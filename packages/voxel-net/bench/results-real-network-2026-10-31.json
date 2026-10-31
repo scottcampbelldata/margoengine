@@ -1,0 +1,2476 @@
+{
+ "surge": {
+  "pc": [
+   {
+    "target": 50,
+    "server": {
+     "inBudget": true,
+     "shards": [
+      {
+       "index": 0,
+       "players": 100,
+       "tickP50": 13.748718000017107,
+       "tickP95": 19.37577699997928,
+       "tickP95Worst": 20.541359999973793,
+       "tickMax": 105.91509800002677,
+       "ticksPerSecond": 20.06494088191744,
+       "ticksPerSecondWorst": 19.93946092534918,
+       "bytesOutPerSecond": 854178,
+       "bytesInPerSecond": 83045,
+       "correctionsPerSecond": 0.20689655172413793,
+       "rssMB": 373.0546875,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 6.83,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 52,
+       "tickP50": 0.5953089999966323,
+       "tickP95": 5.730792000016663,
+       "tickP95Worst": 15.138688999984879,
+       "tickMax": 73.7529649999924,
+       "ticksPerSecond": 19.9962773521269,
+       "ticksPerSecondWorst": 19.974122146544545,
+       "bytesOutPerSecond": 1292126,
+       "bytesInPerSecond": 41542,
+       "correctionsPerSecond": 0.1724137931034483,
+       "rssMB": 239.37109375,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 50,
+     "full": 0,
+     "answerMs": {
+      "n": 50,
+      "median": 40.02,
+      "p95": 62.63,
+      "p99": 206.93,
+      "max": 206.93
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 50,
+      "median": 334.57,
+      "p95": 495.92,
+      "p99": 583.43,
+      "max": 583.43
+     },
+     "fullViewMs": {
+      "n": 50,
+      "median": 1285.9,
+      "p95": 1387.83,
+      "p99": 1444.96,
+      "max": 1444.96
+     }
+    },
+    "players": {
+     "live": 50,
+     "waiting": 0,
+     "rttMs": {
+      "n": 1200,
+      "median": 33.07,
+      "p95": 50.23,
+      "p99": 53.11,
+      "max": 53.61
+     },
+     "editToOthersMs": {
+      "n": 7476,
+      "median": 68.68,
+      "p95": 92.14,
+      "p99": 130.26,
+      "max": 4262.59
+     },
+     "corrections": 0.209,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 1,
+     "processBusyMax": 0.082,
+     "cpuCores": 0.08,
+     "machineCpuMean": 0.311,
+     "machineCpuPeak": 1,
+     "downMbit": 3.57,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.522,
+     "saturated": false
+    }
+   },
+   {
+    "target": 150,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 200,
+       "tickP50": 42.1274759999942,
+       "tickP95": 54.57803400000557,
+       "tickP95Worst": 55.899928000057116,
+       "tickMax": 130.25259199994616,
+       "ticksPerSecond": 20.026539241765263,
+       "ticksPerSecondWorst": 18.52666723655527,
+       "bytesOutPerSecond": 2991206,
+       "bytesInPerSecond": 170756,
+       "correctionsPerSecond": 1,
+       "rssMB": 444.390625,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 100,
+       "tickP50": 14.788366000007954,
+       "tickP95": 22.6206749999983,
+       "tickP95Worst": 23.452866000006907,
+       "tickMax": 69.36222300000372,
+       "ticksPerSecond": 19.978807007059633,
+       "ticksPerSecondWorst": 19.387000830991017,
+       "bytesOutPerSecond": 955285,
+       "bytesInPerSecond": 82705,
+       "correctionsPerSecond": 0.3448275862068966,
+       "rssMB": 387.4765625,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 31.57,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 192,
+       "tickP50": 17.263057999953162,
+       "tickP95": 44.4032480000169,
+       "tickP95Worst": 53.767281999927945,
+       "tickMax": 165.42334099998698,
+       "ticksPerSecond": 19.88059136432844,
+       "ticksPerSecondWorst": 18.29610287125223,
+       "bytesOutPerSecond": 3353992,
+       "bytesInPerSecond": 160000,
+       "correctionsPerSecond": 0.896551724137931,
+       "rssMB": 432.78125,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 1,
+       "players": 38,
+       "tickP50": 2.4028290000023844,
+       "tickP95": 9.578443000000334,
+       "tickP95Worst": 18.215683999995235,
+       "tickMax": 47.65092200000072,
+       "ticksPerSecond": 20.049076087271192,
+       "ticksPerSecondWorst": 19.975701297257896,
+       "bytesOutPerSecond": 2169948,
+       "bytesInPerSecond": 29892,
+       "correctionsPerSecond": 0.10526315789473684,
+       "rssMB": 233.46875,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 100,
+     "full": 0,
+     "answerMs": {
+      "n": 100,
+      "median": 38.37,
+      "p95": 58.56,
+      "p99": 152.4,
+      "max": 152.4
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 100,
+      "median": 355.49,
+      "p95": 553.43,
+      "p99": 1020.76,
+      "max": 1020.76
+     },
+     "fullViewMs": {
+      "n": 100,
+      "median": 1302.72,
+      "p95": 1457.52,
+      "p99": 3018.03,
+      "max": 3018.03
+     }
+    },
+    "players": {
+     "live": 150,
+     "waiting": 0,
+     "rttMs": {
+      "n": 3600,
+      "median": 43.09,
+      "p95": 80.13,
+      "p99": 95.34,
+      "max": 102.26
+     },
+     "editToOthersMs": {
+      "n": 32499,
+      "median": 77.97,
+      "p95": 120.49,
+      "p99": 568.61,
+      "max": 4980.75
+     },
+     "corrections": 0.351,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 3,
+     "processBusyMax": 0.105,
+     "cpuCores": 0.29,
+     "machineCpuMean": 0.3,
+     "machineCpuPeak": 1,
+     "downMbit": 15.62,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.495,
+     "saturated": false
+    }
+   },
+   {
+    "target": 750,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 200,
+       "tickP50": 39.73719200002961,
+       "tickP95": 54.081269999966025,
+       "tickP95Worst": 61.900090000010096,
+       "tickMax": 147.0006150000263,
+       "ticksPerSecond": 19.838752592926202,
+       "ticksPerSecondWorst": 16.637557188825397,
+       "bytesOutPerSecond": 2828261,
+       "bytesInPerSecond": 173843,
+       "correctionsPerSecond": 1.8522727272727273,
+       "rssMB": 498.24609375,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 200,
+       "tickP50": 42.904885999974795,
+       "tickP95": 59.86840699997265,
+       "tickP95Worst": 61.96853200002806,
+       "tickMax": 131.0662720000255,
+       "ticksPerSecond": 19.93499025612937,
+       "ticksPerSecondWorst": 17.01360663190396,
+       "bytesOutPerSecond": 3076426,
+       "bytesInPerSecond": 174521,
+       "correctionsPerSecond": 1.2613636363636365,
+       "rssMB": 472.1640625,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 47.24,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 200,
+       "tickP50": 41.014391000033356,
+       "tickP95": 55.34725899994373,
+       "tickP95Worst": 56.14902200002689,
+       "tickMax": 146.5139569999883,
+       "ticksPerSecond": 20.178515448887687,
+       "ticksPerSecondWorst": 17.376923441035768,
+       "bytesOutPerSecond": 2920619,
+       "bytesInPerSecond": 173170,
+       "correctionsPerSecond": 1.7317073170731707,
+       "rssMB": 450.2578125,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 200,
+       "tickP50": 35.46972700001788,
+       "tickP95": 53.90367500000866,
+       "tickP95Worst": 59.67031399998814,
+       "tickMax": 108.65418700000737,
+       "ticksPerSecond": 19.945683717327523,
+       "ticksPerSecondWorst": 16.724421998564786,
+       "bytesOutPerSecond": 3428047,
+       "bytesInPerSecond": 169240,
+       "correctionsPerSecond": 1.6097560975609757,
+       "rssMB": 447.125,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ]
+    },
+    "join": {
+     "ok": 78,
+     "full": 949,
+     "answerMs": {
+      "n": 78,
+      "median": 47.85,
+      "p95": 169.73,
+      "p99": 183.91,
+      "max": 183.91
+     },
+     "fullAnswerMs": {
+      "n": 949,
+      "median": 38.51,
+      "p95": 49.96,
+      "p99": 61.28,
+      "max": 244.6
+     },
+     "spawnMs": {
+      "n": 78,
+      "median": 427.78,
+      "p95": 625.13,
+      "p99": 666.05,
+      "max": 666.05
+     },
+     "fullViewMs": {
+      "n": 78,
+      "median": 1344.44,
+      "p95": 1473,
+      "p99": 1629.49,
+      "max": 1629.49
+     }
+    },
+    "players": {
+     "live": 349,
+     "waiting": 398,
+     "rttMs": {
+      "n": 11441,
+      "median": 52.7,
+      "p95": 85.62,
+      "p99": 104.66,
+      "max": 142.72
+     },
+     "editToOthersMs": {
+      "n": 120542,
+      "median": 83.64,
+      "p95": 124.17,
+      "p99": 166.84,
+      "max": 4852.02
+     },
+     "corrections": 0.27,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 15,
+     "processBusyMax": 0.098,
+     "cpuCores": 0.65,
+     "machineCpuMean": 0.253,
+     "machineCpuPeak": 1,
+     "downMbit": 29.74,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.63,
+     "saturated": false
+    }
+   }
+  ]
+ },
+ "crowd3": {
+  "pc": [
+   {
+    "target": 13,
+    "server": {
+     "inBudget": true,
+     "shards": [
+      {
+       "index": 0,
+       "players": 25,
+       "tickP50": 2.0453419999976177,
+       "tickP95": 3.626779999991413,
+       "tickP95Worst": 4.219395000007353,
+       "tickMax": 38.75628000003053,
+       "ticksPerSecond": 19.996010717850655,
+       "ticksPerSecondWorst": 19.96835548810235,
+       "bytesOutPerSecond": 46819,
+       "bytesInPerSecond": 20904,
+       "correctionsPerSecond": 0.008547008547008548,
+       "rssMB": 279.73046875,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 1,
+       "players": 0,
+       "tickP50": 0.014265999983763322,
+       "tickP95": 0.033041999995475635,
+       "tickP95Worst": 0.037830000001122244,
+       "tickMax": 1.0290380000005825,
+       "ticksPerSecond": 20.004108299674822,
+       "ticksPerSecondWorst": 19.913340487639278,
+       "bytesOutPerSecond": 0,
+       "bytesInPerSecond": 0,
+       "correctionsPerSecond": 0,
+       "rssMB": 97.95703125,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 0.37,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 18,
+       "tickP50": 1.5026800000005096,
+       "tickP95": 5.655762000000323,
+       "tickP95Worst": 6.438161000000036,
+       "tickMax": 27.04243899999983,
+       "ticksPerSecond": 19.998091375471965,
+       "ticksPerSecondWorst": 19.98986002356387,
+       "bytesOutPerSecond": 1683636,
+       "bytesInPerSecond": 12946,
+       "correctionsPerSecond": 0,
+       "rssMB": 211.45703125,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 1,
+       "players": 0,
+       "tickP50": 0.0159000000001015,
+       "tickP95": 0.07232500000009168,
+       "tickP95Worst": 0.08355600000004415,
+       "tickMax": 0.4360619999999926,
+       "ticksPerSecond": 19.996504220881025,
+       "ticksPerSecondWorst": 19.98841191807461,
+       "bytesOutPerSecond": 0,
+       "bytesInPerSecond": 0,
+       "correctionsPerSecond": 0,
+       "rssMB": 104.27734375,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 13,
+     "full": 0,
+     "answerMs": {
+      "n": 13,
+      "median": 43.58,
+      "p95": 106.56,
+      "p99": 106.56,
+      "max": 106.56
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 13,
+      "median": 285.02,
+      "p95": 738.21,
+      "p99": 738.21,
+      "max": 738.21
+     },
+     "fullViewMs": {
+      "n": 13,
+      "median": 1299.97,
+      "p95": 2879.73,
+      "p99": 2879.73,
+      "max": 2879.73
+     }
+    },
+    "players": {
+     "live": 13,
+     "waiting": 0,
+     "rttMs": {
+      "n": 780,
+      "median": 31.37,
+      "p95": 37.41,
+      "p99": 41.54,
+      "max": 57.56
+     },
+     "editToOthersMs": {
+      "n": 778,
+      "median": 53.31,
+      "p95": 81.73,
+      "p99": 85.62,
+      "max": 103.6
+     },
+     "corrections": 0.092,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 1,
+     "processBusyMax": 0.02,
+     "cpuCores": 0.02,
+     "machineCpuMean": 0.112,
+     "machineCpuPeak": 1,
+     "downMbit": 0.26,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.701,
+     "saturated": false
+    }
+   },
+   {
+    "target": 25,
+    "server": {
+     "inBudget": true,
+     "shards": [
+      {
+       "index": 0,
+       "players": 49,
+       "tickP50": 4.573634999978822,
+       "tickP95": 6.9107829999993555,
+       "tickP95Worst": 8.050748000037856,
+       "tickMax": 49.874885000055656,
+       "ticksPerSecond": 19.997230043218458,
+       "ticksPerSecondWorst": 19.953653608854726,
+       "bytesOutPerSecond": 175136,
+       "bytesInPerSecond": 41405,
+       "correctionsPerSecond": 0.13675213675213677,
+       "rssMB": 351.66796875,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 1,
+       "players": 0,
+       "tickP50": 0.013374999980442226,
+       "tickP95": 0.02060899999924004,
+       "tickP95Worst": 0.027421000064350665,
+       "tickMax": 0.9958559999940917,
+       "ticksPerSecond": 20.00045022885734,
+       "ticksPerSecondWorst": 18.988754441866803,
+       "bytesOutPerSecond": 0,
+       "bytesInPerSecond": 0,
+       "correctionsPerSecond": 0,
+       "rssMB": 97.9453125,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 1.4,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 42,
+       "tickP50": 1.9711039999965578,
+       "tickP95": 4.045412999985274,
+       "tickP95Worst": 4.523792999971192,
+       "tickMax": 38.75628000003053,
+       "ticksPerSecond": 19.991845521184175,
+       "ticksPerSecondWorst": 19.981807962576852,
+       "bytesOutPerSecond": 1904660,
+       "bytesInPerSecond": 33500,
+       "correctionsPerSecond": 0,
+       "rssMB": 342.4296875,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 1,
+       "players": 0,
+       "tickP50": 0.01369600000907667,
+       "tickP95": 0.02305199997499585,
+       "tickP95Worst": 0.023092999996151775,
+       "tickMax": 0.36719399999128655,
+       "ticksPerSecond": 19.996356899918922,
+       "ticksPerSecondWorst": 19.991291933173496,
+       "bytesOutPerSecond": 0,
+       "bytesInPerSecond": 0,
+       "correctionsPerSecond": 0,
+       "rssMB": 97.9453125,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 12,
+     "full": 0,
+     "answerMs": {
+      "n": 12,
+      "median": 52.24,
+      "p95": 174.98,
+      "p99": 174.98,
+      "max": 174.98
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 12,
+      "median": 312.33,
+      "p95": 482.05,
+      "p99": 482.05,
+      "max": 482.05
+     },
+     "fullViewMs": {
+      "n": 12,
+      "median": 1286.61,
+      "p95": 1561.92,
+      "p99": 1561.92,
+      "max": 1561.92
+     }
+    },
+    "players": {
+     "live": 25,
+     "waiting": 0,
+     "rttMs": {
+      "n": 1500,
+      "median": 31.18,
+      "p95": 34.16,
+      "p99": 40.06,
+      "max": 94.76
+     },
+     "editToOthersMs": {
+      "n": 3726,
+      "median": 68.64,
+      "p95": 83.34,
+      "p99": 90,
+      "max": 4006.16
+     },
+     "corrections": 0.208,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 2,
+     "processBusyMax": 0.02,
+     "cpuCores": 0.04,
+     "machineCpuMean": 0.085,
+     "machineCpuPeak": 1,
+     "downMbit": 0.77,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.552,
+     "saturated": false
+    }
+   },
+   {
+    "target": 50,
+    "server": {
+     "inBudget": true,
+     "shards": [
+      {
+       "index": 0,
+       "players": 99,
+       "tickP50": 12.705194000038318,
+       "tickP95": 18.356780000030994,
+       "tickP95Worst": 19.476238000090234,
+       "tickMax": 125.26347400003579,
+       "ticksPerSecond": 20.016015785267335,
+       "ticksPerSecondWorst": 19.977760517256808,
+       "bytesOutPerSecond": 673408,
+       "bytesInPerSecond": 84275,
+       "correctionsPerSecond": 0.4700854700854701,
+       "rssMB": 359.234375,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 1,
+       "players": 0,
+       "tickP50": 0.0070130000822246075,
+       "tickP95": 0.010430000023916364,
+       "tickP95Worst": 0.013023999985307455,
+       "tickMax": 1.0746120000258088,
+       "ticksPerSecond": 19.996964398450437,
+       "ticksPerSecondWorst": 19.958157602836096,
+       "bytesOutPerSecond": 0,
+       "bytesInPerSecond": 0,
+       "correctionsPerSecond": 0,
+       "rssMB": 97.9453125,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 5.39,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 80,
+       "tickP50": 4.836485999985598,
+       "tickP95": 9.746490000048652,
+       "tickP95Worst": 12.896109999972396,
+       "tickMax": 35.8195340000093,
+       "ticksPerSecond": 19.994819677320734,
+       "ticksPerSecondWorst": 19.984509527038966,
+       "bytesOutPerSecond": 2304219,
+       "bytesInPerSecond": 65700,
+       "correctionsPerSecond": 0.625,
+       "rssMB": 357.01953125,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 1,
+       "players": 0,
+       "tickP50": 0.0070229999255388975,
+       "tickP95": 0.010430000023916364,
+       "tickP95Worst": 0.011601999984122813,
+       "tickMax": 0.9958559999940917,
+       "ticksPerSecond": 20.001330165489463,
+       "ticksPerSecondWorst": 19.98248349484535,
+       "bytesOutPerSecond": 0,
+       "bytesInPerSecond": 0,
+       "correctionsPerSecond": 0,
+       "rssMB": 97.9453125,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 25,
+     "full": 0,
+     "answerMs": {
+      "n": 25,
+      "median": 37.36,
+      "p95": 58.72,
+      "p99": 102.08,
+      "max": 102.08
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 25,
+      "median": 336.1,
+      "p95": 363.04,
+      "p99": 364.75,
+      "max": 364.75
+     },
+     "fullViewMs": {
+      "n": 25,
+      "median": 1282.52,
+      "p95": 1363.23,
+      "p99": 1391.13,
+      "max": 1391.13
+     }
+    },
+    "players": {
+     "live": 50,
+     "waiting": 0,
+     "rttMs": {
+      "n": 3012,
+      "median": 30.94,
+      "p95": 39.29,
+      "p99": 48.08,
+      "max": 62.39
+     },
+     "editToOthersMs": {
+      "n": 16395,
+      "median": 66.8,
+      "p95": 89.37,
+      "p99": 3490.33,
+      "max": 4180.05
+     },
+     "corrections": 0.243,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 3,
+     "processBusyMax": 0.032,
+     "cpuCores": 0.07,
+     "machineCpuMean": 0.074,
+     "machineCpuPeak": 1,
+     "downMbit": 2.8,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.519,
+     "saturated": false
+    }
+   },
+   {
+    "target": 100,
+    "server": {
+     "inBudget": true,
+     "shards": [
+      {
+       "index": 0,
+       "players": 192,
+       "tickP50": 36.60300399991684,
+       "tickP95": 48.53303800011054,
+       "tickP95Worst": 52.862265000119805,
+       "tickMax": 180.1362369999988,
+       "ticksPerSecond": 19.89506587343087,
+       "ticksPerSecondWorst": 16.780465582053107,
+       "bytesOutPerSecond": 2451616,
+       "bytesInPerSecond": 165719,
+       "correctionsPerSecond": 1.564102564102564,
+       "rssMB": 438.58984375,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 1,
+       "players": 7,
+       "tickP50": 0.5774469999596477,
+       "tickP95": 1.1691389998886734,
+       "tickP95Worst": 1.3328750000800937,
+       "tickMax": 42.18394899996929,
+       "ticksPerSecond": 20.004418475962158,
+       "ticksPerSecondWorst": 19.919983160681507,
+       "bytesOutPerSecond": 4927,
+       "bytesInPerSecond": 5830,
+       "correctionsPerSecond": 0,
+       "rssMB": 190.203125,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 19.65,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 151,
+       "tickP50": 13.77180300001055,
+       "tickP95": 27.402844000025652,
+       "tickP95Worst": 42.817700999905355,
+       "tickMax": 139.0452150000492,
+       "ticksPerSecond": 20.331114036450707,
+       "ticksPerSecondWorst": 19.77516972776132,
+       "bytesOutPerSecond": 3227106,
+       "bytesInPerSecond": 126252,
+       "correctionsPerSecond": 0.6470588235294118,
+       "rssMB": 363.4375,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 1,
+       "players": 0,
+       "tickP50": 0.007042999961413443,
+       "tickP95": 0.01409599999897182,
+       "tickP95Worst": 1.38961999991443,
+       "tickMax": 47.19441999995615,
+       "ticksPerSecond": 19.995861420014354,
+       "ticksPerSecondWorst": 19.970985632825975,
+       "bytesOutPerSecond": 0,
+       "bytesInPerSecond": 0,
+       "correctionsPerSecond": 0,
+       "rssMB": 97.9453125,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 50,
+     "full": 0,
+     "answerMs": {
+      "n": 50,
+      "median": 36.47,
+      "p95": 55.21,
+      "p99": 150.79,
+      "max": 150.79
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 50,
+      "median": 366.19,
+      "p95": 483.89,
+      "p99": 843.43,
+      "max": 843.43
+     },
+     "fullViewMs": {
+      "n": 50,
+      "median": 1314.45,
+      "p95": 1464.39,
+      "p99": 2992.28,
+      "max": 2992.28
+     }
+    },
+    "players": {
+     "live": 100,
+     "waiting": 0,
+     "rttMs": {
+      "n": 6000,
+      "median": 48.05,
+      "p95": 70.88,
+      "p99": 101.88,
+      "max": 126.92
+     },
+     "editToOthersMs": {
+      "n": 54631,
+      "median": 77.07,
+      "p95": 118.39,
+      "p99": 2998.54,
+      "max": 4998.33
+     },
+     "corrections": 0.422,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 4,
+     "processBusyMax": 0.067,
+     "cpuCores": 0.16,
+     "machineCpuMean": 0.095,
+     "machineCpuPeak": 1,
+     "downMbit": 10.12,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.515,
+     "saturated": false
+    }
+   },
+   {
+    "target": 150,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 199,
+       "tickP50": 38.78871300001629,
+       "tickP95": 51.393706999951974,
+       "tickP95Worst": 56.430888999952,
+       "tickMax": 158.12191500002518,
+       "ticksPerSecond": 19.978648880810923,
+       "ticksPerSecondWorst": 16.809210202915537,
+       "bytesOutPerSecond": 2461731,
+       "bytesInPerSecond": 173864,
+       "correctionsPerSecond": 1.8034188034188035,
+       "rssMB": 519.8984375,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 98,
+       "tickP50": 14.966729999985546,
+       "tickP95": 24.060307000065222,
+       "tickP95Worst": 26.25283099990338,
+       "tickMax": 103.51951100002043,
+       "ticksPerSecond": 19.99472499402273,
+       "ticksPerSecondWorst": 19.59743926022781,
+       "bytesOutPerSecond": 772747,
+       "bytesInPerSecond": 83363,
+       "correctionsPerSecond": 0.39316239316239315,
+       "rssMB": 367.8359375,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 25.88,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 200,
+       "tickP50": 36.509320999961346,
+       "tickP95": 53.02913700020872,
+       "tickP95Worst": 54.22503999993205,
+       "tickMax": 159.46615999983624,
+       "ticksPerSecond": 20.070092407568673,
+       "ticksPerSecondWorst": 17.73013467322612,
+       "bytesOutPerSecond": 2558506,
+       "bytesInPerSecond": 173560,
+       "correctionsPerSecond": 1.5294117647058822,
+       "rssMB": 519.83984375,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 52,
+       "tickP50": 0.6680639998521656,
+       "tickP95": 6.44300500000827,
+       "tickP95Worst": 18.08308000001125,
+       "tickMax": 54.001410000026226,
+       "ticksPerSecond": 19.998709956308097,
+       "ticksPerSecondWorst": 19.986588739131278,
+       "bytesOutPerSecond": 1820176,
+       "bytesInPerSecond": 41976,
+       "correctionsPerSecond": 0.47058823529411764,
+       "rssMB": 237.01171875,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 50,
+     "full": 0,
+     "answerMs": {
+      "n": 50,
+      "median": 40.23,
+      "p95": 53,
+      "p99": 150.26,
+      "max": 150.26
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 49,
+      "median": 320.56,
+      "p95": 472.43,
+      "p99": 564.69,
+      "max": 564.69
+     },
+     "fullViewMs": {
+      "n": 49,
+      "median": 1284.95,
+      "p95": 1384.16,
+      "p99": 1422.55,
+      "max": 1422.55
+     }
+    },
+    "players": {
+     "live": 149,
+     "waiting": 0,
+     "rttMs": {
+      "n": 9027,
+      "median": 39.6,
+      "p95": 75.01,
+      "p99": 90.29,
+      "max": 135.28
+     },
+     "editToOthersMs": {
+      "n": 67645,
+      "median": 72.79,
+      "p95": 110.63,
+      "p99": 245.89,
+      "max": 4978.46
+     },
+     "corrections": 0.437,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 5,
+     "processBusyMax": 0.069,
+     "cpuCores": 0.23,
+     "machineCpuMean": 0.099,
+     "machineCpuPeak": 1,
+     "downMbit": 13.09,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.506,
+     "saturated": false
+    }
+   },
+   {
+    "target": 200,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 200,
+       "tickP50": 38.404135999968275,
+       "tickP95": 53.0206449998077,
+       "tickP95Worst": 56.35780800017528,
+       "tickMax": 151.68412499991246,
+       "ticksPerSecond": 20.032635497778237,
+       "ticksPerSecondWorst": 16.961098245560358,
+       "bytesOutPerSecond": 2405001,
+       "bytesInPerSecond": 175439,
+       "correctionsPerSecond": 2.0085470085470085,
+       "rssMB": 521.5234375,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 193,
+       "tickP50": 40.67731299996376,
+       "tickP95": 56.154458000091836,
+       "tickP95Worst": 62.09545399993658,
+       "tickMax": 191.15028099995106,
+       "ticksPerSecond": 19.913371424255143,
+       "ticksPerSecondWorst": 16.317132429755578,
+       "bytesOutPerSecond": 2883925,
+       "bytesInPerSecond": 167182,
+       "correctionsPerSecond": 1.4273504273504274,
+       "rssMB": 464.046875,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 2,
+       "players": 4,
+       "tickP50": 0.4544069999974454,
+       "tickP95": 1.4439720000082161,
+       "tickP95Worst": 1.7148379999998724,
+       "tickMax": 29.742027000000235,
+       "ticksPerSecond": 20.003856789180116,
+       "ticksPerSecondWorst": 19.879574428487363,
+       "bytesOutPerSecond": 1429,
+       "bytesInPerSecond": 3335,
+       "correctionsPerSecond": 0.008547008547008548,
+       "rssMB": 198.2578125,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 42.32,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 200,
+       "tickP50": 39.946178999962285,
+       "tickP95": 54.9081610001158,
+       "tickP95Worst": 56.49053100007586,
+       "tickMax": 158.12191500002518,
+       "ticksPerSecond": 19.573057252019925,
+       "ticksPerSecondWorst": 17.81125752378189,
+       "bytesOutPerSecond": 2390700,
+       "bytesInPerSecond": 177099,
+       "correctionsPerSecond": 1.588235294117647,
+       "rssMB": 521.12890625,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 156,
+       "tickP50": 16.803946000058204,
+       "tickP95": 32.82226699986495,
+       "tickP95Worst": 46.682566000148654,
+       "tickMax": 186.1960609999951,
+       "ticksPerSecond": 19.881383955666276,
+       "ticksPerSecondWorst": 17.715944599343118,
+       "bytesOutPerSecond": 3536494,
+       "bytesInPerSecond": 129473,
+       "correctionsPerSecond": 0.35294117647058826,
+       "rssMB": 417.0546875,
+       "crashes": 0,
+       "inBudget": true
+      },
+      {
+       "index": 2,
+       "players": 0,
+       "tickP50": 0.014537000000018452,
+       "tickP95": 0.08652099999972052,
+       "tickP95Worst": 3.232586000000083,
+       "tickMax": 26.673616000000038,
+       "ticksPerSecond": 19.866015028404867,
+       "ticksPerSecondWorst": 16.66819728341149,
+       "bytesOutPerSecond": 0,
+       "bytesInPerSecond": 0,
+       "correctionsPerSecond": 0,
+       "rssMB": 104.90625,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 50,
+     "full": 0,
+     "answerMs": {
+      "n": 50,
+      "median": 41.4,
+      "p95": 57,
+      "p99": 112.07,
+      "max": 112.07
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 50,
+      "median": 402.36,
+      "p95": 784.29,
+      "p99": 1177.24,
+      "max": 1177.24
+     },
+     "fullViewMs": {
+      "n": 50,
+      "median": 1337.03,
+      "p95": 1540.7,
+      "p99": 3632.2,
+      "max": 3632.2
+     }
+    },
+    "players": {
+     "live": 199,
+     "waiting": 0,
+     "rttMs": {
+      "n": 11989,
+      "median": 52.54,
+      "p95": 83.45,
+      "p99": 108.39,
+      "max": 175.17
+     },
+     "editToOthersMs": {
+      "n": 117816,
+      "median": 79.82,
+      "p95": 126.48,
+      "p99": 2613.27,
+      "max": 4998.87
+     },
+     "corrections": 0.411,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 6,
+     "processBusyMax": 0.09,
+     "cpuCores": 0.37,
+     "machineCpuMean": 0.212,
+     "machineCpuPeak": 1,
+     "downMbit": 21.05,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.497,
+     "saturated": false
+    }
+   },
+   {
+    "target": 250,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 200,
+       "tickP50": 39.63114199996926,
+       "tickP95": 56.212315999902785,
+       "tickP95Worst": 60.27813500002958,
+       "tickMax": 164.0677559999749,
+       "ticksPerSecond": 19.873947475997202,
+       "ticksPerSecondWorst": 15.963018651221846,
+       "bytesOutPerSecond": 2270072,
+       "bytesInPerSecond": 177081,
+       "correctionsPerSecond": 1.9316239316239316,
+       "rssMB": 634.28515625,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 200,
+       "tickP50": 44.23266199999489,
+       "tickP95": 63.20506200008094,
+       "tickP95Worst": 67.31441199989058,
+       "tickMax": 253.26434199977666,
+       "ticksPerSecond": 19.506081461791624,
+       "ticksPerSecondWorst": 14.573132984271853,
+       "bytesOutPerSecond": 2925945,
+       "bytesInPerSecond": 178993,
+       "correctionsPerSecond": 1.5555555555555556,
+       "rssMB": 476.40625,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 2,
+       "players": 97,
+       "tickP50": 18.378893000015523,
+       "tickP95": 29.870741999940947,
+       "tickP95Worst": 32.443854000011925,
+       "tickMax": 113.40336299996125,
+       "ticksPerSecond": 20.0065918324459,
+       "ticksPerSecondWorst": 18.741502784196545,
+       "bytesOutPerSecond": 724596,
+       "bytesInPerSecond": 83081,
+       "correctionsPerSecond": 0.39316239316239315,
+       "rssMB": 342.96484375,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 47.36,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 200,
+       "tickP50": 38.53202300006524,
+       "tickP95": 52.555107000051066,
+       "tickP95Worst": 53.007690999889746,
+       "tickMax": 138.20031200000085,
+       "ticksPerSecond": 20.053873752580557,
+       "ticksPerSecondWorst": 18.85288570587437,
+       "bytesOutPerSecond": 2373672,
+       "bytesInPerSecond": 178763,
+       "correctionsPerSecond": 1.75,
+       "rssMB": 557.97265625,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 200,
+       "tickP50": 43.30841899989173,
+       "tickP95": 59.73712599999271,
+       "tickP95Worst": 63.728417000034824,
+       "tickMax": 172.427480999846,
+       "ticksPerSecond": 18.69089115487284,
+       "ticksPerSecondWorst": 16.364970162962543,
+       "bytesOutPerSecond": 2990894,
+       "bytesInPerSecond": 175784,
+       "correctionsPerSecond": 1.5625,
+       "rssMB": 464.44921875,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 2,
+       "players": 62,
+       "tickP50": 0.7773889999953099,
+       "tickP95": 12.582638000021689,
+       "tickP95Worst": 25.127825000032317,
+       "tickMax": 70.65438800002448,
+       "ticksPerSecond": 19.989425593020517,
+       "ticksPerSecondWorst": 19.951298978948646,
+       "bytesOutPerSecond": 1994404,
+       "bytesInPerSecond": 48616,
+       "correctionsPerSecond": 0.0625,
+       "rssMB": 229.9765625,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 50,
+     "full": 0,
+     "answerMs": {
+      "n": 50,
+      "median": 41.88,
+      "p95": 61.08,
+      "p99": 155.87,
+      "max": 155.87
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 50,
+      "median": 355.94,
+      "p95": 467.23,
+      "p99": 739.23,
+      "max": 739.23
+     },
+     "fullViewMs": {
+      "n": 50,
+      "median": 1304.54,
+      "p95": 1457.61,
+      "p99": 1579.73,
+      "max": 1579.73
+     }
+    },
+    "players": {
+     "live": 249,
+     "waiting": 0,
+     "rttMs": {
+      "n": 15040,
+      "median": 53.7,
+      "p95": 97.08,
+      "p99": 153.11,
+      "max": 977.37
+     },
+     "editToOthersMs": {
+      "n": 129880,
+      "median": 82.63,
+      "p95": 142.53,
+      "p99": 2997.85,
+      "max": 4998.66
+     },
+     "corrections": 0.957,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 7,
+     "processBusyMax": 0.092,
+     "cpuCores": 0.45,
+     "machineCpuMean": 0.216,
+     "machineCpuPeak": 1,
+     "downMbit": 23.42,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.494,
+     "saturated": false
+    }
+   },
+   {
+    "target": 350,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 189,
+       "tickP50": 37.90355599997565,
+       "tickP95": 59.477818000130355,
+       "tickP95Worst": 63.70274500036612,
+       "tickMax": 160.81911499984562,
+       "ticksPerSecond": 20.03618985001811,
+       "ticksPerSecondWorst": 16.602289385199917,
+       "bytesOutPerSecond": 1923559,
+       "bytesInPerSecond": 167100,
+       "correctionsPerSecond": 1.376068376068376,
+       "rssMB": 771.3046875,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 192,
+       "tickP50": 40.12798300012946,
+       "tickP95": 61.78691399982199,
+       "tickP95Worst": 68.68459299998358,
+       "tickMax": 193.69084100006148,
+       "ticksPerSecond": 19.83592493087275,
+       "ticksPerSecondWorst": 15.153306039818748,
+       "bytesOutPerSecond": 2602728,
+       "bytesInPerSecond": 171211,
+       "correctionsPerSecond": 1.0512820512820513,
+       "rssMB": 618.36328125,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 2,
+       "players": 198,
+       "tickP50": 40.05613899999298,
+       "tickP95": 62.05458300001919,
+       "tickP95Worst": 64.62087700003758,
+       "tickMax": 192.55537300009746,
+       "ticksPerSecond": 19.819244388151315,
+       "ticksPerSecondWorst": 16.00333579932718,
+       "bytesOutPerSecond": 2566985,
+       "bytesInPerSecond": 170937,
+       "correctionsPerSecond": 0.9572649572649573,
+       "rssMB": 491.890625,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 56.75,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 200,
+       "tickP50": 39.47801099997014,
+       "tickP95": 61.91277300007641,
+       "tickP95Worst": 68.36391599988565,
+       "tickMax": 176.75433499971405,
+       "ticksPerSecond": 19.569873724443262,
+       "ticksPerSecondWorst": 15.76317211252002,
+       "bytesOutPerSecond": 2192750,
+       "bytesInPerSecond": 179793,
+       "correctionsPerSecond": 2.5,
+       "rssMB": 771.26953125,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 1,
+       "players": 200,
+       "tickP50": 42.97619300009683,
+       "tickP95": 66.83895500004292,
+       "tickP95Worst": 74.24708600016311,
+       "tickMax": 206.90578899998218,
+       "ticksPerSecond": 18.26895728386271,
+       "ticksPerSecondWorst": 12.117244579449398,
+       "bytesOutPerSecond": 2781453,
+       "bytesInPerSecond": 180349,
+       "correctionsPerSecond": 1.96875,
+       "rssMB": 542.43359375,
+       "crashes": 0,
+       "inBudget": false
+      },
+      {
+       "index": 2,
+       "players": 150,
+       "tickP50": 21.82981300004758,
+       "tickP95": 43.24320200004149,
+       "tickP95Worst": 55.512295999913476,
+       "tickMax": 139.42337600002065,
+       "ticksPerSecond": 19.924773222519413,
+       "ticksPerSecondWorst": 17.866686716529216,
+       "bytesOutPerSecond": 2522845,
+       "bytesInPerSecond": 128398,
+       "correctionsPerSecond": 0.78125,
+       "rssMB": 441.85546875,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 98,
+     "full": 2,
+     "answerMs": {
+      "n": 98,
+      "median": 49.29,
+      "p95": 73.05,
+      "p99": 212.43,
+      "max": 212.43
+     },
+     "fullAnswerMs": {
+      "n": 2,
+      "median": 87.96,
+      "p95": 87.96,
+      "p99": 87.96,
+      "max": 87.96
+     },
+     "spawnMs": {
+      "n": 98,
+      "median": 460.02,
+      "p95": 798.93,
+      "p99": 990.88,
+      "max": 990.88
+     },
+     "fullViewMs": {
+      "n": 98,
+      "median": 1380.72,
+      "p95": 1523.2,
+      "p99": 1620.19,
+      "max": 1620.19
+     }
+    },
+    "players": {
+     "live": 330,
+     "waiting": 0,
+     "rttMs": {
+      "n": 20600,
+      "median": 57.08,
+      "p95": 97.13,
+      "p99": 172.02,
+      "max": 405.2
+     },
+     "editToOthersMs": {
+      "n": 257172,
+      "median": 86.48,
+      "p95": 143.86,
+      "p99": 2246.77,
+      "max": 4999.73
+     },
+     "corrections": 0.409,
+     "closes": {
+      "1006 socket ended": 19
+     }
+    },
+    "bots": {
+     "processes": 9,
+     "processBusyMax": 0.096,
+     "cpuCores": 0.67,
+     "machineCpuMean": 0.257,
+     "machineCpuPeak": 1,
+     "downMbit": 31.53,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.556,
+     "saturated": false
+    }
+   }
+  ]
+ },
+ "c1": {
+  "pc": [
+   {
+    "target": 75,
+    "server": {
+     "inBudget": true,
+     "shards": [
+      {
+       "index": 0,
+       "players": 172,
+       "tickP50": 30.516749000002164,
+       "tickP95": 41.595343000022694,
+       "tickP95Worst": 43.78157700000156,
+       "tickMax": 180.91598499999964,
+       "ticksPerSecond": 20.036898811827324,
+       "ticksPerSecondWorst": 18.823960486288033,
+       "bytesOutPerSecond": 1903047,
+       "bytesInPerSecond": 146742,
+       "correctionsPerSecond": 1.0256410256410255,
+       "rssMB": 490.96484375,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 15.22,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 99,
+       "tickP50": 6.216467999998713,
+       "tickP95": 16.57367499999964,
+       "tickP95Worst": 32.64950200000021,
+       "tickMax": 147.02664200000072,
+       "ticksPerSecond": 20.003423732739446,
+       "ticksPerSecondWorst": 19.510177255696288,
+       "bytesOutPerSecond": 3036348,
+       "bytesInPerSecond": 79877,
+       "correctionsPerSecond": 0.5,
+       "rssMB": 334.00390625,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 75,
+     "full": 0,
+     "answerMs": {
+      "n": 75,
+      "median": 39.72,
+      "p95": 51.44,
+      "p99": 154.89,
+      "max": 154.89
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 75,
+      "median": 351.22,
+      "p95": 458.57,
+      "p99": 691.83,
+      "max": 691.83
+     },
+     "fullViewMs": {
+      "n": 75,
+      "median": 1293.68,
+      "p95": 1366.05,
+      "p99": 1647.83,
+      "max": 1647.83
+     }
+    },
+    "players": {
+     "live": 75,
+     "waiting": 0,
+     "rttMs": {
+      "n": 4500,
+      "median": 34.24,
+      "p95": 68.43,
+      "p99": 75.56,
+      "max": 189.65
+     },
+     "editToOthersMs": {
+      "n": 36605,
+      "median": 71.66,
+      "p95": 109.51,
+      "p99": 163.65,
+      "max": 4770.59
+     },
+     "corrections": 0.34,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 2,
+     "processBusyMax": 0.063,
+     "cpuCores": 0.12,
+     "machineCpuMean": 0.139,
+     "machineCpuPeak": 1,
+     "downMbit": 7.28,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.478,
+     "saturated": false
+    }
+   },
+   {
+    "target": 95,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 211,
+       "tickP50": 44.52259000000777,
+       "tickP95": 60.30327999999281,
+       "tickP95Worst": 69.49340199999278,
+       "tickMax": 182.30335699999705,
+       "ticksPerSecond": 19.889829948601413,
+       "ticksPerSecondWorst": 13.317766133083163,
+       "bytesOutPerSecond": 2797549,
+       "bytesInPerSecond": 184927,
+       "correctionsPerSecond": 1.264957264957265,
+       "rssMB": 584.375,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 22.38,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 196,
+       "tickP50": 31.234018000017386,
+       "tickP95": 43.06375199998729,
+       "tickP95Worst": 45.002344999986235,
+       "tickMax": 109.7711099999724,
+       "ticksPerSecond": 19.79730939235956,
+       "ticksPerSecondWorst": 19.13270766509355,
+       "bytesOutPerSecond": 4277970,
+       "bytesInPerSecond": 161895,
+       "correctionsPerSecond": 1.2857142857142858,
+       "rssMB": 494.66015625,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 20,
+     "full": 0,
+     "answerMs": {
+      "n": 20,
+      "median": 40.86,
+      "p95": 157.81,
+      "p99": 157.81,
+      "max": 157.81
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 20,
+      "median": 375.44,
+      "p95": 525.97,
+      "p99": 525.97,
+      "max": 525.97
+     },
+     "fullViewMs": {
+      "n": 20,
+      "median": 1328.78,
+      "p95": 1428.97,
+      "p99": 1428.97,
+      "max": 1428.97
+     }
+    },
+    "players": {
+     "live": 95,
+     "waiting": 0,
+     "rttMs": {
+      "n": 5737,
+      "median": 59.29,
+      "p95": 85.53,
+      "p99": 146.96,
+      "max": 302.18
+     },
+     "editToOthersMs": {
+      "n": 51110,
+      "median": 84.03,
+      "p95": 140.5,
+      "p99": 263.63,
+      "max": 4973.75
+     },
+     "corrections": 0.43,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 3,
+     "processBusyMax": 0.068,
+     "cpuCores": 0.17,
+     "machineCpuMean": 0.142,
+     "machineCpuPeak": 0.977,
+     "downMbit": 10.11,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.452,
+     "saturated": false
+    }
+   },
+   {
+    "target": 115,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 246,
+       "tickP50": 60.371481999987736,
+       "tickP95": 79.10157000005711,
+       "tickP95Worst": 85.94838499999605,
+       "tickMax": 242.81095700000878,
+       "ticksPerSecond": 14.934389338919859,
+       "ticksPerSecondWorst": 10.718025114931642,
+       "bytesOutPerSecond": 3168752,
+       "bytesInPerSecond": 220113,
+       "correctionsPerSecond": 1.8888888888888888,
+       "rssMB": 590.1171875,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 25.35,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 237,
+       "tickP50": 42.62700599990785,
+       "tickP95": 60.84177499997895,
+       "tickP95Worst": 64.96874800010119,
+       "tickMax": 143.98727699997835,
+       "ticksPerSecond": 15.606153670061468,
+       "ticksPerSecondWorst": 12.35288274901217,
+       "bytesOutPerSecond": 4338246,
+       "bytesInPerSecond": 208259,
+       "correctionsPerSecond": 1.5714285714285714,
+       "rssMB": 588.86328125,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ]
+    },
+    "join": {
+     "ok": 20,
+     "full": 0,
+     "answerMs": {
+      "n": 20,
+      "median": 36.81,
+      "p95": 145.52,
+      "p99": 145.52,
+      "max": 145.52
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 20,
+      "median": 723.64,
+      "p95": 1008.52,
+      "p99": 1008.52,
+      "max": 1008.52
+     },
+     "fullViewMs": {
+      "n": 20,
+      "median": 1768.59,
+      "p95": 1982.51,
+      "p99": 1982.51,
+      "max": 1982.51
+     }
+    },
+    "players": {
+     "live": 113,
+     "waiting": 0,
+     "rttMs": {
+      "n": 6892,
+      "median": 63.52,
+      "p95": 102.1,
+      "p99": 119.81,
+      "max": 226.81
+     },
+     "editToOthersMs": {
+      "n": 75758,
+      "median": 101.39,
+      "p95": 158.9,
+      "p99": 282.53,
+      "max": 4970.78
+     },
+     "corrections": 0.432,
+     "closes": {
+      "1006 socket ended": 2
+     }
+    },
+    "bots": {
+     "processes": 4,
+     "processBusyMax": 0.06,
+     "cpuCores": 0.19,
+     "machineCpuMean": 0.129,
+     "machineCpuPeak": 0.962,
+     "downMbit": 11.89,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.469,
+     "saturated": false
+    }
+   },
+   {
+    "target": 125,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 263,
+       "tickP50": 65.92772899987176,
+       "tickP95": 88.19347199983895,
+       "tickP95Worst": 94.62874199997168,
+       "tickMax": 206.52511700009927,
+       "ticksPerSecond": 13.873504586463,
+       "ticksPerSecondWorst": 10.981755166377239,
+       "bytesOutPerSecond": 3197302,
+       "bytesInPerSecond": 235898,
+       "correctionsPerSecond": 2.299145299145299,
+       "rssMB": 796.1796875,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 25.58,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 265,
+       "tickP50": 56.239938999991864,
+       "tickP95": 75.18802400003187,
+       "tickP95Worst": 76.78775599994697,
+       "tickMax": 184.64960499992594,
+       "ticksPerSecond": 13.61929912034079,
+       "ticksPerSecondWorst": 12.695332993540639,
+       "bytesOutPerSecond": 5114549,
+       "bytesInPerSecond": 233690,
+       "correctionsPerSecond": 2,
+       "rssMB": 622.08203125,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ]
+    },
+    "join": {
+     "ok": 10,
+     "full": 0,
+     "answerMs": {
+      "n": 10,
+      "median": 50.12,
+      "p95": 113.25,
+      "p99": 113.25,
+      "max": 113.25
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 10,
+      "median": 718.15,
+      "p95": 1039.92,
+      "p99": 1039.92,
+      "max": 1039.92
+     },
+     "fullViewMs": {
+      "n": 10,
+      "median": 2124.17,
+      "p95": 2357.37,
+      "p99": 2357.37,
+      "max": 2357.37
+     }
+    },
+    "players": {
+     "live": 116,
+     "waiting": 0,
+     "rttMs": {
+      "n": 7230,
+      "median": 64.86,
+      "p95": 107.98,
+      "p99": 142.8,
+      "max": 202.67
+     },
+     "editToOthersMs": {
+      "n": 85327,
+      "median": 109.26,
+      "p95": 181.44,
+      "p99": 2773.46,
+      "max": 4999.34
+     },
+     "corrections": 0.473,
+     "closes": {
+      "1006 socket ended": 7
+     }
+    },
+    "bots": {
+     "processes": 5,
+     "processBusyMax": 0.072,
+     "cpuCores": 0.25,
+     "machineCpuMean": 0.287,
+     "machineCpuPeak": 1,
+     "downMbit": 11.71,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.458,
+     "saturated": false
+    }
+   },
+   {
+    "target": 150,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 297,
+       "tickP50": 89.93183800019324,
+       "tickP95": 112.14277200005017,
+       "tickP95Worst": 132.33579399995506,
+       "tickMax": 301.2491760000121,
+       "ticksPerSecond": 10.2087953504779,
+       "ticksPerSecondWorst": 6.468602703130732,
+       "bytesOutPerSecond": 3234056,
+       "bytesInPerSecond": 272085,
+       "correctionsPerSecond": 3.6153846153846154,
+       "rssMB": 848.09765625,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 25.87,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 290,
+       "tickP50": 63.34911200008355,
+       "tickP95": 82.50380500010215,
+       "tickP95Worst": 90.15421899990179,
+       "tickMax": 178.38238600012846,
+       "ticksPerSecond": 11.73209531165345,
+       "ticksPerSecondWorst": 10.458813178017872,
+       "bytesOutPerSecond": 4871360,
+       "bytesInPerSecond": 253937,
+       "correctionsPerSecond": 2.75,
+       "rssMB": 802.265625,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ]
+    },
+    "join": {
+     "ok": 25,
+     "full": 0,
+     "answerMs": {
+      "n": 25,
+      "median": 44.1,
+      "p95": 78.14,
+      "p99": 101.07,
+      "max": 101.07
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 24,
+      "median": 851.2,
+      "p95": 1326.89,
+      "p99": 1595.71,
+      "max": 1595.71
+     },
+     "fullViewMs": {
+      "n": 24,
+      "median": 2372.68,
+      "p95": 2755.9,
+      "p99": 2855.54,
+      "max": 2855.54
+     }
+    },
+    "players": {
+     "live": 137,
+     "waiting": 0,
+     "rttMs": {
+      "n": 8321,
+      "median": 85.56,
+      "p95": 134.38,
+      "p99": 161.61,
+      "max": 179.99
+     },
+     "editToOthersMs": {
+      "n": 116039,
+      "median": 138.77,
+      "p95": 224.45,
+      "p99": 2422.52,
+      "max": 4997.59
+     },
+     "corrections": 0.688,
+     "closes": {
+      "1006 socket ended": 4
+     }
+    },
+    "bots": {
+     "processes": 6,
+     "processBusyMax": 0.08,
+     "cpuCores": 0.31,
+     "machineCpuMean": 0.466,
+     "machineCpuPeak": 1,
+     "downMbit": 11.74,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.454,
+     "saturated": false
+    }
+   },
+   {
+    "target": 175,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 345,
+       "tickP50": 132.31994499987923,
+       "tickP95": 176.03337299986742,
+       "tickP95Worst": 185.84113600011915,
+       "tickMax": 407.60404899995774,
+       "ticksPerSecond": 6.9227200968240235,
+       "ticksPerSecondWorst": 4.362321904358651,
+       "bytesOutPerSecond": 3106958,
+       "bytesInPerSecond": 316470,
+       "correctionsPerSecond": 3.8018018018018016,
+       "rssMB": 854.23046875,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 24.86,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 331,
+       "tickP50": 91.1387369998265,
+       "tickP95": 113.06820599990897,
+       "tickP95Worst": 120.40326100005768,
+       "tickMax": 205.50788800022565,
+       "ticksPerSecond": 8.780927524073958,
+       "ticksPerSecondWorst": 7.266628761144766,
+       "bytesOutPerSecond": 5307888,
+       "bytesInPerSecond": 312153,
+       "correctionsPerSecond": 3.25,
+       "rssMB": 852.59765625,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ]
+    },
+    "join": {
+     "ok": 25,
+     "full": 0,
+     "answerMs": {
+      "n": 25,
+      "median": 44.38,
+      "p95": 80.37,
+      "p99": 104.56,
+      "max": 104.56
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 21,
+      "median": 1246.96,
+      "p95": 2010.43,
+      "p99": 2447.87,
+      "max": 2447.87
+     },
+     "fullViewMs": {
+      "n": 21,
+      "median": 3245.72,
+      "p95": 3616.55,
+      "p99": 3764.2,
+      "max": 3764.2
+     }
+    },
+    "players": {
+     "live": 161,
+     "waiting": 0,
+     "rttMs": {
+      "n": 9622,
+      "median": 109.91,
+      "p95": 262.03,
+      "p99": 789.91,
+      "max": 2137.14
+     },
+     "editToOthersMs": {
+      "n": 142339,
+      "median": 193.1,
+      "p95": 404.61,
+      "p99": 2522.15,
+      "max": 4998.95
+     },
+     "corrections": 0.562,
+     "closes": {
+      "1006 socket ended": 1
+     }
+    },
+    "bots": {
+     "processes": 7,
+     "processBusyMax": 0.171,
+     "cpuCores": 0.27,
+     "machineCpuMean": 0.545,
+     "machineCpuPeak": 1,
+     "downMbit": 11.16,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.449,
+     "saturated": false
+    }
+   }
+  ]
+ },
+ "s1w": {
+  "pc": [
+   {
+    "target": 50,
+    "server": {
+     "inBudget": true,
+     "shards": [
+      {
+       "index": 0,
+       "players": 101,
+       "tickP50": 11.456816000049002,
+       "tickP95": 16.07854399998905,
+       "tickP95Worst": 20.014343999995617,
+       "tickMax": 114.9128270000001,
+       "ticksPerSecond": 19.997930551395257,
+       "ticksPerSecondWorst": 19.929521102067863,
+       "bytesOutPerSecond": 687792,
+       "bytesInPerSecond": 85047,
+       "correctionsPerSecond": 0.09401709401709402,
+       "rssMB": 374.37109375,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 5.5,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 56,
+       "tickP50": 2.4950929999995424,
+       "tickP95": 8.988171999997576,
+       "tickP95Worst": 16.755927000005613,
+       "tickMax": 52.19885300000169,
+       "ticksPerSecond": 19.992461091104044,
+       "ticksPerSecondWorst": 19.951180180341144,
+       "bytesOutPerSecond": 2716340,
+       "bytesInPerSecond": 43815,
+       "correctionsPerSecond": 0.38461538461538464,
+       "rssMB": 289.19140625,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 50,
+     "full": 0,
+     "answerMs": {
+      "n": 50,
+      "median": 38.5,
+      "p95": 61.1,
+      "p99": 169.01,
+      "max": 169.01
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 50,
+      "median": 338.91,
+      "p95": 394.85,
+      "p99": 453.57,
+      "max": 453.57
+     },
+     "fullViewMs": {
+      "n": 50,
+      "median": 1298.21,
+      "p95": 1396.1,
+      "p99": 1640.21,
+      "max": 1640.21
+     }
+    },
+    "players": {
+     "live": 50,
+     "waiting": 0,
+     "rttMs": {
+      "n": 3050,
+      "median": 32.83,
+      "p95": 46.77,
+      "p99": 64.81,
+      "max": 90.11
+     },
+     "editToOthersMs": {
+      "n": 7822,
+      "median": 69.48,
+      "p95": 91.85,
+      "p99": 117.51,
+      "max": 3959.09
+     },
+     "corrections": 0.056,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 1,
+     "processBusyMax": 0.074,
+     "cpuCores": 0.08,
+     "machineCpuMean": 0.405,
+     "machineCpuPeak": 1,
+     "downMbit": 2.78,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.505,
+     "saturated": false
+    }
+   },
+   {
+    "target": 100,
+    "server": {
+     "inBudget": true,
+     "shards": [
+      {
+       "index": 0,
+       "players": 201,
+       "tickP50": 33.333088999963365,
+       "tickP95": 48.67831899999874,
+       "tickP95Worst": 51.613127999939024,
+       "tickMax": 189.20020199997816,
+       "ticksPerSecond": 20.014363487000793,
+       "ticksPerSecondWorst": 17.011375719991292,
+       "bytesOutPerSecond": 2062380,
+       "bytesInPerSecond": 170041,
+       "correctionsPerSecond": 0.08547008547008547,
+       "rssMB": 432.99609375,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 16.5,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 161,
+       "tickP50": 12.480024999997113,
+       "tickP95": 26.045961000025272,
+       "tickP95Worst": 40.17543200001819,
+       "tickMax": 95.48936400003731,
+       "ticksPerSecond": 19.993915288710447,
+       "ticksPerSecondWorst": 19.95659942531203,
+       "bytesOutPerSecond": 4175203,
+       "bytesInPerSecond": 132138,
+       "correctionsPerSecond": 0.16666666666666666,
+       "rssMB": 425.359375,
+       "crashes": 0,
+       "inBudget": true
+      }
+     ]
+    },
+    "join": {
+     "ok": 50,
+     "full": 0,
+     "answerMs": {
+      "n": 50,
+      "median": 41.57,
+      "p95": 61.86,
+      "p99": 181.01,
+      "max": 181.01
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 50,
+      "median": 357.21,
+      "p95": 606.4,
+      "p99": 698.1,
+      "max": 698.1
+     },
+     "fullViewMs": {
+      "n": 50,
+      "median": 1328.76,
+      "p95": 1431.29,
+      "p99": 1461.16,
+      "max": 1461.16
+     }
+    },
+    "players": {
+     "live": 100,
+     "waiting": 0,
+     "rttMs": {
+      "n": 6000,
+      "median": 49.52,
+      "p95": 81.94,
+      "p99": 116.75,
+      "max": 153.44
+     },
+     "editToOthersMs": {
+      "n": 28081,
+      "median": 81.71,
+      "p95": 175.28,
+      "p99": 3671.86,
+      "max": 4596.98
+     },
+     "corrections": 0.078,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 2,
+     "processBusyMax": 0.083,
+     "cpuCores": 0.16,
+     "machineCpuMean": 0.365,
+     "machineCpuPeak": 1,
+     "downMbit": 8.14,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.493,
+     "saturated": false
+    }
+   },
+   {
+    "target": 150,
+    "server": {
+     "inBudget": false,
+     "shards": [
+      {
+       "index": 0,
+       "players": 300,
+       "tickP50": 71.54625699995086,
+       "tickP95": 93.41874100000132,
+       "tickP95Worst": 99.53482300008181,
+       "tickMax": 284.8241900000721,
+       "ticksPerSecond": 12.946542757138145,
+       "ticksPerSecondWorst": 9.636772867530293,
+       "bytesOutPerSecond": 3269028,
+       "bytesInPerSecond": 263709,
+       "correctionsPerSecond": 0.19658119658119658,
+       "rssMB": 531.45703125,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ],
+     "metricErrors": 0,
+     "outMbit": 26.15,
+     "duringJoin": [
+      {
+       "index": 0,
+       "players": 262,
+       "tickP50": 34.2602069999557,
+       "tickP95": 53.87335000000894,
+       "tickP95Worst": 75.96664800005965,
+       "tickMax": 137.48628299997654,
+       "ticksPerSecond": 16.212855811482594,
+       "ticksPerSecondWorst": 11.266038829286256,
+       "bytesOutPerSecond": 5540705,
+       "bytesInPerSecond": 219924,
+       "correctionsPerSecond": 1.0769230769230769,
+       "rssMB": 458.8125,
+       "crashes": 0,
+       "inBudget": false
+      }
+     ]
+    },
+    "join": {
+     "ok": 50,
+     "full": 0,
+     "answerMs": {
+      "n": 50,
+      "median": 42.6,
+      "p95": 57.04,
+      "p99": 158.63,
+      "max": 158.63
+     },
+     "fullAnswerMs": null,
+     "spawnMs": {
+      "n": 50,
+      "median": 616.52,
+      "p95": 1111.09,
+      "p99": 1677.8,
+      "max": 1677.8
+     },
+     "fullViewMs": {
+      "n": 50,
+      "median": 1788.67,
+      "p95": 2525.28,
+      "p99": 2737.74,
+      "max": 2737.74
+     }
+    },
+    "players": {
+     "live": 150,
+     "waiting": 0,
+     "rttMs": {
+      "n": 9000,
+      "median": 67.95,
+      "p95": 116.06,
+      "p99": 151.7,
+      "max": 320.22
+     },
+     "editToOthersMs": {
+      "n": 54536,
+      "median": 117.72,
+      "p95": 200.52,
+      "p99": 3229.5,
+      "max": 4998.86
+     },
+     "corrections": 0.076,
+     "closes": {}
+    },
+    "bots": {
+     "processes": 3,
+     "processBusyMax": 0.08,
+     "cpuCores": 0.24,
+     "machineCpuMean": 0.381,
+     "machineCpuPeak": 1,
+     "downMbit": 12.2,
+     "nicDownMbit": null,
+     "deliveredOfServerOut": 0.466,
+     "saturated": false
+    }
+   }
+  ]
+ }
+}

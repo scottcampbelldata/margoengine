@@ -140,7 +140,7 @@ async function play(id) {
       editInterval: o.editInterval,
       home,
       leash: o.leash,
-      sprintHome: o.scenario === 'spread',
+      travelHome: o.scenario === 'spread' && o.travel === 'fly',
       headers: { Origin: o.target.origin },
     });
     bot.id = id;
@@ -154,6 +154,9 @@ async function play(id) {
     bot.connection.onclose = (code, reason) => {
       closed(code, reason);
       window.closes.push([code, reason]);
+      console.log(
+        `close ${code} ${reason} age ${Math.round((clock() - asked) / 1000)} s, ${bot.connection.bytesIn} bytes in, at ${new Date().toISOString()}`,
+      );
     };
     bot.client.onLoaded = () => {
       bot.times.loaded = clock();

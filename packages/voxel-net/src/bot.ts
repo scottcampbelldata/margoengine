@@ -29,8 +29,8 @@ export interface VoxelBotOptions {
   home?: readonly [x: number, z: number];
   /** See `home`, in blocks. Default 64. */
   leash?: number;
-  /** Hold the sprint key while walking back past the leash, so a far `home` is reached sooner. Default false. */
-  sprintHome?: boolean;
+  /** Fly where the server allows it while past the leash, so a far `home` is reached over any terrain. Default false. */
+  travelHome?: boolean;
   /** Extra request headers of the connection, such as the `Origin` a server's `origins` option asks for. Default none. */
   headers?: Record<string, string>;
   /** Random numbers in [0, 1). Default Math.random. */
@@ -73,7 +73,7 @@ export class VoxelBot {
   readonly #place: number;
   readonly #home: readonly [number, number] | undefined;
   readonly #leash: number;
-  readonly #sprintHome: boolean;
+  readonly #travel: boolean;
   #yaw: number;
   #turn = 0;
   #editIn: number;
@@ -95,7 +95,7 @@ export class VoxelBot {
     this.#place = options.place ?? (blocks.table.some((t) => t.name === 'stone') ? blocks.id('stone') : 1);
     this.#home = options.home;
     this.#leash = options.leash ?? 64;
-    this.#sprintHome = options.sprintHome ?? false;
+    this.#travel = options.travelHome ?? false;
     this.#yaw = this.#random() * 2 * Math.PI;
     this.#editIn = this.#interval * (0.5 + this.#random());
     this.world = new VoxelWorld({ blocks });
@@ -161,7 +161,9 @@ export class VoxelBot {
     }
     this.#jump -= dt;
     const keys =
-      Keys.forward | (this.#jump > 0 || player.inLiquid ? Keys.jump : 0) | (away && this.#sprintHome ? Keys.sprint : 0);
+      Keys.forward |
+      (this.#jump > 0 || player.inLiquid ? Keys.jump : 0) |
+      (away && this.#travel && client.welcome?.flight ? Keys.fly : 0);
     client.update(dt, { keys, yaw: this.#yaw, pitch: 0 });
     if (this.#interval > 0 && (this.#editIn -= dt) <= 0) {
       this.#editIn += this.#interval;
