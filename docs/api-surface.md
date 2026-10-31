@@ -83,7 +83,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/staging | `.` 4 |  |  | 6,056 |
 | @margoengine/stats | `.` 3 |  |  | 4,897 |
 | @margoengine/taa | `.` 7 |  |  | 10,204 |
-| @margoengine/terrain | `.` 13 | 2 |  | 10,841 |
+| @margoengine/terrain | `.` 13 | 2 |  | 11,581 |
 | @margoengine/text | `.` 35 | 2 |  | 15,723 |
 | @margoengine/tiles | `.` 72 | 1 |  | 14,336 |
 | @margoengine/tonemap | `.` 7 |  |  | 10,825 |
