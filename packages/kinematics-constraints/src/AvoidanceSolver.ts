@@ -200,8 +200,8 @@ export class AvoidanceSolver {
     bounded: number | undefined;
   } = { accepted: undefined, center: undefined, candidate: undefined, best: undefined, bounded: undefined };
   private readonly segmentResult: SegmentDistanceResult = {
-    pointA: [0, 0, 0],
-    pointB: [0, 0, 0],
+    pointA: new Float64Array(3),
+    pointB: new Float64Array(3),
     distance: 0,
     parameterA: 0,
     parameterB: 0,

@@ -2,12 +2,12 @@ import { typeError } from '../../shared/errors.js';
 import type { ConvexHullVolume } from './hull.js';
 import type { ConstraintVolume, MutableVec3View, Vec3View } from './types.js';
 import {
-  length3,
   validateDistinctOutputs,
   validateNonNegative,
   validateOutputValues,
   validateOutputVector,
   validateVector,
+  writeVector,
 } from './types.js';
 
 /** Closest points between two segments, their distance and the parameter of each point along its segment. */
@@ -33,10 +33,6 @@ export interface CapsuleVolumeOptions {
 
 function clamp(value: number, low: number, high: number): number {
   return Math.max(low, Math.min(high, value));
-}
-
-function interpolate(a: number, b: number, parameter: number): number {
-  return parameter > 0.5 ? b + (a - b) * (1 - parameter) : a + (b - a) * parameter;
 }
 
 function scaledMagnitude(x: number, y: number, z: number, scale: number): number {
@@ -131,8 +127,22 @@ export function closestPointsBetweenSegments(
     deltaBX = vx,
     deltaBY = vy,
     deltaBZ = vz;
-  const lengthA = length3(ux, uy, uz),
-    lengthB = length3(vx, vy, vz);
+  // length3 written out, scaled slow path included. A call in one branch of a ternary makes the whole value a tagged
+  // number, which boxes the result of the fast branch too.
+  const squaredA = ux * ux + uy * uy + uz * uz,
+    squaredB = vx * vx + vy * vy + vz * vz;
+  let lengthA = Math.sqrt(squaredA),
+    lengthB = Math.sqrt(squaredB);
+  if (!(squaredA >= 1e-300 && squaredA < Infinity)) {
+    const big = Math.max(Math.abs(ux), Math.abs(uy), Math.abs(uz));
+    lengthA =
+      big === 0 ? 0 : big * Math.sqrt((ux / big) * (ux / big) + (uy / big) * (uy / big) + (uz / big) * (uz / big));
+  }
+  if (!(squaredB >= 1e-300 && squaredB < Infinity)) {
+    const big = Math.max(Math.abs(vx), Math.abs(vy), Math.abs(vz));
+    lengthB =
+      big === 0 ? 0 : big * Math.sqrt((vx / big) * (vx / big) + (vy / big) * (vy / big) + (vz / big) * (vz / big));
+  }
   const scaleA = Math.max(Math.abs(ux), Math.abs(uy), Math.abs(uz));
   const scaleB = Math.max(Math.abs(vx), Math.abs(vy), Math.abs(vz));
   if (scaleA > 0) {
@@ -158,11 +168,11 @@ export function closestPointsBetweenSegments(
   const projectionA = ux * wx + uy * wy + uz * wz;
   const projectionB = vx * wx + vy * wy + vz * wz;
   if (lengthA === 0) {
-    if (lengthB > 0) alongB = clamp(projectionB, 0, lengthB);
+    if (lengthB > 0) alongB = Math.max(0, Math.min(lengthB, projectionB));
   } else if (lengthB === 0) {
-    alongA = clamp(-projectionA, 0, lengthA);
+    alongA = Math.max(0, Math.min(lengthA, -projectionA));
   } else {
-    const cosine = clamp(ux * vx + uy * vy + uz * vz, -1, 1);
+    const cosine = Math.max(-1, Math.min(1, ux * vx + uy * vy + uz * vz));
     const nx = uy * vz - uz * vy,
       ny = uz * vx - ux * vz,
       nz = ux * vy - uy * vx;
@@ -187,26 +197,28 @@ export function closestPointsBetweenSegments(
           crossX * (nx / crossScale / sine) + crossY * (ny / crossScale / sine) + crossZ * (nz / crossScale / sine);
         // An infinite line parameter is safe to clamp. Avoid 0 * Infinity for
         // coincident lines whose remote intersection has no unique parameter.
-        alongA = numerator === 0 ? 0 : clamp(-(numerator / sine) * (separationScale / crossScale), 0, lengthA);
+        alongA =
+          numerator === 0 ? 0 : Math.max(0, Math.min(lengthA, -(numerator / sine) * (separationScale / crossScale)));
       }
     }
     alongB = cosine * alongA + projectionB;
     if (alongB < 0) {
       alongB = 0;
-      alongA = clamp(-projectionA, 0, lengthA);
+      alongA = Math.max(0, Math.min(lengthA, -projectionA));
     } else if (alongB > lengthB) {
       alongB = lengthB;
-      alongA = clamp(cosine * lengthB - projectionA, 0, lengthA);
+      alongA = Math.max(0, Math.min(lengthA, cosine * lengthB - projectionA));
     }
   }
   const parameterA = lengthA > 0 ? alongA / lengthA : 0;
   const parameterB = lengthB > 0 ? alongB / lengthB : 0;
-  const pax = interpolate(ax, bx, parameterA),
-    pay = interpolate(ay, by, parameterA),
-    paz = interpolate(az, bz, parameterA);
-  const pbx = interpolate(cx, dx, parameterB),
-    pby = interpolate(cy, dy, parameterB),
-    pbz = interpolate(cz, dz, parameterB);
+  // Clamp and interpolation are written out in this kernel: V8 leaves them as calls here, and each call boxes its result.
+  const pax = parameterA > 0.5 ? bx + (ax - bx) * (1 - parameterA) : ax + (bx - ax) * parameterA,
+    pay = parameterA > 0.5 ? by + (ay - by) * (1 - parameterA) : ay + (by - ay) * parameterA,
+    paz = parameterA > 0.5 ? bz + (az - bz) * (1 - parameterA) : az + (bz - az) * parameterA;
+  const pbx = parameterB > 0.5 ? dx + (cx - dx) * (1 - parameterB) : cx + (dx - cx) * parameterB,
+    pby = parameterB > 0.5 ? dy + (cy - dy) * (1 - parameterB) : cy + (dy - cy) * parameterB,
+    pbz = parameterB > 0.5 ? dz + (cz - dz) * (1 - parameterB) : cz + (dz - cz) * parameterB;
   // Keep these scalar guards in the segment kernel: an out-of-line validation
   // call boxes all six coordinates in otherwise optimized V8 code. Check both
   // outputs before writing either, preserving atomic validation and aliasing.
@@ -284,6 +296,30 @@ function writeSurface(
   outNormal[2] = nz;
 }
 
+// The capsule kernel hands its six result numbers over in this array instead of as arguments: it is too large for V8
+// to inline writeSurface into, and every double passed to a call that is not inlined is boxed.
+const capsuleSurface = /* @__PURE__ */ new Float64Array(6);
+
+/** The checks and writes of writeSurface, reading the surface point and the normal from capsuleSurface. */
+function writeCapsuleSurface(outSurface: MutableVec3View, outNormal: MutableVec3View): void {
+  const x = capsuleSurface[0],
+    y = capsuleSurface[1],
+    z = capsuleSurface[2];
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(z) ||
+    (outSurface instanceof Float32Array &&
+      (Math.abs(x) > 3.4028234663852886e38 ||
+        Math.abs(y) > 3.4028234663852886e38 ||
+        Math.abs(z) > 3.4028234663852886e38))
+  ) {
+    throw new RangeError('Result exceeds output precision; scale the scene down or move it nearer the origin');
+  }
+  writeVector(outSurface, capsuleSurface, 0);
+  writeVector(outNormal, capsuleSurface, 3);
+}
+
 // The public numeric adapters share one slot without adding instance fields.
 // Kernels write it LAST, after every observable getter/output setter; nested
 // public evaluations therefore finish before the outer result is published.
@@ -336,7 +372,8 @@ function evaluateCapsuleInto(
 ): void {
   validateVector(volume.start, 'capsule start');
   validateVector(volume.end, 'capsule end');
-  validateNonNegative(volume.radius, 'capsule radius');
+  // A comparison, not a call: a double passed to validateNonNegative is boxed. NaN fails it too, and the call then throws.
+  if (!(volume.radius >= 0 && volume.radius <= 1e100)) validateNonNegative(volume.radius, 'capsule radius');
   validateQuery(point, outSurface, outNormal);
   const px = point[0],
     py = point[1],
@@ -367,10 +404,15 @@ function evaluateCapsuleInto(
     qy = queryScale > 0 ? wy / queryScale : 0,
     qz = queryScale > 0 ? wz / queryScale : 0;
   const relativeLength = queryScale > 0 ? (axisScale / queryScale) * axisLength : 0;
-  const parameter = relativeLength > 0 ? clamp((qx * ux + qy * uy + qz * uz) / relativeLength, 0, 1) : 0;
-  const cx = interpolate(ax, volume.end[0], parameter),
-    cy = interpolate(ay, volume.end[1], parameter),
-    cz = interpolate(az, volume.end[2], parameter);
+  // The clamp, the interpolation and the length rescale are written out here: V8 does not inline them into this
+  // large function, and each out-of-line call returns a boxed number (the allocation test pins this).
+  const parameter = relativeLength > 0 ? Math.max(0, Math.min(1, (qx * ux + qy * uy + qz * uz) / relativeLength)) : 0;
+  const ex = volume.end[0],
+    ey = volume.end[1],
+    ez = volume.end[2];
+  const cx = parameter > 0.5 ? ex + (ax - ex) * (1 - parameter) : ax + (ex - ax) * parameter,
+    cy = parameter > 0.5 ? ey + (ay - ey) * (1 - parameter) : ay + (ey - ay) * parameter,
+    cz = parameter > 0.5 ? ez + (az - ez) * (1 - parameter) : az + (ez - az) * parameter;
   let nx = qx - (queryScale > 0 ? dx / queryScale : 0) * parameter;
   let ny = qy - (queryScale > 0 ? dy / queryScale : 0) * parameter;
   let nz = qz - (queryScale > 0 ? dz / queryScale : 0) * parameter;
@@ -381,7 +423,8 @@ function evaluateCapsuleInto(
     nz /= normalScale;
   }
   const normalLength = Math.sqrt(nx * nx + ny * ny + nz * nz),
-    distance = rescaleLength(normalScale, normalLength, queryScale);
+    distance =
+      normalScale < 2 ** -1022 ? normalScale * queryScale * normalLength : normalScale * normalLength * queryScale;
   // Cancellation on a diagonal centerline must not create an axial normal:
   // projecting along such a normal could remain inside the capsule.
   const axisTolerance =
@@ -416,7 +459,13 @@ function evaluateCapsuleInto(
     ny = 0;
     nz = 0;
   }
-  writeSurface(outSurface, outNormal, cx, cy, cz, nx, ny, nz, radius);
+  capsuleSurface[0] = cx + nx * radius;
+  capsuleSurface[1] = cy + ny * radius;
+  capsuleSurface[2] = cz + nz * radius;
+  capsuleSurface[3] = nx;
+  capsuleSurface[4] = ny;
+  capsuleSurface[5] = nz;
+  writeCapsuleSurface(outSurface, outNormal);
   outDistance[0] = distance - radius;
 }
 
@@ -606,8 +655,8 @@ export function segmentVolumeInto(
 ): void {
   const segmentClearance = volume.segmentClearance;
   if (volume instanceof CapsuleVolume && segmentClearance === capsuleSegmentClearance) {
-    validateNonNegative(volume.radius, 'capsule radius');
-    validateNonNegative(radius, 'segment radius');
+    if (!(volume.radius >= 0 && volume.radius <= 1e100)) validateNonNegative(volume.radius, 'capsule radius');
+    if (!(radius >= 0 && radius <= 1e100)) validateNonNegative(radius, 'segment radius');
     outDistance[0] =
       closestPointsBetweenSegments(start, end, volume.start, volume.end, segmentResult).distance -
       volume.radius -
