@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3957878,
+  "total": 3962647,
   "history": [
     {
       "date": "2026-10-24",
@@ -977,6 +977,12 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "dd392f8c8",
+      "reason": "Line picking gap fix (Scott, threejs-gallery-plan S3): new optional entry bvh/lines; no existing entry grows",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
       "commit": "a66ee4d82",
       "reason": "light keeper P2: animator look-at gains origin (aim from an eye or lens off the bone origin), holds the last aim inside 1 mm instead of throwing, and solves with no allocation per frame (own array-only quaternion helpers, as ccd.ts; tree-shaken when unused)",
       "grew": 1
@@ -1001,9 +1007,9 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "dd392f8c8",
-      "reason": "Line picking gap fix (Scott, threejs-gallery-plan S3): new optional entry bvh/lines; no existing entry grows",
-      "grew": 1
+      "commit": "175c6ec2d",
+      "reason": "animation/sampling gains ClipMarkers, validateMarkers, compressTrack, quantizeTrack and dequantizeTrack (row 21.6 job 1); animation/pointer +35 B for clip.markers validation; both entries stay optional",
+      "grew": 2
     },
     {
       "date": "2026-10-31",
@@ -1014,8 +1020,8 @@
     {
       "date": "2026-10-31",
       "commit": "175c6ec2d",
-      "reason": "animation/sampling gains ClipMarkers, validateMarkers, compressTrack, quantizeTrack and dequantizeTrack (row 21.6 job 1); animation/pointer +35 B for clip.markers validation; both entries stay optional",
-      "grew": 2
+      "reason": "new optional package @margoengine/pixel: pixel camera and layer compositor (row 25, J2; budget 8 KB)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1226,6 +1232,7 @@
     "@margoengine/oit": 3199,
     "@margoengine/physics": 16247,
     "@margoengine/physics2d": 7993,
+    "@margoengine/pixel": 4769,
     "@margoengine/points": 21547,
     "@margoengine/points/e57": 6545,
     "@margoengine/points/las": 5116,

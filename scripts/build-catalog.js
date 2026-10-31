@@ -65,6 +65,7 @@ const layers = {
     'sprites',
     'lines',
     'text',
+    'pixel',
     'labels',
     'html',
     'video',

@@ -1,0 +1,51 @@
+{
+  "name": "@margoengine/pixel",
+  "version": "1.0.0",
+  "description": "Pixel art rendering: a pixel camera with integer zoom and parallax, and a layer compositor that scales low-res layers by whole numbers and turns them with every output pixel one source pixel.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "2d",
+    "pixel-art",
+    "parallax"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/pixel"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "devDependencies": {
+    "@margoengine/cameras": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js pixel",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu": "cd ../.. && node packages/pixel/tests/browser-check.mjs",
+    "prepack": "npm run build"
+  }
+}

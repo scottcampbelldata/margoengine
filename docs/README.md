@@ -99,6 +99,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/sprites`](../packages/sprites/README.md) | 2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target. |
 | [`@margoengine/lines`](../packages/lines/README.md) | Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU. |
 | [`@margoengine/text`](../packages/text/README.md) | GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU. |
+| [`@margoengine/pixel`](../packages/pixel/README.md) | Pixel art rendering: a pixel camera with integer zoom and parallax, and a layer compositor that scales low-res layers by whole numbers and turns them with every output pixel one source pixel. |
 | [`@margoengine/labels`](../packages/labels/README.md) | HTML labels and CSS 3D objects positioned over a Margo Engine canvas. |
 | [`@margoengine/html`](../packages/html/README.md) | World-space DOM anchors, CSS3D placement and scene-depth occlusion. |
 | [`@margoengine/video`](../packages/video/README.md) | WebGPU external video textures and optional Web Audio sampling. |

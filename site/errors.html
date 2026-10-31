@@ -122,6 +122,18 @@
       <p><strong>Cause.</strong> <code>render({views})</code> needs a non-empty array of <code>{camera, viewport}</code>. A view target needs 1-sample colour and a depth of the same size. A pass drawing a partial rectangle with extra colour attachments cannot clear them. Draw rectangles are 4 integers inside the target. <code>pick</code> needs finite CSS pixel coordinates.</p>
       <p><strong>Fix.</strong> Pass <code>{camera, viewport}</code> objects; use 1-sample target textures; draw extra attachments with <code>clear: false</code>; keep rectangles inside the target; pass finite numbers to <code>pick</code>.</p>
     </section>
+    <section id="pixel-options">
+      <h2><a href="#pixel-options">Pixel camera and layer options</a></h2>
+      <p class="messages"><code>Invalid pixel camera width</code> <code>Invalid pixel camera height</code> <code>Invalid pixel camera minZoom</code> <code>Invalid pixel camera maxZoom</code> <code>Invalid pixel camera zoom</code> <code>Invalid pixel camera position</code> <code>Invalid unitsPerPixel</code> <code>Invalid parallax</code> <code>Invalid fit size</code> <code>Invalid pixel order</code> <code>Invalid pixel layer</code> <code>Invalid pixel layer size</code> <code>Invalid pixel layer anchor</code> <code>Invalid pixel image</code> <code>LayerCompositor needs a camera</code></p>
+      <p><strong>Cause.</strong> A <code>PixelCamera</code>, <code>LayerCompositor</code> or <code>PixelLayer</code> value is out of range. Sizes and zoom must be whole numbers, because a fractional scale would blur pixel art. Layer fields are read each frame, so a bad one throws from the frame that first reads it.</p>
+      <p><strong>Fix.</strong> Give the camera whole <code>width</code>, <code>height</code> and <code>zoom</code> (zoom from <code>minZoom</code> to <code>maxZoom</code>) and a finite position. Keep a layer's <code>opacity</code> from 0 to 1, its <code>x</code>, <code>y</code>, <code>z</code>, <code>rotation</code>, <code>parallax</code> and <code>pivot</code> finite, <code>blend</code> one of <code>normal</code>, <code>add</code>, <code>multiply</code> or <code>screen</code>, <code>anchor</code> <code>view</code> or <code>world</code>, and pass <code>write</code> bytes of exactly <code>width * height * 4</code> that fit the target.</p>
+    </section>
+    <section id="pixel-state">
+      <h2><a href="#pixel-state">Pixel layer state</a></h2>
+      <p class="messages"><code>Pixel layer texture needs an attached compositor</code></p>
+      <p><strong>Cause.</strong> A layer's <code>texture</code> or <code>target</code> was read before its <code>LayerCompositor</code> was attached to an engine, so there is no device to make the texture on.</p>
+      <p><strong>Fix.</strong> Use <code>LayerCompositor.attach(engine, options)</code>, or <code>engine.use(compositor)</code>, before reading <code>layer.texture</code>. <code>layer.write</code> works earlier: the picture waits until the target exists.</p>
+    </section>
     <section id="pixel-exact">
       <h2><a href="#pixel-exact">Pixel-exact backbuffer size</a></h2>
       <p class="messages"><code>Invalid exactSize</code></p>

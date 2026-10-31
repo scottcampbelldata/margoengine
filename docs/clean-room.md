@@ -832,3 +832,9 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 Written from the WebGPU and WGSL specifications only (instanced triangle strips, `textureLoad`, straight-alpha blending).
 No other engine's sprite code was read. Snapping rounds an image's corner after the camera, so half-pixel pivots still
 cover whole pixels; the tests compare every frame byte for byte with an image composed on the CPU in the test itself.
+## Pixel camera and layer compositor: `@margoengine/pixel`
+
+Written from the WebGPU and WGSL specifications only (`textureLoad`, `@builtin(position)`, blend factors, dynamic uniform
+offsets) and plain rotation maths. No other engine's pixel-art code was read. Each output pixel turns back into the
+layer and floors to one source pixel; the tests compare every frame byte for byte with an image composed on the CPU in
+the test itself, with quarter turns done by moving pixels forward rather than by the shader's formula.

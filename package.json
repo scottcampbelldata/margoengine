@@ -113,6 +113,7 @@
     "packages/cutscene",
     "packages/ragdoll",
     "packages/sprites",
+    "packages/pixel",
     "packages/save",
     "packages/mixer",
     "packages/webgl2-compat",

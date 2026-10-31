@@ -842,6 +842,10 @@
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"
     },
+    "./pixel": {
+      "types": "./dist/pixel.d.ts",
+      "import": "./dist/pixel.js"
+    },
     "./points": {
       "types": "./dist/points.d.ts",
       "import": "./dist/points.js"
@@ -1540,6 +1544,7 @@
     "@margoengine/oit": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
     "@margoengine/physics2d": "^1.0.0",
+    "@margoengine/pixel": "^1.0.0",
     "@margoengine/points": "^1.0.0",
     "@margoengine/post": "^1.0.0",
     "@margoengine/procedural": "^1.0.0",
