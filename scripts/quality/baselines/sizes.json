@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3917251,
+  "total": 3918691,
   "history": [
     {
       "date": "2026-10-24",
@@ -875,6 +875,18 @@
     },
     {
       "date": "2026-10-30",
+      "commit": "3b4921002",
+      "reason": "scatter: per-cascade GPU shadow culling (prepareShadow, cull shader, list draws) cuts the biome world's four-cascade shadow frame from 72.9 to 44 ms with an identical shadow map",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "3342bf02f",
+      "reason": "biomes: placement keeps every species above sea level (+36 B); the view makes its overview on the workers in row bands, off the page's thread (+111 B)",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-30",
       "commit": "0882df471",
       "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
       "grew": 1
@@ -898,18 +910,6 @@
       "grew": 1
     },
     {
-      "date": "2026-10-30",
-      "commit": "3342bf02f",
-      "reason": "biomes: placement keeps every species above sea level (+36 B); the view makes its overview on the workers in row bands, off the page's thread (+111 B)",
-      "grew": 2
-    },
-    {
-      "date": "2026-10-30",
-      "commit": "3b4921002",
-      "reason": "scatter: per-cascade GPU shadow culling (prepareShadow, cull shader, list draws) cuts the biome world's four-cascade shadow frame from 72.9 to 44 ms with an identical shadow map",
-      "grew": 1
-    },
-    {
       "date": "2026-10-31",
       "commit": "f766d8ee2",
       "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
@@ -926,6 +926,12 @@
       "commit": "b88424755",
       "reason": "biomes view: the sky option, the SEA defaults, material relief and macro tone and materialPixels (landing E, biome look plan 2 items 2 and 3)",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "cfa5c50a5",
+      "reason": "biomes/relief gains islands (coast: 'island' with an outline warp, beach ring and peak), the shelf option and valley width, floor and mouth (biome look plan 3 item C1); the entry is loaded only by relief worlds, and the biomes worker bundles it",
+      "grew": 2
     }
   ],
   "items": {
@@ -947,7 +953,7 @@
     "@margoengine/biomes/objects": 3838,
     "@margoengine/biomes/placement": 11951,
     "@margoengine/biomes/presets": 2024,
-    "@margoengine/biomes/relief": 2825,
+    "@margoengine/biomes/relief": 4265,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 2880,
     "@margoengine/biomes/view": 9492,

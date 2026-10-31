@@ -79,7 +79,11 @@ test('records: 8 bytes each, sorted by species then z then x, decoding inside th
 
 function presetWorldOptions(id) {
   const pw = presetWorlds[id];
-  return { biomes: Object.values(presets), climate: pw.climate, height: { relief: pw.relief } };
+  return {
+    biomes: Object.values(presets).filter((b) => b.id !== 'beach'),
+    climate: pw.climate,
+    height: { relief: pw.relief },
+  };
 }
 
 test('hard core: no two objects of a layer (or of two layers) closer than their spacing, across tile seams', async () => {
@@ -652,7 +656,10 @@ test('paint: a full-strength desert dab leaves no forest inside; the smooth fall
 });
 
 test('the editor dirty margin covers the placement reach, and an edit leaves tiles beyond it unchanged', async () => {
-  const w = await BiomeWorld.create({ size: [2048, 512], biomes: Object.values(presets) }),
+  const w = await BiomeWorld.create({
+      size: [2048, 512],
+      biomes: Object.values(presets).filter((b) => b.id !== 'beach'),
+    }),
     p = BiomePlacement.attach(w),
     e = BiomeEditor.attach(w);
   assert.ok(e.margin() >= p.reach, `editor ${e.margin()} placement ${p.reach}`);

@@ -148,7 +148,7 @@ window.check={
   out.afterDispose=mean(await shot());
   // All 8 presets: 15 ground materials, 4 weight textures. Painted desert must draw as sand (main cut the list at 8 and
   // drew sand, the 12th, as grass).
-  const every=await BiomeWorld.create({size:[512,512],biomes:Object.values(presets),height:{field:(x,z)=>40+3*Math.sin(x/37)*Math.cos(z/41)},climate:{latitude:47,rainfall:1000}});
+  const every=await BiomeWorld.create({size:[512,512],biomes:Object.values(presets).filter(b=>b.id!=='beach'),height:{field:(x,z)=>40+3*Math.sin(x/37)*Math.cos(z/41)},climate:{latitude:47,rainfall:1000}});
   for(let z=0;z<2;z++)for(let x=0;x<2;x++)every.writeLayer('paint/desert',x,z,full);
   const all=await BiomeView.attach(engine,every,{radius:600,objects:false});
   await all.ready;await all.whenIdle();

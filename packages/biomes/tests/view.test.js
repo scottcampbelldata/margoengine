@@ -92,7 +92,7 @@ test('attach refuses a WebGL engine and bad arguments', async () => {
 // Biome look plan item 1: the 8 presets need 15 ground materials. Main cut the list at 8 and drew every dropped
 // material as material 0 (grass), so painted desert sand drew as grass; the default world's boreal needles too.
 test('the 8 presets give 15 materials and every one draws as itself: painted desert is sand, not grass', async () => {
-  const all = Object.values(presets),
+  const all = Object.values(presets).filter((b) => b.id !== 'beach'),
     keys = groundMaterials(all);
   assert.equal(keys.length, 15);
   assert.equal(new Set(keys).size, 15);
@@ -215,7 +215,7 @@ test('the tundra world lies under snow: snow weight above 25 percent of its cell
   const { climate, relief } = presetWorlds.tundra,
     world = await BiomeWorld.create({
       size: [1024, 1024],
-      biomes: Object.values(presets),
+      biomes: Object.values(presets).filter((b) => b.id !== 'beach'),
       climate,
       height: { relief },
     }),

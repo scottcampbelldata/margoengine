@@ -1,10 +1,11 @@
-// The eight biome presets (spec 3.2), as plant functional type limits over the coldest month, growing degree days above
+// The eight climate biome presets (spec 3.2), as plant functional type limits over the coldest month, growing degree days above
 // 5 C and the moisture index AET / PET, with Korner's thermal treeline for forests (spec 2.3). The limits follow the
 // BIOME1 and BIOME4 style of screening (Prentice et al. 1992; Kaplan et al. 2003): tropical trees need a coldest month
 // of about 15.5 C, temperate broadleaf trees about 1,200 degree days, boreal conifers about 350 (background values from
 // that literature, rounded; the per-preset numbers are ours). Meshes are the procedural ones (decision D5).
 // Plain data: the presets are frozen here and checked with defineBiome by the package tests, so this entry carries no
-// validation code (a world validates every definition it is given, presets included).
+// validation code (a world validates every definition it is given, presets included). `beach` is not a climate preset:
+// it takes low, gentle ground by the sea in any world (height and slope envelopes; the island world uses it).
 import type { ClimateOptions } from './climate.js';
 import type { BiomeDefinition, SpeciesRule } from './define.js';
 import type { ReliefOptions } from './relief.js';
@@ -46,10 +47,22 @@ const rock = (density: number): SpeciesRule => ({
   cluster: { kind: 'matern', parents: 1, spread: 8, offspring: 5 },
 });
 
+/** Ids of the eight climate presets, each with its own world in {@link presetWorlds}. */
+export type ClimatePresetId =
+  | 'temperate'
+  | 'desert'
+  | 'tundra'
+  | 'tropical'
+  | 'alpine'
+  | 'wetland'
+  | 'savanna'
+  | 'boreal';
+
+/** Ids of every preset: the climate presets and `beach`, low gentle ground by the sea that any world can add. */
+export type PresetId = ClimatePresetId | 'beach';
+
 /** The presets, by id. Each is a frozen {@link BiomeDefinition}. */
-export const presets: Readonly<
-  Record<'temperate' | 'desert' | 'tundra' | 'tropical' | 'alpine' | 'wetland' | 'savanna' | 'boreal', BiomeDefinition>
-> = Object.freeze({
+export const presets: Readonly<Record<PresetId, BiomeDefinition>> = Object.freeze({
   temperate: freeze<BiomeDefinition>({
     id: 'temperate',
     climate: { coldest: [-15, 8], gdd5: [1200, null], moistureIndex: [0.6, null], treeline: [0, null] },
@@ -178,11 +191,36 @@ export const presets: Readonly<
     rocks: [rock(3)],
     details: [{ id: 'fern', mesh: 'procedural:fern', density: 12, light: [0, 0.6] }],
   }),
+  // A sand beach: low, gentle ground next to the sea, by height and slope envelopes instead of a climate.
+  beach: freeze<BiomeDefinition>({
+    id: 'beach',
+    climate: { height: [null, 5], slope: [null, 12] },
+    ground: [{ material: 'sand' }],
+  }),
 });
 
-/** The world each preset dominates: climate and relief settings for examples, tests and golden digests. */
+/** A preset world: climate and relief settings, and for a world made for several biomes their definitions. */
+export interface PresetWorld {
+  /** Climate settings. */
+  readonly climate: ClimateOptions;
+  /** Relief settings (`height: { relief }`). */
+  readonly relief: ReliefOptions;
+  /** The biomes the world is made for (frozen definitions, ready for `BiomeWorld.create`). */
+  readonly biomes?: readonly BiomeDefinition[];
+}
+
+/** A preset kept off the lowest ground (below 4 m), so the beach takes the shore instead of sharing it. */
+const inland = (b: BiomeDefinition): BiomeDefinition => freeze({ ...b, climate: { ...b.climate, height: [4, null] } });
+
+/**
+ * The world each climate preset dominates (climate and relief settings for examples, tests and golden digests), and
+ * `island`: a tropical island with sea on every side (`coast: 'island'`) and its biomes: `tropical` and `temperate`
+ * kept above 4 m, and `beach` on the shore.
+ */
 export const presetWorlds: Readonly<
-  Record<keyof typeof presets, { readonly climate: ClimateOptions; readonly relief: ReliefOptions }>
+  Record<ClimatePresetId, PresetWorld> & {
+    readonly island: PresetWorld & { readonly biomes: readonly BiomeDefinition[] };
+  }
 > = Object.freeze({
   temperate: { climate: { latitude: 47, rainfall: 1000 }, relief: { relief: 500, base: 150 } },
   boreal: { climate: { latitude: 57, rainfall: 650, inland: 1200 }, relief: { relief: 400, base: 150 } },
@@ -192,4 +230,9 @@ export const presetWorlds: Readonly<
   desert: { climate: { latitude: 24, rainfall: 80 }, relief: { relief: 600, base: 300 } },
   savanna: { climate: { latitude: 11, rainfall: 750 }, relief: { relief: 300, base: 400 } },
   tropical: { climate: { latitude: 3, rainfall: 2700 }, relief: { relief: 800, base: 120 } },
+  island: {
+    climate: { latitude: 9, rainfall: 2400 },
+    relief: { coast: 'island' as const, relief: 330, base: 40 },
+    biomes: [inland(presets.tropical), inland(presets.temperate), presets.beach],
+  },
 });

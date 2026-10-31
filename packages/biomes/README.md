@@ -150,7 +150,9 @@ console.log(world.biomes[first].id, tile.layer('biomeWeight')!.data[0] / 255, wo
 plant functional type limits over the coldest month, growing degree days and the moisture index, with Korner's
 treeline for forests, so belts move with latitude, aspect and cold air instead of fixed heights. They are plain frozen
 data (the package tests check each one with `defineBiome`), so the entry is small. `presetWorlds` holds
-a climate and relief where each one is common, used by the golden digests. The default world uses `temperate` with
+a climate and relief where each one is common, used by the golden digests. `presets.beach` is sand on low, gentle
+ground by the sea (below 5 m, under 12 degrees) in any climate, and `presetWorlds.island` is a tropical island world
+with its biomes ready to pass (see Procedural relief). The default world uses `temperate` with
 its neighbours `alpine`, `wetland` and `boreal`. Every definition is plain JSON: `defineBiome` validates it and returns
 a frozen copy.
 
@@ -548,7 +550,7 @@ algorithm and against float references in the package tests.
 ## Procedural relief
 
 `createRelief(options)` (entry `/relief`) is a seeded landscape in integer millimetres: fractal lowlands, ridged
-mountains under a mountain mask, an optional coast and river valleys. It is the default height of a biome world. The
+mountains under a mountain mask, an optional coast or islands and river valleys. It is the default height of a biome world. The
 mask has a wavelength of 6 km, or half the longest side of a smaller world, so a 4 km world has mountains somewhere on
 every seed; worlds of 12 km and more, R16 included, keep 6 km.
 
@@ -567,9 +569,31 @@ console.log(metres, relief.rivers.length);
 | `origin` | `-size / 2` | minimum corner in metres |
 | `base` | 120 | mean lowland height in metres |
 | `relief` | 900 | ridge height above the lowland in metres, 0..8,000 |
-| `coast` | `'none'` | `'west'`, `'east'`, `'north'` or `'south'`: that side runs into the sea over a 1.5 km shelf |
-| `rivers` | 0 | 0..8 river valleys (250 m half width) toward the coast |
+| `coast` | `'none'` | `'west'`, `'east'`, `'north'` or `'south'`: that side runs into the sea over the shelf; `'island'`: islands with sea on every side |
+| `rivers` | 0 | 0..8 river valleys toward the coast (on islands, out from the peak to the sea) |
 | `seaDepth` | 40 | sea floor depth in metres |
+| `shelf` | 1500 | width of a straight coast's shelf from the sea floor up to the land in metres, 1..16,000 |
+| `valley.width` | 250 | valley half width in metres, 1..4,000 (islands: a sixth of the radius when that is less) |
+| `valley.floor` | 0 | half width of a flat floor at the bed in metres, below `width` and `mouth` |
+| `valley.mouth` | `valley.width` | half width at the mouth in metres; the valley widens (an estuary) or narrows over its last kilometre |
+| `islands.count` | 1 | 1..8 islands, each centred from the seed |
+| `islands.radius` | a third of the shorter side | outer shelf edge on the long axis in metres, 100 m to 0.39 of the shorter side (a sixth for 2 to 4 islands, a ninth for 5 to 8) |
+| `islands.shelf` | `shelf`, else 0.3 of the radius | shelf width from the sea floor up to the beach in metres |
+
+Each island is an ellipse (a hashed turn and stretch) warped by noise into bays and headlands, a shelf from the sea
+floor up to a beach ring 1 to 4 m above the sea and 60 to 120 m wide, then land that climbs to a peak with ridge spurs
+(ridged noise at a third of the radius). `relief.islands` lists their centres and radius in millimetres. The
+island preset world puts one in a tropical climate with its own biomes: `tropical` and `temperate` kept above 4 m and
+`beach` on the shore.
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+import { presetWorlds } from '@margoengine/biomes/presets';
+
+const { climate, relief, biomes } = presetWorlds.island;
+const world = await BiomeWorld.create({ climate, height: { relief }, biomes });
+console.log(world.sample(0, 0).height); // the peak is near the middle; every edge is 40 m under the sea
+```
 
 `quantizeHeights(floats, unit?)` (in `/toolkit`) turns float heights (metres times `unit`) into integer millimetres once, so a
 heightmap from any source enters the integer world the same way everywhere.
