@@ -57,12 +57,20 @@ export const IDLE_BANNER = 'You were idle, so Plaza gave your place to someone e
 
 /** What the router's GET /join answers. */
 export type JoinAnswer =
-  | { kind: 'shard'; url: string; shard: number | undefined; world: string | undefined }
+  | {
+      kind: 'shard';
+      url: string;
+      shard: number | undefined;
+      world: string | undefined;
+      /** The world's seed and its floor (the square's height), when the router says; both or neither. */
+      seed: number | undefined;
+      floor: number | undefined;
+    }
   | { kind: 'full'; online: number | undefined }
   | { kind: 'starting'; retryIn: number };
 
 /**
- * Reads the JSON of GET /join: `{url, shard, world}` joins that shard, `{full: true, online}` means no room, and
+ * Reads the JSON of GET /join: `{url, shard, world, seed, floor}` joins that shard (the last two are optional), `{full: true, online}` means no room, and
  * `{starting: true, retryIn}` means between worlds or restarting, so ask again in `retryIn` seconds.
  * @throws TypeError for anything else.
  */
@@ -76,6 +84,8 @@ export function parseJoin(value: unknown): JoinAnswer {
       url: v.url,
       shard: typeof v.shard === 'number' ? v.shard : undefined,
       world: v.world === undefined ? undefined : String(v.world),
+      seed: Number.isInteger(v.seed) && Number.isInteger(v.floor) ? (v.seed as number) : undefined,
+      floor: Number.isInteger(v.seed) && Number.isInteger(v.floor) ? (v.floor as number) : undefined,
     };
   throw new TypeError(
     `The Plaza router answered /join with ${JSON.stringify(value)}; expected {url}, {full} or {starting}`,
@@ -120,6 +130,50 @@ export function soloBanner(kind: 'full' | 'offline', count: number | undefined, 
 }
 
 const withSlash = (url: string) => (url.endsWith('/') ? url : `${url}/`);
+
+/** What the page says when it will not send an edit the shard refuses: the square cannot be built on. */
+export const PROTECTED_MESSAGE = 'The square is protected. Build outside it.';
+/** What the page says when the server did not keep an edit and the page could not tell why. */
+export const REFUSED_MESSAGE = 'That change did not go through. Move closer or try again.';
+/** The least time between two such messages, milliseconds. */
+export const NOTICE_EVERY = 4000;
+
+/**
+ * Notices of edits the server did not keep. The page applies an edit at once and the server answers only by putting the
+ * cell back, so an edit is checked `delay` milliseconds after it was made: a cell that is not as the page set it was
+ * refused (too far, too fast, someone standing there, a frozen area after a report, the world ending) or changed by
+ * another player at that moment.
+ */
+export class EditWatch {
+  readonly #delay: number;
+  readonly #pending = new Map<string, { x: number; y: number; z: number; state: number; at: number }>();
+  /** @param delay Milliseconds to wait for the server's answer; must cover the round trip and a tick. */
+  constructor(delay = 1200) {
+    this.#delay = delay;
+  }
+  /** Notes an edit made at `now` (milliseconds); a later edit of the same cell replaces it. */
+  add(x: number, y: number, z: number, state: number, now: number): void {
+    this.#pending.set(`${x},${y},${z}`, { x, y, z, state, at: now });
+  }
+  /**
+   * Checks the edits at least `delay` old at `now` and forgets them. `read` gives a cell's state, or undefined when its
+   * chunk is not loaded (that edit is dropped, not counted). Returns how many did not stay.
+   */
+  settle(now: number, read: (x: number, y: number, z: number) => number | undefined): number {
+    let refused = 0;
+    for (const [key, e] of this.#pending) {
+      if (now - e.at < this.#delay) continue;
+      this.#pending.delete(key);
+      const state = read(e.x, e.y, e.z);
+      if (state !== undefined && state !== e.state) refused++;
+    }
+    return refused;
+  }
+  /** Forgets every edit (the connection ended). */
+  clear(): void {
+    this.#pending.clear();
+  }
+}
 
 /** The minimum time between two reports from this page, milliseconds; the router holds the same limit per identity. */
 export const REPORT_EVERY = 60_000;

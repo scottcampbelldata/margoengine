@@ -29,17 +29,22 @@ import { type SceneLighting, setupLighting } from './lighting.ts';
 import type { Figures } from './figures.ts';
 import {
   closeKind,
+  EditWatch,
   IDLE_BANNER,
   joinPlaza,
   joinServer,
   keyBits,
+  NOTICE_EVERY,
   type Online,
+  PROTECTED_MESSAGE,
   plazaName,
+  REFUSED_MESSAGE,
   REPORT_EVERY,
   sendReport,
   soloBanner,
 } from './multiplayer.ts';
 import type { PhotoMode } from './photo.ts';
+import { isPlazaProtected } from './plaza-area.ts';
 import { buildShapes, buildShowcase, groundY, showcaseReady } from './showcase.ts';
 import { DEFAULT_SEED } from './terrain.ts';
 import { paintBlockTextures } from './textures.ts';
@@ -139,6 +144,10 @@ interface Sandbox {
   readonly streamer: VoxelStreamer | undefined;
   /** The joined server (`?server=`, `?plaza=`); undefined when playing alone. */
   readonly online: Online | undefined;
+  /** The seed and floor of the Plaza world the router sent the page to; undefined alone or on a direct `?server=`. */
+  readonly plazaWorld: { seed: number; floor: number } | undefined;
+  /** Asks the server for an edit the way a click does (the protected square refused here, edits watched); false when not sent. Online only. */
+  edit(x: number, y: number, z: number, state: number): boolean;
   /** The other players' figures while online. */
   readonly figures: Figures | undefined;
   /** The touch controls; undefined in the deterministic mode. */
@@ -506,6 +515,25 @@ async function boot(): Promise<void> {
   // Break (left), place (right), pick block (middle) at the block under the crosshair.
   let hit: VoxelHit | null = null,
     outlined = '';
+  // A line for the player, at most once every NOTICE_EVERY: a held button asks again every REPEAT seconds.
+  function notice(text: string): void {
+    const now = performance.now();
+    if (now - lastNotice < NOTICE_EVERY) return;
+    lastNotice = now;
+    toast(text);
+  }
+  // Asks the server for an edit unless the shard's own rule (isPlazaProtected, the same function) would refuse it:
+  // then nothing changes on screen and the player is told why. Returns whether it was sent.
+  function sendEdit(x: number, y: number, z: number, state: number): boolean {
+    if (!online) return false;
+    if (worldInfo && isPlazaProtected(x, y, z, worldInfo.floor)) {
+      notice(PROTECTED_MESSAGE);
+      return false;
+    }
+    if (!online.client.edit(x, y, z, state)) return false;
+    edits.add(x, y, z, state, performance.now());
+    return true;
+  }
   function act(button: number): void {
     if (!hit || !spawned) return;
     if (button === 0) {
@@ -514,7 +542,7 @@ async function boot(): Promise<void> {
       if (!online) {
         world.setBlocks(above.shape === 'cross' ? [x, y, z, 0, x, y + 1, z, 0] : [x, y, z, 0]);
         connectStairs(world, x, y, z);
-      } else if (online.client.edit(x, y, z, 0) && above.shape === 'cross') online.client.edit(x, y + 1, z, 0);
+      } else if (sendEdit(x, y, z, 0) && above.shape === 'cross') sendEdit(x, y + 1, z, 0);
     } else if (button === 2) {
       const id = blocks.id(hotbar.block),
         type = blocks.get(id),
@@ -528,7 +556,7 @@ async function boot(): Promise<void> {
         there = blocks.get(blockId(world.getBlock(x, y, z))),
         below = blocks.get(blockId(world.getBlock(x, y - 1, z)));
       if (onSlab) {
-        if (online) online.client.edit(x, y, z, doubleSlabState(id));
+        if (online) sendEdit(x, y, z, doubleSlabState(id));
         else world.setBlock(x, y, z, doubleSlabState(id));
         return;
       }
@@ -544,7 +572,7 @@ async function boot(): Promise<void> {
           type.shape === 'slab' ? slabState(id, high) : type.shape === 'stair' ? stairState(id, facing, high) : id,
         // Placed into its waterlog liquid, a slab or stair is waterlogged.
         state = there.liquid && type.waterlog === there.id ? waterlogState(shaped) : shaped;
-      if (online) online.client.edit(x, y, z, state);
+      if (online) sendEdit(x, y, z, state);
       else {
         world.setBlock(x, y, z, state);
         connectStairs(world, x, y, z);
@@ -565,7 +593,11 @@ async function boot(): Promise<void> {
     welcomeTimer: ReturnType<typeof setTimeout> | undefined,
     shard: number | undefined,
     worldId: string | undefined,
-    lastReport = Number.NEGATIVE_INFINITY;
+    // The seed and floor of the world the router sent us to; unknown on a direct ?server= (the welcome has neither).
+    worldInfo: { seed: number; floor: number } | undefined,
+    lastReport = Number.NEGATIVE_INFINITY,
+    lastNotice = Number.NEGATIVE_INFINITY;
+  const edits = new EditWatch();
   const serverName = serverUrl ?? 'Plaza';
 
   // Spawn: a saved position, else the first dry ground in a spiral around the origin, once that ground is loaded and lit.
@@ -654,6 +686,13 @@ async function boot(): Promise<void> {
     outlined = target;
     outline.visible = !!hit && isPlaying();
     setUnderwater(!!blocks.get(blockId(world.getBlock(Math.floor(x), Math.floor(y + EYE), Math.floor(z)))).liquid);
+    if (
+      online &&
+      edits.settle(performance.now(), (cx, cy, cz) =>
+        world.getChunk(cx >> 5, cy >> 5, cz >> 5) ? world.getBlock(cx, cy, cz) : undefined,
+      )
+    )
+      notice(REFUSED_MESSAGE);
     if (buttons.size && (repeat -= dt) <= 0) {
       repeat = REPEAT;
       for (const b of buttons) if (b !== 1) act(b);
@@ -736,7 +775,7 @@ async function boot(): Promise<void> {
           ]
         : []),
       `quads ${s.quads.toLocaleString()}  ${(s.bytes / 1048576).toFixed(1)} MiB  draws ${s.draws}`,
-      `seed ${seed}  ${scene.hours.toFixed(1)} h${ready ? '' : '  loading'}`,
+      `${online ? (worldInfo ? `seed ${worldInfo.seed}  ` : '') : `seed ${seed}  `}${scene.hours.toFixed(1)} h${ready ? '' : '  loading'}`,
       ...(photo?.on ? [`photo mode  ${photo.samples} samples`] : []),
     ]);
     if (!spawned)
@@ -818,7 +857,7 @@ async function boot(): Promise<void> {
     chunkBytes: [...loaded.values()].reduce((sum, chunk) => sum + chunk.byteLength, 0),
     lightQueue: lightWork,
     distance,
-    seed,
+    seed: online ? (worldInfo?.seed ?? 'unknown') : seed,
     tier,
     canvas: `${canvas.width}x${canvas.height}`,
     mesherWorkers: workers || 'default',
@@ -840,6 +879,10 @@ async function boot(): Promise<void> {
     get online() {
       return online;
     },
+    get plazaWorld() {
+      return worldInfo;
+    },
+    edit: sendEdit,
     get figures() {
       return figures;
     },
@@ -963,6 +1006,8 @@ async function boot(): Promise<void> {
     setReport(undefined);
     online?.dispose();
     online = undefined;
+    worldInfo = undefined;
+    edits.clear();
     figures?.dispose();
     figures = undefined;
     for (const key of [...loaded.keys()]) {
@@ -1008,6 +1053,8 @@ async function boot(): Promise<void> {
         if (answer.kind === 'full') return goSolo('full', answer.online);
         shard = answer.shard;
         worldId = answer.world;
+        if (answer.seed !== undefined && answer.floor !== undefined)
+          worldInfo = { seed: answer.seed, floor: answer.floor };
         connect(answer.url, Math.max(0, JOIN_TIMEOUT - (performance.now() - started)));
       },
       (error) => {

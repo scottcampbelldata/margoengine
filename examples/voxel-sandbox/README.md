@@ -202,6 +202,12 @@ node examples/voxel-sandbox/server/admin.mjs status --data=plaza-data
 A world lasts 6 hours. Its edited chunks are saved every 10 minutes, so a crash loses at most that; a world's end closes
 each client with 1001, and the page asks `/join` again. A player idle for 10 minutes (no movement, no edit; a hidden tab still answers pings, so pings do not count) is closed with code 4410 and reason `idle`, which frees its place; a page must not rejoin on that code. Worlds get a stone square at the origin that players cannot edit
 (`src/plaza.ts`, only with `plaza=1` in the generator's URL), and names come from two word lists (`src/names.ts`).
+The router's `/join` answer carries the world's `seed` and `floor`; the page keeps `floor` and asks the shard's own
+rule (`isPlazaProtected`, `src/plaza-area.ts`) before it predicts an edit, so a protected cell never flashes and the
+player reads "The square is protected. Build outside it." (at most once every 4 seconds). An edit the shard refuses for
+any other reason (too fast, out of reach, someone standing there, a frozen area) is put back by the server and the page
+says "That change did not go through." A page joined with a bare `?server=` has no floor, so it shows no seed and
+leaves the rule to the server.
 
 ## Tests
 

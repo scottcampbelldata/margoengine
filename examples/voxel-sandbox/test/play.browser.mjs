@@ -7,13 +7,17 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createConnection, createServer as createTcpServer } from 'node:net';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { VoxelBot } from '@margoengine/voxel-net/bot';
 import { freePort, openBrowser } from '../../../scripts/browser.js';
 import { killTree } from '../../../scripts/support/shutdown.mjs';
 import { defineBlocks } from '../src/blocks.ts';
+import { NOTICE_EVERY, PROTECTED_MESSAGE, REFUSED_MESSAGE } from '../src/multiplayer.ts';
+import { isPlazaProtected, PLAZA_WALL_TOP } from '../src/plaza-area.ts';
 
 process.chdir(resolve(import.meta.dirname, '../../..'));
 const cleanup = [];
@@ -38,6 +42,12 @@ const sandbox = (f, arg) => page.evaluate(f, arg),
   position = () => sandbox(() => [...window.voxelSandbox.player.position]);
 try {
   await page.setViewportSize({ width: 960, height: 540 });
+  // PLAY_ONLY=edits runs only the Plaza edit test below (a quick loop while working on it).
+  if (process.env.PLAY_ONLY === 'edits') {
+    await plazaEdits();
+    console.log('voxel sandbox Plaza edit test passed');
+    process.exit(await closeAll());
+  }
   await page.goto(`http://127.0.0.1:${port}${path}`);
   await page.waitForFunction(() => window.voxelSandbox?.spawned, null, { timeout: 120_000 });
   const spawn = await position(),
@@ -129,14 +139,20 @@ try {
   assert.deepEqual(errors, []);
 
   await plaza();
+  await plazaEdits();
   assert.deepEqual(
     errors.filter((e) => !NETWORK_ERROR.test(e)),
     [],
   );
   console.log('voxel sandbox play test passed');
 } finally {
+  await closeAll();
+}
+
+async function closeAll() {
   await context.close();
-  for (const close of cleanup.reverse()) await close();
+  for (const close of cleanup.splice(0).reverse()) await close();
+  return 0;
 }
 
 async function plaza() {
@@ -697,4 +713,258 @@ async function tcpProxy(target) {
       }),
   );
   return pipe;
+}
+
+// Plaza edits on the real page: a local router and shard, the real mouse. Outside the square an edit stays; on it the page
+// sends nothing, changes nothing (not even for a frame) and says why, once in NOTICE_EVERY; an edit the server refuses
+// for any other reason is put back and the page says so; the HUD shows the world's seed.
+async function plazaEdits() {
+  const [routerPort, shardPort] = [await freePort(), await freePort()],
+    data = mkdtempSync(join(tmpdir(), 'plaza-edits-')),
+    router = spawn(
+      process.execPath,
+      [
+        'examples/voxel-sandbox/server/router.mjs',
+        `--data=${data}`,
+        `--port=${routerPort}`,
+        `--shard-port=${shardPort}`,
+        '--origins=*',
+      ],
+      { stdio: 'ignore' },
+    );
+  cleanup.push(async () => {
+    await killTree(router);
+    rmSync(data, { recursive: true, force: true });
+  });
+  for (let tries = 0; ; tries++) {
+    const answer = await fetch(`http://127.0.0.1:${routerPort}/join`).then(
+      (r) => r.json(),
+      () => ({}),
+    );
+    if (answer.url) break;
+    assert.ok(tries < 120, 'the router never found a shard');
+    // fixed-wait: polling the router, which has no event for its first shard being ready
+    await new Promise((done) => setTimeout(done, 500));
+  }
+  const tab = page,
+    ev = (f, arg) => tab.evaluate(f, arg),
+    pause = (ms) => tab.waitForTimeout(ms);
+  await tab.goto(
+    `http://127.0.0.1:${port}/examples/voxel-sandbox/index.html?plaza=http://127.0.0.1:${routerPort}&rd=2`,
+  );
+  await tab.waitForFunction(
+    () => window.voxelSandbox?.spawned && window.voxelSandbox.online?.client.welcome && window.voxelSandbox.plazaWorld,
+    null,
+    { timeout: 120_000 },
+  );
+  const { seed, floor } = await ev(() => window.voxelSandbox.plazaWorld),
+    hud = await ev(() => document.getElementById('hud').textContent);
+  assert.ok(hud.includes(`seed ${seed} `), `the HUD shows the world's seed ${seed}: ${hud}`);
+  console.log(`ok the HUD shows the world's seed ${seed}`);
+
+  await tab.mouse.click(480, 270);
+  await tab.waitForFunction(() => document.pointerLockElement?.id === 'scene', null, { timeout: 5000 });
+  // What the page sent, what the toast said, and every write to a watched cell.
+  await ev(() => {
+    const s = window.voxelSandbox,
+      client = s.online.client,
+      send = client.edit.bind(client);
+    window.__sent = [];
+    client.edit = (x, y, z, state) => {
+      const ok = send(x, y, z, state);
+      window.__sent.push({ x, y, z, state, ok });
+      return ok;
+    };
+    window.__toasts = [];
+    const toastBox = document.getElementById('toast');
+    new MutationObserver(() => {
+      if (toastBox.textContent) window.__toasts.push(toastBox.textContent);
+    }).observe(toastBox, { childList: true, characterData: true, subtree: true });
+    window.__watches = new Map();
+    window.__watch = (name, cell) => {
+      const world = s.world,
+        set = world.setBlock.bind(world),
+        key = cell.join(','),
+        seen = new Set([world.getBlock(...cell)]),
+        writes = [];
+      let running = true;
+      world.setBlock = (x, y, z, state) => {
+        if (`${x},${y},${z}` === key) writes.push(state);
+        return set(x, y, z, state);
+      };
+      const sample = () => {
+        seen.add(world.getBlock(...cell));
+        if (running) requestAnimationFrame(sample);
+      };
+      sample();
+      window.__watches.set(name, () => {
+        running = false;
+        world.setBlock = set;
+        return { writes, seen: [...seen] };
+      });
+    };
+    window.__unwatch = (name) => window.__watches.get(name)();
+  });
+  const state = (cell) => ev((c) => window.voxelSandbox.world.getBlock(...c), cell),
+    target = () =>
+      ev(() => {
+        const t = window.voxelSandbox.target;
+        return t && { cell: [...t.cell], adjacent: [...t.adjacent] };
+      }),
+    pos = () => ev(() => [...window.voxelSandbox.player.position]),
+    sentCount = () => ev(() => window.__sent.length),
+    toasts = () => ev(() => [...window.__toasts]),
+    click = async (button) => {
+      await tab.mouse.down({ button });
+      await pause(40);
+      await tab.mouse.up({ button });
+    };
+  let mouseX = 480,
+    mouseY = 270;
+  // A locked mouse turns the view by its movement: 0.0024 rad per pixel (a move left turns left, a move up looks up).
+  const turn = async (yaw, pitch) => {
+    const look = await ev(() => ({ ...window.voxelSandbox.look }));
+    mouseX += (look.yaw - yaw) / 0.0024;
+    mouseY += (look.pitch - pitch) / 0.0024;
+    await tab.mouse.move(mouseX, mouseY);
+    await pause(150);
+  };
+  // Every edit the page sent, the last for its cell, must stand.
+  const fallen = () =>
+    ev(() => {
+      const last = new Map();
+      for (const e of window.__sent) if (e.ok) last.set(`${e.x},${e.y},${e.z}`, e);
+      return [...last.values()].filter((e) => window.voxelSandbox.world.getBlock(e.x, e.y, e.z) !== e.state);
+    });
+
+  // Outside the square: a break and a place stay, with no word from the page.
+  // The first steepness that has a block in reach (a spawn at a shore may have none ahead).
+  const aimDown = async () => {
+    for (const pitch of [-0.7, -1, -1.3, -1.5]) {
+      await turn(await ev(() => window.voxelSandbox.look.yaw), pitch);
+      const hit = await target();
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const ahead = await aimDown();
+  assert.ok(ahead, 'ground ahead');
+  assert.ok(!isPlazaProtected(...ahead.cell, floor), 'the spawn is outside the square');
+  await click('left');
+  await pause(1500);
+  assert.equal(await state(ahead.cell), 0, `the break of ${ahead.cell} stays`);
+  await tab.keyboard.press('Digit1');
+  const face = await aimDown();
+  assert.ok(face, 'a face to place against');
+  await click('right');
+  await pause(1500);
+  assert.notEqual(await state(face.adjacent), 0, `the block placed at ${face.adjacent} stays`);
+  assert.deepEqual(await toasts(), [], 'nothing to say outside the square');
+  console.log('ok outside the square a break and a place stay');
+
+  // A held button (REPEAT 0.22 s), then a slow stream of clicks: every edit sent stands.
+  for (const button of ['right', 'left']) {
+    await tab.mouse.down({ button });
+    await pause(1600);
+    await tab.mouse.up({ button });
+  }
+  for (let i = 0; i < 5; i++) {
+    await click(i % 2 ? 'right' : 'left');
+    await pause(700);
+  }
+  await pause(1500);
+  const edits = await sentCount();
+  assert.ok(edits >= 8, `the held buttons and the clicks sent ${edits} edits`);
+  assert.deepEqual(await fallen(), [], 'every edit stands');
+  assert.deepEqual(await toasts(), [], 'still nothing to say');
+  console.log(`ok a held button and a slow stream: ${edits} edits, all stand, no notice`);
+
+  // An edit the shard refuses for another reason (too fast: 5 in a burst, 10 a second): put back, and the page says so.
+  const [px, py, pz] = (await pos()).map(Math.floor),
+    cells = [];
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) cells.push([px + dx, py + 3, pz + dz]);
+  const brick = await ev(() => window.voxelSandbox.world.blocks.id('bricks')),
+    sentBefore = await sentCount();
+  assert.ok(isPlazaProtected(...cells[0], floor) === false, 'the cells over the spawn are outside the square');
+  const accepted = await ev(
+    ([cs, state]) => cs.filter(([x, y, z]) => window.voxelSandbox.edit(x, y, z, state)).length,
+    [cells, brick],
+  );
+  assert.equal(accepted, cells.length, 'the page sends them all');
+  await pause(2500);
+  const kept = [];
+  for (const c of cells) if ((await state(c)) === brick) kept.push(c);
+  assert.ok(
+    kept.length >= 5 && kept.length < cells.length,
+    `the shard keeps the burst and refuses the rest (${kept.length})`,
+  );
+  assert.ok((await toasts()).includes(REFUSED_MESSAGE), 'the page says the change did not go through');
+  console.log(`ok a burst of ${cells.length}: ${kept.length} kept, the rest put back, and the page says so`);
+  assert.ok((await sentCount()) > sentBefore);
+  await ev(() => window.__toasts.splice(0));
+  await pause(NOTICE_EVERY);
+
+  // Over the square: fly up above the hills and the sign wall, over the middle of it, and down to about 4 blocks above its floor.
+  await tab.keyboard.press('KeyF');
+  await tab.keyboard.down('Space');
+  await tab.waitForFunction((y) => window.voxelSandbox.player.position[1] > y, floor + PLAZA_WALL_TOP + 3, {
+    timeout: 60_000,
+  });
+  await tab.keyboard.up('Space');
+  const [x0, , z0] = await pos(),
+    toOrigin = Math.atan2(x0, z0);
+  await turn(toOrigin, 0);
+  await tab.keyboard.down('KeyW');
+  await tab.waitForFunction(
+    () => Math.hypot(window.voxelSandbox.player.position[0], window.voxelSandbox.player.position[2]) < 10,
+    null,
+    { timeout: 30_000 },
+  );
+  await tab.keyboard.up('KeyW');
+  await tab.keyboard.down('KeyC');
+  await tab.waitForFunction((y) => window.voxelSandbox.player.position[1] < y, floor + 4.2, { timeout: 30_000 });
+  await tab.keyboard.up('KeyC');
+  await pause(800);
+  await turn(toOrigin, -1.5);
+  const onSquare = await target();
+  assert.ok(onSquare, 'the square under the crosshair');
+  assert.ok(isPlazaProtected(...onSquare.cell, floor), `${onSquare.cell} is on the square`);
+  assert.ok(isPlazaProtected(...onSquare.adjacent, floor), `${onSquare.adjacent} is on the square`);
+  await ev(() => window.__toasts.splice(0)); // the 'Flying' and 'Walking' toasts
+  const original = await state(onSquare.cell);
+  assert.notEqual(original, 0);
+  await ev(
+    ([a, b]) => {
+      window.__watch('cell', a);
+      window.__watch('above', b);
+    },
+    [onSquare.cell, onSquare.adjacent],
+  );
+  const sentOnSquare = await sentCount();
+  await click('left');
+  await pause(1500);
+  assert.deepEqual(await toasts(), [PROTECTED_MESSAGE], 'the break on the square is explained');
+  await tab.keyboard.press('Digit1');
+  await click('right');
+  await pause(1500);
+  const cell = await ev(() => window.__unwatch('cell')),
+    above = await ev(() => window.__unwatch('above'));
+  assert.deepEqual(cell, { writes: [], seen: [original] }, 'the block never changed, not for a frame');
+  assert.deepEqual(above, { writes: [], seen: [0] }, 'nothing appeared above it, not for a frame');
+  assert.equal(await sentCount(), sentOnSquare, 'nothing was sent to the shard');
+  assert.equal((await toasts()).filter((t) => t === PROTECTED_MESSAGE).length, 1, 'one notice, not one per click');
+  console.log('ok on the square nothing changes, nothing is sent, and the page says why once');
+
+  // A held button on the square: one notice, not one per repeat; and the next comes once its interval is over.
+  await pause(NOTICE_EVERY);
+  await ev(() => window.__toasts.splice(0));
+  await tab.mouse.down({ button: 'left' });
+  await pause(NOTICE_EVERY - 600);
+  await tab.mouse.up({ button: 'left' });
+  assert.deepEqual(await toasts(), [PROTECTED_MESSAGE], 'a held button gives one notice inside the interval');
+  await pause(1000);
+  await click('left');
+  assert.deepEqual(await toasts(), [PROTECTED_MESSAGE, PROTECTED_MESSAGE], 'and the next one after it');
+  assert.equal(await sentCount(), sentOnSquare, 'still nothing was sent');
+  console.log('ok a held button on the square repeats the notice no faster than its interval');
 }

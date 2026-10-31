@@ -64,3 +64,13 @@ test('the path tracer is reached only through the dynamic import', async () => {
   assert.match(main, /import\('\.\/photo\.ts'\)/);
   assert.match(main, /import\('\.\/figures\.ts'\)/);
 });
+
+// The page asks the shard's own protection rule before it predicts an edit (so a refused edit never flashes), but takes it
+// from plaza-area.ts: plaza.ts holds the terrain and the generator, which a page must not download.
+test('the page shares the protection rule without the generator', async () => {
+  const main = await readFile(new URL('main.ts', new URL('../src/', import.meta.url)), 'utf8');
+  assert.match(main, /from '\.\/plaza-area\.ts'/);
+  assert.doesNotMatch(main, /from '\.\/plaza\.ts'/);
+  const area = await readFile(new URL('../src/plaza-area.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(area, /^import\s/m, 'plaza-area.ts imports nothing');
+});

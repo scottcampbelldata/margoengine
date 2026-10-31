@@ -4,6 +4,7 @@ import { Keys, SERVER_SILENT_CODE } from '@margoengine/voxel-net';
 import { limbSwing, PARTS, TAG_RANGE, writeFigure, yawOf } from '../src/figures.ts';
 import {
   closeKind,
+  EditWatch,
   IDLE_BANNER,
   IDLE_CLOSE_CODE,
   keyBits,
@@ -11,6 +12,8 @@ import {
   plazaName,
   soloBanner,
 } from '../src/multiplayer.ts';
+import { isPlazaProtected as areaRule } from '../src/plaza-area.ts';
+import { isPlazaProtected as shardRule } from '../src/plaza.ts';
 import { isPlazaName } from '../src/names.ts';
 
 test('keyBits turns the sandbox keys into input bits', () => {
@@ -31,8 +34,23 @@ test('/join answers: a shard, full, starting, or an error', () => {
       url: 'wss://plaza.example/s/1',
       shard: 1,
       world: 'w7',
+      seed: undefined,
+      floor: undefined,
     },
   );
+  // The seed and the floor come together or not at all: the page needs the floor to know the protected square, and the
+  // HUD shows the seed only when it is the world's.
+  assert.deepEqual(parseJoin({ url: 'ws://h:1', shard: 0, world: 'w', seed: 2002451287, floor: 9 }), {
+    kind: 'shard',
+    url: 'ws://h:1',
+    shard: 0,
+    world: 'w',
+    seed: 2002451287,
+    floor: 9,
+  });
+  assert.equal(parseJoin({ url: 'ws://h:1', seed: 5 }).floor, undefined);
+  assert.equal(parseJoin({ url: 'ws://h:1', floor: 5 }).seed, undefined);
+  assert.equal(parseJoin({ url: 'ws://h:1', seed: 'x', floor: 5 }).floor, undefined);
   assert.equal(parseJoin({ url: 'ws://127.0.0.1:9', world: 12 }).world, '12');
   assert.deepEqual(parseJoin({ full: true, online: 400, retryIn: 30 }), { kind: 'full', online: 400 });
   assert.deepEqual(parseJoin({ full: false, starting: true, retryIn: 2 }), { kind: 'starting', retryIn: 2 });
@@ -185,4 +203,36 @@ test('closeKind: only the idle code stops the page; every other close goes back 
   assert.equal(closeKind({ code: 1005, byClient: true }), 'unreadable');
   assert.equal(closeKind({ code: IDLE_CLOSE_CODE, byClient: true }), 'unreadable');
   assert.ok(!/[–—]/.test(IDLE_BANNER), 'no dashes in visible copy');
+});
+
+test('the page asks the rule the shard asks', () => {
+  assert.equal(areaRule, shardRule);
+  assert.equal(areaRule(0, 5, 0, 5), true, 'the middle of the square');
+  assert.equal(areaRule(0, 5, 60, 5), false, 'far outside');
+});
+
+test('EditWatch counts the edits the server put back, once, after its delay', () => {
+  const watch = new EditWatch(1000),
+    world = new Map(),
+    read = (x, y, z) => world.get(`${x},${y},${z}`) ?? 0;
+  watch.add(1, 2, 3, 7, 0); // kept
+  watch.add(4, 5, 6, 7, 0); // refused: the cell went back to 0
+  world.set('1,2,3', 7);
+  assert.equal(watch.settle(999, read), 0, 'the server has not had its time yet');
+  assert.equal(watch.settle(1000, read), 1);
+  assert.equal(watch.settle(5000, read), 0, 'each edit is judged once');
+  // The newest edit of a cell is the one judged: break then place.
+  watch.add(1, 2, 3, 0, 0);
+  watch.add(1, 2, 3, 9, 100);
+  world.set('1,2,3', 9);
+  assert.equal(watch.settle(2000, read), 0);
+  // A cell whose chunk is not loaded is not a refusal.
+  watch.add(7, 7, 7, 1, 0);
+  assert.equal(
+    watch.settle(2000, () => undefined),
+    0,
+  );
+  watch.add(8, 8, 8, 1, 0);
+  watch.clear();
+  assert.equal(watch.settle(9000, read), 0);
 });
