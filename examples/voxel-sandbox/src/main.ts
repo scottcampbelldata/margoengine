@@ -27,6 +27,7 @@ import { BLOCK_DEFINITIONS, defineBlocks, HOTBAR } from './blocks.ts';
 import generatorUrl from './generator.worker.ts?worker&url';
 import { type SceneLighting, setupLighting } from './lighting.ts';
 import type { Figures } from './figures.ts';
+import { chunkLine, frameSeconds } from './frame.ts';
 import {
   closeKind,
   EditWatch,
@@ -768,7 +769,11 @@ async function boot(): Promise<void> {
       `${fps.toFixed(0)} FPS  ${tier} tier`,
       `XYZ ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}  facing ${facing}  ${mode}`,
       `chunk ${Math.floor(x) >> 5} ${Math.floor(y) >> 5} ${Math.floor(z) >> 5}  render distance ${distance}`,
-      `chunks ${s.chunks} drawn, ${s.visible} visible, ${loaded.size} loaded, ${streamer ? `${streamer.pending} to load` : online?.client.loaded ? 'all received' : 'receiving'}`,
+      chunkLine(
+        s,
+        loaded.size,
+        streamer ? `${streamer.pending} to load` : online?.client.loaded ? 'all received' : 'receiving',
+      ),
       ...(online
         ? [
             `server ${serverName}  ${online.client.players.size} players near  ${online.client.stats.corrections} corrections`,
@@ -816,7 +821,7 @@ async function boot(): Promise<void> {
     if (!running) return;
     requestAnimationFrame(frame);
     if (manual || (runtime.pace && !runtime.pace(time))) return;
-    const dt = last ? Math.min((time - last) / 1000, 0.1) : 0;
+    const dt = frameSeconds(time, last);
     last = time;
     const start = performance.now();
     try {

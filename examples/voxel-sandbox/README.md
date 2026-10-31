@@ -111,6 +111,7 @@ slab, slabs and stairs placed in water are waterlogged, and stairs turn into cor
 ### Benchmark
 
 ```sh
+node examples/voxel-sandbox/measure.mjs --live   # per-pass GPU times, frame CPU and walking speed of any build, to one file
 node examples/voxel-sandbox/bench.mjs   # options --distances=8,16 --loads=3 --no-quiet; npm run bench:voxel runs it in the bench tool
 ```
 
