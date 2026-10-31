@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   applyQualityTier,
   watchQuality,
+  FAST_GPU_MS,
   capFrameRate,
   paceEngine,
   qualityPreset,
@@ -181,94 +182,253 @@ test('on the full tier, sustained slow frames store low and reload once; fast or
   );
 });
 
-test('the light tier remembers the full tier only when the GPU has clear headroom, and never reloads', async () => {
-  try {
-    for (const [gpu, expected] of [
-      [2, ['high']],
-      [9, []],
-    ]) {
-      const frames = [],
-        pending = [],
-        stored = [];
-      let clock = 0,
-        reloads = 0;
-      const queue = {
-          submit() {},
-          onSubmittedWorkDone() {
-            return new Promise((resolve) =>
-              pending.push(() => {
-                clock += gpu;
-                resolve();
-              }),
-            );
-          },
-        },
-        submit = queue.submit;
-      applyQualityTier({ search: '', storage: memory(), userAgent: desktop });
-      watchQuality({
-        request: (callback) => frames.push(callback),
-        queue,
-        now: () => clock,
-        store: (value) => stored.push(value),
-        reload: () => reloads++,
-      });
-      for (let i = 0; i < 400 && frames.length; i++) {
-        frames.shift()(i * 16.7);
-        queue.submit([]);
-        while (pending.length) {
-          pending.shift()();
-          await null;
-        }
-      }
-      await null;
-      assert.deepEqual(stored, expected, `${gpu} ms`);
-      assert.equal(reloads, 0);
-      assert.equal(queue.submit, submit, 'the original submit is restored');
-    }
-  } finally {
-    delete globalThis.margoLow;
-  }
-});
-
-// A light-tier reading with `gpu` ms per submission, on a browser whose storage starts as `saved`; what storage ends as.
-async function lightReading(gpu, saved) {
-  const frames = [],
-    pending = [],
-    storage = memory(saved);
+// A fake WebGPU for the light-tier reading. `passMs`: each frame's passes by timestamps. `doneMs`: what submit to done would
+// read (the old rule's number): the presenting floor and other work on the machine, which the reading must ignore.
+function fakeGpu({ passMs = 2, doneMs = passMs, passes = 3, encoders = 1, feature = true, zero = false } = {}) {
+  const live = new Set(),
+    make = (object) => (live.add(object), object);
   let clock = 0;
-  const queue = {
-    submit() {},
-    onSubmittedWorkDone() {
-      return new Promise((resolve) =>
-        pending.push(() => {
-          clock += gpu;
-          resolve();
+  const gpu = {
+    live,
+    wrote: 0,
+    pending: [],
+    clock: () => clock,
+    queue: {
+      submit(buffers) {
+        for (const buffer of buffers) buffer.run?.();
+      },
+      onSubmittedWorkDone() {
+        const start = clock;
+        return new Promise((resolve) =>
+          gpu.pending.push(() => {
+            clock = Math.max(clock, start + doneMs);
+            resolve();
+          }),
+        );
+      },
+    },
+    device: {
+      features: new Set(feature ? ['timestamp-query'] : []),
+      createQuerySet: () =>
+        make({
+          stamps: [],
+          destroy() {
+            live.delete(this);
+          },
         }),
-      );
+      createBuffer: () =>
+        make({
+          destroy() {
+            live.delete(this);
+            this.dead = true;
+          },
+          mapAsync() {
+            return this.dead ? Promise.reject(new Error('destroyed')) : Promise.resolve();
+          },
+          getMappedRange() {
+            return this.data;
+          },
+          unmap() {},
+        }),
+      createCommandEncoder() {
+        const steps = [],
+          begin = (pass) => {
+            const writes = pass?.timestampWrites;
+            if (writes?.querySet) {
+              gpu.wrote++;
+              const each = BigInt(Math.round((passMs * 1e6) / (passes * encoders)));
+              writes.querySet.stamps[writes.beginningOfPassWriteIndex] = 1000n;
+              writes.querySet.stamps[writes.endOfPassWriteIndex] = 1000n + each;
+            }
+            return { end() {} };
+          };
+        return {
+          beginRenderPass: begin,
+          beginComputePass: begin,
+          resolveQuerySet: (set, _first, count, resolve) => steps.push(() => (resolve.from = { set, count })),
+          copyBufferToBuffer: (resolve, _a, read, _b, size) =>
+            steps.push(() => {
+              const stamps = new BigInt64Array(size / 8);
+              for (let i = 0; i < stamps.length; i++) stamps[i] = zero ? 0n : (resolve.from.set.stamps[i] ?? 0n);
+              read.data = stamps.buffer;
+            }),
+          finish: () => ({ run: () => steps.forEach((step) => step()) }),
+        };
+      },
+    },
+    frame(pageTimed = false) {
+      for (let e = 0; e < encoders; e++) {
+        const encoder = gpu.device.createCommandEncoder();
+        for (let p = 0; p < passes; p++)
+          encoder[p % 2 ? 'beginComputePass' : 'beginRenderPass'](pageTimed ? { timestampWrites: {} } : {}).end();
+        gpu.queue.submit([encoder.finish()]);
+      }
     },
   };
+  return gpu;
+}
+// The reading is its own chunk: wait for its first frame request.
+async function started(frames) {
+  for (let i = 0; i < 2000 && !frames.length; i++) await new Promise(setImmediate);
+}
+// Frames at `hz` until the watcher stops asking for them. Maps resolve between frames, as they do on a real queue.
+async function drive(gpu, frames, hz = 60) {
+  await started(frames);
+  for (let i = 0; i < 1500 && frames.length; i++) {
+    frames.shift()((i * 1000) / hz);
+    gpu.frame();
+    while (gpu.pending.length) gpu.pending.shift()();
+    await new Promise(setImmediate);
+  }
+}
+// One visit on the light tier until the reading ends: what was stored and reported. Checks everything was put back.
+async function visit(options, saved, { pageTimed = false } = {}) {
+  const gpu = fakeGpu(options),
+    frames = [],
+    storage = memory(saved),
+    readings = [],
+    submit = gpu.queue.submit,
+    create = gpu.device.createCommandEncoder,
+    plain = gpu.frame;
+  if (pageTimed) gpu.frame = () => plain(true);
+  let reloads = 0;
   try {
     assert.equal(applyQualityTier({ search: '', storage, userAgent: desktop }), 'light');
-    watchQuality({ request: (callback) => frames.push(callback), queue, now: () => clock });
-    for (let i = 0; i < 400 && frames.length; i++) {
-      frames.shift()(i * 16.7);
-      queue.submit([]);
-      while (pending.length) {
-        pending.shift()();
-        await null;
-      }
-    }
-    await null;
-    return storage.getItem('margoQuality');
+    watchQuality({
+      request: (callback) => frames.push(callback),
+      queue: gpu.queue,
+      device: gpu.device,
+      onReading: (ms) => readings.push(ms),
+      now: gpu.clock, // what the old rule read: these pins run it on its own clock, and the reading ignores it
+      reload: () => reloads++,
+    });
+    await drive(gpu, frames);
+    assert.equal(reloads, 0, 'the light tier never reloads');
+    assert.equal(gpu.queue.submit, submit, 'submit is put back');
+    assert.equal(gpu.device.createCommandEncoder, create, 'createCommandEncoder is put back');
+    assert.equal(gpu.live.size, 0, 'every query set and buffer is destroyed');
+    const wrote = gpu.wrote;
+    plain();
+    assert.equal(gpu.wrote, wrote, 'a frame after the reading has no timestamp writes');
+    return { stored: storage.getItem('margoQuality'), readings, wrote };
   } finally {
     delete globalThis.margoLow;
+    delete globalThis.margoPreset;
   }
 }
 
+test('the light tier remembers the full tier when the GPU time is under the limit, and never reloads', async () => {
+  const fast = await visit({ passMs: FAST_GPU_MS - 1 });
+  assert.equal(fast.stored, 'high');
+  assert.ok(Math.abs(fast.readings[0] - (FAST_GPU_MS - 1)) < 0.01, `read ${fast.readings[0]} ms`);
+  assert.equal((await visit({ passMs: FAST_GPU_MS, passes: 1 })).stored, null, 'at the limit is not under it');
+  assert.equal((await visit({ passMs: 16 })).stored, null, 'the Arc 140V in real play stays light');
+});
+
+// These two fail on the rule that read submit to done: both pass under timestamps, neither under a limit of 5 on that clock.
+test('a one-triangle page reads its own GPU time, not the 4 to 5 ms floor of presenting to a canvas', async () => {
+  assert.equal((await visit({ passMs: 0.01, doneMs: 5.1 })).stored, 'high');
+});
+test('a rival load on the machine does not hold a strong GPU on the light tier', async () => {
+  assert.equal((await visit({ passMs: 4.7, doneMs: 11.8 })).stored, 'high');
+});
+test('a fast submit to done does not promote a slow GPU', async () => {
+  assert.equal((await visit({ passMs: 12, doneMs: 3 })).stored, null);
+});
+
+test('a frame is the sum of all its encoders, not one submission', async () => {
+  const split = await visit({ passMs: 12, encoders: 4 });
+  assert.equal(split.stored, null, '3 ms a submission is still a 12 ms frame');
+  assert.ok(Math.abs(split.readings[0] - 12) < 0.01, `read ${split.readings[0]} ms`);
+});
+
+test('without timestamp-query the page stays light, stores nothing and stops at once', async () => {
+  const none = await visit({ feature: false });
+  assert.equal(none.stored, null);
+  assert.deepEqual(none.readings, [undefined]);
+  assert.equal(none.wrote, 0);
+});
+
+test('frames the reading cannot trust store nothing', async () => {
+  assert.equal((await visit({ zero: true })).stored, null, 'a browser returning empty timestamps');
+  assert.equal((await visit({}, undefined, { pageTimed: true })).stored, null, 'a page timing its own passes');
+  assert.equal((await visit({ passes: 200 })).stored, null, 'more passes than the queries hold');
+});
+
+test('applyQualityTier asks for timestamp-query only on a page still to be measured, until the reading starts', () => {
+  const asks = [];
+  class Adapter {
+    features = new Set(['timestamp-query']);
+    requestDevice(descriptor) {
+      asks.push([...(descriptor?.requiredFeatures ?? [])]);
+    }
+  }
+  const plain = Adapter.prototype.requestDevice,
+    adapter = new Adapter();
+  globalThis.GPUAdapter = Adapter;
+  try {
+    for (const [search, saved, expected] of [
+      ['?quality=low', {}, []],
+      ['?quality=high', {}, []],
+      ['', { margoQuality: 'high' }, []],
+      ['', { margoQuality: 'held' }, []],
+      ['', {}, ['timestamp-query']],
+      ['', { margoQuality: 'low' }, ['timestamp-query']],
+    ]) {
+      asks.length = 0;
+      applyQualityTier({ search, storage: memory(saved), userAgent: desktop });
+      adapter.requestDevice();
+      assert.deepEqual(asks[0], expected, `${search} ${JSON.stringify(saved)}`);
+    }
+    asks.length = 0;
+    adapter.requestDevice({ requiredFeatures: ['timestamp-query'] });
+    assert.deepEqual(asks[0], ['timestamp-query'], 'never asked twice');
+    applyQualityTier({ search: '', storage: memory(), userAgent: phone });
+    assert.equal(Adapter.prototype.requestDevice, plain, 'phones leave it alone');
+    applyQualityTier({ search: '', storage: memory(), userAgent: desktop });
+    assert.notEqual(Adapter.prototype.requestDevice, plain);
+    adapter.features = new Set();
+    asks.length = 0;
+    adapter.requestDevice();
+    assert.deepEqual(asks[0], [], 'an adapter without it is not asked for it');
+    const gpu = fakeGpu();
+    watchQuality({ request: () => {}, queue: gpu.queue, device: gpu.device });
+    assert.equal(Adapter.prototype.requestDevice, plain, 'put back when the watcher starts');
+  } finally {
+    delete globalThis.GPUAdapter;
+    delete globalThis.margoLow;
+    delete globalThis.margoPreset;
+  }
+});
+
+test('the result belongs to the page it measured: a light scene does not mark a weak PC high for other pages', async () => {
+  const storage = memory(),
+    gpu = fakeGpu({ passMs: 0.01 }),
+    frames = [];
+  try {
+    assert.equal(applyQualityTier({ search: '', page: '/triangle/', storage, userAgent: desktop }), 'light');
+    watchQuality({ request: (callback) => frames.push(callback), queue: gpu.queue, device: gpu.device });
+    await drive(gpu, frames);
+    assert.equal(storage.getItem('margoQuality:/triangle/'), 'high');
+    assert.equal(applyQualityTier({ search: '', page: '/triangle/', storage, userAgent: desktop }), 'high');
+    assert.equal(applyQualityTier({ search: '', page: '/plaza/', storage, userAgent: desktop }), 'light');
+    // What older builds stored for the whole origin says nothing about this page.
+    storage.setItem('margoQuality', 'high');
+    assert.equal(applyQualityTier({ search: '', page: '/plaza/', storage, userAgent: desktop }), 'light');
+  } finally {
+    delete globalThis.margoLow;
+    delete globalThis.margoPreset;
+  }
+});
+
 test('one slow reading does not hold a browser on the light tier: the next load measures again', async () => {
-  assert.equal(await lightReading(9), null, 'a slow session (a remote desktop, say) remembers nothing');
-  assert.equal(await lightReading(2, { margoQuality: 'low' }), 'high', "an older stored 'low' is measured again");
-  assert.equal(await lightReading(2, { margoLow: '1' }), 'high', 'and so is the old margoLow key');
+  assert.equal((await visit({ passMs: 9 })).stored, null, 'a slow session (a remote desktop, say) remembers nothing');
+  assert.equal(
+    (await visit({ passMs: 2 }, { margoQuality: 'low' })).stored,
+    'high',
+    "an older 'low' is measured again",
+  );
+  assert.equal((await visit({ passMs: 2 }, { margoLow: '1' })).stored, 'high', 'and so is the old margoLow key');
 });
 
 test('a slow full tier is remembered for good, so the page does not swing between tiers on every load', async () => {
@@ -282,7 +442,14 @@ test('a slow full tier is remembered for good, so the page does not swing betwee
   assert.equal(reloads, 1);
   const held = storage.getItem('margoQuality');
   assert.notEqual(held, 'high');
-  assert.equal(await lightReading(2, { margoQuality: held }), held, 'a fast light-tier reading does not undo it');
+  assert.equal(applyQualityTier({ search: '', storage: memory({ margoQuality: held }), userAgent: desktop }), 'light');
+  const again = [],
+    gpu = fakeGpu({ passMs: 2 }),
+    submit = gpu.queue.submit;
+  watchQuality({ request: (callback) => again.push(callback), queue: gpu.queue, device: gpu.device });
+  await started(again);
+  assert.equal(gpu.queue.submit, submit, 'a held page is not read again, so a fast reading cannot undo it');
+  assert.equal(again.length, 0);
 });
 
 test('a forced tier is for testing: it never stores or reloads', () => {
@@ -380,40 +547,37 @@ test('paceEngine caps a light-tier engine through engine.pace without touching r
   }
 });
 
-test('the light-tier measurement skips two seconds and gives up after ten, at any refresh rate', () => {
+test('the light-tier reading skips two seconds and gives up after ten, at any refresh rate', async () => {
   try {
     for (const hz of [60, 120]) {
       const frames = [],
-        stored = [];
-      const queue = {
-        submit() {},
-        onSubmittedWorkDone() {
-          return new Promise(() => {});
-        },
-      };
+        stored = [],
+        readings = [],
+        gpu = fakeGpu(),
+        buffer = gpu.device.createBuffer;
+      // Maps that never finish: no frame ever completes, so only the time limit can end it.
+      gpu.device.createBuffer = (d) => Object.assign(buffer(d), { mapAsync: () => new Promise(() => {}) });
       applyQualityTier({ search: '', storage: memory(), userAgent: desktop });
       watchQuality({
         request: (callback) => frames.push(callback),
-        queue,
-        now: () => 0,
+        queue: gpu.queue,
+        device: gpu.device,
         store: (value) => stored.push(value),
+        onReading: (ms) => readings.push(ms),
       });
+      await started(frames);
       let refresh = 0,
-        firstSample;
-      queue.onSubmittedWorkDone = () => {
-        firstSample ??= ((refresh - 1) * 1000) / hz;
-        return new Promise(() => {});
-      };
+        firstWrite;
       while (frames.length && refresh < hz * 20) {
-        frames.shift()(500 + (refresh++ * 1000) / hz);
-        queue.submit([]);
+        frames.shift()(500 + (refresh * 1000) / hz);
+        gpu.frame();
+        if (gpu.wrote && firstWrite === undefined) firstWrite = (refresh * 1000) / hz;
+        refresh++;
       }
-      assert.ok(
-        firstSample > 2000 && firstSample <= 2000 + 1000 / hz,
-        `${hz} Hz: sampling starts after 2 s (${firstSample})`,
-      );
-      assert.ok(Math.abs(refresh / hz - 10) <= 3 / hz, `${hz} Hz: stops after 10 s (${refresh / hz})`);
+      assert.ok(firstWrite > 2000 && firstWrite <= 2000 + 2000 / hz, `${hz} Hz: starts after 2 s (${firstWrite})`);
+      assert.ok(Math.abs(refresh / hz - 10) <= 4 / hz, `${hz} Hz: stops after 10 s (${refresh / hz})`);
       assert.deepEqual(stored, [], 'too few samples store nothing');
+      assert.deepEqual(readings, [undefined]);
     }
   } finally {
     delete globalThis.margoLow;

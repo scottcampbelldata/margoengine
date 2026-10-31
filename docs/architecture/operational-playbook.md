@@ -3980,20 +3980,20 @@ export function applyQualityTier({
 | --- | --- |
 | User agent matches `/Mobi\|Android\|iPhone/` | `phone`: 1 sample, `margoLow = 1` (DPR 1), phone preset, even with `?quality=high` |
 | `?quality=high` or `?quality=low` | forces the tier, never stored |
-| `localStorage.margoQuality === 'high'` | `high`: core's 4x MSAA desktop path, `margoLow` deleted |
+| `localStorage['margoQuality:' + location.pathname] === 'high'` | `high`: core's 4x MSAA desktop path, `margoLow` deleted |
 | otherwise | `light`: 1 sample, `margoLow` = `?scale` clamped to 1..2, default 1 |
 
 Measurement (`watchQuality`), VERIFIED:
 
 1. Phone or forced: does nothing.
-2. Light tier, unless the full tier already ran slow here (`'held'`): wraps `GPUQueue.prototype.submit`; after skipping 2 s of startup, times submit to
-   `onSubmittedWorkDone` for 120 submissions; gives up after 10 s. p90 under 5 ms stores `high`; a slower reading stores nothing, so the next load measures again. Takes
+2. Light tier, unless the full tier already ran slow here (`'held'`): `applyQualityTier` added `timestamp-query` to the page's devices until the watcher starts; the watcher
+   wraps `GPUQueue.prototype.submit` and `GPUDevice.prototype.createCommandEncoder`; after skipping 2 s of startup, adds timestamp writes to every pass and sums each frame's passes for 120 frames; gives up after 10 s; then puts everything back and destroys its GPU objects. p90 under `FAST_GPU_MS` (8 ms, from Plaza at spawn; the 5 ms on submit to done above is the old rule, which read a floor of about 4.4 ms from presenting and other work on the machine) stores `high` for this page; a slower reading, or no `timestamp-query`, stores nothing, so the next load measures again. Takes
    effect on the next page load; no reload, so no PC is first shown 4x.
 3. High tier: counts frames per one-second window; a gap over 250 ms restarts the window; five consecutive windows
    under 55 FPS store `held` and reload once; stops after 30 seconds.
 
-Override: `?quality=`, `?scale=`, `localStorage.removeItem('margoQuality')`, or inject `search`, `storage`, `userAgent`,
-`request`, `queue`, `now`, `store`, `reload` (tests do).
+Override: `?quality=`, `?scale=`, `localStorage.removeItem('margoQuality:' + location.pathname)`, or inject `search`, `page`, `storage`, `userAgent`,
+`request`, `queue`, `device`, `store`, `reload` (tests do).
 
 Pacing: `paceEngine(engine)` caps the light tier at about 60 FPS through `engine.pace`; `capFrameRate(engine, rate)`
 skips a refresh that comes sooner than 4 ms before the next frame is due.
@@ -4220,8 +4220,8 @@ The "30 pages" count for check:no-webgpu is NOT VERIFIED (the script finds the p
 6. **Device loss from day one.** Watch `device.lost` and frame-time `DOMException`s, recreate the renderer, re-add
    resources from CPU copies, call a restore hook on every plugin, keep transforms on the CPU so they need no restore.
    Add a test that destroys the device mid-frame on every demo.
-7. **Tiers without device sniffing.** Start every desktop on a light tier, time GPU work per submit (submit to
-   `onSubmittedWorkDone`), promote on the next page load only. Make URL overrides and an injectable storage for tests.
+7. **Tiers without device sniffing.** Start every desktop on a light tier, read real GPU time by timestamp queries for a
+   short window only (submit to `onSubmittedWorkDone` also counts presenting and other work on the machine), per page, promote on the next page load only. Make URL overrides and an injectable storage for tests.
    Publish presets through one global that packages read at construction; explicit options win.
 8. **Dynamic resolution** as a pure decision class (feed it frame costs) plus a thin watcher; skip a few frames after
    each change; back off after an undone rise.

@@ -3206,13 +3206,13 @@ Apps call `applyQualityTier()` before creating an engine and `watchQuality()` on
 engine behaviour belongs in packages, never only in demo code.
 
 - Phones (user agent `Mobi|Android`): 1x MSAA, DPR 1 (since 5ec83b52), phone scene settings.
-- Desktops start on the light tier (1x MSAA, DPR 1, capped at ~60 FPS) unless `localStorage.margoQuality` is
-  `'high'`. While light, the watcher times submit-to-`onSubmittedWorkDone` for 120 submissions after a 2 s warm-up;
-  90th percentile under `FAST_GPU_MS` (5 ms) stores `'high'` for the next page load; a slower reading stores nothing and
+- Desktops start on the light tier (1x MSAA, DPR 1, capped at ~60 FPS) unless `localStorage['margoQuality:' + location.pathname]` is
+  `'high'` (one key per page since plaza-tier: a light scene marked weak PCs high for the whole origin). While light, the watcher sums each frame's GPU passes by timestamp queries for 120 frames after a 2 s warm-up, then removes itself;
+  90th percentile under `FAST_GPU_MS` (8 ms) stores `'high'` for the next page load; a slower reading, or no `timestamp-query`, stores nothing and
   the next load measures again (plaza-fps: one remote-desktop session must not pin a browser). No reload.
 - On the full tier, five consecutive seconds under 55 FPS store `'held'` for good and reload once.
 - Laptop result (Arc 140V, busy machine): stored `'low'`, light tier 53-61 FPS with 100k particles.
-- Reset: `localStorage.removeItem('margoQuality')` (an older stored `'low'` or `margoLow` is measured again).
+- Reset: `localStorage.removeItem('margoQuality:' + location.pathname)` (older whole-origin keys are ignored).
 - Feature presets (5i.b): `applyQualityTier()` also sets `globalThis.margoPreset`; shadows, SSAO, SSR, volumetric
   fog, local shadows and VFX fill options the app left undefined from it (table in the quality README).
 

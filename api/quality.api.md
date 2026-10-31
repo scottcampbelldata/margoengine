@@ -5,7 +5,27 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 
-export const FAST_GPU_MS = 5;
+export interface AdapterLike {
+    features: {
+        has(name: string): boolean;
+    };
+    requestDevice(descriptor?: {
+        requiredFeatures?: Iterable<string>;
+    }): unknown;
+}
+
+export interface DeviceLike {
+    features: {
+        has(name: string): boolean;
+    };
+    createCommandEncoder(descriptor?: unknown): any;
+    createQuerySet(descriptor: unknown): {
+        destroy(): void;
+    };
+    createBuffer(descriptor: unknown): any;
+}
+
+export const FAST_GPU_MS = 8;
 
 export type Paced = EngineKernel | {
     pace?: (time: number) => boolean;
@@ -15,6 +35,7 @@ export const QUALITY_PRESETS: Readonly<Record<QualityTier, QualityPreset>>;
 
 export interface QualityOptions {
     search?: string;
+    page?: string;
     storage?: {
         getItem(key: string): string | null;
         setItem(key: string, value: string): void;
@@ -54,6 +75,10 @@ export interface QualityPreset {
 
 export type QualityTier = 'phone' | 'light' | 'high';
 
+export interface QueueLike {
+    submit(buffers: Iterable<object>): unknown;
+}
+
 export interface ResolutionOptions {
     budget?: number;
     min?: number;
@@ -79,7 +104,8 @@ export const SLOW_FPS = 55;
 export interface WatchOptions {
     request?: (callback: (time: number) => void) => unknown;
     queue?: QueueLike;
-    now?: () => number;
+    device?: Pick<DeviceLike, 'createCommandEncoder'>;
+    onReading?: (milliseconds: number | undefined) => void;
     store?: (value: 'high' | 'low') => void;
     reload?: () => void;
 }
@@ -94,7 +120,7 @@ export interface WatchResolutionOptions extends ResolutionOptions {
     apply?: (scale: number) => void;
 }
 
-export function applyQualityTier({ search, storage, userAgent }?: QualityOptions): QualityTier;
+export function applyQualityTier({ search, page, storage, userAgent }?: QualityOptions): QualityTier;
 
 export function capFrameRate(engine: Paced, rate?: number): void;
 
@@ -110,16 +136,9 @@ export function redrawAfterRestore(engine: EngineKernel, render: () => void, req
 
 export const sceneSamples: () => 1 | 4;
 
-export function watchQuality({ request, queue, now, store, reload }?: WatchOptions): void;
+export function watchQuality({ request, queue, device, onReading, store, reload }?: WatchOptions): void;
 
 export function watchResolution({ request, queue, now, apply, ...options }?: WatchResolutionOptions): ResolutionWatch;
-
-// Not exported from this entry, but used by the exports above:
-
-interface QueueLike {
-    submit(buffers: unknown): unknown;
-    onSubmittedWorkDone(): Promise<unknown>;
-}
 
 declare global {
     var margoLow: number | undefined;

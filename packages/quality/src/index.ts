@@ -1,13 +1,17 @@
 import type { EngineKernel } from '@margoengine/core';
 import { sceneSamples as samples } from '../../shared/quality.js';
+import type { DeviceLike, QueueLike } from './reading.js';
 declare global {
   var margoLow: number | undefined;
   var margoPreset: QualityPreset | undefined;
 }
 declare const GPUQueue: { prototype: QueueLike } | undefined;
-interface QueueLike {
-  submit(buffers: unknown): unknown;
-  onSubmittedWorkDone(): Promise<unknown>;
+declare const GPUDevice: { prototype: DeviceLike } | undefined;
+declare const GPUAdapter: { prototype: AdapterLike } | undefined;
+/** The part of `GPUAdapter` the tier uses. */
+export interface AdapterLike {
+  features: { has(name: string): boolean };
+  requestDevice(descriptor?: { requiredFeatures?: Iterable<string> }): unknown;
 }
 /** 'phone' is 1x at DPR 1; 'light' is 1x at a capped DPR; 'high' is core's 4x desktop path. */
 export type QualityTier = 'phone' | 'light' | 'high';
@@ -64,6 +68,8 @@ export const qualityPreset = (): QualityPreset => QUALITY_PRESETS[(state ?? (app
 export interface QualityOptions {
   /** URL query to read `?quality=high|low` (forces a tier, never remembered) and `?scale=1..2` (light-tier DPR). */
   search?: string;
+  /** Page the measured result belongs to, because it says what this page's scene costs. Default `location.pathname`. */
+  page?: string;
   /** Persistent storage for the measured result; defaults to localStorage. */
   storage?: { getItem(key: string): string | null; setItem(key: string, value: string): void };
   /** User agent string; 'Mobi', 'Android' or 'iPhone' selects the phone tier. Default `navigator.userAgent`. */
@@ -72,15 +78,41 @@ export interface QualityOptions {
 
 /** Below this many frames per second, a one-second window on the full tier counts as slow. */
 export const SLOW_FPS = 55;
-/** Light-tier GPU milliseconds per submission (90th percentile) below which the next page load gets the full tier.
- * 4x MSAA with desktop detail measured about 2-3x the light tier's GPU work on an Intel Arc 140V. */
-export const FAST_GPU_MS = 5;
+/** Light-tier GPU milliseconds per frame (90th percentile, timestamp queries: the sum of a frame's passes) below which
+ * this page's next load gets the full tier. Chosen from Plaza in real play at spawn, with the sun moving and shadows
+ * redrawing: an RTX A6000 on a busy machine read 3.2 to 7.25 ms from 720p to 4K, an Intel UHD (Alder Lake-N) 60 ms at 720p,
+ * and an Arc 140V 9 to 16.4 ms by the same queries, copies included, in `measure.mjs`. A limit for that scene, on those
+ * GPUs; other scenes read their own cost against it. */
+export const FAST_GPU_MS = 8;
 const KEY = 'margoQuality',
   // Written when the full tier ran slow on this browser. Unlike a slow light-tier reading it stays: measuring headroom
   // again on the light tier would send the page back to the full tier, slow, and back here, on every other load.
   HELD = 'held';
 
-let state: { tier: QualityTier; stored?: string; forced?: string; storage?: QualityOptions['storage'] } | undefined;
+const TIMESTAMPS = 'timestamp-query';
+/** Add the feature to every device this page asks for until the returned function runs. A device needs it from creation,
+ * and only core creates the engine's device, so the ask happens here; it costs nothing without queries. */
+function askForTimestamps(adapter: Pick<AdapterLike, 'requestDevice'>): () => void {
+  const ask = adapter.requestDevice;
+  function asked(this: AdapterLike, descriptor: { requiredFeatures?: Iterable<string> } = {}): unknown {
+    return ask.call(
+      this,
+      this.features.has(TIMESTAMPS)
+        ? { ...descriptor, requiredFeatures: new Set([...(descriptor.requiredFeatures ?? []), TIMESTAMPS]) }
+        : descriptor,
+    );
+  }
+  adapter.requestDevice = asked;
+  return () => {
+    if (adapter.requestDevice === asked) adapter.requestDevice = ask;
+  };
+}
+
+let state:
+    | { tier: QualityTier; stored?: string; forced?: string; storage?: QualityOptions['storage']; key: string }
+    | undefined,
+  // Set while this page's next device is to carry the timestamp feature.
+  stopAsking: (() => void) | undefined;
 const local = (): QualityOptions['storage'] => {
   try {
     return globalThis.localStorage;
@@ -95,21 +127,29 @@ const local = (): QualityOptions['storage'] => {
  * PC never shows a slow phase or a reload; `paceEngine` then holds light-tier engines to ~60 FPS. */
 export function applyQualityTier({
   search = globalThis.location?.search,
+  page = globalThis.location?.pathname,
   storage = local(),
   userAgent = globalThis.navigator?.userAgent ?? '',
 }: QualityOptions = {}): QualityTier {
   const params = new URLSearchParams(search),
-    forced = params.get('quality') ?? undefined;
+    forced = params.get('quality') ?? undefined,
+    key = page ? `${KEY}:${page}` : KEY;
   let stored: string | undefined;
   try {
-    stored = storage?.getItem(KEY) ?? (storage?.getItem('margoLow') ? 'low' : undefined);
+    stored = storage?.getItem(key) ?? undefined;
   } catch {}
   const choice = forced === 'high' || forced === 'low' ? forced : stored;
   const tier: QualityTier = /Mobi|Android|iPhone/.test(userAgent) ? 'phone' : choice === 'high' ? 'high' : 'light';
   if (tier === 'high') delete globalThis.margoLow;
   else globalThis.margoLow = tier === 'phone' ? 1 : Math.min(2, Math.max(1, Number(params.get('scale')) || 1));
   globalThis.margoPreset = QUALITY_PRESETS[tier];
-  state = { tier, stored: choice, forced: forced === 'high' || forced === 'low' ? forced : undefined, storage };
+  const held = forced === 'high' || forced === 'low' ? forced : undefined;
+  state = { tier, stored: choice, forced: held, storage, key };
+  stopAsking?.();
+  stopAsking =
+    tier === 'light' && !held && stored !== HELD && typeof GPUAdapter !== 'undefined'
+      ? askForTimestamps(GPUAdapter.prototype)
+      : undefined;
   return tier;
 }
 
@@ -134,31 +174,38 @@ export function paceEngine(engine: Paced): void {
 export interface WatchOptions {
   /** Frame scheduler, called with a time in milliseconds. Default `requestAnimationFrame`. */
   request?: (callback: (time: number) => void) => unknown;
-  /** Queue whose `submit` is wrapped to time GPU work. Default `GPUQueue.prototype` when WebGPU exists. */
+  /** Queue whose `submit` is wrapped during the reading. Default `GPUQueue.prototype` when WebGPU exists. */
   queue?: QueueLike;
-  /** Clock in milliseconds. Default `performance.now`. */
-  now?: () => number;
+  /** Device whose `createCommandEncoder` is wrapped during the reading. Default `GPUDevice.prototype` when WebGPU exists. */
+  device?: Pick<DeviceLike, 'createCommandEncoder'>;
+  /** Told the light-tier reading when it ends: GPU milliseconds per frame (90th percentile), or undefined when there is
+   * none (no `timestamp-query`, too few frames). */
+  onReading?: (milliseconds: number | undefined) => void;
   /** Remembers the result. Default writes it to the storage `applyQualityTier` used. */
   store?: (value: 'high' | 'low') => void;
   /** Called after remembering 'low' on the full tier. Default `location.reload`. */
   reload?: () => void;
 }
 
-/** Call once the scene is running. On the light tier, times how long the GPU takes to finish each submitted frame
- * (submit to onSubmittedWorkDone: any refresh rate, no timestamp queries) and remembers 'high' for the next page load
- * when there is headroom. A slow reading remembers nothing, so one bad session (a remote desktop, a busy machine, a
- * slow first window) cannot hold a browser on the light tier for good: the next load measures again. On the full tier,
- * five consecutive slow seconds remember that for good and reload once; `localStorage.removeItem('margoQuality')`
- * measures again. Phones do nothing. */
+/** Call once the scene is running. On the light tier, reads the real GPU time of this page's frames by timestamp queries
+ * and remembers 'high' for this page's next load when it is under `FAST_GPU_MS`. The queries exist only during the
+ * reading (about 4 s at 60 FPS, 10 s at most); everything wrapped for it is then put back and its GPU objects destroyed.
+ * Without `timestamp-query` the page stays light and nothing is stored. A slow reading remembers nothing, so one bad
+ * session (a remote desktop, a busy machine, a slow first window) cannot hold a browser on the light tier for good: the
+ * next load measures again. On the full tier, five consecutive slow seconds remember that for good and reload once;
+ * `localStorage.removeItem('margoQuality:' + location.pathname)` measures again. Phones do nothing. */
 export function watchQuality({
   request = globalThis.requestAnimationFrame?.bind(globalThis),
   queue = typeof GPUQueue === 'undefined' ? undefined : GPUQueue.prototype,
-  now = () => performance.now(),
+  device = typeof GPUDevice === 'undefined' ? undefined : GPUDevice.prototype,
+  onReading,
   store,
   reload = () => location.reload(),
 }: WatchOptions = {}): void {
   const current = state ?? (applyQualityTier(), state!);
-  const remember = store ?? ((value) => current.storage?.setItem(KEY, value === 'low' ? HELD : value));
+  const remember = store ?? ((value) => current.storage?.setItem(current.key, value === 'low' ? HELD : value));
+  stopAsking?.();
+  stopAsking = undefined;
   if (current.tier === 'phone' || current.forced || !request) return;
   if (current.tier === 'high') {
     let start = 0,
@@ -192,42 +239,20 @@ export function watchQuality({
     request(tick);
     return;
   }
-  // Anything else stored ('low' from a light-tier reading before it stopped being remembered, the old margoLow) is
-  // measured again.
-  if (current.stored === HELD || !queue?.submit) return;
-  const submit = queue.submit,
-    times: number[] = [];
-  let first = -1,
-    elapsed = 0,
-    done = false;
-  const finish = () => {
-    done = true;
-    if (queue.submit === measured) queue.submit = submit;
-    if (times.length < 120) return;
-    times.sort((a, b) => a - b);
-    if (times[Math.floor(times.length * 0.9)] >= FAST_GPU_MS) return;
-    try {
-      remember('high');
-    } catch {}
-  };
-  function measured(this: QueueLike, buffers: unknown): unknown {
-    const start = now(),
-      result = submit.call(this, buffers);
-    // Skip two seconds of startup (shader compiles, uploads); then sample 120 submissions.
-    if (elapsed > 2000 && !done)
-      void this.onSubmittedWorkDone().then(() => {
-        if (!done && times.push(now() - start) === 120) finish();
-      });
-    return result;
-  }
-  queue.submit = measured;
-  const count = (time: number) => {
-    if (done) return;
-    if (first < 0) first = time;
-    if ((elapsed = time - first) > 10000) finish();
-    else request(count);
-  };
-  request(count);
+  // Anything else stored ('low' from a light-tier reading before it stopped being remembered) is measured again.
+  if (current.stored === HELD || !queue || !device) return;
+  // Its own chunk: a page with nothing to read never downloads it. If it cannot load there is no reading and no change.
+  void import('./reading.js').then(
+    ({ readGpuTime }) =>
+      readGpuTime(queue, device, request, (milliseconds) => {
+        if (milliseconds !== undefined && milliseconds < FAST_GPU_MS)
+          try {
+            remember('high');
+          } catch {}
+        onReading?.(milliseconds);
+      }),
+    () => onReading?.(undefined),
+  );
 }
 let restorers = 0;
 /** An app that renders on demand (a paused scene, a stopped loop) shows an empty canvas after core restores a lost GPU
@@ -264,3 +289,4 @@ export {
   type ResolutionWatch,
   type WatchResolutionOptions,
 } from './resolution.js';
+export type { DeviceLike, QueueLike } from './reading.js';

@@ -568,7 +568,7 @@ void water;
 ## Quality tiers
 
 `@margoengine/quality` decides how hard to push the GPU by measuring it, not by device name. Desktops start on a
-light tier (no MSAA, pixel ratio 1, paced to about 60 FPS) and time each frame on the GPU; a browser with headroom
+light tier (no MSAA, pixel ratio 1, paced to about 60 FPS) and read each frame's GPU time; a page with headroom
 gets the full 4x MSAA tier from its next page load. Phones stay single-sampled. Use the tier to scale your own
 settings, since tier-aware feature presets in the packages are not built yet:
 
@@ -583,7 +583,7 @@ void shadows; void enemyCount;
 watchQuality(); // once rendering
 ```
 
-`?quality=low` and `?quality=high` force a tier for testing; `localStorage.removeItem('margoQuality')` measures
+`?quality=low` and `?quality=high` force a tier for testing; `localStorage.removeItem('margoQuality:' + location.pathname)` measures
 again. On the full tier, five consecutive seconds under 55 FPS store the light tier and reload once.
 
 ## Deploying

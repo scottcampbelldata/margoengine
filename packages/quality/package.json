@@ -45,6 +45,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js quality",
     "test": "npm run build && node --test test/*.test.js",
+    "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs",
     "prepack": "npm run build"
   }
 }

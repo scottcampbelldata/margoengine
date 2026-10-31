@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Quality reading check</title><style>body{margin:0}canvas{display:block;width:640px;height:360px}</style></head><body><canvas></canvas>
+<script type="module">
+// A triangle overdrawn 400 times, the whole page: a light scene that still reads above the timer step (about 0.07 ms here). ?nofeature hides timestamp-query.
+import {applyQualityTier,watchQuality} from '/packages/quality/dist/index.js';
+const params=new URLSearchParams(location.search),canvas=document.querySelector('canvas'),errors=[],doneTimes=[];
+const wrapped=()=>[GPUAdapter.prototype.requestDevice,GPUQueue.prototype.submit,GPUDevice.prototype.createCommandEncoder];
+const plain=wrapped();
+window.tier=applyQualityTier();
+window.asking=GPUAdapter.prototype.requestDevice!==plain[0];
+const adapter=await navigator.gpu.requestAdapter();
+if(params.has('nofeature'))Object.defineProperty(adapter,'features',{value:new Set()});
+const device=await adapter.requestDevice();
+window.feature=device.features.has('timestamp-query');
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const format=navigator.gpu.getPreferredCanvasFormat(),context=canvas.getContext('webgpu');
+canvas.width=640;canvas.height=360;
+context.configure({device,format});
+const module=device.createShaderModule({code:`@vertex fn v(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(vec2f(f32(i)-1,f32(i&1)*2-1)*.5,0,1);}@fragment fn f()->@location(0) vec4f{return vec4f(1,.5,0,1);}`});
+const pipeline=device.createRenderPipeline({layout:'auto',vertex:{module},fragment:{module,targets:[{format}]}});
+let frames=0,timedAfter=0;
+const draw=()=>{
+  frames++;
+  const encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({colorAttachments:[{view:context.getCurrentTexture().createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,1]}]});
+  pass.setPipeline(pipeline);pass.draw(3,400);pass.end();
+  const start=performance.now();
+  device.queue.submit([encoder.finish()]);
+  device.queue.onSubmittedWorkDone().then(()=>doneTimes.push(performance.now()-start));
+  requestAnimationFrame(draw);
+};
+requestAnimationFrame(draw);
+window.result=new Promise(resolve=>watchQuality({onReading:milliseconds=>{
+  // The promise settles a little later, so everything the reading wrapped and its deferred destroys have had their frame.
+  const at=frames;
+  const wait=()=>frames<at+3?requestAnimationFrame(wait):resolve({
+    milliseconds:milliseconds??null,
+    stored:localStorage.getItem('margoQuality:'+location.pathname),
+    allBack:wrapped().every((method,i)=>method===plain[i]),
+    errors,
+    oldRule:[...doneTimes].sort((a,b)=>a-b)[Math.floor(doneTimes.length*.9)],
+  });
+  wait();
+}}));
+</script></body></html>
