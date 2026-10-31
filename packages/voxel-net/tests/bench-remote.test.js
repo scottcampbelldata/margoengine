@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { test } from 'node:test';
 import { hold, serve } from '../bench/long-hold.mjs';
-import { parseSteps, parseTarget, summarizeCloses, summarizeSamples } from '../bench/remote-args.mjs';
+import { mergeMetrics, parseMetricsUrls, parseSteps, parseTarget, summarizeCloses, summarizeSamples } from '../bench/remote-args.mjs';
 import { acceptWebSocket, connectWebSocket } from '../dist/server.js';
 
 test('parseTarget: no path is the router, a path is one shard', () => {
@@ -118,4 +118,50 @@ test('long-hold reports a connection cut with no close frame, and the ones still
   server.closeAllConnections();
   server.close();
   assert.match(ends[0], /^end 1006 socket \w+ busy age \d+ s at /);
+});
+
+test('--metrics: a comma list is several boxes, and their shards stay apart in one summary', () => {
+  assert.deepEqual(parseMetricsUrls(undefined), []);
+  assert.deepEqual(parseMetricsUrls('https://a.example/metrics'), ['https://a.example/metrics']);
+  assert.deepEqual(parseMetricsUrls('https://a.example/metrics, https://b.example/metrics,'), [
+    'https://a.example/metrics',
+    'https://b.example/metrics',
+  ]);
+
+  const one = { at: 5, load: 1, counters: { online: 9 }, shards: [{ index: 0, online: 9 }] };
+  assert.equal(mergeMetrics([one]), one, 'one box passes through untouched');
+
+  // The first box's counters already add the second's: the sum comes from the shards, not from those counters.
+  const a = { ...sample(1000, 10, 20, 7), load: 2, counters: { online: 12 } },
+    b = { ...sample(9000, 40, 20, 5), load: 3, counters: { online: 5 } },
+    merged = mergeMetrics([a, b]);
+  assert.equal(merged.at, 1000);
+  assert.equal(merged.load, 3);
+  assert.equal(merged.counters.online, 12);
+  assert.deepEqual(
+    merged.shards.map((shard) => shard.index),
+    [0, 100],
+  );
+  const summary = summarizeSamples([merged], 0);
+  assert.deepEqual(
+    summary.shards.map((shard) => [shard.index, shard.players, shard.tickP95]),
+    [
+      [0, 7, 10],
+      [100, 5, 40],
+    ],
+  );
+  assert.equal(summary.inBudget, true);
+  assert.equal(
+    summarizeSamples([mergeMetrics([a, sample(9000, 51)])], 0).inBudget,
+    false,
+    'either box over budget fails',
+  );
+
+  // A box stopped mid-hold: the other's numbers stay, under the same index.
+  const without = mergeMetrics([undefined, b]);
+  assert.equal(without.at, 9000);
+  assert.deepEqual(
+    without.shards.map((shard) => shard.index),
+    [100],
+  );
 });

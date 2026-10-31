@@ -42,6 +42,34 @@ export function parseSteps({ steps, counts, joinRate, window }) {
   return list;
 }
 
+/** The boxes of `--metrics=url,url`: none without the option, and one URL means one box. */
+export function parseMetricsUrls(value) {
+  return (value ?? '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean);
+}
+
+/**
+ * One /metrics sample from one answer per box, in `--metrics` order; undefined for a box that did not answer. One box
+ * passes through as it is. With more, shard `i` of box `b` becomes index `b * 100 + i`, so that summarizeSamples keeps
+ * them apart, and online is the sum of the shards, since the first box's own counters already add the second's. `at`
+ * is the first answering box's clock and `load` the highest.
+ */
+export function mergeMetrics(boxes) {
+  if (boxes.length === 1) return boxes[0];
+  const answered = boxes.filter(Boolean),
+    shards = boxes.flatMap((box, b) =>
+      (box?.shards ?? []).map((shard) => ({ ...shard, index: b * 100 + shard.index })),
+    );
+  return {
+    at: answered[0].at,
+    load: Math.max(...answered.map((box) => box.load ?? 0)),
+    counters: { online: shards.reduce((sum, shard) => sum + (shard.online ?? 0), 0) },
+    shards,
+  };
+}
+
 const median = (values) => {
   const s = [...values].sort((a, b) => a - b);
   return s.length ? s[Math.floor(s.length / 2)] : null;

@@ -5,12 +5,13 @@
 //     [--view=8] [--edit-interval=2] [--spread-radius=1024] [--travel=walk|fly] [--drop-after=N] [--fake-addresses] [--max-seconds=10800] [--nice=10] [--out=FILE]
 // --fake-addresses: each bot sends its own X-Real-IP, so a shard run with --proxied counts them as separate people. Only for
 // a shard on this machine's loopback (a proxied shard reads that header from loopback connections only).
+// --metrics takes a comma list to summarize the shards of several boxes in one run; the list's boxes share one token.
 // The metrics token comes from the environment, PLAZA_METRICS_TOKEN, never from an argument.
 import { fork } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { availableParallelism, cpus, freemem, setPriority, totalmem } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { parseSteps, parseTarget, summarizeCloses, summarizeSamples } from './remote-args.mjs';
+import { mergeMetrics, parseMetricsUrls, parseSteps, parseTarget, summarizeCloses, summarizeSamples } from './remote-args.mjs';
 
 const BOTS_PER_PROCESS = 50,
   wait = (ms) => new Promise((done) => setTimeout(done, ms)),
@@ -48,7 +49,7 @@ export async function runRemote(arg) {
       window: Number(arg('window', 300)),
     }),
     target = parseTarget(arg('url'), arg('origin')),
-    metricsUrl = arg('metrics'),
+    metricsUrls = parseMetricsUrls(arg('metrics')),
     token = process.env.PLAZA_METRICS_TOKEN,
     out = arg('out', fileURLToPath(new URL('./results-remote.json', import.meta.url))),
     blocks = arg('blocks'),
@@ -105,14 +106,20 @@ export async function runRemote(arg) {
             }),
         ),
     );
-  async function sampleMetrics() {
-    if (!metricsUrl) return undefined;
-    const res = await fetch(metricsUrl, {
+  async function sampleBox(url) {
+    const res = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) throw new Error(`metrics ${res.status}`);
     return res.json();
+  }
+  // One box stopping mid-hold must not cost the other box's numbers: only all of them failing is a failed sample.
+  async function sampleMetrics() {
+    if (!metricsUrls.length) return undefined;
+    const answers = await Promise.allSettled(metricsUrls.map(sampleBox));
+    if (answers.every((answer) => answer.status === 'rejected')) throw answers[0].reason;
+    return mergeMetrics(answers.map((answer) => answer.value));
   }
 
   let finishing = false,
@@ -240,7 +247,7 @@ export async function runRemote(arg) {
       results.stoppedBy = 'proxy answer';
       break;
     }
-    if (!r.server.inBudget && metricsUrl && ++over > overStop) {
+    if (!r.server.inBudget && metricsUrls.length && ++over > overStop) {
       results.stoppedBy = 'over budget';
       break;
     }
