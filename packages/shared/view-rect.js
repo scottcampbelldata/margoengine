@@ -1,4 +1,5 @@
 // Multi-view helpers for passes. `PassContext.view` is absent for a plain full-canvas frame, which keeps today's path.
+import { rangeError } from './errors.js';
 
 /** The view rectangle in drawing-buffer pixels, or undefined for the whole target. */
 export function viewRect(context) {
@@ -49,13 +50,18 @@ export function ownLayers(mesh) {
 export const partialRect = (rect, width, height) =>
   !!rect && (rect[0] !== 0 || rect[1] !== 0 || rect[2] !== width || rect[3] !== height);
 
-/** Checks a pixel rectangle [x, y, width, height] (or undefined) against a target of `width` x `height`. */
+/**
+ * Checks a pixel rectangle [x, y, width, height] (or undefined) against a target of `width` x `height`. Core and
+ * WebGL draws use it; the messages link to the error help page (errors#views).
+ */
 export function validateRectangle(rectangle, width, height) {
   if (rectangle === undefined) return;
-  const bad = () => new RangeError('Invalid draw rectangle; pass integer [x, y, width, height] inside the target');
-  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw bad();
-  for (let i = 0; i < 4; i++) if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1)) throw bad();
-  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height) throw bad();
+  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw rangeError('Invalid draw rectangle', 'views');
+  for (let i = 0; i < 4; i++)
+    if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
+      throw rangeError('Invalid draw rectangle', 'views');
+  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
+    throw rangeError('Draw rectangle exceeds target', 'views');
 }
 
 /** Checks a 32-bit layer mask; `subject` names it in the message. */

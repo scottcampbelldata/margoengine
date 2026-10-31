@@ -1,10 +1,13 @@
 // One internal clear-color contract for the renderer and optional target owners.
 export const defaultClear = [0.018, 0.023, 0.035, 1];
 
+/** A `#rrggbb` string as a 24-bit integer, or -1 for any other string. */
+export const hexColor = (color) => (/^#[0-9a-f]{6}$/i.test(color) ? parseInt(color.slice(1), 16) : -1);
+
 export function clearColorValue(color) {
   if (typeof color !== 'string') return defaultClear;
-  if (!/^#[0-9a-f]{6}$/i.test(color)) throw new RangeError('Invalid color; use #rrggbb');
-  const n = parseInt(color.slice(1), 16);
+  const n = hexColor(color);
+  if (n < 0) throw new RangeError('Invalid color; use #rrggbb');
   return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
 }
 

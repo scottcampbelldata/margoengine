@@ -2,17 +2,10 @@ import { TransformStore, syncStoredRotation } from './kernel.js';
 import { Camera, type CameraOptions, type Vec3 } from './camera.js';
 import { F32_OVERFLOW, Geometry, PbrMaterial, finite } from './geometry.js';
 import { hypot } from '../../shared/hypot.js';
-import {
-  GPURenderer,
-  validateRectangle,
-  type Renderer,
-  type Batch,
-  type GeometryBuffers,
-  type RenderView,
-} from './renderer.js';
+import { GPURenderer, type Renderer, type Batch, type GeometryBuffers, type RenderView } from './renderer.js';
 import { FrameGraph, type EnginePlugin } from './plugin.js';
 import { sceneSamples } from './quality.js';
-import { checkLayers, layerRegistry, meshLayers } from '../../shared/view-rect.js';
+import { checkLayers, layerRegistry, meshLayers, validateRectangle } from '../../shared/view-rect.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 const DISPOSED = 'Engine disposed',
@@ -860,10 +853,10 @@ export class Engine {
     const { direction, radiance, ambient } = this.lighting;
     finite(direction, 4, 'Light');
     finite(radiance, 4, 'Radiance');
-    if (ambient !== undefined) finite(ambient, 3, 'Ambient');
+    finite(ambient, 3, 'Ambient');
     // Loops, not some() with a closure: this runs every frame. Finite values have no length only when all are 0.
     let invalid = !(direction[0] || direction[1] || direction[2]) || direction[3] < 0;
-    for (let i = 0; i < 4; i++) invalid ||= radiance[i] < 0 || (i < 3 && !!ambient && ambient[i] < 0);
+    for (let i = 0; i < 4; i++) invalid ||= radiance[i] < 0 || (i < 3 && ambient[i] < 0);
     if (invalid) throw rangeError('Invalid lighting', 'lighting');
     this.collectInstances();
     if (camera === this.camera) this.primaryCulling = culling;

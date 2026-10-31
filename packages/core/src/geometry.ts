@@ -1,4 +1,5 @@
 import { rangeError, typeError } from '../../shared/errors.js';
+import { hexColor } from '../../shared/clear-color.js';
 
 /**
  * Math.fround(v) is finite exactly when |v| < 2 ** 128 - 2 ** 103 (from there on v rounds up past the largest float).
@@ -106,15 +107,16 @@ export class PbrMaterial {
     metalness = this.data[5],
     doubleSided = !!this.data[6],
   }: PbrMaterialOptions): void {
-    const rgb =
-      typeof color === 'string'
-        ? /^#[0-9a-f]{6}$/i.test(color)
-          ? [1, 3, 5].map((i) => {
-              const v = parseInt(color.slice(i, i + 2), 16) / 255;
-              return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-            })
-          : null
-        : color;
+    const hex = typeof color === 'string' ? hexColor(color) : 0,
+      rgb =
+        typeof color === 'string'
+          ? hex < 0
+            ? null
+            : [16, 8, 0].map((shift) => {
+                const v = ((hex >> shift) & 255) / 255;
+                return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+              })
+          : color;
     if (!rgb) throw typeError('Invalid Color', 'material');
     finite(rgb, 3, 'Color');
     if ([...rgb, roughness, metalness].some((v) => !Number.isFinite(v) || v < 0 || v > 1))

@@ -6,6 +6,7 @@ import type { FrameGraph, PassContext, DrawOptions } from './plugin.js';
 import { sceneSamples } from './quality.js';
 import { defaultClear, clearColorValue, clearDraw } from '../../shared/clear-color.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { partialRect, validateRectangle } from '../../shared/view-rect.js';
 // TypeScript's DOM library omits WebGPU flag namespaces and the canvas overload.
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -32,21 +33,9 @@ export function rectangleClear(
   extraAttachments: number,
 ): 'draw' | 'attachment' | 'none' {
   if (!clearColor && !clearDepth) return 'none';
-  const partial = !!rect && (rect[0] !== 0 || rect[1] !== 0 || rect[2] !== width || rect[3] !== height);
-  if (!partial) return 'attachment';
+  if (!partialRect(rect, width, height)) return 'attachment';
   if (extraAttachments) throw typeError('Partial-view clear: draw extra attachments with clear: false', 'views');
   return 'draw';
-}
-
-/** @internal Checks a pixel rectangle [x, y, width, height] against a target of `width` x `height`. */
-export function validateRectangle(rectangle: readonly number[] | undefined, width: number, height: number): void {
-  if (rectangle === undefined) return;
-  if (!Array.isArray(rectangle) || rectangle.length !== 4) throw rangeError('Invalid draw rectangle', 'views');
-  for (let i = 0; i < 4; i++)
-    if (!Number.isSafeInteger(rectangle[i]) || rectangle[i] < (i < 2 ? 0 : 1))
-      throw rangeError('Invalid draw rectangle', 'views');
-  if (rectangle[0] + rectangle[2] > width || rectangle[1] + rectangle[3] > height)
-    throw rangeError('Draw rectangle exceeds target', 'views');
 }
 
 /** `start`/`end`: float range of `instances` changed since the WebGPU renderer last uploaded it (absent: upload all).

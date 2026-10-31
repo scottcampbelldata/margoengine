@@ -1,7 +1,7 @@
 {
   "gate": "duplicates",
   "about": "duplicated lines per package pair (8-line normalised windows); reexport items: value re-exports across packages",
-  "total": 27,
+  "total": 25,
   "history": [
     {
       "date": "2026-10-24",
@@ -24,8 +24,6 @@
   ],
   "items": {
     "environment | staging": 12,
-    "family hex-colour core": 1,
-    "family hex-colour math": 1,
     "lines | text": 12,
     "reexport packages/stage/src/index.ts * from @margoengine/core": 1
   }
