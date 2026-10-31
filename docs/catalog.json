@@ -1538,6 +1538,33 @@
     "category": "World and effects"
   },
   {
+    "id": "tilemap",
+    "title": "Tilemap",
+    "category": "World and effects",
+    "package": "@margoengine/tilemap",
+    "version": "1.0.0",
+    "published": false,
+    "description": "2D tile maps for Margo Engine: the TileMapData format (tilesets, animated tiles, collision shapes, tile and object layers, parallax) shared by the renderer, auto-tiling and the Tiled and LDtk importers.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "tilemap",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/tilemap@1.0.0",
+    "imports": "import { FLIP_D } from '@margoengine/tilemap';",
+    "exports": [
+      "FLIP_D",
+      "FLIP_H",
+      "FLIP_MASK",
+      "FLIP_V",
+      "GID_MASK",
+      "createTileLayer",
+      "decodeTile",
+      "encodeTile",
+      "tileAt",
+      "tileDefForGid",
+      "tilesetForGid",
+      "validateTileMap"
+    ]
+  },
+  {
     "id": "vfx",
     "title": "Vfx",
     "package": "@margoengine/vfx",

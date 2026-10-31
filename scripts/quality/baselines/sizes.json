@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3935041,
+  "total": 3936659,
   "history": [
     {
       "date": "2026-10-24",
@@ -986,6 +986,12 @@
       "commit": "4f309c27a",
       "reason": "react: Canvas maxDpr (pixel-ratio cap through the light tier) and the development hints for lowercase R3F tags and WebGL2 pointer handlers add 832 B gzip to the react entry (7,168 to 8,000 B); core and stage are unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "175c6ec2d",
+      "reason": "new package @margoengine/tilemap (row 25 J3a): types and small helpers, 1.4 kB",
+      "grew": 1
     }
   ],
   "items": {
@@ -1293,6 +1299,7 @@
     "@margoengine/taa": 10390,
     "@margoengine/terrain": 11929,
     "@margoengine/text": 15890,
+    "@margoengine/tilemap": 1618,
     "@margoengine/tiles": 14752,
     "@margoengine/tonemap": 11083,
     "@margoengine/toon": 1701,

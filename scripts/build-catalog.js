@@ -81,6 +81,7 @@ const layers = {
     'scenery',
     'scatter',
     'road',
+    'tilemap',
     'vfx',
     'creative',
     'procedural',

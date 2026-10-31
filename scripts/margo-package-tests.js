@@ -18,6 +18,7 @@ const requested = [
   'wfc',
   'procedural',
   'road',
+  'tilemap',
   'scatter',
   'html',
   'video',

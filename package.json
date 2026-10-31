@@ -73,6 +73,7 @@
     "packages/fbx",
     "packages/navmesh",
     "packages/road",
+    "packages/tilemap",
     "packages/transitions",
     "packages/toon",
     "packages/water",
