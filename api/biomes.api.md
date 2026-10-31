@@ -208,6 +208,12 @@ export type HeightSource = {
     readonly relief: ReliefOptions;
 };
 
+export interface IslandOptions {
+    readonly count?: number;
+    readonly radius?: number;
+    readonly shelf?: number;
+}
+
 export const LAYERS: Readonly<Record<string, LayerInfo>>;
 
 export type LayerFormat = 'i32' | 'i16' | 'u16' | 'u8' | 'rgba8';
@@ -250,6 +256,7 @@ export interface Relief {
     height(x: number, z: number): number;
     readonly rivers: readonly RiverLine[];
     readonly valleyWidth: number;
+    readonly islands: readonly ReliefIsland[];
     waterCells(origin: readonly [number, number], step: number, nx: number, nz: number): Uint8Array;
     readonly settings: Readonly<{
         seed: number;
@@ -259,7 +266,24 @@ export interface Relief {
         relief: number;
         coast: NonNullable<ReliefOptions['coast']>;
         seaDepth: number;
+        shelf: number;
+        valley: Readonly<{
+            width: number;
+            floor: number;
+            mouth: number;
+        }>;
+        islands: Readonly<{
+            count: number;
+            radius: number;
+            shelf: number;
+        }> | null;
     }>;
+}
+
+export interface ReliefIsland {
+    readonly x: number;
+    readonly z: number;
+    readonly radius: number;
 }
 
 export interface ReliefOptions {
@@ -268,9 +292,12 @@ export interface ReliefOptions {
     readonly size?: readonly [number, number];
     readonly base?: number;
     readonly relief?: number;
-    readonly coast?: 'none' | 'west' | 'east' | 'north' | 'south';
+    readonly coast?: 'none' | 'west' | 'east' | 'north' | 'south' | 'island';
     readonly rivers?: number;
     readonly seaDepth?: number;
+    readonly shelf?: number;
+    readonly valley?: ValleyOptions;
+    readonly islands?: IslandOptions;
 }
 
 export type RiverLine = Int32Array;
@@ -304,6 +331,12 @@ export interface SpeciesRule {
 export interface TileRequest {
     readonly layers?: readonly string[];
     readonly signal?: AbortSignal;
+}
+
+export interface ValleyOptions {
+    readonly width?: number;
+    readonly floor?: number;
+    readonly mouth?: number;
 }
 
 export interface ZoneClassifier {

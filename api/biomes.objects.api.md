@@ -316,6 +316,12 @@ interface InstanceView {
     age: number;
 }
 
+interface IslandOptions {
+    readonly count?: number;
+    readonly radius?: number;
+    readonly shelf?: number;
+}
+
 type LayerFormat = 'i32' | 'i16' | 'u16' | 'u8' | 'rgba8';
 
 interface LayerWrite {
@@ -400,9 +406,12 @@ interface ReliefOptions {
     readonly size?: readonly [number, number];
     readonly base?: number;
     readonly relief?: number;
-    readonly coast?: 'none' | 'west' | 'east' | 'north' | 'south';
+    readonly coast?: 'none' | 'west' | 'east' | 'north' | 'south' | 'island';
     readonly rivers?: number;
     readonly seaDepth?: number;
+    readonly shelf?: number;
+    readonly valley?: ValleyOptions;
+    readonly islands?: IslandOptions;
 }
 
 type SizeDistribution = {
@@ -434,6 +443,12 @@ interface SpeciesRule {
 interface TileRequest {
     readonly layers?: readonly string[];
     readonly signal?: AbortSignal;
+}
+
+interface ValleyOptions {
+    readonly width?: number;
+    readonly floor?: number;
+    readonly mouth?: number;
 }
 
 interface ZoneClassifier {
