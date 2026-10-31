@@ -2,8 +2,9 @@
 // block light, a first-person body that walks, sprints, jumps, swims and flies, block breaking and placing with an
 // outline, a hotbar, and saves in IndexedDB. `?view=<name>` is the deterministic mode for screenshots and benchmarks
 // (fixed seed, camera, time; no input; `window.voxelSandbox` reports readiness and stats). `?server=ws://host:port` joins a
-// multiplayer server (server.mjs, multiplayer.ts) instead of streaming the world here. README.md lists the controls and
-// URL parameters.
+// multiplayer server (server.mjs, multiplayer.ts) instead of streaming the world here; `?plaza=https://host` (or a page
+// under /plaza/) asks that router's /join where to play. Every way a join can fail ends in this same sandbox, playing
+// alone, with a banner. README.md lists the controls and URL parameters.
 import { Engine, type EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { Line, Lines } from '@margoengine/lines';
@@ -25,17 +26,31 @@ import { IndexedDBChunkStore, MemoryChunkStore, VoxelStreamer } from '@margoengi
 import { BLOCK_DEFINITIONS, defineBlocks, HOTBAR } from './blocks.ts';
 import generatorUrl from './generator.worker.ts?worker&url';
 import { type SceneLighting, setupLighting } from './lighting.ts';
-import { PhotoMode } from './photo.ts';
-import { joinServer, keyBits, type Online } from './multiplayer.ts';
+import type { Figures } from './figures.ts';
+import {
+  joinPlaza,
+  joinServer,
+  keyBits,
+  type Online,
+  plazaName,
+  REPORT_EVERY,
+  sendReport,
+  soloBanner,
+} from './multiplayer.ts';
+import type { PhotoMode } from './photo.ts';
 import { buildShapes, buildShowcase, groundY, showcaseReady } from './showcase.ts';
 import { DEFAULT_SEED } from './terrain.ts';
 import { paintBlockTextures } from './textures.ts';
+import { slotsThatFit, TouchControls } from './touch.ts';
 import {
   eggCounter,
   Hotbar,
+  setBanner,
   setDeterministic,
   setHud,
   setOverlay,
+  setReport,
+  setTouchUi,
   setUnderwater,
   showError,
   toast,
@@ -87,6 +102,13 @@ const params = new URLSearchParams(location.search),
   deterministic = viewName !== null,
   // A multiplayer server to join (not in the deterministic mode).
   serverUrl = viewName === null ? params.get('server') : null,
+  // The Plaza router that answers /join (not with a direct ?server=).
+  routerUrl =
+    viewName === null && !serverUrl
+      ? (params.get('plaza') ?? (location.pathname.startsWith('/plaza/') ? 'https://plaza.margoengine.com' : null))
+      : null,
+  JOIN_TIMEOUT = 5000, // milliseconds from the page's start to the server's welcome, else it plays alone
+  RETRY = integer('retry', 30_000, 100, 600_000), // milliseconds between asks of the router while playing alone
   seed = integer('seed', DEFAULT_SEED, -(2 ** 31), 2 ** 31 - 1),
   DISTANCES = [4, 8, 12, 16],
   VERTICAL = 3, // chunks loaded above and below the camera's chunk
@@ -97,7 +119,10 @@ const params = new URLSearchParams(location.search),
 let distance = integer('rd', 8, 2, 32);
 const hours = params.has('time') ? Number(params.get('time')) : (view?.hours ?? 10);
 // Before the engine exists: core reads the tier when it builds pipelines and sizes the canvas (?quality=high|low).
-const tier = applyQualityTier();
+const tier = applyQualityTier(),
+  // A phone playing, not a deterministic view with the phone tier forced: those views keep their references.
+  phone = tier === 'phone' && !deterministic;
+if (phone && !params.has('rd')) distance = 4;
 const canvas = document.getElementById('scene') as HTMLCanvasElement;
 
 /** What `window.voxelSandbox` exposes (screenshots, benchmarks, tests and the browser console). */
@@ -107,16 +132,24 @@ interface Sandbox {
   /** The player stands in the world (normal mode). */
   readonly spawned: boolean;
   world: VoxelWorld;
-  player: VoxelCharacter;
+  readonly player: VoxelCharacter;
   /** The local streamer; undefined when playing on a server (`online`). */
-  streamer: VoxelStreamer | undefined;
-  /** The joined server (`?server=`). */
-  online: Online | undefined;
+  readonly streamer: VoxelStreamer | undefined;
+  /** The joined server (`?server=`, `?plaza=`); undefined when playing alone. */
+  readonly online: Online | undefined;
+  /** The other players' figures while online. */
+  readonly figures: Figures | undefined;
+  /** The touch controls; undefined in the deterministic mode. */
+  readonly touch: TouchControls | undefined;
   voxels: VoxelRenderer;
+  /** Where the player looks, radians. */
+  readonly look: { yaw: number; pitch: number };
   /** The light: sky, shadows, local lights (lighting.ts). */
   scene: SceneLighting;
-  /** The path-traced photo mode (photo.ts; P toggles it). */
-  photo: PhotoMode;
+  /** The path-traced photo mode once it has loaded (photo.ts, a dynamic import; P toggles it). */
+  readonly photo: PhotoMode | undefined;
+  /** Loads the photo mode. */
+  loadPhoto(): Promise<PhotoMode>;
   /** The block under the crosshair. */
   readonly target: VoxelHit | null;
   /** Milliseconds from the streamer's start: first voxel draw, every chunk in range loaded, ready (see README). */
@@ -168,6 +201,7 @@ async function boot(): Promise<void> {
       timeScale: deterministic ? 0 : DAY,
       distance: distance * 32,
       lightBlocks: blocks.table.flatMap((type, id) => (type.light > 0 ? [id] : [])),
+      shadows: !phone,
     }),
     lines = new Lines();
   engine.use(lines);
@@ -178,9 +212,11 @@ async function boot(): Promise<void> {
   // Streaming: the generator worker gets the seed in its URL; a deterministic view keeps nothing. On a server, the
   // server sends the chunks instead.
   const timeline: Sandbox['timeline'] = { startedAt: performance.now() },
-    online = serverUrl ? joinServer(engine, world, serverUrl, distance) : undefined,
-    streamer = online ? undefined : startStreamer(),
+    joining = !!(serverUrl || routerUrl),
     pending = () => streamer?.pending ?? (online?.client.loaded ? 0 : 1);
+  let online: Online | undefined,
+    figures: Figures | undefined,
+    streamer: VoxelStreamer | undefined = joining ? undefined : startStreamer();
   function startStreamer(): VoxelStreamer {
     const store = deterministic ? new MemoryChunkStore() : openStore(),
       generator = new URL(generatorUrl, location.href);
@@ -201,40 +237,55 @@ async function boot(): Promise<void> {
     };
     return s;
   }
-  if (online)
-    online.client.onError = (error) => {
-      console.warn(error);
-      toast(`Multiplayer: ${error instanceof Error ? error.message : String(error)}`);
-    };
   // Light after the streamer each frame (plugins update in the order they were added), so a chunk that joins the world
   // is lit in the same frame and meshed once, with its light.
   let lightWork = 0;
-  engine.use({
+  const lightPlugin = {
     name: 'voxel-sandbox:light',
     setup() {},
     onPreUpdate: () => {
       lightWork = lighting.update();
     },
-  });
+  };
+  engine.use(lightPlugin);
   const loaded = new Map<string, VoxelChunk>();
   world.onChunk((cx, cy, cz, chunk) => {
     if (chunk) loaded.set(`${cx},${cy},${cz}`, chunk);
     else loaded.delete(`${cx},${cy},${cz}`);
   });
-  // Photo mode (P): the loaded world path-traced; `?photo` starts in it.
-  const photo = new PhotoMode(engine, {
-    world,
-    blocks,
-    images,
-    chunks: loaded,
-    hours: () => scene.hours,
-    distance: () => distance * 32,
-  });
-  if (params.has('photo')) photo.toggle();
+  // Photo mode (P): the loaded world path-traced; `?photo` starts in it. A dynamic import, so the tracer is not part of
+  // the first download. Phones are refused: the tracer needs a desktop GPU.
+  let photo: PhotoMode | undefined, photoLoad: Promise<PhotoMode> | undefined;
+  const loadPhoto = () =>
+    (photoLoad ??= import('./photo.ts').then(({ PhotoMode }) => {
+      photo = new PhotoMode(engine, {
+        world,
+        blocks,
+        images,
+        chunks: loaded,
+        hours: () => scene.hours,
+        distance: () => distance * 32,
+      });
+      return photo;
+    }));
+  const togglePhoto = async () => {
+    if (phone) return toast('Photo mode needs a desktop GPU, so it stays off on phones');
+    try {
+      toast((await loadPhoto()).toggle() ? 'Photo mode: path traced (P leaves, Enter saves a PNG)' : 'Photo mode off');
+    } catch (error) {
+      photoLoad = undefined; // the next P tries the download again
+      console.warn(error);
+      toast('Photo mode could not load; check the connection and press P again');
+    }
+  };
+  if (params.has('photo')) {
+    if (phone) await togglePhoto();
+    else (await loadPhoto()).toggle();
+  }
 
   // Player, hotbar, saved state (none on a server: it places the player).
-  const player = online ? online.client.player : new VoxelCharacter(world),
-    labelOf = new Map(BLOCK_DEFINITIONS.map(([name], i) => [name, labels[i + 1]])),
+  let player = new VoxelCharacter(world);
+  const labelOf = new Map(BLOCK_DEFINITIONS.map(([name], i) => [name, labels[i + 1]])),
     hotbar = new Hotbar(HOTBAR, (name) => {
       const type = blocks.get(blocks.id(name));
       return { label: labelOf.get(name) ?? name, pixels: images[type.textures[4]], cross: type.shape === 'cross' };
@@ -244,8 +295,10 @@ async function boot(): Promise<void> {
     flyWanted = false, // fly mode on a server: sent with each step
     spawned = false,
     showcase = view?.showcase ? 'waiting' : 'none';
-  const saved = deterministic || online ? undefined : loadPlayer();
-  if (saved) {
+  let saved: SavedPlayer | undefined;
+  function restorePlayer(): void {
+    saved = loadPlayer();
+    if (!saved) return;
     player.position = [...saved.position];
     player.flying = saved.flying;
     yaw = saved.yaw;
@@ -255,6 +308,7 @@ async function boot(): Promise<void> {
     });
     hotbar.select(saved.selected);
   }
+  if (!deterministic && !joining) restorePlayer();
   function blocksHas(name: string): boolean {
     try {
       blocks.id(name);
@@ -286,20 +340,58 @@ async function boot(): Promise<void> {
 
   // Input: pointer lock, keys, buttons.
   const keys = new Set<string>(),
+    noKeys: ReadonlySet<string> = new Set<string>(),
     buttons = new Set<number>();
   let repeat = 0,
     lastSpace = 0;
   // Read the lock itself, not a flag set by pointerlockchange (which arrives after pointerLockElement changes).
   const isLocked = () => document.pointerLockElement === canvas;
+  // Playing: the pointer is locked, or on a touch screen the player tapped past the overlay.
+  const isPlaying = () => isLocked() || !!touch?.active;
+  let touch: TouchControls | undefined;
   const events = new AbortController(),
     on = <K extends keyof DocumentEventMap>(type: K, f: (e: DocumentEventMap[K]) => void) =>
       document.addEventListener(type, f, { signal: events.signal });
   if (!deterministic) {
-    canvas.addEventListener('click', () => {
-      if (!isLocked() && spawned) void canvas.requestPointerLock?.();
+    touch = new TouchControls(canvas, document.getElementById('hotbar')!, document.getElementById('touch-buttons')!, {
+      look(dx, dy) {
+        yaw -= dx * 0.005;
+        pitch = Math.max(-1.55, Math.min(1.55, pitch - dy * 0.005));
+      },
+      place: () => act(2),
+      break: () => act(0),
+      fly: toggleFly,
+      keys,
+      slot: () => hotbar.selected,
+      select: (slot) => hotbar.select(slot),
+      slots: hotbar.slots.length,
     });
-    document.getElementById('overlay')!.addEventListener('click', () => {
-      if (spawned) void canvas.requestPointerLock?.();
+    // A coarse pointer starts with the touch screen's layout: buttons, a smaller hotbar, no HUD text. A touch on a
+    // screen that also has a mouse switches to it when the player taps past the overlay.
+    const touchLayout = () => {
+      setTouchUi(true);
+      toggleHud(false);
+      const fit = () => {
+        hotbar.fit = slotsThatFit(innerWidth);
+        hotbar.refresh();
+      };
+      fit();
+      addEventListener('resize', fit, { signal: events.signal });
+    };
+    if (matchMedia('(pointer: coarse)').matches) touchLayout();
+    canvas.addEventListener('click', () => {
+      if (!isPlaying() && spawned) void canvas.requestPointerLock?.();
+    });
+    const overlay = document.getElementById('overlay')!;
+    overlay.addEventListener('pointerup', (e) => {
+      if (e.pointerType !== 'touch' || !spawned || touch!.active) return;
+      if (!document.body.classList.contains('touch')) touchLayout();
+      touch!.active = true;
+      setOverlay('playing');
+      playing();
+    });
+    overlay.addEventListener('click', () => {
+      if (spawned && !isPlaying()) void canvas.requestPointerLock?.();
     });
     on('pointerlockchange', () => {
       setOverlay(isLocked() ? 'playing' : 'paused');
@@ -334,7 +426,7 @@ async function boot(): Promise<void> {
     on('keydown', (e) => {
       if (e.code === 'KeyM' && !e.repeat) eggPress();
       if (e.code === 'F3') e.preventDefault();
-      if (!isLocked() && e.code !== 'F3') return;
+      if (!isPlaying() && e.code !== 'F3') return;
       keys.add(e.code);
       if (e.repeat) return;
       if (/^Digit[1-9]$/.test(e.code)) hotbar.select(Number(e.code.slice(5)) - 1);
@@ -350,9 +442,9 @@ async function boot(): Promise<void> {
         scene.hours = (Math.floor(scene.hours / 3) * 3 + 3) % 24;
         toast(`Time ${String(Math.floor(scene.hours)).padStart(2, '0')}:00`);
       } else if (e.code === 'KeyH' || e.code === 'F3') toggleHud();
-      else if (e.code === 'KeyP')
-        toast(photo.toggle() ? 'Photo mode: path traced (P leaves, Enter saves a PNG)' : 'Photo mode off');
-      else if (e.code === 'Enter' && photo.on) {
+      else if (e.code === 'KeyP') void togglePhoto();
+      else if (e.code === 'KeyR') report();
+      else if (e.code === 'Enter' && photo?.on) {
         toast('Rendering a photo');
         photo.save(canvas.width, canvas.height).then(
           () => toast('Photo saved'),
@@ -362,15 +454,44 @@ async function boot(): Promise<void> {
     });
     on('keyup', (e) => keys.delete(e.code));
     on('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') save();
+      if (document.visibilityState === 'hidden') {
+        save();
+        if (touch?.active) keys.clear(); // fingers lifted while hidden never reach us
+      }
     });
+    addEventListener(
+      'offline',
+      () => {
+        if (online) goSolo('offline');
+      },
+      { signal: events.signal },
+    );
     addEventListener('pagehide', () => save(), { signal: events.signal });
     setInterval(() => save(), 15000);
   }
-  function toggleFly(): void {
-    if (online && !online.client.welcome?.flight) return toast('This server does not allow flying');
+  function toggleFly(): boolean {
+    if (online && !online.client.welcome?.flight) {
+      toast('This server does not allow flying');
+      return false;
+    }
     const on = online ? (flyWanted = !flyWanted) : (player.flying = !player.flying);
-    toast(on ? 'Flying (Space up, Shift down)' : 'Walking');
+    toast(on ? (touch?.active ? 'Flying' : 'Flying (Space up, Shift down)') : 'Walking');
+    return on;
+  }
+  // A griefing report: where the player stands, on which shard. The router counts them; the page holds to its limit.
+  function report(): void {
+    if (!online || !routerUrl) return toast('Reports work when playing on Plaza');
+    const now = performance.now();
+    if (now - lastReport < REPORT_EVERY) return toast('One report a minute');
+    lastReport = now;
+    const [x, , z] = player.position;
+    sendReport(routerUrl, { shard, x, z }).then(
+      () => toast('Report sent. Thank you.'),
+      (error) => {
+        console.warn(error);
+        toast('The report did not reach Plaza');
+      },
+    );
   }
   function setDistance(chunks: number): void {
     if (!streamer) return toast('On a server the render distance is set when joining (?rd=)');
@@ -437,16 +558,24 @@ async function boot(): Promise<void> {
     return x < px + w / 2 && x + 1 > px - w / 2 && y < py + h && y + 1 > py && z < pz + d / 2 && z + 1 > pz - d / 2;
   }
 
+  let solo = false,
+    welcomeTimer: ReturnType<typeof setTimeout> | undefined,
+    shard: number | undefined,
+    worldId: string | undefined,
+    lastReport = Number.NEGATIVE_INFINITY;
+  const serverName = serverUrl ?? 'Plaza';
+
   // Spawn: a saved position, else the first dry ground in a spiral around the origin, once that ground is loaded and lit.
   function trySpawn(): void {
     if (spawned || lightWork) return;
     if (online) {
       if (online.client.spawned) {
         spawned = true;
-        setOverlay('paused');
+        setOverlay(isPlaying() ? 'playing' : 'paused');
       }
       return;
     }
+    if (!streamer) return; // still asking the router
     if (saved) {
       const [x, y, z] = saved.position;
       if (world.getChunk(Math.floor(x) >> 5, Math.floor(y) >> 5, Math.floor(z) >> 5)) spawned = true;
@@ -465,7 +594,7 @@ async function boot(): Promise<void> {
             }
           }
     if (!spawned) return;
-    setOverlay('paused');
+    setOverlay(isPlaying() ? 'playing' : 'paused');
   }
 
   // Each frame before rendering: player, camera, target block, deterministic build.
@@ -490,10 +619,14 @@ async function boot(): Promise<void> {
       ready = (y: number) => world.getChunk(Math.floor(px) >> 5, Math.floor(y) >> 5, Math.floor(pz) >> 5);
     // Hold the body still while the ground under it is not loaded (fast flight, a far teleport).
     const frozen = !ready(py) || !ready(py - 2);
-    if (online) online.client.update(dt, { keys: keyBits(isLocked() ? keys : new Set(), flyWanted), yaw, pitch });
+    if (touch?.active) {
+      touch.update(performance.now());
+      touch.setDownVisible(online ? flyWanted || player.inLiquid : player.flying || player.inLiquid);
+    }
+    if (online) online.client.update(dt, { keys: keyBits(isPlaying() ? keys : noKeys, flyWanted), yaw, pitch });
     else if (!frozen) {
-      const move = isLocked() ? axis('KeyD', 'ArrowRight') - axis('KeyA', 'ArrowLeft') : 0,
-        ahead = isLocked() ? axis('KeyW', 'ArrowUp') - axis('KeyS', 'ArrowDown') : 0,
+      const move = isPlaying() ? axis('KeyD', 'ArrowRight') - axis('KeyA', 'ArrowLeft') : 0,
+        ahead = isPlaying() ? axis('KeyW', 'ArrowUp') - axis('KeyS', 'ArrowDown') : 0,
         sin = Math.sin(yaw),
         cos = Math.cos(yaw),
         shift = keys.has('ShiftLeft') || keys.has('ShiftRight'),
@@ -508,7 +641,7 @@ async function boot(): Promise<void> {
     const [x, y, z] = online ? online.client.renderPosition : frozen ? player.position : player.renderPosition,
       eye: Vec3 = [x, y + EYE, z];
     aim(eye);
-    online?.drawPlayers();
+    if (online && figures) figures.update(online.client.samplePlayers(), dt, eye);
     hit = raycastVoxels(world, eye, forward(), REACH);
     const target = hit ? `${hit.cell}|${hit.state}` : '';
     if (hit && target !== outlined) {
@@ -516,7 +649,7 @@ async function boot(): Promise<void> {
       outline.setPositions(cellBox(...hit.cell, type.shape === 'cross' ? 0.2 : 0));
     }
     outlined = target;
-    outline.visible = !!hit && isLocked();
+    outline.visible = !!hit && isPlaying();
     setUnderwater(!!blocks.get(blockId(world.getBlock(Math.floor(x), Math.floor(y + EYE), Math.floor(z)))).liquid);
     if (buttons.size && (repeat -= dt) <= 0) {
       repeat = REPEAT;
@@ -555,7 +688,8 @@ async function boot(): Promise<void> {
   // Loading is over (everything in range drawn, or the player started playing): spread the work of new chunks over
   // frames. The light tier measures the GPU for the next load; the full tier's slow-frame reload is not wanted in a
   // game with unsaved edits, so it is not watched.
-  let settled = false;
+  let settled = false,
+    watching = false;
   function playing(): void {
     if (settled) return;
     settled = true;
@@ -564,7 +698,10 @@ async function boot(): Promise<void> {
       streamer.frameBudget = 0.5;
     }
     lighting.budget = 16384;
-    if (!deterministic && tier === 'light') watchQuality();
+    if (!deterministic && tier === 'light' && !watching) {
+      watching = true;
+      watchQuality();
+    }
   }
 
   // HUD, every 250 ms.
@@ -592,25 +729,26 @@ async function boot(): Promise<void> {
       `chunks ${s.chunks} drawn, ${s.visible} visible, ${loaded.size} loaded, ${streamer ? `${streamer.pending} to load` : online?.client.loaded ? 'all received' : 'receiving'}`,
       ...(online
         ? [
-            `server ${serverUrl}  ${online.client.players.size} players near  ${online.client.stats.corrections} corrections`,
+            `server ${serverName}  ${online.client.players.size} players near  ${online.client.stats.corrections} corrections`,
           ]
         : []),
       `quads ${s.quads.toLocaleString()}  ${(s.bytes / 1048576).toFixed(1)} MiB  draws ${s.draws}`,
       `seed ${seed}  ${scene.hours.toFixed(1)} h${ready ? '' : '  loading'}`,
-      ...(photo.on ? [`photo mode  ${photo.samples} samples`] : []),
+      ...(photo?.on ? [`photo mode  ${photo.samples} samples`] : []),
     ]);
     if (!spawned)
       setOverlay(
         'loading',
         streamer
           ? `Generating the world: ${streamer.pending} chunks to load`
-          : `Joining ${serverUrl}: ${loaded.size} chunks received`,
+          : `Joining ${serverName}: ${loaded.size} chunks received`,
       );
   }
 
   function save(): void {
-    if (deterministic || !spawned || !streamer) return;
-    streamer.save().catch((error) => streamer.onError(error));
+    const local = streamer;
+    if (deterministic || !spawned || !local) return;
+    local.save().catch((error) => local.onError(error));
     try {
       localStorage.setItem(
         saveName(),
@@ -641,7 +779,7 @@ async function boot(): Promise<void> {
     const start = performance.now();
     try {
       update(dt);
-      photo.update(dt);
+      photo?.update(dt);
       engine.render({ delta: deterministic ? 0 : dt });
     } catch (error) {
       engine.onError(error);
@@ -668,7 +806,7 @@ async function boot(): Promise<void> {
   // Back from a background tab: restart the clock so the first frame steps 0, not the time away (clamped or not).
   document.addEventListener('visibilitychange', () => (last = 0), { signal: events.signal });
   requestAnimationFrame(frame);
-  setOverlay(deterministic ? 'hidden' : 'loading', online ? `Joining ${serverUrl}` : 'Generating the world');
+  setOverlay(deterministic ? 'hidden' : 'loading', joining ? `Joining ${serverName}` : 'Generating the world');
 
   const stats = () => ({
     ...voxels.stats,
@@ -690,12 +828,30 @@ async function boot(): Promise<void> {
       return spawned;
     },
     world,
-    player,
-    streamer,
-    online,
+    get player() {
+      return player;
+    },
+    get streamer() {
+      return streamer;
+    },
+    get online() {
+      return online;
+    },
+    get figures() {
+      return figures;
+    },
+    get touch() {
+      return touch;
+    },
     voxels,
+    get look() {
+      return { yaw, pitch };
+    },
     scene,
-    photo,
+    get photo() {
+      return photo;
+    },
+    loadPhoto,
     get target() {
       return hit;
     },
@@ -722,13 +878,134 @@ async function boot(): Promise<void> {
     gpuTiming: (count) => gpuTiming(engine, count, (on) => (manual = on)),
   };
   Object.assign(window, { voxelSandbox: sandbox });
+
+  // Joining. Every failure (the router says full or cannot be reached, a socket error or close, no welcome in time) ends
+  // in goSolo: this page keeps its world, its input and its frame loop, with the banner saying why.
+  function connect(url: string, wait: number): void {
+    try {
+      online = joinServer(world, url, {
+        view: distance,
+        name: plazaName(storage()),
+        onClosed: ({ byClient }) => (byClient ? goSolo('offline') : lost()),
+      });
+    } catch (error) {
+      console.warn(error);
+      return goSolo('offline');
+    }
+    online.client.onError = (error) => console.warn(error); // onClose follows and decides
+    player = online.client.player;
+    // A dynamic import: a page playing alone never downloads the figures, name tags or instancing.
+    const joined = online;
+    import('./figures.ts').then(
+      ({ Figures }) => {
+        if (online !== joined) return; // left the server while it loaded
+        figures = new Figures(engine, {
+          capacity: phone ? 128 : 512,
+          tags: phone ? 12 : 32,
+          ...(scene.shadows ? { castShadows: (crowd) => scene.shadows!.add(crowd) } : {}),
+        });
+      },
+      (error) => {
+        console.warn(error);
+        toast('Other players could not load; check the connection');
+      },
+    );
+    welcomeTimer = setTimeout(() => {
+      if (online && !online.client.welcome) goSolo('offline');
+    }, wait);
+    if (routerUrl) setReport(report);
+  }
+  // The server closed on us. Only /join can say why: a new `world` id is a new world, the same id a shard that restarted.
+  // Either way the way back is a reload through /join; no room or no router ends in the solo world within 5 s.
+  function lost(): void {
+    const router = routerUrl;
+    if (!router) return goSolo('offline');
+    setBanner('The connection dropped. Checking Plaza.');
+    // Spread out: a whole world leaves at once at its end.
+    const jitter = Math.random() * 3000;
+    setTimeout(() => {
+      joinPlaza(router, AbortSignal.timeout(JOIN_TIMEOUT - jitter)).then(
+        (answer) => {
+          if (answer.kind === 'full') return goSolo('full', answer.online);
+          setBanner(answer.world !== worldId ? 'This world has ended. Joining the next one.' : 'Rejoining Plaza.');
+          location.reload();
+        },
+        (error) => {
+          console.warn(error);
+          goSolo('offline');
+        },
+      );
+    }, jitter);
+  }
+  function goSolo(kind: 'full' | 'offline', count?: number): void {
+    if (solo || deterministic) return;
+    solo = true;
+    clearTimeout(welcomeTimer);
+    setReport(undefined);
+    online?.dispose();
+    online = undefined;
+    figures?.dispose();
+    figures = undefined;
+    for (const key of [...loaded.keys()]) {
+      const [cx, cy, cz] = key.split(',').map(Number);
+      world.removeChunk(cx, cy, cz);
+    }
+    player = new VoxelCharacter(world);
+    flyWanted = false;
+    hit = null;
+    spawned = false;
+    ready = sandbox.ready = settled = false;
+    restorePlayer();
+    // The streamer loads around the camera, and the spawn below needs its own ground loaded: the camera goes there first.
+    const here = saved?.position;
+    aim(here ? [here[0], here[1] + EYE, here[2]] : [0.5, 40, 0.5]);
+    // The streamer goes before the light in the plugin order, as when the page starts alone.
+    engine.removePlugin(lightPlugin.name);
+    streamer = startStreamer();
+    engine.use(lightPlugin);
+    const rejoin = () => location.reload(),
+      router = routerUrl;
+    setBanner(soloBanner(kind, count, !!router), rejoin);
+    if (router) {
+      const retry = setInterval(() => {
+        if (document.hidden) return;
+        joinPlaza(router, AbortSignal.timeout(JOIN_TIMEOUT)).then(
+          (answer) =>
+            setBanner(
+              answer.kind === 'shard' ? 'Plaza has room now.' : soloBanner('full', answer.online, true),
+              rejoin,
+            ),
+          () => setBanner(soloBanner('offline', undefined, true), rejoin),
+        );
+      }, RETRY);
+      events.signal.addEventListener('abort', () => clearInterval(retry));
+    }
+  }
+  if (serverUrl) connect(serverUrl, JOIN_TIMEOUT);
+  else if (routerUrl) {
+    const started = performance.now();
+    joinPlaza(routerUrl, AbortSignal.timeout(JOIN_TIMEOUT)).then(
+      (answer) => {
+        if (answer.kind === 'full') return goSolo('full', answer.online);
+        shard = answer.shard;
+        worldId = answer.world;
+        connect(answer.url, Math.max(0, JOIN_TIMEOUT - (performance.now() - started)));
+      },
+      (error) => {
+        console.warn(error);
+        goSolo('offline');
+      },
+    );
+  }
   if (import.meta.hot)
     import.meta.hot.dispose(() => {
       running = false;
       events.abort();
       void streamer?.dispose();
       online?.dispose();
-      photo.dispose();
+      figures?.dispose();
+      touch?.dispose();
+      photo?.dispose();
       scene.dispose();
       engine.dispose();
     });
@@ -800,6 +1077,15 @@ function cellBox(x: number, y: number, z: number, inset = 0): number[] {
     out: number[] = [];
   for (let i = 0; i < 8; i++) for (const bit of [1, 2, 4]) if (!(i & bit)) out.push(...corner(i), ...corner(i | bit));
   return out;
+}
+
+// localStorage, or nothing where reading it throws (blocked storage).
+function storage(): Storage | undefined {
+  try {
+    return localStorage;
+  } catch {
+    return undefined;
+  }
 }
 
 const farFor = (chunks: number) => (chunks + 2) * 32 * 1.5;

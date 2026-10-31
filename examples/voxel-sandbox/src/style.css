@@ -15,6 +15,8 @@ body {
   height: 100%;
   display: block;
   outline: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 #underwater {
   position: fixed;
@@ -170,9 +172,128 @@ body {
   color: #ffb4a8;
   margin-top: 16px;
 }
+#banner {
+  position: fixed;
+  z-index: 3;
+  left: 50%;
+  top: max(8px, env(safe-area-inset-top));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  padding: 8px 12px;
+  background: rgba(10, 16, 28, 0.85);
+  border-radius: 4px;
+  font-size: 16px;
+}
+#banner[hidden] {
+  display: none;
+}
+#banner button,
+#report,
+#touch-buttons button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  font: 600 16px/1 system-ui, sans-serif;
+  color: #f4f4f4;
+  background: rgba(10, 16, 28, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 4px;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+#banner button[hidden],
+#report[hidden],
+#touch-buttons button[hidden],
+#touch-buttons[hidden],
+#stick[hidden],
+#hotbar .slot[hidden] {
+  display: none;
+}
+#report {
+  position: fixed;
+  z-index: 2;
+  right: max(8px, env(safe-area-inset-right));
+  top: max(8px, env(safe-area-inset-top));
+}
+#stick {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 120px;
+  height: 120px;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  pointer-events: none;
+}
+#touch-buttons button {
+  position: fixed;
+  z-index: 1;
+  min-width: 64px;
+  min-height: 64px;
+  border-radius: 50%;
+  padding: 0;
+  -webkit-user-select: none;
+}
+#touch-jump {
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px);
+}
+#touch-fly {
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 144px);
+}
+#touch-down {
+  right: calc(max(16px, env(safe-area-inset-right)) + 72px);
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px);
+}
+.touch-help {
+  display: none !important;
+}
+.name-tag {
+  padding: 1px 6px;
+  font-size: 14px;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(10, 16, 28, 0.6);
+  border-radius: 3px;
+}
+body.touch #hotbar {
+  pointer-events: auto;
+  touch-action: none;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  gap: 2px;
+}
+body.touch #hotbar .slot {
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+}
+body.touch #hotbar-label {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 64px);
+}
+body.touch #overlay dl:not(.touch-help) {
+  display: none;
+}
+body.touch #overlay .touch-help {
+  display: grid !important;
+}
+body.touch #overlay {
+  padding: 16px;
+  box-sizing: border-box;
+}
+body.touch #overlay[data-state='loading'] .touch-help {
+  display: none !important;
+}
 body.deterministic #overlay,
 body.deterministic #hud,
 body.deterministic #toast,
-body.deterministic #hotbar-label {
+body.deterministic #hotbar-label,
+body.deterministic #banner {
   display: none;
 }

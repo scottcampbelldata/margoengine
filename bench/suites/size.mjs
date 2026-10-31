@@ -14,7 +14,16 @@ const bytes = (primary = false) => ({ unit: 'B', better: 'lower', exact: true, t
 
 // Eager JavaScript per demo: the entry chunk plus everything it imports statically, gzip per chunk as served. Lazy
 // chunks (dynamic import) are the rest.
+// Plaza's budget (private plan V2): the sandbox's JS before the page split, 215,262 B, minus the tracer's lazy chunk,
+// 78,383 B, plus at most 12,000 B. Its entry is main.ts itself: index.html only checks WebGPU and imports it, so what the
+// page really starts with is main.ts and its static imports. Lazy: the tracer (P) and the figures (joining a server).
+const PLAZA_BUDGET = 148_879;
 const DEMOS = {
+  plaza: {
+    root: 'examples/voxel-sandbox',
+    budget: PLAZA_BUDGET,
+    build: { rollupOptions: { input: resolve(root, 'examples/voxel-sandbox/src/main.ts') } },
+  },
   'night-citadel': { root: 'apps/showcase-night-citadel' },
   afterlight: { root: 'examples/gameplay-sandbox' },
   meadow: {
@@ -148,7 +157,11 @@ export default {
         title: `${demo}: eager and lazy JS, gzip`,
         metrics: { eagerGzip: bytes(true), lazyGzip: bytes() },
         async run() {
-          return { values: await demoBytes(config) };
+          const { budget, ...build } = config,
+            values = await demoBytes(build);
+          if (budget !== undefined && values.eagerGzip > budget)
+            throw new Error(`${demo}: ${values.eagerGzip} B of eager JS is over its budget of ${budget} B`);
+          return { values };
         },
       });
     for (const [name, engine] of Object.entries(ctx.external ?? {}))

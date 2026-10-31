@@ -1,53 +1,126 @@
-// Multiplayer (?server=ws://host:port): the sandbox joins a @margoengine/voxel-net server (server.mjs) instead of
-// streaming its own world. The server sends the chunks and everyone's edits; this module draws the other players as
-// boxes and turns the sandbox's keys into the client's input bits.
-import { box, type EngineKernel, type Mesh, PbrMaterial } from '@margoengine/core';
+// Multiplayer: the sandbox joins a @margoengine/voxel-net server instead of streaming its own world. The server sends
+// the chunks and everyone's edits; this module hears how each connection ends, keeps the Plaza name and turns the sandbox's keys into the client's input bits. /join and /report go to the Plaza router;
+// see joinPlaza and sendReport.
 import type { VoxelWorld } from '@margoengine/voxel';
-import { connectVoxelNet, Keys, type VoxelNetClient } from '@margoengine/voxel-net';
+import { connectVoxelNet, Keys, type VoxelNetClient, type VoxelNetClose } from '@margoengine/voxel-net';
+import { isPlazaName, randomName } from './names.ts';
 
-const COLORS = ['#e4572e', '#29335c', '#f3a712', '#669bbc', '#a8c686', '#8e7dbe', '#d64550', '#3e8914'];
-
-/** A joined server: the client, and the boxes of the other players. */
+/** A joined server: the client, and how to leave. */
 export interface Online {
   readonly client: VoxelNetClient;
-  /** Moves each other player's box to where the client says to draw it; adds and removes boxes as players come and go. */
-  drawPlayers(): void;
   dispose(): void;
 }
 
-/** Connects to `url` with `world` (which must be empty: the server fills it) and a view of `view` chunks. */
-export function joinServer(engine: EngineKernel, world: VoxelWorld, url: string, view: number): Online {
-  const client = connectVoxelNet(url, world, { name: 'sandbox', view }),
-    meshes = new Map<number, Mesh>(),
-    body = box(0.6, 1.8, 0.6);
+/**
+ * Connects to `url` with `world` (which must be empty: the server fills it) and a view of `view` chunks. `onClosed`
+ * hears every end the page did not ask for, whatever its code; `byClient` then means a message it could not read.
+ * @throws SyntaxError for a URL WebSocket refuses.
+ */
+export function joinServer(
+  world: VoxelWorld,
+  url: string,
+  options: { view: number; name: string; onClosed: (closed: VoxelNetClose) => void },
+): Online {
+  const client = connectVoxelNet(url, world, { name: options.name, view: options.view });
+  let leaving = false;
+  client.onClose = (closed) => {
+    if (!leaving) options.onClosed(closed);
+  };
   return {
     client,
-    drawPlayers() {
-      const players = client.samplePlayers();
-      for (const [id, other] of players) {
-        let mesh = meshes.get(id);
-        if (!mesh) {
-          mesh = engine
-            .createMesh()
-            .setGeometry(body)
-            .setMaterial(new PbrMaterial({ color: COLORS[id % COLORS.length], roughness: 0.8 }));
-          meshes.set(id, mesh);
-        }
-        const p = other.snapshot.position,
-          q = other.snapshot.rotation;
-        mesh.setPosition([p[0], p[1] + 0.9, p[2]]).setRotation([0, 2 * Math.atan2(q[1], q[3]), 0]);
-      }
-      for (const [id, mesh] of meshes)
-        if (!players.has(id)) {
-          mesh.dispose();
-          meshes.delete(id);
-        }
-    },
     dispose() {
+      leaving = true;
       client.close();
-      for (const mesh of meshes.values()) mesh.dispose();
     },
   };
+}
+
+/** What the router's GET /join answers. */
+export type JoinAnswer =
+  | { kind: 'shard'; url: string; shard: number | undefined; world: string | undefined }
+  | { kind: 'full'; online: number | undefined }
+  | { kind: 'starting'; retryIn: number };
+
+/**
+ * Reads the JSON of GET /join: `{url, shard, world}` joins that shard, `{full: true, online}` means no room, and
+ * `{starting: true, retryIn}` means between worlds or restarting, so ask again in `retryIn` seconds.
+ * @throws TypeError for anything else.
+ */
+export function parseJoin(value: unknown): JoinAnswer {
+  const v = (value ?? {}) as Record<string, unknown>;
+  if (v.full === true) return { kind: 'full', online: typeof v.online === 'number' ? v.online : undefined };
+  if (v.starting === true) return { kind: 'starting', retryIn: typeof v.retryIn === 'number' ? v.retryIn : 2 };
+  if (typeof v.url === 'string' && /^wss?:\/\//.test(v.url))
+    return {
+      kind: 'shard',
+      url: v.url,
+      shard: typeof v.shard === 'number' ? v.shard : undefined,
+      world: v.world === undefined ? undefined : String(v.world),
+    };
+  throw new TypeError(
+    `The Plaza router answered /join with ${JSON.stringify(value)}; expected {url}, {full} or {starting}`,
+  );
+}
+
+/**
+ * Asks the router at `router` where to play, asking again while it is between worlds, until `signal` ends.
+ * @throws when it cannot be reached in that time or answers nonsense.
+ */
+export async function joinPlaza(
+  router: string,
+  signal: AbortSignal,
+): Promise<Exclude<JoinAnswer, { kind: 'starting' }>> {
+  for (;;) {
+    const response = await fetch(new URL('join', withSlash(router)), { signal, cache: 'no-store' }),
+      answer = parseJoin(await response.json());
+    if (answer.kind !== 'starting') return answer;
+    await new Promise((done) => setTimeout(done, answer.retryIn * 1000));
+    signal.throwIfAborted();
+  }
+}
+
+/** Posts a griefing report: the column the player stands on, on which shard. @throws when the router refuses or is down. */
+export async function sendReport(
+  router: string,
+  report: { shard: number | undefined; x: number; z: number },
+): Promise<void> {
+  // JSON as text/plain, the default: a simple request.
+  const response = await fetch(new URL('report', withSlash(router)), { method: 'POST', body: JSON.stringify(report) });
+  if (!response.ok) throw new Error(`The report was refused (${response.status})`);
+}
+
+/**
+ * The banner of a page playing alone: `kind` is why, `count` how many are in (a full Plaza), `retrying` whether a router
+ * is being asked again.
+ */
+export function soloBanner(kind: 'full' | 'offline', count: number | undefined, retrying: boolean): string {
+  const tail = retrying ? 'building alone, retrying' : 'building alone';
+  if (kind === 'full') return `Plaza is full, ${count === undefined ? '' : `${count} people are in, `}${tail}`;
+  return retrying ? `Plaza is offline, ${tail}` : `The server is offline, ${tail}`;
+}
+
+const withSlash = (url: string) => (url.endsWith('/') ? url : `${url}/`);
+
+/** The minimum time between two reports from this page, milliseconds; the router holds the same limit per identity. */
+export const REPORT_EVERY = 60_000;
+
+const NAME_KEY = 'margo-plaza-name';
+
+/** This browser's Plaza name: kept in localStorage, a new one when there is none or the saved one is not a Plaza name. */
+export function plazaName(storage: Pick<Storage, 'getItem' | 'setItem'> | undefined, random = Math.random): string {
+  try {
+    const saved = storage?.getItem(NAME_KEY);
+    if (saved && isPlazaName(saved)) return saved;
+  } catch {
+    // Storage blocked: a new name each visit.
+  }
+  const name = randomName(random);
+  try {
+    storage?.setItem(NAME_KEY, name);
+  } catch {
+    // As above.
+  }
+  return name;
 }
 
 /** The client's input bits for the sandbox's keys (WASD or arrows, Space, Shift or C) and fly mode. */

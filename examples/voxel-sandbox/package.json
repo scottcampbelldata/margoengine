@@ -24,7 +24,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "test": "node --test test/*.test.js",
+    "test": "node --expose-gc --test test/*.test.js",
     "test:browser": "node test/play.browser.mjs",
     "server": "node server.mjs",
     "bench": "node bench.mjs"
@@ -32,6 +32,8 @@
   "dependencies": {
     "@margoengine/clustered": "^1.0.0",
     "@margoengine/core": "^1.0.0",
+    "@margoengine/culling": "^1.0.0",
+    "@margoengine/labels": "^1.0.0",
     "@margoengine/lines": "^1.0.0",
     "@margoengine/post": "^1.0.0",
     "@margoengine/quality": "^1.0.0",

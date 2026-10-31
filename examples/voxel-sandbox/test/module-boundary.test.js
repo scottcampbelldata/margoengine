@@ -9,6 +9,8 @@ test('the sandbox imports public package entries only', async () => {
   for (const name of [
     'clustered',
     'core',
+    'culling',
+    'labels',
     'lines',
     'post',
     'quality',
@@ -32,4 +34,33 @@ test('the sandbox imports public package entries only', async () => {
       assert.ok(exported.has(specifier), `${path} imports ${specifier}, which is not a package export`);
     }
   }
+});
+
+// The tracer stays out of the first download, and the figures out of a page playing alone: nothing the page loads eagerly
+// may import photo.ts, figures.ts or voxel-pathtracer, and the only way in is the dynamic import in main.ts (the plaza
+// case in bench/suites/size.mjs measures the bytes).
+test('the path tracer is reached only through the dynamic import', async () => {
+  const source = new URL('../src/', import.meta.url),
+    staticImports = async (file) => {
+      const text = await readFile(new URL(file, source), 'utf8');
+      return [...text.matchAll(/^(?:import|export)\s+(?!type\b)[^;]*?from\s+'([^']+)'|^import\s+'([^']+)'/gms)].map(
+        (match) => match[1] ?? match[2],
+      );
+    },
+    seen = new Set(),
+    walk = async (file) => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      for (const specifier of await staticImports(file)) {
+        assert.notEqual(specifier, './photo.ts', `${file} imports photo.ts statically`);
+        assert.notEqual(specifier, './figures.ts', `${file} imports figures.ts statically`);
+        assert.ok(!specifier.startsWith('@margoengine/voxel-pathtracer'), `${file} imports the tracer statically`);
+        if (specifier.startsWith('./') && specifier.endsWith('.ts')) await walk(specifier.slice(2));
+      }
+    };
+  await walk('main.ts');
+  assert.ok(seen.size > 5, 'the walk followed the imports');
+  const main = await readFile(new URL('main.ts', source), 'utf8');
+  assert.match(main, /import\('\.\/photo\.ts'\)/);
+  assert.match(main, /import\('\.\/figures\.ts'\)/);
 });

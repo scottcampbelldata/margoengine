@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#79a6d9">
   <meta name="description" content="A small voxel sandbox on Margo Engine: streamed terrain, light, building and saves.">
   <title>Voxel sandbox · Margo Engine</title>
@@ -16,6 +16,13 @@
   <div id="toast" role="status"></div>
   <div id="hotbar-label" aria-hidden="true"></div>
   <div id="hotbar" aria-label="Hotbar"></div>
+  <div id="touch-buttons" hidden>
+    <div id="stick" aria-hidden="true" hidden></div>
+    <button type="button" id="touch-fly">Fly</button>
+    <button type="button" id="touch-down" hidden>Down</button>
+    <button type="button" id="touch-jump">Jump</button>
+  </div>
+  <button type="button" id="report" hidden>Report griefing</button>
   <section id="overlay" data-state="loading" data-webgpu-status>
     <h1>Voxel sandbox</h1>
     <p id="overlay-status" data-webgpu-status role="status">Starting WebGPU</p>
@@ -32,10 +39,18 @@
       <dt>V</dt><dd>render distance 4, 8, 12, 16</dd>
       <dt>T</dt><dd>time of day</dd>
       <dt>H</dt><dd>hide the HUD</dd>
+      <dt>P</dt><dd>path-traced photo; Enter saves it</dd>
+      <dt>R</dt><dd>report griefing here (on Plaza)</dd>
       <dt>Esc</dt><dd>pause (saves)</dd>
+    </dl>
+    <dl class="touch-help">
+      <dt>Left side</dt><dd>walk</dd>
+      <dt>Right side</dt><dd>look; tap places, hold breaks</dd>
+      <dt>Hotbar</dt><dd>tap or swipe to choose a block</dd>
     </dl>
     <pre id="error" hidden></pre>
   </section>
+  <div id="banner" role="status" hidden><span></span><button type="button" hidden>Join</button></div>
   <script type="module">
     import { needsWebGPU } from '../needs-webgpu.js';
     needsWebGPU('#scene').then((ok) => ok && import('./src/main.ts'));

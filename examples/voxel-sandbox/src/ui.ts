@@ -1,5 +1,6 @@
 // The sandbox's DOM: hotbar, crosshair, HUD text, overlays and toasts. Plain elements from index.html.
 import type { Pixels } from './textures.ts';
+import { hotbarWindow } from './touch.ts';
 
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -24,6 +25,8 @@ export class Hotbar {
   #root = element('hotbar');
   #label = element('hotbar-label');
   #timer: ReturnType<typeof setTimeout> | undefined;
+  /** Slots shown at once; on a narrow touch screen fewer than nine, a run around the selected one. */
+  fit = 9;
   constructor(
     slots: readonly string[],
     private readonly look: (name: string) => { label: string; pixels?: Pixels; cross: boolean },
@@ -53,7 +56,12 @@ export class Hotbar {
     clearTimeout(this.#timer);
     this.#timer = setTimeout(() => this.#label.classList.remove('show'), 1500);
   }
+  /** Redraws the bar (after {@link Hotbar.fit} changed). */
+  refresh(): void {
+    this.#render();
+  }
   #render(): void {
+    const [first, last] = hotbarWindow(this.selected, this.slots.length, this.fit);
     this.#root.replaceChildren(
       ...this.slots.map((name, i) => {
         const slot = document.createElement('div'),
@@ -61,6 +69,8 @@ export class Hotbar {
           key = document.createElement('span');
         slot.className = i === this.selected ? 'slot selected' : 'slot';
         slot.title = `${i + 1}: ${label}`;
+        slot.dataset.slot = String(i);
+        slot.hidden = i < first || i > last;
         key.textContent = String(i + 1);
         slot.append(icon(pixels, cross), key);
         return slot;
@@ -105,6 +115,33 @@ export function setOverlay(state: 'loading' | 'paused' | 'playing' | 'hidden', t
   overlay.dataset.state = state;
   overlay.hidden = state === 'playing' || state === 'hidden';
   element('overlay-status').textContent = text;
+}
+
+/**
+ * The status line over the game: why this page is playing alone, or that the world is changing. `join` adds a Join
+ * button that runs it. No text hides the line.
+ */
+export function setBanner(text: string, join?: () => void): void {
+  const banner = element('banner'),
+    button = banner.querySelector('button')!;
+  banner.hidden = !text;
+  banner.querySelector('span')!.textContent = text;
+  button.hidden = !join;
+  button.onclick = join ?? null;
+}
+
+/** Whether the page plays by touch: shows the touch buttons and the touch help, hides the keyboard help. */
+export function setTouchUi(on: boolean): void {
+  document.body.classList.toggle('touch', on);
+  element('overlay').querySelector('.play')!.textContent = on ? 'Tap to play' : 'Click to play';
+  element('touch-buttons').hidden = !on;
+}
+
+/** Shows the Report button (online on Plaza) and sets what it does. */
+export function setReport(send: (() => void) | undefined): void {
+  const button = element('report');
+  button.hidden = !send;
+  button.onclick = send ?? null;
 }
 
 /** Shows a fatal error. */

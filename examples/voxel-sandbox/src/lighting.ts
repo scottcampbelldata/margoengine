@@ -32,8 +32,8 @@ export interface SceneLighting {
   setDistance(blocks: number): void;
   /** Clock hours (0-24) of the sun. */
   hours: number;
-  /** The sun's (and moon's) shadow maps. */
-  readonly shadows: Shadows;
+  /** The sun's (and moon's) shadow maps; none with `shadows: false` (the phone tier when playing). */
+  readonly shadows: Shadows | undefined;
   /** The local lights of light-emitting blocks near the camera. */
   readonly lights: Clustered;
   dispose(): void;
@@ -49,6 +49,8 @@ export interface LightingOptions {
   distance: number;
   /** Ids of the block types that give off light (torches, glowstone): the nearest get a local light. */
   lightBlocks?: readonly number[];
+  /** Sun and moon shadow maps. Default true. */
+  shadows?: boolean;
 }
 
 // Fog that starts at 60% of the view distance and is nearly opaque (exp(-4) visibility) at 95% of it.
@@ -82,13 +84,16 @@ export function setupLighting(engine: EngineKernel, voxels: VoxelRenderer, optio
       },
       { preetham, clouds, fog, lighting },
     );
-  const shadows = Shadows.attach(engine, {
-      distance: Math.min(96, options.distance),
-      cascades: 2,
-      resolution: 2048,
-      filter: 'pcf',
-    }),
-    removeShadows = shadows.add(voxels, { static: true }),
+  const shadows =
+      options.shadows === false
+        ? undefined
+        : Shadows.attach(engine, {
+            distance: Math.min(96, options.distance),
+            cascades: 2,
+            resolution: 2048,
+            filter: 'pcf',
+          }),
+    removeShadows = shadows?.add(voxels, { static: true }),
     lamps = blockLights(engine, voxels, new Set(options.lightBlocks ?? []));
   // Ambient: VoxelRenderer scales it by each face's sky light and ambient occlusion, so this is the light of open sky.
   const light = engineRuntime(engine).lighting;
@@ -118,8 +123,8 @@ export function setupLighting(engine: EngineKernel, voxels: VoxelRenderer, optio
     dispose() {
       engine.removePlugin(daylight);
       lamps.dispose();
-      removeShadows();
-      engine.removePlugin(shadows.name);
+      removeShadows?.();
+      if (shadows) engine.removePlugin(shadows.name);
       sky.dispose();
       post.dispose();
     },
