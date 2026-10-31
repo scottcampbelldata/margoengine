@@ -21,6 +21,11 @@ export interface LobeShaderConfig {
    * light the lobes recompute then scales by 1 - s.tr, as the host's own diffuse and ambient do.
    */
   transmits?: boolean;
+  /**
+   * True when the composed extension is `transmission()`, whose composite reads `materialTransmissionLobes`: the lobes
+   * then set that share (see `materialLobesTransmitted`), and their dielectric F0 is the host's `s.f0`, the IOR's.
+   */
+  composites?: boolean;
   /** False when an earlier extension already declares materialUV. */
   coordinateHelper?: boolean;
 }
@@ -29,16 +34,19 @@ export interface LobeShaderConfig {
 // Sources: anisotropic GGX D and the mix(a, 1, s^2) width: KHR_materials_anisotropy "Implementation" (Burley 2012);
 // separable anisotropic Smith G1: Heitz 2014; specular-extension Fresnel mix and diffuse x (1 - max F):
 // KHR_materials_specular; sheen albedo scaling: KHR_materials_sheen "Albedo-scaling technique". The hemisphere ambient
-// (ground (0.35, 0.3, 0.25), specular weight 0.5) is a Margo design choice.
+// (ground (0.35, 0.3, 0.25), specular weight 0.5) is a Margo design choice. Transmitted share: the transmitted light is
+// in fresnel_mix's base (KHR_materials_transmission), so 1 - specular x max(F) (KHR_materials_specular) applies, under
+// the sheen scale 1 - max(sheen colour) E(n.v) (KHR_materials_sheen, its simplified form; on a thin wall l.n equals v.n).
 export function lobeShader(
   config: LobeShaderConfig,
-): Pick<MaterialExtension, 'wgsl' | 'declarations' | 'direct' | 'ambient'> {
+): Pick<MaterialExtension, 'wgsl' | 'declarations' | 'direct' | 'ambient' | 'output'> {
   const { sheen, specular, anisotropy, iridescence } = config,
     ior = config.ior ?? 1.5;
   if (!Number.isFinite(Math.fround(ior)) || ior < 1)
     throw new RangeError('Invalid lobe IOR; pass a finite index of refraction of at least 1.');
   // The untransmitted share of diffuse light (shared/pbr-transmission.js); the text stays unchanged without transmission.
-  const diffuseShare = config.transmits ? '*(1.0-s.tr)' : '';
+  const diffuseShare = config.transmits ? '*(1.0-s.tr)' : '',
+    composites = !!config.composites;
   const dielectricF0 =
     ior === 1.5
       ? '0.04'
@@ -105,6 +113,7 @@ export function lobeShader(
     wgsl: 'let materialLobeInputs=materialLobesInputs(i,s,front);',
     direct: 'direct=materialLobesDirect(i,s,direct,materialLobeInputs);',
     ambient: 'materialAmbient=materialLobesAmbient(s,materialAmbient,materialLobeInputs);',
+    output: composites ? 'materialTransmissionLobes=materialLobesTransmitted(s,materialLobeInputs);' : undefined,
     declarations:
       helper +
       (iridescence ? iridescenceWGSL : '') +
@@ -123,12 +132,12 @@ fn materialLobesInputs(i:Out,s:Surface,front:bool)->MaterialLobeInputs {
 }
 fn materialLobesMax(value:vec3f)->f32 {return max(max(value.x,value.y),value.z);}
 fn materialLobesSpecularActive(s:Surface,material:MaterialLobeInputs)->bool {
-  return s.metal<1.0&&(${ior !== 1.5 ? 'true||' : ''}material.specular.a!=1.0||any(material.specular.rgb!=vec3f(1)));
+  return s.metal<1.0&&(${composites ? 'abs(s.f0.x-0.04)>0.000001||' : ior !== 1.5 ? 'true||' : ''}material.specular.a!=1.0||any(material.specular.rgb!=vec3f(1)));
 }
 fn materialLobesFilmActive(material:MaterialLobeInputs)->bool {
   return material.iridescence.x>0.0&&material.iridescence.z>0.0&&material.iridescence.y!=1.0;
 }
-fn materialLobesDielectricF0(material:MaterialLobeInputs)->vec3f {return min(vec3f(${dielectricF0})*material.specular.rgb,vec3f(1));}
+fn materialLobesDielectricF0(s:Surface,material:MaterialLobeInputs)->vec3f {return min(${composites ? 's.f0' : `vec3f(${dielectricF0})`}*material.specular.rgb,vec3f(1));}
 // KHR_materials_sheen BRDF and its albedo, shared with gltf-pro's physical shader (shared/sheen.js).
 ${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenAlbedo')}fn materialLobesDirect(i:Out,s:Surface,baseline:vec3f,material:MaterialLobeInputs)->vec3f {
   let materialSpecularActive=materialLobesSpecularActive(s,material);
@@ -165,7 +174,7 @@ ${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenA
     var materialFresnel=materialBaseFresnel;
     var materialDiffuse=(1-materialBaseFresnel)*(1-s.metal)${diffuseShare}*s.base.rgb/3.14159265;
     if(materialSpecularActive||materialFilmActive){
-      let materialDielectricF0=materialLobesDielectricF0(material);
+      let materialDielectricF0=materialLobesDielectricF0(s,material);
       var materialDielectric=(materialDielectricF0+(1-materialDielectricF0)*materialWeight)*material.specular.a;
       var materialMetal=s.base.rgb+(1-s.base.rgb)*materialWeight;
       ${
@@ -194,7 +203,7 @@ fn materialLobesAmbient(s:Surface,baseline:vec3f,material:MaterialLobeInputs)->v
   var materialResult=baseline;
   let materialHemisphere=mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;
   if(materialSpecularActive||materialFilmActive){
-    let materialDielectricF0=materialLobesDielectricF0(material);var materialDielectric=materialDielectricF0*material.specular.a;var materialMetal=s.base.rgb;
+    let materialDielectricF0=materialLobesDielectricF0(s,material);var materialDielectric=materialDielectricF0*material.specular.a;var materialMetal=s.base.rgb;
     ${
       iridescence
         ? `if(materialFilmActive){
@@ -208,6 +217,27 @@ fn materialLobesAmbient(s:Surface,baseline:vec3f,material:MaterialLobeInputs)->v
   if(materialSheenActive){let materialEnergy=materialLobesSheenAlbedo(material.viewCos,material.sheen.a);materialResult=materialResult*max(0.0,1.0-materialLobesMax(material.sheen.rgb)*materialEnergy)+material.sheen.rgb*materialEnergy*materialHemisphere;}
   return materialResult;
 }
-`,
+${
+  composites
+    ? `// The share of the light behind that enters, for materialTransmissionWeight (comment above lobeShader).
+fn materialLobesTransmitted(s:Surface,material:MaterialLobeInputs)->vec3f {
+  let materialWeight=pow(1.0-material.viewCos,5.0);
+  let materialBaseF0=mix(s.f0,s.base.rgb,s.metal);
+  var materialShare=(1.0-s.metal)*(1.0-(materialBaseF0+(1.0-materialBaseF0)*materialWeight));
+  if(materialLobesSpecularActive(s,material)||materialLobesFilmActive(material)){
+    let materialDielectricF0=materialLobesDielectricF0(s,material);
+    var materialDielectric=(materialDielectricF0+(1.0-materialDielectricF0)*materialWeight)*material.specular.a;
+    ${
+      iridescence
+        ? `if(materialLobesFilmActive(material)){materialDielectric=mix(materialDielectric,materialIridescenceFresnel(material.viewCos,1.0,material.iridescence.y,material.iridescence.z,materialDielectricF0)*material.specular.a,material.iridescence.x);}`
+        : ''
+    }
+    materialShare=vec3f((1.0-materialLobesMax(materialDielectric))*(1.0-s.metal));
+  }
+  return materialShare*max(0.0,1.0-materialLobesMax(material.sheen.rgb)*materialLobesSheenAlbedo(material.viewCos,material.sheen.a));
+}
+`
+    : ''
+}`,
   };
 }

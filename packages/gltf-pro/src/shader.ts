@@ -371,8 +371,21 @@ export const physicalShader = (): string =>
     ),
   ));
 const transmissive = new Map<string, string>();
-// Transmission's first draw (gltf-pro blends it as dst x src): the tint of what is behind, from spare Frame lanes.
-const tintEntry = '\n@fragment fn margoTint(i:Out)->@location(0) vec4f {return vec4f(f.coordsB.zw,f.ext.z,1);}\n';
+// Transmission's first draw (gltf-pro blends it as dst x src): what is left of the light behind, from spare Frame lanes
+// and the material's factors. The transmitted light is in the base layer (KHR_materials_transmission), so it is scaled
+// by 1 - specular x max(F) (KHR_materials_specular), by the sheen's 1 - max(colour) E(n.v) (KHR_materials_sheen) and by
+// the coat's 1 - clearcoat x F (KHR_materials_clearcoat). This draw binds no maps, so it reads factors only and leaves
+// metal out: glTF's default metallicFactor is 1 with the real value in a map (docs/known-bugs.md). A display-encoded
+// target holds encoded light, so the share is encoded as well.
+const tintEntry = `
+fn margoTintShare(i:Out,tint:vec3f)->vec4f {
+  let nv=clamp(abs(dot(normalize(i.normal),normalize(f.eye.xyz-i.position))),0.0001,1.0); let w=pow(1-nv,5.0);
+  let ior=(f.ext.y-1)/(f.ext.y+1); let f0=min(ior*ior*f.specular.rgb,vec3f(1)); let fr=f0+(1-f0)*w;
+  let share=tint*(1-f.specular.w*max(fr.r,max(fr.g,fr.b)))*(1-max(f.sheen.r,max(f.sheen.g,f.sheen.b))*margoSheenAlbedo(nv,clamp(f.sheen.w,0.03,1.0)))*(1-f.coat.x*(0.04+0.96*w));
+  return vec4f(select(share,select(share*12.92,1.055*pow(share,vec3f(1.0/2.4))-0.055,share>=vec3f(0.0031308)),f.settings.w<0.5),1);
+}
+@fragment fn margoTint(i:Out)->@location(0) vec4f {return margoTintShare(i,vec3f(f.coordsB.zw,f.ext.z));}
+`;
 /** Retain the complete material/effect resource interface for a texture-dependent tint draw. */
 export function texturedTintPBR(code: string): string {
   const resources = Array.from(code.matchAll(/((?:@\w+\s*\([^)]*\)\s*)+)var(?:\s*<([^>]+)>)?\s+(\w+)\s*:/g))

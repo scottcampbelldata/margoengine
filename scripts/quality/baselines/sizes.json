@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3933928,
+  "total": 3934209,
   "history": [
     {
       "date": "2026-10-24",
@@ -965,15 +965,21 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "6e1988522",
+      "reason": "shadows: map and alphaMap cut-outs of materials meshes reach the directional, spot and point shadow passes (opacity variant of the caster depth shader, shared/caster.js); opaque casters run the same draw",
+      "grew": 3
+    },
+    {
+      "date": "2026-10-31",
       "commit": "3074fddf9",
       "reason": "tween: smoothDamp (exact critically damped vector filter with a speed limit and safe huge dt) adds 367 B gzip to the tween root; new entry rigging/hulls (jointHulls, 2,503 B gzip) with its quickhull import external, so rigging root and other entries are unchanged",
       "grew": 2
     },
     {
       "date": "2026-10-31",
-      "commit": "6e1988522",
-      "reason": "shadows: map and alphaMap cut-outs of materials meshes reach the directional, spot and point shadow passes (opacity variant of the caster depth shader, shared/caster.js); opaque casters run the same draw",
-      "grew": 3
+      "commit": "c2e927a36",
+      "reason": "gltf-pro extended: the native transmission tint shares the layered transmitted light (KHR_materials_specular, sheen, clearcoat; +150 B); spec bug fix",
+      "grew": 1
     }
   ],
   "items": {
@@ -1106,7 +1112,7 @@
     "@margoengine/gltf-pro dist/workers/progressive.js": 15420,
     "@margoengine/gltf-pro/asset": 5501,
     "@margoengine/gltf-pro/coordinates": 755,
-    "@margoengine/gltf-pro/extended": 6502,
+    "@margoengine/gltf-pro/extended": 6783,
     "@margoengine/gltf-pro/instancing": 3380,
     "@margoengine/gltf-pro/prepare": 17572,
     "@margoengine/gltf-pro/progressive": 63493,

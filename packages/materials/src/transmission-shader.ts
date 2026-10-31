@@ -9,6 +9,8 @@ export interface TransmissionShaderTextures {
   thickness?: ClearcoatTextureSlot;
   /** [factor, IOR, thickness, inverse attenuation distance], then [attenuation RGB, dispersion]. */
   factorsIndex?: number;
+  /** A clearcoat is composed under this extension: its `materialCoatKeep` also scales the transmitted light. */
+  coated?: boolean;
 }
 /** Compiler-owned expressions evaluated in the extension's surface hook. */
 export interface TransmissionShaderValues {
@@ -36,8 +38,10 @@ function readMap(slot: ClearcoatTextureSlot, explicitLevel: boolean): string {
  * Screen-space KHR_materials_transmission / KHR_materials_volume / KHR_materials_dispersion for a material extension.
  * The opaque-scene snapshot is read where the view ray, refracted by Snell's law, leaves a slab `thickness` deep (mesh
  * units, measured along the mesh normal). That light is tinted by the base colour and attenuated by Beer-Lambert
- * (T = attenuationColor^(path / attenuationDistance)), then added to the lit colour, weighted by the factor, the
- * dielectric share (1 - metal) and 1 - Schlick Fresnel. The host already dims diffuse and ambient light by the factor.
+ * (T = attenuationColor^(path / attenuationDistance)), then added to the lit colour, weighted in linear light by the
+ * factor, the dielectric share (1 - metal), 1 - Schlick Fresnel and what the layers above leave of it: glTF puts the
+ * transmitted light in the base layer, under fresnel_mix (KHR_materials_transmission, KHR_materials_specular), sheen
+ * and clearcoat. The host already dims diffuse and ambient light by the factor.
  *
  * @param textures - Slot of the opaque snapshot, optional transmission (R) and thickness (G) maps, and the factor row.
  * @param values - Compiler-owned WGSL expressions used in place of the factor rows (node materials).
@@ -74,7 +78,8 @@ export function transmissionShader(
   const ior = values ? values.ior : `${first}.y`,
     attenuation = values ? values.attenuation : `${second}.xyz`,
     inverseDistance = values ? values.inverseDistance : `${first}.w`,
-    dispersion = values ? (values.dispersion ?? '0.0') : `${second}.w`;
+    dispersion = values ? (values.dispersion ?? '0.0') : `${second}.w`,
+    coat = textures.coated ? '*materialCoatKeep' : '';
   const declarations = /* wgsl */ `${helpers}// IEC 61966-2-1 transfer, to tint display-encoded snapshots in linear light.
 fn materialTransmissionLinear(c:vec3f)->vec3f {let x=max(c,vec3f(0)); return select(x/12.92,pow((x+0.055)/1.055,vec3f(2.4)),x>vec3f(0.04045));}
 fn materialTransmissionEncode(c:vec3f)->vec3f {let x=max(c,vec3f(0)); return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>vec3f(0.0031308));}
@@ -126,11 +131,15 @@ fn materialTransmissionTrace(i:Out,n:vec3f,front:bool,ior:f32,thickness:f32,tint
 // Dielectric F0 of the current fragment, ((IOR-1)/(IOR+1))^2 (KHR_materials_ior), set by materialTransmission
 // before it calls materialTransmissionWeight (whose four-argument call the host contract fixes). Zero at IOR 1.
 var<private> materialTransmissionF0:f32=0.04;
+// The share lobes composed over transmission compute in place of the one below (materialLobesTransmitted, in the
+// output hook); negative while no lobe has set it.
+var<private> materialTransmissionLobes:vec3f=vec3f(-1.0);
 // Share of the light behind that enters: the dielectric part less the Schlick Fresnel reflection (glTF 2.0 Appendix B).
 fn materialTransmissionWeight(s:Surface,v:vec3f,n:vec3f,factor:f32)->vec3f {
+  if(materialTransmissionLobes.x>=0.0){return factor*materialTransmissionLobes${coat};}
   let f0=mix(vec3f(materialTransmissionF0),clamp(s.base.rgb,vec3f(0),vec3f(1)),s.metal);
   let q=1.0-clamp(dot(n,v),0.0,1.0); let q2=q*q;
-  return factor*(1.0-s.metal)*(1.0-(f0+(1.0-f0)*q2*q2*q));
+  return factor*(1.0-s.metal)*(1.0-(f0+(1.0-f0)*q2*q2*q))${coat};
 }
 fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,factor:f32,ior:f32,thickness:f32,attenuation:vec3f,inverseDistance:f32,dispersion:f32)->vec3f {
   let v=normalize(f.eye.xyz-i.position);
@@ -146,7 +155,7 @@ fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,factor:f32,ior:f3
   }
   let r0=(ior-1.0)/(ior+1.0);
   materialTransmissionF0=r0*r0;
-  return color+materialTransmissionWeight(s,v,n,factor)*transmitted;
+  return color+materialTransmissionFilter(transmitted,materialTransmissionWeight(s,v,n,factor));
 }
 `;
   return {

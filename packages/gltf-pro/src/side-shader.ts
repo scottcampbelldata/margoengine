@@ -30,8 +30,8 @@ export function backSideShader(code: string): string {
       'Back-side material requires the PBR logical facing expression; use the default PBR shader or side: "front"',
     );
   result = result.replace(
-    '@fragment fn margoTint(i:Out)->@location(0) vec4f {return vec4f(f.coordsB.zw,f.ext.z,1);}',
-    `@fragment fn margoTint(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {if(${facing}){discard;}return vec4f(f.coordsB.zw,f.ext.z,1);}`,
+    '@fragment fn margoTint(i:Out)->@location(0) vec4f {return margoTintShare(i,vec3f(f.coordsB.zw,f.ext.z));}',
+    `@fragment fn margoTint(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {if(${facing}){discard;}return margoTintShare(i,vec3f(f.coordsB.zw,f.ext.z));}`,
   );
   if (cache.size >= 64) cache.delete(cache.keys().next().value!);
   cache.set(code, result);

@@ -63,6 +63,8 @@ export function clearcoatShader(
     declarations:
       (Object.values(textures).some((slot) => slot?.transformIndex !== undefined) ? coordinateWGSL : '') +
       /* wgsl */ `
+// What the coat leaves of the light transmitted under it, 1 - clearcoat * Fresnel(v.Nc) (KHR_materials_clearcoat).
+var<private> materialCoatKeep:f32=1.0;
 // Clearcoat has an independent normal. Never change Surface.n: SSAO and shadows use the base normal.
 fn materialClearcoatLighting(i:Out,front:bool${values ? ',materialCoatFactor:f32,materialCoatRoughness:f32' + (values.normal ? ',materialCoatNormal:vec3f' : '') : ''})->vec3f {
 ${values ? '' : '  let factors=materialFactors[0];\n'}  let factor=clamp(${values ? 'materialCoatFactor' : 'factors.x'}${textures.factor ? '*' + sample(textures.factor) + '.r' : ''},0.0,1.0);
@@ -82,6 +84,7 @@ ${normalShader}
   let d=${ggxD};
   let g=${smithG};
   let fresnel=0.04+(1-0.04)*pow(1-vh,5.0);
+  materialCoatKeep=1.0-factor*(0.04+0.96*pow(1.0-clamp(dot(coatNormal,v),0.0,1.0),5.0));
   return factor*d*g*fresnel/max(4*nl*nv,0.0001)*nl*f.radiance.rgb*f.light.w;
 }
 `,

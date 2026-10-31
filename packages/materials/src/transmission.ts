@@ -108,7 +108,13 @@ export function createTransmission(options: TransmissionOptions = {}, base?: Mat
   };
   const factor = slot(options.transmissionTexture),
     thickness = slot(options.volume?.thicknessTexture);
-  const shader = transmissionShader({ opaque, factor, thickness, factorsIndex });
+  const shader = transmissionShader({
+    opaque,
+    factor,
+    thickness,
+    factorsIndex,
+    coated: !!base?.declarations?.includes('materialCoatKeep'),
+  });
   const helper =
     (factor?.transformIndex !== undefined || thickness?.transformIndex !== undefined) &&
     !base?.declarations?.includes('fn materialUV(')

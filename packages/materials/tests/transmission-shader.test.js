@@ -95,7 +95,11 @@ test('output assigns color only behind a positive factor and the weight expressi
   assert.equal(value.transmission, 'materialFactors[0].x');
   assert.match(value.output, /^if\(s\.tr>0\.0\)\{color=materialTransmission\(i,s,color,front,s\.tr,/);
   assert.doesNotMatch(value.output, /return/);
-  assert.ok(value.declarations.includes('return color+materialTransmissionWeight(s,v,n,factor)*transmitted;'));
+  assert.ok(
+    value.declarations.includes(
+      'return color+materialTransmissionFilter(transmitted,materialTransmissionWeight(s,v,n,factor));',
+    ),
+  );
   assert.ok(value.declarations.includes('fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,'));
 });
 
@@ -132,13 +136,15 @@ test('thin glass keeps its sightline at any IOR: its own pixel, no conversion, w
       'thin ' + ior,
     );
   }
-  // Display-encoded capture with a white base: the value as read, bit for bit.
+  // Display-encoded capture with a white base: the pixel as read, with the share applied in linear light.
   const { shade } = extension({ factor: 1, ior: 1.5 }, 0),
     { out, pixel } = shade([0.1, 0.1, 0], [0, 0, 1], { metal: 0 });
+  const linear = (c) => (c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92),
+    encode = (c) => (c > 0.0031308 ? 1.055 * c ** (1 / 2.4) - 0.055 : c * 12.92);
   const expected = texel(pixel)
     .slice(0, 3)
-    .map((c) => Math.fround(Math.fround(c) * Math.fround(1 - dielectric(1.5))));
-  close(out, expected, 1e-7, 'display thin');
+    .map((c) => encode(linear(c) * (1 - dielectric(1.5))));
+  close(out, expected, 1e-5, 'display thin');
 });
 
 test('F0 comes from the IOR: IOR 1 transmits everything at normal incidence, metal still mixes toward the base', () => {

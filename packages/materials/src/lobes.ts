@@ -152,7 +152,12 @@ export function materialLobes(options: MaterialLobeOptions = {}, base?: Material
   const values = validateLobes(options),
     factors = [...(base?.factors ?? [])],
     textures: MaterialExtensionTexture[] = [...(base?.textures ?? [])],
-    config: LobeShaderConfig = { ior: values.ior, transmits: !!base?.transmission, coordinateHelper: false };
+    config: LobeShaderConfig = {
+      ior: values.ior,
+      transmits: !!base?.transmission,
+      composites: !!base?.declarations?.includes('materialTransmissionLobes'),
+      coordinateHelper: false,
+    };
   let transformed = false;
   const slot = (map?: ClearcoatTexture) => {
     if (!map) return undefined;
@@ -197,6 +202,7 @@ export function materialLobes(options: MaterialLobeOptions = {}, base?: Material
     wgsl: [base?.wgsl, shader.wgsl].filter(Boolean).join('\n'),
     direct: [shader.direct, base?.direct].filter(Boolean).join('\n'),
     ambient: [shader.ambient, base?.ambient].filter(Boolean).join('\n'),
+    ...(config.composites ? { output: shader.output + base!.output! } : {}),
     declarations: (base?.declarations ?? '') + '\n' + helper + shader.declarations,
     factors: Float32Array.from(factors),
     ...(textures.length ? { textures } : {}),

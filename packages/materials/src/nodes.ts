@@ -373,7 +373,7 @@ function compile(
         : 1 / volume.attenuationDistance;
     const inv = uniform([inverse]);
     const shader = transmissionShader(
-      { opaque: opaqueIndex },
+      { opaque: opaqueIndex, coated: !!coat },
       {
         factor: `clamp(${component(child(transmission, 'factor', values), 'r', '0.0')},0.0,1.0)`,
         ior: `max(${child(transmission, 'ior', values)?.name ?? '1.5'},1.0)`,

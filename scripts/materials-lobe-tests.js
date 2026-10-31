@@ -635,15 +635,26 @@ export async function lobeBrowserChecks(page) {
         exact(combined.normal, baseline.normal, 'New lobes changed the base g-buffer normal');
         const opaque = texture([160, 80, 40, 255]),
           transmitted = materials.transmission({ factor: 1, ior: 1, opaqueColor: opaque.view });
-        // With no light on the surface only the transmitted background is left, so lobes must not change a byte of it.
-        // Compared unlit since dc883a59 keeps reflections over transmission (glTF: reflection and transmission add up):
-        // lit, the lobes' own reflection is meant to show, and it is asserted below.
+        // With no light on the surface only the transmitted background is left. Reflection and transmission add up
+        // (dc883a59) and the transmitted light is in the base under the lobes (packages/materials/tests/transmission-layers
+        // has the numbers): a specular lobe at IOR 1 has F0 0, so it leaves the background; a sheen and a thin film take
+        // their part of it, and nothing adds any.
         const glassLit = { blend: true, base: [1, 1, 1, 1] },
           glassUnlit = { ...glassLit, direction: [0, 0, 1, 0], ambient: 0 },
           lobedTransmission = materials.materialLobes(all, transmitted);
         const transmissionBase = await render(transmitted, glassUnlit),
           transmissionLobes = await render(lobedTransmission, glassUnlit);
-        exact(transmissionBase.beauty, transmissionLobes.beauty, 'New lobes bypassed full transmission compositing');
+        const specularOnly = await render(materials.materialLobes({ specular: all.specular }, transmitted), glassUnlit),
+          specularDifference = difference(transmissionBase.beauty, specularOnly.beauty);
+        assert(
+          specularDifference.max <= 1,
+          `A specular lobe at IOR 1 changed the unlit transmitted background by ${specularDifference.max} steps`,
+        );
+        assert(
+          transmissionLobes.beauty.every((value, index) => value <= transmissionBase.beauty[index] + 1) &&
+            difference(transmissionBase.beauty, transmissionLobes.beauty).max > 0,
+          'Sheen and thin film over transmission must take their part of the background and add none',
+        );
         const centre = (image) => [
           ...image.slice(((height / 2) * width + width / 2) * 4, ((height / 2) * width + width / 2) * 4 + 3),
         ];
@@ -658,8 +669,8 @@ export async function lobeBrowserChecks(page) {
           'Lobes over transmission lost their reflection',
         );
         assert(
-          litLobes.beauty.every((value, index) => value >= transmissionBase.beauty[index]),
-          'Lobes over transmission darkened the background behind them',
+          litLobes.beauty.every((value, index) => value >= transmissionLobes.beauty[index]),
+          'Light on lobes over transmission darkened the background behind them',
         );
         const shadowedExtension = materials.materialLobes(all, coat),
           unshadowed = await render(shadowedExtension, { ...black, direction: [0.4, 0.3, 1, 1] });

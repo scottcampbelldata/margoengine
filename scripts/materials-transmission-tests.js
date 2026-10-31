@@ -259,19 +259,69 @@ export async function transmissionBrowserChecks(page) {
           iorOneDifference.max <= 1,
           `IOR 1 transmission differs from the opaque background by ${iorOneDifference.max} color steps`,
         );
-        // Lobes recompute diffuse light: over transmission they keep only its untransmitted share, so the surface
-        // stays invisible at IOR 1 with a specular or sheen lobe too (they drew about 148 steps of white before).
+        // Lobes recompute diffuse light: over transmission they keep only its untransmitted share, so a specular lobe
+        // at IOR 1 stays invisible (it drew about 148 steps of white before); a sheen takes its own part (below).
         const lobeDifferences = {};
-        for (const [name, lobe] of [
-          ['specular', { KHR_materials_specular: { specularFactor: 0.5 } }],
-          ['sheen', { KHR_materials_sheen: { sheenColorFactor: [0.5, 0.5, 0.5], sheenRoughnessFactor: 0.5 } }],
-        ]) {
-          const lobed = difference(background, await render({ ...extensions(1, 1), ...lobe }), true);
-          lobeDifferences[name] = lobed;
-          assert(
-            lobed.max <= 1,
-            `IOR 1 transmission with a ${name} lobe differs from the opaque background by ${lobed.max} color steps`,
+        const lobed = difference(
+          background,
+          await render({ ...extensions(1, 1), KHR_materials_specular: { specularFactor: 0.5 } }),
+          true,
+        );
+        lobeDifferences.specular = lobed;
+        assert(
+          lobed.max <= 1,
+          `IOR 1 transmission with a specular lobe differs from the opaque background by ${lobed.max} color steps`,
+        );
+        // The light behind against the Khronos layering: transmitted light is in fresnel_mix's base, under sheen and
+        // clearcoat. White transmissive quad, unlit, normal incidence, against the float background. Sheen albedo
+        // E(1, 0.5) = 0.0413 by Margo's fit, itself checked against an integration (materials/test/sheen-albedo-fit).
+        const halfFloat = (lo, hi) => {
+          const h = lo | (hi << 8),
+            e = (h >> 10) & 31,
+            m = h & 1023;
+          return (e === 0 ? m / 16777216 : (1 + m / 1024) * 2 ** (e - 15)) * (h >> 15 ? -1 : 1);
+        };
+        const centreRed = (image) => {
+          const i = ((height / 2) * width + width / 2) * 8;
+          return halfFloat(image[i], image[i + 1]);
+        };
+        const direction = [...engine.lighting.direction],
+          radiance = [...engine.lighting.radiance];
+        engine.lighting.direction.set([0, 0, 1, 0]);
+        engine.lighting.radiance.set([1, 1, 1, 0]);
+        const layered = {};
+        try {
+          const behind = centreRed(
+            await render(
+              {},
+              (model) => {
+                model.primitives[1].node.visible = false;
+              },
+              false,
+              1,
+              true,
+            ),
           );
+          const sheenLobe = { sheenColorFactor: [1, 1, 1], sheenRoughnessFactor: 0.5 };
+          for (const [name, lobe, expected] of [
+            ['plain', {}, 0.96],
+            ['specular factor 0', { KHR_materials_specular: { specularFactor: 0 } }, 1],
+            ['specular factor 0.5', { KHR_materials_specular: { specularFactor: 0.5 } }, 0.98],
+            ['specular colour 2,1,1', { KHR_materials_specular: { specularColorFactor: [2, 1, 1] } }, 0.92],
+            ['specular colour 25,25,25', { KHR_materials_specular: { specularColorFactor: [25, 25, 25] } }, 0],
+            ['sheen white', { KHR_materials_sheen: sheenLobe }, 0.96 * (1 - 0.0413)],
+            ['clearcoat 1', { KHR_materials_clearcoat: { clearcoatFactor: 1 } }, 0.96 * 0.96],
+          ]) {
+            const share = centreRed(await render({ ...extensions(1, 1.5), ...lobe }, () => {}, true, 1, true)) / behind;
+            layered[name] = share;
+            assert(
+              Math.abs(share - expected) < 0.003,
+              `Transmitted share with ${name}: ${share}, the Khronos layering gives ${expected}`,
+            );
+          }
+        } finally {
+          engine.lighting.direction.set(direction);
+          engine.lighting.radiance.set(radiance);
         }
         const msaaBackground = await render(
           {},
@@ -433,6 +483,7 @@ export async function transmissionBrowserChecks(page) {
           factorZero: zeroDifference,
           iorOne: iorOneDifference,
           iorOneLobes: lobeDifferences,
+          layeredShare: layered,
           msaaIorOne: msaaDifference,
           borrowedHDRIorOne: hdrDifference,
           volumeRefraction: refractionDifference,
