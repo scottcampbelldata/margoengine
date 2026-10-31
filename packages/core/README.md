@@ -26,6 +26,17 @@ engine.onFrame((_, delta) => { mesh.rotation.y += delta; });
 engine.start();
 ```
 
+`Engine.create(canvas, options)` options (all optional, all part of the v1.0.0 API):
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `capacity` | `1024` | Initial mesh slots, 1 to 8,388,608; the store doubles when full. |
+| `backend` | `'auto'` | `'auto'` tries WebGPU, then `fallback`; `'webgpu'` fails without WebGPU; `'webgl2'` uses `fallback`. |
+| `camera` | `Camera` defaults | Initial camera settings (`position`, `target`, `fov`, ...). |
+| `fallback` | none | Builds the non-WebGPU renderer, for example `webglRenderer` from `@margoengine/webgl`. |
+| `features` | `[]` | Extra WebGPU features to request when the adapter offers them, such as `['timestamp-query']`. |
+| `exactSize` | `false` | `[width, height]` or `true`: pixel-exact backbuffer with no pixel-ratio scaling and no MSAA ([Pixel-perfect rendering](#pixel-perfect-rendering)). |
+
 `delta` is in seconds. The built-in loop clamps a long frame to `engine.maxDelta` (default `0.1`; keep it at 1 or less, since `render` rejects a larger delta with a RangeError), and when the page becomes visible again after a background tab its first frame steps `0`, so animation and physics resume where they paused instead of jumping.
 
 Materials are live: `material.set({ color: '#ff8800', roughness: 0.2, metalness: 1, doubleSided: false })` changes the given values in place (omitted ones keep theirs; invalid input throws and changes nothing). Every mesh using the material shows it on the next frame with no new pipeline or bind group. A value change re-collects the frame's instances, so each drawn geometry's whole instance range is uploaded once on that frame (only changed ranges after that); for per-frame recolouring of one part among many thousands, give that part its own material or use `@margoengine/materials`. Core materials are opaque (no `opacity`).

@@ -1,5 +1,18 @@
 # Margo Engine handoff
 
+## Landed 2026-10-30: core cleanup, audit items P1 to P3 (approved by Scott)
+
+- P1: core's copy of a view's depth into a caller depth of another format or sample count is gone. A view target
+  depth must have the scene depth format and sample count (core draws into it), else core throws
+  `TypeError: Invalid view depth: use the scene depth format and samples, or omit depth` (errors#views).
+- P2: `mesh.euler` is gone (`@margoengine/core/extension`); `mesh.rotation.x/y/z` reads and writes the same
+  numbers. The animator and the skinning-ik example read `store.rotations` directly.
+- P3: one draw-rectangle check and partial test (shared/view-rect.js; WebGL's rectangle errors now carry core's
+  message and help link), one `#rrggbb` parser (shared/clear-color.js `hexColor`), no absent-ambient branches in
+  the engine.
+- Size gate: core 21,176 -> 20,790 B gzip, core + stage 22,580 -> 22,189 B (2,811 B under the gate).
+- Open: a 4x view target depth comes back unwritten without a package pass ([known-bugs.md](known-bugs.md)).
+
 ## Landed 2026-10-29: the frame allocation limits hold on the minimum Node (24.18) as well as on Node 26
 
 - `tests/frame-alloc.test.js` failed on Node 24 (V8 13.6) and passed only on Node 26 (V8 14.6): V8 13's middle tier

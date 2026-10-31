@@ -28,6 +28,7 @@ export interface EngineOptions {
    * `true`, the canvas's own `width` and `height` attributes), with no device-pixel-ratio scaling and no MSAA. Zoom by
    * an integer with CSS (`width: 4 * w px; image-rendering: pixelated`); `engine.pick` still takes CSS pixels. Set
    * `canvas.width`/`height` to resize. Default false: the backbuffer follows the CSS size times the pixel ratio.
+   * A v1.0.0 option.
    */
   exactSize?: boolean | readonly [number, number];
 }
