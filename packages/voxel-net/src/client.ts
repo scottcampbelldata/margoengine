@@ -648,7 +648,7 @@ export class VoxelNetClient {
  * spreads out, then 1, 2, 4 and 8 s, each within half of that either way.
  * @internal
  */
-export const resumeDelay = (attempt: number, random: () => number = Math.random): number =>
+const resumeDelay = (attempt: number, random: () => number = Math.random): number =>
   attempt < 2 ? 100 + 500 * random() : 1000 * 2 ** Math.min(attempt - 2, 3) * (0.5 + random());
 
 /**
