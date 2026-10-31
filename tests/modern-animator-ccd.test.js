@@ -162,6 +162,41 @@ test('plain CCD never ends farther away with more sweeps, and tighter tolerances
   assert.equal(again.reached, true);
 });
 
+// Regression: a leg with a hinged knee, once straight against its limit, stayed straight with the foot 20 cm off its target:
+// the first joint could only aim it, and the fold from straight used an axis the hinge projected away. The Boulder climber
+// hit this as soon as a limb reached full stretch.
+test('CCD: a hinge stopped at straight folds again when the target comes closer', () => {
+  const next = random(11);
+  for (const [min, max] of [
+    [0, 1.9],
+    [-1.9, 0],
+  ]) {
+    // Hip, knee and ankle, with the effector on the ankle joint, so the knee is the only joint a fold can use.
+    const solver = new CCDSolver([
+      [0, 0, 0],
+      [0, 0.3, 0],
+      [0, 0.25, 0],
+    ]);
+    solver.setLimit(1, { type: 'hinge', axis: [1, 0, 0], min, max });
+    // Each solve starts from the straight pose the last one left behind, or very near it.
+    for (const start of [0, 1e-6, 0.01])
+      for (let trial = 0; trial < 60; trial++) {
+        identity(solver);
+        const fold = start * Math.sign(min + max);
+        solver.rotations.set([Math.sin(fold / 2), 0, 0, Math.cos(fold / 2)], 4);
+        const a = next() * Math.PI * 2,
+          b = next() * Math.PI,
+          r = 0.33 + next() * 0.2,
+          target = [r * Math.sin(b) * Math.cos(a), r * Math.cos(b), r * Math.sin(b) * Math.sin(a)],
+          result = solveWith(solver, target, { iterations: 12, pole: [0.05, 0, 0.3] });
+        assert.ok(
+          result.distance < 2e-3,
+          `range ${min} to ${max}, from ${start}: ${result.distance} off after ${result.iterations} sweeps`,
+        );
+      }
+  }
+});
+
 test('CCD hinge limits keep each joint turning about its axis within its range', () => {
   const next = random(3),
     solver = chainOf([1, 0.8, 0.6]);

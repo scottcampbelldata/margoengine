@@ -62,6 +62,7 @@ const FREE = 0,
   HINGE = 2,
   CONE = 3,
   EPSILON = 1e-9,
+  STRAIGHT = 0.02,
   MAX_JOINTS = 256,
   PI = Math.PI;
 // Scratch slots: quaternions (4 wide), vectors (3 wide) and scalars.
@@ -637,8 +638,10 @@ export class CCDSolver {
       b[o + 3] = Math.atan2(sin, cos);
       total += b[o + 3];
     }
+    // A chain this close to straight cannot bend enough by scaling what bend it has (at most nine times over), so it folds
+    // from straight instead. Only when it has to get shorter: getting longer, a small bend scales down fine.
     let mode = 0;
-    if (total > 1e-9) mode = 1;
+    if (total > (r > d ? STRAIGHT : 1e-9)) mode = 1;
     else if (r > d) mode = 2;
     else return true; // Straight already: the first joint's aim does the rest.
     if (mode === 2) this.bendAxis(last);
@@ -733,8 +736,26 @@ export class CCDSolver {
     this.forward(0);
     return false;
   }
-  // Mode 2's axis in s[AXIS]: perpendicular to the chord and to the target's direction off it (or any perpendicular).
+  // Mode 2's axis in s[AXIS]. A hinge can only fold about its own axis, so the first hinge's, signed toward its room to
+  // turn: any other axis is projected away by the limit and the chain stays straight. With no hinge, perpendicular to the
+  // chord and to the target's direction off it (or any perpendicular).
   private bendAxis(last: number): void {
+    for (let j = 1; j <= last; j++) {
+      if (this.types[j] !== HINGE) continue;
+      const s = this.scratch,
+        l = this.limits,
+        o = j * 8;
+      multiply(s, WORLD, this.worldRotations, (j - 1) * 4, this.rest, j * 4);
+      rotate(s, AXIS, s, WORLD, l, o);
+      multiplyConjugate(s, LOCAL, this.rest, j * 4, this.rotations, j * 4);
+      twistAngle(s, LOCAL, l, o, s, HINGE_ANGLE);
+      if (l[o + 4] - s[HINGE_ANGLE] < s[HINGE_ANGLE] - l[o + 3]) {
+        s[AXIS] = -s[AXIS];
+        s[AXIS + 1] = -s[AXIS + 1];
+        s[AXIS + 2] = -s[AXIS + 2];
+      }
+      return;
+    }
     const p = this.positions,
       s = this.scratch,
       e = this.joints * 3,
