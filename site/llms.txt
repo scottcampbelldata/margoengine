@@ -107,7 +107,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 
 - [@margoengine/animation](https://margoengine.com/llms/packages/animation.md): Storage-buffer skinning and compute morph targets for Margo Engine.
 - [@margoengine/animator](https://margoengine.com/llms/packages/animator.md): Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints.
-- [@margoengine/kinematics-constraints](https://margoengine.com/llms/packages/kinematics-constraints.md): Standalone analytical capsule and sphere constraints for IK target and arm clearance.
+- [@margoengine/kinematics-constraints](https://margoengine.com/llms/packages/kinematics-constraints.md): Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance.
 - [@margoengine/rigging](https://margoengine.com/llms/packages/rigging.md): Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets.
 - [@margoengine/tween](https://margoengine.com/llms/packages/tween.md): Allocation-free numeric tween updates and easing timelines.
 - [@margoengine/cinematic](https://margoengine.com/llms/packages/cinematic.md): Critically damped camera follow, look-at and screen shake.

@@ -591,4 +591,27 @@ export const entries = [
       'A biome world option, height source, climate setting, tile request or edit was out of range or the wrong shape, or the world was used after `dispose()` or changed from inside its own `onChange` listener.',
     fix: 'Check the option against the defaults table in the package README (every option lists its range and default), pass tile indices inside `0..tilesX - 1` and `0..tilesZ - 1`, create a new world after `dispose()`, and call `update` after an `onChange` listener returns.',
   },
+  {
+    id: 'kinematics',
+    title: 'kinematics-constraints: a convex hull or link hull was set up wrongly',
+    kind: 'family',
+    messages: [
+      'ConvexHullVolume points must be flat x, y, z values',
+      'ConvexHullVolume maxPoints must be a positive integer',
+      'ConvexHullVolume needs at least one point',
+      'ConvexHullVolume has more points than maxPoints; pass hull corners only or raise it',
+      'ConvexHullVolume matrix must have 16 values',
+      'ConvexHullVolume matrix has a non-finite value; check the bone',
+      'ConvexHullVolume matrix must be affine; its last row must be 0, 0, 0, 1',
+      'A link hull must be a ConvexHullVolume',
+      'A link hull axis and hinge must be non-zero and not parallel',
+      'An upper link hull replaces upperArmRadius and rootExclusion; pass one or the other',
+      'A collider of a solver with link hulls needs a hullClearanceInto method',
+      'A link hull cannot also be a collider; pass a separate ConvexHullVolume',
+      'A volume with an overridden segmentClearance must override hullClearanceInto for link hulls',
+    ],
+    cause:
+      'A `ConvexHullVolume` got points or a matrix it cannot use, such as a raw mesh over the point limit or a matrix holding NaN from a broken bone. Or an `AvoidanceSolver` with `links` got a hull frame or a collider it cannot check against a hull.',
+    fix: 'Pass hull corners as flat `x, y, z` values (`convexGeometry` makes them from a mesh) and raise `maxPoints` above 64 only if you need to. Pass a column-major affine matrix of 16 finite values to `setTransform`. Give each link a separate hull with `axis` and `hinge` not parallel. A custom collider in a solver with link hulls implements `hullClearanceInto(hull, outDistance)`.',
+  },
 ];

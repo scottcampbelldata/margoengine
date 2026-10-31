@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/kinematics-constraints",
   "version": "1.0.0",
-  "description": "Standalone analytical capsule and sphere constraints for IK target and arm clearance.",
+  "description": "Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance.",
   "keywords": [
     "margoengine",
     "webgpu",

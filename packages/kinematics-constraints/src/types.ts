@@ -1,3 +1,5 @@
+import type { ConvexHullVolume } from './hull.js';
+
 /** A three-component vector in the caller's common coordinate frame. */
 export type Vec3View = readonly [number, number, number] | Float32Array | Float64Array;
 /** Writable, caller-owned vector storage. Only vectors of length three are accepted. */
@@ -9,6 +11,20 @@ export interface ConstraintVolume {
   evaluate(point: Vec3View, outSurface: MutableVec3View, outNormal: MutableVec3View): number;
   /** Signed clearance between a swept segment and this volume. */
   segmentClearance(start: Vec3View, end: Vec3View, radius: number): number;
+  /** Optional form of `evaluate` that writes the distance to `outDistance[0]`; the solver prefers it. */
+  evaluateInto?(
+    point: Vec3View,
+    outSurface: MutableVec3View,
+    outNormal: MutableVec3View,
+    outDistance: Float64Array,
+  ): void;
+  /** Optional form of `segmentClearance` that writes the gap to `outDistance[0]`; the solver prefers it. */
+  segmentClearanceInto?(start: Vec3View, end: Vec3View, radius: number, outDistance: Float64Array): void;
+  /**
+   * Signed gap to a convex hull, written to `outDistance[0]`. A solver with link hulls needs this on every collider;
+   * spheres, capsules and hulls have it.
+   */
+  hullClearanceInto?(hull: ConvexHullVolume, outDistance: Float64Array): void;
 }
 
 // Bounded coordinates leave ample headroom for differences and scalar products.
@@ -23,7 +39,8 @@ export function length3(x: number, y: number, z: number): number {
   return squared >= 1e-300 && squared < Infinity ? Math.sqrt(squared) : scaledLength3(x, y, z);
 }
 
-function scaledLength3(x: number, y: number, z: number): number {
+/** The slow path of length3, for squared lengths too small or too large for a double. */
+export function scaledLength3(x: number, y: number, z: number): number {
   const scale = Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
   if (scale === 0) return 0;
   x /= scale;
@@ -32,7 +49,7 @@ function scaledLength3(x: number, y: number, z: number): number {
   return scale * Math.sqrt(x * x + y * y + z * z);
 }
 
-export function validateFinite(value: number, name = 'value'): void {
+function validateFinite(value: number, name = 'value'): void {
   if (typeof value !== 'number' || !Number.isFinite(value) || Math.abs(value) > MAX_MAGNITUDE) {
     throw new RangeError(`${name} must be finite with magnitude at most 1e100`);
   }
@@ -52,11 +69,73 @@ function isVector(value: unknown): value is Vec3View {
   return (Array.isArray(value) || value instanceof Float32Array || value instanceof Float64Array) && value.length === 3;
 }
 
+// An element access that has seen more than one array type boxes each value, and callers mix tuples and typed arrays.
+// So each type gets its own copy of the access: V8 keeps the types seen per line of code.
+/** Copies a three-component vector to `into` at element `at`. */
+export function readVector(from: Vec3View, into: Float64Array, at: number): void {
+  if (from instanceof Float64Array) {
+    into[at] = from[0];
+    into[at + 1] = from[1];
+    into[at + 2] = from[2];
+  } else if (from instanceof Float32Array) {
+    into[at] = from[0];
+    into[at + 1] = from[1];
+    into[at + 2] = from[2];
+  } else {
+    into[at] = from[0];
+    into[at + 1] = from[1];
+    into[at + 2] = from[2];
+  }
+}
+
+/** Copies three elements of `from` at element `at` to a vector. */
+export function writeVector(out: MutableVec3View, from: Float64Array, at: number): void {
+  if (out instanceof Float64Array) {
+    out[0] = from[at];
+    out[1] = from[at + 1];
+    out[2] = from[at + 2];
+  } else if (out instanceof Float32Array) {
+    out[0] = from[at];
+    out[1] = from[at + 1];
+    out[2] = from[at + 2];
+  } else {
+    out[0] = from[at];
+    out[1] = from[at + 1];
+    out[2] = from[at + 2];
+  }
+}
+
+const checked = /* @__PURE__ */ new Float64Array(3);
+
 export function validateVector(value: Vec3View, name = 'vector'): void {
-  if (!isVector(value)) throw new TypeError(`${name} must have three components`);
-  validateFinite(value[0], name);
-  validateFinite(value[1], name);
-  validateFinite(value[2], name);
+  if (value instanceof Float64Array && value.length === 3) {
+    checked[0] = value[0];
+    checked[1] = value[1];
+    checked[2] = value[2];
+  } else if (value instanceof Float32Array && value.length === 3) {
+    checked[0] = value[0];
+    checked[1] = value[1];
+    checked[2] = value[2];
+  } else if (Array.isArray(value) && value.length === 3) {
+    const x = value[0],
+      y = value[1],
+      z = value[2];
+    if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number')
+      throw new RangeError(`${name} must be finite with magnitude at most 1e100`);
+    checked[0] = x;
+    checked[1] = y;
+    checked[2] = z;
+  } else throw new TypeError(`${name} must have three components`);
+  // Compared here, not in a call: passing a double to validateFinite boxes it whenever V8 did not inline the call, and
+  // this runs for every proxy on every candidate pose. A comparison with NaN is false.
+  const x = checked[0],
+    y = checked[1],
+    z = checked[2];
+  if (
+    !(x <= MAX_MAGNITUDE && x >= -MAX_MAGNITUDE && y <= MAX_MAGNITUDE && y >= -MAX_MAGNITUDE) ||
+    !(z <= MAX_MAGNITUDE && z >= -MAX_MAGNITUDE)
+  )
+    throw new RangeError(`${name} must be finite with magnitude at most 1e100`);
 }
 
 export function validateOutputVector(value: MutableVec3View, name = 'output vector'): void {

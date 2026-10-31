@@ -1712,7 +1712,7 @@
     "package": "@margoengine/kinematics-constraints",
     "version": "1.0.0",
     "published": false,
-    "description": "Standalone analytical capsule and sphere constraints for IK target and arm clearance.",
+    "description": "Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance.",
     "requirements": "See the package guide for requirements",
     "keywords": "kinematics constraints inverse kinematics IK avoidance capsule sphere torso elbow pole clearance",
     "install": "npm install @margoengine/kinematics-constraints@1.0.0",
@@ -1720,6 +1720,7 @@
     "exports": [
       "AvoidanceSolver",
       "CapsuleVolume",
+      "ConvexHullVolume",
       "SolveStatus",
       "SphereVolume",
       "closestPointsBetweenSegments",

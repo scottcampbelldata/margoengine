@@ -1,6 +1,7 @@
-import { margoError } from '../../shared/errors.js';
+import { margoError, rangeError, typeError } from '../../shared/errors.js';
+import type { ConvexHullVolume } from './hull.js';
 import type { ConstraintVolume, Vec3View } from './types.js';
-import { length3, validateVector, validateNonNegative, validatePositive } from './types.js';
+import { length3, readVector, scaledLength3, validateVector, validateNonNegative, validatePositive } from './types.js';
 import { evaluateVolumeInto, segmentVolumeInto, type SegmentDistanceResult } from './volumes.js';
 
 /** Why a solve ended: clear, swivel-rate limited, clamped by a singularity band, or blocked by an obstacle. */
@@ -27,6 +28,22 @@ export interface SolveOptions {
   searchBudget?: number;
 }
 
+/**
+ * A chain link checked as its own convex hull instead of a capsule. The hull's points are in the link's local space,
+ * such as its bone's. The solver moves the hull to each candidate pose: `axis` along the link, `hinge` on the normal
+ * of the plane through root, elbow and hand, in the direction of `(elbow - root) x (hand - elbow)`.
+ */
+export interface LinkHullOptions {
+  /** The hull to move. The solver owns its transform; do not list it in the colliders. */
+  hull: ConvexHullVolume;
+  /** Local position of the link's start joint. Defaults to the local origin. */
+  origin?: Vec3View;
+  /** Local direction from the link's start joint toward its end joint. Defaults to +Y, as in a glTF bone. */
+  axis?: Vec3View;
+  /** Local direction of the elbow's hinge axis; need not be square to `axis`. Defaults to +X. */
+  hinge?: Vec3View;
+}
+
 /** Options of AvoidanceSolver: the colliders, clearances, damping, iteration limit and tolerance. */
 export interface AvoidanceSolverOptions {
   colliders?: readonly ConstraintVolume[];
@@ -42,6 +59,11 @@ export interface AvoidanceSolverOptions {
   upperArmRadius?: number | null;
   /** Length excluded from the root end of the checked upper link. Defaults to zero. */
   rootExclusion?: number;
+  /**
+   * Upper link and forearm hulls, in that order; leave either out for its capsule. An upper link hull takes the place
+   * of `upperArmRadius` and `rootExclusion`, so setting those as well throws.
+   */
+  links?: readonly [(LinkHullOptions | null)?, (LinkHullOptions | null)?];
 }
 
 /**
@@ -86,6 +108,57 @@ function count(value: number, maximum: number, name: string): void {
   if (!Number.isSafeInteger(value) || value < 0 || value > maximum) throw new RangeError(name);
 }
 
+/** A link hull and its frame: `basis` holds the local axis, hinge and their cross, unit and square, then the origin. */
+interface LinkHull {
+  hull: ConvexHullVolume;
+  basis: Float64Array;
+}
+
+function linkHull(options: LinkHullOptions | null | undefined): LinkHull | null {
+  if (!options) return null;
+  const hull = options.hull;
+  if (!hull || typeof hull.setTransform !== 'function')
+    throw typeError('A link hull must be a ConvexHullVolume', 'kinematics');
+  const origin = options.origin ?? [0, 0, 0],
+    axis = options.axis ?? [0, 1, 0],
+    hinge = options.hinge ?? [1, 0, 0];
+  validateVector(origin, 'link hull origin');
+  validateVector(axis, 'link hull axis');
+  validateVector(hinge, 'link hull hinge');
+  const axisLength = length3(axis[0], axis[1], axis[2]);
+  const ax = axis[0] / axisLength,
+    ay = axis[1] / axisLength,
+    az = axis[2] / axisLength;
+  const along = hinge[0] * ax + hinge[1] * ay + hinge[2] * az;
+  const hx = hinge[0] - ax * along,
+    hy = hinge[1] - ay * along,
+    hz = hinge[2] - az * along;
+  const hingeLength = length3(hx, hy, hz);
+  // The negated form also catches a NaN length from a zero axis.
+  if (!(axisLength > 0) || !(hingeLength > 1e-9 * length3(hinge[0], hinge[1], hinge[2])))
+    throw rangeError('A link hull axis and hinge must be non-zero and not parallel', 'kinematics');
+  const nx = hx / hingeLength,
+    ny = hy / hingeLength,
+    nz = hz / hingeLength;
+  return {
+    hull,
+    basis: new Float64Array([
+      ax,
+      ay,
+      az,
+      nx,
+      ny,
+      nz,
+      ay * nz - az * ny,
+      az * nx - ax * nz,
+      ax * ny - ay * nx,
+      origin[0],
+      origin[1],
+      origin[2],
+    ]),
+  };
+}
+
 /**
  * One stateful solver per chain. Volumes and all coordinates share one coordinate frame.
  * Results and their buffers are reused; copy them if retaining a previous result.
@@ -104,6 +177,11 @@ export class AvoidanceSolver {
   readonly tolerance: number;
   readonly rootExclusion: number;
   private readonly upperArmRadius: number | null | undefined;
+  private readonly upperHull: LinkHull | null;
+  private readonly forearmHull: LinkHull | null;
+  private readonly linkMatrix = new Float64Array(16);
+  private readonly linkFrame = new Float64Array(3);
+  private readonly measured = new Float64Array(1);
   private readonly surface = new Float64Array(3);
   private readonly normal = new Float64Array(3);
   private readonly distance = new Float64Array(1);
@@ -213,6 +291,13 @@ export class AvoidanceSolver {
       validateNonNegative(this.upperArmRadius, 'upperArmRadius');
     count(this.maxIterations, 256, 'maxIterations must be 1..256');
     if (this.maxIterations === 0) throw new RangeError('maxIterations must be 1..256');
+    this.upperHull = linkHull(settings.links?.[0]);
+    this.forearmHull = linkHull(settings.links?.[1]);
+    if (this.upperHull && (settings.upperArmRadius !== undefined || this.rootExclusion > 0))
+      throw typeError(
+        'An upper link hull replaces upperArmRadius and rootExclusion; pass one or the other',
+        'kinematics',
+      );
     for (let i = 0; i < this.volumes.length; i++) this.checkVolume(this.volumes[i]);
   }
 
@@ -220,6 +305,11 @@ export class AvoidanceSolver {
     if (!volume || typeof volume.evaluate !== 'function' || typeof volume.segmentClearance !== 'function') {
       throw new TypeError('Volumes require evaluate and exact segmentClearance methods');
     }
+    if (!this.upperHull && !this.forearmHull) return;
+    if (typeof volume.hullClearanceInto !== 'function')
+      throw typeError('A collider of a solver with link hulls needs a hullClearanceInto method', 'kinematics');
+    if (volume === (this.upperHull?.hull as unknown) || volume === (this.forearmHull?.hull as unknown))
+      throw typeError('A link hull cannot also be a collider; pass a separate ConvexHullVolume', 'kinematics');
   }
 
   addVolume(volume: ConstraintVolume): void {
@@ -246,11 +336,15 @@ export class AvoidanceSolver {
 
   private copyInput(value: Vec3View, output: Float64Array): void {
     validateVector(value);
-    for (let i = 0; i < 3; i++) {
-      if (!Number.isFinite(Math.fround(value[i])))
-        throw new RangeError('Position exceeds Float32 output range; move the target closer to the origin');
-      output[i] = value[i];
-    }
+    readVector(value, output, 0);
+    // Past this size Math.fround gives Infinity; compared directly because that call boxes on some V8 tiers.
+    const limit = 3.4028235677973366e38;
+    if (
+      !(output[0] < limit && output[0] > -limit) ||
+      !(output[1] < limit && output[1] > -limit) ||
+      !(output[2] < limit && output[2] > -limit)
+    )
+      throw new RangeError('Position exceeds Float32 output range; move the target closer to the origin');
   }
 
   private evaluateInto(volume: ConstraintVolume, point: Vec3View): void {
@@ -260,17 +354,34 @@ export class AvoidanceSolver {
       throw new RangeError('Non-finite volume distance; check the collider for NaN or infinite values');
     validateVector(this.surface);
     validateVector(this.normal);
-    if (Math.abs(length3(this.normal[0], this.normal[1], this.normal[2]) - 1) > 1e-6)
+    // Inline, as below: a double returned by a call V8 did not inline is boxed, once per proxy per candidate.
+    const nx = this.normal[0],
+      ny = this.normal[1],
+      nz = this.normal[2];
+    if (Math.abs(Math.sqrt(nx * nx + ny * ny + nz * nz) - 1) > 1e-6)
       throw new RangeError('Volume normal must be unit length');
   }
 
-  private pointClearance(point: Vec3View): number {
+  /** The point's clearance from every volume, into `targetClearance`. */
+  private updateTargetClearance(point: Vec3View): void {
     let clearance = Infinity;
     for (let i = 0; i < this.volumes.length; i++) {
       this.evaluateInto(this.volumes[i], point);
-      clearance = Math.min(clearance, this.distance[0] - this.minClearance - this.targetRadius);
+      const gap = this.distance[0] - this.minClearance - this.targetRadius;
+      if (gap < clearance) clearance = gap;
     }
-    return clearance;
+    this.targetClearance = clearance;
+  }
+
+  /** The distance from `from` (root or elbow) to `to`, into `measured`. */
+  private measure(from: Vec3View, to: Vec3View): void {
+    const x = from[0] - to[0],
+      y = from[1] - to[1],
+      z = from[2] - to[2],
+      squared = x * x + y * y + z * z;
+    // Two stores, not a conditional: a value merged from a call's result is boxed.
+    if (squared >= 1e-300 && squared < Infinity) this.measured[0] = Math.sqrt(squared);
+    else this.measured[0] = scaledLength3(x, y, z);
   }
 
   private clampReach(): void {
@@ -347,13 +458,10 @@ export class AvoidanceSolver {
       if (boundedReach) this.clampReach();
       for (let a = 0; a < 3; a++) this.target[a] = this.point[a];
       validateVector(this.target);
-      this.targetClearance = this.pointClearance(this.target);
+      this.updateTargetClearance(this.target);
       this.targetIterations = iteration + 1;
-      const reach = length3(
-        this.target[0] - this.root[0],
-        this.target[1] - this.root[1],
-        this.target[2] - this.root[2],
-      );
+      this.measure(this.target, this.root);
+      const reach = this.measured[0];
       if (this.targetClearance >= -this.tolerance && (!boundedReach || (reach >= minimum && reach <= maximum))) break;
       // Include output rounding in the next projection pass.
       for (let a = 0; a < 3; a++) this.point[a] = this.target[a];
@@ -362,11 +470,8 @@ export class AvoidanceSolver {
     state.clearance = this.targetClearance;
     state.resolved = this.targetClearance >= -this.tolerance;
     if (boundedReach) {
-      const reach = length3(
-        this.target[0] - this.root[0],
-        this.target[1] - this.root[1],
-        this.target[2] - this.root[2],
-      );
+      this.measure(this.target, this.root);
+      const reach = this.measured[0];
       state.resolved &&= reach >= minimum && reach <= maximum;
     }
     state.maxPenetration = Math.max(0, -state.clearance);
@@ -397,6 +502,74 @@ export class AvoidanceSolver {
     segmentVolumeInto(volume, start, end, radius, this.distance, this.segmentResult);
   }
 
+  /**
+   * The bend-plane normal for this pose goes to `linkFrame`. A straight chain has none, and the search never accepts
+   * one (the reach margin keeps it out), so any axis across the chain serves; this one is repeatable.
+   */
+  private bendNormal(root: Vec3View, elbow: Vec3View, end: Vec3View): void {
+    const ux = elbow[0] - root[0],
+      uy = elbow[1] - root[1],
+      uz = elbow[2] - root[2],
+      vx = end[0] - elbow[0],
+      vy = end[1] - elbow[1],
+      vz = end[2] - elbow[2];
+    let nx = uy * vz - uz * vy,
+      ny = uz * vx - ux * vz,
+      nz = ux * vy - uy * vx;
+    let squared = nx * nx + ny * ny + nz * nz;
+    if (squared < 1e-300) {
+      const small = Math.abs(ux) <= Math.abs(uy) && Math.abs(ux) <= Math.abs(uz);
+      nx = small ? 0 : -uz;
+      ny = small ? -uz : 0;
+      nz = small ? uy : ux;
+      squared = nx * nx + ny * ny + nz * nz;
+      if (squared < 1e-300) {
+        nx = 1;
+        ny = nz = 0;
+        squared = 1;
+      }
+    }
+    const length = Math.sqrt(squared);
+    this.linkFrame[0] = nx / length;
+    this.linkFrame[1] = ny / length;
+    this.linkFrame[2] = nz / length;
+  }
+
+  /** Moves a link hull onto segment start-end and writes the worst gap to the colliders into `distance`. */
+  private linkGapInto(link: LinkHull, start: Vec3View, end: Vec3View): void {
+    const x = end[0] - start[0],
+      y = end[1] - start[1],
+      z = end[2] - start[2];
+    this.measure(end, start);
+    const length = this.measured[0];
+    const ax = length > 0 ? x / length : 1,
+      ay = length > 0 ? y / length : 0,
+      az = length > 0 ? z / length : 0;
+    // The normal is square to both links of a two-bone chain, so the frame below is a pure rotation.
+    const hx = this.linkFrame[0],
+      hy = this.linkFrame[1],
+      hz = this.linkFrame[2];
+    const cx = ay * hz - az * hy,
+      cy = az * hx - ax * hz,
+      cz = ax * hy - ay * hx;
+    const b = link.basis,
+      m = this.linkMatrix;
+    // World frame times the transposed local frame: each local axis lands on its world axis.
+    for (let column = 0; column < 3; column++) {
+      const p = b[column],
+        q = b[column + 3],
+        r = b[column + 6];
+      m[column * 4] = ax * p + hx * q + cx * r;
+      m[column * 4 + 1] = ay * p + hy * q + cy * r;
+      m[column * 4 + 2] = az * p + hz * q + cz * r;
+    }
+    m[12] = start[0] - (m[0] * b[9] + m[4] * b[10] + m[8] * b[11]);
+    m[13] = start[1] - (m[1] * b[9] + m[5] * b[10] + m[9] * b[11]);
+    m[14] = start[2] - (m[2] * b[9] + m[6] * b[10] + m[10] * b[11]);
+    m[15] = 1;
+    link.hull.setTransform(m);
+  }
+
   private poseClearanceInto(
     root: Vec3View,
     elbow: Vec3View,
@@ -406,17 +579,26 @@ export class AvoidanceSolver {
     upperLength: number,
   ): void {
     let clearance = Infinity;
-    const upperRadius = this.upperArmRadius === undefined ? elbowRadius : this.upperArmRadius;
+    const upperHull = this.upperHull,
+      forearmHull = this.forearmHull;
+    const upperRadius = upperHull ? 0 : this.upperArmRadius === undefined ? elbowRadius : this.upperArmRadius;
     const fraction = Math.min(1, this.rootExclusion / upperLength);
     for (let a = 0; a < 3; a++) this.trim[a] = root[a] + (elbow[a] - root[a]) * fraction;
+    if (upperHull || forearmHull) this.bendNormal(root, elbow, end);
+    if (upperHull) this.linkGapInto(upperHull, root, elbow);
+    if (forearmHull) this.linkGapInto(forearmHull, elbow, end);
     for (let i = 0; i < this.volumes.length; i++) {
       const volume = this.volumes[i];
       this.evaluateInto(volume, elbow);
       const elbowGap = this.distance[0] - elbowRadius;
-      this.segmentInto(volume, elbow, end, forearmRadius);
+      if (forearmHull) volume.hullClearanceInto!(forearmHull.hull, this.distance);
+      else this.segmentInto(volume, elbow, end, forearmRadius);
       const lowerGap = this.distance[0];
       let upperGap = Infinity;
-      if (upperRadius !== null) {
+      if (upperHull) {
+        volume.hullClearanceInto!(upperHull.hull, this.distance);
+        upperGap = this.distance[0];
+      } else if (upperRadius !== null) {
         this.segmentInto(volume, this.trim, elbow, upperRadius);
         upperGap = this.distance[0];
       }
@@ -447,16 +629,10 @@ export class AvoidanceSolver {
     evaluate(this.callbackRoot, this.callbackTarget, angle, this.candidate);
     validateVector(this.candidate, 'IK elbow');
     // Validate the callback rather than silently certifying an arbitrary elbow location.
-    const upperActual = length3(
-      this.candidate[0] - this.root[0],
-      this.candidate[1] - this.root[1],
-      this.candidate[2] - this.root[2],
-    );
-    const lowerActual = length3(
-      this.candidate[0] - this.target[0],
-      this.candidate[1] - this.target[1],
-      this.candidate[2] - this.target[2],
-    );
+    this.measure(this.candidate, this.root);
+    const upperActual = this.measured[0];
+    this.measure(this.candidate, this.target);
+    const lowerActual = this.measured[0];
     const lengthTolerance = Math.min(this.tolerance * 4, Math.min(upper, lower) * 1e-5);
     this.poseDistance[0] = -Infinity;
     if (Math.abs(upperActual - upper) > lengthTolerance || Math.abs(lowerActual - lower) > lengthTolerance) return;
@@ -551,7 +727,8 @@ export class AvoidanceSolver {
       if (minimum >= maximum || !Number.isFinite(Math.fround(maximum)))
         throw new RangeError('Singularity margins leave no operational reach; lower reachMargin or foldMargin');
       this.singular = false;
-      const rawDistance = length3(this.raw[0] - this.root[0], this.raw[1] - this.root[1], this.raw[2] - this.root[2]);
+      this.measure(this.raw, this.root);
+      const rawDistance = this.measured[0];
       if (rawDistance < minimum || rawDistance > maximum) this.singular = true;
       this.solveInputs[0] = minimum;
       this.solveInputs[1] = maximum;
@@ -567,12 +744,9 @@ export class AvoidanceSolver {
       let boundedLengthValid = this.bestClearance !== -Infinity;
       let iterations = this.targetIterations + this.searchIterations;
       let status = SolveStatus.ObstacleOccluded;
-      this.targetClearance = this.pointClearance(this.target);
-      const targetReach = length3(
-        this.target[0] - this.root[0],
-        this.target[1] - this.root[1],
-        this.target[2] - this.root[2],
-      );
+      this.updateTargetClearance(this.target);
+      this.measure(this.target, this.root);
+      const targetReach = this.measured[0];
       const targetValid = this.targetClearance >= -this.tolerance && targetReach >= minimum && targetReach <= maximum;
       if (targetValid && this.bestClearance >= -this.tolerance) {
         status = this.singular ? SolveStatus.SingularDeadZone : SolveStatus.Success;
@@ -594,7 +768,7 @@ export class AvoidanceSolver {
       }
       // Recheck after all user callbacks. They may update a moving obstacle or
       // retain and write earlier public results while evaluating a candidate.
-      this.targetClearance = this.pointClearance(this.target);
+      this.updateTargetClearance(this.target);
       this.poseDistance[0] = -Infinity;
       if (boundedLengthValid)
         this.poseClearanceInto(this.root, this.boundedElbow, this.target, elbowRadius, forearmRadius, upperArmLen);

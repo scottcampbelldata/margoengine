@@ -31,6 +31,7 @@ export interface AvoidanceSolverOptions {
     tolerance?: number;
     upperArmRadius?: number | null;
     rootExclusion?: number;
+    links?: readonly [(LinkHullOptions | null)?, (LinkHullOptions | null)?];
 }
 
 export class CapsuleVolume implements ConstraintVolume {
@@ -41,6 +42,7 @@ export class CapsuleVolume implements ConstraintVolume {
     set(start: Vec3View, end: Vec3View, radius?: number): this;
     evaluate(point: Vec3View, outSurface: MutableVec3View, outNormal: MutableVec3View): number;
     segmentClearance(start: Vec3View, end: Vec3View, radius: number): number;
+    hullClearanceInto(hull: ConvexHullVolume, outDistance: Float64Array): void;
 }
 
 export interface CapsuleVolumeOptions {
@@ -52,9 +54,37 @@ export interface CapsuleVolumeOptions {
 export interface ConstraintVolume {
     evaluate(point: Vec3View, outSurface: MutableVec3View, outNormal: MutableVec3View): number;
     segmentClearance(start: Vec3View, end: Vec3View, radius: number): number;
+    evaluateInto?(point: Vec3View, outSurface: MutableVec3View, outNormal: MutableVec3View, outDistance: Float64Array): void;
+    segmentClearanceInto?(start: Vec3View, end: Vec3View, radius: number, outDistance: Float64Array): void;
+    hullClearanceInto?(hull: ConvexHullVolume, outDistance: Float64Array): void;
+}
+
+export class ConvexHullVolume implements ConstraintVolume {
+    constructor(options: ConvexHullVolumeOptions);
+    get pointCount(): number;
+    setTransform(matrix: ArrayLike<number>): this;
+    evaluate(point: Vec3View, outSurface: MutableVec3View, outNormal: MutableVec3View): number;
+    segmentClearance(start: Vec3View, end: Vec3View, radius: number): number;
+    hullClearance(hull: ConvexHullVolume): number;
+    evaluateInto(point: Vec3View, outSurface: MutableVec3View, outNormal: MutableVec3View, outDistance: Float64Array): void;
+    segmentClearanceInto(start: Vec3View, end: Vec3View, radius: number, outDistance: Float64Array): void;
+    hullClearanceInto(hull: ConvexHullVolume, outDistance: Float64Array): void;
+}
+
+export interface ConvexHullVolumeOptions {
+    points: ArrayLike<number>;
+    matrix?: ArrayLike<number>;
+    maxPoints?: number;
 }
 
 export type ElbowEvaluator = (root: Vec3View, target: Vec3View, poleAngle: number, outElbow: Float32Array) => void;
+
+export interface LinkHullOptions {
+    hull: ConvexHullVolume;
+    origin?: Vec3View;
+    axis?: Vec3View;
+    hinge?: Vec3View;
+}
 
 export type MutableVec3View = [number, number, number] | Float32Array | Float64Array;
 
@@ -105,6 +135,7 @@ export class SphereVolume implements ConstraintVolume {
     set(center: Vec3View, radius?: number): this;
     evaluate(point: Vec3View, outSurface: MutableVec3View, outNormal: MutableVec3View): number;
     segmentClearance(start: Vec3View, end: Vec3View, radius: number): number;
+    hullClearanceInto(hull: ConvexHullVolume, outDistance: Float64Array): void;
 }
 
 export interface SphereVolumeOptions {

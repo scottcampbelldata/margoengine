@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3922834,
+  "total": 3927785,
   "history": [
     {
       "date": "2026-10-24",
@@ -894,7 +894,13 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
+      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "f766d8ee2",
+      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
       "grew": 1
     },
     {
@@ -906,13 +912,7 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "f766d8ee2",
-      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
+      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
       "grew": 1
     },
     {
@@ -950,6 +950,12 @@
       "commit": "6547044dd",
       "reason": "sky dither fixes colour bands on the 8-bit canvas; report r3dither-report.md",
       "grew": 2
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "d27f31df4",
+      "reason": "kinematics-constraints: ConvexHullVolume (GJK and an expanding polytope) and link hulls in AvoidanceSolver; a page that imports only capsules and spheres pays for neither kernel",
+      "grew": 1
     }
   ],
   "items": {
@@ -1098,7 +1104,7 @@
     "@margoengine/inspector/history": 1113,
     "@margoengine/inspector/resources": 902,
     "@margoengine/inspector/snapshot": 1320,
-    "@margoengine/kinematics-constraints": 6800,
+    "@margoengine/kinematics-constraints": 11751,
     "@margoengine/labels": 4756,
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/global": 7409,

@@ -1,3 +1,5 @@
+import { typeError } from '../../shared/errors.js';
+import type { ConvexHullVolume } from './hull.js';
 import type { ConstraintVolume, MutableVec3View, Vec3View } from './types.js';
 import {
   length3,
@@ -458,6 +460,9 @@ function segmentSphereInto(
   outDistance[0] = distance - volume.radius - radius;
 }
 
+// A subclass's own segment check would be silently ignored against a link hull.
+const OVERRIDDEN = 'A volume with an overridden segmentClearance must override hullClearanceInto for link hulls';
+
 /** A sphere in a caller-selected coordinate frame. */
 export class SphereVolume implements ConstraintVolume {
   readonly center: [number, number, number] = [0, 0, 0];
@@ -489,6 +494,13 @@ export class SphereVolume implements ConstraintVolume {
   segmentClearance(start: Vec3View, end: Vec3View, radius: number): number {
     segmentSphereInto(this, start, end, radius, publicDistance);
     return publicDistance[0];
+  }
+
+  /** Signed gap to a convex hull, written to `outDistance[0]`. A subclass that changes the geometry overrides this. */
+  hullClearanceInto(hull: ConvexHullVolume, outDistance: Float64Array): void {
+    if (this.segmentClearance !== sphereSegmentClearance) throw typeError(OVERRIDDEN, 'kinematics');
+    validateNonNegative(this.radius, 'sphere radius');
+    hull.segmentClearanceInto(this.center, this.center, this.radius, outDistance);
   }
 }
 
@@ -536,6 +548,13 @@ export class CapsuleVolume implements ConstraintVolume {
       closestPointsBetweenSegments(start, end, this.start, this.end, this.segmentResult).distance - this.radius - radius
     );
   }
+
+  /** Signed gap to a convex hull, written to `outDistance[0]`. A subclass that changes the geometry overrides this. */
+  hullClearanceInto(hull: ConvexHullVolume, outDistance: Float64Array): void {
+    if (this.segmentClearance !== capsuleSegmentClearance) throw typeError(OVERRIDDEN, 'kinematics');
+    validateNonNegative(this.radius, 'capsule radius');
+    hull.segmentClearanceInto(this.start, this.end, this.radius, outDistance);
+  }
 }
 
 // Capture original methods once: overrides, including later prototype changes,
@@ -566,6 +585,8 @@ export function evaluateVolumeInto(
     evaluateCapsuleInto(volume, point, outSurface, outNormal, outDistance);
   } else if (volume instanceof SphereVolume && evaluate === sphereEvaluate) {
     evaluateSphereInto(volume, point, outSurface, outNormal, outDistance);
+  } else if (volume.evaluateInto) {
+    volume.evaluateInto(point, outSurface, outNormal, outDistance);
   } else {
     const distance = evaluate.call(volume, point, outSurface, outNormal);
     // A typed-array store would coerce strings/null/boxed numbers. Preserve the
@@ -593,6 +614,8 @@ export function segmentVolumeInto(
       radius;
   } else if (volume instanceof SphereVolume && segmentClearance === sphereSegmentClearance) {
     segmentSphereInto(volume, start, end, radius, outDistance);
+  } else if (volume.segmentClearanceInto) {
+    volume.segmentClearanceInto(start, end, radius, outDistance);
   } else {
     const distance = segmentClearance.call(volume, start, end, radius);
     // Keep rejection in the caller, after both checked links have been queried.

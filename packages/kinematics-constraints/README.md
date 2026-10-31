@@ -2,7 +2,7 @@
 
 Import `margoengine/kinematics-constraints` from the `margoengine` package, or `@margoengine/kinematics-constraints` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Standalone capsule and sphere avoidance for IK targets and two-bone chains. The package projects targets out of proxy volumes, checks elbow and link clearance, and searches a shoulder swivel angle through a caller-supplied IK evaluator. It has no engine, renderer, physics, or Wasm dependency. ESM exports and declarations are tree-shakable; core, stage, animation, and the existing IK kernels remain unchanged.
+Standalone capsule, sphere and convex hull avoidance for IK targets and two-bone chains. The package projects targets out of proxy volumes, checks elbow and link clearance, and searches a shoulder swivel angle through a caller-supplied IK evaluator. It has no engine, renderer, physics, or Wasm dependency. ESM exports and declarations are tree-shakable; core, stage, animation, and the existing IK kernels remain unchanged.
 
 Version `1.0.0` is source-only and has not been published to npm. From the repository root:
 
@@ -130,6 +130,7 @@ The speed limit bounds the supplied pole-angle coordinate. Moving the target or 
 | `tolerance` | `1e-6` | Numerical clearance acceptance tolerance in scene units. |
 | `upperArmRadius` | Elbow radius from `solve` | Override for the upper-link capsule. `null` explicitly disables its segment check. |
 | `rootExclusion` | `0` | Length trimmed from the root end of the upper-link check. |
+| `links` | None | Upper link and forearm as convex hulls, in that order: `[{hull, origin?, axis?, hinge?}, {...}]`. Leave either out or `null` for its capsule. See [Convex hulls](#convex-hulls). |
 
 All radii, gaps, damping, and exclusions must be finite and nonnegative; tolerance must be positive. `targetRadius` should enclose the hand/end-effector proxy you want the target projection to accommodate. For a capsule ending at the hand, use at least its forearm radius. A zero target radius projects only the point; subsequent link checks can still reject that target.
 
@@ -183,9 +184,9 @@ Results, vector buffers, `targetResult`, and helper results are reused. Read the
 | `measureSegmentClearance(start, end, radius, volume)` | Convenience wrapper for the same signed segment clearance. |
 | `closestPointsBetweenSegments(a, b, c, d, out?)` | Closest segment points, distance, and parameters in `[0, 1]`; supports degenerate and parallel segments. |
 
-Geometry normals at a sphere center or capsule axis use deterministic fallback directions. Output vectors must be writable, distinct, and nonoverlapping. Vector inputs are three-element tuples, `Float32Array`, or `Float64Array`. A custom `ConstraintVolume` must provide a signed-distance `evaluate` with unit normals and an exact `segmentClearance`; sampling only segment endpoints cannot satisfy that contract.
+`ConvexHullVolume` is the third built-in proxy; [Convex hulls](#convex-hulls) has its table. Geometry normals at a sphere center or capsule axis use deterministic fallback directions. Output vectors must be writable, distinct, and nonoverlapping. Vector inputs are three-element tuples, `Float32Array`, or `Float64Array`. A custom `ConstraintVolume` must provide a signed-distance `evaluate` with unit normals and an exact `segmentClearance`; sampling only segment endpoints cannot satisfy that contract. It may also provide `evaluateInto` and `segmentClearanceInto`, which write the number to `outDistance[0]` and which the solver then calls instead, and it needs `hullClearanceInto(hull, outDistance)` to sit in a solver that has link hulls.
 
-The built-in solver/volume hot paths reuse their vector and result storage and do not explicitly create per-call JavaScript containers when passed reused inputs/options. JavaScript engines can still allocate temporary numeric values at builtin and function boundaries: browser profiling observes allocation and minor garbage collection even with warmed reused buffers. This is not a zero-allocation or zero-GC guarantee. Caller callbacks, pose adapters, and UI code also control their own allocations. `closestPointsBetweenSegments` allocates a result when `out` is omitted; supply a reused `SegmentDistanceResult` with distinct `pointA`/`pointB` vectors to reuse that storage. This package makes no fixed runtime or frame-rate claim.
+The built-in solver/volume hot paths reuse their vector and result storage and do not explicitly create per-call JavaScript containers when passed reused inputs/options. JavaScript engines can still allocate temporary numeric values at builtin and function boundaries: a warmed solve against capsules still allocates (about 930 B per solve with two capsule colliders, Node 26), inside the capsule distance code. Hulls do not; see [Convex hulls](#convex-hulls). This is not a zero-allocation or zero-GC guarantee for capsules or spheres. Caller callbacks, pose adapters, and UI code also control their own allocations. `closestPointsBetweenSegments` allocates a result when `out` is omitted; supply a reused `SegmentDistanceResult` with distinct `pointA`/`pointB` vectors to reuse that storage. This package makes no fixed runtime or frame-rate claim.
 
 Point and link queries on unchanged built-in spheres and capsules use internal destination-passing paths into solver-owned `Float64Array` slots. Private pose checks also write their clearance into reused storage. The public `evaluate(...): number` and `segmentClearance(...): number` signatures and all numerical guards remain intact. Custom volumes and overridden methods continue through those public contracts; they do not need additional methods. This avoids numeric return boundaries for built-in queries and private pose checks, while other runtime allocation sites remain measurable.
 
@@ -197,8 +198,83 @@ For actual V8 object types, run `node scripts/profile-kinematics-constructors.js
 
 Geometry helpers reject nonfinite components or magnitudes above `1e100` and keep their calculations in JavaScript number precision. Solver input positions must additionally fit finite Float32 values because accepted targets/elbows use Float32 storage. Float32 range does not imply useful precision at large world coordinates: use a local frame and units where bone lengths, radii, and `tolerance` remain representable. Inputs outside supported ranges throw rather than being silently accepted.
 
+## Convex hulls
+
+A capsule fits a box corner or a torso badly: a target can clear the capsule and still be inside the corner. `ConvexHullVolume` takes the corners themselves. It works as a collider anywhere a sphere or capsule does, and a chain link can be a hull too, so an arm can reach round a torso without either passing through the other:
+
+```ts
+import {
+  AvoidanceSolver, ConvexHullVolume, SolveStatus,
+  type ElbowEvaluator,
+} from 'margoengine/kinematics-constraints';
+
+// The corners of a box from x, y, z = -0.5 to 0.5. convexGeometry's positions work the same way.
+const corners: number[] = [];
+for (const x of [-0.5, 0.5]) for (const y of [-0.5, 0.5]) for (const z of [-0.5, 0.5]) corners.push(x, y, z);
+
+// The torso, one metre up and two metres behind the arm, following its bone's world matrix.
+const torso = new ConvexHullVolume({ points: corners });
+const boneWorldMatrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 2, 1]);
+torso.setTransform(boneWorldMatrix);
+
+// A forearm hull in its bone's local space: the link runs along +Y from the local origin.
+const forearm = new ConvexHullVolume({
+  points: [-0.05, 0, -0.05, 0.05, 0, -0.05, 0, 0, 0.05, 0, 1, 0],
+});
+
+const solver = new AvoidanceSolver([torso], {
+  minClearance: 0.01,
+  links: [null, { hull: forearm }],
+});
+
+// Unit bones, reaching along +X: the elbow swings on a circle around the root to hand line.
+const elbow: ElbowEvaluator = (_root, _target, angle, out) => {
+  out[0] = 0.6;
+  out[1] = 0.8 * Math.cos(angle);
+  out[2] = 0.8 * Math.sin(angle);
+};
+
+const result = solver.solve([0, 0, 0], [1.2, 0, 0], [1.2, 0, 0], 1, 1, 0.05, 0.05, 1 / 60, elbow);
+if (result.status === SolveStatus.Success) console.log(result.elbow, result.clearance);
+```
+
+| Export | Use |
+| --- | --- |
+| `new ConvexHullVolume({points, matrix?, maxPoints?})` | `points` are flat `x, y, z` values in local space; exact duplicates are dropped. `matrix` defaults to the identity. `maxPoints` defaults to `64` and more points throw, because a query costs one dot product per point per step. Raise it for a hull that needs more corners. Interior points cost time and change nothing, so pass hull corners, not a raw mesh. |
+| `hull.setTransform(matrix)` | Places the hull. A column-major affine matrix of 16 values; scale and shear are fine. Costs a copy, whatever the point count. |
+| `hull.evaluate(point, outSurface, outNormal)` | Signed distance, closest surface point and outward unit normal. Inside, the distance is minus the depth and the surface point is the nearest way out. |
+| `hull.segmentClearance(start, end, radius)` | Signed gap to a capsule around a segment. Overlapping, it is minus a distance that moves them apart: the true depth or up to 2 percent more, and within 1e-4 of the shapes' size when nearly touching. |
+| `hull.hullClearance(other)` | Signed gap to another hull, each at its current transform, with the same bound on the depth. A clear gap is exact. |
+| `evaluateInto`, `segmentClearanceInto`, `hullClearanceInto` | The same, writing the number to `outDistance[0]`. A returned fractional number is a heap allocation unless V8 inlines the call, so use these in a per-frame loop of your own. |
+
+One point, a line and a flat polygon are all valid hulls. They have no inside of their own: a point on one reads zero with a repeatable normal (the plate's normal, sign fixed; an axis across a line; `[1, 0, 0]` on a point).
+
+A link hull's `points` are in the link's local space, such as its bone's. For each candidate pose the solver sets the hull's transform: `origin` goes to the link's start joint, `axis` runs along the link toward its end joint, and `hinge` lies on the normal of the plane through root, elbow and hand, in the direction of `(elbow - root) x (hand - elbow)`.
+
+| `links[i]` option | Default | Meaning |
+| --- | --- | --- |
+| `hull` | Required | The hull to move. The solver owns its transform, so it cannot also be a collider. |
+| `origin` | `[0, 0, 0]` | Local position of the link's start joint. |
+| `axis` | `[0, 1, 0]` | Local direction from the start joint to the end joint; +Y is the glTF bone convention. |
+| `hinge` | `[1, 0, 0]` | Local direction of the elbow's hinge axis; its part along `axis` is ignored. |
+
+A link hull replaces that link's capsule. The `elbowRadius` sphere is still checked, so pass `0` if the hulls already cover the elbow. An upper link hull replaces `upperArmRadius` and `rootExclusion`, and setting those as well throws; build the hull so it leaves out whatever the root joint is allowed to touch. A collider in a solver with link hulls must have `hullClearanceInto`: spheres, capsules and hulls do. A subclass of a sphere or capsule that overrides `segmentClearance` must override `hullClearanceInto` too, or the solve throws, so its geometry is never silently ignored.
+
+Hull colliders and link hulls allocate nothing per solve once warmed, with any mix of tuples and typed arrays: `tests/hull-allocation.test.js` runs 20,000 clear solves and 20,000 of each overlap query with no heap growth, on V8 14. A fresh fractional `angle` passed to your IK evaluator can still box, as under Proxy geometry above.
+
+Measured on one desktop thread (Node 26, Windows), 64-point hulls unless noted:
+
+| Query | Time |
+| --- | --- |
+| `segmentClearanceInto`, clear / overlapping | 0.40 / 5.7 us |
+| `hullClearanceInto`, clear / deep overlap | 0.59 / 12 us |
+| `evaluateInto`, point outside / inside | 0.29 / 5.1 us |
+| `solve`, first pose clear, 3 hull colliders and 2 link hulls | 9.4 us (16 points: 5.8 us; 3 capsule colliders and capsule links: 4.1 us) |
+| `solve`, no clear pose, all 34 candidates tried, limb-shaped hulls | 0.44 ms (16 points: 0.17 ms) |
+| `solve`, no clear pose, a round hull nested in a round hull, the slowest shape found | 1.9 ms (16 points: 0.27 ms); a lower `searchBudget` limits it |
+
 ## Scope
 
 `Success` describes static analytical proxy clearance at one evaluated instant, within numerical tolerance. It covers neither unsupplied mesh/skinning geometry nor unchecked link portions. Set proxies to enclose the full deformation envelope and any desired padding in your application.
 
-This package does not implement continuous collision detection, swept-path planning between frames, mesh collision, a joint-limit solver, dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or use a higher-level planner.
+This package does not implement continuous collision detection, swept-path planning between frames, concave mesh collision, a joint-limit solver, dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or use a higher-level planner.
