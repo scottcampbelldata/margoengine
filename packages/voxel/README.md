@@ -2,7 +2,7 @@
 
 Import `margoengine/voxel` from the `margoengine` package, or `@margoengine/voxel` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Voxel worlds for Minecraft-style games and voxel editors: a block-type registry, 32 x 32 x 32 palette chunks with a
+Voxel worlds for block-building games and voxel editors: a block-type registry, 32 x 32 x 32 palette chunks with a
 light byte per cell, and a chunked world with dirty tracking and change events. This release is the storage layer;
 meshing, rendering, light, queries, streaming and `.vox` files follow as subpath entries (plan: [DESIGN.md](DESIGN.md)).
 
@@ -474,7 +474,7 @@ mesher.dispose(); // every pending job resolves null; the workers stop
 - **Translucent order.** Pass the camera's world position as `eye` and the worker returns `translucent` sorted back to
   front by quad centre distance. `sortQuads(words, localEye)` does the same on any thread (to re-sort a near chunk after
   the camera moves; `localEye` is the world position minus 32 times the chunk coordinates). Large merged quads beside
-  small ones can still sort wrong: centre distance is Minecraft's order, not an exact one.
+  small ones can still sort wrong: centre distance is a common order, not an exact one.
 - **Failures.** A worker that crashes rejects its job's promise and is replaced for the next job.
 
 Measured with Node 24 worker threads on the development laptop (8 logical cores) while other jobs kept the whole machine
