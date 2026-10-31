@@ -31,14 +31,9 @@ The site build (`node scripts/build-site.js`) publishes it as `/voxel/`.
 | H or F3 | hide or show the HUD |
 | P | photo mode on / off: the loaded world path traced |
 | Enter | in photo mode: save a PNG of the view (256 samples, denoised) |
-| R | report griefing where you stand (on Plaza, once a minute) |
 
 The HUD shows frames per second, position, chunk, render distance, chunks (with quads on the GPU, in view, loaded, still
 to load), quads, quad memory and draw calls (`voxels.stats`).
-
-On a touch screen the left half of the screen walks (a stick that starts where the finger lands), the right half looks,
-a tap on it places, a 400 ms press breaks; Jump and Fly are buttons (Down appears while flying or swimming), and the
-hotbar takes a tap or a swipe.
 
 ## URL parameters
 
@@ -55,8 +50,6 @@ hotbar takes a tap or a swipe.
 | `gpuTiming` | | Requests `timestamp-query` so `voxelSandbox.gpuTiming()` can time the voxel passes. |
 | `photo` | | Starts in photo mode (also with `view`). |
 | `server` | | `ws://host:port` of a multiplayer server (see below): play there instead of in a local world. |
-| `plaza` | | URL of a Plaza router: ask its `/join` where to play. A page served under `/plaza/` uses the public router without it. |
-| `retry` | 30000 | Milliseconds between asks of the router while playing alone. |
 
 ## How it is built
 
@@ -174,22 +167,45 @@ npm run dev:voxel                                  # then open http://127.0.0.1:
 Every tab that opens the sandbox with `?server=` joins one shared world on
 [`@margoengine/voxel-net`](../../packages/voxel-net/README.md). The server generates the same terrain and plants as
 single player (`src/plants.ts` runs in both), holds the world and checks every edit; the page draws what it is sent,
-moves its own player at once and is corrected if the server disagrees, and shows the other players as voxel figures
-with name tags within 24 blocks (`src/figures.ts`, loaded when joining: one `DynamicInstances` box per limb, one draw). Flying is allowed. The server lets on only pages from the dev server (`http://127.0.0.1:5173`
+moves its own player at once and is corrected if the server disagrees, and shows the other players as coloured boxes
+(`src/multiplayer.ts`). Flying is allowed. The server lets on only pages from the dev server (`http://127.0.0.1:5173`
 and `http://localhost:5173`); for a page served elsewhere pass its origin, `--origins=https://my.site`, or `--origins=*`
 for any page. Nothing is saved: the world lasts as long as the server process, and the
 render distance (`rd`, 2-8 on the server) is fixed when joining.
 
-The page never stops at a failed join. If the router says the world is full, the socket fails or closes, or no welcome
-arrives within 5 s, it starts its own world in place and says why in a banner, asks the router again every 30 s, and has
-a Join button that reloads. When a shard closes with 1001 and the reason `world ended`, the page reloads through `/join`.
-Phones ask for a view of 4 chunks and play without shadows; photo mode (a dynamic import, downloaded on the first P) is
-refused there with a message.
+## Plaza server
+
+`server/` runs the public world: `router.mjs` forks one `shard.mjs` per world and answers the page, and `admin.mjs` is the
+operator's tool. Everything listens on 127.0.0.1, behind a proxy that sets `X-Real-IP` (`--proxied`).
+
+```sh
+npm run build:packages
+node examples/voxel-sandbox/server/router.mjs --data=plaza-data --origins=*      # http://127.0.0.1:8790
+curl http://127.0.0.1:8790/join                                                  # where to connect
+node examples/voxel-sandbox/server/admin.mjs status --data=plaza-data
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--data` | required | Folder for worlds, snapshots and the identity salt. |
+| `--port` | 8790 | The router's port. |
+| `--shard-port` | 8800 | Shard `i` listens on this plus `i`. |
+| `--proxied` | off | Take the client's address from `X-Real-IP`; without it, from the socket. |
+| `--origins` | the dev server | Pages that may connect, comma separated, or `*`. |
+| `--public-url` | the shard's own `ws://` | What `/join` answers, with `{i}` for the shard, such as `wss://example.com/s/{i}`. |
+| `--capacity` | 200 | Players per shard. |
+| `--max-shards` | 2 | Shards at most; another starts only while a core is free. |
+| `--per-identity` | 8 | Players at once from one address; raise it only for a bench. |
+| env `PLAZA_METRICS_TOKEN` | none | Bearer token for `GET /metrics`; without one it answers 404. |
+
+A world lasts 6 hours. Its edited chunks are saved every 10 minutes, so a crash loses at most that; a world's end closes
+each client with 1001, and the page asks `/join` again. Worlds get a stone square at the origin that players cannot edit
+(`src/plaza.ts`, only with `plaza=1` in the generator's URL), and names come from two word lists (`src/names.ts`).
 
 ## Tests
 
 ```sh
-npm run test --workspace examples/voxel-sandbox     # Node: textures, block ids, public imports only
+npm run test --workspace examples/voxel-sandbox     # Node: textures, block ids, public imports, the Plaza server
 node scripts/gpu-lock.mjs run --owner=you -- node examples/voxel-sandbox/test/play.browser.mjs
 ```
 
@@ -200,5 +216,5 @@ breaks and places a block, swims, changes the render distance and finds the edit
 
 - No image-based light (the sky's ambient is a constant colour); `Fog.add(voxels)` works but the sky's depth fog hides
   the range edge better, so the example uses that.
-- No mobs or items, no crafting.
+- No touch controls (phones only show the deterministic views well), no mobs or items, no crafting.
 - Water does not flow; breaking a lake's shore leaves a wall of water.

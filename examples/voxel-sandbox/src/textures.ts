@@ -391,6 +391,21 @@ function glowstone(random: Random): Canvas16 {
   );
 }
 
+function heartRed(random: Random): Canvas16 {
+  return speckled(
+    random,
+    [
+      [120, 12, 24],
+      [168, 18, 34],
+      [206, 28, 44],
+      [232, 48, 60],
+      [248, 88, 92],
+    ],
+    1,
+    0.5,
+  );
+}
+
 // Layer order: the index of a name in this list is its texture layer. Water's frames are consecutive layers.
 const PAINTERS: readonly [string, (random: Random) => Canvas16][] = [
   ['stone', stone],
@@ -414,6 +429,7 @@ const PAINTERS: readonly [string, (random: Random) => Canvas16][] = [
   ['dandelion', (random) => flower([246, 214, 36], [214, 142, 20], random)],
   ['poppy', (random) => flower([208, 36, 32], [52, 30, 24], random)],
   ['glowstone', glowstone],
+  ['heart_red', heartRed],
 ];
 
 /** Texture layer names in layer order. */

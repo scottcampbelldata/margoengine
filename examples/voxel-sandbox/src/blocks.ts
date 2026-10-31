@@ -47,6 +47,7 @@ export const BLOCK_DEFINITIONS: readonly (readonly [name: string, options: Block
   ['planks_slab', { textures: t('planks'), shape: 'slab', waterlog: 'water' }, 'Plank slab'],
   ['cobblestone_stairs', { textures: t('cobblestone'), shape: 'stair', waterlog: 'water' }, 'Cobblestone stairs'],
   ['brick_stairs', { textures: t('bricks'), shape: 'stair', waterlog: 'water' }, 'Brick stairs'],
+  ['heart_red', { textures: t('heart_red'), light: 8, emissive: 0.5 }, 'Heart red'],
 ];
 
 /** Blocks in the hotbar at the start, by name (keys 1-9). */

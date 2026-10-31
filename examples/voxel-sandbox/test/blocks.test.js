@@ -31,6 +31,7 @@ test('block ids keep their order (saved chunks store ids)', () => {
       'planks_slab',
       'cobblestone_stairs',
       'brick_stairs',
+      'heart_red',
     ],
   );
   assert.equal(labels.length, blocks.table.length);

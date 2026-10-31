@@ -30,6 +30,7 @@ test('solid blocks are opaque, cutouts are all-or-nothing, water and glass are s
     'cobblestone',
     'bricks',
     'glowstone',
+    'heart_red',
   ])
     assert.ok(
       alphas(layer(name)).every((a) => a === 255),
