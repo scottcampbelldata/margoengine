@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f1a14">
+  <title>Boulder · Margo Engine</title>
+  <meta name="description" content="A robot on an indoor climbing wall. Choose a hold and its limbs find a way there without passing through the wall, the overhang or itself. WebGPU.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./boulder/boulder.css">
+</head>
+<body>
+  <main id="viewport" aria-label="Interactive climbing wall"></main>
+  <aside aria-label="Boulder controls">
+    <h1>Boulder</h1>
+    <p>Choose a hold. The climber finds a way there without passing through the wall or itself.</p>
+    <button id="climb" class="primary" type="button">Climb the red route</button>
+    <p id="status" data-webgpu-status role="status">Starting WebGPU</p>
+    <p id="error" role="alert"></p>
+    <details id="panel">
+      <summary>Controls</summary>
+      <div class="group" role="group" aria-label="What a chosen hold does">
+        <button type="button" data-moment="reach" aria-pressed="true">Reach <kbd>1</kbd></button>
+        <button type="button" data-moment="step" aria-pressed="false">Step <kbd>2</kbd></button>
+        <button type="button" data-moment="route" aria-pressed="false">Route <kbd>3</kbd></button>
+      </div>
+      <div class="group" id="routes" role="group" aria-label="Routes" hidden>
+        <button type="button" data-route="green">Green</button>
+        <button type="button" data-route="blue">Blue</button>
+        <button type="button" data-route="red">Red</button>
+      </div>
+      <div class="group">
+        <button id="fall" type="button">Fall</button>
+        <button id="reset" type="button">Reset</button>
+        <button id="sound" type="button" aria-pressed="false">Sound</button>
+      </div>
+      <small>Drag to look around, scroll or pinch to zoom.</small>
+    </details>
+  </aside>
+  <noscript><p class="plain">This demo needs JavaScript and a browser with WebGPU.</p></noscript>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./boulder/main.ts'));
+  </script>
+</body>
+</html>

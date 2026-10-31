@@ -6,7 +6,7 @@ import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { GLTFAsset, PBRModel } from '../packages/gltf-pro/dist/index.js';
 import { Animation } from '../packages/animation/dist/index.js';
 import { Animator } from '../packages/animator/dist/index.js';
-import { RigScratch } from '../examples/skinning-ik/rig-scratch.ts';
+import { MeshRotationWriter } from './support/mesh-rotation-writer.js';
 import { animatedTriangle } from './support/gltf-pro-fixture.js';
 
 function fixture() {
@@ -151,7 +151,7 @@ function writer(scratch, observed) {
 
 test('explicit writer matches all stored bits through clips, blend trees, interrupted fades, additive layers, morphs and external edits', async (t) => {
   const calls = [],
-    scratch = new RigScratch(),
+    scratch = new MeshRotationWriter(),
     options = baseOptions();
   options.writeRotation = writer(scratch, calls);
   const baseline = await scene(),
@@ -194,7 +194,7 @@ test('FootIK corrections use the same writer and preserve full pose bits', async
   const calls = [],
     options = baseOptions();
   options.initial = 'rest';
-  options.writeRotation = writer(new RigScratch(), calls);
+  options.writeRotation = writer(new MeshRotationWriter(), calls);
   const plain = baseOptions();
   plain.initial = 'rest';
   const baseline = await scene(plain),
@@ -273,7 +273,7 @@ test('writer getter is read once and later option edits cannot substitute the ca
   let reads = 0,
     writes = 0;
   const options = baseOptions(),
-    scratch = new RigScratch();
+    scratch = new MeshRotationWriter();
   Object.defineProperty(options, 'writeRotation', {
     configurable: true,
     get() {
@@ -334,7 +334,7 @@ test('invalid writer fails before attachment/model mutation and preserves earlie
 test('invalid update/blend and disposed-Animator guards do not invoke a rotation writer', async (t) => {
   let calls = 0;
   const options = baseOptions(),
-    scratch = new RigScratch();
+    scratch = new MeshRotationWriter();
   options.writeRotation = (node, q) => {
     calls++;
     scratch.setQuaternion(node, q);
@@ -363,7 +363,7 @@ test('writer failures before and after a real commit do not certify the cache an
   for (const timing of ['before', 'after']) {
     let fail = false,
       calls = 0;
-    const scratch = new RigScratch(),
+    const scratch = new MeshRotationWriter(),
       options = baseOptions();
     options.writeRotation = (node, q) => {
       calls++;
@@ -398,7 +398,7 @@ test('writer failures before and after a real commit do not certify the cache an
 
 test('recursive writer updates reject before changing time/playback/pose and the active flag clears on failure', async (t) => {
   const options = baseOptions(),
-    scratch = new RigScratch();
+    scratch = new MeshRotationWriter();
   let f,
     nested = 0,
     fail = false;
@@ -433,7 +433,7 @@ test('recursive writer updates reject before changing time/playback/pose and the
 test('a throw after restoring the previous successful cached rotation preserves the default unchanged-update skip', async (t) => {
   const plain = baseOptions(),
     options = baseOptions(),
-    scratch = new RigScratch();
+    scratch = new MeshRotationWriter();
   plain.initial = options.initial = 'rest';
   let candidate,
     fail = false,
@@ -481,7 +481,7 @@ test('a throw after restoring the previous successful cached rotation preserves 
 test('explicit commit preserves malformed quaternion and disposed-node guards without changing public typed-array setters', async (t) => {
   const calls = [],
     options = baseOptions(),
-    scratch = new RigScratch();
+    scratch = new MeshRotationWriter();
   options.initial = 'rest';
   options.writeRotation = (node, q) => {
     calls.push(node);

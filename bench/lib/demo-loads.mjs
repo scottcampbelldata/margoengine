@@ -21,6 +21,7 @@ export const DEMOS = [
   '/demos/earth/',
   '/demos/dof/',
   '/demos/tonemap/',
+  '/demos/boulder/',
 ];
 export const PROFILES = {
   'phone-layout-cold': {

@@ -279,7 +279,7 @@ def skin(o,arm,bone,weights=None):
     return o
 
 
-def resting_hand_details(arm,cream,teal,dark,copper):
+def resting_hand_details(arm,cream,teal,dark,copper,shift=(0,0,0)):
     """Complete the resting gripper with the orb hand's articulated styling.
 
     The original teal housing and wrist bearing remain unchanged. Every added
@@ -288,15 +288,16 @@ def resting_hand_details(arm,cream,teal,dark,copper):
     parts=[]
     def attach(obj):
         parts.append(skin(obj,arm,"RightHand"))
-    attach(ellipsoid("Right curved resting palm",(.29,.650,-.092),(.102,.034,.062),dark))
-    attach(ellipsoid("Right palm porcelain back armor",(.29,.655,-.035),(.094,.052,.022),cream))
+    at=lambda x,y,z:(x+shift[0],y+shift[1],z+shift[2])
+    attach(ellipsoid("Right curved resting palm",at(.29,.650,-.092),(.102,.034,.062),dark))
+    attach(ellipsoid("Right palm porcelain back armor",at(.29,.655,-.035),(.094,.052,.022),cream))
     for x in (.255,.29,.325):
-        points=[(x,.641,-.113),(x,.615,-.130),(x,.589,-.123),(x,.581,-.105)]
+        points=[at(x,.641,-.113),at(x,.615,-.130),at(x,.589,-.123),at(x,.581,-.105)]
         for i,(a,b) in enumerate(zip(points,points[1:])):
             attach(rod("Right relaxed finger phalange "+str(i),a,b,.0105,cream if i!=1 else teal))
             attach(sphere("Right relaxed finger dark knuckle",a,.013,dark,16))
         attach(sphere("Right relaxed finger pad",points[-1],.012,dark,16))
-    thumb=[(.336,.671,-.088),(.362,.640,-.108),(.350,.615,-.125)]
+    thumb=[at(.336,.671,-.088),at(.362,.640,-.108),at(.350,.615,-.125)]
     for a,b in zip(thumb,thumb[1:]):
         attach(rod("Right opposing relaxed thumb phalange",a,b,.012,cream))
         attach(sphere("Right opposing relaxed thumb knuckle",a,.014,copper,16))
@@ -452,7 +453,25 @@ def export(path,selected=False,animations=False,tangents=True,texcoords=True,act
     path.write_bytes(struct.pack("<III",0x46546C67,2,20+len(encoded)+len(remainder))+struct.pack("<II",len(encoded),0x4E4F534A)+encoded+remainder)
 
 
-def author_upper(arm,cream,teal,dark,copper,visor,eye,shoulder,elbow,wrist,rshoulder,relbow,rwrist):
+def orb_hand(arm,cream,teal,dark,copper,bone,wrist,thumb_side):
+    """The articulated hand, posed for the wrist: bone +Y along the fingers, +Z out of the palm, thumb on `thumb_side` of bone X."""
+    at=lambda x,y,z:(wrist[0]+x,wrist[1]+y-1.04,wrist[2]+z+.23)
+    skin(ellipsoid("Curved palm supporting the orb",at(0,1.04,-.245),(.14,.052,.125),dark),arm,bone)
+    skin(ellipsoid("Palm porcelain back armor",at(0,1.018,-.245),(.13,.026,.115),cream),arm,bone)
+    for x in (-.05,0,.05):
+        tip_z=-.23-math.sqrt((.10465342044830322+.012)**2-x**2-.03**2)
+        points=[at(x,1.05,-.275),at(x,1.075,-.315),at(x,1.115,tip_z-.008),at(x,1.14,tip_z)]
+        for i,(a,b) in enumerate(zip(points,points[1:])):
+            skin(rod("Gripping finger phalange "+str(i),a,b,.012,cream if i!=1 else teal),arm,bone)
+            skin(sphere("Gripping finger dark knuckle",a,.014,dark,16),arm,bone)
+        skin(sphere("Gripping finger pad",points[-1],.013,dark,16),arm,bone)
+    thumb=[at(thumb_side*.055,1.045,-.22),at(thumb_side*.098,1.078,-.22),at(thumb_side*.093,1.12,-.23)]
+    for a,b in zip(thumb,thumb[1:]):
+        skin(rod("Opposing thumb phalange",a,b,.014,cream),arm,bone)
+        skin(sphere("Opposing thumb knuckle",a,.016,copper,16),arm,bone)
+
+
+def author_upper(arm,cream,teal,dark,copper,visor,eye,shoulder,elbow,wrist,rshoulder,relbow,rwrist,right_hand_shift=(0,0,0),boulder_hands=False):
     """Arms, torso and head shared by the Light Keeper and the Boulder robot."""
     # Continuous weighted skin bends visibly across the elbow, with 2 influences.
     sleeve("Left arm continuous deforming bellows",(shoulder,elbow,wrist),("UpperArm","Forearm"),arm,dark)
@@ -482,21 +501,14 @@ def author_upper(arm,cream,teal,dark,copper,visor,eye,shoulder,elbow,wrist,rshou
             for side in (-1,1):
                 skin(rod(prefix+" copper bearing washer",point+pole*side*.065,point+pole*side*.079,radius,copper),arm,bone)
                 skin(rod(prefix+" hexagonal bearing hub",point+pole*side*.080,point+pole*side*.087,radius*.37,dark,6),arm,bone)
-    skin(ellipsoid("Curved palm supporting the orb",(-.48,1.04,-.245),(.14,.052,.125),dark),arm,"Hand")
-    skin(ellipsoid("Palm porcelain back armor",(-.48,1.018,-.245),(.13,.026,.115),cream),arm,"Hand")
-    for x in (-.53,-.48,-.43):
-        tip_z=-.23-math.sqrt((.10465342044830322+.012)**2-(x+.48)**2-.03**2)
-        points=[(x,1.05,-.275),(x,1.075,-.315),(x,1.115,tip_z-.008),(x,1.14,tip_z)]
-        for i,(a,b) in enumerate(zip(points,points[1:])):
-            skin(rod("Gripping finger phalange "+str(i),a,b,.012,cream if i!=1 else teal),arm,"Hand")
-            skin(sphere("Gripping finger dark knuckle",a,.014,dark,16),arm,"Hand")
-        skin(sphere("Gripping finger pad",points[-1],.013,dark,16),arm,"Hand")
-    thumb=[(-.425,1.045,-.22),(-.382,1.078,-.22),(-.387,1.12,-.23)]
-    for a,b in zip(thumb,thumb[1:]):
-        skin(rod("Opposing thumb phalange",a,b,.014,cream),arm,"Hand")
-        skin(sphere("Opposing thumb knuckle",a,.016,copper,16),arm,"Hand")
-    skin(box("Right gripper",(.29,.675,-.075),(.105,.08,.09),teal,.018),arm,"RightHand")
-    resting_hand_details(arm,cream,teal,dark,copper)
+    if boulder_hands:
+        # A climber needs a real left hand and right hand: both hands are this one hand, with the thumb on opposite sides.
+        orb_hand(arm,cream,teal,dark,copper,"Hand",wrist,-1)
+        orb_hand(arm,cream,teal,dark,copper,"RightHand",rwrist,1)
+    else:
+        orb_hand(arm,cream,teal,dark,copper,"Hand",wrist,1)
+        skin(box("Right gripper",tuple(v+d for v,d in zip((.29,.675,-.075),right_hand_shift)),(.105,.08,.09),teal,.018),arm,"RightHand")
+        resting_hand_details(arm,cream,teal,dark,copper,right_hand_shift)
 
     skin(torso_shell(cream),arm,"Body")
     skin(curved_chest(teal),arm,"Body")
@@ -884,7 +896,11 @@ def author_legs_boulder(arm,cream,teal,dark,copper):
 def boulder_bones():
     """(name, head, tail, parent) for every bone, in glTF coordinates. Hips carries the legs and the torso."""
     shoulder,elbow,wrist=(-.24,1.03,0),(-.44,.84,-.08),(-.48,1.04,-.23)
-    rshoulder,relbow,rwrist=(.25,1.03,.01),(.34,.82,.05),(.29,.70,-.06)
+    # A climber has equal arms. The right arm keeps the relaxed directions of its old pose, at the left arm's lengths, and
+    # its shoulder mirrors the left one. The hand moves with the wrist.
+    rshoulder=(-shoulder[0],shoulder[1],shoulder[2])
+    relbow=tuple(a+d*math.dist(shoulder,elbow)/math.dist((.09,-.21,.04),(0,0,0)) for a,d in zip(rshoulder,(.09,-.21,.04)))
+    rwrist=tuple(a+d*math.dist(elbow,wrist)/math.dist((-.05,-.12,-.11),(0,0,0)) for a,d in zip(relbow,(-.05,-.12,-.11)))
     defs=[("Root",(0,0,0),(0,.20,0),None),
           ("Hips",(0,.66,.025),(0,.70,.02),"Root"),
           ("Body",(0,.70,.02),(0,1.10,.02),"Hips"),
@@ -894,7 +910,7 @@ def boulder_bones():
           ("Hand",wrist,(-.48,1.04,-.34),"Forearm"),
           ("RightUpperArm",rshoulder,relbow,"Body"),
           ("RightForearm",relbow,rwrist,"RightUpperArm"),
-          ("RightHand",rwrist,(.29,.65,-.09),"RightForearm")]
+          ("RightHand",rwrist,(rwrist[0],rwrist[1],rwrist[2]-.11),"RightForearm")]
     for side,label in ((-1,"Left"),(1,"Right")):
         hip,knee,ankle,ball,tip=leg_points(side)
         defs+=[(label+"UpperLeg",hip,knee,"Hips"),(label+"LowerLeg",knee,ankle,label+"UpperLeg"),
@@ -913,6 +929,7 @@ def boulder_report():
         "chains":{"leftArm":["Body","UpperArm","Forearm","Hand"],"rightArm":["Body","RightUpperArm","RightForearm","RightHand"],
                   "leftLeg":["Hips","LeftUpperLeg","LeftLowerLeg","LeftFoot"],"rightLeg":["Hips","RightUpperLeg","RightLowerLeg","RightFoot"]},
         "hinges":{"knee":"bone X axis = world X in the rest pose","ankle":"bone X axis","toe":"bone X axis","hip":"ball joint"},
+        "hands":{"fingers":"bone +Y","palm":"bone +Z","thumb":{"Hand":"bone -X","RightHand":"bone +X"}},
         "ankleHeightAboveSole":ANKLE_Y,
         "hip":[0,HIP_Y,HIP_Z],"knee":[LEG_X,KNEE_Y,KNEE_Z],"ankle":[LEG_X,ANKLE_Y,ANKLE_Z],"ball":[LEG_X,BALL[0],BALL[1]],"toeTip":[LEG_X,TOE_TIP[0],TOE_TIP[1]],
         "upperLegLength":round(math.dist((0,HIP_Y,HIP_Z),(0,KNEE_Y,KNEE_Z)),4),"lowerLegLength":round(math.dist((0,KNEE_Y,KNEE_Z),(0,ANKLE_Y,ANKLE_Z)),4),
@@ -1047,7 +1064,8 @@ def build_boulder(preview=None):
         arm["copyright"]="Copyright 2026 Scott Campbell. Original Margo Engine Boulder robot. Apache-2.0."
         arm["forward"]="glTF -Z"
         arm["boulder"]=json.dumps(boulder_report(),separators=(",",":"))
-        author_upper(arm,cream,teal,dark,copper,visor,eye,shoulder,elbow,wrist,rshoulder,relbow,rwrist)
+        author_upper(arm,cream,teal,dark,copper,visor,eye,shoulder,elbow,wrist,rshoulder,relbow,rwrist,
+                     tuple(a-b for a,b in zip(rwrist,(.29,.70,-.06))),True)
         author_legs_boulder(arm,cream,teal,dark,copper)
         crossings=crossing_report(scene)
         if any(crossings.values()):raise RuntimeError("Parts cross each other: "+json.dumps(crossings))

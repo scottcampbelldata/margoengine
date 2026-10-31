@@ -97,6 +97,14 @@ export const demos = [
   { id: 'earth', path: 'demos/earth/', ready: "!!window.earthDemo&&window.earthDemo.quality!=='preview'" },
   { id: 'dof', path: 'demos/dof/', ready: '!!window.dofDemo', views: ['high', 'light', 'phone'] },
   { id: 'tonemap', path: 'demos/tonemap/', ready: '!!window.tonemapDemo', views: ['high', 'phone'] },
+  // Device loss only until its baselines are recorded.
+  {
+    id: 'boulder',
+    path: 'demos/boulder/',
+    ready: '!!window.boulder?.readiness',
+    views: ['high', 'phone'],
+    lossOnly: true,
+  },
   // Khronos sample assets: one small view per model, served by a Vite dev server from the repo root
   // (`dev`) because the site build must not ship 250 MB of models. Models that fail to load are left out.
   ...JSON.parse(readFileSync(resolve(import.meta.dirname, '../../examples/assets/khronos/manifest.json'), 'utf8'))

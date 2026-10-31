@@ -118,7 +118,7 @@ const ASSETS = [
   ['examples/assets/boulder-robot-LICENSE.md', 'Boulder demo climber: Margo-made model and rig, no third-party files'],
   [
     'examples/assets/skinning-ik-LICENSE.md',
-    'Light Keeper workshop demo: Margo-made model and rig, Poly Haven surface textures (CC0 1.0)',
+    'Workshop scene from the retired Light Keeper demo, kept for the benchmark HDR and the orb test model: Margo-made model and rig, Poly Haven surface textures (CC0 1.0)',
   ],
   ['tools/create-margo/templates/game/public/pete-LICENSE.txt', 'game starter character (Kay Lousberg, KayKit, CC0)'],
   ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],

@@ -260,6 +260,8 @@ export function demoSources(demo) {
   if (path === 'gameplay-sandbox/') return ['examples/gameplay-sandbox'];
   if (path === 'voxel/') return ['examples/voxel-sandbox'];
   if (path === 'demos/earth/') return ['packages/creative/examples/earth'];
+  if (path === 'demos/boulder/')
+    return ['examples/boulder.html', 'examples/boulder', 'examples/assets/boulder-robot.glb'];
   let m = /^demos\/(dof|tonemap|animator)\/$/.exec(path);
   if (m) return [`packages/${m[1]}/examples`];
   m = /^demos\/([a-z0-9-]+)\.html$/.exec(path);

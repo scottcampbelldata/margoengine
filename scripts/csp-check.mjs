@@ -233,6 +233,7 @@ if (want('site')) {
       '/demos/earth/',
       '/demos/dof/',
       '/demos/tonemap/',
+      '/demos/boulder/',
     ].map((path) => [
       path,
       settle(

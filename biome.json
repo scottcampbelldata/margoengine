@@ -35,10 +35,6 @@
   "assist": { "enabled": false },
   "overrides": [
     {
-      "includes": ["scripts/profile-pbr-locked-drag.mjs"],
-      "javascript": { "globals": ["__lockedDrag"] }
-    },
-    {
       "includes": ["examples/package-benchmarks/tier-presets-gpu.mjs"],
       "javascript": { "globals": ["presetProbe", "presetSpans", "dofDemo", "sandbox"] }
     },

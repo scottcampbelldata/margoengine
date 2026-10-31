@@ -31,6 +31,12 @@ const DEMOS = {
     publicDir: false,
     build: { rollupOptions: { input: resolve(root, 'examples/gallery/khronos.html') } },
   },
+  boulder: {
+    configFile: false,
+    root: 'examples',
+    publicDir: false,
+    build: { rollupOptions: { input: resolve(root, 'examples/boulder.html') } },
+  },
   // What `await addSky(stage)` (margoengine/stage/sky) fetches on top of core + stage.
   'stage-sky': {
     configFile: false,

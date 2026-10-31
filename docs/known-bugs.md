@@ -4,6 +4,20 @@ What is known to be wrong or not yet proven, and what it would take to close eac
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
 
+## Boulder demo
+
+### The robot's arm shows a copper piston through its shell at close range
+
+- **What:** in the Boulder demo, from the nearest orbit distance (1.2 m), a copper rod shows through the upper arm shell
+  and the shell has a jagged edge near the elbow. It does not show from the default view, and it does not affect the
+  collision results, which use the link hulls.
+- **Repro:** `npm run build:boulder`, then `node scripts/test-boulder-browser.mjs --shots=<dir> --closeups`, and open
+  `boulder-high-close-right.png` and `boulder-high-close-left.png`.
+- **Cause, not yet confirmed:** the piston, washers and hubs in `examples/assets/source/skinning_ik/build_robot.py` are
+  not in its `NO_CROSSING` list, so the crossing check in that script does not see them.
+- **Needed to close:** decide whether this model stays. If it does, add those parts to `NO_CROSSING`, fix what the check
+  then reports and rebuild the GLB. If another model replaces it, this entry goes with the old model.
+
 ## Blocked on hardware we do not have
 
 These features pass their tests against the published specifications, but the only real check is a device the project

@@ -47,7 +47,6 @@
     "scripts/test-earth-streaming.js": 1,
     "scripts/test-helmet-streaming.js": 1,
     "scripts/test-no-webgpu-browser.mjs": 1,
-    "scripts/test-skinning-ik-motion-browser.js": 7,
     "scripts/test-taa-pbr-storage.js": 1,
     "scripts/test-views-browser.mjs": 1,
     "scripts/visual-regression.js": 2,

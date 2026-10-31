@@ -20,6 +20,7 @@ All pages need a browser with WebGPU. A page shows a short notice when WebGPU is
 
 | Page | What it shows |
 | --- | --- |
+| [boulder.html](boulder.html) | A robot climbs a wall: IK that keeps its arms clear of the wall and itself ([details](boulder/README.md)) |
 | [animation-formats.html](animation-formats.html) | Collada skins and glTF animation pointers |
 | [batched-mesh.html](batched-mesh.html) | Many shapes drawn in one call |
 | [character-animation.html](character-animation.html) | A walking robot with blendable expressions |
@@ -32,7 +33,6 @@ All pages need a browser with WebGPU. A page shows a short notice when WebGPU is
 | [minimap.html](minimap.html) | A second camera view as a minimap |
 | [robot-expressive.html](robot-expressive.html) | The same character study as a standalone page |
 | [scene-targets.html](scene-targets.html) | Several render targets with named outputs |
-| [skinning-ik.html](skinning-ik.html) | Skinning and IK in a small animated scene ([details](skinning-ik/README.md)) |
 | [split-screen.html](split-screen.html) | Two players, two views, render layers |
 | [texture-formats.html](texture-formats.html) | TGA, TIFF, KTX and DDS textures |
 | [tokyo-diorama.html](tokyo-diorama.html) | A street corner animated in Blender and played back by the animation package |

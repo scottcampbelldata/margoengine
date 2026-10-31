@@ -1,0 +1,140 @@
+:root {
+  --ink: #f3ece0;
+  --dim: #d3c7b5;
+  --ground: #1f1a14;
+  --panel: #231d16f2;
+  --line: #6d5f4c;
+  --chalk: #f4efe4;
+  --route: #d4432f;
+  --display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+  --text: 'Avenir Next', 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 16px/1.5 var(--text);
+  overflow: hidden;
+}
+#viewport {
+  position: fixed;
+  inset: 0;
+}
+canvas {
+  display: block;
+  touch-action: none;
+  outline-offset: -4px;
+}
+aside {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  width: min(330px, calc(100% - 32px));
+  max-height: calc(100svh - 40px);
+  overflow: auto;
+  padding: 18px 20px;
+  background: var(--panel);
+  border-left: 4px solid var(--route);
+}
+h1 {
+  margin: 0 0 4px;
+  font: 400 40px/1.05 var(--display);
+  letter-spacing: 0;
+}
+p {
+  margin: 0 0 12px;
+}
+#status {
+  color: var(--dim);
+  min-height: 48px;
+  margin: 12px 0 0;
+}
+#error {
+  color: #ffc9a8;
+  margin: 8px 0 0;
+}
+#error:empty {
+  display: none;
+}
+button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--chalk);
+}
+button[aria-pressed='true'] {
+  background: var(--chalk);
+  border-color: var(--chalk);
+  color: #1f1a14;
+}
+.primary {
+  width: 100%;
+  background: var(--route);
+  border-color: var(--route);
+  color: #fff;
+  background: #b5301e;
+  font-weight: 600;
+}
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.group[hidden] {
+  display: none;
+}
+.group button {
+  flex: 1 1 auto;
+}
+kbd {
+  font: inherit;
+  opacity: 0.75;
+}
+summary {
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+small {
+  display: block;
+  margin-top: 10px;
+  font-size: 16px;
+  color: var(--dim);
+}
+:focus-visible {
+  outline: 3px solid var(--chalk);
+  outline-offset: 2px;
+}
+.plain {
+  position: absolute;
+  inset: 20px;
+}
+@media (max-width: 600px) {
+  aside {
+    left: 16px;
+    right: 16px;
+    bottom: 12px;
+    width: auto;
+    max-height: 52svh;
+    padding: 12px 14px;
+  }
+  h1 {
+    font-size: 30px;
+  }
+  #status {
+    min-height: 0;
+    margin-top: 8px;
+  }
+}

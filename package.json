@@ -239,7 +239,7 @@
     "test:frame-alloc:nodes": "node scripts/frame-alloc-nodes.mjs",
     "site:check": "node scripts/site-check.mjs",
     "dev:ik": "vite --host 127.0.0.1 --port 5191 --strictPort",
-    "build:ik": "npm run build:packages && node scripts/build-skinning-ik.mjs",
+    "build:boulder": "npm run build:packages && node scripts/build-boulder.mjs",
     "build:tokyo": "node scripts/build-tokyo-diorama.mjs",
     "test:tokyo": "node scripts/tokyo-diorama-browser-test.mjs",
     "test:gallery:browser": "node scripts/test-gallery-browser.mjs",

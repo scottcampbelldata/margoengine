@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { convexGeometry } from '@margoengine/geometry/extras';
 import { GLTFAsset, parseGLTFAsync } from '@margoengine/gltf-pro';
 import { buildBoulderAssets } from '../scripts/build-boulder-assets.mjs';
+import { CHARACTER } from '../examples/boulder/rig.ts';
 import { headless, headlessModels } from './support/pbr-snapshot.js';
 
 const require = createRequire(import.meta.url),
@@ -52,6 +53,7 @@ const skin = doc.skins[0],
     return parent < 0 ? null : doc.nodes[parent].name;
   };
 
+const dotAxes = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const primitives = doc.meshes.flatMap((m) => m.primitives);
 const vertexData = primitives.map((p) => ({
   positions: asset.accessor(p.attributes.POSITION),
@@ -119,6 +121,81 @@ test('knee, ankle and toe bend about the world X axis', () => {
       const { xAxis } = world(`${side}${joint}`);
       assert.ok(xAxis[0] > 0.999, `${side}${joint} local X axis is world X (${xAxis.map((v) => v.toFixed(3))})`);
     }
+});
+
+// Which way the parts face at rest. The climber's code aims each bone by these axes, so a model that disagrees with them
+// comes out with a knee bent backward or a palm to the room, and passes every clearance check while it does.
+const boneAxis = (name, axis) => world(name).r[axis],
+  // The vertices a joint owns, in that joint's own space, optionally of one material.
+  ownedInBoneSpace = (name, material) => {
+    const out = [],
+      j = index(name),
+      m = ibm.subarray(j * 16, j * 16 + 16);
+    for (const [p, primitive] of primitives.entries()) {
+      if (material && doc.materials[primitive.material].name !== material) continue;
+      const { positions, joints: jn, weights } = vertexData[p];
+      for (let i = 0; i < positions.length / 3; i++) {
+        let owned = false;
+        for (let k = 0; k < 4; k++) if (jn[i * 4 + k] === j && weights[i * 4 + k] >= 0.5) owned = true;
+        if (!owned) continue;
+        const [x, y, z] = [positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]];
+        out.push([0, 1, 2].map((a) => m[a] * x + m[a + 4] * y + m[a + 8] * z + m[a + 12]));
+      }
+    }
+    return out;
+  },
+  mean = (points, axis) => points.reduce((sum, p) => sum + p[axis], 0) / points.length;
+
+test('at rest the pelvis and chest face the same way, with the character forward at -Z and its right at +X', () => {
+  for (const name of ['Hips', 'Body']) {
+    const x = boneAxis(name, 0);
+    assert.ok(x[0] > 0.99, `${name} bone X is the character's right: ${x}`);
+  }
+  assert.ok(dotAxes(boneAxis('Hips', 2), boneAxis('Body', 2)) > 0.99, 'pelvis and chest share a forward');
+});
+
+test('at rest each knee bends forward, each foot points forward, and the toe tip is where the rig says', () => {
+  for (const side of ['Left', 'Right']) {
+    const hip = world(`${side}UpperLeg`).position,
+      knee = world(`${side}LowerLeg`).position,
+      ankle = world(`${side}Foot`).position,
+      ball = world(`${side}Toe`).position;
+    assert.ok(knee[2] < (hip[2] + ankle[2]) / 2 - 0.01, `${side} knee is forward of the leg line`);
+    assert.ok(ball[2] < ankle[2] - 0.05, `${side} toe joint is forward of the ankle: ${ball[2]} against ${ankle[2]}`);
+    // Toe space is translation from the toe joint: the rig's tip is measured from the ankle.
+    const toe = ownedInBoneSpace(`${side}Toe`).map((p) => [
+        0,
+        p[0] * boneAxis(`${side}Toe`, 0)[1] + p[1] * boneAxis(`${side}Toe`, 1)[1] + p[2] * boneAxis(`${side}Toe`, 2)[1],
+        p[0] * boneAxis(`${side}Toe`, 0)[2] + p[1] * boneAxis(`${side}Toe`, 1)[2] + p[2] * boneAxis(`${side}Toe`, 2)[2],
+      ]),
+      tip = Math.min(...toe.map((p) => p[2])) + ball[2] - ankle[2];
+    assert.ok(Math.abs(tip - CHARACTER.toeTip[2]) < 0.02, `${side} toe tip ${tip} against ${CHARACTER.toeTip[2]}`);
+  }
+});
+
+test('both hands are built the same way and mirrored: fingers, palm and thumb lie on the axes the rig aims by', () => {
+  const { fingers, palm, thumb } = CHARACTER.hand,
+    along = (p, axis) => dotAxes(p, axis);
+  for (const [i, name] of ['Hand', 'RightHand'].entries()) {
+    // The same rest axes on both, so one aim works for both.
+    assert.ok(boneAxis(name, 0)[0] > 0.99, `${name} bone X is world X`);
+    assert.ok(boneAxis(name, 1)[2] < -0.99, `${name} bone Y points forward at rest`);
+    assert.ok(boneAxis(name, 2)[1] > 0.99, `${name} bone Z points up at rest`);
+    const all = ownedInBoneSpace(name),
+      cream = ownedInBoneSpace(name, 'Boulder / porcelain enamel'),
+      copper = ownedInBoneSpace(name, 'Boulder / copper joints');
+    assert.ok(all.length > 100 && cream.length > 20 && copper.length > 20, `${name} has a hand to measure`);
+    const out = all.map((p) => along(p, fingers));
+    assert.ok(Math.max(...out) > 2 * -Math.min(...out), `${name}: the fingers lie along +Y of the bone`);
+    // Fingers curl toward the palm, and the porcelain back plate is the far side from it.
+    const ends = all.filter((p) => along(p, fingers) > 0.09),
+      curl = mean(ends, 2) * palm[2],
+      back = Math.min(...cream.map((p) => along(p, palm)));
+    assert.ok(curl > 0.02, `${name}: the finger ends at ${curl} curl to the palm side`);
+    assert.ok(back < -0.01, `${name}: the back plate at ${back} is opposite the palm`);
+    // The copper knuckles are the thumb's.
+    assert.ok(mean(copper, 0) * thumb[i][0] > 0.02, `${name}: the thumb at ${mean(copper, 0)} is on its own side`);
+  }
 });
 
 test('skin weights are normalized, use at most four joints, and stay clean at the hips', () => {

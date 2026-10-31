@@ -11,7 +11,7 @@ ink artwork rasterized in Blender and baked onto the existing case surface.
 Its editable generator, image, and authoring provenance are retained under
 `source/skinning_ik/dedication.py` and `source/skinning_ik/dedication/`.
 
-The exported `skinning-ik.glb` combines that original work with the following
+The exported workshop model (no longer shipped; `build_robot.py` rebuilds it) combined that original work with the following
 photographic PBR surface maps from [Poly Haven](https://polyhaven.com):
 
 - [Wood Table Worn](https://polyhaven.com/a/wood_table_worn), used on the wood

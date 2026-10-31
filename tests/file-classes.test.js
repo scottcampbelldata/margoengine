@@ -36,7 +36,7 @@ test('each class places the files it is meant for, checked in order', () => {
     proof: ['examples/package-benchmarks/proofs/run.mjs', 'examples/package-benchmarks/proofs/baselines/q.json'],
     'quality-baseline': ['scripts/quality/baselines/sizes.json'],
     python: ['python/margoengine/_figure.py', 'python/frontend/figure.ts'],
-    asset: ['examples/assets/skinning-ik.glb'],
+    asset: ['examples/assets/boulder-robot.glb'],
     script: [
       'scripts/quiet-gate.mjs',
       'scripts/support/msaa-blend-repeat.html',

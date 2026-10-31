@@ -48,19 +48,6 @@ chain is `UpperArm → Forearm → Hand`. Rest world joint positions are shoulde
 `Head` pivots at `[0, 1.15, 0]`. The four-second idle clip only rotates Head;
 the arm bind pose stays fixed for the optional IK solver.
 
-`extract_ik_shapes.py` refreshes `examples/skinning-ik/body-ik-shapes.ts` from
-the exported rigid arm vertices using Blender's in-memory convex hull operation.
-It preserves the exact convex support of the exported geometry and exempts
-only the authored shoulder cap, spherical bearing, washers, axle, and hex hubs.
-The analytic primitive union uses a one-micrometre float guard and retains the
-visible proximal shaft that a broad shoulder sphere would hide. Run its `extract()`
-function in Blender after changing arm geometry; it does not change
-the open scene. The matching saved Blender scene must be open at bind frame 1:
-its native loose components produce separate `upperArmPieces` for the bellows,
-piston barrel, sculpted armor, and copper shaft. Keeping those four hulls separate
-avoids a fictitious solid bridge across the gaps between parts. The smooth skin
-sleeve remains an animated rendering surface.
-
 Both rubber boot soles are `0.010 m` tall, centered at `Y=0.004`, with a
 `0.003 m` bevel. Their bottom `Y=-0.001` embeds one millimetre into the island's
 `Y=0` stone top; their top `Y=0.009` meets the porcelain toe underside.
