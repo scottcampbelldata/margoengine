@@ -91,6 +91,12 @@ export interface ViewTile {
     readonly weights: readonly Uint8Array[];
 }
 
+export function clipmapLevels(bounds: readonly [number, number, number, number], radius: number, clipmap?: {
+    readonly cellSize?: number;
+    readonly resolution?: number;
+    readonly levels?: number;
+}): number;
+
 export function groundMaterials(biomes: readonly BiomeDefinition[]): string[];
 
 export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: readonly string[]): Uint8Array;
@@ -124,6 +130,7 @@ interface BiomeDefinition {
     };
     readonly tint?: ColorVariation;
     readonly priority?: number;
+    readonly weight?: number;
     readonly zones?: readonly string[];
 }
 

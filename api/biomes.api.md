@@ -17,6 +17,7 @@ export interface BiomeDefinition {
     };
     readonly tint?: ColorVariation;
     readonly priority?: number;
+    readonly weight?: number;
     readonly zones?: readonly string[];
 }
 
