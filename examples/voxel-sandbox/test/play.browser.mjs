@@ -1253,11 +1253,15 @@ async function plazaEdits() {
   }
   // Aiming again each time: what the held buttons left in front of the player depends on the seed, and a click at nothing
   // sends nothing.
-  for (let i = 0; i < 5 || ((await sentCount()) < 8 && i < 20); i++) {
+  // Eight clicks, each at a block in reach, so each sends one edit; the test then waits until the page has sent them
+  // all (no repeat until a count is reached).
+  const sentBeforeClicks = await sentCount();
+  for (let i = 0; i < 8; i++) {
     assert.ok(await aimDown(), 'a block in reach');
     await click(i % 2 ? 'right' : 'left');
     await pause(700);
   }
+  await tab.waitForFunction((n) => window.__sent.length >= n, sentBeforeClicks + 8, { timeout: 10_000 });
   await pause(1500);
   const edits = await sentCount();
   assert.ok(edits >= 8, `the held buttons and the clicks sent ${edits} edits`);
