@@ -181,4 +181,9 @@ capacity bench: a server process, bots in several processes joining at 25 per se
 view, then 30 s of measured play; counts rise until the 20 Hz budget breaks. Options: see the top of
 [bench/run.mjs](bench/run.mjs).
 
+Against a running server, through whatever proxy stands in front of it: `node bench/run.mjs --url=wss://host
+--metrics=https://host/metrics --blocks=path/to/blocks.mjs` (the token in `PLAZA_METRICS_TOKEN`). Bots ask `/join` as a page
+does, send the page's `Origin`, stay connected from step to step and read server numbers from `/metrics`; see
+[bench/remote.mjs](bench/remote.mjs). `VoxelBot` and `connectWebSocket` accept `wss://` URLs and request headers.
+
 Apache-2.0. Build and tests: `npm test --workspace @margoengine/voxel-net`.

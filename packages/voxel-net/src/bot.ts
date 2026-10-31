@@ -11,7 +11,7 @@ import { connectWebSocket, type WebSocketConnection } from './websocket.js';
 
 /** Options of {@link VoxelBot.connect}. */
 export interface VoxelBotOptions {
-  /** The server, `ws://host:port`. */
+  /** The server, `ws://host:port` or `wss://host/path`. */
   url: string | URL;
   /** The server's block types. */
   blocks: BlockTypes;
@@ -29,6 +29,10 @@ export interface VoxelBotOptions {
   home?: readonly [x: number, z: number];
   /** See `home`, in blocks. Default 64. */
   leash?: number;
+  /** Hold the sprint key while walking back past the leash, so a far `home` is reached sooner. Default false. */
+  sprintHome?: boolean;
+  /** Extra request headers of the connection, such as the `Origin` a server's `origins` option asks for. Default none. */
+  headers?: Record<string, string>;
   /** Random numbers in [0, 1). Default Math.random. */
   random?: () => number;
 }
@@ -62,11 +66,14 @@ export class VoxelBot {
   readonly edits: VoxelBotEdit[] = [];
   /** The close code once the connection ended. */
   closeCode: number | undefined;
+  /** The close reason once the connection ended. */
+  closeReason: string | undefined;
   readonly #random: () => number;
   readonly #interval: number;
   readonly #place: number;
   readonly #home: readonly [number, number] | undefined;
   readonly #leash: number;
+  readonly #sprintHome: boolean;
   #yaw: number;
   #turn = 0;
   #editIn: number;
@@ -88,6 +95,7 @@ export class VoxelBot {
     this.#place = options.place ?? (blocks.table.some((t) => t.name === 'stone') ? blocks.id('stone') : 1);
     this.#home = options.home;
     this.#leash = options.leash ?? 64;
+    this.#sprintHome = options.sprintHome ?? false;
     this.#yaw = this.#random() * 2 * Math.PI;
     this.#editIn = this.#interval * (0.5 + this.#random());
     this.world = new VoxelWorld({ blocks });
@@ -106,8 +114,9 @@ export class VoxelBot {
       this.client.receive(data);
       if (this.times.welcome === undefined && this.client.welcome) this.times.welcome = clock();
     };
-    connection.onclose = (code) => {
+    connection.onclose = (code, reason) => {
       this.closeCode = code;
+      this.closeReason = reason;
       this.client.close();
     };
   }
@@ -117,7 +126,7 @@ export class VoxelBot {
    */
   static async connect(options: VoxelBotOptions): Promise<VoxelBot> {
     const connect = clock(),
-      connection = await connectWebSocket(options.url);
+      connection = await connectWebSocket(options.url, options.headers ? { headers: options.headers } : {});
     return new VoxelBot(connection, options, { connect, open: clock() });
   }
   /** Plays `dt` seconds: steers, moves through the client, and edits when its timer runs out. */
@@ -128,7 +137,8 @@ export class VoxelBot {
     const p = player.position;
     // Steer: a new random heading every 3-8 s, or towards home when past the leash, or when stuck for a while.
     this.#turn -= dt;
-    if (this.#home && (p[0] - this.#home[0]) ** 2 + (p[2] - this.#home[1]) ** 2 > this.#leash ** 2) {
+    const away = !!this.#home && (p[0] - this.#home[0]) ** 2 + (p[2] - this.#home[1]) ** 2 > this.#leash ** 2;
+    if (this.#home && away) {
       if (this.#turn <= 0) {
         this.#yaw = Math.atan2(-(this.#home[0] - p[0]), -(this.#home[1] - p[2])) + (this.#random() - 0.5);
         this.#turn = 2;
@@ -150,7 +160,8 @@ export class VoxelBot {
       this.#since = 0;
     }
     this.#jump -= dt;
-    const keys = Keys.forward | (this.#jump > 0 || player.inLiquid ? Keys.jump : 0);
+    const keys =
+      Keys.forward | (this.#jump > 0 || player.inLiquid ? Keys.jump : 0) | (away && this.#sprintHome ? Keys.sprint : 0);
     client.update(dt, { keys, yaw: this.#yaw, pitch: 0 });
     if (this.#interval > 0 && (this.#editIn -= dt) <= 0) {
       this.#editIn += this.#interval;

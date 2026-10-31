@@ -1,8 +1,10 @@
 // A WebSocket (RFC 6455) for Node, written for @margoengine/voxel-net on node:http and node:crypto alone (design:
 // packages/voxel-net/DESIGN.md, "Transport"). Binary messages only: a text frame closes the connection with 1003. The
-// server side accepts an upgrade request; the client side (bots, tests) connects to a ws:// URL. No extensions.
+// server side accepts an upgrade request; the client side (bots, tests) connects to a ws:// or wss:// URL. No
+// extensions.
 import { createHash, randomBytes, randomFillSync } from 'node:crypto';
 import { type IncomingMessage, request } from 'node:http';
+import { request as requestTls } from 'node:https';
 import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { MargoError } from '@margoengine/math/errors';
@@ -59,6 +61,8 @@ export class WebSocketConnection {
     this.#onclose = handler;
     this.#schedule();
   }
+  /** Called when a pong arrives: the answer to {@link WebSocketConnection.ping}. Default none. */
+  onpong: (() => void) | undefined;
   /** Bytes read from the socket, frame headers included. */
   bytesIn = 0;
   /** Bytes written to the socket, frame headers included. */
@@ -291,7 +295,8 @@ export class WebSocketConnection {
         this.#shut();
       }
       this.#end(code, reason);
-    } else if (opcode !== PONG) this.#fail(1002, `unknown opcode ${opcode}`);
+    } else if (opcode === PONG) this.onpong?.();
+    else this.#fail(1002, `unknown opcode ${opcode}`);
   }
 }
 
@@ -383,8 +388,8 @@ export interface ConnectWebSocketOptions extends WebSocketOptions {
 }
 
 /**
- * Opens a WebSocket to a `ws://host:port/path` URL from Node (bots and tests; browsers have their own WebSocket).
- * @throws TypeError (rejects) when `url` is not a ws:// URL.
+ * Opens a WebSocket to a `ws://host:port/path` or `wss://host/path` URL from Node (bots and tests; browsers have their own WebSocket).
+ * @throws TypeError (rejects) when `url` is neither a ws:// nor a wss:// URL.
  * @throws MargoError `'failed'` (rejects) when the server refuses the upgrade (the message holds the server's reason)
  * or answers with a wrong accept key.
  */
@@ -393,15 +398,17 @@ export function connectWebSocket(
   options: ConnectWebSocketOptions = {},
 ): Promise<WebSocketConnection> {
   const target = new URL(url);
-  if (target.protocol !== 'ws:')
+  if (target.protocol !== 'ws:' && target.protocol !== 'wss:')
     return Promise.reject(
-      new TypeError(`connectWebSocket needs a ws:// URL, not ${target.protocol}; use ws://host:port`),
+      new TypeError(`connectWebSocket needs a ws:// or wss:// URL, not ${target.protocol}; use ws://host:port`),
     );
+  const secure = target.protocol === 'wss:',
+    open = secure ? requestTls : request;
   const key = randomBytes(16).toString('base64');
   return new Promise((resolve, reject) => {
-    const req = request({
+    const req = open({
       host: target.hostname,
-      port: target.port || 80,
+      port: target.port || (secure ? 443 : 80),
       path: target.pathname + target.search,
       headers: {
         ...options.headers,

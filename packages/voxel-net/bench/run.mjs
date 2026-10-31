@@ -15,6 +15,11 @@ const arg = (name, fallback) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
   return hit ? hit.slice(name.length + 3) : fallback;
 };
+// --url: the real network mode, no server forked (remote.mjs).
+if (arg('url')) {
+  const { runRemote } = await import('./remote.mjs');
+  await runRemote(arg);
+}
 const options = {
   scenarios: arg('scenarios', 'spread,crowd').split(','),
   counts: arg('counts', '50,100,200,400').split(',').map(Number),
