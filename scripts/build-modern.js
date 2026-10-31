@@ -13,7 +13,7 @@ import { packageDeclarations, packageRuntime } from './package-declarations.js';
 import { writeServerEntries } from './react-server-entries.js';
 import { importMap } from './umbrella.mjs';
 import { copyLegal } from './package-legal.js';
-import { recordScope } from './support/record-reads.mjs';
+import { recordJob, recordScope } from './support/record-reads.mjs';
 const precompiled = process.argv.includes('--precompiled');
 // --only=post,lines rebuilds just those packages (their dependencies must already be built) and skips the size records.
 const only = process.argv
@@ -184,7 +184,8 @@ await buildInDependencyOrder(
   packageOrder(manifests).filter((name) => !only || only.includes(name)),
   packageDependencies(manifests),
   jobs,
-  buildPackage,
+  // Under verify's recorder each package's reads form one job, so its build has its own content key, side by side too.
+  (name) => recordJob(`package:${name}`, () => buildPackage(name)),
 );
 if (only) process.exit(0);
 recordScope('size-records');

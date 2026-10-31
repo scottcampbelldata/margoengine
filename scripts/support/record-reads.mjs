@@ -7,6 +7,7 @@
 //
 // Known limits, all caught by the uncached nightly (a key it fails is a disagreement): `new Date()` is not seen, and a
 // native program started from inside an npm script is not seen, because npm's own process is not recorded.
+import { AsyncLocalStorage } from 'node:async_hooks';
 import childProcess from 'node:child_process';
 import fs from 'node:fs';
 import { registerHooks, syncBuiltinESMExports } from 'node:module';
@@ -107,6 +108,9 @@ function install(dir) {
   });
   const segments = [newSegment(rawEnv.MARGO_RECORD_SCOPE ?? '')];
   let segment = segments[0];
+  // A job run side by side with others (recordJob) keeps its own segment through its async work.
+  const jobs = new AsyncLocalStorage();
+  const active = () => jobs.getStore() ?? segment;
   const writtenEnv = new Set();
   // Windows reuses process ids within one long step, so the id alone would let a later process overwrite a log.
   const logName = `${process.pid}-${threadId}-${startedAt}-${original.random().toString(36).slice(2, 10)}`;
@@ -117,8 +121,8 @@ function install(dir) {
   const stamp = () => performance.timeOrigin + performance.now();
   const noteRead = (path, kind) => {
     if (path === undefined) return;
-    const entry = segment.reads.get(path);
-    if (entry === undefined) segment.reads.set(path, [kind, stamp()]);
+    const entry = active().reads.get(path);
+    if (entry === undefined) active().reads.set(path, [kind, stamp()]);
     else if (READ_RANK[kind] > READ_RANK[entry[0]]) {
       // The time kept is of the strongest read: an existence check before a tool writes a file is not reading it.
       entry[0] = kind;
@@ -127,11 +131,11 @@ function install(dir) {
   };
   const noteWrite = (path) => {
     if (path === undefined) return;
-    if (!segment.writes.has(path)) segment.writes.set(path, stamp());
+    if (!active().writes.has(path)) active().writes.set(path, stamp());
   };
   const noteCover = (path) => {
     if (path === undefined) return;
-    segment.covers.add(path);
+    active().covers.add(path);
     noteWrite(path);
   };
 
@@ -230,14 +234,14 @@ function install(dir) {
     get(target, key) {
       if (typeof key === 'string') {
         if (pending === key) pending = undefined;
-        else if (!RECORDER_ENV.has(key) && !writtenEnv.has(key) && !segment.env.has(key))
-          segment.env.set(key, target[key] ?? null);
+        else if (!RECORDER_ENV.has(key) && !writtenEnv.has(key) && !active().env.has(key))
+          active().env.set(key, target[key] ?? null);
       }
       return target[key];
     },
     has(target, key) {
-      if (typeof key === 'string' && !RECORDER_ENV.has(key) && !writtenEnv.has(key) && !segment.env.has(key))
-        segment.env.set(key, target[key] ?? null);
+      if (typeof key === 'string' && !RECORDER_ENV.has(key) && !writtenEnv.has(key) && !active().env.has(key))
+        active().env.set(key, target[key] ?? null);
       return key in target;
     },
     set(target, key, value) {
@@ -256,8 +260,8 @@ function install(dir) {
     },
     getOwnPropertyDescriptor(target, key) {
       if (enumeration?.includes(key)) pending = key;
-      else if (typeof key === 'string' && !RECORDER_ENV.has(key) && !writtenEnv.has(key) && !segment.env.has(key))
-        segment.env.set(key, target[key] ?? null);
+      else if (typeof key === 'string' && !RECORDER_ENV.has(key) && !writtenEnv.has(key) && !active().env.has(key))
+        active().env.set(key, target[key] ?? null);
       return Reflect.getOwnPropertyDescriptor(target, key);
     },
   });
@@ -269,7 +273,8 @@ function install(dir) {
     // A child given its own recording folder is its own recording; every other child belongs to this scope.
     if (env?.MARGO_RECORD_DIR === undefined || env.MARGO_RECORD_DIR === rawEnv.MARGO_RECORD_DIR) {
       out.MARGO_RECORD_DIR = rawEnv.MARGO_RECORD_DIR;
-      if (rawEnv.MARGO_RECORD_SCOPE !== undefined) out.MARGO_RECORD_SCOPE = rawEnv.MARGO_RECORD_SCOPE;
+      const scope = jobs.getStore()?.scope ?? rawEnv.MARGO_RECORD_SCOPE;
+      if (scope !== undefined) out.MARGO_RECORD_SCOPE = scope;
     }
     if (!String(out.NODE_OPTIONS ?? '').includes(self))
       out.NODE_OPTIONS = out.NODE_OPTIONS ? `${out.NODE_OPTIONS} ${self}` : self;
@@ -277,11 +282,11 @@ function install(dir) {
   };
   const noteCommand = (text, explicitArgs, options, isFile) => {
     const found = classifyCommand(text, isFile);
-    if (found.kind === 'opaque') segment.opaque.add(found.program);
+    if (found.kind === 'opaque') active().opaque.add(found.program);
     if (found.kind === 'git') {
       const args = [...found.args, ...(explicitArgs ?? [])].map(String);
       const cwd = resolve(options?.cwd instanceof URL ? fileURLToPath(options.cwd) : (options?.cwd ?? process.cwd()));
-      segment.git.set(JSON.stringify([args, cwd]), [args, cwd]);
+      active().git.set(JSON.stringify([args, cwd]), [args, cwd]);
     }
   };
   // Where the options object sits: after the args array, or after an explicit undefined in its place.
@@ -304,7 +309,7 @@ function install(dir) {
     // An allocation probe measures its own heap, and any --import preload, even an empty one, moves its first window by
     // about 200 B per call. So it runs unrecorded, and the mark keeps this scope out of the store.
     if (list?.includes('--expose-gc')) {
-      segment.clocks.set('--expose-gc process', 'allocation probes');
+      active().clocks.set('--expose-gc process', 'allocation probes');
       const options = typeof args[at] === 'object' && args[at] !== null ? args[at] : {},
         env = { ...(options.env ?? rawEnv) };
       env.NODE_OPTIONS = String(env.NODE_OPTIONS ?? '')
@@ -345,7 +350,7 @@ function install(dir) {
     host === '[::1]' ||
     host === '0.0.0.0';
   const noteHost = (host) => {
-    if (!isLocal(host)) segment.net.add(String(host));
+    if (!isLocal(host)) active().net.add(String(host));
   };
   const socketHost = (args) => {
     const first = Array.isArray(args[0]) ? args[0][0] : args[0];
@@ -375,7 +380,7 @@ function install(dir) {
   };
   const noteClock = (what) => {
     if (++clockCalls > CLOCK_BUDGET) {
-      segment.clocks.set(`unattributed ${what}`, what);
+      active().clocks.set(`unattributed ${what}`, what);
       restoreClocks();
       return;
     }
@@ -389,7 +394,7 @@ function install(dir) {
     if (!at) return;
     const file = at[1].startsWith('file:') ? fileURLToPath(at[1]) : at[1];
     if (isClockInfrastructure(file)) return;
-    segment.clocks.set(file, what);
+    active().clocks.set(file, what);
     restoreClocks();
   };
   Date.now = function now() {
@@ -415,7 +420,7 @@ function install(dir) {
       startedAt,
       segments: segments.map((part, index) => ({
         scope: part.scope,
-        seconds: ((segments[index + 1]?.started ?? finished) - part.started) / 1000,
+        seconds: ((part.ended ?? segments[index + 1]?.started ?? finished) - part.started) / 1000,
         reads: [...part.reads],
         writes: [...part.writes],
         covers: [...part.covers],
@@ -440,12 +445,33 @@ function install(dir) {
       segment = newSegment(name);
       segments.push(segment);
     },
+    job(name, work) {
+      if (rawEnv.MARGO_RECORD_SCOPE?.startsWith('test:')) return work();
+      const part = newSegment(name);
+      segments.push(part);
+      return jobs.run(part, async () => {
+        try {
+          return await work();
+        } finally {
+          part.ended = performance.now();
+        }
+      });
+    },
   };
 }
 
 /** Starts a named job in the current recording; does nothing when the process is not being recorded. */
 export function recordScope(name) {
   globalThis[Symbol.for('margoengine.recordReads')]?.scope(name);
+}
+
+/**
+ * Runs `work` as a named job that may overlap other jobs: its reads, writes and children stay under its name.
+ * Without a recording it only runs `work`.
+ */
+export function recordJob(name, work) {
+  const recording = globalThis[Symbol.for('margoengine.recordReads')];
+  return recording ? recording.job(name, work) : work();
 }
 
 const recordDir = process.env.MARGO_RECORD_DIR,

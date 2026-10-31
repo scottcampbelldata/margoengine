@@ -388,3 +388,43 @@ function withoutRecorder() {
   delete env.NODE_OPTIONS;
   return env;
 }
+
+test('jobs side by side keep their own reads and children, even when their work overlaps', (t) => {
+  const { root } = fixture(t, { 'a.js': 'one', 'b.js': 'two', 'shared.js': 'three' });
+  const dir = join(temp(t), 'logs'),
+    script = join(root, 'step.mjs');
+  writeFileSync(
+    script,
+    `import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { recordJob } from ${JSON.stringify(recorder)};
+const pause = () => new Promise((done) => setTimeout(done, 5));
+const job = (name, file) => recordJob(name, async () => {
+  for (let i = 0; i < 3; i++) { readFileSync(file); await pause(); }
+  spawnSync(process.execPath, ['-e', "require('fs').readFileSync(process.argv[1])", 'child-' + file], { stdio: 'ignore' });
+});
+readFileSync('shared.js');
+await Promise.all([job('package:a', 'a.js'), job('package:b', 'b.js')]);
+`,
+  );
+  writeFileSync(join(root, 'child-a.js'), 'x');
+  writeFileSync(join(root, 'child-b.js'), 'y');
+  const result = spawnSync(process.execPath, [script], {
+    cwd: root,
+    env: { ...withoutRecorder(), MARGO_RECORD_DIR: dir, NODE_OPTIONS: `--import=${recorder}` },
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const { scopes } = collectLogs(dir),
+    names = (scope) => [...scopes.get(scope).reads.keys()].map((path) => path.replace(/\\/g, '/').split('/').pop());
+  for (const [scope, own, other] of [
+    ['package:a', 'a.js', 'b.js'],
+    ['package:b', 'b.js', 'a.js'],
+  ]) {
+    assert.ok(names(scope).includes(own), `${scope} read ${own}`);
+    assert.ok(names(scope).includes(`child-${own}`), `${scope}'s child belongs to it`);
+    assert.ok(!names(scope).includes(other), `${scope} did not read ${other}`);
+    assert.ok(!names(scope).includes(`child-${other}`));
+  }
+  assert.ok(names('').includes('shared.js'), 'outside any job stays the step');
+});
