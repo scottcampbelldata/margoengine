@@ -45,6 +45,7 @@ import {
   soloBanner,
 } from './multiplayer.ts';
 import type { PhotoMode } from './photo.ts';
+import type { LoadTiming } from './timing.ts';
 import { isPlazaProtected } from './plaza-area.ts';
 import { buildShapes, buildShowcase, groundY, showcaseReady } from './showcase.ts';
 import { DEFAULT_SEED } from './terrain.ts';
@@ -65,6 +66,8 @@ import {
   toggleHud,
 } from './ui.ts';
 import './style.css';
+
+performance.mark('margo-main');
 
 type Vec3 = [number, number, number];
 declare const GPUBufferUsage: { QUERY_RESOLVE: number; COPY_SRC: number; COPY_DST: number; MAP_READ: number };
@@ -172,11 +175,14 @@ interface Sandbox {
   fillFrames: number[];
   fly(count: number, speed: number): Promise<{ cpu: number[]; stats: Record<string, number | string | boolean> }>;
   gpuTiming(count: number): Promise<number[] | null>;
+  /** With `?timing`: where the seconds of loading went (timing.ts). */
+  readonly timing: LoadTiming | undefined;
 }
 
 async function boot(): Promise<void> {
   if (!navigator.gpu) throw new Error('WebGPU is unavailable: open the sandbox in a browser with WebGPU');
   if (viewName !== null && !view) throw new RangeError(`No view "${viewName}"; use ${Object.keys(VIEWS).join(', ')}`);
+  const timing = params.has('timing') ? new (await import('./timing.ts')).LoadTiming() : undefined;
   if (params.has('reset')) await resetSave();
   let features: GPUFeatureName[] = [];
   if (params.has('gpuTiming')) {
@@ -188,6 +194,7 @@ async function boot(): Promise<void> {
     features,
     camera: { position: [0.5, 40, 0.5], target: [0.5, 40, -1], near: 0.05, far: farFor(distance), fov: 70 },
   });
+  timing?.mark('engine');
   const runtime = engineRuntime(engine);
   if (!deterministic) paceEngine(engine);
   let running = true;
@@ -221,6 +228,8 @@ async function boot(): Promise<void> {
   const outline = lines.add(new Line({ mode: 'segments', positions: cellBox(0, 0, 0), color: '#000000', width: 2 }));
   outline.material.opacity = 0.55;
   outline.visible = false;
+
+  timing?.mark('setup');
 
   // Streaming: the generator worker gets the seed in its URL; a deterministic view keeps nothing. On a server, the
   // server sends the chunks instead.
@@ -838,6 +847,24 @@ async function boot(): Promise<void> {
     if (!ready) fillFrames.push(cpu);
     track(now);
     hud(now);
+    if (timing) {
+      const s = voxels.stats,
+        [px, py, pz] = player.position;
+      if (online?.client.spawned) timing.mark('spawn');
+      timing.frame(cpu, {
+        drew: s.draws > 0,
+        canMove:
+          spawned &&
+          !!world.getChunk(Math.floor(px) >> 5, Math.floor(py) >> 5, Math.floor(pz) >> 5) &&
+          !!world.getChunk(Math.floor(px) >> 5, Math.floor(py - 2) >> 5, Math.floor(pz) >> 5),
+        world: loaded.size,
+        meshed: s.chunks,
+        pending: s.pending,
+        light: lightWork,
+        ready,
+        about: `${tier} tier, view ${distance}, canvas ${canvas.width}x${canvas.height}`,
+      });
+    }
     if (sampler) {
       sampler.out.push(cpu);
       if (!--sampler.left) {
@@ -928,6 +955,7 @@ async function boot(): Promise<void> {
         };
       }),
     gpuTiming: (count) => gpuTiming(engine, count, (on) => (manual = on)),
+    timing,
   };
   Object.assign(window, { voxelSandbox: sandbox });
 
@@ -1056,6 +1084,7 @@ async function boot(): Promise<void> {
     const started = performance.now();
     joinPlaza(routerUrl, AbortSignal.timeout(JOIN_TIMEOUT)).then(
       (answer) => {
+        timing?.mark('join');
         if (answer.kind === 'full') return goSolo('full', answer.online);
         shard = answer.shard;
         worldId = answer.world;
