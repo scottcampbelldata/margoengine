@@ -173,12 +173,6 @@
   "khronos-ToyCar": {
    "status": "same"
   },
-  "light-keeper": {
-   "status": "differs",
-   "over2": 0.0702,
-   "mean": 0.758,
-   "exact": true
-  },
   "minimap": {
    "status": "same",
    "exact": true

@@ -73,7 +73,6 @@ Last recorded 2026-10-30 at 38445c65 on nvidia ampere (msedge 156.0.4314.50); a 
 | `khronos-SheenChair` | model | runs, same pixels | exact | 0.4 ms / 0.5 ms; 16.7 ms / 16.7 ms |
 | `khronos-TextureTransformTest` | model | runs, same pixels | exact | 0.4 ms / 0.6 ms; 16.7 ms / 16.7 ms |
 | `khronos-ToyCar` | model | runs, same pixels | 0.00%, mean 0.000511, max d 1 | 0.4 ms / 0.6 ms; 16.7 ms / 16.7 ms |
-| `light-keeper` | high | runs with differences: d > 2 on 7.02% of pixels, mean d 0.758, max d 226 | exact | 1.5 ms / 2.1 ms; 16.7 ms / 16.7 ms |
 | `minimap` | high | runs, same pixels | exact | 0.5 ms / 0.6 ms; 16.7 ms / 16.7 ms |
 | `night-citadel` | high | runs with differences: d > 2 on 0.20% of pixels, mean d 0.0333, max d 235 | exact | 0.5 ms / 9.2 ms; 16.7 ms / 16.7 ms |
 | `scene-targets` | high | runs, same pixels | exact | 0.4 ms / 0.6 ms; 16.7 ms / 16.7 ms |
@@ -113,7 +112,6 @@ the RTX A6000, 2026-10-30:
 | `voxel-shapes` | 0.23% | 0.003%, 153 |
 
 At 1x MSAA all seven are within the parity rule. The voxel views read the resolved depth for their fog (before the
-layer's fix of 2026-10-30 they also differed through Bloom, voxel night by 1.51% at 1x). Light keeper has no 1x
-setting; its SSAO rebuilds view positions from the resolved depth. Measured with a local build whose native depth
-resolve keeps sample 0 (what the layer's blit keeps) in place of the nearest sample: light keeper then differs on
-0.032% of pixels (its performance readout, now masked) instead of 7.07%, and voxel night on 0.001% instead of 0.22%.
+layer's fix of 2026-10-30 they also differed through Bloom, voxel night by 1.51% at 1x). Measured with a local build whose native depth
+resolve keeps sample 0 (what the layer's blit keeps) in place of the nearest sample, voxel night differs on 0.001% of
+pixels instead of 0.22%.

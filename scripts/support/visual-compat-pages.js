@@ -27,9 +27,7 @@ const views = {
 export const withQuery = (path, query) => (query && path.includes('?') ? `${path}&${query.slice(1)}` : path + query);
 // Site demos the visual check leaves out (no baselines: their native picture is not pinned), compared here all the
 // same, so every demo on the site runs on the layer. The dual viewport page runs both paths itself.
-const viewportReady = "document.querySelector('#viewport')?.dataset.ready==='true'";
-// mask: live readouts painted over (sciviz points' status line states the plot time, light keeper's performance pill
-// its frame rate and heap size).
+// mask: live readouts painted over (sciviz points' status line states the plot time).
 export const extraDemos = [
   ...['compute-lab', 'sciviz-volume', 'sciviz-points', 'sciviz-surface', 'ui-game'].map((id) => ({
     id,
@@ -38,12 +36,6 @@ export const extraDemos = [
     ...(id === 'sciviz-points' ? { mask: ['#status'] } : {}),
   })),
   { id: 'animator', path: 'demos/animator/', ready: '!!window.animatorDemo' },
-  {
-    id: 'light-keeper',
-    path: 'demos/light-keeper/',
-    ready: viewportReady,
-    mask: ['[data-workshop-performance-host] button > span:first-child'],
-  },
 ];
 // One view per demo: the desktop one (the gallery's model view). The robot page is character-animation's old URL.
 export const allCases = [...demos, ...extraDemos]
