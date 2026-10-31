@@ -44,7 +44,7 @@ to be written.
 
 - **WebGPU.** The engine draws with WebGPU. Chrome and Edge on desktop are the tested browsers. The optional WebGL2
   fallback draws plain meshes only. See [Browser support](../README.md#browser-support).
-- **Small core, optional packages.** The core and the stage together are 22,212 bytes gzip (not your whole app: React, models and optional packages add to it; see [limits](limits.md)). Shadows, glTF, physics and the
+- **Small core, optional packages.** The core and the stage together are 22,522 bytes gzip (not your whole app: React, models and optional packages add to it; see [limits](limits.md)). Shadows, glTF, physics and the
   rest are packages you import when you need them: `import { Shadows } from 'margoengine/shadows'`.
 - **Not on npm yet.** 1.0.0 is the first planned release. Run examples from a clone until then.
 - **Units are metres, Y is up.** The same as glTF.

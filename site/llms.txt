@@ -36,7 +36,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/math](https://margoengine.com/llms/packages/math.md): Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math, one module per type.
 - [@margoengine/quality](https://margoengine.com/llms/packages/quality.md): Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom.
 - [@margoengine/webgl](https://margoengine.com/llms/packages/webgl.md): WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}).
-- [@margoengine/webgl2-compat](https://margoengine.com/llms/packages/webgl2-compat.md): In development (milestones M0 to M7): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates…
+- [@margoengine/webgl2-compat](https://margoengine.com/llms/packages/webgl2-compat.md): In development (milestones M0 to M7 done, M8 under way): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on…
 - [@margoengine/stats](https://margoengine.com/llms/packages/stats.md): Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling.
 - [@margoengine/inspector](https://margoengine.com/llms/packages/inspector.md): Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger.
 
@@ -186,7 +186,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/shader API](https://margoengine.com/llms/api/shader.md): 7 entry points
 - [@margoengine/environment API](https://margoengine.com/llms/api/environment.md): 7 entry points
 - [@margoengine/clustered API](https://margoengine.com/llms/api/clustered.md): 7 entry points
-- [@margoengine/shadows API](https://margoengine.com/llms/api/shadows.md): 1 entry point
+- [@margoengine/shadows API](https://margoengine.com/llms/api/shadows.md): 2 entry points
 - [@margoengine/lightmap API](https://margoengine.com/llms/api/lightmap.md): 3 entry points
 - [@margoengine/sky API](https://margoengine.com/llms/api/sky.md): 11 entry points
 - [@margoengine/weather API](https://margoengine.com/llms/api/weather.md): 2 entry points
@@ -195,7 +195,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/lod API](https://margoengine.com/llms/api/lod.md): 1 entry point
 - [@margoengine/culling API](https://margoengine.com/llms/api/culling.md): 2 entry points
 - [@margoengine/points API](https://margoengine.com/llms/api/points.md): 5 entry points
-- [@margoengine/sprites API](https://margoengine.com/llms/api/sprites.md): 1 entry point
+- [@margoengine/sprites API](https://margoengine.com/llms/api/sprites.md): 2 entry points
 - [@margoengine/lines API](https://margoengine.com/llms/api/lines.md): 1 entry point
 - [@margoengine/text API](https://margoengine.com/llms/api/text.md): 1 entry point
 - [@margoengine/pixel API](https://margoengine.com/llms/api/pixel.md): 1 entry point
@@ -218,8 +218,8 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 2 entry points
 - [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 2 entry points
 - [@margoengine/road API](https://margoengine.com/llms/api/road.md): 1 entry point
-- [@margoengine/tilemap API](https://margoengine.com/llms/api/tilemap.md): 1 entry point
-- [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 8 entry points
+- [@margoengine/tilemap API](https://margoengine.com/llms/api/tilemap.md): 2 entry points
+- [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 9 entry points
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 8 entry points
 - [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 5 entry points
 - [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 2 entry points
@@ -254,7 +254,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/geometry API](https://margoengine.com/llms/api/geometry.md): 7 entry points
 - [@margoengine/mesh-edit API](https://margoengine.com/llms/api/mesh-edit.md): 2 entry points
 - [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 9 entry points
-- [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 3 entry points
+- [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 4 entry points
 - [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 1 entry point
 - [@margoengine/react API](https://margoengine.com/llms/api/react.md): 19 entry points
 
@@ -292,6 +292,7 @@ One page per package: every exported name with its declaration, generated from t
 - [Security model](https://margoengine.com/llms/docs/security.md): What Margo trusts, what it does not, what it guarantees and what your app still has to do. Parser fuzzing and its regression tests are…
 - [Shader contracts between packages](https://margoengine.com/llms/docs/shader-contracts.md): Packages extend each other's WGSL in three ways. Prefer them in this order.
 - [Start here](https://margoengine.com/llms/docs/start-here.md): You will find the page that matches what you want to do. Every guide is short, has code you can copy, and has been run in a real browser.
-- [Reading the three.js parity counts](https://margoengine.com/llms/docs/three-parity-matrix.md): The table in threejs-parity.md was recounted after the parity-closing work: 161 features, 153 COVERED, 4 PARTIAL, 4 MISSING (142 / 13 / 6…
-- [three.js r186 parity matrix](https://margoengine.com/llms/docs/threejs-parity.md): What Margo Engine covers compared with three.js r186 and its common add-ons (`three/addons`). It is meant for roadmap planning and as the…
+- [Reading the three.js parity counts](https://margoengine.com/llms/docs/three-parity-matrix.md): The table in threejs-parity.md was rewritten by feature group: 188 features, 153 COVERED, 4 PARTIAL, 18 MISSING, plus 13 NOT PLANNED by…
+- [three.js r186 parity matrix](https://margoengine.com/llms/docs/threejs-parity.md): What Margo Engine covers compared with three.js r186 and its common add-ons (`three/addons`), one row per feature group. It is for roadmap…
+- [Site demos on the WebGL2 compatibility layer](https://margoengine.com/llms/docs/webgl2-compat-demos.md): Every live demo on margoengine.com and every model of the Khronos gallery, drawn once on native WebGPU and once on the WebGL2…
 - [Workspace setup: the engine and the Margo apps](https://margoengine.com/llms/docs/workspace-setup.md): Every Margo app builds against the engine checkout beside it, always at the latest `origin/main`. There is one engine folder per machine…

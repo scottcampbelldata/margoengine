@@ -1,6 +1,6 @@
 # Design envelope
 
-Margo is a small WebGPU engine: core plus the stage facade is 22,212 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 20,813 B of its 21,504 B cap; the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,212 B; storing a caller's 4x view target depth then added 23 B to each), and every
+Margo is a small WebGPU engine: core plus the stage facade is 22,522 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,134 B of its 21,504 B cap; the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,522 B; storing a caller's 4x view target depth then added 23 B to each), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -75,7 +75,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ### React page
 
-What a minimal React page downloads, and why it is larger than core + stage (22,212 B gzip). The cube page of the
+What a minimal React page downloads, and why it is larger than core + stage (22,522 B gzip). The cube page of the
 bundler matrix (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `useFrame`, and `OrbitControls` from
 `@margoengine/react/controls`), built by Vite 8.3.4, React 19.3 and `@margoengine/react` installed alone with
 `@margoengine/controls` (2026-10-27), measured from the build's source maps (minified bytes per package; gzip is each

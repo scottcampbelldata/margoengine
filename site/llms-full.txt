@@ -18,7 +18,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 22,581 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 22,522 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Install
@@ -267,7 +267,7 @@ meshes (no textures, effects or picking).
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 22,581 B | 56,427 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 22,522 B | 55,595 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -317,7 +317,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/math`](packages/math/README.md) | Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math, one module per type. |
 | [`@margoengine/quality`](packages/quality/README.md) | Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom. |
 | [`@margoengine/webgl`](packages/webgl/README.md) | WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}). |
-| [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) | In development (milestones M0 to M7): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures, gather and storage-buffer reads run, compute pipelines run as fragment draws, point draws or on the CPU, whichever the shader allows, and DOF, splats and culling take routes of their own there. |
+| [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) | In development (milestones M0 to M7 done, M8 under way): the WebGL2 compatibility layer for browsers without WebGPU. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures, gather and storage-buffer reads run, compute pipelines run as fragment draws, point draws or on the CPU, whichever the shader allows, and DOF, splats and culling take routes of their own there. |
 | [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling. |
 | [`@margoengine/inspector`](packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
 
@@ -621,6 +621,7 @@ Rules:
 | `state` | not valid right now: re-entrant call from a callback, missing prerequisite, stale handle |
 | `unsupported` | the browser or device lacks something needed: WebGPU, OffscreenCanvas, a shader hook |
 | `failed` | the operation ran and produced no result: no solution within the budget, a failed request |
+| `timeout` | a step that should finish never settled within its time limit: a stalled WebGPU startup step |
 
 Branch on `error.code`, not on the message. Messages name the subject, the problem and the fix, in that order:
 `'Input is disposed; create a new Input'`. Packages bundle their own copy of the class, so `MargoError` matches by
@@ -663,6 +664,12 @@ the stage (`@margoengine/stage/gltf` `addGLTF`, `/sky` `addSky`, `/particles` `a
 `/effects` `addEffects`, `/environment` `addEnvironment`, `/shadows` `addShadows`; the whole-pack accessors became a
 plain `import()`), and the root gained `stage.signal`. The stage root shrank (core + stage 22,781 -> 21,910 B gzip).
 Core is untouched. The exception covers this one change; the freeze applies again after it.
+
+**Exception, `powerPreference` (Scott, 2026-10-29, "do the core add i agree"):** core gains one option,
+`EngineOptions.powerPreference` (`'low-power'` | `'high-performance'`), which `GPURenderer.create` passes to
+`requestAdapter` at creation and again on device restore, so an app can pick the integrated or discrete GPU on a
+two-GPU PC. Unset keeps the old request (`'high-performance'`, nothing on Windows). Cost: core 21,077 -> 21,106 B gzip, core + stage 22,494 -> 22,524 B. The exception
+covers this one option; the freeze applies again after it.
 
 ## Names exported by more than one package
 
@@ -1034,7 +1041,7 @@ Notes:
 
 - Apps without `@margoengine/quality` are unaffected: the packages read `globalThis.margoPreset` only, which nothing
   else sets.
-- The measured tier is stored in `localStorage.margoQuality`; `localStorage.removeItem('margoQuality')` measures again.
+- `localStorage['margoQuality:' + location.pathname]` holds `'high'` after a light-tier reading under `FAST_GPU_MS` (GPU passes by timestamp queries; without `timestamp-query` a page stays light), or `'held'` after the full tier ran slow. One key per page: the reading is what that page's scene costs. A slow light-tier reading stores nothing, so the next load measures again; `localStorage.removeItem('margoQuality:' + location.pathname)` clears either.
 - Testing: `?quality=low|high` forces a tier without storing it; `?scale=1.5` raises the light tier's pixel ratio.
 
 === Kits (docs/guides/kits.md) ===
@@ -1056,7 +1063,7 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 151,721 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 22,581 B). Wasm decoders, workers and lazily loaded parts
+part of a kit pays for that part; core + stage alone is 22,522 B). Wasm decoders, workers and lazily loaded parts
 are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
 moves more than 3%.
 
@@ -2493,8 +2500,7 @@ engine recreates the device and every plugin rebuilds its GPU state; no reload i
 ## Not yet
 
 Remaining gaps and documented limits from [`docs/threejs-parity.md`](threejs-parity.md). The optional-package backlog
-does not reopen the core freeze or the closed v1 limits listed there. Complete actionable PARTIAL rows before MISSING
-rows.
+does not reopen the core freeze or the closed v1 limits listed there.
 
 Materials already support one class per shading model (unlit, Lambert, Phong, PBR, normal, matcap, depth, distance),
 physical factors and maps, iridescence, anisotropy, dispersion, wireframe, front/back/double sides, live swaps and
@@ -2504,23 +2510,18 @@ features add no core or stage functionality.
 
 | three.js | Status in Margo |
 | --- | --- |
-| Multiple scenes, general multi-view rendering | `engine.createScene(name)` and `engine.views` (or `engine.render({views})`): each view draws one scene through its own camera into its own rectangle, with per-view effects and history. Layer masks from `@margoengine/cameras/layers`. Mirrors, glass and `CubeCamera` (`@margoengine/environment`) capture other views. Status per package: [multi-view-roadmap.md](multi-view-roadmap.md) |
-| General viewport/scissor support | Core draws accept viewport/scissor rectangles; optional native passes and picking do not inherit them, and camera aspect remains caller-controlled |
-| WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
-| glTF `KHR_animation_pointer` | Files that require it are rejected; when only used, animation `createMaterialAnimation` plays base-colour UV offset and scale tracks, and exporters write those tracks from data scenes. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
-| Stencil caps for clipped glTF-pro models | Missing (shader `discard` slices without caps or shadows) |
-| `BatchedMesh` | Missing (render layers are in `@margoengine/cameras/layers`) |
-| LDraw and other long-tail loaders; COLLADA skins and animation | Missing (loaders read OBJ with MTL materials, SVG, TrueType fonts and COLLADA geometry and materials; voxel reads and writes VOX) |
-| Arbitrary property tracks (`PropertyBinding`) | Missing (node TRS and morph-weight clips are authored with animation `createKeyframeClip`) |
-| `ArcballControls`, roll in the controls | Missing (core `camera.up` can roll; no control drives it) |
-| Cameras and lights from engine-scene glTF export, Draco/KTX2/EXR export, USDZ export with textures | Missing (`exportModel` and the data-scene writers write cameras and lights; glTF export with animation, skins, morphs and textures exists, plus OBJ, STL, PLY, DAE and static USDZ) |
-| WebXR hit test, controller and hand models, other plugin passes in XR | Missing (VR sessions, controller poses and loader-owned glTF-pro models in XR exist) |
+| Shadows from alpha cut-outs, `alphaHash`, object-space normal maps, your own mip levels | Missing, planned before v1.0.0 (shadows, materials) |
+| Picking fat lines, soft particles | Missing, planned before v1.0.0 (lines, vfx) |
+| Rendering in a worker, render into layers, compute writing textures, SSAA and upscaling, environment blend, KTX2 arrays and cubes, NRRD, subsurface blur, OBB | Missing, after v1.0.0 |
+| WebXR plane detection, depth, light estimation, controller and hand models, plugin passes in XR | Needs a headset test first (`@margoengine/xr`) |
+| WebGL2 for every package | In development: `@margoengine/webgl2-compat` |
+| Long-tail loaders, Draco, KTX2 or G-code writers, stereo on a flat screen, deferred shading, meshlets, cloth, fluids | Not planned for v1.0.0 |
 
 === Design envelope (docs/limits.md) ===
 
 # Design envelope
 
-Margo is a small WebGPU engine: core plus the stage facade is 22,581 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,077 B of its 21,504 B cap; the item 53.2 batch-redirect hook, which lets `DynamicInstances` in @margoengine/culling supply a whole batch on the GPU, took core from 21,063 B to 21,077 B and core + stage from 22,482 B to 22,581 B), and every
+Margo is a small WebGPU engine: core plus the stage facade is 22,522 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,134 B of its 21,504 B cap; the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,522 B; storing a caller's 4x view target depth then added 23 B to each), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -2578,19 +2579,24 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 22,581 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) gets, on every live demo, "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no engine code; the landing page draws no scene. No demo runs on the WebGL2 preview: each needs effects, particles, skinning or compute. | `@margoengine/webgl` (3,021 B gzip, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo shows the message with no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). Most rendering packages stay WebGPU-only; a fuller WebGL2 compatibility package is in development as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
+| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 22,581 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) downloads the WebGL2 compatibility layer and runs every live demo on it (see the next row); only a browser without WebGL2 at the layer's full tier as well gets "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no demo code; the landing page draws no scene. No demo runs on the WebGL2 preview: each needs effects, particles, skinning or compute. | `@margoengine/webgl` (3,021 B gzip, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo installs the layer without WebGPU, shows the message without WebGL2 too, downloads none of the layer with WebGPU, throws no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). The fuller WebGL2 compatibility package runs the WebGPU code of core and the packages as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
+| WebGPU pages alive at once | Measured on an Intel Arc 140V laptop (Edge and Chrome 156, headless, 2026-10-30): with 3 WebGPU pages alive in one browser process a new page's `requestDevice` took 10.6 s, and the 4th page never got a device or finished its pipeline compile (4 of 7 runs); 2 pages at once, one page at a time, or 4 separate browsers always started. The NVIDIA RTX A6000 desktop starts 4 at once. Enforced since then: each `Engine.create` startup step (`requestAdapter`, `requestDevice`, each pipeline compile) has a limit ([renderer.ts](../packages/core/src/renderer.ts), [core-startup-watchdog.test.js](../tests/core-startup-watchdog.test.js)). | The stall is in the driver or the browser's GPU process, not the page: the pages already drawing keep drawing every frame while the new one waits. | One `console.warn` (`Margo: still waiting for requestDevice after 8 s; see https://margoengine.com/errors#timeout`) after `startupWarning` ms (default 8,000), then a rejection with `MargoError` code `timeout` naming the step after `startupTimeout` ms (default 30,000); `backend: 'auto'` with a `fallback` draws on WebGL2 instead. Before, `Engine.create` never settled and the canvas stayed blank at 300 x 150. | Start several engines one at a time (each after the previous has drawn) and dispose those that leave the screen; the demo gallery must not start many engines at once. `signal` cancels creation; raise `startupTimeout` for a slow first compile. |
 | Compute on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-28, [compute.html](../packages/webgl2-compat/test/compute.html) cases and a timing page). Compute entry points that store only their own texel run as fragment draws and those with a bounded number of stores as point draws, on the GPU. The rest (atomics, workgroup memory, barriers, stores in loops of unknown length) run on the CPU in JavaScript: a clustered-binning kernel over 3,456 clusters takes 1.5 ms with 16 lights, 2.8 ms with 64 and 9.4 ms with 256 (37 to 94 million loop iterations a second); a 64-wide workgroup reduction with 7 barriers runs 4.4 million invocations a second (65,536 in 14.9 ms). | WebGL2 has no compute shaders, storage buffers or atomics. | The same results as WebGPU (the layer's compute check compares both on one GPU), slower: GPU-written inputs of a CPU kernel are read back synchronously (counted in the device's `stalls`). Multisampled and external textures cannot be read by CPU-tier kernels (MargoError `unsupported`); cube textures are sampled there as on WebGPU, seamless; CPU kernels need a page that allows JavaScript compiled at run time (CSP `unsafe-eval`; nothing else in the layer does). A CPU-tier dispatch stops at its work budget, 100,000,000 invocations plus loop iterations by default (`cpuWorkBudget`), and is reported as a `GPUInternalError` coded `failed` with nothing stored. | Keep per-frame CPU-tier work under the numbers measured here; [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md) lists the tiers. |
 | Package routes on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-29, frame wall time, native WebGPU then the layer; [routes-browser.mjs](../packages/webgl2-compat/test/routes-browser.mjs) checks the pixels). DOF at 1280 x 720: 0.72 ms, 10.1 ms on its route (913 ms on the generic CPU tier before). Splats: 10,000 in 1.2 ms, 17.9 ms (44 ms before); 100,000 in 2.1 ms, 39 ms (308 ms before). `CulledInstances`, 10,000 parts: 0.98 ms, 1.14 ms (11.7 ms before). VFX on the CPU tier, its plan's route: 5,000 particles 0.61 ms, 6.5 ms; 50,000 in 0.67 ms, 48 ms. Scatter on the CPU tier: 10,000 instances 0.56 ms, 5.4 ms; 100,000 in 0.85 ms, 40 ms. | WebGL2 has no workgroup memory, atomics or compute; each route does the same work another way. | The same pixels as native WebGPU. Splats read their projected keys back once a frame (a counted stall); `'occlusion'` culling culls against the frustum only (the same image, more parts drawn). The voxel path tracer and XR refuse the layer (MargoError `unsupported`). | Budget VFX particles and scatter instances by the per-frame times measured here (about 1 µs per particle and 0.4 µs per instance on this PC). |
+| Site demos on the WebGL2 compatibility layer | Measured by `npm run visual:compat` (part of `check:merge`): every site demo and Khronos gallery model, natively and on the layer in one browser on one GPU; the per-demo table, with each pixel difference and frame cost, is [webgl2-compat-demos.md](webgl2-compat-demos.md). | WebGL2 has no compute, storage buffers or atomics; the layer runs those kernels as fragment draws, point draws or on the CPU, and Shadows, DOF, splats and culling take routes of their own. | Each demo either draws the same pixels as WebGPU (at most 0.1% of pixels more than 2 levels apart, mean at most 0.25), runs with differences the table states, or refuses the layer for a part that needs WebGPU (MargoError `unsupported`, shown over the scene). A demo's median frame on the layer must stay under 50 ms of main-thread work, or under twice its native frame when that is slower already (`npm run visual:compat:budget`, part of `check:merge`, with the GPU held exclusively; `--budget=<ms>` sets another limit, for an integrated GPU). | [webgpu.html](../site/webgpu.html) explains the compatibility mode to visitors; [examples/dual-viewport.html](../examples/dual-viewport.html) draws one scene both ways with the live difference and frame times. |
+| Download size of the WebGL2 compatibility layer | Measured by `npm run measure:size`'s record ([entry-sizes.json](../examples/package-benchmarks/results/entry-sizes.json), `splits`; the sizes gate holds both numbers, [lazy-boundary.test.js](../tests/lazy-boundary.test.js) holds the boundary), min+gzip, 2026-10-30. Two numbers: the base, everything `install()` loads (device, GLSL back end, WGSL front end, the render path), is 72,500 B (241,774 B minified); the compute runtime, which only a page that makes its first compute pipeline loads, is 22,094 B (69,306 B minified). Both together, as one file, are 94,046 B. A page on WebGPU downloads none of it. | The layer translates WGSL to GLSL and runs WebGPU's device model on WebGL2, so the base holds a full WGSL front end (check.ts 61 KB, parser, builtins) and the GLSL emitter. Property names are not mangled. | Accepted difference (Scott, 2026-10-30): the sizes gate holds the base to 73,000 B, not the 60,000 B target the roadmap once stated and no gate enforced. The base carries the full WGSL to GLSL translator and the WGSL checker, both needed on the first frame; native WebGPU always validates shaders, so a production build without the checker would behave differently. The lazy compute runtime is measured and gated separately. The five largest modules of the base by their share of the gzip bytes: device/render.ts 14.0 KB, glsl/emit.ts 13.9 KB, wgsl/check.ts 11.4 KB, device/resources.ts 5.0 KB, wgsl/builtins.ts 4.3 KB. | A page that never runs compute pays the base only. [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md) tracks the size work. |
 | Content Security Policy | Enforced by the browser: core compiles its Wasm kernel, so `script-src` needs `'wasm-unsafe-eval'` (as do Draco and Basis). The standard WebGPU path and the other WebGL2 tiers need no `'unsafe-eval'`, workers included (the optional WebGL2 CPU compute tier of `webgl2-compat` builds its shaders with `new Function` and needs it, or is refused): the Draco/KTX2 decoder worker loads its Emscripten code with `importScripts`, and the build replaces the `new Function` wrapper generators in the Basis glue with closures, output byte-identical ([no-eval-workers.test.js](../tests/no-eval-workers.test.js)). No COOP/COEP. Checked with zero violations on Edge, one policy on the page and every worker ([csp-check.json](../examples/package-benchmarks/results/csp-check.json)). | Wasm is how the kernel stays small and fast. | Without `'wasm-unsafe-eval'`, `Engine.create` rejects ("Compiling or instantiating WebAssembly module violates the following Content Security policy directive") ([csp-check-negative.json](../examples/package-benchmarks/results/csp-check-negative.json)). | Headers for Cloudflare Pages, Netlify, Vercel and Nginx in [deploying.md](deploying.md). A Draco or Basis build you substitute for the bundled one may still call `new Function` (three.js's Basis transcoder does) and then needs `'unsafe-eval'` for its worker. |
 | React app budget (what a bundler emits and the browser loads) | Measured and enforced by the bundler matrix (`npm run modern:test:bundlers`, part of `check:merge`): a Vite 8 build of the React cube page (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `OrbitControls` from `@margoengine/react/controls`, `useFrame`; React 19) loads 94,216 B gzip before it runs (React, React DOM, core, the stage and the React bindings; budget 100,000 B), and with `@margoengine/react` installed alone the whole build emits 104,197 B gzip of JavaScript and no Wasm (budget 115,000 B). The matrix loads the built page in Edge and fails if it requests Wasm, an optional engine package or the BVH raycaster, and builds the same page with `@margoengine/react` alone in Next.js 16 (webpack and Turbopack), Rollup and esbuild: every module resolves and no optional package is emitted. Breakdown: [React page](#react-page). The build prints no warnings, without `@vitejs/plugin-react` too: `'use client'` is only on the `react-server` entries. | `@margoengine/react`'s root holds only bindings that need no optional package; each optional one is a subpath named after its package (`/controls`, `/gltf-pro`, `/shadows`, ...), and the stage's features are entries of their own (`@margoengine/stage/gltf`, ...), so no root reaches an optional package, not even through a lazy `import()` (`tests/optional-peer-reach.test.js`). | With `npm i margoengine`, `margoengine/react` re-exports every binding, so its module graph reaches gltf-pro's decoders: Vite copies the Basis (527,333 B) and Draco (192,420 B) `.wasm` to `dist` when it reads those modules, before tree-shaking. No chunk of them is emitted and the page never requests them (94,222 B gzip at load). | Install `@margoengine/react` alone, plus the packages its subpaths name (`@margoengine/controls` for `OrbitControls`): nothing else is installed or emitted. |
+| Meshlets, cloth, particle fluids and soft bodies | By decision (2026-10-31): out of scope for v1.0.0. | Each is a large package of its own; `@margoengine/culling` already culls instances on the GPU and `@margoengine/physics` has `Rope`. | No such API exists; the parity matrix lists them as NOT PLANNED ([threejs-parity.md](threejs-parity.md)). | `CulledInstances` for large static assemblies, GPU particles in `@margoengine/vfx`, Rapier joints in `@margoengine/physics`. |
 | No visual editor | By design: Margo is code-first. | An editor is a product of its own; the engine stays a library. | Scenes are built in code or authored in another tool. | Author in Blender and export glTF or `.margo` (`@margoengine/blender`, `tools/blender-addon`, [guides/blender-game.md](guides/blender-game.md)); inspect at runtime with `@margoengine/inspector` and its `/frame` debugger; move objects with `@margoengine/controls`'s TransformControls. A Margo Studio editor is planned after 1.0. |
+| Bricked volumes | Enforced by the budget ([bricks.ts](../packages/sciviz/src/bricks.ts), [bricks.test.js](../packages/sciviz/tests/bricks.test.js)): `@margoengine/sciviz/bricks` holds at most `memoryBudget` bytes of GPU memory (default 512 MiB) and marches at most 2048 samples per ray. Measured at 4096 x 1024 x 1024 voxels (8.6 GiB as half floats, past the 2048 texture limit), 1280 x 720, RTX A6000, default budget: median 4.3-12.6 ms per frame over four views. Drawn against the same volume as one texture: largest channel difference 2 of 255. | A single 3D texture stops at the GPU's limit and costs all its bytes up front. | Past the budget, finer bricks wait and coarser ones draw; between levels values can step by what averaging removed. The page table takes one texel per full-resolution brick and must fit the 3D limit. Errors: `RangeError` naming `memoryBudget` or `brickSize`; `MargoError` code `failed` for a read that failed. | Raise `memoryBudget` or lower `detail` for more detail; frame time grows with the bricks drawn (2 GiB, closest view: median 653 ms). |
 | Tested hardware | Committed real-GPU results come from two Windows 11 machines in Edge 155: the Intel Arc 140V laptop above and an NVIDIA RTX A6000 desktop (its own visual-baseline profile, `nvidia-ampere-msedge-155`; the voxel results above come from it). Phones: the demos were run by hand on an iPhone (Safari), with no scripted run or committed result; a Galaxy S23 Ultra report of a slow island demo is unresolved. | One developer, two machines so far. | Behaviour elsewhere follows WebGPU's guarantees but is unverified. | Untested: AMD GPUs, NVIDIA GPUs other than the A6000, Apple silicon Macs, Android devices other than the S23 report, Linux, ChromeOS. Results from these are welcome; [reproduce.md](whitepaper/reproduce.md) has the commands. |
 | Browsers | Verified: Edge 155 (Chromium) on Windows, automated (real-GPU suites, visual regression, CSP). iPhone Safari: run by hand only (above). Firefox: not verified. macOS Safari: not verified. | Same as above. | Where a browser lacks WebGPU, `Engine.create` reports it (see "WebGPU first"). | Chrome uses the same Chromium engine as Edge; the automated suites run in Edge. CSP behaviour in Firefox and Safari is unverified. |
 | WebXR AR hit testing | Not measured: `@margoengine/xr` `HitTest` has never run on an AR headset or phone. It is checked against the W3C WebXR Hit Test Module's interfaces with a mocked session (hit results, transient input, anchors, failure paths: [hit-test.test.js](../packages/xr/tests/hit-test.test.js)). | No AR device is in the test setup, and immersive AR needs the native WebGPU XR binding. | `XR.isSupported('immersive-ar')` is false where the browser cannot run it; on a device that can, behaviour is unverified. | Plane detection, depth sensing and light estimation are not wrapped; read them from the native session (`xr.session`). |
 
 ### React page
 
-What a minimal React page downloads, and why it is larger than core + stage (22,581 B gzip). The cube page of the
+What a minimal React page downloads, and why it is larger than core + stage (22,522 B gzip). The cube page of the
 bundler matrix (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `useFrame`, and `OrbitControls` from
 `@margoengine/react/controls`), built by Vite 8.3.4, React 19.3 and `@margoengine/react` installed alone with
 `@margoengine/controls` (2026-10-27), measured from the build's source maps (minified bytes per package; gzip is each
@@ -2635,6 +2641,20 @@ the entry: `PbrMaterial` is core's material and pulls in no other package.
 What is known to be wrong or not yet proven, and what it would take to close each item. Design limits (where a
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
+
+## Boulder demo
+
+### The robot's arm shows a copper piston through its shell at close range
+
+- **What:** in the Boulder demo, from the nearest orbit distance (1.2 m), a copper rod shows through the upper arm shell
+  and the shell has a jagged edge near the elbow. It does not show from the default view, and it does not affect the
+  collision results, which use the link hulls.
+- **Repro:** `npm run build:boulder`, then `node scripts/test-boulder-browser.mjs --shots=<dir> --closeups`, and open
+  `boulder-high-close-right.png` and `boulder-high-close-left.png`.
+- **Cause, not yet confirmed:** the piston, washers and hubs in `examples/assets/source/skinning_ik/build_robot.py` are
+  not in its `NO_CROSSING` list, so the crossing check in that script does not see them.
+- **Needed to close:** decide whether this model stays. If it does, add those parts to `NO_CROSSING`, fix what the check
+  then reports and rebuild the GLB. If another model replaces it, this entry goes with the old model.
 
 ## Blocked on hardware we do not have
 
@@ -2769,6 +2789,18 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### VFX: blended particles draw in a different order each frame
+
+- **What:** the gameplay sandbox's still frame (prefers-reduced-motion, `?quality=high`, 1280 x 720) is not repeatable
+  natively: two captures differ by 1 level on 41 to 57 pixels, over the sea and the beach (Edge 156, RTX A6000,
+  2026-10-30). With its particles off (`#particles` set to 0) four captures are equal pixel for pixel.
+- **Repro:** `npm run visual:compat -- --only=gameplay-sandbox` prints native noise above 0 (mean 0.00005).
+- **Cause:** VFX's update kernel appends each live particle to the draw list with `atomicAdd` (packages/vfx/src/shader.ts),
+  so the list's order, and with it the order in which overlapping blended particles add up, changes from frame to
+  frame; float blending rounds differently in another order.
+- **Needed to close:** a draw order that does not depend on atomics (a stable compaction by particle index), with a
+  check that draws one still frame twice and compares it pixel for pixel.
+
 ### `KHR_materials_specular` weight does not scale Fresnel at grazing angles on gltf-pro's native paths
 
 - **What:** the spec's Fresnel is `specular * (f0 + (1 - f0) * (1 - v.h)^5)`, so `specularFactor` 0 reflects nothing at any
@@ -2832,7 +2864,6 @@ does not own. Each entry says exactly what is needed to close it.
   the budget is too short for a loaded machine), or a close that hangs on a pending GPU request (a defect). Next step:
   rerun under the burner with `DEBUG=pw:browser` and a process list at the timeout, and see whether the browser ends
   later by itself.
-
 ### Findings of the outside audit (2026-10-28)
 
 - **What:** an outside audit of revision 74a01810 (a source review, canary tests on a second laptop with temporary
@@ -2929,20 +2960,6 @@ does not own. Each entry says exactly what is needed to close it.
 - **Fix needed:** in `#dirty`, drop the waiting steps of the tiles in the rectangle and make them again (objects too
   when they were not yet held); with a browser check that edits while a tile waits (no frames drawn, so it waits for
   the drain timer) and compares the drawn tile with a fresh view of the edited world.
-
-### VoxelRenderer draws nothing for a few frames after an effect is taken out of the middle
-
-- **Repro:** add two lighting effects to a `VoxelRenderer` (`shadows.add(voxels)`, then `clustered.add(voxels)`), let
-  both compile, then call the shadows remover: `voxels.stats.compiling` is true and `draws` 0 until the composition
-  with the clustered light alone has compiled (about 2 frames on an Intel UHD, 1 on an RTX A6000), so the clear colour
-  shows through for those frames.
-- **Cause:** the pipelines with the removed effect cannot keep drawing (they bind its resources, which its owner may
-  dispose right away), and a composition never drawn before has nothing compiled. Since bug 29 the last four
-  compositions stay compiled, so taking effects out in the reverse order they were added, or putting one back, draws
-  at once (`packages/voxel/tests/render.test.js` "addLighting", `render-lighting-browser-check.mjs` clustered).
-- **Fix needed:** draw with the remaining effects' last pipelines and a neutral stand-in for the removed effect's
-  bindings while the new composition compiles, or compile the compositions without each effect ahead of time; either
-  with a check that the frame right after an out-of-order removal is drawn.
 
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
@@ -3333,6 +3350,7 @@ All were found by `npm run modern:test:extensions` and the other `test:release` 
 | --- | --- | --- | --- |
 | The packed-browser step of `modern:test:packages` missed its fixed 30 s page-load limit on a busy machine ("Packed browser failure: state null") | a fixed time against load: a cold dev server transforming every package took longer while other check:merge runs shared the CPU | the step waits on the dev server (`waitForRequestsIdle`) and then gives the page 10 s; a 10 minute hard limit fails a real hang naming the server state and page errors, and the browser and server close (`scripts/support/page-ready.js`) | `tests/page-ready.test.js` (holds the last module back in a real dev server: the fixed wait fails, the new wait passes) |
 | `npm run dev:examples` refused every page (403) from a checkout reached through an 8.3 short path | Vite's file-serving allow list held the working directory as given and compared it with each file's real path | `dev:examples` runs `scripts/dev-examples.mjs`, which starts Vite in `realpathSync.native(process.cwd())`; no root Vite config, so every other root `vite` command is unchanged | `tests/dev-examples.test.js` (short-path cwd serves 200, a file outside the repository stays 403) |
+| Taking one lighting effect out of a `VoxelRenderer` other than the last one added drew the clear colour for 8 to 21 frames (`draws` 0, RTX A6000, 3 ms frames) | a composition never drawn before had nothing compiled, and the pipelines with the removed effect cannot draw (its owner may dispose its resources) | once a composition is ready, those without each one of its effects compile a GPU call per frame and stay among those kept, the one without effects stays always, and while the wanted one is not compiled the largest compiled composition whose effects are all still added draws, which covers several effects leaving at once (`packages/voxel/src/render.ts`). The stand-in way was measured and refused: zeroed bindings draw every voxel black with fog taken out, 190921 black pixels with an environment, 1956 wrong with shadows, and the renderer cannot make a depth or cube texture of a kind it does not know | `packages/voxel/tests/render.test.js` "addLighting: the frame right after" and the three after it, `render-lighting-browser-check.mjs` effectRemoval (either effect, disposed at once, 0 pixels off the settled frame) and severalRemoved (two of three leaving in one frame) |
 | `modern:test:extensions` sat silent until the 30 min GPU lock limit | Chromium (Edge 156, RTX A6000) leaves a `getCompilationInfo()` asked once the device is idle pending until another GPU request runs; `material-extension-tests.js` asked for 41 modules then, inside a `page.evaluate` with no time limit, and the eight suites ran in one process with no limit | the WGSL guard asks every module at creation and answers later calls with that (`scripts/support/wgsl-guard.js`); each suite runs alone under `runLimited` (`scripts/modern-extension-suite.mjs`); engine source must ask at creation | `tests/wgsl-guard.test.js`, `tests/modern-extension-suite.test.js`, `tests/compilation-info-at-creation.test.js` |
 | IOR 1 transmission (materials) drew a 13-step highlight over the background | since `dc883a59` the host keeps reflections under extension transmission, but its F0 stayed 0.04 whatever `KHR_materials_ior` said | the extension slot takes an `ior` expression and the host sets `s.f0` from it (gltf-pro); transmission and node transmission pass it (materials) | `packages/materials/tests/transmission-ior.test.js`, `scripts/materials-transmission-tests.js` |
 | Transmission with a sheen or specular lobe drew about 148 steps of white on a fully transmissive surface | the lobes recompute diffuse light at full strength, ignoring the transmitted share `s.tr` | lobes composed over transmission scale their diffuse by 1 - `s.tr`; `install` composes transmission first (materials) | same two |
@@ -3487,7 +3505,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 22,581 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 22,522 B gzip.
 
 Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
 apps that want a smaller install.
@@ -3596,6 +3614,8 @@ engine.onFrame((_, delta) => { mesh.rotation.y += delta; });
 engine.start();
 ```
 
+`Engine.create(canvas, options)` options (all optional, all part of the v1.0.0 API):
+
 [README continues: https://margoengine.com/llms/packages/core.md]
 
 === @margoengine/math (packages/math/README.md) ===
@@ -3629,9 +3649,9 @@ Checked contracts for saved data (each reproduces Margo Voxel Studio's saved ari
 Import `margoengine/quality` from the `margoengine` package, or `@margoengine/quality` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 Measured quality tiers. Desktops start on a light tier (single-sampled, pixel ratio capped, paced to at most about
-60 FPS) and time how long the GPU takes to finish each frame; a browser with clear headroom gets the full 4× MSAA tier
-from its next page load. No PC is first shown the 4× tier or reloaded by the probe (the light tier's own frame rate
-depends on the GPU), and no rule based on device names is involved.
+60 FPS) and read the real GPU time of each frame by timestamp queries; a page under the limit gets the full 4× MSAA tier
+from its next load. No PC is first shown the 4× tier or reloaded by the probe (the light tier's own frame rate depends on
+the GPU), and no rule based on device names is involved.
 
 ```ts
 import {applyQualityTier, paceEngine, watchQuality} from 'margoengine/quality';
@@ -3647,17 +3667,27 @@ watchQuality();
 - `applyQualityTier()` returns `'light'`, `'high'` or `'phone'`. Phones are single-sampled with the pixel ratio capped
   at 1 (`globalThis.margoLow = 1`), even with `?quality=high` or `?scale=2`. It sets core's `globalThis.margoLow`, which
   core reads when it builds pipelines and sizes the canvas, so it must run before the engine is created.
-- `watchQuality()` measures on the light tier and remembers `'high'` or `'low'` in `localStorage.margoQuality`. On the
-  full tier, five consecutive seconds under 55 FPS remember `'low'` and reload once (a machine that slowed down, for
-  example on battery).
+- `watchQuality()` reads 120 frames on the light tier and, when the 90th percentile of a frame's GPU passes is under
+  `FAST_GPU_MS` (8 ms), remembers `'high'` for this page in `localStorage['margoQuality:' + location.pathname]`. One key
+  per page, because the result says what this page's scene costs: a light scene must not mark a weak PC high for a heavy
+  one. A slow reading remembers nothing, so one bad session cannot hold a browser on the light tier: the next load
+  measures again. On the full tier, five consecutive seconds under 55 FPS remember that for good (`'held'`) and reload
+  once (a machine that slowed down, for example on battery).
+- Timestamps: `applyQualityTier()` adds `timestamp-query` to the devices this page asks for, only while the page is still
+  to be measured, until `watchQuality()` starts. The reading is its own small chunk, downloaded only by a page that reads. During the reading (about 4 s at 60 FPS, 10 s at most) `submit` and
+  `createCommandEncoder` are wrapped and every pass gets timestamp writes; then all of it is put back and its GPU objects
+  destroyed, so nothing runs after the reading. Without `timestamp-query` the page stays light and stores nothing. A frame
+  whose passes the page times itself is not counted. Copies between passes, presenting and other work between passes are
+  not in the number.
+- `onReading(milliseconds)` on `watchQuality` reports the reading when it ends, undefined when there is none.
 - For testing: `?quality=high` or `?quality=low` forces a tier without remembering it; `?scale=1.5` sets the light
-  tier's pixel ratio (1 to 2). `localStorage.removeItem('margoQuality')` measures again.
+  tier's pixel ratio (1 to 2). `localStorage.removeItem('margoQuality:' + location.pathname)` measures again.
 - `paceEngine(engine)` sets core's `engine.pace` hook on the light tier so `engine.start()` renders about 60 FPS
   (every other refresh at 120 Hz, 72 FPS at 144 Hz) instead of swinging between 120 and 40 FPS on a slow GPU. Other
   tiers stay uncapped. Nothing global is patched: other `requestAnimationFrame` loops on the page run at the display
   rate. An app that renders from its own loop (calling `engine.render` itself) can gate it with `frameDue`.
 - `capFrameRate(engine, rate = 60)` sets the same pacing on any engine regardless of tier.
-- The light-tier measurement skips the first two seconds and gives up after ten, at any refresh rate.
+- The light-tier reading skips the first two seconds and gives up after ten, at any refresh rate.
 
 ## Dynamic resolution
 
@@ -3679,12 +3709,6 @@ also switch off multisampling); pass your own `apply(scale)` to scale some other
 decision logic without timers: `push(frameMs)` returns the new scale when it changes.
 
 ## Tier presets
-
-The tier also scales optional features. `applyQualityTier()` publishes the tier's `QualityPreset` as
-`globalThis.margoPreset`; each feature package below reads its key when an effect is constructed (`X.attach` or
-`new X`) and uses a preset value only for an option the app left undefined. **Explicit options always win.** Feature
-packages never import this package: the global is the whole contract, so an app that does not use
-`@margoengine/quality` gets every package's own defaults, unchanged.
 
 [README continues: https://margoengine.com/llms/packages/quality.md]
 
@@ -3739,7 +3763,7 @@ Build and unit tests: npm test --workspace @margoengine/webgl
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: in development, milestones M0 to M7 of the [roadmap](../../docs/webgl2-compat-roadmap.md).** This package
+**Status: in development, milestones M0 to M7 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done, M8 (every site demo, docs, release) under way.** Every live demo on margoengine.com loads this layer when the browser has no WebGPU; [webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists how each one compares with native WebGPU. This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels
@@ -3763,7 +3787,9 @@ engine.render();
 ```
 
 `install()` makes `navigator.gpu` a WebGPU-shaped GPU on WebGL2, makes `canvas.getContext('webgpu')` return its canvas
-context, and defines `GPUBufferUsage` and the other flag objects where the browser lacks them. Where the browser's own
+context, defines `GPUBufferUsage` and the other flag objects where the browser lacks them, and names its classes as
+the WebGPU interfaces (`GPUBuffer`, `GPUDevice` and the rest) while installed, so `instanceof GPUBuffer` holds for its
+objects, also in a browser that defines those interfaces without an adapter. Where the browser's own
 WebGPU has an adapter it does nothing (it resolves `{ installed: false, reason: 'webgpu' }`) unless you pass
 `{ force: true }`, which the layer's tests use to compare both paths on one machine. It rejects with MargoError code
 `unsupported` on a browser whose WebGL2 is below the full tier, naming what is missing. `uninstall()` puts everything
@@ -5447,6 +5473,18 @@ A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoEr
 Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
 sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.
 
+## Animation
+
+`@margoengine/sprites/animation` (`margoengine/sprites/animation`) plays sprite-sheet clips. It is plain CPU code, so it
+runs in Node and an app that only draws still frames does not ship it.
+
+```ts
+import { SpriteLayer } from 'margoengine/sprites';
+import { frameGrid, SpriteAnimation } from 'margoengine/sprites/animation';
+```
+
+[README continues: https://margoengine.com/llms/packages/sprites.md]
+
 === @margoengine/lines (packages/lines/README.md) ===
 
 # @margoengine/lines
@@ -6206,6 +6244,9 @@ world.dispose(); // or `using world = await BiomeWorld.create()` inside a block
 
 `world.sample(x, z)` answers point queries for gameplay (synchronous: exact from a finished tile, otherwise from
 the region fields; `world.sampleRegion(x, z)` always from the region fields, whatever tiles were made).
+`world.heightAt(x, z)` is the quick one for placing a character or a camera: the ground height in metres, blended
+between the four height cells around the point (the values the tiles hold), without tiles, with no allocation once
+warm, and the edge's height outside the world. A `BiomeView` draws the same surface to within its `textureResolution`.
 `world.tiles(rect, { focus })` yields the tiles of a rectangle nearest first. `world.digest(x, z)`
 is the SHA-256 of a tile's canonical bytes: the same options give the same digest on every machine, and the package
 tests lock several of them. `world.update({ climate, height })` recomputes and calls `onChange` listeners with the
@@ -6225,22 +6266,6 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 | `backend` | `'auto'` | `'auto'` or `'cpu'`; `'gpu'` is not available yet and throws `unsupported` |
 | `signal` | none | rejects `create` with its reason |
 
-| `climate` option | Default | Meaning |
-| --- | --- | --- |
-| `latitude` | 45 | degrees, -89..89 |
-| `seaLevel` | 0 | metres |
-| `lapseRate` | 5.0 | mean surface lapse rate, K per km (observed surface rates; 6.5 is the free atmosphere) |
-| `lapseSplit` | 3.0 | day minus night lapse rate: 6.5 by day, 3.5 by night |
-| `equatorTemperature`, `poleTemperature` | 27, -20 | mean annual sea-level C at the equator and the poles |
-| `rainfall` | 900 | mm per year before orography |
-| `wind` | from latitude | `[x, z]` the air moves toward; trade easterlies below 30 degrees, westerlies to 60, polar easterlies beyond |
-| `rainShadow` | 0.6 | 0..1, the share of moisture a 1,500 m rise wrings out |
-| `inland` | 500 | km of land between the sea and the upwind edge when no sea is upwind (continentality) |
-| `coldAir` | 3 | largest night cooling of cold-air pools in K; 0 turns pooling off |
-| `rainSeason` | `'auto'` | when the rain falls, for the Koppen label view: `'uniform'`, `'summer'` or `'winter'` |
-
-### The layers of a tile
-
 [README continues: https://margoengine.com/llms/packages/biomes.md]
 
 === @margoengine/voxel (packages/voxel/README.md) ===
@@ -6249,7 +6274,7 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 
 Import `margoengine/voxel` from the `margoengine` package, or `@margoengine/voxel` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Voxel worlds for Minecraft-style games and voxel editors: a block-type registry, 32 x 32 x 32 palette chunks with a
+Voxel worlds for block-building games and voxel editors: a block-type registry, 32 x 32 x 32 palette chunks with a
 light byte per cell, and a chunked world with dirty tracking and change events. This release is the storage layer;
 meshing, rendering, light, queries, streaming and `.vox` files follow as subpath entries (plan: [DESIGN.md](DESIGN.md)).
 
@@ -6646,7 +6671,7 @@ Build and unit tests: npm test --workspace @margoengine/road
 
 Import `margoengine/tilemap` from the `margoengine` package, or `@margoengine/tilemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. This entry has types and small helpers only: no renderer, auto-tiling or importers yet. Orthogonal maps only. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
+The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. This entry has types and small helpers only: no renderer or importers yet. Orthogonal maps only. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
 
 ```ts
 import {createTileLayer, encodeTile, FLIP_H, tileAt, validateTileMap, type TileMapData} from 'margoengine/tilemap';
@@ -6661,6 +6686,20 @@ console.log(tileAt(ground, 1, 0)); // 2147483650: tile 2, mirrored left to right
 ```
 
 Layer values keep the low 28 bits for the global tile id (0 is empty) and the top bits for `FLIP_H`, `FLIP_V` and `FLIP_D`, exactly as Tiled stores them, so imported data is used as is. `decodeTile` and `encodeTile` split and join them; `tilesetForGid` and `tileDefForGid` find the tileset and the per-tile entry; `validateTileMap` throws a `TypeError` or `RangeError` that names the field.
+
+## Auto-tiling
+
+`margoengine/tilemap/autotile` picks the tile for each cell from its neighbours with rule sets written as data: 16 tiles for the four edge neighbours (`cardinal`), or 47 for all eight (`blob`; corners count only when both edges beside them are filled). Terrain sets match the terrain at a tile's four corners instead. Both are deterministic.
+
+```ts
+import {autotileGrid, BLOB_MASKS} from 'margoengine/tilemap/autotile';
+const filled = [1, 1, 0, 1, 1, 1, 0, 1, 1]; // 3 x 3, 1 = ground
+const tiles = BLOB_MASKS.map((_, i) => i); // tile id for each of the 47 cases
+const cells = autotileGrid(filled, 3, 3, {mode: 'blob', tiles}, {firstGid: 1});
+console.log(cells.length); // 9 global tile values, 0 where nothing is drawn
+```
+
+`autotile(layer, rules)` does the same on a `TileLayer`; `resolveTerrain(vertices, width, height, set)` and `verticesFromCells` handle corner terrain.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
 
@@ -6851,19 +6890,17 @@ import {generateTreeMesh} from 'margoengine/procedural';
 const rings = [2, 1, 0].map((detail) => generateTreeMesh('broadleaf', {detail})); // near, middle, far
 ```
 
-`contactAO(y, groundY)` gives bounded ground-contact occlusion, and
-`radialAO(x,y,z,center,radius)` shades enclosed canopy volumes. Use their output
-with `pbrVertexStream()` from geometry to bake ambient occlusion into vertex alpha
-at initialization. `ScatterInstances` applies it to ambient lighting; direct light
-and material albedo remain independent.
+For a cove scene there are two waterfront props, each one `GeometryData` mesh with UVs, tangents and unit normals,
+local origin at the water surface (y = 0), +Y up, in metres, deterministic by `seed` (an integer, default 1):
 
-Seeded 3D simplex, gradient Perlin and exact nearest-feature Worley noise, CPU Marching Cubes geometry, and standalone tree/shrub generators.
+| Call | Options (defaults) | Triangles at `detail` 2 / 1 / 0 |
+| --- | --- | --- |
+| `generateJettyMesh(options?)` | `length` 4..120 (24), `width` 1..8 (2.2), `height` above the water 0.3..4 (1.1), `ladder` (true), `seed`, `detail` | 2,768 / 1,680 / 508 |
+| `generateBoatMesh(options?)` | `length` 1.5..12 (3.6), `seats` 0..4 (3), `oars` (true), `seed`, `detail` | 1,884 / 812 / 372 |
 
-```ts
-import {Noise, marchingCubes} from 'margoengine/procedural';
-const noise = new Noise(123);
-const geometry = marchingCubes((x,y,z) => x*x+y*y+z*z-0.5, {resolution: [32,32,32]});
-```
+The jetty runs along +X from the shore end at x = 0, with planks, stringers, posts and a ladder at the far end. The
+boat is a rowing boat centred on the origin with its bow toward +X. A wrong type throws a `TypeError` and a value out of
+range a `RangeError`; the message names the range to pass.
 
 [README continues: https://margoengine.com/llms/packages/procedural.md]
 
@@ -8557,7 +8594,7 @@ client.edit(x, y, z, 0); // shown at once; the server confirms it or sends the c
   eye plus 1 of slack), that a placed block replaces air, liquid or a plant and overlaps no player, and that a break hits
   a block, then sends the change to every client holding that chunk. A refused edit sends the cell back.
 - **Other players**: `client.samplePlayers()` interpolates each one from a `@margoengine/net` `SnapshotBuffer`, 100 ms
-  behind the newest snapshot.
+  behind the newest snapshot. `other.name` holds its display name (see below).
 - **Wire format** (`.`): one type byte and a varint body per WebSocket message. `encodeClientMessage`,
   `decodeClientMessage`, `encodeServerMessage` and `decodeServerMessage` check every length; chunks, block changes
   and players carry the `@margoengine/voxel/codec` bytes. Chunks go out without light (clients light them).
@@ -8929,6 +8966,7 @@ lines at the ticks and HTML tick labels.
 | `fig.surface(z, { nx, ny, x, y, colormap, range, contours, grid, opacity })` | height field coloured by height, contour lines, NaN holes |
 | `fig.volume(data, { dims, bounds, colormap, range, opacity, density, mode, quality, shading, clip })` | ray-marched volume; `mode: 'mip'` for maximum intensity |
 | `volume.slice('x' \| 'y' \| 'z', position)` | a plane through the volume, coloured by its map |
+| `brickedVolume(fig, source, options)` from `/bricks` | a volume larger than one texture or the memory budget, loaded by view ([below](#bricked-volumes)) |
 | `await fig.isosurface(data, level, { dims, bounds, color })` | GPU marching cubes; `layer.update(level)` re-extracts |
 | `fig.colorbar(colormap, range, { label, ticks })` | HTML colour bar at the canvas edge |
 
@@ -9176,6 +9214,7 @@ The `Model` line needs a `.glb` file at `public/model.glb`; delete it for a scen
 
 ## Example pages
 
+- `examples/boulder.html`: A robot climbs a wall: IK that keeps its arms clear of the wall and itself
 - `examples/animation-formats.html`: Collada skins and glTF animation pointers
 - `examples/batched-mesh.html`: Many shapes drawn in one call
 - `examples/character-animation.html`: A walking robot with blendable expressions
@@ -9183,11 +9222,11 @@ The `Model` line needs a `.glb` file at `public/model.glb`; delete it for a scen
 - `examples/depth-texture.html`: A depth texture that any material can sample
 - `examples/flight-helmet.html`: The Khronos Flight Helmet with PBR materials
 - `examples/khronos-gallery.html`: Khronos glTF sample assets
+- `examples/gallery/index.html`: The Harrow Head gallery: live pages by feature ([direction](gallery/DIRECTION.md))
 - `examples/kinematics-constraints.html`: Arm clearance check with the kinematics package
 - `examples/minimap.html`: A second camera view as a minimap
 - `examples/robot-expressive.html`: The same character study as a standalone page
 - `examples/scene-targets.html`: Several render targets with named outputs
-- `examples/skinning-ik.html`: Skinning and IK in a small animated scene
 - `examples/split-screen.html`: Two players, two views, render layers
 - `examples/texture-formats.html`: TGA, TIFF, KTX and DDS textures
 - `examples/tokyo-diorama.html`: A street corner animated in Blender and played back by the animation package
