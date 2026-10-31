@@ -92,6 +92,7 @@ Several agents push to `main`. Each push must leave it at least as clean as it f
   always); the React docs, React unit tests and packed browser run when `react` is affected. `modern:test:bundlers`
   (no GPU, no GPU lock) runs only when a changed package is one the matrix builds or imports (react, shadows, controls,
   stage, core, the umbrella, the starters) or one they import. `check:merge:full` keeps all of it whole.
+- `npm run check:examples-types` type-checks the examples (TypeScript, TSX and the top-level JavaScript demos) against the built package types; `npm run typecheck` covers packages only. `check:merge` runs it for the example projects a change can reach (`scripts/support/example-projects.mjs`); a new example folder goes into a project there, and `tests/check-example-types.test.js` fails until it does.
 - `npm run hygiene`: no gate gets worse for the packages you touched. New public exports carry TSDoc; new throws follow `docs/conventions.md` (`MargoError` with a code, `TypeError`, `RangeError`; the message names the fix). Run `npx biome format --write` on files you touched.
 - `npm run proofs -- --current` passes. If a deliberate change alters what a feature-off path emits, advance that proof's current reference to your commit and say why in `docs/whitepaper/claims.md`; never leave a proof failing.
 - Public numbers stay true: `site/index.html`, `README.md` and `docs/limits.md` must match `npm run measure:size`. When work affects a launch gate, update its status in `docs/HANDOFF.md`.

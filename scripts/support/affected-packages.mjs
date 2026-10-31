@@ -11,9 +11,14 @@
 //                          Vite and Next starters) or one they depend on, or a file it runs changed (the `bundlers`
 //                          footprint), and in the full decision. A changed file modern:test:packages runs (the
 //                          `packages` footprint) runs it whole.
+//   check:examples-types   type-checks the examples against the built package types, one project per tsconfig
+//                          (scripts/support/example-projects.mjs). A project runs when a package it imports is
+//                          affected (changed, or depending on a changed one), when a file it holds or its tsconfig
+//                          changed, and every project runs for the full decision or when the check code changed.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { scan, workspaceOf } from './affected-gpu.mjs';
+import { PROJECTS } from './example-projects.mjs';
 
 const posix = (path) => path.replaceAll('\\', '/');
 
@@ -85,9 +90,18 @@ export function matrixClosure(root, workspaces) {
  * run whole. `closure` is matrixClosure().
  * Returns { packages: { full, dirs, reason }, bundlers: { run, reason } }; dirs are directory names under packages/.
  */
-export function packageScopes({ decision, files, workspaces, browserFiles = new Set(), closure = new Set() }) {
+export function packageScopes({
+  decision,
+  files,
+  workspaces,
+  browserFiles = new Set(),
+  closure = new Set(),
+  examples = [],
+}) {
+  const exampleScope = exampleScopes({ decision, files, examples });
   if (decision.mode === 'full')
     return {
+      examples: exampleScope,
       packages: { full: true, dirs: [], reason: decision.reason },
       bundlers: { run: true, reason: decision.reason },
     };
@@ -99,6 +113,7 @@ export function packageScopes({ decision, files, workspaces, browserFiles = new 
       owner = workspaceOf(workspaces, file);
     if (browserFiles.has(file))
       return {
+        examples: exampleScope,
         packages: { full: true, dirs: [], reason: `${file} is served by the packed browser test` },
         bundlers: bundlerScope(decision, closure),
       };
@@ -109,11 +124,13 @@ export function packageScopes({ decision, files, workspaces, browserFiles = new 
   // A changed file that the tarball test runs (the stepClosure footprint `packages`) runs it whole.
   if ((decision.hits ?? []).includes('packages'))
     return {
+      examples: exampleScope,
       packages: { full: true, dirs: [], reason: 'a file modern:test:packages runs changed' },
       bundlers: bundlerScope(decision, closure),
     };
   const sorted = [...dirs].sort();
   return {
+    examples: exampleScope,
     packages: {
       full: false,
       dirs: sorted,
@@ -130,4 +147,46 @@ function bundlerScope(decision, closure) {
   // A package that depends on a changed one is not enough: every package is a dependent of the umbrella.
   if (hit.length) return { run: true, reason: `the matrix builds ${hit.join(', ')}` };
   return { run: false, reason: 'no changed package is one the bundler matrix builds' };
+}
+
+/**
+ * The example projects (example-projects.mjs) with what each reaches: { id, config, packages: Set of workspace names its
+ * entries import, files: Set of the repository files they read }. `projects` is PROJECTS, or a test list of its own.
+ */
+export function exampleClosure(root, workspaces, projects = PROJECTS) {
+  return projects.map(({ id, config, entries }) => {
+    const { packages, files } = scan(root, entries(root), workspaces);
+    // A starter or sandbox is a workspace that lists many packages in its package.json; only what its sources import counts.
+    for (const w of workspaces) if (config.startsWith(`${w.dir}/`)) packages.delete(w.name);
+    return { id, config, packages, files };
+  });
+}
+
+/**
+ * The example projects a decision needs: { all, ids, reason }. Everything for the full decision, and when a file that
+ * check:examples-types runs changed (the `examples-types` footprint). Otherwise a project runs when an affected package
+ * is one it imports, or a changed file is one it reads or its tsconfig.
+ */
+export function exampleScopes({ decision, files, examples }) {
+  const all = examples.map((e) => e.id);
+  if (decision.mode === 'full') return { all: true, ids: all, reason: decision.reason };
+  if ((decision.hits ?? []).includes('examples-types'))
+    return { all: true, ids: all, reason: 'a file check:examples-types runs changed' };
+  const affected = new Set(decision.affected),
+    changed = files.map(posix),
+    why = [];
+  const ids = examples
+    .filter((e) => {
+      const package_ = [...e.packages].find((name) => affected.has(name)),
+        file = changed.find((f) => f === e.config || e.files.has(f));
+      if (package_) why.push(`${e.id} imports ${package_}`);
+      else if (file) why.push(`${e.id} holds ${file}`);
+      return package_ || file;
+    })
+    .map((e) => e.id);
+  return {
+    all: false,
+    ids,
+    reason: ids.length ? why.join('; ') : 'no changed package or file is one an example project reads',
+  };
 }

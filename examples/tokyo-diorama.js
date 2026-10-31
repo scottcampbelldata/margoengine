@@ -103,11 +103,11 @@ try {
   // Play the clip; the panel pauses it, changes its speed, toggles auto-rotate and resets the view.
   const animation = Animation.attach(model);
   animation.play('Diorama');
-  const pause = document.querySelector('#pause'),
-    rotate = document.querySelector('#auto-rotate');
-  const speed = document.querySelector('#speed'),
-    speedValue = document.querySelector('#speed-value');
-  const reset = document.querySelector('#reset-view');
+  const pause = /** @type {HTMLButtonElement} */ (document.querySelector('#pause')),
+    rotate = /** @type {HTMLInputElement} */ (document.querySelector('#auto-rotate'));
+  const speed = /** @type {HTMLInputElement} */ (document.querySelector('#speed')),
+    speedValue = /** @type {HTMLOutputElement} */ (document.querySelector('#speed-value'));
+  const reset = /** @type {HTMLButtonElement} */ (document.querySelector('#reset-view'));
   const sync = () => {
     pause.textContent = animation.playing ? 'Pause animation' : 'Resume animation';
     pause.setAttribute('aria-pressed', String(!animation.playing));
@@ -140,7 +140,7 @@ try {
   await submitPrincipalScene(() => stage.engine.render(), runtime.gpu.queue, { signal: abort.signal });
   stage.engine.start();
   watchQuality();
-  document.querySelector('#viewport').dataset.ready = 'true';
+  /** @type {HTMLElement} */ (document.querySelector('#viewport')).dataset.ready = 'true';
   status.textContent = 'Ready';
 } catch (reason) {
   dispose?.();

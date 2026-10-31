@@ -8,10 +8,12 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "types": [
-      "vite/client"
+      "vite/client",
+      "node"
     ]
   },
   "include": [
-    "src"
+    "src",
+    "vite.config.ts"
   ]
 }

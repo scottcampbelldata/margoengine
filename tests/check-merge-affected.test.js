@@ -409,12 +409,13 @@ test('every check:merge step is either narrowed GPU work or plain; a new step ha
   assert.equal(manifest.scripts['check:merge:full'], 'node scripts/check-merge.mjs --full');
 });
 
-test('a documents-only change skips every GPU step and the bundler matrix, and keeps the others', () => {
+test('a documents-only change skips every GPU step, the example types and the bundler matrix, and keeps the others', () => {
   const { decision, planned } = planFor(['docs/HANDOFF.md', 'AGENTS.md', 'packages/dof/README.md']);
   assert.equal(decision.mode, 'affected');
   for (const { command, skip } of planned) {
     const name = stepName(command);
-    if (GPU_STEPS.includes(name) || name === 'modern:test:bundlers') assert.ok(skip, `${command} should be skipped`);
+    if (GPU_STEPS.includes(name) || ['modern:test:bundlers', 'check:examples-types'].includes(name))
+      assert.ok(skip, `${command} should be skipped`);
     else assert.equal(skip, undefined, `${command} should run`);
   }
   assert.equal(planned.length, steps.length);

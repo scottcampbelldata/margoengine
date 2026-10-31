@@ -5,7 +5,7 @@ import { createStage } from 'margoengine';
 import { torusKnotGeometry } from '@margoengine/geometry';
 import { Material, createMesh } from '@margoengine/materials';
 import { SceneTargets } from '@margoengine/post/mrt';
-import type { PassContext } from '@margoengine/core/extension';
+import type { FrameGraph, PassContext } from '@margoengine/core/extension';
 import { still } from './multi-view.js';
 
 declare global {
@@ -78,7 +78,7 @@ try {
   stage.use({
     name: 'show-targets',
     setup() {},
-    registerPasses(graph) {
+    registerPasses(graph: FrameGraph) {
       graph.add({
         name: 'show-targets',
         order: 20,

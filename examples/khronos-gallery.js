@@ -4,6 +4,7 @@
 // validation errors). `?model=Name` shows one model as a still frame; that is the view scripts/visual-regression.js
 // captures (readiness: body[data-ready]); `&variant=Name` (or its index) shows that KHR_materials_variants variant (model.selectVariant).
 import { createStage } from 'margoengine';
+import { engineRuntime } from '@margoengine/core/extension';
 import { applyGLTFLights, loadGLTF, viewGLTFCamera } from '@margoengine/gltf-pro';
 import { instancing } from '@margoengine/gltf-pro/instancing';
 import { extendedMaterials } from '@margoengine/gltf-pro/extended';
@@ -71,7 +72,8 @@ async function main() {
     camera: { position: [0.6, 0.8, 3], target: [0, 0, 0] },
   });
   const engine = stage.engine,
-    device = engine.gpu,
+    runtime = engineRuntime(engine),
+    device = runtime.gpu,
     gpuErrors = [];
   device.addEventListener('uncapturederror', (event) => {
     gpuErrors.push(event.error.message);
@@ -91,14 +93,14 @@ async function main() {
   let clustered; // for KHR_lights_punctual point and spot lights, attached by the first model that has some
   const camera = engine.camera,
     fov = camera.fov,
-    light = [engine.lighting.direction.slice(), engine.lighting.radiance.slice()];
+    light = [runtime.lighting.direction.slice(), runtime.lighting.radiance.slice()];
   // ABeautifulGame's 33 2048x2048 textures decode to 528 MiB, over the default image budget (4 x 128 MiB).
   const maxDownloadBytes = 160 * 1024 * 1024;
 
   const report = [],
     rows = document.querySelector('#rows'),
     esc = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-  window.khronosGallery = { report };
+  Object.assign(window, { khronosGallery: { report } });
   for (const m of models) {
     caption.textContent = `Loading ${m.name}…`;
     const row = { name: m.name, ok: false, error: undefined, ignored: [], gpuErrors: [], loadMs: 0, frameMs: 0 },
@@ -106,8 +108,8 @@ async function main() {
       before = gpuErrors.length;
     let model;
     try {
-      engine.lighting.direction.set(light[0]);
-      engine.lighting.radiance.set(light[1]);
+      runtime.lighting.direction.set(light[0]);
+      runtime.lighting.radiance.set(light[1]);
       camera.project = undefined;
       camera.up = [0, 1, 0];
       camera.fov = fov;
@@ -132,8 +134,8 @@ async function main() {
         exposure: sun?.intensity ? 3 / sun.intensity : 1,
       });
       const b = model.bounds,
-        min = [b[0], b[1], b[2]],
-        max = [b[3], b[4], b[5]];
+        min = /** @type {[number, number, number]} */ ([b[0], b[1], b[2]]),
+        max = /** @type {[number, number, number]} */ ([b[3], b[4], b[5]]);
       if (![...min, ...max].every(Number.isFinite)) throw new Error('model has no finite bounds');
       const radius = Math.max(1e-3, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2);
       camera.near = radius / 100;

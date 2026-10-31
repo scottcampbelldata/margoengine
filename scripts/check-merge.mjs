@@ -19,7 +19,8 @@
 // The steps are the ones in package.json `check:merge:steps`. Verify, the fresh clone, the site build and the
 // quickstart always run; each GPU step runs only when its footprint (scripts/support/affected-gpu.mjs) meets the
 // affected packages or holds a changed file, or runs on a narrowed list (visual demos, GPU test ids, WGSL package
-// directories). The package tarball test always runs, on the affected packages' README examples (the umbrella smoke
+// directories). The example type check (scripts/check-example-types.mjs) runs the example projects an affected package
+// or a changed example file reaches, all of them in the full run. The package tarball test always runs, on the affected packages' README examples (the umbrella smoke
 // test every time; whole when a file it runs changed), and the bundler matrix runs when a changed package is one it
 // builds or imports, or a file it runs changed (scripts/support/affected-packages.mjs); the full run keeps both whole.
 // The mode and the reason are printed first and written to test-results/check-merge.json. A step that fails while the
@@ -65,7 +66,7 @@ import {
   visualIds,
   wgslPackages,
 } from './support/affected-gpu.mjs';
-import { matrixClosure, packageScopes } from './support/affected-packages.mjs';
+import { exampleClosure, matrixClosure, packageScopes } from './support/affected-packages.mjs';
 import { changedUmbrellaReader, umbrellaChangeIsReexportOnly } from './support/umbrella-change.mjs';
 import { PARALLEL, SERIAL } from './verify.mjs';
 
@@ -85,7 +86,7 @@ export const GPU_STEPS = [
 /** Steps known to need no GPU narrowing; a step in neither list fails the unit test so someone decides. */
 export const PLAIN_STEPS = ['verify', 'check:fresh-clone', 'build:site', 'check:quickstart'];
 /** Package-level steps (no GPU) that always run in some form and are narrowed by packageScopes. */
-export const SCOPED_STEPS = ['modern:test:packages', 'modern:test:bundlers'];
+export const SCOPED_STEPS = ['check:examples-types', 'modern:test:packages', 'modern:test:bundlers'];
 
 /** Steps that never drive the GPU: no heat watch. */
 export const NO_GPU_STEPS = ['verify', 'check:fresh-clone'];
@@ -143,6 +144,11 @@ export function planSteps({ steps, decision, tests, workspaces, testId, scope })
         const dirs = wgslPackages(workspaces, decision.affected);
         return dirs.length ? [{ command: `${command} -- --packages=${dirs.join(',')}` }] : skip(none);
       }
+      case 'check:examples-types':
+        if (!scope || scope.examples.all) return [{ command }];
+        return scope.examples.ids.length
+          ? [{ command: `${command} -- --projects=${scope.examples.ids.join(',')}` }]
+          : skip(scope.examples.reason);
       case 'modern:test:packages':
         return scope && !scope.packages.full
           ? [{ command: `${command} -- --packages=${scope.packages.dirs.join(',')}` }]
@@ -192,6 +198,7 @@ export async function planContext(dir = root) {
     mentions: mentionIndex(dir, footprints),
     browserFiles: scan(dir, ['tests/modern.html'], workspaces).files,
     matrix: matrixClosure(dir, workspaces),
+    examples: exampleClosure(dir, workspaces),
   };
 }
 
@@ -203,8 +210,8 @@ export function planFiles(ctx, files, env = {}) {
 }
 
 function planDecision(ctx, decision, files) {
-  const { steps, workspaces, tests, testId, browserFiles, matrix } = ctx;
-  const scope = packageScopes({ decision, files, workspaces, browserFiles, closure: matrix });
+  const { steps, workspaces, tests, testId, browserFiles, matrix, examples } = ctx;
+  const scope = packageScopes({ decision, files, workspaces, browserFiles, closure: matrix, examples });
   return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope }) };
 }
 
@@ -255,7 +262,7 @@ async function planRun(args) {
   const { scope, planned } = planDecision(ctx, decision, files);
   console.log(describe(decision, base));
   console.log(
-    `  packages: ${scope.packages.full ? 'whole' : 'scoped'} (${scope.packages.reason}); bundlers: ${scope.bundlers.run ? 'run' : 'skip'} (${scope.bundlers.reason})`,
+    `  packages: ${scope.packages.full ? 'whole' : 'scoped'} (${scope.packages.reason}); bundlers: ${scope.bundlers.run ? 'run' : 'skip'} (${scope.bundlers.reason}); example types: ${scope.examples.all ? 'all' : scope.examples.ids.join(',') || 'none'} (${scope.examples.reason})`,
   );
   for (const { command, skip } of planned) console.log(`  ${skip ? `skip (${skip})` : 'run'}  ${command}`);
   return { decision, base, planned };
