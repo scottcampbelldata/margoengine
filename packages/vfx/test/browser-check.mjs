@@ -7,6 +7,8 @@
 // Curves: 64 particles of known ages with size, alpha and colour curves; five probes each match the colour, alpha and
 // soft-disc falloff computed here from the curves (1x and 4x MSAA). Emitters: 4096 births of a ball, a shell, a cone and
 // a two-triangle mesh are read back and tested against the shape's own maths (volume, angle, area weights, normals).
+// Soft particles: six particles over a floor drawn into the scene depth fade by the distance to it (1x and 4x, the scene's own
+// depth or a separate 1-sample one); without softness the hard falloff stays.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -75,6 +77,37 @@ try {
     assert.ok(r.sameList, 'order: two runs list the same particles in the same order');
     assert.equal(r.differing, 0, 'order: two runs give the same pixels');
     console.log(`ok order: ${r.drawn} drawn in slot order, ${r.lit} lit pixels, 0 differ between two runs`);
+  }
+  for (const [samples, provider] of [
+    [1, 'same'],
+    [4, 'single'],
+    [4, 'same'],
+  ]) {
+    const name = `soft ${samples}x ${provider}`,
+      hard = await page.evaluate(([s, p]) => window.checkSoft(s, p, 0), [samples, provider]),
+      r = await page.evaluate(([s, p]) => window.checkSoft(s, p, 1), [samples, provider]);
+    report.results[name] = { hard, soft: r };
+    for (const each of [hard, r]) {
+      assert.equal(each.error, null, name);
+      assert.deepEqual(each.errors, [], name);
+    }
+    const off = (a, key) => Math.max(...a.rows.map((row) => Math.abs(row.got - row[key])));
+    assert.ok(
+      off(hard, 'hard') <= 3,
+      `${name}: without softness the alpha is the plain falloff (${off(hard, 'hard')}/255)`,
+    );
+    assert.ok(off(r, 'soft') <= 4, `${name}: the fade matches the floor gap (${off(r, 'soft')}/255)`);
+    const gaps = r.rows.map((row) => row.gap);
+    assert.ok(gaps[0] < 0.3 && gaps.at(-1) > 1, `${name}: gaps span the ramp (${gaps.map((g) => g.toFixed(2))})`);
+    const cut = r.rows.filter((row) => row.hard - row.got > 60).length;
+    assert.ok(cut >= 3, `${name}: softness removes the hard edge where the floor is within 1 m (${cut} particles)`);
+    assert.ok(
+      Math.abs(r.rows.at(-1).got - hard.rows.at(-1).got) <= 3,
+      `${name}: a particle 1 m clear of the floor is unchanged`,
+    );
+    console.log(
+      `ok ${name}: gaps ${gaps.map((g) => g.toFixed(2))}, alpha ${r.rows.map((row) => row.got)} (${hard.rows.map((row) => row.got)} without), largest difference ${off(r, 'soft')}/255`,
+    );
   }
   assert.deepEqual(pageErrors, []);
   await writeFile('test-results/vfx-browser-check.json', JSON.stringify(report, null, 1));

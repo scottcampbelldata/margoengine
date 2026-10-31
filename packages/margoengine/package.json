@@ -1322,6 +1322,10 @@
       "types": "./dist/vfx/texture.d.ts",
       "import": "./dist/vfx/texture.js"
     },
+    "./vfx/soft": {
+      "types": "./dist/vfx/soft.d.ts",
+      "import": "./dist/vfx/soft.js"
+    },
     "./vfx/curves": {
       "types": "./dist/vfx/curves.d.ts",
       "import": "./dist/vfx/curves.js"

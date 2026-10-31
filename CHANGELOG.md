@@ -86,6 +86,12 @@
   constants, undo and redo, live validation with the node to fix, WGSL view, keyboard and screen-reader friendly), and the
   DOM-free `GraphModel` behind it. `editor.onGraph` reports each new valid graph for hot reload.
 
+- `@margoengine/vfx`: soft particles. `softness` (world units, default 0 = off) fades a particle over that distance in
+  front of any opaque surface behind it, so it no longer shows a hard line where it meets the floor or a wall; `depth: () =>
+  depthTexture.texture` supplies the scene depth (`DepthTexture` from `@margoengine/post/depth`, 1 sample or the scene's
+  sample count). New optional entry `@margoengine/vfx/soft` (`{soft}` on `/base`; the root `VFX` has it). Effects with
+  `softness` off compile the same WGSL and make the same GPU calls as before.
+
 - `@margoengine/vfx`: two optional features. `curves: {size, alpha, color}` (`@margoengine/vfx/curves`) shapes each
   particle's size, opacity and colour over its life; `emitter` (`@margoengine/vfx/emitter`) starts births on a sphere
   (volume or shell), a cone or the area-weighted surface of a triangle mesh and pushes them along the shape's direction

@@ -58,6 +58,10 @@
       "types": "./dist/texture.d.ts",
       "import": "./dist/texture.js"
     },
+    "./soft": {
+      "types": "./dist/soft.d.ts",
+      "import": "./dist/soft.js"
+    },
     "./curves": {
       "types": "./dist/curves.d.ts",
       "import": "./dist/curves.js"

@@ -75,6 +75,19 @@ export interface VFXOptions {
   wrap?: boolean;
   /** Draw back to front: bitonic sort of the live list each frame. Read at attach. */
   sort?: boolean;
+  /**
+   * Fade distance in world units, >= 0: a particle fades out over this distance in front of any opaque surface behind it
+   * (measured along the view axis), so it no longer shows a hard line where it meets the floor or a wall. Needs the `soft`
+   * feature and `depth`; changeable between frames. Default 0 (off: no extra shader code, bindings or per-frame work).
+   */
+  softness?: number;
+  /**
+   * Scene depth for `softness`: a function returning a sampleable depth texture (reversed Z: 1 at the near plane, 0 where
+   * nothing is drawn; 1 sample or the scene's sample count) the size of the drawing buffer, or undefined before it
+   * exists. For example `() => depth.texture` with `DepthTexture` from `@margoengine/post/depth`. Throws `MargoError`
+   * `'state'` at draw time when it returns undefined while `softness` is on.
+   */
+  depth?: () => GPUTexture | undefined;
   /** RGBA8 sRGB sprite (or atlas of frames) multiplied by the particle colour, instead of the soft disc. Read at construction. */
   texture?: VFXTexture;
   /** Size, opacity and colour over each particle's life. Which curves are set is read at attach; their values are read each frame. Needs the `curves` feature. */
@@ -185,6 +198,20 @@ export interface VFXFeatures {
     patch(billboard: string, texture: VFXTexture): string;
     create(device: GPUDevice, texture: VFXTexture, owned: OwnedResources): GPUBindGroupEntry[];
   };
+  soft?: {
+    patch(billboard: string, samples: number): string;
+    create(
+      device: GPUDevice,
+      owned: OwnedResources,
+    ): {
+      /** Bind group entries (uniform at 11, depth at 12) for the depth last given to `write`. */
+      entries: GPUBindGroupEntry[];
+      /** True when `write` was given a different depth texture than before (bind groups are stale). */
+      changed: boolean;
+      /** Validates `depth` against the pass, uploads the frame's uniform and returns the depth's sample count. */
+      write(c: Context, depth: GPUTexture | undefined, view: ArrayLike<number>, softness: number): number;
+    };
+  };
   curves?: {
     validate(curves: VFXCurves): void;
     patch(billboard: string, curves: VFXCurves): string;
@@ -247,6 +274,7 @@ export class VFX implements EnginePlugin {
   private emitterShape?: string;
   private sorter?: ReturnType<NonNullable<VFXFeatures['sort']>['create']>;
   private owned: OwnedResources = [];
+  private softRuntime?: ReturnType<NonNullable<VFXFeatures['soft']>['create']>;
   private fogSource: FogLike | null = null;
   private fogBuffer?: GPUBuffer;
   private readonly fogData = new Float32Array(12);
@@ -332,6 +360,17 @@ export class VFX implements EnginePlugin {
       (o.wrap && !o.emissionExtent?.every((v) => v > 0))
     )
       throw new RangeError('VFX sort and wrap must be booleans; wrap needs emissionExtent above 0.');
+    if (o.softness !== undefined && (!Number.isFinite(Math.fround(o.softness)) || o.softness < 0))
+      throw new RangeError('VFX softness must be a world distance of 0 or more; pass e.g. 0.5, or 0 to turn it off.');
+    if (o.depth !== undefined && typeof o.depth !== 'function')
+      throw new TypeError('VFX depth must be a function returning the scene depth texture; pass () => depth.texture');
+    if (o.softness) {
+      if (!this.features.soft) throw new TypeError('VFX softness needs soft from @margoengine/vfx/soft: pass {soft}');
+      if (!o.depth)
+        throw new TypeError(
+          'VFX softness needs scene depth: add DepthTexture from @margoengine/post/depth and pass depth: () => depth.texture',
+        );
+    }
     for (const key of ['obstacles', 'wrap', 'sort', 'curves', 'emitter'] as const)
       if (o[key] && !this.features[key]) throw new TypeError(`VFX ${key} needs ${key} from @margoengine/vfx/${key}`);
     if (o.curves) {
@@ -575,10 +614,20 @@ export class VFX implements EnginePlugin {
       });
       c.device.queue.writeBuffer(this.fogBuffer, 0, this.fogData);
     }
-    const key = this.renderKey + ':' + c.descriptor.multisample?.count + (fog ? ':fog' : '');
+    // Soft particles: the feature checks the depth and uploads its uniform; a new depth texture rebinds.
+    const softness = this.options.softness ?? 0;
+    let samples = 0;
+    if (softness > 0) {
+      this.softRuntime ??= this.features.soft!.create(c.device, this.owned);
+      samples = this.softRuntime.write(c, this.options.depth!(), this.view, softness);
+      if (this.softRuntime.changed) this.renderGroups.clear();
+    }
+    const key =
+      this.renderKey + ':' + c.descriptor.multisample?.count + (fog ? ':fog' : '') + (samples ? ':soft' + samples : '');
     let pipeline = this.renders.get(key);
     if (!pipeline) {
-      const billboard = fog ? foggedBillboard(this.billboard) : this.billboard;
+      const lit = samples ? this.features.soft!.patch(this.billboard, samples) : this.billboard,
+        billboard = fog ? foggedBillboard(lit) : lit;
       const module = c.device.createShaderModule({
         code: (c.descriptor.multisample?.count ?? 1) > 1 ? multisampled(billboard) : billboard,
       });
@@ -620,6 +669,7 @@ export class VFX implements EnginePlugin {
           ...this.spriteEntries,
           ...(this.curveRuntime?.entries ?? []),
           ...(fog ? [{ binding: 5, resource: { buffer: this.fogBuffer! } }] : []),
+          ...(samples ? this.softRuntime!.entries : []),
         ],
       });
       this.renderGroups.set(pipeline, group);
@@ -654,6 +704,7 @@ export class VFX implements EnginePlugin {
     ])
       buffer?.destroy();
     this.fogBuffer = undefined;
+    this.softRuntime = undefined;
     this.owned = [];
     this.spriteEntries = [];
     this.curveRuntime = this.emitterRuntime = undefined;

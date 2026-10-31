@@ -206,5 +206,82 @@ window.checkOrder=async()=>{
   ascending:a.list.every((v,i)=>i===0||v>a.list[i-1]),
   born:born.length,bornLowest:born.length===40000&&born[born.length-1]===39999};
 };
+// Soft particles: a camera 8 m up looking steeply down at a floor (y = 0) drawn into the scene depth, and six particles of size 0.4
+// at heights 0.2 to 2 m over it. With softness 1 each particle centre fades by (floor depth along the pixel ray - particle
+// depth along the view axis) / 1, clamped, times the soft-disc falloff, all computed here from the camera basis. Without
+// softness the alpha is the falloff alone (the hard line where the floor cuts the particle). 'same' samples the scene's own
+// depth texture (multisampled at 4x); 'single' a separate 1-sample depth of the same floor, as DepthTexture provides.
+const floorShader=`@group(0) @binding(0) var<uniform> m:mat4x4f;
+@vertex fn v(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
+ let q=array<vec2f,6>(vec2f(-50,-50),vec2f(50,-50),vec2f(50,50),vec2f(-50,-50),vec2f(50,50),vec2f(-50,50))[i];
+ return m*vec4f(q.x,0,q.y,1);
+}`;
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],norm=a=>{const l=Math.hypot(...a);return a.map(c=>c/l);};
+const eye=[0,8,3],softCamera=()=>{const c=new Camera({position:eye,target:[0,0,0],fov:40,near:0.1,far:100});c.update(1,true);return c;};
+const drawFloor=(encoder,cam,texture,count)=>{
+ const module=device.createShaderModule({code:floorShader}),
+  pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'v'},multisample:{count},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'greater'}}),
+  uniform=device.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+ device.queue.writeBuffer(uniform,0,cam.matrix);
+ const pass=encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:texture.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:0}});
+ pass.setPipeline(pipeline);pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:uniform}}]}));pass.draw(6);pass.end();
+ return uniform;
+};
+const heights=[0.2,0.3,0.5,0.8,1.2,2],softSize=0.4;
+window.checkSoft=async(samples,provider,softness)=>{
+ const cam=softCamera(),n=8;
+ const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage}),
+  color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),
+  resolved=samples>1?target('rgba8unorm',1,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC):color,
+  depth=target('depth32float',samples,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING),
+  single=provider==='single'&&samples>1?target('depth32float',1,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING):depth,
+  effect=new VFX({capacity:n,rate:0,gravity:[0,0,0],velocity:[0,0,0],spread:0,turbulence:0,ground:-100,size:softSize,color:[1,1,1,1],
+   ...(softness?{softness,depth:()=>single}:{})});
+ const records=new Float32Array(n*16),places=heights.map((h,i)=>[(i-2.5)*0.9,h,0]);
+ places.forEach((p,i)=>{records.set([...p,4,0,0,0,softSize],i*8);records.set([1,1,1,1,0,0,4,0],n*8+i*8);});
+ device.pushErrorScope('validation');
+ effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+ device.queue.writeBuffer(effect.gpuState.particles,0,records);
+ const pixels=device.createBuffer({size:size*size*4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder(),uniforms=[drawFloor(encoder,cam,depth,samples)];
+ if(single!==depth)uniforms.push(drawFloor(encoder,cam,single,1));
+ encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}]}).end();
+ const context={backend:'webgpu',device,delta:0,camera:cam,width:size,height:size,format:'rgba8unorm',color:color.createView(),depth:depth.createView(),descriptor:{multisample:{count:samples},depthStencil:{format:'depth32float'}},encoder};
+ effect.simulate(context);effect.draw(context);
+ if(samples>1)encoder.beginRenderPass({colorAttachments:[{view:color.createView(),resolveTarget:resolved.createView(),loadOp:'load',storeOp:'store'}]}).end();
+ encoder.copyTextureToBuffer({texture:resolved},{buffer:pixels,bytesPerRow:size*4},[size,size]);
+ device.queue.submit([encoder.finish()]);
+ await pixels.mapAsync(GPUMapMode.READ);
+ const image=new Uint8Array(pixels.getMappedRange().slice(0)),F=norm(eye.map(c=>-c)),R=norm(cross(F,[0,1,0])),U=cross(R,F),t=Math.tan(20*Math.PI/180);
+ const rows=places.map((P,i)=>{
+  const m=cam.matrix,w=m[3]*P[0]+m[7]*P[1]+m[11]*P[2]+m[15],px=Math.floor(((m[0]*P[0]+m[4]*P[1]+m[8]*P[2]+m[12])/w*0.5+0.5)*size),py=Math.floor((0.5-(m[1]*P[0]+m[5]*P[1]+m[9]*P[2]+m[13])/w*0.5)*size);
+  // The pixel's centre ray: forward + x tan R + y tan U has a view-axis component of 1, so a point at s along it is s deep.
+  const nx=(px+0.5)/size*2-1,ny=1-(py+0.5)/size*2,dir=[0,1,2].map(k=>F[k]+nx*t*R[k]+ny*t*U[k]),
+   depthP=dot(F,[P[0]-eye[0],P[1]-eye[1],P[2]-eye[2]]),Q=[0,1,2].map(k=>eye[k]+depthP*dir[k]),r=Math.hypot(Q[0]-P[0],Q[1]-P[1],Q[2]-P[2])/(softSize/2),
+   fall=(1-r*r)**2,gap=-eye[1]/dir[1]-depthP,fade=Math.min(Math.max(gap/(softness||1),0),1),at=(py*size+px)*4;
+  return {height:P[1],gap,hard:fall*255,soft:fall*fade*255,got:image[at+3]};
+ });
+ const error=await device.popErrorScope();
+ effect.dispose();for(const x of new Set([color,resolved,depth,single]))x.destroy();pixels.destroy();for(const u of uniforms)u.destroy();
+ return {error:error?.message??null,errors:errors.splice(0),rows};
+};
+// Frame cost: the same system with and without softness, alternated, wall time per frame over batches (floor depth,
+// simulate and draw, the queue drained at the end of each batch). Every particle is alive and on screen.
+window.benchSoft=async(capacity,batches,frames)=>{
+ const cam=softCamera(),w=1280,h=720,make=softness=>new VFX({capacity,initialCount:capacity,rate:0,position:[0,1.5,0],emissionExtent:[6,1.5,3],velocity:[0,0,0],spread:0.3,gravity:[0,0,0],turbulence:0.3,ground:-100,size:0.12,lifetime:[1000,1000],color:[1,0.6,0.3,0.2],...(softness?{softness,depth:()=>depth}:{})});
+ const target=(format,usage)=>device.createTexture({size:[w,h],format,usage}),color=target('rgba8unorm',GPUTextureUsage.RENDER_ATTACHMENT),
+  depth=target('depth32float',GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING),plain=make(0),soft=make(0.5);
+ for(const e of [plain,soft])e.setup({gpu:device,stats:{drawCalls:0},removePlugin(){}});
+ const frame=effect=>{
+  const encoder=device.createCommandEncoder();drawFloor(encoder,cam,depth,1);
+  encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}]}).end();
+  const context={backend:'webgpu',device,delta:1/60,camera:cam,width:w,height:h,format:'rgba8unorm',color:color.createView(),depth:depth.createView(),descriptor:{multisample:{count:1},depthStencil:{format:'depth32float'}},encoder};
+  effect.simulate(context);effect.draw(context);device.queue.submit([encoder.finish()]);
+ };
+ const time=async effect=>{const start=performance.now();for(let i=0;i<frames;i++)frame(effect);await device.queue.onSubmittedWorkDone();return(performance.now()-start)/frames;};
+ await time(plain);await time(soft);
+ const a=[],b=[];for(let i=0;i<batches;i++){a.push(await time(plain));b.push(await time(soft));}
+ for(const e of [plain,soft])e.dispose();color.destroy();depth.destroy();
+ return {errors:errors.splice(0),plain:a,soft:b};
+};
 window.ready=true;
 </script></body></html>

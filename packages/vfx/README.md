@@ -116,7 +116,7 @@ const shower = VFX.attach(engine, {
 against curves evaluated in the test, at 1x and 4x MSAA) and 4,096 births of each shape: a ball's volume (mean r^3 / R^3
 is 1/2), a shell's radius, a cone's solid-angle and disc statistics, and a two-triangle mesh's area share, bounds and normals.
 
-`obstacles`, `wrap`, `sort`, `texture`, `curves` and `emitter` are read when the effect attaches.
+`obstacles`, `wrap`, `sort`, `texture`, `curves` and `emitter` are read when the effect attaches; `softness` and `depth` are read every frame.
 
 ### Fog
 
@@ -135,6 +135,39 @@ declare const engine: EngineKernel, sparks: VFX; // from the first example
 const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 60});
 sparks.setFog(fog);
 ```
+
+### Soft particles
+
+`softness` (world units, default 0 = off) fades each particle over that distance in front of any opaque surface behind
+it, measured along the view axis, so a particle that meets the floor or a wall no longer shows a hard line. A particle
+`softness` or more clear of every surface is drawn exactly as before; one touching a surface fades to nothing. It needs
+the `soft` feature (on the root `VFX`; `{soft}` from `@margoengine/vfx/soft` on `/base`) and the scene depth as a
+sampleable depth texture of the drawing size, given by the `depth` option: a function returning it, so a texture that is
+replaced on resize is picked up. `DepthTexture` from `@margoengine/post/depth` provides one (depth32float, reversed Z, 1 sample);
+a multisampled scene depth works too (the nearest sample counts), as do views (the view's rectangle is used).
+`softness` may change every frame; with it at 0 the effect compiles the same WGSL, binds the same resources and does the
+same per-frame work as without the option. The first soft frame compiles a second billboard shader, like fog.
+
+Without a depth texture the draw throws `MargoError` `'state'` (`depth()` returned undefined: add `DepthTexture` before the
+first frame, or set `softness` to 0); a depth texture that cannot be sampled or is not the drawing size throws
+`RangeError`; `softness` without the feature or without `depth` throws `TypeError` when the effect is made. Where the
+depth is 0 (nothing drawn) the particle is left alone.
+
+```ts
+import type {EngineKernel} from 'margoengine/core';
+import {DepthTexture} from 'margoengine/post/depth';
+import {VFX} from 'margoengine/vfx';
+declare const engine: EngineKernel; // from the first example
+const depth = DepthTexture.attach(engine);
+// Steam that thins out over the last 0.5 m before the floor and walls.
+const steam = VFX.attach(engine, {
+  capacity: 20_000, rate: 2_000, position: [0, 0.1, 0], size: 0.4, color: [0.9, 0.9, 1, 0.3],
+  softness: 0.5, depth: () => depth.texture,
+});
+```
+
+Measured on an RTX A6000 (Edge, 1280x720, one million particles on screen, 40 frames a batch, 9 alternating batches,
+simulate + draw + the floor depth pass): see the table below.
 
 ### GPU cost
 
@@ -163,12 +196,12 @@ from 0.010 to 0.031 ms at 100,000; the draw is unchanged.
 
 ### Load only what you use
 
-`VFX` from `@margoengine/vfx` (about 13.0 kB min+gzip) carries all six features. An effect that uses none of them can
-import the same class from `@margoengine/vfx/base` (about 8.0 kB); add features as a second argument from their own
+`VFX` from `@margoengine/vfx` (about 14.1 kB min+gzip) carries all seven features. An effect that uses none of them can
+import the same class from `@margoengine/vfx/base` (about 8.3 kB); add features as a second argument from their own
 entries: `/obstacles` (1.1 kB alone), `/wrap` (0.2 kB), `/sort` (1.1 kB), `/texture` (1.5 kB; it exports
-`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB) and `/emitter` (2.4 kB). Sizes are vite library builds with bare imports external,
+`textureFeature`, passed as `{texture: textureFeature}`), `/curves` (1.6 kB), `/emitter` (2.4 kB) and `/soft` (1.3 kB). Sizes are vite library builds with bare imports external,
 each entry compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)), so a
-bundle that combines them adds less: the whole root is 13.0 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
+bundle that combines them adds less: the whole root is 14.1 kB. `node examples/package-benchmarks/vfx-size.mjs` measures base-plus-feature bundles
 (`results/vfx-size.json`, at an earlier commit, `76af7a0`).
 
 ```ts
