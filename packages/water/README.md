@@ -10,11 +10,27 @@ const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0});
 ```
 
 For an open ocean, set `horizon: true`. The central 75% of each grid axis keeps
-its original spacing; outer rows stretch toward a 10 km horizon and render beyond
-the scene's far clip. Wave displacement and normals fade together when those
-larger cells cannot resolve the wavelength. The default grid remains bounded for
-ponds and finite surfaces. Horizon mode is centered at the origin, so use a size
-that keeps the shoreline and terrain map within the central grid.
+its original spacing and follows the camera in whole cells, so the swell
+surrounds the camera wherever it goes and the waves stay put in the world. Each
+outer row is a fixed ratio wider than the one inside it, out to 10 km past the
+grid's edge, and the last row lies 10,000 km out, so the sea meets the true
+horizon even from a camera kilometres up; both draw beyond the scene's far clip.
+Wave displacement and normals fade
+together over those rows as the cells grow too large to resolve the wavelength.
+The default grid remains bounded and centred on the origin for ponds and finite
+surfaces. Use a size that keeps the shoreline and terrain map within 37.5% of
+`size` of the camera, where the cells are regular.
+
+```ts
+import {Water} from 'margoengine/water';
+// A 4 km sea on 8 m cells: the swell follows the camera to the horizon.
+const sea = Water.attach(engine, {
+  size: [4096, 4096],
+  segments: 512,
+  horizon: true,
+  waves: [{direction: [1, 0.3], amplitude: 0.9, wavelength: 48}],
+});
+```
 
 Directions are XZ, dimensions/amplitudes are world units, wavelengths are positive, and phase is radians. A configured wave supplies the dominant direction and wavelength of its train; its three component amplitudes sum to the configured amplitude. Invalid steepness that would fold the surface is rejected. The crest bend includes analytical derivatives and a displacement margin to preserve that bound. Agitation and micro-ripples follow the first wave's direction; each of their four layers is turned by its own angle (11° to 41°) and scaled by non-integer ratios, so no two noise lattices line up into visible streaks. Open-water sky reflections clamp below-horizon rays to the horizon and soften with roughness. Fresnel inputs are saturated before exponentiation so floating-point roundoff cannot feed a negative base into `pow`. Default water owns a shared sampleable scene-depth target with HTML. With Bloom/SSAO/DOF, pass `depth: () => effect.depthTexture` explicitly; dimensions must match the viewport. Water is opaque and Y-up. It seeds its own depth target from opaque scene depth and writes that target to resolve overlapping wave triangles; the original scene depth stays available for shoreline comparisons. Default foam history is screen-space and resets on resize/restoration. Each engine view keeps its own foam history; a view not drawn for a frame releases it.
 

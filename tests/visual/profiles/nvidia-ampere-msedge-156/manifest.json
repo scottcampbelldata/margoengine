@@ -3,7 +3,7 @@
   "night-citadel-high": {
    "url": "night-citadel/?quality=high",
    "size": "640x360",
-   "runs": 3,
+   "runs": 4,
    "noise": {
     "changed": 0,
     "hot": 0,
@@ -15,15 +15,19 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 156.0.4314.42",
+    "browser": "msedge 156.0.4314.50",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-27T11:31:15.557Z",
-    "commit": "2434db027dd1f5e49e5ea7997e6ccb1278794e2f",
-    "packagesDirty": false,
-    "renderedInputsDirty": false,
-    "renderedInputChanges": []
+    "date": "2026-10-31T03:50:37.500Z",
+    "commit": "cb6e9b0ad0f2376c2d32eb117cbdb44d114c81dd",
+    "packagesDirty": true,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "packages/water/src/index.ts",
+     "packages/water/test/horizon.browser.mjs",
+     "packages/water/test/water.test.js"
+    ]
    }
   },
   "night-citadel-light": {
@@ -41,15 +45,19 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 156.0.4314.42",
+    "browser": "msedge 156.0.4314.50",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T18:54:18.206Z",
-    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
-    "packagesDirty": false,
-    "renderedInputsDirty": false,
-    "renderedInputChanges": []
+    "date": "2026-10-31T03:50:37.500Z",
+    "commit": "cb6e9b0ad0f2376c2d32eb117cbdb44d114c81dd",
+    "packagesDirty": true,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "packages/water/src/index.ts",
+     "packages/water/test/horizon.browser.mjs",
+     "packages/water/test/water.test.js"
+    ]
    }
   },
   "night-citadel-phone": {
@@ -67,15 +75,19 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 156.0.4314.42",
+    "browser": "msedge 156.0.4314.50",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T18:54:18.206Z",
-    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
-    "packagesDirty": false,
-    "renderedInputsDirty": false,
-    "renderedInputChanges": []
+    "date": "2026-10-31T03:50:37.500Z",
+    "commit": "cb6e9b0ad0f2376c2d32eb117cbdb44d114c81dd",
+    "packagesDirty": true,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "packages/water/src/index.ts",
+     "packages/water/test/horizon.browser.mjs",
+     "packages/water/test/water.test.js"
+    ]
    }
   },
   "gameplay-sandbox-high": {
@@ -97,11 +109,19 @@
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-30T18:43:18.532Z",
-    "commit": "5571774346013701fe378ddfaec9288d6d741d7c",
-    "packagesDirty": false,
-    "renderedInputsDirty": false,
-    "renderedInputChanges": []
+    "date": "2026-10-31T03:37:49.067Z",
+    "commit": "cfa5c50a526229af381f6daecc8ec47d6a3d5289",
+    "packagesDirty": true,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "packages/water/README.md",
+     "packages/water/package.json",
+     "packages/water/src/coastal.ts",
+     "packages/water/src/index.ts",
+     "packages/water/test/water.test.js",
+     "site/llms-full.txt",
+     "packages/water/test/horizon.browser.mjs"
+    ]
    }
   },
   "gameplay-sandbox-light": {
@@ -109,25 +129,33 @@
    "size": "640x360",
    "runs": 4,
    "noise": {
-    "changed": 0.000013,
+    "changed": 0,
     "hot": 0,
-    "mean": 0.000013,
-    "max": 1
+    "mean": 0,
+    "max": 0
    },
    "tolerance": {
-    "changed": 0.000539,
+    "changed": 0.0005,
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 156.0.4314.42",
+    "browser": "msedge 156.0.4314.50",
     "gpu": "nvidia ampere",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-10-24T18:54:18.206Z",
-    "commit": "6ecfa01815566747090ccd9564dafcbcbf4de986",
-    "packagesDirty": false,
-    "renderedInputsDirty": false,
-    "renderedInputChanges": []
+    "date": "2026-10-31T03:37:49.067Z",
+    "commit": "cfa5c50a526229af381f6daecc8ec47d6a3d5289",
+    "packagesDirty": true,
+    "renderedInputsDirty": true,
+    "renderedInputChanges": [
+     "packages/water/README.md",
+     "packages/water/package.json",
+     "packages/water/src/coastal.ts",
+     "packages/water/src/index.ts",
+     "packages/water/test/water.test.js",
+     "site/llms-full.txt",
+     "packages/water/test/horizon.browser.mjs"
+    ]
    }
   },
   "gameplay-sandbox-phone": {
@@ -2169,11 +2197,15 @@
   "gpu": "nvidia ampere",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-10-30T18:43:18.532Z",
-  "commit": "5571774346013701fe378ddfaec9288d6d741d7c",
-  "packagesDirty": false,
-  "renderedInputsDirty": false,
-  "renderedInputChanges": []
+  "date": "2026-10-31T03:50:37.500Z",
+  "commit": "cb6e9b0ad0f2376c2d32eb117cbdb44d114c81dd",
+  "packagesDirty": true,
+  "renderedInputsDirty": true,
+  "renderedInputChanges": [
+   "packages/water/src/index.ts",
+   "packages/water/test/horizon.browser.mjs",
+   "packages/water/test/water.test.js"
+  ]
  },
  "method": {
   "hot": 24,

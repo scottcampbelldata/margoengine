@@ -97,7 +97,7 @@ export interface WaterOptions {
   lights?: readonly WaterLight[];
   /** A 2,048-droplet GPU spray pool; needs `terrain`. Default false. */
   spray?: boolean;
-  /** Stretch the outer grid rows to a 10 km horizon for open ocean. Default false. */
+  /** Open ocean: regular rows follow the camera, outer rows widen to 10 km, the last one to the horizon. Default false. */
   horizon?: boolean;
   /**
    * The engine light's shadow map: `Shadows` from @margoengine/shadows, attached to the same engine. Glints and foam
@@ -171,7 +171,9 @@ fn surface(xz:vec2f,sampleWidth:f32)->Surface {
  return Surface(p,normalize(cross(binormal,tangent)),crest);
 }
 struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location(1) world:vec3f,@location(2) crest:f32,@location(3) xz:vec2f}
-@vertex fn vertex(@location(0) xz:vec2f,@location(1) sampleWidth:f32)->Output {
+// A horizon grid follows the camera in whole cells (frame.grid.xy), so every term still reads fixed world positions.
+@vertex fn vertex(@location(0) grid:vec2f,@location(1) sampleWidth:f32)->Output {
+ var xz=grid;if(HORIZON){xz+=frame.grid.xy;}
  let v=surface(xz,sampleWidth);var clip=frame.camera*vec4f(v.position,1);if(HORIZON){clip.z=max(clip.z,0.000001*clip.w);}return Output(clip,v.normal,v.position,v.crest,xz);
 }
 fn linear(d:f32)->f32 {return frame.cameraData.x*frame.cameraData.y/(frame.cameraData.x+d*(frame.cameraData.y-frame.cameraData.x));}
@@ -303,6 +305,8 @@ const depthCopy = `
 @fragment fn fragment(@builtin(position) p:vec4f)->@builtin(frag_depth) f32 {return textureLoad(sceneDepth,vec2i(p.xy),0);}
 `;
 let instances = 0;
+// How far the horizon grid's last row lies from the camera, in metres: atan(10 km / 10,000 km) is 0.06 degrees.
+const HORIZON_REACH = 10_000_000;
 /** One view's foam history and the bind groups that read it. */
 interface WaterView {
   foam: GPUTexture[];
@@ -400,7 +404,7 @@ export class Water implements EnginePlugin {
   private pipeline?: GPURenderPipeline;
   private format = '';
   private time = 0;
-  private readonly values = new Float32Array(128);
+  private readonly values = new Float32Array(132);
   private fogSource: FogLike | null = null;
   private fogBuffer?: GPUBuffer;
   private readonly fogData = new Float32Array(12);
@@ -410,6 +414,8 @@ export class Water implements EnginePlugin {
   private readonly positions: Float32Array;
   private readonly triangles: Uint32Array;
   private readonly horizon: boolean;
+  // Regular cell width and depth: the step a horizon grid follows the camera in.
+  private readonly cell: readonly [number, number];
   constructor(readonly options: WaterOptions = {}) {
     const {
       size = [100, 100],
@@ -462,6 +468,7 @@ export class Water implements EnginePlugin {
       throw new TypeError('Water shadows need pbr() and bindings(); pass a Shadows from @margoengine/shadows');
     this.validateLights();
     this.horizon = options.horizon ?? false;
+    this.cell = [size[0] / segments, size[1] / segments];
     this.values[98] = this.values[99] = 1;
     const terrain = options.terrain;
     if (terrain) {
@@ -528,12 +535,34 @@ export class Water implements EnginePlugin {
     }
     this.positions = new Float32Array((segments + 1) ** 2 * 3);
     this.triangles = new Uint32Array(segments ** 2 * 6);
-    // shortcut: a fixed 10 km extension suits local worlds; use camera-centered ocean rings for large travel ranges.
+    // Horizon rows: the central 75% of each axis keeps its regular cells and follows the camera (drawSurface); each
+    // outer row but the last is `ratio` times wider than the one inside it, reaching 10 km past the grid's edge, so
+    // waves fade over many rows instead of one. The last row lies HORIZON_REACH out, where a camera 10 km up sees the
+    // sea's edge within a pixel of the true horizon (a 10 km square edge showed 14 degrees below it from 3 km).
+    const inner = Math.max(0, Math.floor(segments * 0.875) - segments / 2),
+      grown = segments / 2 - inner - 1,
+      ratios = (this.horizon && grown > 0 ? size : []).map((s) => {
+        const cell = s / segments,
+          target = (s / 2 + 10000 - inner * cell) / cell,
+          reach = (r: number) => (r * (r ** grown - 1)) / (r - 1);
+        let low = 1,
+          high = 2;
+        while (reach(high) < target) high *= 2;
+        for (let i = 0; i < 200; i++) {
+          const mid = (low + high) / 2;
+          if (reach(mid) < target) low = mid;
+          else high = mid;
+        }
+        return high;
+      });
     const coordinate = (i: number, axis: number) => {
-      const u = i / segments - 0.5;
-      return (
-        u * size[axis] + (this.horizon ? Math.sign(u) * 10000 * Math.max(0, (Math.abs(u) - 0.375) / 0.125) ** 3 : 0)
-      );
+      const u = i / segments - 0.5,
+        d = Math.abs(i - segments / 2);
+      if (!this.horizon || d <= inner) return u * size[axis];
+      if (d >= segments / 2) return Math.sign(u) * HORIZON_REACH;
+      const cell = size[axis] / segments,
+        r = ratios[axis];
+      return Math.sign(u) * (inner * cell + (cell * r * (r ** (d - inner) - 1)) / (r - 1));
     };
     const step = (i: number, axis: number) =>
       Math.max(
@@ -862,6 +891,11 @@ export class Water implements EnginePlugin {
     this.time += c.delta;
     this.values.set(c.camera.matrix);
     this.values.set(c.camera.position, 16);
+    if (this.horizon) {
+      const [x, z] = this.cell;
+      this.values[128] = Math.round(c.camera.position[0] / x) * x;
+      this.values[129] = Math.round(c.camera.position[2] / z) * z;
+    }
     this.values[20] = this.time;
     this.values[28] = c.camera.near;
     this.values[29] = c.camera.far;
@@ -876,7 +910,7 @@ export class Water implements EnginePlugin {
       this.values[110] = lighting.radiance[2];
     }
     this.validateLights();
-    this.values.fill(0, 112);
+    this.values.fill(0, 112, 128);
     if (this.options.lights) {
       for (let i = 0; i < this.options.lights.length; i++) {
         const light = this.options.lights[i],

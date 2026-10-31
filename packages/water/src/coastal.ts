@@ -5,7 +5,7 @@ declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
 export const waterFrame = `
 struct Wave {wave:vec4f,shape:vec4f}
 struct Light {direction:vec4f,radiance:vec4f}
-struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,cameraData:vec4f,waves:array<Wave,8>,coast:vec4f,flow:vec4f,sun:vec4f,radiance:vec4f,lights:array<Light,2>}
+struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,cameraData:vec4f,waves:array<Wave,8>,coast:vec4f,flow:vec4f,sun:vec4f,radiance:vec4f,lights:array<Light,2>,grid:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 `;
 // Margo's three-component swell spectrum and crest bend (all constants are Margo tuning).

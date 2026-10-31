@@ -42,7 +42,7 @@ test('moon radiance drives wave glints, foam and the water ambient floor', async
   const water = new Water({ segments: 4 });
   h.engine.use(water);
   h.frame();
-  const uniform = h.resources.find((r) => r.size === 512),
+  const uniform = h.resources.find((r) => r.size === 528),
     values = new Float32Array(uniform.data);
   assert.deepEqual(Array.from(values.subarray(104, 108)), Array.from(h.engine.lighting.direction));
   assert.deepEqual(Array.from(values.subarray(108, 111)), Array.from(h.engine.lighting.radiance.subarray(0, 3)));
@@ -72,7 +72,7 @@ test('explicit reflection lights stay separate, update in place and survive rest
   const water = new Water({ segments: 4, lights });
   h.engine.use(water);
   h.frame();
-  const read = () => new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 512).data),
+  const read = () => new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 528).data),
     first = read().slice(112),
     allocated = { ...h.counts };
   assert.deepEqual(Array.from(first.slice(0, 3)), [Math.fround(0.6), Math.fround(0.8), 0]);
@@ -130,7 +130,7 @@ test('wave height adjusts the existing spectrum atomically and rejects folded su
   h.engine.use(effect);
   effect.setWaveHeight(0.6);
   h.frame();
-  const uniform = h.resources.find((r) => r.size === 512),
+  const uniform = h.resources.find((r) => r.size === 528),
     values = new Float32Array(uniform.data);
   assert.ok(Math.abs(values[34] - 0.6) < 1e-6);
   assert.ok(Math.abs(values[42] - 0.3) < 1e-6);
@@ -183,7 +183,7 @@ test('default reflection lights copy exact uniform bits without creating tempora
     Float32Array.prototype.subarray = original;
   }
   assert.equal(views, 0);
-  const values = new Uint32Array(h.resources.find((r) => r.size === 512).data);
+  const values = new Uint32Array(h.resources.find((r) => r.size === 528).data);
   assert.deepEqual(values.slice(112, 116), values.slice(104, 108));
   assert.deepEqual(values.slice(116, 119), values.slice(108, 111));
   water.dispose();
@@ -270,7 +270,7 @@ test('default swells share a wind cone and keep distinct wavelengths', () => {
     effect = new Water({ segments: 4 });
   h.engine.use(effect);
   h.frame();
-  const v = new Float32Array(h.resources.find((r) => r.size === 512).data);
+  const v = new Float32Array(h.resources.find((r) => r.size === 528).data);
   assert.ok(v[32] * v[40] + v[33] * v[41] > Math.cos((25 * Math.PI) / 180));
   assert.notEqual(v[35], v[43]);
   effect.dispose();
@@ -433,7 +433,7 @@ test('mesh sampling fades short waves without changing their wavelength or heigh
   });
   h.engine.use(effect);
   h.frame();
-  const values = new Float32Array(h.resources.find((r) => r.size === 512).data);
+  const values = new Float32Array(h.resources.find((r) => r.size === 528).data);
   for (let i = 0; i < ratios.length; i++) {
     assert.ok(Math.abs(values[39 + i * 8] - weights[i]) < 1e-6);
     assert.ok(Math.abs(values[35 + i * 8] - (2 * Math.PI) / (ratios[i] * edge)) < 1e-6);
@@ -470,7 +470,7 @@ test('coastal flow reuses its resources and borrows terrain across resize and re
     'WebKit emits an invalid Metal result struct for compare-exchange',
   );
   const allocated = { ...h.counts },
-    uniform = h.resources.find((r) => r.size === 512),
+    uniform = h.resources.find((r) => r.size === 528),
     values = new Float32Array(uniform.data);
   assert.deepEqual(Array.from(values.subarray(96, 100)), [-8, -8, 16, 16]);
   assert.equal(values[103], 1);
@@ -511,9 +511,26 @@ test('ocean horizon retains the central grid and supplies larger sample footprin
   assert.equal(bounded.positions[0], -80);
   assert.ok(ocean.positions[0] < -10000);
   assert.ok(ocean.positions[2] > 1000);
+  // Outer rows grow by one ratio from the regular 5 m cell to 10 km past the grid's edge, the same on both sides, and
+  // the last row lies 10,000 km out so the sea meets the horizon.
+  const row = Array.from({ length: 33 }, (_, x) => ocean.positions[x * 3]),
+    widths = [0, 1, 2].map((k) => row[29 + k] - row[28 + k]),
+    ratio = widths[1] / widths[0];
+  assert.ok(Math.abs(row[28] - 60) < 1e-4 && Math.abs(row[31] - 10080) < 0.01, `horizon reach ${row[28]}..${row[31]}`);
+  assert.equal(row[32], 1e7);
+  assert.ok(ratio > 1 && widths[0] > 5, `outer rows ${widths}`);
+  assert.ok(Math.abs(widths[2] / widths[1] / ratio - 1) < 1e-3, `outer rows ${widths}`);
+  for (let x = 0; x <= 32; x++) assert.ok(Math.abs(row[x] + row[32 - x]) < 1e-3, 'horizon rows are not symmetric');
   const h = optionalGPU();
   h.engine.use(ocean);
   h.frame();
+  // The horizon grid follows the camera in whole 5 m cells; a bounded grid stays put.
+  h.engine.camera.position = [107, 1, -43];
+  h.frame();
+  assert.deepEqual(
+    Array.from(new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 528).data).subarray(128, 130)),
+    [105, -45],
+  );
   const pipeline = h.pipelines.find((p) => p.fragment?.targets.length === 2);
   assert.equal(pipeline.vertex.buffers[0].arrayStride, 12);
   assert.match(pipeline.vertex.module.code, /const HORIZON=true;/);
