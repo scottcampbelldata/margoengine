@@ -13,7 +13,7 @@ import { weldMeshVertices } from './weld.js';
  * `faceSizes` (corners per polygon, each fanned (c0, ck, ck+1) in order) and `positionIndices` (the shared position
  * of each vertex).
  */
-export interface TriangleSource {
+export interface ImportTriangles {
   positions: ArrayLike<number>;
   indices?: ArrayLike<number>;
   uvs?: ArrayLike<number>;
@@ -65,7 +65,7 @@ const integerArray = (values: ArrayLike<number>, limit: number, label: string) =
  * @throws TypeError for malformed arrays or options; RangeError for a bad weld distance, more than 200000 vertices
  * or faces, or UVs outside 0 to 1 with `uv: 'keep'`; the signal's reason when aborted.
  */
-export function polygonMeshFromTriangles(source: TriangleSource, options: ImportMeshOptions = {}): ImportMeshResult {
+export function polygonMeshFromTriangles(source: ImportTriangles, options: ImportMeshOptions = {}): ImportMeshResult {
   assertOptions(options, 'Import');
   if (!source || typeof source !== 'object' || source.positions?.length === undefined)
     throw new TypeError('Import needs { positions } with x, y, z per vertex; pass the decoded vertex data.');

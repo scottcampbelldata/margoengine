@@ -44,7 +44,7 @@ export {
 export { mergeFlatFaces, type MergeFlatOptions, type MergeFlatResult } from './flat.js';
 export {
   polygonMeshFromTriangles,
-  type TriangleSource,
+  type ImportTriangles,
   type ImportMeshOptions,
   type ImportMeshResult,
 } from './import.js';

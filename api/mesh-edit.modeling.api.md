@@ -54,6 +54,14 @@ export interface ImportMeshResult {
     diagnostics: string[];
 }
 
+export interface ImportTriangles {
+    positions: ArrayLike<number>;
+    indices?: ArrayLike<number>;
+    uvs?: ArrayLike<number>;
+    faceSizes?: ArrayLike<number>;
+    positionIndices?: ArrayLike<number>;
+}
+
 export interface KnifeOptions extends MeshEditOptions {
     faces?: readonly string[];
     closed?: boolean;
@@ -164,14 +172,6 @@ export interface SubdivideOptions extends MeshEditOptions {
     signal?: AbortSignal;
 }
 
-export interface TriangleSource {
-    positions: ArrayLike<number>;
-    indices?: ArrayLike<number>;
-    uvs?: ArrayLike<number>;
-    faceSizes?: ArrayLike<number>;
-    positionIndices?: ArrayLike<number>;
-}
-
 export interface UVChart {
     faces: string[];
     pins: number;
@@ -224,7 +224,7 @@ export function meshLODChain(mesh: PolygonMesh, options?: LODChainOptions): Simp
 
 export function meshLightmapUVs(mesh: PolygonMesh, options?: ChartOptions): LightmapUVResult;
 
-export function polygonMeshFromTriangles(source: TriangleSource, options?: ImportMeshOptions): ImportMeshResult;
+export function polygonMeshFromTriangles(source: ImportTriangles, options?: ImportMeshOptions): ImportMeshResult;
 
 export function simplifyMesh(mesh: PolygonMesh, options?: SimplifyOptions): SimplifyResult;
 
