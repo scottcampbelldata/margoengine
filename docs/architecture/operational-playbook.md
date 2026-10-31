@@ -187,7 +187,7 @@ Every brief also carries these, each from a trap that cost a landing round (2026
   which sits late in `check:merge` (about 27 minutes in on one run), so a failure otherwise costs a whole run.
 - Builders never run `check:merge`, narrowed or full (session rule 24). It runs once, at landing, in the mode it
   prints. There is no exception: anything to be proven with a check is proven by a run that was happening anyway, and a
-  check never runs twice for the same tree.
+  check never runs twice on one code tree.
 - A landing that re-records a visual baseline on the workstation also queues the same views for re-record on the
   laptop profile, or the laptop's nightly fails on them.
 - Pictures: do not judge colour or banding from a PNG over 3,932,160 bytes (session rule 23, section 1.16).
@@ -201,7 +201,7 @@ run, so ask for the raw matching lines, not a summary.
 
 #### 1.4.2 The rules file every brief carries
 
-`handoffs/session-rules.txt` has 24 numbered rules. The ones that belong in this part, quoted:
+`handoffs/session-rules.txt` has 25 numbered rules. The ones that belong in this part, quoted:
 
 ```text
 1. Quiet: don't send "waiting" or progress messages. Run long checks in the background and message the coordinator only when something lands, when you're blocked, or when you need a decision. One short paragraph.
@@ -219,10 +219,10 @@ run, so ask for the raw matching lines, not a summary.
 
 Rules 6 to 12 (never land dirty, failures are yours, public-release bug rule, mandatory regression test, rerun of one
 step, never skip work for speed, accepted differences) are quoted where they apply: sections 1.12, 1.13 and 2.11.
-Rules 13 to 15 are website design rules and are out of scope here. Rules 16 to 24 are the per-job model and effort
+Rules 13 to 15 are website design rules and are out of scope here. Rules 16 to 25 are the per-job model and effort
 tiers (1.2), never stopping or sitting idle (1.1), the coordinator model and the planner (1.2), narrowing (2.10.2),
-core as the last resort, the shared git config, pictures and builders never running `check:merge` (sections 1.16 and
-2.6.5).
+core as the last resort, the shared git config, pictures, builders never running `check:merge` and the result cache (sections 1.16, 2.6.5
+and 2.10.4).
 
 Rule 2 once said to run the full `check:merge` before taking the lock. The landing scripts have run it inside the lock,
 after the rebase, since 2026-10-29, and since 2026-10-31 the landing runner owns that run (rule 24). The quoted text
@@ -352,8 +352,8 @@ may be either.
 The coordinator follows the same rule, with a higher threshold: about 500,000 tokens (the maintainer, 2026-10-30), and
 also at its first automatic compaction. On the host used here the window compacts at 368,000 of 400,000 tokens
 (observed 2026-10-31; NOT VERIFIED on other hosts), so a 500,000 trigger by itself never shows. The real figure comes
-from the host's usage query, not from the coordinator's own guess. Over a remote-control link the host app refuses to
-start a new session; only a message typed in the desktop app can, so the coordinator writes the resume file first and
+from the host's usage query, not from the coordinator's own guess. Over Remote Control the host app refuses to
+start a new session (a limit that exists on this host, not a choice); only a message typed in the desktop app can, so the coordinator writes the resume file first and
 asks the maintainer to start the successor. The successor is again Opus 5.5 at high effort (1.2).
 
 On 2026-10-29 the coordinator wrote
@@ -601,6 +601,9 @@ row first. The coordinator's own ideas are proposed to the maintainer, not start
 left alone, and built work that is on it is committed. Keep `Running` true: 18 of 24 rows marked Running had no helper
 on them when counted.
 
+The list stays short (the maintainer, 2026-10-31): one row per item, with the jobs of an item in a working file that a script
+rolls up into the row. The list grew from 108 to 305 rows in one day when items were split into jobs.
+
 Rules that make it trustworthy:
 
 - `result` holds a commit hash only after `origin/main` shows it (1.8).
@@ -781,7 +784,7 @@ Rulings from the maintainer that every brief inherits (session rules 21 to 24 an
    reduced palette, which shows false bands and colour shifts. Judge colour or banding from numbers or from
    `scripts/review-png.mjs` (a lossless rewrite that proves the pixels equal), never from a large PNG.
 7. Builders never run `check:merge` (session rule 24); landings are batched (2.6.5). In plain words: anything to be proven
-   with a check is proven by a run that was happening anyway, and a check never runs twice for the same tree.
+   with a check is proven by a run that was happening anyway, and a check never runs twice on one code tree.
 
 ---
 
@@ -1624,8 +1627,8 @@ Session rule 20 (the maintainer, 2026-10-30): check only what a change can affec
 packages plus their dependents, not every package; a package's own package.json counts as that package; a script
 runs only the checks that use it; a new standalone script no check imports runs none; everything runs only for core,
 stage, shared code, the check code itself, the root package.json or the lock file; an unplaceable file gets
-added to the map, not a full run; never narrow by skipping a test the change can affect; the nightly full run (not on
-the main dev PC) is the backstop.
+added to the map, not a full run; never narrow by skipping a test the change can affect; the nightly full run (on a
+machine other than the main dev PC, plus the weekly uncached run in 2.10.4) is the backstop.
 
 File classes (`scripts/support/file-classes.mjs`, checked in this order; `classify(file)` gives the class):
 
@@ -1713,20 +1716,50 @@ pack may contain, so reuse cannot hide a stale-file bug.
 
 #### 2.10.3 Parallel suites inside check:merge (under way)
 
-Work is under way to run suites in parallel inside `check:merge`; there is no result yet. The measured starting point:
-on the development PC the GPU package suites run one at a time, with the GPU about 39 percent busy and 4.8 of 48 GB of
-GPU memory in use during the longest suite (a biomes test), while the CPU and memory are far from full. Over three full
+The parallel check is built and still under way: it is off by default (the run stays serial) and is turned on with
+`MARGO_CHECK_PARALLEL=1`. It is not proven, and no time saving is claimed. The measured starting point: on the
+development PC the GPU package suites ran one at a time, with the GPU about 39 percent busy and 4.8 of 48 GB of GPU
+memory in use during the longest suite (a biomes test), while the CPU and memory were far from full. Over three full
 runs the 68 to 69 GPU suites summed to 1,289 to 1,947 seconds, and 59 of them took under 30 seconds each.
 
 What the design has to respect: each running suite takes its own shared GPU slot; each browser gets its own temporary
 profile directory; no two suites start on one fixed port at once (70 test files name a port, and a busy port is waited
-for up to 20 minutes); timing tests keep running alone under the exclusive hold after the shared ones. Proof, once built: the parallel run happens inside a batch's own check (2.6.5), with no extra run, and its step list, suite labels and results are compared with the serial record of the previous batch: the same steps, the same suites, every one ok and none skipped. Until it matches, the serial run stays the rule. Any time it should save is a goal, not a measurement.
+for up to 20 minutes); timing tests keep running alone under the exclusive hold after the shared ones. Proof: the
+parallel run happens inside a batch's own check (2.6.5), with no extra run, and `scripts/compare-check-runs.mjs`
+compares its step list, suite labels and results with the serial record: the same steps, the same suites, every one ok
+and none skipped. Until it matches, the serial run stays the rule.
 
 Tests: `tests/check-merge-affected.test.js` (40 tests), for example "core, stage, shared and the margoengine umbrella
 run everything", "a package's own package.json runs that package and its dependents, not everything", "a change to the
 GPU package runner runs the smoke list plus what the change affects", "RUNNER_SMOKE holds one real test of each kind
 the runner treats differently" and the five planned cases; `tests/file-classes.test.js` (one case per class and the
 class gate).
+
+#### 2.10.4 Result reuse (session rule 25, the maintainer, 2026-10-31)
+
+Narrowing (2.10.2) works from the package graph. A result cache works from bytes: the same test on the same bytes is the
+same result, so rule 20 ("never skip a test the change can affect") holds by construction, because a step reruns when
+any byte it reads changed. The design is in a private planning note; this section is the rule.
+
+- **Reuse.** A step whose recorded inputs are byte-identical to a first-try pass counts as passed on the pushed tree.
+  `test-results/check-merge.json` names the source run and commit, and the log prints which results stand from an
+  earlier tree. A reuse is reported, never silent.
+- **Never reused.** Failures, rerun passes, timing tests, benchmarks and pinned proofs. A failure on a key that holds a
+  pass poisons that key and goes on the bug list.
+- **Record before serving.** Each step kind first runs in recording mode only: every step still runs, and the cache
+  notes where it would have hit. A "would hit" whose real run then fails is a key lie and blocks that step kind. Serving
+  starts per step kind only after 3 landings and 2 nightlies with no disagreement.
+- **Backstop.** The nightly runs with the cache off, writes keys anyway, and re-executes everything, so a flake cannot
+  hide behind a hit. Until the laptop has visual baselines, one uncached full check a week runs on the development PC at
+  night. That is the only full nightly-type run allowed there, and it stops when the laptop has the baselines.
+- **One run per code tree.** A check never runs twice on one code tree, and anything to be proven with a check is proven
+  by a run that was happening anyway (session rule 24). A stacked batch whose diff from its checked tip is generated
+  records alone pushes without a new check (2.6.5).
+
+Estimates for a one-line change once every phase is live (ESTIMATES, not measurements; replace with measured numbers):
+docs 2.5 to 4 min, a leaf package 4 to 7, a package with many dependents 9 to 12, core code 15 to 22, a core comment
+3 to 5. The measured figures today are in 2.6.5 and 2.10.2. Status: being built in phases; no phase is live yet
+(NOT VERIFIED beyond the plan).
 
 ### 2.11 Never land dirty, and rerunning one step
 
@@ -1787,7 +1820,7 @@ export const pinnedProofsCommand = () => [
 Both run with `MARGO_FULL=1` and `MARGO_NIGHTLY=1` (tests with a nightly depth run it). The exit code is the first
 failing run's. The script "registers nothing with the OS".
 
-Where it runs: the maintainer moved the nightly full run off the development PC. It runs on the Beelink or the Ubuntu server only, and the development PC's scheduled task is disabled. The Task Scheduler description below is the historical setup of that task.
+Where it runs: the maintainer moved the nightly full run off the development PC. It runs on the mini PC or the Linux server, and the development PC's nightly task is disabled. The one exception is the weekly uncached full check at night on the development PC (2.10.4), which lasts only until the laptop has visual baselines. The Task Scheduler description below is the historical setup of that task.
 
 Windows Task Scheduler: task "MargoEngine Nightly Full Check", daily at 10:00, task to run
 `<projects>/margoengine-nightly/nightly.cmd` (read with `schtasks /query /v` on 2026-10-29: Status Ready, Last Result 0).
@@ -1842,7 +1875,7 @@ backstop for check:merge's narrowing (session rule 20).
 | --- | --- |
 | `laptop` (the Intel Arc laptop) | `full check:merge`, `pinned proofs`, `nightly-status`; nothing excluded, voxel-pathtracer included; heavy suites in short steps, and every GPU step of check:merge under its heat watch (2.15.9). Its visual baselines are captured on the laptop itself, later; until they are committed its visual:check has no matching profile |
 | `mini-pc`, `thermal-limited` | `gpu package tests` (builds every package first; voxel-pathtracer excluded), then the light GPU checks `check:wgsl`, `check:views`, `check:depth`, `check:no-webgpu` (after `npm run build:site`), `modern:test:bundlers` (after `npm run modern:test:packages`), then `nightly-status` |
-| `workstation` | `full check:merge`, `pinned proofs` (its scheduled task is disabled: no nightly on the main dev PC) |
+| `workstation` | `full check:merge`, `pinned proofs` (its nightly task is disabled; the only full run there is the weekly uncached check of 2.10.4, until the laptop has visual baselines) |
 
 The light checks run through `node scripts/check-merge.mjs --steps=<a>,<b>` (`stepsCommand`), check:merge's own step
 runner, so the profile's heat watch covers them as in check:merge (2.15.9); they take the GPU lock themselves.

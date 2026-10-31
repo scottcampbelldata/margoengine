@@ -80,7 +80,8 @@ Several agents push to `main`. Each push must leave it at least as clean as it f
   cannot place), not a full run. Never narrow by skipping a test the change can affect. A change to the GPU package
   runner runs its pinned `RUNNER_SMOKE` tests plus what it affects. `npm run check:merge:full` (or `MARGO_FULL=1`)
   forces the full run, and it prints which mode ran and why. The nightly full run (`node scripts/nightly-full.mjs`,
-  not on the main dev PC; dated log in `test-results/nightly/`) is the backstop. A GPU step skipped as unaffected is
+  not on the main dev PC, except the weekly uncached full check there until the laptop has visual baselines; dated log in
+  `test-results/nightly/`) is the backstop. A GPU step skipped as unaffected is
   not a failure; if you doubt the mapping, run `check:merge:full`.
 - The two package-level steps are narrowed the same way (`scripts/support/affected-packages.mjs`). `verify` builds every
   package once, then runs its other checks side by side. `modern:test:packages` builds nothing again after `verify`
@@ -111,8 +112,11 @@ Details in `docs/architecture/operational-playbook.md`.
 
 - Coordinators run Opus 5.5 at high effort. Design-heavy or risky work gets a planner first (playbook 1.2).
 - The to-do list sets what is built, in its order; work not on it is left alone (playbook 1.11). Demo work is stopped until the engine is done; never stop a running service without the maintainer's word.
-- Builders never run `check:merge`. It runs once, at landing, in the mode it prints; landings are batched (playbook 2.6.5). Anything to be proven with a check is proven by a run that was happening anyway, and a check never runs twice for the same tree. At most three `check:merge` runs at once on the video card (about eight at once forced a reboot on 2026-10-30); pushes stay one at a time under the land lock. A stacked batch pushes after the batch below it lands without a new check only if `git diff` against its checked tip shows generated records alone.
+- Builders never run `check:merge`. It runs once, at landing, in the mode it prints; landings are batched (playbook 2.6.5). Anything to be proven with a check is proven by a run that was happening anyway, and a check never runs twice on one code tree. At most three `check:merge` runs at once on the video card (about eight at once forced a reboot on 2026-10-30); pushes stay one at a time under the land lock. A stacked batch pushes after the batch below it lands without a new check only if `git diff` against its checked tip shows generated records alone.
 - Quick checks before a branch is READY: quality, hygiene, the tests you touched, the root unit tests (`node --test tests/*.test.js`) and `npm run api:check`. A change that alters exports commits the `npm run api:update` output.
+- Result reuse (session rule 25): a step whose recorded inputs are byte-identical to a first-try pass counts as passed on the pushed tree, and the report names the source run and commit. Failures, rerun passes, timing tests, benchmarks and pinned proofs are never reused. Reuse is recorded only until 3 landings and 2 nightlies agree, per step kind (playbook 2.10.4). The parallel check is under way, off by default.
+- The to-do list stays short: one row per item, jobs in a working file.
+- Coordinator handoff: about 500,000 tokens or the first auto-compaction. Remote Control cannot start a session, so the successor is started from the desktop app (playbook 1.6.5).
 - Every worktree shares one `.git/config`: add worktrees with `--no-track` and never write git config from a worktree.
 
 ## One branch: main
