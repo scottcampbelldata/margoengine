@@ -68,6 +68,10 @@ Depends on `@margoengine/voxel` and `@margoengine/net`; no other runtime depende
   with 1003, protocol errors with 1002, messages over the limit (default 4 KiB from clients) with 1009.
 - Backpressure: chunk sends stop while a socket holds more than 256 KiB unsent; a client more than 8 MiB behind is
   dropped as too slow.
+- A player's inputs wait while the chunks within one chunk of it are not made, and those chunks go to the front of the
+  generator's queue. The wait is the server's, so past 256 queued messages later inputs fold into the last one instead of
+  closing the player: after the wait the 0.5 s bank moves at most 60 steps, and the rest only count. Sending more than 64
+  messages a second during a wait, or 256 in one tick outside one, still closes it (1008 `too many messages`).
 - No compression extension (chunks are already deflated) and no TLS in the prototype: `wss://` goes through a reverse
   proxy. The Node bots use a small client built on the same frame code; tests also check the server against Node's
   built-in `WebSocket` so the two halves cannot hide each other's mistakes.

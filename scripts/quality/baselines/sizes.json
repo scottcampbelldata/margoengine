@@ -922,6 +922,12 @@
       "grew": 2
     },
     {
+      "date": "2026-10-31",
+      "commit": "677d2b8b8",
+      "reason": "voxel-net server: a joining player's ground is generated and sent first, 15 B",
+      "grew": 1
+    },
+    {
       "date": "2026-10-30",
       "commit": "0882df471",
       "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
@@ -983,8 +989,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "677d2b8b8",
-      "reason": "voxel-net server: a joining player's ground is generated and sent first, 15 B",
+      "commit": "2c977c21d",
+      "reason": "voxel-net app messages (protocol 3): the generic app message, VoxelServer.send and broadcast, client.onApp and MAX_APP_BYTES; gzip client +120 B, server +179 B, bot +81 B",
       "grew": 1
     },
     {
@@ -1061,8 +1067,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "2c977c21d",
-      "reason": "voxel-net app messages (protocol 3): the generic app message, VoxelServer.send and broadcast, client.onApp and MAX_APP_BYTES; gzip client +120 B, server +179 B, bot +81 B",
+      "commit": "87e007e26",
+      "reason": "voxel-net server: inputs held on the server's own chunks fold past 256 messages instead of closing the player, and held chunks go first in the generator queue; server +333 B gzip, client unchanged",
       "grew": 1
     }
   ],

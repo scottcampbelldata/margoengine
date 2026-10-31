@@ -64,8 +64,13 @@ so this is a crowd fanning out and not a fully spread map. A fully spread run wa
 
 **Flying out.** When 150 bots flew outward at once, 38 were closed with 1008 `too many messages` within about 100 s. Each shard
 has one generator thread, measured at 27 to 29 new chunks a second. A player's inputs wait until the chunks around it exist,
-and 256 waiting messages close the connection. Walking bots were never closed this way, at up to 300 players. See
-[known-bugs.md](known-bugs.md).
+and 256 waiting messages closed the connection. Walking bots were never closed this way, at up to 300 players.
+
+Fixed since, measured on a local shard with its generator slowed to the box's 28 chunks a second and the same 150 bots: 18 to 28
+closes a run became 0, and a client flying among them went from up to 43 blocks snapped back, 6 times in 110 s, to none. The wait
+is still there: that client stood still for 81 of 110 s, on the ground it had, and covered 2.6 blocks a second against 11 alone.
+A second generator thread (`--workers=2`) cut the wait to 57 of 110 s and 5.0 blocks a second, for 68 to 97 MB more per shard.
+What it costs the box's CPU is not measured.
 
 ## Surge and overflow
 
@@ -92,7 +97,7 @@ ceiling.
   was measured with the fix.
 - **Fixed in code, not measured**: a page playing alone asked `/join` every 30 s and each ask held a place for 5 s. It now uses
   `?peek=1`, which holds nothing.
-- **Open**: `too many messages` closes for fast travel, and unexplained 1006 closes on connections older than about 15 minutes. See
+- **Open**: unexplained 1006 closes on connections older than about 15 minutes. See
   [known-bugs.md](known-bugs.md).
 
 ## Transfer (worked out from the rows above)

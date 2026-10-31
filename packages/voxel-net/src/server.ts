@@ -240,6 +240,10 @@ interface Client extends VoxelServerPlayer {
   upgradeAuth: Promise<boolean> | undefined;
   view: number;
   queue: ClientMessage[];
+  // Its next input waits for chunks this server has not made yet. Past MAX_QUEUED, messages count against HELD_RATE.
+  held: boolean;
+  heldMessages: number;
+  heldSince: number;
   step: number;
   bank: number;
   credited: number;
@@ -291,9 +295,14 @@ const NAMES: Record<number, ServerMessage['type']> = {
   SPAWN_REACH = 3, // squared chunks from the player: the 3 x 3 x 3 chunks #trySpawn waits for
   BYTES_PER_TICK = 128 * 1024,
   MAX_STEPS = 240, // movement steps in one input message
+  MAX_QUEUED = 256, // messages kept per client: inputs past this are folded while it waits on our chunks, else it is closed
+  // Messages a second a client may send while folded. A real client sends 20 inputs, and an input and an edit per edit.
+  HELD_RATE = 64,
   GENERATE_TRIES = 3, // a chunk's generation is tried this often before the players who need it are closed
   RETRY_MS = 250, // wait before the second try; it doubles for each further one
   FAILED_KEPT = 4096; // most chunks whose failures are remembered
+// An input that holds the steps of later ones, so its total may pass MAX_STEPS.
+type Folded = ClientMessage & { folded?: boolean };
 const TIMED_OUT: unique symbol = Symbol('timed out'),
   HEARTBEAT = encodeServerMessage({ type: 'heartbeat' }),
   PING_BYTES = 2; // an empty ping frame
@@ -393,13 +402,15 @@ async function generatorThread(data: GeneratorData): Promise<void> {
 /** How long a closing generator thread may take over the jobs it has: a chunk takes milliseconds, this is for a hung one. */
 const DRAIN_MS = 10_000;
 
-// Worker threads running the generator: first the ground a joining player waits to spawn on, then urgent jobs (chunks a
-// player stands in), then the others.
+// Worker threads running the generator: first the jobs that hold up a player right now (the ground a joining player waits
+// to spawn on, or the chunks a flying player waits on), then urgent jobs (chunks a player stands in), then the others.
 class GeneratorPool {
   readonly #workers: { worker: Worker; busy: number }[] = [];
-  readonly #first: (() => void)[] = [];
-  readonly #urgent: (() => void)[] = [];
-  readonly #normal: (() => void)[] = [];
+  // Waiting jobs by chunk key, oldest first: #first holds up a player right now, whether joining or flying; #urgent is
+  // for the world.
+  readonly #first = new Map<string, () => void>();
+  readonly #urgent = new Map<string, () => void>();
+  readonly #normal = new Map<string, () => void>();
   readonly #jobs = new Map<number, { resolve: (g: Generated) => void; reject: (e: Error) => void; worker: number }>();
   #next = 0;
   #closing = false;
@@ -409,7 +420,7 @@ class GeneratorPool {
   ) {}
   run(cx: number, cy: number, cz: number, urgent: boolean, first = false): Promise<Generated> {
     return new Promise((resolve, reject) => {
-      (first ? this.#first : urgent ? this.#urgent : this.#normal).push(() => {
+      (first ? this.#first : urgent ? this.#urgent : this.#normal).set(chunkKey(cx, cy, cz), () => {
         const index = this.#pick(),
           slot = this.#workers[index],
           id = ++this.#next;
@@ -421,7 +432,17 @@ class GeneratorPool {
     });
   }
   get queued(): number {
-    return this.#first.length + this.#urgent.length + this.#normal.length;
+    return this.#first.size + this.#urgent.size + this.#normal.size;
+  }
+  // Moves a chunk's waiting job, if there is one, to the front: a player cannot move until it is done.
+  hurry(key: string): void {
+    for (const queue of [this.#urgent, this.#normal]) {
+      const job = queue.get(key);
+      if (!job) continue;
+      queue.delete(key);
+      this.#first.set(key, job);
+      return;
+    }
   }
   // Each thread finishes the jobs it has and ends by itself. Terminating one that is compressing aborts the whole
   // process in Node ("close before init", a native assertion nothing can catch), so terminate() is only for a generator
@@ -477,8 +498,12 @@ class GeneratorPool {
       !this.#closing &&
       this.queued &&
       (this.#workers.length < this.size || this.#workers.some((slot) => slot.busy < 2))
-    )
-      ((this.#first.length ? this.#first : this.#urgent.length ? this.#urgent : this.#normal).shift() as () => void)();
+    ) {
+      const queue = this.#first.size ? this.#first : this.#urgent.size ? this.#urgent : this.#normal,
+        [key, job] = queue.entries().next().value as [string, () => void];
+      queue.delete(key);
+      job();
+    }
   }
 }
 
@@ -917,6 +942,9 @@ export class VoxelServer {
       character: new VoxelCharacter(this.world, this.#characterOptions),
       view: this.#view,
       queue: [],
+      held: false,
+      heldMessages: 0,
+      heldSince: 0,
       step: 0,
       bank: 0,
       credited: 0,
@@ -1033,8 +1061,39 @@ export class VoxelServer {
       return this.#hello(c, m);
     }
     if (c.phase !== 'playing') return this.#kick(c, 1008, `${m.type} before spawning`);
-    if (c.queue.length >= 256) return this.#kick(c, 1008, 'too many messages');
-    c.queue.push(m);
+    if (c.queue.length < MAX_QUEUED) return void c.queue.push(m);
+    if (!c.held) return this.#kick(c, 1008, 'too many messages');
+    this.#fold(c, m);
+  }
+  // A full queue while the client's inputs wait on chunks this server has not made: the wait is ours, so it is not
+  // closed for it, however long the generator takes. Nothing grows: after the wait the bank moves at most BANK steps,
+  // and steps past that only count, so later inputs fold into the last one. Edits are refused as usual. Only a rate no
+  // real client sends is closed.
+  #fold(c: Client, m: ClientMessage): void {
+    const now = performance.now();
+    if (!c.heldMessages) c.heldSince = now;
+    if (++c.heldMessages > MAX_QUEUED + ((now - c.heldSince) * HELD_RATE) / 1000)
+      return this.#kick(c, 1008, 'too many messages');
+    if (m.type === 'edit') {
+      if (this.world.getChunk(m.x >> 5, m.y >> 5, m.z >> 5))
+        c.denied.push(m.x, m.y, m.z, this.world.getBlock(m.x, m.y, m.z));
+      this.metrics.editsDenied++;
+      return;
+    }
+    if (m.type !== 'input') return;
+    let total = 0;
+    for (const run of m.runs) total += run.steps;
+    if (total > MAX_STEPS) return this.#kick(c, 1008, `${total} steps in one input`);
+    const last = c.queue[c.queue.length - 1];
+    if (last.type !== 'input') return void c.queue.push(m); // once: the next one folds into this
+    let steps = 0;
+    for (const run of last.runs) steps += run.steps;
+    if (m.step !== last.step + steps)
+      return this.#kick(c, 1002, `input step ${m.step} does not follow ${last.step + steps - 1}`);
+    last.runs = [{ ...m.runs[m.runs.length - 1], steps: steps + total }];
+    last.acked = m.acked;
+    last.position = m.position;
+    (last as Folded).folded = true;
   }
   #hello(c: Client, m: Extract<ClientMessage, { type: 'hello' }>): void {
     clearTimeout(c.timer);
@@ -1515,21 +1574,25 @@ export class VoxelServer {
         this.#edit(c, m, now);
         continue;
       }
-      if (m.type !== 'input' || !this.#around(c)) return; // wait for the chunks around the player
+      if (m.type !== 'input' || !this.#around(c)) {
+        c.held = true; // wait for the chunks around the player
+        return;
+      }
+      c.held = false;
+      c.heldMessages = 0;
       c.queue.shift();
       if (m.step !== c.step + 1) return this.#kick(c, 1002, `input step ${m.step} does not follow ${c.step}`);
       let total = 0;
       for (const run of m.runs) total += run.steps;
-      if (total > MAX_STEPS) return this.#kick(c, 1008, `${total} steps in one input`);
+      if (total > MAX_STEPS && !(m as Folded).folded) return this.#kick(c, 1008, `${total} steps in one input`);
       for (const run of m.runs) {
         const intent = moveIntent(run.keys, run.yaw),
           flying = this.#flight && (run.keys & Keys.fly) !== 0;
-        for (let i = 0; i < run.steps; i++)
-          if (c.bank >= 1) {
-            c.bank--;
-            ch.flying = flying;
-            ch.update(STEP_SECONDS, intent);
-          }
+        for (let i = 0; i < run.steps && c.bank >= 1; i++) {
+          c.bank--;
+          ch.flying = flying;
+          ch.update(STEP_SECONDS, intent);
+        }
         c.yaw = run.yaw;
         c.pitch = run.pitch;
       }
@@ -1561,14 +1624,19 @@ export class VoxelServer {
       cz = Math.floor(p[2]) >> 5,
       key = chunkKey(cx, cy, cz);
     if (c.verified === key) return true;
+    let ready = true;
     for (let dy = -1; dy <= 1; dy++) {
       const y = (cy + dy) * 32;
       if (y > this.world.maxY || y + 31 < this.world.minY) continue;
       for (let dz = -1; dz <= 1; dz++)
-        for (let dx = -1; dx <= 1; dx++) if (!this.world.getChunk(cx + dx, cy + dy, cz + dz)) return false;
+        for (let dx = -1; dx <= 1; dx++)
+          if (!this.world.getChunk(cx + dx, cy + dy, cz + dz)) {
+            ready = false;
+            this.#pool.hurry(chunkKey(cx + dx, cy + dy, cz + dz));
+          }
     }
-    c.verified = key;
-    return true;
+    if (ready) c.verified = key;
+    return ready;
   }
   #edit(c: Client, m: Extract<ClientMessage, { type: 'edit' }>, now: number): void {
     const { x, y, z, state } = m,
