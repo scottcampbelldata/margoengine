@@ -149,7 +149,10 @@ fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {
 // `outward` (the surface's own outward normal, for baked light), the face tangent and pixel i. Sky light scales the
 // ambient term and the sun, so caves and nights stay dark. Its lines keep gltf-pro's hook points
 // (packages/shared/pbr-hooks.js) for shadows, clustered lights, IBL and fog. Transmission (MODE 3) lowers alpha and
-// mixes in the base colour; scatter halves that see-through part at 1.
+// mixes in the base colour; scatter halves that see-through part at 1. Alpha to coverage (MODE 2) takes the cutout edge at
+// 0.5, about a pixel wide, as the alpha test does (Golus, "Anti-aliased Alpha Test", 2017): filtered alpha as coverage
+// would give every layer of a canopy the same partial sample mask, so stacked leaves never close and what lies behind
+// shows through the whole tree.
 // Constants: sRGB decode per IEC 61966-2-1; roughness floor 0.045 is the minimum perceptual roughness of the
 // Filament design document (published engine standard); AO 0.4 + 0.2 x level and the 0.03 ambient floor are Margo
 // design (the corner AO rule itself is Lysenko 2013, see mesher.ts).
@@ -177,7 +180,7 @@ const SHADE = /* wgsl */ `
  var color=direct+ambient(s)+s.emissive;
  if(f.settings.w<0.5) {color=toDisplay(color);}
  if(MODE==3u){let through=f32((maps.z>>11u)&255u)/255.0*(1.0-bitcast<f32>(maps.y)*0.5);let alpha=s.base.a*(1.0-through*0.85);return vec4f((color*(1.0-through)+s.base.rgb*through)*alpha,alpha);}
- return vec4f(color,select(1.0,s.base.a,MODE==2u));
+ return vec4f(color,select(1.0,(s.base.a-0.5)/max(fwidth(s.base.a),0.0001)+0.5,MODE==2u));
 }`;
 
 // The quad beauty shader. EDGE: pixels a merged quad's edges move out. T-junctions: neighbours' corners lie on a merged
@@ -453,6 +456,9 @@ interface Pipelines {
   /** Quad pipelines per layer, and with a bevel the triangle pipelines. */
   layers: GPURenderPipeline[];
   bevel?: GPURenderPipeline[];
+  /** Depth-only pipelines of the translucent surfaces (quads, then triangles with a bevel) and their bind groups. */
+  surface?: [GPURenderPipeline, GPURenderPipeline | undefined];
+  surfaceGroups?: [GPUBindGroup, GPUBindGroup | undefined];
   /** The effects composed into them, whose bindings fill group 1. */
   effects: VoxelRendererEffect[];
   /** Whether the lightmap is composed in (bindings 8-10). */
@@ -525,6 +531,11 @@ const serialOf = (effect: object): number => {
  */
 const KEPT = 4;
 type PipelineCache = Map<string, { ready?: Pipelines }>;
+// Runs `start`, a GPU call of a composition compiled ahead, on its turn in gpu.ahead.
+function inTurn<T>(gpu: Gpu, start: () => T | Promise<T>): Promise<T> {
+  return new Promise<T>((resolve) => gpu.ahead.push(() => resolve(start())));
+}
+
 /** Marks `key` as the most recently used entry of `cache` (Map order is use order). */
 function touch(cache: PipelineCache, key: string, entry: { ready?: Pipelines }): void {
   let last: string | undefined;
@@ -1003,7 +1014,7 @@ export class VoxelRenderer implements EnginePlugin {
     this.#engine = engine;
   }
 
-  /** @internal Engine plugin hook: prepare (order -6), opaque and cutout (1), translucent (4.5). */
+  /** @internal Engine plugin hook: prepare (order -6), opaque and cutout (1), translucent then its depth (4.5). */
   registerPasses(graph: FrameGraph): void {
     const webgpu = (run: (c: Context) => void) => (c: PassContext) => {
       if (c.backend === 'webgpu' && !this.#disposed) run(c);
@@ -1667,8 +1678,7 @@ export class VoxelRenderer implements EnginePlugin {
   ): Promise<[GPURenderPipeline[], GPURenderPipeline[] | undefined]> {
     const device = gpu.device,
       // Paced, each GPU call waits for its turn in gpu.ahead; otherwise it starts now.
-      turn = <T>(start: () => T | Promise<T>): T | Promise<T> =>
-        paced ? new Promise<T>((resolve) => gpu.ahead.push(() => resolve(start()))) : start(),
+      turn = <T>(start: () => T | Promise<T>): T | Promise<T> => (paced ? inTurn(gpu, start) : start()),
       all = (module: GPUShaderModule, quads: boolean) =>
         Promise.all(
           Array.from({ length: count }, (_, l) => {
@@ -1711,30 +1721,34 @@ export class VoxelRenderer implements EnginePlugin {
   ): { ready?: Pipelines } {
     const samples = c.descriptor.multisample?.count ?? 1,
       pending: { ready?: Pipelines } = {},
-      format = c.format;
+      format = c.format,
+      depth = c.descriptor.depthStencil!.format;
     gpu.pipelines.set(key, pending);
-    this.#compile(
-      gpu,
-      code,
-      bevel,
-      3,
-      (l) => {
-        const mode = l === 2 ? 3 : l && samples > 1 ? 2 : l;
-        return {
-          mode,
-          targets: [{ format, ...(l === 2 ? { blend: { color: OVER, alpha: OVER } } : {}) }],
-          write: l < 2,
-          compare: 'greater-equal',
-          coverage: mode === 2,
-        };
-      },
-      samples,
-      c.descriptor.depthStencil!.format,
-      paced,
-    )
-      .then(([layers, bevelLayers]) => {
+    Promise.all([
+      this.#compile(
+        gpu,
+        code,
+        bevel,
+        3,
+        (l) => {
+          const mode = l === 2 ? 3 : l && samples > 1 ? 2 : l;
+          return {
+            mode,
+            targets: [{ format, ...(l === 2 ? { blend: { color: OVER, alpha: OVER } } : {}) }],
+            write: l < 2,
+            compare: 'greater-equal',
+            coverage: mode === 2,
+          };
+        },
+        samples,
+        depth,
+        paced,
+      ),
+      this.#compileSurface(gpu, code, bevel, samples, depth, paced),
+    ])
+      .then(([[layers, bevelLayers], surface]) => {
         if (this.#gpu !== gpu) return;
-        pending.ready = { target, layers, bevel: bevelLayers, effects, lit };
+        pending.ready = { target, layers, bevel: bevelLayers, effects, lit, surface };
         // The current composition's neighbours, each one effect short, stay among those kept.
         retain(gpu.pipelines, target, key, KEPT + this.#effects.size, true);
       })
@@ -1756,6 +1770,37 @@ export class VoxelRenderer implements EnginePlugin {
       bevel = less.bevel && this.#finish(less.bevel),
       key = `${target}|${this.#named(less.effects, lit, code, bevel)}`;
     if (!gpu.pipelines.has(key)) this.#request(c, gpu, key, target, code, bevel, less.effects, lit, paced);
+  }
+
+  // Depth-only pipelines of the translucent surfaces: the vertex stages of `code` and `bevel`, nothing shaded.
+  #compileSurface(
+    gpu: Gpu,
+    code: string,
+    bevel: string,
+    samples: number,
+    depth: GPUTextureFormat,
+    paced: boolean,
+  ): Promise<[GPURenderPipeline, GPURenderPipeline | undefined]> {
+    const device = gpu.device,
+      make = (module: GPUShaderModule, vertex: Partial<GPUVertexState>) =>
+        device.createRenderPipelineAsync({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex', ...vertex },
+          primitive: { cullMode: 'none' },
+          depthStencil: { format: depth, depthWriteEnabled: true, depthCompare: 'greater-equal' },
+          multisample: { count: samples },
+        }),
+      pipeline = paced
+        ? async (source: string, vertex: Partial<GPUVertexState>) => {
+            const module = await inTurn(gpu, () => device.createShaderModule({ code: source }));
+            return inTurn(gpu, () => make(module, vertex));
+          }
+        : (source: string, vertex: Partial<GPUVertexState>) =>
+            make(device.createShaderModule({ code: source }), vertex);
+    return Promise.all([
+      pipeline(code, { constants: { EDGE: 0 } }),
+      bevel ? pipeline(bevel, { buffers: [this.#bevel!.layout] }) : undefined,
+    ]);
   }
 
   // The pipelines for this target (format, samples, depth format) and composition, compiled asynchronously. While a
@@ -1827,6 +1872,11 @@ export class VoxelRenderer implements EnginePlugin {
         ],
         // The triangle shaders read no quad pool.
         shared = entries.filter((e) => e.binding < 1 || e.binding > 3);
+      if (p.surface)
+        p.surfaceGroups = [
+          group(p.surface[0], 0, entries.slice(0, 5)),
+          p.surface[1] && group(p.surface[1], 0, entries.slice(0, 1)),
+        ];
       p.groups = p.layers.map((pipeline) => group(pipeline, 0, entries));
       p.bevelGroups = p.bevel?.map((pipeline) => group(pipeline, 0, shared));
       p.groupVersion = this.#resources;
@@ -1968,5 +2018,40 @@ export class VoxelRenderer implements EnginePlugin {
     const pass = this.#pass(c);
     this.#engine!.stats.drawCalls += this.#drawRuns(gpu, pass, p);
     pass.end();
+    this.#drawSurfaceDepth(c, gpu, p);
+  }
+
+  // The translucent surfaces' depth, once their colour is down in depth order. What reads or tests the scene depth after
+  // this (screen-space fog above all) meets the nearest surface, not what lies behind it, which at the edge of the
+  // loaded range may be nothing: fog skips empty depth, so water there stayed in full colour over the fogged land.
+  #drawSurfaceDepth(c: Context, gpu: Gpu, p: Pipelines): void {
+    if (!p.surface || !p.surfaceGroups) return;
+    const pass = c.encoder.beginRenderPass({
+      colorAttachments: [],
+      depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true },
+    });
+    let draws = 0;
+    applyView(pass, c);
+    pass.setPipeline(p.surface[0]);
+    pass.setBindGroup(0, p.surfaceGroups[0]);
+    pass.setIndexBuffer(gpu.index, 'uint32');
+    for (const chunk of this.#translucent)
+      if (chunk.quads[2]) {
+        pass.drawIndexed(chunk.quads[2] * 6, 1, 0, chunk.start[2] * PAGE * 4, 0);
+        draws++;
+      }
+    if (p.surface[1]) {
+      pass.setPipeline(p.surface[1]);
+      pass.setBindGroup(0, p.surfaceGroups[1]!);
+      for (const chunk of this.#translucent) {
+        const mesh = chunk.bevel?.[2];
+        if (mesh) {
+          this.#drawMesh(pass, mesh);
+          draws++;
+        }
+      }
+    }
+    pass.end();
+    this.#engine!.stats.drawCalls += draws;
   }
 }

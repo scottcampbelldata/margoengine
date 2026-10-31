@@ -607,7 +607,9 @@ voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
   arguments, uploads, the frame uniform. Order 1 draws opaque blocks (back faces culled) and cutout blocks (both sides,
   alpha to coverage at 4x MSAA, alpha test at 0.5 at 1x) by replaying a render bundle of one `drawIndexedIndirect` per
   chunk layer, re-recorded only when the set of chunk layers with quads, a buffer or the target changes (0.2-0.8 ms for
-  2,000 draws). Order 4.5 draws translucent blocks (premultiplied over, no depth write). Pipelines compile
+  2,000 draws). Order 4.5 draws translucent blocks (premultiplied over, no depth write while they blend), then their
+  depth alone, so passes after it (screen-space fog, lines at the default order 20) meet the surface, not what is
+  behind it. Draw lines that must show through water before 4.5 (`new Lines({ order: 4 })`). Pipelines compile
   asynchronously: the first frames after attaching, or on a new target format, draw nothing.
 - **Shading.** Each pixel is shaded where its ray meets the face's plane, never from interpolated attributes: texture
   coordinates and their gradients (nearest texels up close, trilinear mips in the distance, no seams on tiled greedy

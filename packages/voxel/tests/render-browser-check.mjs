@@ -11,6 +11,7 @@
 // - the same world and views with the meshes arriving in the reverse order draw the same pixels (chunks draw in
 //   position order, so equal-depth samples where chunks overlap never follow the workers' timing);
 // - a cutout square and translucent glass composite to their exact linear numbers;
+// - distant leaves stay dense over what is behind them, and fog takes water with nothing under it;
 // - a block edit is drawn within two 60 Hz frames (best of five); engine.rebootDevice() draws the same image again;
 // - the worst case, 196,608 quads in one chunk layer (cutout and translucent), draws;
 // - no WebGPU validation errors; sane stats.
@@ -125,6 +126,22 @@ try {
     console.log(
       `ok ${samples}x composites: glass ${c.glass.map((v) => v.toFixed(4))}, cutout ${c.square} / ${c.border}`,
     );
+    // Leaves keep their density far away at either MSAA: filtered alpha as coverage let the wall behind show at 4x.
+    const dl = await page.evaluate(() => window.check.distantLeaves());
+    report.results[`${samples}x distant leaves`] = dl;
+    assert.deepEqual(dl.errors, []);
+    for (const [distance, red] of Object.entries(dl.red))
+      assert.ok(
+        red < 0.25,
+        `${samples}x wall behind leaves at ${distance} blocks shows ${red}: ${JSON.stringify(dl.red)}`,
+      );
+    console.log(`ok ${samples}x distant leaves: red showing through ${JSON.stringify(dl.red)}`);
+    // Fog meets the water's surface when the opaque depth under it is empty.
+    const wf = await page.evaluate(() => window.check.waterFog());
+    report.results[`${samples}x water fog`] = wf;
+    assert.deepEqual(wf.errors, []);
+    near(wf.water, [1, 0, 1], `${samples}x water with nothing under it takes the fog`, 0.02);
+    console.log(`ok ${samples}x fog over water with nothing under it: ${wf.water.map((v) => v.toFixed(3))}`);
     const e = await page.evaluate(() => window.check.edit());
     report.results[`${samples}x edit`] = e;
     assert.deepEqual(e.errors, []);

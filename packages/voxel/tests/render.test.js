@@ -848,7 +848,7 @@ test('addLighting: the frame right after taking an effect out of the middle is d
     await new Promise((resolve) => setTimeout(resolve));
     assert.equal(made.length, compiled, 'a still scene compiles nothing more');
     assert.equal(
-      made.filter((d) => /var<uniform> a:/.test(d.fragment.module.code) === false).length >= 3,
+      made.filter((d) => d.fragment && !/var<uniform> a:/.test(d.fragment.module.code)).length >= 3,
       true,
       'the composition without the first effect was compiled ahead',
     );
@@ -887,10 +887,12 @@ function gated() {
   const context = setup(),
     { device } = context,
     made = [],
+    // The depth-only pipelines of the translucent surfaces, one per composition, compile beside the three layers.
+    surfaces = [],
     gates = [],
     create = device.createRenderPipelineAsync;
   device.createRenderPipelineAsync = (d) => {
-    made.push(d);
+    (d.fragment ? made : surfaces).push(d);
     return new Promise((resolve) => gates.push(resolve)).then(() => create(d));
   };
   const open = async () => {
@@ -917,10 +919,10 @@ function gated() {
     // Frames with the gates open until nothing more starts.
     drain = async () => {
       for (let i = 0, still = 0; still < 3 && i < 200; i++) {
-        const before = made.length;
+        const before = made.length + surfaces.length;
         context.frame();
         await open();
-        still = made.length === before ? still + 1 : 0;
+        still = made.length + surfaces.length === before ? still + 1 : 0;
       }
     },
     // What the last frame's bundle drew: the effects in its shader, and the buffers its group 1 binds.
@@ -934,11 +936,11 @@ function gated() {
         buffers: group?.entries.map((x) => x.resource.buffer) ?? [],
       };
     };
-  return { ...context, made, open, effect, drain, drawn };
+  return { ...context, made, surfaces, open, effect, drain, drawn };
 }
 
 test('addLighting: compiling ahead starts one GPU call a frame, after the composition is ready, the same frames drawn', async () => {
-  const { world, renderer, frame, device, made, open, effect, drain, STONE } = gated(),
+  const { world, renderer, frame, device, made, surfaces, open, effect, drain, STONE } = gated(),
     modules = [],
     module = device.createShaderModule;
   device.createShaderModule = (d) => (modules.push(d), module.call(device, d));
@@ -957,7 +959,7 @@ test('addLighting: compiling ahead starts one GPU call a frame, after the compos
     frame();
     assert.equal(made.length, 6);
     await open();
-    const calls = () => made.length + modules.length;
+    const calls = () => made.length + surfaces.length + modules.length;
     let last = calls();
     frame();
     assert.equal(renderer.stats.compiling, false);
@@ -971,8 +973,10 @@ test('addLighting: compiling ahead starts one GPU call a frame, after the compos
       last = calls();
     }
     assert.equal(made.length, 12, 'then the two without one effect each');
+    assert.equal(surfaces.length, 4, 'and a surface pipeline with each of the four compositions, paced as they are');
     await drain();
     assert.equal(made.length, 12, 'only once');
+    assert.equal(surfaces.length, 4, 'only once');
   } finally {
     renderer.dispose();
   }
@@ -1198,7 +1202,7 @@ test('post replay: shared capture lifecycle and opaque/cutout native quad materi
       replay.some((c) => c[0] === 'end'),
       false,
     );
-    assert.equal(passes.length, 2, 'external replay does not open another render pass');
+    assert.equal(passes.length, 3, 'beauty, translucent and its depth: external replay does not open another pass');
 
     let disposed = 0;
     const off = renderer.onDispose(() => disposed++);
@@ -1314,7 +1318,10 @@ test('bevel: glass triangles and liquid quads blend back to front together, re-s
     camera.target = [1.5, 1.5, 0];
     await settle(frame, () => renderer.stats.triangles === CUBE_TRIANGLES && device.groups.length > 0);
     frame();
-    const translucent = () => passes.filter((p) => p.commands.some(([n, x]) => n === 'setPipeline' && isBevel(x)));
+    const translucent = () =>
+      passes.filter(
+        (p) => p.descriptor.colorAttachments.length && p.commands.some(([n, x]) => n === 'setPipeline' && isBevel(x)),
+      );
     let draws = drawOrder(translucent(), device, camera.position);
     assert.deepEqual(misordered(draws), []);
     assert.equal(draws[0].kind, 'quad', 'the far water first from +z');
@@ -1338,6 +1345,50 @@ test('bevel: glass triangles and liquid quads blend back to front together, re-s
   }
 });
 
+test('translucent surfaces write their depth after their colour: a depth-only pass, nothing shaded', async () => {
+  for (const options of [{}, { bevel: voxelBevel(0.15) }]) {
+    const { world, frame, renderer, camera, passes, device, GLASS } = setup(options);
+    try {
+      world.setBlocks([1, 1, 1, GLASS]);
+      camera.position = [1.5, 1.5, 10];
+      camera.target = [1.5, 1.5, 0];
+      await settle(frame, () => device.groups.length > 0 && (renderer.stats.quads > 0 || renderer.stats.triangles > 0));
+      frame();
+      const last = passes.at(-1),
+        colour = passes.at(-2),
+        pipeline = last.commands.findLast(([name]) => name === 'setPipeline')[1];
+      assert.equal(last.descriptor.colorAttachments.length, 0);
+      assert.equal(last.descriptor.depthStencilAttachment.depthStoreOp, 'store');
+      assert.equal(pipeline.fragment, undefined);
+      assert.equal(pipeline.depthStencil.depthWriteEnabled, true);
+      assert.equal(pipeline.depthStencil.depthCompare, 'greater-equal');
+      assert.equal(pipeline.multisample.count, 4);
+      assert.ok(last.commands.some(([name]) => name === 'drawIndexed'));
+      const blending = colour.commands.findLast(([name]) => name === 'setPipeline')[1];
+      assert.equal(blending.depthStencil.depthWriteEnabled, false, 'no depth write while the layers blend');
+      assert.equal(blending.fragment.constants.MODE, 3);
+    } finally {
+      renderer.dispose();
+    }
+  }
+});
+
+test('alpha to coverage takes the cutout edge at 0.5, so stacked leaves close', async () => {
+  const { world, frame, renderer, device, STONE } = setup();
+  try {
+    world.setBlock(1, 1, 1, blockState(STONE));
+    await settle(frame, () => device.bundles.length > 0);
+    const beauty = device.bundles.at(-1).commands.findLast(([name]) => name === 'setPipeline')[1];
+    assert.match(
+      beauty.fragment.module.code,
+      /\(s\.base\.a-0\.5\)\/max\(fwidth\(s\.base\.a\),0\.0001\)\+0\.5,MODE==2u/,
+    );
+    assert.equal(beauty.multisample.alphaToCoverageEnabled, true);
+  } finally {
+    renderer.dispose();
+  }
+});
+
 test('bevel: translucent chunks draw back to front for each view', async () => {
   const { world, frame, renderer, camera, passes, device, GLASS } = setup({ bevel: voxelBevel(0.15) });
   try {
@@ -1346,11 +1397,13 @@ test('bevel: translucent chunks draw back to front for each view', async () => {
     camera.target = [1.5, 1.5, 0];
     await settle(frame, () => renderer.stats.triangles === 2 * CUBE_TRIANGLES && device.groups.length > 0);
     const chunks = () =>
-      passes.flatMap((p) =>
-        p.commands
-          .filter(([name]) => name === 'setVertexBuffer')
-          .map(([, , buffer]) => Math.floor(new Float32Array(buffer.data)[2] / 32)),
-      );
+      passes
+        .filter((p) => p.descriptor.colorAttachments.length)
+        .flatMap((p) =>
+          p.commands
+            .filter(([name]) => name === 'setVertexBuffer')
+            .map(([, , buffer]) => Math.floor(new Float32Array(buffer.data)[2] / 32)),
+        );
     assert.deepEqual(chunks(), [0, 1], 'far chunk before near chunk from +z');
     camera.position = [1.5, 1.5, -4];
     camera.target = [1.5, 1.5, 40];

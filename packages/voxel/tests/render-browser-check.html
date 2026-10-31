@@ -13,6 +13,7 @@ import {BlockTypes,VoxelChunk,VoxelWorld,blockState} from '/packages/voxel/dist/
 import {VoxelLighting} from '/packages/voxel/dist/light.js';
 import {meshChunk,meshInput} from '/packages/voxel/dist/mesher.js';
 import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
+import {Sky} from '/packages/sky/dist/index.js';
 import {compareImages,toleranceFor} from '/packages/voxel/tests/blend-tolerance.js';
 if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
 // ?trace=1 (the --replay repro): every WebGPU object is recorded so check.trace can hand one frame to the plain replay.
@@ -66,7 +67,8 @@ const blocks=new BlockTypes(),STONE=blocks.define('stone',{textures:0}),DIRT=blo
  RED=blocks.define('red',{textures:9,color:[1,0,0],emissive:1}),GREEN=blocks.define('cutout test',{layer:'cutout',textures:10,color:[0,1,0],emissive:1}),
  BLUE=blocks.define('glass test',{layer:'translucent',textures:11,color:[0,0,1],emissive:1}),
  WHITE=blocks.define('white',{textures:9,emissive:1}),WHITE2=blocks.define('white 2',{textures:9,emissive:1}),
- AMBER=blocks.define('glass amber',{layer:'translucent',textures:11,color:[1,0.6,0],emissive:1});
+ AMBER=blocks.define('glass amber',{layer:'translucent',textures:11,color:[1,0.6,0],emissive:1}),
+ LEAF_LIT=blocks.define('leaf lit',{layer:'cutout',textures:6,color:[0,1,0],emissive:1,opacity:1});
 // The fixed world: 2 x 2 chunks of seeded hills, a flat stone floor with dirt patches (T-junctions), a pool of lowered
 // water, a glass wall, a tree, flowers, a torch and an overhang.
 const world=new VoxelWorld({blocks}),keys=[];
@@ -89,6 +91,14 @@ const lighting=VoxelLighting.attach(world,{budget:Infinity});while(lighting.upda
 // Composite scene in a second world: a red block behind a 0.4-alpha blue glass and behind a cutout square.
 const flat=new VoxelWorld({blocks});flat.setBlocks([0,0,0,RED,2,0,0,RED,0,0,2,BLUE,2,0,2,GREEN]);
 const flatKeys=['0,0,0'];
+// Distance scene: red wall behind a wall of leaves (emissive, so a pixel is its colour). And a sheet of water with
+// nothing under it, as at the edge of the loaded range.
+const leafWorld=new VoxelWorld({blocks}),waterWorld=new VoxelWorld({blocks}),distanceKeys=[];
+{const leafEdits=[],waterEdits=[];
+ for(let cz=0;cz<2;cz++)for(let cx=0;cx<4;cx++){distanceKeys.push(`${cx},0,${cz}`);leafWorld.addChunk(cx,0,cz);waterWorld.addChunk(cx,0,cz);}
+ for(let x=0;x<128;x++)for(let y=0;y<32;y++){leafEdits.push(x,y,10,RED,x,y,31,LEAF_LIT);}
+ for(let x=0;x<128;x++)for(let z=0;z<64;z++)waterEdits.push(x,8,z,WATER);
+ leafWorld.setBlocks(leafEdits);waterWorld.setBlocks(waterEdits);}
 // Crack scene: a closed 96 x 4 x 96 slab of two white emissive block types (they never merge with each other, so the
 // greedy quads meet in T-junctions); lit only by emission, every face has the same colour.
 const slab=new VoxelWorld({blocks}),slabKeys=[],slabEdits=[];
@@ -255,6 +265,32 @@ window.check={
   px=await at([0.5,0.5,-5],[0.5,0.5,0]);const red=px(0.5,0.5);
   renderer.dispose();post.dispose();post=undefined;l.direction.set(saved[0]);l.radiance.set(saved[1]);
   return {glass,square,border,red,errors:errors.splice(0)};
+ },
+ // Leaves far away: how much of the red wall behind them shows. Mean red over the wall, per distance.
+ async distantLeaves(){
+  post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+  const l=runtime().lighting,saved=[l.direction.slice(),l.radiance.slice()];l.direction[3]=0;l.radiance[3]=0;
+  renderer=attach(leafWorld,distanceKeys,'greedy');await ready(renderer,leafWorld,distanceKeys,'greedy');
+  const red={};
+  for(const d of [40,80,160]){
+   look({position:[64,16,32+d],target:[64,16,32]});
+   const img=await shot(),w=canvas.width,h=canvas.height,half=Math.floor(h*(12/d)/(2*Math.tan(Math.PI/6))),cx=w>>1,cy=h>>1;
+   let sum=0,n=0;for(let y=cy-half;y<cy+half;y++)for(let x=cx-half;x<cx+half;x++){sum+=img[(y*w+x)*4];n++;}
+   red[d]=sum/n;
+  }
+  renderer.dispose();post.dispose();post=undefined;l.direction.set(saved[0]);l.radiance.set(saved[1]);
+  return {red,errors:errors.splice(0)};
+ },
+ // Screen-space fog over water with nothing under it in the opaque depth.
+ async waterFog(){
+  post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+  const l=runtime().lighting,saved=[l.direction.slice(),l.radiance.slice()];
+  const sky=new Sky({hours:10,timeScale:0,fog:{depth:()=>post.depthTexture,color:[1,0,1],falloff:'exp',start:0,density:1}});engine.use(sky);
+  renderer=attach(waterWorld,distanceKeys,'greedy');await ready(renderer,waterWorld,distanceKeys,'greedy');
+  look({position:[64,40,70],target:[64,8,32]});
+  const img=await shot(),w=canvas.width,h=canvas.height,p=(Math.floor(h*0.75)*w+(w>>1))*4,water=[img[p],img[p+1],img[p+2]];
+  renderer.dispose();sky.dispose();post.dispose();post=undefined;l.direction.set(saved[0]);l.radiance.set(saved[1]);
+  return {water,errors:errors.splice(0)};
  },
  // Frames at 60 Hz from a block edit to its pixels: a gold block placed in view and removed again, five times.
  async edit(){
