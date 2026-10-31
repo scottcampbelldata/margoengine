@@ -54,6 +54,7 @@ test('the path tracer is reached only through the dynamic import', async () => {
       for (const specifier of await staticImports(file)) {
         assert.notEqual(specifier, './photo.ts', `${file} imports photo.ts statically`);
         assert.notEqual(specifier, './figures.ts', `${file} imports figures.ts statically`);
+        assert.notEqual(specifier, './timing.ts', `${file} imports timing.ts statically`);
         assert.ok(!specifier.startsWith('@margoengine/voxel-pathtracer'), `${file} imports the tracer statically`);
         if (specifier.startsWith('./') && specifier.endsWith('.ts')) await walk(specifier.slice(2));
       }

@@ -3,7 +3,8 @@
 // front of the page, the router and the shard, sharing one rate and delay, so WebSockets are held to the connection too
 // (Chromium's own network emulation does not reliably cover them). Each new connection waits 2 round trips, for TCP and
 // TLS. CPU throttling is Chromium's, applied to the page and its workers; the GPU stays this PC's.
-//   node examples/voxel-sandbox/loadtime.mjs [--profiles=a,b] [--runs=3] [--out=file] [--no-build] [--headed]
+//   node examples/voxel-sandbox/loadtime.mjs [--profiles=a,b] [--runs=3] [--out=file] [--no-build] [--headed] [--bots=n]
+// --bots=n has n walking, building bots on the shard during every run, each in their own view of it.
 // Run it from a checkout after `npm run build:packages`, holding a GPU slot. Emulation is not a phone: relative numbers.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -23,6 +24,7 @@ const option = (name, fallback) => {
   LIMIT = Number(option('limit', 14)) * 60_000,
   RUNS = Number(option('runs', 3)),
   HEADLESS = !option('headed'),
+  BOTS = Number(option('bots', 0)),
   ROOT = resolve(import.meta.dirname, '../..'),
   DIST = resolve(ROOT, String(option('dist', 'test-results/plaza-load-dist'))),
   IPHONE =
@@ -40,9 +42,10 @@ const PROFILES = {
   'desktop-open': { down: 0, up: 0, rtt: 0, cpu: 1, context: desktop },
   'desktop-10': { down: 10, up: 5, rtt: 40, cpu: 1, context: desktop },
   'desktop-10-high': { down: 10, up: 5, rtt: 40, cpu: 1, context: desktop, query: '&quality=high' },
-  'phone-open': { down: 0, up: 0, rtt: 0, cpu: 1, context: phone },
-  'phone-4g': { down: 9, up: 3, rtt: 60, cpu: 4, context: phone },
-  'phone-slow4g': { down: 1.6, up: 0.75, rtt: 150, cpu: 6, context: phone },
+  // Two mesher workers: what an iPhone's reported core count gives (this PC would start four).
+  'phone-open': { down: 0, up: 0, rtt: 0, cpu: 1, context: phone, query: '&workers=2' },
+  'phone-4g': { down: 9, up: 3, rtt: 60, cpu: 4, context: phone, query: '&workers=2' },
+  'phone-slow4g': { down: 1.6, up: 0.75, rtt: 150, cpu: 6, context: phone, query: '&workers=2' },
 };
 
 setTimeout(() => {
@@ -98,35 +101,6 @@ class Link {
   }
 }
 
-async function pipe(link, targetPort) {
-  const sockets = new Set(),
-    server = createServer((client) => {
-      const upstream = createConnection(targetPort, '127.0.0.1'),
-        // TCP and TLS before the first byte of the request.
-        opens = performance.now() + link.rtt * 2;
-      client.setNoDelay(true);
-      upstream.setNoDelay(true);
-      sockets.add(client).add(upstream);
-      client.on('data', (data) => link.send('up', data, upstream, opens));
-      upstream.on('data', (data) => link.send('down', data, client));
-      for (const [a, b] of [
-        [client, upstream],
-        [upstream, client],
-      ]) {
-        a.on('error', () => b.destroy());
-        a.on('close', () => setTimeout(() => b.destroy(), link.rtt + 50));
-      }
-    });
-  await new Promise((done) => server.listen(0, '127.0.0.1', done));
-  return {
-    port: server.address().port,
-    close: () => {
-      for (const socket of sockets) socket.destroy();
-      server.close();
-    },
-  };
-}
-
 // The page, as nginx would serve it: gzip for what compresses. Set in the argument: headers on top.
 const TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -173,6 +147,7 @@ async function startRouter(shardPipePort) {
         `--shard-port=${shardPort}`,
         '--origins=*',
         `--public-url=ws://127.0.0.1:${shardPipePort()}/s/{i}`,
+        ...(BOTS ? [`--per-identity=${BOTS + 16}`] : []),
       ],
       { cwd: ROOT, stdio: 'ignore' },
     );
@@ -186,10 +161,19 @@ async function startRouter(shardPipePort) {
     // fixed-wait: polling the router, which has no event for its first shard being ready
     await sleep(250);
   }
+  const bots = BOTS
+    ? spawn(process.execPath, [import.meta.filename, `--bot-child=ws://127.0.0.1:${shardPort}`, `--bots=${BOTS}`], {
+        cwd: ROOT,
+        stdio: 'ignore',
+      })
+    : undefined;
+  // fixed-wait: the bots settle in; there is no event for "the shard is busy"
+  if (BOTS) await sleep(8000);
   return {
     routerPort,
     shardPort,
     close: async () => {
+      if (bots) await killTree(bots);
       await killTree(child);
       rmSync(data, { recursive: true, force: true });
     },
@@ -238,7 +222,7 @@ async function run(browser, name, profile, pipes, router, repeat) {
       timedOut = true;
     });
   const cpu1 = cpuTimes(),
-    result = await page.evaluate(() => {
+    result = await page.evaluate(async () => {
       const s = window.voxelSandbox,
         t = s?.timing?.read();
       return {
@@ -246,6 +230,23 @@ async function run(browser, name, profile, pipes, router, repeat) {
         solo: !s?.online,
         stats: s?.stats(),
         panel: document.getElementById('timing')?.textContent,
+        resources: performance
+          .getEntriesByType('resource')
+          .map((e) => [
+            e.name.replace(/^.*\//, ''),
+            Math.round(e.startTime),
+            Math.round(e.responseEnd),
+            e.encodedBodySize,
+          ]),
+        spin: await (async () => {
+          const spin = `const end=performance.now()+200;let n=0;while(performance.now()<end)n++;`,
+            worker = new Worker(URL.createObjectURL(new Blob([`${spin}postMessage(n)`]))),
+            inWorker = await new Promise((done) => {
+              worker.onmessage = (e) => done(e.data);
+            });
+          worker.terminate();
+          return { main: new Function(`${spin}return n`)(), worker: inWorker };
+        })(),
       };
     }),
     panel = result.panel;
@@ -270,6 +271,28 @@ const median = (list) => {
 
 // --- main
 process.chdir(ROOT);
+if (option('bot-child')) {
+  const { VoxelBot } = await import('@margoengine/voxel-net/bot'),
+    { defineBlocks } = await import('./src/blocks.ts'),
+    blocks = defineBlocks().blocks,
+    bots = [];
+  for (let i = 0; i < BOTS; i++) {
+    bots.push(
+      await VoxelBot.connect({
+        url: option('bot-child'),
+        blocks,
+        name: 'Quiet Otter',
+        view: 6,
+      }).catch(() => undefined),
+    );
+    for (const bot of bots) bot?.update?.(0.02);
+    await sleep(20);
+  }
+  setInterval(() => {
+    for (const bot of bots) bot?.update?.(0.05);
+  }, 50);
+  await new Promise(() => {});
+}
 if (!option('no-build')) {
   rmSync(DIST, { recursive: true, force: true });
   await new Promise((done, fail) => {
@@ -285,7 +308,7 @@ const wanted = String(option('profiles', Object.keys(PROFILES).join(','))).split
   link = new Link(),
   http = await serve(),
   pipes = {
-    page: await pipe(link, http.address().port),
+    page: undefined,
     router: undefined,
     shard: undefined,
   },
@@ -324,6 +347,7 @@ const relay = (target) => {
     ),
   );
 };
+pipes.page = await relay(() => http.address().port);
 pipes.router = await relay(() => routerTarget);
 pipes.shard = await relay(() => shardTarget);
 

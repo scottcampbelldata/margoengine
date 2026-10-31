@@ -119,7 +119,7 @@ const params = new URLSearchParams(location.search),
     viewName === null && !serverUrl
       ? (params.get('plaza') ?? (location.pathname.startsWith('/plaza/') ? 'https://plaza.margoengine.com' : null))
       : null,
-  JOIN_TIMEOUT = 5000, // milliseconds from the page's start to the server's welcome, else it plays alone
+  JOIN_TIMEOUT = 5000, // milliseconds for /join's answer and again for the server's welcome, else it plays alone
   RETRY = integer('retry', 30_000, 100, 600_000), // milliseconds between asks of the router while playing alone
   seed = integer('seed', DEFAULT_SEED, -(2 ** 31), 2 ** 31 - 1),
   DISTANCES = [4, 8, 12, 16],
@@ -180,11 +180,26 @@ interface Sandbox {
   readonly timing: LoadTiming | undefined;
 }
 
+// A promise's outcome as a value, so that it can fail before anyone waits for it.
+function outcomeOf<T>(promise: Promise<T>, done: () => void): Promise<{ value: T } | { error: unknown }> {
+  return promise.then(
+    (value) => {
+      done();
+      return { value };
+    },
+    (error) => ({ error }),
+  );
+}
+
 async function boot(): Promise<void> {
+  const timing = params.has('timing') ? new (await import('./timing.ts')).LoadTiming() : undefined;
   if (!navigator.gpu) throw new Error('WebGPU is unavailable: open the sandbox in a browser with WebGPU');
   if (viewName !== null && !view) throw new RangeError(`No view "${viewName}"; use ${Object.keys(VIEWS).join(', ')}`);
-  const timing = params.has('timing') ? new (await import('./timing.ts')).LoadTiming() : undefined;
   if (params.has('reset')) await resetSave();
+  // Asked now, not after the engine: the answer's round trips run beside the GPU setup instead of after it.
+  const joinAnswer = routerUrl
+    ? outcomeOf(joinPlaza(routerUrl, AbortSignal.timeout(JOIN_TIMEOUT)), () => timing?.mark('join'))
+    : undefined;
   let features: GPUFeatureName[] = [];
   if (params.has('gpuTiming')) {
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
@@ -624,11 +639,21 @@ async function boot(): Promise<void> {
   const edits = new EditWatch();
   const serverName = serverUrl ?? 'Plaza';
 
-  // Spawn: a saved position, else the first dry ground in a spiral around the origin, once that ground is loaded and lit.
+  // Spawn: a saved position, else the first dry ground in a spiral around the origin, once that ground is loaded and
+  // something is drawn; the rest of the view loads behind the player. A chunk is lit in the frame it joins the world.
   function trySpawn(): void {
-    if (spawned || lightWork) return;
+    if (spawned) return;
+    if (online?.client.spawned) {
+      // The camera goes there first: meshes are made nearest it, and the player should find the ground drawn.
+      const [x, y, z] = online.client.player.position;
+      aim([x, y + EYE, z]);
+    }
+    const s = voxels.stats;
+    if (!s.chunks || s.compiling) return;
     if (online) {
-      if (online.client.spawned) {
+      const [x, y, z] = online.client.player.position,
+        here = (h: number) => world.getChunk(Math.floor(x) >> 5, Math.floor(h) >> 5, Math.floor(z) >> 5);
+      if (online.client.spawned && here(y) && here(y - 2)) {
         spawned = true;
         setOverlay(isPlaying() ? 'playing' : 'paused');
       }
@@ -993,22 +1018,24 @@ async function boot(): Promise<void> {
     }
     online.client.onError = (error) => console.warn(error); // onClose follows and decides
     player = online.client.player;
-    // A dynamic import: a page playing alone never downloads the figures, name tags or instancing.
+    // A dynamic import: a page playing alone never downloads the figures, name tags or instancing; a joining one waits
+    // until the player has spawned, so this does not compete with the ground on a slow connection.
     const joined = online;
-    import('./figures.ts').then(
-      ({ Figures }) => {
-        if (online !== joined) return; // left the server while it loaded
-        figures = new Figures(engine, {
-          capacity: phone ? 128 : 512,
-          tags: phone ? 12 : 32,
-          ...(scene.shadows ? { castShadows: (crowd) => scene.shadows!.add(crowd) } : {}),
-        });
-      },
-      (error) => {
-        console.warn(error);
-        toast('Other players could not load; check the connection');
-      },
-    );
+    joined.client.onSpawn = () =>
+      void import('./figures.ts').then(
+        ({ Figures }) => {
+          if (online !== joined) return; // left the server while it loaded
+          figures = new Figures(engine, {
+            capacity: phone ? 128 : 512,
+            tags: phone ? 12 : 32,
+            ...(scene.shadows ? { castShadows: (crowd) => scene.shadows!.add(crowd) } : {}),
+          });
+        },
+        (error) => {
+          console.warn(error);
+          toast('Other players could not load; check the connection');
+        },
+      );
     welcomeTimer = setTimeout(() => {
       if (online && !online.client.welcome) goSolo('offline');
     }, wait);
@@ -1094,24 +1121,21 @@ async function boot(): Promise<void> {
     }
   }
   if (serverUrl) connect(serverUrl, JOIN_TIMEOUT);
-  else if (routerUrl) {
-    const started = performance.now();
-    joinPlaza(routerUrl, AbortSignal.timeout(JOIN_TIMEOUT)).then(
-      (answer) => {
-        timing?.mark('join');
-        if (answer.kind === 'full') return goSolo('full', answer.online);
-        shard = answer.shard;
-        worldId = answer.world;
-        if (answer.seed !== undefined && answer.floor !== undefined)
-          worldInfo = { seed: answer.seed, floor: answer.floor };
-        connect(answer.url, Math.max(0, JOIN_TIMEOUT - (performance.now() - started)));
-      },
-      (error) => {
-        console.warn(error);
-        goSolo('offline');
-      },
-    );
-  }
+  else if (joinAnswer)
+    joinAnswer.then((outcome) => {
+      if ('error' in outcome) {
+        console.warn(outcome.error);
+        return goSolo('offline');
+      }
+      const answer = outcome.value;
+      if (answer.kind === 'full') return goSolo('full', answer.online);
+      shard = answer.shard;
+      worldId = answer.world;
+      if (answer.seed !== undefined && answer.floor !== undefined)
+        worldInfo = { seed: answer.seed, floor: answer.floor };
+      // The time since the answer is the engine's, not the network's: the welcome gets its own limit from here.
+      connect(answer.url, JOIN_TIMEOUT);
+    });
   if (import.meta.hot)
     import.meta.hot.dispose(() => {
       running = false;
@@ -1248,4 +1272,7 @@ async function resetSave(): Promise<void> {
   await new Promise(() => {}); // the page is going away
 }
 
-boot().catch(showError);
+/** Starts the game; index.html calls it once it knows the browser has WebGPU. */
+export function start(): void {
+  boot().catch(showError);
+}

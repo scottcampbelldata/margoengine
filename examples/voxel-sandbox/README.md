@@ -226,3 +226,9 @@ breaks and places a block, swims, changes the render distance and finds the edit
   the range edge better, so the example uses that.
 - No touch controls (phones only show the deterministic views well), no mobs or items, no crafting.
 - Water does not flow; breaking a lake's shore leaves a wall of water.
+
+## Load time
+
+`?timing` shows where the seconds of loading went, as plain text at the top left, in seconds from the moment the page was asked for. Each line reads phase, time, and the gap since the phase before it. Without the option nothing changes and its code is not downloaded. `CAN MOVE` is the player's moment; `Everything drawn` is the whole view.
+
+`node examples/voxel-sandbox/loadtime.mjs` measures the same phases on this machine against a local router and shard, with the connection and CPU held to phone-like settings. It is an emulation with this machine's GPU, so its numbers are for comparing builds, not for quoting as a phone's.

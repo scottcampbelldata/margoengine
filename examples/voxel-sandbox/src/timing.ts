@@ -77,6 +77,7 @@ export class LoadTiming {
     messages: 0,
     pipelines: 0,
     pipelineMs: 0,
+    syncGpuMs: 0,
     longestFrame: 0,
     longFrames: 0,
     frames: 0,
@@ -121,6 +122,18 @@ export class LoadTiming {
     wrapResult(GPU.prototype, 'requestAdapter', () => this.mark('adapter'));
     wrapResult(GPUAdapter.prototype, 'requestDevice', () => this.mark('device'));
     const self = this;
+    for (const name of ['createShaderModule', 'createRenderPipeline', 'createComputePipeline'] as const) {
+      const original = GPUDevice.prototype[name] as (...args: unknown[]) => unknown;
+      (GPUDevice.prototype as unknown as Record<string, unknown>)[name] = function (
+        this: GPUDevice,
+        ...args: unknown[]
+      ) {
+        const start = performance.now(),
+          result = original.apply(this, args);
+        self.counts.syncGpuMs += performance.now() - start;
+        return result;
+      };
+    }
     for (const name of ['createRenderPipelineAsync', 'createComputePipelineAsync'] as const) {
       const original = GPUDevice.prototype[name] as (...args: unknown[]) => Promise<unknown>;
       (GPUDevice.prototype as unknown as Record<string, unknown>)[name] = function (
@@ -226,7 +239,7 @@ export class LoadTiming {
       lines = timingLines(this.marks, [
         `JS ${files} files ${(bytes / 1024).toFixed(0)} KB (0 KB = cached or no header)`,
         `chunks ${c.chunks}, ${(c.chunkBytes / 1024).toFixed(0)} KB`,
-        `pipelines ${c.pipelines}, sum ${(c.pipelineMs / 1000).toFixed(2)} s`,
+        `pipelines ${c.pipelines}, sum ${(c.pipelineMs / 1000).toFixed(2)} s, blocking ${(c.syncGpuMs / 1000).toFixed(2)} s`,
         `frames ${c.frames}, longest ${(c.longestFrame / 1000).toFixed(2)} s, over 50 ms ${c.longFrames}`,
         this.#about,
         ...(connection?.effectiveType ? [`net ${connection.effectiveType} ${connection.downlink ?? ''} Mbps`] : []),

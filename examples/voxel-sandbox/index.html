@@ -59,9 +59,11 @@
   <div id="banner" role="status" hidden><span></span><button type="button" hidden>Join</button></div>
   <script type="module">
     import { needsWebGPU } from '../needs-webgpu.js';
-    needsWebGPU('#scene').then((ok) => {
+    // The game's code downloads while the check runs, so the check holds nothing up. A browser with no WebGPU downloads none.
+    const game = navigator.gpu && import('./src/main.ts');
+    needsWebGPU('#scene').then(async (ok) => {
       performance.mark('margo-probe-done');
-      return ok && import('./src/main.ts');
+      if (ok) (await game).start();
     });
   </script>
 </body>

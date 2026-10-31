@@ -48,6 +48,12 @@ try {
     console.log('voxel sandbox Plaza edit test passed');
     process.exit(await closeAll());
   }
+  // PLAY_ONLY=load runs only the load order test.
+  if (process.env.PLAY_ONLY === 'load') {
+    await loadOrder();
+    console.log('voxel sandbox load order test passed');
+    process.exit(await closeAll());
+  }
   // PLAY_ONLY=phone runs only the phone test.
   if (process.env.PLAY_ONLY === 'phone') {
     await phone();
@@ -149,6 +155,7 @@ try {
   console.log('ok the edits survive a reload');
   assert.deepEqual(errors, []);
 
+  await loadOrder();
   await plaza();
   await plazaEdits();
   assert.deepEqual(
@@ -521,6 +528,111 @@ async function plaza() {
   await phone();
 }
 
+// The order of loading. A slow GPU start must hold nothing else up: the code and /join go out while the adapter is still
+// being asked for. On a slow connection the player may move before the far chunks arrive (they used to wait for all of
+// them, once behind the socket's queue and once for the light to go quiet), with the ground drawn; figures come after that.
+// ?timing shows the phases, and without it no panel and no timing code.
+async function loadOrder() {
+  const shard = await startShard(),
+    pipe = await tcpProxy(shard.port, 60_000), // 480 kbit/s down: a view of 8 takes about 10 s
+    asked = [],
+    routerServer = createServer((request, response) => {
+      response.setHeader('access-control-allow-origin', '*');
+      response.setHeader('content-type', 'application/json');
+      asked.push(performance.now());
+      response.end(JSON.stringify({ url: `ws://127.0.0.1:${pipe.port}`, shard: 1, world: 'a' }));
+    });
+  await new Promise((done) => routerServer.listen(0, '127.0.0.1', done));
+  cleanup.push(() => new Promise((done) => (routerServer.closeAllConnections(), routerServer.close(done))));
+  const browser = page.context().browser(),
+    context2 = await browser.newContext({ viewport: { width: 960, height: 540 } }),
+    tab = await context2.newPage(),
+    requests = [];
+  cleanup.push(() => context2.close());
+  tab.on('request', (request) => requests.push([request.url().replace(/\?.*$/, ''), performance.now()]));
+  // The adapter answers late, at a moment the test chooses.
+  await tab.addInitScript(() => {
+    const ask = GPU.prototype.requestAdapter;
+    window.__releaseAdapter = undefined;
+    const gate = new Promise((done) => (window.__releaseAdapter = done));
+    GPU.prototype.requestAdapter = async function (...args) {
+      await gate;
+      return ask.apply(this, args);
+    };
+  });
+  const url = `http://127.0.0.1:${port}/examples/voxel-sandbox/index.html?plaza=http://127.0.0.1:${routerServer.address().port}&rd=8&timing`;
+  await tab.goto(url, { waitUntil: 'domcontentloaded' });
+  await tab.waitForResponse((r) => r.url().includes('/src/main.ts'), { timeout: 60_000 }).catch(() => {});
+  assert.ok(
+    requests.some(([name]) => name.endsWith('/src/main.ts')),
+    'the game code is asked for while the WebGPU check waits',
+  );
+  await tab.evaluate(() => window.__releaseAdapter());
+  await tab.waitForFunction(() => window.voxelSandbox?.spawned, null, { timeout: 120_000 });
+  const atMove = await tab.evaluate(() => {
+    const s = window.voxelSandbox,
+      c = s.online.client,
+      [x, y, z] = c.player.position;
+    return {
+      loaded: c.loaded,
+      chunks: c.stats.chunks,
+      meshed: s.voxels.stats.chunks,
+      ground: !!s.world.getChunk(Math.floor(x) >> 5, Math.floor(y - 2) >> 5, Math.floor(z) >> 5),
+      overlay: document.getElementById('overlay').dataset.state,
+      marks: s.timing.read().marks,
+    };
+  });
+  assert.equal(atMove.loaded, false, `the player can move with chunks still to come (${atMove.chunks} here)`);
+  assert.ok(atMove.ground, 'the ground under the player is in the world');
+  assert.ok(atMove.meshed > 0, 'and something is drawn');
+  assert.equal(atMove.overlay, 'paused', 'the prompt to play shows');
+  // The figures wait until the spawn: asked for at or after the first chunks, not beside the ground.
+  const figuresAt = requests.findIndex(([name]) => /figures/.test(name));
+  assert.ok(figuresAt >= 0, 'the figures were asked for');
+  await tab.waitForFunction(() => /CAN MOVE +\d/.test(document.getElementById('timing').textContent));
+  assert.ok(atMove.marks.join < atMove.marks.engine, 'the /join answer came before the engine was ready');
+  assert.ok(atMove.marks.spawn <= atMove.marks.move);
+  assert.ok(
+    requests.some(([name]) => /mesher/.test(name) && name),
+    'the mesher started',
+  );
+  const before = await tab.evaluate(() => window.voxelSandbox.player.position.slice());
+  await tab.mouse.click(480, 270);
+  await tab.waitForFunction(() => document.pointerLockElement?.id === 'scene', null, { timeout: 5000 });
+  await tab.keyboard.down('KeyW');
+  await tab.keyboard.down('Space');
+  await tab.waitForFunction(
+    (from) => Math.hypot(...window.voxelSandbox.online.client.player.position.map((v, i) => v - from[i])) > 1,
+    before,
+    { timeout: 15_000 },
+  );
+  await tab.keyboard.up('KeyW');
+  await tab.keyboard.up('Space');
+  assert.equal(
+    await tab.evaluate(() => window.voxelSandbox.online.client.loaded),
+    false,
+    'walked before the far chunks',
+  );
+  console.log(
+    `ok moved at ${(atMove.marks.move / 1000).toFixed(2)} s with ${atMove.chunks} chunks, ground drawn, far chunks still coming`,
+  );
+
+  // Without the option: no panel, no timing code.
+  const plainRequests = [];
+  page.on('request', (request) => plainRequests.push(request.url()));
+  await page.goto(`http://127.0.0.1:${port}/examples/voxel-sandbox/index.html?rd=2`);
+  await page.waitForFunction(() => window.voxelSandbox?.spawned, null, { timeout: 120_000 });
+  assert.equal(await page.evaluate(() => !!document.getElementById('timing') || !!window.voxelSandbox.timing), false);
+  assert.ok(!plainRequests.some((u) => /timing/.test(u)), 'the timing code was not downloaded');
+  console.log('ok no panel and no timing code without ?timing');
+  await context2.close();
+  cleanup.splice(
+    cleanup.findIndex((c) => String(c).includes('context2')),
+    1,
+  );
+  await killTree(shard.child);
+}
+
 // A phone: its user agent, screen and touch events (Chromium's own emulation, on this PC's GPU).
 async function phone() {
   const browser = page.context().browser(),
@@ -782,7 +894,7 @@ async function startShard(flags = []) {
 // A TCP pipe in front of a shard that the test can cut. `pause` drops everything both ways and keeps the socket open (a
 // network that died without a close). `injectClose` sends the browser a WebSocket close frame as if the server had sent
 // it, then pauses, so the real server's later bytes do not follow it.
-async function tcpProxy(target) {
+async function tcpProxy(target, bytesPerSecond = 0) {
   const sockets = new Set(),
     pipe = { paused: false, port: 0, last: undefined },
     server = createTcpServer((client) => {
@@ -790,7 +902,22 @@ async function tcpProxy(target) {
       sockets.add(client).add(upstream);
       pipe.last = client;
       client.on('data', (data) => pipe.paused || upstream.write(data));
-      upstream.on('data', (data) => pipe.paused || client.write(data));
+      if (bytesPerSecond) {
+        // Down, at a fixed rate: the socket's queue stays here, as it would on the slow link.
+        const queue = [];
+        const pump = setInterval(() => {
+          let room = bytesPerSecond / 50;
+          while (queue.length && room > 0) {
+            const part = queue[0].subarray(0, room);
+            room -= part.length;
+            if (!pipe.paused && client.writable) client.write(part);
+            queue[0] = queue[0].subarray(part.length);
+            if (!queue[0].length) queue.shift();
+          }
+        }, 20);
+        client.on('close', () => clearInterval(pump));
+        upstream.on('data', (data) => queue.push(data));
+      } else upstream.on('data', (data) => pipe.paused || client.write(data));
       for (const [a, b] of [
         [client, upstream],
         [upstream, client],
