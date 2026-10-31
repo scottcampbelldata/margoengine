@@ -637,21 +637,20 @@ export async function lobeBrowserChecks(page) {
           transmitted = materials.transmission({ factor: 1, ior: 1, opaqueColor: opaque.view });
         // With no light on the surface only the transmitted background is left. Reflection and transmission add up
         // (dc883a59) and the transmitted light is in the base under the lobes (packages/materials/tests/transmission-layers
-        // has the numbers): a specular lobe at IOR 1 has F0 0, so it leaves the background; a sheen and a thin film take
-        // their part of it, and nothing adds any.
+        // has the numbers). A specular lobe at IOR 1 has F0 0 and an anisotropy only moves highlights, so these must not
+        // change a byte of the background. A sheen and a thin film take their part of it by the Khronos formulas, and add none.
         const glassLit = { blend: true, base: [1, 1, 1, 1] },
           glassUnlit = { ...glassLit, direction: [0, 0, 1, 0], ambient: 0 },
           lobedTransmission = materials.materialLobes(all, transmitted);
         const transmissionBase = await render(transmitted, glassUnlit),
-          transmissionLobes = await render(lobedTransmission, glassUnlit);
-        const specularOnly = await render(materials.materialLobes({ specular: all.specular }, transmitted), glassUnlit),
-          specularDifference = difference(transmissionBase.beauty, specularOnly.beauty);
+          transmissionLobes = await render(lobedTransmission, glassUnlit),
+          neutralLobes = await render(
+            materials.materialLobes({ specular: all.specular, anisotropy: all.anisotropy }, transmitted),
+            glassUnlit,
+          );
+        exact(transmissionBase.beauty, neutralLobes.beauty, 'New lobes bypassed full transmission compositing');
         assert(
-          specularDifference.max <= 1,
-          `A specular lobe at IOR 1 changed the unlit transmitted background by ${specularDifference.max} steps`,
-        );
-        assert(
-          transmissionLobes.beauty.every((value, index) => value <= transmissionBase.beauty[index] + 1) &&
+          transmissionLobes.beauty.every((value, index) => value <= transmissionBase.beauty[index]) &&
             difference(transmissionBase.beauty, transmissionLobes.beauty).max > 0,
           'Sheen and thin film over transmission must take their part of the background and add none',
         );
@@ -661,6 +660,24 @@ export async function lobeBrowserChecks(page) {
         assert(
           centre(transmissionBase.beauty).every((value, c) => Math.abs(value - [160, 80, 40][c]) <= 1),
           `Unlit IOR 1 transmission must show the background 160, 80, 40, got ${centre(transmissionBase.beauty)}`,
+        );
+        // A white sheen of roughness 0.5 at normal incidence keeps 1 - E(1, 0.5) = 1 - 0.0413 (Margo's fit, itself checked
+        // against an integration), applied in linear light on this display-encoded target.
+        const sheenKeep = 1 - 0.0413,
+          toLinear = (c) => (c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92),
+          toDisplay = (c) => (c > 0.0031308 ? 1.055 * c ** (1 / 2.4) - 0.055 : c * 12.92),
+          sheenExpected = [160, 80, 40].map((value) => Math.round(255 * toDisplay(toLinear(value / 255) * sheenKeep))),
+          sheenCentre = centre(
+            (
+              await render(
+                materials.materialLobes({ sheen: { colorFactor: [1, 1, 1], roughnessFactor: 0.5 } }, transmitted),
+                glassUnlit,
+              )
+            ).beauty,
+          );
+        assert(
+          sheenCentre.every((value, c) => value === sheenExpected[c]),
+          `A white sheen must leave ${sheenExpected} of the background 160, 80, 40, got ${sheenCentre}`,
         );
         const litBase = await render(transmitted, glassLit),
           litLobes = await render(lobedTransmission, glassLit);
