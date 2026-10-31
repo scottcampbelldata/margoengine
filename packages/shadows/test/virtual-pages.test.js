@@ -225,3 +225,55 @@ test('importing the virtual entry leaves the root entry whole: both load side by
   assert.equal(typeof VirtualShadows, 'function');
   assert.notEqual(new VirtualShadows().name, new Shadows().name);
 });
+test('feedback bits decode through the window they were marked in, with dilation and the coarsest ancestor first', () => {
+  const p = new PagePool({ levels: 3, base: 1, poolPages: 16 }),
+    bits = new Uint32Array((3 * PAGES_PER_SIDE * PAGES_PER_SIDE) / 32),
+    seen = new Int32Array([20, -3, 0, 0, 0, 0]),
+    mark = (level, ix, iy) => {
+      const slot = tableSlot(level, ix, iy);
+      bits[slot >>> 5] |= 1 << (slot & 31);
+    };
+  mark(0, 25, -9);
+  p.beginFrame();
+  p.requestFeedback(bits, seen, seen);
+  // Nine pages around (25, -9) on level 0, one ancestor (25 >> 2, -9 >> 2) on level 2.
+  assert.deepEqual(Array.from(p.requested), [9, 0, 1]);
+  assert.ok(p.find(0, 25, -9) >= 0 && p.find(0, 24, -10) >= 0 && p.find(0, 26, -8) >= 0);
+  assert.ok(p.find(2, 6, -3) >= 0);
+  // The window moved on: a page outside the current window is not asked for.
+  const moved = new Int32Array([20 + PAGES_PER_SIDE, -3, 0, 0, 0, 0]);
+  p.beginFrame();
+  p.requestFeedback(bits, seen, moved);
+  assert.deepEqual(Array.from(p.requested), [0, 0, 1]);
+});
+test('a full budget keeps the coarser requests: fine pages overflow first', () => {
+  const p = new PagePool({ levels: 3, base: 1, poolPages: 2 }),
+    bits = new Uint32Array((3 * PAGES_PER_SIDE * PAGES_PER_SIDE) / 32),
+    seen = new Int32Array(6);
+  for (const [level, ix, iy] of [
+    [0, 0, 0],
+    [1, 4, 4],
+  ]) {
+    const slot = tableSlot(level, ix, iy);
+    bits[slot >>> 5] |= 1 << (slot & 31);
+  }
+  p.beginFrame();
+  p.requestFeedback(bits, seen, seen);
+  assert.equal(p.resident, 4);
+  assert.ok(p.overflow > 0);
+  assert.ok(p.find(2, 0, 0) >= 0 && p.find(2, 2, 2) >= 0, 'both ancestors');
+  assert.equal(p.find(0, 0, 0), -1);
+});
+test('requestCircle takes the pages a caster reaches, clipped to the window', () => {
+  const p = pool({ poolPages: 16, levels: 1 }),
+    centers = [0, 0];
+  p.beginFrame();
+  p.requestCircle(0, 0.5, 0.5, 0.1, centers);
+  assert.equal(p.requested[0], 1);
+  p.beginFrame();
+  p.requestCircle(0, 0, 0, 0.1, centers);
+  assert.equal(p.requested[0], 4);
+  p.beginFrame();
+  p.requestCircle(0, 7.5, 0.5, 3, centers);
+  assert.ok(p.find(0, 8, 0) === -1, 'the window ends at page 7');
+});

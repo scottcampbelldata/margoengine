@@ -18,13 +18,21 @@ import { viewMatrix } from '../../shared/view.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { invert } from '../../shared/math.js';
 import { casterPipeline, casterRuntime, displacementGroup, drawCaster, staleCaster } from '../../shared/caster.js';
 import { PAGES_PER_SIDE, PAGE_TEXELS, PagePool, basePageSize, pageIndex, pageMatrix, pageSize } from './pages.js';
 import { shadowDepth, type ShadowFilter } from './shader.js';
-import { pageClear, virtualSampling } from './virtual-shader.js';
+import { pageClear, pageFeedback, virtualSampling } from './virtual-shader.js';
 import type { ShadowPrimitive, ShadowSource } from './index.js';
 export type { ShadowFilter } from './shader.js';
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+declare const GPUBufferUsage: {
+  UNIFORM: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  STORAGE: number;
+  MAP_READ: number;
+};
+declare const GPUMapMode: { READ: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
   TEXTURE_BINDING: number;
@@ -61,6 +69,7 @@ interface Source {
   source: ShadowSource | Mesh;
   static: boolean;
   cast: boolean;
+  receive: boolean;
   version: number;
   removeLighting?: () => void;
   meshPrimitive?: ShadowPrimitive[];
@@ -79,6 +88,8 @@ interface Draw {
   section?: GPUBuffer;
   displacement?: ShadowPrimitive['displacement'];
   displaced?: GPUBindGroup;
+  /** A cast registration reached it this frame. */
+  casts: boolean;
   /** Draws made this frame. */
   used: number;
   serial: number;
@@ -105,8 +116,11 @@ const shaderKey = (filter: string, group: number) => group * 8 + (filter === 'so
  */
 export class VirtualShadows implements EnginePlugin {
   readonly name = 'virtual-shadows';
-  /** Frame counters: `residentPages` now, `pagesRendered` drawn this frame, `casterDraws` their caster draws. */
-  readonly stats = { residentPages: 0, pagesRendered: 0, casterDraws: 0 };
+  /**
+   * Frame counters: `residentPages` now, `pagesRendered` drawn this frame, `casterDraws` their caster draws,
+   * `levelPages` the distinct pages requested per level, `overflow` the requests the budget turned away.
+   */
+  readonly stats = { residentPages: 0, pagesRendered: 0, casterDraws: 0, levelPages: [] as number[], overflow: 0 };
   private engine?: Engine;
   private device?: GPUDevice;
   private pool?: GPUTexture;
@@ -128,10 +142,25 @@ export class VirtualShadows implements EnginePlugin {
   private readonly pipelines = new Map<number, GPURenderPipeline>();
   private readonly draws = new Map<Mesh, Map<object, Draw>>();
   private readonly casters: Draw[] = [];
+  private readonly receivers: Draw[] = [];
+  private readonly customReceivers: ShadowSource[] = [];
+  /** Core meshes nobody added still receive, so feedback draws them too. */
+  private readonly loose = new Map<Mesh, Source>();
+  private feedbackDepth?: GPUTexture;
+  private feedbackView?: GPUTextureView;
+  private feedbackPipeline?: GPUComputePipeline;
+  private feedbackGroup?: GPUBindGroup;
+  private requestBuffer?: GPUBuffer;
+  private ring: { buffer: GPUBuffer; busy: boolean; centers: Int32Array }[] = [];
+  private ringNext = 0;
+  /** The newest feedback read back, and each level's window centre on the frame it was marked. */
+  private requests = new Uint32Array(0);
+  private requestCenters = new Int32Array(0);
+  private readonly cameraMatrix = new Float32Array(16);
   private serial = 0;
   private table = new Uint32Array(0);
   private centers = new Int32Array(0);
-  private readonly values = new Float32Array(100);
+  private readonly values = new Float32Array(116);
   private readonly view = this.values.subarray(0, 16);
   private readonly right = this.values.subarray(16, 19);
   private readonly up = this.values.subarray(20, 23);
@@ -252,7 +281,14 @@ export class VirtualShadows implements EnginePlugin {
         }
       };
     }
-    const r: Source = { source: runtime, static: cached, cast: castShadow, version: -1, removeLighting };
+    const r: Source = {
+      source: runtime,
+      static: cached,
+      cast: castShadow,
+      receive: receiveShadow,
+      version: -1,
+      removeLighting,
+    };
     this.sources.push(r);
     this.invalidate();
     return () => {
@@ -350,7 +386,7 @@ export class VirtualShadows implements EnginePlugin {
       poolPages: size / PAGE_TEXELS,
       budgetPages: o.budgetPages,
     });
-    this.uniform = device.createBuffer({ size: 400, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = device.createBuffer({ size: 464, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sampler = device.createSampler({ compare: 'less-equal', magFilter: 'linear', minFilter: 'linear' });
     this.alphaSampler = device.createSampler();
     // One white texel stands in for the alpha map of casters without one.
@@ -364,6 +400,18 @@ export class VirtualShadows implements EnginePlugin {
       { binding: 3, resource: this.sampler },
       { binding: 31, resource: this.tableTexture.createView({ dimension: '2d-array' }) },
     ];
+    const words = (levels * PAGES_PER_SIDE * PAGES_PER_SIDE) / 32;
+    this.requestBuffer = device.createBuffer({
+      size: words * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+    this.ring = [0, 1].map(() => ({
+      buffer: device.createBuffer({ size: words * 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+      busy: false,
+      centers: new Int32Array(levels * 2),
+    }));
+    this.requests = new Uint32Array(words);
+    this.requestCenters = new Int32Array(levels * 2);
     this.origin = Number.NaN;
     this.dirty = true;
   }
@@ -455,9 +503,7 @@ export class VirtualShadows implements EnginePlugin {
   }
   /** This frame's casters, each once, with their light-space spheres. Registered twice, the moving registration wins. */
   private gather(serial: number, section?: GPUBufferBinding): void {
-    const list = this.casters,
-      store = this.engine!.store;
-    list.length = 0;
+    this.casters.length = 0;
     for (let i = this.sources.length - 1; i >= 0; i--) {
       const r = this.sources[i];
       if (
@@ -469,37 +515,58 @@ export class VirtualShadows implements EnginePlugin {
         this.dirty = true;
       }
     }
-    for (const r of this.sources) {
-      if (!r.cast) continue;
-      if (r.static && 'shadowVersion' in r.source && r.version !== r.source.shadowVersion) {
-        r.version = r.source.shadowVersion ?? 0;
-        this.dirty = true;
-      }
-      const primitives = this.primitives(r);
-      for (let i = 0; i < primitives.length; i++) {
-        const p = primitives[i],
-          node = p.node;
-        node.check();
-        if (node.engine !== this.engine)
-          throw new MargoError(
-            'attached',
-            'Shadow source belongs to another engine; use objects created by the same engine',
-          );
-        if (hiddenInTree(store, node.id)) continue;
-        const inst = p.instances;
-        if (inst && !inst.count) continue;
-        const moving = !r.static && !!(p.dynamic || inst);
-        const d = this.record(p, section);
-        if (d.serial === serial) {
-          if (moving) d.still = false;
-          continue;
-        }
+    this.receivers.length = 0;
+    this.customReceivers.length = 0;
+    for (const r of this.sources) this.collect(r, serial, section);
+    const loose = this.loose;
+    for (const mesh of this.engine!.meshes.values()) {
+      if (!mesh.geometry || !mesh.receiveShadow) continue;
+      let r = loose.get(mesh);
+      if (!r) loose.set(mesh, (r = { source: mesh, static: true, cast: false, receive: true, version: 0 }));
+      this.collect(r, serial, section);
+    }
+    if (loose.size > this.engine!.meshes.size * 2 + 16)
+      for (const mesh of loose.keys()) if (this.engine!.meshes.get(mesh.id) !== mesh) loose.delete(mesh);
+  }
+  private collect(r: Source, serial: number, section?: GPUBufferBinding): void {
+    const store = this.engine!.store,
+      source = r.source;
+    if (r.cast && r.static && 'shadowVersion' in source && r.version !== source.shadowVersion) {
+      r.version = source.shadowVersion ?? 0;
+      this.dirty = true;
+    }
+    if (!('id' in source) && !('shadowPrimitives' in source)) {
+      if (r.receive) this.customReceivers.push(source);
+      return;
+    }
+    const primitives = this.primitives(r);
+    for (let i = 0; i < primitives.length; i++) {
+      const p = primitives[i],
+        node = p.node;
+      node.check();
+      if (node.engine !== this.engine)
+        throw new MargoError(
+          'attached',
+          'Shadow source belongs to another engine; use objects created by the same engine',
+        );
+      if (hiddenInTree(store, node.id)) continue;
+      const inst = p.instances;
+      if (inst && !inst.count) continue;
+      const moving = r.cast && !r.static && !!(p.dynamic || inst),
+        d = this.record(p, section);
+      if (d.serial !== serial) {
         d.serial = serial;
         d.used = 0;
-        d.still = !moving;
+        d.still = true;
+        d.casts = false;
         d.p = p;
         this.sphere(d, p);
-        list.push(d);
+        this.receivers.push(d);
+      }
+      if (moving) d.still = false;
+      if (r.cast && !d.casts) {
+        d.casts = true;
+        this.casters.push(d);
       }
     }
   }
@@ -544,6 +611,7 @@ export class VirtualShadows implements EnginePlugin {
         section: section?.buffer,
         displacement: p.displacement,
         displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), p.displacement),
+        casts: false,
         used: 0,
         serial: 0,
         still: true,
@@ -618,15 +686,96 @@ export class VirtualShadows implements EnginePlugin {
     );
     this.stats.casterDraws++;
   }
-  /** Requests this frame's pages: for now every page of the finest level. */
+  /**
+   * This frame's pages: where each known caster reaches on the coarsest level, so a receiver never reads a hole whatever
+   * feedback has seen yet, then what the newest feedback marked. Every requested page draws every frame for now.
+   */
   private request(): void {
     const pages = this.pages!,
-      centers = this.centers;
-    for (let iy = -PAGES_PER_SIDE / 2; iy < PAGES_PER_SIDE / 2; iy++)
-      for (let ix = -PAGES_PER_SIDE / 2; ix < PAGES_PER_SIDE / 2; ix++) {
-        const slot = pages.request(0, centers[0] + ix, centers[1] + iy);
-        if (slot >= 0) pages.stale[slot] = 1;
-      }
+      coarsest = pages.levels - 1;
+    for (let i = 0; i < this.casters.length; i++) {
+      const d = this.casters[i];
+      if (d.radius === d.radius) pages.requestCircle(coarsest, d.x, d.y, d.radius, this.centers);
+    }
+    pages.requestFeedback(this.requests, this.requestCenters, this.centers);
+    pages.staleRequested();
+  }
+  /** Depth of everything that receives, from the camera at half size, then the compute pass that marks its pages. */
+  private feedback(c: VirtualPassContext): void {
+    const device = c.device,
+      width = Math.max(1, c.width >> 1),
+      height = Math.max(1, c.height >> 1),
+      slot = this.ring[this.ringNext];
+    // Both read buffers on their way back: the newest feedback stays in use one frame longer.
+    if (slot.busy) return;
+    if (this.feedbackDepth?.width !== width || this.feedbackDepth.height !== height) {
+      this.feedbackDepth?.destroy();
+      this.feedbackDepth = device.createTexture({
+        size: [width, height],
+        format: 'depth32float',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      this.feedbackView = this.feedbackDepth.createView();
+      this.feedbackGroup = undefined;
+    }
+    const pass = c.encoder.beginRenderPass({
+        colorAttachments: [],
+        depthStencilAttachment: {
+          view: this.feedbackView!,
+          depthClearValue: 1,
+          depthLoadOp: 'clear',
+          depthStoreOp: 'store',
+        },
+      }),
+      matrix = this.cameraMatrix,
+      section = sectionState(c);
+    try {
+      for (let i = 0; i < this.receivers.length; i++) this.draw(pass, this.receivers[i], matrix, section);
+      for (const source of this.customReceivers) source.drawShadow?.({ context: c, pass, matrix, cascade: 0 });
+    } catch (error) {
+      try {
+        pass.end();
+      } catch {}
+      throw error;
+    }
+    pass.end();
+    this.feedbackPipeline ??= device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: device.createShaderModule({ code: pageFeedback }), entryPoint: 'main' },
+    });
+    this.feedbackGroup ??= device.createBindGroup({
+      layout: this.feedbackPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.uniform! } },
+        { binding: 1, resource: this.feedbackView! },
+        { binding: 2, resource: { buffer: this.requestBuffer! } },
+      ],
+    });
+    c.encoder.clearBuffer(this.requestBuffer!);
+    const compute = c.encoder.beginComputePass();
+    compute.setPipeline(this.feedbackPipeline);
+    compute.setBindGroup(0, this.feedbackGroup);
+    compute.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
+    compute.end();
+    c.encoder.copyBufferToBuffer(this.requestBuffer!, 0, slot.buffer, 0, slot.buffer.size);
+    slot.busy = true;
+    slot.centers.set(this.centers);
+    this.ringNext ^= 1;
+    // After this frame's submit, which runs synchronously once the frame graph returns: a buffer may not be mapped before.
+    queueMicrotask(() => {
+      slot.buffer.mapAsync(GPUMapMode.READ).then(
+        () => {
+          this.requests.set(new Uint32Array(slot.buffer.getMappedRange()));
+          this.requestCenters.set(slot.centers);
+          slot.buffer.unmap();
+          slot.busy = false;
+        },
+        // The buffer went with its device or with dispose: nothing is waiting for it.
+        () => {
+          slot.busy = false;
+        },
+      );
+    });
   }
   private render(c: VirtualPassContext): void {
     this.validate();
@@ -660,6 +809,11 @@ export class VirtualShadows implements EnginePlugin {
       values[at + 3] = size;
     }
     viewMatrix(this.view, c.camera);
+    // Core's depth is reversed (near 1) and the caster pipelines keep the smallest: feedback's camera flips it.
+    const flip = this.cameraMatrix;
+    flip.set(c.camera.matrix);
+    for (let k = 2; k < 16; k += 4) flip[k] = flip[k + 1] - flip[k];
+    invert(values.subarray(100, 116), flip);
     values[27] = origin;
     values[28] = o.lightSize ?? 0.02;
     values[29] = o.bias ?? 0.002;
@@ -685,7 +839,10 @@ export class VirtualShadows implements EnginePlugin {
       [PAGES_PER_SIDE, PAGES_PER_SIDE, levels],
     );
     this.stats.residentPages = pages.resident;
+    this.stats.levelPages = Array.from(pages.requested);
+    this.stats.overflow = pages.overflow;
     this.stats.pagesRendered = 0;
+    this.feedback(c);
     this.stats.casterDraws = 0;
     this.drawPages(c, origin, range);
   }
@@ -757,6 +914,17 @@ export class VirtualShadows implements EnginePlugin {
     this.clearDraws();
     for (const texture of [this.pool, this.cached, this.tableTexture, this.white]) texture?.destroy();
     this.uniform?.destroy();
+    this.requestBuffer?.destroy();
+    this.feedbackDepth?.destroy();
+    for (const slot of this.ring) slot.buffer.destroy();
+    this.ring = [];
+    this.requestBuffer =
+      this.feedbackDepth =
+      this.feedbackView =
+      this.feedbackPipeline =
+      this.feedbackGroup =
+        undefined;
+    this.ringNext = 0;
     this.pool = this.cached = this.tableTexture = this.white = undefined;
     this.uniform = undefined;
     this.whiteView = undefined;
@@ -779,7 +947,8 @@ export class VirtualShadows implements EnginePlugin {
     this.engine?.removePlugin(this.name);
     for (const r of this.sources) r.removeLighting?.();
     this.sources.length = 0;
-    this.casters.length = 0;
+    this.casters.length = this.receivers.length = this.customReceivers.length = 0;
+    this.loose.clear();
     this.lightingOwners.clear();
     this.release();
     this.engine = this.device = undefined;

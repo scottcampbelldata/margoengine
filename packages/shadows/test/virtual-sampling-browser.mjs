@@ -1,5 +1,5 @@
 // Real-GPU test of virtual shadow pages and 'hard' sampling (row 21.6 stage 2). A box on a plane; the expected mask is a CPU
-// ray cast against the same geometry. Agreement of the virtual map with it must reach 99.5% outside a 2 px band around
+// ray cast against the same geometry. Agreement of the virtual map with it must reach 99.9% (plan floor 99.5%, measured 100%) outside a 2 px band around
 // the mask's edges and the surfaces' outlines, and the same frame from cascades ('hard') must agree with the virtual map
 // in the same band. Run from the repository root after `npm run build:packages`.
 // Writes test-results/virtual-sampling.json and test-results/virtual-sampling-*.png.
@@ -11,7 +11,7 @@ import { decodePNG } from '../../../tests/support/png.js';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const BAND = 2,
-  AGREEMENT = 0.995;
+  AGREEMENT = 0.999;
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const release = await acquire({ owner: 'shadows-virtual-sampling' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/virtual-sampling.html', port: 5268 }),

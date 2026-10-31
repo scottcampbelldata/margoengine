@@ -65,6 +65,8 @@ export class PagePool {
   readonly capacity: number;
   /** Pages asked for this frame that found no slot: every slot was requested this frame too. */
   overflow = 0;
+  /** Per level, the distinct pages requested this frame. */
+  readonly requested: Int32Array;
   private readonly slots = new Map<number, number>();
   private readonly free: number[] = [];
   private readonly pageLevel: Uint8Array;
@@ -93,6 +95,7 @@ export class PagePool {
     this.stale = new Uint8Array(pages);
     this.touched = new Uint8Array(pages);
     this.touchedBefore = new Uint8Array(pages);
+    this.requested = new Int32Array(levels);
     for (let slot = this.capacity - 1; slot >= 0; slot--) this.free.push(slot);
   }
   /** Resident pages now. */
@@ -103,6 +106,7 @@ export class PagePool {
   beginFrame(): void {
     this.frame++;
     this.overflow = 0;
+    this.requested.fill(0);
     this.touchedBefore.set(this.touched);
     this.touched.fill(0);
   }
@@ -131,8 +135,63 @@ export class PagePool {
       this.stale[slot] = 1;
       this.touched[slot] = this.touchedBefore[slot] = 0;
     }
-    this.lastUsed[slot] = this.frame;
+    if (this.lastUsed[slot] !== this.frame) {
+      this.lastUsed[slot] = this.frame;
+      this.requested[level]++;
+    }
     return slot;
+  }
+  /** Requests every page of `level` a light-space circle reaches, inside the window around `centers`. */
+  requestCircle(level: number, x: number, y: number, radius: number, centers: ArrayLike<number>): void {
+    const size = pageSize(this.base, level),
+      half = PAGES_PER_SIDE / 2,
+      cx = centers[level * 2],
+      cy = centers[level * 2 + 1],
+      guard = (size * PAGE_GUARD) / PAGE_INTERIOR + radius,
+      x0 = Math.max(pageIndex(x - guard, size), cx - half),
+      x1 = Math.min(pageIndex(x + guard, size), cx + half - 1),
+      y0 = Math.max(pageIndex(y - guard, size), cy - half),
+      y1 = Math.min(pageIndex(y + guard, size), cy + half - 1);
+    for (let iy = y0; iy <= y1; iy++) for (let ix = x0; ix <= x1; ix++) this.request(level, ix, iy);
+  }
+  /**
+   * Requests what a feedback buffer asks for: `bits` holds one bit per table slot, set around `seen` (each level's
+   * window centres on the frame it was marked), and only pages inside the current `centers` window count. The coarsest
+   * level goes first, every marked page's ancestor there, then finer levels each with its neighbours (a one page
+   * dilation), so a full budget loses the finest pages and a receiver always has somewhere to fall back to.
+   */
+  requestFeedback(bits: Uint32Array, seen: ArrayLike<number>, centers: ArrayLike<number>): void {
+    const coarsest = this.levels - 1,
+      half = PAGES_PER_SIDE / 2,
+      mask = PAGES_PER_SIDE - 1,
+      perLevel = PAGES_PER_SIDE * PAGES_PER_SIDE;
+    for (let pass = 0; pass <= this.levels; pass++) {
+      // Pass 0 reads every level for its ancestors; pass n reads level (levels - n), coarsest first.
+      const first = pass ? this.levels - pass : 0,
+        end = pass ? first + 1 : this.levels;
+      for (let from = first; from < end; from++) {
+        const low = from * perLevel,
+          sx = seen[from * 2] - half,
+          sy = seen[from * 2 + 1] - half;
+        for (let slot = low; slot < low + perLevel; slot++) {
+          if (!(bits[slot >>> 5] & (1 << (slot & 31)))) continue;
+          const ix = sx + (((slot & mask) - sx) & mask),
+            iy = sy + ((((slot >> 4) & mask) - sy) & mask);
+          if (!pass) this.requestInWindow(coarsest, ix >> (coarsest - from), iy >> (coarsest - from), centers);
+          else
+            for (let dy = -1; dy <= 1; dy++)
+              for (let dx = -1; dx <= 1; dx++) this.requestInWindow(from, ix + dx, iy + dy, centers);
+        }
+      }
+    }
+  }
+  private requestInWindow(level: number, ix: number, iy: number, centers: ArrayLike<number>): void {
+    if (inWindow(ix, centers[level * 2]) && inWindow(iy, centers[level * 2 + 1])) this.request(level, ix, iy);
+  }
+  /** Marks stale every page requested this frame. */
+  staleRequested(): void {
+    for (let slot = 0; slot < this.capacity; slot++)
+      if (this.used[slot] && this.lastUsed[slot] === this.frame) this.stale[slot] = 1;
   }
   private evict(): number {
     let best = EMPTY;

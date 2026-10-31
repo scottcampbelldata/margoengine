@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Virtual shadows: feedback</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas width="1280" height="720"></canvas>
+<script type="module">
+// A box on a plane with default clipmap settings. window.check.show attaches an effect and renders `frames` frames, each
+// settled on the GPU, so feedback from one frame reaches the next.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const POSES={near:{position:[-5,5,-6],target:[0,0,0]},far:{position:[-8,10,-13],target:[1,0,-1]}};
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:POSES.near}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const floor=engine.createMesh().setGeometry(box(12,0.1,12)).setPosition([0,-0.05,0]);
+const block=engine.createMesh().setGeometry(box(1.2,1.5,1.6)).setPosition([0,0.75,0]);
+const radiance=Float32Array.from(engine.lighting.radiance);
+let shadows;
+const pose=(name)=>{engine.camera.position=POSES[name].position;engine.camera.target=POSES[name].target;};
+const frame=async(n)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();await new Promise(r=>setTimeout(r));}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const attach=(make)=>{shadows?.dispose();shadows=undefined;if(!make)return;shadows=make();shadows.add(block);shadows.add(floor,{castShadow:false});};
+const result=()=>({errors:errors.splice(0),stats:shadows?.stats&&{...shadows.stats}});
+window.check={
+  async reference(name,state){
+    pose(name);engine.lighting.radiance.set(state==='dark'?[0,0,0]:radiance.subarray(0,3));
+    attach(state==='cascades'?()=>Shadows.attach(engine,{filter:'hard',distance:40}):undefined);
+    await frame(3);return result();
+  },
+  // A new effect, `frames` frames at the pose.
+  async fresh(name,frames,options={}){
+    pose(name);engine.lighting.radiance.set(radiance.subarray(0,3));
+    attach(()=>VirtualShadows.attach(engine,{filter:'hard',...options}));
+    await frame(frames);return result();
+  },
+  // The effect stays; the camera jumps to `name` and `frames` frames render there.
+  async jump(name,frames){pose(name);await frame(frames);return result();},
+};
+window.ready=true;
+</script></body></html>
