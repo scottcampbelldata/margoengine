@@ -330,7 +330,8 @@ async function plaza() {
   const router = { answer: { full: true, online: 400 }, joins: 0, reports: [] },
     routerServer = createServer((request, response) => {
       response.setHeader('access-control-allow-origin', '*');
-      if (request.url.endsWith('/join')) {
+      // A page playing alone asks /join?peek=1.
+      if (request.url.split('?')[0].endsWith('/join')) {
         router.joins++;
         response.setHeader('content-type', 'application/json');
         response.end(JSON.stringify(typeof router.answer === 'function' ? router.answer() : router.answer));
