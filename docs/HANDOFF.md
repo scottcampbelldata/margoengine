@@ -140,8 +140,12 @@ dozen stale checks. `modern:test:domains`, `modern:test:wrapper`, `modern:test:g
 `scripts/gpu-package-tests.mjs`, so `check:merge` runs them when a change can affect them. `unrunReleaseGates` fails
 the plan when a `test:release` suite that drives a browser is in no check and not in `RELEASE_ONLY` with a reason; two
 are: `modern:test:stress` (hours of GPU) and `test:basic-scene` (run by `land-records.mjs` in every landing). Not in
-`test:release` and still in no check: `modern:test:sky`, `:citadel`, `:finalization`, `:hardware`, `:blender`,
-`test:browser`, `test:tokyo`; nobody has checked whether they still pass.
+`test:release` and in no check, found 2026-10-31: `modern:test:sky` (2 s), `modern:test:finalization` (3 s) and
+`test:tokyo` (6 s) all passed and joined `ROOT`; `test:browser` is a copy of `modern:test:browser` (already in `ROOT`; it needs
+the starters built first, which `PREPARE` does). `modern:test:hardware` passes on the RTX A6000 PC with
+`GPU_VENDOR=nvidia` (72 s, a visible window) but needs a physical NVIDIA or AMD GPU, so it stays out. `unrunBrowserSuites`
+now fails the plan for any `test:*` or `modern:test:*` browser suite that is in no check and not in `NOT_IN_CHECKS` with a reason:
+hardware, `modern:test:citadel` (page being removed) and `modern:test:blender` (needs Scott's go).
 
 ## Landed 2026-10-25: every package GPU test in check:merge (`npm run check:gpu-packages`)
 

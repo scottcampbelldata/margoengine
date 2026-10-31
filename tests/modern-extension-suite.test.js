@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { ROOT, unrunReleaseGates } from '../scripts/gpu-package-tests.mjs';
+import { NOT_IN_CHECKS, ROOT, unrunBrowserSuites, unrunReleaseGates } from '../scripts/gpu-package-tests.mjs';
 import { STEPS } from '../scripts/modern-extension-suite.mjs';
 
 const read = (path) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -48,4 +48,36 @@ test('check:gpu-packages runs modern:test:extensions, and this repo has no unrun
   const scripts = JSON.parse(read('package.json')).scripts,
     file = (path) => (path && existsSync(new URL('../' + path, import.meta.url)) ? read(path) : undefined);
   assert.deepEqual(unrunReleaseGates(scripts, file), []);
+});
+
+// The class of bug again: modern:test:sky, finalization and test:tokyo were in no check at all, not even test:release.
+test('a test:* browser suite must be in a check, a copy of one, a step of the extension suite, or say why not', () => {
+  const page = "import { openBrowser } from './browser.js';\nawait openBrowser();\n";
+  const read = (file) => (file === 'scripts/plain.js' ? '' : page);
+  const scripts = {
+    'check:merge:steps': 'npm run verify && npm run test:merged',
+    'test:lost': 'node scripts/lost.js',
+    'modern:test:lost': 'node scripts/lost2.mjs',
+    'test:ran': 'node scripts/ran.js',
+    'test:copy': 'node scripts/ran.js',
+    'test:merged': 'node scripts/merged.js',
+    'test:step': 'node scripts/step.js',
+    'test:said': 'node scripts/said.js',
+    'test:plain': 'node scripts/plain.js',
+  };
+  assert.deepEqual(
+    unrunBrowserSuites(scripts, read, { 'test:ran': '' }, { 'test:said': 'a reason' }, ['scripts/step.js']),
+    ['test:lost', 'modern:test:lost'],
+  );
+});
+
+test('every browser suite of this repo is in a check or in NOT_IN_CHECKS with a reason', () => {
+  const scripts = JSON.parse(read('package.json')).scripts,
+    file = (path) => (path && existsSync(new URL('../' + path, import.meta.url)) ? read(path) : undefined);
+  assert.deepEqual(unrunBrowserSuites(scripts, file, ROOT, NOT_IN_CHECKS, STEPS), []);
+  for (const [name, reason] of Object.entries(NOT_IN_CHECKS)) {
+    assert.ok(scripts[name], `${name} is gone from package.json; remove it from NOT_IN_CHECKS`);
+    assert.ok(reason.length > 20, `${name} needs a stated reason`);
+  }
+  for (const name of ['modern:test:sky', 'modern:test:finalization', 'test:tokyo']) assert.ok(name in ROOT, name);
 });

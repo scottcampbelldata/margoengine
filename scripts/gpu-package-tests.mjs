@@ -33,6 +33,7 @@ import { acquire, lockDir } from './gpu-lock.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { coolDown, thermalSource, watchHeat } from './support/heat.mjs';
 import { describeProfile, excludedReason, machineProfile } from './support/machine-profile.mjs';
+import { STEPS } from './modern-extension-suite.mjs';
 import { packageMinutes, runLimited, testLimitMs } from './support/run-limited.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -57,6 +58,10 @@ export const ROOT = {
   'modern:test:wrapper': 'the stage facade: quickstart bundle, orb pixels, controls, models, device and context loss',
   'modern:test:game': 'animation, shadows, clustered lights, terrain, VFX, foot IK and SSAO together',
   'modern:test:gltf-compression': 'Draco and meshopt in a production Vite consumer',
+  'modern:test:sky': 'sky and fog: 1x and multisample shader parity, coverage, ownership of every shader module',
+  'modern:test:finalization': 'picking races, depth precision at 500 m, 10,000-part hierarchy and device reboot',
+  'test:tokyo':
+    'the Tokyo diorama example: production build, tram animation, reduced motion, phone layout, missing asset',
 };
 /**
  * `test:release` suites that drive a browser yet stay out of check:merge, each with its reason. Anything else in
@@ -66,6 +71,17 @@ export const ROOT = {
 export const RELEASE_ONLY = {
   'modern:test:stress': '500 sessions of 120 frames, hours of GPU; the release checks it once',
   'test:basic-scene': 'runs in every landing: scripts/land-records.mjs measures the network record with it',
+};
+/**
+ * Browser suites (`test:*`, `modern:test:*`) that no check runs, each with its reason (unrunBrowserSuites fails the
+ * plan for any other). modern:test:sky, finalization and test:tokyo had no check and were found passing on 2026-10-31
+ * after their neighbours had rotted; they are in ROOT now.
+ */
+export const NOT_IN_CHECKS = {
+  'modern:test:hardware':
+    'needs a physical NVIDIA or AMD GPU (GPU_VENDOR=nvidia|amd), a visible window and 60 s of recording; the machines that run check:merge may have neither',
+  'modern:test:citadel': 'the Night Citadel page is being removed (Scott, 2026-10-31)',
+  'modern:test:blender': 'drives Blender, which Scott has not cleared for the checks (needs his go)',
 };
 /** Commands a root suite needs first (it reads their output), run once before it. */
 export const PREPARE = {
@@ -129,6 +145,30 @@ export function unrunReleaseGates(scripts, read, inChecks = ROOT, releaseOnly = 
     );
 }
 
+/**
+ * Root `test:*` / `modern:test:*` scripts that drive a browser and no check runs: not in ROOT, not a check:merge step,
+ * not a copy of a ROOT command (`test:browser` is `modern:test:browser`), not a step of modern:test:extensions
+ * (`covered`: its script paths), not in NOT_IN_CHECKS. test:release is not the only place a suite can rot unseen.
+ */
+export function unrunBrowserSuites(scripts, read, inChecks = ROOT, exempt = NOT_IN_CHECKS, covered = []) {
+  const merge = (scripts['check:merge:steps'] ?? '').split(' && '),
+    commands = new Set(Object.keys(inChecks).map((n) => scripts[n]));
+  return Object.keys(scripts).filter((name) => {
+    const file = /^node (?:--\S+ )*(\S+\.m?js)/.exec(scripts[name] ?? '')?.[1];
+    return (
+      /^(modern:)?test:/.test(name) &&
+      file &&
+      !(name in inChecks) &&
+      !(name in exempt) &&
+      !(name in RELEASE_ONLY) &&
+      !commands.has(scripts[name]) &&
+      !covered.includes(file) &&
+      !merge.includes(`npm run ${name}`) &&
+      DRIVES_BROWSER.test(read(file) ?? '')
+    );
+  });
+}
+
 /** A test's stable id: `dof/test:browser` for a package script, `root/modern:test:xr:browser` for a root suite. */
 export const testId = (test) => (test.name ? `root/${test.name}` : test.label.replace(' ', '/'));
 
@@ -174,6 +214,17 @@ export function plan() {
   if (orphans.length)
     throw new Error(
       `test:release suite(s) ${orphans.join(', ')} drive a browser but no check runs them, so they rot unseen; add each to ROOT in scripts/gpu-package-tests.mjs or, with its reason, to RELEASE_ONLY`,
+    );
+  const loose = unrunBrowserSuites(
+    scripts,
+    (file) => (existsSync(join(root, file)) ? readFileSync(join(root, file), 'utf8') : undefined),
+    ROOT,
+    NOT_IN_CHECKS,
+    STEPS,
+  );
+  if (loose.length)
+    throw new Error(
+      `browser suite(s) ${loose.join(', ')} are in no check, so they rot unseen; add each to ROOT in scripts/gpu-package-tests.mjs or, with its reason, to NOT_IN_CHECKS`,
     );
   for (const name of Object.keys(ROOT)) {
     if (!scripts[name]) throw new Error(`ROOT lists ${name}, which package.json no longer has; remove it from ROOT`);

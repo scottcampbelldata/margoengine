@@ -432,6 +432,21 @@ test('a change to a package the extension suite draws, or to one of its suites, 
   }
 });
 
+// modern:test:sky, finalization and test:tokyo joined check:gpu-packages on 2026-10-31: a change to what they draw selects them.
+test('a change to the sky package, a core-free page they open, or the tokyo example selects its suite', () => {
+  for (const [file, suite] of [
+    ['packages/sky/src/index.ts', 'modern:test:sky'],
+    ['scripts/modern-sky-fog-tests.js', 'modern:test:sky'],
+    ['scripts/modern-finalization-tests.js', 'modern:test:finalization'],
+    ['scripts/tokyo-diorama-browser-test.mjs', 'test:tokyo'],
+    ['examples/tokyo-diorama.js', 'test:tokyo'],
+  ]) {
+    const { decision, planned } = planFor([file]),
+      gpu = planned.find((p) => stepName(p.command) === 'check:gpu-packages');
+    if (decision.mode !== 'full') assert.match(gpu.command, new RegExp(`--select=.*root/${suite}`), file);
+  }
+});
+
 test('every visual demo that is not a Khronos model maps to its sources, and the mapped sources exist', () => {
   for (const demo of demos) {
     const sources = demoSources(demo);
