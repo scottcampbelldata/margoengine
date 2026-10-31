@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { Keys } from '@margoengine/voxel-net';
+import { Keys, SERVER_SILENT_CODE } from '@margoengine/voxel-net';
 import { limbSwing, PARTS, TAG_RANGE, writeFigure, yawOf } from '../src/figures.ts';
-import { keyBits, parseJoin, plazaName, soloBanner } from '../src/multiplayer.ts';
+import {
+  closeKind,
+  IDLE_BANNER,
+  IDLE_CLOSE_CODE,
+  keyBits,
+  parseJoin,
+  plazaName,
+  soloBanner,
+} from '../src/multiplayer.ts';
 import { isPlazaName } from '../src/names.ts';
 
 test('keyBits turns the sandbox keys into input bits', () => {
@@ -162,4 +170,19 @@ test('writeFigure allocates nothing', { skip: typeof globalThis.gc !== 'function
 
 test('tags are for players close enough to read', () => {
   assert.equal(TAG_RANGE, 24);
+});
+
+test('closeKind: only the idle code stops the page; every other close goes back through /join', () => {
+  assert.equal(IDLE_CLOSE_CODE, 4410, 'the number the Plaza shard sends (server/shard.mjs IDLE_CLOSE_CODE)');
+  assert.equal(closeKind({ code: IDLE_CLOSE_CODE, byClient: false }), 'idle');
+  assert.equal(
+    closeKind({ code: SERVER_SILENT_CODE, byClient: false }),
+    'rejoin',
+    'a silent server takes the /join path',
+  );
+  for (const code of [1001, 1006, 1008, 1011, 1013])
+    assert.equal(closeKind({ code, byClient: false }), 'rejoin', String(code));
+  assert.equal(closeKind({ code: 1005, byClient: true }), 'unreadable');
+  assert.equal(closeKind({ code: IDLE_CLOSE_CODE, byClient: true }), 'unreadable');
+  assert.ok(!/[–—]/.test(IDLE_BANNER), 'no dashes in visible copy');
 });

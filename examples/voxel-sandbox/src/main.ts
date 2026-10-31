@@ -28,6 +28,8 @@ import generatorUrl from './generator.worker.ts?worker&url';
 import { type SceneLighting, setupLighting } from './lighting.ts';
 import type { Figures } from './figures.ts';
 import {
+  closeKind,
+  IDLE_BANNER,
   joinPlaza,
   joinServer,
   keyBits,
@@ -559,6 +561,7 @@ async function boot(): Promise<void> {
   }
 
   let solo = false,
+    idled = false,
     welcomeTimer: ReturnType<typeof setTimeout> | undefined,
     shard: number | undefined,
     worldId: string | undefined,
@@ -886,7 +889,12 @@ async function boot(): Promise<void> {
       online = joinServer(world, url, {
         view: distance,
         name: plazaName(storage()),
-        onClosed: ({ byClient }) => (byClient ? goSolo('offline') : lost()),
+        onClosed: (closed) => {
+          const kind = closeKind(closed);
+          if (kind === 'idle') idleOut();
+          else if (kind === 'unreadable') goSolo('offline');
+          else lost();
+        },
       });
     } catch (error) {
       console.warn(error);
@@ -915,6 +923,17 @@ async function boot(): Promise<void> {
     }, wait);
     if (routerUrl) setReport(report);
   }
+  // The server closed us for being idle. Asking /join again would put the player straight back and defeat the limit, so
+  // the page stays as it is: the world still shows, nothing more is sent (a closed client sends and edits nothing), and
+  // the banner's Join button reloads when the player is back.
+  function idleOut(): void {
+    if (idled || solo) return;
+    idled = true;
+    clearTimeout(welcomeTimer);
+    setReport(undefined);
+    online?.dispose();
+    setBanner(IDLE_BANNER, () => location.reload());
+  }
   // The server closed on us. Only /join can say why: a new `world` id is a new world, the same id a shard that restarted.
   // Either way the way back is a reload through /join; no room or no router ends in the solo world within 5 s.
   function lost(): void {
@@ -938,7 +957,7 @@ async function boot(): Promise<void> {
     }, jitter);
   }
   function goSolo(kind: 'full' | 'offline', count?: number): void {
-    if (solo || deterministic) return;
+    if (solo || idled || deterministic) return;
     solo = true;
     clearTimeout(welcomeTimer);
     setReport(undefined);

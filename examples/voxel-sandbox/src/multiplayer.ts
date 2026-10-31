@@ -35,6 +35,26 @@ export function joinServer(
   };
 }
 
+/**
+ * The close code a Plaza shard sends a player with no movement and no edit for its idle limit (reason 'idle'). It is
+ * the server's number (examples/voxel-sandbox/server/shard.mjs, IDLE_CLOSE_CODE); a page that rejoined on it would
+ * undo the limit, so it shows the world, stops sending and offers a Join button instead.
+ */
+export const IDLE_CLOSE_CODE = 4410;
+
+/**
+ * What to do about a close the page did not ask for: 'idle' stops and waits for the player, 'unreadable' is a message
+ * the page could not read (play alone), and everything else (a world's end 1001, a full shard 1013, a crash 1006, a
+ * silent server 4408) asks /join where to go.
+ */
+export function closeKind(closed: Pick<VoxelNetClose, 'code' | 'byClient'>): 'idle' | 'unreadable' | 'rejoin' {
+  if (closed.byClient) return 'unreadable';
+  return closed.code === IDLE_CLOSE_CODE ? 'idle' : 'rejoin';
+}
+
+/** The banner after an idle close; its Join button reloads the page. */
+export const IDLE_BANNER = 'You were idle, so Plaza gave your place to someone else. Join to come back.';
+
 /** What the router's GET /join answers. */
 export type JoinAnswer =
   | { kind: 'shard'; url: string; shard: number | undefined; world: string | undefined }

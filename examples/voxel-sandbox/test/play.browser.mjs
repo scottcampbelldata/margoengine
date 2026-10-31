@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
-import { createServer as createTcpServer } from 'node:net';
+import { createConnection, createServer as createTcpServer } from 'node:net';
 import { resolve } from 'node:path';
 import { VoxelBot } from '@margoengine/voxel-net/bot';
 import { freePort, openBrowser } from '../../../scripts/browser.js';
@@ -368,6 +368,116 @@ async function plaza() {
   await alone();
   console.log('ok a close with no room: solo');
 
+  // The server's idle limit closes the player with 4410 'idle'. Rejoining would undo the limit: the page keeps showing the
+  // world, sends nothing more, and shows a Join button that reloads. The close comes from a pipe in front of a real shard,
+  // so the page has a world to keep.
+  const real = await startShard(),
+    pipe = await tcpProxy(real.port);
+  router.answer = { url: `ws://127.0.0.1:${pipe.port}`, shard: 1, world: 'a' };
+  router.joins = 0;
+  await open(`plaza=${routerUrl}&rd=2`);
+  await page.waitForFunction(() => window.voxelSandbox?.online?.client.spawned, null, { timeout: 60_000 });
+  const here = () =>
+    sandbox(() => {
+      const [x, y, z] = window.voxelSandbox.player.position;
+      return !!window.voxelSandbox.world.getChunk(Math.floor(x) >> 5, Math.floor(y) >> 5, Math.floor(z) >> 5);
+    });
+  assert.equal(await here(), true, 'the world is there before the close');
+  let loads = 0;
+  const counted = () => loads++;
+  page.on('load', counted);
+  pipe.injectClose(4410, 'idle');
+  await banner(/You were idle/, 10_000);
+  assert.equal(await page.isVisible('#banner button'), true, 'the Join button shows');
+  assert.equal(await page.evaluate(() => document.querySelector('#banner button').textContent), 'Join');
+  const sent = () => sandbox(() => window.voxelSandbox.online.client.stats.sent);
+  const sentThen = await sent();
+  // Frames pass with the key held: the client is closed, so nothing is sent and nothing is edited.
+  await page.keyboard.down('KeyW');
+  await page.evaluate(
+    () =>
+      new Promise((done) => {
+        let n = 0;
+        const step = () => (++n < 30 ? requestAnimationFrame(step) : done());
+        requestAnimationFrame(step);
+      }),
+  );
+  await page.keyboard.up('KeyW');
+  assert.equal(await sent(), sentThen, 'nothing is sent after the idle close');
+  // The rejoin path waits 0 to 3 s before it asks /join. Anything in this window is a rejoin; there is no event to wait
+  // for when nothing should happen, so the test waits out the longest delay.
+  await wait(3500); // fixed-wait: the longest rejoin delay is 3 s, and the test is that nothing happens in it
+  assert.equal(router.joins, 1, 'no second ask of /join');
+  assert.equal(loads, 0, 'no reload');
+  assert.equal(await here(), true, 'the world is still shown');
+  assert.match(await bannerText(), /You were idle/);
+  router.answer = { url: `ws://127.0.0.1:${real.port}`, shard: 1, world: 'a' };
+  await Promise.all([page.waitForEvent('load'), page.click('#banner button')]);
+  await page.waitForFunction(() => window.voxelSandbox?.online?.client.spawned, null, { timeout: 60_000 });
+  assert.equal(router.joins, 2, 'Join asked /join once more');
+  page.off('load', counted);
+  console.log('ok idle close: world kept, nothing sent, no rejoin; Join reloads into the shard');
+
+  // A server gone silent with its socket open (the pipe drops everything): the client's own 15 s silence limit closes with
+  // 4408, which takes the /join path like any other close. /join says full, so the banner proves which path ran.
+  const silentPipe = await tcpProxy(real.port);
+  router.answer = { url: `ws://127.0.0.1:${silentPipe.port}`, shard: 1, world: 'a' };
+  router.joins = 0;
+  await open(`plaza=${routerUrl}&rd=2`);
+  await page.waitForFunction(() => window.voxelSandbox?.online?.client.spawned, null, { timeout: 60_000 });
+  assert.equal(router.joins, 1);
+  router.answer = { full: true, online: 7 };
+  silentPipe.pause();
+  const silentSince = Date.now();
+  await banner(/Plaza is full, 7 people are in/, 60_000);
+  assert.equal(router.joins, 2, '4408 asked /join');
+  console.log(`ok a silent server with the socket open reached the banner after ${Date.now() - silentSince} ms`);
+
+  // A hidden or busy page still answers pings, because the browser does, not the page's scripts. The server here pings
+  // after 300 ms of silence and drops a player at 1.5 s. The debugger stops the page's JavaScript, so the page sends no
+  // input at all; the player must stay for twice the limit. The same fixture then drops a player whose connection is cut.
+  const pinger = await startShard(['--heartbeat=300', '--client-timeout=1500', '--watch']);
+  await open(`server=ws://127.0.0.1:${pinger.port}&rd=2`);
+  await page.waitForFunction(() => window.voxelSandbox?.online?.client.spawned, null, { timeout: 60_000 });
+  const until = async (condition, what, ms = 20_000) => {
+    for (const end = Date.now() + ms; !condition(); ) {
+      assert.ok(Date.now() < end, `timed out waiting for ${what}`);
+      await wait(40);
+    }
+  };
+  await until(() => pinger.watch?.players === 1, 'one player');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Debugger.enable');
+  await cdp.send('Debugger.pause');
+  const before = pinger.watch.bytesIn;
+  let seenAlone = 0;
+  const stayUntil = Date.now() + 3600;
+  // The window is time itself (more than twice clientTimeout), so it is waited out, checking the server's count on the way.
+  while (Date.now() < stayUntil) {
+    assert.equal(pinger.watch.players, 1, 'the paused page was dropped');
+    seenAlone++;
+    await wait(100); // fixed-wait: a window of 3.6 s the test measures against the server's 1.5 s limit
+  }
+  const pongs = pinger.watch.bytesIn - before;
+  await cdp.send('Debugger.resume');
+  await cdp.detach();
+  assert.ok(pongs >= 6 * 3, `the browser answered pings on its own: ${pongs} bytes in ${seenAlone} looks`);
+  assert.equal(await sandbox(() => !!window.voxelSandbox.online?.client.spawned), true, 'still connected after resume');
+  assert.equal(await bannerText(), '');
+  console.log(
+    `ok a headless Edge page with stopped scripts answered pings for 3.6 s (${pongs} bytes of pongs), server limit 1.5 s`,
+  );
+  // Control: the same limit does drop a player whose network is cut.
+  const cut = await tcpProxy(pinger.port);
+  await open(`server=ws://127.0.0.1:${cut.port}&rd=2`);
+  await page.waitForFunction(() => window.voxelSandbox?.online?.client.spawned, null, { timeout: 60_000 });
+  await until(() => pinger.watch.players === 1, 'the proxied player');
+  cut.pause();
+  await until(() => pinger.watch.players === 0, 'the server dropping a cut player', 10_000);
+  console.log('ok control: a cut connection is dropped by the same server limit');
+  await killTree(pinger.child);
+  await killTree(real.child);
+
   // The router is down: solo with its banner.
   await page.goto('about:blank');
   await new Promise((done) => (routerServer.closeAllConnections(), routerServer.close(done)));
@@ -526,20 +636,65 @@ async function centre(on, selector) {
   return [box.x + box.width / 2, box.y + box.height / 2];
 }
 
-// A shard in its own process, so a kill is a real kill.
-async function startShard() {
-  const child = spawn(process.execPath, ['examples/voxel-sandbox/test/shard-fixture.mjs'], {
-    stdio: ['ignore', 'pipe', 'inherit'],
-  });
+// A shard in its own process, so a kill is a real kill. `flags` go to the fixture (--heartbeat, --client-timeout,
+// --watch); `watch` holds the newest {players, bytesIn} it printed.
+async function startShard(flags = []) {
+  const child = spawn(process.execPath, ['examples/voxel-sandbox/test/shard-fixture.mjs', ...flags], {
+      stdio: ['ignore', 'pipe', 'inherit'],
+    }),
+    shard = { child, port: 0, watch: undefined };
   cleanup.push(() => killTree(child));
-  const port = await new Promise((done, fail) => {
+  shard.port = await new Promise((done, fail) => {
     let text = '';
     child.stdout.on('data', (chunk) => {
       text += chunk;
-      const match = /"port":(\d+)/.exec(text);
-      if (match) done(Number(match[1]));
+      const lines = text.split('\n');
+      text = lines.pop();
+      for (const line of lines) {
+        const message = JSON.parse(line);
+        if (message.watch) shard.watch = message.watch;
+        else if (message.port) done(message.port);
+      }
     });
     child.once('exit', (code) => fail(new Error(`The shard fixture exited with ${code}`)));
   });
-  return { child, port };
+  return shard;
+}
+
+// A TCP pipe in front of a shard that the test can cut. `pause` drops everything both ways and keeps the socket open (a
+// network that died without a close). `injectClose` sends the browser a WebSocket close frame as if the server had sent
+// it, then pauses, so the real server's later bytes do not follow it.
+async function tcpProxy(target) {
+  const sockets = new Set(),
+    pipe = { paused: false, port: 0, last: undefined },
+    server = createTcpServer((client) => {
+      const upstream = createConnection(target, '127.0.0.1');
+      sockets.add(client).add(upstream);
+      pipe.last = client;
+      client.on('data', (data) => pipe.paused || upstream.write(data));
+      upstream.on('data', (data) => pipe.paused || client.write(data));
+      for (const [a, b] of [
+        [client, upstream],
+        [upstream, client],
+      ]) {
+        a.on('error', () => b.destroy());
+        a.on('close', () => b.destroy());
+      }
+    });
+  await new Promise((done) => server.listen(0, '127.0.0.1', done));
+  pipe.port = server.address().port;
+  pipe.pause = () => (pipe.paused = true);
+  pipe.injectClose = (code, reason) => {
+    const text = Buffer.from(reason);
+    pipe.paused = true;
+    pipe.last.end(Buffer.concat([Buffer.from([0x88, text.length + 2, code >> 8, code & 255]), text]));
+  };
+  cleanup.push(
+    () =>
+      new Promise((done) => {
+        for (const socket of sockets) socket.destroy();
+        server.close(done);
+      }),
+  );
+  return pipe;
 }
