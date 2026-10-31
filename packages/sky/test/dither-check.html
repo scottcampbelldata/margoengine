@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky dither browser check</title><style>body{margin:0}canvas{display:block;width:1440px;height:900px}</style></head><body><canvas width="1440" height="900"></canvas>
+<script type="module">
+// Bug A3: the Preetham sky wrote its display colour to the 8-bit canvas undithered, so each channel stepped one level every
+// few rows and the three staircases beat into visible bands. Renders the default Sky at sun azimuth 20, elevation 34
+// (biome scene 02), once straight to the canvas (`?mode=canvas`: 40 columns of 8-bit values) and once to the HDR scene
+// behind a Bloom (`?mode=hdr`: the same gradient before 8-bit rounding, the truth the canvas should average to).
+import {Engine} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {pbrNeutral} from '/packages/shared/display.js';
+const mode=new URLSearchParams(location.search).get('mode')??'canvas',canvas=document.querySelector('canvas'),W=1440,H=900,COLUMNS=40,FIRST=700;
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,2,0],target:[0,2+10*Math.tan(0.35),10],near:0.1,far:800}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const az=20*Math.PI/180,el=34*Math.PI/180,post=mode==='hdr'?Bloom.attach(engine,{strength:0,threshold:100,exposure:0}):null;
+const sky=new Sky({sunDirection:[Math.sin(az)*Math.cos(el),Math.sin(el),Math.cos(az)*Math.cos(el)],timeScale:0});engine.use(sky);
+for(let i=0;i<4;i++){engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();}
+const encode=v=>v>=0.0031308?1.055*Math.pow(v,1/2.4)-0.055:v*12.92;
+async function hdr(texture){
+ const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'}),
+  pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}}),bytes=texture.width*texture.height*16,
+  output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),
+  encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();return data;
+}
+window.check={
+ // Per column, the three channels of every row in [0,1], as 8-bit values / 255 (canvas) or exact display values (hdr).
+ async run(){
+  let columns=[];
+  if(mode==='canvas'){
+   const copy=document.createElement('canvas');copy.width=W;copy.height=H;const g=copy.getContext('2d',{willReadFrequently:true});
+   engine.render({delta:0});g.drawImage(canvas,0,0);const d=g.getImageData(0,0,W,H).data;
+   for(let c=0;c<COLUMNS;c++){const col=[];for(let y=0;y<H;y++){const p=(y*W+FIRST+c)*4;col.push([d[p]/255,d[p+1]/255,d[p+2]/255]);}columns.push(col);}
+  }else{
+   engine.render({delta:0});await device.queue.onSubmittedWorkDone();const t=post.sceneTexture,d=await hdr(t),w=t.width;
+   for(let c=0;c<COLUMNS;c++){const col=[];for(let y=0;y<t.height;y++){const p=(y*w+FIRST+c)*4,v=pbrNeutral([d[p],d[p+1],d[p+2]].map(a=>Math.max(a,0)));col.push(v.map(encode));}columns.push(col);}
+  }
+  return {mode,errors:errors.splice(0),height:columns[0].length,columns};
+ }};
+window.ready=true;
+</script></body></html>

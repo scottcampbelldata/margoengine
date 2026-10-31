@@ -86,6 +86,6 @@
     "build": "node ../../scripts/build-optional.js sky",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/sky/test/browser-check.mjs"
+    "test:gpu": "cd ../.. && node packages/sky/test/browser-check.mjs && node packages/sky/test/dither-check.mjs"
   }
 }

@@ -274,13 +274,21 @@ fn nightSky(w:vec3f,footprint:f32)->vec3f {
 }
 fn skyRadiance(w:vec3f,footprint:f32)->vec3f {if(frame.sun.w>=1.0){return nightSky(w,footprint);}return mix(daySky(w),nightSky(w,footprint),frame.sun.w);}
 ${displayShader}
+// Dither for the 8-bit canvas (Gjol, "Low Complexity, High Fidelity: INSIDE", GDC 2016, as in @margoengine/post Bloom):
+// triangular noise of up to one 8-bit step from a hash of the pixel (C. Wellons' lowbias32, public domain), kept within
+// each channel's distance to 0 and 1 so black stays black and nothing clips. Without it the smooth gradient steps one
+// level per channel every few rows and the three staircases beat into visible bands.
+fn dither(p:vec2f)->f32{
+ var x=(u32(p.x)*0x9e3779b9u)^(u32(p.y)*0x85ebca6bu);x=(x^(x>>16u))*0x7feb352du;x=(x^(x>>15u))*0x846ca68bu;x^=x>>16u;
+ return f32(x&0xffffu)/65536.0+f32(x>>16u)/65536.0-1.0;
+}
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
  let p=frame.inverse*vec4f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0,0.000001,1);let w=normalize(p.xyz/p.w-frame.eye.xyz);let s=frame.sun.xyz;
  let footprint=max(length(dpdx(w)),length(dpdy(w)));let sky=skyRadiance(w,footprint);var color=sky;
  let sun=celestialProfile(w,s,SUN_RADIUS,footprint);
  color+=(sun.x*60.0+sun.y*0.8)*trans(transmission,R+clamp(frame.eye.w,0.001,99.9),s.y)*(1.0-frame.sun.w);
  color+=frame.moonColor.rgb*frame.moon.w*moonRadiance(w,frame.moon.xyz,footprint);
- color=cloudSky(color,sky,w,footprint);color*=exp2(frame.settings.y);if(frame.settings.w<0.5&&frame.sunlight.w<0.5){color=toDisplay(color);}return vec4f(color,1);
+ color=cloudSky(color,sky,w,footprint);color*=exp2(frame.settings.y);if(frame.settings.w<0.5&&frame.sunlight.w<0.5){color=toDisplay(color);color+=dither(i.position.xy)*min(vec3f(1.0/255.0),min(color,1.0-color));}return vec4f(color,1);
 }`,
   ];
 }
