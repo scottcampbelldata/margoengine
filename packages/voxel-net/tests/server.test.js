@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VoxelWorld } from '@margoengine/voxel';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import { decodeServerMessage, encodeClientMessage, Keys, PROTOCOL_VERSION, VoxelNetClient } from '../dist/index.js';
@@ -137,6 +137,7 @@ test('a matching prediction is never corrected; a cheat is corrected and replaye
   // Stand still until any jump has landed, then let the server run the last inputs before comparing.
   await drive([c], 1500);
   c.flush();
+  // fixed-wait: the server runs the inputs just sent, about 3 ticks; the assert below reads the result with a tolerance
   await wait(200);
   assert.ok(c.stats.corrections >= 1);
   const truth = server.players[0].character.position;
@@ -174,7 +175,8 @@ test('protocol violations close the connection', async (t) => {
   for (const conn of [wrong, early]) conn.onclose = (code) => codes.push(code);
   wrong.send(encodeClientMessage({ type: 'hello', version: 99, view: 6, name: '' }));
   early.send(encodeClientMessage({ type: 'edit', x: 0, y: 0, z: 0, state: 0 }));
-  await wait(200);
+  for (const end = performance.now() + 30_000; codes.length < 2; await wait(5))
+    assert.ok(performance.now() < end, `both closed, got ${codes}`);
   assert.deepEqual(codes.sort(), [1008, 1008]);
   await server.close();
 });
@@ -281,10 +283,67 @@ test('a chunk that keeps failing closes the waiting player with 1011 and a reaso
     reasons.push(reason);
     previous(code, reason);
   };
+  // fixed-wait: a bound on a promise the test waits for; a.closed wins as soon as it comes
   const code = await Promise.race([a.closed, wait(15_000).then(() => 'still open')]);
   assert.equal(code, 1011);
   assert.match(reasons[0], /^chunk 1,-?\d+,0 failed to generate/);
   // Bounded: a few tries per failing chunk, not one per tick.
   const chunks = new Set(errors.map((e) => /chunk (\S+) fails/.exec(e.message)?.[1]));
   assert.ok(errors.length <= chunks.size * 3 * 2, `${errors.length} errors for ${chunks.size} chunks`);
+});
+
+// Regression (2026-10-31): close() terminated the generator threads at once. A thread terminated while it compresses a
+// chunk aborts the whole process in Node ("close before init"), a native assertion nothing can catch: a shard closing
+// under load took the process down. The thread is held in the job here, so the bad order is certain: without the fix it
+// is terminated in the job and writes nothing.
+const heldDir = (t, env = {}) => {
+  const dir = mkdtempSync(joinPath(tmpdir(), 'voxel-net-held-'));
+  process.env.VOXEL_NET_HELD_DIR = dir;
+  Object.assign(process.env, env);
+  t.after(() => {
+    delete process.env.VOXEL_NET_HELD_DIR;
+    for (const key of Object.keys(env)) delete process.env[key];
+    rmSync(dir, { recursive: true, force: true });
+  });
+  return dir;
+};
+const held = new URL('./held-generator.js', import.meta.url);
+
+test('close lets a generator thread finish the chunk it is making and end by itself', {
+  timeout: 60_000,
+}, async (t) => {
+  const dir = heldDir(t),
+    { server, url } = await start(t, { generator: held, workers: 1 }),
+    a = await join(url);
+  await drive([a.client], 30_000, undefined, () => existsSync(joinPath(dir, 'started')));
+  assert.ok(existsSync(joinPath(dir, 'started')), 'a job is in the thread');
+  const closed = server.close();
+  writeFileSync(joinPath(dir, 'release'), '');
+  await closed;
+  const ended = readdirSync(dir).filter((name) => name.startsWith('ended-'));
+  assert.equal(ended.length, 1, 'the thread ended by itself');
+  assert.ok(Number(readFileSync(joinPath(dir, ended[0]), 'utf8')) >= 1, 'with the job it had done');
+});
+
+test('a generator that never returns does not hold close for ever', { timeout: 60_000 }, async (t) => {
+  const dir = heldDir(t, { VOXEL_NET_HELD_FOREVER: '1' }),
+    { server, url } = await start(t, { generator: held, workers: 1 }),
+    a = await join(url);
+  await drive([a.client], 30_000, undefined, () => existsSync(joinPath(dir, 'started')));
+  assert.ok(existsSync(joinPath(dir, 'started')), 'a job is in the thread');
+  await server.close();
+  assert.deepEqual(
+    readdirSync(dir).filter((name) => name.startsWith('ended-')),
+    [],
+    'it was ended from outside',
+  );
+});
+
+test('close is fine when a generator thread has already died', { timeout: 60_000 }, async (t) => {
+  const missing = new URL('./no-such-generator.js', import.meta.url),
+    { server, url } = await start(t, { generator: missing, workers: 1 });
+  server.onError = () => {};
+  const a = await join(url);
+  await drive([a.client], 300);
+  await server.close();
 });

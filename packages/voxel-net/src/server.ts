@@ -292,10 +292,12 @@ const rotation = (yaw: number, pitch: number): [number, number, number, number] 
 /** The wire message of chunk (cx, cy, cz): its encodeChunk bytes without light, deflated unless they are tiny. */
 async function chunkMessage(chunk: VoxelChunk, cx: number, cy: number, cz: number): Promise<Uint8Array> {
   // Both encodes read the chunk now, before either awaits.
-  const raw = encodeChunk(chunk, { light: false, compress: false }),
-    deflated = encodeChunk(chunk, { light: false }),
-    small = await raw;
-  return encodeServerMessage({ type: 'chunk', cx, cy, cz, data: small.length <= 64 ? small : await deflated });
+  // Both are awaited: a compression left running here would still be running when the generator thread reports idle.
+  const [small, deflated] = await Promise.all([
+    encodeChunk(chunk, { light: false, compress: false }),
+    encodeChunk(chunk, { light: false }),
+  ]);
+  return encodeServerMessage({ type: 'chunk', cx, cy, cz, data: small.length <= 64 ? small : deflated });
 }
 
 // The generator thread: this module, started by GeneratorPool with workerData.voxelNetGenerator.
@@ -309,7 +311,19 @@ if (!isMainThread && (workerData as GeneratorData | undefined)?.voxelNetGenerato
 async function generatorThread(data: GeneratorData): Promise<void> {
   const port = parentPort as NonNullable<typeof parentPort>,
     generate: VoxelGenerate = data.module ? (await import(data.module)).default : noiseTerrain(data.terrain);
-  port.on('message', async ({ id, cx, cy, cz }: { id: number; cx: number; cy: number; cz: number }) => {
+  let running = 0,
+    closing = false;
+  const endWhenIdle = () => {
+    if (closing && !running) port.close();
+  };
+  port.on('message', async (job: { id: number; cx: number; cy: number; cz: number } | 'close') => {
+    if (job === 'close') {
+      closing = true;
+      endWhenIdle();
+      return;
+    }
+    const { id, cx, cy, cz } = job;
+    running++;
     try {
       if (typeof generate !== 'function')
         throw new TypeError('The voxel-net generator module must export a VoxelGenerate function as its default');
@@ -323,9 +337,15 @@ async function generatorThread(data: GeneratorData): Promise<void> {
       port.postMessage({ id, packed, message, ceiling: Number.isInteger(ceiling) ? ceiling : undefined }, transfer);
     } catch (error) {
       port.postMessage({ id, error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      running--;
+      endWhenIdle();
     }
   });
 }
+
+/** How long a closing generator thread may take over the jobs it has: a chunk takes milliseconds, this is for a hung one. */
+const DRAIN_MS = 10_000;
 
 // Worker threads running the generator: urgent jobs (chunks a player stands in) go before the others.
 class GeneratorPool {
@@ -334,6 +354,7 @@ class GeneratorPool {
   readonly #normal: (() => void)[] = [];
   readonly #jobs = new Map<number, { resolve: (g: Generated) => void; reject: (e: Error) => void; worker: number }>();
   #next = 0;
+  #closing = false;
   constructor(
     readonly size: number,
     readonly data: GeneratorData,
@@ -354,8 +375,25 @@ class GeneratorPool {
   get queued(): number {
     return this.#urgent.length + this.#normal.length;
   }
+  // Each thread finishes the jobs it has and ends by itself. Terminating one that is compressing aborts the whole
+  // process in Node ("close before init", a native assertion nothing can catch), so terminate() is only for a generator
+  // that never returns, past DRAIN_MS.
   close(): Promise<unknown> {
-    return Promise.all(this.#workers.map(({ worker }) => worker.terminate()));
+    this.#closing = true;
+    return Promise.all(
+      this.#workers.map(({ worker }) =>
+        worker.threadId < 0
+          ? undefined
+          : new Promise<void>((done) => {
+              const limit = setTimeout(() => worker.terminate(), DRAIN_MS);
+              worker.once('exit', () => {
+                clearTimeout(limit);
+                done();
+              });
+              worker.postMessage('close');
+            }),
+      ),
+    );
   }
   #pick(): number {
     if (this.#workers.length < this.size) {
@@ -387,7 +425,11 @@ class GeneratorPool {
   }
   // Two jobs per worker at most, so one waits while the other compresses.
   #pump(): void {
-    while (this.queued && (this.#workers.length < this.size || this.#workers.some((slot) => slot.busy < 2)))
+    while (
+      !this.#closing &&
+      this.queued &&
+      (this.#workers.length < this.size || this.#workers.some((slot) => slot.busy < 2))
+    )
       ((this.#urgent.length ? this.#urgent : this.#normal).shift() as () => void)();
   }
 }
