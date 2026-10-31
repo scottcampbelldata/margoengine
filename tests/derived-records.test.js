@@ -152,6 +152,28 @@ function scratch({ register }) {
   return { dir, git };
 }
 
+// Bug (2026-10-31): every new worktree rewrote the .git/config all worktrees share, four times. On Windows a git command
+// reading it during the rename dies with status 128 ("unable to access '.git/config': Permission denied"), which sent a
+// proof in another worktree's landing down a false HISTORICAL. With config.lock held any write fails, so this test sees one.
+test('registering merge drivers already registered writes nothing to the shared git config', () => {
+  const { dir, git } = scratch({ register: true }),
+    lock = join(dir, '.git/config.lock');
+  try {
+    writeFileSync(lock, '');
+    setupMergeDrivers(dir);
+    rmSync(lock);
+    // A changed entry is still written.
+    git('config', 'merge.margo-derived.driver', 'old');
+    writeFileSync(lock, '');
+    assert.throws(() => setupMergeDrivers(dir), /lock/);
+    rmSync(lock);
+    setupMergeDrivers(dir);
+    assert.match(git('config', 'merge.margo-derived.driver'), /merge-driver\.mjs derived/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 function landing(dir, git, { api, size, items, reason }) {
   mkdirSync(join(dir, 'api'), { recursive: true });
   mkdirSync(join(dir, 'records'), { recursive: true });

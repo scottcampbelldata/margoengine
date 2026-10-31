@@ -11,12 +11,20 @@ export const DRIVERS = {
   'margo-ratchet': 'Quality baselines (limits only shrink)',
 };
 
-/** Writes the driver entries of git config in `cwd`. The command is relative: git runs drivers at the work tree root. */
+/**
+ * Writes the driver entries of git config in `cwd` that are missing or differ. The command is relative: git runs drivers
+ * at the work tree root. An entry already right is not written: every worktree shares one .git/config, and on Windows any
+ * git command in any worktree that reads it during the rename of a write dies with "unable to access '.git/config':
+ * Permission denied". Every new worktree runs this.
+ */
 export function setupMergeDrivers(cwd = process.cwd()) {
-  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim(),
+    set = (key, value) => {
+      if (git('config', '--get', '--default', '', key) !== value) git('config', key, value);
+    };
   for (const [name, description] of Object.entries(DRIVERS)) {
-    git('config', `merge.${name}.name`, description);
-    git('config', `merge.${name}.driver`, `node scripts/merge-driver.mjs ${name.slice(6)} %O %A %B`);
+    set(`merge.${name}.name`, description);
+    set(`merge.${name}.driver`, `node scripts/merge-driver.mjs ${name.slice(6)} %O %A %B`);
   }
 }
 
