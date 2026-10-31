@@ -75,6 +75,14 @@ export class PlazaShard {
   // player object, so an entry goes with its player.
   #activity = new WeakMap();
   #idleClosed = 0;
+  #resume = {
+    parked: { socket: 0, clientSilent: 0 },
+    resumed: 0,
+    resumeFailed: { unknown: 0, expired: 0 },
+    replaced: 0,
+    chunksResent: 0,
+    fullResends: 0,
+  };
 
   /**
    * @param {object} options
@@ -193,6 +201,8 @@ export class PlazaShard {
     const now = this.#o.now();
     let closed = 0;
     for (const player of this.server.players) {
+      // A parked player has no socket to close, and may be on its way back.
+      if (!player.connected) continue;
       const [x, y, z] = player.character.position,
         seen = this.#activity.get(player);
       if (!seen) {
@@ -227,7 +237,7 @@ export class PlazaShard {
   /** Whether a player with `identity` is in this world within `distance` blocks of column (x, z). */
   isNear(identity, x, z, distance) {
     return (this.server?.players ?? []).some((player) => {
-      if (player.identity !== identity) return false;
+      if (!player.connected || player.identity !== identity) return false;
       const [px, , pz] = player.character.position;
       return (px - x) ** 2 + (pz - z) ** 2 <= distance * distance;
     });
@@ -351,7 +361,9 @@ export class PlazaShard {
   #authenticate(req) {
     const identity = identityOfRequest(req, { proxied: this.#o.proxied, salt: this.#salt });
     if (!identity) return false;
-    const mine = this.server.players.filter((player) => player.identity === identity).length;
+    // Connected only: every tab of one line can come back after a CDN cut, while their parked places wait. So one line
+    // holds up to twice perIdentity for at most the server's resumeTimeout, and no longer.
+    const mine = this.server.players.filter((player) => player.connected && player.identity === identity).length;
     return mine < this.#o.perIdentity ? identity : false;
   }
 
@@ -405,8 +417,20 @@ export class PlazaShard {
         chunksGenerated: m.chunksGenerated,
         snapshotFailures: this.#snapshotFailures,
         idleClosed: this.#idleClosed,
+        parkedNow: server.counts.parked,
+        resume: this.#resume,
         rss: process.memoryUsage.rss(),
       };
+    // Kept over the shard's life, because one drop must still show on a /metrics read minutes later.
+    const r = this.#resume;
+    r.parked.socket += m.parked.socket;
+    r.parked.clientSilent += m.parked.clientSilent;
+    r.resumed += m.resumed;
+    r.resumeFailed.unknown += m.resumeFailed.unknown;
+    r.resumeFailed.expired += m.resumeFailed.expired;
+    r.replaced += m.replaced;
+    r.chunksResent += m.chunksResent;
+    r.fullResends += m.fullResends;
     // The metrics arrays grow with every tick: this reset is what keeps them from holding six hours of ticks.
     this.#edits = counted;
     server.resetMetrics();

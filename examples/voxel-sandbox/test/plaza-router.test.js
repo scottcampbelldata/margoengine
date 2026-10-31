@@ -8,10 +8,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { VoxelWorld } from '@margoengine/voxel';
-import { VoxelNetClient } from '@margoengine/voxel-net';
+import { connectVoxelNet, VoxelNetClient } from '@margoengine/voxel-net';
 import { adminRequest, commandFrom, timeOfDay } from '../server/admin.mjs';
 import { fromArguments, PlazaRouter, PRODUCTION_ORIGIN, pickShard, ROUTER_DEFAULTS } from '../server/router.mjs';
 import { defineBlocks } from '../src/blocks.ts';
+import { cutProxy } from '../../../packages/voxel-net/tests/cut-proxy.js';
 
 const { blocks } = defineBlocks(),
   BRICKS = blocks.id('bricks'),
@@ -134,6 +135,33 @@ test('counters have their shape; /join says where; /metrics wants the token', TI
   assert.equal((await plaza.get('/nothing')).status, 404);
   assert.deepEqual(await (await plaza.get('/finished/index.json')).json(), []);
   assert.equal(plaza.router.address.address, '127.0.0.1');
+});
+
+test('/metrics shows a drop and its resume, for as long as the shard lives', TIMEOUT, async (t) => {
+  const plaza = await startRouter(t),
+    answer = await joinAnswer(plaza),
+    proxy = await cutProxy(Number(new URL(answer.url).port));
+  t.after(() => proxy.close());
+  const page = connectVoxelNet(`ws://127.0.0.1:${proxy.port}`, new VoxelWorld({ blocks }), {
+      view: 2,
+      name: 'Amber Lantern',
+    }),
+    pump = setInterval(() => page.update(1 / 60, { keys: 0, yaw: 0, pitch: 0 }), 16);
+  t.after(() => {
+    clearInterval(pump);
+    page.onClose = () => {};
+    page.close();
+  });
+  await until('the player', () => page.spawned);
+  proxy.cut();
+  await until('the resume', () => page.stats.resumes === 1);
+  const shard = await until('the numbers', async () => {
+    const res = await plaza.get('/metrics', { headers: { Authorization: 'Bearer test-metrics-token' } }),
+      [first] = (await res.json()).shards;
+    return first.resume?.resumed === 1 && first;
+  });
+  assert.deepEqual(shard.resume.parked, { socket: 1, clientSilent: 0 });
+  assert.equal(shard.parkedNow, 0);
 });
 
 test('CORS: the production origin by default, allowed origins only, never on /metrics', TIMEOUT, async (t) => {

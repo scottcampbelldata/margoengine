@@ -5,13 +5,14 @@ import { tmpdir } from 'node:os';
 import { join as pathJoin } from 'node:path';
 import test from 'node:test';
 import { VoxelWorld } from '@margoengine/voxel';
-import { Keys, VoxelNetClient } from '@margoengine/voxel-net';
+import { connectVoxelNet, Keys, VoxelNetClient } from '@margoengine/voxel-net';
 import { connectWebSocket } from '@margoengine/voxel-net/server';
 import { defineBlocks } from '../src/blocks.ts';
 import { FIRST_WORDS, isPlazaName, SECOND_WORDS } from '../src/names.ts';
 import { isPlazaProtected, plazaSpawnRing } from '../src/plaza.ts';
 import { readSnapshot } from '../server/snapshots.mjs';
 import { HOST, IDLE_CLOSE_CODE, IDLE_REASON, PlazaShard } from '../server/shard.mjs';
+import { cutProxy } from '../../../packages/voxel-net/tests/cut-proxy.js';
 
 const { blocks } = defineBlocks(),
   BRICKS = blocks.id('bricks'),
@@ -423,6 +424,81 @@ test('a player with no movement and no edit is closed with 4410 idle and its pla
   const again = await joined(shard, url);
   assert.ok(again.client.spawned, 'a new player takes the place');
   for (const c of [mover, builder, again]) c.client.close();
+});
+
+// A proxy in front of the shard, closed when the test ends.
+async function proxied(t, url) {
+  const proxy = await cutProxy(Number(new URL(url).port));
+  t.after(() => proxy.close());
+  return { proxy, url: `ws://${HOST}:${proxy.port}` };
+}
+
+test('every tab of one line comes back after a cut, though their parked places still count; the limit then holds', async (t) => {
+  const { shard, url } = await startShard(t, { perIdentity: 2, spawn: () => [0, 30] }),
+    { proxy, url: through } = await proxied(t, url),
+    pages = [1, 2].map(() => connectVoxelNet(through, new VoxelWorld({ blocks }), { view: 2, name: 'Amber Lantern' })),
+    ended = [];
+  for (const page of pages) page.onClose = (close) => ended.push(close);
+  assert.ok(await drive(pages, () => pages.every((page) => page.spawned)));
+  proxy.cut();
+  assert.ok(await drive(pages, () => pages.every((page) => page.stats.resumes === 1) || ended.length));
+  assert.deepEqual(ended, []);
+  assert.equal(shard.server.counts.players, 2);
+  assert.equal(shard.server.counts.parked, 0);
+  const third = await join(url);
+  assert.equal((await closes(third.conn)).code, 1008, 'both are back, so the line is full again');
+  for (const page of pages) {
+    page.onClose = () => {};
+    page.close();
+  }
+});
+
+test('a parked player is not closed as idle or counted as near; once back, both apply to it', async (t) => {
+  const { shard, clock, url } = await startShard(t, { idleMs: 1000, idleCheckMs: 3_600_000, spawn: () => [0, 30] }),
+    { proxy, url: through } = await proxied(t, url),
+    page = await joined(shard, through),
+    [player] = shard.server.players,
+    [x, , z] = player.character.position;
+  assert.equal(shard.closeIdle(), 0, 'the first look');
+  assert.equal(shard.isNear(player.identity, x, z, 1), true);
+  proxy.cut();
+  assert.ok(await drive([], () => !player.connected));
+  clock.now += 10_000;
+  assert.equal(shard.closeIdle(), 0, 'nothing to close');
+  assert.equal(shard.isNear(player.identity, x, z, 1), false);
+
+  const conn = await connectWebSocket(url);
+  conn.onmessage = (d) => page.client.receive(d);
+  page.client.detach();
+  page.client.attach({ send: (d) => conn.send(d), close: () => conn.close() });
+  assert.ok(await drive([page.client], () => player.connected && page.client.stats.resumes === 1));
+  assert.equal(shard.isNear(player.identity, x, z, 1), true);
+  const closed = closes(conn);
+  clock.now += 10_000;
+  assert.equal(shard.closeIdle(), 1, 'the new socket is the one closed');
+  assert.deepEqual(await closed, { code: IDLE_CLOSE_CODE, reason: IDLE_REASON });
+  assert.ok(await drive([], () => shard.server.counts.players === 0), 'closed as idle, it is not parked');
+});
+
+test('beats carry the parks and resumes, and keep them after the next beat', async (t) => {
+  const { shard, url } = await startShard(t, { beatMs: 50, spawn: () => [0, 30] }),
+    { proxy, url: through } = await proxied(t, url),
+    page = connectVoxelNet(through, new VoxelWorld({ blocks }), { view: 2, name: 'Amber Lantern' });
+  let last;
+  shard.onBeat = (beat) => (last = beat);
+  assert.ok(await drive([page], () => page.spawned && last));
+  assert.equal(last.resume.resumed, 0);
+  proxy.cut();
+  assert.ok(await drive([page], () => last.resume.resumed === 1));
+  const beats = last;
+  assert.ok(await drive([page], () => last !== beats));
+  assert.equal(last.resume.resumed, 1);
+  assert.deepEqual(last.resume.parked, { socket: 1, clientSilent: 0 });
+  assert.deepEqual(last.resume.resumeFailed, { unknown: 0, expired: 0 });
+  assert.equal(last.resume.fullResends, 0);
+  assert.equal(last.parkedNow, 0);
+  page.onClose = () => {};
+  page.close();
 });
 
 test('idleMs 0 turns the limit off', async (t) => {
