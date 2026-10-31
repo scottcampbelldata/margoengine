@@ -570,3 +570,287 @@ test('a player in the world can report, near where they stand', TIMEOUT, async (
   assert.equal(res.status, 202);
   assert.deepEqual(await res.json(), { result: 'counted' });
 });
+
+// Two boxes, as two routers on this machine. The first is always filled by a real player, so its 5 s hold cannot run out
+// under a test; `second` is a router or a stand-in, anything with a base URL.
+const PEER_SECRET = 'test-peer-secret',
+  ONE_PLACE = { capacity: 1, maxShards: 1 },
+  peerMetrics = async (plaza) =>
+    (await plaza.get('/metrics', { headers: { Authorization: 'Bearer test-metrics-token' } }).then((r) => r.json()))
+      .peer,
+  readyShards = (plaza) => until('a ready shard', () => plaza.router.shards[0]?.state === 'ready');
+
+async function startFirstBox(t, secondBase, options = {}) {
+  const first = await startRouter(t, {
+    ...ONE_PLACE,
+    peer: secondBase,
+    peerSecret: PEER_SECRET,
+    peerPollMs: 100,
+    ...options,
+  });
+  await readyShards(first);
+  return first;
+}
+
+// The first box with its one place taken.
+async function fillFirstBox(t, first) {
+  const answer = await first.get('/join').then((r) => r.json());
+  assert.equal(answer.router, undefined, 'the first arrival stays on the first box');
+  const page = connectPage(answer.url);
+  t.after(() => page.stop());
+  await until('the first box to count its player', () => first.router.shards[0].online === 1);
+  return page;
+}
+
+async function startSecondBox(t, options = {}) {
+  const second = await startRouter(t, { ...ONE_PLACE, peerSecret: PEER_SECRET, ...options });
+  await readyShards(second);
+  return second;
+}
+
+// A second box that says it has room and answers /peer/join with `onJoin`.
+async function startStandIn(t, onJoin, status = () => ({ online: 3, room: 5, canGrow: false })) {
+  const server = createServer((req, res) => {
+    if (req.url !== '/peer/status') return onJoin(req, res);
+    const body = status();
+    if (!body) res.writeHead(500);
+    res.end(JSON.stringify(body ?? {}));
+  });
+  await new Promise((done) => server.listen(0, '127.0.0.1', done));
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  return { base: `http://127.0.0.1:${server.address().port}` };
+}
+
+const peerUp = (first) => until('the peer to be up', async () => (await peerMetrics(first)).up);
+
+test('two boxes: the first fills, the next goes to the second naming it, then full counts both', TIMEOUT, async (t) => {
+  const second = await startSecondBox(t),
+    first = await startFirstBox(t, second.base);
+  await until('the second box to show room', async () => (await peerMetrics(first)).room === 1);
+  await fillFirstBox(t, first);
+
+  const res = await first.get('/join'),
+    answer = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(answer.full, false);
+  assert.equal(answer.router, second.base);
+  assert.equal(answer.url.split(':').at(-1), String(second.router.shards[0].port), 'the second box runs this shard');
+  const page = connectPage(answer.url);
+  t.after(() => page.stop());
+  await until('the player to spawn on the second box', () => page.client.spawned);
+
+  const full = await until('the two players counted', async () => {
+    const body = await first.get('/join').then((r) => r.json());
+    return body.online === 2 && body;
+  });
+  assert.equal(full.full, true);
+  assert.equal(full.retryIn, 30);
+  assert.equal((await first.get('/counters').then((r) => r.json())).online, 2);
+  const metrics = await peerMetrics(first);
+  assert.equal(metrics.up, true);
+  assert.equal(metrics.forwards, 1);
+  assert.equal(metrics.room, 0);
+  assert.equal((await second.get('/counters').then((r) => r.json())).online, 1, 'the second box counts its own');
+});
+
+test('a peek with the first box full reads the last poll and holds no place on the second', TIMEOUT, async (t) => {
+  const second = await startSecondBox(t),
+    first = await startFirstBox(t, second.base);
+  await until('the second box to show room', async () => (await peerMetrics(first)).room === 1);
+  await fillFirstBox(t, first);
+  const answer = await first.get('/join?peek=1').then((r) => r.json());
+  assert.equal(answer.full, false);
+  assert.match(answer.url, /^ws:\/\//, 'a page reads this as a shard: there is room');
+  assert.equal(second.router.shards[0].reserved.length, 0);
+  assert.equal((await peerMetrics(first)).forwards, 0);
+});
+
+test('the second box closed: the first answers full fast, and marks it down after two misses', TIMEOUT, async (t) => {
+  const second = await startSecondBox(t),
+    first = await startFirstBox(t, second.base, { peerPollMs: 600_000 });
+  await peerUp(first);
+  await fillFirstBox(t, first);
+  await second.router.close();
+
+  const began = performance.now(),
+    res = await first.get('/join'),
+    answer = await res.json();
+  assert.ok(performance.now() - began < 1500, 'within the forward limit');
+  assert.equal(res.status, 200);
+  assert.equal(answer.full, true);
+  assert.equal((await first.get('/counters')).status, 200);
+  assert.equal((await peerMetrics(first)).failures, 1);
+});
+
+test('a peer that stops answering polls is down after two misses and up again after one answer', TIMEOUT, async (t) => {
+  let answering = true;
+  const standIn = await startStandIn(
+      t,
+      (req, res) => res.end('{}'),
+      () => (answering ? { online: 3, room: 5, canGrow: false } : undefined),
+    ),
+    first = await startFirstBox(t, standIn.base, { peerPollMs: 25 });
+  await peerUp(first);
+  assert.equal((await first.get('/counters').then((r) => r.json())).online, 3);
+  answering = false;
+  await until('the peer to be down', async () => !(await peerMetrics(first)).up);
+  assert.ok((await peerMetrics(first)).failures >= 2);
+  assert.equal((await first.get('/counters').then((r) => r.json())).online, 0, 'a box that is down counts nobody');
+  await fillFirstBox(t, first);
+  assert.equal((await first.get('/join').then((r) => r.json())).full, true, 'nothing is forwarded while it is down');
+  answering = true;
+  await peerUp(first);
+});
+
+test('a second box that never answers /peer/join: full within the limit, not an error', TIMEOUT, async (t) => {
+  const standIn = await startStandIn(t, () => {}),
+    first = await startFirstBox(t, standIn.base, { peerTimeoutMs: 300 });
+  await peerUp(first);
+  await fillFirstBox(t, first);
+  const began = performance.now(),
+    res = await first.get('/join'),
+    answer = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(answer.full, true);
+  assert.equal(answer.online, 4, 'its own player and the three of the last poll');
+  const took = performance.now() - began;
+  assert.ok(took >= 250 && took < 1500, `took ${took} ms`);
+});
+
+test('every odd answer from the second box gives full, never a 5xx or its body', TIMEOUT, async (t) => {
+  const answers = [
+    [500, '{"full":false,"url":"ws://127.0.0.1:1"}'],
+    [429, '{"error":"slow-down"}'],
+    [503, '{"full":false,"starting":true,"retryIn":2}'],
+    [200, 'not json'],
+    [200, 'null'],
+    [200, '{}'],
+    [200, '{"full":false}'],
+    [200, '{"full":false,"url":"https://not-a-socket.example"}'],
+    [200, '{"full":false,"url":3}'],
+    [301, ''],
+  ];
+  let next = 0;
+  const standIn = await startStandIn(t, (req, res) => {
+      const [status, text] = answers[next++];
+      res.writeHead(status, status === 301 ? { Location: 'http://127.0.0.1:1/' } : {});
+      res.end(text);
+    }),
+    first = await startFirstBox(t, standIn.base);
+  await peerUp(first);
+  await fillFirstBox(t, first);
+  for (let i = 0; i < answers.length; i++) {
+    const res = await first.get('/join'),
+      answer = await res.json();
+    assert.equal(res.status, 200, answers[i][1]);
+    assert.equal(answer.full, true, answers[i][1]);
+    assert.equal(answer.router, undefined, answers[i][1]);
+  }
+  assert.equal(next, answers.length, 'each one was asked');
+  assert.equal((await peerMetrics(first)).forwards, 0);
+});
+
+test(
+  'with no shard ready here, a join goes to the second box; if that fails it still says starting',
+  TIMEOUT,
+  async (t) => {
+    let place = true;
+    const standIn = await startStandIn(t, (req, res) => {
+        if (place) res.end('{"full":false,"url":"ws://127.0.0.1:9","shard":0,"world":"w","online":1}');
+        else res.writeHead(500).end();
+      }),
+      first = await startFirstBox(t, standIn.base, { restartMs: 600_000 });
+    await peerUp(first);
+    first.router.shards[0].child.kill('SIGKILL');
+    await until('the shard to be gone', () => first.router.shards[0].state === 'stopped');
+    const forwarded = await first.get('/join').then((r) => r.json());
+    assert.equal(forwarded.router, standIn.base);
+    assert.equal(forwarded.url, 'ws://127.0.0.1:9');
+    place = false;
+    const res = await first.get('/join');
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { full: false, starting: true, retryIn: 2 });
+  },
+);
+
+test('/peer/* wants the secret, has no CORS headers and no per-identity bucket', TIMEOUT, async (t) => {
+  const second = await startSecondBox(t, { rateBurst: 2, ratePerSecond: 0.001 }),
+    bearer = (secret) => ({ headers: { Authorization: `Bearer ${secret}`, Origin: 'https://a.test' } });
+  for (const path of ['/peer/status', '/peer/join']) {
+    const wrong = await second.get(path, bearer('wrong'));
+    assert.equal(wrong.status, 401);
+    assert.equal(wrong.headers.get('access-control-allow-origin'), null);
+    assert.equal((await second.get(path)).status, 401, 'no header at all');
+  }
+  for (let i = 0; i < 5; i++) {
+    const res = await second.get('/peer/status', bearer(PEER_SECRET));
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('access-control-allow-origin'), null);
+    assert.deepEqual(Object.keys(await res.json()).sort(), ['canGrow', 'online', 'room']);
+  }
+  const preflight = await second.get('/peer/join', { method: 'OPTIONS', headers: { Origin: 'https://a.test' } });
+  assert.equal(preflight.headers.get('access-control-allow-origin'), null);
+  const joined = await second.get('/peer/join', bearer(PEER_SECRET));
+  assert.equal(joined.status, 200);
+  assert.equal(second.router.shards[0].reserved.length, 1, 'the second box holds the place');
+  assert.equal((await joined.json()).router, undefined, 'only the first box knows it is another box');
+  assert.equal((await second.get('/counters')).status, 200, 'the bucket is still full for everyone else');
+});
+
+test(
+  'a router with no secret and no peer: /peer/* is 404, nothing is asked, /metrics has no peer',
+  TIMEOUT,
+  async (t) => {
+    const plaza = await startRouter(t);
+    assert.equal(
+      (await plaza.get('/peer/status', { headers: { Authorization: `Bearer ${PEER_SECRET}` } })).status,
+      404,
+    );
+    assert.equal((await plaza.get('/peer/join')).status, 404);
+    assert.equal(await peerMetrics(plaza), undefined);
+  },
+);
+
+test('the second box starts its next shard from forwarded joins', TIMEOUT, async (t) => {
+  const second = await startSecondBox(t, { maxShards: 2 }),
+    first = await startFirstBox(t, second.base);
+  await until('the second box to show room', async () => (await peerMetrics(first)).room === 1);
+  await fillFirstBox(t, first);
+  const answer = await first.get('/join').then((r) => r.json());
+  assert.equal(answer.shard, 0);
+  const page = connectPage(answer.url);
+  t.after(() => page.stop());
+  const next = await until('a place on its second shard', async () => {
+    const body = await first.get('/join').then((r) => r.json());
+    return body.shard === 1 && body;
+  });
+  assert.equal(next.router, second.base);
+  assert.equal(second.router.shards[1].state, 'ready');
+});
+
+test('--peer: passed on with the env, refused without the secret or as anything but a base URL', () => {
+  const before = process.env.PLAZA_PEER_SECRET,
+    dataDir = mkdtempSync(join(tmpdir(), 'plaza-router-'));
+  try {
+    delete process.env.PLAZA_PEER_SECRET;
+    const alone = fromArguments(['--data=d']);
+    assert.equal(alone.peer, undefined);
+    assert.equal(alone.peerSecret, undefined);
+    process.env.PLAZA_PEER_SECRET = 'from-env';
+    const peered = fromArguments(['--data=d', '--peer=https://box2.example']);
+    assert.equal(peered.peer, 'https://box2.example');
+    assert.equal(peered.peerSecret, 'from-env');
+    const make = (options) => new PlazaRouter({ dataDir, log: () => {}, ...options });
+    assert.throws(() => make({ peer: 'https://box2.example' }), /PLAZA_PEER_SECRET/);
+    for (const peer of ['box2', 'ftp://box2.example', 'https://box2.example/path', 'https://box2.example/?a=1'])
+      assert.throws(() => make({ peer, peerSecret: 's' }), TypeError, peer);
+    make({ peer: 'https://box2.example/', peerSecret: 's' });
+  } finally {
+    if (before === undefined) delete process.env.PLAZA_PEER_SECRET;
+    else process.env.PLAZA_PEER_SECRET = before;
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});

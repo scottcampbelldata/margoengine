@@ -4,9 +4,11 @@
 //   GET /finished/index.json  the finished worlds that have a render
 //   GET /metrics              shards' numbers; needs the token (env PLAZA_METRICS_TOKEN) as a Bearer header
 //   POST /report              a griefing report, { shard, x, z }
+//   GET /peer/status          this box's room, and GET /peer/join a place on it; for the other box's router, with the
+//                             secret (env PLAZA_PEER_SECRET) as a Bearer header; 404 without that env
 // It listens on 127.0.0.1 only, behind nginx. `admin.mjs` talks to it over a local socket nginx cannot reach.
 //   node examples/voxel-sandbox/server/router.mjs --data=DIR [--port=8790] [--shard-port=8800] [--proxied]
-//     [--origins=a,b or * (default https://margoengine.com)] [--public-url=wss://host/s/{i}] [--capacity=200] [--max-shards=2] [--per-identity=8] [--idle-minutes=10] [--rate-burst=30] [--rate-per-second=5] [--workers=1]
+//     [--origins=a,b or * (default https://margoengine.com)] [--public-url=wss://host/s/{i}] [--capacity=200] [--max-shards=2] [--per-identity=8] [--idle-minutes=10] [--rate-burst=30] [--rate-per-second=5] [--workers=1] [--peer=https://box2.example]
 // Run `npm run build:packages` first: the shards import the built packages.
 import { fork } from 'node:child_process';
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -34,7 +36,8 @@ const SHARD_FILE = fileURLToPath(new URL('./shard.mjs', import.meta.url)),
   STOP_MS = 15_000,
   RATE_KEPT = 100_000,
   FINISHED_KEPT = 64,
-  ID = /^s\d+-[0-9a-z]+$/;
+  ID = /^s\d+-[0-9a-z]+$/,
+  SOCKET_URL = /^wss?:\/\//;
 
 /** The page that talks to the router in production: the only origin allowed unless --origins says otherwise. */
 export const PRODUCTION_ORIGIN = 'https://margoengine.com';
@@ -57,6 +60,8 @@ export const ROUTER_DEFAULTS = Object.freeze({
   // The machine's cores, not availableParallelism: that follows the service's CPUQuota down (360% reads as 3), and the
   // free core this is asked about may be any core of the machine.
   cores: () => cpus().length,
+  peerPollMs: 5000, // how often --peer is asked for its room; two misses in a row mark it down until a poll succeeds
+  peerTimeoutMs: 1500, // the most a poll or a forwarded join may take
   log: console.log,
 });
 
@@ -79,7 +84,28 @@ const taking = (shard, now) => {
 const sameSecret = (given, secret) =>
   timingSafeEqual(createHash('sha256').update(given).digest(), createHash('sha256').update(secret).digest());
 
-const coordinate = (v) => Number.isFinite(v) && Math.abs(v) <= MAX_COORDINATE;
+const coordinate = (v) => Number.isFinite(v) && Math.abs(v) <= MAX_COORDINATE,
+  count = (v) => Number.isInteger(v) && v >= 0;
+
+function newPeer(address, secret) {
+  if (!secret)
+    throw new TypeError(`--peer=${address} needs the shared secret: set the env PLAZA_PEER_SECRET on both boxes`);
+  const url = new URL(address);
+  if (!/^https?:$/.test(url.protocol) || url.pathname !== '/' || url.search)
+    throw new TypeError(`--peer=${address}: pass the router's base URL, such as https://box2.example`);
+  return {
+    url: url.origin,
+    stop: new AbortController(),
+    polling: false,
+    up: false,
+    misses: 0,
+    online: 0,
+    room: 0,
+    canGrow: false,
+    forwards: 0,
+    failures: 0,
+  };
+}
 
 /** Where admin.mjs reaches the router of data folder `dataDir`: a file only the service's user can open. */
 export const adminPath = (dataDir) =>
@@ -103,11 +129,15 @@ export class PlazaRouter {
   #finishedJson = '[]';
   #rates = new Map();
   #requestId = 0;
+  #peer;
 
   /**
    * @param {object} options Those of {@link ROUTER_DEFAULTS}, and:
    * @param {string} options.dataDir The installation's data folder.
    * @param {string} [options.metricsToken] Without one, /metrics answers 404.
+   * @param {string} [options.peer] The base URL of the second box's router: a /join with no place here goes there. Without
+   * one, nothing is asked of any other box.
+   * @param {string} [options.peerSecret] The secret both boxes share. Without one, /peer/* answers 404.
    * @param {object} [options.shard] More options for each shard (spanMs, snapshotMs and so on).
    */
   constructor(options) {
@@ -115,6 +145,7 @@ export class PlazaRouter {
     if (!this.#o.dataDir) throw new TypeError('PlazaRouter needs dataDir, the folder its worlds live in');
     mkdirSync(this.#o.dataDir, { recursive: true });
     this.#salt = loadSalt(this.#o.dataDir);
+    if (this.#o.peer !== undefined) this.#peer = newPeer(this.#o.peer, this.#o.peerSecret);
   }
 
   async start() {
@@ -149,6 +180,10 @@ export class PlazaRouter {
       .filter((index) => existsSync(join(this.#o.dataDir, `shard-${index}`, 'state.json')));
     for (const index of new Set([0, ...live])) this.#startShard(index);
     this.#every(5000, () => this.#watchdog());
+    if (this.#peer) {
+      void this.#pollPeer();
+      this.#every(this.#o.peerPollMs, () => this.#pollPeer());
+    }
     this.#every(this.#o.sweepMs, async () => {
       await this.#saveTotals();
       await this.#writeFinishedIndex();
@@ -162,6 +197,7 @@ export class PlazaRouter {
     this.#closing = true;
     for (const timer of this.#timers) clearTimeout(timer);
     this.#timers.clear();
+    this.#peer?.stop.abort();
     await Promise.all(this.shards.map((shard) => this.#stopShard(shard)));
     await this.#saveTotals();
     await new Promise((done) => (this.#admin ? this.#admin.close(done) : done()));
@@ -175,7 +211,7 @@ export class PlazaRouter {
   counters() {
     const live = this.shards.filter((shard) => shard.world);
     return {
-      online: this.#online(),
+      online: this.#online() + this.#peerOnline(),
       blocksToday: this.#blocksToday(),
       worldsFinished: this.#worldsFinished,
       worldEndsAt: live.length ? Math.min(...live.map((shard) => shard.world.endsAt)) : null,
@@ -376,10 +412,20 @@ export class PlazaRouter {
 
   // Another shard starts when the rest are nearly full, only while a core is free.
   #growIfNeeded(now) {
-    if (this.#closing || !this.#extraNeeded(now)) return;
-    if (this.#o.load() >= this.#o.cores() - 1) return;
-    for (let index = 0; index < this.#o.maxShards; index++)
-      if (!this.shards[index]?.child && !this.shards[index]?.restartTimer) return this.#startShard(index);
+    if (this.#canGrow(now)) this.#startShard(this.#freeShard());
+  }
+  #canGrow(now) {
+    return (
+      !this.#closing &&
+      this.#extraNeeded(now) &&
+      this.#o.load() < this.#o.cores() - 1 &&
+      this.#freeShard() < this.#o.maxShards
+    );
+  }
+  #freeShard() {
+    let index = 0;
+    while (index < this.#o.maxShards && (this.shards[index]?.child || this.shards[index]?.restartTimer)) index++;
+    return index;
   }
   #extraNeeded(now = this.#o.now()) {
     // A shard on its way back is room on its way: a crash must not start a world beside the one coming back.
@@ -406,6 +452,112 @@ export class PlazaRouter {
 
   #online() {
     return this.shards.reduce((sum, shard) => sum + (shard?.online ?? 0), 0);
+  }
+
+  // The second box. Its answers only ever add a place: whatever goes wrong there, this box answers as it would alone.
+  #peerOnline() {
+    return this.#peer?.up ? this.#peer.online : 0;
+  }
+
+  async #askPeer(path) {
+    const { url, stop } = this.#peer,
+      response = await fetch(url + path, {
+        headers: { Authorization: `Bearer ${this.#o.peerSecret}` },
+        redirect: 'error',
+        signal: AbortSignal.any([stop.signal, AbortSignal.timeout(this.#o.peerTimeoutMs)]),
+      });
+    if (response.status !== 200) {
+      await response.body?.cancel();
+      throw new Error(`${path} answered ${response.status}`);
+    }
+    return response.json();
+  }
+
+  async #pollPeer() {
+    const peer = this.#peer;
+    if (peer.polling) return;
+    peer.polling = true;
+    try {
+      const { online, room, canGrow } = await this.#askPeer('/peer/status');
+      if (!count(online) || !count(room) || typeof canGrow !== 'boolean')
+        throw new TypeError('/peer/status answered something else than { online, room, canGrow }');
+      if (!peer.up) this.#o.log(`router: peer ${peer.url} is up`);
+      Object.assign(peer, { up: true, misses: 0, online, room, canGrow });
+    } catch (error) {
+      if (this.#closing) return;
+      peer.failures++;
+      if (++peer.misses >= 2 && peer.up) {
+        peer.up = false;
+        this.#o.log(`router: peer ${peer.url} is down: ${error.message}`);
+      }
+    } finally {
+      peer.polling = false;
+    }
+  }
+
+  // A place on the second box, or undefined when it gave none. The place it holds is its own: its capacity, its 5 s hold
+  // and its growth count as they do for its own /join.
+  async #forwardJoin() {
+    const peer = this.#peer;
+    try {
+      const body = await this.#askPeer('/peer/join');
+      if (count(body?.online)) peer.online = body.online;
+      if (body?.full === true) {
+        peer.room = 0;
+        return undefined;
+      }
+      if (body?.full !== false || typeof body.url !== 'string' || !SOCKET_URL.test(body.url))
+        throw new TypeError('/peer/join answered something else than a place or full');
+      peer.forwards++;
+      return { status: 200, body: { ...body, router: peer.url, online: this.#online() + peer.online } };
+    } catch (error) {
+      peer.failures++;
+      this.#o.log(`router: join forwarded to ${peer.url} failed: ${error.message}`);
+      return undefined;
+    }
+  }
+
+  // /join: a place here, else one on the second box. A peek only reads what the last poll said and holds nothing.
+  async #joinEitherBox(peek) {
+    const local = this.join({ peek }),
+      peer = this.#peer;
+    if (!peer) return local;
+    if ((local.status !== 200 || local.body.full) && peer.up) {
+      if (peek && peer.room > 0)
+        return {
+          status: 200,
+          body: {
+            full: false,
+            url: peer.url.replace(/^http/, 'ws'),
+            router: peer.url,
+            online: this.#online() + peer.online,
+          },
+        };
+      if (!peek && (peer.room > 0 || peer.canGrow)) {
+        const forwarded = await this.#forwardJoin();
+        if (forwarded) return forwarded;
+      }
+    }
+    if (local.body.online !== undefined) local.body.online = this.#online() + this.#peerOnline();
+    return local;
+  }
+
+  #peerRoute(req, res, route) {
+    if (!sameSecret(req.headers.authorization ?? '', `Bearer ${this.#o.peerSecret}`))
+      return this.#json(req, res, 401, { error: 'token' });
+    if (route === 'GET /peer/join') {
+      const { status, body } = this.join();
+      return this.#json(req, res, status, body);
+    }
+    const now = this.#o.now();
+    return this.#json(req, res, 200, {
+      online: this.#online(),
+      room: this.shards.reduce(
+        (sum, shard) => (shard?.state === 'ready' ? sum + Math.max(0, this.#o.capacity - taking(shard, now)) : sum),
+        0,
+      ),
+      canGrow: this.#canGrow(now),
+    });
   }
 
   // Counters kept across restarts.
@@ -472,6 +624,9 @@ export class PlazaRouter {
     const url = new URL(req.url, 'http://plaza.invalid'),
       route = `${req.method} ${url.pathname}`;
     if (req.method === 'OPTIONS') return this.#preflight(req, res);
+    // Before the per-identity bucket: the other box is one address, and it asks for every arrival it cannot place.
+    if (this.#o.peerSecret && (route === 'GET /peer/status' || route === 'GET /peer/join'))
+      return this.#peerRoute(req, res, route);
     const identity = identityOfRequest(req, { proxied: this.#o.proxied, salt: this.#salt });
     if (!this.#allowRate(identity ?? 'unknown')) return this.#json(req, res, 429, { error: 'slow-down' });
     switch (route) {
@@ -484,7 +639,7 @@ export class PlazaRouter {
       case 'GET /join': {
         // Behind the proxy a request with no client address did not come through it.
         if (!identity) return this.#json(req, res, 400, { error: 'no-client-address' });
-        const { status, body } = this.join({ peek: url.searchParams.has('peek') });
+        const { status, body } = await this.#joinEitherBox(url.searchParams.has('peek'));
         return this.#json(req, res, status, body, status === 503 ? { 'Retry-After': '2' } : {});
       }
       case 'POST /report':
@@ -568,6 +723,17 @@ export class PlazaRouter {
           crashes: shard.crashes,
           ...shard.beat,
         })),
+        ...(this.#peer
+          ? {
+              peer: {
+                up: this.#peer.up,
+                online: this.#peer.online,
+                room: this.#peer.room,
+                forwards: this.#peer.forwards,
+                failures: this.#peer.failures,
+              },
+            }
+          : {}),
       },
       { 'Cache-Control': 'no-store' },
     );
@@ -589,9 +755,10 @@ export class PlazaRouter {
   }
 
   // CORS for the page's calls (/join, /report, /counters, /finished): only the allowed origins, or any with `*`. Never
-  // for /metrics, which is for the operator's token and not for pages.
+  // for /metrics, which is for the operator's token and not for pages, nor for /peer/*, which is for the other box.
   #cors(req) {
-    if (new URL(req.url, 'http://plaza.invalid').pathname === '/metrics') return {};
+    const path = new URL(req.url, 'http://plaza.invalid').pathname;
+    if (path === '/metrics' || (this.#o.peerSecret && path.startsWith('/peer/'))) return {};
     const origin = req.headers.origin;
     if (this.#o.origins === '*') return { 'Access-Control-Allow-Origin': '*' };
     return origin !== undefined && this.#o.origins.includes(origin)
@@ -700,6 +867,8 @@ export function fromArguments(argv) {
     capacity: number('capacity', ROUTER_DEFAULTS.capacity),
     maxShards: number('max-shards', ROUTER_DEFAULTS.maxShards),
     metricsToken: process.env.PLAZA_METRICS_TOKEN || undefined,
+    peer: arg('peer'),
+    peerSecret: process.env.PLAZA_PEER_SECRET || undefined,
     rateBurst: number('rate-burst', ROUTER_DEFAULTS.rateBurst),
     ratePerSecond: number('rate-per-second', ROUTER_DEFAULTS.ratePerSecond),
     // The real network bench runs many bots from one address; everyone else keeps the default.
