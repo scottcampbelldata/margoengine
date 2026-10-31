@@ -194,6 +194,8 @@ body {
 }
 #banner button,
 #report,
+#fps,
+#help,
 #touch-buttons button {
   min-width: 44px;
   min-height: 44px;
@@ -208,6 +210,8 @@ body {
 }
 #banner button[hidden],
 #report[hidden],
+#fps[hidden],
+#help[hidden],
 #touch-buttons button[hidden],
 #touch-buttons[hidden],
 #stick[hidden],
@@ -284,11 +288,48 @@ body.touch #overlay .touch-help {
   display: grid !important;
 }
 body.touch #overlay {
+  background: rgba(10, 16, 28, 0.74);
   padding: 16px;
   box-sizing: border-box;
 }
 body.touch #overlay[data-state='loading'] .touch-help {
   display: none !important;
+}
+body.touch #overlay .play {
+  font-size: 22px;
+}
+body.touch #overlay dl {
+  font-size: 16px;
+  gap: 4px 14px;
+}
+/* The frame rate and help buttons: top left, moved below the banner while it shows (it can take the width of a phone). */
+#fps,
+#help {
+  position: fixed;
+  z-index: 2;
+  top: max(8px, env(safe-area-inset-top));
+  padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+#fps {
+  left: max(8px, env(safe-area-inset-left));
+  width: 84px;
+}
+#help {
+  left: calc(max(8px, env(safe-area-inset-left)) + 92px);
+}
+body:has(#banner:not([hidden])) #fps,
+body:has(#banner:not([hidden])) #help {
+  top: calc(max(8px, env(safe-area-inset-top)) + 104px);
+}
+body.touch #hud {
+  top: calc(max(8px, env(safe-area-inset-top)) + 52px);
+  max-width: calc(100vw - 16px);
+  box-sizing: border-box;
+  white-space: pre-wrap;
+}
+body:has(#banner:not([hidden])).touch #hud {
+  top: calc(max(8px, env(safe-area-inset-top)) + 156px);
 }
 body.deterministic #overlay,
 body.deterministic #hud,

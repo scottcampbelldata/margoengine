@@ -48,6 +48,12 @@ try {
     console.log('voxel sandbox Plaza edit test passed');
     process.exit(await closeAll());
   }
+  // PLAY_ONLY=phone runs only the phone test.
+  if (process.env.PLAY_ONLY === 'phone') {
+    await phone();
+    console.log('voxel sandbox phone test passed');
+    process.exit(await closeAll());
+  }
   await page.goto(`http://127.0.0.1:${port}${path}`);
   await page.waitForFunction(() => window.voxelSandbox?.spawned, null, { timeout: 120_000 });
   const spawn = await position(),
@@ -59,6 +65,11 @@ try {
     );
   assert.ok(['grass', 'sand'].includes(ground), `spawned on ${ground} at ${spawn}`);
   console.log(`ok spawned at ${spawn.map((v) => v.toFixed(1))} on ${ground}`);
+  assert.deepEqual(
+    await sandbox(() => ['fps', 'help'].map((id) => getComputedStyle(document.getElementById(id)).display)),
+    ['none', 'none'],
+    'a desktop page has no frame rate or help button',
+  );
 
   await page.mouse.click(480, 270);
   await page.waitForFunction(() => document.pointerLockElement?.id === 'scene', null, { timeout: 5000 });
@@ -566,11 +577,102 @@ async function phone() {
   assert.ok(layout.slots >= 5);
   console.log(`ok the layout fits 390 px: ${layout.slots} slots, every target at least 44 px`);
 
+  // Before play: every control explained, on screen, and "Tap to play".
+  const shots = process.env.PLAZA_SHOTS,
+    instructions = async () => {
+      const seen = await tab.evaluate(() => {
+        const list = document.querySelector('.touch-help'),
+          box = list.getBoundingClientRect(),
+          overlay = document.getElementById('overlay');
+        return {
+          overlay: !overlay.hidden,
+          state: overlay.dataset.state,
+          play: overlay.querySelector('.play').textContent,
+          playShown: getComputedStyle(overlay.querySelector('.play')).display !== 'none',
+          help: list.textContent,
+          text: overlay.textContent,
+          keysShown: getComputedStyle(overlay.querySelector('dl:not(.touch-help)')).display !== 'none',
+          fits: box.height > 0 && box.left >= 0 && box.right <= innerWidth && box.top >= 0 && box.bottom <= innerHeight,
+          size: parseFloat(getComputedStyle(list).fontSize),
+          overflow: document.documentElement.scrollWidth - innerWidth,
+        };
+      });
+      assert.ok(seen.overlay && seen.playShown, `the overlay and its prompt show: ${JSON.stringify(seen.state)}`);
+      assert.equal(seen.play, 'Tap to play');
+      assert.equal(seen.keysShown, false, 'no keyboard list on a phone');
+      assert.ok(seen.fits, 'the instructions are on screen');
+      assert.ok(seen.size >= 16, `instructions at ${seen.size} px`);
+      assert.equal(seen.overflow, 0);
+      for (const word of [/walk/, /look/, /Jump/, /Fly/, /place/, /break/, /choose a block/])
+        assert.match(seen.help, word);
+      assert.doesNotMatch(seen.text, /Click to play|[–—]/);
+    };
+  if (shots) await tab.screenshot({ path: `${shots}/phone-before-play.png` });
+  await instructions();
+  console.log('ok a phone sees the instructions and "Tap to play" before play');
+
   // Tap past the overlay.
   await tab.touchscreen.tap(195, 420);
   await tab.waitForFunction(() => window.voxelSandbox.touch.active);
   assert.equal(await tab.evaluate(() => document.getElementById('overlay').hidden), true);
   await tab.screenshot({ path: 'test-results/plaza-phone.png' });
+
+  // The help button reopens them, and a tap plays on: nothing stuck, the stick still walks.
+  const box = (selector) =>
+      tab.evaluate((s) => {
+        const e = document.querySelector(s);
+        if (!e || e.hidden || getComputedStyle(e).display === 'none') return null;
+        const r = e.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+      }, selector),
+    overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom,
+    bigEnough = (b, name) => assert.ok(b && b.width >= 44 && b.height >= 44, `${name}: ${JSON.stringify(b)}`);
+  bigEnough(await box('#help'), 'help');
+  await tab.touchscreen.tap(...(await centre(tab, '#help')));
+  await tab.waitForFunction(() => !document.getElementById('overlay').hidden);
+  assert.equal(await tab.evaluate(() => window.voxelSandbox.touch.active), false);
+  assert.equal(await box('#help'), null, 'no help button over the help');
+  await instructions();
+  await tab.touchscreen.tap(195, 420);
+  await tab.waitForFunction(() => window.voxelSandbox.touch.active);
+  assert.equal(await tab.evaluate(() => document.getElementById('overlay').hidden), true);
+  console.log('ok the help button reopens the instructions and a tap plays on');
+
+  // The frame rate shows; a tap opens the full HUD and closes it; neither blocks the hotbar or the buttons.
+  await tab.waitForFunction(() => /^\d+ FPS$/.test(document.getElementById('fps').textContent));
+  bigEnough(await box('#fps'), 'fps');
+  const hudShown = () => tab.evaluate(() => getComputedStyle(document.getElementById('hud')).display !== 'none');
+  assert.equal(await hudShown(), false, 'the HUD starts closed');
+  await tab.touchscreen.tap(...(await centre(tab, '#fps')));
+  await tab.waitForFunction(() => getComputedStyle(document.getElementById('hud')).display !== 'none');
+  const hudBox = await box('#hud'),
+    hudStyle = await tab.evaluate(() => getComputedStyle(document.getElementById('hud')).pointerEvents);
+  assert.equal(hudStyle, 'none', 'the HUD lets touches through');
+  assert.ok(hudBox.right <= 390, `the HUD fits the width: ${hudBox.right}`);
+  for (const other of ['#hotbar', '#fps', '#help', '#touch-jump', '#touch-fly'])
+    assert.equal(overlap(hudBox, await box(other)), false, `the HUD is clear of ${other}`);
+  assert.equal(await tab.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0);
+  if (shots) await tab.screenshot({ path: `${shots}/phone-hud.png` });
+  await tab.touchscreen.tap(...(await centre(tab, '#fps')));
+  await tab.waitForFunction(() => getComputedStyle(document.getElementById('hud')).display === 'none');
+  assert.equal(await tab.evaluate(() => window.voxelSandbox.touch.active), true, 'still playing');
+  // A banner over the top of the screen moves them out of its way.
+  const bannerOver = await tab.evaluate(() => {
+    const b = document.getElementById('banner');
+    b.hidden = false;
+    b.querySelector('span').textContent = 'Plaza is full, 400 people are in, building alone, retrying';
+    b.querySelector('button').hidden = false;
+    return true;
+  });
+  assert.ok(bannerOver);
+  const bannerBox = await box('#banner');
+  for (const other of ['#fps', '#help'])
+    assert.equal(overlap(bannerBox, await box(other)), false, `banner over ${other}`);
+  await tab.evaluate(() => {
+    document.getElementById('banner').hidden = true;
+  });
+  if (shots) await tab.screenshot({ path: `${shots}/phone-playing.png` });
+  console.log('ok a phone has a frame rate; a tap opens and closes the HUD, clear of the controls');
 
   // P is refused with a toast, not a crash.
   await tab.keyboard.press('KeyP');

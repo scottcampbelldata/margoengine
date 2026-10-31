@@ -114,6 +114,8 @@ export function setOverlay(state: 'loading' | 'paused' | 'playing' | 'hidden', t
   const overlay = element('overlay');
   overlay.dataset.state = state;
   overlay.hidden = state === 'playing' || state === 'hidden';
+  // Help reopens this overlay, so it shows only while the overlay does not.
+  element('help').hidden = state !== 'playing' || !document.body.classList.contains('touch');
   element('overlay-status').textContent = text;
 }
 
@@ -135,6 +137,12 @@ export function setTouchUi(on: boolean): void {
   document.body.classList.toggle('touch', on);
   element('overlay').querySelector('.play')!.textContent = on ? 'Tap to play' : 'Click to play';
   element('touch-buttons').hidden = !on;
+  element('fps').hidden = !on;
+}
+
+/** The touch layout's frame rate button. */
+export function setFps(fps: number): void {
+  element('fps').textContent = `${fps.toFixed(0)} FPS`;
 }
 
 /** Shows the Report button (online on Plaza) and sets what it does. */

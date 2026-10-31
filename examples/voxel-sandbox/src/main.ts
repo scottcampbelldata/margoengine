@@ -56,6 +56,7 @@ import {
   Hotbar,
   setBanner,
   setDeterministic,
+  setFps,
   setHud,
   setOverlay,
   setReport,
@@ -400,6 +401,18 @@ async function boot(): Promise<void> {
       fit();
       addEventListener('resize', fit, { signal: events.signal });
     };
+    // The frame rate button opens and closes the full HUD; the help button goes back to the overlay and its instructions,
+    // and the overlay's tap (below) plays on.
+    document.getElementById('fps')!.addEventListener('click', () => toggleHud(), { signal: events.signal });
+    document.getElementById('help')!.addEventListener(
+      'click',
+      () => {
+        touch!.active = false;
+        keys.clear();
+        setOverlay('paused');
+      },
+      { signal: events.signal },
+    );
     if (matchMedia('(pointer: coarse)').matches) touchLayout();
     canvas.addEventListener('click', () => {
       if (!isPlaying() && spawned) void canvas.requestPointerLock?.();
@@ -771,6 +784,7 @@ async function boot(): Promise<void> {
     }
     if (deterministic || now - hudAt < 250) return;
     hudAt = now;
+    setFps(fps);
     const s = voxels.stats,
       [x, y, z] = player.renderPosition,
       facing = ['N', 'W', 'S', 'E'][Math.round((((yaw % (2 * Math.PI)) + 2 * Math.PI) / (Math.PI / 2)) % 4) % 4],

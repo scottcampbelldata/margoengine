@@ -23,6 +23,8 @@
     <button type="button" id="touch-jump">Jump</button>
   </div>
   <button type="button" id="report" hidden>Report griefing</button>
+  <button type="button" id="fps" aria-label="Frame rate. Tap for details." hidden>FPS</button>
+  <button type="button" id="help" aria-label="How to play" hidden>?</button>
   <section id="overlay" data-state="loading" data-webgpu-status>
     <h1>Voxel sandbox</h1>
     <p id="overlay-status" data-webgpu-status role="status">Starting WebGPU</p>
@@ -44,8 +46,12 @@
       <dt>Esc</dt><dd>pause (saves)</dd>
     </dl>
     <dl class="touch-help">
-      <dt>Left side</dt><dd>walk</dd>
-      <dt>Right side</dt><dd>look; tap places, hold breaks</dd>
+      <dt>Left side</dt><dd>drag to walk</dd>
+      <dt>Right side</dt><dd>drag to look</dd>
+      <dt>Tap</dt><dd>place a block</dd>
+      <dt>Hold</dt><dd>break a block</dd>
+      <dt>Jump</dt><dd>jump, swim up</dd>
+      <dt>Fly</dt><dd>fly on / off, Jump goes up</dd>
       <dt>Hotbar</dt><dd>tap or swipe to choose a block</dd>
     </dl>
     <pre id="error" hidden></pre>
