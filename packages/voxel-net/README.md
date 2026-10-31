@@ -187,7 +187,7 @@ to send is never. So both ends watch for silence, and the page's usual handling 
 
 | Option or constant | Default | What it does |
 | --- | --- | --- |
-| `serverTimeout` (client) | 15,000 ms | `connectVoxelNet` gives up on a server that sent nothing for this long, from the start of the connection on: `onError` gets a MargoError `'failed'`, then `onClose` gets `{ code: SERVER_SILENT_CODE, reason: 'server-silent', byClient: false }`, at once, without waiting for the socket's own close. 0 never gives up. |
+| `serverTimeout` (client) | 15,000 ms | `connectVoxelNet` gives up on a server that sent nothing for this long, from the start of the connection on, without waiting for the socket's own close. A spawned player then tries to resume (below). Otherwise, or when that fails, `onError` gets a MargoError `'failed'` and `onClose` gets `{ code: SERVER_SILENT_CODE, reason: 'server-silent', byClient: false }`. 0 never gives up. |
 | `SERVER_SILENT_CODE` | 4408 | That close code. No server sends it. |
 | `heartbeatInterval`, `clientTimeout` (server) | 5,000 ms, 20,000 ms | See the table above. A dead client is gone from the server at most 20 s after its last byte. |
 
@@ -210,6 +210,50 @@ client.onClose = ({ code, byClient }) => {
   console.log(code === SERVER_SILENT_CODE ? 'The server went quiet; joining again' : 'Disconnected; joining again');
 };
 ```
+
+## Resuming a dropped connection
+
+A CDN closes old sockets (Cloudflare from about 15 minutes of age), and phones change networks. `connectVoxelNet` and
+`VoxelBot` come back on their own, with the same player, the same spot and the world they had:
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { connectVoxelNet } from 'margoengine/voxel-net';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }));
+client.onResume = ({ attempt, cause, delay }) => {
+  if (attempt >= 2) console.log(`Reconnecting (${cause}), try ${attempt} in ${Math.round(delay)} ms`);
+};
+client.onResumed = ({ gapMs, chunksResent }) => console.log(`Back after ${gapMs} ms, ${chunksResent} chunks again`);
+client.onClose = ({ code, resumeFailed }) => {
+  if (resumeFailed) console.log(`Could not get back (${resumeFailed}); the connection ended with ${code}`);
+};
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `resume` (client, bot) | on, 5 tries | `false` turns it off. `{ attempts, signal }` sets the tries, and an `AbortSignal` that ends them with `onClose` 1000 `aborted`. |
+| `resumeTimeout` (server) | 30,000 ms | How long a dropped player is kept. 0 turns resume off: no token goes out and a drop frees the player at once. |
+
+- **In the gap** the player is held (no steps are sent) and `edit` returns false and changes nothing. World, chunks and
+  other players stay on screen. `detached` says when it is so. The first try comes within 0.6 s, then after 1, 2, 4 and
+  8 s, each within half of that, and none starts after 30 s.
+- **After it** the server sends again only what the client lost or what changed: chunks written into the dead socket,
+  chunks edited while it was away, and those of its own last edits, so a prediction the server never saw goes back to the
+  truth. `onSpawn` and `onLoaded` do not fire again. Inputs in the gap are not queued: the server would correct them away.
+- **On the server** only a socket that ended with no close (1006) or a client gone silent parks a player. A player who
+  left on purpose, a kick, a server closing or a server that restarted (`resume-unknown`) ends as it always did. Others see
+  the figure go at once and come back with its name. A parked player keeps its `maxPlayers` place, its chunks loaded, and
+  an out queue of at most 8 MiB. `player.connected` is false while it is so; `authenticate` hooks that count places by
+  identity should count connected players only, so that every tab of one line can come back. One line can then hold up to
+  twice its limit, for at most `resumeTimeout`.
+- **Lost for good**: app messages written into a dead socket (`send` and `broadcast` have no acknowledgement). Those sent
+  while the player is parked wait and go out in order. A token is 16 random bytes, works once, and is never in a URL.
+- **Numbers**: `server.metrics` counts `parked { socket, clientSilent }`, `resumed`, `resumeFailed { unknown, expired }`,
+  `replaced`, `chunksResent` and `fullResends`; `client.stats` counts `drops`, `resumes`, `resumeAttempts` and
+  `resumeFailed`.
 
 ## Limits of the prototype
 

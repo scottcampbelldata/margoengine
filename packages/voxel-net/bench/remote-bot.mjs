@@ -22,6 +22,8 @@ function fresh() {
     joinTimes: [],
     rtts: [],
     closes: [],
+    drops: [],
+    resumes: [],
     connectErrors: [],
     bytesBase: new Map(),
     receipts: [],
@@ -43,7 +45,7 @@ setInterval(() => {
 // One ping per bot every 5 s, the way round the whole path: bot, Cloudflare, nginx, the shard's event loop and back.
 setInterval(() => {
   for (const bot of bots) {
-    if (bot.closeCode !== undefined || bot.pingAt) continue;
+    if (bot.closeCode !== undefined || bot.pingAt || bot.client.detached) continue;
     bot.pingAt = clock();
     bot.connection.ping();
   }
@@ -149,16 +151,28 @@ async function play(id) {
     bot.id = id;
     bot.home = home;
     bot.asked = asked;
-    bot.connection.onpong = () => {
-      if (bot.pingAt) window.rtts.push(clock() - bot.pingAt);
-      bot.pingAt = 0;
+    const pong = () => {
+        if (bot.pingAt) window.rtts.push(clock() - bot.pingAt);
+        bot.pingAt = 0;
+      },
+      age = () => Math.round((clock() - asked) / 1000);
+    bot.connection.onpong = pong;
+    // Each drop with its age and cause, then how it came out: what a run through a CDN is for.
+    bot.client.onResume = ({ attempt, cause }) => {
+      if (attempt > 1) return;
+      window.drops.push([cause, (clock() - asked) / 1000]);
+      console.log(`drop ${cause} age ${age()} s at ${new Date().toISOString()}`);
     };
-    const closed = bot.connection.onclose;
-    bot.connection.onclose = (code, reason) => {
-      closed(code, reason);
+    bot.client.onResumed = ({ gapMs, chunksResent }) => {
+      bot.connection.onpong = pong; // a new socket
+      bot.pingAt = 0;
+      window.resumes.push([gapMs, chunksResent]);
+      console.log(`resumed after ${Math.round(gapMs)} ms, ${chunksResent} chunks again, age ${age()} s`);
+    };
+    bot.client.onClose = ({ code, reason, resumeFailed }) => {
       window.closes.push([code, reason, (clock() - asked) / 1000]);
       console.log(
-        `close ${code} ${reason} age ${Math.round((clock() - asked) / 1000)} s, ${bot.connection.bytesIn} bytes in, at ${new Date().toISOString()}`,
+        `close ${code} ${reason}${resumeFailed ? `, resume failed: ${resumeFailed}` : ''} age ${age()} s, ${bot.bytesIn} bytes in, at ${new Date().toISOString()}`,
       );
     };
     bot.client.onLoaded = () => {
@@ -190,13 +204,13 @@ async function play(id) {
 process.on('message', (message) => {
   if (message.type === 'mark') {
     window = fresh();
-    window.bytesBase = new Map(bots.map((b) => [b, b.connection.bytesIn]));
+    window.bytesBase = new Map(bots.map((b) => [b, b.bytesIn]));
     process.send({ type: 'marked' });
   } else if (message.type === 'report') {
     const cpu = process.cpuUsage(window.cpu),
       end = clock();
     let bytesIn = 0;
-    for (const bot of bots) bytesIn += bot.connection.bytesIn - (window.bytesBase.get(bot) ?? 0);
+    for (const bot of bots) bytesIn += bot.bytesIn - (window.bytesBase.get(bot) ?? 0);
     process.send({
       type: 'report',
       seconds: (end - window.at) / 1000,
@@ -207,6 +221,8 @@ process.on('message', (message) => {
       joinTimes: window.joinTimes,
       rtts: window.rtts,
       closes: window.closes,
+      drops: window.drops,
+      resumes: window.resumes,
       connectErrors: window.connectErrors,
       enteredAfterFull: window.enteredAfterFull,
       corrections: bots.reduce((a, b, i) => a + b.client.stats.corrections - (window.corrections[i] ?? 0), 0),

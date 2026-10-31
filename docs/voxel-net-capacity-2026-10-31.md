@@ -97,7 +97,9 @@ ceiling.
   was measured with the fix.
 - **Fixed in code, not measured**: a page playing alone asked `/join` every 30 s and each ask held a place for 5 s. It now uses
   `?peek=1`, which holds nothing.
-- **Open, not a server bug**: the 1006 closes on old connections come from the CDN proxy. See "Old connections" below.
+- **Not a server bug**: the 1006 closes on old connections come from the CDN proxy ("Old connections" below). A page now
+  resumes in place through them, protocol 4; the one `client-silent` close stays unexplained, and shows in `/metrics` as a
+  park of its own kind.
 
 ## Old connections
 

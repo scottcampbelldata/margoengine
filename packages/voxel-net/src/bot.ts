@@ -129,7 +129,7 @@ export class VoxelBot {
           next = await connectWebSocket(options.url, options.headers ? { headers: options.headers } : {});
         if (mine !== opening) {
           next.close();
-          throw new Error('too late');
+          throw new RangeError('This connection came after its try was over; the next try makes its own');
         }
         return this.#transport(next);
       },

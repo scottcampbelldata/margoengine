@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3968245,
+  "total": 3973606,
   "history": [
     {
       "date": "2026-10-24",
@@ -928,6 +928,12 @@
       "grew": 1
     },
     {
+      "date": "2026-10-31",
+      "commit": "2c977c21d",
+      "reason": "voxel-net app messages (protocol 3): the generic app message, VoxelServer.send and broadcast, client.onApp and MAX_APP_BYTES; gzip client +120 B, server +179 B, bot +81 B",
+      "grew": 1
+    },
+    {
       "date": "2026-10-30",
       "commit": "0882df471",
       "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
@@ -989,8 +995,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "2c977c21d",
-      "reason": "voxel-net app messages (protocol 3): the generic app message, VoxelServer.send and broadcast, client.onApp and MAX_APP_BYTES; gzip client +120 B, server +179 B, bot +81 B",
+      "commit": "87e007e26",
+      "reason": "voxel-net server: inputs held on the server's own chunks fold past 256 messages instead of closing the player, and held chunks go first in the generator queue; server +333 B gzip, client unchanged",
       "grew": 1
     },
     {
@@ -1067,9 +1073,9 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "87e007e26",
-      "reason": "voxel-net server: inputs held on the server's own chunks fold past 256 messages instead of closing the player, and held chunks go first in the generator queue; server +333 B gzip, client unchanged",
-      "grew": 1
+      "commit": "b846a40a9",
+      "reason": "voxel-net resume (protocol 4): a dropped player is parked and comes back in place, because every socket is cut by the CDN at about 15 minutes; gzip client +1,634 B, server +1,146 B, bot +1,565 B (it holds the client)",
+      "grew": 3
     }
   ],
   "items": {
@@ -1416,9 +1422,9 @@
     "@margoengine/voxel-edit/pick": 7239,
     "@margoengine/voxel-edit/sparse": 6873,
     "@margoengine/voxel-edit/vox": 12202,
-    "@margoengine/voxel-net": 6513,
-    "@margoengine/voxel-net/bot": 7936,
-    "@margoengine/voxel-net/server": 15006,
+    "@margoengine/voxel-net": 8267,
+    "@margoengine/voxel-net/bot": 9750,
+    "@margoengine/voxel-net/server": 16799,
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1313,
     "@margoengine/voxel/bevel": 2457,

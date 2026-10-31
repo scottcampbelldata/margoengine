@@ -368,6 +368,9 @@ function summarizeStep(
         3,
       ),
       closes: closes(holdReports),
+      drops: holdReports.reduce((a, rep) => a + rep.drops.length, 0),
+      resumes: holdReports.reduce((a, rep) => a + rep.resumes.length, 0),
+      chunksResent: holdReports.reduce((a, rep) => a + rep.resumes.reduce((n, [, chunks]) => n + chunks, 0), 0),
       closeAges: summarizeCloses(
         holdReports.flatMap((rep) => rep.closes.map(([code, reason, age]) => ({ code, reason, age }))),
       ),

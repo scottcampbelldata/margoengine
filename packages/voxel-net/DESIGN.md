@@ -123,6 +123,25 @@ gets 5 s more before losing its slot. Three heartbeats fit in the client's wait,
 Closing a socket whose peer stopped reading never finishes on its own, so `WebSocketConnection.close` cuts it off after
 2 s. Without that, the dead client's queued bytes stayed in memory and `VoxelServer.close()` never resolved.
 
+## Resume (protocol 4, 2026-10-31)
+
+Cloudflare closes every proxied WebSocket from about 15 minutes of age, whatever it carries
+(`docs/voxel-net-capacity-2026-10-31.md`, "Old connections"), so a game behind a CDN loses every socket several times an
+hour. A reload through /join for each one costs a player their spot and a view of chunks. So a socket is not the player:
+a playing client whose socket ended, or that went silent, is parked with its id, place, `sim` refs and `sent` set for
+`resumeTimeout`. A hello with its one-use token moves a fresh connection into it.
+
+What a dead socket can hide is told by three lists, none a guess. `chunks` in the hello against `chunksSent`, with a ring
+of the last 512 keys written, gives the chunks lost; a negative or too large count clears `sent`, counted as a full
+resend. Per client the keys of `blocks` messages and unloads written in the last `clientTimeout` go out again, as does
+every chunk edited while parked. `stale` lists the chunks of the client's last 64 edits, so a prediction the server never
+saw goes back. The client takes a chunk sent again in place of the old copy, with no hole.
+
+Ruled out: queuing inputs or edits in the gap and replaying them (the server's 0.5 s bank would correct them away, and an
+edit is refused at once and seen to be, never lost in silence); a client id in the URL (a token in a binary frame stays out
+of logs, and one that was stolen lasts one session); keeping figures on others' screens through the gap (decision 3 of the
+plan: a figure with no player behind it cannot be walked around).
+
 ## Join
 
 1. Client connects and sends `hello`; the server answers `welcome` (or closes on a wrong version or full server).
