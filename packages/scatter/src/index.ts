@@ -123,6 +123,17 @@ export interface ScatterOptions {
    */
   edgeShrink?: number;
   /**
+   * World units from the camera within which nothing is drawn (default 0: off), so another layer can take over nearby,
+   * such as stored objects in front of far stand-ins. Instances keep their places and random numbers: those beyond
+   * `inner + innerFade` are the same as without it. Measured in 3D, like the LOD distances; must be below the last one.
+   */
+  inner?: number;
+  /**
+   * World units past `inner` over which instances appear one by one instead of all at `inner` (default 0: a sharp
+   * circle). Each instance takes its own start from a hash, so the band thins toward the camera and nothing changes size.
+   */
+  innerFade?: number;
+  /**
    * Shades instances as grass blades: upright geometry whose local origin is the root and whose tallest vertex is the
    * tip (default off). Albedo darkens toward the root; the shading normal blends from the ground normal at the root to
    * the blade's own normal at the tip, and fully to the ground normal by the last LOD distance, so a field shades like
@@ -347,7 +358,7 @@ function shadowDepth(d: GPUDevice, code: string): GPURenderPipeline {
   });
 }
 /** Whether the frame carries the world-rectangle fields (follow offsets and bounds). */
-const extended = (o: ScatterOptions) => !!(o.bounds || o.follow || o.densityMap);
+const extended = (o: ScatterOptions) => !!(o.bounds || o.follow || o.densityMap || o.inner);
 
 function validateWorld(o: ScatterOptions): void {
   const b = o.bounds;
@@ -364,8 +375,8 @@ function validateWorld(o: ScatterOptions): void {
 }
 
 /**
- * The distribute shader for a set of options. Without bounds, densityMap and follow it is the original text, byte for
- * byte; each option rewrites only its own part.
+ * The distribute shader for a set of options. Without bounds, densityMap, follow and inner it is the original text,
+ * byte for byte; each option rewrites only its own part.
  */
 export function scatterCullShader(o: ScatterOptions): string {
   if (!extended(o)) return cull;
@@ -398,6 +409,12 @@ export function scatterCullShader(o: ScatterOptions): string {
         ' for(var j=0u;j<u32(frame.eye.w);j++){',
         ` let dm=(p.xz-frame.bounds.xy)/(frame.bounds.zw-frame.bounds.xy);if(any(dm<vec2f(0.0))||any(dm>=vec2f(1.0))){return;}\n if(hash(${o.follow ? 'key' : 'i'}*7u+6u)>=textureLoad(densityMap,vec2i(dm*vec2f(textureDimensions(densityMap))),0).r){return;}\n for(var j=0u;j<u32(frame.eye.w);j++){`,
       );
+  if (o.inner)
+    // Slot 7 of the instance's hashes is its own (slots 1 to 6 are placement); offset.z is inner, offset.w the band.
+    code = code.replace(
+      'if(d>frame.lod.z){return;}',
+      `if(d>frame.lod.z||d<frame.offset.z+frame.offset.w*hash(${o.follow ? 'key' : 'i'}*7u+7u)){return;}`,
+    );
   return code;
 }
 
@@ -501,6 +518,8 @@ export class Scatter implements EnginePlugin {
       alignToGround = 0,
       sink = 0,
       edgeShrink = 0,
+      inner = 0,
+      innerFade = 0,
     } = options;
     if (
       this.geometries.length !== 3 ||
@@ -547,9 +566,12 @@ export class Scatter implements EnginePlugin {
       throw new RangeError('Scatter alignToGround must be 0-1 and sink a distance from 0 to 100000');
     if (!Number.isFinite(edgeShrink) || edgeShrink < 0 || edgeShrink > 100000)
       throw new RangeError('Scatter edgeShrink must be a distance from 0 to 100000');
+    if (!Number.isFinite(inner) || inner < 0 || inner >= lod[2] || !Number.isFinite(innerFade) || innerFade < 0)
+      throw new RangeError('Scatter inner must be a distance from 0 up to below the last lod, innerFade 0 or more');
     if (options.wind) validateWind(options.wind);
     validateWorld(options);
     if (options.bounds) this.values.set(options.bounds, 84);
+    if (inner) this.values.set([inner, innerFade], 82);
     const exclusions = options.exclusions ?? [];
     validateExclusions(exclusions);
     this.exclusionValues = new Float32Array(Math.max(1, exclusions.length) * 4);

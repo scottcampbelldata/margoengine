@@ -39,6 +39,27 @@ default 0) scales instances down to zero over that last stretch instead of
 cutting them at it, so the far edge of a grass field recedes without popping;
 it needs no fade mask or `discard`, so it also suits the phone tier.
 
+`inner` (world units, default 0: off) leaves a hole round the camera, so another
+layer can take over nearby, such as stored objects in front of far stand-ins.
+`innerFade` (world units, default 0: a sharp circle) is a band past `inner` where
+instances appear one by one, each at its own hashed distance. Both are measured in
+3D like the LOD distances, and `inner` must be below the last one. Instances beyond
+`inner + innerFade` are the very same ones as without the option, and without it the
+distribute shader stays the same text.
+
+```ts
+import { Scatter } from '@margoengine/scatter';
+
+const farTrees = Scatter.attach(engine, standIn, {
+  count: 100_000,
+  area: [5000, 5000],
+  follow: true,
+  lod: [1000, 2000, 2500],
+  inner: 1000,
+  innerFade: 256,
+});
+```
+
 With `lodFade: 0`, or one Geometry for every ring, no instance can fade, so the
 shaders are compiled without the fade's `discard`; lit scatter also compiles out
 core's back-face `discard` (single-sided materials cull back faces in the

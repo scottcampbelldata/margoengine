@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter inner check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof for inner.browser.mjs: reads the distribute pass's output, the world positions in the three LOD rings.
+import {Engine,Geometry} from '/packages/core/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+const eye=[3.5,4,-2.25];
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:eye,target:[3.5,4,300],near:0.5,far:2000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// The instance buffers are storage only, so a compute pass copies them where they can be read.
+const pipeline=device.createComputePipeline({layout:'auto',compute:{entryPoint:'main',module:device.createShaderModule({code:'@group(0) @binding(0) var<storage,read> source:array<vec4f>;@group(0) @binding(1) var<storage,read_write> to:array<vec4f>;@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){if(id.x<arrayLength(&to)){to[id.x]=source[id.x*2u];}}'})}});
+async function positions(scatter){
+ const commands=device.createBuffer({size:60,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ let encoder=device.createCommandEncoder();encoder.copyBufferToBuffer(scatter.commands,0,commands,0,60);device.queue.submit([encoder.finish()]);
+ await commands.mapAsync(GPUMapMode.READ);const counts=new Uint32Array(commands.getMappedRange()).slice();commands.unmap();commands.destroy();
+ const out=[];
+ for(let ring=0;ring<3;ring++){
+  const n=counts[ring*5+1];if(!n)continue;
+  const to=device.createBuffer({size:n*16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:n*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  encoder=device.createCommandEncoder();const pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+  pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:scatter.instances[ring]}},{binding:1,resource:{buffer:to}}]}));
+  pass.dispatchWorkgroups(Math.ceil(n/64));pass.end();encoder.copyBufferToBuffer(to,0,staging,0,n*16);device.queue.submit([encoder.finish()]);
+  await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange());
+  for(let i=0;i<n;i++)out.push([data[i*4],data[i*4+1],data[i*4+2]]);
+  staging.unmap();to.destroy();staging.destroy();
+ }
+ return out;
+}
+const box=new Geometry([-1,0,0,1,0,0,0,1,0],[0,0,1,0,0,1,0,0,1],[0,1,2]);
+async function run(options){
+ const scatter=Scatter.attach(engine,box,{count:60000,area:[800,800],lodFade:0,lod:[40,120,400],seed:9,...options});
+ device.pushErrorScope('validation');
+ await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+ const e=await device.popErrorScope();if(e)errors.push(e.message);
+ const list=await positions(scatter);scatter.dispose();
+ return list.map(p=>({key:p.join(),d:Math.hypot(p[0]-eye[0],p[1]-eye[1],p[2]-eye[2])}));
+}
+function compare(base,got,inner,fade){
+ const far=l=>l.filter(p=>p.d>=inner+fade).map(p=>p.key).sort(),a=far(base),b=far(got),share=(lo,hi)=>got.filter(p=>p.d>=lo&&p.d<hi).length/Math.max(1,base.filter(p=>p.d>=lo&&p.d<hi).length);
+ return {baseInside:base.filter(p=>p.d<inner).length,inside:got.filter(p=>p.d<inner).length,beyond:b.length,baseBeyond:a.length,sameBeyond:a.join(';')===b.join(';'),nearShare:share(inner,inner+fade/2),farShare:share(inner+fade/2,inner+fade)};
+}
+window.check={
+ async run(){
+  const base=await run({}),moving=await run({follow:true}),
+   sharp=await run({inner:100}),band=await run({inner:100,innerFade:80}),follow=await run({inner:100,innerFade:80,follow:true});
+  return {cases:{sharp:compare(base,sharp,100,0),band:compare(base,band,100,80),follow:compare(moving,follow,100,80)},errors:errors.splice(0)};
+ }
+};
+window.ready=true;
+</script></body></html>

@@ -24,6 +24,26 @@ test('off path: without bounds, densityMap and follow the distribute shader and 
   effect.dispose();
 });
 
+test('inner: only its own shader part, on an extended frame, and off at 0', () => {
+  const base = scatterCullShader({}),
+    plain = scatterCullShader({ inner: 100 }),
+    follow = scatterCullShader({ inner: 100, follow: true });
+  assert.equal(sha(scatterCullShader({ inner: 0, innerFade: 20 })), ORIGINAL);
+  assert.equal(
+    plain.replace('||d<frame.offset.z+frame.offset.w*hash(i*7u+7u)', '').replace(',offset:vec4f,bounds:vec4f', ''),
+    base,
+  );
+  assert.match(follow, /d<frame\.offset\.z\+frame\.offset\.w\*hash\(key\*7u\+7u\)/);
+  const h = optionalGPU(),
+    effect = new Scatter(box(), { count: 16, inner: 30, innerFade: 5 });
+  h.engine.use(effect);
+  h.frame();
+  assert.equal(h.resources.filter((r) => r.size === 352).length >= 1, true, 'an 88-float frame');
+  effect.dispose();
+  for (const bad of [{ inner: -1 }, { inner: 120 }, { inner: Number.NaN }, { inner: 10, innerFade: -1 }])
+    assert.throws(() => new Scatter(box(), bad), /Scatter inner must be/, JSON.stringify(bad));
+});
+
 test('each world option rewrites only its own part of the shader', () => {
   const base = scatterCullShader({}),
     bounds = scatterCullShader({ bounds: [0, 0, 100, 100] }),

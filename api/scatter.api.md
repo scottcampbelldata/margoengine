@@ -131,6 +131,8 @@ export interface ScatterOptions {
     alignToGround?: number;
     sink?: number;
     edgeShrink?: number;
+    inner?: number;
+    innerFade?: number;
     blades?: ScatterBlades;
     bounds?: readonly [number, number, number, number];
     densityMap?: () => GPUTexture | undefined;
