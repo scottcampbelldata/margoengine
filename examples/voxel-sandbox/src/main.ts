@@ -536,7 +536,7 @@ async function boot(): Promise<void> {
     if (now - lastReport < REPORT_EVERY) return toast('One report a minute');
     lastReport = now;
     const [x, , z] = player.position;
-    sendReport(routerUrl, { shard, x, z }).then(
+    sendReport(reportRouter ?? routerUrl, { shard, x, z }).then(
       () => toast('Report sent. Thank you.'),
       (error) => {
         console.warn(error);
@@ -635,6 +635,7 @@ async function boot(): Promise<void> {
     worldId: string | undefined,
     // The seed and floor of the world the router sent us to; unknown on a direct ?server= (the welcome has neither).
     worldInfo: { seed: number; floor: number } | undefined,
+    reportRouter: string | undefined, // the box running this player's shard, when it is not the one that answered /join
     lastReport = Number.NEGATIVE_INFINITY,
     lastNotice = Number.NEGATIVE_INFINITY;
   const edits = new EditWatch();
@@ -1139,6 +1140,7 @@ async function boot(): Promise<void> {
       if (answer.kind === 'full') return goSolo('full', answer.online);
       shard = answer.shard;
       worldId = answer.world;
+      reportRouter = answer.router;
       if (answer.seed !== undefined && answer.floor !== undefined)
         worldInfo = { seed: answer.seed, floor: answer.floor };
       // The time since the answer is the engine's, not the network's: the welcome gets its own limit from here.

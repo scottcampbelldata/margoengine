@@ -73,13 +73,16 @@ export type JoinAnswer =
       /** The world's seed and its floor (the square's height), when the router says; both or neither. */
       seed: number | undefined;
       floor: number | undefined;
+      router?: string;
     }
   | { kind: 'full'; online: number | undefined }
   | { kind: 'starting'; retryIn: number };
 
 /**
  * Reads the JSON of GET /join: `{url, shard, world, seed, floor}` joins that shard (the last two are optional), `{full: true, online}` means no room, and
- * `{starting: true, retryIn}` means between worlds or restarting, so ask again in `retryIn` seconds.
+ * `{starting: true, retryIn}` means between worlds or restarting, so ask again in `retryIn` seconds. A shard on another
+ * box also names that box's `router` (http or https), which takes this player's griefing reports; any other value is
+ * ignored.
  * @throws TypeError for anything else.
  */
 export function parseJoin(value: unknown): JoinAnswer {
@@ -94,6 +97,7 @@ export function parseJoin(value: unknown): JoinAnswer {
       world: v.world === undefined ? undefined : String(v.world),
       seed: Number.isInteger(v.seed) && Number.isInteger(v.floor) ? (v.seed as number) : undefined,
       floor: Number.isInteger(v.seed) && Number.isInteger(v.floor) ? (v.floor as number) : undefined,
+      ...(typeof v.router === 'string' && /^https?:\/\/\S/.test(v.router) ? { router: v.router } : {}),
     };
   throw new TypeError(
     `The Plaza router answered /join with ${JSON.stringify(value)}; expected {url}, {full} or {starting}`,

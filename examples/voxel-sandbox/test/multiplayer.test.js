@@ -11,6 +11,7 @@ import {
   parseJoin,
   plazaName,
   resumeBanner,
+  sendReport,
   soloBanner,
 } from '../src/multiplayer.ts';
 import { isPlazaProtected as areaRule } from '../src/plaza-area.ts';
@@ -242,4 +243,27 @@ test('EditWatch counts the edits the server put back, once, after its delay', ()
   watch.add(8, 8, 8, 1, 0);
   watch.clear();
   assert.equal(watch.settle(9000, read), 0);
+});
+
+test('/join names the box running the shard only with a http or https router; griefing reports go there', async () => {
+  const place = { full: false, url: 'wss://box2.example/s/0', shard: 0, world: 'w' };
+  assert.equal(parseJoin({ ...place, router: 'https://box2.example' }).router, 'https://box2.example');
+  assert.equal(parseJoin({ ...place, router: 'http://127.0.0.1:9' }).router, 'http://127.0.0.1:9');
+  assert.equal('router' in parseJoin(place), false);
+  for (const router of ['', 'wss://box2.example', 'javascript:alert(1)', 'https://', 3, null, {}])
+    assert.equal('router' in parseJoin({ ...place, router }), false, String(router));
+  assert.deepEqual(parseJoin({ full: true, online: 2, router: 'https://box2.example' }), { kind: 'full', online: 2 });
+
+  const realFetch = globalThis.fetch,
+    asked = [];
+  globalThis.fetch = async (url, init) => {
+    asked.push({ url: String(url), method: init.method });
+    return new Response(null, { status: 202 });
+  };
+  try {
+    await sendReport(parseJoin({ ...place, router: 'https://box2.example' }).router, { shard: 0, x: 1, z: 2 });
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(asked, [{ url: 'https://box2.example/report', method: 'POST' }]);
 });
