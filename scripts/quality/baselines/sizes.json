@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3966200,
+  "total": 3966816,
   "history": [
     {
       "date": "2026-10-24",
@@ -965,6 +965,12 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "d27f31df4",
+      "reason": "voxel-net names on the wire (names message, cleanPlayerName, filterName) and exportEdits and importEdits for Plaza snapshots and rollback; server-only code in the Node entry, client +421 B",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-31",
       "commit": "175c6ec2d",
       "reason": "new package @margoengine/tilemap (row 25 J3a): types and small helpers, 1.4 kB",
       "grew": 1
@@ -1037,8 +1043,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "d27f31df4",
-      "reason": "voxel-net names on the wire (names message, cleanPlayerName, filterName) and exportEdits and importEdits for Plaza snapshots and rollback; server-only code in the Node entry, client +421 B",
+      "commit": "c065fe3e1",
+      "reason": "voxel-net heartbeat, both ways: a dead network reaches onClose with SERVER_SILENT_CODE (serverTimeout), dead clients freed (clientTimeout, pings), close linger; gzip client +271 B, server +342 B, bot +79 B",
       "grew": 2
     }
   ],
@@ -1386,8 +1392,8 @@
     "@margoengine/voxel-edit/pick": 7239,
     "@margoengine/voxel-edit/sparse": 6873,
     "@margoengine/voxel-edit/vox": 12202,
-    "@margoengine/voxel-net": 6209,
-    "@margoengine/voxel-net/bot": 7624,
+    "@margoengine/voxel-net": 6513,
+    "@margoengine/voxel-net/bot": 7936,
     "@margoengine/voxel-net/server": 14553,
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1313,

@@ -62,6 +62,8 @@ Every limit has a safe default; set them on `new VoxelServer({...})`.
 | `maxPending` | 64 | Connections that have not joined yet (no hello, or still in `authenticate`), all together. The next upgrade gets HTTP 503 before any player object or timer exists. |
 | `maxPerAddress` | 8 | The same, per IP address; the next gets HTTP 429. Behind a reverse proxy every client has the proxy's address: raise it there. |
 | `helloTimeout` | 3,000 ms | Time a new connection has to send its hello; then it is closed with 1008. |
+| `heartbeatInterval` | 5,000 ms | A client that got no message for this long gets a `heartbeat` message, and one that sent no bytes for this long gets a WebSocket ping. Players with traffic get neither. Keep it well below the clients' `serverTimeout`. |
+| `clientTimeout` | 20,000 ms | A client that sent not one byte for this long, pongs included, is closed with 1008 `'client-silent'` and its slot, counts and chunks are freed, within one tick of the time. Must exceed `heartbeatInterval`. |
 | `authenticate` | none | `(req, hello) => boolean \| string \| Promise<...>`, called on the upgrade request (`hello` undefined: read a cookie or token header) and again on the hello (`{ name }`). `true` lets the client on, a non-empty string too and becomes `player.identity`, anything else closes it with 1008 `'not authorized'`. A throw, or a call longer than `authTimeout`, closes it with 1011 (reason `auth-failed...` or `auth-timeout...`) and goes to `onError`. |
 | `authTimeout` | 5,000 ms | Time each `authenticate` call may take. |
 | `maxEditedChunks` | 65,536 | Edited chunks held in memory. Past it the least recently edited one is saved to `store` and dropped, and read back when needed. Without a store, a player edit to one more chunk is refused and `onError` gets a MargoError `'failed'` naming the option. |
@@ -113,7 +115,7 @@ or angle brackets, at most 2 stacked combining marks, whitespace collapsed. Stil
 | `filterName` | none | `(name, id) => string`: your rule for names, such as a word list or a fallback. Its result is cleaned too. A throw, or a result that is not a string, goes to `onError` and closes the client with 1011 `'name-failed'`. |
 | `server.exportEdits()` | | Resolves to a `Map` of `'cx,cy,cz'` to a copy of each chunk edited since the server started, including those past `maxEditedChunks` in the `store`. A store cannot be listed, so what it holds from an earlier run and nobody edited in this one is left out. |
 | `server.importEdits(map)` | | Makes the edited chunks exactly `map`: its chunks replace what the world holds, other edited chunks go back to the generator's, matching ones are left alone. Clients holding a changed chunk get it again. Everything is checked first, so a rejection changes nothing. Works before `listen`. With a `store`, going back to the generator's needs the store's `delete(key)`. |
-| `client.onClose` | does nothing | `({ code, reason, byClient }) => void`: called once when a `connectVoxelNet` connection has ended, however it ended, after any `onError`. A clean server shutdown is code 1001 with the server's reason and no `onError`; `byClient` is true after `client.close()`. Use it to rejoin; no second socket is needed. With your own transport, call it yourself. |
+| `client.onClose` | does nothing | `({ code, reason, byClient }) => void`: called once when a `connectVoxelNet` connection has ended, however it ended, after any `onError`. A clean server shutdown is code 1001 with the server's reason and no `onError`; a silent server is `SERVER_SILENT_CODE` (see below); `byClient` is true after `client.close()`. Use it to rejoin; no second socket is needed. With your own transport, call it yourself. |
 
 ```ts
 import { readFile, writeFile } from 'node:fs/promises';
@@ -134,6 +136,37 @@ await server.close();
 
 Breaking change (2026-10-31): `PROTOCOL_VERSION` is 2. Server and clients must be built from the same version; a client
 on another one is closed with 1008 and a reason naming both, which `connectVoxelNet` now passes to `onError`.
+
+## A dead network
+
+A phone that walks out of Wi-Fi or a dropped route shows nothing until TCP gives up, which for a connection with nothing
+to send is never. So both ends watch for silence, and the page's usual handling takes over:
+
+| Option or constant | Default | What it does |
+| --- | --- | --- |
+| `serverTimeout` (client) | 15,000 ms | `connectVoxelNet` gives up on a server that sent nothing for this long, from the start of the connection on: `onError` gets a MargoError `'failed'`, then `onClose` gets `{ code: SERVER_SILENT_CODE, reason: 'server-silent', byClient: false }`, at once, without waiting for the socket's own close. 0 never gives up. |
+| `SERVER_SILENT_CODE` | 4408 | That close code. No server sends it. |
+| `heartbeatInterval`, `clientTimeout` (server) | 5,000 ms, 20,000 ms | See the table above. A dead client is gone from the server at most 20 s after its last byte. |
+
+Silence is counted in firings of a timer on the client and in ticks on the server, never on a clock, so a thread that was
+stuck (a long frame, a throttled background tab, a stalled server) does not blame the other end for messages that are
+waiting behind it: one late firing is one fifteenth of the timeout. A hidden tab whose timers fire once a minute takes
+longer to notice a dead server, and catches up when it is shown. The server's pings are answered by the browser itself,
+so a hidden tab keeps its slot. Cost: 1 byte per second down and 1.2 up for a hidden lone player, and nothing for a player
+with traffic (`docs/voxel-net-capacity-2026-10-21.md`).
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { connectVoxelNet, SERVER_SILENT_CODE } from 'margoengine/voxel-net';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }), { serverTimeout: 15_000 });
+client.onClose = ({ code, byClient }) => {
+  if (byClient) return;
+  console.log(code === SERVER_SILENT_CODE ? 'The server went quiet; joining again' : 'Disconnected; joining again');
+};
+```
 
 ## Limits of the prototype
 

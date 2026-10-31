@@ -14,7 +14,8 @@ const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11',
   BINARY = 2,
   CLOSE = 8,
   PING = 9,
-  PONG = 10;
+  PONG = 10,
+  CLOSE_LINGER = 2000; // milliseconds a closing socket waits for its peer before it is destroyed
 
 /** `Sec-WebSocket-Accept` for a `Sec-WebSocket-Key`: base64 of the SHA-1 of the key and the RFC 6455 GUID. */
 export const acceptKey = (key: string): string =>
@@ -79,6 +80,7 @@ export class WebSocketConnection {
   /** The close not yet reported, when the connection ended before onclose was set or before early messages left. */
   #ended: [number, string] | undefined;
   #flushing = false;
+  #linger: ReturnType<typeof setTimeout> | undefined;
   /**
    * Takes over `socket` after the opening handshake. `client` is true on the connecting end (its frames are masked).
    * `head` holds bytes that arrived with the handshake.
@@ -98,7 +100,10 @@ export class WebSocketConnection {
       socket.end();
       this.#end(1006, 'socket ended');
     });
-    socket.on('close', () => this.#end(1006, 'socket closed'));
+    socket.on('close', () => {
+      clearTimeout(this.#linger);
+      this.#end(1006, 'socket closed');
+    });
     socket.on('error', () => this.#end(1006, 'socket error'));
     if (head.length) this.#data(head);
   }
@@ -114,6 +119,13 @@ export class WebSocketConnection {
   send(data: Uint8Array): void {
     if (!this.closed) this.#frame(BINARY, data);
   }
+  /**
+   * Sends a ping frame. The other end's WebSocket answers by itself, a browser's too while its page's scripts are
+   * throttled, and the answer shows in {@link WebSocketConnection.bytesIn}. Does nothing once the connection is closing.
+   */
+  ping(): void {
+    if (!this.closed) this.#frame(PING, EMPTY);
+  }
   /** Holds writes until {@link WebSocketConnection.uncork}, so a burst of messages leaves in few packets. */
   cork(): void {
     this.#socket.cork();
@@ -122,7 +134,10 @@ export class WebSocketConnection {
   uncork(): void {
     this.#socket.uncork();
   }
-  /** Starts the closing handshake with `code` (default 1000) and `reason`, then ends the socket. */
+  /**
+   * Starts the closing handshake with `code` (default 1000) and `reason`, then ends the socket. A peer that has not
+   * finished closing 2 s later is cut off, so one that stopped reading cannot hold the socket and its unsent bytes.
+   */
   close(code = 1000, reason = ''): void {
     if (this.#sentClose || this.#closed) return;
     const text = Buffer.from(reason.slice(0, 120)),
@@ -131,8 +146,13 @@ export class WebSocketConnection {
     text.copy(body, 2);
     this.#frame(CLOSE, body);
     this.#sentClose = true;
-    this.#socket.end();
+    this.#shut();
     this.#end(code, reason);
+  }
+  #shut(): void {
+    this.#socket.end();
+    this.#linger = setTimeout(() => this.#socket.destroy(), CLOSE_LINGER);
+    this.#linger.unref();
   }
   #end(code: number, reason: string): void {
     if (this.#closed) return;
@@ -268,7 +288,7 @@ export class WebSocketConnection {
       if (!this.#sentClose) {
         this.#frame(CLOSE, payload.length ? payload.subarray(0, 2) : EMPTY);
         this.#sentClose = true;
-        this.#socket.end();
+        this.#shut();
       }
       this.#end(code, reason);
     } else if (opcode !== PONG) this.#fail(1002, `unknown opcode ${opcode}`);

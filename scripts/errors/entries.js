@@ -690,6 +690,9 @@ export const entries = [
     kind: 'family',
     messages: [
       'The voxel-net server closed the connection with <code>; check that it is running and that server and client are the same version',
+      'The voxel-net server sent nothing for <ms> ms (serverTimeout); the network or the server is gone, so join again',
+      'VoxelServer clientTimeout <ms> must exceed heartbeatInterval <ms>; a client needs time to answer a ping',
+      'serverTimeout <ms> must be finite and >= 0 milliseconds; 0 never gives up',
       'VoxelServer closed during importEdits, so nothing was imported; call importEdits before close',
       'VoxelServer filterName must be a function (name, id) => string',
       "VoxelServer filterName returned <type>; return the name to show, or '' for none",
@@ -704,7 +707,7 @@ export const entries = [
       'names name must be a string',
     ],
     cause:
-      'A client and server of different protocol versions met, or the server refused the page or stopped; a `filterName` hook returned something other than a string; or `importEdits` got something other than the output of `exportEdits` for this game.',
-    fix: 'Build server and client from the same voxel-net version (`PROTOCOL_VERSION`), and read the close reason in the message. Return a string from `filterName`. Pass `importEdits` the `Map` that `exportEdits` returned, on a server with the same block types, and give a `VoxelEditStore` a `delete(key)` when chunks must go back to the generator.',
+      'A client and server of different protocol versions met, or the server refused the page or stopped, or nothing arrived for `serverTimeout` on a dead network; a `filterName` hook returned something other than a string; or `importEdits` got something other than the output of `exportEdits` for this game.',
+    fix: "Build server and client from the same voxel-net version (`PROTOCOL_VERSION`), and read the close reason in the message. After a silent server, join again; keep `serverTimeout` well above the server's `heartbeatInterval`, and `clientTimeout` above `heartbeatInterval`. Return a string from `filterName`. Pass `importEdits` the `Map` that `exportEdits` returned, on a server with the same block types, and give a `VoxelEditStore` a `delete(key)` when chunks must go back to the generator.",
   },
 ];

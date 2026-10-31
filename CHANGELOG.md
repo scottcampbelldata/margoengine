@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### voxel-net notices a dead network, both ways (protocol 2, unreleased)
+
+- `connectVoxelNet` gives up on a server that sent nothing for the new `serverTimeout` (default 15,000 ms; 0 never does):
+  `onError` gets a MargoError `'failed'`, then `onClose` gets the new `SERVER_SILENT_CODE` (4408), reason
+  `'server-silent'`, `byClient: false`. Before, a dead route left a frozen world until the socket closed, if ever.
+- `VoxelServer` closes a client that sent no byte for the new `clientTimeout` (default 20,000 ms) with 1008
+  `'client-silent'` and frees its slot, counts and chunks. Before, a lone dead client held them for ever. A new
+  `heartbeatInterval` option (default 5,000 ms) paces a new `heartbeat` message, sent only to a client with no other
+  traffic, and a WebSocket ping, sent only to a client that sent nothing. Hidden tabs answer pings and stay.
+- `WebSocketConnection.close` cuts off a peer that has not finished closing after 2 s, and `WebSocketConnection.ping()`
+  is new. Before, `VoxelServer.close()` never resolved while a client had stopped reading.
+
 ### voxel-net names and snapshots (protocol 2)
 
 - **Breaking:** `PROTOCOL_VERSION` is 2. Server and clients must be built from the same version; a client on another one

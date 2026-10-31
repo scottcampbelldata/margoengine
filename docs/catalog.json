@@ -2410,6 +2410,7 @@
       "Keys",
       "PLAYER_SCHEMA",
       "PROTOCOL_VERSION",
+      "SERVER_SILENT_CODE",
       "STEP_SECONDS",
       "VoxelNetClient",
       "blockTableHash",

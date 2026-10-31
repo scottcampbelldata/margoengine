@@ -47,6 +47,13 @@ export interface VoxelNetClientOptions {
   players?: boolean;
   /** How far behind the newest player snapshot others are drawn, seconds. Default 0.1. */
   interpolationDelay?: number;
+  /**
+   * With {@link connectVoxelNet}: milliseconds of nothing from the server, from the start of the connection on, before
+   * the page gives up on it (see {@link SERVER_SILENT_CODE}); 0 never does. Default 15,000. Keep it well above the
+   * server's `heartbeatInterval` (default 5,000). A background tab whose timers are throttled takes longer to notice,
+   * never less. {@link VoxelNetClient} with your own transport, and `VoxelBot`, ignore it.
+   */
+  serverTimeout?: number;
   /** Options of the local player's body; the server's must match. */
   character?: VoxelCharacterOptions;
 }
@@ -77,7 +84,10 @@ export interface RemotePlayer {
 
 /** How a connection ended, for {@link VoxelNetClient.onClose}. */
 export interface VoxelNetClose {
-  /** The WebSocket close code: 1001 when the server shut down cleanly, 1006 when the connection was lost or never made. */
+  /**
+   * The WebSocket close code: 1001 when the server shut down cleanly, 1006 when the connection was lost or never made,
+   * {@link SERVER_SILENT_CODE} when the server went silent with the socket still open.
+   */
   code: number;
   /** The reason the server gave, `''` for none. */
   reason: string;
@@ -109,7 +119,15 @@ interface Entry {
 }
 
 const HISTORY = 1200, // steps of input kept for replay: 10 s
-  SEND_EVERY = 6; // steps per input message: one per 20 Hz tick
+  SEND_EVERY = 6, // steps per input message: one per 20 Hz tick
+  SILENT_CHECKS = 15; // serverTimeout is watched by this many timer firings
+
+/**
+ * {@link VoxelNetClose.code} when {@link connectVoxelNet} gave up on a server that sent nothing for
+ * {@link VoxelNetClientOptions.serverTimeout}, with reason `'server-silent'` and `byClient` false: a dead network, or a
+ * server that stopped. From the private use range (4000 to 4999), like HTTP 408; no server ever sends it.
+ */
+export const SERVER_SILENT_CODE = 4408;
 
 /**
  * The client half of voxel-net. Feed it the server's messages with {@link VoxelNetClient.receive}; call
@@ -137,7 +155,7 @@ export class VoxelNetClient {
   readonly players = new Map<number, RemotePlayer>();
   /** Counters for tests and benchmarks. */
   readonly stats: VoxelNetClientStats = {
-    received: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0, names: 0 },
+    received: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0, names: 0, heartbeat: 0 },
     sent: 0,
     corrections: 0,
     chunks: 0,
@@ -352,6 +370,8 @@ export class VoxelNetClient {
             if (other) other.name = name;
           }
         break;
+      case 'heartbeat': // arriving was its whole job
+        break;
     }
   }
   #drop(key: string): void {
@@ -490,8 +510,15 @@ export class VoxelNetClient {
  * Connects a {@link VoxelNetClient} to a voxel-net server with the browser's WebSocket. When the server refuses or drops
  * the connection (any close but 1000 and 1001, for example another protocol version), `onError` gets a MargoError
  * `'failed'` holding the close code and reason. Every way the connection ends, a clean server shutdown included, calls
- * {@link VoxelNetClient.onClose} once, after any `onError`.
+ * {@link VoxelNetClient.onClose} once, after any `onError`. A server silent for
+ * {@link VoxelNetClientOptions.serverTimeout} ends it the same way, at once and without waiting for the socket, whose own
+ * close can take a minute on a dead route: `onError` gets a MargoError `'failed'` and `onClose` gets
+ * {@link SERVER_SILENT_CODE}.
+ *
+ * Silence is counted in timer firings, not on a clock: one firing, however late, is one fifteenth of the timeout. So a
+ * long frame or a throttled background tab, where messages wait behind the timer, is not taken for a dead server.
  * @throws MargoError `'unsupported'` where there is no global WebSocket.
+ * @throws RangeError for a `serverTimeout` that is negative or not finite.
  * @throws as the {@link VoxelNetClient} constructor.
  */
 export function connectVoxelNet(
@@ -501,16 +528,23 @@ export function connectVoxelNet(
 ): VoxelNetClient {
   if (typeof WebSocket !== 'function')
     throw new MargoError('unsupported', 'connectVoxelNet needs a global WebSocket; use a browser or Node 22+');
+  const { serverTimeout = 15_000 } = options;
+  if (!(serverTimeout >= 0 && serverTimeout < Number.POSITIVE_INFINITY))
+    throw new RangeError(`serverTimeout ${serverTimeout} must be finite and >= 0 milliseconds; 0 never gives up`);
   const socket = new WebSocket(url),
     queue: Uint8Array[] = [];
   socket.binaryType = 'arraybuffer';
-  let closing = false;
+  let closing = false,
+    ended = false,
+    silent = 0,
+    watch: ReturnType<typeof setInterval> | undefined;
   const client = new VoxelNetClient(
     world,
     {
       send: (data) => (socket.readyState === 1 ? socket.send(data as Uint8Array<ArrayBuffer>) : queue.push(data)),
       close: () => {
         closing = true;
+        clearInterval(watch);
         socket.close();
       },
     },
@@ -519,22 +553,44 @@ export function connectVoxelNet(
   socket.addEventListener('open', () => {
     for (const data of queue.splice(0)) socket.send(data as Uint8Array<ArrayBuffer>);
   });
-  socket.addEventListener('message', (event) => client.receive(new Uint8Array(event.data as ArrayBuffer)));
-  socket.addEventListener('close', ({ code, reason }) => {
-    // Read first: an onError handler may call client.close(), which does not make this close the client's.
-    const byClient = closing;
+  socket.addEventListener('message', (event) => {
+    silent = 0;
+    client.receive(new Uint8Array(event.data as ArrayBuffer));
+  });
+  const end = (code: number, reason: string, byClient: boolean, message: string | undefined): void => {
+    if (ended) return;
+    ended = true;
+    clearInterval(watch);
     try {
-      if (!byClient && code !== 1000 && code !== 1001)
-        client.onError(
-          new MargoError(
-            'failed',
-            `The voxel-net server closed the connection with ${code}${reason ? ` (${reason})` : ''}; check that it is running and that server and client are the same version`,
-          ),
-        );
+      if (message) client.onError(new MargoError('failed', message));
     } finally {
       client.close();
       client.onClose({ code, reason, byClient });
     }
+  };
+  socket.addEventListener('close', ({ code, reason }) => {
+    // Read first: an onError handler may call client.close(), which does not make this close the client's.
+    const byClient = closing;
+    end(
+      code,
+      reason,
+      byClient,
+      !byClient && code !== 1000 && code !== 1001
+        ? `The voxel-net server closed the connection with ${code}${reason ? ` (${reason})` : ''}; check that it is running and that server and client are the same version`
+        : undefined,
+    );
   });
+  if (serverTimeout > 0) {
+    watch = setInterval(() => {
+      if (++silent >= SILENT_CHECKS)
+        end(
+          SERVER_SILENT_CODE,
+          'server-silent',
+          false,
+          `The voxel-net server sent nothing for ${serverTimeout} ms (serverTimeout); the network or the server is gone, so join again`,
+        );
+    }, serverTimeout / SILENT_CHECKS);
+    (watch as { unref?: () => void }).unref?.();
+  }
   return client;
 }

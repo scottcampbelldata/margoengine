@@ -89,6 +89,18 @@ export interface VoxelServerOptions {
   /** Milliseconds a new connection has to send its hello before it is closed with 1008. Default 3,000. */
   helloTimeout?: number;
   /**
+   * Milliseconds without a message to a client before it gets a `heartbeat` message, and without bytes from one before
+   * it gets a WebSocket ping. Players with traffic in that direction get neither. Keep it well below the clients'
+   * `serverTimeout` (default 15,000). Default 5,000.
+   */
+  heartbeatInterval?: number;
+  /**
+   * Milliseconds without a byte from a client, pongs included, before it is closed with 1008 `'client-silent'` and its
+   * slot, counts and chunks are freed; must exceed `heartbeatInterval`. A page in a background tab stays, because its
+   * browser answers pings. Counted in ticks, so a stalled server does not blame its clients. Default 20,000.
+   */
+  clientTimeout?: number;
+  /**
    * Your login check. Called on the upgrade request (`hello` undefined: read a cookie or a token header), then again
    * on the hello. `true` lets the client on; a non-empty string does too and becomes the player's `identity` (the
    * hello's answer wins); anything else closes it with 1008 `'not authorized'`. A hook that throws, or does not settle
@@ -182,7 +194,7 @@ export interface VoxelServerMetrics {
   tickStarts: number[];
   /** Times the loop fell more than 5 ticks behind and skipped ahead. */
   skipped: number;
-  /** Bytes written to clients by message type, WebSocket frame headers included. */
+  /** Bytes written to clients by message type, WebSocket frame headers included; `heartbeat` counts pings too. */
   bytesOut: Record<ServerMessage['type'], number>;
   /** Bytes read from clients, frame headers included. */
   bytesIn: number;
@@ -251,6 +263,10 @@ interface Client extends VoxelServerPlayer {
   tokenTime: number;
   bytesIn: number;
   timer: ReturnType<typeof setTimeout> | undefined;
+  // conn.bytesIn when last looked at, ticks since it last grew, and ticks since the last message to this client.
+  heardBytes: number;
+  silentTicks: number;
+  quietTicks: number;
 }
 
 const NAMES: Record<number, ServerMessage['type']> = {
@@ -262,6 +278,7 @@ const NAMES: Record<number, ServerMessage['type']> = {
     21: 'players',
     22: 'loaded',
     23: 'names',
+    24: 'heartbeat',
   },
   BANK = 60, // movement steps a client may save up: 0.5 s
   DRIFT = 1 / 64, // blocks of disagreement before a correction
@@ -275,7 +292,9 @@ const NAMES: Record<number, ServerMessage['type']> = {
   GENERATE_TRIES = 3, // a chunk's generation is tried this often before the players who need it are closed
   RETRY_MS = 250, // wait before the second try; it doubles for each further one
   FAILED_KEPT = 4096; // most chunks whose failures are remembered
-const TIMED_OUT: unique symbol = Symbol('timed out');
+const TIMED_OUT: unique symbol = Symbol('timed out'),
+  HEARTBEAT = encodeServerMessage({ type: 'heartbeat' }),
+  PING_BYTES = 2; // an empty ping frame
 
 const sameArray = (a: ArrayLike<number>, b: ArrayLike<number>): boolean => {
   if (a.length !== b.length) return false;
@@ -496,6 +515,8 @@ export class VoxelServer {
   readonly #maxPending: number;
   readonly #maxPerAddress: number;
   readonly #helloTimeout: number;
+  readonly #heartbeatTicks: number;
+  readonly #clientTimeoutTicks: number;
   readonly #authenticate: VoxelAuthenticate | undefined;
   readonly #authTimeout: number;
   readonly #maxEdited: number;
@@ -576,6 +597,14 @@ export class VoxelServer {
     this.#maxPending = integer('maxPending', o.maxPending ?? 64, 1, 1 << 20);
     this.#maxPerAddress = integer('maxPerAddress', o.maxPerAddress ?? 8, 1, 1 << 20);
     this.#helloTimeout = integer('helloTimeout', o.helloTimeout ?? 3000, 1, 600_000);
+    const heartbeat = integer('heartbeatInterval', o.heartbeatInterval ?? 5000, 1, 3_600_000),
+      silence = integer('clientTimeout', o.clientTimeout ?? 20_000, 1, 86_400_000);
+    if (silence <= heartbeat)
+      throw new RangeError(
+        `VoxelServer clientTimeout ${silence} must exceed heartbeatInterval ${heartbeat}; a client needs time to answer a ping`,
+      );
+    this.#heartbeatTicks = Math.max(1, Math.round((heartbeat * this.#tickRate) / 1000));
+    this.#clientTimeoutTicks = Math.max(this.#heartbeatTicks + 1, Math.ceil((silence * this.#tickRate) / 1000));
     if (o.authenticate !== undefined && typeof o.authenticate !== 'function')
       throw new TypeError('VoxelServer authenticate must be a function (req, hello) => boolean | string');
     this.#authenticate = o.authenticate;
@@ -813,7 +842,7 @@ export class VoxelServer {
       tickTimes: [],
       tickStarts: [],
       skipped: 0,
-      bytesOut: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0, names: 0 },
+      bytesOut: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0, names: 0, heartbeat: 0 },
       bytesIn: 0,
       corrections: 0,
       editsAccepted: 0,
@@ -862,6 +891,9 @@ export class VoxelServer {
       tokenTime: performance.now(),
       bytesIn: 0,
       timer: undefined,
+      heardBytes: 0,
+      silentTicks: 0,
+      quietTicks: 0,
     };
     this.#pending++;
     this.#perAddress.set(address, (this.#perAddress.get(address) ?? 0) + 1);
@@ -1358,6 +1390,16 @@ export class VoxelServer {
         this.#kick(c, 1008, 'too slow to keep up');
         continue;
       }
+      // After the hello: until then helloTimeout rules. Ticks, not a clock: bytes that came while this thread was
+      // stuck wait in the socket and are read right after this tick, so a long stall counts as one tick.
+      const joined = c.phase !== 'hello';
+      if (c.conn.bytesIn !== c.heardBytes) {
+        c.heardBytes = c.conn.bytesIn;
+        c.silentTicks = 0;
+      } else if (joined && ++c.silentTicks >= this.#clientTimeoutTicks) {
+        this.#kick(c, 1008, 'client-silent');
+        continue;
+      }
       c.conn.cork();
       for (const message of c.out) this.#write(c, message);
       c.out = [];
@@ -1396,6 +1438,13 @@ export class VoxelServer {
         if (data.length > 1) this.#write(c, encodeServerMessage({ type: 'players', tick: this.#tick, data }));
       }
       if (c.phase === 'playing' || c.phase === 'spawning') this.#sendChunks(c);
+      if (joined) {
+        if (++c.quietTicks >= this.#heartbeatTicks) this.#write(c, HEARTBEAT);
+        if (c.silentTicks > 0 && c.silentTicks % this.#heartbeatTicks === 0) {
+          c.conn.ping();
+          this.metrics.bytesOut.heartbeat += PING_BYTES;
+        }
+      }
       c.conn.uncork();
     }
   }
@@ -1644,6 +1693,7 @@ export class VoxelServer {
     }
   }
   #write(c: Client, message: Uint8Array): void {
+    c.quietTicks = 0;
     c.conn.send(message);
     this.metrics.bytesOut[NAMES[message[0]]] += message.length + header(message.length);
   }

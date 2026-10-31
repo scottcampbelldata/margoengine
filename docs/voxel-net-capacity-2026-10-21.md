@@ -80,6 +80,23 @@ The crowd 350 row comes from a separate run the same day, made to narrow the cro
 - **Memory.** 270 to 880 MB for the whole server process. The 8 generator threads account for about 250 MB of
   it: a 10-bot trial measured 466 MB with 8 threads and 210 MB with 1.
 
+## Heartbeat cost (added 2026-10-31, the tables above predate it)
+
+Bytes per player per second at the default settings, frame headers included, next to the 1.9 KiB/s (spread) and 29 to
+31 KiB/s (crowd) above. Measured on `VoxelServer` over loopback, except the pong, which is worked out from its frame.
+
+| Player | Down | Up |
+| --- | ---: | ---: |
+| In traffic both ways (a crowd, or any walking player in view of another) | 0 | 0 |
+| Lone and visible: sends its inputs, nothing arrives | 0.6 (a 3 byte heartbeat every 5 s) | 0 extra (its inputs count) |
+| Lone and hidden: no inputs either | 1.0 (measured: 60 bytes in 60 s, heartbeats and 2 byte pings) | 1.2 (a 6 byte pong every 5 s) |
+
+On the network each of those small sends is one packet every 5 s with its TCP and IP headers (about 40 bytes, *estimate*,
+more with TLS): under 20 bytes per second for a hidden player. 1,000 quiet players cost about 20 KB/s (*estimate*). A
+20 bot run (`bench/run.mjs`, 20 s window, not recorded in results.json) spent 0 bytes per second on heartbeats in the
+crowd and 2 in total spread out; its tick work was 0.94 ms median and 1.46 ms p95 in the crowd, 19.99 to 20.04 ticks per
+second, no bot closed. Per tick the server adds two integer comparisons per client, so the tables above still stand.
+
 ## Where the server's time goes
 
 Main-thread profiles (`bench/run.mjs --profile`, read with `bench/profile.mjs`). They cover the join phase as well

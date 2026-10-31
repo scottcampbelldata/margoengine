@@ -100,7 +100,12 @@ export type ServerMessage =
   /** The whole view has been sent once since joining. */
   | { type: 'loaded' }
   /** Names of the players about to enter this client's players messages; players without a name are left out. */
-  | { type: 'names'; names: PlayerName[] };
+  | { type: 'names'; names: PlayerName[] }
+  /**
+   * Nothing else went to this client for `heartbeatInterval`: the server still lives. Browsers cannot see WebSocket
+   * pings, so this is what `connectVoxelNet` watches when no other message is due, as for a lone idle player.
+   */
+  | { type: 'heartbeat' };
 
 const HELLO = 1,
   INPUT = 2,
@@ -113,6 +118,7 @@ const HELLO = 1,
   PLAYERS = 21,
   LOADED = 22,
   NAMES = 23,
+  HEARTBEAT = 24,
   MAX_RUNS = 1024,
   MAX_NAMES = 65535, // VoxelServer's largest maxPlayers
   encoder = new TextEncoder(),
@@ -363,6 +369,9 @@ export function encodeServerMessage(message: ServerMessage): Uint8Array {
     case 'loaded':
       w.u8(LOADED);
       break;
+    case 'heartbeat':
+      w.u8(HEARTBEAT);
+      break;
     case 'names': {
       const names = message.names;
       if (!Array.isArray(names)) throw new TypeError('names must be an array of PlayerName');
@@ -432,6 +441,7 @@ export function decodeServerMessage(bytes: Uint8Array): ServerMessage {
   } else if (type === BLOCKS) message = { type: 'blocks', data: r.rest() };
   else if (type === PLAYERS) message = { type: 'players', tick: r.varint(), data: r.rest() };
   else if (type === LOADED) message = { type: 'loaded' };
+  else if (type === HEARTBEAT) message = { type: 'heartbeat' };
   else if (type === NAMES) {
     const n = r.varint();
     if (!n || n > MAX_NAMES) throw r.fail(`has ${n} names`);

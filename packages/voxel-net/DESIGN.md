@@ -90,9 +90,33 @@ unless stated.
 | server → client | `players` | tick, then `EntityCodec` bytes for schema `{position: 'position', rotation: 'rotation'}` |
 | server → client | `names` | count, then (player id, name length, UTF-8 bytes, at most 32) for each named player coming into range, just before its first `players` state |
 | server → client | `loaded` | marks the first time the whole view has been sent (used to measure join time) |
+| server → client | `heartbeat` | empty; sent only to a client that got no other message for `heartbeatInterval` |
 
 The connection is TCP, so every message arrives, in order. That lets `EntityCodec` use "the last state I sent you" as
 its baseline with no acknowledgements.
+
+## Silence
+
+TCP says nothing about a peer that vanished: with nothing to send it waits for ever, and with data queued it retries for
+many minutes. Before this, a lone idle player got no messages at all, and a client gone silently stayed a player with its
+chunks held, until 8 MiB had queued for it (about 7 minutes in a crowd, never when alone).
+
+Towards the client: browsers hide WebSocket pings from pages, and no existing message is steady (`players` stops when
+nothing near moves), so the server sends a one-byte `heartbeat` when a client has had nothing else for `heartbeatInterval`.
+`connectVoxelNet` ends the connection after `serverTimeout`, without waiting for the socket's own close.
+
+Towards the server: a visible page sends 20 inputs a second, but a hidden one sends none and its scripts may be throttled,
+so inputs cannot mean alive. The server sends a real WebSocket ping to a client it has not heard from for
+`heartbeatInterval`; the browser answers without the page's scripts. Any byte counts as hearing from it. After
+`clientTimeout` the client is closed and leaves.
+
+Both ends count events rather than time: timer firings on the client, ticks on the server. A thread that was stuck sees
+the timer before the bytes waiting in its socket, so comparing clocks would blame the peer for the stall; one late firing
+or tick counts once. Client default 15 s, server 20 s: the page finds out first and rejoins, and a client on a bad link
+gets 5 s more before losing its slot. Three heartbeats fit in the client's wait, so one lost burst does not end a game.
+
+Closing a socket whose peer stopped reading never finishes on its own, so `WebSocketConnection.close` cuts it off after
+2 s. Without that, the dead client's queued bytes stayed in memory and `VoxelServer.close()` never resolved.
 
 ## Join
 

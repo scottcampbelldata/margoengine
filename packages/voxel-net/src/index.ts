@@ -8,7 +8,7 @@ export type {
   VoxelNetControls,
   VoxelNetTransport,
 } from './client.js';
-export { connectVoxelNet, VoxelNetClient } from './client.js';
+export { connectVoxelNet, SERVER_SILENT_CODE, VoxelNetClient } from './client.js';
 export type { ClientMessage, InputRun, PlayerName, PlayerState, ServerMessage } from './protocol.js';
 export {
   blockTableHash,
