@@ -113,7 +113,9 @@ At resolution 2048, the two four-layer maps occupy 128 MiB (width × height × l
 `margoengine/shadows/virtual` is a second, optional entry for one directional light: `VirtualShadows` keeps the texel density a camera needs at every distance, in small pages of depth, and renders only the pages that are seen and have changed. Importing it costs `Shadows` users nothing; the root entry does not reach it.
 
 ```ts
+import { EngineKernel, box } from 'margoengine/core';
 import {VirtualShadows} from 'margoengine/shadows/virtual';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
 const city = engine.createMesh().setGeometry(box()).setScale([100,1,100]);
 const walker = engine.createMesh().setGeometry(box()).setPosition([0,2,0]);
 const pages = VirtualShadows.attach(engine, {distance:500, filter:'soft'});
