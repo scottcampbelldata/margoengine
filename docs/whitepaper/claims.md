@@ -427,6 +427,8 @@ the nearest depth, takes its first search read at the receiver's texel and compa
 `'pcf'` and `'hard'` receivers change only by the appended struct member. Against the old references the first
 difference in each story is the uniform's size and the new buffer.
 
+**environment-hemisphere, advanced to `b31bdb16a` on 2026-10-31:** without a hemisphere the proof's text differs in one place, the transmissive shader. `tintEntry` gained `margoTintShare`, because the light behind glass is in the base layer under specular, sheen and clearcoat (KHR_materials_transmission, KHR_materials_specular, KHR_materials_sheen, KHR_materials_clearcoat). No hemisphere path changed; a material without transmission emits the same text. `packages/materials/tests/transmission-layers.test.js` has the numbers.
+
 **terrain-ssr, advanced to `ba7a0fc89` on 2026-10-30 (biome look plan L5, item 7):** the clipmap's outer rings
 reach past the heightmap, where main drew a shelf of clamped edge heights to the horizon (and cast its shadows inward).
 Terrain now discards fragments outside the heightmap rectangle, so with neither the SSR hook nor `roughness` 11 calls
