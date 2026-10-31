@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4112400,
+  "total": 4113300,
   "history": [
     {
       "date": "2026-10-24",
@@ -1166,6 +1166,12 @@
       "commit": "51dfeea1b",
       "reason": "vfx soft particles: new optional soft entry (softness and depth options); root VFX carries it with the other features (+735 B gzip), base grows 45 B for the option checks; effects without softness compile the same WGSL",
       "grew": 3
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "12906698c",
+      "reason": "shadows root: the WebGL2 route hook for the PCSS nearest-depth reduction (commit a6d194cc8, webgl2-m8) on top of the shadow cut-outs; core and stage unchanged by it",
+      "grew": 1
     }
   ],
   "items": {
@@ -1387,7 +1393,7 @@
     "@margoengine/post/bloom": 6716,
     "@margoengine/post/decals": 4760,
     "@margoengine/post/depth": 3876,
-    "@margoengine/post/fxaa": 4735,
+    "@margoengine/post/fxaa": 4732,
     "@margoengine/post/glitch": 6269,
     "@margoengine/post/gtao": 11961,
     "@margoengine/post/image": 11905,
@@ -1450,7 +1456,7 @@
     "@margoengine/shader/noise": 4753,
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
-    "@margoengine/shadows": 15340,
+    "@margoengine/shadows": 16243,
     "@margoengine/shadows/virtual": 14601,
     "@margoengine/sky": 16485,
     "@margoengine/sky/base": 7066,
