@@ -270,6 +270,8 @@ test('a snapshot keeps the last 6 hours and skips when nothing changed', async (
 });
 
 test('a world comes back from its newest good snapshot after a crash, with the same seed, end and edits', async (t) => {
+  // Both players spawn at one place on the ring, or the edited chunk may be out of the second player's view.
+  t.mock.method(Math, 'random', () => 0.5);
   const dir = dataDir(t),
     first = await startShard(t, { dataDir: dir }),
     a = await joined(first.shard, first.url),
