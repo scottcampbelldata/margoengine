@@ -1,5 +1,5 @@
 {
-  "commit": "6e7353bed",
+  "commit": "7ab91aa37",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1358,8 +1358,8 @@
     },
     "@margoengine/terrain": {
       ".": {
-        "raw": 32953,
-        "gzip": 10841
+        "raw": 35741,
+        "gzip": 11581
       }
     },
     "@margoengine/text": {
