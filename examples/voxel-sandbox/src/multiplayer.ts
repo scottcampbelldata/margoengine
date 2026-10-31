@@ -99,9 +99,12 @@ export function parseJoin(value: unknown): JoinAnswer {
 export async function joinPlaza(
   router: string,
   signal: AbortSignal,
+  options: { peek?: boolean } = {},
 ): Promise<Exclude<JoinAnswer, { kind: 'starting' }>> {
+  // A page playing alone only looks: a place held for 5 s by each page asking every 30 s keeps real players out.
+  const path = options.peek ? 'join?peek=1' : 'join';
   for (;;) {
-    const response = await fetch(new URL('join', withSlash(router)), { signal, cache: 'no-store' }),
+    const response = await fetch(new URL(path, withSlash(router)), { signal, cache: 'no-store' }),
       answer = parseJoin(await response.json());
     if (answer.kind !== 'starting') return answer;
     await new Promise((done) => setTimeout(done, answer.retryIn * 1000));

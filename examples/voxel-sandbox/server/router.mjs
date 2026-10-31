@@ -1,12 +1,12 @@
 // Plaza's front door: forks one shard.mjs per world, restarts them, and answers the page.
-//   GET /join                 where to connect, or full
+//   GET /join                 where to connect, or full; ?peek=1 only looks, holding no place
 //   GET /counters             online, blocksToday, worldsFinished, worldEndsAt
 //   GET /finished/index.json  the finished worlds that have a render
 //   GET /metrics              shards' numbers; needs the token (env PLAZA_METRICS_TOKEN) as a Bearer header
 //   POST /report              a griefing report, { shard, x, z }
 // It listens on 127.0.0.1 only, behind nginx. `admin.mjs` talks to it over a local socket nginx cannot reach.
 //   node examples/voxel-sandbox/server/router.mjs --data=DIR [--port=8790] [--shard-port=8800] [--proxied]
-//     [--origins=a,b or * (default https://margoengine.com)] [--public-url=wss://host/s/{i}] [--capacity=200] [--max-shards=2] [--per-identity=8] [--idle-minutes=10]
+//     [--origins=a,b or * (default https://margoengine.com)] [--public-url=wss://host/s/{i}] [--capacity=200] [--max-shards=2] [--per-identity=8] [--idle-minutes=10] [--rate-burst=30] [--rate-per-second=5]
 // Run `npm run build:packages` first: the shards import the built packages.
 import { fork } from 'node:child_process';
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { chmod, mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { createServer as createHttp } from 'node:http';
 import { createServer as createSocketServer } from 'node:net';
-import { availableParallelism, loadavg } from 'node:os';
+import { cpus, loadavg } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HOST, identityOfRequest, loadSalt } from './identity.mjs';
@@ -54,7 +54,9 @@ export const ROUTER_DEFAULTS = Object.freeze({
   ratePerSecond: 5, // ... this many a second
   now: Date.now,
   load: () => loadavg()[0],
-  cores: availableParallelism,
+  // The machine's cores, not availableParallelism: that follows the service's CPUQuota down (360% reads as 3), and the
+  // free core this is asked about may be any core of the machine.
+  cores: () => cpus().length,
   log: console.log,
 });
 
@@ -180,11 +182,11 @@ export class PlazaRouter {
     };
   }
 
-  /** The answer of /join for one new player. */
-  join() {
+  /** The answer of /join for one new player; with `peek`, for a page that only asks whether there is room. */
+  join({ peek = false } = {}) {
     const now = this.#o.now(),
       shard = pickShard(this.shards, this.#o.capacity, now);
-    if (shard) shard.reserved.push(now);
+    if (shard && !peek) shard.reserved.push(now);
     this.#growIfNeeded(now);
     if (!shard)
       // Between worlds or after a crash nothing is ready for a moment: that is not full.
@@ -482,7 +484,7 @@ export class PlazaRouter {
       case 'GET /join': {
         // Behind the proxy a request with no client address did not come through it.
         if (!identity) return this.#json(req, res, 400, { error: 'no-client-address' });
-        const { status, body } = this.join();
+        const { status, body } = this.join({ peek: url.searchParams.has('peek') });
         return this.#json(req, res, status, body, status === 503 ? { 'Retry-After': '2' } : {});
       }
       case 'POST /report':
@@ -698,6 +700,8 @@ export function fromArguments(argv) {
     capacity: number('capacity', ROUTER_DEFAULTS.capacity),
     maxShards: number('max-shards', ROUTER_DEFAULTS.maxShards),
     metricsToken: process.env.PLAZA_METRICS_TOKEN || undefined,
+    rateBurst: number('rate-burst', ROUTER_DEFAULTS.rateBurst),
+    ratePerSecond: number('rate-per-second', ROUTER_DEFAULTS.ratePerSecond),
     // The real network bench runs many bots from one address; everyone else keeps the default.
     shard: {
       ...(arg('per-identity') === undefined ? {} : { perIdentity: number('per-identity', 8) }),

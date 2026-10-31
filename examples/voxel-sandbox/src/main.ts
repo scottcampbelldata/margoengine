@@ -1038,7 +1038,7 @@ async function boot(): Promise<void> {
     if (router) {
       const retry = setInterval(() => {
         if (document.hidden) return;
-        joinPlaza(router, AbortSignal.timeout(JOIN_TIMEOUT)).then(
+        joinPlaza(router, AbortSignal.timeout(JOIN_TIMEOUT), { peek: true }).then(
           (answer) =>
             setBanner(
               answer.kind === 'shard' ? 'Plaza has room now.' : soloBanner('full', answer.online, true),

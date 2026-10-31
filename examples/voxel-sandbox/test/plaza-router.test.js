@@ -196,6 +196,30 @@ test('full is an answer: one place taken, the next player hears full with the co
   assert.deepEqual(full, { full: true, online: 1, retryIn: 30 });
 });
 
+test('a page that only looks holds no place', TIMEOUT, async (t) => {
+  const plaza = await startRouter(t, { capacity: 1, maxShards: 1 });
+  await until('a ready shard', async () => (await plaza.get('/join?peek=1')).status === 200);
+  for (let i = 0; i < 5; i++) assert.equal((await (await plaza.get('/join?peek=1')).json()).full, false);
+  assert.equal((await (await plaza.get('/join')).json()).full, false, 'the place is still there for a real join');
+  assert.equal((await (await plaza.get('/join')).json()).full, true, 'and a real join did take it');
+});
+
+test('the free core check counts the machine, not the CPU quota', async () => {
+  // availableParallelism follows a service's CPUQuota down: a 4 core box at 360% read 3, so a third shard never started.
+  const os = await import('node:os'),
+    { syncBuiltinESMExports } = await import('node:module'),
+    real = os.default.availableParallelism;
+  os.default.availableParallelism = () => 1;
+  syncBuiltinESMExports();
+  try {
+    const { ROUTER_DEFAULTS: fresh } = await import('../server/router.mjs?quota');
+    assert.equal(fresh.cores(), os.default.cpus().length);
+  } finally {
+    os.default.availableParallelism = real;
+    syncBuiltinESMExports();
+  }
+});
+
 test('a new shard starts only while a core is free', TIMEOUT, async (t) => {
   const busy = await startRouter(t, { capacity: 1, maxShards: 2, load: () => 16, cores: () => 16 });
   await joinAnswer(busy);
