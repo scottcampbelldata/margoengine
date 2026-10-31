@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3921254,
+  "total": 3921669,
   "history": [
     {
       "date": "2026-10-24",
@@ -888,6 +888,12 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
+      "reason": "procedural: detail 0|1|2 mesh levels (lobe merging, per-level segment counts, normal mixing) for far LOD rings; opt-in, default mesh unchanged",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "0882df471",
       "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
       "grew": 1
     },
@@ -896,12 +902,6 @@
       "commit": "0882df471",
       "reason": "biomes ecotone: painted edges blend over a feathered, warped box (biome look plan 2 item 4)",
       "grew": 2
-    },
-    {
-      "date": "2026-10-30",
-      "commit": "0882df471",
-      "reason": "procedural: detail 0|1|2 mesh levels (lobe merging, per-level segment counts, normal mixing) for far LOD rings; opt-in, default mesh unchanged",
-      "grew": 1
     },
     {
       "date": "2026-10-30",
@@ -937,6 +937,12 @@
       "date": "2026-10-31",
       "commit": "270024481",
       "reason": "biomes worker bundles biomes/relief, which gains islands (coast: island with an outline warp, beach ring and peak), the shelf option and valley width, floor and mouth (biome look plan 3 item C1); the builder's 37,800 B budget was set before the round 2 landings grew the worker",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "a66ee4d82",
+      "reason": "procedural: detail 0 canopies are stretched to the detail 2 bounding box (fitToHull and six hull boxes, +97 B) so far trees keep their size; detail 2 unchanged",
       "grew": 1
     }
   ],
@@ -1169,7 +1175,7 @@
     "@margoengine/post/ssgi": 11862,
     "@margoengine/post/ssr": 11154,
     "@margoengine/post/stack": 4001,
-    "@margoengine/procedural": 10473,
+    "@margoengine/procedural": 10888,
     "@margoengine/procedural/expression": 4720,
     "@margoengine/procedural/lsystem": 2454,
     "@margoengine/procedural/noise": 2314,

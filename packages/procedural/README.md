@@ -41,8 +41,10 @@ For the biome presets there are more plants: `generatePalmMesh()`, `generateBirc
 Mesh levels for distance: `generateTreeMesh(kind, options)`, `generateShrubMesh`, `generateTundraShrubMesh`,
 `generatePalmMesh`, `generateBirchMesh` and `generateAcaciaMesh` take `{ detail: 0 | 1 | 2 }` (default 2, the full
 mesh, unchanged byte for byte). Level 1 keeps the shape with coarser lobes (a broadleaf canopy goes from 6,240 to
-3,180 triangles); level 0 merges lobes into a few coarse ones for the far rings (400 triangles). Each axis of the
-canopy box stays within 20 percent of level 2. An invalid level throws a `RangeError`.
+3,180 triangles); level 0 merges lobes into a few coarse ones for the far rings (400 triangles).
+Level 1 keeps each axis of the canopy box within 20 percent of level 2; level 0 is stretched to level 2's box (conifer,
+broadleaf, palm, birch, acacia and shrub canopies, within 10 percent on every axis), so far trees keep their size. An
+invalid level throws a `RangeError`.
 
 ```ts
 import {generateTreeMesh} from 'margoengine/procedural';

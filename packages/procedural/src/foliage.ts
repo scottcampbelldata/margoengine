@@ -159,6 +159,46 @@ export function consecutiveGroups(count: number, size: number): number[][] {
   return groups;
 }
 
+/** A bounding box as [minX, minY, minZ, maxX, maxY, maxZ] in tree-local metres. */
+export type HullBox = readonly [number, number, number, number, number, number];
+
+/**
+ * Detail-0 meshes merge or coarsen their lobes, which pulls the outline inside the full mesh (flat facets, fewer and
+ * lower leaf clumps). This stretches the pieces of a detail-0 canopy per axis so their joint bounding box equals
+ * `hull`, the detail-2 canopy's box, and carries `points` (lobe centres) with them. Normals follow the inverse
+ * scale and stay unit length. Pieces and points are changed in place.
+ */
+export function fitToHull(pieces: readonly GeometryData[], hull: HullBox, points: number[][] = []): void {
+  const lo = [Infinity, Infinity, Infinity],
+    hi = [-Infinity, -Infinity, -Infinity];
+  for (const { positions } of pieces)
+    for (let i = 0; i < positions.length; i++) {
+      lo[i % 3] = Math.min(lo[i % 3], positions[i]);
+      hi[i % 3] = Math.max(hi[i % 3], positions[i]);
+    }
+  const scale = lo.map((v, k) => (hi[k] > v ? (hull[k + 3] - hull[k]) / (hi[k] - v) : 1)),
+    move = (v: number, k: number) => hull[k] + (v - lo[k]) * scale[k];
+  for (const { positions, normals } of pieces) {
+    for (let i = 0; i < positions.length; i++) positions[i] = move(positions[i], i % 3);
+    for (let i = 0; normals && i < normals.length; i += 3) {
+      const n = [0, 1, 2].map((k) => normals[i + k] / scale[k]),
+        length = Math.hypot(n[0], n[1], n[2]) || 1;
+      for (let k = 0; k < 3; k++) normals[i + k] = n[k] / length;
+    }
+  }
+  for (const point of points) for (let k = 0; k < 3; k++) point[k] = move(point[k], k);
+}
+
+/** The detail-2 canopy boxes the detail-0 meshes are fitted to (a test compares them with the real meshes). */
+export const FULL_HULLS = {
+  conifer: [-1.74, 1.25, -2.47, 2.38, 7.4, 2.39],
+  broadleaf: [-2.83, 3.44, -3.51, 3.76, 7.48, 3.46],
+  palm: [-1.81, 8, -3.16, 4.4, 8.38, 2.99],
+  birch: [-1.32, 4.22, -1.21, 1.17, 10.38, 1.25],
+  acacia: [-3.56, 4.1, -3.52, 3.24, 4.65, 3.57],
+  shrub: [-0.66, -0.04, -0.61, 0.7, 0.85, 0.83],
+} as const satisfies Record<string, HullBox>;
+
 /**
  * Leaf clumps around one lumpy lobe centred at (x, y, z) with radii (size, 0.87 size, size): opaque double-sided
  * diamonds that start inside the surface and reach past it, so the canopy outline breaks into leafy points instead of
@@ -334,6 +374,8 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: MeshDe
       else if (detail === 1) clumps.push(leafClumps(lobe.x, lobe.y, lobe.z, lobe.sx, lobe.yaw, 8));
     });
   }
+  // Level 0 keeps the full canopy's bounding box, so far trees read at the right size.
+  if (detail === 0) fitToHull([...leaves, ...clumps], FULL_HULLS[kind], lobeCenters);
   // Lobes first, then their leaf clumps (broadleaf only), so lobe i keeps its index range.
   const canopy = mergeGeometries([...leaves, ...clumps]),
     center = new Float32Array(3),
@@ -382,6 +424,7 @@ export function generateShrubMesh(options?: MeshDetailOptions): GeometryData {
       ),
     );
   }
+  if (detail === 0) fitToHull(lobes, FULL_HULLS.shrub);
   return computeTangents(mergeGeometries(lobes));
 }
 

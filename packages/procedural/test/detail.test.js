@@ -124,3 +124,49 @@ test('an invalid detail throws a RangeError that names the fix', () => {
     for (const detail of [3, -1, 1.5, '2', null])
       assert.throws(() => make({ detail }), { name: 'RangeError', message: /Invalid mesh detail; pass 0, 1 or 2/ });
 });
+
+const box = (geometries) => {
+  const lo = [Infinity, Infinity, Infinity],
+    hi = [-Infinity, -Infinity, -Infinity];
+  for (const g of geometries)
+    if (g)
+      for (let i = 0; i < g.positions.length; i += 3)
+        for (let k = 0; k < 3; k++) {
+          lo[k] = Math.min(lo[k], g.positions[i + k]);
+          hi[k] = Math.max(hi[k], g.positions[i + k]);
+        }
+  return { lo, hi };
+};
+
+test('detail 0 keeps the detail 2 bounding volume within 10 percent on every axis (biome look round 3, L6)', () => {
+  for (const [name, make] of Object.entries(makers)) {
+    const full = pair(make({ detail: 2 })),
+      far = pair(make({ detail: 0 }));
+    for (const [what, parts] of [
+      ['canopy', (m) => [m.canopy]],
+      ['whole tree', (m) => [m.canopy, m.trunk]],
+    ]) {
+      const a = box(parts(full)),
+        b = box(parts(far));
+      for (let k = 0; k < 3; k++) {
+        const size = a.hi[k] - a.lo[k];
+        assert.ok(
+          Math.abs((b.hi[k] - b.lo[k]) / size - 1) < 0.1,
+          `${name} ${what} axis ${k} size ${b.hi[k] - b.lo[k]} vs ${size}`,
+        );
+        // The box also sits where the full one does: each face within 10 percent of the full size on that axis.
+        assert.ok(Math.abs(b.lo[k] - a.lo[k]) < 0.1 * size, `${name} ${what} axis ${k} low face`);
+        assert.ok(Math.abs(b.hi[k] - a.hi[k]) < 0.1 * size, `${name} ${what} axis ${k} high face`);
+      }
+    }
+  }
+});
+
+test('detail 0 stays under 600 canopy triangles for every species and keeps unit normals after the hull fit', () => {
+  for (const [name, make] of Object.entries(makers)) {
+    const g = pair(make({ detail: 0 })).canopy;
+    assert.ok(triangles(g) < 600, `${name} ${triangles(g)} triangles`);
+    for (let i = 0; i < g.normals.length; i += 3)
+      assert.ok(Math.abs(Math.hypot(g.normals[i], g.normals[i + 1], g.normals[i + 2]) - 1) < 1e-3, `${name} normal`);
+  }
+});

@@ -12,6 +12,8 @@ import {
 } from '@margoengine/geometry/utils';
 import {
   consecutiveGroups,
+  FULL_HULLS,
+  fitToHull,
   mergeLobeGroups,
   perturb,
   placed,
@@ -70,9 +72,11 @@ function fronds(x: number, y: number, z: number, count: number, length: number, 
  */
 export function generatePalmMesh(options?: MeshDetailOptions): TreeMesh {
   const detail = resolveDetail(options);
+  const crown = fronds(1.2, 8, 0, [5, 7, 9][detail], 3.2, [2, 4, 6][detail]);
+  if (detail === 0) fitToHull([crown], FULL_HULLS.palm);
   return {
     trunk: computeTangents(trunk(8, 0.13, 0.22, 1.2, [2, 4, 6][detail], [5, 6, 7][detail])),
-    canopy: computeTangents(fronds(1.2, 8, 0, [5, 7, 9][detail], 3.2, [2, 4, 6][detail])),
+    canopy: computeTangents(crown),
   };
 }
 
@@ -94,6 +98,7 @@ export function generateBirchMesh(options?: MeshDetailOptions): TreeMesh {
     lobes = drawn.map((l) =>
       placed(perturb(icosahedronGeometry(1, [1, 1, 2][detail])), l.x, l.y, l.z, l.sx, l.sy, l.sz, l.yaw),
     );
+  if (detail === 0) fitToHull(lobes, FULL_HULLS.birch);
   return {
     trunk: computeTangents(trunk(9.5, 0.06, 0.16, 0.25, [2, 5, 5][detail], [5, 6, 7][detail])),
     canopy: computeTangents(mergeGeometries(lobes)),
@@ -139,6 +144,7 @@ export function generateAcaciaMesh(options?: MeshDetailOptions): TreeMesh {
         l.yaw,
       ),
     );
+  if (detail === 0) fitToHull(crown, FULL_HULLS.acacia);
   return {
     trunk: computeTangents(computeVertexNormals(toNonIndexed(mergeGeometries(wood)))),
     canopy: computeTangents(mergeGeometries(crown)),
