@@ -29,6 +29,7 @@ export const SHARD_DEFAULTS = Object.freeze({
   freezeMs: 5 * 60_000,
   maxEditedChunks: 16_384, // about 160 MB at worst; past it edits to further chunks are refused
   perIdentity: 8, // same as nginx's limit_conn
+  workers: 1, // generator threads
   beatMs: 1000,
   idleMs: 10 * 60_000, // no movement and no edit for this long closes the player; 0 turns the limit off
 });
@@ -130,7 +131,7 @@ export class PlazaShard {
     this.server = new VoxelServer({
       blocks: this.#blocks,
       generator: url,
-      workers: 1,
+      workers: this.#o.workers,
       flight: true,
       origins: this.#o.origins,
       maxPlayers: this.#o.capacity,

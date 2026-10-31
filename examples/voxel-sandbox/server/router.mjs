@@ -6,7 +6,7 @@
 //   POST /report              a griefing report, { shard, x, z }
 // It listens on 127.0.0.1 only, behind nginx. `admin.mjs` talks to it over a local socket nginx cannot reach.
 //   node examples/voxel-sandbox/server/router.mjs --data=DIR [--port=8790] [--shard-port=8800] [--proxied]
-//     [--origins=a,b or * (default https://margoengine.com)] [--public-url=wss://host/s/{i}] [--capacity=200] [--max-shards=2] [--per-identity=8] [--idle-minutes=10] [--rate-burst=30] [--rate-per-second=5]
+//     [--origins=a,b or * (default https://margoengine.com)] [--public-url=wss://host/s/{i}] [--capacity=200] [--max-shards=2] [--per-identity=8] [--idle-minutes=10] [--rate-burst=30] [--rate-per-second=5] [--workers=1]
 // Run `npm run build:packages` first: the shards import the built packages.
 import { fork } from 'node:child_process';
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -705,6 +705,7 @@ export function fromArguments(argv) {
     // The real network bench runs many bots from one address; everyone else keeps the default.
     shard: {
       ...(arg('per-identity') === undefined ? {} : { perIdentity: number('per-identity', 8) }),
+      ...(arg('workers') === undefined ? {} : { workers: number('workers', 1) }),
       ...(arg('idle-minutes') === undefined ? {} : { idleMs: number('idle-minutes', 10) * 60_000 }),
     },
   };
