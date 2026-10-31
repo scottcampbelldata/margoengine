@@ -705,6 +705,60 @@ struct V { @builtin(position) p: vec4f, @location(0) @interpolate(flat) i: u32 }
     for (const r of [a, b, msaa, depth, color]) r.destroy();
     return { first, upload, depthAfter, both };
   },
+
+  /**
+   * A depth texture sampled by the pass it is attached to read-only: GL calls that a feedback loop and refuses the draw,
+   * however the masks are set. The depth test still sees the attachment, and the second round sees the depth written since.
+   */
+  async readOnlyDepth(device) {
+    const m = device.createShaderModule({
+      code: `@group(0) @binding(0) var d: texture_depth_2d;
+@vertex fn v(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f { return vec4f(f32(i & 1u) * 4.0 - 1.0, f32(i >> 1u) * 4.0 - 1.0, 0.5, 1.0); }
+@fragment fn split(@builtin(position) p: vec4f) -> @builtin(frag_depth) f32 { return select(0.75, 0.25, p.x < 2.0); }
+@fragment fn low() -> @builtin(frag_depth) f32 { return 0.125; }
+@fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f { return vec4f(textureLoad(d, vec2i(p.xy), 0), 1.0, 0.0, 1.0); }`,
+    });
+    const reader = device.createRenderPipeline({
+      layout: 'auto',
+      vertex: { module: m, entryPoint: 'v' },
+      fragment: { module: m, entryPoint: 'f', targets: [{ format: 'rgba32float' }] },
+      depthStencil: { format: 'depth32float', depthWriteEnabled: false, depthCompare: 'greater' },
+    });
+    const depth = device.createTexture({ size: [4, 1], format: 'depth32float', usage: U.RENDER_ATTACHMENT | U.TEXTURE_BINDING });
+    const color = device.createTexture({ size: [4, 1], format: 'rgba32float', usage: U.RENDER_ATTACHMENT | U.COPY_SRC });
+    const group = device.createBindGroup({ layout: reader.getBindGroupLayout(0), entries: [{ binding: 0, resource: depth.createView() }] });
+    const round = async (entryPoint) => {
+      const e = device.createCommandEncoder();
+      const write = e.beginRenderPass({
+        colorAttachments: [],
+        depthStencilAttachment: { view: depth.createView(), depthLoadOp: 'clear', depthStoreOp: 'store', depthClearValue: 1 },
+      });
+      write.setPipeline(
+        device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module: m, entryPoint: 'v' },
+          fragment: { module: m, entryPoint, targets: [] },
+          depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'always' },
+        }),
+      );
+      write.draw(3);
+      write.end();
+      const pass = e.beginRenderPass({
+        colorAttachments: [{ view: color.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
+        depthStencilAttachment: { view: depth.createView(), depthReadOnly: true },
+      });
+      pass.setPipeline(reader);
+      pass.setBindGroup(0, group);
+      pass.draw(3);
+      pass.end();
+      device.queue.submit([e.finish()]);
+      return floats(await read(device, color, { bytes: 16 }));
+    };
+    const out = { split: await round('split'), low: await round('low') };
+    depth.destroy();
+    color.destroy();
+    return out;
+  },
 };
 
 async function run(device, name) {

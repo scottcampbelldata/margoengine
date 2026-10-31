@@ -1541,11 +1541,15 @@ export class Replayer {
         plan.push({ unit: t.unit, target: gl.TEXTURE_2D, texture: tex.resolved, sampler });
       } else {
         const range = `${view.baseMipLevel}:${view.baseMipLevel + levels - 1}`;
-        let storage = tex.sampled(view);
+        let storage = tex.sampled(view),
+          alias = 1;
+        // WebGPU lets a pass sample the depth texture it has attached read-only; GL calls that a feedback loop and refuses
+        // the draw whatever the masks say, so the draw reads a copy that follows the attachment's depth.
+        const attachment = pass.desc.depth?.view;
+        if (attachment?.texture === tex && storage === tex.attached(attachment)) storage = tex.sampled(view, alias++);
         // GL keeps one base and max level per texture object: another range of a texture this draw already samples
         // (Bloom's last up step reads two levels of its down chain) reads a copy of its own.
-        for (let alias = 1; ranges.has(storage) && ranges.get(storage) !== range; alias++)
-          storage = tex.sampled(view, alias);
+        while (ranges.has(storage) && ranges.get(storage) !== range) storage = tex.sampled(view, alias++);
         ranges.set(storage, range);
         tex.read(storage, view.baseMipLevel, view.mipLevelCount, view.baseArrayLayer, view.arrayLayerCount, this.sync);
         if (storage.levels !== range) {

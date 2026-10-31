@@ -5,7 +5,8 @@
 // The cases: sRGB views of a unorm texture, 2D views of array layers, cube views of 6- and 12-layer textures and an
 // array view of a cube, copyTextureToBuffer of depth, stencil, packed and snorm formats, occlusion queries, render
 // bundles, textureGather in every address mode and textureGatherCompare, an external texture from a VideoFrame, and
-// two regressions (an upload on the wrong texture unit; depth writes after a multisample resolve).
+// two regressions (an upload on the wrong texture unit; depth writes after a multisample resolve), and a depth texture
+// sampled by the pass it is attached to read-only.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 
@@ -105,6 +106,15 @@ try {
       assert.equal(r['depth32float depth'][0], 0.25, 'the triangle wrote z 0.25');
       assert.equal(r['stencil8 stencil'][0], 0xa7, 'two increments over 0xa5');
       assert.deepEqual(r.rgb10a2unorm, [0x3ff, 0, 0x155, 0x2aa, 0x40000001, 0xc00ffc00, 0x12345678, 0x87654321]);
+    }
+    if (name === 'readOnlyDepth') {
+      // Red is the sampled depth, green marks a pixel that passed the depth test against the attachment (z 0.5, greater).
+      assert.deepEqual(
+        [r.split[0], r.split[1], r.split[8], r.split[9]],
+        [0.25, 1, 0, 0],
+        'the left half is drawn with the depth it samples, the right half fails the depth test',
+      );
+      assert.deepEqual(r.low.slice(0, 2), [0.125, 1], 'the next round samples the depth written since');
     }
     if (name === 'regressions') {
       assert.deepEqual(r.upload.slice(0, 8), [1, 0, 0, 1, 0, 1, 0, 1], 'the upload reached the texture it named');
