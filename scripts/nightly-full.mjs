@@ -34,6 +34,12 @@ import { describeProfile, machineProfile } from './support/machine-profile.mjs';
 const root = resolve(import.meta.dirname, '..');
 
 /** `2026-10-25T0300`, local time: sorts as a date, and two runs on one day keep separate logs. */
+/** The result cache's ledger: a key the uncached nightly failed while the store held a pass (a flake or a hidden input). */
+export function copyCacheLedger(root, out) {
+  const ledger = join(root, 'test-results', 'cache', 'disagreements.json');
+  if (existsSync(ledger)) writeFileSync(join(out, 'cache-disagreements.json'), readFileSync(ledger));
+}
+
 export const stamp = (date = new Date()) => {
   const p = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}${p(date.getMinutes())}`;
@@ -347,9 +353,7 @@ export function publishStatus({ dir, profile, env = process.env, run = spawnSync
     mkdirSync(out, { recursive: true });
     writeFileSync(join(out, 'last-status.json'), `${JSON.stringify(status, null, 2)}\n`);
     writeFileSync(join(out, 'last-log.txt'), lastLines(status.log));
-    // The result cache's ledger: a key the uncached nightly failed while the store held a pass (a flake or a hidden input).
-    const ledger = join(root, 'test-results', 'cache', 'disagreements.json');
-    if (existsSync(ledger)) writeFileSync(join(out, 'cache-disagreements.json'), readFileSync(ledger));
+    copyCacheLedger(root, out);
     git('add', '--', profile);
     if (git('status', '--porcelain', '--', profile).trim()) {
       git(

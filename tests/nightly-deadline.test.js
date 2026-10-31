@@ -4,11 +4,11 @@
 // grandchild and sleeps proves the tree dies; a tiny deadline keeps it to seconds.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { deadlineMs, lastLines, publishStatus, runNightly } from '../scripts/nightly-full.mjs';
+import { copyCacheLedger, deadlineMs, lastLines, publishStatus, runNightly } from '../scripts/nightly-full.mjs';
 
 const env = { ...process.env, MARGO_NIGHTLY_NO_ALERT: '1' };
 const alive = (pid) => {
@@ -172,4 +172,20 @@ test('lastLines keeps the last lines of a log and gives nothing for a missing fi
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('the result cache ledger is copied to the status folder when there is one, and nothing is made when there is not', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'margo-ledger-')),
+    out = mkdtempSync(join(tmpdir(), 'margo-ledger-out-'));
+  t.after(() => {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(out, { recursive: true, force: true });
+  });
+  copyCacheLedger(root, out);
+  assert.equal(existsSync(join(out, 'cache-disagreements.json')), false);
+  mkdirSync(join(root, 'test-results', 'cache'), { recursive: true });
+  const ledger = '{"disagreements":[{"key":"abc"}]}\n';
+  writeFileSync(join(root, 'test-results', 'cache', 'disagreements.json'), ledger);
+  copyCacheLedger(root, out);
+  assert.equal(readFileSync(join(out, 'cache-disagreements.json'), 'utf8'), ledger);
 });
