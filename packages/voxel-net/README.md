@@ -113,6 +113,7 @@ or angle brackets, at most 2 stacked combining marks, whitespace collapsed. Stil
 | `filterName` | none | `(name, id) => string`: your rule for names, such as a word list or a fallback. Its result is cleaned too. A throw, or a result that is not a string, goes to `onError` and closes the client with 1011 `'name-failed'`. |
 | `server.exportEdits()` | | Resolves to a `Map` of `'cx,cy,cz'` to a copy of each chunk edited since the server started, including those past `maxEditedChunks` in the `store`. A store cannot be listed, so what it holds from an earlier run and nobody edited in this one is left out. |
 | `server.importEdits(map)` | | Makes the edited chunks exactly `map`: its chunks replace what the world holds, other edited chunks go back to the generator's, matching ones are left alone. Clients holding a changed chunk get it again. Everything is checked first, so a rejection changes nothing. Works before `listen`. With a `store`, going back to the generator's needs the store's `delete(key)`. |
+| `client.onClose` | does nothing | `({ code, reason, byClient }) => void`: called once when a `connectVoxelNet` connection has ended, however it ended, after any `onError`. A clean server shutdown is code 1001 with the server's reason and no `onError`; `byClient` is true after `client.close()`. Use it to rejoin; no second socket is needed. With your own transport, call it yourself. |
 
 ```ts
 import { readFile, writeFile } from 'node:fs/promises';

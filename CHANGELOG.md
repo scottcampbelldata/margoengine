@@ -7,6 +7,8 @@
 - **Breaking:** `PROTOCOL_VERSION` is 2. Server and clients must be built from the same version; a client on another one
   is closed with 1008 and a reason naming both. `connectVoxelNet` now passes any close but 1000 and 1001 to `onError`
   as a MargoError `'failed'` with the code and reason; before, a refused page heard nothing.
+- `client.onClose({ code, reason, byClient })`: `connectVoxelNet` calls it once when the connection has ended, a clean
+  server shutdown (1001, no `onError`) included, so a page can rejoin without a socket of its own.
 - `RemotePlayer.name`: other players' display names, from a new `names` message. The server cleans every name with the
   new `cleanPlayerName` (controls, bidi overrides, zero widths, blank letters, angle brackets, stacked marks) and the
   new `filterName` option applies your own rule. `player.name` and `authenticate` now see the cleaned name.

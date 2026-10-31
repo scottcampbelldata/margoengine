@@ -75,6 +75,16 @@ export interface RemotePlayer {
   last?: { time: number; position: MutableVec3 };
 }
 
+/** How a connection ended, for {@link VoxelNetClient.onClose}. */
+export interface VoxelNetClose {
+  /** The WebSocket close code: 1001 when the server shut down cleanly, 1006 when the connection was lost or never made. */
+  code: number;
+  /** The reason the server gave, `''` for none. */
+  reason: string;
+  /** Whether this client started the close, through {@link VoxelNetClient.close} or after a message it could not read. */
+  byClient: boolean;
+}
+
 /** Bytes and events a client counted since it was created. */
 export interface VoxelNetClientStats {
   /** Bytes of messages received, by message type. */
@@ -144,6 +154,12 @@ export class VoxelNetClient {
   onLoaded: () => void = () => {};
   /** Called with each block change list the server sends, flat `[x, y, z, state, ...]`, before it is applied. */
   onBlocks: (changes: Int32Array) => void = () => {};
+  /**
+   * Called once when the connection has ended, however it ended: read `code` and `reason` to rejoin after a server
+   * shutdown (1001). {@link connectVoxelNet} calls it; with your own {@link VoxelNetTransport}, call it yourself when
+   * the transport ends. Default does nothing.
+   */
+  onClose: (event: VoxelNetClose) => void = () => {};
   /** Receives errors: a message the client cannot read, a chunk that fails to decode. Default console.error. */
   onError: (error: unknown) => void = (error) => console.error(error);
   readonly #transport: VoxelNetTransport;
@@ -473,7 +489,8 @@ export class VoxelNetClient {
 /**
  * Connects a {@link VoxelNetClient} to a voxel-net server with the browser's WebSocket. When the server refuses or drops
  * the connection (any close but 1000 and 1001, for example another protocol version), `onError` gets a MargoError
- * `'failed'` holding the close code and reason.
+ * `'failed'` holding the close code and reason. Every way the connection ends, a clean server shutdown included, calls
+ * {@link VoxelNetClient.onClose} once, after any `onError`.
  * @throws MargoError `'unsupported'` where there is no global WebSocket.
  * @throws as the {@link VoxelNetClient} constructor.
  */
@@ -504,14 +521,20 @@ export function connectVoxelNet(
   });
   socket.addEventListener('message', (event) => client.receive(new Uint8Array(event.data as ArrayBuffer)));
   socket.addEventListener('close', ({ code, reason }) => {
-    if (!closing && code !== 1000 && code !== 1001)
-      client.onError(
-        new MargoError(
-          'failed',
-          `The voxel-net server closed the connection with ${code}${reason ? ` (${reason})` : ''}; check that it is running and that server and client are the same version`,
-        ),
-      );
-    client.close();
+    // Read first: an onError handler may call client.close(), which does not make this close the client's.
+    const byClient = closing;
+    try {
+      if (!byClient && code !== 1000 && code !== 1001)
+        client.onError(
+          new MargoError(
+            'failed',
+            `The voxel-net server closed the connection with ${code}${reason ? ` (${reason})` : ''}; check that it is running and that server and client are the same version`,
+          ),
+        );
+    } finally {
+      client.close();
+      client.onClose({ code, reason, byClient });
+    }
   });
   return client;
 }

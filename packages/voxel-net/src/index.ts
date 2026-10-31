@@ -4,6 +4,7 @@ export type {
   RemotePlayer,
   VoxelNetClientOptions,
   VoxelNetClientStats,
+  VoxelNetClose,
   VoxelNetControls,
   VoxelNetTransport,
 } from './client.js';
