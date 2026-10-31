@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3934209,
+  "total": 3935041,
   "history": [
     {
       "date": "2026-10-24",
@@ -980,6 +980,12 @@
       "commit": "c2e927a36",
       "reason": "gltf-pro extended: the native transmission tint shares the layered transmitted light (KHR_materials_specular, sheen, clearcoat; +150 B); spec bug fix",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "4f309c27a",
+      "reason": "react: Canvas maxDpr (pixel-ratio cap through the light tier) and the development hints for lowercase R3F tags and WebGL2 pointer handlers add 832 B gzip to the react entry (7,168 to 8,000 B); core and stage are unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -1219,7 +1225,7 @@
     "@margoengine/quality": 2705,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 6511,
-    "@margoengine/react": 7424,
+    "@margoengine/react": 8256,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/controls": 4346,
     "@margoengine/react/dof": 1157,
