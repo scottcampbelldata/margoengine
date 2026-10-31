@@ -492,7 +492,7 @@ export async function sceneHelperBrowserChecks(page) {
           try {
             query();
           } catch (error) {
-            rejected = /^Mesh disposed$/.test(error.message);
+            rejected = /^Mesh disposed; see /.test(error.message);
           }
           check(rejected, 'facade query accepted a disposed PBR handle');
         }, 'stale facade query performed GPU work');

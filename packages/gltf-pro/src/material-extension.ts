@@ -1,4 +1,5 @@
 import { retire } from '../../shared/frame-resources.js';
+import { margoError } from '../../shared/errors.js';
 import { transmissionWeight } from '../../shared/pbr-transmission.js';
 
 /** Caller-owned, filterable 2D texture and optional filtering sampler. */
@@ -22,6 +23,12 @@ export interface MaterialExtension {
    * transmission path, so reflections keep their strength. The value is in `s.tr`.
    */
   transmission?: string;
+  /**
+   * WGSL f32 expression (evaluated after `wgsl`) of the surface's index of refraction (KHR_materials_ior; values below 1
+   * count as 1): the dielectric F0 of direct and ambient light becomes ((ior - 1) / (ior + 1))^2 in place of 0.04
+   * (IOR 1.5), as on the native physical path, so IOR 1 reflects nothing. The value is in `s.f0`. Default: F0 0.04.
+   */
+  ior?: string;
   /** Statements after surface(i,front), in every fragment entry point. May mutate s. */
   wgsl?: string;
   /** Beauty-only statements after directional direct lighting, before lighting effects. */
@@ -72,6 +79,7 @@ export function prepareMaterialExtension(
     (extension.ambient !== undefined && typeof extension.ambient !== 'string') ||
     (extension.output !== undefined && typeof extension.output !== 'string') ||
     (extension.transmission !== undefined && typeof extension.transmission !== 'string') ||
+    (extension.ior !== undefined && typeof extension.ior !== 'string') ||
     (extension.lighting !== undefined && typeof extension.lighting !== 'boolean') ||
     (extension.declarations !== undefined && typeof extension.declarations !== 'string')
   )
@@ -149,8 +157,28 @@ export function materialExtensionSurface(code: string, extension: MaterialExtens
     'let s=surface(i,front);',
     () =>
       `var s=surface(i,front);\n${extensionAccess(extension)}${extension.wgsl ?? ''}\n` +
-      (extension.transmission ? `s.tr=clamp(${extension.transmission},0.0,1.0);\n` : ''),
+      (extension.transmission ? `s.tr=clamp(${extension.transmission},0.0,1.0);\n` : '') +
+      (extension.ior
+        ? `{let materialIorRatio=(max(${extension.ior},1.0)-1.0)/(max(${extension.ior},1.0)+1.0);s.f0=vec3f(materialIorRatio*materialIorRatio);}\n`
+        : ''),
   );
+}
+
+/**
+ * `code` with a per-surface dielectric F0 (`s.f0`, set from the extension's `ior` in the surface hook) in place of the
+ * fixed 0.04 in every metal/rough F0, as gltf-pro's native physical shader does. Throws when the shader has no Surface
+ * struct or no F0 to replace, so a changed base shader cannot silently keep 0.04.
+ */
+function dielectricIor(code: string): string {
+  if (code.includes(' f0:vec3f')) return code;
+  const fixed = 'mix(vec3f(0.04),s.base.rgb,s.metal)',
+    struct = /struct Surface \{([^}]*)\}/;
+  if (!struct.test(code) || !code.includes(fixed))
+    throw margoError(
+      'unsupported',
+      'PBR shader IOR target missing: the Surface struct or its 0.04 F0; use matching @margoengine/gltf-pro and materials versions',
+    );
+  return code.replace(struct, 'struct Surface {$1, f0:vec3f}').replaceAll(fixed, 'mix(s.f0,s.base.rgb,s.metal)');
 }
 
 export function materialExtensionShader(source: string, extension: MaterialExtension): string {
@@ -166,6 +194,7 @@ export function materialExtensionShader(source: string, extension: MaterialExten
   // Phony assignments retain the resource interface even for factors-only slots,
   // without texture samples or changes to the surface (WGSL 9.2.3).
   let code = extension.transmission ? transmissionWeight(source) : source;
+  if (extension.ior) code = dielectricIor(code);
   if (extension.direct)
     code = code.replace('let direct=', 'var direct=').replace('var color=', () => `${extension.direct}\n  var color=`);
   if (extension.output)

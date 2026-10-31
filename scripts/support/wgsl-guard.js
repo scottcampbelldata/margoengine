@@ -9,8 +9,13 @@
 // A check that compiles broken WGSL on purpose (to test how the error is reported) names that one module with the
 // label `expect-error:<name>`; only its errors are excused, and the run fails if it does not fail.
 // scripts/browser.js installs it in every page it opens; scripts/visual-regression.js in every view's context.
+// Every module's compilation info is asked for when the module is created, and a check's own later
+// `module.getCompilationInfo()` returns that answer (Chromium can leave a later request pending; see below).
 
-/** Init script: wraps GPUDevice.prototype.createShaderModule to check each distinct source's compilation info. */
+/**
+ * Init script: wraps GPUDevice.prototype.createShaderModule to check each distinct source's compilation info, and
+ * makes each module's getCompilationInfo() return the answer asked for at its creation.
+ */
 export function wgslGuard() {
   if (typeof GPUDevice === 'undefined' || GPUDevice.prototype.createShaderModule.margoWgslGuard) return;
   const create = GPUDevice.prototype.createShaderModule,
@@ -23,7 +28,14 @@ export function wgslGuard() {
   const guarded = function (descriptor) {
     const module = create.call(this, descriptor),
       code = typeof descriptor?.code === 'string' ? descriptor.code : '',
-      key = hash(code);
+      key = hash(code),
+      // Asked at creation, for every module: Chromium (Edge 156 here) leaves a getCompilationInfo() asked later, once
+      // the device has gone idle, pending until some other GPU request runs, and a suite that awaited one sat until
+      // its lock limit (material-extension-tests.js). A module's compilation info never changes, so each later call
+      // gets this answer. Engine code must ask at creation itself (tests/compilation-info-at-creation.test.js).
+      compiled = module.getCompilationInfo();
+    compiled.catch(() => {});
+    module.getCompilationInfo = () => compiled;
     // scripts/check-wgsl.mjs compiles fragments on purpose and judges them itself.
     const label = String(descriptor?.label ?? '');
     if (!seen.has(key) && !label.startsWith('check-wgsl:')) {
@@ -34,7 +46,7 @@ export function wgslGuard() {
       const pending = (globalThis.__margoWgslPending ??= new Map()),
         id = globalThis.__margoWgslReports?.length ?? 0;
       pending.set(id, label || key);
-      const report = module.getCompilationInfo().then((info) => {
+      const report = compiled.then((info) => {
         const lines = code.split('\n'),
           errors = info.messages.filter((m) => m.type === 'error');
         if (label.startsWith('expect-error:')) {

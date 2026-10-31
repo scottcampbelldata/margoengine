@@ -152,7 +152,7 @@ export function materialLobes(options: MaterialLobeOptions = {}, base?: Material
   const values = validateLobes(options),
     factors = [...(base?.factors ?? [])],
     textures: MaterialExtensionTexture[] = [...(base?.textures ?? [])],
-    config: LobeShaderConfig = { ior: values.ior, coordinateHelper: false };
+    config: LobeShaderConfig = { ior: values.ior, transmits: !!base?.transmission, coordinateHelper: false };
   let transformed = false;
   const slot = (map?: ClearcoatTexture) => {
     if (!map) return undefined;

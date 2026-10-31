@@ -450,20 +450,27 @@ export async function nodeBrowserChecks(page) {
           difference(straight.beauty, arithmeticIOR.beauty).changed === 0,
           'Scalar arithmetic for node IOR did not preserve IOR-1 parity',
         );
+        // At the default IOR 1.5, whose F0 0.04 the opaque baseline reflects too: at IOR 1 a mapped factor of zero
+        // keeps the extension and reflects nothing (KHR_materials_ior), unlike the opaque baseline.
+        const glass = await render(
+          (model) => materials.installNodeMaterial(model, txGraph(1, scalar(1.5))),
+          fixtures.front,
+          true,
+        );
         const transmissionMapZero = await render(
-          (model) => materials.installNodeMaterial(model, txGraph({ type: 'texture', texture: redZero })),
+          (model) => materials.installNodeMaterial(model, txGraph({ type: 'texture', texture: redZero }, scalar(1.5))),
           fixtures.front,
           true,
         );
         const transmissionMapOne = await render(
-          (model) => materials.installNodeMaterial(model, txGraph({ type: 'texture', texture: redOne })),
+          (model) => materials.installNodeMaterial(model, txGraph({ type: 'texture', texture: redOne }, scalar(1.5))),
           fixtures.front,
           true,
         );
         const transmissionMapZeroDifference = difference(glassBaseline.beauty, transmissionMapZero.beauty, true);
         assert(transmissionMapZeroDifference.max <= 1, 'Transmission node factor must use texture red');
         assert(
-          difference(straight.beauty, transmissionMapOne.beauty).changed === 0,
+          difference(glass.beauty, transmissionMapOne.beauty).changed === 0,
           'Transmission node red=1 differs from its scalar factor',
         );
         const volume = { thickness: scalar(1), attenuationColor: constant([0.2, 1, 1, 1]), attenuationDistance: 0.5 };

@@ -16,6 +16,11 @@ export interface LobeShaderConfig {
   /** [factor, film IOR, minimum thickness nm, maximum thickness nm]. */
   iridescence?: { index: number; factor?: ClearcoatTextureSlot; thickness?: ClearcoatTextureSlot };
   ior?: number;
+  /**
+   * True when the composed extension also composites transmission (its `transmission` weight, `s.tr`): the diffuse
+   * light the lobes recompute then scales by 1 - s.tr, as the host's own diffuse and ambient do.
+   */
+  transmits?: boolean;
   /** False when an earlier extension already declares materialUV. */
   coordinateHelper?: boolean;
 }
@@ -32,6 +37,8 @@ export function lobeShader(
     ior = config.ior ?? 1.5;
   if (!Number.isFinite(Math.fround(ior)) || ior < 1)
     throw new RangeError('Invalid lobe IOR; pass a finite index of refraction of at least 1.');
+  // The untransmitted share of diffuse light (shared/pbr-transmission.js); the text stays unchanged without transmission.
+  const diffuseShare = config.transmits ? '*(1.0-s.tr)' : '';
   const dielectricF0 =
     ior === 1.5
       ? '0.04'
@@ -156,7 +163,7 @@ ${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenA
     let materialWeight=pow(1-materialVH,5.0);
     let materialBaseF0=mix(vec3f(0.04),s.base.rgb,s.metal);let materialBaseFresnel=materialBaseF0+(1-materialBaseF0)*materialWeight;
     var materialFresnel=materialBaseFresnel;
-    var materialDiffuse=(1-materialBaseFresnel)*(1-s.metal)*s.base.rgb/3.14159265;
+    var materialDiffuse=(1-materialBaseFresnel)*(1-s.metal)${diffuseShare}*s.base.rgb/3.14159265;
     if(materialSpecularActive||materialFilmActive){
       let materialDielectricF0=materialLobesDielectricF0(material);
       var materialDielectric=(materialDielectricF0+(1-materialDielectricF0)*materialWeight)*material.specular.a;
@@ -170,7 +177,7 @@ ${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenA
           : ''
       }
       materialFresnel=mix(materialDielectric,materialMetal,s.metal);
-      materialDiffuse=(1.0-materialLobesMax(materialDielectric))*(1.0-s.metal)*s.base.rgb/3.14159265;
+      materialDiffuse=(1.0-materialLobesMax(materialDielectric))*(1.0-s.metal)${diffuseShare}*s.base.rgb/3.14159265;
     }
     materialResult=(materialDiffuse+materialFresnel*materialSpecularBRDF)*materialNL*f.radiance.rgb*f.light.w;
   }
@@ -196,7 +203,7 @@ fn materialLobesAmbient(s:Surface,baseline:vec3f,material:MaterialLobeInputs)->v
     }`
         : ''
     }
-    materialResult=(s.base.rgb*(1-s.metal)+mix(materialDielectric,materialMetal,s.metal)*0.5)*materialHemisphere;
+    materialResult=(s.base.rgb*(1-s.metal)${diffuseShare}+mix(materialDielectric,materialMetal,s.metal)*0.5)*materialHemisphere;
   }
   if(materialSheenActive){let materialEnergy=materialLobesSheenAlbedo(material.viewCos,material.sheen.a);materialResult=materialResult*max(0.0,1.0-materialLobesMax(material.sheen.rgb)*materialEnergy)+material.sheen.rgb*materialEnergy*materialHemisphere;}
   return materialResult;

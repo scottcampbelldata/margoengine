@@ -327,7 +327,7 @@ export async function pbrBoxBrowserChecks(page) {
       body.remove();
       check(physics.bodyCount === 0, 'body removal retained its fitted collider');
       const empty = instance.createMesh();
-      rejects(() => physics.addBody(empty), /^No geometry$/, 'empty-mesh root fitting');
+      rejects(() => physics.addBody(empty), /^Mesh has no geometry;/, 'empty-mesh root fitting');
       check(physics.bodyCount === 0, 'empty fitting retained a body');
       empty.dispose();
       physics.dispose();
@@ -345,7 +345,7 @@ export async function pbrBoxBrowserChecks(page) {
         'model disposal retained registry/GPU ownership',
       );
       const disposedPhysics = (physics = new Physics(instance, { rapier: RAPIER }));
-      rejects(() => disposedPhysics.addBody(mesh), /^Mesh disposed$/, 'disposed mesh handle');
+      rejects(() => disposedPhysics.addBody(mesh), /^Mesh disposed; see /, 'disposed mesh handle');
       check(disposedPhysics.bodyCount === 0, 'disposed handle retained a physics body');
       disposedPhysics.dispose();
       physics = undefined;
@@ -387,7 +387,7 @@ export async function pbrBoxBrowserChecks(page) {
         avocadoBytes = await (await fetch('/test-results/pbr-box-avocado/Avocado.bin')).arrayBuffer();
       rejects(
         () => parseGLTF(instance, avocadoDoc, [avocadoBytes]),
-        /^Draco geometry requires parseGLTFAsync or loadGLTF$/,
+        /^Draco geometry requires parseGLTFAsync or loadGLTF/,
         'synchronous Avocado diagnostic',
       );
       avocado = await loadGLTF(instance, '/test-results/pbr-box-avocado/Avocado.gltf');

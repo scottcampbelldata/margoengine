@@ -46,7 +46,7 @@ function readMap(slot: ClearcoatTextureSlot, explicitLevel: boolean): string {
 export function transmissionShader(
   textures: TransmissionShaderTextures,
   values?: TransmissionShaderValues,
-): Pick<MaterialExtension, 'declarations' | 'output' | 'transmission'> {
+): Pick<MaterialExtension, 'declarations' | 'output' | 'transmission' | 'ior'> {
   const row = textures.factorsIndex ?? 0,
     first = `materialFactors[${row}]`,
     second = `materialFactors[${row + 1}]`,
@@ -151,6 +151,8 @@ fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,factor:f32,ior:f3
 `;
   return {
     transmission: factor,
+    // The host's reflection F0 follows this IOR too (0 at IOR 1), the same F0 the transmitted share subtracts.
+    ior,
     output: `if(s.tr>0.0){color=materialTransmission(i,s,color,front,s.tr,${ior},${thickness},${attenuation},${inverseDistance},${dispersion});}`,
     declarations,
   };

@@ -2,8 +2,11 @@
 // without importing it (the import went into a generated page's source instead), so `modern:test:bundlers` died with
 // `ReferenceError: closeAll is not defined` only after the landing lock had been held for an hour. Node reports a
 // missing name only when the line runs; Biome's `noUndeclaredVariables` rule reports it from the source. This runs
-// the rule over every tracked .mjs file (scripts, tests, tools, examples) and fails on a name that is neither
-// imported, declared, nor a global. Page code that a script sends to the browser is declared in biome.json `overrides`.
+// the rule over every tracked .mjs file (scripts, tests, tools, examples) and every .js file under scripts/, and fails
+// on a name that is neither imported, declared, nor a global. Page code that a script sends to the browser is declared in
+// biome.json `overrides`. The .js files joined after the same slip reached gltf-ktx2-production-tests.js and
+// gltf-compression-browser-tests.js, where the `closeAll` import sat inside the consumer page's source: the first died
+// in modern:test:extensions, and its Vite build could not resolve the import either.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { rmSync, writeFileSync } from 'node:fs';
@@ -43,8 +46,12 @@ export function undeclaredNames(files) {
   return found.map((entry) => entry.split(String.fromCharCode(92)).join('/'));
 }
 
-test('no tracked .mjs file uses a name it does not import or declare (bug 70)', () => {
-  const files = execFileSync('git', ['ls-files', '*.mjs'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 })
+test('no tracked .mjs file or .js script uses a name it does not import or declare (bug 70)', () => {
+  const files = execFileSync('git', ['ls-files', '*.mjs', 'scripts/**/*.js', 'scripts/*.js'], {
+    cwd: root,
+    encoding: 'utf8',
+    maxBuffer: 1 << 28,
+  })
     .split('\n')
     .filter((file) => file && !/(^|\/)(node_modules|dist|vendor)\//.test(file));
   const found = undeclaredNames(files);

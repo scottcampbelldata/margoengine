@@ -288,6 +288,10 @@ the model retains ownership and closes them when disposed.
 return, after tone mapping/output encoding. `lighting: false` omits optional
 lighting shaders and bindings for a caller-managed surface. The material package
 uses these hooks for transmission while retaining the baseline factor-zero path.
+`transmission` (a WGSL weight, kept in `s.tr`) scales diffuse and ambient light by
+1 minus it, and `ior` (a WGSL index of refraction, kept as `s.f0`) sets the
+dielectric F0 of direct and ambient light to ((ior - 1) / (ior + 1))^2 in place of
+0.04, as the native physical path does; without `ior` the F0 stays 0.04.
 The optional `ambient` statements can mutate `materialAmbient` after hemisphere
 lighting in beauty and ambient-only passes. They are applied after lighting
 effects have matched the standard PBR source. Materials uses this hook for sheen,

@@ -127,3 +127,47 @@ test('expect-error excuses only the labelled shader, and only when it fails', as
   assert.equal(watched.errors.length, 1, 'other shaders still fail');
   assert.match(watched.errors[0], /^other /);
 });
+
+// Regression: modern:test:extensions sat until its 30 minute lock limit. material-extension-tests.js asked
+// getCompilationInfo() for its 41 modules after the device had gone idle, and Chromium (Edge 156 on the RTX A6000 PC)
+// left every one of those requests pending until another GPU request ran; the same request made when a module is
+// created is answered. The guard asks once per module at creation and answers every later call with it.
+test('a compilation info asked for after the device went idle gets the answer asked for at creation', async () => {
+  delete globalThis.__margoWgslReports;
+  delete globalThis.__margoWgslPending;
+  const original = console.debug;
+  console.debug = () => {};
+  let creating = false,
+    asks = 0;
+  // A stand-in for that Chromium behaviour: answered while its module is being created, never once idle.
+  globalThis.GPUDevice = class {
+    createShaderModule({ code }) {
+      creating = true;
+      queueMicrotask(() => (creating = false));
+      return {
+        getCompilationInfo: () => {
+          asks++;
+          return creating ? Promise.resolve({ messages: [], code }) : new Promise(() => {});
+        },
+      };
+    }
+  };
+  let modules;
+  try {
+    wgslGuard();
+    const device = new GPUDevice();
+    // The second module repeats the first one's source: the guard reports it once, but still answers for it.
+    modules = [device.createShaderModule({ code: 'fine a' }), device.createShaderModule({ code: 'fine a' })];
+  } finally {
+    console.debug = original;
+    delete globalThis.GPUDevice;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const late = modules.map((module) => module.getCompilationInfo());
+  const outcome = await Promise.race([
+    Promise.all(late).then((infos) => infos.map((info) => info.code)),
+    new Promise((resolve) => setTimeout(() => resolve('pending'), 500)),
+  ]);
+  assert.deepEqual(outcome, ['fine a', 'fine a']);
+  assert.equal(asks, 2, 'one request per module, made at its creation');
+});

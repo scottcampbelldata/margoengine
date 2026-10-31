@@ -43,6 +43,38 @@
       "javascript": { "globals": ["presetProbe", "presetSpans", "dofDemo", "sandbox"] }
     },
     {
+      "includes": ["scripts/**/*.js"],
+      "javascript": {
+        "globals": [
+          "nightCitadel",
+          "physicalMaps",
+          "meadowAudit",
+          "gpuAudit",
+          "vfxIslandAudit",
+          "extensionDemo",
+          "demoLoad",
+          "coreHooks",
+          "uvGroups",
+          "earthDemo",
+          "sandbox",
+          "afterlightStartup",
+          "auditFixture",
+          "desktopDemoAudit",
+          "vfxIslandProfiler",
+          "scene",
+          "sectionLoadedAsset",
+          "initialAfterlightHeightmap",
+          "originalEarth",
+          "startupResourceAudit",
+          "startupAudit",
+          "touchDefaults",
+          "originalEarthRotation",
+          "originalEarthClouds",
+          "startupApiTrace"
+        ]
+      }
+    },
+    {
       "includes": ["examples/package-benchmarks/vfx-island.mjs"],
       "javascript": { "globals": ["sandbox", "vfxPass", "vfxSamples"] }
     },

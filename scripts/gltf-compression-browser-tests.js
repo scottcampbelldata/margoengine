@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser } from './lib/browser.mjs';
 import { build, preview } from 'vite';
+import { closeAll } from './support/shutdown.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results/gltf-compression-browser');
@@ -59,7 +60,6 @@ await writeFile(
   `
 import {Engine} from '@margoengine/core';
 import {loadGLTF, parseGLTF} from '@margoengine/gltf-pro';
-import { closeAll } from './support/shutdown.mjs';
 
 window.runCompressionConsumer = async kind => {
   const NativeWorker = window.Worker, workers = [];

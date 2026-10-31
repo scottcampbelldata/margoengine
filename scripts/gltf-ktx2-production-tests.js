@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { launchBrowser } from './lib/browser.mjs';
 import { build, preview } from 'vite';
 import { basisTextureQuad } from '../tests/support/texture-fixture.js';
+import { closeAll } from './support/shutdown.mjs';
 
 const repository = fileURLToPath(new URL('..', import.meta.url)),
   results = resolve(repository, 'test-results/gltf-ktx2-production');
@@ -29,7 +30,6 @@ await writeFile(
   `
 import {Engine} from '@margoengine/core';
 import {loadGLTF} from '@margoengine/gltf-pro';
-import { closeAll } from './support/shutdown.mjs';
 window.runKTX2Consumer=async()=>{
   const NativeWorker=window.Worker,workers=[];
   window.Worker=class extends NativeWorker{

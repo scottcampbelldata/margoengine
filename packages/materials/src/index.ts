@@ -327,20 +327,10 @@ export class MaterialInstallation implements EnginePlugin {
                   : textures.resolve(map, field === 'sheenColorTexture' || field === 'specularColorTexture');
           }
           for (const field of mapFields) options[field] = resolved[field];
-          let coat = plan.coat ? clearcoat(options) : undefined;
-          if (plan.lobes) {
-            const lobes: MaterialLobeOptions = { ...plan.lobes };
-            for (const key of Object.keys(lobeMaps) as (keyof typeof lobeMaps)[])
-              if (lobes[key]) {
-                const value = { ...lobes[key] };
-                for (const field of lobeMaps[key])
-                  if (resolved[field]) Object.assign(value, { [field]: resolved[field] });
-                Object.assign(lobes, { [key]: value });
-              }
-            coat = materialLobes(lobes, coat);
-          }
+          const coat = plan.coat ? clearcoat(options) : undefined;
           plan.opaqueIndex = plan.transmission ? (coat?.textures?.length ?? 0) : undefined;
-          const extension = plan.transmission
+          // Transmission first, so lobes composed over it know the surface transmits (lobeShader `transmits`).
+          let extension = plan.transmission
             ? createTransmission(
                 {
                   ...plan.transmission,
@@ -352,9 +342,20 @@ export class MaterialInstallation implements EnginePlugin {
                 },
                 coat,
               )
-            : coat!;
-          if (plan.extension?.factors) extension.factors = plan.extension.factors;
-          return { plan, extension };
+            : coat;
+          if (plan.lobes) {
+            const lobes: MaterialLobeOptions = { ...plan.lobes };
+            for (const key of Object.keys(lobeMaps) as (keyof typeof lobeMaps)[])
+              if (lobes[key]) {
+                const value = { ...lobes[key] };
+                for (const field of lobeMaps[key])
+                  if (resolved[field]) Object.assign(value, { [field]: resolved[field] });
+                Object.assign(lobes, { [key]: value });
+              }
+            extension = materialLobes(lobes, extension);
+          }
+          if (plan.extension?.factors) extension!.factors = plan.extension.factors;
+          return { plan, extension: extension! };
         });
       for (const { plan, extension } of ready) {
         extension.replacesPhysical = true;

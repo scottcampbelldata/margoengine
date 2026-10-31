@@ -108,7 +108,7 @@ the complete-asset runner also checks original Khronos models.
 
 Positive transmission opts into a shared opaque-color capture. All opaque and masked PBR primitives, including those from other models, render before the snapshot; blended primitives render afterward. The snapshot preserves the scene format and supports 1x or 4x MSAA, including an existing HDR capture. No frozen core or stage pass is changed. Transmission factor `0` leaves the opaque material and its allocation path unchanged.
 
-Transmission defaults to factor `0` and IOR `1.5`. Its optional texture multiplies the factor using the red channel. Refraction samples the opaque color already rendered this frame; IOR `1` samples the same pixel without bending. This is screen-space transmission with one background sample. It does not trace rays or produce multiple bounces.
+Transmission defaults to factor `0` and IOR `1.5`. Its optional texture multiplies the factor using the red channel. The IOR also sets the surface's reflection, F0 = ((IOR - 1) / (IOR + 1))^2 (KHR_materials_ior: 0.04 at 1.5, none at 1), and lobes such as sheen or specular keep only the untransmitted share of their diffuse light, so a fully transmissive IOR `1` surface shows exactly what is behind it. Refraction samples the opaque color already rendered this frame; IOR `1` samples the same pixel without bending. This is screen-space transmission with one background sample. It does not trace rays or produce multiple bounces.
 
 Thin glass (no or zero volume thickness) keeps its sightline: it samples the pixel behind it, as glTF specifies. Only positive thickness bends the view along a refraction path. Off-screen coordinates clamp to the image edge, and transparent layers are absent from the opaque snapshot.
 

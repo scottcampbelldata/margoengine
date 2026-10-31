@@ -149,6 +149,14 @@ export async function textureBrowserChecks(page) {
         pipelines.push({ value, descriptor, code: modules.get(descriptor.vertex.module) });
         return value;
       };
+      // The pipelines a render binds: gltf-pro shares a pipeline across models with the same shader, so a render can
+      // draw with one created before it.
+      const setPipeline = GPURenderPassEncoder.prototype.setPipeline;
+      let bound = [];
+      GPURenderPassEncoder.prototype.setPipeline = function (value) {
+        bound.push(value);
+        return setPipeline.call(this, value);
+      };
       device.createTexture = (descriptor) => {
         const value = createTexture(descriptor),
           record = { value, descriptor, destroyed: false },
@@ -223,8 +231,8 @@ export async function textureBrowserChecks(page) {
       const renderModel = async (model) => {
         captures++;
         engine.store.tick(false);
-        const before = pipelines.length,
-          encoder = device.createCommandEncoder();
+        bound = [];
+        const encoder = device.createCommandEncoder();
         const context = {
           backend: 'webgpu',
           device,
@@ -257,9 +265,12 @@ export async function textureBrowserChecks(page) {
         model.draw(context, 'gbuffer', normalView, depthView);
         device.queue.submit([encoder.finish()]);
         await device.queue.onSubmittedWorkDone();
-        const pipeline = pipelines
-          .slice(before)
-          .find((item) => item.descriptor.vertex.entryPoint === 'vertex' && item.code?.includes('fn surface('));
+        const pipeline = pipelines.find(
+          (item) =>
+            bound.includes(item.value) &&
+            item.descriptor.vertex.entryPoint === 'vertex' &&
+            item.code?.includes('fn surface('),
+        );
         return { beauty: await read(), normals: await read(normalTarget), pipeline };
       };
       const render = async (fixture, coat = false) => {
@@ -316,14 +327,11 @@ export async function textureBrowserChecks(page) {
           identity = await render(payload.identity);
         const baselineDifference = difference(ordinary.beauty, identity.beauty);
         assert(baselineDifference.changed === 0, 'Identity transform changed ordinary PBR pixels');
-        const hash = async (value) =>
-          [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))]
-            .map((byte) => byte.toString(16).padStart(2, '0'))
-            .join('');
-        assert(
-          (await hash(ordinary.pipeline.code)) === '45df766b2c73181edc3cbd8109a848f17851f03b7cc947dec8d987ff60c2dee5',
-          'Ordinary PBR shader changed',
-        );
+        // The source itself, not a hash of it: a pinned hash went stale at the next deliberate shader edit, in a suite no
+        // check ran. An ordinary material must compile the plain PBR shader (with its constant face and alpha
+        // tests and its per-view block), with nothing a texture transform adds.
+        const { compactTests, pbrShader, viewShader } = await import('/packages/gltf-pro/src/shader.ts');
+        assert(ordinary.pipeline.code === viewShader(compactTests(pbrShader)), 'Ordinary PBR shader changed');
         assert(ordinary.pipeline.code === identity.pipeline.code, 'Identity transform changed the PBR shader');
         const results = [];
         for (const item of payload.normalCases) {
@@ -457,7 +465,11 @@ export async function textureBrowserChecks(page) {
               await buffer.mapAsync(GPUMapMode.READ);
               const values = new Float32Array(buffer.getMappedRange()).slice();
               buffer.unmap();
-              assert(shadows.stats.dynamicDraws === 4, 'Masked PBR caster did not draw all four cascades');
+              // An undeformed caster is cached automatically (static draws); either way once per cascade.
+              assert(
+                shadows.stats.staticDraws + shadows.stats.dynamicDraws === 4,
+                'Masked PBR caster did not draw all four cascades',
+              );
               return values;
             } finally {
               buffer.destroy();

@@ -22,15 +22,13 @@ const bundled = await build({
 });
 const chunks = bundled.output.filter((output) => output.type === 'chunk'),
   entry = chunks.find((chunk) => chunk.isEntry);
-for (const name of ['gltf', 'creative', 'scenery']) {
-  assert.ok(!Object.keys(entry.modules).some((id) => id.includes(`/packages/${name}/`)), `${name} leaked into startup`);
+// The stage root holds no import() of an optional package (its methods moved to feature entries, 2026-10-27), so the
+// quickstart pays for none of them, in its startup or in a lazy chunk.
+for (const name of ['gltf', 'gltf-pro', 'creative', 'scenery'])
   assert.ok(
-    chunks.some(
-      (chunk) => !chunk.isEntry && Object.keys(chunk.modules).some((id) => id.includes(`/packages/${name}/`)),
-    ),
-    `${name} has no lazy chunk`,
+    !chunks.some((chunk) => Object.keys(chunk.modules).some((id) => id.includes(`/packages/${name}/`))),
+    `${name} is in the quickstart bundle`,
   );
-}
 
 const browser = await openBrowser({ startPath: '/tests/modern-wrapper.html' }),
   { page, hardware } = browser,

@@ -217,6 +217,26 @@ export async function transmissionBrowserChecks(page) {
         return { max, changed };
       };
       const red = (image) => image[((height / 2) * width + width / 2) * 4];
+      // Where the red/green background lies in the centre: red, green or neither per pixel. Refraction moves this
+      // layout; reflection, whose strength follows the IOR (KHR_materials_ior), only brightens it.
+      const layout = (image) => {
+        const classes = [];
+        for (let y = 48; y < 80; y++)
+          for (let x = 48; x < 80; x++) {
+            const i = (y * width + x) * 4;
+            classes.push(image[i] > image[i + 1] + 32 ? 'r' : image[i + 1] > image[i] + 32 ? 'g' : '-');
+          }
+        return classes;
+      };
+      const moved = (a, b) => {
+        const before = layout(a),
+          after = layout(b);
+        return {
+          moved: before.filter((value, i) => value !== after[i]).length,
+          red: before.filter((value) => value === 'r').length,
+          green: before.filter((value) => value === 'g').length,
+        };
+      };
       device.pushErrorScope('validation');
       try {
         const opaque = await render({}, () => {}, false),
@@ -239,6 +259,20 @@ export async function transmissionBrowserChecks(page) {
           iorOneDifference.max <= 1,
           `IOR 1 transmission differs from the opaque background by ${iorOneDifference.max} color steps`,
         );
+        // Lobes recompute diffuse light: over transmission they keep only its untransmitted share, so the surface
+        // stays invisible at IOR 1 with a specular or sheen lobe too (they drew about 148 steps of white before).
+        const lobeDifferences = {};
+        for (const [name, lobe] of [
+          ['specular', { KHR_materials_specular: { specularFactor: 0.5 } }],
+          ['sheen', { KHR_materials_sheen: { sheenColorFactor: [0.5, 0.5, 0.5], sheenRoughnessFactor: 0.5 } }],
+        ]) {
+          const lobed = difference(background, await render({ ...extensions(1, 1), ...lobe }), true);
+          lobeDifferences[name] = lobed;
+          assert(
+            lobed.max <= 1,
+            `IOR 1 transmission with a ${name} lobe differs from the opaque background by ${lobed.max} color steps`,
+          );
+        }
         const msaaBackground = await render(
           {},
           (model) => {
@@ -285,17 +319,23 @@ export async function transmissionBrowserChecks(page) {
             false,
             true,
           ),
-          refractionDifference = difference(straightPattern, refractedPattern, true);
+          refractionDifference = moved(straightPattern, refractedPattern);
         assert(
-          refractionDifference.changed > 0,
+          refractionDifference.red > 0 && refractionDifference.green > 0,
+          `The red/green boundary is not in the centre: ${JSON.stringify(refractionDifference)}`,
+        );
+        assert(
+          refractionDifference.moved > 0,
           'Positive volume at IOR 1.5 did not refract an opaque red/green boundary through the tilted surface',
         );
-        // Thin glass (no volume) keeps its sightline at any IOR, as glTF specifies.
+        // Thin glass (no volume) keeps its sightline at any IOR, as glTF specifies. Compared by layout, not bytes:
+        // IOR 1.5 reflects F0 0.04 and passes 1 - F of the light behind, where IOR 1 reflects nothing and passes all.
         const thinPattern = await render(extensions(1, 1.5), () => {}, true, 1, false, true),
-          thinStraight = await render(extensions(1, 1), () => {}, true, 1, false, true);
+          thinStraight = await render(extensions(1, 1), () => {}, true, 1, false, true),
+          thinDifference = moved(thinStraight, thinPattern);
         assert(
-          difference(thinStraight, thinPattern, true).changed === 0,
-          'Thin IOR 1.5 transmission moved the background instead of keeping its sightline',
+          thinDifference.moved === 0,
+          `Thin IOR 1.5 transmission moved the background instead of keeping its sightline: ${JSON.stringify(thinDifference)}`,
         );
         assert(red(straight) > red(opaque), 'Transmission did not reveal the red opaque background');
         const infinite = await render(
@@ -327,16 +367,19 @@ export async function transmissionBrowserChecks(page) {
 
         const redZero = texture([0, 255, 255, 255]),
           redOne = texture([255, 0, 0, 255]);
+        // At the default IOR 1.5, whose F0 0.04 a factor-zero material (no extension) reflects too: at IOR 1 a mapped
+        // factor of zero keeps the extension and reflects nothing (KHR_materials_ior), unlike the opaque reference.
         const configureTransmission = (map) => (model) => {
-          model.primitives[1].material.transmission = { factor: 1, ior: 1, transmissionTexture: map };
+          model.primitives[1].material.transmission = { factor: 1, ior: 1.5, transmissionTexture: map };
         };
-        const mapZero = await render({}, configureTransmission(redZero)),
+        const glass = await render(extensions(1, 1.5)),
+          mapZero = await render({}, configureTransmission(redZero)),
           mapOne = await render({}, configureTransmission(redOne));
         assert(difference(opaque, mapZero).max <= 1, 'Transmission texture must use red for its factor');
-        assert(difference(straight, mapOne).max <= 1, 'Transmission texture red=1 differs from scalar factor 1');
+        assert(difference(glass, mapOne).max <= 1, 'Transmission texture red=1 differs from scalar factor 1');
         const samplerFree = await render({}, configureTransmission({ view: redOne.view }));
         assert(
-          difference(straight, samplerFree).max <= 1,
+          difference(glass, samplerFree).max <= 1,
           'Sampler-free transmission texture differs from its constant sampled value',
         );
         const greenZero = texture([255, 0, 255, 255]),
@@ -389,9 +432,11 @@ export async function transmissionBrowserChecks(page) {
           captures,
           factorZero: zeroDifference,
           iorOne: iorOneDifference,
+          iorOneLobes: lobeDifferences,
           msaaIorOne: msaaDifference,
           borrowedHDRIorOne: hdrDifference,
           volumeRefraction: refractionDifference,
+          thinSightline: thinDifference,
           redBackground: red(background),
           redTransmission: red(straight),
           redVolume: red(volume),

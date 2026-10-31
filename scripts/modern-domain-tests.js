@@ -326,7 +326,8 @@ try {
       e.onError = (error) => window.race.errors.push(String(error));
       window.race.remove = e.onFrame(() => {
         window.race.frames++;
-        if (e.recovery) {
+        // Between the loss and the new device (the engine's private recovery promise is not visible in a built dist).
+        if (window.race.destroyed && e.gpu === window.race.device) {
           window.race.recoveryFrames++;
           [...e.meshes.values()][0].position.x += 0.0001;
         }
@@ -349,12 +350,7 @@ try {
         });
       e.start();
     }, scenario);
-    await page.waitForFunction(
-      () =>
-        window.modern.state.core.gpu !== window.race.device &&
-        !window.modern.state.core.recovery &&
-        window.race.frames >= 20,
-    );
+    await page.waitForFunction(() => window.modern.state.core.gpu !== window.race.device && window.race.frames >= 20);
     const race = await page.evaluate(() => {
       const e = window.modern.state.core;
       e.stop();
@@ -388,7 +384,10 @@ try {
       };
     });
     assert.deepEqual(race.errors, []);
-    assert.ok(race.state && race.recreated && race.recoveryFrames >= 2);
+    assert.ok(
+      race.state && race.recreated && race.recoveryFrames >= 2,
+      `${scenario} device loss: ${JSON.stringify({ state: race.state, recreated: race.recreated, recoveryFrames: race.recoveryFrames, frames: race.frames })}`,
+    );
     await pixel(`race-${scenario}`);
     checks.push({
       name: `Combined passes: ${scenario} destruction preserves RAF, Wasm and replaces buffers, textures, bind groups and pipelines`,

@@ -517,11 +517,5 @@ try {
 } finally {
   await browser.close();
 }
-// The material slot shares PBR entry points and must retain valid GPU layouts.
-await import('./material-extension-tests.js');
-await import('./gltf-parity-tests.js');
-await (await import('./local-shadow-tests.js')).runLocalShadowBrowserTests();
-await (await import('./deformed-picking-tests.js')).runDeformedPickingTests();
-await (await import('./silent-geometry-tests.js')).runSilentGeometryTests();
-await (await import('./pbr-box-tests.js')).runPBRBoxTests();
-await (await import('./scene-helper-tests.js')).runSceneHelperTests();
+// The material, parity, shadow, picking, geometry, box and helper suites run after this one, each in its own process
+// with a time limit: scripts/modern-extension-suite.mjs (npm run modern:test:extensions).

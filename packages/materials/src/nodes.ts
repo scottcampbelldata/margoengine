@@ -356,7 +356,8 @@ function compile(
   }
   let transmits = false,
     opaqueIndex: number | undefined,
-    transmitted: string | undefined;
+    transmitted: string | undefined,
+    transmittedIor: string | undefined;
   if (transmission && (constantChannel(child(transmission, 'factor', values)) ?? 1) > 0) {
     transmits = true;
     opaqueIndex = textures.length;
@@ -384,13 +385,14 @@ function compile(
     declarations += shader.declarations;
     output = shader.output ?? '';
     transmitted = shader.transmission;
+    transmittedIor = shader.ior;
   }
   if (needsNormal) declarations = normalShader + declarations;
   const extension: MaterialExtension = {
     wgsl: statements,
     ...(declarations ? { declarations } : {}),
     ...(direct ? { direct } : {}),
-    ...(output ? { output, lighting: false, afterOpaque: true, transmission: transmitted } : {}),
+    ...(output ? { output, lighting: false, afterOpaque: true, transmission: transmitted, ior: transmittedIor } : {}),
     ...(factors.length ? { factors: Float32Array.from(factors) } : {}),
     ...(textures.length ? { textures } : {}),
   };

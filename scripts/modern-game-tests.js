@@ -194,7 +194,11 @@ try {
       shadows.invalidate();
       instance.render({ culling: false });
       await device.queue.onSubmittedWorkDone();
-      assert(shadows.stats.staticDraws === 8, 'Explicit shadow invalidation failed');
+      // Four cascades of three casters: the two explicit statics, and dynamicMesh, undeformed so cached automatically.
+      assert(
+        shadows.stats.staticDraws === 12,
+        `Explicit shadow invalidation failed: ${shadows.stats.staticDraws} static draws`,
+      );
       // One million particles exercises real storage limits and a GPU-only indirect draw.
       const million = VFX.attach(instance, {
         capacity: 1_000_000,
@@ -255,7 +259,7 @@ try {
       instance.camera.target = [2, 0, 0];
       instance.render({ culling: false });
       await device.queue.onSubmittedWorkDone();
-      assert(shadows.stats.staticDraws === 8, 'Camera motion did not invalidate static cascades');
+      assert(shadows.stats.staticDraws === 12, 'Camera motion did not invalidate static cascades');
       const ssao = SSAO.attach(instance, { samples: 8 });
       ssao.add(model);
       taa.options.depth = () => ssao.depthTexture;

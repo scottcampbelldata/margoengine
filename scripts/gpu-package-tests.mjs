@@ -51,6 +51,21 @@ export const ROOT = {
   'test:lifecycle:browser': 'background tab, no WebGPU, fractional zoom and device loss on the stage and React',
   'test:python:browser': 'the margoengine Python package in JupyterLab and Notebook 7, camera events and to_png',
   'test:frame-alloc:browser': 'JavaScript heap bytes of a steady-state frame, per scene, against their floors',
+  'modern:test:extensions':
+    'glTF extension, material, parity, local shadow, picking, silent geometry, box and helper pixels',
+  'modern:test:domains': 'combined rendering domains, device loss races and recovery',
+  'modern:test:wrapper': 'the stage facade: quickstart bundle, orb pixels, controls, models, device and context loss',
+  'modern:test:game': 'animation, shadows, clustered lights, terrain, VFX, foot IK and SSAO together',
+  'modern:test:gltf-compression': 'Draco and meshopt in a production Vite consumer',
+};
+/**
+ * `test:release` suites that drive a browser yet stay out of check:merge, each with its reason. Anything else in
+ * test:release that drives a browser must run in a check (unrunReleaseGates): modern:test:extensions ran nowhere but
+ * there from about 2026-10-16, and by 2026-10-31 it hung and held a dozen stale checks and two real shader bugs.
+ */
+export const RELEASE_ONLY = {
+  'modern:test:stress': '500 sessions of 120 frames, hours of GPU; the release checks it once',
+  'test:basic-scene': 'runs in every landing: scripts/land-records.mjs measures the network record with it',
 };
 /** Commands a root suite needs first (it reads their output), run once before it. */
 export const PREPARE = {
@@ -95,6 +110,25 @@ const DRIVES_BROWSER =
 /** A package script this check runs: `test:browser`, `test:browser:walk`, `test:probes:browser`, `test:gpu`, ... */
 export const isGpuScript = (name) => /^test:/.test(name) && /(^|:)(browser|gpu)(:|$)/.test(name);
 
+/**
+ * `npm run` suites of `test:release` that drive a browser (their `node <file>` matches DRIVES_BROWSER) and no check
+ * runs: not in ROOT, not a check:merge step, not in RELEASE_ONLY. `read(file)` gives a file's text, or undefined.
+ */
+export function unrunReleaseGates(scripts, read, inChecks = ROOT, releaseOnly = RELEASE_ONLY) {
+  const merge = (scripts['check:merge:steps'] ?? '').split(' && ');
+  return (scripts['test:release'] ?? '')
+    .split(' && ')
+    .map((part) => /^npm run (\S+)/.exec(part)?.[1])
+    .filter(
+      (name) =>
+        name &&
+        !(name in inChecks) &&
+        !(name in releaseOnly) &&
+        !merge.includes(`npm run ${name}`) &&
+        DRIVES_BROWSER.test(read(/^node (?:--\S+ )*(\S+\.m?js)/.exec(scripts[name] ?? '')?.[1]) ?? ''),
+    );
+}
+
 /** A test's stable id: `dof/test:browser` for a package script, `root/modern:test:xr:browser` for a root suite. */
 export const testId = (test) => (test.name ? `root/${test.name}` : test.label.replace(' ', '/'));
 
@@ -133,6 +167,13 @@ export function plan() {
   if (unrun.length)
     throw new Error(
       `root script(s) ${unrun.join(', ')} look like GPU tests but no check runs them; add each to ROOT in scripts/gpu-package-tests.mjs or to check:merge:steps`,
+    );
+  const orphans = unrunReleaseGates(scripts, (file) =>
+    file && existsSync(join(root, file)) ? readFileSync(join(root, file), 'utf8') : undefined,
+  );
+  if (orphans.length)
+    throw new Error(
+      `test:release suite(s) ${orphans.join(', ')} drive a browser but no check runs them, so they rot unseen; add each to ROOT in scripts/gpu-package-tests.mjs or, with its reason, to RELEASE_ONLY`,
     );
   for (const name of Object.keys(ROOT)) {
     if (!scripts[name]) throw new Error(`ROOT lists ${name}, which package.json no longer has; remove it from ROOT`);

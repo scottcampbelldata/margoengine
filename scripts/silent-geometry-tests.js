@@ -410,7 +410,8 @@ export async function silentGeometryBrowserChecks(page) {
             record.code.includes('normalMap') &&
             record.code.includes('mrMap'),
         );
-        check(pbrShaders.length === 2, `${name}: each eye must compile the ordinary material PBR shader`);
+        // Draw records keep their pipelines per device, so both eyes share one compile; the pixels below show both drew.
+        check(pbrShaders.length === 1, `${name}: the eyes must share one compile of the ordinary material PBR shader`);
         for (const target of [targets[0], targets[3]]) {
           const pixels = await textureBytes(device, target);
           let count = 0,
@@ -602,7 +603,11 @@ export async function silentGeometryBrowserChecks(page) {
         shadows.add(mesh);
         try {
           await capture(fixture.name + ':mesh-cascades');
-          check(shadows.stats.dynamicDraws === 4, 'Mesh shadow route did not submit four cascades');
+          // An undeformed mesh is cached automatically (static draws), a deformed one is not; either way once per cascade.
+          check(
+            shadows.stats.staticDraws + shadows.stats.dynamicDraws === 4,
+            'Mesh shadow route did not submit four cascades',
+          );
           const maps = resources.filter(
             (record) =>
               record.device === engine.gpu &&
