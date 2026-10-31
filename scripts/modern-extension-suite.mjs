@@ -7,17 +7,20 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runLimited, testLimitMs } from './support/run-limited.mjs';
 
-/** The suites, in run order: each runs alone with `node <file>`. */
+/**
+ * The suites, in run order: each runs alone with `node <file>`. Written as `new URL` so check:merge's footprint follows
+ * them into the packages they draw (scripts/support/affected-gpu.mjs scan); a plain path string reaches only the file.
+ */
 export const STEPS = [
-  'scripts/modern-extension-tests.js',
-  'scripts/material-extension-tests.js',
-  'scripts/gltf-parity-tests.js',
-  'scripts/local-shadow-tests.js',
-  'scripts/deformed-picking-tests.js',
-  'scripts/silent-geometry-tests.js',
-  'scripts/pbr-box-tests.js',
-  'scripts/scene-helper-tests.js',
-];
+  new URL('./modern-extension-tests.js', import.meta.url),
+  new URL('./material-extension-tests.js', import.meta.url),
+  new URL('./gltf-parity-tests.js', import.meta.url),
+  new URL('./local-shadow-tests.js', import.meta.url),
+  new URL('./deformed-picking-tests.js', import.meta.url),
+  new URL('./silent-geometry-tests.js', import.meta.url),
+  new URL('./pbr-box-tests.js', import.meta.url),
+  new URL('./scene-helper-tests.js', import.meta.url),
+].map((url) => `scripts/${url.pathname.split('/').pop()}`);
 
 /** Runs the steps in order and exits 1 at the first that fails or runs out of time, naming it. */
 async function main() {

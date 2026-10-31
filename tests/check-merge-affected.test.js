@@ -414,6 +414,24 @@ test('a one-package change narrows the visual demos, the GPU tests and the WGSL 
   assert.doesNotMatch(command('check:gpu-packages').command, /gpu\/|water|voxel/);
 });
 
+// modern:test:extensions launches its suites by file name (scripts/modern-extension-suite.mjs STEPS), and they import
+// packages from page code: a change to a package they draw, or to one of those files, must still select it.
+test('a change to a package the extension suite draws, or to one of its suites, runs modern:test:extensions', () => {
+  for (const file of [
+    'packages/materials/src/lobes.ts',
+    'packages/gltf-pro/src/material-extension.ts',
+    'packages/shadows/src/index.ts',
+    'scripts/pbr-box-tests.js',
+    'scripts/materials-lobe-tests.js',
+    'scripts/gltf-texture-tests.js',
+  ]) {
+    const { decision, planned } = planFor([file]),
+      gpu = planned.find((p) => stepName(p.command) === 'check:gpu-packages');
+    // gltf-pro has more dependents than MAX_AFFECTED: the full run holds this suite too.
+    if (decision.mode !== 'full') assert.match(gpu.command, /--select=.*root\/modern:test:extensions/, file);
+  }
+});
+
 test('every visual demo that is not a Khronos model maps to its sources, and the mapped sources exist', () => {
   for (const demo of demos) {
     const sources = demoSources(demo);

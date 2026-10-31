@@ -136,7 +136,7 @@ Last updated 2026-10-28. Read this first when starting a new session. Update it 
 `modern:test:extensions` ran only in `test:release`, and nothing ran that from about 2026-10-16. By 2026-10-31 it hung
 until the GPU lock limit, and behind the hang sat two real shader bugs (docs/known-bugs.md, "Fixed 2026-10-31") and a
 dozen stale checks. `modern:test:domains`, `modern:test:wrapper`, `modern:test:game` and
-`modern:test:gltf-compression` had rotted the same way. All five pass now, take about 80 s together, and are in `ROOT` of
+`modern:test:gltf-compression` had rotted the same way. All five pass now, take about 95 s together, and are in `ROOT` of
 `scripts/gpu-package-tests.mjs`, so `check:merge` runs them when a change can affect them. `unrunReleaseGates` fails
 the plan when a `test:release` suite that drives a browser is in no check and not in `RELEASE_ONLY` with a reason; two
 are: `modern:test:stress` (hours of GPU) and `test:basic-scene` (run by `land-records.mjs` in every landing). Not in
