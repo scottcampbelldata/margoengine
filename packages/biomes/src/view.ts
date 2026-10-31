@@ -10,7 +10,7 @@
 // Ground layer rules use the same Wendland bands as biome envelopes (define.ts); materials are generated textures.
 import type { EngineKernel } from '@margoengine/core';
 import type { Terrain, TerrainColorOptions } from '@margoengine/terrain';
-import type { Water, WaterOptions } from '@margoengine/water';
+import type { Water, WaterLight, WaterOptions } from '@margoengine/water';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type BiomeDefinition, type Dimension, fieldDimension } from './define.js';
 // The toolkit comes through the package name, so the view shares the root's copy (a view always has a world).
@@ -19,31 +19,41 @@ import type { PlacedTile } from './placement.js';
 import type { BiomeSample } from './sample.js';
 import type { BiomeTile, BiomeWorld } from './world.js';
 
-/** The look of a ground material: sRGB colour 0..1 and the contrast of its generated detail 0..1. */
+/** The look of a ground material: sRGB colour 0..1, the contrast of its generated detail 0..1 and its relief. */
 export interface MaterialLook {
   readonly color: readonly [number, number, number];
   /** Default 0.25. */
   readonly detail?: number;
+  /**
+   * Relief from the generated detail, 0 to 1: the terrain's `TerrainLayer.bump` (the shading normal follows the
+   * texture's light and dark, up to 2 m of relief at 1). Default 0.
+   */
+  readonly bump?: number;
+  /**
+   * Large-scale light and dark, 0 to 1: the terrain's `TerrainLayer.macro` (a second sample of the texture at 96 m
+   * scales the colour, so far slopes are not one flat tone). Default 0.
+   */
+  readonly macro?: number;
 }
 
 /** Built-in material looks, by key (the materials the presets use). Unknown keys get a neutral grey-brown. */
 export const MATERIALS: Readonly<Record<string, MaterialLook>> = Object.freeze({
-  grass: { color: [0.4, 0.55, 0.2], detail: 0.4 },
-  meadow: { color: [0.56, 0.62, 0.28], detail: 0.4 },
-  'leaf-litter': { color: [0.52, 0.37, 0.2], detail: 0.4 },
-  needles: { color: [0.46, 0.32, 0.18], detail: 0.35 },
-  moss: { color: [0.32, 0.5, 0.2], detail: 0.4 },
-  mud: { color: [0.4, 0.31, 0.21], detail: 0.25 },
-  sand: { color: [0.9, 0.8, 0.58], detail: 0.15 },
-  'red-sand': { color: [0.82, 0.5, 0.3], detail: 0.2 },
-  'dry-grass': { color: [0.78, 0.67, 0.38], detail: 0.35 },
-  laterite: { color: [0.68, 0.38, 0.22], detail: 0.25 },
-  rock: { color: [0.54, 0.51, 0.47], detail: 0.4 },
-  scree: { color: [0.64, 0.61, 0.57], detail: 0.45 },
-  gravel: { color: [0.6, 0.57, 0.52], detail: 0.45 },
-  snow: { color: [0.95, 0.97, 1], detail: 0.05 },
-  tundra: { color: [0.54, 0.5, 0.34], detail: 0.35 },
-  heather: { color: [0.52, 0.36, 0.4], detail: 0.35 },
+  grass: { color: [0.4, 0.55, 0.2], detail: 0.4, bump: 0.3, macro: 0.35 },
+  meadow: { color: [0.56, 0.62, 0.28], detail: 0.4, bump: 0.3, macro: 0.35 },
+  'leaf-litter': { color: [0.52, 0.37, 0.2], detail: 0.4, bump: 0.3, macro: 0.2 },
+  needles: { color: [0.46, 0.32, 0.18], detail: 0.35, bump: 0.3, macro: 0.2 },
+  moss: { color: [0.32, 0.5, 0.2], detail: 0.4, bump: 0.3, macro: 0.2 },
+  mud: { color: [0.4, 0.31, 0.21], detail: 0.25, bump: 0.3, macro: 0.2 },
+  sand: { color: [0.9, 0.8, 0.58], detail: 0.15, bump: 0.25, macro: 0.3 },
+  'red-sand': { color: [0.82, 0.5, 0.3], detail: 0.2, bump: 0.3, macro: 0.2 },
+  'dry-grass': { color: [0.78, 0.67, 0.38], detail: 0.35, bump: 0.3, macro: 0.2 },
+  laterite: { color: [0.68, 0.38, 0.22], detail: 0.25, bump: 0.3, macro: 0.2 },
+  rock: { color: [0.54, 0.51, 0.47], detail: 0.6, bump: 1, macro: 1 },
+  scree: { color: [0.64, 0.61, 0.57], detail: 0.45, bump: 0.8, macro: 0.6 },
+  gravel: { color: [0.6, 0.57, 0.52], detail: 0.45, bump: 0.6, macro: 0.5 },
+  snow: { color: [0.95, 0.96, 0.99], detail: 0.1, bump: 0.35, macro: 0.15 },
+  tundra: { color: [0.54, 0.5, 0.34], detail: 0.35, bump: 0.3, macro: 0.2 },
+  heather: { color: [0.52, 0.36, 0.4], detail: 0.35, bump: 0.3, macro: 0.2 },
 });
 
 /** Settings of {@link BiomeView.attach}. */
@@ -81,12 +91,42 @@ export interface BiomeViewOptions {
    * The sea: a `@margoengine/water` surface at the world's `climate.seaLevel`, centred on the origin over the whole
    * world and out to the horizon, loaded with import() only when drawn. The terrain hides it under land, so its shore
    * follows the coast, with the water's shoreline foam. `'auto'` draws it when the world's heights reach below sea
-   * level; an object draws it with those `Water` settings (pass `depth: () => bloom.depthTexture` when Bloom, SSAO or
-   * DOF owns the scene depth, and `reflection`, `lights` from a `Sky`). Rivers stay dry valleys (docs/limits.md).
-   * Default `'auto'`.
+   * level; an object draws it with those `Water` settings over the sea defaults (`SEA`; pass
+   * `depth: () => bloom.depthTexture` when Bloom, SSAO or DOF owns the scene depth). Rivers stay dry valleys
+   * (docs/limits.md). Default `'auto'`.
    */
   readonly water?: boolean | 'auto' | BiomeWaterSettings;
+  /**
+   * A `Sky` from `@margoengine/sky`: the sea reflects its sky (`reflectionTexture`) and its sun and moon glint on the
+   * waves (`lights`). Without one the sea reflects a plain sky gradient under the engine light. `water` settings with
+   * their own `reflection` or `lights` win. Default none.
+   */
+  readonly sky?: BiomeSky;
 }
+
+/** What `BiomeViewOptions.sky` needs: a `Sky` (`@margoengine/sky`), of which only these two are read. */
+export interface BiomeSky {
+  /** The sky environment the sea reflects (read every frame). */
+  readonly reflectionTexture: GPUTexture | undefined;
+  /** Sun and moon, for glints on the waves. */
+  readonly lights: readonly WaterLight[];
+}
+
+/**
+ * The sea a view draws unless its `water` settings say otherwise: a 512-cell grid (8 m cells on a 4 km world, so the
+ * swell does not alias flat), two ocean swell trains of 48 m and 27 m (0.9 m and 0.44 m high, a moderate swell whose
+ * crests break into foam), a 6 m band of shoreline foam and a sea-blue body. `Water`'s own defaults suit a pond of 100 m.
+ */
+export const SEA: Readonly<Required<Pick<WaterOptions, 'segments' | 'waves' | 'foamDistance' | 'color'>>> =
+  Object.freeze({
+    segments: 512,
+    waves: Object.freeze([
+      Object.freeze({ direction: [1, 0.3] as const, amplitude: 0.9, wavelength: 48, phase: 0.43 }),
+      Object.freeze({ direction: [1, 0.6] as const, amplitude: 0.44, wavelength: 27, phase: 2.17 }),
+    ]),
+    foamDistance: 6,
+    color: [0.02, 0.24, 0.34] as const,
+  });
 
 /** `Water` settings a view passes on (`@margoengine/water`); the view sets the size, the height and the horizon. */
 export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon' | 'terrain' | 'spray'>;
@@ -438,20 +478,29 @@ export function terrainColorsFor(
   };
 }
 
-/** A generated material texture (256 x 256 RGBA8, sRGB bytes) with mip levels, from value noise. */
-function materialPixels(key: string, m: MaterialLook): Uint8Array[] {
-  const size = 256,
+/**
+ * The generated texture of a ground material, as a view draws it: 256 x 256 RGBA8 sRGB bytes and its 8 mip levels
+ * (9 arrays, 256 to 1 texels a side), three octaves of tileable value noise (16, 64 and 256 cells across) around
+ * `material.color` with `material.detail` contrast, seeded by `key`.
+ */
+export function materialPixels(key: string, material: MaterialLook): Uint8Array[] {
+  const m = material,
+    size = 256,
     base = new Uint8Array(size * size * 4),
     detail = m.detail ?? 0.25,
     seed = hash3(0x6d61, key.length, key.charCodeAt(0) * 31 + key.charCodeAt(key.length - 1));
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
-      // Two octaves of tileable lattice noise (16 and 64 cells over the texture).
-      // Red and green share one noise and blue has its own, so patches shift between warm and cool, not only light and dark.
-      const k = (y * size + x) * 4;
+      // Three octaves of tileable lattice noise (16, 64 and 256 cells over the texture). Red and green share the two
+      // coarse ones and blue has its own, so patches shift between warm and cool, not only light and dark; the fine
+      // octave (one value a texel) is grain shared by all three, the light and dark the terrain's bump turns into relief.
+      const k = (y * size + x) * 4,
+        grain = cellNoise(seed + 4, x, y, 256);
       for (let c = 0; c < 3; c++) {
         const n =
-          (cellNoise(seed + 2 * (c >> 1), x, y, 16) * 2 + cellNoise(seed + 1 + 2 * (c >> 1), x, y, 64)) / 3 - 0.5; // float division: view only
+          (cellNoise(seed + 2 * (c >> 1), x, y, 16) * 2 + cellNoise(seed + 1 + 2 * (c >> 1), x, y, 64) + grain * 0.5) /
+            3.5 - // float division: view only
+          0.5;
         base[k + c] = clampInt(Math.round(m.color[c] * 255 * (1 + detail * n * 2)), 0, 255);
       }
       base[k + 3] = 255;
@@ -618,8 +667,11 @@ export class BiomeView implements Disposable {
       cellSize: options.clipmap?.cellSize ?? 1,
       resolution: options.clipmap?.resolution ?? 64,
       levels: options.clipmap?.levels ?? 6,
-      // Weights replace the rules; the rules only set each material's texture repeat (4 m).
-      layers: layerKeys.map(() => ({ height: [-1e6, 1e6] as const, slope: [0, 1] as const, scale: 0.25 })),
+      // Weights replace the rules; the rules only set each material's texture repeat (4 m), relief and macro tone.
+      layers: layerKeys.map((_, i) => {
+        const { bump = 0, macro = 0 } = looks[Math.min(i, looks.length - 1)];
+        return { height: [-1e6, 1e6] as const, slope: [0, 1] as const, scale: 0.25, bump, macro };
+      }),
       textures(device) {
         const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
           size = [view.#width, view.#depth],
@@ -667,9 +719,21 @@ export class BiomeView implements Disposable {
     const shadows = options.shadows;
     if (shadows !== undefined && typeof shadows?.add !== 'function')
       throw typeError('BiomeView shadows must be a Shadows from @margoengine/shadows', 'biomes');
-    const water = options.water ?? 'auto';
+    const water = options.water ?? 'auto',
+      sky = options.sky;
     if (water !== true && water !== false && water !== 'auto' && (typeof water !== 'object' || water === null))
       throw typeError("BiomeView water must be true, false, 'auto' or Water settings", 'biomes');
+    if (sky !== undefined && (typeof sky !== 'object' || sky === null || !('reflectionTexture' in sky) || !sky.lights))
+      throw typeError(
+        'BiomeView sky must be a Sky from @margoengine/sky (it reads reflectionTexture and lights)',
+        'biomes',
+      );
+    for (const [key, m] of Object.entries(options.materials ?? {}))
+      if (![m?.bump ?? 0, m?.macro ?? 0].every((v) => typeof v === 'number' && v >= 0 && v <= 1))
+        throw rangeError(
+          `BiomeView material '${key}' bump and macro must be numbers from 0 to 1 (default 0)`,
+          'biomes',
+        );
     if (options.signal?.aborted) throw options.signal.reason;
     const terrainModule = await import('@margoengine/terrain');
     if (options.signal?.aborted) throw options.signal.reason;
@@ -722,6 +786,8 @@ export class BiomeView implements Disposable {
       // The water grid is centred on the origin: wide enough to cover the world, stretched to the horizon past it.
       if (!view.#disposed)
         view.#water = Water.attach(engine, {
+          ...SEA,
+          ...(sky ? { reflection: () => sky.reflectionTexture, lights: sky.lights } : {}),
           ...(typeof water === 'object' ? water : {}),
           size: [side(x0, x1), side(z0, z1)],
           height: sea,

@@ -214,21 +214,25 @@ corners (`overviewWeights(world, materials)`, from `sampleRegion`, so it does no
 hills beyond `radius` keep their rock and snow. With workers, `attach` makes it there, one band of texel rows per worker
 (`overviewRows`, the same bytes), instead of blocking the page (about 650 ms of the zero-config attach on an RTX A6000 PC, now about 200). The terrain draws
 nothing outside the world's rectangle: past an edge the sky shows. Materials are generated textures from `MATERIALS` (16 built-in looks, such as
-`grass`, `sand`, `rock`, `snow`; `materials` overrides or adds them). Up to 16 materials per world, the terrain's
-limit (the 8 presets use 15); more is a RangeError from `attach` that names the count.
+`grass`, `sand`, `rock`, `snow`; `materials` overrides or adds them; `materialPixels(key, look)` gives the texture and
+its mips): three octaves of value noise around the colour, with relief (`bump`, the terrain's `TerrainLayer.bump`) and
+a large-scale light and dark (`macro`, a second sample at 96 m) so far rock and snow are not one flat grey. Rock has the
+most of both, plant cover a little. Up to 16 materials per world, the terrain's limit (the 8 presets use 15); more is a
+RangeError from `attach` that names the count.
 `terrainColorsFor(world)` gives `TerrainColors` sand, meadow and stone colours for small scenes drawn as one mesh.
 
 | `BiomeView.attach` option | Default | Meaning |
 | --- | --- | --- |
 | `textureResolution` | 2 | metres per heightmap and weights texel, a multiple of the world resolution; raised to fit the device |
 | `radius` | 1,000 | tiles within this many metres of the camera are drawn at full detail |
-| `materials` | none | `{ key: { color: [r, g, b] (sRGB 0..1), detail? (0..1, default 0.25) } }` over `MATERIALS` |
+| `materials` | none | `{ key: { color: [r, g, b] (sRGB 0..1), detail?, bump?, macro? } }` over `MATERIALS`; `detail` 0..1 (default 0.25), `bump` and `macro` 0..1 (default 0, a RangeError outside) |
 | `clipmap` | cell 1 m, 64 cells, 6 rings | `cellSize`, `resolution` and `levels` of the terrain |
 | `lookahead` | 3 | seconds ahead along the camera's velocity that tiles are fetched early |
 | `budget` | 0.25 | milliseconds per frame the page spends copying arrived tiles in (one step always goes in) |
 | `detailBudget` | 128 MiB | most bytes of detail density maps (one byte per texel per detail species, on this thread and the GPU); detail maps coarsen by halves to fit it and the device's largest texture |
 | `signal` | none | rejects `attach` and stops streaming |
-| `water` | `'auto'` | the sea: a `@margoengine/water` surface at `climate.seaLevel` over the world and out to the horizon (`view.water`), loaded on first use; `'auto'` draws it when the world reaches below sea level, `true` always, `false` never; Water settings (`{ depth: () => bloom.depthTexture, reflection, lights }`) draw it with those |
+| `water` | `'auto'` | the sea: a `@margoengine/water` surface at `climate.seaLevel` over the world and out to the horizon (`view.water`), loaded on first use; `'auto'` draws it when the world reaches below sea level, `true` always, `false` never; Water settings (`{ depth: () => bloom.depthTexture }`) draw it with those over `SEA` |
+| `sky` | none | a `Sky` (`@margoengine/sky`): the sea reflects its sky (`reflectionTexture`) and its sun glints on the waves (`lights`); without one the sea reflects a plain gradient |
 
 WebGPU only. The view streams before every frame: tiles within `radius` of the camera, and of where the camera will be
 `lookahead` seconds on, are fetched nearest first; tiles that fall out of range on their way are cancelled, and objects
@@ -242,7 +246,11 @@ tile in takes 0.1 ms at the median and 0.3 ms at the 99th percentile on the page
 
 The sea comes with the world: a world whose relief runs below `climate.seaLevel` (the wetland preset's west coast,
 `coast` on `createRelief`) gets a water surface there with no option. The terrain hides it under land, so the shore
-follows the coastline, with the water's shoreline foam. Rivers stay dry valleys in v1.0.0 (docs/limits.md).
+follows the coastline, with the water's shoreline foam. Rivers stay dry valleys in v1.0.0 (docs/limits.md). The sea
+is not `Water`'s pond default: `SEA` gives it a 512-cell grid (8 m cells on a 4 km world), two swell trains of 48 m and
+27 m (0.9 m and 0.44 m high, their crests break into foam), 6 m of shoreline foam and a sea-blue body. Pass the scene's
+`Sky` as `sky` and the sea reflects it: from the wetland shore at noon the sea's mean sRGB luma goes from 0.27 (a dark
+teal plane) to 0.74, with waves (water-check.mjs).
 
 ```ts
 import { Engine } from '@margoengine/core';
@@ -255,6 +263,23 @@ const { climate, relief } = presetWorlds.wetland;
 const world = await BiomeWorld.create({ climate, height: { relief } });
 const view = await BiomeView.attach(engine, world); // water: 'auto' finds the sea on the west side
 console.log(view.water !== undefined); // true
+```
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld } from '@margoengine/biomes';
+import { presetWorlds } from '@margoengine/biomes/presets';
+import { BiomeView } from '@margoengine/biomes/view';
+import { Sky } from '@margoengine/sky';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const sky = Sky.attach(engine, { hours: 12, environment: true });
+const { climate, relief } = presetWorlds.wetland;
+const world = await BiomeWorld.create({ climate, height: { relief } });
+// The sea reflects the sky and the sun glints on its swell.
+const view = await BiomeView.attach(engine, world, { sky });
+await view.ready;
+engine.start();
 ```
 
 ```ts

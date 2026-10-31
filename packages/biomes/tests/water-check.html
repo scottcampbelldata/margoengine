@@ -1,13 +1,53 @@
-<!doctype html><html><head><meta charset="utf-8"/><title>Biomes water check</title><style>body{margin:0}canvas{display:block;width:320px;height:200px}</style></head><body><canvas width="320" height="200"></canvas>
+<!doctype html><html><head><meta charset="utf-8"/><title>Biomes water check</title><style>body{margin:0}canvas{display:block;width:320px;height:200px}canvas.sea{width:720px;height:450px}</style></head><body><canvas width="320" height="200"></canvas>
 <script type="module">
 // Real-GPU proof for the `water` option of @margoengine/biomes/view: the wetland preset world reaches below sea level on
 // its west side, so the default view (`water: 'auto'`) draws the sea there; with `water: false` (main had no water) the
-// sea floor shows as mud.
+// sea floor shows as mud. Then the sea's look from the biome shots' camera 06 under a noon Sky passed as `sky`.
 import {Engine} from '/packages/core/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
 import {BiomeWorld} from '/packages/biomes/dist/index.js';
-import {presetWorlds} from '/packages/biomes/dist/presets.js';
+import {presets,presetWorlds} from '/packages/biomes/dist/presets.js';
 import {BiomeView} from '/packages/biomes/dist/view.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 const canvas=document.querySelector('canvas');
+const luma=(d,k)=>(0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2])/255;
+// The sea of the wetland world from shot 06 (14 m over the shore at x = -700 m, looking west to x = -1,900 m), 720 x 450
+// sRGB pixels, under the shots' Sky (noon, lighting 3, environment). Water pixels are the ones the sea changes: the
+// same frame drawn with `water: false` shows the sea floor there. Returns their mean and standard deviation of sRGB luma
+// and, in the shore band (water pixels with land at most 8 px below them in the same column), the share of foam-white
+// pixels (every channel 0.7 or more), and the wave texture (below).
+async function sea(){
+ const c2=document.createElement('canvas');c2.className='sea';c2.width=720;c2.height=450;document.body.append(c2);
+ const world=await BiomeWorld.create({biomes:[presets.wetland],climate:presetWorlds.wetland.climate,height:{relief:presetWorlds.wetland.relief}});
+ const g=world.sample(-700,0).height;
+ const e=await Engine.create(c2,{backend:'webgpu',camera:{position:[-700,g+14,0],target:[-1900,g-14,0],near:0.3,far:20000}});
+ const errors=[];e.gpu.addEventListener('uncapturederror',ev=>errors.push(ev.error.message));
+ const sky=Sky.attach(e,{hours:12,timeScale:0,lighting:{intensity:3},environment:true});
+ const frame=async()=>{e.render({delta:1/60});await e.gpu.queue.onSubmittedWorkDone();};
+ async function grab(water){
+  const view=await BiomeView.attach(e,world,{objects:false,sky,water});
+  await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();await waitForPipelines(frame);
+  e.render({delta:1/60});
+  const c=new OffscreenCanvas(c2.width,c2.height).getContext('2d');c.drawImage(c2,0,0);
+  const {data}=c.getImageData(0,0,c2.width,c2.height);
+  const drawn=view.water!==undefined;view.dispose();return {data,drawn};
+ }
+ const on=await grab('auto'),off=await grab(false),W=c2.width,H=c2.height,water=new Uint8Array(W*H);
+ for(let i=0;i<W*H;i++){const k=i*4;water[i]=+(Math.abs(on.data[k]-off.data[k])+Math.abs(on.data[k+1]-off.data[k+1])+Math.abs(on.data[k+2]-off.data[k+2])>30);}
+ let n=0,s=0,q=0,band=0,foam=0,tn=0,tq=0;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const i=y*W+x;if(!water[i])continue;
+  const l=luma(on.data,i*4);n++;s+=l;q+=l*l;
+  // Wave texture: luma less the mean of its 5 x 5 neighbourhood, where that is all water (a plane's distance gradient
+  // and the horizon haze cancel out; waves do not).
+  if(x>=2&&y>=2&&x<W-2&&y<H-2){let all=true,m=0;for(let dy=-2;dy<=2&&all;dy++)for(let dx=-2;dx<=2;dx++){const j=i+dy*W+dx;if(!water[j]){all=false;break;}m+=luma(on.data,j*4);}if(all){const d=l-m/25;tn++;tq+=d*d;}}
+  let shore=false;for(let d=1;d<=8&&y+d<H;d++)if(!water[i+d*W]){shore=true;break;}
+  if(shore){band++;const k=i*4;if(on.data[k]>=179&&on.data[k+1]>=179&&on.data[k+2]>=179)foam++;}
+ }
+ const mean=s/n;
+ sky.dispose();e.dispose();world.dispose();c2.remove();
+ return {drawn:on.drawn,share:n/(W*H),mean,sd:Math.sqrt(Math.max(0,q/n-mean*mean)),texture:Math.sqrt(tq/Math.max(1,tn)),band,foam:foam/Math.max(1,band),errors};
+}
 window.check={
  async run(){
   const {climate,relief}=presetWorlds.wetland,world=await BiomeWorld.create({climate,height:{relief}});
@@ -33,7 +73,8 @@ window.check={
   }
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);
-  engine.dispose();
+  engine.dispose();world.dispose();
+  out.sea=await sea();
   return out;
  }
 };

@@ -534,6 +534,7 @@ export const entries = [
       'BiomeView prefetch takes a [minX, minZ, maxX, maxZ] rectangle in metres',
       'BiomeView radius must be above 0',
       'BiomeView shadows must be a Shadows from @margoengine/shadows',
+      'BiomeView sky must be a Sky from @margoengine/sky (it reads reflectionTexture and lights)',
       'BiomeView textureResolution must be a positive multiple of the world resolution',
       'overviewWeights textureResolution must be a positive multiple of the world resolution',
       "BiomeView water must be true, false, 'auto' or Water settings",

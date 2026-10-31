@@ -2,7 +2,8 @@
 //   node packages/biomes/tests/browser-check.mjs
 // A biome world draws as terrain with its ground layer (temperate grass), painting the desert biome turns the painted
 // ground to the desert's sand, clearing the paint brings the grass back, a disposed view leaves no terrain, and with all
-// 8 presets (15 ground materials) painted desert is still sand.
+// 8 presets (15 ground materials) painted desert is still sand. Then the look of far rock and snow (shot 05) and of a
+// painted edge (shot 08).
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -43,6 +44,26 @@ await runSuite(
     // 0.008, one dark olive; the palette of 2026-10-30: 0.42 and 0.016).
     assert.ok(r.noon.luma > 0.25, `temperate noon ground luma (sRGB): ${r.noon.luma}`);
     assert.ok(r.noon.spread > 0.012, `temperate noon ground colour spread (sRGB): ${r.noon.spread}`);
+    // Landing E (biome look plan 2, item 3): shot 05's camera on the alpine world, 720 x 450 under a noon Sky. Rock above
+    // 2,600 m: the spread of its own light and dark with the lighting divided out (see alpine() in the page); BASE
+    // b88424755 (one flat grey at that distance) 0.0415 on an RTX A6000, now 0.158 (bump, macro, detail 0.6). Snow: BASE
+    // had no pixel where snow outweighs rock (alpine snow and rock shared steep high ground half and half, a grey peak);
+    // the alpine preset's snow now has weight 3, 2 percent of the frame, mean luma 0.55 (0.61 even pure white: the peak's
+    // steep faces take the noon sun at a grazing angle, so 0.8 is past what the palette can reach).
+    const alpine = r.alpine;
+    assert.deepEqual(alpine.errors, []);
+    assert.equal(alpine.saturated, 0, 'the mask look stays under 255 red');
+    assert.ok(alpine.rock > 0.005, `rock above 2,600 m in the frame: ${alpine.rock}`);
+    assert.ok(alpine.rockSd > 3 * 0.0415, `rock light and dark above 3x BASE's 0.0415: ${alpine.rockSd}`);
+    assert.ok(alpine.snow > 0.01, `snow outweighs rock on over 1 percent of the frame: ${alpine.snow}`);
+    assert.ok(alpine.snowLuma > 0.5, `snow mean sRGB luma above 0.5: ${alpine.snowLuma}`);
+    // Landing F's painted edge (ecotone, default 24 m) at shot 08's camera: no neighbouring-pixel jump above 60 where
+    // the row crosses the painted patch's edge (41 to 42 on the A6000); with ecotone 0 the one-cell step is back (154 to
+    // 214), which the same measure must catch.
+    assert.deepEqual([...r.edge.errors, ...r.edgeOff.errors], []);
+    assert.ok(r.edge.last - r.edge.first > 100, `the row crosses the painted patch: ${r.edge.first}..${r.edge.last}`);
+    assert.ok(r.edge.jump <= 60, `painted edge, ecotone 24: largest jump ${r.edge.jump}`);
+    assert.ok(r.edgeOff.jump > 60, `painted edge, ecotone 0: largest jump ${r.edgeOff.jump}`);
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-browser-check.json', JSON.stringify({ hardware, result: r }, null, 1));
@@ -57,6 +78,14 @@ await runSuite(
       r.noon.luma.toFixed(3),
       'spread',
       r.noon.spread.toFixed(4),
+      'rock',
+      r.alpine.rockSd.toFixed(3),
+      'snow',
+      r.alpine.snowLuma.toFixed(3),
+      'edge jump',
+      r.edge.jump,
+      'ecotone 0',
+      r.edgeOff.jump,
     );
   },
   () => context.close(),

@@ -3,7 +3,7 @@
 // Biome look plan item 5: the wetland preset world runs down to a sea floor 40 m below sea level on its west side, and
 // main drew no water there (shot 06: a dark shelf to the horizon). The default view (`water: 'auto'`) now draws the sea:
 // looking west from the shore, over 10 percent of the lower third of the frame is water (blue over red). With
-// `water: false` the same view shows the bare sea floor, under 10 percent.
+// `water: false` the same view shows the bare sea floor, under 10 percent. Then the sea's look (below).
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -26,10 +26,35 @@ await runSuite(
     assert.equal(r.off.water, false);
     assert.ok(r.auto.share > 0.1, `water in the lower third: ${r.auto.share}`);
     assert.ok(r.off.share < 0.1, `without water the sea floor shows: ${r.off.share}`);
+    // Landing E (biome look plan 2, item 2): the sea from the biome shots' camera 06 under a noon Sky passed as `sky`.
+    // Before (BASE b88424755, RTX A6000, 720 x 450): a flat dark teal plane, wave texture 0.0130 (sRGB luma less its
+    // 5 x 5 mean, RMS), mean luma 0.266, no foam-white pixel in the shore band. Now: texture 0.0485, mean 0.74, shore band
+    // 11 percent foam-white (the swell's crests break; the water's own shoreline term is at most 8 percent foam).
+    const sea = r.sea;
+    assert.deepEqual(sea.errors, []);
+    assert.equal(sea.drawn, true);
+    assert.ok(sea.share > 0.05, `sea pixels: ${sea.share}`);
+    assert.ok(sea.texture > 3 * 0.013, `sea wave texture above 3x the flat plane's 0.013: ${sea.texture}`);
+    assert.ok(sea.mean > 0.2, `sea mean sRGB luma above 0.2: ${sea.mean}`);
+    assert.ok(
+      sea.band > 500 && sea.foam > 0.02,
+      `shore band (${sea.band} px) foam-white share above 2 percent: ${sea.foam}`,
+    );
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-water-check.json', JSON.stringify({ hardware, result: r }, null, 1));
-    console.log('ok biomes water: lower third water', r.auto.share.toFixed(3), 'without', r.off.share.toFixed(3));
+    console.log(
+      'ok biomes water: lower third water',
+      r.auto.share.toFixed(3),
+      'without',
+      r.off.share.toFixed(3),
+      'sea texture',
+      sea.texture.toFixed(4),
+      'mean luma',
+      sea.mean.toFixed(3),
+      'shore foam',
+      sea.foam.toFixed(3),
+    );
   },
   () => context.close(),
 );

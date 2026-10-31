@@ -6,7 +6,9 @@ import {Engine} from '/packages/core/dist/index.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
 import {Sky} from '/packages/sky/dist/index.js';
 import {BiomeWorld} from '/packages/biomes/dist/index.js';
-import {presets} from '/packages/biomes/dist/presets.js';
+import {presets,presetWorlds} from '/packages/biomes/dist/presets.js';
+import {BiomeEditor} from '/packages/biomes/dist/editor.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {BiomeView} from '/packages/biomes/dist/view.js';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,160,40],target:[0,0,0],near:0.5,far:2000}}),device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -39,6 +41,93 @@ async function noonGround(world){
  view.dispose();sky.dispose();e.dispose();canvas.remove();
  return {luma:luma/n,spread:spread/3,mean:m};
 }
+
+// A 720 x 450 canvas engine under the biome shots' Sky (noon, lighting 3, environment), its sRGB pixels after a view of
+// `world` is in, and the camera ray through a pixel (60 degree vertical field of view, Y up).
+async function shotEngine(position,target){
+ const canvas=document.createElement('canvas');canvas.width=720;canvas.height=450;canvas.style.cssText='width:720px;height:450px';document.body.append(canvas);
+ const e=await Engine.create(canvas,{backend:'webgpu',camera:{position,target,near:0.3,far:20000}}),sky=Sky.attach(e,{hours:12,timeScale:0,lighting:{intensity:3},environment:true}),errs=[];
+ e.gpu.addEventListener('uncapturederror',ev=>errs.push(ev.error.message));
+ const frame=async()=>{e.render({delta:1/60});await e.gpu.queue.onSubmittedWorkDone();};
+ return {canvas,e,sky,errs,
+  async pixels(world,options={}){
+   const view=await BiomeView.attach(e,world,{objects:false,sky,...options});
+   await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();await waitForPipelines(frame);
+   e.render({delta:1/60});
+   const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);
+   view.dispose();return c.getImageData(0,0,canvas.width,canvas.height).data;
+  },
+  ray(px,py){
+   const p=position,f=norm(target.map((v,i)=>v-p[i])),r=norm([-f[2],0,f[0]]),u=[r[1]*f[2]-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]-r[1]*f[0]],t=Math.tan(Math.PI/6),a=canvas.width/canvas.height;
+   const x=((px+0.5)/canvas.width*2-1)*t*a,y=(1-(py+0.5)/canvas.height*2)*t;
+   return norm([0,1,2].map(i=>f[i]+x*r[i]+y*u[i]));
+  },
+  dispose(){sky.dispose();e.dispose();canvas.remove();}};
+}
+const norm=v=>{const l=Math.hypot(...v);return v.map(x=>x/l);};
+const luma=(d,k)=>(0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2])/255;
+// Where a ray from `p` along `d` meets the world's region heights (bilinear, 16 m grid), marched in 4 m steps to 6 km.
+function hit(world,p,d){
+ const o=world.overview(),[x0,z0]=world.bounds,h=(x,z)=>{const fx=Math.min(o.width-1.001,Math.max(0,(x-x0)/o.resolution)),fz=Math.min(o.depth-1.001,Math.max(0,(z-z0)/o.resolution)),ix=Math.floor(fx),iz=Math.floor(fz),tx=fx-ix,tz=fz-iz,g=(i,j)=>o.height[j*o.width+i],a=g(ix,iz)+(g(ix+1,iz)-g(ix,iz))*tx,b=g(ix,iz+1)+(g(ix+1,iz+1)-g(ix,iz+1))*tx;return a+(b-a)*tz;};
+ for(let t=4;t<6000;t+=4){const q=[p[0]+d[0]*t,p[1]+d[1]*t,p[2]+d[2]*t];if(q[1]<=h(q[0],q[2]))return q;}
+ return null;
+}
+// Shot 05: the alpine preset world's highest peak from 1,400 m away and 150 m over the ground, sRGB pixels of the
+// default look and of a mask look (rock red, snow blue, scree yellow, meadow green, 0.35 each, no detail or relief).
+// Rock pixels whose ground is above 2,600 m: the standard deviation of the natural log of their luma over the mask's red
+// (how much the rock's own light and dark varies, with the lighting divided out); pixels where snow outweighs rock:
+// their mean luma.
+async function alpine(){
+ const world=await BiomeWorld.create({biomes:[presets.alpine],climate:presetWorlds.alpine.climate,height:{relief:presetWorlds.alpine.relief}});
+ const g=(x,z)=>world.sample(x,z).height;let best=[0,0,-1e9];
+ for(let z=-2000;z<=2000;z+=64)for(let x=-2000;x<=2000;x+=64){const h=g(x,z);if(h>best[2])best=[x,z,h];}
+ const [hx,hz,hh]=best,len=Math.hypot(hx,hz)||1,px=hx-hx/len*1400,pz=hz-hz/len*1400,position=[px,g(px,pz)+150,pz];
+ const s=await shotEngine(position,[hx,hh-60,hz]),W=s.canvas.width,H=s.canvas.height;
+ const look=await s.pixels(world),flat=c=>({color:c,detail:0}),
+  mask=await s.pixels(world,{materials:{rock:flat([0.35,0,0]),snow:flat([0,0,0.35]),scree:flat([0.35,0.35,0]),meadow:flat([0,0.35,0])}});
+ const rock=new Uint8Array(W*H),snow=new Uint8Array(W*H),high=new Int8Array((W>>1)*(H>>1)).fill(-1);
+ // Ground height per 2 x 2 pixel block, marched only where the mask shows rock.
+ const above=(x,y)=>{const b=(y>>1)*(W>>1)+(x>>1);if(high[b]<0){const q=hit(world,position,s.ray(x&~1,y&~1));high[b]=+(q!==null&&q[1]>2600);}return high[b];};
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const i=y*W+x,k=i*4,[r,gg,b]=[mask[k],mask[k+1],mask[k+2]];
+  if(b>r&&b>3*gg&&b>20)snow[i]=1;
+  else if(r>10*gg&&r>10*b&&r>20)rock[i]=above(x,y);
+ }
+ let n=0,sum=0,sq=0,sn=0,ss=0;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const i=y*W+x;
+  if(snow[i]){sn++;ss+=luma(look,i*4);}
+  if(!rock[i])continue;
+  // The look's luma over the flat mask's red: the light (sun, sky, the vertex normal) cancels, the ground's own light and
+  // dark (texture, relief, macro tone) stays.
+  const l=Math.log(luma(look,i*4)/Math.max(1,mask[i*4])*255);n++;sum+=l;sq+=l*l;
+ }
+ const mean=sum/Math.max(1,n),errors=s.errs.splice(0);
+ s.dispose();world.dispose();
+ return {rock:n/(W*H),rockSd:Math.sqrt(Math.max(0,sq/Math.max(1,n)-mean*mean)),saturated:mask.filter((v,k)=>k%4===0&&v===255).length,snow:sn/(W*H),snowLuma:ss/Math.max(1,sn),errors};
+}
+// Shot 08: the temperate world with desert painted (constant, radius 260 m at [0, -300]) from 110 m over [0, 500]. On the
+// screen row through the circle's centre, the largest change between neighbouring pixels (the sum of the absolute R, G
+// and B differences, sRGB bytes) within 12 px of where the row enters and leaves the patch's sand (R over G by more than 12:
+// grass is G over R). R minus B alone does not tell this palette's grass from sand (76 and 83 on that row).
+async function edge(ecotone){
+ const world=await BiomeWorld.create({biomes:[presets.temperate,presets.desert],climate:presetWorlds.temperate.climate,height:{relief:presetWorlds.temperate.relief},ecotone});
+ const editor=BiomeEditor.attach(world);editor.paint('desert',{center:[0,-300],radius:260,falloff:'constant'});editor.dispose?.();
+ const g=(x,z)=>world.sample(x,z).height,position=[0,g(0,500)+110,500],target=[0,g(0,500)-20,-300];
+ const s=await shotEngine(position,target),W=s.canvas.width,H=s.canvas.height,data=await s.pixels(world);
+ // The screen row of the circle's centre (the camera ray inverted: 60 degree vertical field of view, Y up).
+ const f=norm(target.map((v,i)=>v-position[i])),r=norm([-f[2],0,f[0]]),u=[r[1]*f[2]-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]-r[1]*f[0]],
+  d=[0,g(0,-300),-300].map((v,i)=>v-position[i]),depth=d[0]*f[0]+d[1]*f[1]+d[2]*f[2],
+  row=Math.round((1-(d[0]*u[0]+d[1]*u[1]+d[2]*u[2])/(depth*Math.tan(Math.PI/6)))/2*H);
+ const at=x=>(row*W+x)*4,sand=x=>data[at(x)]-data[at(x)+1]>12;
+ // The widest stretch of sand on the row, gaps of up to 40 px (the desert's rock patches) included, is the painted
+ // patch; other reddish specks are leaf litter.
+ let first=-1,last=-1;for(let x=0,start=-1,end=-1;x<=W;x++){if(x<W&&sand(x)){if(start<0||x-end>40)start=x;end=x;if(end-start>last-first)[first,last]=[start,end];}}
+ let jump=0;
+ for(const ex of [first,last])for(let x=Math.max(1,ex-12);x<=Math.min(W-1,ex+12);x++){const k=at(x),j=k-4;jump=Math.max(jump,Math.abs(data[k]-data[j])+Math.abs(data[k+1]-data[j+1])+Math.abs(data[k+2]-data[j+2]));}
+ const errors=s.errs.splice(0);s.dispose();world.dispose();
+ return {row,first,last,jump,errors};
+}
 window.check={
  async run(){
   const out={};device.pushErrorScope('validation');
@@ -68,6 +157,8 @@ window.check={
   // Temperate ground at noon, as the canvas shows it (sRGB pixels of a second engine with the Sky's sun and sky light and
   // no Bloom), looked at from 12 m up over the world's rolling ground: how bright and how varied the default ground reads.
   out.noon=await noonGround(world);
+  out.alpine=await alpine();
+  out.edge=await edge(24);out.edgeOff=await edge(0);
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);
   return out;

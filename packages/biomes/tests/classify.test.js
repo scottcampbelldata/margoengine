@@ -386,7 +386,8 @@ test('ground layers take temperature, coldest and warmest ranges; snow follows t
   assert.deepEqual(cold.ground[1].warmest, [null, 10]);
   const snow = (id) => presets[id].ground.find((g) => g.material === 'snow');
   assert.deepEqual(snow('tundra'), { material: 'snow', temperature: [null, -6] });
-  assert.deepEqual(snow('alpine'), { material: 'snow', height: [2800, null], temperature: [null, -3] });
+  // Weight 3: alpine snow outweighs the rock it lies on (landing E, a snowy peak reads as snow).
+  assert.deepEqual(snow('alpine'), { material: 'snow', height: [2800, null], temperature: [null, -3], weight: 3 });
   for (const p of Object.values(presets)) defineBiome(p);
 });
 

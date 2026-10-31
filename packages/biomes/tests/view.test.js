@@ -3,13 +3,16 @@
 // browser-check.mjs (test:gpu).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { presets, presetWorlds } from '../dist/presets.js';
 import {
   BiomeView,
   MATERIALS,
   MAX_GROUND_MATERIALS,
+  SEA,
   groundMaterials,
+  materialPixels,
   groundWeights,
   overviewRows,
   overviewWeights,
@@ -309,4 +312,62 @@ test('the overview is the same whatever tiles were made, and its row bands are t
 test('water: a bad option is a TypeError before anything loads', async () => {
   const world = await BiomeWorld.create({ size: [512, 512] });
   await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { water: 'yes' }), TypeError);
+});
+
+test('sky and material relief: bad options are errors before anything loads', async () => {
+  const world = await BiomeWorld.create({ size: [512, 512] });
+  for (const sky of [null, 3, {}, { reflectionTexture: undefined }])
+    await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { sky }), {
+      name: 'TypeError',
+      message: /sky/,
+    });
+  for (const look of [{ bump: 2 }, { macro: -0.1 }, { bump: '1' }])
+    await assert.rejects(
+      BiomeView.attach({ backend: 'webgpu' }, world, { materials: { rock: { color: [0.5, 0.5, 0.5], ...look } } }),
+      { name: 'RangeError', message: /rock.*bump and macro/ },
+    );
+});
+
+test('the sea defaults are an ocean swell the water draws without folding', () => {
+  assert.equal(SEA.segments, 512);
+  assert.equal(SEA.foamDistance, 6);
+  assert.deepEqual(SEA.color, [0.02, 0.24, 0.34]);
+  assert.deepEqual(
+    SEA.waves.map((w) => [w.wavelength, w.amplitude]),
+    [
+      [48, 0.9],
+      [27, 0.44],
+    ],
+  );
+  // Water rejects steepness x amplitude x wavenumber over 1 / waves (steepness default 0.5).
+  for (const w of SEA.waves) assert.ok(0.5 * w.amplitude * ((2 * Math.PI) / w.wavelength) <= 1 / SEA.waves.length);
+  // 8 m cells on a 4 km world: the shortest swell spans over 3 cells.
+  assert.ok(SEA.waves.every((w) => w.wavelength / (4096 / SEA.segments) > 3));
+});
+
+test('ground looks: rock and snow have relief and macro tone, textures have a fine grain octave', () => {
+  assert.deepEqual([MATERIALS.rock.bump, MATERIALS.rock.macro, MATERIALS.rock.detail], [1, 1, 0.6]);
+  assert.deepEqual([MATERIALS.snow.bump, MATERIALS.snow.macro], [0.35, 0.15]);
+  for (const [key, look] of Object.entries(MATERIALS))
+    assert.ok(look.bump > 0 && look.bump <= 1 && look.macro > 0 && look.macro <= 1, `${key} relief and macro`);
+  // The alpine preset's snow outweighs the rock it lies on.
+  assert.equal(presets.alpine.ground.find((g) => g.material === 'snow').weight, 3);
+  const levels = materialPixels('rock', MATERIALS.rock);
+  assert.equal(levels.length, 9);
+  assert.deepEqual(
+    levels.map((l) => l.length),
+    [256, 128, 64, 32, 16, 8, 4, 2, 1].map((s) => s * s * 4),
+  );
+  // The 256-cell octave: neighbouring texels differ (two octaves of 16 and 64 cells changed by about 1 in 255).
+  const base = levels[0];
+  let step = 0;
+  for (let i = 0; i < 255; i++) step += Math.abs(base[i * 4] - base[i * 4 + 4]);
+  assert.ok(step / 255 > 3, `mean step between neighbouring texels: ${step / 255}`);
+  assert.equal(
+    createHash('sha256')
+      .update(Buffer.concat(levels.map((l) => Buffer.from(l))))
+      .digest('hex')
+      .slice(0, 16),
+    'd55e967f053eed4a',
+  );
 });

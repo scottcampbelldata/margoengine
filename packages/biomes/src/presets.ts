@@ -95,7 +95,8 @@ export const presets: Readonly<
       { material: 'meadow', slope: [null, 25] },
       { material: 'scree', slope: [25, 40] },
       { material: 'rock', slope: [35, null] },
-      { material: 'snow', height: [2800, null], temperature: [null, -3] },
+      // Snow outweighs the rock it lies on (weight 3: a quarter rock), so a snowy peak reads as snow, not grey.
+      { material: 'snow', height: [2800, null], temperature: [null, -3], weight: 3 },
     ],
     plants: [shrub('dwarf-pine', 'shrub', 120, 1.5), shrub('heather', 'shrub', 600, 0.4)],
     rocks: [rock(40)],
