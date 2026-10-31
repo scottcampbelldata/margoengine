@@ -103,8 +103,8 @@ does not own. Each entry says exactly what is needed to close it.
   `pending` count and the precise fisheye rays) were what changed them, and it reports no per-function bounds.
 - **Not verified:** the precise functions' error bounds on the Intel compiler (`compute-browser.json` from an Intel
   PC), which no recheck has recorded.
-- **Needed to close:** the `compute-browser.json` precise-maths results from an Intel PC (steps in
-  `private/handoffs/intel-recheck.md`), then this entry removed or turned into the cause found.
+- **Needed to close:** the `compute-browser.json` precise-maths results from an Intel PC, then this entry removed or
+  turned into the cause found.
 
 ### Intel Arc 140V: voxel-pathtracer `denoise` case ran out of time with no output
 
@@ -137,7 +137,7 @@ does not own. Each entry says exactly what is needed to close it.
   if a split script is missing, if their cases are not exactly the check's case list (each once), if a script runs the
   whole check with no case named, or if check:merge would not run one when the package is affected. An unknown case
   name now fails the browser check instead of running nothing.
-- **Needed to close:** run the five scripts on the Arc (`private/handoffs/voxpt-split-laptop-run.md`). If each passes
+- **Needed to close:** run the five split scripts above on the Arc. If each passes
   inside its limit, remove this entry. If one stops with `GPU stall`, the message names the render to hunt.
 
 ### Linux (Intel UHD, Mesa): three GPU suites not finished

@@ -4,7 +4,7 @@ import { smoothDamp } from '@margoengine/tween';
 import { CHARACTER, RIG } from './rig.ts';
 import { LEFT_FOOT, RIGHT_FOOT, wallAt, wallNormalAbove, type Hold, type Point } from './wall.ts';
 
-// Past about 110 degrees of flexion the thigh and calf armour touch (private/handoffs/boulder-a0-report.md). This hip to
+// Past about 110 degrees of flexion the thigh and calf armour touch. This hip to
 // ankle distance is about 102 degrees, so a stance never asks for the touching range.
 export const MIN_LEG_REACH = 0.33;
 export const MAX_LEG_REACH = 0.5;

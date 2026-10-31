@@ -62,19 +62,19 @@ export function deviceLossMessage({ reason, message, at }, resets) {
     return (
       `${what}, so it cannot get ready: the GPU driver reset the GPU (${describeResets(resets)}). A reset removes the ` +
       'WebGPU device of every page on that GPU, so this page may only have been the one that was using it; check:merge ' +
-      'runs the step once more after a confirmed reset. If resets repeat, see private/handoffs/bug-queue.md, bug 25'
+      'runs the step once more after a confirmed reset. If resets repeat, see bug 25 (scripts/support/driver-resets.mjs)'
     );
   if (resets) {
     const why = describeResets(resets);
     return (
       `${what}, so it cannot get ready. ${why ? `${why[0].toUpperCase()}${why.slice(1)}` : 'No GPU driver reset is logged in the Windows event log around then'}` +
       ", so something else took the device: a crash of the browser's GPU process, or the page's own GPU work. Run the " +
-      'check again; if it repeats, it is a bug to find (private/handoffs/bug-queue.md, bug 25)'
+      'check again; if it repeats, it is a bug to find (bug 25, scripts/support/driver-resets.mjs)'
     );
   }
   return (
     `${what}, so it cannot get ready; the GPU driver or the browser removed it (a GPU reset, or a crash of the ` +
-    "browser's GPU process). Run the check again; if it repeats, find what resets the GPU (private/handoffs/bug-queue.md, bug 25)"
+    "browser's GPU process). Run the check again; if it repeats, find what resets the GPU (bug 25, scripts/support/driver-resets.mjs)"
   );
 }
 
