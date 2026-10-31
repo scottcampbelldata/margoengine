@@ -651,6 +651,7 @@ interface MaterialExtension {
     afterOpaque?: boolean;
     replacesPhysical?: boolean;
     transmission?: string;
+    ior?: string;
     wgsl?: string;
     direct?: string;
     ambient?: string;
