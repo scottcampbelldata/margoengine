@@ -5,7 +5,7 @@
 import type { BlockTypes } from '@margoengine/voxel';
 import { VoxelWorld } from '@margoengine/voxel';
 import { raycastVoxels } from '@margoengine/voxel/query';
-import { VoxelNetClient } from './client.js';
+import { ResumeLoop, VoxelNetClient, type VoxelNetClientOptions, type VoxelNetClose } from './client.js';
 import { Keys } from './protocol.js';
 import { connectWebSocket, type WebSocketConnection } from './websocket.js';
 
@@ -33,6 +33,8 @@ export interface VoxelBotOptions {
   travelHome?: boolean;
   /** Extra request headers of the connection, such as the `Origin` a server's `origins` option asks for. Default none. */
   headers?: Record<string, string>;
+  /** Taking the bot back after a dropped connection, as in `connectVoxelNet`. Default `{ attempts: 5 }`. */
+  resume?: VoxelNetClientOptions['resume'];
   /** Random numbers in [0, 1). Default Math.random. */
   random?: () => number;
 }
@@ -58,8 +60,8 @@ export class VoxelBot {
   readonly client: VoxelNetClient;
   /** Its own copy of the world (decoded near itself only). */
   readonly world: VoxelWorld;
-  /** Its WebSocket. */
-  readonly connection: WebSocketConnection;
+  /** Its WebSocket, the latest one after a dropped connection was resumed. */
+  connection: WebSocketConnection;
   /** {@link clock} times of joining: connect started, socket open, welcome, spawn, whole view received. */
   readonly times: { connect: number; open: number; welcome?: number; spawn?: number; loaded?: number };
   /** Every edit it asked for. */
@@ -68,6 +70,8 @@ export class VoxelBot {
   closeCode: number | undefined;
   /** The close reason once the connection ended. */
   closeReason: string | undefined;
+  /** Why it stopped trying, when a dropped connection could not be taken back. */
+  resumeFailed: string | undefined;
   readonly #random: () => number;
   readonly #interval: number;
   readonly #place: number;
@@ -82,6 +86,10 @@ export class VoxelBot {
   #since = 0;
   #from: [number, number] = [0, 0];
   #stuck = 0;
+  #bytesBefore = 0;
+  #live: WebSocketConnection | undefined;
+  #closing = false;
+  readonly #loop: ResumeLoop;
   private constructor(
     connection: WebSocketConnection,
     options: VoxelBotOptions,
@@ -99,26 +107,78 @@ export class VoxelBot {
     this.#yaw = this.#random() * 2 * Math.PI;
     this.#editIn = this.#interval * (0.5 + this.#random());
     this.world = new VoxelWorld({ blocks });
-    this.client = new VoxelNetClient(
-      this.world,
-      { send: (data) => connection.send(data), close: () => connection.close() },
-      { name: options.name ?? 'bot', view: options.view ?? 6, decodeDistance: 1, players: options.players ?? false },
-    );
+    this.client = new VoxelNetClient(this.world, this.#transport(connection), {
+      name: options.name ?? 'bot',
+      view: options.view ?? 6,
+      decodeDistance: 1,
+      players: options.players ?? false,
+    });
     this.client.onSpawn = () => {
       this.times.spawn = clock();
     };
     this.client.onLoaded = () => {
       this.times.loaded = clock();
     };
+    // Later tries ask the same way; one that comes in after its time is closed by #transport's caller.
+    let opening = 0;
+    this.#loop = new ResumeLoop(
+      this.client,
+      options.resume,
+      async () => {
+        const mine = ++opening,
+          next = await connectWebSocket(options.url, options.headers ? { headers: options.headers } : {});
+        if (mine !== opening) {
+          next.close();
+          throw new Error('too late');
+        }
+        return this.#transport(next);
+      },
+      () => {
+        opening++;
+        const old = this.#live;
+        this.#live = undefined;
+        old?.close();
+      },
+      (close) => this.#ended(close),
+    );
+  }
+  // A connection's calls for the client, and its events for this bot.
+  #transport(connection: WebSocketConnection): { send(data: Uint8Array): void; close(): void } {
+    this.#live = connection;
+    this.#bytesBefore += this.connection === connection ? 0 : this.connection.bytesIn;
+    this.connection = connection;
     connection.onmessage = (data) => {
+      if (this.#live !== connection) return;
       this.client.receive(data);
+      this.#loop.heard();
       if (this.times.welcome === undefined && this.client.welcome) this.times.welcome = clock();
     };
     connection.onclose = (code, reason) => {
-      this.closeCode = code;
-      this.closeReason = reason;
-      this.client.close();
+      if (this.#live !== connection) return;
+      if (this.#closing || !this.#loop.drop(code, reason)) this.#ended({ code, reason, byClient: this.#closing });
     };
+    return {
+      send: (data) => connection.send(data),
+      close: () => {
+        this.#closing = true;
+        this.#loop.stop();
+        const live = this.#live;
+        if (live) live.close();
+        else this.#ended({ code: 1000, reason: '', byClient: true });
+      },
+    };
+  }
+  #ended(close: VoxelNetClose): void {
+    if (this.closeCode !== undefined) return;
+    this.closeCode = close.code;
+    this.closeReason = close.reason;
+    this.resumeFailed = close.resumeFailed;
+    this.client.close();
+    this.client.onClose(close);
+  }
+  /** Bytes read so far, over every connection it has had. */
+  get bytesIn(): number {
+    return this.#bytesBefore + this.connection.bytesIn;
   }
   /**
    * Opens a connection and joins.

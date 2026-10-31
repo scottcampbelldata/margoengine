@@ -6,10 +6,12 @@ export type {
   VoxelNetClientStats,
   VoxelNetClose,
   VoxelNetControls,
+  VoxelNetResume,
+  VoxelNetResumed,
   VoxelNetTransport,
 } from './client.js';
 export { connectVoxelNet, SERVER_SILENT_CODE, VoxelNetClient } from './client.js';
-export type { ClientMessage, InputRun, PlayerName, PlayerState, ServerMessage } from './protocol.js';
+export type { ClientMessage, InputRun, PlayerName, PlayerState, ResumeHello, ServerMessage } from './protocol.js';
 export {
   blockTableHash,
   cleanPlayerName,
@@ -20,10 +22,12 @@ export {
   Keys,
   MAX_APP_BYTES,
   MAX_NAME_BYTES,
+  MAX_STALE_CHUNKS,
   moveIntent,
   PLAYER_SCHEMA,
   PROTOCOL_VERSION,
   quantizePitch,
   quantizeYaw,
+  RESUME_TOKEN_BYTES,
   STEP_SECONDS,
 } from './protocol.js';

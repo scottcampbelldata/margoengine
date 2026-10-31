@@ -18,6 +18,7 @@ import {
   PLAYER_SCHEMA,
   type PlayerState,
   PROTOCOL_VERSION,
+  MAX_STALE_CHUNKS,
   quantizePitch,
   quantizeYaw,
   STEP_SECONDS,
@@ -54,6 +55,14 @@ export interface VoxelNetClientOptions {
    * never less. {@link VoxelNetClient} with your own transport, and `VoxelBot`, ignore it.
    */
   serverTimeout?: number;
+  /**
+   * With {@link connectVoxelNet} and `VoxelBot`: taking the player back after a dropped connection, in place, with its
+   * position, world and id. `attempts` is how many tries (default 5, spread over about 20 s); aborting `signal` during a
+   * gap ends the connection with {@link VoxelNetClient.onClose} 1000 `'aborted'`, and after it no drop is resumed. `false`
+   * turns it off, so `onClose` comes at the first drop. Default `{ attempts: 5 }`. {@link VoxelNetClient} with your own
+   * transport ignores it: call {@link VoxelNetClient.detach} and {@link VoxelNetClient.attach} yourself.
+   */
+  resume?: false | { attempts?: number; signal?: AbortSignal };
   /** Options of the local player's body; the server's must match. */
   character?: VoxelCharacterOptions;
 }
@@ -93,6 +102,26 @@ export interface VoxelNetClose {
   reason: string;
   /** Whether this client started the close, through {@link VoxelNetClient.close} or after a message it could not read. */
   byClient: boolean;
+  /** Set when the connection dropped and could not be taken back: why the last try failed. `code` is the first drop's. */
+  resumeFailed?: string;
+}
+
+/** One try to take the player back, for {@link VoxelNetClient.onResume}. */
+export interface VoxelNetResume {
+  /** Which try, from 1. */
+  attempt: number;
+  /** Why the connection dropped: its close reason, or its code when it gave none. */
+  cause: string;
+  /** Milliseconds until this try starts. */
+  delay: number;
+}
+
+/** A player taken back, for {@link VoxelNetClient.onResumed}. */
+export interface VoxelNetResumed {
+  /** Milliseconds from the drop until the server had the player again. */
+  gapMs: number;
+  /** Chunks the server sends again because the dead socket may have lost them. */
+  chunksResent: number;
 }
 
 /** Bytes and events a client counted since it was created. */
@@ -105,6 +134,14 @@ export interface VoxelNetClientStats {
   corrections: number;
   /** Chunks received. */
   chunks: number;
+  /** Connections that dropped and were not given up on at once. */
+  drops: number;
+  /** Tries to take the player back. */
+  resumeAttempts: number;
+  /** Times the player was taken back. */
+  resumes: number;
+  /** Drops that ended in giving up. */
+  resumeFailed: number;
 }
 
 // A chunk the server sent: bytes until decoded, then in the world; edits that arrive before then wait in `changes`.
@@ -116,11 +153,15 @@ interface Entry {
   changes: number[];
   loaded: boolean;
   decoding: boolean;
+  // Sent again while the old copy is in the world: that one stays until this one is decoded, so nobody falls through.
+  swap: boolean;
 }
 
 const HISTORY = 1200, // steps of input kept for replay: 10 s
   SEND_EVERY = 6, // steps per input message: one per 20 Hz tick
-  SILENT_CHECKS = 15; // serverTimeout is watched by this many timer firings
+  SILENT_CHECKS = 15, // serverTimeout is watched by this many timer firings
+  ATTEMPT_MS = 5000, // one try to take a player back may take this long
+  GAP_MS = 30_000; // no new try after this long: the server's resumeTimeout has run out by then
 
 /**
  * {@link VoxelNetClose.code} when {@link connectVoxelNet} gave up on a server that sent nothing for
@@ -170,6 +211,10 @@ export class VoxelNetClient {
     sent: 0,
     corrections: 0,
     chunks: 0,
+    drops: 0,
+    resumeAttempts: 0,
+    resumes: 0,
+    resumeFailed: 0,
   };
   /** The server's welcome once it arrived. */
   welcome: Extract<ServerMessage, { type: 'welcome' }> | undefined;
@@ -195,9 +240,15 @@ export class VoxelNetClient {
    * the transport ends. Default does nothing.
    */
   onClose: (event: VoxelNetClose) => void = () => {};
+  /** Called before each try to take the player back after a drop. Default does nothing. */
+  onResume: (event: VoxelNetResume) => void = () => {};
+  /** Called when the server has the player again, in the same place. Default does nothing. */
+  onResumed: (event: VoxelNetResumed) => void = () => {};
   /** Receives errors: a message the client cannot read, a chunk that fails to decode. Default console.error. */
   onError: (error: unknown) => void = (error) => console.error(error);
-  readonly #transport: VoxelNetTransport;
+  #transport: VoxelNetTransport;
+  readonly #view: number;
+  readonly #name: string;
   readonly #decodeDistance: number;
   readonly #decodePlayers: boolean;
   readonly #delay: number;
@@ -217,6 +268,8 @@ export class VoxelNetClient {
   #center = ''; // chunk of the player when chunks near it were last decoded
   #offset = Number.POSITIVE_INFINITY; // local seconds minus server seconds, smallest seen
   #closed = false;
+  #detachedAt = -1; // performance.now() of the drop, -1 while connected
+  readonly #edited: (readonly [number, number, number])[] = []; // chunks of the latest edits, oldest first
   /**
    * @throws TypeError when `world` is not a VoxelWorld or `transport` lacks send and close.
    * @throws RangeError for a view outside 0..64 or a negative decode distance.
@@ -234,7 +287,9 @@ export class VoxelNetClient {
     this.#decodeDistance = decodeDistance;
     this.#decodePlayers = options.players ?? true;
     this.#delay = options.interpolationDelay ?? 0.1;
-    this.#send(encodeClientMessage({ type: 'hello', version: PROTOCOL_VERSION, view, name: options.name ?? '' }));
+    this.#view = view;
+    this.#name = options.name ?? '';
+    this.#send(encodeClientMessage({ type: 'hello', version: PROTOCOL_VERSION, view, name: this.#name }));
   }
   /**
    * Handles one message from the server.
@@ -261,7 +316,7 @@ export class VoxelNetClient {
   update(dt: number, controls: VoxelNetControls): void {
     if (!(dt >= 0 && dt < Number.POSITIVE_INFINITY))
       throw new RangeError(`VoxelNetClient update dt ${dt} must be finite and >= 0 seconds`);
-    if (!this.spawned || this.#closed) return;
+    if (!this.spawned || this.#closed || this.detached) return;
     const p = this.player.position;
     this.#decodeNear();
     if (!this.#ready(p)) {
@@ -294,7 +349,7 @@ export class VoxelNetClient {
   }
   /** Sends the inputs of the steps since the last send now (an edit does this first, so the server sees them in order). */
   flush(): void {
-    if (!this.#runs.length || this.#closed) return;
+    if (!this.#runs.length || this.#closed || this.detached) return;
     this.#send(
       encodeClientMessage({
         type: 'input',
@@ -309,13 +364,16 @@ export class VoxelNetClient {
   }
   /**
    * Sets cell (x, y, z) to `state` at once and asks the server to make it so; the server answers with the cell's real
-   * state if it refuses. Returns false (and changes nothing) before spawning or when the cell's chunk is not loaded.
+   * state if it refuses. Returns false (and changes nothing) before spawning, between a drop and its resume, or when the
+   * cell's chunk is not loaded.
    * @throws as `VoxelWorld.setBlock` for a bad cell or state.
    */
   edit(x: number, y: number, z: number, state: number): boolean {
-    if (!this.spawned || this.#closed || !this.world.getChunk(x >> 5, y >> 5, z >> 5)) return false;
+    if (!this.spawned || this.#closed || this.detached || !this.world.getChunk(x >> 5, y >> 5, z >> 5)) return false;
     this.world.setBlock(x, y, z, state);
     this.flush();
+    this.#edited.push([x >> 5, y >> 5, z >> 5]);
+    if (this.#edited.length > MAX_STALE_CHUNKS) this.#edited.shift();
     this.#send(encodeClientMessage({ type: 'edit', x, y, z, state }));
     return true;
   }
@@ -328,6 +386,52 @@ export class VoxelNetClient {
     const time = now - this.#offset - this.#delay;
     if (Number.isFinite(time)) for (const other of this.players.values()) other.buffer.sample(time, other.snapshot);
     return this.players;
+  }
+  /** True from {@link VoxelNetClient.detach} until the server has the player again. */
+  get detached(): boolean {
+    return this.#detachedAt >= 0;
+  }
+  /**
+   * The connection dropped. Until {@link VoxelNetClient.attach} brings the player back, {@link VoxelNetClient.update} holds
+   * it where it is and sends nothing, {@link VoxelNetClient.edit} refuses, and the world, its chunks and the other players
+   * stay as they are. {@link connectVoxelNet} and `VoxelBot` do this by themselves.
+   */
+  detach(): void {
+    if (this.#closed || this.detached) return;
+    this.#detachedAt = performance.now();
+    this.#runs = [];
+    this.#pending = 0;
+    this.#time = 0;
+    this.stats.drops++;
+  }
+  /**
+   * Tries to take the player back over a new `transport`: says hello with the token of the last welcome. The server's
+   * `state` answer ends the gap. A refusal closes `transport`; call this again with another one to try again.
+   * @throws MargoError `'state'` when the client is not detached, or the server gave it no token.
+   * @throws TypeError when `transport` lacks send and close.
+   */
+  attach(transport: VoxelNetTransport): void {
+    const token = this.welcome?.resume;
+    if (!this.detached || !token?.length)
+      throw new MargoError(
+        'state',
+        'VoxelNetClient.attach needs a player that was spawned and then detached; call detach() first',
+      );
+    if (typeof transport?.send !== 'function' || typeof transport.close !== 'function')
+      throw new TypeError('VoxelNetClient.attach transport needs send(bytes) and close(); pass a WebSocket');
+    this.#transport = transport;
+    this.#entities = new Map(); // the server starts its players messages over
+    const stale = new Map(this.#edited.map((key) => [chunkKey(key[0], key[1], key[2]), key]));
+    this.stats.resumeAttempts++;
+    this.#send(
+      encodeClientMessage({
+        type: 'hello',
+        version: PROTOCOL_VERSION,
+        view: this.#view,
+        name: this.#name,
+        resume: { token, chunks: this.stats.chunks, stale: [...stale.values()] },
+      }),
+    );
   }
   /** Closes the connection. */
   close(): void {
@@ -347,8 +451,9 @@ export class VoxelNetClient {
         this.welcome = m;
         break;
       case 'chunk': {
-        const key = chunkKey(m.cx, m.cy, m.cz);
-        this.#drop(key);
+        const key = chunkKey(m.cx, m.cy, m.cz),
+          old = this.#chunks.get(key),
+          swap = !!old && (old.loaded || old.swap);
         const entry: Entry = {
           cx: m.cx,
           cy: m.cy,
@@ -357,6 +462,7 @@ export class VoxelNetClient {
           changes: [],
           loaded: false,
           decoding: false,
+          swap,
         };
         this.#chunks.set(key, entry);
         this.stats.chunks++;
@@ -376,8 +482,10 @@ export class VoxelNetClient {
         if (this.#decodePlayers) this.#players(m.tick, m.data);
         break;
       case 'loaded':
-        this.loaded = true;
-        this.onLoaded();
+        if (!this.loaded) {
+          this.loaded = true; // a resume says it again
+          this.onLoaded();
+        }
         break;
       case 'names':
         if (this.#decodePlayers)
@@ -398,7 +506,7 @@ export class VoxelNetClient {
     const entry = this.#chunks.get(key);
     if (!entry) return;
     this.#chunks.delete(key);
-    if (entry.loaded) this.world.removeChunk(entry.cx, entry.cy, entry.cz);
+    if (entry.loaded || entry.swap) this.world.removeChunk(entry.cx, entry.cy, entry.cz);
   }
   // Within decodeDistance of the player (before spawning, only when decoding everything).
   #near(e: Entry): boolean {
@@ -427,6 +535,8 @@ export class VoxelNetClient {
     decodeChunk(bytes).then(
       (chunk) => {
         if (this.#chunks.get(key) !== entry || this.#closed) return;
+        if (entry.swap) this.world.removeChunk(entry.cx, entry.cy, entry.cz);
+        entry.swap = false;
         this.world.addChunk(entry.cx, entry.cy, entry.cz, chunk);
         entry.loaded = true;
         entry.decoding = false;
@@ -454,14 +564,21 @@ export class VoxelNetClient {
     p.flying = m.flying;
     if (m.spawn) {
       this.#step = m.step;
+      this.#acked = m.step;
       this.#runs = [];
       this.#pending = 0;
       this.#time = 0;
       for (let i = 0; i < 3; i++) this.renderPosition[i] = this.#previous[i] = m.position[i];
+      const back = this.spawned;
       this.spawned = true;
       this.#center = '';
       this.#decodeNear();
-      this.onSpawn();
+      if (!back) return this.onSpawn();
+      const gapMs = performance.now() - this.#detachedAt;
+      this.#detachedAt = -1;
+      this.#edited.length = 0;
+      this.stats.resumes++;
+      this.onResumed({ gapMs, chunksResent: this.welcome?.resent ?? 0 });
       return;
     }
     // Replay the steps after the corrected one, when they are still in the history.
@@ -527,6 +644,153 @@ export class VoxelNetClient {
 }
 
 /**
+ * Milliseconds to wait before try `attempt` to take a player back: 100 to 600 for the first, so a whole crowd cut at once
+ * spreads out, then 1, 2, 4 and 8 s, each within half of that either way.
+ * @internal
+ */
+export const resumeDelay = (attempt: number, random: () => number = Math.random): number =>
+  attempt < 2 ? 100 + 500 * random() : 1000 * 2 ** Math.min(attempt - 2, 3) * (0.5 + random());
+
+/**
+ * The tries to take a player back after a drop, for {@link connectVoxelNet} and `VoxelBot`: `open` makes a new
+ * connection and `abandon` lets go of the current one, whose later events must not reach {@link ResumeLoop.drop}.
+ * @internal
+ */
+export class ResumeLoop {
+  readonly #client: VoxelNetClient;
+  readonly #attempts: number;
+  readonly #signal: AbortSignal | undefined;
+  readonly #open: () => Promise<VoxelNetTransport>;
+  readonly #abandon: () => void;
+  readonly #end: (close: VoxelNetClose) => void;
+  #first: VoxelNetClose | undefined; // the drop being resumed from
+  #attempt = 0;
+  #at = 0;
+  #timer: ReturnType<typeof setTimeout> | undefined;
+  #wake: (() => void) | undefined;
+  constructor(
+    client: VoxelNetClient,
+    resume: VoxelNetClientOptions['resume'],
+    open: () => Promise<VoxelNetTransport>,
+    abandon: () => void,
+    end: (close: VoxelNetClose) => void,
+  ) {
+    this.#client = client;
+    const attempts = resume === false ? 0 : (resume?.attempts ?? 5);
+    if (!Number.isInteger(attempts) || attempts < 0)
+      throw new RangeError(`resume attempts ${attempts} must be a whole number >= 0; pass false to turn resuming off`);
+    this.#attempts = attempts;
+    this.#signal = resume ? resume.signal : undefined;
+    this.#open = open;
+    this.#abandon = abandon;
+    this.#end = end;
+  }
+  /** Whether a drop is being resumed from. */
+  get active(): boolean {
+    return !!this.#first;
+  }
+  /** The socket ended. True while this handles it; false when the connection has ended for good. */
+  drop(code: number, reason: string): boolean {
+    const retry = code === 1006 || code === SERVER_SILENT_CODE;
+    if (this.#first) {
+      if (!retry) this.#give(reason || String(code));
+      else this.#next();
+      return true;
+    }
+    const client = this.#client;
+    if (
+      !this.#attempts ||
+      this.#signal?.aborted ||
+      !client.spawned ||
+      !client.welcome?.resume.length ||
+      !(retry || (code === 1008 && reason === 'client-silent'))
+    )
+      return false;
+    this.#first = { code, reason, byClient: false };
+    this.#attempt = 0;
+    this.#at = performance.now();
+    this.#signal?.addEventListener('abort', this.#aborted);
+    client.detach();
+    this.#abandon();
+    this.#next();
+    return true;
+  }
+  /** A message arrived: the gap ends when the client has its player again. */
+  heard(): void {
+    if (this.#first && !this.#client.detached) this.stop();
+  }
+  /** Stops trying. */
+  stop(): void {
+    this.#clear();
+    this.#signal?.removeEventListener('abort', this.#aborted);
+    this.#first = undefined;
+    this.#attempt = -1;
+  }
+  readonly #aborted = (): void => {
+    this.stop();
+    this.#abandon();
+    this.#end({ code: 1000, reason: 'aborted', byClient: true });
+  };
+  #clear(): void {
+    clearTimeout(this.#timer);
+    if (this.#wake) {
+      globalThis.document?.removeEventListener('visibilitychange', this.#wake);
+      globalThis.removeEventListener?.('online', this.#wake);
+    }
+    this.#wake = undefined;
+  }
+  #give(why: string): void {
+    const first = this.#first as VoxelNetClose;
+    this.stop();
+    this.#client.stats.resumeFailed++;
+    this.#abandon();
+    this.#end({ ...first, resumeFailed: why });
+  }
+  #next(): void {
+    this.#clear();
+    const attempt = ++this.#attempt,
+      first = this.#first as VoxelNetClose;
+    if (attempt > this.#attempts || performance.now() - this.#at >= GAP_MS)
+      return this.#give(`no answer in ${attempt - 1} tries`);
+    const delay = resumeDelay(attempt);
+    this.#client.onResume({ attempt, cause: first.reason || String(first.code), delay });
+    if (this.#first) this.#wait(delay, attempt);
+  }
+  // Waits out `ms`, longer while the page is offline; a tab shown again or a network that came back ends it at once.
+  #wait(ms: number, attempt: number): void {
+    const offline = () => globalThis.navigator?.onLine === false,
+      left = () => GAP_MS - (performance.now() - this.#at),
+      fire = () => {
+        this.#clear();
+        if (offline() && left() > 0) return this.#wait(left(), attempt);
+        this.#try(attempt);
+      },
+      wake = () => {
+        if (globalThis.document?.visibilityState !== 'hidden' && !offline()) fire();
+      };
+    this.#wake = wake;
+    this.#timer = setTimeout(fire, ms);
+    globalThis.document?.addEventListener('visibilitychange', wake);
+    globalThis.addEventListener?.('online', wake);
+  }
+  #try(attempt: number): void {
+    const live = () => this.#attempt === attempt;
+    this.#timer = setTimeout(() => {
+      this.#abandon();
+      this.drop(1006, 'no answer');
+    }, ATTEMPT_MS);
+    this.#open().then(
+      (transport) => {
+        if (live()) this.#client.attach(transport);
+      },
+      (error) => {
+        if (live()) this.drop(1006, String(error?.message ?? error));
+      },
+    );
+  }
+}
+
+/**
  * Connects a {@link VoxelNetClient} to a voxel-net server with the browser's WebSocket. When the server refuses or drops
  * the connection (any close but 1000 and 1001, for example another protocol version), `onError` gets a MargoError
  * `'failed'` holding the close code and reason. Every way the connection ends, a clean server shutdown included, calls
@@ -534,6 +798,11 @@ export class VoxelNetClient {
  * {@link VoxelNetClientOptions.serverTimeout} ends it the same way, at once and without waiting for the socket, whose own
  * close can take a minute on a dead route: `onError` gets a MargoError `'failed'` and `onClose` gets
  * {@link SERVER_SILENT_CODE}.
+ *
+ * A connection that drops after the player has spawned (close 1006, a silent server, or the server's `client-silent`) is
+ * not the end: the client holds the player (see {@link VoxelNetClient.detach}) and tries again as
+ * {@link VoxelNetClientOptions.resume} says, telling {@link VoxelNetClient.onResume} and {@link VoxelNetClient.onResumed}.
+ * `onError` and `onClose` come only if that fails, with the first drop's code and `resumeFailed`.
  *
  * Silence is counted in timer firings, not on a clock: one firing, however late, is one fifteenth of the timeout. So a
  * long frame or a throttled background tab, where messages wait behind the timer, is not taken for a dead server.
@@ -551,33 +820,49 @@ export function connectVoxelNet(
   const { serverTimeout = 15_000 } = options;
   if (!(serverTimeout >= 0 && serverTimeout < Number.POSITIVE_INFINITY))
     throw new RangeError(`serverTimeout ${serverTimeout} must be finite and >= 0 milliseconds; 0 never gives up`);
-  const socket = new WebSocket(url),
-    queue: Uint8Array[] = [];
-  socket.binaryType = 'arraybuffer';
   let closing = false,
     ended = false,
     silent = 0,
+    socket: WebSocket | undefined,
     watch: ReturnType<typeof setInterval> | undefined;
-  const client = new VoxelNetClient(
-    world,
-    {
-      send: (data) => (socket.readyState === 1 ? socket.send(data as Uint8Array<ArrayBuffer>) : queue.push(data)),
-      close: () => {
-        closing = true;
-        clearInterval(watch);
-        socket.close();
-      },
-    },
-    options,
-  );
-  socket.addEventListener('open', () => {
-    for (const data of queue.splice(0)) socket.send(data as Uint8Array<ArrayBuffer>);
-  });
-  socket.addEventListener('message', (event) => {
+  const close = (): void => {
+    closing = true;
+    clearInterval(watch);
+    loop.stop();
+    if (socket) socket.close();
+    else end(1000, '', true, undefined); // in a gap there is no socket to report it
+  };
+  const open = (): VoxelNetTransport => {
+    const ws = new WebSocket(url),
+      queue: Uint8Array[] = [];
+    socket = ws;
     silent = 0;
-    client.receive(new Uint8Array(event.data as ArrayBuffer));
-  });
-  const end = (code: number, reason: string, byClient: boolean, message: string | undefined): void => {
+    ws.binaryType = 'arraybuffer';
+    ws.addEventListener('open', () => {
+      for (const data of queue.splice(0)) ws.send(data as Uint8Array<ArrayBuffer>);
+    });
+    ws.addEventListener('message', (event) => {
+      if (ws !== socket) return;
+      silent = 0;
+      client.receive(new Uint8Array(event.data as ArrayBuffer));
+      loop.heard();
+    });
+    ws.addEventListener('close', ({ code, reason }) => {
+      if (ws === socket) lost(code, reason);
+    });
+    return {
+      send: (data) => (ws.readyState === 1 ? ws.send(data as Uint8Array<ArrayBuffer>) : queue.push(data)),
+      close,
+    };
+  };
+  const client = new VoxelNetClient(world, open(), options);
+  const end = (
+    code: number,
+    reason: string,
+    byClient: boolean,
+    message: string | undefined,
+    resumeFailed?: string,
+  ): void => {
     if (ended) return;
     ended = true;
     clearInterval(watch);
@@ -585,30 +870,33 @@ export function connectVoxelNet(
       if (message) client.onError(new MargoError('failed', message));
     } finally {
       client.close();
-      client.onClose({ code, reason, byClient });
+      client.onClose({ code, reason, byClient, ...(resumeFailed ? { resumeFailed } : {}) });
     }
   };
-  socket.addEventListener('close', ({ code, reason }) => {
+  const said = (code: number, reason: string): string =>
+    code === SERVER_SILENT_CODE
+      ? `The voxel-net server sent nothing for ${serverTimeout} ms (serverTimeout); the network or the server is gone, so join again`
+      : `The voxel-net server closed the connection with ${code}${reason ? ` (${reason})` : ''}; check that it is running and that server and client are the same version`;
+  const loop = new ResumeLoop(
+    client,
+    options.resume,
+    async () => open(),
+    () => {
+      const old = socket;
+      socket = undefined;
+      old?.close();
+    },
+    (c) => end(c.code, c.reason, c.byClient, c.resumeFailed && said(c.code, c.reason), c.resumeFailed),
+  );
+  const lost = (code: number, reason: string): void => {
     // Read first: an onError handler may call client.close(), which does not make this close the client's.
     const byClient = closing;
-    end(
-      code,
-      reason,
-      byClient,
-      !byClient && code !== 1000 && code !== 1001
-        ? `The voxel-net server closed the connection with ${code}${reason ? ` (${reason})` : ''}; check that it is running and that server and client are the same version`
-        : undefined,
-    );
-  });
+    if (byClient || !loop.drop(code, reason))
+      end(code, reason, byClient, !byClient && code !== 1000 && code !== 1001 ? said(code, reason) : undefined);
+  };
   if (serverTimeout > 0) {
     watch = setInterval(() => {
-      if (++silent >= SILENT_CHECKS)
-        end(
-          SERVER_SILENT_CODE,
-          'server-silent',
-          false,
-          `The voxel-net server sent nothing for ${serverTimeout} ms (serverTimeout); the network or the server is gone, so join again`,
-        );
+      if (!loop.active && ++silent >= SILENT_CHECKS) lost(SERVER_SILENT_CODE, 'server-silent');
     }, serverTimeout / SILENT_CHECKS);
     (watch as { unref?: () => void }).unref?.();
   }
