@@ -287,7 +287,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> `49f3e971` (the water/terrain SSR commit): terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
-| water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `57250a49` |
+| water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `5cf53d7e6` |
 | quality-presets | `96daac7` -> `01e5e35` | `33c403984` |
 | post-ssao-perspective | `9c761d5` -> `9702e57`: 3,282 calls | - |
 | probes-decals | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | - |
@@ -437,6 +437,16 @@ Call counts, bind groups, buffers and every buffer write are unchanged. The proo
 `d.fragment?.targets[0].format`, which threw on a fragment with no targets; it reads `targets[0]?.format` now.
 `packages/terrain/test/edge.browser.mjs` checks the pixels on a real GPU (sky only past a corner) and
 `packages/terrain/test/lighting.test.js` the shadow pipeline.
+
+**water-ssr, advanced to `5cf53d7e6` on 2026-10-31 (biome look plan 3, A2, the horizon sea follows the camera):** the
+horizon grid kept regular cells only near the origin, so a camera away from it saw no swell, and it ended in a square
+10 km out that high cameras saw below the horizon. The frame uniform gains a `grid` vec4 (the camera position snapped
+to a whole cell, added to the grid in the vertex shader when `horizon` is on), so in every story the frame uniform is
+528 bytes instead of 512 (its `createBuffer` and every write of it) and the water shader texts (surface, capture,
+coastal flow and spray, which share the frame struct) change; the story with `horizon: true` also writes the snapped
+offset and a vertex buffer whose outer rows grow geometrically to 10 km and whose last row lies 10,000 km out. With
+`horizon: false` the rendered pixels are unchanged (`packages/water/test/horizon.browser.mjs` compares the near field of
+both grids on a real GPU).
 
 **quality-presets, advanced to `33c403984` on 2026-10-30 (VFX repeatable particle order):** the VFX update kernel took
 respawn tickets and draw-list places with `atomicAdd`, so which dead slots were born and the order of blended particles
