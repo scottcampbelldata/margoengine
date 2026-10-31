@@ -58,8 +58,8 @@ test('the deadline kills the whole process tree, exits non-zero and names the st
     const log = readdirSync(dir).find((name) => name.endsWith('.log'));
     assert.match(readFileSync(join(dir, log), 'utf8'), /TIMED OUT[\s\S]*nightly RESULT TIMEOUT at step "hanging step"/);
     const grandchild = Number(readFileSync(pidFile, 'utf8'));
-    await sleep(500);
-    assert.equal(alive(grandchild), false, 'the grandchild process was killed with the tree');
+    for (const end = Date.now() + 30_000; alive(grandchild); await sleep(10))
+      assert.ok(Date.now() < end, 'the grandchild process was killed with the tree');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

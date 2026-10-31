@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixedWaits, isCheckFile, scan } from '../scripts/check-fixed-waits.mjs';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const kinds = (source) => fixedWaits(source).map((w) => `${w.line}:${w.kind}`);
 
@@ -29,18 +29,31 @@ test('a sleep of 50 ms or more is a fixed wait; a short poll interval is not', (
   assert.deepEqual(kinds('setTimeout(() => controller.abort(), 5000);'), []);
 });
 
+// Regression (2026-10-31): these were invisible to the check, and each one failed under a loaded 8-way run.
+test("a unit test's sleep helper, and a promise raced against a time, are fixed waits", () => {
+  assert.deepEqual(kinds('await sleep(500);\nassert.equal(alive(pid), false);'), ['1:ms']);
+  assert.deepEqual(kinds('await wait(200);'), ['1:ms']);
+  assert.deepEqual(kinds('await delay(1_500);'), ['1:ms']);
+  assert.deepEqual(kinds("assert.equal(await settled(next, 2000), 'got');"), ['1:ms']);
+  assert.deepEqual(kinds("assert.equal(await settled(take(old, 'x'), 1000), 'got');"), ['1:ms']);
+  assert.deepEqual(kinds('while (!ok()) await sleep(10);'), []);
+  assert.deepEqual(kinds('await handle.wait(path);'), []);
+  assert.deepEqual(kinds('await sleep(500); // fixed-wait: nothing may start in this time'), []);
+});
+
 test('a fixed-wait: comment with a reason, on the line or the line above, allows it', () => {
   assert.deepEqual(kinds('await page.waitForTimeout(500); // fixed-wait: the debounce under test is 400 ms'), []);
   assert.deepEqual(kinds('// fixed-wait: warm-up before timing\nfor (let i = 0; i < 5; i++) engine.render();'), []);
   assert.deepEqual(kinds('// fixed-wait:\nfor (let i = 0; i < 5; i++) engine.render();'), ['2:frames']);
 });
 
-test('the check reads test folders and the browser drivers in scripts/, not benchmarks or builds', () => {
+test('the check reads test folders, unit tests too, and the browser drivers in scripts/, not benchmarks or builds', () => {
   assert.ok(isCheckFile('packages/voxel/tests/bevel-browser-check.html'));
   assert.ok(isCheckFile('packages/sky/test/browser-check.html'));
   assert.ok(isCheckFile('scripts/modern-browser-tests.js'));
   assert.ok(!isCheckFile('packages/voxel/src/render.ts'));
-  assert.ok(!isCheckFile('packages/voxel/tests/mesher.test.js'));
+  assert.ok(isCheckFile('packages/voxel/tests/mesher.test.js'));
+  assert.ok(isCheckFile('tests/gpu-lock-limits.test.js'));
   assert.ok(!isCheckFile('bench/cli.mjs'));
   assert.ok(!isCheckFile('scripts/benchmark-vfx-island.js'));
   assert.ok(!isCheckFile('packages/voxel/dist/tests/x.js'));
@@ -57,8 +70,9 @@ test('every GPU and browser check has exactly the fixed waits its baseline count
       `${file} has a new fixed wait; wait for readiness (scripts/support/gpu-ready.js) or mark it // fixed-wait: <reason>: ${waits.map((w) => `${w.line} ${w.text}`).join('; ')}`,
     );
   for (const [file, count] of Object.entries(baseline.files))
-    assert.ok(
-      (found[file]?.length ?? 0) >= count,
-      `${file} has fewer fixed waits than its baseline (${count}): run node scripts/check-fixed-waits.mjs --update`,
-    );
+    if (existsSync(new URL(`../${file}`, import.meta.url)))
+      assert.ok(
+        (found[file]?.length ?? 0) >= count,
+        `${file} has fewer fixed waits than its baseline (${count}): run node scripts/check-fixed-waits.mjs --update`,
+      );
 });

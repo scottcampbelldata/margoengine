@@ -392,12 +392,14 @@ test('rooms: a connection that sends no join is closed with CloseCode.timeout af
   raw.onclose = (c) => (code = c);
   await h.settle();
   assert.equal(h.rooms.connections, 1);
+  // fixed-wait: joinTimeout's real 30 ms timer; Node fires timers in order of expiry, so it comes first
   await wait(60);
   await h.settle();
   assert.equal(code, 4006);
   assert.equal(h.rooms.connections, 0, 'the timed-out connection no longer counts');
   // A client that joins in time is not closed by the timer.
   const room = await joined(h);
+  // fixed-wait: past joinTimeout, a timer that must not fire
   await wait(60);
   await h.settle();
   assert.deepEqual(h.closes, [0]);
@@ -556,6 +558,7 @@ test('rooms: a client that leaves while onAuth runs is not seated', async () => 
   await h.settle();
   controller.abort(new Error('gone'));
   await h.settle();
+  // fixed-wait: past joinTimeout, a timer that must not bring the aborted join back
   await wait(60);
   await h.settle();
   await assert.rejects(joining, /gone/, 'an aborted join rejects with the abort reason');

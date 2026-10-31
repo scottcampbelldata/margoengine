@@ -121,7 +121,17 @@ async function lockIn(folder, env = {}) {
 const quiet = () => {};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // 'got' as soon as the promise resolves, 'waiting' if it has not within `ms`.
-const settled = (promise, ms = 500) => Promise.race([promise.then(() => 'got'), sleep(ms).then(() => 'waiting')]);
+const settled = (promise, ms = 500) => {
+  let timer;
+  return Promise.race([
+    promise.then(() => 'got'),
+    new Promise((done) => {
+      timer = setTimeout(() => done('waiting'), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+};
+// As long as it takes, past any load: only a real failure reaches this bound.
+const BOUND = 30_000;
 const deadPid = () => spawnSync(process.execPath, ['-e', '']).pid;
 const take = (gpu, owner, mode) => gpu.acquire({ owner, mode, poll: 10, log: quiet });
 // Runs `body(gpu, folder)` against a fresh gpu.lock; `env` is set while the module loads and, for MARGO_GPU_SLOTS and
@@ -286,7 +296,7 @@ test('a legacy owner.json holder blocks until it is released or its process is g
       // Released the old way (the folder's owner.json goes, the folder stays empty a moment): got once the folder is
       // older than the window in which an old client is between its mkdir and its owner.json.
       rmSync(join(lock, 'owner.json'));
-      assert.equal(await settled(next, 1500), 'got');
+      assert.equal(await settled(next, BOUND), 'got');
       (await next)();
     },
     { MARGO_GPU_FRESH_MS: '200' },

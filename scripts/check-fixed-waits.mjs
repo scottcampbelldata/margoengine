@@ -3,12 +3,17 @@
 // 140V that way (docs/known-bugs.md): its driver compiles and its CPU meshes more slowly than this PC, so 20 frames or
 // 300 ms were not enough there. Wait for the readiness itself instead (scripts/support/gpu-ready.js waitForPipelines,
 // a package's own stats such as VoxelRenderer's `pending` and `compiling`, a draw that returns whether it drew).
-// A wait that really is about time (an animation clock, a debounce, a settle period the test measures) carries a
-// `// fixed-wait: <reason>` comment on its line or the line above.
+// The same in unit tests (*.test.js, added 2026-10-31): half a second's sleep before an assert stands in for "the process
+// has gone", and a promise raced against two seconds for "the lock came"; both pass on a quiet machine and fail under
+// an 8-way run. Poll the condition instead, with a long bound that only a real failure reaches. (Counted frame loops in
+// a unit test step a mock, so only sleeps count there.)
+// A wait that really is about time (an animation clock, a debounce, a settle period the test measures, a check that
+// nothing happens) carries a `// fixed-wait: <reason>` comment on its line or the line above.
 // The waits that were there when this check began are counted per file in scripts/fixed-waits-baseline.json; a file
-// may not gain one, and when one goes the count must go down with it (`--update` writes the lower counts).
+// may not gain one, and when one goes the count must go down with it (`--update` writes the lower counts). Unit tests
+// and helper-named sleeps joined on 2026-10-31, with what was there then.
 //   node scripts/check-fixed-waits.mjs [--update]   (tests/check-fixed-waits.test.js runs the same check in verify)
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
@@ -18,10 +23,10 @@ const BASELINE = join(root, 'scripts/fixed-waits-baseline.json');
 const SKIP =
   /(^|\/)(node_modules|dist|build|\.git|\.claude|private|test-results|site|bench|benchmarks|[^/]*-benchmarks|vendor|third_party)(\/|$)/;
 
-/** Files that run or drive a GPU or browser check: test folders and the browser test drivers in scripts/. */
+/** Files that run or drive a check: test folders, unit tests included, and the browser test drivers in scripts/. */
 export function isCheckFile(path) {
   const p = path.replaceAll('\\', '/');
-  if (SKIP.test(p) || !/\.(html|js|mjs|ts)$/.test(p) || /\.test\.js$|\.d\.ts$/.test(p)) return false;
+  if (SKIP.test(p) || !/\.(html|js|mjs|ts)$/.test(p) || /\.d\.ts$|check-fixed-waits\.test\.js$/.test(p)) return false;
   if (/(^|\/)bench[^/]*$/i.test(p) || /benchmark/i.test(p)) return false;
   return (
     /(^|\/)(tests?)\//.test(p) ||
@@ -34,8 +39,11 @@ export function isCheckFile(path) {
 const FRAME_LOOP = /for\s*\(\s*let\s+(\w+)\s*=\s*0\s*;\s*\1\s*<\s*(\d+)\s*;\s*\1\s*\+\+\s*\)/g;
 // Drawing or waiting for a frame.
 const FRAME_WORK = /\brender\s*\(|requestAnimationFrame|\bframes?\s*\(|\bnextFrame\s*\(/;
-// A sleep: `waitForTimeout(ms)`, `setTimeout(resolve, ms)` or `setTimeout(() => resolve(), ms)`.
-const SLEEP = /waitForTimeout\s*\(\s*(\d+)\s*\)|setTimeout\s*\(\s*(?:\w+|\(\)\s*=>\s*\w+\(\))\s*,\s*(\d+)\s*\)/g;
+// A sleep: `waitForTimeout(ms)`, `setTimeout(resolve, ms)`, `setTimeout(() => resolve(), ms)`, a test's helper
+// `sleep(ms)`, `wait(ms)` or `delay(ms)`, or a promise raced against a time and expected to win, `settled(p, ms)`
+// (one that expects 'waiting' checks that nothing happens: mark it).
+const SLEEP =
+  /waitForTimeout\s*\(\s*([\d_]+)\s*\)|setTimeout\s*\(\s*(?:\w+|\(\)\s*=>\s*\w+\(\))\s*,\s*([\d_]+)\s*\)|\b(?:sleep|wait|delay)\(\s*([\d_]+)\s*\)|\bsettled\(.*?,\s*([\d_]+)\s*\)/g;
 /** Sleeps shorter than this are poll intervals inside a loop that checks a condition, not a wait on their own. */
 export const MIN_SLEEP_MS = 50;
 
@@ -72,7 +80,7 @@ export function fixedWaits(source) {
       found.push({ line: n, kind: 'frames', text: lines[n - 1].trim() });
   }
   for (const m of source.matchAll(SLEEP)) {
-    const ms = Number(m[1] ?? m[2]),
+    const ms = Number((m[1] ?? m[2] ?? m[3] ?? m[4]).replaceAll('_', '')),
       n = lineOf(m.index);
     if (ms >= MIN_SLEEP_MS && !allowed(n)) found.push({ line: n, kind: 'ms', text: lines[n - 1].trim() });
   }
@@ -94,7 +102,9 @@ function walk(dir, out = []) {
 export function scan() {
   const result = {};
   for (const file of walk(root).sort()) {
-    const waits = fixedWaits(readFileSync(join(root, file), 'utf8'));
+    const waits = fixedWaits(readFileSync(join(root, file), 'utf8')).filter(
+      (wait) => wait.kind === 'ms' || !file.endsWith('.test.js'),
+    );
     if (waits.length) result[file] = waits;
   }
   return result;
@@ -113,6 +123,8 @@ if (import.meta.url === `file:///${process.argv[1]?.replaceAll('\\', '/').replac
       );
   }
   for (const [file, allowed] of Object.entries(baseline.files)) {
+    // A file not in this tree yet (its branch is still in the landing queue) has nothing to compare.
+    if (!existsSync(join(root, file))) continue;
     const now = found[file]?.length ?? 0;
     if (now < allowed) lower[file] = now;
   }
@@ -127,7 +139,7 @@ if (import.meta.url === `file:///${process.argv[1]?.replaceAll('\\', '/').replac
     );
   if (problems.length) {
     console.error(
-      `Fixed waits in GPU or browser checks. Wait for readiness instead (scripts/support/gpu-ready.js), or mark a wait that is really about time with // fixed-wait: <reason>.\n${problems.join('\n')}`,
+      `Fixed waits in checks. Wait for readiness instead (scripts/support/gpu-ready.js, or poll the condition in a unit test), or mark a wait that is really about time with // fixed-wait: <reason>.\n${problems.join('\n')}`,
     );
     process.exit(1);
   }

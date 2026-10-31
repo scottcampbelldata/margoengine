@@ -109,6 +109,7 @@ test('killTree ends the process and everything it started', async () => {
   };
   assert.ok(alive(childPid), 'the grandchild runs before the kill');
   killTree(parent.pid);
-  for (let t = 0; alive(childPid) && t < 50; t++) await new Promise((r) => setTimeout(r, 100));
+  for (const end = Date.now() + 30_000; alive(childPid) && Date.now() < end; )
+    await new Promise((r) => setTimeout(r, 10));
   assert.ok(!alive(childPid), 'the grandchild is gone after killTree');
 });

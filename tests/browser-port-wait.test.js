@@ -27,9 +27,12 @@ test('a Vite server on a port another suite holds starts once that suite lets th
   try {
     const messages = [];
     const started = listenWhenFree(() => server.listen(), { port, poll: 50, log: (m) => messages.push(m) });
+    const said = new RegExp(`port ${port} is in use`);
+    for (const end = Date.now() + 30_000; !said.test(messages.join('\n')); await new Promise((r) => setTimeout(r, 10)))
+      assert.ok(Date.now() < end, 'it says the port is in use');
+    // fixed-wait: several polls of 50 ms pass with the port held and nothing may listen
     await new Promise((resolve) => setTimeout(resolve, 300));
     assert.equal(server.httpServer.listening, false, 'it waits while the port is held');
-    assert.match(messages.join('\n'), new RegExp(`port ${port} is in use`));
     await new Promise((resolve) => blocker.close(resolve));
     await started;
     assert.equal(server.httpServer.listening, true);

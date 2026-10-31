@@ -8,7 +8,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const settled = (promise, ms = 300) => Promise.race([promise.then(() => 'got'), sleep(ms).then(() => 'waiting')]);
+const settled = (promise, ms = 300) => {
+  let timer;
+  return Promise.race([
+    promise.then(() => 'got'),
+    new Promise((done) => {
+      timer = setTimeout(() => done('waiting'), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+};
+// As long as it takes, past any load: only a real failure reaches this bound.
+const BOUND = 30_000;
 const quiet = () => {};
 
 let copies = 0;
@@ -41,7 +51,6 @@ async function withBoth(body, env = {}) {
       if (saved[key] === undefined) delete process.env[key];
       else process.env[key] = saved[key];
     }
-    await sleep(150); // heartbeat processes see their release and end
     rmSync(folder, { recursive: true, force: true });
   }
 }
@@ -101,10 +110,11 @@ test('a just-made empty folder is an old client between its mkdir and owner.json
     process.env.MARGO_GPU_FRESH_MS = '60000';
     mkdirSync(lock);
     const next = takeNew(now, 'new');
+    // fixed-wait: nothing may be handed over in this time
     assert.equal(await settled(next, 100), 'waiting', 'inside the window it counts as a holder');
     // No owner.json ever came: an empty, ownerless folder past the window is stale and is used.
     process.env.MARGO_GPU_FRESH_MS = '0';
-    assert.equal(await settled(next, 2000), 'got');
+    assert.equal(await settled(next, BOUND), 'got');
     (await next)();
     assert.equal(existsSync(lock), false, 'and it is tidied away on release');
   }));
@@ -146,7 +156,7 @@ test('a waiting request leaves no empty lock folder behind, which would make old
     assert.equal(await settled(shared), 'waiting', 'it queues behind the exclusive request');
     assert.equal(existsSync(lock), false, 'no empty folder is left while it waits');
     // So an old client is not blocked by it.
-    const oldRelease = await settled(takeOld(old, 'old-agent'), 1000);
+    const oldRelease = await settled(takeOld(old, 'old-agent'), BOUND);
     assert.equal(oldRelease, 'got');
     rmSync(`${lock}-waiting`, { recursive: true, force: true });
   }));
@@ -157,9 +167,10 @@ test('an owner.json still being written counts as a holder; an unreadable old on
     mkdirSync(lock);
     writeFileSync(join(lock, 'owner.json'), '{"owner":');
     const next = takeNew(now, 'new');
+    // fixed-wait: nothing may be handed over in this time
     assert.equal(await settled(next, 100), 'waiting');
     process.env.MARGO_GPU_FRESH_MS = '0';
-    assert.equal(await settled(next, 2000), 'got');
+    assert.equal(await settled(next, BOUND), 'got');
     (await next)();
   }));
 

@@ -387,6 +387,7 @@ test('pipelines compile asynchronously; a WGSL error is reported once with its l
   m.vertexShader = shader.replace('uniforms.gain', 'nope');
   const broken = h.gpu.record(() => h.frame());
   assert.equal(named(broken, 'pass.drawIndexed').length, 0);
+  // fixed-wait: a bound on a promise that wins as soon as it settles; the assert below says if it never did
   await Promise.race([raw.ready(), new Promise((resolve) => setTimeout(resolve, 1000))]);
   assert.equal(errors.length, 1, 'the compile error is reported although the device went idle');
   assert.equal(errors[0].name, 'MargoError');

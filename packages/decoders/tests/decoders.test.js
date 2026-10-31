@@ -349,8 +349,8 @@ test('a job past its time limit restarts its worker; an aborted job keeps its wo
   controller.abort(new Error('user cancelled'));
   await assert.rejects(aborted, /user cancelled/);
   assert.equal(pool.pending, 1, 'the aborted job still occupies its worker');
-  await new Promise((done) => setTimeout(done, 60));
-  assert.equal(pool.pending, 0);
+  for (const end = performance.now() + 30_000; pool.pending; await new Promise((done) => setTimeout(done, 5)))
+    assert.ok(performance.now() < end, 'the timeout frees the worker');
   assert.equal(await pool.run({ mode: 'ok' }, []), 'fine');
   assert.throws(() => new decoders.DracoDecoder({ timeout: 0 }), /timeout must be a positive number/);
   pool.dispose();

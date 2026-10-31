@@ -131,6 +131,7 @@ test('serveStdio answers every request already started when the input ends, and 
     description: 'Answers after a moment.',
     inputSchema: { type: 'object', properties: {} },
     run: async () => {
+      // fixed-wait: the tool under test takes a moment, and nothing depends on how long
       await new Promise((done) => setTimeout(done, 50));
       return { content: [{ type: 'text', text: 'done' }] };
     },

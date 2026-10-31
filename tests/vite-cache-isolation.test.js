@@ -26,7 +26,7 @@ const until = async (condition, what, ms = 60_000) => {
   const deadline = Date.now() + ms;
   while (!condition()) {
     if (Date.now() > deadline) throw new Error(`timed out after ${ms} ms waiting for ${what}`);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
 };
 

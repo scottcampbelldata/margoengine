@@ -22,6 +22,7 @@ test('a real-time server over WebSocket: two clients join, move and are seen by 
     mover.update();
     watcher.update();
   }, 1000 / 60);
+  // fixed-wait: the game runs this long; the asserts below read how far it got
   await wait(1200);
   clearInterval(frames);
   assert.deepEqual(served.server.players.sort(), [mover.player, watcher.player].sort());
@@ -33,6 +34,12 @@ test('a real-time server over WebSocket: two clients join, move and are seen by 
   watcher.close();
 });
 
+// The server's first bytes are in `chunks`. The bound is for a real failure, not for a busy machine.
+const answered = async (chunks) => {
+  for (const end = performance.now() + 30_000; !chunks.length; await wait(5))
+    assert.ok(performance.now() < end, 'the server answered the upgrade');
+};
+
 // Raw RFC 6455 checks: write an upgrade and frames by hand, read what the server answers.
 async function raw(port, headers, frames = []) {
   const socket = connect(port, '127.0.0.1');
@@ -40,7 +47,7 @@ async function raw(port, headers, frames = []) {
   socket.on('data', (chunk) => chunks.push(chunk));
   await new Promise((done) => socket.once('connect', done));
   socket.write(`GET /play HTTP/1.1\r\nHost: x\r\n${headers}\r\n`);
-  await wait(50);
+  await answered(chunks);
   for (const frame of frames) socket.write(frame);
   await new Promise((done) => {
     socket.once('close', done);
@@ -151,7 +158,7 @@ test('listenWebSocket maxConnections: the next upgrade gets 503 until one closes
     socket.on('data', (chunk) => chunks.push(chunk));
     await new Promise((done) => socket.once('connect', done));
     socket.write(`GET / HTTP/1.1\r\nHost: x\r\n${upgrade()}\r\n`);
-    await wait(150);
+    await answered(chunks);
     sockets.push(socket);
     return () => Buffer.concat(chunks).toString('latin1');
   };
@@ -160,8 +167,10 @@ test('listenWebSocket maxConnections: the next upgrade gets 503 until one closes
   assert.match(two(), /^HTTP\/1.1 101/);
   assert.match(three(), /^HTTP\/1.1 503/, 'the third connection is over maxConnections');
   assert.equal(held.length, 2, 'the refused one never became a connection');
-  held[0].close();
-  await wait(100);
+  await new Promise((done) => {
+    held[0].onclose = done; // the listener has forgotten it by then
+    held[0].close();
+  });
   const four = await hold();
   assert.match(four(), /^HTTP\/1.1 101/, 'a slot is free again');
   for (const socket of sockets) socket.destroy();
@@ -184,11 +193,14 @@ test('listenWebSocket firstMessageTimeout: a silent connection is closed with ti
   await raw(listener.port, upgrade(), [masked(9, [])]);
   assert.equal(closed.length, 1, 'a ping alone does not keep the connection');
   closed.length = 0;
-  const socket = connect(listener.port, '127.0.0.1');
+  const socket = connect(listener.port, '127.0.0.1'),
+    answer = [];
+  socket.on('data', (chunk) => answer.push(chunk));
   await new Promise((done) => socket.once('connect', done));
   socket.write(`GET / HTTP/1.1\r\nHost: x\r\n${upgrade()}\r\n`);
-  await wait(50);
+  await answered(answer);
   socket.write(masked(2, [1]));
+  // fixed-wait: past firstMessageTimeout, a timer that must not fire now
   await wait(450);
   assert.deepEqual(closed, [], 'a connection that sent a message stays open past firstMessageTimeout');
   socket.destroy();

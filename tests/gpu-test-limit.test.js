@@ -37,8 +37,16 @@ test('a hanging test is killed with its child process, within the limit, and nam
     assert.match(result.message, /MARGO_GPU_TEST_TIMEOUT_MIN/);
     assert.ok(existsSync(pidFile), 'the fake test never started its child');
     const pid = Number(readFileSync(pidFile, 'utf8'));
-    await new Promise((r) => setTimeout(r, 500));
-    assert.throws(() => process.kill(pid, 0), 'the hung test left its child process running');
+    const gone = () => {
+      try {
+        process.kill(pid, 0);
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    for (const end = Date.now() + 30_000; !gone(); await new Promise((r) => setTimeout(r, 10)))
+      assert.ok(Date.now() < end, 'the hung test left its child process running');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

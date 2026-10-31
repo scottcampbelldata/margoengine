@@ -145,6 +145,7 @@ test('FBX: truncated scalar properties and corrupt zlib arrays are FBX errors (n
   const listener = (e) => (unhandled = e);
   process.on('unhandledRejection', listener);
   await assert.rejects(convertFBX(corrupt), /FBX.*(compressed|[Dd]eflate|corrupt)/);
+  // fixed-wait: an unhandled rejection, if any, is reported within this time; this checks that none comes
   await new Promise((r) => setTimeout(r, 50));
   process.off('unhandledRejection', listener);
   assert.equal(unhandled, null);
