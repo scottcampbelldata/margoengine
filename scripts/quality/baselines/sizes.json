@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4113300,
+  "total": 4117564,
   "history": [
     {
       "date": "2026-10-24",
@@ -1172,6 +1172,12 @@
       "commit": "12906698c",
       "reason": "shadows root: the WebGL2 route hook for the PCSS nearest-depth reduction (commit a6d194cc8, webgl2-m8) on top of the shadow cut-outs; core and stage unchanged by it",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "3c9501329",
+      "reason": "new entry @margoengine/tilemap/tiled: the Tiled JSON importer (parseTiled, fromTMX, MapImportError), 4.0 kB, with tests",
+      "grew": 1
     }
   ],
   "items": {
@@ -1488,6 +1494,7 @@
     "@margoengine/text": 15890,
     "@margoengine/tilemap": 1618,
     "@margoengine/tilemap/autotile": 1605,
+    "@margoengine/tilemap/tiled": 4264,
     "@margoengine/tiles": 14752,
     "@margoengine/tonemap": 11083,
     "@margoengine/toon": 1701,

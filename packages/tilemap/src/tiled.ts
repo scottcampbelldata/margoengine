@@ -72,7 +72,8 @@ function collisionShape(o: Obj): MapShape {
 }
 
 function readObject(o: Obj, warn: (m: string) => void): MapObject {
-  if (o.template !== undefined) warn(`object ${num(o, 'id')} uses a template; Tiled templates are not read, save the map with templates detached`);
+  if (o.template !== undefined)
+    warn(`object ${num(o, 'id')} uses a template; Tiled templates are not read, save the map with templates detached`);
   if (isObj(o.text)) warn(`object ${num(o, 'id')} is a text object; drawn as its rectangle`);
   const gid = typeof o.gid === 'number' ? cleanGid(o.gid) : undefined;
   const type = str(o, 'class') || str(o, 'type');
@@ -119,7 +120,10 @@ async function readTileset(ref: Obj, options: TiledOptions): Promise<MapTileset>
     const got = await options.resolve(source, options.signal);
     throwIfAborted(F, options.signal);
     if (typeof got === 'string' && got.trimStart().startsWith('<'))
-      return fail('unsupported', `tileset "${source}" is TSX (XML); export it as .tsj JSON, or load the map with parseTMX and fromTMX.`);
+      return fail(
+        'unsupported',
+        `tileset "${source}" is TSX (XML); export it as .tsj JSON, or load the map with parseTMX and fromTMX.`,
+      );
     set = parseJson(F, got);
   }
   const tiles = list(set, 'tiles').filter(isObj).map(readTile);
@@ -156,7 +160,8 @@ async function inflate(bytes: Uint8Array, format: 'deflate' | 'gzip', cap: numbe
       const { done, value } = await reader.read();
       if (done) break;
       total += value.length;
-      if (total > cap) return fail('limit', `a compressed layer expands past its ${cap} byte size; the file is damaged.`);
+      if (total > cap)
+        return fail('limit', `a compressed layer expands past its ${cap} byte size; the file is damaged.`);
       chunks.push(value);
     }
   } catch (e) {
@@ -186,8 +191,10 @@ async function decodeCells(layer: Obj, data: unknown, count: number, signal?: Ab
     }
     return out;
   }
-  if (typeof data !== 'string') return fail('syntax', `layer "${name}" has no tile data; expected an array or a base64 string.`);
-  if (layer.encoding !== 'base64') return fail('unsupported', `layer "${name}" is encoded as "${String(layer.encoding)}"; use CSV or base64.`);
+  if (typeof data !== 'string')
+    return fail('syntax', `layer "${name}" has no tile data; expected an array or a base64 string.`);
+  if (layer.encoding !== 'base64')
+    return fail('unsupported', `layer "${name}" is encoded as "${String(layer.encoding)}"; use CSV or base64.`);
   let bytes: Uint8Array;
   try {
     bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
@@ -197,10 +204,17 @@ async function decodeCells(layer: Obj, data: unknown, count: number, signal?: Ab
   const compression = str(layer, 'compression') ?? '';
   if (compression === 'zlib') bytes = await inflate(bytes, 'deflate', count * 4);
   else if (compression === 'gzip') bytes = await inflate(bytes, 'gzip', count * 4);
-  else if (compression) return fail('unsupported', `layer "${name}" uses ${compression} compression; save it as zlib, gzip or uncompressed.`);
+  else if (compression)
+    return fail(
+      'unsupported',
+      `layer "${name}" uses ${compression} compression; save it as zlib, gzip or uncompressed.`,
+    );
   throwIfAborted(F, signal);
   if (bytes.length !== count * 4)
-    return fail(bytes.length < count * 4 ? 'truncated' : 'syntax', `layer "${name}" decodes to ${bytes.length} bytes, expected ${count * 4}; re-save the map.`);
+    return fail(
+      bytes.length < count * 4 ? 'truncated' : 'syntax',
+      `layer "${name}" decodes to ${bytes.length} bytes, expected ${count * 4}; re-save the map.`,
+    );
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   for (let i = 0; i < count; i++) out[i] = cleanGid(view.getUint32(i * 4, true));
   return out;
@@ -215,14 +229,28 @@ interface Inherited {
   py: number;
 }
 
-export async function parseTiled(input: string | Uint8Array | object, options: TiledOptions = {}): Promise<TileMapData> {
+/**
+ * Read a Tiled map saved as JSON (`.tmj`) into `TileMapData`. Takes the text, UTF-8 bytes or the parsed object;
+ * orthogonal maps only. Throws `MapImportError` (coded, the message names the fix) for malformed, truncated, oversized
+ * or unsupported input.
+ */
+export async function parseTiled(
+  input: string | Uint8Array | object,
+  options: TiledOptions = {},
+): Promise<TileMapData> {
   const root = parseJson(F, input);
   const warn = options.onWarning ?? (() => {});
   if (!Array.isArray(root.layers) || !Array.isArray(root.tilesets))
-    return fail('syntax', 'this is not a Tiled map: "layers" and "tilesets" are missing; pass the .tmj / .json file contents.');
+    return fail(
+      'syntax',
+      'this is not a Tiled map: "layers" and "tilesets" are missing; pass the .tmj / .json file contents.',
+    );
   const orientation = str(root, 'orientation') ?? 'orthogonal';
   if (orientation !== 'orthogonal')
-    return fail('unsupported', `the map is ${orientation}; only orthogonal maps are read, change the orientation in Tiled.`);
+    return fail(
+      'unsupported',
+      `the map is ${orientation}; only orthogonal maps are read, change the orientation in Tiled.`,
+    );
   const tileWidth = num(root, 'tilewidth');
   const tileHeight = num(root, 'tileheight');
   if (!(tileWidth > 0 && tileHeight > 0)) return fail('syntax', 'tilewidth and tileheight must be positive numbers.');
@@ -279,7 +307,9 @@ export async function parseTiled(input: string | Uint8Array | object, options: T
           type: 'object',
           ...common,
           ...offset(0, 0),
-          objects: list(l, 'objects').filter(isObj).map((o) => readObject(o, warn)),
+          objects: list(l, 'objects')
+            .filter(isObj)
+            .map((o) => readObject(o, warn)),
         });
         continue;
       }
@@ -302,7 +332,10 @@ export async function parseTiled(input: string | Uint8Array | object, options: T
         const w = x1 - x0;
         const h = y1 - y0;
         if (w * h > MAX_TILES)
-          return fail('limit', `layer "${common.name}" spans ${w} x ${h} tiles; the limit is ${MAX_TILES} cells. Split the map or use fewer chunks.`);
+          return fail(
+            'limit',
+            `layer "${common.name}" spans ${w} x ${h} tiles; the limit is ${MAX_TILES} cells. Split the map or use fewer chunks.`,
+          );
         const data = new Uint32Array(w * h);
         for (const c of chunks) {
           const cw = num(c, 'width');
@@ -409,7 +442,8 @@ export interface TMXMapLike {
   readonly properties: Properties;
 }
 
-const flipBits = (flips: number): number => (flips & 1 ? FLIP_H : 0) | (flips & 2 ? FLIP_V : 0) | (flips & 4 ? FLIP_D : 0);
+const flipBits = (flips: number): number =>
+  (flips & 1 ? FLIP_H : 0) | (flips & 2 ? FLIP_V : 0) | (flips & 4 ? FLIP_D : 0);
 const some = (p: Properties): Properties | undefined => (Object.keys(p).length ? p : undefined);
 
 /** Turn a map from the loaders' `parseTMX` into `TileMapData`, so TMX and Tiled JSON share one format and one parser. */

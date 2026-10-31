@@ -29,6 +29,10 @@
     "./autotile": {
       "types": "./dist/autotile.d.ts",
       "import": "./dist/autotile.js"
+    },
+    "./tiled": {
+      "types": "./dist/tiled.d.ts",
+      "import": "./dist/tiled.js"
     }
   },
   "files": [

@@ -2,7 +2,7 @@
 
 Import `margoengine/tilemap` from the `margoengine` package, or `@margoengine/tilemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. This entry has types and small helpers only: no renderer or importers yet. Orthogonal maps only. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
+The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. The root entry has types and small helpers only (no renderer yet); the Tiled importer is its own entry. Orthogonal maps only. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
 
 ```ts
 import {createTileLayer, encodeTile, FLIP_H, tileAt, validateTileMap, type TileMapData} from 'margoengine/tilemap';
@@ -31,6 +31,22 @@ console.log(cells.length); // 9 global tile values, 0 where nothing is drawn
 ```
 
 `autotile(layer, rules)` does the same on a `TileLayer`; `resolveTerrain(vertices, width, height, set)` and `verticesFromCells` handle corner terrain.
+
+## Tiled import
+
+`margoengine/tilemap/tiled` reads a Tiled map saved as JSON (`.tmj`, or `.json`) into `TileMapData`. It takes the text, UTF-8 bytes or the parsed object. Tile layers may be CSV (an array), base64, or base64 with zlib or gzip compression; infinite maps are joined into one layer per Tiled layer; group layers pass their offset, opacity, visibility and parallax to their children. An external tileset (`.tsj`) is loaded through `options.resolve`, which receives the path written in the map. Image layers, text and object templates are skipped with a call to `onWarning`, and hexagonal and isometric maps are refused.
+
+```ts
+import { parseTiled } from 'margoengine/tilemap/tiled';
+const map = await parseTiled({
+  orientation: 'orthogonal', width: 2, height: 1, tilewidth: 16, tileheight: 16,
+  tilesets: [{ firstgid: 1, name: 'grass', tilewidth: 16, tileheight: 16, tilecount: 2, columns: 2, image: 'grass.png', imagewidth: 32, imageheight: 16 }],
+  layers: [{ type: 'tilelayer', name: 'ground', width: 2, height: 1, data: [1, 2] }],
+});
+console.log(map.layers[0].type); // 'tile'
+```
+
+Bad input throws a `MapImportError` with a `code` (`syntax`, `truncated`, `missing`, `unsupported`, `limit` or `aborted`) and a message that names the fix; a compressed layer cannot expand past its declared size, and a layer past 16,777,216 cells is refused. `fromTMX(map)` converts what `parseTMX` of `margoengine/loaders` returns into the same `TileMapData`. Pass `signal` to stop an import.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
 
