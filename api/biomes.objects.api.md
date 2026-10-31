@@ -432,6 +432,7 @@ interface SpeciesRule {
     readonly radius: number;
     readonly size?: SizeDistribution;
     readonly cluster?: ClusterRule;
+    readonly stands?: StandRule;
     readonly shade?: number;
     readonly suitability?: Partial<Record<'temperature' | 'rainfall' | 'moisture' | 'slope' | 'height' | 'waterDistance', Range>>;
     readonly alignToGround?: number;
@@ -439,6 +440,11 @@ interface SpeciesRule {
     readonly lod?: readonly [near: number, mid: number, far: number];
     readonly color?: ColorVariation;
     readonly tags?: readonly string[];
+}
+
+interface StandRule {
+    readonly scale: number;
+    readonly cover: number;
 }
 
 interface TileRequest {

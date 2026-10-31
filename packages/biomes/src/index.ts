@@ -25,6 +25,7 @@ export {
   type BiomeDefinition,
   type ClimateEnvelope,
   type ClusterRule,
+  type StandRule,
   type ColorVariation,
   defineBiome,
   type DetailRule,

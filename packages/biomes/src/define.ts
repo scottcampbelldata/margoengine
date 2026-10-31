@@ -92,6 +92,19 @@ export interface ClusterRule {
   readonly tail?: number;
 }
 
+/**
+ * Stands and clearings of a species: `cover` of the ground, in patches about `scale` metres across, holds the species'
+ * whole density, and the rest holds none, with a soft edge. The mean density over a large area stays the species'
+ * `density`, so inside a stand it is `density / cover`. Species of one world with the same `scale` share their stands and
+ * clearings; a different `scale` gives independent ones.
+ */
+export interface StandRule {
+  /** Size of the patches in metres, 50..2000. */
+  readonly scale: number;
+  /** Share of the ground in stands, 0.1..1. 1 gives the same objects as no rule. */
+  readonly cover: number;
+}
+
 /** Colour variation: hue and value jitter 0..1, and whether it follows the seasons. */
 export interface ColorVariation {
   readonly hue?: number;
@@ -110,6 +123,8 @@ export interface SpeciesRule {
   readonly radius: number;
   readonly size?: SizeDistribution;
   readonly cluster?: ClusterRule;
+  /** Stands and clearings at a larger scale than `cluster`. Default none: an even density. */
+  readonly stands?: StandRule;
   /** Shade tolerance 0 (needs sun) to 1 (deep shade). Default 0.5. */
   readonly shade?: number;
   readonly suitability?: Partial<
@@ -270,6 +285,11 @@ function species(list: unknown, what: string): void {
       throw typeError('A species rule needs a string id and mesh', 'biomes');
     if (!(s.density >= 0) || !(s.radius > 0) || (s.shade !== undefined && !(s.shade >= 0 && s.shade <= 1)))
       throw rangeError('A species rule needs density 0 or more, radius above 0 and shade 0..1', 'biomes');
+    if (
+      s.stands !== undefined &&
+      !(s.stands?.scale >= 50 && s.stands.scale <= 2000 && s.stands.cover >= 0.1 && s.stands.cover <= 1)
+    )
+      throw rangeError('A species stands rule needs scale 50..2000 metres and cover 0.1..1', 'biomes');
   }
 }
 

@@ -5,7 +5,7 @@
 // runs on a fresh replica.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BiomeWorld } from '../dist/index.js';
+import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { BiomePlacement } from '../dist/placement.js';
 import { presets } from '../dist/presets.js';
 import { groundMaterials, overviewWeights, VIEW_LAYERS, viewTile } from '../dist/view.js';
@@ -240,5 +240,31 @@ test('overview bands made on the workers are the main thread overview bytes, spr
   );
   assert.equal(made, 2, 'bands about no tile go to the least loaded worker, not all to the first');
   main.dispose();
+  remote.dispose();
+});
+
+test('stands: worker placements are the main thread bytes', { timeout: 240000 }, async () => {
+  const biomes = [
+    defineBiome({
+      id: 'stand',
+      climate: {},
+      ground: [{ material: 'grass' }],
+      plants: [
+        { id: 'oak', mesh: 'procedural:broadleaf', density: 150, radius: 4, stands: { scale: 200, cover: 0.5 } },
+      ],
+    }),
+  ];
+  const [main, remote] = await both({ biomes }),
+    p = BiomePlacement.attach(main),
+    q = BiomePlacement.attach(remote);
+  let total = 0;
+  for (const [x, z] of [
+    [1, 1],
+    [2, 2],
+  ]) {
+    assert.equal(await q.digest(x, z), await p.digest(x, z), `placement ${x},${z}`);
+    total += (await q.tile(x, z)).count;
+  }
+  assert.ok(total > 0);
   remote.dispose();
 });

@@ -762,3 +762,111 @@ test('sea level: no species stands on ground below the sea, and inland objects d
     'objects more than 30 m from the sea are those of the unfixed placement',
   );
 });
+
+/** Objects per 50 m cell of a 1,024 m square, and the positions, for a species rule on a flat world. */
+async function counts(rule, seed = 7) {
+  const p = BiomePlacement.attach(await stand([{ id: 'tree', mesh: 'procedural:broadleaf', ...rule }], { seed }, 1024)),
+    cells = new Int32Array(20 * 20);
+  let total = 0;
+  const bytes = [];
+  for (let tz = 0; tz < 4; tz++)
+    for (let tx = 0; tx < 4; tx++) {
+      const t = await p.tile(tx, tz);
+      bytes.push(Buffer.from(t.instances.subarray(0, t.count * 8)).toString('base64'));
+      t.forEachInstance((i) => {
+        const cx = Math.floor((i.x + 512) / 51.2),
+          cz = Math.floor((i.z + 512) / 51.2);
+        cells[cz * 20 + cx]++;
+        total++;
+      });
+    }
+  let sum2 = 0;
+  for (const c of cells) sum2 += c * c;
+  const mean = total / cells.length;
+  return { total, cells, bytes, cv: Math.sqrt(sum2 / cells.length - mean * mean) / mean };
+}
+
+const RULE = { density: 100, radius: 2 };
+
+test('stands: a forest gathers into stands and clearings, the total stays, the same bytes every time', async () => {
+  const even = await counts(RULE),
+    stands = await counts({ ...RULE, stands: { scale: 200, cover: 0.5 } }),
+    again = await counts({ ...RULE, stands: { scale: 200, cover: 0.5 } });
+  assert.ok(stands.cv > 2 * even.cv, `coefficient of variation ${stands.cv} against ${even.cv} with no stands`);
+  const ratio = stands.total / even.total;
+  assert.ok(Math.abs(ratio - 1) <= 0.15, `total ${stands.total} against ${even.total}`);
+  assert.deepEqual(stands.bytes, again.bytes);
+  // Clearings hold nothing: about the uncovered share of cells is empty (with no stands none is).
+  const empty = (r) => r.cells.filter((c) => c === 0).length / r.cells.length;
+  assert.ok(empty(stands) > 0.2, `empty cells ${empty(stands)}`);
+  assert.equal(empty(even), 0);
+});
+
+test('stands: `cover` is the share of the ground over many seeds, and the mean density stays', async () => {
+  // Small crowns, so the hard core does not cap the density inside a stand (with 2 m crowns at cover 0.25 it does).
+  const small = { density: 50, radius: 0.5 };
+  for (const cover of [0.25, 0.5, 0.75]) {
+    let total = 0,
+      even = 0,
+      used = 0,
+      cells = 0;
+    for (let seed = 1; seed <= 8; seed++) {
+      const r = await counts({ ...small, stands: { scale: 100, cover } }, seed);
+      total += r.total;
+      even += (await counts(small, seed)).total;
+      // Patches much wider than the 51 m count cells, so few cells straddle an edge.
+      const wide = await counts({ ...small, stands: { scale: 500, cover } }, seed);
+      used += wide.cells.filter((c) => c > 0).length;
+      cells += wide.cells.length;
+    }
+    assert.ok(Math.abs(total / even - 1) < 0.08, `cover ${cover}: total ${total} against ${even}`);
+    assert.ok(Math.abs(used / cells - cover) < 0.15, `cover ${cover}: used ${used / cells}`);
+  }
+});
+
+test('stands: cover 1 gives the bytes of no rule, tile size does not matter, species with one scale share clearings', async () => {
+  assert.deepEqual((await counts({ ...RULE, stands: { scale: 300, cover: 1 } })).bytes, (await counts(RULE)).bytes);
+  const two = (a, b) => [
+    { id: 'a', mesh: 'procedural:broadleaf', ...RULE, stands: a },
+    { id: 'b', mesh: 'procedural:conifer', ...RULE, stands: b },
+  ];
+  const overlap = async (a, b) => {
+    const p = BiomePlacement.attach(await stand(two(a, b), {}, 1024)),
+      cells = { a: new Int32Array(400), b: new Int32Array(400) };
+    for (let tz = 0; tz < 4; tz++)
+      for (let tx = 0; tx < 4; tx++)
+        (await p.tile(tx, tz)).forEachInstance((i) => {
+          cells[i.key.endsWith('/a') ? 'a' : 'b'][
+            Math.floor((i.z + 512) / 51.2) * 20 + Math.floor((i.x + 512) / 51.2)
+          ]++;
+        });
+    let both = 0,
+      either = 0;
+    for (let k = 0; k < 400; k++) {
+      if (cells.a[k] && cells.b[k]) both++;
+      if (cells.a[k] || cells.b[k]) either++;
+    }
+    return both / either;
+  };
+  const shared = await overlap({ scale: 200, cover: 0.5 }, { scale: 200, cover: 0.5 }),
+    apart = await overlap({ scale: 200, cover: 0.5 }, { scale: 230, cover: 0.5 });
+  assert.ok(shared > apart + 0.2, `one scale overlaps ${shared}, two scales ${apart}`);
+  for (const stands of [
+    { scale: 49, cover: 0.5 },
+    { scale: 2001, cover: 0.5 },
+    { scale: 200, cover: 0.09 },
+    { scale: 200, cover: 1.1 },
+    {},
+    null,
+  ])
+    assert.throws(
+      () =>
+        defineBiome({
+          id: 'x',
+          climate: {},
+          ground: [{ material: 'grass' }],
+          plants: [{ id: 'a', mesh: 'm', ...RULE, stands }],
+        }),
+      /stands rule/,
+    );
+});

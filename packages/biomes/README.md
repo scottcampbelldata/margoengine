@@ -407,6 +407,11 @@ How it works, per tile and each layer in turn (rocks, canopy trees, understory, 
 - **Clusters** (`cluster`): `parents * offspring` plants per hectare cluster around hashed parents, by a Thomas
   (Gaussian), Matern (disc) or Clark 2Dt (fat-tailed: clusters with scattered outliers) kernel; the rest of the
   density is random. This is a shot-noise Cox process, the Neyman-Scott process with Poisson offspring.
+- **Stands** (`stands: { scale, cover }`, default none): a species gathers at a larger scale than its clusters, so a
+  forest has stands and clearings. `cover` (0.1..1) of the ground, in patches about `scale` metres across (50..2000),
+  holds the species' whole density and the rest holds none, with a soft edge, so the mean over a large area stays
+  `density` and inside a stand it is `density / cover` (crowns shrink if that is more than they have room for). Species
+  with the same `scale` share their clearings; give a species another `scale` to mix independent stands.
 - **Hard core**: no two objects closer than a species-pair spacing (`conflicts`, default 0.85 of the summed crowns
   within a layer, 0.3 across layers, so a shrub grows under a crown but not at its trunk). Luby's rounds with hashed
   priorities settle the candidates exactly as sequential random adsorption would; after `rounds` (6) the few still

@@ -16,6 +16,8 @@ import type { BiomeTile, BiomeWorld } from '@margoengine/biomes';
 import {
   clampInt,
   divFloor,
+  fbm,
+  hash2,
   hash5,
   isqrt,
   ONE,
@@ -38,6 +40,16 @@ const PPA_SHIFT = 13; // 2^13 ticks = 32 m
 const LOG2E = 94548;
 /** Largest local cluster intensity, as a multiple of the mean (candidates are generated at this rate). */
 const CLUSTER_CAP = 4;
+/** Fade of a stand's edge, in units of the 0..65535 noise (0.6 of its standard deviation): about a quarter of `scale`. */
+const STAND_BAND = 6000;
+/**
+ * The noise level a stand's band is centred on for a cover of 1/16, 2/16 .. 16/16 of the ground: the mean of the band
+ * over 3-octave fbm equals the cover. Measured once, 320,000 samples over 16 seeds; the distribution is the same for
+ * every seed, and the placement test checks the share it gives.
+ */
+const STAND_LEVELS = [
+  46857, 43445, 40954, 38837, 36934, 35151, 33433, 31745, 30058, 28339, 26559, 24661, 22553, 20044, 16667, 0,
+];
 /** Fates of a candidate. */
 const LIVE = 0,
   ACCEPTED = 1,
@@ -210,6 +222,13 @@ interface Spec extends PlacedSpecies {
   readonly mu: number; // expected candidates per generation cell, Q16
   readonly e0: number; // exp(-mu), Q16: the Poisson draw's first term
   readonly cluster?: Cluster;
+  readonly stands?: Stands;
+}
+
+interface Stands {
+  readonly scale: number; // one noise cell, ticks
+  readonly top: number; // the noise level (0..65535) from which the density is full
+  readonly boost: number; // 1 / cover, Q16: the whole density lives on the cover share of the ground
 }
 
 interface Cluster {
@@ -367,6 +386,16 @@ function clusterOf(rule: SpeciesRule, index: number, code: number): Cluster | un
   };
 }
 
+/** A stand rule in integers. A cover of 1 is no stand at all: the same bytes as leaving the rule out. */
+function standsOf(rule: SpeciesRule): Stands | undefined {
+  const s = rule.stands;
+  if (!s || s.cover >= 1) return undefined;
+  const cover = toQ(s.cover),
+    i = (cover * 16) >> 16, // the cover is at least 0.1, so i is at least 1
+    level = STAND_LEVELS[i - 1] + qmul(STAND_LEVELS[i] - STAND_LEVELS[i - 1], (cover * 16) & 0xffff);
+  return { scale: Math.round(s.scale * TICK), top: level + (STAND_BAND >> 1), boost: divFloor(ONE * ONE, cover) };
+}
+
 /** exp(-mu) in Q16 for a mean mu (Q16): the first term of {@link poisson}. */
 const firstTerm = (mu: number) => qexp2(-Math.min(15 * ONE, qmul(mu, LOG2E)));
 
@@ -405,9 +434,13 @@ function planOf(biomes: readonly BiomeDefinition[], options: PlacementOptions): 
           layer = kind === 'rock' ? 0 : kind === 'prop' ? 4 : STRATA(rule.radius),
           sizes = sizeOf(rule),
           cluster = clusterOf(rule, index, code),
+          stands = standsOf(rule),
           capQ = cluster ? ONE + qmul(cluster.beta, (CLUSTER_CAP - 1) * ONE) : ONE,
-          // Edges raise lower layers up to 1.5 times; convex ground raises rocks up to 2 times.
-          kappa = qmul(capQ, layer >= 2 && layer <= 3 ? 98304 : layer === 0 ? 2 * ONE : ONE),
+          // Edges raise lower layers up to 1.5 times; convex ground raises rocks up to 2 times; a stand holds 1 / cover.
+          kappa = qmul(
+            stands ? qmul(capQ, stands.boost) : capQ,
+            layer >= 2 && layer <= 3 ? 98304 : layer === 0 ? 2 * ONE : ONE,
+          ),
           r = Math.max(1, Math.round(rule.radius * TICK)),
           perHa = toQ(rule.density); // Q16 per ha
         specs.push({
@@ -436,6 +469,7 @@ function planOf(biomes: readonly BiomeDefinition[], options: PlacementOptions): 
           mu: qmul(perHa, kappa), // per ha for now; set per generation cell below
           e0: 0,
           cluster,
+          stands,
         });
       }
   });
@@ -918,6 +952,12 @@ class Run {
     return ONE - c.beta + qmul(c.beta, Math.min(CLUSTER_CAP * ONE, sum));
   }
 
+  /** How much of a stand covers (x, z), Q16, 0 in a clearing: a Wendland-shaped threshold of world-anchored noise. */
+  stand(st: Stands, x: number, z: number): number {
+    const noise = fbm(hash2(this.seed, st.scale), divFloor(x * ONE, st.scale), divFloor(z * ONE, st.scale), 3);
+    return wendland(clampInt(divFloor((st.top - noise) * ONE, STAND_BAND), 0, ONE));
+  }
+
   /**
    * Generates (once) the candidates of stratum `s` in cell (cx, cz) that pass thinning, light and lower layers. Returns
    * the cell's slot in the stratum's table (valid until that table's next add).
@@ -957,7 +997,10 @@ class Run {
               h3 = pcg(h2),
               h4 = pcg(h3),
               x = gx * sp.gen + Math.floor(((h0 >>> 8) * sp.gen) / 16777216),
-              z = gz * sp.gen + Math.floor(((h1 >>> 8) * sp.gen) / 16777216);
+              z = gz * sp.gen + Math.floor(((h1 >>> 8) * sp.gen) / 16777216),
+              stand = sp.stands ? this.stand(sp.stands, x, z) : ONE;
+            // The thinning below keeps a candidate at most `stand` of the time: most of a clearing's stop here, cheaply.
+            if (h2 >>> 16 >= stand) continue;
             if (!this.at(x, z, look)) continue;
             const f = look.f!,
               k = look.k;
@@ -990,6 +1033,7 @@ class Run {
               p = qmul(p, ONE + clampInt(curv * 131, 0, ONE));
             }
             if (sp.cluster) p = qmul(p, this.cluster(sp.cluster, x, z));
+            if (sp.stands) p = qmul(p, qmul(stand, sp.stands.boost));
             // Thinning against the candidate's own number: p is the intensity over the candidate rate.
             const limit = divFloor(p * ONE, sp.kappa); // Q16 survival probability
             if (h2 >>> 16 >= limit) continue;
