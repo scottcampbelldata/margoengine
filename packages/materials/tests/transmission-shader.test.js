@@ -144,7 +144,7 @@ test('thin glass keeps its sightline at any IOR: its own pixel, no conversion, w
   const expected = texel(pixel)
     .slice(0, 3)
     .map((c) => encode(linear(c) * (1 - dielectric(1.5))));
-  close(out, expected, 1e-5, 'display thin');
+  close(out, expected, 1e-7, 'display thin');
 });
 
 test('F0 comes from the IOR: IOR 1 transmits everything at normal incidence, metal still mixes toward the base', () => {
