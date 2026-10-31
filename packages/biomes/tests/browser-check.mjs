@@ -49,7 +49,7 @@ await runSuite(
     // b88424755 (one flat grey at that distance) 0.0415 on an RTX A6000, now 0.158 (bump, macro, detail 0.6). Snow: BASE
     // had no pixel where snow outweighs rock (alpine snow and rock shared steep high ground half and half, a grey peak);
     // the alpine preset's snow now has weight 3, over 1 percent of the frame. Its brightness is read against the same
-    // pixels with pure white snow, 0.90 at the time (0.55 of 0.61): how far a steep peak's faces take the noon sun depends on
+    // pixels with pure white snow, 0.90 when set (0.55 of 0.61; the old limit of 0.5 was 0.82 of that white, so 0.82 stays the limit): how far a steep peak's faces take the noon sun depends on
     // which peak the seed makes, so an absolute luma would measure the peak and not the snow.
     const alpine = r.alpine;
     assert.deepEqual(alpine.errors, []);
@@ -58,8 +58,8 @@ await runSuite(
     assert.ok(alpine.rockSd > 3 * 0.0415, `rock light and dark above 3x BASE's 0.0415: ${alpine.rockSd}`);
     assert.ok(alpine.snow > 0.01, `snow outweighs rock on over 1 percent of the frame: ${alpine.snow}`);
     assert.ok(
-      alpine.snowLuma > 0.8 * alpine.snowWhite,
-      `snow mean sRGB luma ${alpine.snowLuma} over 0.8 of pure white on the same pixels ${alpine.snowWhite}`,
+      alpine.snowLuma > 0.82 * alpine.snowWhite,
+      `snow mean sRGB luma ${alpine.snowLuma} over 0.82 of pure white on the same pixels ${alpine.snowWhite}`,
     );
     // Landing F's painted edge (ecotone, default 24 m) at shot 08's camera: no neighbouring-pixel jump above 60 where
     // the row crosses the painted patch's edge (41 to 42 on the A6000); with ecotone 0 the one-cell step is back (154 to
@@ -72,7 +72,10 @@ await runSuite(
     // frame differed from the 12-ring frame; now it is the same frame, and a clipmap that reaches less than the radius
     // is a RangeError.
     assert.deepEqual(r.clip.errors, []);
-    assert.ok(r.clip.autoVsFull < 0.001, `default clipmap draws what 12 rings draw: ${r.clip.autoVsFull} of pixels differ`);
+    assert.ok(
+      r.clip.autoVsFull < 0.001,
+      `default clipmap draws what 12 rings draw: ${r.clip.autoVsFull} of pixels differ`,
+    );
     assert.match(r.clip.error ?? '', /clipmap reaches 496 m but radius is 1600 m/);
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });
