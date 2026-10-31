@@ -66,6 +66,7 @@ export class PlazaShard {
   #edits = 0; // edits accepted, metrics resets included
   #saved = -1; // #edits at the last snapshot
   #ticks = [];
+  #beatAt = performance.now();
   #closed = false;
   #snapshotFailures = 0;
   #ring = [];
@@ -375,6 +376,9 @@ export class PlazaShard {
     const server = this.server,
       m = server.metrics,
       counted = this.#countedEdits();
+    const time = performance.now(),
+      perSecond = (m.tickTimes.length * 1000) / Math.max(1, time - this.#beatAt);
+    this.#beatAt = time;
     this.#ticks.push(...m.tickTimes);
     if (this.#ticks.length > TICKS_KEPT) this.#ticks.splice(0, this.#ticks.length - TICKS_KEPT);
     const sorted = [...this.#ticks].sort((a, b) => a - b),
@@ -386,6 +390,7 @@ export class PlazaShard {
         edits: counted - this.#edits,
         ticks: {
           count: sorted.length,
+          perSecond,
           p50: percentile(sorted, 0.5),
           p95: percentile(sorted, 0.95),
           max: sorted.at(-1) ?? 0,
