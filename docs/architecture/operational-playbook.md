@@ -3986,11 +3986,11 @@ export function applyQualityTier({
 Measurement (`watchQuality`), VERIFIED:
 
 1. Phone or forced: does nothing.
-2. Light tier without a stored result: wraps `GPUQueue.prototype.submit`; after skipping 2 s of startup, times submit to
-   `onSubmittedWorkDone` for 120 submissions; gives up after 10 s. p90 under 5 ms stores `high`, else `low`. Takes
+2. Light tier, unless the full tier already ran slow here (`'held'`): wraps `GPUQueue.prototype.submit`; after skipping 2 s of startup, times submit to
+   `onSubmittedWorkDone` for 120 submissions; gives up after 10 s. p90 under 5 ms stores `high`; a slower reading stores nothing, so the next load measures again. Takes
    effect on the next page load; no reload, so no PC is first shown 4x.
 3. High tier: counts frames per one-second window; a gap over 250 ms restarts the window; five consecutive windows
-   under 55 FPS store `low` and reload once; stops after 30 seconds.
+   under 55 FPS store `held` and reload once; stops after 30 seconds.
 
 Override: `?quality=`, `?scale=`, `localStorage.removeItem('margoQuality')`, or inject `search`, `storage`, `userAgent`,
 `request`, `queue`, `now`, `store`, `reload` (tests do).

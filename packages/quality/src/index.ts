@@ -75,7 +75,10 @@ export const SLOW_FPS = 55;
 /** Light-tier GPU milliseconds per submission (90th percentile) below which the next page load gets the full tier.
  * 4x MSAA with desktop detail measured about 2-3x the light tier's GPU work on an Intel Arc 140V. */
 export const FAST_GPU_MS = 5;
-const KEY = 'margoQuality';
+const KEY = 'margoQuality',
+  // Written when the full tier ran slow on this browser. Unlike a slow light-tier reading it stays: measuring headroom
+  // again on the light tier would send the page back to the full tier, slow, and back here, on every other load.
+  HELD = 'held';
 
 let state: { tier: QualityTier; stored?: string; forced?: string; storage?: QualityOptions['storage'] } | undefined;
 const local = (): QualityOptions['storage'] => {
@@ -142,9 +145,11 @@ export interface WatchOptions {
 }
 
 /** Call once the scene is running. On the light tier, times how long the GPU takes to finish each submitted frame
- * (submit to onSubmittedWorkDone: any refresh rate, no timestamp queries) and remembers 'high' or 'low' for the next
- * page load. On the full tier, five consecutive slow seconds remember 'low' and reload once. Phones do nothing.
- * ponytail: the result has no expiry; `localStorage.removeItem('margoQuality')` measures again. */
+ * (submit to onSubmittedWorkDone: any refresh rate, no timestamp queries) and remembers 'high' for the next page load
+ * when there is headroom. A slow reading remembers nothing, so one bad session (a remote desktop, a busy machine, a
+ * slow first window) cannot hold a browser on the light tier for good: the next load measures again. On the full tier,
+ * five consecutive slow seconds remember that for good and reload once; `localStorage.removeItem('margoQuality')`
+ * measures again. Phones do nothing. */
 export function watchQuality({
   request = globalThis.requestAnimationFrame?.bind(globalThis),
   queue = typeof GPUQueue === 'undefined' ? undefined : GPUQueue.prototype,
@@ -153,7 +158,7 @@ export function watchQuality({
   reload = () => location.reload(),
 }: WatchOptions = {}): void {
   const current = state ?? (applyQualityTier(), state!);
-  const remember = store ?? ((value) => current.storage?.setItem(KEY, value));
+  const remember = store ?? ((value) => current.storage?.setItem(KEY, value === 'low' ? HELD : value));
   if (current.tier === 'phone' || current.forced || !request) return;
   if (current.tier === 'high') {
     let start = 0,
@@ -187,7 +192,9 @@ export function watchQuality({
     request(tick);
     return;
   }
-  if (current.stored || !queue?.submit) return;
+  // Anything else stored ('low' from a light-tier reading before it stopped being remembered, the old margoLow) is
+  // measured again.
+  if (current.stored === HELD || !queue?.submit) return;
   const submit = queue.submit,
     times: number[] = [];
   let first = -1,
@@ -198,8 +205,9 @@ export function watchQuality({
     if (queue.submit === measured) queue.submit = submit;
     if (times.length < 120) return;
     times.sort((a, b) => a - b);
+    if (times[Math.floor(times.length * 0.9)] >= FAST_GPU_MS) return;
     try {
-      remember(times[Math.floor(times.length * 0.9)] < FAST_GPU_MS ? 'high' : 'low');
+      remember('high');
     } catch {}
   };
   function measured(this: QueueLike, buffers: unknown): unknown {

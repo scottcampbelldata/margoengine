@@ -3208,10 +3208,11 @@ engine behaviour belongs in packages, never only in demo code.
 - Phones (user agent `Mobi|Android`): 1x MSAA, DPR 1 (since 5ec83b52), phone scene settings.
 - Desktops start on the light tier (1x MSAA, DPR 1, capped at ~60 FPS) unless `localStorage.margoQuality` is
   `'high'`. While light, the watcher times submit-to-`onSubmittedWorkDone` for 120 submissions after a 2 s warm-up;
-  90th percentile under `FAST_GPU_MS` (5 ms) stores `'high'` for the next page load, else `'low'`. No reload.
-- On the full tier, five consecutive seconds under 55 FPS store `'low'` and reload once.
+  90th percentile under `FAST_GPU_MS` (5 ms) stores `'high'` for the next page load; a slower reading stores nothing and
+  the next load measures again (plaza-fps: one remote-desktop session must not pin a browser). No reload.
+- On the full tier, five consecutive seconds under 55 FPS store `'held'` for good and reload once.
 - Laptop result (Arc 140V, busy machine): stored `'low'`, light tier 53-61 FPS with 100k particles.
-- Reset: `localStorage.removeItem('margoQuality')` (the older `margoLow` key is still read as `'low'`).
+- Reset: `localStorage.removeItem('margoQuality')` (an older stored `'low'` or `margoLow` is measured again).
 - Feature presets (5i.b): `applyQualityTier()` also sets `globalThis.margoPreset`; shadows, SSAO, SSR, volumetric
   fog, local shadows and VFX fill options the app left undefined from it (table in the quality README).
 
@@ -3243,7 +3244,7 @@ Built and deployed to the preview, not yet measured:
   `@margoengine/quality`; Citadel `NightAtmosphere` -> `@margoengine/scenery`; Earth `Stars` -> `@margoengine/creative/stars`.
   Verify with `node scripts/modern-night-citadel-tests.js` (passes, 2026-10-14) and by opening the Earth demo.
 
-- The measured tier is remembered per browser with no expiry and no on-page control yet.
+- A stored `'high'` or `'held'` is remembered per browser with no expiry and no on-page control yet.
 - A fast PC sees the light tier on its first page view only; the full tier starts from the next page load.
 - `packages/core/src/renderer.ts` requests `timestamp-query` whenever available (for the Stats profiler);
   its runtime cost was never measured.

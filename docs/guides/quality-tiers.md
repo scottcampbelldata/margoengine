@@ -57,5 +57,5 @@ Notes:
 
 - Apps without `@margoengine/quality` are unaffected: the packages read `globalThis.margoPreset` only, which nothing
   else sets.
-- The measured tier is stored in `localStorage.margoQuality`; `localStorage.removeItem('margoQuality')` measures again.
+- `localStorage.margoQuality` holds `'high'` after a light-tier reading with headroom, or `'held'` after the full tier ran slow. A slow light-tier reading stores nothing, so the next load measures again; `localStorage.removeItem('margoQuality')` clears either.
 - Testing: `?quality=low|high` forces a tier without storing it; `?scale=1.5` raises the light tier's pixel ratio.

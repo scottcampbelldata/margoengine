@@ -184,8 +184,8 @@ test('on the full tier, sustained slow frames store low and reload once; fast or
 test('the light tier remembers the full tier only when the GPU has clear headroom, and never reloads', async () => {
   try {
     for (const [gpu, expected] of [
-      [2, 'high'],
-      [9, 'low'],
+      [2, ['high']],
+      [9, []],
     ]) {
       const frames = [],
         pending = [],
@@ -221,13 +221,68 @@ test('the light tier remembers the full tier only when the GPU has clear headroo
         }
       }
       await null;
-      assert.deepEqual(stored, [expected], `${gpu} ms`);
+      assert.deepEqual(stored, expected, `${gpu} ms`);
       assert.equal(reloads, 0);
       assert.equal(queue.submit, submit, 'the original submit is restored');
     }
   } finally {
     delete globalThis.margoLow;
   }
+});
+
+// A light-tier reading with `gpu` ms per submission, on a browser whose storage starts as `saved`; what storage ends as.
+async function lightReading(gpu, saved) {
+  const frames = [],
+    pending = [],
+    storage = memory(saved);
+  let clock = 0;
+  const queue = {
+    submit() {},
+    onSubmittedWorkDone() {
+      return new Promise((resolve) =>
+        pending.push(() => {
+          clock += gpu;
+          resolve();
+        }),
+      );
+    },
+  };
+  try {
+    assert.equal(applyQualityTier({ search: '', storage, userAgent: desktop }), 'light');
+    watchQuality({ request: (callback) => frames.push(callback), queue, now: () => clock });
+    for (let i = 0; i < 400 && frames.length; i++) {
+      frames.shift()(i * 16.7);
+      queue.submit([]);
+      while (pending.length) {
+        pending.shift()();
+        await null;
+      }
+    }
+    await null;
+    return storage.getItem('margoQuality');
+  } finally {
+    delete globalThis.margoLow;
+  }
+}
+
+test('one slow reading does not hold a browser on the light tier: the next load measures again', async () => {
+  assert.equal(await lightReading(9), null, 'a slow session (a remote desktop, say) remembers nothing');
+  assert.equal(await lightReading(2, { margoQuality: 'low' }), 'high', "an older stored 'low' is measured again");
+  assert.equal(await lightReading(2, { margoLow: '1' }), 'high', 'and so is the old margoLow key');
+});
+
+test('a slow full tier is remembered for good, so the page does not swing between tiers on every load', async () => {
+  const storage = memory({ margoQuality: 'high' }),
+    frames = [];
+  let reloads = 0,
+    now = 1000;
+  applyQualityTier({ search: '', storage, userAgent: desktop });
+  watchQuality({ request: (callback) => frames.push(callback), reload: () => reloads++ });
+  for (let i = 0; i < 400 && frames.length; i++) frames.shift()((now += 25));
+  assert.equal(reloads, 1);
+  const held = storage.getItem('margoQuality');
+  assert.notEqual(held, 'high');
+  assert.equal(await lightReading(2, { margoQuality: held }), held, 'a fast light-tier reading does not undo it');
 });
 
 test('a forced tier is for testing: it never stores or reloads', () => {

@@ -21,9 +21,10 @@ watchQuality();
 - `applyQualityTier()` returns `'light'`, `'high'` or `'phone'`. Phones are single-sampled with the pixel ratio capped
   at 1 (`globalThis.margoLow = 1`), even with `?quality=high` or `?scale=2`. It sets core's `globalThis.margoLow`, which
   core reads when it builds pipelines and sizes the canvas, so it must run before the engine is created.
-- `watchQuality()` measures on the light tier and remembers `'high'` or `'low'` in `localStorage.margoQuality`. On the
-  full tier, five consecutive seconds under 55 FPS remember `'low'` and reload once (a machine that slowed down, for
-  example on battery).
+- `watchQuality()` measures on the light tier and remembers `'high'` in `localStorage.margoQuality` when there is
+  headroom. A slow reading remembers nothing, so one bad session cannot hold a browser on the light tier: the next load
+  measures again. On the full tier, five consecutive seconds under 55 FPS remember that for good (`'held'`) and reload
+  once (a machine that slowed down, for example on battery).
 - For testing: `?quality=high` or `?quality=low` forces a tier without remembering it; `?scale=1.5` sets the light
   tier's pixel ratio (1 to 2). `localStorage.removeItem('margoQuality')` measures again.
 - `paceEngine(engine)` sets core's `engine.pace` hook on the light tier so `engine.start()` renders about 60 FPS
