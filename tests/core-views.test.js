@@ -324,9 +324,9 @@ const targetView = (target) => ({
   target,
 });
 
-test('a 4x target view draws into core 4x attachments of its format, resolves colour and writes a 1x depth', (t) => {
+test('a 4x target view draws into core 4x attachments of its format and resolves colour', (t) => {
   const h = gpuDrawHarness(t, 4),
-    target = { color: callerTexture('rgba16float'), depth: callerTexture('depth32float') };
+    target = { color: callerTexture('rgba16float') };
   h.frame(undefined, targetView(target));
   const own = h.device.textures.filter((texture) => texture.width === 64 && texture.height === 32),
     draw = h.draws().at(-1).descriptor;
@@ -340,12 +340,6 @@ test('a 4x target view draws into core 4x attachments of its format, resolves co
   );
   assert.equal(draw.colorAttachments[0].resolveTarget.caller, 'rgba16float', 'colour resolves into the caller texture');
   assert.equal(draw.depthStencilAttachment.view.texture, own[1], 'the scene draws into core depth');
-  const write = h.passes.at(-1).descriptor;
-  assert.deepEqual(
-    [write.colorAttachments.length, write.depthStencilAttachment.view.caller, write.depthStencilAttachment.depthLoadOp],
-    [0, 'depth32float', 'clear'],
-    'a last pass writes the nearest sample into the 1x caller depth',
-  );
   // Reused while the size and format stay; replaced on resize; released on dispose (and so on device restore, which
   // disposes the old renderer).
   const count = h.device.textures.length;
@@ -366,7 +360,7 @@ test('a 4x target view draws into core 4x attachments of its format, resolves co
 
 test('views into one 4x target stack: the shared 4x colour is kept and resolved once both halves are drawn', (t) => {
   const h = gpuDrawHarness(t, 4),
-    target = { color: callerTexture('bgra8unorm'), depth: callerTexture('depth32float') },
+    target = { color: callerTexture('bgra8unorm') },
     half = (index, x) => ({
       rect: [x, 0, 32, 32],
       index,
@@ -386,9 +380,9 @@ test('views into one 4x target stack: the shared 4x colour is kept and resolved 
     [left, right].map((pass) => [attachment(pass).loadOp, attachment(pass).storeOp, !!attachment(pass).resolveTarget]),
     [
       ['load', 'store', false],
-      ['load', 'store', true],
+      ['load', 'discard', true],
     ],
-    'both views load the shared 4x colour and keep it; only the last resolves into the target',
+    'both views load the shared 4x colour; the first keeps it, the last resolves it into the target and drops it',
   );
   assert.equal(attachment(left).view, attachment(right).view, 'one shared 4x colour');
   for (const [pass, x] of [
@@ -400,16 +394,9 @@ test('views into one 4x target stack: the shared 4x colour is kept and resolved 
       [['viewport', x, 0, 32, 32, 0, 1], ['scissor', x, 0, 32, 32], ['pipeline']],
       'each view clears only its rectangle, with a draw',
     );
-  const depthWrites = (passes) =>
-    passes.filter((pass) => pass.descriptor.depthStencilAttachment?.view?.caller === 'depth32float').length;
-  assert.deepEqual(
-    [depthWrites(h.passes.slice(0, first)), depthWrites(h.passes.slice(first))],
-    [0, 1],
-    'the 1x caller depth is written once, after the last view',
-  );
 });
 
-test('a target depth in the scene samples and format is drawn into; impossible shapes throw naming the fix', (t) => {
+test('a target depth in the scene samples and format is drawn into; other shapes throw naming the fix', (t) => {
   for (const samples of [1, 4]) {
     const h = gpuDrawHarness(t, samples);
     h.frame(
@@ -420,8 +407,14 @@ test('a target depth in the scene samples and format is drawn into; impossible s
     for (const target of [
       { color: callerTexture('bgra8unorm', 4) },
       { color: callerTexture('bgra8unorm'), depth: callerTexture('depth32float', samples, 32, 32) },
-      { color: callerTexture('bgra8unorm'), depth: callerTexture('depth24plus', 4) },
     ])
       assert.throws(() => h.frame(undefined, targetView(target)), /Invalid view target: use 1-sample colour/);
+    // Core no longer copies its depth into a caller depth of another format or sample count: that throws instead of
+    // leaving the caller's texture unwritten.
+    for (const depth of [callerTexture('depth24plus', samples), callerTexture('depth32float', 5 - samples)])
+      assert.throws(
+        () => h.frame(undefined, targetView({ color: callerTexture('bgra8unorm'), depth })),
+        /Invalid view depth: use the scene depth format and samples, or omit depth; see https:\/\/margoengine\.com\/errors#views$/,
+      );
   }
 });

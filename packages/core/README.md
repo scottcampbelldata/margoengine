@@ -66,7 +66,8 @@ const hit = await engine.pick(400, 300);           // CSS pixel; picks through t
   once per scene and each camera advances once per frame. Partial rectangles clear with a draw inside the rectangle.
 - `PassContext.view` (`id`, `camera`, `viewport`, `scissor`, `index`, `count`, `clear`, `layers`) tells passes which
   view they draw; `draw()` uses its rectangles by default and effects key per-view history on `id`.
-- `target: {color, depth?}` draws a view into textures (sized by the texture) instead of the canvas.
+- `target: {color, depth?}` draws a view into textures (sized by the texture) instead of the canvas. `color` is
+  1-sample; `depth`, if given, has the scene's depth format and sample count (core draws into it; another format throws).
 - `layers` draws only the meshes whose render layers (`@margoengine/cameras/layers`) share a bit; default the camera's.
 - Scenes: `engine.createScene()` makes a scene with its own meshes (`scene.createMesh()`), lighting, `background` and
   plugins (`scene.use(plugin)`); a view draws it with `scene`. `engine.scene` is the default scene; while a scene is

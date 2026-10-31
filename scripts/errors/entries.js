@@ -173,14 +173,15 @@ export const entries = [
       'Invalid views',
       'Invalid view: pass {camera, viewport}',
       'Invalid view target: use 1-sample colour',
+      'Invalid view depth: use the scene depth format and samples, or omit depth',
       'Partial-view clear: draw extra attachments with clear: false',
       'Invalid draw rectangle',
       'Draw rectangle exceeds target',
       'Invalid pick',
     ],
     cause:
-      '`render({views})` needs a non-empty array of `{camera, viewport}`. A view target needs 1-sample colour and a depth of the same size. A pass drawing a partial rectangle with extra colour attachments cannot clear them. Draw rectangles are 4 integers inside the target. `pick` needs finite CSS pixel coordinates.',
-    fix: 'Pass `{camera, viewport}` objects; use 1-sample target textures; draw extra attachments with `clear: false`; keep rectangles inside the target; pass finite numbers to `pick`.',
+      '`render({views})` needs a non-empty array of `{camera, viewport}`. A view target needs 1-sample colour and, if it has a depth, a depth of the same size in the scene depth format and sample count (core draws into it directly and does not convert another format). A pass drawing a partial rectangle with extra colour attachments cannot clear them. Draw rectangles are 4 integers inside the target. `pick` needs finite CSS pixel coordinates.',
+    fix: 'Pass `{camera, viewport}` objects; use 1-sample target colour; give a target depth the scene depth format (`depth32float-stencil8` when the device has it, else `depth32float`) and sample count (4 with 4x MSAA, else 1), or omit it (a package can resolve the core depth itself with a `SceneTarget`); draw extra attachments with `clear: false`; keep rectangles inside the target; pass finite numbers to `pick`.',
   },
   {
     id: 'pixel-options',

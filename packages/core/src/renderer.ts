@@ -17,7 +17,7 @@ declare const GPUBufferUsage: {
   INDIRECT: number;
   STORAGE: number;
 };
-declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number; TEXTURE_BINDING: number };
+declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number };
 declare const GPUMapMode: { READ: number };
 
 const defaultDraw: DrawOptions = {};
@@ -112,10 +112,10 @@ export interface RenderView {
    * Draw into these textures instead of the canvas; the caller owns them and recreates them after device loss.
    * `color`: 1 sample, any renderable colour format, RENDER_ATTACHMENT usage; with 4x MSAA core draws into its own 4x
    * texture of that format (kept per target size and format) and resolves into it, so edges are antialiased.
-   * `depth` (optional): the size of `color`. With the scene's depth format and sample count core draws into it;
-   * otherwise (a 1-sample depth under 4x MSAA, or another format) core draws into its own depth and then writes the
-   * nearest sample of each pixel into it with a fullscreen pass. Other shapes throw TypeError. Several views may draw
-   * into one target: they stack like canvas views (later ones keep the colour outside their rectangle).
+   * `depth` (optional): the size of `color`, in the scene's depth format and sample count (`depth32float-stencil8`
+   * when the device has that feature, else `depth32float`; 4 samples with 4x MSAA, else 1); core draws into it. Without
+   * it core draws into its own depth. Other shapes throw TypeError. Several views may draw into one target: they stack
+   * like canvas views (later ones keep the colour outside their rectangle).
    */
   target?: { color: GPUTexture; depth?: GPUTexture };
   /**
@@ -179,8 +179,6 @@ export class GPURenderer implements Renderer {
     format: GPUTextureFormat;
     textures: GPUTexture[];
     views: GPUTextureView[];
-    pipeline?: GPURenderPipeline;
-    group?: GPUBindGroup;
   }[] = [];
   /** The current draw's MSAA colour, which resolves into `resolveTarget`. */
   private msaa?: GPUTextureView;
@@ -387,15 +385,12 @@ export class GPURenderer implements Renderer {
       format = target?.color.format ?? this.format,
       views = this.attach(+!!target, width, height, format),
       samples = this.descriptor.multisample!.count!,
-      caller = target?.depth,
-      // A caller depth core can draw into directly; any other is written from core's own depth after the frame.
-      direct = caller?.sampleCount === samples && caller.format === this.descriptor.depthStencil!.format;
-    if (
-      target &&
-      (target.color.sampleCount > 1 ||
-        (caller && (caller.width !== width || caller.height !== height || (!direct && caller.sampleCount > 1))))
-    )
+      caller = target?.depth;
+    if (target && (target.color.sampleCount > 1 || (caller && (caller.width !== width || caller.height !== height))))
       throw typeError('Invalid view target: use 1-sample colour', 'views');
+    // Core draws into a caller depth directly, so it must match the scene's depth.
+    if (caller && (caller.sampleCount !== samples || caller.format !== this.descriptor.depthStencil!.format))
+      throw typeError('Invalid view depth: use the scene depth format and samples, or omit depth', 'views');
     this.frame.set(camera.matrix);
     this.frame.set(camera.position, 16);
     this.frame.set(lighting.direction, 20);
@@ -415,9 +410,8 @@ export class GPURenderer implements Renderer {
     this.resolveTarget = target?.color.createView() ?? this.context.getCurrentTexture().createView();
     this.msaa = views.length > 1 ? views[0] : undefined;
     const color = this.msaa ?? this.resolveTarget,
-      depth = direct ? caller.createView() : views.at(-1)!,
-      keepDepth = stacked || (!!caller && !direct);
-    this.preserveMSAA = (graph.revision > 0 || keepDepth) && !!this.msaa;
+      depth = caller ? caller.createView() : views.at(-1)!;
+    this.preserveMSAA = (graph.revision > 0 || stacked) && !!this.msaa;
     const context = (this.passContext ??= {
       backend: 'webgpu',
       draw: (options: DrawOptions = defaultDraw) => {
@@ -611,11 +605,9 @@ export class GPURenderer implements Renderer {
         attachment.resolveTarget = this.resolveTarget;
         attachment.storeOp = stacked ? 'store' : 'discard';
         resolve.depthStencilAttachment!.view = depth;
-        resolve.depthStencilAttachment!.depthStoreOp = keepDepth ? 'store' : 'discard';
+        resolve.depthStencilAttachment!.depthStoreOp = stacked ? 'store' : 'discard';
         encoder.beginRenderPass(resolve).end();
       }
-      // Once the last view into this target is drawn.
-      if (caller && !direct && !stacked) this.resolveDepth(encoder, caller, samples);
       this.commands[0] = encoder.finish();
       this.device.queue.submit(this.commands);
     }
@@ -633,58 +625,13 @@ export class GPURenderer implements Renderer {
           size: [width, height],
           sampleCount: this.descriptor.multisample!.count,
           format: each,
-          // A target view's depth is read to write the caller's own depth texture.
-          usage: GPUTextureUsage.RENDER_ATTACHMENT | (slot ? GPUTextureUsage.TEXTURE_BINDING : 0),
+          usage: GPUTextureUsage.RENDER_ATTACHMENT,
         });
         set.textures.push(texture);
         set.views.push(texture.createView());
       }
     }
     return set.views;
-  }
-  /**
-   * Writes a target view's depth into the caller's depth texture of another sample count or format: a fullscreen pass
-   * writes each pixel's nearest sample (the largest reversed-Z value, so overlays test against the visible surface).
-   */
-  private resolveDepth(encoder: GPUCommandEncoder, caller: GPUTexture, samples: number): void {
-    const key = 'depth' + caller.format + samples,
-      set = this.attachments[1]!;
-    let pipeline = this.clears.get(key);
-    if (!pipeline) {
-      const module = this.device.createShaderModule({
-        code: `@group(0) @binding(0) var d:texture_depth${samples > 1 ? '_multisampled' : ''}_2d;
-@vertex fn v(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(f32(i&1u)*4-1,f32(i>>1u)*4-1,0,1);}
-@fragment fn f(@builtin(position) p:vec4f)->@builtin(frag_depth) f32{var z=0.0;for(var i=0;i<${samples};i++){z=max(z,textureLoad(d,vec2i(p.xy),i));}return z;}`,
-      });
-      pipeline = this.device.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module, entryPoint: 'v' },
-        fragment: { module, entryPoint: 'f', targets: [] },
-        depthStencil: { format: caller.format, depthWriteEnabled: true, depthCompare: 'always' },
-      });
-      this.clears.set(key, pipeline);
-    }
-    if (set.pipeline !== pipeline) {
-      set.pipeline = pipeline;
-      set.group = this.device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [{ binding: 0, resource: set.textures.at(-1)!.createView({ aspect: 'depth-only' }) }],
-      });
-    }
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [],
-      depthStencilAttachment: {
-        view: caller.createView(),
-        depthClearValue: 0,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
-        ...(caller.format.includes('stencil') && { stencilLoadOp: 'clear', stencilStoreOp: 'store' }),
-      },
-    });
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, set.group!);
-    pass.draw(3);
-    pass.end();
   }
   /** Uploads the batch's changed instance range (all of it into a buffer not yet written), marked as `frame`'s. */
   private upload(batch: Batch, resource: { instance: GPUBuffer; frame: number }, frame: number): void {

@@ -626,8 +626,9 @@ try {
   });
 
   assert.deepEqual(errors, []);
-  // Item preview: a scene drawn at 4x MSAA into a caller's 1x colour and depth matches a 1x render of the same view,
-  // with antialiased edges, the caller depth written, and no validation error.
+  // Item preview: a scene drawn at 4x MSAA into a caller's 1x colour matches a 1x render of the same view, with
+  // antialiased edges and no validation error. A caller depth core cannot draw into (here a 1x depth under 4x MSAA)
+  // throws naming the fix; core does not copy its depth into one.
   const preview = await page.evaluate(async () => {
     const { EngineKernel, box } = await import('/packages/core/dist/index.js');
     const { Camera, engineRuntime } = await import('/packages/core/dist/extension.js');
@@ -654,23 +655,28 @@ try {
             format: 'rgba8unorm',
             usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
           }),
-          depth = device.createTexture({
+          view = {
+            camera: new Camera({ position: [0, 0, 3], target: [0, 0, 0] }),
+            viewport: [0, 0, 1, 1],
+            scene: item,
+            target: { color },
+          };
+        let depthError = '';
+        if (samples === 4) {
+          const depth = device.createTexture({
             size: [size, size],
             format: 'depth32float',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
           });
+          try {
+            instance.render({ culling: false, views: [{ ...view, target: { color, depth } }] });
+          } catch (error) {
+            depthError = error.message;
+          }
+          depth.destroy();
+        }
         device.pushErrorScope('validation');
-        instance.render({
-          culling: false,
-          views: [
-            {
-              camera: new Camera({ position: [0, 0, 3], target: [0, 0, 0] }),
-              viewport: [0, 0, 1, 1],
-              scene: item,
-              target: { color, depth },
-            },
-          ],
-        });
+        instance.render({ culling: false, views: [view] });
         const read = async (texture, bytes) => {
           const row = Math.ceil((size * bytes) / 256) * 256,
             buffer = device.createBuffer({
@@ -687,17 +693,9 @@ try {
           buffer.destroy();
           return out;
         };
-        const pixels = (await read(color, 4)).map((row) => Array.from({ length: size }, (_, x) => row[x * 4])),
-          depthRows = await read(depth, 4),
-          depthAt = (x, y) => new Float32Array(depthRows[y].slice(x * 4, x * 4 + 4).buffer)[0];
+        const pixels = (await read(color, 4)).map((row) => Array.from({ length: size }, (_, x) => row[x * 4]));
         const validation = await device.popErrorScope();
-        return {
-          samples,
-          pixels,
-          centerDepth: depthAt(size / 2, size / 2),
-          cornerDepth: depthAt(0, 0),
-          errors: [validation?.message, ...uncaptured].filter(Boolean),
-        };
+        return { samples, pixels, depthError, errors: [validation?.message, ...uncaptured].filter(Boolean) };
       } finally {
         instance.dispose();
         canvas.remove();
@@ -723,8 +721,7 @@ try {
       differingPixels: differing,
       intermediateEdgePixels: intermediate,
       referenceIntermediateEdgePixels: referenceIntermediate,
-      centerDepth: msaa.centerDepth,
-      cornerDepth: msaa.cornerDepth,
+      depthError: msaa.depthError,
       errors: [...msaa.errors, ...reference.errors],
     };
   });
@@ -735,7 +732,11 @@ try {
     preview.intermediateEdgePixels > preview.referenceIntermediateEdgePixels,
     'item preview edges are antialiased (more partially covered pixels than at 1x)',
   );
-  assert.ok(preview.centerDepth > 0 && preview.cornerDepth === 0, 'the caller depth holds the item and nothing else');
+  assert.match(
+    preview.depthError,
+    /^Invalid view depth: use the scene depth format and samples, or omit depth; see https:\/\/margoengine.com\/errors#views$/,
+    'a 1x caller depth under 4x MSAA throws naming the fix',
+  );
 
   // exactSize (pixel-exact drawing): a 16 x 8 backbuffer under a 64 x 32 CSS box keeps exactly 16 x 8, draws a
   // 1-texel checker of per-pixel views back exactly, and has no MSAA (a tilted box's edges show only two colours).

@@ -45,8 +45,8 @@ engine.views = [{ camera: engine.camera, viewport: [0, 0, 1, 1] }, { camera: hud
 - **`RenderView`**: `camera`, `viewport` (fractions of the canvas, or of `target`; `pixels: true` for drawing-buffer
   pixels), `scissor`, `clear` (`color` string or false, `depth`), `target` (colour and depth textures; views into one
   target stack like canvas views (core draws them grouped by target): 1-sample colour in any renderable format; with 4x MSAA core draws into its own 4x colour and depth, kept per
-  target size and format, resolves colour into the caller's texture and writes each pixel's nearest depth sample into
-  a 1x caller depth), `layers` (validated 32-bit mask), `id` (stable key for per-view history; default the index), `scene`.
+  target size and format and resolves colour into the caller's texture; a caller depth must have the scene's depth
+  format and sample count, and core draws into it directly (another shape throws TypeError; core does not convert depth)), `layers` (validated 32-bit mask), `id` (stable key for per-view history; default the index), `scene`.
 - **`engine.render({views})`** draws the views in order. Canvas views stack: the first clears colour, later ones load
   it, and a partial rectangle clears with a draw inside it (an attachment clear would cover the whole target). Camera
   aspect follows the rectangle. Plugins update once per scene and each camera advances once per call. `render()`
