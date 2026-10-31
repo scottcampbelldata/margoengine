@@ -34,6 +34,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./virtual": {
+      "types": "./dist/virtual.d.ts",
+      "import": "./dist/virtual.js"
     }
   },
   "files": [

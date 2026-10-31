@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4077516,
+  "total": 4080099,
   "history": [
     {
       "date": "2026-10-24",
@@ -845,18 +845,6 @@
     },
     {
       "date": "2026-10-30",
-      "commit": "beff7850",
-      "reason": "shadows: the WebGL2 layer route for the PCSS nearest-depth reduction, which ran on the layer CPU tier at about 0.5 s a frame",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-30",
-      "commit": "c017aa23",
-      "reason": "webgl2-compat names its classes as the WebGPU interfaces while installed (instanceof GPUBuffer held false for layer objects in a browser that defines the native interface: the sciviz surface bug), +182 B",
-      "grew": 2
-    },
-    {
-      "date": "2026-10-30",
       "commit": "81063f03",
       "reason": "item 53.2: new entry @margoengine/culling/dynamic (DynamicInstances: GPU-driven moving instances, compute shaders, shadow and pick passes)",
       "grew": 1
@@ -906,7 +894,13 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
+      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "f766d8ee2",
+      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
       "grew": 1
     },
     {
@@ -918,13 +912,7 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "f766d8ee2",
-      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
+      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
       "grew": 1
     },
     {
@@ -968,6 +956,18 @@
       "commit": "d27f31df4",
       "reason": "kinematics-constraints: ConvexHullVolume (GJK and an expanding polytope) and link hulls in AvoidanceSolver; a page that imports only capsules and spheres pays for neither kernel",
       "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "beff7850",
+      "reason": "shadows: the WebGL2 layer route for the PCSS nearest-depth reduction, which ran on the layer CPU tier at about 0.5 s a frame",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-30",
+      "commit": "c017aa23",
+      "reason": "webgl2-compat names its classes as the WebGPU interfaces while installed (instanceof GPUBuffer held false for layer objects in a browser that defines the native interface: the sciviz surface bug), +182 B",
+      "grew": 2
     },
     {
       "date": "2026-10-31",
@@ -1112,6 +1112,12 @@
       "commit": "cd8037c9",
       "reason": "webgl2-compat size split (item 3): two new items, the layer's base without the lazy compute runtime (limit is 73,000 B, Scott's accepted limit of 2026-10-30, not the measured size) and the lazy compute runtime alone; the joined entry limit is unchanged, nothing raised",
       "grew": 2
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "175c6ec2d",
+      "reason": "@margoengine/shadows/virtual: new optional entry, virtual shadow maps (row 21.6), stage 1 page bookkeeping; 9 kB gzip budget for the whole feature (allocator 2, feedback 2, render 2.5, shader 2.5); the root entry is unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -1396,6 +1402,7 @@
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
     "@margoengine/shadows": 15340,
+    "@margoengine/shadows/virtual": 2583,
     "@margoengine/sky": 16485,
     "@margoengine/sky/base": 7066,
     "@margoengine/sky/bruneton": 2557,

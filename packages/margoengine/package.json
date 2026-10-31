@@ -1138,6 +1138,10 @@
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"
     },
+    "./shadows/virtual": {
+      "types": "./dist/shadows/virtual.d.ts",
+      "import": "./dist/shadows/virtual.js"
+    },
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"
