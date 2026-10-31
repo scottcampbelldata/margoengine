@@ -1147,9 +1147,9 @@ written on grant.
    the holder, whose own push is then rejected as non-fast-forward and has to queue and run again (2026-10-29: a
    docs-only playbook push outside the lock cost the leak-scrub landing a full rerun, about 40 minutes of lock time).
 
-7. Never run more than one full `check:merge` pipeline at a time on one machine. On 2026-10-30 about eight parallel
-   pipelines exhausted the Windows process table (bash fork: "Resource temporarily unavailable"), killed a landing
-   mid check and forced a reboot. Landing pipelines go through one serial runner.
+7. Run at most three `check:merge` pipelines at once on the video card (the maintainer, 2026-10-31), never more. About eight
+   at once on 2026-10-30 exhausted the Windows process table (bash fork: "Resource temporarily unavailable"), killed a
+   landing mid check and forced a reboot. Pushes stay one at a time under the landing lock.
 8. Logs: every run of a pipeline or landing writes a new dated log, or appends. A restart never overwrites the log of the
    run that failed (the cause of one failed first verify was lost this way, 2026-10-30).
 
@@ -1367,6 +1367,9 @@ batch tip, one records commit, and every branch keeps its own commits and author
 - Batches group branches so the mode is honest: fixes and check code together, new packages and tooling together
   (the lock file and the root `package.json` force a full run), core together, and branches that touch one narrow area
   together so the affected run stays narrow.
+- Stacked batch checks: a later batch's tree sits on the earlier batch's tip and may be checked while the earlier one
+  still checks. After the earlier batch lands, the later one pushes without a new check only if `git diff` against its
+  checked tip shows generated records alone (the records commit). Anything else gets its own check on the new tip.
 - A failure in a batch: find the root cause first, never a plain rerun. A failing suite or golden names a package, which
   names a branch. Drop that branch, rebuild the batch without it, rerun; the dropped branch gets its own hunt and lands
   later alone. A flake is a bug: its fix goes into the batch, then the rerun. Only when the failure names no branch is

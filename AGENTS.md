@@ -111,7 +111,7 @@ Details in `docs/architecture/operational-playbook.md`.
 
 - Coordinators run Opus 5.5 at high effort. Design-heavy or risky work gets a planner first (playbook 1.2).
 - The to-do list sets what is built, in its order; work not on it is left alone (playbook 1.11). Demo work is stopped until the engine is done; never stop a running service without the maintainer's word.
-- Builders never run `check:merge`. It runs once, at landing, in the mode it prints; landings are batched (playbook 2.6.5). Anything to be proven with a check is proven by a run that was happening anyway, and a check never runs twice for the same tree.
+- Builders never run `check:merge`. It runs once, at landing, in the mode it prints; landings are batched (playbook 2.6.5). Anything to be proven with a check is proven by a run that was happening anyway, and a check never runs twice for the same tree. At most three `check:merge` runs at once on the video card (about eight at once forced a reboot on 2026-10-30); pushes stay one at a time under the land lock. A stacked batch pushes after the batch below it lands without a new check only if `git diff` against its checked tip shows generated records alone.
 - Quick checks before a branch is READY: quality, hygiene, the tests you touched, the root unit tests (`node --test tests/*.test.js`) and `npm run api:check`. A change that alters exports commits the `npm run api:update` output.
 - Every worktree shares one `.git/config`: add worktrees with `--no-track` and never write git config from a worktree.
 
