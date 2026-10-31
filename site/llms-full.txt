@@ -3263,6 +3263,19 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 - **Plan (gltf-pro and animation):** create the pipelines a loaded model will draw with
   (`createRenderPipelineAsync` / `createComputePipelineAsync`) while it loads, so the first frame finds them ready.
 
+## Open: browser checks
+
+### browser.close() can pass the 30 s shutdown budget under extreme CPU load
+
+- **What:** a browser suite that passed every assertion fails with `SHUTDOWN_TIMEOUT` ("still open: browser") from
+  `closeAll` (`scripts/support/shutdown.mjs`, budget 30 s, reached through `withBoundedClose` in `scripts/lib/browser.mjs`).
+- **Repro:** 12 copies of `tests/catalog.test.js` in a loop beside 24 CPU-spinning threads on the 32-thread dev PC, itself
+  at about 80 percent: 12 of 26 runs failed this way in 120 s. With 10 copies and 8 spinning threads: 0 of 100 in 180 s.
+- **Cause:** not proven. `tests/browser/catalog.test.js` records that headless Edge shuts down on low-priority threads, so
+  a loaded machine can take minutes to close it; that fits, but no trace was taken of what Edge was doing.
+- **Not done:** the budget was not raised, since that would only hide it. `tests/catalog.test.js` closes one browser per
+  run. Needed to close: a trace of a slow close, then a fix for what holds it.
+
 ## Fixed 2026-10-31
 
 All were found by `npm run modern:test:extensions` and the other `test:release` suites, which no check ran from about
