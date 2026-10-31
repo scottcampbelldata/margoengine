@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4117564,
+  "total": 4117563,
   "history": [
     {
       "date": "2026-10-24",
@@ -1558,7 +1558,7 @@
     "@margoengine/webgl": 3277,
     "@margoengine/webgl2-compat": 96803,
     "@margoengine/webgl2-compat base (without compute runtime)": 73000,
-    "@margoengine/webgl2-compat lazy compute runtime": 22757,
+    "@margoengine/webgl2-compat lazy compute runtime": 22756,
     "@margoengine/webgl2-compat/compute": 42734,
     "@margoengine/webgl2-compat/device": 96628,
     "@margoengine/webgl2-compat/glsl": 43666,
