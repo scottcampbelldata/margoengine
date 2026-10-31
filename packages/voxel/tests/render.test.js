@@ -839,7 +839,7 @@ test('addLighting: the frame right after taking an effect out of the middle is d
     await settle(frame, () => executed() && group1(executed()) && shows('a', 'b', 'c', 'd', 'e', 'f'), 'all lit');
     // The composition without each effect compiles once that one is ready: six more, of three pipelines each. A frame
     // later nothing more starts, so a still scene pays once.
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 40; i++) {
       frame();
       await new Promise((resolve) => setTimeout(resolve));
     }
@@ -872,7 +872,7 @@ test('addLighting: the frame right after taking an effect out of the middle is d
         effects.filter((e) => !e.disposed).map((e) => e.buffer),
       );
       // The remaining compositions without one effect each compile before the next removal.
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < 40; i++) {
         frame();
         await new Promise((resolve) => setTimeout(resolve));
       }
@@ -882,8 +882,10 @@ test('addLighting: the frame right after taking an effect out of the middle is d
   }
 });
 
-test('addLighting: nothing is compiled ahead before the composition itself is ready, or without effects', async () => {
-  const { world, renderer, frame, device, STONE } = setup(),
+// A renderer whose pipelines compile only when `open` is called, and effects whose disposal shows if they are bound.
+function gated() {
+  const context = setup(),
+    { device } = context,
     made = [],
     gates = [],
     create = device.createRenderPipelineAsync;
@@ -892,24 +894,61 @@ test('addLighting: nothing is compiled ahead before the composition itself is re
     return new Promise((resolve) => gates.push(resolve)).then(() => create(d));
   };
   const open = async () => {
-    for (const resolve of gates.splice(0)) resolve();
-    await new Promise((resolve) => setTimeout(resolve));
-  };
+      for (const resolve of gates.splice(0)) resolve();
+      await new Promise((resolve) => setTimeout(resolve));
+    },
+    effect = (name, binding) => {
+      const buffer = device.createBuffer({ size: 16, usage: 64 }),
+        e = {
+          disposed: false,
+          name,
+          buffer,
+          pbr: (group) => ({
+            declarations: `@group(${group}) @binding(${binding}) var<uniform> ${name}:vec4f;\n`,
+            light: `${name}.rgb`,
+          }),
+          bindings: () => {
+            if (e.disposed) throw new Error(`${name} is disposed`);
+            return [{ binding, resource: { buffer } }];
+          },
+        };
+      return e;
+    },
+    // Frames with the gates open until nothing more starts.
+    drain = async () => {
+      for (let i = 0, still = 0; still < 3 && i < 200; i++) {
+        const before = made.length;
+        context.frame();
+        await open();
+        still = made.length === before ? still + 1 : 0;
+      }
+    },
+    // What the last frame's bundle drew: the effects in its shader, and the buffers its group 1 binds.
+    drawn = () => {
+      const bundle = context.passes[0].commands.find(([name]) => name === 'executeBundles')?.[1][0];
+      if (!bundle) return undefined;
+      const code = bundle.commands.find(([n]) => n === 'setPipeline')[1].fragment.module.code,
+        group = bundle.commands.find(([n, i]) => n === 'setBindGroup' && i === 1)?.[2];
+      return {
+        names: ['a', 'b', 'c', 'd'].filter((n) => code.includes(`var<uniform> ${n}:`)),
+        buffers: group?.entries.map((x) => x.resource.buffer) ?? [],
+      };
+    };
+  return { ...context, made, open, effect, drain, drawn };
+}
+
+test('addLighting: compiling ahead starts one GPU call a frame, after the composition is ready, the same frames drawn', async () => {
+  const { world, renderer, frame, device, made, open, effect, drain, STONE } = gated(),
+    modules = [],
+    module = device.createShaderModule;
+  device.createShaderModule = (d) => (modules.push(d), module.call(device, d));
   try {
     world.setBlocks([3, 3, 3, STONE]);
-    const effect = (name, binding) => ({
-      pbr: (group) => ({
-        declarations: `@group(${group}) @binding(${binding}) var<uniform> ${name}:vec4f;\n`,
-        light: `${name}.rgb`,
-      }),
-      bindings: () => [{ binding, resource: { buffer: device.createBuffer({ size: 16, usage: 64 }) } }],
-    });
     frame();
     assert.equal(made.length, 3, 'one composition, three layers');
     frame();
     assert.equal(made.length, 3, 'still that one');
-    await open();
-    frame();
+    await drain();
     assert.equal(made.length, 3, 'no effects: nothing to take out, nothing ahead');
     renderer.addLighting(effect('a', 10));
     renderer.addLighting(effect('b', 11));
@@ -918,11 +957,103 @@ test('addLighting: nothing is compiled ahead before the composition itself is re
     frame();
     assert.equal(made.length, 6);
     await open();
+    const calls = () => made.length + modules.length;
+    let last = calls();
     frame();
+    assert.equal(renderer.stats.compiling, false);
+    assert.equal(calls(), last, 'the frame that queues them starts none');
+    for (let i = 0, quiet = 0; quiet < 3 && i < 100; i++) {
+      await open();
+      frame();
+      assert.equal(renderer.stats.compiling, false, 'nothing waits on them');
+      assert.ok(calls() - last <= 1, `frame ${i}: ${calls() - last} GPU calls`);
+      quiet = calls() === last ? quiet + 1 : 0;
+      last = calls();
+    }
     assert.equal(made.length, 12, 'then the two without one effect each');
+    await drain();
+    assert.equal(made.length, 12, 'only once');
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('addLighting: effects added before the first frame compile the composition without any at once', async () => {
+  const { world, renderer, frame, made, effect, STONE } = gated();
+  try {
+    world.setBlocks([3, 3, 3, STONE]);
+    renderer.addLighting(effect('a', 10));
+    frame();
+    assert.equal(made.length, 6, 'the composition, and the one without effects');
+    assert.equal(made.filter((d) => d.fragment.module.code.includes('var<uniform> a:')).length, 3);
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('addLighting: several effects leaving in one frame draw the composition without any until theirs compiles', async () => {
+  const { world, renderer, frame, drain, open, effect, drawn, STONE } = gated();
+  try {
+    world.setBlocks([3, 3, 3, STONE]);
+    const [a, b, c] = [effect('a', 10), effect('b', 11), effect('c', 12)],
+      removeA = renderer.addLighting(a),
+      removeB = renderer.addLighting(b);
+    renderer.addLighting(c);
+    await drain();
+    while (!renderer.stats.chunks || renderer.stats.pending) {
+      await new Promise((resolve) => setTimeout(resolve));
+      frame();
+      await open();
+    }
+    frame();
+    assert.deepEqual(drawn().names, ['a', 'b', 'c']);
+    removeA();
+    removeB();
+    a.disposed = b.disposed = true;
+    frame();
+    assert.equal(renderer.stats.compiling, true, 'the composition with c alone compiles');
+    assert.ok(renderer.stats.draws > 0, 'drawn at once');
+    assert.deepEqual(drawn(), { names: [], buffers: [] }, 'nothing of a and b; c returns next');
+    await drain();
+    frame();
+    assert.equal(renderer.stats.compiling, false);
+    assert.deepEqual(drawn(), { names: ['c'], buffers: [c.buffer] });
+  } finally {
+    renderer.dispose();
+  }
+});
+
+test('addLighting: an effect leaving before the ahead compile is done draws the largest composition left', async () => {
+  const { world, renderer, frame, drain, open, effect, drawn, STONE } = gated();
+  try {
+    world.setBlocks([3, 3, 3, STONE]);
+    const [a, c, d] = [effect('a', 10), effect('c', 12), effect('d', 13)];
+    renderer.addLighting(c);
+    await drain();
+    while (!renderer.stats.chunks || renderer.stats.pending) {
+      await new Promise((resolve) => setTimeout(resolve));
+      frame();
+      await open();
+    }
+    frame();
+    assert.deepEqual(drawn().names, ['c']);
+    // Three effects ready, nothing ahead started yet: c alone is compiled, and the one without any.
+    const removeA = renderer.addLighting(a);
+    renderer.addLighting(d);
+    frame();
     await open();
     frame();
-    assert.equal(made.length, 12, 'only once');
+    assert.deepEqual(drawn().names, ['a', 'c', 'd']);
+    assert.equal(renderer.stats.compiling, false);
+    removeA();
+    a.disposed = true;
+    frame();
+    assert.equal(renderer.stats.compiling, true, 'the composition with c and d is still on its way');
+    assert.deepEqual(drawn(), { names: ['c'], buffers: [c.buffer] }, 'c alone beats none, and a is not bound');
+    await drain();
+    frame();
+    assert.deepEqual(drawn().names, ['c', 'd']);
+    assert.deepEqual(drawn().buffers, [c.buffer, d.buffer]);
   } finally {
     renderer.dispose();
   }

@@ -352,8 +352,9 @@ export interface VoxelRendererStats {
   readonly draws: number;
   /**
    * True while the pipelines of the current composition (target, lightmap, lighting effects) compile in the
-   * background; the previous ones keep drawing meanwhile, or nothing on the first frames (`draws` is 0). Taking out one
-   * effect draws at once: the compositions without each effect are compiled ahead, once the current one is ready.
+   * background; meanwhile the largest compiled composition whose effects are all still added draws, or nothing on the
+   * first frames (`draws` is 0). The compositions without each effect are compiled ahead, a little per frame, so taking
+   * out one normally draws its final result at once.
    */
   readonly compiling: boolean;
   /**
@@ -501,6 +502,8 @@ interface Gpu {
   sampler: GPUSampler;
   view?: GPUTextureView;
   pipelines: Map<string, { ready?: Pipelines }>;
+  /** GPU calls of the compositions compiled ahead: one starts per frame, all when a wanted composition is not ready. */
+  ahead: (() => void)[];
   lightmap?: { buffer: GPUBuffer; index: GPUBuffer; view: GPUTextureView };
   shadow?: ShadowState;
   post?: { view: GPUBuffer; states: Map<string, { ready?: Pipelines }> };
@@ -530,11 +533,16 @@ function touch(cache: PipelineCache, key: string, entry: { ready?: Pipelines }):
   cache.delete(key);
   cache.set(key, entry);
 }
-/** Drops all but the `keep` most recently used compiled entries for `target`, `key` (just compiled) among them. */
-function retain(cache: PipelineCache, target: string, key: string, keep = KEPT): void {
+/**
+ * Drops all but the `keep` most recently used compiled entries for `target`, `key` (just compiled) among them. With
+ * `pin`, entries without effects stay as well: something can always draw once every effect has left.
+ */
+function retain(cache: PipelineCache, target: string, key: string, keep = KEPT, pin = false): void {
   let kept = 1;
-  for (const [k, e] of [...cache].reverse())
-    if (k !== key && e.ready?.target === target && ++kept > keep) cache.delete(k);
+  for (const [k, e] of [...cache].reverse()) {
+    if (k === key || e.ready?.target !== target || (pin && !e.ready.effects.length)) continue;
+    if (++kept > keep) cache.delete(k);
+  }
 }
 const isNumber = (value: unknown, name: string, fix: string): number => {
   if (typeof value !== 'number') throw new TypeError(`VoxelRenderer ${name} must be a number; ${fix}`);
@@ -893,9 +901,10 @@ export class VoxelRenderer implements EnginePlugin {
   /**
    * Lights the voxels with an effect's glTF-pro lighting hooks: `shadows.add(voxels, {static: true})`,
    * `clustered.add(voxels)`, `fog.add(voxels)` and `environment.add(voxels)` call this. The shader is composed again
-   * and compiled in the background; until it is ready the previous one keeps drawing. Returns a remover: once the
-   * composition is ready, those without each one effect compile in the background too, so a removed effect's frame is
-   * drawn at once without its resources, which its owner may dispose right away.
+   * and compiled in the background; until it is ready the previous one keeps drawing. Returns a remover: the frame after
+   * it draws without the removed effect's resources, which its owner may dispose right away. Once a composition is
+   * ready, those without each one effect and the one without any compile ahead, a pipeline a frame; while the wanted one
+   * is not compiled, the largest compiled composition whose effects are all still added draws (see `stats.compiling`).
    * @throws TypeError when `effect` has no `pbr` and `bindings` functions.
    * @throws MargoError `attached` when the effect belongs to another engine, `disposed` after `dispose()`.
    */
@@ -1067,6 +1076,7 @@ export class VoxelRenderer implements EnginePlugin {
         mipmapFilter: 'linear',
       }),
       pipelines: new Map(),
+      ahead: [],
     };
     this.#materialTypes = 0;
     this.#resources++;
@@ -1653,28 +1663,38 @@ export class VoxelRenderer implements EnginePlugin {
     layer: (l: number) => LayerState,
     samples: number,
     depth: GPUTextureFormat,
+    paced = false,
   ): Promise<[GPURenderPipeline[], GPURenderPipeline[] | undefined]> {
     const device = gpu.device,
+      // Paced, each GPU call waits for its turn in gpu.ahead; otherwise it starts now.
+      turn = <T>(start: () => T | Promise<T>): T | Promise<T> =>
+        paced ? new Promise<T>((resolve) => gpu.ahead.push(() => resolve(start()))) : start(),
       all = (module: GPUShaderModule, quads: boolean) =>
         Promise.all(
           Array.from({ length: count }, (_, l) => {
             const o = layer(l);
-            return device.createRenderPipelineAsync({
-              layout: 'auto',
-              vertex: quads
-                ? { module, entryPoint: 'vertex', constants: { EDGE: l === 2 ? 0 : EDGE_PIXELS } }
-                : { module, entryPoint: 'vertex', buffers: [this.#bevel!.layout] },
-              fragment: { module, entryPoint: 'fragment', constants: { MODE: o.mode }, targets: o.targets },
-              primitive: { cullMode: l ? 'none' : 'back' },
-              depthStencil: { format: depth, depthWriteEnabled: o.write, depthCompare: o.compare },
-              multisample: { count: samples, alphaToCoverageEnabled: o.coverage },
-            });
+            return turn(() =>
+              device.createRenderPipelineAsync({
+                layout: 'auto',
+                vertex: quads
+                  ? { module, entryPoint: 'vertex', constants: { EDGE: l === 2 ? 0 : EDGE_PIXELS } }
+                  : { module, entryPoint: 'vertex', buffers: [this.#bevel!.layout] },
+                fragment: { module, entryPoint: 'fragment', constants: { MODE: o.mode }, targets: o.targets },
+                primitive: { cullMode: l ? 'none' : 'back' },
+                depthStencil: { format: depth, depthWriteEnabled: o.write, depthCompare: o.compare },
+                multisample: { count: samples, alphaToCoverageEnabled: o.coverage },
+              }),
+            );
           }),
-        );
-    return Promise.all([
-      all(device.createShaderModule({ code }), true),
-      bevel ? all(device.createShaderModule({ code: bevel }), false) : undefined,
-    ]);
+        ),
+      shaders = async (text: string, quads: boolean) =>
+        all(await turn(() => device.createShaderModule({ code: text })), quads);
+    return paced
+      ? Promise.all([shaders(code, true), bevel ? shaders(bevel, false) : undefined])
+      : Promise.all([
+          all(device.createShaderModule({ code }), true),
+          bevel ? all(device.createShaderModule({ code: bevel }), false) : undefined,
+        ]);
   }
 
   // Starts compiling the pipelines of one composition for this frame's target; `key` holds them once they are ready.
@@ -1687,6 +1707,7 @@ export class VoxelRenderer implements EnginePlugin {
     bevel: string,
     effects: VoxelRendererEffect[],
     lit: boolean,
+    paced = false,
   ): { ready?: Pipelines } {
     const samples = c.descriptor.multisample?.count ?? 1,
       pending: { ready?: Pipelines } = {},
@@ -1709,52 +1730,82 @@ export class VoxelRenderer implements EnginePlugin {
       },
       samples,
       c.descriptor.depthStencil!.format,
+      paced,
     )
       .then(([layers, bevelLayers]) => {
         if (this.#gpu !== gpu) return;
         pending.ready = { target, layers, bevel: bevelLayers, effects, lit };
         // The current composition's neighbours, each one effect short, stay among those kept.
-        retain(gpu.pipelines, target, key, KEPT + this.#effects.size);
+        retain(gpu.pipelines, target, key, KEPT + this.#effects.size, true);
       })
       .catch((error) => this.#engine?.onError(error));
     return pending;
   }
 
+  // Compiles `effects`' composition unless it is known already.
+  #compileLess(
+    c: Context,
+    gpu: Gpu,
+    target: string,
+    effects: VoxelRendererEffect[],
+    lit: boolean,
+    paced: boolean,
+  ): void {
+    const less = this.#hooked(effects),
+      code = this.#finish(less.code),
+      bevel = less.bevel && this.#finish(less.bevel),
+      key = `${target}|${this.#named(less.effects, lit, code, bevel)}`;
+    if (!gpu.pipelines.has(key)) this.#request(c, gpu, key, target, code, bevel, less.effects, lit, paced);
+  }
+
   // The pipelines for this target (format, samples, depth format) and composition, compiled asynchronously. While a
-  // new composition compiles, the last pipelines for the target keep drawing as long as their effects are still added
-  // and the lightmap is still on or off as they were built; undefined when there are none. The last KEPT compositions
-  // stay compiled, so putting an effect back draws at once, and once a composition is ready those without each one of
-  // its effects compile too, so taking out any one effect does: pipelines with a removed effect cannot keep drawing
-  // (they bind its resources, which its owner may dispose right away), and no stand-in for those is neutral (zeroed fog
-  // draws black, a zeroed environment has no ambient).
+  // new composition compiles, the largest compiled one for the target whose effects are all still added draws (the
+  // lightmap on or off as now); pipelines with a removed effect cannot (they bind its resources, which its owner may
+  // dispose right away), and no stand-in for those is neutral (zeroed fog draws black, a zeroed environment has no
+  // ambient). undefined when there are none. The last KEPT compositions stay compiled, so putting an effect back draws
+  // at once; once a composition is ready those without each one of its effects compile ahead, a GPU call a frame so no
+  // frame takes them all, so taking out any one effect does too. The one without effects compiles with the first that
+  // has any and stays, so something can always draw.
   #pipelines(c: Context, gpu: Gpu): Pipelines | undefined {
     const samples = c.descriptor.multisample?.count ?? 1,
       depth = c.descriptor.depthStencil!.format,
       target = `${c.format}|${samples}|${depth}`,
       { code, bevel, effects, id, lit } = this.#composition(),
       key = `${target}|${id}`,
-      entry = gpu.pipelines.get(key) ?? this.#request(c, gpu, key, target, code, bevel, effects, lit),
+      known = gpu.pipelines.get(key),
+      entry = known ?? this.#request(c, gpu, key, target, code, bevel, effects, lit),
       ready = entry.ready;
+    if (!known && effects.length) this.#compileLess(c, gpu, target, [], lit, false);
     this.#stats.compiling = !ready;
     if (ready) {
       touch(gpu.pipelines, key, entry);
+      gpu.ahead.shift()?.();
       if (!ready.ahead) {
         ready.ahead = true;
-        for (const out of effects) {
-          const less = this.#hooked(effects.filter((e) => e !== out)),
-            lessCode = this.#finish(less.code),
-            lessBevel = less.bevel && this.#finish(less.bevel),
-            lessKey = `${target}|${this.#named(less.effects, lit, lessCode, lessBevel)}`;
-          if (!gpu.pipelines.has(lessKey))
-            this.#request(c, gpu, lessKey, target, lessCode, lessBevel, less.effects, lit);
-        }
+        for (const out of effects)
+          this.#compileLess(
+            c,
+            gpu,
+            target,
+            effects.filter((e) => e !== out),
+            lit,
+            true,
+          );
       }
       return ready;
     }
-    const last = this.#ready;
-    return last?.target === target && last.lit === lit && last.effects.every((e) => this.#effects.has(e) && e.pbr(1))
-      ? last
-      : undefined;
+    // A wanted composition comes first: whatever waits its turn starts now.
+    for (const start of gpu.ahead.splice(0)) start();
+    let best: Pipelines | undefined;
+    for (const { ready: p } of gpu.pipelines.values())
+      if (
+        p?.target === target &&
+        p.lit === lit &&
+        (!best || p.effects.length >= best.effects.length) &&
+        p.effects.every((e) => this.#effects.has(e) && e.pbr(1))
+      )
+        best = p;
+    return best;
   }
 
   // Bind groups of `p` (per pipeline: 'auto' layouts), made again when a buffer, the textures or the lightmap change,

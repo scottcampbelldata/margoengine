@@ -123,6 +123,17 @@ try {
       );
     }
 
+    // Two of three effects leaving in one frame: until the composition with the third compiles, the one without effects
+    // draws, every pixel the picture from before any effect; then the third is back.
+    const sr = await run('severalRemoved');
+    assert.ok(sr.firstStats.compiling && sr.firstStats.draws > 0, `drawn at once: ${JSON.stringify(sr.firstStats)}`);
+    assert.equal(sr.vsNone.n, 0, `off the frame without effects: ${JSON.stringify(sr.vsNone)}`);
+    assert.ok(sr.settled.lamp[0] > sr.first.lamp[0] * 1.2, `the light returns: ${JSON.stringify(sr)}`);
+    console.log(
+      `ok ${samples}x two of three taken out: ${sr.gap} frames without effects, ${sr.vsSettled.n} pixels off the ` +
+        `settled frame by up to ${sr.vsSettled.big.toFixed(4)}; by the lamp ${fixed(sr.first.lamp)} then ${fixed(sr.settled.lamp)}`,
+    );
+
     // A light swapped for another of the same kind: the shader is the same, the bindings must be the new light's.
     const sw = await run('swap');
     assert.ok(sw.withA.a[0] > 0.05, `first light: ${JSON.stringify(sw.withA)}`);

@@ -142,14 +142,15 @@ window.check={
  async effectRemoval(first){
   lights(3,0.2);const {w,keys}=floorWorld();w.setBlocks(slab.flatMap(([x,y,z])=>[x,y,z,STONE]));renderer=attach(w,keys);await ready(renderer,w,keys);look([18,22,14],[18,1,32]);
   const P={under:[12,1,32],lamp:[20,1,32],far:[29.5,1,36]};
-  let pending=0;const gpu=device(),create=gpu.createRenderPipelineAsync;
-  gpu.createRenderPipelineAsync=(d)=>{pending++;const p=create.call(gpu,d);p.finally(()=>pending--);return p;};
+  let pending=0,quadPipelines=0;const gpu=device(),create=gpu.createRenderPipelineAsync;
+  gpu.createRenderPipelineAsync=(d)=>{pending++;if(d.vertex.constants?.EDGE!==undefined)quadPipelines++;const p=create.call(gpu,d);p.finally(()=>pending--);return p;};
   const shadows=Shadows.attach(engine,{distance:60,cascades:1,filter:'hard',resolution:2048}),clustered=Clustered.attach(engine);clustered.setLights([{position:[20,4,32],range:8,intensity:30,color:[1,1,1]}]);
   const add={shadows:()=>shadows.add(renderer,{static:true}),clustered:()=>clustered.add(renderer)},second=first==='shadows'?'clustered':'shadows',
    removeFirst=add[first]();add[second]();
   // Both on the floor at once, and the shadow map drawn; then nothing left compiling, the compositions without each.
   const both=await until((i)=>at(i,P.under)[0]<at(i,P.far)[0]*0.5&&at(i,P.lamp)[0]>at(i,P.far)[0]*1.2);
-  for(let i=0;i<2000&&(pending||renderer.stats.compiling);i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}
+  // Three pipelines a composition: this one and those one effect short, started a call a frame.
+  for(let i=0;i<4000&&(pending||renderer.stats.compiling||quadPipelines<9);i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}
   const withBoth=probe(both.img,P);
   gpu.createRenderPipelineAsync=create;
   removeFirst();drop(first==='shadows'?shadows:clustered);
@@ -160,6 +161,28 @@ window.check={
   for(let i=0;i<image.length;i+=4){const d=Math.max(Math.abs(image[i]-settled[i]),Math.abs(image[i+1]-settled[i+1]),Math.abs(image[i+2]-settled[i+2]));if(d>0)differing++;if(d>biggest)biggest=d;}
   drop(first==='shadows'?clustered:shadows);renderer.dispose();
   return {withBoth,removed,settled:settledProbe,removedStats,differing,biggest,errors:errors.splice(0)};
+ },
+ // Shadows, a light and fog, compiled ahead; shadows and fog leave in one frame, disposed at once. The composition with
+ // the light alone has never been drawn or compiled ahead, so the frames until it compiles draw the one without effects:
+ // every pixel the picture from before any effect, none of the removed ones. Then the settled frame, with the light.
+ async severalRemoved(){
+  lights(3,0.2);const {w,keys}=floorWorld();w.setBlocks(slab.flatMap(([x,y,z])=>[x,y,z,STONE]));renderer=attach(w,keys);await ready(renderer,w,keys);look([18,22,14],[18,1,32]);
+  const P={under:[12,1,32],lamp:[20,1,32],far:[29.5,1,36]},none=await shot(4);
+  let pending=0,quadPipelines=0;const gpu=device(),create=gpu.createRenderPipelineAsync;
+  gpu.createRenderPipelineAsync=(d)=>{pending++;if(d.vertex.constants?.EDGE!==undefined)quadPipelines++;const p=create.call(gpu,d);p.finally(()=>pending--);return p;};
+  const shadows=Shadows.attach(engine,{distance:60,cascades:1,filter:'hard',resolution:2048}),clustered=Clustered.attach(engine),fog=Fog.attach(engine,{color:[0.2,0.4,0.8],near:0,far:200});
+  clustered.setLights([{position:[20,4,32],range:8,intensity:30,color:[1,1,1]}]);
+  const removeShadows=shadows.add(renderer,{static:true}),removeFog=fog.add(renderer),removeLight=clustered.add(renderer);
+  await until((i)=>at(i,P.under)[0]<at(i,P.far)[0]*0.5&&at(i,P.lamp)[0]>at(i,P.far)[0]*1.2);
+  // Three pipelines a composition: this one and those one effect short, started a call a frame.
+  for(let i=0;i<4000&&(pending||renderer.stats.compiling||quadPipelines<12);i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,1));}
+  gpu.createRenderPipelineAsync=create;
+  removeShadows();removeFog();drop(shadows);drop(fog);
+  const first=await shot(0),firstStats={...renderer.stats};let gap=1;
+  for(let i=0;i<2000&&renderer.stats.compiling;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();gap++;await new Promise((r)=>setTimeout(r,1));}
+  const settled=await shot(4),count=(a,b)=>{let n=0,big=0;for(let i=0;i<a.length;i+=4){const d=Math.max(Math.abs(a[i]-b[i]),Math.abs(a[i+1]-b[i+1]),Math.abs(a[i+2]-b[i+2]));if(d>0)n++;if(d>big)big=d;}return {n,big};};
+  removeLight();drop(clustered);renderer.dispose();
+  return {firstStats,gap,vsNone:count(first,none),vsSettled:count(first,settled),first:probe(first,P),settled:probe(settled,P),errors:errors.splice(0)};
  },
  // Linear fog from 0 to 40 blocks toward a blue: a floor point's colour moves toward it by distance / 40.
  async fog(){

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3963231,
+  "total": 3964051,
   "history": [
     {
       "date": "2026-10-24",
@@ -1028,6 +1028,12 @@
       "commit": "554adb340",
       "reason": "ridged simplex noise in biomes/relief and biomes/toolkit: the fix for the rounded-square ridges, 32 and 40 B, r3-l8-report",
       "grew": 2
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "ecaa37247",
+      "reason": "voxel/render: compile-ahead of compositions without each effect, paced a GPU call a frame, and the largest-composition fallback, so removing lighting effects never draws nothing",
+      "grew": 1
     }
   ],
   "items": {
@@ -1387,7 +1393,7 @@
     "@margoengine/voxel/mesher": 8312,
     "@margoengine/voxel/physics": 10257,
     "@margoengine/voxel/query": 3821,
-    "@margoengine/voxel/render": 23305,
+    "@margoengine/voxel/render": 24125,
     "@margoengine/voxel/stream": 13408,
     "@margoengine/voxel/vox": 12969,
     "@margoengine/water": 19258,
