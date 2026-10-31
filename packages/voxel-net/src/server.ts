@@ -3,6 +3,7 @@
 // cache of finished messages, made by worker threads that run the generator and encodeChunk. Every tick it runs the
 // players' movement steps and edits in arrival order, moves each client's view, and writes corrections, block changes,
 // players and paced chunks to each client in one corked write. This module is also the generator thread's script.
+import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { availableParallelism } from 'node:os';
@@ -25,6 +26,8 @@ import {
   type PlayerName,
   PLAYER_SCHEMA,
   PROTOCOL_VERSION,
+  RESUME_TOKEN_BYTES,
+  type ResumeHello,
   STEP_SECONDS,
   type ServerMessage,
 } from './protocol.js';
@@ -100,6 +103,14 @@ export interface VoxelServerOptions {
    * browser answers pings. Counted in ticks, so a stalled server does not blame its clients. Default 20,000.
    */
   clientTimeout?: number;
+  /**
+   * Milliseconds a playing client whose connection dropped keeps its place, so it can come back with the token of its
+   * last welcome and carry on (see {@link VoxelServerPlayer.connected}). A drop is a socket that ended with no close
+   * frame, or `client-silent`; a client that leaves, a server close and every kick free the player at once. While parked
+   * it is out of other players' view but counts in `maxPlayers` and keeps its chunks loaded. 0 turns this off and welcomes
+   * carry no token. Default 30,000.
+   */
+  resumeTimeout?: number;
   /**
    * Your login check. Called on the upgrade request (`hello` undefined: read a cookie or a token header), then again
    * on the hello. `true` lets the client on; a non-empty string does too and becomes the player's `identity` (the
@@ -184,6 +195,11 @@ export interface VoxelServerPlayer {
   readonly character: VoxelCharacter;
   /** Whether it has spawned and moves. */
   readonly spawned: boolean;
+  /**
+   * False while it is parked: its connection dropped and {@link VoxelServerOptions.resumeTimeout} has not run out. Skip
+   * such a player when you count who is here.
+   */
+  readonly connected: boolean;
 }
 
 /** What a {@link VoxelServer} counted since the last {@link VoxelServer.resetMetrics}. */
@@ -208,6 +224,18 @@ export interface VoxelServerMetrics {
   chunksGenerated: number;
   /** Players who joined. */
   joins: number;
+  /** Players parked after a dropped connection, by cause: the socket ended, or `client-silent`. */
+  parked: { socket: number; clientSilent: number };
+  /** Parked or half-open players who came back. */
+  resumed: number;
+  /** Resumes refused for a token nobody holds, and parked players whose time ran out. */
+  resumeFailed: { unknown: number; expired: number };
+  /** Resumes that found the old socket still open and closed it. */
+  replaced: number;
+  /** Chunks marked to go out again because a dropped connection may have lost them. */
+  chunksResent: number;
+  /** Resumes that had to send the whole view again. */
+  fullResends: number;
 }
 
 // A chunk position; `d` orders a view nearest first.
@@ -230,7 +258,20 @@ interface Client extends VoxelServerPlayer {
   name: string;
   identity: string | undefined;
   // 'auth': the hello came and authenticate is running.
-  phase: 'hello' | 'auth' | 'joining' | 'spawning' | 'playing' | 'gone';
+  phase: 'hello' | 'auth' | 'joining' | 'spawning' | 'playing' | 'parked' | 'gone';
+  connected: boolean;
+  // The token of its last welcome, as hex; '' for none. When it was parked.
+  token: string;
+  parkedAt: number;
+  // Chunk messages written, and the keys of the last RING of them: what the client's count says it lost.
+  chunksSent: number;
+  ring: string[];
+  // Keys of chunks by the tick of their last blocks message, and of unloads, oldest first: a dead socket hides them.
+  edited: Map<string, number>;
+  unloaded: Map<string, number>;
+  // Chunks marked to go out again since it was parked; a players message goes out even if nobody is near.
+  resent: number;
+  announce: boolean;
   // Counted in maxPending and maxPerAddress until it joins or leaves.
   pending: boolean;
   address: string;
@@ -285,6 +326,7 @@ const NAMES: Record<number, ServerMessage['type']> = {
     24: 'heartbeat',
     25: 'app',
   },
+  RING = 512, // chunk messages remembered per client
   BANK = 60, // movement steps a client may save up: 0.5 s
   DRIFT = 1 / 64, // blocks of disagreement before a correction
   EYE = 1.62,
@@ -306,6 +348,7 @@ type Folded = ClientMessage & { folded?: boolean };
 const TIMED_OUT: unique symbol = Symbol('timed out'),
   HEARTBEAT = encodeServerMessage({ type: 'heartbeat' }),
   PING_BYTES = 2; // an empty ping frame
+const ignore = (): void => {};
 
 const sameArray = (a: ArrayLike<number>, b: ArrayLike<number>): boolean => {
   if (a.length !== b.length) return false;
@@ -550,6 +593,9 @@ export class VoxelServer {
   readonly #authTimeout: number;
   readonly #maxEdited: number;
   readonly #store: VoxelEditStore | undefined;
+  readonly #resumeTimeout: number;
+  /** The players a token takes back. */
+  readonly #tokens = new Map<string, Client>();
   /** Connections not yet joined, all together and per address. */
   #pending = 0;
   readonly #perAddress = new Map<string, number>();
@@ -634,6 +680,7 @@ export class VoxelServer {
       );
     this.#heartbeatTicks = Math.max(1, Math.round((heartbeat * this.#tickRate) / 1000));
     this.#clientTimeoutTicks = Math.max(this.#heartbeatTicks + 1, Math.ceil((silence * this.#tickRate) / 1000));
+    this.#resumeTimeout = integer('resumeTimeout', o.resumeTimeout ?? 30_000, 0, 86_400_000);
     if (o.authenticate !== undefined && typeof o.authenticate !== 'function')
       throw new TypeError('VoxelServer authenticate must be a function (req, hello) => boolean | string');
     this.#authenticate = o.authenticate;
@@ -687,7 +734,7 @@ export class VoxelServer {
       list.push(x, y, z, state);
     });
   }
-  /** The players connected now, spawned or not. */
+  /** The players on this server now, spawned or not, parked ones too ({@link VoxelServerPlayer.connected}). */
   get players(): VoxelServerPlayer[] {
     return [...this.#clients].filter((c) => c.phase !== 'hello' && c.phase !== 'auth');
   }
@@ -726,11 +773,12 @@ export class VoxelServer {
     return true;
   }
   /**
-   * Sizes for monitoring: players, connections not yet joined (`pending`) and the addresses they come from, chunks in
+   * Sizes for monitoring: players, those parked after a drop, connections not yet joined (`pending`) and the addresses they come from, chunks in
    * the world, cached chunk messages and their bytes, edited chunks in memory and on their way to the store, jobs.
    */
   get counts(): {
     players: number;
+    parked: number;
     pending: number;
     pendingAddresses: number;
     worldChunks: number;
@@ -742,6 +790,7 @@ export class VoxelServer {
   } {
     return {
       players: this.players.length,
+      parked: this.players.filter((p) => !p.connected).length,
       pending: this.#pending,
       pendingAddresses: this.#perAddress.size,
       worldChunks: this.#refs.size,
@@ -890,7 +939,10 @@ export class VoxelServer {
     if (this.#closed) return;
     this.#closed = true;
     clearTimeout(this.#timer);
-    for (const c of [...this.#clients]) c.conn.close(1001, 'server closing');
+    for (const c of [...this.#clients]) {
+      c.conn.close(1001, 'server closing');
+      if (c.phase === 'parked') this.#leave(c);
+    }
     const saves = this.#store ? [...this.#edited].map(([key, chunk]) => this.#persist(key, chunk.pack())) : [];
     await Promise.all([
       new Promise<void>((done) => (this.#http ? this.#http.close(() => done()) : done())),
@@ -923,6 +975,12 @@ export class VoxelServer {
       editsDenied: 0,
       chunksGenerated: 0,
       joins: 0,
+      parked: { socket: 0, clientSilent: 0 },
+      resumed: 0,
+      resumeFailed: { unknown: 0, expired: 0 },
+      replaced: 0,
+      chunksResent: 0,
+      fullResends: 0,
     };
   }
 
@@ -939,6 +997,15 @@ export class VoxelServer {
       upgradeAuth: undefined,
       phase: 'hello',
       spawned: false,
+      connected: true,
+      token: '',
+      parkedAt: 0,
+      chunksSent: 0,
+      ring: [],
+      edited: new Map(),
+      unloaded: new Map(),
+      resent: 0,
+      announce: false,
       character: new VoxelCharacter(this.world, this.#characterOptions),
       view: this.#view,
       queue: [],
@@ -979,9 +1046,23 @@ export class VoxelServer {
       this.#helloTimeout,
     );
     this.#clients.add(c);
-    conn.onmessage = (bytes) => this.#receive(c, bytes);
-    conn.onclose = () => this.#leave(c);
+    this.#wire(c, conn);
     if (this.#authenticate) c.upgradeAuth = this.#authorize(c, undefined);
+  }
+  #wire(c: Client, conn: WebSocketConnection): void {
+    conn.onmessage = (bytes) => this.#receive(c, bytes);
+    conn.onclose = (code, reason) => {
+      const silent = code === 1008 && reason === 'client-silent';
+      if ((code !== 1006 && !silent) || c.phase !== 'playing' || !c.token || this.#closed) return this.#leave(c);
+      // A drop: the player stays, out of everyone's sight, until it comes back or its time runs out.
+      c.phase = 'parked';
+      c.connected = false;
+      c.parkedAt = performance.now();
+      c.queue = [];
+      c.held = false;
+      c.heldMessages = 0;
+      this.metrics.parked[silent ? 'clientSilent' : 'socket']++;
+    };
   }
   // Takes a client out of maxPending and maxPerAddress, once: when it joins or leaves, whichever comes first.
   #settle(c: Client): void {
@@ -1000,6 +1081,8 @@ export class VoxelServer {
   #leave(c: Client): void {
     if (c.phase === 'gone') return;
     c.phase = 'gone';
+    c.connected = false;
+    this.#tokens.delete(c.token);
     (c as { spawned: boolean }).spawned = false;
     clearTimeout(c.timer);
     this.#settle(c);
@@ -1101,12 +1184,135 @@ export class VoxelServer {
       return this.#kick(c, 1008, `protocol ${m.version}, server speaks ${PROTOCOL_VERSION}`);
     // Hostile until cleaned: other players are shown this.
     c.name = cleanPlayerName(m.name);
-    if (!this.#authenticate) return this.#join(c, m);
+    if (!this.#authenticate) return this.#admit(c, m);
     c.phase = 'auth';
     void (async () => {
       if (!(await c.upgradeAuth) || c.phase !== 'auth') return;
-      if ((await this.#authorize(c, { name: c.name })) && c.phase === 'auth') this.#join(c, m);
+      if ((await this.#authorize(c, { name: c.name })) && c.phase === 'auth') this.#admit(c, m);
     })();
+  }
+  #admit(c: Client, m: Extract<ClientMessage, { type: 'hello' }>): void {
+    if (!m.resume) return this.#join(c, m);
+    const old = this.#tokens.get(Buffer.from(m.resume.token).toString('hex'));
+    if (!old || (old.phase !== 'parked' && old.phase !== 'playing')) {
+      this.metrics.resumeFailed.unknown++;
+      return this.#kick(c, 1008, 'resume-unknown');
+    }
+    this.#resume(c, old, m.resume);
+  }
+  // A fresh connection takes back a player: `c` was only the shell it came in, `old` is the one with the chunks and the
+  // place. What the dead socket may have swallowed goes out again; nothing else does.
+  #resume(c: Client, old: Client, resume: ResumeHello): void {
+    if (old.phase === 'playing') {
+      // Half-open: this server has not noticed yet. Later bytes from the old socket mean nothing.
+      old.conn.onmessage = ignore;
+      old.conn.onclose = ignore;
+      old.conn.close(1000, 'replaced');
+      this.metrics.replaced++;
+    }
+    this.#settle(c);
+    clearTimeout(c.timer);
+    c.phase = 'gone';
+    this.#clients.delete(c);
+    this.#wire(old, c.conn);
+    old.conn = c.conn;
+    old.address = c.address;
+    old.identity = c.identity;
+    old.bytesIn = c.bytesIn;
+    old.heardBytes = c.conn.bytesIn;
+    old.silentTicks = 0;
+    old.quietTicks = 0;
+    old.phase = 'playing';
+    old.connected = true;
+    old.queue = [];
+    old.held = false;
+    old.heldMessages = 0;
+    old.denied = [];
+    old.baseline = new Map();
+    old.announce = true;
+    old.bank = BANK / 2;
+    old.credited = performance.now();
+    old.correction = old.step;
+    old.loadedSent = false; // it may have been lost too; the client takes only the first
+    old.cursor = 0;
+    const lost = old.chunksSent - resume.chunks;
+    if (lost < 0 || lost > RING) {
+      for (const key of [...old.sent.keys()]) if (this.#unsend(old, key)) old.resent++;
+      this.metrics.fullResends++;
+    } else for (let i = 1; i <= lost; i++) if (this.#unsend(old, old.ring[(old.chunksSent - i) % RING])) old.resent++;
+    for (const key of old.edited.keys()) if (this.#unsend(old, key)) old.resent++;
+    for (const [cx, cy, cz] of resume.stale) if (this.#unsend(old, chunkKey(cx, cy, cz))) old.resent++;
+    for (const key of old.unloaded.keys())
+      if (!old.sent.has(key)) {
+        const [cx, cy, cz] = key.split(',').map(Number);
+        old.out.push(encodeServerMessage({ type: 'unload', cx, cy, cz }));
+      }
+    old.edited.clear();
+    old.unloaded.clear();
+    this.metrics.chunksResent += old.resent;
+    this.metrics.resumed++;
+    this.#welcome(old);
+    old.resent = 0;
+    const ch = old.character;
+    old.out.unshift(
+      encodeServerMessage({
+        type: 'state',
+        spawn: true,
+        step: old.step,
+        position: ch.position,
+        velocity: ch.velocity,
+        flying: ch.flying,
+      }),
+    );
+  }
+  #welcome(c: Client): void {
+    const token = this.#resumeTimeout ? randomBytes(RESUME_TOKEN_BYTES) : new Uint8Array(0);
+    this.#tokens.delete(c.token);
+    c.token = Buffer.from(token).toString('hex');
+    if (c.token) this.#tokens.set(c.token, c);
+    this.#write(
+      c,
+      encodeServerMessage({
+        type: 'welcome',
+        version: PROTOCOL_VERSION,
+        id: c.id,
+        tickRate: this.#tickRate,
+        view: c.view,
+        viewHeight: this.#viewHeight,
+        simulation: this.#simulation,
+        simulationHeight: this.#simulationHeight,
+        playerDistance: Math.round(this.#playerDistance),
+        blocks: this.#hash,
+        flight: this.#flight,
+        resume: token,
+        resent: c.resent,
+      }),
+    );
+  }
+  // Marks a chunk the client has as not sent, so it goes out again; true when it did have it. One lying past the view,
+  // where #sendChunks would not replace it, is unloaded instead.
+  #unsend(c: Client, key: string): boolean {
+    const s = c.sent.get(key);
+    if (!s) return false;
+    c.sent.delete(key);
+    c.cursor = 0;
+    if ((s.cx - c.cx) ** 2 + (s.cz - c.cz) ** 2 > c.view ** 2 || Math.abs(s.cy - c.cy) > this.#viewHeight)
+      this.#unload(c, s);
+    return true;
+  }
+  #unload(c: Client, s: Spot): void {
+    c.out.push(encodeServerMessage({ type: 'unload', cx: s.cx, cy: s.cy, cz: s.cz }));
+    this.#remember(c, c.unloaded, s.key);
+  }
+  // Notes a key whose message a dead socket may hide; those older than a socket can stay dead unnoticed are forgotten.
+  #remember(c: Client, keys: Map<string, number>, key: string): void {
+    if (!c.token) return;
+    keys.delete(key);
+    keys.set(key, this.#tick);
+    for (const [oldest, tick] of keys) {
+      if (this.#tick - tick <= this.#clientTimeoutTicks) break;
+      keys.delete(oldest);
+    }
   }
   #join(c: Client, m: Extract<ClientMessage, { type: 'hello' }>): void {
     if (this.players.length >= this.#maxPlayers) return this.#kick(c, 1013, 'server full');
@@ -1126,22 +1332,7 @@ export class VoxelServer {
     c.view = Math.max(2, Math.min(this.#maxView, m.view || this.#view));
     c.phase = 'joining';
     this.metrics.joins++;
-    this.#write(
-      c,
-      encodeServerMessage({
-        type: 'welcome',
-        version: PROTOCOL_VERSION,
-        id: c.id,
-        tickRate: this.#tickRate,
-        view: c.view,
-        viewHeight: this.#viewHeight,
-        simulation: this.#simulation,
-        simulationHeight: this.#simulationHeight,
-        playerDistance: Math.round(this.#playerDistance),
-        blocks: this.#hash,
-        flight: this.#flight,
-      }),
-    );
+    this.#welcome(c);
     const [sx, sz] = this.#spawn(c.id),
       x = Math.floor(sx),
       z = Math.floor(sz);
@@ -1381,13 +1572,7 @@ export class VoxelServer {
       this.#cache.delete(key);
     }
     this.#changes.delete(key);
-    for (const c of this.#clients)
-      if (c.sent.delete(key)) {
-        c.cursor = 0;
-        // Sent chunks may lie one chunk past the view, where #sendChunks would not replace them.
-        if ((cx - c.cx) ** 2 + (cz - c.cz) ** 2 > c.view ** 2 || Math.abs(cy - c.cy) > this.#viewHeight)
-          c.out.push(encodeServerMessage({ type: 'unload', cx, cy, cz }));
-      }
+    for (const c of this.#clients) this.#unsend(c, key);
   }
   // Takes a chunk out of the store, in order with its saves; it reads as absent from now on. Never rejects.
   #forget(key: string): Promise<void> {
@@ -1499,6 +1684,16 @@ export class VoxelServer {
     this.#changes = new Map();
     for (const c of clients) {
       if (c.phase === 'gone') continue;
+      if (c.phase === 'parked') {
+        for (const key of changes.keys()) if (this.#unsend(c, key)) c.resent++;
+        let queued = 0;
+        for (const message of c.out) queued += message.length;
+        if (queued > TOO_SLOW || now - c.parkedAt >= this.#resumeTimeout) {
+          this.metrics.resumeFailed.expired++;
+          this.#leave(c);
+        }
+        continue;
+      }
       if (c.conn.buffered > TOO_SLOW) {
         this.#kick(c, 1008, 'too slow to keep up');
         continue;
@@ -1511,7 +1706,7 @@ export class VoxelServer {
         c.heardBytes = c.conn.bytesIn;
         c.silentTicks = 0;
       } else if (joined && ++c.silentTicks >= this.#clientTimeoutTicks) {
-        this.#kick(c, 1008, 'client-silent');
+        c.conn.close(1008, 'client-silent'); // parks a player who is playing; the close handler decides
         continue;
       }
       c.conn.cork();
@@ -1525,7 +1720,11 @@ export class VoxelServer {
           for (const v of flat) list.push(v);
         }
       c.denied = [];
-      if (list) this.#write(c, encodeServerMessage({ type: 'blocks', data: encodeBlockChanges(list) }));
+      if (list) {
+        this.#write(c, encodeServerMessage({ type: 'blocks', data: encodeBlockChanges(list) }));
+        for (let i = 0; i < list.length; i += 4)
+          this.#remember(c, c.edited, chunkKey(list[i] >> 5, list[i + 1] >> 5, list[i + 2] >> 5));
+      }
       if (c.phase === 'playing') {
         const p = c.character.position,
           px = Math.floor(p[0]) >> 5,
@@ -1549,7 +1748,9 @@ export class VoxelServer {
         if (names) this.#write(c, encodeServerMessage({ type: 'names', names }));
         const data = this.#codec.encode(nearby, c.baseline);
         c.baseline = nearby;
-        if (data.length > 1) this.#write(c, encodeServerMessage({ type: 'players', tick: this.#tick, data }));
+        if (data.length > 1 || c.announce)
+          this.#write(c, encodeServerMessage({ type: 'players', tick: this.#tick, data }));
+        c.announce = false;
       }
       if (c.phase === 'playing' || c.phase === 'spawning') this.#sendChunks(c);
       if (joined) {
@@ -1759,7 +1960,7 @@ export class VoxelServer {
     for (const [key, s] of c.sent)
       if ((s.cx - cx) ** 2 + (s.cz - cz) ** 2 > (V + 1) ** 2 || Math.abs(s.cy - cy) > H + 1) {
         c.sent.delete(key);
-        c.out.push(encodeServerMessage({ type: 'unload', cx: s.cx, cy: s.cy, cz: s.cz }));
+        this.#unload(c, s);
       }
   }
   // Spawns a player once the server holds, and the client has been sent, the chunks within one chunk of it.
@@ -1812,6 +2013,7 @@ export class VoxelServer {
         continue;
       }
       this.#write(c, message);
+      c.ring[c.chunksSent++ % RING] = spot.key;
       c.sent.set(spot.key, spot);
       bytes += message.length;
       if (++count >= CHUNKS_PER_TICK || bytes >= BYTES_PER_TICK) break;

@@ -162,7 +162,13 @@ test('every message restarts the wait', async (t) => {
 
 test('a client that stops responding is dropped and its slot, counts and chunks freed', async (t) => {
   const clientTimeout = 500,
-    { server, url } = await start(t, { heartbeatInterval: 100, clientTimeout, maxPlayers: 1, spawn: () => [0, 0] }),
+    { server, url } = await start(t, {
+      heartbeatInterval: 100,
+      clientTimeout,
+      maxPlayers: 1,
+      spawn: () => [0, 0],
+      resumeTimeout: 0,
+    }),
     dead = await deadClient(t, url);
   assert.equal(server.counts.players, 1);
   assert.ok(server.counts.worldChunks > 0);
