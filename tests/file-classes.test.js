@@ -56,6 +56,7 @@ test('each class places the files it is meant for, checked in order', () => {
       'docs/catalog.json',
       'site/index.html',
       'private/x.txt',
+      '.claude/settings.json',
       'api/dof.api.md',
       'benchmarks/records/x.json',
       '.github/workflows/ci.yml',

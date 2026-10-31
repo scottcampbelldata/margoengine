@@ -64,50 +64,34 @@ Scott's rule (2026-10-24): every API and tool should feel modern and familiar, s
 
 Scott's decision (2026-10-29): CAD import and CAD tooling are not part of this repository and must not be added back. `npm run check:banned-terms` (in verify) enforces it; its encoded list is `scripts/banned-terms.json`.
 
-## Before every push to main
+## Before every push to main (Scott approved D1 to D7, 2026-10-31)
 
-Several agents push to `main`. Each push must leave it at least as clean as it found it:
+Agents never push. One integrator (`scripts/integrate.mjs`, run by the coordinator or a cheap runner) is the only pusher, one at a time. Until that script and `scripts/tier2-loop.mjs` exist, the coordinator pushes batches by hand with the tier 1 steps below.
 
-- `npm run verify` passes. For changes to shaders, anything a demo draws, a package README or package exports, run `npm run check:merge` (adds the site build, the visual check and `modern:test:packages`, which packs every package,
-  installs the tarballs into a clean project and type-checks each README example; a few minutes for a one-package
-  change).
-- Check only what a change can affect (Scott, 2026-10-30, session rule 20): `check:merge` runs the GPU tests of the
-  changed packages plus their dependents, not every package (their GPU tests, the visual demos and views that import
-  them, the WGSL compile for their shaders). A package's own package.json counts as that package; a script runs only
-  the checks that use it; a new standalone script no check imports runs none. Everything runs only for core, stage,
-  shared code (and the margoengine umbrella, unless it only adds or removes `export * from` entries: its package.json exports, the matching thin files and its README; any other umbrella source change or a dependency change stays full, and the umbrella smoke test always runs), the check code itself, the root package.json or the lock file (also
-  build configuration, a WGSL file outside a package, or more than 12 affected packages). An unplaceable file gets
-  added to the map (`scripts/support/file-classes.mjs`; `tests/file-classes.test.js` fails on any tracked file it
-  cannot place), not a full run. Never narrow by skipping a test the change can affect. A change to the GPU package
-  runner runs its pinned `RUNNER_SMOKE` tests plus what it affects. `npm run check:merge:full` (or `MARGO_FULL=1`)
-  forces the full run, and it prints which mode ran and why. The nightly full run (`node scripts/nightly-full.mjs`,
-  not on the main dev PC, except the weekly uncached full check there until the laptop has visual baselines; dated log in
-  `test-results/nightly/`) is the backstop. A GPU step skipped as unaffected is
-  not a failure; if you doubt the mapping, run `check:merge:full`.
-- The two package-level steps are narrowed the same way (`scripts/support/affected-packages.mjs`). `verify` builds every
-  package once, then runs its other checks side by side. `modern:test:packages` builds nothing again after `verify`
-  (check:merge hands it that build), packs all packages in one `npm pack`, reuses the consumer project's third-party
-  `node_modules` from `os.tmpdir()/margoengine-consumer-cache` (new key on a lock-file or dependency change, and weekly),
-  and type-checks README examples in parallel shards: only for the affected packages (plus the umbrella's smoke test,
-  always); the React docs, React unit tests and packed browser run when `react` is affected. `modern:test:bundlers`
-  (no GPU, no GPU lock) runs only when a changed package is one the matrix builds or imports (react, shadows, controls,
-  stage, core, the umbrella, the starters) or one they import. `check:merge:full` keeps all of it whole.
-- `npm run check:examples-types` type-checks the examples (TypeScript, TSX and the top-level JavaScript demos) against the built package types; `npm run typecheck` covers packages only. `check:merge` runs it for the example projects a change can reach (`scripts/support/example-projects.mjs`); a new example folder goes into a project there, and `tests/check-example-types.test.js` fails until it does.
-- `npm run hygiene`: no gate gets worse for the packages you touched. New public exports carry TSDoc; new throws follow `docs/conventions.md` (`MargoError` with a code, `TypeError`, `RangeError`; the message names the fix). Run `npx biome format --write` on files you touched.
-- `npm run proofs -- --current` passes. If a deliberate change alters what a feature-off path emits, advance that proof's current reference to your commit and say why in `docs/whitepaper/claims.md`; never leave a proof failing.
-- Public numbers stay true: `site/index.html`, `README.md` and `docs/limits.md` must match `npm run measure:size`. When work affects a launch gate, update its status in `docs/HANDOFF.md`.
-- `git pull --rebase` before pushing (no merge commits of `main` into itself), one commit per change, and no repeated record-only commits.
-- Generated records (`api/*.api.md`, `docs/api-surface.md`, `entry-sizes.json`, `basic-scene-network.json`, the quality
-  baselines) no longer conflict on a rebase. `node scripts/worktree-node-modules.mjs` (main checkout:
-  `node scripts/setup-merge-drivers.mjs`) registers two merge drivers once per clone: the generated files keep main's
-  copy, the baselines merge item by item (limits only shrink, every reasoned history entry stays). Do not resolve them
-  by hand. Inside the landing lock, right after the rebase and from a clean tree, run `node scripts/land-records.mjs --no-build`:
-  it rebuilds, rewrites the API reports, shrinks the baselines (a baseline that would grow stops it, as
-  `npm run quality -- --update` does), measures both size records at the rebased `HEAD`, checks that they name one
-  commit and makes one `records:` commit. Then run `verify` and push. Commit nothing else by hand in those files.
-  `build:site` and `test:basic-scene` take the GPU lock themselves, only around the browser; do not wrap them in it.
-- GPU tests share 3 slots; benchmarks take the GPU exclusively; every lock hold has a time limit.
-- `check:merge -- --parallel` (or `MARGO_CHECK_PARALLEL=1`) runs the same steps and suites side by side: verify alone first, each GPU suite in its own slot, never two on one fixed port or output, timing tests last and alone. `--serial` or `MARGO_CHECK_SERIAL=1` forces one at a time; heat and split profiles always do. `node scripts/compare-check-runs.mjs --serial=<folder>` compares a run with a serial one.
+- Tier 0, in the agent before it declares READY: `npm run lint`, `npm run hygiene`, `npm run verify` once (build, typecheck, `api:check`, quality, `proofs -- --current`, size gate, unit tests), and the GPU test of the package you changed. A change that alters exports commits the `npm run api:update` output. No `check:merge`, narrowed or full.
+- READY: write `READY <sha>` in `private/queue/`. The branch is cut from current `main`, is local to its worktree, lives one task and at most one day, and is rebased by its agent when it is a day old or 30 commits behind. At most 6 unlanded branches exist at once.
+- Tier 1, the integrator's gate on the batch tip, CPU only, once per batch (every 30 min, or as soon as 3 branches are READY): rebase each branch onto `main` in order (a conflict sends that branch back to its agent), then `npm run verify`, `npm run check:examples-types`, `modern:test:packages` narrowed to the batch's packages (`scripts/support/affected-packages.mjs`), and `node scripts/land-records.mjs --no-build` (one `records:` commit; the merge drivers from `node scripts/worktree-node-modules.mjs` keep generated records from conflicting; never edit them by hand). Then push and append the batch's commits and the tier 1 log to `private/queue/landed.log`. A failing test names a package, which names one branch: that branch leaves the batch, the gate runs again on the rest, and the branch goes back to its agent with the log. No rerun without a change.
+- Tier 2, after the push, on the newest `main` tip, continuously (`scripts/tier2-loop.mjs`): `npm run check:merge:full`, uncached, in a detached worktree. It takes GPU slots first. Each pass tags `green/<sha>`; site deploys, releases and benchmarks use green tags only.
+- RED: when tier 2 fails, `main` is RED. The integrator writes `private/queue/RED.json` (failed step, suite, commit range since the last green tag) and pushes only the fix. The culprit is found from the failed suite's file footprint (`scripts/support/affected-gpu.mjs`); rerun that one suite at the candidate and its parent, and bisect the range with that one suite only when no candidate shows. The fix is a regression test plus the fix, pushed ahead of the queue. Past 2 hours from RED, `git revert` the culprit (history kept) and re-enter the work as a new branch.
+- Tier 3, nightly on the other machines: pinned proofs and benchmarks, exclusive, results to the status repo.
+- Quality that every change keeps: new public exports carry TSDoc; new throws follow `docs/conventions.md` (`MargoError` with a code, `TypeError`, `RangeError`; the message names the fix); run `npx biome format --write` on files you touched; `npm run proofs -- --current` passes, and a deliberate change to what a feature-off path emits advances that proof's reference with the reason in `docs/whitepaper/claims.md`; public numbers in `site/index.html`, `README.md` and `docs/limits.md` match `npm run measure:size`; a launch-gate change updates `docs/HANDOFF.md`.
+- GPU use: at most 3 GPU users at once including tier 2 (so 2 GPU builders while it runs), plus up to 3 CPU-only helpers; 6 agents in total. GPU tests share 3 slots, benchmarks take the GPU exclusively, every lock hold has a time limit.
+- Stop orders: `private/control.json` lists stopped tags (`stopped`, `at`, `words`). Read it before each commit and before READY; if your tag is stopped, stop with a handoff. The integrator refuses a stopped class of paths.
+
+## Working rules (from the retired session-rules file)
+
+- Quiet: no progress messages. Run long commands in the background and message the coordinator only when something lands, you are blocked or you need a decision, in one short paragraph.
+- Own files only: keep scripts and logs in your own worktree, never a shared scratch folder.
+- Timeouts: every test, check, benchmark and wait has a hard time limit; never hold a lock without one. On a hang, kill the process tree, release the lock and report it.
+- Nothing is skipped, loosened or retried until green. A failing step is yours to resolve whether or not your change caused it: find the root cause and fix it in the owning package with a regression test, unless the coordinator already assigned a fix helper to that exact failure.
+- This ships publicly: any bug you find, related to your task or not, is tracked to its root cause and fixed in the owning package. If it cannot be fixed now, it goes in `docs/known-bugs.md` with a repro and cause, and you tell the coordinator.
+- Every bug fix has a regression test. If the bug is hard (GPU or timing, concurrency, maths, unclear owner) and you are on a cheaper model, stop and tell the coordinator so a stronger model can take it.
+- Never skip, weaken or shrink work to match another engine's speed. A speed fix does the same work with the same output. If a rival is faster because it does less, keep the work, publish the number as an accepted difference with its cause, what Margo does extra and the trade-off, and add a like-for-like row. Never change a benchmark scene so Margo does less; keep the old scene beside a new one.
+- Being slower than three.js is acceptable only with a measured, documented reason (Margo does more or better work, or three.js cuts a corner we should not). A row with no valid reason is a loss to fix.
+- Model and effort: every helper gets both chosen for the job. Chores (docs, renames, landings, running tests, searches): Haiku or Sonnet, low or medium. Normal feature work: Sonnet or Opus, medium. Hard work (GPU or timing bugs, architecture, tricky maths, risky changes): Opus high, max only when needed. State both in the brief and the handoff note. Switch a stuck job to a stronger model.
+- Core is the last resort: add to `@margoengine/core` only when no package can hold the change and it fixes a bug or flaw that would make the engine fail. The commit and report say why no package can hold it and which failure it prevents; ask the coordinator first.
+- Shared git config: every worktree shares one `.git/config`. Never write git config from a worktree, add worktrees with `--no-track`, avoid `git push -u` and `git branch -m` while checks run. If a check names `.git/config` in a failure, tell the coordinator; do not retry silently.
+- Pictures over 3,932,160 bytes are re-encoded with a reduced palette when read by an agent, which shows false bands. Run `scripts/review-png.mjs` first (lossless rewrite), or compare numbers.
 
 ## How agents are run
 
@@ -129,9 +113,9 @@ mixed up.
 
 - Work in your chat's worktree, on its branch cut from current `main`. Never create extra branches (no test, backup,
   record or "land" branches); test in the worktree you have.
-- Finish every task by landing it: `git pull --rebase` onto `origin/main`, run the checks above, push to `main` (after
-  Scott's go-ahead), then delete your branch (local and on GitHub) and remove your worktree.
-- If the work cannot land yet, rebase it onto current `main` anyway and say in your final report, in one line, what
+- Finish a task by declaring READY (see "Before every push to main"), not by pushing. The integrator rebases, gates,
+  pushes and records the batch; after it lands, delete your branch and remove your worktree.
+- If the work cannot be READY yet, rebase it onto current `main` anyway and say in your final report, in one line, what
   blocks it. Never leave a branch that is behind `main`.
 - Never delete or rewrite another session's or agent's branch or uncommitted work without Scott's say-so.
 - Every coding agent follows these rules. Work by another agent that is not on `main` is unlanded: report it, or,

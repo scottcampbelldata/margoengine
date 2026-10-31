@@ -20,7 +20,7 @@
 //   asset             examples/assets/**: the checks whose files reach or name it, else everything
 //   script            other scripts/, tests/, examples/, bench/ and tools/ files: the checks whose files reach them
 //                     (stepClosure in affected-gpu.mjs); a file no check reaches runs nothing beyond verify
-//   inert             documents, site pages, records, licences, dotfiles, .github (no local step runs a workflow)
+//   inert             documents, site pages, records, licences, dotfiles, .github, .claude (no local step runs a workflow)
 //   unknown           none of these: everything at run time, and the class gate (tests/file-classes.test.js) fails on
 //                     any tracked file in it, naming the file and the fix
 const posix = (path) => path.replaceAll('\\', '/');
@@ -98,6 +98,7 @@ const INERT = [
   /^api\/[\w.-]+\.api\.md$/,
   /^benchmarks\//,
   /^\.github\//,
+  /^\.claude\//,
   /^public\/favicon\.ico$/,
   /^(LICENSE|NOTICE)$/,
   /^\.(gitignore|gitattributes|editorconfig)$/,

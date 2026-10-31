@@ -1,5 +1,7 @@
 # Operational playbook
 
+Reference, not rules; AGENTS.md wins.
+
 ## Purpose
 
 This document describes how the Margo Engine project is run and verified, in enough detail to build the same systems
