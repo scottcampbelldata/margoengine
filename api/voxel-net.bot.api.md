@@ -12,7 +12,7 @@ import { VoxelCharacter, VoxelCharacterOptions } from "@margoengine/voxel/query"
 export class VoxelBot {
     readonly client: VoxelNetClient;
     readonly world: VoxelWorld;
-    readonly connection: WebSocketConnection;
+    connection: WebSocketConnection;
     readonly times: {
         connect: number;
         open: number;
@@ -22,7 +22,10 @@ export class VoxelBot {
     };
     readonly edits: VoxelBotEdit[];
     closeCode: number | undefined;
+    closeReason: string | undefined;
+    resumeFailed: string | undefined;
     private constructor();
+    get bytesIn(): number;
     static connect(options: VoxelBotOptions): Promise<VoxelBot>;
     update(dt: number): void;
     close(): void;
@@ -46,6 +49,9 @@ export interface VoxelBotOptions {
     players?: boolean;
     home?: readonly [x: number, z: number];
     leash?: number;
+    travelHome?: boolean;
+    headers?: Record<string, string>;
+    resume?: VoxelNetClientOptions['resume'];
     random?: () => number;
 }
 
@@ -53,8 +59,14 @@ export const clock: () => number;
 
 // Not exported from this entry, but used by the exports above:
 
+interface PlayerName {
+    id: number;
+    name: string;
+}
+
 interface RemotePlayer {
     readonly id: number;
+    name: string;
     readonly buffer: SnapshotBuffer;
     readonly snapshot: Snapshot;
     last?: {
@@ -76,6 +88,8 @@ type ServerMessage =
     playerDistance: number;
     blocks: number;
     flight: boolean;
+    resume: Uint8Array;
+    resent: number;
 }
  | {
     type: 'chunk';
@@ -109,6 +123,17 @@ type ServerMessage =
 }
  | {
     type: 'loaded';
+}
+ | {
+    type: 'names';
+    names: PlayerName[];
+}
+ | {
+    type: 'heartbeat';
+}
+ | {
+    type: 'app';
+    data: Uint8Array;
 };
 
 class VoxelNetClient {
@@ -124,7 +149,11 @@ class VoxelNetClient {
     loaded: boolean;
     onSpawn: () => void;
     onLoaded: () => void;
+    onApp: (data: Uint8Array) => void;
     onBlocks: (changes: Int32Array) => void;
+    onClose: (event: VoxelNetClose) => void;
+    onResume: (event: VoxelNetResume) => void;
+    onResumed: (event: VoxelNetResumed) => void;
     onError: (error: unknown) => void;
     constructor(world: VoxelWorld, transport: VoxelNetTransport, options?: VoxelNetClientOptions);
     receive(bytes: Uint8Array): void;
@@ -132,6 +161,9 @@ class VoxelNetClient {
     flush(): void;
     edit(x: number, y: number, z: number, state: number): boolean;
     samplePlayers(now?: number): ReadonlyMap<number, RemotePlayer>;
+    get detached(): boolean;
+    detach(): void;
+    attach(transport: VoxelNetTransport): void;
     close(): void;
 }
 
@@ -141,6 +173,11 @@ interface VoxelNetClientOptions {
     decodeDistance?: number;
     players?: boolean;
     interpolationDelay?: number;
+    serverTimeout?: number;
+    resume?: false | {
+        attempts?: number;
+        signal?: AbortSignal;
+    };
     character?: VoxelCharacterOptions;
 }
 
@@ -149,12 +186,34 @@ interface VoxelNetClientStats {
     sent: number;
     corrections: number;
     chunks: number;
+    drops: number;
+    resumeAttempts: number;
+    resumes: number;
+    resumeFailed: number;
+}
+
+interface VoxelNetClose {
+    code: number;
+    reason: string;
+    byClient: boolean;
+    resumeFailed?: string;
 }
 
 interface VoxelNetControls {
     keys: number;
     yaw: number;
     pitch: number;
+}
+
+interface VoxelNetResume {
+    attempt: number;
+    cause: string;
+    delay: number;
+}
+
+interface VoxelNetResumed {
+    gapMs: number;
+    chunksResent: number;
 }
 
 interface VoxelNetTransport {
@@ -167,12 +226,14 @@ class WebSocketConnection {
     set onmessage(handler: (data: Uint8Array) => void);
     get onclose(): (code: number, reason: string) => void;
     set onclose(handler: (code: number, reason: string) => void);
+    onpong: (() => void) | undefined;
     bytesIn: number;
     bytesOut: number;
     constructor(socket: Duplex, client: boolean, options?: WebSocketOptions, head?: Buffer);
     get buffered(): number;
     get closed(): boolean;
     send(data: Uint8Array): void;
+    ping(): void;
     cork(): void;
     uncork(): void;
     close(code?: number, reason?: string): void;

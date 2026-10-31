@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3975699,
+  "total": 3975758,
   "history": [
     {
       "date": "2026-10-24",
@@ -894,13 +894,7 @@
     {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "f766d8ee2",
-      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
+      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
       "grew": 1
     },
     {
@@ -910,39 +904,15 @@
       "grew": 2
     },
     {
-      "date": "2026-10-31",
-      "commit": "d27f31df4",
-      "reason": "voxel-net names on the wire (names message, cleanPlayerName, filterName) and exportEdits and importEdits for Plaza snapshots and rollback; server-only code in the Node entry, client +421 B",
-      "grew": 2
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "c065fe3e1",
-      "reason": "voxel-net heartbeat, both ways: a dead network reaches onClose with SERVER_SILENT_CODE (serverTimeout), dead clients freed (clientTimeout, pings), close linger; gzip client +271 B, server +342 B, bot +79 B",
-      "grew": 2
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "677d2b8b8",
-      "reason": "voxel-net server: a joining player's ground is generated and sent first, 15 B",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "2c977c21d",
-      "reason": "voxel-net app messages (protocol 3): the generic app message, VoxelServer.send and broadcast, client.onApp and MAX_APP_BYTES; gzip client +120 B, server +179 B, bot +81 B",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "87e007e26",
-      "reason": "voxel-net server: inputs held on the server's own chunks fold past 256 messages instead of closing the player, and held chunks go first in the generator queue; server +333 B gzip, client unchanged",
-      "grew": 1
-    },
-    {
       "date": "2026-10-30",
       "commit": "0882df471",
-      "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
+      "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "f766d8ee2",
+      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
       "grew": 1
     },
     {
@@ -989,6 +959,42 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "a66ee4d82",
+      "reason": "procedural entry grows by the jetty and boat generators (generateJettyMesh, generateBoatMesh: lofted hull, planks, posts), about 1.7 kB, an optional package",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "d27f31df4",
+      "reason": "voxel-net names on the wire (names message, cleanPlayerName, filterName) and exportEdits and importEdits for Plaza snapshots and rollback; server-only code in the Node entry, client +421 B",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "c065fe3e1",
+      "reason": "voxel-net heartbeat, both ways: a dead network reaches onClose with SERVER_SILENT_CODE (serverTimeout), dead clients freed (clientTimeout, pings), close linger; gzip client +271 B, server +342 B, bot +79 B",
+      "grew": 2
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "677d2b8b8",
+      "reason": "voxel-net server: a joining player's ground is generated and sent first, 15 B",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "2c977c21d",
+      "reason": "voxel-net app messages (protocol 3): the generic app message, VoxelServer.send and broadcast, client.onApp and MAX_APP_BYTES; gzip client +120 B, server +179 B, bot +81 B",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "87e007e26",
+      "reason": "voxel-net server: inputs held on the server's own chunks fold past 256 messages instead of closing the player, and held chunks go first in the generator queue; server +333 B gzip, client unchanged",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
       "commit": "ecaa37247",
       "reason": "voxel/render: compile-ahead of compositions without each effect, paced a GPU call a frame, and the largest-composition fallback, so removing lighting effects never draws nothing",
       "grew": 1
@@ -1004,6 +1010,12 @@
       "commit": "b846a40a9",
       "reason": "voxel-net resume (protocol 4): a dropped player is parked and comes back in place, because every socket is cut by the CDN at about 15 minutes; gzip client +1,634 B, server +1,146 B, bot +1,565 B (it holds the client)",
       "grew": 3
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "6a1effcd7",
+      "reason": "procedural entry grows by the jetty and boat generators; report ajetty-report.md says about 1.7 kB, measured 2,032 B on current main (10,570 -> 12,602), the extra about 360 B over the report is as measured, cause not traced, next to r3-hulls; optional package, core and stage unchanged",
+      "grew": 1
     },
     {
       "date": "2026-10-31",
@@ -1079,14 +1091,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "a66ee4d82",
-      "reason": "procedural entry grows by the jetty and boat generators (generateJettyMesh, generateBoatMesh: lofted hull, planks, posts), about 1.7 kB, an optional package",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "6a1effcd7",
-      "reason": "procedural entry grows by the jetty and boat generators; report ajetty-report.md says about 1.7 kB, measured 2,032 B on current main (10,570 -> 12,602), the extra about 360 B over the report is as measured, cause not traced, next to r3-hulls; optional package, core and stage unchanged",
+      "commit": "977870d25",
+      "reason": "sky/fog over by 5 B: fog on a 4x capture reads this frame's depth (plaza-tear-report.md, e003bbc24)",
       "grew": 1
     }
   ],
@@ -1373,16 +1379,16 @@
     "@margoengine/shader/readback": 7620,
     "@margoengine/shadows": 15340,
     "@margoengine/sky": 16485,
-    "@margoengine/sky/base": 7119,
-    "@margoengine/sky/bruneton": 2627,
+    "@margoengine/sky/base": 7066,
+    "@margoengine/sky/bruneton": 2557,
     "@margoengine/sky/clouds": 2338,
-    "@margoengine/sky/fog": 2034,
+    "@margoengine/sky/fog": 2295,
     "@margoengine/sky/lighting": 3617,
     "@margoengine/sky/night": 2523,
     "@margoengine/sky/preetham": 953,
-    "@margoengine/sky/reflection": 1399,
+    "@margoengine/sky/reflection": 1325,
     "@margoengine/sky/sun": 1917,
-    "@margoengine/sky/weather": 5879,
+    "@margoengine/sky/weather": 5874,
     "@margoengine/splats": 24851,
     "@margoengine/splats/data": 17665,
     "@margoengine/splines": 1555,

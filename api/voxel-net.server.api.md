@@ -24,6 +24,7 @@ export type VoxelAuthenticate = (req: IncomingMessage, hello: {
 export interface VoxelEditStore {
     save(key: string, chunk: PackedChunk): void | Promise<void>;
     load(key: string): PackedChunk | undefined | Promise<PackedChunk | undefined>;
+    delete?(key: string): void | Promise<void>;
 }
 
 export class VoxelServer {
@@ -33,8 +34,11 @@ export class VoxelServer {
     onError: (error: unknown) => void;
     constructor(options: VoxelServerOptions);
     get players(): VoxelServerPlayer[];
+    send(player: VoxelServerPlayer, data: Uint8Array): boolean;
+    broadcast(data: Uint8Array): number;
     get counts(): {
         players: number;
+        parked: number;
         pending: number;
         pendingAddresses: number;
         worldChunks: number;
@@ -46,6 +50,8 @@ export class VoxelServer {
     };
     get tick(): number;
     resetMetrics(): void;
+    exportEdits(): Promise<Map<string, PackedChunk>>;
+    importEdits(edits: ReadonlyMap<string, PackedChunk>): Promise<void>;
     listen(port?: number, host?: string): Promise<AddressInfo>;
     close(): Promise<void>;
 }
@@ -61,6 +67,18 @@ export interface VoxelServerMetrics {
     editsDenied: number;
     chunksGenerated: number;
     joins: number;
+    parked: {
+        socket: number;
+        clientSilent: number;
+    };
+    resumed: number;
+    resumeFailed: {
+        unknown: number;
+        expired: number;
+    };
+    replaced: number;
+    chunksResent: number;
+    fullResends: number;
 }
 
 export interface VoxelServerOptions {
@@ -85,11 +103,15 @@ export interface VoxelServerOptions {
     maxPending?: number;
     maxPerAddress?: number;
     helloTimeout?: number;
+    heartbeatInterval?: number;
+    clientTimeout?: number;
+    resumeTimeout?: number;
     authenticate?: VoxelAuthenticate;
     authTimeout?: number;
     maxEditedChunks?: number;
     store?: VoxelEditStore;
     character?: VoxelCharacterOptions;
+    filterName?: (name: string, id: number) => string;
     allowEdit?: (player: VoxelServerPlayer, x: number, y: number, z: number, state: number, previous: number) => boolean;
 }
 
@@ -99,6 +121,7 @@ export interface VoxelServerPlayer {
     readonly identity: string | undefined;
     readonly character: VoxelCharacter;
     readonly spawned: boolean;
+    readonly connected: boolean;
 }
 
 export class WebSocketConnection {
@@ -106,12 +129,14 @@ export class WebSocketConnection {
     set onmessage(handler: (data: Uint8Array) => void);
     get onclose(): (code: number, reason: string) => void;
     set onclose(handler: (code: number, reason: string) => void);
+    onpong: (() => void) | undefined;
     bytesIn: number;
     bytesOut: number;
     constructor(socket: Duplex, client: boolean, options?: WebSocketOptions, head?: Buffer);
     get buffered(): number;
     get closed(): boolean;
     send(data: Uint8Array): void;
+    ping(): void;
     cork(): void;
     uncork(): void;
     close(code?: number, reason?: string): void;
@@ -129,6 +154,11 @@ export function connectWebSocket(url: string | URL, options?: ConnectWebSocketOp
 
 // Not exported from this entry, but used by the exports above:
 
+interface PlayerName {
+    id: number;
+    name: string;
+}
+
 type ServerMessage =
 {
     type: 'welcome';
@@ -142,6 +172,8 @@ type ServerMessage =
     playerDistance: number;
     blocks: number;
     flight: boolean;
+    resume: Uint8Array;
+    resent: number;
 }
  | {
     type: 'chunk';
@@ -175,5 +207,16 @@ type ServerMessage =
 }
  | {
     type: 'loaded';
+}
+ | {
+    type: 'names';
+    names: PlayerName[];
+}
+ | {
+    type: 'heartbeat';
+}
+ | {
+    type: 'app';
+    data: Uint8Array;
 };
 ```

@@ -2420,6 +2420,7 @@
       "STEP_SECONDS",
       "VoxelNetClient",
       "blockTableHash",
+      "cleanPlayerName",
       "connectVoxelNet",
       "decodeClientMessage",
       "decodeServerMessage",

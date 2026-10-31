@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### voxel-net resumes a dropped connection (protocol 4, unreleased)
+
+- **Breaking:** `PROTOCOL_VERSION` is 4. A server and its clients must be built from the same version; the server closes
+  another one with 1008 and a reason naming both.
+- A hello can ask for a player back and a welcome hands out a token. The server parks a dropped player for 30 s and takes
+  it back on the same connection state; `connectVoxelNet` and `VoxelBot` resume on their own, because every proxied socket
+  is cut at about 15 minutes.
+
 ### voxel-net app messages (protocol 3, unreleased)
 
 - **Breaking:** `PROTOCOL_VERSION` is 3. A server and its clients must be built from the same version; the server closes

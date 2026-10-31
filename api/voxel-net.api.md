@@ -16,6 +16,7 @@ export type ClientMessage =
     version: number;
     view: number;
     name: string;
+    resume?: ResumeHello;
 }
  | {
     type: 'input';
@@ -50,17 +51,31 @@ export const Keys: {
     readonly fly: 128;
 };
 
+export const MAX_APP_BYTES = 16384;
+
+export const MAX_NAME_BYTES = 32;
+
+export const MAX_STALE_CHUNKS = 64;
+
 export const PLAYER_SCHEMA: {
     readonly position: 'position';
     readonly rotation: 'rotation';
 };
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 4;
+
+export interface PlayerName {
+    id: number;
+    name: string;
+}
 
 export type PlayerState = EntityState<typeof PLAYER_SCHEMA>;
 
+export const RESUME_TOKEN_BYTES = 16;
+
 export interface RemotePlayer {
     readonly id: number;
+    name: string;
     readonly buffer: SnapshotBuffer;
     readonly snapshot: Snapshot;
     last?: {
@@ -68,6 +83,14 @@ export interface RemotePlayer {
         position: MutableVec3;
     };
 }
+
+export interface ResumeHello {
+    token: Uint8Array;
+    chunks: number;
+    stale: (readonly [cx: number, cy: number, cz: number])[];
+}
+
+export const SERVER_SILENT_CODE = 4408;
 
 export const STEP_SECONDS: number;
 
@@ -84,6 +107,8 @@ export type ServerMessage =
     playerDistance: number;
     blocks: number;
     flight: boolean;
+    resume: Uint8Array;
+    resent: number;
 }
  | {
     type: 'chunk';
@@ -117,6 +142,17 @@ export type ServerMessage =
 }
  | {
     type: 'loaded';
+}
+ | {
+    type: 'names';
+    names: PlayerName[];
+}
+ | {
+    type: 'heartbeat';
+}
+ | {
+    type: 'app';
+    data: Uint8Array;
 };
 
 export class VoxelNetClient {
@@ -132,7 +168,11 @@ export class VoxelNetClient {
     loaded: boolean;
     onSpawn: () => void;
     onLoaded: () => void;
+    onApp: (data: Uint8Array) => void;
     onBlocks: (changes: Int32Array) => void;
+    onClose: (event: VoxelNetClose) => void;
+    onResume: (event: VoxelNetResume) => void;
+    onResumed: (event: VoxelNetResumed) => void;
     onError: (error: unknown) => void;
     constructor(world: VoxelWorld, transport: VoxelNetTransport, options?: VoxelNetClientOptions);
     receive(bytes: Uint8Array): void;
@@ -140,6 +180,9 @@ export class VoxelNetClient {
     flush(): void;
     edit(x: number, y: number, z: number, state: number): boolean;
     samplePlayers(now?: number): ReadonlyMap<number, RemotePlayer>;
+    get detached(): boolean;
+    detach(): void;
+    attach(transport: VoxelNetTransport): void;
     close(): void;
 }
 
@@ -149,6 +192,11 @@ export interface VoxelNetClientOptions {
     decodeDistance?: number;
     players?: boolean;
     interpolationDelay?: number;
+    serverTimeout?: number;
+    resume?: false | {
+        attempts?: number;
+        signal?: AbortSignal;
+    };
     character?: VoxelCharacterOptions;
 }
 
@@ -157,6 +205,17 @@ export interface VoxelNetClientStats {
     sent: number;
     corrections: number;
     chunks: number;
+    drops: number;
+    resumeAttempts: number;
+    resumes: number;
+    resumeFailed: number;
+}
+
+export interface VoxelNetClose {
+    code: number;
+    reason: string;
+    byClient: boolean;
+    resumeFailed?: string;
 }
 
 export interface VoxelNetControls {
@@ -165,12 +224,25 @@ export interface VoxelNetControls {
     pitch: number;
 }
 
+export interface VoxelNetResume {
+    attempt: number;
+    cause: string;
+    delay: number;
+}
+
+export interface VoxelNetResumed {
+    gapMs: number;
+    chunksResent: number;
+}
+
 export interface VoxelNetTransport {
     send(data: Uint8Array): void;
     close(): void;
 }
 
 export function blockTableHash(blocks: BlockTypes): number;
+
+export function cleanPlayerName(name: unknown): string;
 
 export function connectVoxelNet(url: string | URL, world: VoxelWorld, options?: VoxelNetClientOptions): VoxelNetClient;
 
