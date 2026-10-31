@@ -6,6 +6,8 @@
 //   - A job with `exclusive` runs after every other job, with nothing beside it.
 //   - The first failure stops the run: running jobs are aborted (their trees killed by the caller's runner), jobs not
 //     started are reported `not-run`, and the failing job is named. Time limits are the runner's (runLimited).
+//   - Keep going (--keep-going or MARGO_CHECK_KEEP_GOING=1): a failure stops nothing beside it; only a job that needs the
+//     failed one (`after`) is `not-run`, and every failure is reported, so one run finds every bug it can reach.
 import { readFileSync } from 'node:fs';
 import { margoError } from '../../packages/shared/errors.js';
 
@@ -21,6 +23,10 @@ export function parallelMode({ argv = [], env = {}, profile = {} } = {}) {
   if (argv.includes('--serial') || env.MARGO_CHECK_SERIAL === '1' || profile.heat || profile.split) return false;
   return argv.includes('--parallel') || env.MARGO_CHECK_PARALLEL === '1' || PARALLEL_DEFAULT;
 }
+
+/** Whether a failed step or suite leaves the others running: `--keep-going` or MARGO_CHECK_KEEP_GOING=1. */
+export const keepGoingMode = ({ argv = [], env = {} } = {}) =>
+  argv.includes('--keep-going') || env.MARGO_CHECK_KEEP_GOING === '1';
 
 /** Shared jobs longest first (ties keep their order), then exclusive jobs in their order. */
 export function longestFirst(jobs) {
@@ -45,14 +51,19 @@ const seconds = (ms) => Math.round(ms / 100) / 10;
  * `slotWaitSeconds`. A job is `{ id, label, estimate?, resources?, after?: [id], exclusive? }`. `run(job, signal)`
  * resolves `{ ok, aborted? }` and must end the job's process tree when `signal` aborts. `take(mode, job)` resolves the
  * release of that job's own hold; it is given back before the job's resources. `limit` caps jobs running at once. A
- * plan that can never finish (an `after` cycle or an unknown id) throws PARALLEL_PLAN_STUCK.
+ * plan that can never finish (an `after` cycle or an unknown id) throws PARALLEL_PLAN_STUCK. With `keepGoing` a failure
+ * aborts nothing; a job whose `after` holds a job that did not pass is 'not-run', naming it, and the rest still run.
  */
-export function runJobs(jobs, { limit, run, take = async () => () => {}, now = Date.now, log = () => {} }) {
+export function runJobs(
+  jobs,
+  { limit, run, take = async () => () => {}, now = Date.now, log = () => {}, keepGoing = false },
+) {
   if (!(limit >= 1)) throw new RangeError(`runJobs: limit must be 1 or more, got ${limit}; use MARGO_GPU_SLOTS=3`);
   const pending = longestFirst(jobs),
     running = new Map(),
     busy = new Set(),
     passed = new Set(),
+    blocked = new Set(),
     results = new Map();
   let stoppedBy = null;
   return new Promise((resolve, reject) => {
@@ -107,7 +118,10 @@ export function runJobs(jobs, { limit, run, take = async () => () => {}, now = D
       for (const r of job.resources ?? []) busy.delete(r);
       results.set(job, { ...job, ...result, hold });
       if (result.ok) passed.add(job.id);
-      if (result.outcome === 'fail' && !stoppedBy) {
+      if (result.outcome === 'fail' && keepGoing) {
+        blocked.add(job.id);
+        log(`FAILED: ${job.label}; the rest go on`);
+      } else if (result.outcome === 'fail' && !stoppedBy) {
         stoppedBy = job;
         log(`STOPPING: ${job.label} failed; ending what runs beside it`);
         for (const c of running.values()) c.abort();
@@ -115,6 +129,18 @@ export function runJobs(jobs, { limit, run, take = async () => () => {}, now = D
       tick();
     };
     const tick = () => {
+      // A job that needs a failed one cannot run, and neither can what needs that job.
+      for (let moved = keepGoing; moved; ) {
+        moved = false;
+        for (const job of [...pending]) {
+          const needs = (job.after ?? []).find((id) => blocked.has(id));
+          if (!needs) continue;
+          pending.splice(pending.indexOf(job), 1);
+          blocked.add(job.id);
+          results.set(job, { ...job, outcome: 'not-run', ok: false, reason: `it needs ${needs}, which did not pass` });
+          moved = true;
+        }
+      }
       if (stoppedBy)
         for (const job of pending.splice(0))
           results.set(job, {

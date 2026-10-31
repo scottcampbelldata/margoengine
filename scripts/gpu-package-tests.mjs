@@ -35,7 +35,7 @@ import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
 import { exitOnHelp } from './support/help.mjs';
 import { acquire, lockDir, slots } from './gpu-lock.mjs';
-import { parallelMode, runJobs, tailOf } from './support/parallel-run.mjs';
+import { keepGoingMode, parallelMode, runJobs, tailOf } from './support/parallel-run.mjs';
 import { suiteResources } from './support/suite-resources.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { coolDown, thermalSource, watchHeat } from './support/heat.mjs';
@@ -653,8 +653,14 @@ export function suiteJobs(steps, resourcesOf, last = {}) {
 export const holdMinutes = (step) =>
   Math.ceil((2 * testLimitMs(step.minutes)) / 60_000) + (PREPARE[step.name] ? 25 : 5);
 
-/** The suites side by side: each in its own slot of the GPU lock with its own log; the first failure stops the run. */
-export async function runSideBySide(steps, { env, phase, logs = join(root, 'test-results/gpu-suites') }) {
+/**
+ * The suites side by side: each in its own slot of the GPU lock with its own log. The first failure stops the run, unless
+ * `keepGoing`: then every suite runs and every failure is reported.
+ */
+export async function runSideBySide(
+  steps,
+  { env, phase, keepGoing = false, logs = join(root, 'test-results/gpu-suites') },
+) {
   const record = join(root, 'test-results/gpu-packages.json'),
     scripts = json('package.json').scripts,
     last = existsSync(record)
@@ -675,6 +681,7 @@ export async function runSideBySide(steps, { env, phase, logs = join(root, 'test
   const jobs = suiteJobs(steps, resources, last);
   const done = await runJobs(jobs, {
     limit: slots(),
+    keepGoing,
     log: (line) => console.error(line),
     take: (mode, step) =>
       acquire({
@@ -728,6 +735,7 @@ Options:
   --list                     print the plan and the machine profile, run nothing
   --parallel                 run suites side by side, each in its own GPU slot (or MARGO_CHECK_PARALLEL=1)
   --serial                   one suite at a time, whatever else is set (or MARGO_CHECK_SERIAL=1)
+  --keep-going               a failed suite stops nothing; the run ends with every failure and exit 1 (or MARGO_CHECK_KEEP_GOING=1)
   --phase=shared|timing      only the shared suites, or only the timing suites added to the shared phase's results (check:merge)
   -h, --help                 print this help and exit
 
@@ -747,7 +755,8 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     steps = lockOrder(planSteps(tests, profile)).filter(
       (s) => !phase || (phase === 'timing' ? s.exclusive : !s.exclusive),
     ),
-    sideBySide = parallelMode({ argv: process.argv, env: process.env, profile });
+    sideBySide = parallelMode({ argv: process.argv, env: process.env, profile }),
+    keepGoing = keepGoingMode({ argv: process.argv, env: process.env });
   if (phase && phase !== 'shared' && phase !== 'timing')
     throw new RangeError(`--phase must be shared or timing, got ${phase}`);
   if (process.argv.includes('--list')) {
@@ -779,10 +788,11 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     throw new Error('npm run build:packages failed; fix the build first');
   const started = performance.now(),
     prepared = new Set(),
+    prepareFailed = new Set(),
     thermal = profile.heat ? thermalSource() : null;
   if (thermal) console.log(`temperature from the ${thermal.name}`);
   const results = sideBySide
-    ? await runSideBySide(steps, { env, phase })
+    ? await runSideBySide(steps, { env, phase, keepGoing })
     : await runPlan(steps, {
         profile,
         read: thermal?.read,
@@ -801,7 +811,13 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
           // Each preparing command once, however many suites need it.
           for (const command of PREPARE[step.name] ?? []) {
             if (prepared.has(command)) continue;
-            if (!run(command, '.').ok) throw new Error(`${command} failed (needed by ${step.label}); fix it first`);
+            if (prepareFailed.has(command) || !run(command, '.').ok) {
+              if (!keepGoing) throw new Error(`${command} failed (needed by ${step.label}); fix it first`);
+              // Once only: every other suite that needs it fails the same way, and the rest go on.
+              prepareFailed.add(command);
+              console.error(`${command} failed (needed by ${step.label}); that suite counts as failed`);
+              return { ok: false, seconds: 0 };
+            }
             prepared.add(command);
           }
           console.log(`\n=== ${step.label}`);
