@@ -91,6 +91,7 @@ unless stated.
 | server → client | `names` | count, then (player id, name length, UTF-8 bytes, at most 32) for each named player coming into range, just before its first `players` state |
 | server → client | `loaded` | marks the first time the whole view has been sent (used to measure join time) |
 | server → client | `heartbeat` | empty; sent only to a client that got no other message for `heartbeatInterval` |
+| server → client | `app` | the game's own bytes, 0 to 16,384 (`MAX_APP_BYTES`), from `VoxelServer.send` or `broadcast`; the package never reads them. Kind byte 25. A client may not send one |
 
 The connection is TCP, so every message arrives, in order. That lets `EntityCodec` use "the last state I sent you" as
 its baseline with no acknowledgements.

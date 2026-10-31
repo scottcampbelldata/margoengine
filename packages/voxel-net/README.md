@@ -134,8 +134,51 @@ await server.importEdits(deserialize(await readFile('world.snapshot')));
 await server.close();
 ```
 
-Breaking change (2026-10-31): `PROTOCOL_VERSION` is 2. Server and clients must be built from the same version; a client
-on another one is closed with 1008 and a reason naming both, which `connectVoxelNet` now passes to `onError`.
+Breaking change (2026-10-31): `PROTOCOL_VERSION` is 3 (2 added names, 3 adds app messages). Server and clients must be
+built from the same version; a client on another one is closed with 1008 and a reason naming both, which
+`connectVoxelNet` passes to `onError`.
+
+## App messages
+
+Your game can send its own bytes along the connection, one player or all, without a second socket. The package never
+reads them: the format is yours, and they arrive in order with the chunks, edits and players.
+
+| Method or constant | What it does |
+| --- | --- |
+| `server.send(player, data)` | Queues `data` (a `Uint8Array`) for one player of `server.players`, sent with the next tick's other messages. Works from the player's welcome on, before it has spawned too. Returns `true` when queued and `false` when the player has already left (a connection can drop between your lookup and the call, so this is not an error). Throws `TypeError` for a `player` that is not one or `data` that is not a `Uint8Array`, and `RangeError` over `MAX_APP_BYTES`. |
+| `server.broadcast(data)` | The same for every player that has joined; returns how many it was queued for. |
+| `client.onApp` | `(data) => void`, called with a copy of each payload. A throw goes to `onError` and closes the connection, like any handler. Default does nothing. |
+| `MAX_APP_BYTES` | 16,384: the largest payload, on the wire and in `send`. A frame over it is refused by the decoder. |
+
+A client cannot send one: the server closes a connection that tries with 1002. `server.metrics.bytesOut.app` and
+`client.stats.received.app` count the bytes. The server has no event for "a player spawned"; read `player.spawned` on
+your own tick, as below.
+
+```ts
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { connectVoxelNet } from 'margoengine/voxel-net';
+import { VoxelServer } from 'margoengine/voxel-net/server';
+
+const blocks = new BlockTypes();
+for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+
+// Server: greet each player once it has spawned, and tell everyone how many are here.
+const server = new VoxelServer({ blocks });
+await server.listen(8787, '0.0.0.0');
+const greeted = new Set<number>();
+setInterval(() => {
+  for (const player of server.players)
+    if (player.spawned && !greeted.has(player.id)) {
+      greeted.add(player.id);
+      server.send(player, new TextEncoder().encode(`Welcome, player ${player.id}`));
+      server.broadcast(Uint8Array.of(server.players.length));
+    }
+}, 50);
+
+// Client: the first message is text, the others are the count.
+const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }));
+client.onApp = (data) => console.log(data.length > 1 ? new TextDecoder().decode(data) : `${data[0]} players`);
+```
 
 ## A dead network
 

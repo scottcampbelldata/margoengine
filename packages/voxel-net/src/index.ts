@@ -18,6 +18,7 @@ export {
   encodeClientMessage,
   encodeServerMessage,
   Keys,
+  MAX_APP_BYTES,
   MAX_NAME_BYTES,
   moveIntent,
   PLAYER_SCHEMA,

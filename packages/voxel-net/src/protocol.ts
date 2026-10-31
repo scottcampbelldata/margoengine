@@ -8,7 +8,10 @@ import type { VoxelMoveIntent } from '@margoengine/voxel/query';
 import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
 
 /** Version of this wire format; a server closes connections that say another. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
+
+/** Most bytes of an `app` message's payload, on the wire and for `VoxelServer.send` and `broadcast`. */
+export const MAX_APP_BYTES = 16384;
 
 /** Most UTF-8 bytes of a player's display name, on the wire and after {@link cleanPlayerName}. */
 export const MAX_NAME_BYTES = 32;
@@ -105,7 +108,12 @@ export type ServerMessage =
    * Nothing else went to this client for `heartbeatInterval`: the server still lives. Browsers cannot see WebSocket
    * pings, so this is what `connectVoxelNet` watches when no other message is due, as for a lone idle player.
    */
-  | { type: 'heartbeat' };
+  | { type: 'heartbeat' }
+  /**
+   * Bytes the game running on the server sent with `VoxelServer.send` or `broadcast`, at most {@link MAX_APP_BYTES}; the
+   * package never looks inside them. Delivered in order with the other messages, to `VoxelNetClient.onApp`.
+   */
+  | { type: 'app'; data: Uint8Array };
 
 const HELLO = 1,
   INPUT = 2,
@@ -119,6 +127,7 @@ const HELLO = 1,
   LOADED = 22,
   NAMES = 23,
   HEARTBEAT = 24,
+  APP = 25,
   MAX_RUNS = 1024,
   MAX_NAMES = 65535, // VoxelServer's largest maxPlayers
   encoder = new TextEncoder(),
@@ -372,6 +381,14 @@ export function encodeServerMessage(message: ServerMessage): Uint8Array {
     case 'heartbeat':
       w.u8(HEARTBEAT);
       break;
+    case 'app': {
+      const data = bytesOf('app data', message.data);
+      if (data.length > MAX_APP_BYTES)
+        throw new RangeError(`App data is ${data.length} bytes; send at most ${MAX_APP_BYTES} per message`);
+      w.u8(APP);
+      w.raw(data);
+      break;
+    }
     case 'names': {
       const names = message.names;
       if (!Array.isArray(names)) throw new TypeError('names must be an array of PlayerName');
@@ -442,7 +459,11 @@ export function decodeServerMessage(bytes: Uint8Array): ServerMessage {
   else if (type === PLAYERS) message = { type: 'players', tick: r.varint(), data: r.rest() };
   else if (type === LOADED) message = { type: 'loaded' };
   else if (type === HEARTBEAT) message = { type: 'heartbeat' };
-  else if (type === NAMES) {
+  else if (type === APP) {
+    const data = new Uint8Array(r.rest()); // a plain copy: a Node Buffer's slice would share the socket's memory
+    if (data.length > MAX_APP_BYTES) throw r.fail(`has ${data.length} bytes of app data, over ${MAX_APP_BYTES}`);
+    message = { type: 'app', data };
+  } else if (type === NAMES) {
     const n = r.varint();
     if (!n || n > MAX_NAMES) throw r.fail(`has ${n} names`);
     const names: PlayerName[] = [];

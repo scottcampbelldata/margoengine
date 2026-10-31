@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### voxel-net app messages (protocol 3, unreleased)
+
+- **Breaking:** `PROTOCOL_VERSION` is 3. A server and its clients must be built from the same version; the server closes
+  another one with 1008 and a reason naming both.
+- `VoxelServer.send(player, data)` and `broadcast(data)` carry a game's own bytes (at most `MAX_APP_BYTES`, 16,384) to
+  one player or all as a new `app` message (kind byte 25), and `client.onApp(data)` receives them. The package never
+  reads the payload. `send` returns `false` for a player who has left; hostile arguments throw `TypeError` or
+  `RangeError`. `metrics.bytesOut.app` and `stats.received.app` count them. A client cannot send one.
+
 ### voxel-net notices a dead network, both ways (protocol 2, unreleased)
 
 - `connectVoxelNet` gives up on a server that sent nothing for the new `serverTimeout` (default 15,000 ms; 0 never does):

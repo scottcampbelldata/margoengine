@@ -983,6 +983,12 @@
     },
     {
       "date": "2026-10-31",
+      "commit": "677d2b8b8",
+      "reason": "voxel-net server: a joining player's ground is generated and sent first, 15 B",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
       "commit": "175c6ec2d",
       "reason": "new package @margoengine/tilemap (row 25 J3a): types and small helpers, 1.4 kB",
       "grew": 1
@@ -1055,8 +1061,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "677d2b8b8",
-      "reason": "voxel-net server: a joining player's ground is generated and sent first, 15 B",
+      "commit": "2c977c21d",
+      "reason": "voxel-net app messages (protocol 3): the generic app message, VoxelServer.send and broadcast, client.onApp and MAX_APP_BYTES; gzip client +120 B, server +179 B, bot +81 B",
       "grew": 1
     }
   ],

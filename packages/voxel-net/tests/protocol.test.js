@@ -99,7 +99,7 @@ test('names round-trip, and hostile names messages throw', () => {
     bytes = encodeServerMessage({ type: 'names', names });
   assert.deepEqual(decodeServerMessage(bytes), { type: 'names', names });
   assert.equal(bytes[0], 23);
-  assert.equal(PROTOCOL_VERSION, 2);
+  assert.equal(PROTOCOL_VERSION, 3);
   assert.equal(MAX_NAME_BYTES, 32);
   // No entries, more entries than it carries, a name over 32 bytes, past the end, not UTF-8, trailing bytes.
   for (const hostile of [

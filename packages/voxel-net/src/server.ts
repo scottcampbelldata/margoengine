@@ -279,6 +279,7 @@ const NAMES: Record<number, ServerMessage['type']> = {
     22: 'loaded',
     23: 'names',
     24: 'heartbeat',
+    25: 'app',
   },
   BANK = 60, // movement steps a client may save up: 0.5 s
   DRIFT = 1 / 64, // blocks of disagreement before a correction
@@ -666,6 +667,40 @@ export class VoxelServer {
     return [...this.#clients].filter((c) => c.phase !== 'hello' && c.phase !== 'auth');
   }
   /**
+   * Sends `data` to one player as an `app` message, delivered to its `VoxelNetClient.onApp` with the next tick's other
+   * messages, in the order sent. Works from the player's welcome on, before it has spawned too; the bytes are copied.
+   * @param player A player from {@link VoxelServer.players}.
+   * @param data At most `MAX_APP_BYTES` (16,384) bytes; the package never reads them.
+   * @returns Whether the message was queued: false when the player has left (or this server never had it), which
+   * happens in every game when a connection drops between a lookup and the send, so it is not an error.
+   * @throws TypeError when `player` is not a player or `data` is not a Uint8Array.
+   * @throws RangeError when `data` is over `MAX_APP_BYTES`.
+   */
+  send(player: VoxelServerPlayer, data: Uint8Array): boolean {
+    if (!player || typeof player !== 'object' || typeof (player as { id?: unknown }).id !== 'number')
+      throw new TypeError('VoxelServer.send needs a player from server.players; pass one');
+    const message = encodeServerMessage({ type: 'app', data });
+    return this.#queueApp(player as unknown as Client, message);
+  }
+  /**
+   * Sends `data` to every player that has joined, as {@link VoxelServer.send} does.
+   * @returns How many players it was queued for.
+   * @throws TypeError when `data` is not a Uint8Array.
+   * @throws RangeError when `data` is over `MAX_APP_BYTES`.
+   */
+  broadcast(data: Uint8Array): number {
+    const message = encodeServerMessage({ type: 'app', data });
+    let n = 0;
+    for (const c of this.#clients) if (this.#queueApp(c, message)) n++;
+    return n;
+  }
+  #queueApp(c: Client, message: Uint8Array): boolean {
+    // Only a client the server holds, past its hello: before the welcome there is nothing to deliver to.
+    if (!this.#clients.has(c) || c.phase === 'hello' || c.phase === 'auth' || c.phase === 'gone') return false;
+    c.out.push(message);
+    return true;
+  }
+  /**
    * Sizes for monitoring: players, connections not yet joined (`pending`) and the addresses they come from, chunks in
    * the world, cached chunk messages and their bytes, edited chunks in memory and on their way to the store, jobs.
    */
@@ -845,7 +880,18 @@ export class VoxelServer {
       tickTimes: [],
       tickStarts: [],
       skipped: 0,
-      bytesOut: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0, names: 0, heartbeat: 0 },
+      bytesOut: {
+        welcome: 0,
+        chunk: 0,
+        unload: 0,
+        state: 0,
+        blocks: 0,
+        players: 0,
+        loaded: 0,
+        names: 0,
+        heartbeat: 0,
+        app: 0,
+      },
       bytesIn: 0,
       corrections: 0,
       editsAccepted: 0,

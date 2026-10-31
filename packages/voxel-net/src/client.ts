@@ -155,7 +155,18 @@ export class VoxelNetClient {
   readonly players = new Map<number, RemotePlayer>();
   /** Counters for tests and benchmarks. */
   readonly stats: VoxelNetClientStats = {
-    received: { welcome: 0, chunk: 0, unload: 0, state: 0, blocks: 0, players: 0, loaded: 0, names: 0, heartbeat: 0 },
+    received: {
+      welcome: 0,
+      chunk: 0,
+      unload: 0,
+      state: 0,
+      blocks: 0,
+      players: 0,
+      loaded: 0,
+      names: 0,
+      heartbeat: 0,
+      app: 0,
+    },
     sent: 0,
     corrections: 0,
     chunks: 0,
@@ -170,6 +181,12 @@ export class VoxelNetClient {
   onSpawn: () => void = () => {};
   /** Called once the whole view has arrived. */
   onLoaded: () => void = () => {};
+  /**
+   * Called with the payload of each `app` message the server's game sends with `VoxelServer.send` or `broadcast`, in
+   * order with the other messages. The bytes are yours to keep. A throw goes to {@link VoxelNetClient.onError} and
+   * closes the connection, as for any handler. Default does nothing.
+   */
+  onApp: (data: Uint8Array) => void = () => {};
   /** Called with each block change list the server sends, flat `[x, y, z, state, ...]`, before it is applied. */
   onBlocks: (changes: Int32Array) => void = () => {};
   /**
@@ -371,6 +388,9 @@ export class VoxelNetClient {
           }
         break;
       case 'heartbeat': // arriving was its whole job
+        break;
+      case 'app':
+        this.onApp(m.data);
         break;
     }
   }
