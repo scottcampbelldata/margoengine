@@ -15,7 +15,8 @@
 //     and speckle; a smooth ramp has none) stays under EDGE_NOISE (RMS).
 // Visibility per pixel is (soft - dark) / (open - dark) in linear light from four renders of the same frame.
 // Run from the repository root after `npm run build:packages`: node packages/shadows/test/lit-faces-browser.mjs
-// Writes test-results/shadows-lit-faces.json and test-results/shadows-lit-faces-*.png.
+// Writes test-results/<name>.json and test-results/<name>-*.png, <name> being shadows-lit-faces.
+// --page=virtual runs the same scene and thresholds on VirtualShadows (virtual-lit-faces.html, name virtual-lit-faces).
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -33,8 +34,13 @@ const LIT_MARGIN = 16,
 
 // The dev server serves the repository root, whichever folder the script starts in.
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-lit-faces' });
-const context = await openBrowser({ startPath: '/packages/shadows/test/lit-faces.html', port: 5267 }),
+const virtual = process.argv.includes('--page=virtual'),
+  name = virtual ? 'virtual-lit-faces' : 'shadows-lit-faces';
+const release = await acquire({ owner: name });
+const context = await openBrowser({
+    startPath: `/packages/shadows/test/${virtual ? 'virtual-' : ''}lit-faces.html`,
+    port: virtual ? 5273 : 5267,
+  }),
   { page } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -52,7 +58,7 @@ const luma = (img) => {
 };
 const shot = async (state, options) => {
   assert.deepEqual(await page.evaluate(([s, o]) => window.check.show(s, o), [state, options]), [], state);
-  return decodePNG(await page.locator('canvas').screenshot({ path: `test-results/shadows-lit-faces-${state}.png` }));
+  return decodePNG(await page.locator('canvas').screenshot({ path: `test-results/${name}-${state}.png` }));
 };
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -208,12 +214,12 @@ try {
     pageErrors,
   };
   console.log(JSON.stringify(result));
-  await writeFile('test-results/shadows-lit-faces.json', JSON.stringify(result, null, 2));
+  await writeFile(`test-results/${name}.json`, JSON.stringify(result, null, 2));
   // The soft frame with failing pixels marked: magenta lit pixels that lost light, green shade that kept light, cyan
   // sphere-umbra pixels left lit.
   await sharp(marks, { raw: { width: W, height: H, channels: 4 } })
     .png()
-    .toFile('test-results/shadows-lit-faces-marks.png');
+    .toFile(`test-results/${name}-marks.png`);
   assert.deepEqual(pageErrors, []);
   assert.ok(
     litPixels > 20000 && shadePixels > 2000 && umbraPixels > 500 && bandPixels > 500,
@@ -227,7 +233,7 @@ try {
   assert.equal(leaked, 0, `${leaked} pixels deep in a reference shadow kept over ${SHADE_MAX} of their sunlight`);
   assert.equal(umbraLit, 0, `${umbraLit} pixels inside the sphere's umbra were lit`);
   assert.ok(result.edgeNoise < EDGE_NOISE, `the sphere's shadow edge is speckled: RMS ${result.edgeNoise}`);
-  console.log('shadows lit faces: ok');
+  console.log(`${name}: ok`);
 } finally {
   await context.close?.();
   await release?.();

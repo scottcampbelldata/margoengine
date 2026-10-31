@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4091034,
+  "total": 4092117,
   "history": [
     {
       "date": "2026-10-24",
@@ -976,6 +976,12 @@
       "grew": 1
     },
     {
+      "date": "2026-10-31",
+      "commit": "5cf19c001",
+      "reason": "@margoengine/shadows/virtual stage 4: static page cache and moving casters",
+      "grew": 1
+    },
+    {
       "date": "2026-10-30",
       "commit": "beff7850",
       "reason": "shadows: the WebGL2 layer route for the PCSS nearest-depth reduction, which ran on the layer CPU tier at about 0.5 s a frame",
@@ -1133,8 +1139,8 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "5cf19c001",
-      "reason": "@margoengine/shadows/virtual stage 4: static page cache and moving casters",
+      "commit": "491f39e09",
+      "reason": "@margoengine/shadows/virtual stage 5: pcf and soft filters, per-tap table reads, per-page nearest hint. About 9 kB of its own, as budgeted, plus about 5 kB of shared caster helpers the 9 kB budget did not count; a Shadows user already loads that chunk",
       "grew": 1
     }
   ],
@@ -1420,7 +1426,7 @@
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
     "@margoengine/shadows": 15340,
-    "@margoengine/shadows/virtual": 13518,
+    "@margoengine/shadows/virtual": 14601,
     "@margoengine/sky": 16485,
     "@margoengine/sky/base": 7066,
     "@margoengine/sky/bruneton": 2557,

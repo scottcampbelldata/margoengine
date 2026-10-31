@@ -107,3 +107,26 @@ While a core mesh opts out, core's shader patch keeps that mesh's direct light w
 Static geometry renders into a cached depth array. Each frame copies that array and adds dynamic casters, so dynamic geometry cannot overwrite the cache. Cache invalidation occurs when snapped cascade matrices, clipmap origins, source membership, disposal or device change. Call `invalidate()` after moving/hiding a static mesh, editing its geometry/material, or changing a height texture. Moving the camera far enough to move a cascade rerenders static geometry. Eight or more plain core-mesh casters that share one geometry (no alpha mask, no displacement, no section planes) are drawn as one instanced draw per cascade, with their world matrices uploaded once per frame: 1,000 boxes cost 0.9 ms of CPU per frame instead of 7.2 ms (`npm run bench -- render --cases=shadows`, RTX A6000, smoke). Other casters keep one draw each. `stats` reports static/dynamic primitive draws (each caster in each cascade, batched or not) and cache hits; custom sources record their own draws.
 
 At resolution 2048, the two four-layer maps occupy 128 MiB (width × height × layers × 4 bytes each). Choose smaller maps for constrained devices. All resources are released by `dispose()`/`destroy()` and recreated after device restoration. `cascadeSplits()` and `fitCascades()` are exported for custom cameras. The package has no core/stage imports from other feature packages and does not enter their base bundle.
+
+## Virtual shadow maps
+
+`margoengine/shadows/virtual` is a second, optional entry for one directional light: `VirtualShadows` keeps the texel density a camera needs at every distance, in small pages of depth, and renders only the pages that are seen and have changed. Importing it costs `Shadows` users nothing; the root entry does not reach it.
+
+```ts
+import {VirtualShadows} from 'margoengine/shadows/virtual';
+const city = engine.createMesh().setGeometry(box()).setScale([100,1,100]);
+const walker = engine.createMesh().setGeometry(box()).setPosition([0,2,0]);
+const pages = VirtualShadows.attach(engine, {distance:500, filter:'soft'});
+pages.add(city, {castShadow:false}); // receives, casts nothing
+pages.add(walker);
+engine.start();
+// pages.stats.residentPages and pages.stats.pagesRendered show the page work of the last frame.
+```
+
+Options and defaults: `poolSize` 4096 (texels a side of the page pool, 32 x 32 pages of 128 texels; a multiple of 256, 2048 for phones), `levels` 8 (each level's pages are twice the size of the one before), `distance` 500, `budgetPages` the pool's page count, `lightSize` 0.02, `bias` 0.002 and `normalBias` 0.02 (both world units, unlike the root's `bias`), `casterMargin` 100 (world units towards the light for off-screen casters), `filter` `'soft'`. `filter` takes the same three edges as `Shadows`; each `'pcf'` and `'soft'` tap reads the page table for its own position, so an edge crossing a page edge reads the neighbouring page. The `'soft'` search and penumbra stop at one page.
+
+A frame draws the camera's view at half size per axis to find the pages it needs, one frame late; a page not yet resident reads the next coarser level, so a new view starts softer and sharpens, with no holes. Once the view settles a still scene renders no pages. A caster that moves redraws the resident pages its bounds reach; a caster whose bounds the effect cannot know (a node that is not a core mesh, a dynamic, instanced or displaced primitive) redraws every resident page every frame. `invalidate()` redraws them all; so does a change of light direction.
+
+Sources with their own `drawShadow` (terrain, scatter, voxels, VAT, culling) cannot cast here: their uniforms are per cascade, and a page needs its own matrix. `add` throws a `TypeError` naming the fix: add them with `{castShadow:false}` to receive, or use `Shadows`, which they cast into.
+
+Memory at the default pool size is 134,218,752 B (two 64 MiB pools and an 8 KiB page table; `memoryBytes` reports it). WebGPU only, directional light only.

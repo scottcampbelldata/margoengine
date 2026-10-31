@@ -22,7 +22,7 @@ import { invert } from '../../shared/math.js';
 import { casterPipeline, casterRuntime, displacementGroup, drawCaster, staleCaster } from '../../shared/caster.js';
 import { PAGES_PER_SIDE, PAGE_TEXELS, PagePool, basePageSize, pageIndex, pageMatrix, pageSize } from './pages.js';
 import { shadowDepth, type ShadowFilter } from './shader.js';
-import { pageClear, pageCopy, pageFeedback, virtualSampling } from './virtual-shader.js';
+import { pageClear, pageCopy, pageFeedback, pageNearest, virtualSampling } from './virtual-shader.js';
 import type { ShadowPrimitive, ShadowSource } from './index.js';
 export type { ShadowFilter } from './shader.js';
 declare const GPUBufferUsage: {
@@ -146,6 +146,11 @@ export class VirtualShadows implements EnginePlugin {
   private copyGroup?: GPUBindGroup;
   private cachedView?: GPUTextureView;
   private uploaded = new Uint32Array(0);
+  private nearestBuffer?: GPUBuffer;
+  private nearestPipeline?: GPUComputePipeline;
+  private nearestGroup?: GPUBindGroup;
+  private nearestStale = true;
+  private readonly nearestSeed = new Uint32Array(16).fill(0x3f800000);
   private clipped = false;
   /** Casters of the previous frame, to find the ones that stopped casting. */
   private previous: Draw[] = [];
@@ -404,7 +409,11 @@ export class VirtualShadows implements EnginePlugin {
       poolPages: size / PAGE_TEXELS,
       budgetPages: o.budgetPages,
     });
-    this.uniform = device.createBuffer({ size: 464, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.nearestBuffer = device.createBuffer({
+      size: 64,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+    this.uniform = device.createBuffer({ size: 528, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sampler = device.createSampler({ compare: 'less-equal', magFilter: 'linear', minFilter: 'linear' });
     this.alphaSampler = device.createSampler();
     // One white texel stands in for the alpha map of casters without one.
@@ -930,6 +939,7 @@ export class VirtualShadows implements EnginePlugin {
     let same = true;
     for (let i = 0; same && i < this.table.length; i++) same = this.table[i] === this.uploaded[i];
     if (!same) {
+      this.nearestStale = true;
       this.uploaded.set(this.table);
       c.device.queue.writeTexture(
         { texture: this.tableTexture! },
@@ -945,6 +955,31 @@ export class VirtualShadows implements EnginePlugin {
     this.feedback(c);
     this.stats.casterDraws = 0;
     this.drawPages(c, origin, range);
+    if ((o.filter ?? 'soft') === 'soft' && this.nearestStale) this.nearest(c);
+  }
+  /** Reduces each level's mapped pages to the level's nearest depth for the PCSS search, when pages changed. */
+  private nearest(c: VirtualPassContext): void {
+    const device = c.device;
+    this.nearestPipeline ??= device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: device.createShaderModule({ code: pageNearest }), entryPoint: 'main' },
+    });
+    this.nearestGroup ??= device.createBindGroup({
+      layout: this.nearestPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.entries[1].resource },
+        { binding: 1, resource: this.entries[3].resource },
+        { binding: 2, resource: { buffer: this.nearestBuffer! } },
+      ],
+    });
+    device.queue.writeBuffer(this.nearestBuffer!, 0, this.nearestSeed);
+    const pass = c.encoder.beginComputePass();
+    pass.setPipeline(this.nearestPipeline);
+    pass.setBindGroup(0, this.nearestGroup);
+    pass.dispatchWorkgroups(PAGES_PER_SIDE, PAGES_PER_SIDE, this.pages!.levels);
+    pass.end();
+    c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 464, 64);
+    this.nearestStale = false;
   }
   /**
    * The frame's page work, two render passes at most. Stale pages clear and draw their still casters into the still pool.
@@ -999,6 +1034,7 @@ export class VirtualShadows implements EnginePlugin {
       pass = undefined;
       for (let slot = 0; slot < capacity; slot++) {
         if (!(stale[slot] || touched[slot] || before[slot]) || !pages.isUsed(slot)) continue;
+        this.nearestStale = true;
         pass ??= c.encoder.beginRenderPass(depth(this.entries[1].resource as GPUTextureView));
         this.pageTarget(pass, slot, origin, range);
         pass.setPipeline(this.copyPipeline);
@@ -1055,6 +1091,9 @@ export class VirtualShadows implements EnginePlugin {
     for (const texture of [this.pool, this.cached, this.tableTexture, this.white]) texture?.destroy();
     this.uniform?.destroy();
     this.requestBuffer?.destroy();
+    this.nearestBuffer?.destroy();
+    this.nearestBuffer = this.nearestPipeline = this.nearestGroup = undefined;
+    this.nearestStale = true;
     this.feedbackDepth?.destroy();
     for (const slot of this.ring) slot.buffer.destroy();
     this.ring = [];

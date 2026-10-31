@@ -11,13 +11,13 @@ export const PAGES_PER_SIDE = 16;
 /** Texels per side of one physical page. */
 export const PAGE_TEXELS = 128;
 /** Texels each page repeats of its neighbour on every side, so a bilinear comparison stays seamless across pages. */
-export const PAGE_GUARD = 1;
+const PAGE_GUARD = 1;
 /** Texels per side of a page's own light-space square. */
 export const PAGE_INTERIOR = PAGE_TEXELS - 2 * PAGE_GUARD;
 /** Bit of a table entry: the entry names a resident page. */
 export const ENTRY_VALID = 0x10000;
 /** Bit of a table entry: the page holds static casters only (no moving caster reaches it). */
-export const ENTRY_CACHED = 0x20000;
+const ENTRY_CACHED = 0x20000;
 
 /**
  * World size of one page at level 0: the coarsest window reaches at least `distance` from the camera in every
@@ -39,7 +39,7 @@ export const inWindow = (i: number, center: number): boolean =>
   i >= center - PAGES_PER_SIDE / 2 && i < center + PAGES_PER_SIDE / 2;
 
 /** Options of a {@link PagePool}. */
-export interface PagePoolOptions {
+interface PagePoolOptions {
   /** Clipmap levels. */
   levels: number;
   /** World size of a level 0 page. */

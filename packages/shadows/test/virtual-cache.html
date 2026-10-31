@@ -1,6 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Virtual shadows: page cache</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas width="1280" height="720"></canvas>
 <script type="module">
-// A box on a plane and a second box that moves. window.check drives frames one at a time and reports what each drew, so the
+// A box on a plane and a second box that moves, with the 'soft' filter: its search reads each level's nearest depth, so a
+// stale hint would show in the comparison with a fresh effect. window.check drives frames one at a time and reports what each drew, so the
 // browser test can compare page counts with the set the caster's bounds predict.
 import {Engine,box} from '/packages/core/dist/index.js';
 import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
@@ -20,7 +21,7 @@ const out=(extra)=>({errors:errors.splice(0),stats:{...shadows.stats},...extra})
 // A caster the effect cannot bound: the mover's geometry drawn as a dynamic primitive.
 const dynamicSource=()=>{const b=engine.geometryBuffers(mover.geometry);return {shadowPrimitives:[{node:mover,vertex:b.vertex,index:b.index,count:mover.geometry.indices.length,stride:24,dynamic:true}]};};
 window.check={
-  async start(at=[-2,0.6,1],dynamic=false){shadows?.dispose();mover.setPosition(at);shadows=VirtualShadows.attach(engine,{filter:'hard'});shadows.add(still);shadows.add(floor,{castShadow:false});if(dynamic)shadows.add(dynamicSource());else shadows.add(mover);return out({frames:await frame(6)});},
+  async start(at=[-2,0.6,1],dynamic=false){shadows?.dispose();mover.setPosition(at);shadows=VirtualShadows.attach(engine,{filter:'soft'});shadows.add(still);shadows.add(floor,{castShadow:false});if(dynamic)shadows.add(dynamicSource());else shadows.add(mover);return out({frames:await frame(6)});},
   async idle(n){return out({frames:await frame(n)});},
   async move(to){const before=circle(mover);mover.setPosition(to);const seen=await frame(1);return out({frames:seen,predicted:predicted([before,circle(mover)])});},
   async invalidate(){const resident=shadows.pages.resident;shadows.invalidate();return out({frames:await frame(1),resident});},

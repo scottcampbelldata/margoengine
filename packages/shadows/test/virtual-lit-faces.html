@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Virtual shadows: lit faces stay lit</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas width="1280" height="720"></canvas>
+<script type="module">
+// The animation guide's scene (docs/guides/animation.md): RobotExpressive, a skinned low-poly model, walking (paused),
+// on a sun-facing floor, plus a sphere whose shadow edge has a closed form. Default Shadows settings but the map size.
+// lit-faces-browser.mjs --page=virtual reads the canvas in four states (window.check.show) and compares them: the page
+// of lit-faces.html with VirtualShadows at default settings under test in the 'soft' state.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Animation} from '/packages/animation/dist/index.js';
+import {sphereGeometry} from '/packages/geometry/dist/index.js';
+import {PbrMaterial,createMesh} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,2,6],target:[0,1.2,0]}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const robot=await loadGLTF(engine,'/examples/assets/robot-expressive.glb');
+const b=robot.bounds;engine.camera.fitToBoundingBox([b[0],b[1],b[2]],[b[3],b[4],b[5]]);
+const floor=engine.createMesh().setGeometry(box(8,0.1,8)).setPosition([0,-0.05,0]);
+const SPHERE={center:[2.4,1,1.6],radius:0.45};
+const ball=createMesh(engine,sphereGeometry(SPHERE.radius,48,24),new PbrMaterial({color:'#c05050',roughness:0.8}));
+ball.root.setPosition(SPHERE.center);
+const animation=Animation.attach(robot);animation.play('Walking');animation.playing=false;animation.seek(0.4);
+const radiance=Float32Array.from(engine.lighting.radiance);
+let shadows;
+const render=async(n=3)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const attach=(options)=>{shadows?.dispose();shadows=undefined;if(!options)return;shadows=options.virtual?VirtualShadows.attach(engine,options.virtual):Shadows.attach(engine,options);shadows.add(robot);shadows.add(ball);shadows.add(floor,{castShadow:false});};
+// The direction towards the sun, normalised (core's default light).
+const d=engine.lighting.direction,l=Math.hypot(d[0],d[1],d[2]),sun=[d[0]/l,d[1]/l,d[2]/l];
+window.check={
+  // 'soft': the default filter. 'reference': one tight 4096 map over the scene, filter 'hard' (texels 30x finer than
+  // the default first cascade's), the geometric shadow. 'open': no shadows. 'dark': no shadows, no sun.
+  async show(state,options={}){
+    engine.lighting.radiance.set(state==='dark'?[0,0,0]:radiance.subarray(0,3));
+    const c=[0,1,0],at=[c[0]+sun[0]*20,c[1]+sun[1]*20,c[2]+sun[2]*20];
+    attach(state==='soft'?{virtual:{...options}}:state==='reference'?{resolution:4096,filter:'hard',frustum:{position:at,left:-6,right:6,bottom:-6,top:6,near:1,far:40}}:undefined);
+    await render(8);
+    return errors.splice(0);
+  },
+  // Lets the test cast pixel rays onto the floor (y = 0) and solve the sphere's shadow edge.
+  scene(){const cam=engine.camera;return {position:[...cam.position],target:[...cam.target],fov:cam.fov,width:canvas.width,height:canvas.height,sun,lightSize:0.02,sphere:SPHERE};},
+};
+window.ready=true;
+</script></body></html>
