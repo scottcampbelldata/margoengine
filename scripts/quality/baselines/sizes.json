@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3918691,
+  "total": 3921254,
   "history": [
     {
       "date": "2026-10-24",
@@ -932,6 +932,12 @@
       "commit": "cfa5c50a5",
       "reason": "biomes/relief gains islands (coast: 'island' with an outline warp, beach ring and peak), the shelf option and valley width, floor and mouth (biome look plan 3 item C1); the entry is loaded only by relief worlds, and the biomes worker bundles it",
       "grew": 2
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "270024481",
+      "reason": "biomes worker bundles biomes/relief, which gains islands (coast: island with an outline warp, beach ring and peak), the shelf option and valley width, floor and mouth (biome look plan 3 item C1); the builder's 37,800 B budget was set before the round 2 landings grew the worker",
+      "grew": 1
     }
   ],
   "items": {
@@ -946,7 +952,7 @@
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
     "@margoengine/biomes": 18360,
-    "@margoengine/biomes dist/workers/biomes.js": 36519,
+    "@margoengine/biomes dist/workers/biomes.js": 39082,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/koppen": 1231,
