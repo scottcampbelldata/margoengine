@@ -32,6 +32,9 @@ world.dispose(); // or `using world = await BiomeWorld.create()` inside a block
 
 `world.sample(x, z)` answers point queries for gameplay (synchronous: exact from a finished tile, otherwise from
 the region fields; `world.sampleRegion(x, z)` always from the region fields, whatever tiles were made).
+`world.heightAt(x, z)` is the quick one for placing a character or a camera: the ground height in metres, blended
+between the four height cells around the point (the values the tiles hold), without tiles, with no allocation once
+warm, and the edge's height outside the world. A `BiomeView` draws the same surface to within its `textureResolution`.
 `world.tiles(rect, { focus })` yields the tiles of a rectangle nearest first. `world.digest(x, z)`
 is the SHA-256 of a tile's canonical bytes: the same options give the same digest on every machine, and the package
 tests lock several of them. `world.update({ climate, height })` recomputes and calls `onChange` listeners with the
@@ -174,6 +177,33 @@ blended weights, so a forest thins across the band. `readLayer` returns a copy. 
 thin with the painted share: none of a replaced biome stand where its paint reaches 255, and where half is painted a
 dense stand keeps somewhat more than half, because fewer seedlings meet fewer neighbours (a temperate forest keeps 75
 percent at a 49 percent desert share; `tests/placement.test.js`).
+
+### Clearings
+
+A clearing is a biome no climate picks, with a ground and no plants, painted where stored objects and detail should
+stay out (a cabin yard, a path, a beach): `custom: { 'mask/clearing': [0.5, null] }` never matches until something
+writes that mask, so only paint chooses it. Where its paint reaches 255 nothing of the other biomes stands (the
+`ecotone` feather ramps the edge, so the bare core is the painted radius less about 25 m). For a hard footprint
+without any ground change, use `BiomePlacement` `exclusions` (lines and polygons in metres).
+
+```ts
+import { BiomeWorld, defineBiome } from '@margoengine/biomes';
+import { BiomeEditor } from '@margoengine/biomes/editor';
+import { BiomePlacement } from '@margoengine/biomes/placement';
+import { presetWorlds } from '@margoengine/biomes/presets';
+
+const { climate, relief, biomes } = presetWorlds.island;
+const clearing = defineBiome({
+  id: 'clearing',
+  climate: { custom: { 'mask/clearing': [0.5, null] } },
+  ground: [{ material: 'grass' }],
+});
+const world = await BiomeWorld.create({ size: [1024, 1024], climate, height: { relief }, biomes: [...biomes, clearing] });
+const placement = BiomePlacement.attach(world);
+BiomeEditor.attach(world).paint('clearing', { center: [100, 80], radius: 40, falloff: 'constant' });
+const tile = await placement.tile(2, 2); // objects stay out of the painted yard; undo brings them back
+console.log(tile.count, world.heightAt(100, 80)); // where to stand the cabin, in metres
+```
 
 ### Koppen labels
 

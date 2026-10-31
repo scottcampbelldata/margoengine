@@ -166,6 +166,8 @@ export class BiomeWorld implements Disposable {
   readonly #cache = new Map<string, Promise<BiomeTile>>();
   /** Working arrays of tile making, reused from tile to tile (a tile is made start to finish in one go). */
   readonly #scratch = new Scratch();
+  /** Working arrays of `heightAt`, apart from the tiles' so a point query never overwrites a tile in the making. */
+  readonly #pointScratch = new Scratch();
   /** Finished tiles that hold every default layer, for exact `sample` reads. */
   readonly #ready = new Map<string, BiomeTile>();
   readonly #listeners = new Set<(rect: Rect) => void>();
@@ -710,6 +712,28 @@ export class BiomeWorld implements Disposable {
       z,
       out,
     );
+  }
+
+  /**
+   * The ground height in metres at world (x, z), synchronous and without tiles: the bilinear blend of the four height
+   * cells around the point, which are the values the tiles' `height` layer holds (so a character placed with this
+   * stands on the surface a `BiomeView` draws, to within the view's texel spacing, `textureResolution`). Points outside the world answer
+   * for the nearest edge. Allocation free once warm; the same bytes on every machine.
+   * @throws RangeError when x or z is not finite.
+   */
+  heightAt(x: number, z: number): number {
+    this.#live();
+    if (!Number.isFinite(x) || !Number.isFinite(z))
+      throw rangeError('BiomeWorld heightAt needs finite x and z', 'biomes');
+    const cell = this.resolution * 1000,
+      u = (Math.min(this.bounds[2], Math.max(this.bounds[0], x)) - this.bounds[0]) / this.resolution, // float division: metres to cells
+      v = (Math.min(this.bounds[3], Math.max(this.bounds[1], z)) - this.bounds[1]) / this.resolution, // float division
+      gx = Math.floor(u),
+      gz = Math.floor(v),
+      h = this.#heights.grid(gx, gz, 2, 2, cell, this.#pointScratch),
+      top = h[0] + (h[1] - h[0]) * (u - gx),
+      bottom = h[2] + (h[3] - h[2]) * (u - gx);
+    return (top + (bottom - top) * (v - gz)) / 1000; // float division: millimetres to metres
   }
 
   /**
