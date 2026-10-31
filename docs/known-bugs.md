@@ -312,15 +312,6 @@ does not own. Each entry says exactly what is needed to close it.
   bindings while the new composition compiles, or compile the compositions without each effect ahead of time; either
   with a check that the frame right after an out-of-order removal is drawn.
 
-### The packed-browser step of `modern:test:packages` can miss its 30 s page-load limit on a busy machine
-
-- **What:** `scripts/modern-package-tests.js` (`packedBrowser`) waits 30 s for `window.modern` after the first page load,
-  and a cold dev server transforming every package can exceed that when several agents share the CPU and GPU.
-- **Repro:** run `npm run check:merge` while other check:merge runs are active; seen once on 2026-10-27 ("Packed browser
-  failure: state null", `page.waitForFunction` timeout), and the same step passed on a rerun with the machine quieter.
-- **Cause:** a fixed timeout against load, not a wrong result. Fix: wait on the dev server's readiness (as `listenWhenFree`
-  and the pipeline-ready helper do) instead of a fixed time, and add a test that holds the load back.
-
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
 - **What:** the Windows System log shows nine `nvlddmkm` event 153 entries ("Error occurred on GPUID: 100") on
@@ -708,6 +699,7 @@ All were found by `npm run modern:test:extensions` and the other `test:release` 
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| The packed-browser step of `modern:test:packages` missed its fixed 30 s page-load limit on a busy machine ("Packed browser failure: state null") | a fixed time against load: a cold dev server transforming every package took longer while other check:merge runs shared the CPU | the step waits on the dev server (`waitForRequestsIdle`) and then gives the page 10 s; a 10 minute hard limit fails a real hang naming the server state and page errors, and the browser and server close (`scripts/support/page-ready.js`) | `tests/page-ready.test.js` (holds the last module back in a real dev server: the fixed wait fails, the new wait passes) |
 | `npm run dev:examples` refused every page (403) from a checkout reached through an 8.3 short path | Vite's file-serving allow list held the working directory as given and compared it with each file's real path | `dev:examples` runs `scripts/dev-examples.mjs`, which starts Vite in `realpathSync.native(process.cwd())`; no root Vite config, so every other root `vite` command is unchanged | `tests/dev-examples.test.js` (short-path cwd serves 200, a file outside the repository stays 403) |
 | `modern:test:extensions` sat silent until the 30 min GPU lock limit | Chromium (Edge 156, RTX A6000) leaves a `getCompilationInfo()` asked once the device is idle pending until another GPU request runs; `material-extension-tests.js` asked for 41 modules then, inside a `page.evaluate` with no time limit, and the eight suites ran in one process with no limit | the WGSL guard asks every module at creation and answers later calls with that (`scripts/support/wgsl-guard.js`); each suite runs alone under `runLimited` (`scripts/modern-extension-suite.mjs`); engine source must ask at creation | `tests/wgsl-guard.test.js`, `tests/modern-extension-suite.test.js`, `tests/compilation-info-at-creation.test.js` |
 | IOR 1 transmission (materials) drew a 13-step highlight over the background | since `dc883a59` the host keeps reflections under extension transmission, but its F0 stayed 0.04 whatever `KHR_materials_ior` said | the extension slot takes an `ior` expression and the host sets `s.f0` from it (gltf-pro); transmission and node transmission pass it (materials) | `packages/materials/tests/transmission-ior.test.js`, `scripts/materials-transmission-tests.js` |

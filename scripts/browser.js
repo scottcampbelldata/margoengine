@@ -588,6 +588,7 @@ export async function openBrowser({
     }
     return {
       page,
+      server,
       hardware,
       wgsl,
       deviceLoss,

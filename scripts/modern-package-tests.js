@@ -24,6 +24,7 @@ import { mkdir, mkdtemp, writeFile, readFile, copyFile, readdir, rm, realpath, s
 import { resolve, join, dirname, basename } from 'node:path';
 import { cpus, tmpdir } from 'node:os';
 import { openBrowser } from './browser.js';
+import { waitForPageReady } from './support/page-ready.js';
 import { pages } from './support/doc-snippets.mjs';
 import { BUNDLED } from './supply-chain.mjs';
 
@@ -538,7 +539,14 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text());
     });
-    await page.waitForFunction(() => window.modern);
+    // Ready when the dev server has served what the page imports, not after a fixed time (a cold server under load
+    // took longer than the 30 s default); a hard limit of 10 minutes still fails a real hang, naming what hung.
+    await waitForPageReady({
+      what: 'packed browser page (window.modern)',
+      ready: () => page.evaluate(() => Boolean(window.modern)).catch(() => false),
+      idle: () => browser.server.waitForRequestsIdle(),
+      describe: () => `url ${page.url()}, page errors: ${JSON.stringify(errors.slice(0, 5))}`,
+    });
     await page.evaluate(() => window.modern.mount());
     await page.waitForFunction(
       () => window.modern.state.react?.meshes.size === 2 && window.modern.state.parent && window.modern.state.child,
