@@ -5,7 +5,7 @@
 // `npm run build:site` measures every package (entry-sizes.mjs) and a basic glTF scene's network log
 // (basic-scene-network.mjs, which takes the GPU lock only around its browser) first, for /sizes.html.
 import { execFileSync } from 'node:child_process';
-import { cp, rm, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { cp, rm, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'vite';
 import { readSizesInputs, sizesPage } from './build-sizes.js';
@@ -94,6 +94,37 @@ await site({
     rollupOptions: { input: Object.fromEntries(pages.map((page) => [page, resolve(`examples/${page}.html`)])) },
   },
 });
+// The Harrow Head gallery (examples/gallery/DIRECTION.md): every html page there, under /gallery/. The model cabinet's
+// models are the ones its section buttons name, copied here without their reference screenshots.
+const galleryPages = (await readdir('examples/gallery')).filter((name) => name.endsWith('.html'));
+await site({
+  configFile: false,
+  root: 'examples/gallery',
+  base: './',
+  publicDir: false,
+  plugins: [demoSources],
+  build: {
+    outDir: `${out}/gallery`,
+    target: 'es2022',
+    rollupOptions: {
+      input: Object.fromEntries(galleryPages.map((page) => [page.slice(0, -5), resolve(`examples/gallery/${page}`)])),
+    },
+  },
+});
+const cabinet = await readFile('examples/gallery/khronos.html', 'utf8'),
+  published = [...cabinet.matchAll(/data-section="(\w+)"/g)].map((match) => match[1]),
+  khronos = JSON.parse(await readFile('examples/assets/khronos/manifest.json', 'utf8'));
+for (const model of published)
+  await cp(`examples/assets/khronos/${model}`, `${out}/gallery/models/${model}`, {
+    recursive: true,
+    filter: (source) => !/screenshot\.\w+$/.test(source),
+  });
+await writeFile(
+  `${out}/gallery/models/manifest.json`,
+  JSON.stringify({ models: khronos.models.filter((model) => published.includes(model.name)) }),
+);
+await cp('examples/assets/khronos/README.md', `${out}/gallery/models/README.md`);
+await cp('examples/gallery/khronos.ts', `${out}/gallery/khronos.ts`);
 await site({
   configFile: false,
   root: 'packages/creative/examples/earth',

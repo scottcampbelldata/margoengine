@@ -1,4 +1,4 @@
-// Margo voxel sandbox: a small Minecraft-style game on @margoengine/voxel. Streamed noise terrain with plants, sky and
+// Margo voxel sandbox: a small block-world game on @margoengine/voxel. Streamed noise terrain with plants, sky and
 // block light, a first-person body that walks, sprints, jumps, swims and flies, block breaking and placing with an
 // outline, a hotbar, and saves in IndexedDB. `?view=<name>` is the deterministic mode for screenshots and benchmarks
 // (fixed seed, camera, time; no input; `window.voxelSandbox` reports readiness and stats). `?server=ws://host:port` joins a
@@ -30,7 +30,17 @@ import { joinServer, keyBits, type Online } from './multiplayer.ts';
 import { buildShapes, buildShowcase, groundY, showcaseReady } from './showcase.ts';
 import { DEFAULT_SEED } from './terrain.ts';
 import { paintBlockTextures } from './textures.ts';
-import { Hotbar, setDeterministic, setHud, setOverlay, setUnderwater, showError, toast, toggleHud } from './ui.ts';
+import {
+  eggCounter,
+  Hotbar,
+  setDeterministic,
+  setHud,
+  setOverlay,
+  setUnderwater,
+  showError,
+  toast,
+  toggleHud,
+} from './ui.ts';
 import './style.css';
 
 type Vec3 = [number, number, number];
@@ -320,7 +330,9 @@ async function boot(): Promise<void> {
       },
       { signal: events.signal, passive: true },
     );
+    const eggPress = eggCounter(() => toast('Margo engine \u2764\uFE0F made for Margie'));
     on('keydown', (e) => {
+      if (e.code === 'KeyM' && !e.repeat) eggPress();
       if (e.code === 'F3') e.preventDefault();
       if (!isLocked() && e.code !== 'F3') return;
       keys.add(e.code);

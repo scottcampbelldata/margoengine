@@ -208,7 +208,7 @@
 <p>The runs also found importer behaviour worth knowing: glTFast lowers emissive strength from 1.4 to 1.0, Godot ignores glass transmission so glass looks opaque, and Unreal's Nanite fallback drops some triangles of one showcase model unless Nanite is turned off for it.</p>
 
 <h2 id="worlds"><span class="n">7</span>Voxel worlds and multiplayer</h2>
-<p>The same engine has packages for Minecraft-style worlds, separate from the editor: <code>@margoengine/voxel</code> stores 32×32×32 palette chunks with a light byte per cell, a block-type registry and a chunked world with dirty tracking, and adds meshing, lighting, streaming and rendering as separate entries. Generation and meshing run in workers.</p>
+<p>The same engine has packages for block worlds, separate from the editor: <code>@margoengine/voxel</code> stores 32×32×32 palette chunks with a light byte per cell, a block-type registry and a chunked world with dirty tracking, and adds meshing, lighting, streaming and rendering as separate entries. Generation and meshing run in workers.</p>
 <div class="table"><table>
 <thead><tr><th>Sandbox, render distance</th><th class="num">8 chunks</th><th class="num">16 chunks</th></tr></thead>
 <tbody>

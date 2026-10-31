@@ -79,6 +79,17 @@ export function toggleHud(show?: boolean): boolean {
   return !element('hud').classList.toggle('hidden', show === undefined ? undefined : !show);
 }
 
+/** Counts presses inside 1.5 s and calls `found` on the third; a press after that window starts again. */
+export function eggCounter(found: () => void, now: () => number = () => performance.now()): () => void {
+  let count = 0,
+    first = 0;
+  return () => {
+    const t = now();
+    if (t - first > 1500) (count = 0), (first = t);
+    if (++count === 3) (count = 0), found();
+  };
+}
+
 /** A message near the top of the screen for two seconds. */
 export function toast(text: string): void {
   const t = element('toast');

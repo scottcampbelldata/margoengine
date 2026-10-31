@@ -67,6 +67,8 @@ export const ROOT = {
   'modern:test:gltf-compression': 'Draco and meshopt in a production Vite consumer',
   'modern:test:sky': 'sky and fog: 1x and multisample shader parity, coverage, ownership of every shader module',
   'modern:test:finalization': 'picking races, depth precision at 500 m, 10,000-part hierarchy and device reboot',
+  'test:gallery:browser':
+    'the Harrow Head gallery: every page and section draws, no errors, phone layout, JavaScript off, budget, dedication',
   'test:tokyo':
     'the Tokyo diorama example: production build, tram animation, reduced motion, phone layout, missing asset',
 };

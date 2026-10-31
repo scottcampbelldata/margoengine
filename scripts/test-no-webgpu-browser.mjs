@@ -29,7 +29,9 @@ async function codeBytes(folder, chunk, seen = new Set()) {
 }
 
 const root = resolve(import.meta.dirname, '..'),
-  dist = join(root, 'site/dist');
+  dist = join(root, 'site/dist'),
+  // Pages with a module script that draw nothing: no demo code to import and no message to show.
+  NO_SCENE = new Set(['index.html', 'gallery/index.html']);
 // The two ways a browser lacks WebGPU: no `navigator.gpu` at all, or one whose adapter request answers null.
 const modes = {
   'no navigator.gpu': () => {
@@ -79,14 +81,19 @@ let browser, site, dev;
 try {
   const demos = await pages();
   // Every demo built by scripts/build-site.js; a page that drops out of the list is a test failure, not a skip.
-  for (const expected of ['night-citadel/index.html', 'gameplay-sandbox/index.html', 'voxel/index.html'])
+  for (const expected of [
+    'night-citadel/index.html',
+    'gameplay-sandbox/index.html',
+    'voxel/index.html',
+    'gallery/khronos.html',
+  ])
     assert.ok(demos.includes(expected), `site/dist has no ${expected}: run npm run build:site first`);
   // With WebGPU the page imports the demo's own code; a build that tree-shook it to nothing ships a blank demo.
   for (const path of demos) {
     const html = await readFile(join(dist, path), 'utf8'),
       entry = /<script[^>]*type="module"[^>]*src="\.\/([^"]+)"/.exec(html)?.[1],
       folder = join(dist, path, '..');
-    if (!entry) continue;
+    if (!entry || NO_SCENE.has(path)) continue;
     const code = await readFile(join(folder, entry), 'utf8'),
       imports = [...code.matchAll(/import\(`\.\/([^`]+\.js)`\)/g)];
     assert.ok(imports.length, `${path}: imports no demo code`);
@@ -128,7 +135,7 @@ try {
         if (body.includes(LAYER_MARK)) layer.push(response.url());
       });
       await page.goto(`${origin}/${path}`, { waitUntil: 'load' });
-      const landing = path === 'index.html';
+      const landing = NO_SCENE.has(path);
       if (mode === 'WebGPU' || (mode !== 'no WebGPU, no WebGL2' && !landing && !NOT_ON_LAYER.has(path))) {
         // With WebGPU nothing of the layer loads; without it the page installs the layer and the demo starts on it.
         const compat = mode !== 'WebGPU';
@@ -166,7 +173,7 @@ try {
       // Let a quiet failure (a rejected import, a throw after the message) surface before judging the page.
       await page.waitForTimeout(500);
       await context.close();
-      if (landing) assert.equal(shown, false, `${path} (${mode}): the landing page draws nothing, so shows no message`);
+      if (landing) assert.equal(shown, false, `${path} (${mode}): this page draws nothing, so shows no message`);
       else {
         assert.equal(text, message, `${path} (${mode}): the needs-WebGPU message must show`);
         assert.ok(box.width >= 300 && box.height >= 150, `${path} (${mode}): the message must cover the canvas area`);

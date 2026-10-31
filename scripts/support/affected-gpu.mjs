@@ -264,6 +264,8 @@ export function demoSources(demo) {
   if (m) return [`packages/${m[1]}/examples`];
   m = /^demos\/([a-z0-9-]+)\.html$/.exec(path);
   if (m) return [`examples/${m[1]}.html`];
+  m = /^gallery\/([a-z0-9-]+)\.html$/.exec(path);
+  if (m) return [`examples/gallery/${m[1]}.html`];
   m = /^(examples\/[a-z0-9-]+\.html)$/.exec(path);
   if (m) return [m[1]];
   return undefined;
@@ -408,7 +410,7 @@ export function buildFootprints({ root, workspaces, tests, scripts, verify = [],
   out.depth = ofScript('scripts/test-depth-browser.mjs');
   out['no-webgpu'] = ofScript('scripts/test-no-webgpu-browser.mjs');
   // It opens every page of site/dist that runs a module script, the landing page included.
-  out['no-webgpu'].patterns = [/^site\/.*\.(html|m?js)$/];
+  out['no-webgpu'].patterns = [/^site\/.*\.(html|m?js)$/, /^examples\/gallery\/.*\.(html|m?js|ts)$/];
   const runner = stepFiles('check:gpu-packages').filter((f) => !RUNNER.includes(f));
   for (const test of tests) {
     const id = test.name ? `gpu/root/${test.name}` : `gpu/${test.label.replace(' ', '/')}`;

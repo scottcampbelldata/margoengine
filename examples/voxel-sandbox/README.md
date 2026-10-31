@@ -1,6 +1,6 @@
 # Voxel sandbox
 
-A small Minecraft-style game on [`@margoengine/voxel`](../../packages/voxel/README.md): streamed infinite terrain with
+A small block-world game on [`@margoengine/voxel`](../../packages/voxel/README.md): streamed infinite terrain with
 caves, lakes, trees and plants, sky and block light, a first-person body that walks, sprints, jumps, swims and flies,
 breaking and placing blocks, a hotbar, and saves in the browser. Every block texture is painted in code (16 x 16 pixel
 art from seeded noise, `src/textures.ts`); there are no image files. It uses only the packages' public entries

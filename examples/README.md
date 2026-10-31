@@ -27,6 +27,7 @@ All pages need a browser with WebGPU. A page shows a short notice when WebGPU is
 | [depth-texture.html](depth-texture.html) | A depth texture that any material can sample |
 | [flight-helmet.html](flight-helmet.html) | The Khronos Flight Helmet with PBR materials |
 | [khronos-gallery.html](khronos-gallery.html) | Khronos glTF sample assets |
+| [gallery/](gallery/index.html) | The Harrow Head gallery: live pages by feature ([direction](gallery/DIRECTION.md)) |
 | [kinematics-constraints.html](kinematics-constraints.html) | Arm clearance check with the kinematics package |
 | [minimap.html](minimap.html) | A second camera view as a minimap |
 | [robot-expressive.html](robot-expressive.html) | The same character study as a standalone page |

@@ -1,8 +1,8 @@
 // Regression: docs/threejs-parity.md carried a summary typed by hand that nothing recounted, and it drifted.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { checkParity, parseParity } from '../scripts/check-parity-table.mjs';
+import { existsSync, readFileSync } from 'node:fs';
+import { checkParity, checkReferences, pageSource, parseParity } from '../scripts/check-parity-table.mjs';
 
 const doc = (s, extra = '') => `# Parity
 
@@ -76,4 +76,32 @@ test('the explainer page must quote the same counts', () => {
 test('the real docs are consistent', () => {
   const read = (f) => readFileSync(new URL(`../docs/${f}`, import.meta.url), 'utf8');
   assert.deepEqual(checkParity(read('threejs-parity.md'), read('three-parity-matrix.md')), []);
+});
+
+test('a stale repository path, package or page in the table fails, and example names stay private', () => {
+  const exists = (path) => path === 'packages/real' || path === 'examples/clipping-planes.html';
+  assert.deepEqual(
+    checkReferences(
+      '`packages/real` @margoengine/real [page](https://margoengine.com/demos/clipping-planes.html)',
+      exists,
+    ),
+    [],
+  );
+  const problems = checkReferences(
+    '`packages/gone/a.ts` @margoengine/gone [page](https://margoengine.com/demos/gone.html) [page](https://margoengine.com/nowhere/) webgl_loader_x',
+    exists,
+  );
+  assert.equal(problems.length, 5);
+  assert.ok(problems.some((p) => /example name/.test(p)));
+  assert.equal(pageSource('/gallery/khronos.html'), 'examples/gallery/khronos.html');
+});
+
+test('the real table names only things that exist', () => {
+  const root = new URL('..', import.meta.url);
+  assert.deepEqual(
+    checkReferences(readFileSync(new URL('../docs/threejs-parity.md', import.meta.url), 'utf8'), (path) =>
+      existsSync(new URL(path, root)),
+    ),
+    [],
+  );
 });

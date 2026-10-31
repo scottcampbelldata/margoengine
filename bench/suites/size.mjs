@@ -24,6 +24,13 @@ const DEMOS = {
     build: { rollupOptions: { input: resolve(root, 'examples/windy-meadow.html') } },
   },
   earth: { configFile: false, root: 'packages/creative/examples/earth' },
+  // Budget per gallery page, 120 kB gzip before the first frame: scripts/test-gallery-browser.mjs enforces it.
+  'gallery-khronos': {
+    configFile: false,
+    root: 'examples/gallery',
+    publicDir: false,
+    build: { rollupOptions: { input: resolve(root, 'examples/gallery/khronos.html') } },
+  },
   // What `await addSky(stage)` (margoengine/stage/sky) fetches on top of core + stage.
   'stage-sky': {
     configFile: false,

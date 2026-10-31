@@ -1175,8 +1175,7 @@ engine recreates the device and every plugin rebuilds its GPU state; no reload i
 ## Not yet
 
 Remaining gaps and documented limits from [`docs/threejs-parity.md`](threejs-parity.md). The optional-package backlog
-does not reopen the core freeze or the closed v1 limits listed there. Complete actionable PARTIAL rows before MISSING
-rows.
+does not reopen the core freeze or the closed v1 limits listed there.
 
 Materials already support one class per shading model (unlit, Lambert, Phong, PBR, normal, matcap, depth, distance),
 physical factors and maps, iridescence, anisotropy, dispersion, wireframe, front/back/double sides, live swaps and
@@ -1186,14 +1185,9 @@ features add no core or stage functionality.
 
 | three.js | Status in Margo |
 | --- | --- |
-| Multiple scenes, general multi-view rendering | `engine.createScene(name)` and `engine.views` (or `engine.render({views})`): each view draws one scene through its own camera into its own rectangle, with per-view effects and history. Layer masks from `@margoengine/cameras/layers`. Mirrors, glass and `CubeCamera` (`@margoengine/environment`) capture other views. Status per package: [multi-view-roadmap.md](multi-view-roadmap.md) |
-| General viewport/scissor support | Core draws accept viewport/scissor rectangles; optional native passes and picking do not inherit them, and camera aspect remains caller-controlled |
-| WebGL2 for optional packages | Closed v1 limit: core meshes, controls, labels, viewcube, bvh, LOD distance levels and the small glTF loader run on WebGL2; the rest needs WebGPU |
-| glTF `KHR_animation_pointer` | Files that require it are rejected; when only used, animation `createMaterialAnimation` plays base-colour UV offset and scale tracks, and exporters write those tracks from data scenes. Dispersion, iridescence, anisotropy and diffuse transmission use the documented `@margoengine/gltf-pro/extended` material path; material variants (`selectVariant`) and glTF cameras (`viewGLTFCamera`) are supported |
-| Stencil caps for clipped glTF-pro models | Missing (shader `discard` slices without caps or shadows) |
-| `BatchedMesh` | Missing (render layers are in `@margoengine/cameras/layers`) |
-| LDraw and other long-tail loaders; COLLADA skins and animation | Missing (loaders read OBJ with MTL materials, SVG, TrueType fonts and COLLADA geometry and materials; voxel reads and writes VOX) |
-| Arbitrary property tracks (`PropertyBinding`) | Missing (node TRS and morph-weight clips are authored with animation `createKeyframeClip`) |
-| `ArcballControls`, roll in the controls | Missing (core `camera.up` can roll; no control drives it) |
-| Cameras and lights from engine-scene glTF export, Draco/KTX2/EXR export, USDZ export with textures | Missing (`exportModel` and the data-scene writers write cameras and lights; glTF export with animation, skins, morphs and textures exists, plus OBJ, STL, PLY, DAE and static USDZ) |
-| WebXR hit test, controller and hand models, other plugin passes in XR | Missing (VR sessions, controller poses and loader-owned glTF-pro models in XR exist) |
+| Shadows from alpha cut-outs, `alphaHash`, object-space normal maps, your own mip levels | Missing, planned before v1.0.0 (shadows, materials) |
+| Picking fat lines, soft particles | Missing, planned before v1.0.0 (lines, vfx) |
+| Rendering in a worker, render into layers, compute writing textures, SSAA and upscaling, environment blend, KTX2 arrays and cubes, NRRD, subsurface blur, OBB | Missing, after v1.0.0 |
+| WebXR plane detection, depth, light estimation, controller and hand models, plugin passes in XR | Needs a headset test first (`@margoengine/xr`) |
+| WebGL2 for every package | In development: `@margoengine/webgl2-compat` |
+| Long-tail loaders, Draco, KTX2 or G-code writers, stereo on a flat screen, deferred shading, meshlets, cloth, fluids | Not planned for v1.0.0 |

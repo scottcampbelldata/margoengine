@@ -1,0 +1,174 @@
+/* The Harrow Head page template (examples/gallery/DIRECTION.md). Colours and type live in :root; pages add nothing. */
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("../../site/fonts/SourceSans3-latin.woff2") format("woff2");
+  font-weight: 200 900;
+  font-display: swap;
+}
+:root {
+  --paper: #f4f1ea;
+  --ink: #1b1a17;
+  --muted: #55524a;
+  --rule: #b9b3a4;
+  --oxide: #8f2f1c;
+  --title: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1rem/1.5 var(--body);
+}
+a { color: var(--oxide); text-underline-offset: 2px; }
+a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visible, canvas:focus-visible {
+  outline: 2px solid var(--oxide);
+  outline-offset: 2px;
+}
+h1 {
+  margin: 0;
+  font: 600 clamp(2rem, 3vw, 2.75rem)/1.08 var(--title);
+  letter-spacing: -0.01em;
+}
+.lede { margin: 12px 0 0; max-width: 34ch; }
+
+/* A scene page: panel on the left, the canvas filling the rest. */
+.page {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "head stage" "numbers stage" "panel stage" "foot foot";
+  column-gap: 24px;
+  min-height: 100svh;
+  padding: 24px;
+}
+.head { grid-area: head; }
+.stage {
+  grid-area: stage;
+  position: relative;
+  min-height: 420px;
+  height: calc(100svh - 48px);
+  position: sticky;
+  top: 24px;
+  border: 1px solid var(--rule);
+}
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.status { position: absolute; left: 12px; bottom: 8px; margin: 0; color: var(--muted); }
+.numbers {
+  grid-area: numbers;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin: 16px 0 0;
+  padding: 8px 0;
+  border-block: 1px solid var(--rule);
+  font: 400 1rem/1.5 var(--mono);
+}
+.numbers div { display: flex; gap: 6px; }
+.numbers dt { color: var(--muted); }
+.numbers dd { margin: 0; font-variant-numeric: tabular-nums; }
+.panel { grid-area: panel; margin-top: 16px; min-height: 0; }
+.panel summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.sections { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.sections li { border-bottom: 1px solid var(--rule); }
+.sections button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 8px 8px 12px;
+  border: 0;
+  border-left: 3px solid transparent;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sections button b { display: block; font-weight: 600; }
+.sections button[aria-pressed="true"] { border-left-color: var(--oxide); }
+.sections button[aria-pressed="true"] b { color: var(--oxide); }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0; }
+.controls[hidden] { display: none; }
+.controls label[hidden] { display: none; }
+.controls label:not([hidden]) { display: flex; align-items: center; gap: 8px; }
+.controls select, .controls button {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.foot {
+  grid-area: foot;
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+}
+.foot p { margin: 0 0 8px; max-width: 80ch; }
+.foot .mark {
+  display: inline-block;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: 600 1rem/1.5 var(--title);
+  cursor: default;
+}
+/* In flow under the footer, so it never covers the canvas or the panel. */
+.egg { min-height: 1.5em; margin: 0; color: var(--oxide); font: 600 1rem/1.5 var(--title); }
+
+/* The index: one large plate and one smaller, offset plate. */
+.index { max-width: 1240px; margin: 0 auto; padding: 32px 24px 24px; }
+.index header { max-width: 640px; }
+.index .primary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 16px;
+  padding: 0 16px;
+  border-radius: 2px;
+  background: var(--oxide);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+.plates {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+  gap: 32px;
+  align-items: start;
+  margin-top: 32px;
+}
+.plate { display: block; margin: 0; color: inherit; text-decoration: none; }
+.plate.small { margin-top: 96px; }
+.plate img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+}
+.plate h2 { margin: 12px 0 4px; font: 600 1.375rem/1.2 var(--title); color: var(--oxide); text-decoration: underline; text-underline-offset: 3px; }
+.plate p { margin: 0; max-width: 56ch; }
+.index .foot { margin-top: 32px; }
+
+@media (max-width: 860px) {
+  .page {
+    display: block;
+    padding: 16px;
+  }
+  .stage { position: relative; top: 0; height: 62svh; min-height: 320px; margin-top: 16px; }
+  .lede { max-width: none; }
+  .index { padding: 24px 16px 16px; }
+  .plates { display: block; }
+  .plate.small { margin-top: 32px; }
+}

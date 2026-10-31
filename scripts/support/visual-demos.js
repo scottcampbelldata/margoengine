@@ -7,6 +7,17 @@ import { resolve } from 'node:path';
 const VOXEL = ['nvidia-ampere-msedge-155', 'nvidia-ampere-msedge-156'];
 // path: URL path under the site root; ready: page expression true once the principal scene (and any full-detail
 // upgrade) is on screen; mask: dynamic elements painted over. tonemap reads no tier, so its light view is skipped.
+/**
+ * A gallery page's view for the visual check: one hero section per landing batch (at most 13 in all, to hold check:merge
+ * time). Baselines are recorded with `npm run visual:update -- --only=<id> --runs=4`.
+ */
+export const galleryView = (slug, section) => ({
+  id: `gallery-${slug}`,
+  path: `gallery/${slug}.html?section=${section}&view=${section}`,
+  ready: 'window.gallery?.readiness===true',
+  views: ['high'],
+});
+
 export const demos = [
   {
     id: 'night-citadel',

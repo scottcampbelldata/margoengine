@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Model cabinet · Harrow Head · Margo Engine</title>
+  <meta name="description" content="Khronos glTF sample models loaded by Margo Engine in WebGPU: sheen, iridescence, anisotropy, transmission, material variants and meshopt.">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./gallery.css">
+</head>
+<body>
+  <main class="page">
+    <header class="head">
+      <h1>Model cabinet</h1>
+      <p class="lede">Standard Khronos sample files, each loaded and drawn live. Pick one and drag to turn it.</p>
+    </header>
+    <div class="stage" id="viewport">
+      <canvas aria-label="The selected glTF sample model, drawn live. Drag to orbit, scroll to zoom."></canvas>
+      <p class="status" data-gallery-status data-webgpu-status role="status">Starting WebGPU</p>
+    </div>
+    <dl class="numbers" aria-label="Live numbers">
+      <div><dt>Frame</dt><dd data-number="frame">n/a</dd></div>
+      <div><dt>GPU</dt><dd data-number="gpu">n/a</dd></div>
+      <div><dt>Draws</dt><dd data-number="draws">n/a</dd></div>
+      <div><dt>Loaded</dt><dd data-number="bytes">n/a</dd></div>
+    </dl>
+    <details class="panel" open>
+      <summary>Models</summary>
+      <div class="controls">
+        <button type="button" data-reset>Reset view</button>
+        <label data-variants hidden>Variant <select></select></label>
+      </div>
+      <ul class="sections">
+        <li><button type="button" data-section="ToyCar"><b>Toy car</b> Clearcoat, transmission, sheen and texture transforms.</button></li>
+        <li><button type="button" data-section="SheenChair"><b>Sheen chair</b> Fabric sheen, with material variants.</button></li>
+        <li><button type="button" data-section="MaterialsVariantsShoe"><b>Shoe</b> Material variants switched without reloading.</button></li>
+        <li><button type="button" data-section="IridescenceLamp"><b>Iridescent lamp</b> Thin-film iridescence with volume and index of refraction.</button></li>
+        <li><button type="button" data-section="AnisotropyBarnLamp"><b>Barn lamp</b> Anisotropy, clearcoat and emissive strength.</button></li>
+        <li><button type="button" data-section="DiffuseTransmissionTeacup"><b>Teacup</b> Light passing through with diffuse transmission.</button></li>
+        <li><button type="button" data-section="LightsPunctualLamp"><b>Lamp with lights</b> Punctual lights stored in the file.</button></li>
+        <li><button type="button" data-section="CommercialRefrigerator"><b>Refrigerator</b> Clearcoat and transmission together.</button></li>
+        <li><button type="button" data-section="MeshoptCubeTest"><b>Meshopt cube</b> Geometry decoded from meshopt compression.</button></li>
+        <li><button type="button" data-section="TextureTransformTest"><b>Texture transforms</b> Offset, scale and rotation from KHR_texture_transform.</button></li>
+        <li><button type="button" data-section="MetalRoughSpheres"><b>Metal and roughness</b> The grid of metallic and roughness values.</button></li>
+        <li><button type="button" data-section="AlphaBlendModeTest"><b>Alpha modes</b> Opaque, mask and blend side by side.</button></li>
+        <li><button type="button" data-section="NormalTangentMirrorTest"><b>Mirrored normals</b> Normal maps on mirrored tangent space.</button></li>
+        <li><button type="button" data-section="BoomBox"><b>Boom box</b> A textured PBR model with no extensions.</button></li>
+        <li><button type="button" data-section="Corset"><b>Corset</b> A textured PBR model, the largest file here.</button></li>
+      </ul>
+    </details>
+    <footer class="foot">
+      <p>Packages: <a href="../catalog/">@margoengine/gltf-pro, environment, controls, clustered, stats</a>. Source: <a href="./khronos.ts">khronos.ts</a>.</p>
+      <p data-credit></p>
+      <p>Models from the <a href="./models/README.md">Khronos glTF Sample Assets</a>, under their own licences. <a href="../THIRD-PARTY-NOTICES.md">Notices</a>. <a href="./">Harrow Head</a>.</p>
+      <button type="button" class="mark" aria-label="Harrow Head">HH</button>
+      <p class="egg" aria-live="polite"></p>
+    </footer>
+  </main>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    import { hideEgg } from './gallery.js';
+    hideEgg();
+    needsWebGPU('#viewport').then((ok) => ok && import('./khronos.ts'));
+  </script>
+</body>
+</html>

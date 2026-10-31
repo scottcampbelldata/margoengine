@@ -223,6 +223,8 @@ if (want('site')) {
       '/night-citadel/',
       '/gameplay-sandbox/',
       '/voxel/',
+      '/gallery/',
+      '/gallery/khronos.html',
       '/demos/flight-helmet.html',
       '/demos/character-animation.html',
       '/demos/robot-expressive.html',
@@ -233,7 +235,9 @@ if (want('site')) {
       '/demos/tonemap/',
     ].map((path) => [
       path,
-      settle(['/', '/catalog/', '/sizes.html'].includes(path) || path.startsWith('/whitepaper/') ? 1500 : 8000),
+      settle(
+        ['/', '/catalog/', '/sizes.html', '/gallery/'].includes(path) || path.startsWith('/whitepaper/') ? 1500 : 8000,
+      ),
     ]),
   });
 }

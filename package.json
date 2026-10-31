@@ -242,6 +242,7 @@
     "build:ik": "npm run build:packages && node scripts/build-skinning-ik.mjs",
     "build:tokyo": "node scripts/build-tokyo-diorama.mjs",
     "test:tokyo": "node scripts/tokyo-diorama-browser-test.mjs",
+    "test:gallery:browser": "node scripts/test-gallery-browser.mjs",
     "typecheck": "node scripts/typecheck.js",
     "modern:test:gltf-compression": "node scripts/gltf-compression-browser-tests.js",
     "modern:test:gltf-parity": "node scripts/gltf-parity-tests.js",
