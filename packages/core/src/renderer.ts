@@ -173,6 +173,8 @@ export class GPURenderer implements Renderer {
   private msaa?: GPUTextureView;
   private resolveTarget?: GPUTextureView;
   private preserveMSAA = false;
+  /** A caller's view target depth: every pass stores it, since the caller reads it after the frame. */
+  private keepDepth = false;
   private passDescriptor?: GPURenderPassDescriptor;
   private resolvePass?: GPURenderPassDescriptor;
   private readonly drawBatches: Batch[] = [];
@@ -401,6 +403,7 @@ export class GPURenderer implements Renderer {
     const color = this.msaa ?? this.resolveTarget,
       depth = caller ? caller.createView() : views.at(-1)!;
     this.preserveMSAA = (graph.revision > 0 || stacked) && !!this.msaa;
+    this.keepDepth = !!caller;
     const context = (this.passContext ??= {
       backend: 'webgpu',
       draw: (options: DrawOptions = defaultDraw) => {
@@ -492,7 +495,8 @@ export class GPURenderer implements Renderer {
         depth.depthLoadOp = mode === 'attachment' && clearDepth ? 'clear' : 'load';
         attachment.resolveTarget = context.color === this.msaa && !this.holdColor ? this.resolveTarget : undefined;
         // Later scene passes load MSAA color and depth until the final resolve.
-        attachment.storeOp = depth.depthStoreOp = attachment.resolveTarget && !this.preserveMSAA ? 'discard' : 'store';
+        attachment.storeOp = attachment.resolveTarget && !this.preserveMSAA ? 'discard' : 'store';
+        depth.depthStoreOp = this.keepDepth ? 'store' : attachment.storeOp;
         attachments.length = 1;
         if (options.colorAttachments) attachments.push(...options.colorAttachments);
         const stencil = context.descriptor.depthStencil!.format.includes('stencil');
@@ -594,7 +598,7 @@ export class GPURenderer implements Renderer {
         attachment.resolveTarget = this.resolveTarget;
         attachment.storeOp = stacked ? 'store' : 'discard';
         resolve.depthStencilAttachment!.view = depth;
-        resolve.depthStencilAttachment!.depthStoreOp = stacked ? 'store' : 'discard';
+        resolve.depthStencilAttachment!.depthStoreOp = stacked || caller ? 'store' : 'discard';
         encoder.beginRenderPass(resolve).end();
       }
       this.commands[0] = encoder.finish();

@@ -298,20 +298,6 @@ does not own. Each entry says exactly what is needed to close it.
   when they were not yet held); with a browser check that edits while a tile waits (no frames drawn, so it waits for
   the drain timer) and compares the drawn tile with a fresh view of the edited world.
 
-### A view target depth under 4x MSAA comes back unwritten
-
-- **Repro:** on a desktop engine (4x MSAA) with no package passes, `engine.render({views: [{camera, viewport: [0, 0, 1,
-  1], target: {color, depth}}]})` where `depth` has the scene's depth format and 4 samples, then read `depth` in a
-  later pass: it does not hold the frame's depth.
-- **Cause:** `renderFrame` in `packages/core/src/renderer.ts` draws straight into the caller's depth, but the draw's
-  `depthStoreOp` is `'discard'` whenever the colour resolves in that pass and `preserveMSAA` is false, and
-  `preserveMSAA` does not count a caller depth (it did only for the depth copy pass, removed 2026-10-30 as core audit
-  P1). With 1 sample, or with any package pass, the depth is stored.
-- **Fix needed:** count a caller depth in `preserveMSAA` and in the resolve pass's `depthStoreOp` (`stacked ||
-  !!caller`), with a unit test in `tests/core-views.test.js` that a 4x caller depth gets `depthStoreOp: 'store'`
-  and a GPU check in `scripts/test-views-browser.mjs` that reads the 4x depth back through a resolve. Found while
-  preparing P1; left for Scott's go because the approval covered removals only.
-
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
 - **What:** the Windows System log shows nine `nvlddmkm` event 153 entries ("Error occurred on GPUID: 100") on

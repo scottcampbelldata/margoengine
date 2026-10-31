@@ -418,3 +418,23 @@ test('a target depth in the scene samples and format is drawn into; other shapes
       );
   }
 });
+
+test('a 4x target depth in the scene format keeps what the scene drew: every pass on it stores depth', (t) => {
+  // Regression: the scene pass resolved its colour and so discarded depth too, and the final resolve pass discarded
+  // depth, so the caller got its depth texture back without the frame's depth.
+  const passesOn = (h, depth) =>
+    h.passes.filter((pass) => pass.descriptor.depthStencilAttachment?.view?.caller === depth);
+  for (const draws of [undefined, (draw) => draw()]) {
+    const h = gpuDrawHarness(t, 4),
+      depth = callerTexture('depth32float', 4);
+    h.frame(draws, targetView({ color: callerTexture('bgra8unorm'), depth }));
+    const passes = passesOn(h, 'depth32float');
+    assert.ok(passes.length > 0, 'the scene draws into the caller depth');
+    assert.deepEqual(
+      passes.map((pass) => pass.descriptor.depthStencilAttachment.depthStoreOp),
+      passes.map(() => 'store'),
+      `${draws ? 'with' : 'without'} a package pass, no pass discards the caller depth`,
+    );
+    assert.equal(h.draws().at(-1).descriptor.colorAttachments[0].resolveTarget.caller, 'bgra8unorm');
+  }
+});

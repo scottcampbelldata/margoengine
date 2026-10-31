@@ -4,7 +4,7 @@
 // Sections: scenes (separate scenes, picking, resize, device restore), postfx (four views equal one view with Tonemap,
 // DOF, PostStack and zero-density fog), temporal (TAA, motion blur and volumetric fog keep separate histories and
 // depth), water (a later view keeps the earlier view's pixels, also after resize and device restore), preview (an item
-// preview drawn at 4x into a caller's 1x colour and depth matches 1x, with antialiased edges), demos (the three
+// preview drawn at 4x into a caller's 1x colour matches 1x, with antialiased edges; a 4x caller depth comes back written), demos (the three
 // multi-view demos: picks through each view, layers kept out of a view, frame time).
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
@@ -627,7 +627,7 @@ try {
 
   assert.deepEqual(errors, []);
   // Item preview: a scene drawn at 4x MSAA into a caller's 1x colour matches a 1x render of the same view, with
-  // antialiased edges and no validation error. A caller depth core cannot draw into (here a 1x depth under 4x MSAA)
+  // antialiased edges and no validation error; a caller's 4x depth in the scene format comes back written. A caller depth core cannot draw into (here a 1x depth under 4x MSAA)
   // throws naming the fix; core does not copy its depth into one.
   const preview = await page.evaluate(async () => {
     const { EngineKernel, box } = await import('/packages/core/dist/index.js');
@@ -661,7 +661,9 @@ try {
             scene: item,
             target: { color },
           };
-        let depthError = '';
+        let depthError = '',
+          centerDepth = -1,
+          cornerDepth = -1;
         if (samples === 4) {
           const depth = device.createTexture({
             size: [size, size],
@@ -674,6 +676,51 @@ try {
             depthError = error.message;
           }
           depth.destroy();
+          // A 4x caller depth in the scene format is drawn into directly and must come back holding the frame's
+          // depth: sample 0 at the centre (the box) and a corner (cleared to 0), read through a compute shader.
+          const scene = device.createTexture({
+            size: [size, size],
+            format: device.features.has('depth32float-stencil8') ? 'depth32float-stencil8' : 'depth32float',
+            sampleCount: 4,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+          });
+          device.pushErrorScope('validation');
+          instance.render({ culling: false, views: [{ ...view, target: { color, depth: scene } }] });
+          const pipeline = device.createComputePipeline({
+              layout: 'auto',
+              compute: {
+                module: device.createShaderModule({
+                  code: `@group(0) @binding(0) var depth:texture_depth_multisampled_2d;
+@group(0) @binding(1) var<storage,read_write> out:array<f32,2>;
+@compute @workgroup_size(1) fn main(){out[0]=textureLoad(depth,vec2i(${size / 2},${size / 2}),0);out[1]=textureLoad(depth,vec2i(0,0),0);}`,
+                }),
+                entryPoint: 'main',
+              },
+            }),
+            storage = device.createBuffer({ size: 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
+            mapped = device.createBuffer({ size: 8, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+            encoder = device.createCommandEncoder(),
+            pass = encoder.beginComputePass();
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(
+            0,
+            device.createBindGroup({
+              layout: pipeline.getBindGroupLayout(0),
+              entries: [
+                { binding: 0, resource: scene.createView({ aspect: 'depth-only' }) },
+                { binding: 1, resource: { buffer: storage } },
+              ],
+            }),
+          );
+          pass.dispatchWorkgroups(1);
+          pass.end();
+          encoder.copyBufferToBuffer(storage, 0, mapped, 0, 8);
+          device.queue.submit([encoder.finish()]);
+          await mapped.mapAsync(GPUMapMode.READ);
+          [centerDepth, cornerDepth] = new Float32Array(mapped.getMappedRange().slice(0));
+          const validation = await device.popErrorScope();
+          if (validation) uncaptured.push(validation.message);
+          for (const each of [scene, storage, mapped]) each.destroy();
         }
         device.pushErrorScope('validation');
         instance.render({ culling: false, views: [view] });
@@ -695,7 +742,14 @@ try {
         };
         const pixels = (await read(color, 4)).map((row) => Array.from({ length: size }, (_, x) => row[x * 4]));
         const validation = await device.popErrorScope();
-        return { samples, pixels, depthError, errors: [validation?.message, ...uncaptured].filter(Boolean) };
+        return {
+          samples,
+          pixels,
+          depthError,
+          centerDepth,
+          cornerDepth,
+          errors: [validation?.message, ...uncaptured].filter(Boolean),
+        };
       } finally {
         instance.dispose();
         canvas.remove();
@@ -722,6 +776,8 @@ try {
       intermediateEdgePixels: intermediate,
       referenceIntermediateEdgePixels: referenceIntermediate,
       depthError: msaa.depthError,
+      centerDepth: msaa.centerDepth,
+      cornerDepth: msaa.cornerDepth,
       errors: [...msaa.errors, ...reference.errors],
     };
   });
@@ -736,6 +792,11 @@ try {
     preview.depthError,
     /^Invalid view depth: use the scene depth format and samples, or omit depth; see https:\/\/margoengine.com\/errors#views$/,
     'a 1x caller depth under 4x MSAA throws naming the fix',
+  );
+  // Regression: with no package pass the 4x scene pass resolved colour and discarded depth, so this came back empty.
+  assert.ok(
+    preview.centerDepth > 0 && preview.cornerDepth === 0,
+    `a 4x caller depth holds the item and nothing else (centre ${preview.centerDepth}, corner ${preview.cornerDepth})`,
   );
 
   // exactSize (pixel-exact drawing): a 16 x 8 backbuffer under a 64 x 32 CSS box keeps exactly 16 x 8, draws a

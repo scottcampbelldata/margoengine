@@ -10,8 +10,9 @@
 - P3: one draw-rectangle check and partial test (shared/view-rect.js; WebGL's rectangle errors now carry core's
   message and help link), one `#rrggbb` parser (shared/clear-color.js `hexColor`), no absent-ambient branches in
   the engine.
-- Size gate: core 21,176 -> 20,790 B gzip, core + stage 22,580 -> 22,189 B (2,811 B under the gate).
-- Open: a 4x view target depth comes back unwritten without a package pass ([known-bugs.md](known-bugs.md)).
+- Size gate: core 21,176 -> 20,813 B gzip, core + stage 22,580 -> 22,212 B (2,788 B under the gate; the 4x view target depth store fix is 23 B of that).
+- Fixed: a 4x view target depth came back unwritten (the scene pass and the final resolve discarded it); every pass
+  now stores a caller depth (tests/core-views.test.js, check:views item preview reads it back).
 
 ## Landed 2026-10-29: the frame allocation limits hold on the minimum Node (24.18) as well as on Node 26
 
