@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4106396,
+  "total": 4107784,
   "history": [
     {
       "date": "2026-10-24",
@@ -960,6 +960,12 @@
     {
       "date": "2026-10-31",
       "commit": "175c6ec2d",
+      "reason": "new optional package @margoengine/sprites: 2D sprites at exact pixels, one instanced draw per layer (row 25, J1; budget 9 KB)",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "175c6ec2d",
       "reason": "@margoengine/shadows/virtual: new optional entry, virtual shadow maps (row 21.6), stage 1 page bookkeeping; 9 kB gzip budget for the whole feature (allocator 2, feedback 2, render 2.5, shader 2.5); the root entry is unchanged",
       "grew": 1
     },
@@ -1062,12 +1068,6 @@
     {
       "date": "2026-10-31",
       "commit": "175c6ec2d",
-      "reason": "new optional package @margoengine/sprites: 2D sprites at exact pixels, one instanced draw per layer (row 25, J1; budget 9 KB)",
-      "grew": 1
-    },
-    {
-      "date": "2026-10-31",
-      "commit": "175c6ec2d",
       "reason": "new package @margoengine/physics2d (row 25 J5): 2D Rapier plugin, bodies, joints, queries, character controller and tile map colliders, 7.7 kB",
       "grew": 1
     },
@@ -1147,6 +1147,12 @@
       "date": "2026-10-31",
       "commit": "175c6ec2d",
       "reason": "new optional entry @margoengine/sciviz/bricks (bricked volumes); no existing entry limit raised",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "b0e0c60e0",
+      "reason": "row 25 J9: new /animation entry of @margoengine/sprites",
       "grew": 1
     }
   ],
@@ -1449,6 +1455,7 @@
     "@margoengine/splats/data": 17665,
     "@margoengine/splines": 1555,
     "@margoengine/sprites": 5136,
+    "@margoengine/sprites/animation": 1388,
     "@margoengine/stage": 2240,
     "@margoengine/stage/effects": 727,
     "@margoengine/stage/environment": 747,

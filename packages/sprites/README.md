@@ -72,3 +72,32 @@ A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoEr
 
 Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
 sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.
+
+## Animation
+
+`@margoengine/sprites/animation` (`margoengine/sprites/animation`) plays sprite-sheet clips. It is plain CPU code, so it
+runs in Node and an app that only draws still frames does not ship it.
+
+```ts
+import { SpriteLayer } from 'margoengine/sprites';
+import { frameGrid, SpriteAnimation } from 'margoengine/sprites/animation';
+
+declare const layer: SpriteLayer;
+const hero = layer.add({ x: 10, y: 7, rect: [0, 0, 8, 8] });
+const animation = new SpriteAnimation({
+  clips: {
+    walk: { frames: frameGrid(8, 8, 4), fps: 8, events: [{ frame: 1, name: 'step' }] },
+    jump: { frames: frameGrid(8, 8, 2, 2, 0, 8), mode: 'once' },
+  },
+  onEvent: (name, clip) => console.log(clip, name),
+});
+animation.play('walk');
+// Once per frame, with the seconds since the last one:
+animation.update(1 / 60).apply(hero);
+```
+
+A clip is `frames` (rectangles, or `{ rect, duration }` for a frame with its own seconds), `mode` (`'loop'` default,
+`'once'` or `'pingpong'`), `fps` (default 12, for frames without a `duration`) and `events`, names fired once each time
+a frame starts showing, in order even when one `update` skips several frames. `speed` (default 1) scales time and 0
+pauses. `play(name)` keeps going if that clip is already playing; pass `true` to restart. `finished` turns true when a
+`'once'` clip ends. Read `frame` or `rect` instead of `apply` if the sprite is not a `Sprite`.

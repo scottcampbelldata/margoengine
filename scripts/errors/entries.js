@@ -255,10 +255,12 @@ export const entries = [
       'SpriteLayer needs an atlas',
       'Sprite normal atlas differs in size',
       'Too many sprites in a layer',
+      'Invalid sprite animation',
+      'Unknown sprite clip',
     ],
     cause:
       'A `SpriteLayer` option or a `Sprite` field is out of range. Sprite fields are read each frame, so a bad value throws from the frame that first reads it: a non-finite position, an `alpha` outside 0 to 1, or a `rect` that is not whole texels inside the atlas.',
-    fix: 'Keep `x`, `y`, `z`, scale, pivot and `rotation` finite, `alpha` from 0 to 1, and `rect` as `[x, y, width, height]` in whole texels inside the atlas. `camera.zoom` must be above 0, `tint` is `0xrrggbb`, `#rrggbb` or `#rgb`, atlas bytes are `width * height * 4` long, and a normal atlas is the size of the colour atlas. For too many sprites, split them across layers.',
+    fix: 'Keep `x`, `y`, `z`, scale, pivot and `rotation` finite, `alpha` from 0 to 1, and `rect` as `[x, y, width, height]` in whole texels inside the atlas. `camera.zoom` must be above 0, `tint` is `0xrrggbb`, `#rrggbb` or `#rgb`, atlas bytes are `width * height * 4` long, and a normal atlas is the size of the colour atlas. For too many sprites, split them across layers. Animation clips need at least one frame of whole-texel rectangles, positive durations and `fps`, an event `frame` inside the clip, a `speed` and `dt` of 0 or more, and `play` takes a clip name you passed in `clips`.',
   },
   {
     id: 'sprite-state',

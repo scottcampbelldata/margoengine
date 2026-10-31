@@ -1206,6 +1206,10 @@
       "types": "./dist/sprites.d.ts",
       "import": "./dist/sprites.js"
     },
+    "./sprites/animation": {
+      "types": "./dist/sprites/animation.d.ts",
+      "import": "./dist/sprites/animation.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"
