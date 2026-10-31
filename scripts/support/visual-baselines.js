@@ -102,3 +102,27 @@ export function missingBaselineMessage(profileId, environment, committedProfiles
     'Only if this hardware is meant to have its own baseline, capture the full committed product reference on it (npm run visual:update)'
   );
 }
+
+/**
+ * The tolerance a re-record writes. Run-to-run noise is a sample, so a new sample may not raise a limit the view already
+ * has: the old limit stays while the new noise itself fits under it. Noise above the old limit is a real change in the
+ * view's stability, which throws unless the caller passes `raise` (`--raise-tolerance`) after finding out why.
+ * @param {Record<string, number>} derived - The limits the new noise gives, by metric.
+ * @param {Record<string, number>} noise - The new run-to-run noise, by metric.
+ * @param {Record<string, number> | undefined} previous - The view's recorded limits, if it has any.
+ * @param {{ id?: string, raise?: boolean }} [options]
+ * @returns {Record<string, number>} The limits to record.
+ */
+export function recordedTolerance(derived, noise, previous, { id = 'view', raise = false } = {}) {
+  if (!previous || raise) return derived;
+  return Object.fromEntries(
+    Object.entries(derived).map(([metric, limit]) => {
+      const old = previous[metric];
+      if (old === undefined || limit <= old) return [metric, limit];
+      if (noise[metric] <= old) return [metric, old];
+      throw new RangeError(
+        `${id}: run-to-run ${metric} noise ${noise[metric]} is over its limit ${old}. Find out why the view got less stable; only then re-record with --raise-tolerance.`,
+      );
+    }),
+  );
+}

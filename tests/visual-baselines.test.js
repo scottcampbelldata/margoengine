@@ -5,6 +5,7 @@ import {
   assertCaptureEnvironment,
   assertProfileCreationCoverage,
   missingBaselineMessage,
+  recordedTolerance,
   renderedInputChanges,
   selectBaselineProfile,
 } from '../scripts/support/visual-baselines.js';
@@ -219,4 +220,18 @@ test('a missing baseline names the adapter it ran on, the committed profiles and
     'Remote Desktop',
   ])
     assert.ok(text.includes(part), part);
+});
+
+test('a re-record never raises a limit on a new noise sample alone', () => {
+  const limit = (changed) => ({ changed, hot: 0.0002 }),
+    noise = (changed) => ({ changed, hot: 0 });
+  // ToyCar, 2026-10-31: noise 0.000612 then 0.000951 on the same view raised 0.00234 to 0.00335.
+  assert.deepEqual(recordedTolerance(limit(0.00335), noise(0.000951), limit(0.00234)), limit(0.00234));
+  assert.deepEqual(recordedTolerance(limit(0.0005), noise(0), limit(0.00234)), limit(0.0005), 'a lower limit is taken');
+  assert.deepEqual(recordedTolerance(limit(0.00335), noise(0.000951), undefined), limit(0.00335), 'a new view');
+  assert.throws(
+    () => recordedTolerance(limit(0.01), noise(0.003), limit(0.00234), { id: 'khronos-ToyCar-model' }),
+    /khronos-ToyCar-model: run-to-run changed noise 0\.003 is over its limit 0\.00234.*--raise-tolerance/,
+  );
+  assert.deepEqual(recordedTolerance(limit(0.01), noise(0.003), limit(0.00234), { raise: true }), limit(0.01));
 });

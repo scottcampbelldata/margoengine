@@ -36,6 +36,7 @@ import {
   selectBaselineProfile,
   missingBaselineMessage,
   assertBaselineIdentity,
+  recordedTolerance,
   assertCaptureEnvironment,
   assertProfileCreationCoverage,
   renderedInputChanges,
@@ -54,6 +55,7 @@ Options:
   --only=<id>,<id>           only these views, for example --only=earth,dof-high
   --runs=<n>                 captures per view (default 1; 4 with --update)
   --update                   re-capture baselines and noise tolerances
+  --raise-tolerance          with --update: let noise above a view's limit raise it (find out why first)
   --device-loss              destroy the GPU device mid-frame in every site demo and check it recovers
   --no-build                 do not build the site first
   -h, --help                 print this help and exit
@@ -380,7 +382,12 @@ try {
         floor = Object.fromEntries(
           ['changed', 'hot', 'mean', 'max'].map((k) => [k, round(Math.max(0, ...noise.map((n) => n[k])))]),
         );
-      const tolerance = Object.fromEntries(GATED.map((k) => [k, round(floor[k] * MARGIN + ALLOWANCE[k])]));
+      const tolerance = recordedTolerance(
+        Object.fromEntries(GATED.map((k) => [k, round(floor[k] * MARGIN + ALLOWANCE[k])])),
+        floor,
+        manifest.views[r.id]?.tolerance,
+        { id: r.id, raise: process.argv.includes('--raise-tolerance') },
+      );
       await mkdir(baselines, { recursive: true });
       await writeFile(resolve(baselines, `${r.id}.png`), encodePNG(r.captures[0]));
       manifest.views[r.id] = {
