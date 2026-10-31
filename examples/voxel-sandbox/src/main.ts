@@ -34,6 +34,7 @@ import {
   IDLE_BANNER,
   joinPlaza,
   joinServer,
+  resumeBanner,
   keyBits,
   NOTICE_EVERY,
   type Online,
@@ -825,7 +826,7 @@ async function boot(): Promise<void> {
       ),
       ...(online
         ? [
-            `server ${serverName}  ${online.client.players.size} players near  ${online.client.stats.corrections} corrections`,
+            `server ${serverName}  ${online.client.players.size} players near  ${online.client.stats.corrections} corrections${online.client.stats.resumes ? `  ${online.client.stats.resumes} reconnects` : ''}`,
           ]
         : []),
       `quads ${s.quads.toLocaleString()}  ${(s.bytes / 1048576).toFixed(1)} MiB  draws ${s.draws}`,
@@ -1017,6 +1018,12 @@ async function boot(): Promise<void> {
       return goSolo('offline');
     }
     online.client.onError = (error) => console.warn(error); // onClose follows and decides
+    // A dropped socket comes back in place: the client holds the player and keeps the world, so only a slow try is shown.
+    online.client.onResume = ({ attempt }) => {
+      const text = resumeBanner(attempt);
+      if (text) setBanner(text);
+    };
+    online.client.onResumed = () => setBanner('');
     player = online.client.player;
     // A dynamic import: a page playing alone never downloads the figures, name tags or instancing; a joining one waits
     // until the player has spawned, so this does not compete with the ground on a slow connection.
@@ -1052,8 +1059,9 @@ async function boot(): Promise<void> {
     online?.dispose();
     setBanner(IDLE_BANNER, () => location.reload());
   }
-  // The server closed on us. Only /join can say why: a new `world` id is a new world, the same id a shard that restarted.
-  // Either way the way back is a reload through /join; no room or no router ends in the solo world within 5 s.
+  // The server closed on us and resuming in place did not get over it. Only /join can say why: a new `world` id is a new
+  // world, the same id a shard that restarted. Either way the way back is a reload through /join; no room or no router
+  // ends in the solo world within 5 s of here.
   function lost(): void {
     const router = routerUrl;
     if (!router) return goSolo('offline');

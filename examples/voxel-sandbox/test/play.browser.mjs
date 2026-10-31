@@ -54,6 +54,12 @@ try {
     console.log('voxel sandbox load order test passed');
     process.exit(await closeAll());
   }
+  // PLAY_ONLY=rejoin runs only the test of a dropped connection.
+  if (process.env.PLAY_ONLY === 'rejoin') {
+    await rejoin();
+    console.log('voxel sandbox rejoin test passed');
+    process.exit(await closeAll());
+  }
   // PLAY_ONLY=phone runs only the phone test.
   if (process.env.PLAY_ONLY === 'phone') {
     await phone();
@@ -157,6 +163,7 @@ try {
 
   await loadOrder();
   await plaza();
+  await rejoin();
   await plazaEdits();
   assert.deepEqual(
     errors.filter((e) => !NETWORK_ERROR.test(e)),
@@ -276,11 +283,13 @@ async function plaza() {
   );
   assert.ok(cost.mean < 4, `${cost.mean} ms a frame for 200 figures`);
 
-  // The server is killed: the banner within 5 s, then a playable solo world.
+  // The server is killed: the page says it is trying within 5 s, stops trying within the 30 s a server keeps a player,
+  // then a playable solo world.
   clearInterval(botLoop);
   const killed = Date.now();
   await killTree(shard.child);
-  await banner(/building alone/, 5000);
+  await banner(/Reconnecting to Plaza/, 5000);
+  await banner(/building alone/, 35_000);
   console.log(`ok the banner shows ${Date.now() - killed} ms after the kill: ${await bannerText()}`);
   await alone();
   await page.keyboard.up('KeyW');
@@ -464,14 +473,15 @@ async function plaza() {
   router.answer = { full: true, online: 7 };
   silentPipe.pause();
   const silentSince = Date.now();
-  await banner(/Plaza is full, 7 people are in/, 60_000);
+  // 15 s of silence, then the tries at resuming, each stuck in the same pipe for 5 s, up to 30 s.
+  await banner(/Plaza is full, 7 people are in/, 90_000);
   assert.equal(router.joins, 2, '4408 asked /join');
   console.log(`ok a silent server with the socket open reached the banner after ${Date.now() - silentSince} ms`);
 
   // A hidden or busy page still answers pings, because the browser does, not the page's scripts. The server here pings
   // after 300 ms of silence and drops a player at 1.5 s. The debugger stops the page's JavaScript, so the page sends no
   // input at all; the player must stay for twice the limit. The same fixture then drops a player whose connection is cut.
-  const pinger = await startShard(['--heartbeat=300', '--client-timeout=1500', '--watch']);
+  const pinger = await startShard(['--heartbeat=300', '--client-timeout=1500', '--resume-timeout=1000', '--watch']);
   await open(`server=ws://127.0.0.1:${pinger.port}&rd=2`);
   await page.waitForFunction(() => window.voxelSandbox?.online?.client.spawned, null, { timeout: 60_000 });
   const until = async (condition, what, ms = 20_000) => {
@@ -527,6 +537,130 @@ async function plaza() {
   await killTree(shard.child);
 
   await phone();
+}
+
+// A dropped connection, as Cloudflare drops one every 15 minutes: the page stays, the player stays, and what changed in
+// the gap arrives. A real shard behind a pipe the test cuts, and a router whose /join counts every ask.
+async function rejoin() {
+  const origin = `http://127.0.0.1:${port}/examples/voxel-sandbox/index.html`,
+    router = { answer: undefined, joins: 0 },
+    routerServer = createServer((request, response) => {
+      response.setHeader('access-control-allow-origin', '*');
+      router.joins++;
+      response.setHeader('content-type', 'application/json');
+      response.end(JSON.stringify(router.answer));
+    });
+  await new Promise((done) => routerServer.listen(0, '127.0.0.1', done));
+  cleanup.push(() => new Promise((done) => (routerServer.closeAllConnections(), routerServer.close(done))));
+  const shard = await startShard(),
+    cdn = await tcpProxy(shard.port),
+    open = async (url) => {
+      router.answer = { url, shard: 1, world: 'a' };
+      router.joins = 0;
+      await page.goto(`${origin}?plaza=http://127.0.0.1:${routerServer.address().port}&rd=2`);
+      await page.waitForFunction(() => window.voxelSandbox?.online?.client.loaded, null, { timeout: 120_000 });
+    },
+    banner = (source, timeout) =>
+      page.waitForFunction(
+        (text) => {
+          const box = document.getElementById('banner');
+          return !box.hidden && new RegExp(text).test(box.textContent);
+        },
+        source,
+        { timeout },
+      ),
+    resumes = (count, timeout) =>
+      page.waitForFunction((n) => window.voxelSandbox.online.client.stats.resumes === n, count, { timeout }),
+    near = (a, b, what) => assert.ok(Math.hypot(...a.map((v, i) => v - b[i])) < 0.1, `${what}: ${a} against ${b}`);
+  await open(`ws://127.0.0.1:${cdn.port}`);
+  // Every text the banner shows from now on, and every load of the page.
+  await page.evaluate(() => {
+    window.banners = [];
+    const box = document.getElementById('banner');
+    new MutationObserver(() => box.hidden || window.banners.push(box.textContent)).observe(box, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      characterData: true,
+    });
+  });
+  let loads = 0;
+  const counted = () => loads++;
+  page.on('load', counted);
+
+  // A cut, and the first try gets through: nothing to see.
+  let spot = await position();
+  cdn.cut();
+  await resumes(1, 10_000);
+  near(await position(), spot, 'after a cut');
+  assert.deepEqual(await sandbox(() => window.banners), [], 'no banner on a quick resume');
+  console.log('ok a cut resumes in place with no banner');
+
+  // A slow one: the way back stays shut for a while. The page says so, and another player's edit in the gap is there after.
+  const { blocks } = defineBlocks(),
+    bot = await VoxelBot.connect({
+      url: `ws://127.0.0.1:${shard.port}`,
+      blocks,
+      name: 'Quiet Otter',
+      view: 2,
+      editInterval: 0,
+    }),
+    botLoop = setInterval(() => bot.update(0.05), 50);
+  cleanup.push(() => {
+    clearInterval(botLoop);
+    bot.close();
+  });
+  while (!bot.client.spawned || !bot.client.loaded) await wait(50); // polling a value in this process
+  const [bx, by, bz] = bot.client.player.position.map(Math.floor);
+  let cell;
+  for (let up = 3; !cell; up++) if (!bot.world.getBlock(bx + 2, by + up, bz)) cell = [bx + 2, by + up, bz];
+  const bricks = blocks.id('bricks'),
+    blockAt = (at) => sandbox((c) => window.voxelSandbox.world.getBlock(...c), at);
+  assert.equal(await blockAt(cell), 0, 'the page has that air');
+  spot = await position();
+  cdn.refuse = true;
+  cdn.cut();
+  await banner('Reconnecting to Plaza', 10_000);
+  assert.equal(bot.client.edit(...cell, bricks), true);
+  await wait(500); // fixed-wait: a few server ticks, so that the edit lands while the player is away
+  assert.equal(bot.world.getBlock(...cell), bricks, 'the server kept it');
+  assert.equal(await blockAt(cell), 0, 'the page cannot know yet');
+  cdn.refuse = false;
+  await resumes(2, 30_000);
+  await page.waitForFunction((c) => window.voxelSandbox.world.getBlock(c[0], c[1], c[2]) !== 0, cell, {
+    timeout: 5000,
+  });
+  assert.equal(await blockAt(cell), bricks);
+  assert.equal(await sandbox(() => document.getElementById('banner').hidden), true, 'the banner went');
+  near(await position(), spot, 'after a slow resume');
+  console.log('ok a slow resume shows the banner, clears it, and brings the edit made in the gap');
+
+  // Half-open: nothing moves either way and neither end has noticed.
+  spot = await position();
+  cdn.cutSilent();
+  await resumes(3, 40_000);
+  near(await position(), spot, 'after a half-open connection');
+  console.log('ok a half-open connection resumes at the client silence limit');
+
+  assert.equal(loads, 0, 'the page never reloaded');
+  assert.equal(router.joins, 1, 'and never asked /join again');
+
+  // The shard itself dies: the tries run out, and the way back is today's, through /join and a reload.
+  page.off('load', counted);
+  const doomed = await startShard();
+  await open(`ws://127.0.0.1:${doomed.port}`);
+  router.answer = { url: `ws://127.0.0.1:${shard.port}`, shard: 1, world: 'a' };
+  const reloaded = page.waitForEvent('load', { timeout: 60_000 });
+  await killTree(doomed.child);
+  await banner('Reconnecting to Plaza', 10_000);
+  await banner('The connection dropped. Checking Plaza.|Rejoining Plaza.', 40_000);
+  await reloaded;
+  await page.waitForFunction(() => window.voxelSandbox?.online?.client.spawned, null, { timeout: 120_000 });
+  assert.ok(router.joins >= 3, `${router.joins} asks of /join`);
+  console.log('ok a dead shard falls back through /join and a reload');
+  clearInterval(botLoop);
+  await page.goto('about:blank');
+  await killTree(shard.child);
 }
 
 // The order of loading. A slow GPU start must hold nothing else up: the code and /join go out while the adapter is still
@@ -892,17 +1026,22 @@ async function startShard(flags = []) {
   return shard;
 }
 
-// A TCP pipe in front of a shard that the test can cut. `pause` drops everything both ways and keeps the socket open (a
+// A TCP pipe in front of a shard that the test can cut. `cut`, `cutSilent` and `refuse` are for one connection's end and
+// the way back; `pause` drops everything both ways and keeps the socket open (a
 // network that died without a close). `injectClose` sends the browser a WebSocket close frame as if the server had sent
 // it, then pauses, so the real server's later bytes do not follow it.
 async function tcpProxy(target, bytesPerSecond = 0) {
   const sockets = new Set(),
-    pipe = { paused: false, port: 0, last: undefined },
+    pairs = [],
+    pipe = { paused: false, refuse: false, port: 0, last: undefined },
     server = createTcpServer((client) => {
-      const upstream = createConnection(target, '127.0.0.1');
+      if (pipe.refuse) return client.destroy();
+      const upstream = createConnection(target, '127.0.0.1'),
+        pair = { client, upstream, silent: false };
+      pairs.push(pair);
       sockets.add(client).add(upstream);
       pipe.last = client;
-      client.on('data', (data) => pipe.paused || upstream.write(data));
+      client.on('data', (data) => pipe.paused || pair.silent || upstream.write(data));
       if (bytesPerSecond) {
         // Down, at a fixed rate: the socket's queue stays here, as it would on the slow link.
         const queue = [];
@@ -918,7 +1057,7 @@ async function tcpProxy(target, bytesPerSecond = 0) {
         }, 20);
         client.on('close', () => clearInterval(pump));
         upstream.on('data', (data) => queue.push(data));
-      } else upstream.on('data', (data) => pipe.paused || client.write(data));
+      } else upstream.on('data', (data) => pipe.paused || pair.silent || client.write(data));
       for (const [a, b] of [
         [client, upstream],
         [upstream, client],
@@ -930,6 +1069,17 @@ async function tcpProxy(target, bytesPerSecond = 0) {
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
   pipe.port = server.address().port;
   pipe.pause = () => (pipe.paused = true);
+  // A FIN to both ends of what is open now: what Cloudflare does.
+  pipe.cut = () => {
+    for (const { client, upstream } of pairs.splice(0)) {
+      client.end();
+      upstream.end();
+    }
+  };
+  // What is open now goes silent and stays open; a new connection works.
+  pipe.cutSilent = () => {
+    for (const pair of pairs.splice(0)) pair.silent = true;
+  };
   pipe.injectClose = (code, reason) => {
     const text = Buffer.from(reason);
     pipe.paused = true;

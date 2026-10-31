@@ -44,8 +44,8 @@ export const IDLE_CLOSE_CODE = 4410;
 
 /**
  * What to do about a close the page did not ask for: 'idle' stops and waits for the player, 'unreadable' is a message
- * the page could not read (play alone), and everything else (a world's end 1001, a full shard 1013, a crash 1006, a
- * silent server 4408) asks /join where to go.
+ * the page could not read (play alone), and everything else (a world's end 1001, a full shard 1013, a crash 1006 or a
+ * silent server 4408 that resuming in place could not get over) asks /join where to go.
  */
 export function closeKind(closed: Pick<VoxelNetClose, 'code' | 'byClient'>): 'idle' | 'unreadable' | 'rejoin' {
   if (closed.byClient) return 'unreadable';
@@ -54,6 +54,14 @@ export function closeKind(closed: Pick<VoxelNetClose, 'code' | 'byClient'>): 'id
 
 /** The banner after an idle close; its Join button reloads the page. */
 export const IDLE_BANNER = 'You were idle, so Plaza gave your place to someone else. Join to come back.';
+
+/**
+ * The banner while a dropped connection is tried again: nothing on the first try, which is over in under a second, and
+ * a line with no button after that. Nothing is reloaded; the world and the player stay.
+ */
+export function resumeBanner(attempt: number): string {
+  return attempt < 2 ? '' : 'Reconnecting to Plaza.';
+}
 
 /** What the router's GET /join answers. */
 export type JoinAnswer =

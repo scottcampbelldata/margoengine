@@ -10,6 +10,7 @@ import {
   keyBits,
   parseJoin,
   plazaName,
+  resumeBanner,
   soloBanner,
 } from '../src/multiplayer.ts';
 import { isPlazaProtected as areaRule } from '../src/plaza-area.ts';
@@ -188,6 +189,12 @@ test('writeFigure allocates nothing', { skip: typeof globalThis.gc !== 'function
 
 test('tags are for players close enough to read', () => {
   assert.equal(TAG_RANGE, 24);
+});
+
+test('resumeBanner: nothing on the first try, a line with no button from the second', () => {
+  assert.equal(resumeBanner(1), '');
+  assert.equal(resumeBanner(2), 'Reconnecting to Plaza.');
+  assert.equal(resumeBanner(5), 'Reconnecting to Plaza.');
 });
 
 test('closeKind: only the idle code stops the page; every other close goes back through /join', () => {
