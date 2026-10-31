@@ -42,7 +42,7 @@ and commit.
 | Page | Figures | Evidence | Status |
 | --- | --- | --- | --- |
 | engine | Core 21,178 B (52,606 raw), core + stage 22,581 B (56,427 raw), 2,419 B under the gate | `entry-sizes.json` at the item 53.2 dynamic instances landing (2026-10-29, dirty: false) | PROVEN |
-| engine | 92 packages (none published to npm yet); `npm i margoengine`; kit sizes (game 307,012, viz 277,396, web 155,058 B) | `docs/catalog.json`; `docs/guides/kits.md`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
+| engine | 96 packages (none published to npm yet); `npm i margoengine`; kit sizes (game 307,012, viz 277,396, web 155,058 B) | `docs/catalog.json`; `docs/guides/kits.md`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
 | engine | Starter first frames: web 788, react 835, viz 968, game 1,308 ms (vite dev, packages linked, one run each, RTX A6000 PC) | `examples/package-benchmarks/results/starters-first-frame.json` (`tools/create-margo/test/browser-check.mjs`) | PROVEN (dated, one run) |
 | engine | 6,498 tests, 6,496 pass, 2 skipped (Node 26.12, `01836c27`) | `examples/package-benchmarks/results/test-count.json` | PROVEN |
 | engine | Section 10 (what the checks caught): figures quoted from fix commits (`b6bea3e9`, `baa66526`, `ab27353f`, `6d08b0af`, `3a59aa55`, `7714e84e`, `109ec352`, `7ab8cd13`, `6ddd733b`, `85c96a55`, `49dca9dd`, `51d8786a`, `a4fca9be`, `7f0dd465`, `0687e6ec`, `86ed9107`) and `docs/known-bugs.md` | [perf-history.md](perf-history.md) entries 37 to 44 | PROVEN (each from its commit message) |

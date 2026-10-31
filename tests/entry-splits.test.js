@@ -11,7 +11,13 @@ const splits = [
   ['@margoengine/decoders/texture', '@margoengine/decoders'],
   ['@margoengine/gltf-pro/coordinates', '@margoengine/gltf-pro'],
   ['@margoengine/materials/atlas', '@margoengine/materials'],
-  ['@margoengine/animation/sampling', '@margoengine/animation'],
+  // ClipMarkers and clip compression live in the sampling entry only, so the root does not pay for them.
+  [
+    '@margoengine/animation/sampling',
+    '@margoengine/animation',
+    [],
+    ['ClipMarkers', 'validateMarkers', 'compressTrack', 'quantizeTrack', 'dequantizeTrack'],
+  ],
   ['@margoengine/loaders/common', '@margoengine/loaders'],
   ['@margoengine/loaders/usd', '@margoengine/loaders'],
   ['@margoengine/geometry/shapes', '@margoengine/geometry'],
@@ -41,11 +47,13 @@ function staticImports(file, seen = new Set(), out = new Set()) {
 }
 const dist = (pkg, entry) => join(root, 'packages', pkg, 'dist', entry + '.js');
 
-for (const [sub, whole] of splits)
+for (const [sub, whole, , only = []] of splits)
   test(`${sub} serves the same bindings as ${whole}`, async () => {
     const [part, all] = await Promise.all([import(sub), import(whole)]);
     assert.ok(Object.keys(part).length > 0);
-    for (const [name, value] of Object.entries(part)) assert.equal(all[name], value, `${sub} ${name}`);
+    for (const [name, value] of Object.entries(part))
+      if (only.includes(name)) assert.equal(all[name], undefined, `${sub} ${name} is served by the split only`);
+      else assert.equal(all[name], value, `${sub} ${name}`);
   });
 
 test('the split entries load no other package beyond core and math', () => {

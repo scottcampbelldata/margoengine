@@ -64,4 +64,6 @@ export class CharacterController2D {
     this.world.removeCharacterController(this.raw);
     this.onDispose(this);
   }
+  declare [Symbol.dispose]: () => void;
 }
+CharacterController2D.prototype[Symbol.dispose] = CharacterController2D.prototype.dispose;

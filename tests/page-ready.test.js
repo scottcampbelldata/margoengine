@@ -76,7 +76,7 @@ test('a server that went idle with the page not ready fails after the grace, not
     }),
     /idle page: the dev server went idle but the page was still not ready/,
   );
-  assert.ok(Date.now() - begun < 5000);
+  assert.ok(Date.now() - begun < 5000); // wall-clock: the wait gives up at the 300 ms grace, not the 60 s hard limit
 });
 
 test('ready as soon as the page says so, however long the server stays busy', async () => {

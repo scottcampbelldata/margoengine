@@ -1584,7 +1584,7 @@ its environment so it takes the shared GPU lock, not the landing lock. The resul
 Run it with `--no-build` from a landing script: `verify` just built the packages and `dist` is still that build. The API
 reports are checked by `api:check` in `verify` before this step, so a change that alters exports must already carry the
 `api:update` output (1.4.1). Planned, not built: reuse the entry-size and basic-scene results that `build:site` measured on
-the same tree (about 25 to 35 seconds a landing, an estimate); it is a change to the check machinery.
+the same tree (about 25 to 35 seconds a landing, an estimate); it is a change to the check scripts.
 
 Why one place: "Generated records (sizes, baselines) that every change rewrites cause rebase conflicts; regenerate them
 in one place (nightly or a single records commit) rather than in every landing where possible" (global rules).

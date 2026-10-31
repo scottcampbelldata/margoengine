@@ -64,6 +64,7 @@ export class CharacterController2D {
     constructor(world: World2D, raw: KinematicCharacterController2D, body: Body2D, scale: number, onDispose: (controller: CharacterController2D) => void, refresh: () => void);
     move(delta: Vec2D): CharacterMoveResult2D;
     dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface CharacterMoveResult2D {

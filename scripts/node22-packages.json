@@ -79,6 +79,8 @@
     "@margoengine/react": "its unit tests rely on node:test mock.module timing that Node 22 does not give (bug 18), so they run on the contributors' Node 24.18; React 18 SSR itself runs on Node 22 in the end-user proof"
   },
   "browserOnly": {
+    "@margoengine/pixel": "the pixel camera and layer compositor render with WebGPU; runs in the browser",
+    "@margoengine/sprites": "2D sprites render with WebGPU (instanced pipelines, textures); runs in the browser",
     "@margoengine/animation": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/audio": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/blender": "loads Blender .margo assets into an engine for the WebGPU PBR renderer; runs in the browser",
