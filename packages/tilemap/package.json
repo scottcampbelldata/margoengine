@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./autotile": {
+      "types": "./dist/autotile.d.ts",
+      "import": "./dist/autotile.js"
     }
   },
   "files": [
