@@ -6,6 +6,13 @@
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { GeometryData } from "@margoengine/geometry";
 
+export interface BoatOptions extends MeshDetailOptions {
+    length?: number;
+    seats?: number;
+    oars?: boolean;
+    seed?: number;
+}
+
 export type DensityField = (x: number, y: number, z: number) => number;
 
 export interface FractalOptions {
@@ -16,6 +23,14 @@ export interface FractalOptions {
 }
 
 export { HeightField } from "@margoengine/math";
+
+export interface JettyOptions extends MeshDetailOptions {
+    length?: number;
+    width?: number;
+    height?: number;
+    ladder?: boolean;
+    seed?: number;
+}
 
 export interface MarchingCubesOptions {
     resolution?: readonly [number, number, number];
@@ -79,6 +94,8 @@ export function generateAcaciaMesh(options?: MeshDetailOptions): TreeMesh;
 
 export function generateBirchMesh(options?: MeshDetailOptions): TreeMesh;
 
+export function generateBoatMesh(options?: BoatOptions): GeometryData;
+
 export function generateCabinMesh(height: HeightField, position?: readonly [number, number]): {
     floor: number;
     siding: GeometryData;
@@ -92,6 +109,8 @@ export function generateCactusMesh(): GeometryData;
 export function generateFernMesh(): GeometryData;
 
 export function generateGrassMesh(blades?: number): GeometryData;
+
+export function generateJettyMesh(options?: JettyOptions): GeometryData;
 
 export function generatePalmMesh(options?: MeshDetailOptions): TreeMesh;
 

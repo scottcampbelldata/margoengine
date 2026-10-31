@@ -527,6 +527,23 @@ export const entries = [
     fix: 'Split the module, flatten the nesting, use a var instead of a huge constant, or give a large integer a concrete type such as i32 or u32.',
   },
   {
+    id: 'procedural',
+    title: '@margoengine/procedural: mesh generators',
+    kind: 'family',
+    messages: [
+      'Invalid mesh detail; pass 0, 1 or 2.',
+      'Invalid seed; pass an integer.',
+      'Invalid jetty length; pass a number from 4 to 120.',
+      'Invalid jetty width; pass a number from 1 to 8.',
+      'Invalid jetty height; pass a number from 0.3 to 4.',
+      'Invalid boat length; pass a number from 1.5 to 12.',
+      'Invalid boat seats; pass an integer from 0 to 4.',
+    ],
+    cause:
+      'A mesh generator option has the wrong type (TypeError) or is outside its range (RangeError), for example a jetty length of 3 m, a boat with 5 seats, a seed that is not an integer or a detail level other than 0, 1 or 2. The message names the option and the range.',
+    fix: 'Pass a number inside the range the message gives, `true` or `false` for `ladder` and `oars`, an integer for `seed` and `seats`, and 0, 1 or 2 for `detail`. Every option is optional: leave it out to get the default.',
+  },
+  {
     id: 'biomes',
     title: '@margoengine/biomes: biome worlds, climate fields and editing',
     kind: 'family',

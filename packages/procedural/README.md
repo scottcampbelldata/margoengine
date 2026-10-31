@@ -51,6 +51,24 @@ import {generateTreeMesh} from 'margoengine/procedural';
 const rings = [2, 1, 0].map((detail) => generateTreeMesh('broadleaf', {detail})); // near, middle, far
 ```
 
+For a cove scene there are two waterfront props, each one `GeometryData` mesh with UVs, tangents and unit normals,
+local origin at the water surface (y = 0), +Y up, in metres, deterministic by `seed` (an integer, default 1):
+
+| Call | Options (defaults) | Triangles at `detail` 2 / 1 / 0 |
+| --- | --- | --- |
+| `generateJettyMesh(options?)` | `length` 4..120 (24), `width` 1..8 (2.2), `height` above the water 0.3..4 (1.1), `ladder` (true), `seed`, `detail` | 2,768 / 1,680 / 508 |
+| `generateBoatMesh(options?)` | `length` 1.5..12 (3.6), `seats` 0..4 (3), `oars` (true), `seed`, `detail` | 1,884 / 812 / 372 |
+
+The jetty runs along +X from the shore end at x = 0, with planks, stringers, posts and a ladder at the far end. The
+boat is a rowing boat centred on the origin with its bow toward +X. A wrong type throws a `TypeError` and a value out of
+range a `RangeError`; the message names the range to pass.
+
+```ts
+import {generateJettyMesh, generateBoatMesh} from 'margoengine/procedural';
+const jetty = generateJettyMesh({length: 28, seed: 3}); // place it with its shore end on the beach
+const boat = generateBoatMesh({seed: 7, oars: false}); // moor it beside the jetty, y = 0 is the waterline
+```
+
 `contactAO(y, groundY)` gives bounded ground-contact occlusion, and
 `radialAO(x,y,z,center,radius)` shades enclosed canopy volumes. Use their output
 with `pbrVertexStream()` from geometry to bake ambient occlusion into vertex alpha

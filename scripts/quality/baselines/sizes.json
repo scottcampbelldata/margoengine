@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3973606,
+  "total": 3975699,
   "history": [
     {
       "date": "2026-10-24",
@@ -934,6 +934,12 @@
       "grew": 1
     },
     {
+      "date": "2026-10-31",
+      "commit": "87e007e26",
+      "reason": "voxel-net server: inputs held on the server's own chunks fold past 256 messages instead of closing the player, and held chunks go first in the generator queue; server +333 B gzip, client unchanged",
+      "grew": 1
+    },
+    {
       "date": "2026-10-30",
       "commit": "0882df471",
       "reason": "terrain: TerrainLayer.bump and macro shader text (biome look plan round 2, item 3); compiled in only when a layer sets one",
@@ -995,9 +1001,9 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "87e007e26",
-      "reason": "voxel-net server: inputs held on the server's own chunks fold past 256 messages instead of closing the player, and held chunks go first in the generator queue; server +333 B gzip, client unchanged",
-      "grew": 1
+      "commit": "b846a40a9",
+      "reason": "voxel-net resume (protocol 4): a dropped player is parked and comes back in place, because every socket is cut by the CDN at about 15 minutes; gzip client +1,634 B, server +1,146 B, bot +1,565 B (it holds the client)",
+      "grew": 3
     },
     {
       "date": "2026-10-31",
@@ -1073,9 +1079,15 @@
     },
     {
       "date": "2026-10-31",
-      "commit": "b846a40a9",
-      "reason": "voxel-net resume (protocol 4): a dropped player is parked and comes back in place, because every socket is cut by the CDN at about 15 minutes; gzip client +1,634 B, server +1,146 B, bot +1,565 B (it holds the client)",
-      "grew": 3
+      "commit": "a66ee4d82",
+      "reason": "procedural entry grows by the jetty and boat generators (generateJettyMesh, generateBoatMesh: lofted hull, planks, posts), about 1.7 kB, an optional package",
+      "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "6a1effcd7",
+      "reason": "procedural entry grows by the jetty and boat generators; report ajetty-report.md says about 1.7 kB, measured 2,032 B on current main (10,570 -> 12,602), the extra about 360 B over the report is as measured, cause not traced, next to r3-hulls; optional package, core and stage unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -1310,7 +1322,7 @@
     "@margoengine/post/ssgi": 11862,
     "@margoengine/post/ssr": 11154,
     "@margoengine/post/stack": 4001,
-    "@margoengine/procedural": 10888,
+    "@margoengine/procedural": 12981,
     "@margoengine/procedural/expression": 4720,
     "@margoengine/procedural/lsystem": 2454,
     "@margoengine/procedural/noise": 2314,
