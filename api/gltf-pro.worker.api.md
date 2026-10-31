@@ -773,6 +773,17 @@ interface PBRMaterial extends GLTFMaterial {
         readonly sampler: GPUSampler;
     };
     clip?: GPUBufferBinding;
+    castMask?: {
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+        readonly texCoord: 0 | 1;
+        readonly transform: Float32Array;
+        readonly opacity?: {
+            readonly buffer: GPUBuffer;
+            readonly view: GPUTextureView;
+            readonly sampler: GPUSampler;
+        };
+    };
     extendedFrame?: boolean;
 }
 
@@ -1010,6 +1021,7 @@ interface ShadowCasterRecord {
     alphaTransform?: Float32Array;
     instances?: PBRInstances;
     displacement?: PBRMaterial['displacement'];
+    opacity?: NonNullable<PBRMaterial['castMask']>['opacity'];
     clip?: GPUBufferBinding;
     dynamic: boolean;
 }

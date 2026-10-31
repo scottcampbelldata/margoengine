@@ -39,6 +39,11 @@ export interface LocalShadowPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    opacity?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
     bounds?: ArrayLike<number>;
 }
 
@@ -221,6 +226,11 @@ interface LocalShadowPrimitive {
         upload(device: GPUDevice): GPUBuffer;
     };
     displacement?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
+    opacity?: {
         readonly buffer: GPUBuffer;
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;

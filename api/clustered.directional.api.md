@@ -200,6 +200,11 @@ interface LocalShadowPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    opacity?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
 }
 
 interface LocalShadowSource {

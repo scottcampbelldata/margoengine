@@ -2765,6 +2765,58 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### `KHR_materials_specular` weight does not scale Fresnel at grazing angles on gltf-pro's native paths
+
+- **What:** the spec's Fresnel is `specular * (f0 + (1 - f0) * (1 - v.h)^5)`, so `specularFactor` 0 reflects nothing at any
+  angle, and the base is weighted by `1 - specular * max(F)`, one number for all channels. gltf-pro's native physical
+  shader and the `Transmission` pass multiply only F0 by the weight (`s.f0`), keep F90 at 1, and subtract F per channel.
+- **Measured (`Transmission` pass, white glass, unlit, n.v 0.25, 2026-10-31):** specular 0 passes 0.76 of the light
+  behind, the spec gives 1.0; specular 0.5 passes 0.75, the spec 0.87. Colour [2,1,1] at normal incidence passes
+  (0.92, 0.96, 0.96), the spec 0.92 in all channels. Normal incidence with white specular is right.
+- **Repro:** a material with `KHR_materials_specular: {specularFactor: 0}` through `Transmission.add(model)`; for the
+  reflection, the same material lit at a grazing view through `loadGLTF`.
+- **Cause:** `s.f0=min(ior*ior*color,1)*weight` in `physicalEdits` (`packages/gltf-pro/src/shader.ts`), used by
+  `direct_light` and `margoTransmission` (`packages/materials/src/transmission-pass.ts`), and the split-sum ambient in
+  `environment`, `sky` and `clustered`, which all take F90 = 1. The fix needs a surface F90 through those packages.
+  The materials `install` lobes and the native tint draw already follow the spec, so on the native tint path a surface with
+  specular 0 passes all the light behind and still reflects at grazing angles until this is fixed.
+
+### gltf-pro's native tint draw reads factors, never maps
+
+- **What:** transmitted light on the default path (no `install`, no `Transmission`) is a multiply draw that binds no
+  textures. It reads the sheen, specular and clearcoat factors, not their maps, and has never read the base colour or
+  transmission maps. `metallicFactor` is left out altogether: the default is 1 with the real value in a map, and reading
+  it turned FlightHelmet's lenses black. So a metal factor below 1 does not dim the light behind on this path (spec:
+  `1 - metal`), and a sheen factor of 1 with a dark map dims as if the map were white. Iridescence does not reach it.
+- **Repro:** a glass material with `KHR_materials_transmission.transmissionTexture` black on half its area through
+  `loadGLTF`: the whole surface passes the light behind. The two other paths honour it.
+- **Cause:** `tintEntry` in `packages/gltf-pro/src/shader.ts`, drawn with group 0 only (`frameGroup`). The fix is a tint
+  read from the full surface (`createDrawGroups`, as `texturedTint` does), with the volume attenuation apart from the base
+  colour in the uniform; it costs a second textured fragment pass on every native glass surface.
+
+### Clearcoat does not dim the opaque base under it through materials `install`
+
+- **What:** the spec's coated material is `mix(material, clearcoat_brdf, clearcoat * F)`, so the base keeps
+  `1 - clearcoat * F`. `clearcoatShader`'s `direct` hook only adds the coat (`direct+=materialClearcoat`), and no ambient
+  term exists. Transmitted light under the coat is right since `materialCoatKeep` (2026-10-31); opaque lit light is not.
+- **Size:** with clearcoat 1 the base should read 0.96 of itself at normal incidence and 0.73 at n.v 0.25.
+- **Repro:** `install(model)` on an opaque `KHR_materials_clearcoat` material, against the same model through gltf-pro's
+  native `layers()`, which does scale it.
+- **Cause:** `packages/materials/src/shader.ts`. The fix is `direct=direct*materialCoatKeep+materialClearcoat` plus a coat
+  ambient term; it moves the clearcoat baselines, so it was left for its own change.
+
+### Display-encoded targets add transmitted and lit light in encoded values
+
+- **What:** without an HDR scene target (`f.settings.w` below 0.5), the lit colour and the transmitted light are both
+  display-encoded when they are added: `color+...` in `materialTransmission`, and the lit draw's blend over the tint on
+  the native path. Light adds in linear values, so bright highlights over bright backgrounds come out too bright.
+- **Size:** encoded 0.5 + 0.5 reads 1.0; adding in linear light reads 0.69. The share itself is linear since 2026-10-31.
+- **Repro:** glass with a strong highlight over a bright background, on a target with no PostStack, against the same
+  scene with `Tonemap`.
+- **Cause:** the tone map and encoding run before the `output` hook; the extension path could decode and re-encode, the
+  native path's second draw cannot without a scene copy. Also, the native tint encodes the share and multiplies, which
+  is exact only for a power curve: within 1 step above about 40 of 255, up to 2 steps below it.
+
 ### Headless Edge took over 30 s to close once under heavy CPU load
 
 - **What:** `node scripts/frame-alloc-browser.mjs` measured all five scenes within their floors, then failed with
@@ -3043,6 +3095,19 @@ does not own. Each entry says exactly what is needed to close it.
   blend, or drawing a full-screen layer first to change the GPU's tile state, changes or adds work to hide the
   symptom.
 
+### Cut-outs on materials meshes: passes the shadow fix did not reach
+
+Found while fixing shadow cut-outs (2026-10-31). Each comes from reading the code; none has been run as a repro yet.
+
+- **Picking:** `PBRModel.pickingPrimitives` (gltf-pro) binds `r.views[0]`, the default white, so a click on a materials
+  mesh's cut-out hole still hits it. Repro: `new PbrMaterial({map, alphaTest: 0.5})`, pick through a transparent texel.
+  Fix: use `castMask` there too.
+- **Contact shadows:** `@margoengine/staging` samples `alphaTexture` at the raw UVs (no `alphaTransform`, glTF
+  `KHR_texture_transform` included) and ignores `opacity`. Repro: a cut-out with `uvTransform` or an `alphaMap`.
+- **TAA velocity:** `@margoengine/taa` ignores a caster's `opacity`, so an `alphaMap` hole writes the quad's velocity.
+- **`vertexColors: false`:** the colour pass reads vertex alpha as 1, but the caster depth shaders still multiply it in.
+  Repro: geometry with RGBA colours below `alphaTest`, `vertexColors: false`: drawn, yet casts nothing.
+
 ## Performance losses still open
 
 Measured but not fixed. Their history, sources and rerun commands are in
@@ -3289,7 +3354,9 @@ All were found by `npm run modern:test:extensions` and the other `test:release` 
 | Transmission with a sheen or specular lobe drew about 148 steps of white on a fully transmissive surface | the lobes recompute diffuse light at full strength, ignoring the transmitted share `s.tr` | lobes composed over transmission scale their diffuse by 1 - `s.tr`; `install` composes transmission first (materials) | same two |
 | The thin-glass sightline and volume refraction checks compared bytes, which IOR-dependent reflection and transmission (`dd13beb9`) change | the checks measured lighting, not where the background lies | they compare the red/green layout of the background | `scripts/materials-transmission-tests.js` |
 | `gltf-ktx2-production-tests.js` and `gltf-compression-browser-tests.js` could not build | the `closeAll` codemod put its import into the source of the generated consumer page (bug 70 again; that guard read only `.mjs`) | the import moved to the script | `tests/undeclared-names.test.js` now reads `scripts/**/*.js` |
+| Over transmission, sheen, specular and clearcoat did not touch the transmitted light (materials `install`): a white glass quad read 0.96 of the background whatever the lobes said, against the Khronos numbers 1.0 (specular 0), 0.92 (specular colour [2,1,1]), 0 (colour [25,25,25]), 0.42 (white sheen, roughness 0.5, 75 degrees), 0.54 (clearcoat 1, 75 degrees). Native tint path (no install): 1.0 for all of them | the transmission weight knew only the IOR's Fresnel, and the native tint was a per-material constant; glTF puts transmitted light in `fresnel_mix`'s base, under sheen and clearcoat | lobes set the transmitted share `materialLobesTransmitted`, the coat its `materialCoatKeep`, and the share is applied in linear light (materials); `margoTintShare` computes the same from the material's factors (gltf-pro) | `packages/materials/tests/transmission-layers.test.js`, `scripts/materials-transmission-tests.js` "layeredShare" |
 | Suite checks had gone stale against deliberate changes: a pinned shader hash, "New lobes bypassed transmission" (exact pixels, from before reflections stayed over transmission, `dc883a59`), `dynamicDraws === 4` and `staticDraws === 8` (undeformed casters cache automatically), one PBR compile per eye (pipelines are per device), exact error messages (coded errors with links), a lazy gltf chunk (the stage root has no `import()` since 2026-10-27), `engine.recovery` (private, mangled in dist, so the device loss race counted zero recovery frames) | no check ran them | each now states today's contract, as strictly: the shader against its source, lobes byte-exact on the unlit transmitted background plus a reflection check when lit, draws per cascade, the shared compile, the coded messages, no optional package anywhere in the quickstart bundle, frames between the loss and the new device | the suites, in `check:gpu-packages` |
+| Scene 05 of the biome scenes seemed to change colour and show sky bands above about 1.4 million objects; no engine fault: sky bytes are identical at 1,357,722, 1,387,928 and 1,429,018 objects, and at 2,028,410 no errors and every buffer stays under 13 MB | the tool that reads a picture to a model re-encodes a file over 3,932,160 bytes (5 MiB of base64) with a reduced palette; the same pixels pass true at 3,932,160 bytes and bands appear at 3,932,161; a 1920x1080 frame sits right at that size, so object count only moved the file size | `scripts/review-png.mjs` rewrites a shot losslessly under the limit and stops with `REVIEW_PNG_TOO_LARGE` if it cannot; judge shots from its output or by their numbers | `tests/review-png.test.js` |
 
 ## Fixed 2026-10-26 to 10-28
 
