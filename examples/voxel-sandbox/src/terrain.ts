@@ -15,12 +15,6 @@ export const terrainOptions = (seed: number): NoiseTerrainOptions => ({
   trees: 0.012,
 });
 
-/**
- * The Plaza's terrain: {@link terrainOptions} with wider tunnels, only in plaza=1 worlds. The ground's heights do not
- * depend on `caves`, so a seed's square and spawn ring stay where they are.
- */
-export const plazaTerrainOptions = (seed: number): NoiseTerrainOptions => ({ ...terrainOptions(seed), caves: 0.55 });
-
 /** Plants scattered on grass: block name and chance per grass column (decided by a hash of the column). */
 export const PLANTS: readonly (readonly [name: string, chance: number])[] = [
   ['tall_grass', 0.09],

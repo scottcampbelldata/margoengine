@@ -3,11 +3,11 @@
 // and it also stamps the Plaza's finds and its square at the origin.
 import { sandboxGenerator } from './plants.ts';
 import { plazaGenerator } from './plaza.ts';
-import { DEFAULT_SEED, plazaTerrainOptions } from './terrain.ts';
+import { DEFAULT_SEED, terrainOptions } from './terrain.ts';
 
 const params = new URL(import.meta.url).searchParams,
   seed = Number(params.get('seed') ?? DEFAULT_SEED) | 0;
 
 export default params.get('plaza') === '1'
-  ? plazaGenerator(sandboxGenerator(seed, plazaTerrainOptions(seed)), seed)
+  ? plazaGenerator(sandboxGenerator(seed, terrainOptions(seed)), seed)
   : sandboxGenerator(seed);

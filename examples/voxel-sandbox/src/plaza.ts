@@ -80,7 +80,7 @@ export function plazaSpawnRing(seed: number, blocks: readonly BlockType[]): [x: 
 }
 
 /**
- * `generate` with the finds (finds.ts: cave mouths, glow caps, ores, opals) and the square stamped on it, in world `seed`.
+ * `generate` with the finds (finds.ts: glow caps, ores, opals) and the square stamped on it, in world `seed`.
  * Every stamp follows from the coordinates alone, so chunks come out the same in any order.
  */
 export function plazaGenerator(generate: VoxelGenerate, seed: number): VoxelGenerate {

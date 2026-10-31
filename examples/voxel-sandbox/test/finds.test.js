@@ -4,15 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { VoxelChunk } from '@margoengine/voxel';
 import { defineBlocks } from '../src/blocks.ts';
-import {
-  GEM_DEPTH,
-  GEM_RADIUS,
-  gemChunkKey,
-  isFindsClear,
-  MOUTH_SURE_RADIUS,
-  plazaFinds,
-  VEINS,
-} from '../src/finds.ts';
+import { GEM_DEPTH, GEM_RADIUS, gemChunkKey, isFindsClear, plazaFinds, VEINS } from '../src/finds.ts';
 import { sandboxGenerator } from '../src/plants.ts';
 import {
   COUNTED_BLOCKS,
@@ -25,13 +17,13 @@ import {
   plazaRingColumn,
   plazaSpawnRing,
 } from '../src/plaza.ts';
-import { plazaTerrainOptions, terrainOptions } from '../src/terrain.ts';
+import { terrainOptions } from '../src/terrain.ts';
 
 const { blocks } = defineBlocks(),
   context = { blocks: blocks.table },
   id = (name) => blocks.id(name),
-  world = (seed) => plazaGenerator(sandboxGenerator(seed, plazaTerrainOptions(seed)), seed),
-  plain = (seed) => sandboxGenerator(seed, plazaTerrainOptions(seed));
+  world = (seed) => plazaGenerator(sandboxGenerator(seed, terrainOptions(seed)), seed),
+  plain = (seed) => sandboxGenerator(seed, terrainOptions(seed));
 
 async function chunkOf(generate, cx, cy, cz) {
   const chunk = new VoxelChunk();
@@ -49,7 +41,7 @@ function reader(generate) {
   };
 }
 
-test('wider tunnels only in the Plaza; the plain options the views use are as they were', () => {
+test('the terrain options the views and the Plaza use', () => {
   assert.deepEqual(terrainOptions(7), {
     seed: 7,
     seaLevel: 0,
@@ -59,7 +51,6 @@ test('wider tunnels only in the Plaza; the plain options the views use are as th
     caves: 0.3,
     trees: 0.012,
   });
-  assert.deepEqual(plazaTerrainOptions(7), { ...terrainOptions(7), caves: 0.55 });
 });
 
 test('the height and tunnel fields here are the ones noiseTerrain builds with', async () => {
@@ -158,18 +149,16 @@ test('a chunk is the same in any order, and from a fresh world', async () => {
   for (const key of a.keys()) assert.deepEqual(a.get(key), b.get(key), key);
 });
 
-test('mouths and glow caps per area stay in their band, and veins fall in their depth bands', async () => {
+test('glow caps per area stay in their band, and veins fall in their depth bands', async () => {
   const cap = id('glow_cap'),
     veinIds = new Map(VEINS.map(([name, min, max]) => [id(name), [name, min, max]])),
     counts = new Map();
   for (const seed of [11, 12]) {
     const finds = plazaFinds(seed),
       generate = world(seed);
-    let mouths = 0,
-      caps = 0;
+    let caps = 0;
     for (let cx = -2; cx < 2; cx++)
       for (let cz = -2; cz < 2; cz++) {
-        if (finds.mouth(cx, cz)) mouths++;
         for (let cy = -2; cy <= 1; cy++) {
           const chunk = await chunkOf(generate, cx, cy, cz);
           for (let z = 0; z < 32; z++)
@@ -185,57 +174,10 @@ test('mouths and glow caps per area stay in their band, and veins fall in their 
               }
         }
       }
-    // 128 x 128 blocks: within MOUTH_SURE_RADIUS, every chunk column able to have one does; some fall in the square.
-    assert.ok(mouths >= 7 && mouths <= 16, `seed ${seed}: ${mouths} mouths per 128 x 128`);
     assert.ok(caps >= 500 && caps <= 12_000, `seed ${seed}: ${caps} glow caps per 128 x 128`);
   }
   for (const [name] of VEINS) assert.ok(counts.get(name) > 50, `${name}: ${counts.get(name)} cells`);
   for (const name of COUNTED_BLOCKS) assert.doesNotThrow(() => id(name));
-});
-
-test('a mouth is a real hole: open down to a tunnel, with a ramp, a lip and light', async () => {
-  const stone = id('stone'),
-    cap = id('glow_cap'),
-    log = id('log');
-  let seen = 0;
-  for (const seed of [11, 12, 13]) {
-    const finds = plazaFinds(seed),
-      read = reader(world(seed));
-    for (let cx = -3; cx < 3; cx++)
-      for (let cz = -3; cz < 3; cz++) {
-        const mouth = finds.mouth(cx, cz);
-        if (!mouth) continue;
-        seen++;
-        const { x, z, top, bottom } = mouth;
-        assert.ok(top - bottom >= 2 && top - bottom <= 8, 'tunnel within 8');
-        for (let y = bottom + 1; y <= top + 1; y++)
-          assert.ok([0, cap].includes(await read(x, y, z)), `${x},${y},${z} open`);
-        assert.equal(await read(x + 2, finds.surface(x + 2, z), z), stone, 'the lip');
-        // The ramp: going round the rim, each tread is at most one block above the one before, and reaches near the top.
-        const treads = [];
-        for (const [dx, dz] of [
-          [-1, -1],
-          [0, -1],
-          [1, -1],
-          [1, 0],
-          [1, 1],
-          [0, 1],
-          [-1, 1],
-          [-1, 0],
-        ]) {
-          let y = top + 1;
-          while (y >= bottom - 1 && [0, cap].includes(await read(x + dx, y, z + dz))) y--;
-          treads.push(y);
-          for (let u = y + 1; u <= top + 1; u++) assert.notEqual(await read(x + dx, u, z + dz), log, 'no tree over it');
-        }
-        for (let i = 1; i < treads.length; i++) assert.ok(treads[i] - treads[i - 1] <= 1, `treads ${treads}`);
-        assert.ok(top - treads[treads.length - 1] <= 2, `treads ${treads}, ground ${top}`);
-        let caps = 0;
-        for (let y = bottom - 16; y <= top; y++) if ((await read(x, y, z)) === cap) caps++;
-        assert.ok(caps >= 1, 'a light at the bottom');
-      }
-  }
-  assert.ok(seen > 30, `${seen} mouths`);
 });
 
 test('nothing under or on the square, the sign or the ring columns', async () => {
@@ -258,39 +200,5 @@ test('nothing under or on the square, the sign or the ring columns', async () =>
       }
     }
     for (const list of finds.gems.values()) for (const [x, , z] of list) assert.ok(isFindsClear(x, z));
-    for (let cx = -3; cx < 3; cx++)
-      for (let cz = -3; cz < 3; cz++) {
-        const mouth = finds.mouth(cx, cz);
-        if (!mouth) continue;
-        for (let dz = -2; dz <= 2; dz++)
-          for (let dx = -2; dx <= 2; dx++)
-            assert.ok(isFindsClear(mouth.x + dx, mouth.z + dz), 'the whole mouth is clear');
-      }
   }
-});
-
-test('someone new at the spawn ring has a mouth within a short walk, in every world', () => {
-  // A walk of 40 blocks at the sandbox's 4.3 blocks a second is under ten seconds; a chunk is 32.
-  let worst = 0,
-    total = 0,
-    n = 0;
-  for (let seed = 1; seed <= 12; seed++) {
-    const finds = plazaFinds(seed),
-      mouths = [];
-    for (let cx = -7; cx < 7; cx++)
-      for (let cz = -7; cz < 7; cz++) {
-        const mouth = finds.mouth(cx, cz);
-        if (mouth) mouths.push(mouth);
-      }
-    const ring = plazaSpawnRing(seed, blocks.table);
-    for (const [x, z] of ring) {
-      const best = Math.min(...mouths.map((m) => Math.hypot(m.x - x, m.z - z)));
-      worst = Math.max(worst, best);
-      total += best;
-      n++;
-    }
-  }
-  assert.ok(MOUTH_SURE_RADIUS >= 100);
-  assert.ok(worst <= 120, `the farthest spawn is ${worst.toFixed(0)} blocks from a mouth`);
-  assert.ok(total / n <= 45, `a spawn is ${(total / n).toFixed(0)} blocks from a mouth on average`);
 });
