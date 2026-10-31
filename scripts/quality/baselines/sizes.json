@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3921669,
+  "total": 3922834,
   "history": [
     {
       "date": "2026-10-24",
@@ -944,6 +944,12 @@
       "commit": "a66ee4d82",
       "reason": "procedural: detail 0 canopies are stretched to the detail 2 bounding box (fitToHull and six hull boxes, +97 B) so far trees keep their size; detail 2 unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "6547044dd",
+      "reason": "sky dither fixes colour bands on the 8-bit canvas; report r3dither-report.md",
+      "grew": 2
     }
   ],
   "items": {
@@ -1224,8 +1230,8 @@
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
     "@margoengine/shadows": 14810,
-    "@margoengine/sky": 15740,
-    "@margoengine/sky/base": 6699,
+    "@margoengine/sky": 16485,
+    "@margoengine/sky/base": 7119,
     "@margoengine/sky/bruneton": 2627,
     "@margoengine/sky/clouds": 2338,
     "@margoengine/sky/fog": 2034,
