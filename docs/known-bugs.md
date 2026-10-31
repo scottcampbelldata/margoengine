@@ -321,19 +321,6 @@ does not own. Each entry says exactly what is needed to close it.
 - **Cause:** a fixed timeout against load, not a wrong result. Fix: wait on the dev server's readiness (as `listenWhenFree`
   and the pipeline-ready helper do) instead of a fixed time, and add a test that holds the load back.
 
-### `npm run dev:examples` refuses every page from a checkout reached through an 8.3 short path
-
-- **Repro (Windows):** open a terminal in the repository through its short name (`cd C:\DEVELO~1\Projects\MARGOE~1`,
-  or any clone under `os.tmpdir()`, which is `C:\Users\\...` on this PC), run `npm run dev:examples` and open
-  any page, for example `/packages/netcode/examples/arena/`: Vite answers 403 "outside of Vite serving allow list".
-  The same command from the long path serves 200 (measured with both paths on the same worktree).
-- **Cause:** with no Vite config at the repository root, Vite's file-serving allow list holds the working directory
-  as given (the short name) and compares it with each file's real long path, so no file matches.
-- **Fix needed:** a root `server.fs.allow` built from `realpathSync.native(process.cwd())` (a root `vite.config.js`, or
-  the same option passed by a small `dev:examples` wrapper), with a check that serves a page from a short-path cwd.
-  Not done in the netcode landing because a root Vite config changes every root `vite` command; the arena test runs
-  the README command from the canonical path meanwhile (`packages/netcode/tests/arena.test.js`).
-
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
 - **What:** the Windows System log shows nine `nvlddmkm` event 153 entries ("Error occurred on GPUID: 100") on
@@ -721,6 +708,7 @@ All were found by `npm run modern:test:extensions` and the other `test:release` 
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| `npm run dev:examples` refused every page (403) from a checkout reached through an 8.3 short path | Vite's file-serving allow list held the working directory as given and compared it with each file's real path | `dev:examples` runs `scripts/dev-examples.mjs`, which starts Vite in `realpathSync.native(process.cwd())`; no root Vite config, so every other root `vite` command is unchanged | `tests/dev-examples.test.js` (short-path cwd serves 200, a file outside the repository stays 403) |
 | `modern:test:extensions` sat silent until the 30 min GPU lock limit | Chromium (Edge 156, RTX A6000) leaves a `getCompilationInfo()` asked once the device is idle pending until another GPU request runs; `material-extension-tests.js` asked for 41 modules then, inside a `page.evaluate` with no time limit, and the eight suites ran in one process with no limit | the WGSL guard asks every module at creation and answers later calls with that (`scripts/support/wgsl-guard.js`); each suite runs alone under `runLimited` (`scripts/modern-extension-suite.mjs`); engine source must ask at creation | `tests/wgsl-guard.test.js`, `tests/modern-extension-suite.test.js`, `tests/compilation-info-at-creation.test.js` |
 | IOR 1 transmission (materials) drew a 13-step highlight over the background | since `dc883a59` the host keeps reflections under extension transmission, but its F0 stayed 0.04 whatever `KHR_materials_ior` said | the extension slot takes an `ior` expression and the host sets `s.f0` from it (gltf-pro); transmission and node transmission pass it (materials) | `packages/materials/tests/transmission-ior.test.js`, `scripts/materials-transmission-tests.js` |
 | Transmission with a sheen or specular lobe drew about 148 steps of white on a fully transmissive surface | the lobes recompute diffuse light at full strength, ignoring the transmitted share `s.tr` | lobes composed over transmission scale their diffuse by 1 - `s.tr`; `install` composes transmission first (materials) | same two |
