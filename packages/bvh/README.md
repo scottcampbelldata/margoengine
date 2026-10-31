@@ -139,6 +139,10 @@ the whole sphere and keeps the upper half; here every ray is cast in the hemisph
 bake runs synchronously on the calling thread (measured about 0.23 s for 20,000 vertices at 33 rays each, Node 24 on
 one laptop core).
 
+## Lines
+
+`intersectLines(raycaster, lines, options)` from `@margoengine/bvh/lines` picks `@margoengine/lines` lines with a Raycaster's ray, using a BVH per line, and returns the line, segment index, point, distance and offset. It has its own entry, so nothing else pays for it. Options, defaults and an example are in the [lines README](../lines/README.md#picking).
+
 ## Benchmark
 
 `npm run bench` on Node 22, one core of a shared 2-core container, 1M triangles:

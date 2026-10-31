@@ -146,6 +146,10 @@
       "types": "./dist/bvh/bake.d.ts",
       "import": "./dist/bvh/bake.js"
     },
+    "./bvh/lines": {
+      "types": "./dist/bvh/lines.d.ts",
+      "import": "./dist/bvh/lines.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"

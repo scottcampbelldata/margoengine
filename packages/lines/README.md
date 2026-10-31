@@ -153,13 +153,50 @@ const skin = lines.add(SkeletonHelper.fromGLTF(model)); // a loaded, animated gl
 bones.dispose(); // removes it from the plugin and frees its buffers
 ```
 
+## Picking
+
+`intersectLines` from `margoengine/bvh/lines` tests lines against a `Raycaster` ray, the same ray you test meshes with. Only code that imports that entry pays for it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Lines, Line} from 'margoengine/lines';
+import {Raycaster} from 'margoengine/bvh';
+import {intersectLines} from 'margoengine/bvh/lines';
+
+const engine = await Engine.create(canvas);
+const lines = new Lines();
+engine.use(lines);
+lines.add(new Line({positions: [-2, 0, 0, 0, 1, 0, 2, 0, 0], width: 4}));
+
+canvas.addEventListener('pointerdown', (event) => {
+  const ray = new Raycaster().setFromEngine(engine, event.offsetX, event.offsetY);
+  const [hit] = intersectLines(ray, lines.lines, {engine, tolerance: 5});
+  if (hit) console.log(hit.line, hit.segment, hit.point, hit.distance, hit.offset);
+});
+```
+
+A hit gives the `line`, the `segment` index, the world `point` on the centre line, the `distance` along the ray and the `offset` from the ray to the point. Options:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `engine` | none | Gives the view, attached lines' matrices and helper updates. An attached line needs it. |
+| `view` | the engine's camera and canvas | `{matrix, width, height}`: a WebGPU view-projection matrix and the canvas size in CSS pixels, for picking without an engine. |
+| `tolerance` | 3 pixels with a view, else 0 | The least distance from the centre line that hits. A line drawn wider hits across its drawn width instead. |
+| `toleranceUnits` | `'pixels'` | `'pixels'` (CSS pixels, needs a view) or `'world'`. |
+| `refresh` | true | Run the transform kernel first, as `Raycaster` queries do. |
+
+- Dash gaps hit. A dashed line picks as one line, so a hover does not flicker along it.
+- Each segment's pick area is a capsule: joins and ends count as round whatever the material says, so a butt end picks up to half a width past its drawn end.
+- Hits sort by distance. Neighbouring segments inside the tolerance count as one crossing and give one hit, the segment closest to the ray. Set `firstHitOnly` on the Raycaster for the nearest only.
+- Hidden lines and points cut away by the material's clipping planes do not hit; nor does anything behind the ray origin or outside `near` and `far`. Hits ignore depth, as all `Raycaster` hits do: merge with mesh hits by `distance`.
+- A pick on a polyline of 100,000 segments takes 0.015 ms; the BVH behind it takes 51 ms to build, on the first pick and after the line changes (`node packages/bvh/scripts/bench-line-pick.js`, Node 26). A dashed line's matrix change counts as a change.
+
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
-- Lines do not write depth, so crossing lines do not occlude each other and are not pickable through `engine.pick`. Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
+- Lines do not write depth, so crossing lines do not occlude each other and are not pickable through `engine.pick` (use [`intersectLines`](#picking)). Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
 - Dashes run continuously through joins, and caps apply to line ends only, not to each dash. World-unit widths ignore the mesh scale.
 - `ArrowHelper` draws its head as a wire cone, and `PlaneHelper` draws an outline with diagonals; there are no filled meshes. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
-- No line picking yet; `expandLine` gives the screen-space triangles for a CPU hit test.
 
 ## Tests
 

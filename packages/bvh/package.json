@@ -44,6 +44,10 @@
     "./bake": {
       "types": "./dist/bake.d.ts",
       "import": "./dist/bake.js"
+    },
+    "./lines": {
+      "types": "./dist/lines.d.ts",
+      "import": "./dist/lines.js"
     }
   },
   "files": [
