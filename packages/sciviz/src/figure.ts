@@ -268,7 +268,18 @@ export interface HeatmapLayerOptions {
 }
 
 /** Any figure layer. */
-export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer;
+/** A layer an optional entry builds (`@margoengine/sciviz/bricks`): it draws itself and reports its data bounds. */
+export interface CustomLayer {
+  /** Data bounds of the layer. */
+  readonly bounds: Bounds;
+  /** The figure's data-to-scene transform. */
+  setModel(model: Float32Array): void;
+  /** Frees the layer. */
+  dispose(): void;
+}
+
+/** Any layer a figure holds. */
+export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer | CustomLayer;
 
 const read = async (data: DataSource | undefined): Promise<ArrayLike<number> | undefined> =>
   data === undefined ? undefined : isGpuArray(data) ? await data.read() : data;
@@ -770,6 +781,14 @@ export class Figure extends EventTarget {
   // The one lines plugin per figure, shared by line layers and the axes.
   #linesPlugin(): Promise<Lines> {
     return (this.#lines ??= import('@margoengine/lines').then(({ Lines }) => Lines.attach(this.engine)));
+  }
+
+  /** Adds a layer built by an optional entry; it joins the figure's bounds and `remove()`. */
+  addLayer<L extends CustomLayer>(layer: L): L {
+    this.#check();
+    this.#need3d('This layer');
+    this.#linear('This layer');
+    return this.#add(layer);
   }
 
   /**

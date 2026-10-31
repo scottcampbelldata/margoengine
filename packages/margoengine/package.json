@@ -1094,6 +1094,10 @@
       "types": "./dist/sciviz.d.ts",
       "import": "./dist/sciviz.js"
     },
+    "./sciviz/bricks": {
+      "types": "./dist/sciviz/bricks.d.ts",
+      "import": "./dist/sciviz/bricks.js"
+    },
     "./sciviz/colormaps": {
       "types": "./dist/sciviz/colormaps.d.ts",
       "import": "./dist/sciviz/colormaps.js"

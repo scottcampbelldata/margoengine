@@ -4,6 +4,7 @@
 export { Figure, createFigure } from './figure.js';
 export type {
   BarLayerOptions,
+  CustomLayer,
   CreateFigureOptions,
   FieldData,
   FieldStyleOptions,

@@ -28,6 +28,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./bricks": {
+      "types": "./dist/bricks.d.ts",
+      "import": "./dist/bricks.js"
+    },
     "./colormaps": {
       "types": "./dist/colormaps.d.ts",
       "import": "./dist/colormaps.js"
@@ -60,7 +64,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js sciviz",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/sciviz-browser.mjs",
+    "test:browser": "npm run build && node tests/sciviz-browser.mjs && node tests/bricks-browser.mjs",
     "prepack": "npm run build"
   }
 }

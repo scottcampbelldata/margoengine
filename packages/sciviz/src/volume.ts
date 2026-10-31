@@ -115,7 +115,8 @@ fn kept(p: vec3f) -> bool {
   let exit = min(min(max(t0.x, t1.x), max(t0.y, t1.y)), max(t0.z, t1.z));
   if (exit <= enter) { discard; }
   let voxel = 1.0 / max(max(volume.dims.x, volume.dims.y), volume.dims.z);
-  let stride = voxel / volume.params.x;
+  // At most 2048 samples: a longer ray takes wider steps, so it still reaches the far side of the box.
+  let stride = max(voxel / volume.params.x, (exit - enter) / 2048.0);
   let count = min(u32((exit - enter) / stride) + 1u, 2048u);
   var t = enter + stride * hash(in.clip.xy);
   var colour = vec3f(0.0);
@@ -297,7 +298,10 @@ export class VolumeLayer implements Drawable {
       );
     const max = renderer.device!.limits.maxTextureDimension3D;
     if (dims.some((d) => d > max))
-      throw rangeError(`Volume dims [${dims.join(', ')}] exceed this GPU's 3D texture limit of ${max}`, 'sciviz');
+      throw rangeError(
+        `Volume dims [${dims.join(', ')}] exceed this GPU's 3D texture limit of ${max}; draw it with brickedVolume from @margoengine/sciviz/bricks`,
+        'sciviz',
+      );
     this.dims = [dims[0], dims[1], dims[2]];
     this.bounds = options.bounds ? ([...options.bounds] as Bounds) : [0, dims[0] - 1, 0, dims[1] - 1, 0, dims[2] - 1];
     const given = rangeOption(options.range, 'Volume range');

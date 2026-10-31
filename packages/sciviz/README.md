@@ -67,6 +67,7 @@ lines at the ticks and HTML tick labels.
 | `fig.surface(z, { nx, ny, x, y, colormap, range, contours, grid, opacity })` | height field coloured by height, contour lines, NaN holes |
 | `fig.volume(data, { dims, bounds, colormap, range, opacity, density, mode, quality, shading, clip })` | ray-marched volume; `mode: 'mip'` for maximum intensity |
 | `volume.slice('x' \| 'y' \| 'z', position)` | a plane through the volume, coloured by its map |
+| `brickedVolume(fig, source, options)` from `/bricks` | a volume larger than one texture or the memory budget, loaded by view ([below](#bricked-volumes)) |
 | `await fig.isosurface(data, level, { dims, bounds, color })` | GPU marching cubes; `layer.update(level)` re-extracts |
 | `fig.colorbar(colormap, range, { label, ticks })` | HTML colour bar at the canvas edge |
 
@@ -239,6 +240,67 @@ timeline.addEventListener('time', () => console.log(timeline.index));
 await fig.play({ fps: 30, signal: AbortSignal.timeout(10_000) });
 ```
 
+## Bricked volumes
+
+`brickedVolume(fig, source, options)` from `@margoengine/sciviz/bricks` draws a grid larger than one 3D texture or
+than you want in GPU memory. Bricks of a level-of-detail pyramid load by view into one atlas texture: the coarsest
+brick covers the box first, then finer ones replace it where their voxels would look largest. A separate entry, so a
+figure that does not import it pays nothing. It looks like `fig.volume()` and takes the same `colormap`, `range`,
+`opacity`, `density`, `mode`, `quality`, `shading`, `clip` and `bounds`; `layer.slice(axis, position)` works too.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `memoryBudget` | 536,870,912 (512 MiB) | Bytes of GPU memory for the atlas and page table; the least recently used bricks are replaced past it |
+| `brickSize` | 64 | Voxels per brick side |
+| `border` | 1 | Voxels a brick repeats from each neighbour, so filtering is exact across brick edges; 0 shows seams |
+| `detail` | 1 | Pixels a voxel may cover before finer bricks are wanted; 0 asks for full resolution everywhere in view |
+| `concurrency` | 4 | Most brick reads started per frame and running at once |
+
+A source is `{ dims, range, frames, read(request) }`. `read` gets `{ level, frame, origin, size, signal }` and returns
+those voxels (x fastest), or a promise of them: slice a file with `fetch` and a `Range` header, and pass `signal` on.
+Level 0 is full resolution; each level above averages 2 x 2 x 2 voxels of the one below. `arraySource(data, dims)`
+makes a source from arrays in memory (one array, or one per time step). A `GpuArray` is not a source: read it back
+first.
+
+`await layer.ready({ signal })` resolves once the view's bricks are loaded, and rejects with a `failed` MargoError if a
+read failed (coarser bricks keep drawing, an `error` event also fires, and calling `ready()` again reads it again).
+`await layer.setFrame(index, { signal })` moves to a time step: the old step stays on screen until the new one's bricks
+for the view are in, so a timeline's playback waits for it. `layer.stats` reports the bricks and bytes in use. Bricks
+are chosen and started as frames draw, so the engine's loop must be running (it is, unless you stopped it).
+
+```ts
+import { Figure } from '@margoengine/sciviz';
+import { brickedVolume, type BrickRequest } from '@margoengine/sciviz/bricks';
+
+const canvas = document.querySelector('canvas')!;
+const fig = await Figure.create(canvas);
+// 4096 x 1024 x 1024 voxels: 8.6 GiB as half floats, past a 2048 texture. Here a function fills each block; a real
+// source would fetch it. Two time steps.
+const dims = [4096, 1024, 1024] as const;
+const read = ({ level, frame, origin, size }: BrickRequest) => {
+  const scale = 2 ** level,
+    out = new Float32Array(size[0] * size[1] * size[2]);
+  for (let z = 0, i = 0; z < size[2]; z++)
+    for (let y = 0; y < size[1]; y++)
+      for (let x = 0; x < size[0]; x++, i++) {
+        const u = ((origin[0] + x) * scale) / dims[0] - 0.5 - frame * 0.1,
+          v = ((origin[1] + y) * scale) / dims[1] - 0.5,
+          w = ((origin[2] + z) * scale) / dims[2] - 0.5;
+        out[i] = Math.exp(-(u * u + v * v + w * w) * 14);
+      }
+  return out;
+};
+const volume = brickedVolume(fig, { dims, range: [0, 1], frames: 2, read }, {
+  colormap: 'ember',
+  opacity: (t) => t * t,
+  memoryBudget: 256 * 1024 * 1024,
+});
+await volume.ready({ signal: AbortSignal.timeout(60_000) });
+console.log(volume.stats.resident, volume.stats.memoryBytes);
+const timeline = fig.timeline([0, 1], (index) => volume.setFrame(index));
+await timeline.seek(1);
+```
+
 ## Picking, tooltips and selection
 
 Hovering shows a tooltip for the scatter point, line vertex, surface point, bar or heatmap cell under the pointer, with its x, y, z, its
@@ -331,6 +393,10 @@ console.log(ticks(0, 97).labels); // ['0', '20', '40', '60', '80']
   Rays are marched front to back from a jittered start, with opacity corrected for the step length, gradient
   lighting and early termination. With the camera outside the box, front faces are tested against scene depth;
   inside it, back faces are drawn. Opaque geometry inside the box does not cut rays short.
+- **Bricked volumes.** A page table with one entry per full-resolution brick names the finest loaded brick over that
+  place; each ray sample looks it up and reads the atlas with hardware filtering. Coarser bricks step, and take
+  gradients, by their own voxel. Between loaded levels values can step by what averaging removed: there is no gap, and
+  no seam between bricks of one level.
 - **Isosurfaces.** Each cell is classified, the triangle counts are scanned (`@margoengine/compute`), and every
   cell writes its triangles at its offset, with normals from the field's gradient. The vertices are drawn from the
   GPU buffer; only the triangle total is read back. The case table is derived from the cube's geometry with one

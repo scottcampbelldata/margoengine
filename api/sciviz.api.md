@@ -84,6 +84,12 @@ export interface CreateFigureOptions extends FigureOptions {
     readonly signal?: AbortSignal;
 }
 
+export interface CustomLayer {
+    readonly bounds: Bounds;
+    setModel(model: Float32Array): void;
+    dispose(): void;
+}
+
 export type DataSource = ArrayLike<number> | GpuArray;
 
 export type DragMode = 'orbit' | 'pan' | 'box' | 'lasso';
@@ -130,6 +136,7 @@ export class Figure extends EventTarget {
     select(region: SelectRegion): PointSelection;
     get bounds(): Bounds;
     get model(): Float32Array;
+    addLayer<L extends CustomLayer>(layer: L): L;
     ready(): Promise<void>;
     get layers(): readonly Layer[];
     get legend(): Legend | undefined;
@@ -235,7 +242,7 @@ export interface IsosurfaceLayerOptions {
     readonly signal?: AbortSignal;
 }
 
-export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer;
+export type Layer = ScatterLayer | LineLayer | SurfaceLayer | VolumeLayer | IsosurfaceLayer | RectsLayer | CustomLayer;
 
 export class Legend {
     readonly canvas: HTMLCanvasElement;

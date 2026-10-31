@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4092117,
+  "total": 4106396,
   "history": [
     {
       "date": "2026-10-24",
@@ -1142,6 +1142,12 @@
       "commit": "491f39e09",
       "reason": "@margoengine/shadows/virtual stage 5: pcf and soft filters, per-tap table reads, per-page nearest hint. About 9 kB of its own, as budgeted, plus about 5 kB of shared caster helpers the 9 kB budget did not count; a Shadows user already loads that chunk",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "175c6ec2d",
+      "reason": "new optional entry @margoengine/sciviz/bricks (bricked volumes); no existing entry limit raised",
+      "grew": 1
     }
   ],
   "items": {
@@ -1415,6 +1421,7 @@
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
     "@margoengine/sciviz": 36802,
+    "@margoengine/sciviz/bricks": 14279,
     "@margoengine/sciviz/colormaps": 4433,
     "@margoengine/sciviz/maths": 5638,
     "@margoengine/selection": 18404,
