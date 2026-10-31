@@ -428,3 +428,25 @@ await Promise.all([job('package:a', 'a.js'), job('package:b', 'b.js')]);
   }
   assert.ok(names('').includes('shared.js'), 'outside any job stays the step');
 });
+
+// Windows reuses process ids within one long step (found while building the recorder): a log named by the id alone was
+// overwritten by the later process, and that process's reads vanished from the key.
+test('two processes with one process id keep two logs', (t) => {
+  const { root } = fixture(t, { 'first.js': '1', 'second.js': '2' });
+  const dir = join(temp(t), 'logs'),
+    script = join(root, 'step.mjs'),
+    samePid = 'data:text/javascript,Object.defineProperty(process,"pid",{value:4242})';
+  writeFileSync(script, "import { readFileSync } from 'node:fs'; readFileSync(process.argv[2]);\n");
+  for (const file of ['first.js', 'second.js']) {
+    const result = spawnSync(process.execPath, [`--import=${samePid}`, `--import=${recorder}`, script, file], {
+      cwd: root,
+      env: { ...withoutRecorder(), MARGO_RECORD_DIR: dir },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  const logs = readdirSync(dir).filter((name) => name.endsWith('.json'));
+  assert.equal(logs.length, 2, 'one log for each process');
+  const reads = [...collectLogs(dir).scopes.get('').reads.keys()].join(' ');
+  assert.ok(reads.includes('first.js') && reads.includes('second.js'), reads);
+});
