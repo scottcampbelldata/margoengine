@@ -1,5 +1,5 @@
 {
-  "commit": "d7045cee3",
+  "commit": "e870506d9",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1172,8 +1172,8 @@
     },
     "@margoengine/scatter": {
       ".": {
-        "raw": 45361,
-        "gzip": 14126
+        "raw": 47035,
+        "gzip": 14826
       },
       "./tiles": {
         "raw": 7677,
