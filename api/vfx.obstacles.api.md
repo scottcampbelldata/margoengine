@@ -4,10 +4,15 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
+import { PassContext } from "@margoengine/core/extension";
 
 export const obstacles: NonNullable<VFXFeatures['obstacles']>;
 
 // Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type OwnedResources = {
     destroy(): void;
@@ -64,6 +69,14 @@ interface VFXFeatures {
         copy(texture: VFXTexture): VFXTexture;
         patch(billboard: string, texture: VFXTexture): string;
         create(device: GPUDevice, texture: VFXTexture, owned: OwnedResources): GPUBindGroupEntry[];
+    };
+    soft?: {
+        patch(billboard: string, samples: number): string;
+        create(device: GPUDevice, owned: OwnedResources): {
+            entries: GPUBindGroupEntry[];
+            changed: boolean;
+            write(c: Context, depth: GPUTexture | undefined, view: ArrayLike<number>, softness: number): number;
+        };
     };
     curves?: {
         validate(curves: VFXCurves): void;

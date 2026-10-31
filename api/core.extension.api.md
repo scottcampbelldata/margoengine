@@ -77,6 +77,7 @@ export class Engine {
     unshadowed: number;
     features?: GPUFeatureName[];
     exact?: 1;
+    power?: GPUPowerPreference;
     get frameGraph(): FrameGraph;
     get lighting(): Scene['lighting'];
     get stats(): Scene['stats'];
@@ -118,6 +119,10 @@ export interface EngineOptions {
     fallback?: (canvas: HTMLCanvasElement) => Renderer;
     features?: GPUFeatureName[];
     exactSize?: boolean | readonly [number, number];
+    signal?: AbortSignal;
+    startupWarning?: number;
+    startupTimeout?: number;
+    powerPreference?: GPUPowerPreference;
 }
 
 export interface EnginePlugin {

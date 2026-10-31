@@ -202,6 +202,7 @@ class BiomeWorld implements Disposable {
     }): AsyncIterableIterator<BiomeTile>;
     sample(x: number, z: number, out?: BiomeSample): BiomeSample;
     sampleRegion(x: number, z: number, out?: BiomeSample): BiomeSample;
+    heightAt(x: number, z: number): number;
     update(changes: Partial<Pick<BiomeWorldOptions, 'biomes' | 'climate' | 'classifier' | 'paint' | 'height'>>): void;
     onChange(listener: (rect: Rect) => void): () => void;
     digest(x: number, z: number, options?: {

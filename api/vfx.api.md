@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
 export interface FogLike {
@@ -74,6 +74,14 @@ export interface VFXFeatures {
         patch(billboard: string, texture: VFXTexture): string;
         create(device: GPUDevice, texture: VFXTexture, owned: OwnedResources): GPUBindGroupEntry[];
     };
+    soft?: {
+        patch(billboard: string, samples: number): string;
+        create(device: GPUDevice, owned: OwnedResources): {
+            entries: GPUBindGroupEntry[];
+            changed: boolean;
+            write(c: Context, depth: GPUTexture | undefined, view: ArrayLike<number>, softness: number): number;
+        };
+    };
     curves?: {
         validate(curves: VFXCurves): void;
         patch(billboard: string, curves: VFXCurves): string;
@@ -123,6 +131,8 @@ export interface VFXOptions {
     obstacles?: readonly VFXObstacle[];
     wrap?: boolean;
     sort?: boolean;
+    softness?: number;
+    depth?: () => GPUTexture | undefined;
     texture?: VFXTexture;
     curves?: VFXCurves;
     emitter?: VFXEmitter;
@@ -136,6 +146,10 @@ export interface VFXTexture {
 }
 
 // Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type OwnedResources = {
     destroy(): void;

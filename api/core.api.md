@@ -97,6 +97,7 @@ export interface EngineOptions {
     signal?: AbortSignal;
     startupWarning?: number;
     startupTimeout?: number;
+    powerPreference?: GPUPowerPreference;
 }
 
 export interface EnginePlugin {
