@@ -135,6 +135,13 @@ export interface ScatterOptions {
     bounds?: readonly [number, number, number, number];
     densityMap?: () => GPUTexture | undefined;
     follow?: boolean;
+    variation?: ScatterVariation;
+    clusters?: number;
+}
+
+export interface ScatterVariation {
+    hue?: number;
+    value?: number;
 }
 
 export type ScatterWind = readonly [number, number, number];

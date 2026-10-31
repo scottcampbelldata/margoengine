@@ -122,11 +122,18 @@ interface ScatterOptions {
     bounds?: readonly [number, number, number, number];
     densityMap?: () => GPUTexture | undefined;
     follow?: boolean;
+    variation?: ScatterVariation;
+    clusters?: number;
 }
 
 type ScatterPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface ScatterVariation {
+    hue?: number;
+    value?: number;
+}
 
 type ScatterWind = readonly [number, number, number];
 

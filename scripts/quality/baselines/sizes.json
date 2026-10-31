@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 3912320,
+  "total": 3913343,
   "history": [
     {
       "date": "2026-10-24",
@@ -896,6 +896,12 @@
       "commit": "0882df471",
       "reason": "scatter variation and clusters options (biome look round 2, landing A): per-instance tint and leaf-cluster shading WGSL plus option checks",
       "grew": 1
+    },
+    {
+      "date": "2026-10-31",
+      "commit": "f766d8ee2",
+      "reason": "scatter: per-cascade GPU shadow culling and the variation and clusters options now sit together in one entry (14,826 B gzip); both are optional WGSL and option code that was budgeted separately",
+      "grew": 1
     }
   ],
   "items": {
@@ -1160,7 +1166,7 @@
     "@margoengine/road": 1171,
     "@margoengine/save": 6955,
     "@margoengine/save/node": 939,
-    "@margoengine/scatter": 14248,
+    "@margoengine/scatter": 15271,
     "@margoengine/scatter/tiles": 3448,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
