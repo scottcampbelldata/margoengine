@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { paintBlockTextures, TEXTURE_NAMES, textureLayer, WATER_FRAMES } from '../src/textures.ts';
 
@@ -31,12 +32,24 @@ test('solid blocks are opaque, cutouts are all-or-nothing, water and glass are s
     'bricks',
     'glowstone',
     'heart_red',
+    'sandstone',
+    'marble',
+    'slate',
+    'plaster',
+    'walnut_planks',
+    'roof_tiles',
+    'gravel',
+    'moss',
+    'tin_ore',
+    'silver_ore',
+    'malachite_ore',
+    'opal',
   ])
     assert.ok(
       alphas(layer(name)).every((a) => a === 255),
       `${name} is opaque`,
     );
-  for (const name of ['leaves', 'torch', 'tall_grass', 'dandelion', 'poppy']) {
+  for (const name of ['leaves', 'torch', 'tall_grass', 'dandelion', 'poppy', 'glow_cap']) {
     const a = alphas(layer(name));
     assert.ok(
       a.every((v) => v === 0 || v === 255),
@@ -46,13 +59,23 @@ test('solid blocks are opaque, cutouts are all-or-nothing, water and glass are s
   }
   const holes = alphas(layer('leaves')).filter((v) => v === 0).length / 256;
   assert.ok(holes > 0.2 && holes < 0.5, `leaves are ${(holes * 100).toFixed(0)}% holes`);
-  for (const name of ['water', 'glass']) {
+  for (const name of ['water', 'glass', 'amber']) {
     const a = alphas(layer(name));
     assert.ok(
       a.some((v) => v > 0 && v < 255),
       `${name} is translucent`,
     );
   }
+});
+
+test('new types only append: every older layer keeps its pixels', () => {
+  // SHA-256 of the 26 layers before the Plaza's blocks, in layer order. A new painter goes at the end of PAINTERS; a
+  // deliberate repaint changes this with its reason.
+  const images = paintBlockTextures().slice(0, 26),
+    hash = createHash('sha256');
+  for (const { data } of images) hash.update(data);
+  assert.equal(TEXTURE_NAMES[25], 'heart_red');
+  assert.equal(hash.digest('hex'), '1912a596b6764113adf1a227fc98027c71f7ba2c9e4fd96a6b81b0d004b7f458');
 });
 
 test('water frames are consecutive layers that differ from each other', () => {

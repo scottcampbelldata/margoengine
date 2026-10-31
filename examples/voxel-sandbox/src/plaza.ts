@@ -4,17 +4,20 @@
 // this file adds what needs terrain: the floor, the spawn ring and the generator.
 import { type BlockType, VoxelChunk } from '@margoengine/voxel';
 import { noiseTerrain, type VoxelGenerate, type VoxelGenerateContext } from '@margoengine/voxel/generate';
+import { plazaFinds } from './finds.ts';
 import {
   isPlazaSpawnClear,
   onApron,
   onDisc,
   PLAZA_FOUNDATION,
   PLAZA_RADIUS,
+  PLAZA_RING_CANDIDATES,
   PLAZA_SIGN_BOTTOM,
   PLAZA_SIGN_CELLS,
   PLAZA_WALL_HALF,
   PLAZA_WALL_TOP,
   PLAZA_WALL_Z,
+  plazaRingColumn,
 } from './plaza-area.ts';
 import { terrainOptions } from './terrain.ts';
 
@@ -61,9 +64,6 @@ export function plazaFloor(seed: number, blocks: readonly BlockType[]): number {
   return Math.max(groundReader(seed, blocks)(0, 0) ?? 0, (terrainOptions(seed).seaLevel ?? 0) + 2);
 }
 
-/** Candidates on the ring from which {@link plazaSpawnRing} keeps the dry ones. */
-export const PLAZA_RING_CANDIDATES = 64;
-
 /**
  * Columns where players of world `seed` spawn: on the ring 40 to 60 blocks out, clear of the sign and on dry land, since
  * a server places a player on the highest rock of a column, which in the sea is its floor. Always the same for a seed;
@@ -73,23 +73,25 @@ export function plazaSpawnRing(seed: number, blocks: readonly BlockType[]): [x: 
   const ground = groundReader(seed, blocks),
     ring: [number, number][] = [];
   for (let i = 0; i < PLAZA_RING_CANDIDATES; i++) {
-    const angle = (i / PLAZA_RING_CANDIDATES) * 2 * Math.PI,
-      radius = 40 + ((i * 7) % 21), // 40 to 60, not in step with the angle
-      x = Math.round(Math.cos(angle) * radius),
-      z = Math.round(Math.sin(angle) * radius);
+    const [x, z] = plazaRingColumn(i);
     if (isPlazaSpawnClear(x, z) && ground(x, z) !== undefined) ring.push([x, z]);
   }
   return ring;
 }
 
-/** `generate` with the square stamped on it, in world `seed`. */
+/**
+ * `generate` with the finds (finds.ts: cave mouths, glow caps, ores, opals) and the square stamped on it, in world `seed`.
+ * Every stamp follows from the coordinates alone, so chunks come out the same in any order.
+ */
 export function plazaGenerator(generate: VoxelGenerate, seed: number): VoxelGenerate {
   let floor: number | undefined;
+  const finds = plazaFinds(seed);
   return async (chunk, cx, cy, cz, context) => {
     const ceiling = await generate(chunk, cx, cy, cz, context),
       reach = Math.max(PLAZA_RADIUS, PLAZA_WALL_HALF),
       x0 = cx * 32,
       z0 = cz * 32;
+    finds.stamp(chunk, cx, cy, cz, context.blocks);
     // Chunk columns outside the footprint keep the terrain's chunks and ceiling.
     if (x0 > reach || x0 + 31 < -reach || z0 > PLAZA_RADIUS || z0 + 31 < PLAZA_WALL_Z) return ceiling;
     floor ??= plazaFloor(seed, context.blocks);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { VoxelChunk } from '@margoengine/voxel';
 import { defineBlocks } from '../src/blocks.ts';
+import { plazaFinds } from '../src/finds.ts';
 import { sandboxGenerator } from '../src/plants.ts';
 import {
   isPlazaProtected,
@@ -167,8 +168,9 @@ test('the disc is stone with open air above, and its foundation has no holes', a
   }
 });
 
-test('the ceiling a chunk returns covers the wall, and columns away from the square keep the terrain', async () => {
+test('the ceiling a chunk returns covers the wall, and columns away from the square keep the terrain and its finds', async () => {
   const plain = sandboxGenerator(SEED),
+    finds = plazaFinds(SEED),
     chunk = new VoxelChunk();
   const ceiling = await generate(chunk, 0, 10, -1, context);
   assert.ok(ceiling >= floor + PLAZA_WALL_TOP, `ceiling ${ceiling}, wall top ${floor + PLAZA_WALL_TOP}`);
@@ -176,6 +178,7 @@ test('the ceiling a chunk returns covers the wall, and columns away from the squ
     b = new VoxelChunk(),
     [ca, cb] = [await generate(a, 9, 0, 9, context), await plain(b, 9, 0, 9, context)];
   assert.equal(ca, cb);
+  finds.stamp(b, 9, 0, 9, blocks.table);
   assert.deepEqual(a.pack().words, b.pack().words);
 });
 

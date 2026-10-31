@@ -123,3 +123,19 @@ export function isPlazaProtected(x: number, y: number, z: number, floor: number)
 export function isPlazaSpawnClear(x: number, z: number): boolean {
   return !onDisc(x, z) && !(Math.abs(x) <= PLAZA_WALL_HALF + 2 && z >= PLAZA_WALL_Z - 3 && z <= APRON_Z + 2);
 }
+
+/** Candidates on the ring from which plaza.ts `plazaSpawnRing` keeps the dry ones. */
+export const PLAZA_RING_CANDIDATES = 64;
+
+/** Candidate `i` of the spawn ring: 40 to 60 blocks out, not in step with the angle. */
+export function plazaRingColumn(i: number): [x: number, z: number] {
+  const angle = (i / PLAZA_RING_CANDIDATES) * 2 * Math.PI,
+    radius = 40 + ((i * 7) % 21);
+  return [Math.round(Math.cos(angle) * radius), Math.round(Math.sin(angle) * radius)];
+}
+
+/** The opals in a world: exact, known from the seed without generating anything (finds.ts places them). */
+export const GEM_TOTAL = 1000;
+
+/** The block types a player finds and counts, by name, in the order of the shard's counters. */
+export const COUNTED_BLOCKS: readonly string[] = ['tin_ore', 'silver_ore', 'malachite_ore', 'amber', 'opal'];

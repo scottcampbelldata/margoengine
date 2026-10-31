@@ -13,6 +13,7 @@ test('the sandbox imports public package entries only', async () => {
     'labels',
     'lines',
     'post',
+    'procedural',
     'quality',
     'shadows',
     'sky',
@@ -33,6 +34,16 @@ test('the sandbox imports public package entries only', async () => {
       }
       assert.ok(exported.has(specifier), `${path} imports ${specifier}, which is not a package export`);
     }
+  }
+});
+
+// The finds and wider tunnels are for plaza=1 worlds: the page's generator worker, which every deterministic view runs,
+// and the page itself reach neither.
+test('the deterministic views and the page never reach the finds', async () => {
+  const source = new URL('../src/', import.meta.url);
+  for (const file of ['generator.worker.ts', 'plants.ts', 'main.ts']) {
+    const text = await readFile(new URL(file, source), 'utf8');
+    assert.doesNotMatch(text, /finds[.]ts|plazaTerrainOptions|[.][/]plaza[.]ts/, file);
   }
 });
 

@@ -1,11 +1,14 @@
 // The sandbox's world generator: the built-in noiseTerrain, then plants (tall grass and flowers) on grass with open air
 // above. The browser's generator worker and the multiplayer server (server.mjs) both run it, so they build one world.
-import { noiseTerrain, type VoxelGenerate } from '@margoengine/voxel/generate';
+import { type NoiseTerrainOptions, noiseTerrain, type VoxelGenerate } from '@margoengine/voxel/generate';
 import { PLANTS, terrainOptions } from './terrain.ts';
 
-/** The generator of world `seed`; returns the column's ceiling, one higher than the terrain's for a plant. */
-export function sandboxGenerator(seed: number): VoxelGenerate {
-  const terrain = noiseTerrain(terrainOptions(seed)),
+/**
+ * The generator of world `seed`; returns the column's ceiling, one higher than the terrain's for a plant. The Plaza
+ * passes its own `options`; the page's worker and every deterministic view use the default.
+ */
+export function sandboxGenerator(seed: number, options: NoiseTerrainOptions = terrainOptions(seed)): VoxelGenerate {
+  const terrain = noiseTerrain(options),
     total = PLANTS.reduce((sum, [, chance]) => sum + chance, 0);
   // An unsigned 32-bit hash of a column (different constants from the tree hash, so plants do not follow trees).
   const hash = (x: number, z: number): number => {

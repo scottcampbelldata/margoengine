@@ -53,8 +53,10 @@ to load), quads, quad memory and draw calls (`voxels.stats`).
 
 ## How it is built
 
-- **World** (`src/blocks.ts`): 16 block types (stone, dirt, grass, sand, water, log, leaves, planks, cobblestone,
-  bricks, glass, torch, tall grass, dandelion, poppy, glowstone). Saves store block ids, so new types go at the end.
+- **World** (`src/blocks.ts`): 35 block types: stone, dirt, grass, sand, water, log, leaves, planks, cobblestone,
+  bricks, glass, torch, plants, glowstone, slabs, stairs, the sign's red heart, and the Plaza's sandstone, marble, slate,
+  plaster, walnut planks, roof tiles, gravel, moss, tin ore, silver ore, malachite ore, amber, opal and glow cap, all
+  painted in code (`src/textures.ts`). Saves store block ids, so new types go at the end.
 - **Generation** (`src/generator.worker.ts`): a module worker that `VoxelStreamer` starts by URL (`?worker&url`,
   seed in the query). It runs the built-in `noiseTerrain` (`src/terrain.ts`: sea level 0, height 8, amplitude 32,
   scale 192, caves 0.3, trees 0.012) and then puts tall grass (9%), dandelions and poppies (0.6% each) on grass
@@ -205,6 +207,11 @@ node examples/voxel-sandbox/server/admin.mjs status --data=plaza-data
 A world lasts 6 hours. Its edited chunks are saved every 10 minutes, so a crash loses at most that; a world's end closes
 each client with 1001, and the page asks `/join` again. A player idle for 10 minutes (no movement, no edit; a hidden tab still answers pings, so pings do not count) is closed with code 4410 and reason `idle`, which frees its place; a page must not rejoin on that code. Worlds get a stone square at the origin that players cannot edit
 (`src/plaza.ts`, only with `plaza=1` in the generator's URL), and names come from two word lists (`src/names.ts`).
+Those worlds also have wider tunnels and finds (`src/finds.ts`, never in the page's own generator or the deterministic views):
+cave mouths about every 40 x 40 blocks (always near the spawn ring), each a 3 x 3 hole with a ramp back up, a stone lip and
+glow caps; glow caps on tunnel floors; veins of tin (2 to 24 deep), silver (8 to 40), malachite (4 to 30) and amber (1 to 6,
+in dirt and sand); and exactly 1,000 opals on tunnel floors within 512 blocks, worked out from the seed without generating a
+chunk. None of it touches the square, the sign or a spawn ring column.
 The router's `/join` answer carries the world's `seed` and `floor`; the page keeps `floor` and asks the shard's own
 rule (`isPlazaProtected`, `src/plaza-area.ts`) before it predicts an edit, so a protected cell never flashes and the
 player reads "The square is protected. Build outside it." (at most once every 4 seconds). An edit the shard refuses for
