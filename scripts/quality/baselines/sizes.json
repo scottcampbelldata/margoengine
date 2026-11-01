@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4285078,
+  "total": 4286646,
   "history": [
     {
       "date": "2026-10-24",
@@ -1352,6 +1352,12 @@
       "commit": "1454595d3",
       "reason": "voxel-net file-store entry (FileChunkStore, new, 792 B gzip) and the server store option taking a ChunkStore (voxel finish plan V5)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "62a54b159",
+      "reason": "clustered/flicker and clustered/budget: flicker curves and a shadow texel budget, own entries, root unchanged",
+      "grew": 2
     }
   ],
   "items": {
@@ -1395,7 +1401,9 @@
     "@margoengine/cinematic": 2076,
     "@margoengine/clustered": 13989,
     "@margoengine/clustered/area": 10461,
+    "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/directional": 2563,
+    "@margoengine/clustered/flicker": 845,
     "@margoengine/clustered/ies": 3953,
     "@margoengine/clustered/projector": 2874,
     "@margoengine/clustered/shadows": 11774,

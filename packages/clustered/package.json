@@ -57,6 +57,14 @@
     "./units": {
       "types": "./dist/units.d.ts",
       "import": "./dist/units.js"
+    },
+    "./flicker": {
+      "types": "./dist/flicker.d.ts",
+      "import": "./dist/flicker.js"
+    },
+    "./budget": {
+      "types": "./dist/budget.d.ts",
+      "import": "./dist/budget.js"
     }
   },
   "files": [

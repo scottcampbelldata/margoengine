@@ -214,6 +214,14 @@
       "types": "./dist/clustered/units.d.ts",
       "import": "./dist/clustered/units.js"
     },
+    "./clustered/flicker": {
+      "types": "./dist/clustered/flicker.d.ts",
+      "import": "./dist/clustered/flicker.js"
+    },
+    "./clustered/budget": {
+      "types": "./dist/clustered/budget.d.ts",
+      "import": "./dist/clustered/budget.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"

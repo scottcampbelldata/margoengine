@@ -68,6 +68,36 @@ point lights' GGX and Lambert BRDF text, so materials' Lambert and Phong shade t
 shader's group) and the shader code exist only while the list is not empty: an empty or absent `DirectionalLights`
 leaves every GPU call unchanged. `lights.list` and `suns.list` return the lists last set (frozen copies).
 
+## Flicker and a shadow budget
+
+Two small entries that work on your light list, on the CPU.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {animateFlicker, flickerAt} from 'margoengine/clustered/flicker';
+import {shadowBudget} from 'margoengine/clustered/budget';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const lights = Clustered.attach(engine, {shadows: {maxLights: 4}});
+// candle, fire, fluorescent, pulse, strobe or your own function of seconds.
+const stop = animateFlicker(engine, lights, [
+  {position: [0, 2, 0], range: 8, intensity: 5, flicker: {curve: 'candle'}},
+  {position: [3, 2, 0], range: 8, intensity: 5, flicker: {curve: 'fluorescent', speed: 0.5, seed: 2}},
+]);
+console.log(flickerAt('fire', 1.5));
+stop();
+// Shadow texels shared by importance: nearer, brighter lights get bigger maps and the rest stop casting.
+lights.setLights(shadowBudget([
+  {position: [0, 2, 0], range: 8, castShadow: true},
+  {position: [9, 2, 0], direction: [0, -1, 0], range: 8, castShadow: true},
+], {viewer: engine.camera.position, texels: 1024 * 1024}));
+engine.start();
+```
+
+`shadowBudget` budgets what is drawn each update, with a point light paying for six faces. The shadow texture array
+keeps the size its `resolution` and `maxLights` set, so call it again when the camera moves far, not every frame.
+
 ## Directional and area light shadows
 
 `DirectionalLights` and `AreaLights` (`@margoengine/clustered/area`) lights with
