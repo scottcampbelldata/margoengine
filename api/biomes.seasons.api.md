@@ -17,6 +17,7 @@ export class BiomeSeasons implements Disposable {
     }): Promise<RasterLayer>;
     at(x: number, z: number, out?: Uint8Array): Uint8Array;
     colorAt(base: readonly [number, number, number], x: number, z: number): [number, number, number];
+    tintAt(x: number, z: number, out?: Uint8Array): Uint8Array;
     isSeasonal(biome: string, species?: string): boolean;
     dispose(): void;
     [Symbol.dispose](): void;
@@ -35,6 +36,8 @@ export interface SeasonWeather {
 export function degreeDaysSince(mean: number, half: number, base: number, phase: number): number;
 
 export function seasonalColor(base: readonly [number, number, number], state: ArrayLike<number>, offset?: number): [number, number, number];
+
+export function seasonalMix(state: ArrayLike<number>, offset?: number): [number, number, number, number];
 
 // Not exported from this entry, but used by the exports above:
 

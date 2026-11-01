@@ -94,6 +94,7 @@ export interface TerrainLayer {
     scale: number;
     bump?: number;
     macro?: number;
+    tint?: boolean;
 }
 
 export interface TerrainLighting {
@@ -120,6 +121,7 @@ export interface TerrainTextures {
     normalmap?: GPUTexture;
     layers: GPUTexture;
     weights?: readonly GPUTexture[];
+    tint?: GPUTexture;
 }
 
 export function clipmapGrid(resolution: number): {

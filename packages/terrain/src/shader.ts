@@ -139,15 +139,17 @@ fn terrainLayerSample(position:vec3f,projection:vec3f,dx:vec3f,dy:vec3f,layer:u3
  * The fragment shader with `TerrainTextures.weights` (`count` textures, 2 to 4): layer i's weight is channel i % 4 of
  * weight texture i / 4, sampled bilinearly once per fragment over the heightmap's bounds, in place of the height and
  * slope rules (which still set each layer's texture scale). A layer whose weight is 0 skips its three triplanar
- * samples, so 16 layers cost what the ones that show do; the colour is the same as sampling every layer. A function,
- * so importing anything else from this package keeps no shader text.
+ * samples, so 16 layers cost what the ones that show do; the colour is the same as sampling every layer. With `tint`
+ * (`TerrainTextures.tint`, bound after the weights), each layer whose rule has params.w 1 is mixed toward the tint
+ * texel's RGB by its A before relief and macro tone. A function, so importing anything else from this package keeps no
+ * shader text.
  */
-export const weightedFragment = (count: number, surface = false): string => {
+export const weightedFragment = (count: number, surface = false, tint = false): string => {
   const rules = terrainFragment(surface),
     ruleColor = rules.slice(rules.indexOf('fn terrainColor('), rules.indexOf('@fragment fn fragment(')),
     n = Math.min(4, Math.max(1, Math.floor(count))),
     ids = Array.from({ length: n }, (_, i) => i);
-  return /* wgsl */ `
+  const code = /* wgsl */ `
 ${ids.map((i) => `@group(0) @binding(${6 + i}) var terrainWeights${i}:texture_2d<f32>;`).join('\n')}
 ${layerSample}
 fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
@@ -163,4 +165,15 @@ fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   ${surface ? 'let surface=terrainSurface(terrainLayerSample(position,projection,dx,dy,0u),position,projection,dx,dy,0u);terrainRelief=surface.w;terrainRepeat=layerRules[0].params.x;return surface.rgb;' : 'return terrainLayerSample(position,projection,dx,dy,0u);'}
 }
 ${rules.replace(ruleColor, '')}`;
+  if (!tint) return code;
+  // The tint is sampled once per fragment over the heightmap's bounds, clamped to its texel centres like the weights.
+  return /* wgsl */ `@group(0) @binding(${6 + n}) var terrainTint:texture_2d<f32>;
+var<private> terrainTintTexel:vec4f;
+fn terrainTinted(c:vec3f,layer:u32)->vec3f {return mix(c,terrainTintTexel.rgb,terrainTintTexel.a*layerRules[layer].params.w);}
+${code
+  .replace(
+    'var packed=',
+    'let td=vec2f(textureDimensions(terrainTint));terrainTintTexel=textureSampleLevel(terrainTint,terrainSampler,clamp((position.xz-frame.map.xy)/frame.map.zw,vec2f(0.5)/td,vec2f(1)-vec2f(0.5)/td),0);var packed=',
+  )
+  .replace(/terrainLayerSample\(position,projection,dx,dy,(layer|0u)\)/g, 'terrainTinted($&,$1)')}`;
 };

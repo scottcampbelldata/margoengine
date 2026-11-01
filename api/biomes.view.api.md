@@ -178,6 +178,7 @@ class BiomeSeasons implements Disposable {
     }): Promise<RasterLayer>;
     at(x: number, z: number, out?: Uint8Array): Uint8Array;
     colorAt(base: readonly [number, number, number], x: number, z: number): [number, number, number];
+    tintAt(x: number, z: number, out?: Uint8Array): Uint8Array;
     isSeasonal(biome: string, species?: string): boolean;
     dispose(): void;
     [Symbol.dispose](): void;

@@ -795,13 +795,17 @@ rainfall and moisture layers the world already makes and adds none, so tiles, pl
 - **Senescence** grows from the warmest day to the autumn crossing of 5 C, as the share of the cooling between them,
   and stays full through the dormant season.
 - **Snow** is the precipitation of the days below 0 C since the autumn crossing, melted at 3 mm per thaw degree day (Hock
-  2003) from the spring crossing; 50 mm of snow water covers the ground. Snow that outlasts the summer lies all year.
+  2003) from the spring crossing; 50 mm of snow water covers the ground fully, less covers it in proportion. What the
+  summer cannot melt lies all year, and below 0 C all year the year's precipitation lies, so a cold, dry cell stays
+  thinly covered.
 - **Wetness** is the soil moisture, raised toward 255 by `weather.rain`.
 
 The counts start at the season crossings, not at 1 January, so 31 December runs into 1 January without a step. South
 of the equator the year is half a year on. `seasonalColor(base, state)` turns a colour with the state: autumn orange,
 bare straw in winter, darker on wet ground and white under snow. Species with `color: { seasonal: true }` and biomes
-with `tint: { seasonal: true }` follow it when `BiomeView` or `BiomeObjects` gets the seasons.
+with `tint: { seasonal: true }` follow it when `BiomeView` or `BiomeObjects` gets the seasons. `seasonalMix(state)`
+is the same curve as one mix, `[r, g, b, amount]`, for a shader: `base + (rgb - base) * amount`. `seasons.tintAt(x, z)`
+gives that mix at a place as 4 bytes (sRGB colour, amount), the amount scaled by the share of seasonal biomes there.
 
 ```ts
 import { BiomeWorld } from '@margoengine/biomes';
@@ -816,9 +820,10 @@ seasons.set({ dayOfYear: 20 }); // midwinter; views and objects that hold these 
 console.log(green, autumn, snow, wet, leaf);
 ```
 
-With a view, pass the seasons as an option. The plant cover ground of seasonal biomes and the foliage of seasonal
-species take the state at the world's centre, one colour per material (a per-texel tint needs a terrain feature that
-is not built yet). Without `seasons` the view draws exactly what it drew before.
+With a view, pass the seasons as an option. The plant cover ground of seasonal biomes is drawn through a tint texture
+of `tintAt` over the world (the terrain's `tint`, at most 256 texels a side), so each place shows its own snow, wet
+ground and green-up, and ground of other biomes keeps its look. The foliage of seasonal species takes the state at the
+centre of the objects' bounds, one colour per species. Without `seasons` the view draws exactly what it drew before.
 
 ```ts
 import { Engine } from '@margoengine/core';

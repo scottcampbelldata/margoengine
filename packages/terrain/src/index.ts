@@ -43,6 +43,14 @@ export interface TerrainTextures {
    * samples there. Without them the terrain shader and bindings are unchanged. Default: none.
    */
   weights?: readonly GPUTexture[];
+  /**
+   * Optional tint over the heightmap's bounds, with `weights` only: one `rgba8unorm` or `rgba8unorm-srgb` 2D texture of
+   * any size, sampled bilinearly. Each layer with `tint: true` has its colour mixed toward the texel's RGB by its A:
+   * `mix(layer, tint.rgb, tint.a)`, in linear light (an `-srgb` texture holds sRGB colours). Layers without `tint` are
+   * drawn as they are. `@margoengine/biomes/view` draws seasons through it. Without it the shader and bindings are
+   * unchanged. Default: none.
+   */
+  tint?: GPUTexture;
 }
 /** A splat rule: where layer i's texture shows. Rules blend smoothly around their bounds; layer 0 is the fallback. */
 export interface TerrainLayer {
@@ -67,6 +75,8 @@ export interface TerrainLayer {
    * Default 0 (no macro sample).
    */
   macro?: number;
+  /** Whether the layer takes `TerrainTextures.tint` (plant cover, not rock). Ignored without a tint. Default false. */
+  tint?: boolean;
 }
 /** Clipmap terrain settings, fixed at construction. Invalid values throw RangeError. */
 export interface TerrainOptions {
@@ -241,7 +251,13 @@ export class Terrain implements EnginePlugin {
     this.device = engine.gpu;
     this.textures = this.options.textures(this.device);
     const t = this.textures;
-    const weights = t.weights;
+    const weights = t.weights,
+      tint = t.tint;
+    if (
+      tint !== undefined &&
+      (!weights || !['rgba8unorm', 'rgba8unorm-srgb'].includes(tint?.format) || tint.depthOrArrayLayers !== 1)
+    )
+      throw new TypeError('Terrain tint must be one rgba8unorm or rgba8unorm-srgb 2D texture, given with weights');
     if (
       weights !== undefined &&
       (!Array.isArray(weights) ||
@@ -252,7 +268,13 @@ export class Terrain implements EnginePlugin {
       throw new TypeError(
         'Terrain weights must be 2 to 4 rgba8unorm 2D textures, one per 4 layers; pass the same texture twice for 4 layers',
       );
-    for (const texture of [t.heightmap, t.layers, ...(t.normalmap ? [t.normalmap] : []), ...(weights ?? [])])
+    for (const texture of [
+      t.heightmap,
+      t.layers,
+      ...(t.normalmap ? [t.normalmap] : []),
+      ...(weights ?? []),
+      ...(tint ? [tint] : []),
+    ])
       if (texture.dimension !== '2d' || !(texture.usage & GPUTextureUsage.TEXTURE_BINDING) || texture.sampleCount !== 1)
         throw new TypeError('Terrain textures must be sampled 2D textures');
     if (
@@ -296,7 +318,8 @@ export class Terrain implements EnginePlugin {
           layer.scale,
           Math.max(0.01, (layer.height[1] - layer.height[0]) * 0.05),
           0.05,
-          0,
+          // params.w: 1 for a layer that takes the tint (0 without a tint, as before).
+          +(!!tint && !!layer.tint),
           ...(stride === 12 ? [((layer.bump ?? 0) * 0.5) / layer.scale, layer.macro ?? 0, layer.scale / 24, 0] : []),
         ],
         i * stride,
@@ -320,7 +343,11 @@ export class Terrain implements EnginePlugin {
         { binding: 3, visibility: fragment, texture: { viewDimension: '2d-array' } },
         { binding: 4, visibility: fragment, sampler: { type: 'filtering' } },
         { binding: 5, visibility: fragment, buffer: { type: 'read-only-storage' } },
-        ...(weights ?? []).map((_, i) => ({ binding: 6 + i, visibility: fragment, texture: {} })),
+        ...[...(weights ?? []), ...(tint ? [tint] : [])].map((_, i) => ({
+          binding: 6 + i,
+          visibility: fragment,
+          texture: {},
+        })),
       ],
     });
     const resources = [
@@ -330,6 +357,7 @@ export class Terrain implements EnginePlugin {
       this.sampler,
       { buffer: this.rules },
       ...(weights ? weights.map((w) => w.createView()) : []),
+      ...(tint ? [tint.createView()] : []),
     ];
     const group = (buffer: GPUBuffer) =>
       this.device!.createBindGroup({
@@ -445,7 +473,9 @@ export class Terrain implements EnginePlugin {
           : terrainVertex.replace('o.material=vec4f(0.9,0,1,1)', `o.material=vec4f(${r},0,1,1)`);
     let code =
       (surface ? surfaceStruct(vertex) : vertex) +
-      (this.textures?.weights ? weightedFragment(this.textures.weights.length, surface) : terrainFragment(surface));
+      (this.textures?.weights
+        ? weightedFragment(this.textures.weights.length, surface, !!this.textures.tint)
+        : terrainFragment(surface));
     for (const effect of this.lighting) code = effect.shader(code, 1);
     return code;
   }
@@ -686,7 +716,13 @@ export class Terrain implements EnginePlugin {
   private release(): void {
     for (const texture of new Set(
       this.textures
-        ? [this.textures.heightmap, this.textures.normalmap, this.textures.layers, ...(this.textures.weights ?? [])]
+        ? [
+            this.textures.heightmap,
+            this.textures.normalmap,
+            this.textures.layers,
+            ...(this.textures.weights ?? []),
+            this.textures.tint,
+          ]
         : [],
     ))
       texture?.destroy();

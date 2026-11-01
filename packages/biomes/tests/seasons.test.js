@@ -7,7 +7,7 @@ import { BiomeWorld, degreeDays } from '../dist/index.js';
 import { canonicalBytes, sha256 } from '../dist/digest.js';
 import { BiomePlacement } from '../dist/placement.js';
 import { presets, presetWorlds } from '../dist/presets.js';
-import { BiomeSeasons, degreeDaysSince, seasonalColor } from '../dist/seasons.js';
+import { BiomeSeasons, degreeDaysSince, seasonalColor, seasonalMix } from '../dist/seasons.js';
 
 const golden = JSON.parse(readFileSync(new URL('./golden/seasons.json', import.meta.url), 'utf8'));
 const fields = JSON.parse(readFileSync(new URL('./golden/fields.json', import.meta.url), 'utf8'));
@@ -138,6 +138,87 @@ test('weather: snowfall scales the snow, rain raises the wetness, point reads ma
   const point = plain.at(0, 0);
   assert.equal(point.length, 4);
   assert.ok(point[2] > 0 && point[0] === 0, `${[...point]}`);
+});
+
+/** A one-cell tile of the layers the seasons read: mean and warmest-month temperature (cK), rainfall (mm a year). */
+const one = (mean, warmest, rainfall, moisture = 100) => ({
+  cells: 1,
+  layer: (name) => ({
+    data: { temperature: [mean], warmest: [warmest], rainfall: [rainfall], moisture: [moisture] }[name],
+  }),
+});
+
+test('snow cover follows the snow water, so a cold dry cell is not fully white', async () => {
+  const seasons = BiomeSeasons.attach(await flat(45), { dayOfYear: 1 }),
+    snow = (tile, day) => {
+      seasons.set({ dayOfYear: day });
+      return seasons.stateOf(tile).data[2];
+    };
+  // Below 0 C all year: the year's precipitation lies, 1 mm of 50 mm for full cover, 20 mm two fifths, 50 mm all.
+  for (const day of [1, 201]) {
+    assert.equal(snow(one(-2000, -1000, 1), day), 5, `1 mm on day ${day}`);
+    assert.equal(snow(one(-2000, -1000, 20), day), 102);
+    assert.equal(snow(one(-2000, -1000, 50), day), 255);
+  }
+  // A short thaw too weak to melt the winter's 5 mm: the snow outlasts the summer but stays thin.
+  const thin = snow(one(-850, 0, 5), 201);
+  assert.ok(thin > 0 && thin <= 25, `5 mm a year gave ${thin}`);
+  // Snow that outlasts the summer runs through the year without a step, 31 December into 1 January included.
+  const deep = one(-800, 50, 100),
+    year = Array.from({ length: 365 }, (_, i) => snow(deep, i + 1));
+  for (let i = 0; i < 365; i++)
+    assert.ok(Math.abs(year[(i + 1) % 365] - year[i]) <= 16, `day ${i + 1}: ${year[i]} to ${year[(i + 1) % 365]}`);
+});
+
+test('seasonalMix is seasonalColor as one mix for any base', () => {
+  for (const state of [
+    [255, 0, 0, 100],
+    [255, 220, 0, 100],
+    [0, 255, 0, 100],
+    [0, 255, 255, 100],
+    [255, 0, 0, 255],
+    [120, 60, 30, 200],
+    [17, 240, 90, 10],
+  ]) {
+    const [r, g, b, amount] = seasonalMix(state);
+    assert.ok(amount >= 0 && amount <= 1 && [r, g, b].every((c) => c >= 0 && c <= 1), `${state}: ${[r, g, b, amount]}`);
+    for (const base of [
+      [0.14, 0.3, 0.05],
+      [0.9, 0.8, 0.58],
+      [0, 0, 0],
+    ]) {
+      const want = seasonalColor(base, state),
+        got = base.map((c, i) => c + ([r, g, b][i] - c) * amount);
+      got.forEach((c, i) => assert.ok(Math.abs(c - want[i]) < 1e-12, `${state} ${base}: ${got} vs ${want}`));
+    }
+  }
+});
+
+test('tintAt: each place its own state, nothing where no biome follows the seasons', async () => {
+  const hills = (biome) =>
+      BiomeWorld.create({
+        size: [512, 512],
+        biomes: [biome],
+        height: { field: (x) => 100 + x * 5 },
+        climate: { latitude: 45 },
+      }),
+    seasonal = await hills({ ...presets.temperate, tint: { seasonal: true } }),
+    plain = await hills(presets.temperate),
+    seasons = BiomeSeasons.attach(seasonal, { dayOfYear: 30 }),
+    low = seasons.tintAt(20, 256),
+    high = seasons.tintAt(490, 256);
+  assert.notDeepEqual([...low], [...high], 'valley and summit tint apart');
+  for (const [x, tint] of [
+    [20, low],
+    [490, high],
+  ]) {
+    const mix = seasonalMix(seasons.at(x, 256));
+    assert.deepEqual([...tint], [...mix.slice(0, 3).map((c) => Math.round(c * 255)), Math.round(mix[3] * 255)]);
+    assert.ok(tint[3] > 0, 'winter tints seasonal ground');
+  }
+  const none = BiomeSeasons.attach(plain, { dayOfYear: 30 });
+  assert.equal(none.tintAt(20, 256)[3], 0, 'a biome without tint.seasonal keeps its look');
+  assert.equal(none.tintAt(490, 256)[3], 0);
 });
 
 test('seasonalColor: summer gives the base, autumn turns orange, winter bare or white, wet ground darker', () => {

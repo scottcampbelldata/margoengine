@@ -112,6 +112,34 @@ samples there, so 16 layers cost about what the ones that show do. This is how `
 group layout and draw calls are exactly as before (`examples/package-benchmarks/proofs/terrain-ssr.proof.js` checks the
 whole call sequence). Update the textures with `queue.writeTexture` and call `terrain.invalidate()`.
 
+Optional tint, with `weights` only: return `tint` from the factory, one `rgba8unorm` or `rgba8unorm-srgb` 2D texture of
+any size over the heightmap's bounds, and set `tint: true` on the layers it should colour (plant cover, not rock). Each
+such layer is mixed toward the texel's RGB by its A, in linear light, before relief and macro tone; other layers are
+drawn as they are. `@margoengine/biomes/view` draws seasons this way. Without `tint` the shader, bindings and rules
+are unchanged, whatever the layers say.
+
+```ts
+import type { EngineKernel } from 'margoengine/core';
+import { Terrain } from 'margoengine/terrain';
+declare const engine: EngineKernel;
+// Your heightmap, layers and weights textures, as above.
+declare const make: (device: GPUDevice) => { heightmap: GPUTexture; layers: GPUTexture; weights: GPUTexture[] };
+Terrain.attach(engine, {
+  size: [512, 512],
+  layers: [0, 1, 2, 3].map((i) => ({ height: [-1e6, 1e6], slope: [0, 1], scale: 0.25, tint: i === 0 })),
+  textures(device) {
+    const tint = device.createTexture({
+      size: [64, 64],
+      format: 'rgba8unorm-srgb',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    // RGB: the colour to mix toward; A: how far (0 keeps the layer).
+    device.queue.writeTexture({ texture: tint }, new Uint8Array(64 * 64 * 4).fill(200), { bytesPerRow: 256 }, [64, 64]);
+    return { ...make(device), tint };
+  },
+});
+```
+
 ## Relief and far detail: `bump` and `macro`
 
 Past about 50 m a layer texture's mips average it to its mean colour, and the ground is lit by the vertex normal only,

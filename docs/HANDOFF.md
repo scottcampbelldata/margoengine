@@ -3,14 +3,20 @@
 ## Biomes J4 (2026-11-01): seasons and the sun path, with follow-ups
 
 - Built: `@margoengine/biomes/seasons` (`BiomeSeasons`, per-cell rgba8 green-up, senescence, snow, wetness from the
-  partial-year degree-day integral; `seasonalColor`), the `seasons` option of `BiomeView` and `BiomeObjects`, and
-  `sunPath` in `@margoengine/sky/sun` (Spencer 1971). Tile, placement and climate digests are unchanged
-  (packages/biomes/tests/seasons.test.js checks them against the existing goldens).
-- Follow-up, not built: the ground tint is one colour per seasonal material, from the state at the world's centre. A
-  per-texel tint (the seasons raster sampled by the terrain shader) needs an optional extra texture in
-  `@margoengine/terrain`, which is terrain feature work. Objects likewise take one colour per seasonal species.
-- Follow-up: the biomes GPU checks (`test:gpu`, `test:gpu:objects`) did not run on this branch (the Beelink baseline
-  biomes GPU smoke hung before J4). Run them at this revision on the A6000 before calling the seasons path GPU-proven.
+  partial-year degree-day integral; `seasonalColor`, `seasonalMix`, `tintAt`), the `seasons` option of `BiomeView`
+  and `BiomeObjects`, and `sunPath` in `@margoengine/sky/sun` (Spencer 1971). Tile, placement and climate digests are
+  unchanged (packages/biomes/tests/seasons.test.js checks them against the existing goldens).
+- Ground: `BiomeView` with `seasons` draws plant cover layers of `tint.seasonal` biomes through a per-texel tint
+  texture (`seasons.tintAt` over the world, at most 256 texels a side), the new optional `TerrainTextures.tint` with
+  `TerrainLayer.tint`. Ground of biomes without `tint.seasonal` keeps its look. Without a tint the terrain shader,
+  bindings and rules are unchanged.
+- Follow-up: objects take one colour per seasonal species, from the state at the centre of their bounds.
+- Follow-up: the biomes and terrain GPU checks (`test:gpu`, `test:gpu:objects`, terrain `test:gpu`) did not run on this
+  branch (the Beelink baseline biomes GPU smoke hung before J4). Run them at this revision on the A6000 before calling
+  the seasons path GPU-proven.
+- Follow-up: the review pass could not build or test `@margoengine/terrain` in its sandbox, nor regenerate the API
+  reports and entry sizes; the tier 0 verify and the integrator's records must produce them (terrain, biomes/seasons
+  and biomes/view grow).
 
 ## Landed 2026-10-30: core cleanup, audit items P1 to P3 (approved by Scott)
 

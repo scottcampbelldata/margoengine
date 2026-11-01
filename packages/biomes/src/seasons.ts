@@ -9,6 +9,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { degreeDays } from './climate.js';
 import { clampInt, divFloor, ONE, qacos, qdiv, qmul, qsqrt, sincos, TURN } from './fixed.js';
 import type { RasterLayer } from './layers.js';
+import type { BiomeSample } from './sample.js';
 import type { BiomeTile, BiomeWorld } from './world.js';
 
 /** pi and 2 pi in Q16 radians (the same pi as climate.ts). */
@@ -118,27 +119,28 @@ function cellState(
         brown = clampInt(divFloor((phase - sin) * 255, Math.max(1, theta - sinOf(toAngle(theta)))), 0, 255);
     }
   }
-  // Snow: the precipitation of the days below 0 C since the autumn crossing, then melted by the thaw degree days since
-  // the spring crossing. Snow that outlasts the summer lies all year.
-  let snow = 0;
+  // Snow water (hundredths of a mm): the precipitation of the days below 0 C since the autumn crossing, then melted by
+  // the thaw degree days since the spring crossing. What the summer cannot melt stays as a floor all year, and below
+  // 0 C all year the year's precipitation lies. Cover is that water over SNOW_FULL, so a dry cold cell stays thin.
+  let water = 0;
   if (snowfall > 0 && rain > 0) {
-    if (half <= 0 ? mean <= 0 : mean <= -half) snow = 255;
+    if (half <= 0 ? mean <= 0 : mean <= -half) water = Math.floor((rain * 100 * snowfall) / ONE);
     else if (mean < half) {
       const theta = qacos(qdiv(-mean, half)),
         lying = Math.floor((divFloor(rain * (TWO_PI - 2 * theta) * 100, TWO_PI) * snowfall) / ONE);
-      if (lying > MELT * degreeDays(mean, half, 0, pair)[0]) snow = 255;
-      else {
-        const water =
-          phase > theta || phase < -theta
-            ? Math.floor(
-                (divFloor(rain * (phase > theta ? phase - theta : phase + TWO_PI - theta) * 100, TWO_PI) * snowfall) /
-                  ONE,
-              )
-            : Math.max(0, lying - MELT * degreeDaysSince(mean, half, 0, phase));
-        snow = Math.min(255, divFloor(water * 255, SNOW_FULL));
-      }
+      water = Math.max(
+        lying - MELT * degreeDays(mean, half, 0, pair)[0],
+        phase > theta || phase < -theta
+          ? Math.floor(
+              (divFloor(rain * (phase > theta ? phase - theta : phase + TWO_PI - theta) * 100, TWO_PI) * snowfall) /
+                ONE,
+            )
+          : lying - MELT * degreeDaysSince(mean, half, 0, phase),
+        0,
+      );
     }
   }
+  const snow = Math.min(255, divFloor(water * 255, SNOW_FULL));
   out[k] = green;
   out[k + 1] = brown;
   out[k + 2] = snow;
@@ -166,6 +168,7 @@ export class BiomeSeasons implements Disposable {
   #rain = 0;
   readonly #listeners = new Set<() => void>();
   #disposed = false;
+  #sample?: BiomeSample;
 
   private constructor(world: BiomeWorld) {
     this.world = world;
@@ -288,7 +291,11 @@ export class BiomeSeasons implements Disposable {
    */
   at(x: number, z: number, out: Uint8Array = new Uint8Array(4)): Uint8Array {
     this.#live();
-    const s = this.world.sampleRegion(x, z);
+    return this.#state(this.world.sampleRegion(x, z), out);
+  }
+
+  /** The state of a region sample into `out`. */
+  #state(s: BiomeSample, out: Uint8Array): Uint8Array {
     cellState(
       Math.round(s.temperature * 100),
       Math.round(s.warmest * 100),
@@ -309,6 +316,26 @@ export class BiomeSeasons implements Disposable {
    */
   colorAt(base: readonly [number, number, number], x: number, z: number): [number, number, number] {
     return seasonalColor(base, this.at(x, z));
+  }
+
+  /**
+   * The ground tint at world (x, z), 4 bytes: an sRGB colour and an amount, so that mixing a colour toward that colour by
+   * the amount gives {@link seasonalColor} of it under the state there ({@link seasonalMix}). The amount is scaled by the
+   * share of the biomes there with `tint.seasonal`, so it is 0 where no biome follows the seasons. `BiomeView` draws
+   * plant cover ground through a texture of these.
+   * @throws RangeError for a non-finite x or z.
+   */
+  tintAt(x: number, z: number, out: Uint8Array = new Uint8Array(4)): Uint8Array {
+    this.#live();
+    const s = (this.#sample = this.world.sampleRegion(x, z, this.#sample)),
+      mix = seasonalMix(this.#state(s, out));
+    let share = 0;
+    s.biomes.forEach((id, i) => {
+      if (this.isSeasonal(id)) share += s.weights[i];
+    });
+    for (let c = 0; c < 3; c++) out[c] = Math.round(mix[c] * 255);
+    out[3] = Math.round(mix[3] * Math.min(1, share) * 255);
+    return out;
   }
 
   /**
@@ -363,4 +390,27 @@ export function seasonalColor(
       wet = plant * dark;
     return wet + (SNOW[c] - wet) * snow;
   }) as [number, number, number];
+}
+
+/**
+ * {@link seasonalColor} as one mix for any base: `[r, g, b, amount]` such that `base + (rgb - base) * amount` is
+ * `seasonalColor(base, state, offset)`, so a shader can apply a season state to every texel of a texture. The colour is
+ * a blend of the autumn, dormant and snow colours and black (wet darkening), each 0..1; amount 0 gives black and keeps
+ * the base.
+ * @example const [r, g, b, amount] = seasonalMix(seasons.at(0, 0));
+ */
+export function seasonalMix(state: ArrayLike<number>, offset = 0): [number, number, number, number] {
+  const green = state[offset] / 255,
+    brown = state[offset + 1] / 255,
+    snow = state[offset + 2] / 255,
+    dark = 1 - 0.3 * Math.max(0, (state[offset + 3] - 128) / 127),
+    amount = 1 - (1 - brown) * green * dark * (1 - snow);
+  return [
+    ...[0, 1, 2].map((c) =>
+      amount > 0
+        ? ((AUTUMN[c] * brown * green + DORMANT[c] * (1 - green)) * dark * (1 - snow) + SNOW[c] * snow) / amount
+        : 0,
+    ),
+    amount,
+  ] as [number, number, number, number];
 }

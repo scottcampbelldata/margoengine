@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Terrain } from '../dist/index.js';
 
-function rig(weights, count = 5) {
+function rig(weights, count = 5, tint, tinted = () => false) {
   const gpu = mockGPU(),
     engine = {
       gpu: gpu.device,
@@ -20,7 +20,12 @@ function rig(weights, count = 5) {
     resolution: 8,
     levels: 2,
     size: [32, 32],
-    layers: Array.from({ length: count }, () => ({ height: [-10, 10], slope: [0, 1], scale: 1 })),
+    layers: Array.from({ length: count }, (_, i) => ({
+      height: [-10, 10],
+      slope: [0, 1],
+      scale: 1,
+      ...(tinted(i) ? { tint: true } : {}),
+    })),
     textures: (device) => {
       const texture = (format, layers = 1) =>
         device.createTexture({ size: [4, 4, layers], format, usage: GPUTextureUsage.TEXTURE_BINDING });
@@ -28,6 +33,7 @@ function rig(weights, count = 5) {
         heightmap: texture('r32float'),
         layers: texture('rgba8unorm', count),
         ...(weights ? { weights: weights(texture) } : {}),
+        ...(tint ? { tint: tint(texture) } : {}),
       };
       return made;
     },
@@ -124,6 +130,59 @@ test('16 layers take 4 weights textures bound at 6 to 9; 17 layers, too few text
   assert.match(code3, /@binding\(8\) var terrainWeights2/);
   assert.doesNotMatch(code3, /terrainWeights3/);
   assert.match(code3, /vec4f\(0\)\);/, 'the missing fourth texture weighs 0');
+});
+
+test('a tint texture binds after the weights and mixes only the layers that take it', () => {
+  const two = (texture) => [texture('rgba8unorm'), texture('rgba8unorm')],
+    r = rig(
+      two,
+      5,
+      (texture) => texture('rgba8unorm-srgb'),
+      (i) => i === 1 || i === 3,
+    ),
+    layout = r.log.find((e) => e[0] === 'layout')[2];
+  assert.deepEqual(
+    layout.entries.map((e) => e.binding),
+    [0, 1, 2, 3, 4, 5, 6, 7, 8],
+  );
+  assert.ok(r.log.filter((e) => e[0] === 'group').every((g) => g[2].entries.length === 9));
+  const code = modules(r.frame()).find((c) => c.includes('@fragment'));
+  assert.match(code, /@binding\(8\) var terrainTint:texture_2d<f32>;/);
+  assert.equal(code.split('textureSampleLevel(terrainTint,').length, 2, 'the tint is sampled once per fragment');
+  assert.match(code, /color\+=terrainTinted\(terrainLayerSample\(position,projection,dx,dy,layer\),layer\)\*weight;/);
+  assert.match(code, /return terrainTinted\(terrainLayerSample\(position,projection,dx,dy,0u\),0u\);/);
+  // params.w (the 8th float of each rule) is 1 for the layers with tint: true, 0 for the rest.
+  const writes = r.log.filter((e) => e[0] === 'writeBuffer' && e[3].length === 5 * 8 * 4 * 2);
+  assert.equal(writes.length, 1, 'one rules upload of 5 layers x 8 floats');
+  const bytes = Buffer.from(writes[0][3], 'hex'),
+    rules = new Float32Array(bytes.buffer, bytes.byteOffset, 40);
+  assert.deepEqual(
+    [0, 1, 2, 3, 4].map((i) => rules[i * 8 + 7]),
+    [0, 1, 0, 1, 0],
+  );
+  const tint = r.made().tint;
+  r.terrain.dispose();
+  assert.ok(tint.destroyed, 'the terrain owns and frees its tint texture');
+});
+
+test('without a tint, layers with tint: true leave the shader, bindings and rules as they were', () => {
+  const two = (texture) => [texture('rgba8unorm'), texture('rgba8unorm')],
+    plain = rig(two),
+    flagged = rig(two, 5, undefined, () => true);
+  assert.deepEqual(flagged.log, plain.log);
+  const code = modules(flagged.frame()).find((c) => c.includes('@fragment'));
+  assert.equal(
+    code,
+    modules(plain.frame()).find((c) => c.includes('@fragment')),
+  );
+  assert.doesNotMatch(code, /terrainTint/);
+});
+
+test('a bad tint is rejected: without weights, a float format or an array texture', () => {
+  const two = (texture) => [texture('rgba8unorm'), texture('rgba8unorm')];
+  assert.throws(() => rig(undefined, 5, (texture) => texture('rgba8unorm')), /tint/);
+  assert.throws(() => rig(two, 5, (texture) => texture('r32float')), /tint/);
+  assert.throws(() => rig(two, 5, (texture) => texture('rgba8unorm', 2)), /tint/);
 });
 
 test('16 rule layers (no weights) are accepted, 17 rejected', () => {
