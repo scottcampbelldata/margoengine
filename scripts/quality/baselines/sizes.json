@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4125371,
+  "total": 4131428,
   "history": [
     {
       "date": "2026-10-24",
@@ -1196,6 +1196,12 @@
       "commit": "764e66da1",
       "reason": "new entry @margoengine/pixel/palette: quantize, Bayer and blue-noise dither, palette swap, Oklab helpers (row 25 J6), with tests",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "6c010a6b7",
+      "reason": "BiomeView canopy option and the cover entry (biome look plan 3 L7, Scott's S5): option and its import in the view, the cover code in the worker",
+      "grew": 3
     }
   ],
   "items": {
@@ -1210,17 +1216,18 @@
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
     "@margoengine/biomes": 18360,
-    "@margoengine/biomes dist/workers/biomes.js": 39082,
+    "@margoengine/biomes dist/workers/biomes.js": 41083,
+    "@margoengine/biomes/cover": 3608,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/koppen": 1231,
-    "@margoengine/biomes/objects": 3838,
+    "@margoengine/biomes/objects": 3835,
     "@margoengine/biomes/placement": 11951,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/relief": 4553,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 3176,
-    "@margoengine/biomes/view": 9492,
+    "@margoengine/biomes/view": 9943,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,

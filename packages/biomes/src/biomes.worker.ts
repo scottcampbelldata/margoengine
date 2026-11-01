@@ -5,6 +5,7 @@
 import { typeError } from '../../shared/errors.js';
 import { type BiomeTile, BiomeWorld, type BiomeWorldOptions } from './world.js';
 import { BiomePlacement, type PlacedTile, type PlacementOptions } from './placement.js';
+import { canopyCorners, darkenTile } from './cover.js';
 import { overviewRows, viewTile } from './view.js';
 
 let world: BiomeWorld | undefined,
@@ -135,11 +136,20 @@ async function run(m: Message): Promise<unknown> {
       // asked for with the default layers (VIEW_LAYERS among them), so the view and placement of a tile, which go to
       // the same worker, share one cached tile instead of making it twice.
       const t = await world!.tile(m.x as number, m.z as number);
-      return viewTile(world!, t, m.materials as string[], m.step as number);
+      const made = viewTile(world!, t, m.materials as string[], m.step as number);
+      if (m.canopy) darkenTile(world!, made, m.step as number, m.materials as string[], m.canopy as number);
+      return made;
     }
     case 'overview':
       // A band of texel rows of a view's far-field ground weights (from the region fields, never a cached tile).
-      return overviewRows(world!, m.materials as string[], m.texel as number, m.v0 as number, m.v1 as number);
+      return overviewRows(
+        world!,
+        m.materials as string[],
+        m.texel as number,
+        m.v0 as number,
+        m.v1 as number,
+        m.canopy ? canopyCorners(world!, m.materials as string[], m.canopy as number) : undefined,
+      );
     default:
       throw typeError('Unknown biome worker job; load the page and the worker script from one build', 'biomes');
   }

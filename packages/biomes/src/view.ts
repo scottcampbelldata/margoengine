@@ -48,12 +48,13 @@ export const MATERIALS: Readonly<Record<string, MaterialLook>> = Object.freeze({
   'red-sand': { color: [0.82, 0.5, 0.3], detail: 0.2, bump: 0.3, macro: 0.2 },
   'dry-grass': { color: [0.78, 0.67, 0.38], detail: 0.35, bump: 0.3, macro: 0.2 },
   laterite: { color: [0.68, 0.38, 0.22], detail: 0.25, bump: 0.3, macro: 0.2 },
-  rock: { color: [0.54, 0.51, 0.47], detail: 0.6, bump: 1, macro: 1 },
-  scree: { color: [0.64, 0.61, 0.57], detail: 0.45, bump: 0.8, macro: 0.6 },
-  gravel: { color: [0.6, 0.57, 0.52], detail: 0.45, bump: 0.6, macro: 0.5 },
+  rock: { color: [0.54, 0.51, 0.47], detail: 0.45, bump: 1, macro: 0.5 },
+  scree: { color: [0.64, 0.61, 0.57], detail: 0.4, bump: 0.8, macro: 0.6 },
+  gravel: { color: [0.6, 0.57, 0.52], detail: 0.4, bump: 0.6, macro: 0.5 },
   snow: { color: [0.95, 0.96, 0.99], detail: 0.1, bump: 0.35, macro: 0.15 },
   tundra: { color: [0.54, 0.5, 0.34], detail: 0.35, bump: 0.3, macro: 0.2 },
   heather: { color: [0.52, 0.36, 0.4], detail: 0.35, bump: 0.3, macro: 0.2 },
+  canopy: { color: [0.12, 0.2, 0.08], detail: 0.3, bump: 0.2, macro: 0.4 },
 });
 
 /** Settings of {@link BiomeView.attach}. */
@@ -69,6 +70,12 @@ export interface BiomeViewOptions {
    * `radius` need (`clipmapLevels`: 9 for a 4 km world). Explicit settings that reach less than `radius` are a
    * RangeError. */
   readonly clipmap?: { readonly cellSize?: number; readonly resolution?: number; readonly levels?: number };
+  /**
+   * How far tree crowns darken the ground, 0 to 1: a material `'canopy'` (its look in `MATERIALS`) takes this share of
+   * the ground weight times `canopyCover`, on far hills and on the forest floor, and `materials` lists it last. Nothing
+   * is added for worlds without trees or with 16 ground materials already. Default 0.6 with `objects`, 0 without.
+   */
+  readonly canopy?: number;
   /** Rejects `attach` and stops streaming when aborted. */
   readonly signal?: AbortSignal;
   /** Draws the stored objects (trees, shrubs, rocks) and the detail (grass, ferns) of the world's biomes through
@@ -338,12 +345,16 @@ export interface OverviewWeights {
   readonly weights: Uint8Array[];
 }
 
+/** Changes one grid corner's 16 ground weights, at `at` in `weights`, for the sample at (x, z). */
+export type OverviewCorner = (s: BiomeSample, x: number, z: number, weights: Uint8Array, at: number) => void;
+
 /**
  * Ground weights of the whole world at `textureResolution` metres per texel, from the region grid
  * (`world.regionResolution`, 16 m by default) through the same ground rules as the tiles: the biomes, height, slope,
  * moisture and temperatures of every grid corner come from `world.sampleRegion` (never a cached tile, so the answer
  * does not depend on which tiles were made), and texels between corners are bilinear. A view draws these until the
- * 1 m tiles around the camera replace them, so far hills show their rock and snow.
+ * 1 m tiles around the camera replace them, so far hills show their rock and snow. `corner`, when given, may change
+ * each grid corner's 16 weights before the texels are made from them (`canopyCorners` of the cover entry).
  * @throws RangeError for a materials list that misses a biome's key or holds more than 16, or a texel size that is not
  * a positive multiple of the world resolution.
  */
@@ -351,8 +362,9 @@ export function overviewWeights(
   world: BiomeWorld,
   materials: readonly string[],
   textureResolution = 2,
+  corner?: OverviewCorner,
 ): OverviewWeights {
-  return overviewRows(world, materials, textureResolution, 0, Number.POSITIVE_INFINITY);
+  return overviewRows(world, materials, textureResolution, 0, Number.POSITIVE_INFINITY, corner);
 }
 
 /**
@@ -365,6 +377,7 @@ export function overviewRows(
   textureResolution: number,
   v0: number,
   v1: number,
+  corner?: OverviewCorner,
 ): OverviewWeights & { readonly v0: number; readonly v1: number } {
   const texel = textureResolution,
     [x0, z0, x1, z1] = world.bounds,
@@ -392,7 +405,9 @@ export function overviewRows(
   let s: BiomeSample | undefined;
   for (let j = j0; j <= j1; j++)
     for (let i = 0; i < o.width; i++) {
-      s = world.sampleRegion(x0 + i * res, z0 + j * res, s);
+      const x = x0 + i * res,
+        z = z0 + j * res;
+      s = world.sampleRegion(x, z, s);
       // Stored units, as the tile layers hold them (LAYERS scales); the region has no curvature (0).
       data.height[0] = Math.round(s.height * 1000);
       data.slope[0] = Math.round(s.slope * 256);
@@ -404,7 +419,9 @@ export function overviewRows(
       sums.fill(0);
       for (let b = 0; b < s.biomes.length; b++)
         addBiome(rules[ids.indexOf(s.biomes[b])], data, 0, Math.round(s.weights[b] * ONE), sums, share);
-      quantise(sums, corners, ((j - j0) * o.width + i) * STRIDE);
+      const at = ((j - j0) * o.width + i) * STRIDE;
+      quantise(sums, corners, at);
+      corner?.(s, x, z, corners, at);
     }
   const weights = Array.from(
       { length: weightTextures(materials.length) },
@@ -605,6 +622,9 @@ export class BiomeView implements Disposable {
   /** CPU copies of the weight textures, 4 bytes per texel each. */
   readonly #weights: Uint8Array[];
   readonly #radius: number;
+  /** Share of the ground the canopy material takes under full crowns (0: no canopy material). */
+  readonly #canopy: number;
+  readonly #cover?: typeof import('@margoengine/biomes/cover');
   readonly #signal?: AbortSignal;
   readonly #lookahead: number;
   readonly #budget: number;
@@ -661,6 +681,8 @@ export class BiomeView implements Disposable {
     options: BiomeViewOptions,
     terrainModule: typeof import('@margoengine/terrain'),
     limit: number,
+    cover?: typeof import('@margoengine/biomes/cover'),
+    canopy = 0,
   ) {
     this.#engine = engine;
     this.#world = world;
@@ -681,7 +703,9 @@ export class BiomeView implements Disposable {
     this.textureResolution = texel;
     this.#width = Math.round((x1 - x0) / texel) + 1; // float division: exact
     this.#depth = Math.round((z1 - z0) / texel) + 1; // float division
-    this.materials = Object.freeze(groundMaterials(world.biomes));
+    this.#cover = cover;
+    this.#canopy = canopy;
+    this.materials = Object.freeze([...groundMaterials(world.biomes), ...(canopy ? ['canopy'] : [])]);
     checkMaterialCount(this.materials);
     const looks = this.materials.map((key) => look(key, options.materials)),
       // The terrain needs 4 to 16 layers: repeat the last material when there are fewer.
@@ -773,7 +797,9 @@ export class BiomeView implements Disposable {
     const terrainModule = await import('@margoengine/terrain');
     if (options.signal?.aborted) throw options.signal.reason;
     const limit = (engine as unknown as { gpu?: GPUDevice }).gpu?.limits.maxTextureDimension2D ?? 8192;
-    const view = new BiomeView(engine, world, options, terrainModule, limit),
+    const canopy = options.canopy ?? ((options.objects ?? true) ? 0.6 : 0),
+      cover = canopy === 0 ? undefined : await import('@margoengine/biomes/cover'),
+      view = new BiomeView(engine, world, options, terrainModule, limit, cover, cover?.canopyShare(world, canopy)),
       // The overview runs while the objects load: on the workers off this thread, or here when there are none.
       overview = view.#overview(options.signal);
     // A failed attach must not leave the overview's rejection unhandled; it is awaited below.
@@ -851,7 +877,12 @@ export class BiomeView implements Disposable {
       width = this.#width,
       depth = this.#depth;
     if (!workers)
-      overviewWeights(world, this.materials, texel).weights.forEach((data, i) => this.#weights[i].set(data));
+      overviewWeights(
+        world,
+        this.materials,
+        texel,
+        this.#canopy ? this.#cover!.canopyCorners(world, this.materials, this.#canopy) : undefined,
+      ).weights.forEach((data, i) => this.#weights[i].set(data));
     else {
       const n = workers.size,
         bands = await Promise.all(
@@ -863,6 +894,7 @@ export class BiomeView implements Disposable {
                 texel,
                 v0: divFloor(b * depth, n),
                 v1: divFloor((b + 1) * depth, n),
+                canopy: this.#canopy,
               },
               { signal },
             ),
@@ -982,13 +1014,17 @@ export class BiomeView implements Disposable {
     if (kind === 'p') return this.#placement!.tile(x, z, { signal, priority, detail: this.#detailStep });
     return w.workers
       ? w.workers.run<ViewTile>(
-          { op: 'view', x, z, materials: this.materials, step },
+          { op: 'view', x, z, materials: this.materials, step, canopy: this.#canopy },
           { near: [x, z], priority, signal },
         )
       : // No workers: made on this thread, one per task so frames keep drawing.
         new Promise<void>((done) => setTimeout(done, 0))
           .then(() => w.tile(x, z, { layers: VIEW_LAYERS, signal }))
-          .then((tile) => viewTile(w, tile, this.materials, step));
+          .then((tile) => {
+            const made = viewTile(w, tile, this.materials, step);
+            if (this.#canopy) this.#cover!.darkenTile(w, made, step, this.materials, this.#canopy);
+            return made;
+          });
   }
 
   /**

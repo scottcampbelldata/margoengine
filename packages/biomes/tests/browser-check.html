@@ -84,6 +84,7 @@ async function alpine(){
  const [hx,hz,hh]=best,len=Math.hypot(hx,hz)||1,px=hx-hx/len*1400,pz=hz-hz/len*1400,position=[px,g(px,pz)+150,pz];
  const s=await shotEngine(position,[hx,hh-60,hz]),W=s.canvas.width,H=s.canvas.height;
  const look=await s.pixels(world),flat=c=>({color:c,detail:0}),
+  plainRock=await s.pixels(world,{materials:{rock:{color:[0.54,0.51,0.47],detail:0.25}}}),
   mask=await s.pixels(world,{materials:{rock:flat([0.35,0,0]),snow:flat([0,0,0.35]),scree:flat([0.35,0.35,0]),meadow:flat([0,0.35,0])}});
  const white=await s.pixels(world,{materials:{snow:flat([1,1,1])}});
  const rock=new Uint8Array(W*H),snow=new Uint8Array(W*H),high=new Int8Array((W>>1)*(H>>1)).fill(-1);
@@ -103,9 +104,11 @@ async function alpine(){
   // dark (texture, relief, macro tone) stays.
   const l=Math.log(luma(look,i*4)/Math.max(1,mask[i*4])*255);n++;sum+=l;sq+=l*l;
  }
- const mean=sum/Math.max(1,n),errors=s.errs.splice(0);
+ // Form: the spread of 32 x 32 pixel block means on rock, which grain cannot raise (a block averages it away).
+ const form=(px)=>{let c=0,m=0,q=0;for(let by=0;by+32<=H;by+=32)for(let bx=0;bx+32<=W;bx+=32){let k=0,v=0;for(let y=by;y<by+32;y++)for(let x=bx;x<bx+32;x++){const i=y*W+x;if(rock[i]){k++;v+=Math.log(luma(px,i*4)/Math.max(1,mask[i*4])*255);}}if(k>=256){v/=k;c++;m+=v;q+=v*v;}}m/=Math.max(1,c);return Math.sqrt(Math.max(0,q/Math.max(1,c)-m*m));};
+ const mean=sum/Math.max(1,n),errors=s.errs.splice(0),rockForm=form(look),plainForm=form(plainRock);
  s.dispose();world.dispose();
- return {rock:n/(W*H),rockSd:Math.sqrt(Math.max(0,sq/Math.max(1,n)-mean*mean)),saturated:mask.filter((v,k)=>k%4===0&&v===255).length,snow:sn/(W*H),snowLuma:ss/Math.max(1,sn),snowWhite:sw/Math.max(1,sn),errors};
+ return {rockForm,plainForm,rock:n/(W*H),rockSd:Math.sqrt(Math.max(0,sq/Math.max(1,n)-mean*mean)),saturated:mask.filter((v,k)=>k%4===0&&v===255).length,snow:sn/(W*H),snowLuma:ss/Math.max(1,sn),snowWhite:sw/Math.max(1,sn),errors};
 }
 // Shot 08: the temperate world with desert painted (constant, radius 260 m at [0, -300]) from 110 m over [0, 500]. On the
 // screen row through the circle's centre, the largest change between neighbouring pixels (the sum of the absolute R, G

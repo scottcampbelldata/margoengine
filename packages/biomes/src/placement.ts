@@ -16,7 +16,6 @@ import type { BiomeTile, BiomeWorld } from '@margoengine/biomes';
 import {
   clampInt,
   divFloor,
-  fbm,
   hash2,
   hash5,
   isqrt,
@@ -31,25 +30,14 @@ import {
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type BiomeDefinition, type Dimension, fieldDimension, type SpeciesRule } from './define.js';
 import { placementReach, STRATA } from './reach.js';
+import { standAt, type Stands, standsOf, TICK } from './stands.js';
 
-/** Position unit: 1/256 m (3.9 mm), the step of a record inside a 256 m tile. */
-const TICK = 256;
 /** Perfect plasticity cells: 32 m, world-anchored, inside every tile size. */
 const PPA_SHIFT = 13; // 2^13 ticks = 32 m
 /** log2(e) in Q16. */
 const LOG2E = 94548;
 /** Largest local cluster intensity, as a multiple of the mean (candidates are generated at this rate). */
 const CLUSTER_CAP = 4;
-/** Fade of a stand's edge, in units of the 0..65535 noise (0.6 of its standard deviation): about a quarter of `scale`. */
-const STAND_BAND = 6000;
-/**
- * The noise level a stand's band is centred on for a cover of 1/16, 2/16 .. 16/16 of the ground: the mean of the band
- * over 3-octave fbm equals the cover. Measured once, 320,000 samples over 16 seeds; the distribution is the same for
- * every seed, and the placement test checks the share it gives.
- */
-const STAND_LEVELS = [
-  46857, 43445, 40954, 38837, 36934, 35151, 33433, 31745, 30058, 28339, 26559, 24661, 22553, 20044, 16667, 0,
-];
 /** Fates of a candidate. */
 const LIVE = 0,
   ACCEPTED = 1,
@@ -225,12 +213,6 @@ interface Spec extends PlacedSpecies {
   readonly stands?: Stands;
 }
 
-interface Stands {
-  readonly scale: number; // one noise cell, ticks
-  readonly top: number; // the noise level (0..65535) from which the density is full
-  readonly boost: number; // 1 / cover, Q16: the whole density lives on the cover share of the ground
-}
-
 interface Cluster {
   readonly table: Int32Array; // contribution to C (Q16) over d^2 in 256 steps of reach^2
   readonly reach: number; // ticks
@@ -384,16 +366,6 @@ function clusterOf(rule: SpeciesRule, index: number, code: number): Cluster | un
     beta,
     code: (code ^ 0x51ed270b ^ index) >>> 0,
   };
-}
-
-/** A stand rule in integers. A cover of 1 is no stand at all: the same bytes as leaving the rule out. */
-function standsOf(rule: SpeciesRule): Stands | undefined {
-  const s = rule.stands;
-  if (!s || s.cover >= 1) return undefined;
-  const cover = toQ(s.cover),
-    i = (cover * 16) >> 16, // the cover is at least 0.1, so i is at least 1
-    level = STAND_LEVELS[i - 1] + qmul(STAND_LEVELS[i] - STAND_LEVELS[i - 1], (cover * 16) & 0xffff);
-  return { scale: Math.round(s.scale * TICK), top: level + (STAND_BAND >> 1), boost: divFloor(ONE * ONE, cover) };
 }
 
 /** exp(-mu) in Q16 for a mean mu (Q16): the first term of {@link poisson}. */
@@ -954,8 +926,7 @@ class Run {
 
   /** How much of a stand covers (x, z), Q16, 0 in a clearing: a Wendland-shaped threshold of world-anchored noise. */
   stand(st: Stands, x: number, z: number): number {
-    const noise = fbm(hash2(this.seed, st.scale), divFloor(x * ONE, st.scale), divFloor(z * ONE, st.scale), 3);
-    return wendland(clampInt(divFloor((st.top - noise) * ONE, STAND_BAND), 0, ONE));
+    return standAt(this.seed, st, x, z);
   }
 
   /**

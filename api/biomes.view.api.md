@@ -49,6 +49,7 @@ export interface BiomeViewOptions {
         readonly resolution?: number;
         readonly levels?: number;
     };
+    readonly canopy?: number;
     readonly signal?: AbortSignal;
     readonly objects?: boolean;
     readonly detailRadius?: number;
@@ -72,6 +73,8 @@ export interface MaterialLook {
     readonly bump?: number;
     readonly macro?: number;
 }
+
+export type OverviewCorner = (s: BiomeSample, x: number, z: number, weights: Uint8Array, at: number) => void;
 
 export interface OverviewWeights {
     readonly width: number;
@@ -103,12 +106,12 @@ export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: rea
 
 export function materialPixels(key: string, material: MaterialLook): Uint8Array[];
 
-export function overviewRows(world: BiomeWorld, materials: readonly string[], textureResolution: number, v0: number, v1: number): OverviewWeights & {
+export function overviewRows(world: BiomeWorld, materials: readonly string[], textureResolution: number, v0: number, v1: number, corner?: OverviewCorner): OverviewWeights & {
     readonly v0: number;
     readonly v1: number;
 };
 
-export function overviewWeights(world: BiomeWorld, materials: readonly string[], textureResolution?: number): OverviewWeights;
+export function overviewWeights(world: BiomeWorld, materials: readonly string[], textureResolution?: number, corner?: OverviewCorner): OverviewWeights;
 
 export function terrainColorsFor(world: BiomeWorld, materials?: Readonly<Record<string, MaterialLook>>): Pick<TerrainColorOptions, 'sand' | 'meadow' | 'stone'>;
 

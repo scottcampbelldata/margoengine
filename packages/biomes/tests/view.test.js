@@ -20,6 +20,7 @@ import {
   terrainColorsFor,
   viewTile,
 } from '../dist/view.js';
+import { canopyCorners, canopyCover, canopyShare, CANOPY_KINDS, darkenTile } from '../dist/cover.js';
 
 test('ground materials are the unique ground layers in first-use order, all of them', () => {
   assert.deepEqual(groundMaterials([presets.temperate, presets.desert]), [
@@ -347,7 +348,7 @@ test('the sea defaults are an ocean swell the water draws without folding', () =
 });
 
 test('ground looks: rock and snow have relief and macro tone, textures have a fine grain octave', () => {
-  assert.deepEqual([MATERIALS.rock.bump, MATERIALS.rock.macro, MATERIALS.rock.detail], [1, 1, 0.6]);
+  assert.deepEqual([MATERIALS.rock.bump, MATERIALS.rock.macro, MATERIALS.rock.detail], [1, 0.5, 0.45]);
   assert.deepEqual([MATERIALS.snow.bump, MATERIALS.snow.macro], [0.35, 0.15]);
   for (const [key, look] of Object.entries(MATERIALS))
     assert.ok(look.bump > 0 && look.bump <= 1 && look.macro > 0 && look.macro <= 1, `${key} relief and macro`);
@@ -369,7 +370,7 @@ test('ground looks: rock and snow have relief and macro tone, textures have a fi
       .update(Buffer.concat(levels.map((l) => Buffer.from(l))))
       .digest('hex')
       .slice(0, 16),
-    'd55e967f053eed4a',
+    '8a4fe8c41bfe93ed',
   );
 });
 
@@ -393,4 +394,70 @@ test('regression: clipmapLevels reaches the whole world, so the terrain no longe
     () => clipmapLevels(world(4000), 1000, { levels: 5 }),
     (e) => e instanceof RangeError && /reaches 496 m but radius is 1000 m/.test(e.message),
   );
+});
+
+test('canopy cover: a temperate world is mostly crowns, a desert empty, stands open clearings, the sea has none', async () => {
+  const flat = { field: () => 40 },
+    make = (biomes, height = flat) =>
+      BiomeWorld.create({ size: [512, 512], biomes, height, climate: { latitude: 47, rainfall: 1000 } });
+  const temperate = await make([presets.temperate]),
+    full = canopyCover(temperate);
+  assert.equal(full.width, 33);
+  assert.equal(full.depth, 33);
+  // Oak and beech: density x crown area x mean crown size squared is 0.68 of the ground (the placed crowns of tile (1, 1)
+  // read 0.38: the hard core thins them, and cover is meant to read as forest from afar).
+  assert.ok(
+    full.data.every((v) => v === 174),
+    `crowns over a temperate world: ${full.data[0]}`,
+  );
+  assert.deepEqual(full.kinds[CANOPY_KINDS.indexOf('broadleaf')], full.data, 'and they are broadleaf');
+  assert.ok(full.kinds[CANOPY_KINDS.indexOf('conifer')].every((v) => v === 0));
+  const desert = await make([presets.desert]);
+  assert.ok(
+    canopyCover(desert).data.every((v) => v === 0),
+    'a desert has no canopy',
+  );
+  const under = await make([presets.temperate], { field: (x) => (x < 0 ? -20 : 40) }),
+    sea = canopyCover(under);
+  assert.equal(sea.data[16 * 33 + 2], 0, 'none under the sea');
+  assert.equal(sea.data[16 * 33 + 30], 174, 'crowns on land');
+  const stands = await make([
+      {
+        ...presets.temperate,
+        plants: presets.temperate.plants.map((p) => ({ ...p, stands: { scale: 150, cover: 0.5 } })),
+      },
+    ]),
+    patchy = canopyCover(stands);
+  assert.ok(patchy.data.some((v) => v === 0) && patchy.data.some((v) => v === 255), 'stands and clearings');
+  assert.deepEqual(canopyCover(stands).data, patchy.data, 'the same bytes twice');
+  assert.throws(() => canopyCover(temperate, 0), RangeError);
+  for (const w of [temperate, desert, under, stands]) w.dispose();
+});
+
+test('the canopy material takes its share of the ground and each texel still sums to 255', async () => {
+  const world = await BiomeWorld.create({
+      size: [512, 512],
+      biomes: [presets.temperate],
+      height: { field: () => 40 },
+      climate: { latitude: 47, rainfall: 1000 },
+    }),
+    plain = groundMaterials(world.biomes),
+    materials = [...plain, 'canopy'],
+    tile = await world.tile(0, 0),
+    i = materials.length - 1,
+    a = viewTile(world, tile, plain, 2),
+    b = viewTile(world, tile, materials, 2);
+  darkenTile(world, b, 2, materials, 0.6);
+  const sum = (t, k) => t.weights.reduce((n, w) => n + w[k] + w[k + 1] + w[k + 2] + w[k + 3], 0);
+  for (let k = 0; k < 40; k += 4) {
+    assert.equal(sum(b, k), 255);
+    assert.ok(Math.abs(b.weights[i >> 2][k + (i & 3)] - 0.6 * 174) <= 1, 'canopy takes 0.6 of the cover');
+    assert.ok(b.weights[0][k] <= a.weights[0][k]);
+  }
+  assert.equal(canopyShare(world, 0.6), 0.6);
+  assert.throws(() => canopyShare(world, 2), RangeError);
+  const over = overviewWeights(world, materials, 2, canopyCorners(world, materials, 0.6));
+  // A tile matches the far ground it replaces, up to the bilinear rounding.
+  assert.ok(Math.abs(over.weights[i >> 2][i & 3] - b.weights[i >> 2][i & 3]) <= 1);
+  world.dispose();
 });

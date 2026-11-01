@@ -55,7 +55,17 @@ await runSuite(
     assert.deepEqual(alpine.errors, []);
     assert.equal(alpine.saturated, 0, 'the mask look stays under 255 red');
     assert.ok(alpine.rock > 0.005, `rock above 2,600 m in the frame: ${alpine.rock}`);
-    assert.ok(alpine.rockSd > 3 * 0.0415, `rock light and dark above 3x BASE's 0.0415: ${alpine.rockSd}`);
+    // Biome look plan 3, B2 (Scott approved): the old 3x target rewarded grain as much as form, so the grain has a ceiling
+    // now (1.5x to 2.5x of BASE's 0.0415) and the form, the spread of 32 px block means, a floor against plain rock.
+    console.log('rock', alpine.rockSd, 'form', alpine.rockForm, 'plain', alpine.plainForm);
+    assert.ok(alpine.rockSd > 1.5 * 0.0415, `rock light and dark above 1.5x BASE's 0.0415: ${alpine.rockSd}`);
+    assert.ok(alpine.rockSd < 2.5 * 0.0415, `rock light and dark under 2.5x BASE's 0.0415: ${alpine.rockSd}`);
+    // Plan 3 guessed 1.3x; measured here at the plan's rock values 1.20x (0.0455 over 0.0378), and any values under the
+    // grain ceiling stay under 1.3x (0.0477 at 0.113): a 32 px block spans about 115 m, wider than the macro's 96 m.
+    assert.ok(
+      alpine.rockForm >= 1.15 * alpine.plainForm,
+      `rock form ${alpine.rockForm} at least 1.15x plain rock's ${alpine.plainForm}`,
+    );
     assert.ok(alpine.snow > 0.01, `snow outweighs rock on over 1 percent of the frame: ${alpine.snow}`);
     assert.ok(
       alpine.snowLuma > 0.82 * alpine.snowWhite,

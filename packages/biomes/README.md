@@ -410,6 +410,30 @@ with its ring's mesh, so on a forest the shadow passes can cost more than the re
 `cascades` cost less and reach less far. Objects outside the view cast no shadow onto ground in it (scatter casts the
 instances it culled for the camera). `packages/biomes/tests/shadows-check.mjs` checks the look.
 
+### Forest floor and far hills
+
+Tree crowns darken the ground: a material `'canopy'` (its look in `MATERIALS`) takes `canopy` (default 0.6 with
+objects, 0 without) of the ground weight times the crown cover, on far hills and under the trees alike, and
+`view.materials` lists it last. Nothing is added for a world without trees or with 16 ground materials already. The
+`@margoengine/biomes/cover` entry, loaded only when `canopy` is above 0, computes the cover from the region fields
+without placing a tree: density x crown area x mean crown size squared of each biome's trees, by biome weight, with
+stands and suitability.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld } from '@margoengine/biomes';
+import { canopyCover } from '@margoengine/biomes/cover';
+import { BiomeView } from '@margoengine/biomes/view';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const world = await BiomeWorld.create();
+const view = await BiomeView.attach(engine, world, { canopy: 0.8 });
+await view.ready;
+const cover = canopyCover(world); // 0..255 every 16 m over the world, in all and by tree kind
+console.log(cover.width, cover.depth, cover.data[0], cover.kinds.length);
+engine.start();
+```
+
 ## Trees, shrubs, rocks and props
 
 `@margoengine/biomes/placement` places every species rule of the world's biomes (`plants`, `rocks`, `props`) as stored

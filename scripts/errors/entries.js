@@ -595,6 +595,8 @@ export const entries = [
       "A cluster needs kind 'thomas', 'matern' or '2dt', parents 0..10,000 per ha and spread 0..500 m",
       'A cluster needs offspring above 0 and a 2dt tail in 0.5..8',
       'A species stands rule needs scale 50..2000 metres and cover 0.1..1',
+      'canopyCover step must be a positive multiple of the world resolution',
+      'BiomeView canopy must be a number from 0 to 1 (default 0.6 with objects, 0 without)',
       'BiomePlacement rounds must be an integer in 1..16',
       'A world can place at most 255 species',
       'BiomePlacement conflicts is an object of factors',

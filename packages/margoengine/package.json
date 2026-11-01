@@ -110,6 +110,10 @@
       "types": "./dist/biomes/view.d.ts",
       "import": "./dist/biomes/view.js"
     },
+    "./biomes/cover": {
+      "types": "./dist/biomes/cover.d.ts",
+      "import": "./dist/biomes/cover.js"
+    },
     "./biomes/objects": {
       "types": "./dist/biomes/objects.d.ts",
       "import": "./dist/biomes/objects.js"
