@@ -9,8 +9,8 @@ reports WebGL2 capabilities and tiers; the WGSL corpus is recorded) and M1 (the 
 parses and type-checks, [below](#wgsl-front-end-m1-2026-10-27)) and M2 (the GLSL back end and the device: core renders on
 WebGL2 with the same pixels as native WebGPU, [below](#glsl-back-end-and-device-m2-2026-10-28)) are done, and so are M3 (first
 part), M4 (storage buffers read in render shaders), M5 (compute, [below](#compute-m5-2026-10-28)) and M6 (package
-routes, [below](#package-routes-m6-2026-10-29)) and M7 (performance and hardening); M8 (every site demo, docs and the release,
-[below](#demos-docs-and-release-m8-2026-10-29)) is under way. It was paused
+routes, [below](#package-routes-m6-2026-10-29)) and M7 (performance and hardening) and M8 (every site demo, docs and the release,
+[below](#demos-docs-and-release-m8-2026-10-29)), which landed on 2026-10-31. It was paused
 on 2026-10-24 (the apps built on Margo so far run on Electron, which has WebGPU) and planned for after v1.0.0 before
 that.
 
@@ -296,7 +296,9 @@ budgets and GPU-driven culling on WebGL2.
    package). It names what it does, WebGL2 compatibility for the WebGPU API, and stays apart from `@margoengine/webgl`,
    which is a different thing: a second, small renderer. **`@margoengine/webgl` stays** as the preview until the layer
    replaces it: it is 3,021 B gzip and draws plain meshes on any WebGL2, including devices below the layer's minimum
-   tier. M8 decides its retirement, once every page that uses the preview draws the same through the layer.
+   tier. Decided with the end of M8 (2026-10-31): it stays for v1.0 (3,154 B gzip, `entry-sizes.json`), and the layer is
+   documented as the site's fallback; its retirement is for after v1.0. Today its code users are the React `loadFallback`
+   and one benchmark page.
 2. **Minimum tier: `EXT_color_buffer_float` and `highp` fragment shaders are required** (the `full` tier of
    `webgl2Capabilities`). Below it, `install()` (M2) will reject with `MargoError` code `unsupported` naming what is
    missing, and the app keeps the `@margoengine/webgl` preview. Reasons: Margo's HDR path renders to `rgba16float`
@@ -710,8 +712,9 @@ the browser offers it, the layer, and for the basic scene the milestone M2 layer
 - **Scatter tier.** 65,536 invocations storing 1, 2, 4, 8 and 16 words take 0.51, 0.52, 0.76, 1.10 and 1.94 ms a
   dispatch on the layer (0.19 to 0.26 natively): about 0.09 ms more per stored word, since every word is a point
   draw of its own. Transform feedback would write all of an invocation's words at its own index in one vertex
-  pass (up to 64 interleaved components); it is not built yet: no package's kernel spends more than a few
-  milliseconds a frame there (splat projection, 14 words, is the largest).
+  pass (up to 64 interleaved components); it is not built, and parked on 2026-10-31 as a speed-only item (those stores already run on the scatter tier with the
+  same pixels; no package's kernel spends more than a few milliseconds a frame there, splat projection, 14 words, is
+  the largest), together with the sandbox's CPU-tier speed.
 - **Integrated GPUs.** The bug 58 frame (8.4 s a frame on an AMD Radeon 680M) came from the CPU tier, not the GPU. A
   per-frame time budget check for every compat demo on an integrated GPU belongs to M8, which runs every demo on the
   layer.
@@ -744,18 +747,19 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   none of the layer on every page (the dual viewport page excepted, it draws both ways), that without WebGPU each demo
   installs it with no uncaught error, and that without WebGL2 as well the old message shows.
 - **Every demo compared** (`npm run visual:compat`, in `check:merge`; table in
-  [webgl2-compat-demos.md](webgl2-compat-demos.md)): 60 demos, 28 site demos and 32 Khronos gallery models. All 32
-  models and 20 site demos draw the same pixels as native WebGPU by the parity rule (decision 4); 8 site demos run
-  with differences the table states (0.2% to 7.1% of pixels with d > 2, causes in the last item of this list).
-  Main-thread work
-  per still frame on the layer: 0.2 to 9.9 ms (native 0.2 to 1.2 ms).
-- **Exact still frames.** 57 of the 60 demos capture the same pixels twice natively, and the check fails when one of
+  [webgl2-compat-demos.md](webgl2-compat-demos.md)): 59 demos, 27 site demos and 32 Khronos gallery models. All 32
+  models and 20 site demos draw the same pixels as native WebGPU by the parity rule (decision 4); 7 site demos run
+  with differences the table states (0.20% to 1.24% of pixels with d > 2, one cause, in the last item of this list).
+  Main-thread work per still frame on the layer: 0.4 to 9.2 ms for every demo with a recorded frame except khronos-NodePerformanceTest
+  (55.6 ms, native 36.9 ms; native 0.3 to 1.1 ms for the others).
+- **Exact still frames.** 56 of the 59 demos capture the same pixels twice natively, and the check fails when one of
   them stops doing so, so native noise cannot flip a status. ui-game, weather and animator still moved with real time
   under reduced motion (their status flipped between runs); they now hold still and draw the same pixels on the layer.
-  Sciviz points differed only in its status line, which states how long the plot took; the check paints it over
-  (and light keeper's live frame time), and sciviz points now draws the same pixels on the layer. Three still show
-  native noise, none with a pixel at d > 2: gameplay sandbox (its VFX particles' draw order) and two Khronos
-  models (ToyCar, IridescenceLamp).
+  Sciviz points differed only in its status line, which states how long the plot took; the check paints it over,
+  and sciviz points now draws the same pixels on the layer. Three still show
+  native noise in the table, none with a pixel at d > 2: gameplay sandbox (its VFX particles' draw order, fixed
+  since by `33c403984`; the table's cell changes at its next recording) and two Khronos models (ToyCar,
+  IridescenceLamp).
 - **Compute lab and sciviz surface (two bugs found by the run, both fixed).** Sciviz surface did not start on the layer
   ("Uniform p.time is missing"): a browser without a WebGPU adapter may still define the native `GPUBuffer` interface,
   the layer's buffers failed `instanceof GPUBuffer`, and the compute package encoded its own uniform buffer as the
@@ -779,7 +783,8 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   of 8 demos) fails a demo whose median frame on the layer costs more than 50 ms of main-thread work and more than
   twice its native frame (`--budget=<ms>`). It was part of `visual:compat`, in a shared GPU slot, until a landing
   failed on khronos-NodePerformanceTest at 86 ms beside other GPU suites (2026-10-30). The run on an integrated GPU
-  (AMD Radeon 680M) is still to be recorded.
+  (AMD Radeon 680M) is still to be recorded. On the RTX A6000 the step currently fails on gameplay-sandbox
+  (see `docs/known-bugs.md`).
 - **Dual viewport** ([examples/dual-viewport.html](../examples/dual-viewport.html), the launch showcase item): one
   scene with PBR materials and soft shadows, native WebGPU on the left and the layer on the right, with the live pixel
   difference and both frame times. In exact-pixel mode and with 4x MSAA on this PC no pixel of the 274,176 differs by more than one level.
@@ -792,9 +797,9 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   Bloom glow on the layer was wrong at its widest level (the voxel night view's sky glow: d > 2 on 1.45% of pixels,
   now 0.22%). Such a binding now reads a copy of its own, brought up to date only when its levels changed; the compute
   check's `fragmentMipViews` case fails without the fix.
-- **Causes of the demos that run with differences, all found.** Light keeper (SSAO) and the four voxel views (fog)
-  read the scene's resolved depth, which keeps each pixel's nearest of 4 samples natively and one sample on WebGL2: the
-  accepted per-sample MSAA difference ([webgl2-compat-demos.md](webgl2-compat-demos.md#accepted-difference-per-sample-reads-of-multisampled-textures)).
+- **Causes of the demos that run with differences, all found.** The seven (DOF, gameplay sandbox, Night Citadel and the
+  four voxel views) read the scene's resolved depth, which keeps each pixel's nearest of 4 samples natively and one
+  sample on WebGL2: the accepted per-sample MSAA difference ([webgl2-compat-demos.md](webgl2-compat-demos.md#accepted-difference-per-sample-reads-of-multisampled-textures)).
   Sciviz points (its status line, which states the plot time, now masked) differs by 16 pixels, within the parity
   rule: of the 2,000,000 positions sampled on the GPU, 5% of the x coordinates differ by one unit in the last place
   (0.1% of the normal samples already do; the two paths round their float arithmetic differently), and one point
@@ -805,4 +810,5 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   73,000 B, not the 60,000 B target, which no gate ever enforced. The base carries the full WGSL to GLSL translator and
   the WGSL checker, both needed on the first frame; native WebGPU always validates shaders, so a build without the
   checker would behave differently from it. The lazy compute runtime is measured and gated on its own.
-- **Also left in M8.** The transform-feedback tier for own-index stores, and the integrated-GPU budget run.
+- **Left from M8.** The integrated-GPU budget run. The transform-feedback tier for own-index stores is parked with the
+  sandbox's speed (speed only, see the scatter tier above); nothing is built for it.

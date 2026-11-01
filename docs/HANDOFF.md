@@ -449,12 +449,12 @@ stage 22,253 B) and the root entries of the other packages total 30 B less than 
 depends on nothing), `margoengine` re-exports core (it is the stage facade), and lines/text share a 12-line method
 shape. navigation (a Recast wrapper) is removed: its API is `@margoengine/navmesh/build`, a clean-room generator, with
 ORCA and the funnel rewritten clean room too (78 packages). Renames: [renames-2026-10-24.md](renames-2026-10-24.md).
-The full WebGL2 fallback was paused by Scott (2026-10-24) and is active again since 2026-10-27: milestones M0 to M2 are done
-and M3's device work, M4 and M5 (compute) have landed (core, the materials check with its compute scenarios, the glTF
+The full WebGL2 fallback was paused by Scott (2026-10-24) and is active again since 2026-10-27; milestones M0 to M8 are done (M8, every site demo, landed 2026-10-31). Until then: milestones M0 to M2 were done
+and M3's device work, M4 and M5 (compute) had landed (core, the materials check with its compute scenarios, the glTF
 PBR review, lod, lines, text, single-sample points, the skinned shadows check, the voxel render check, the environment
 check and the post-effects suite run on the layer with the same results as native WebGPU; compute runs as fragment
-draws, point draws or on the CPU, whichever the shader allows; M6, the package compat paths, is next), see
-[webgl2-compat-roadmap.md](webgl2-compat-roadmap.md), which also records what visitors without WebGPU see today (every site demo: a needs-WebGPU message, `check:no-webgpu`). `loadFallback` and `fallbackContent` in the React Canvas are how the layer is loaded and how pages degrade today.
+draws, point draws or on the CPU, whichever the shader allows; M6, the package compat paths, and M7 followed), see
+[webgl2-compat-roadmap.md](webgl2-compat-roadmap.md), which also records what visitors without WebGPU see today (every site demo loads the layer; the 7 demos that differ and why are in [webgl2-compat-demos.md](webgl2-compat-demos.md); `check:no-webgpu`). The layer is the site's fallback and `@margoengine/webgl` stays for v1.0 as the small preview that the React Canvas's `loadFallback` loads.
 
 ## Landed 2026-10-24: Codex's mesh-edit engine work (codex/mesh-rotation-visibility)
 

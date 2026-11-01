@@ -10,13 +10,13 @@ COVERED can still name a limit. PARTIAL means one common three.js use is absent.
 implements that feature yet. NOT PLANNED means out of scope by decision, with the reason on the row. Public copy should keep calling Margo an alternative path; the matrix is not a claim that
 Margo replaces three.js.
 
-## WebGL2 runs on a layer that is still in development
+## WebGL2 runs on a compatibility layer
 
-`@margoengine/webgl2-compat` (milestones M0 to M7 of [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)) puts a WebGPU-shaped
+`@margoengine/webgl2-compat` (milestones M0 to M8 of [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)) puts a WebGPU-shaped
 device on WebGL2 and translates every WGSL shader to GLSL ES 3.00, so core and the optional packages run unchanged at
-zero core bytes. The row stays PARTIAL: M8 (every site demo, docs, release) is open, the layer's base is 72,500 B gzip (limit
-73,000 B, an accepted difference) with a lazy compute runtime of 22,094 B, the voxel path tracer and XR refuse it, and CPU-tier compute kernels need `unsafe-eval`. The older
-`@margoengine/webgl` preview (core meshes only) still ships; `loadFallback` and `fallbackContent` remain the supported way to degrade today.
+zero core bytes. The row stays PARTIAL: the layer's base is 72,556 B gzip (limit
+73,000 B, an accepted difference) with a lazy compute runtime of 22,093 B, the voxel path tracer and XR refuse it, and CPU-tier compute kernels need `unsafe-eval`. Every site demo (27) and Khronos gallery model (32) loads it without WebGPU: 20 demos and all 32 models draw the same pixels as native, 7 demos run with one accepted difference. It is the site's fallback. The small
+`@margoengine/webgl` preview (core meshes only) stays for v1.0; the React Canvas's `loadFallback` loads it and `fallbackContent` replaces the plain message. The layer is installed with `install()` before `Engine.create`.
 
 ## The 4 MISSING rows
 
@@ -29,7 +29,7 @@ zero core bytes. The row stays PARTIAL: M8 (every site demo, docs, release) is o
 
 ## The 4 PARTIAL rows
 
-In progress: WebGL2 fallback (above).
+WebGL2 fallback: see above.
 
 Narrower APIs that already have a Margo path: Node materials (typed WGSL nodes, not a statement language), WebXR VR
 (untested on a headset) and WebXR AR (hit testing and anchors, untested on a device; no plane detection, depth sensing

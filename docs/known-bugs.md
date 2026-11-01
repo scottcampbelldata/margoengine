@@ -151,17 +151,15 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
-### VFX: blended particles draw in a different order each frame
+### The frame-budget step fails on the gameplay sandbox (WebGL2 layer, CPU tier)
 
-- **What:** the gameplay sandbox's still frame (prefers-reduced-motion, `?quality=high`, 1280 x 720) is not repeatable
-  natively: two captures differ by 1 level on 41 to 57 pixels, over the sea and the beach (Edge 156, RTX A6000,
-  2026-10-30). With its particles off (`#particles` set to 0) four captures are equal pixel for pixel.
-- **Repro:** `npm run visual:compat -- --only=gameplay-sandbox` prints native noise above 0 (mean 0.00005).
-- **Cause:** VFX's update kernel appends each live particle to the draw list with `atomicAdd` (packages/vfx/src/shader.ts),
-  so the list's order, and with it the order in which overlapping blended particles add up, changes from frame to
-  frame; float blending rounds differently in another order.
-- **Needed to close:** a draw order that does not depend on atomics (a stable compaction by particle index), with a
-  check that draws one still frame twice and compares it pixel for pixel.
+- **What:** `npm run visual:compat:budget` fails since 974a2a48c, which times gameplay-sandbox while it runs (it stops
+  drawing under reduced motion; before, a missing median passed without a check): 2,403 ms a frame on the layer against
+  0.8 ms native, budget 50 ms (RTX A6000, Edge 156). windy-meadow, timed the same way, passes at 22.3 ms.
+- **Repro:** `npm run visual:compat:budget -- --only=gameplay-sandbox`.
+- **Cause:** the VFX and scatter kernels of the sandbox use atomics, which the layer runs on the CPU tier.
+- **Needed to close:** layer routes for the VFX and scatter prefix counts (a branch with an unchecked start exists,
+  `sandbox-compat-routes`, 27aa6aff5). Parked by Scott with the sandbox's speed; no budget was raised and no step skipped.
 
 ### `KHR_materials_specular` weight does not scale Fresnel at grazing angles on gltf-pro's native paths
 
@@ -701,6 +699,12 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   a loaded machine can take minutes to close it; that fits, but no trace was taken of what Edge was doing.
 - **Not done:** the budget was not raised, since that would only hide it. `tests/catalog.test.js` closes one browser per
   run. Needed to close: a trace of a slow close, then a fix for what holds it.
+
+## Fixed 2026-10-31 (found by the WebGL2 demo comparison)
+
+| Bug | Cause | Fix | Regression test |
+| --- | --- | --- | --- |
+| VFX: blended particles drew in a different order each frame (the gameplay sandbox still frame differed by 1 level on 41 to 57 pixels between two native captures, RTX A6000, Edge 156) | the update kernel took respawn tickets and draw-list places with `atomicAdd`, so the order of overlapping blended particles changed between runs | `33c403984` (dated 2026-10-30): four workgroup prefix-sum passes give births the lowest dead slots and compact the drawn particles in slot order | the order case of `packages/vfx/test/browser-check.mjs` (65,536 slots, 40,000 births, five frames, two runs; fails with the atomic build, 0 pixels differ with the fix) |
 
 ## Fixed 2026-10-31
 
