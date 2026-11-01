@@ -291,9 +291,13 @@ export function fixWithoutTest(commits) {
   return null;
 }
 
-/** Text that must never reach main: a home folder, a secret, or an address at a domain of Scott's own. */
-const HOME_PATH =
-  /(?:[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s"']+|\/(?:Users|home)\/[^/\s"']+|%USERPROFILE%|\$HOME\b|~[\\/]\.?[\w-]+)/;
+/**
+ * Text that must never reach main: a home folder, a secret, or an address at a domain of Scott's own. In added lines only a
+ * home folder that holds a name counts, since a README has to be able to say where a tool keeps its config under the
+ * reader's home; a commit message has no such need and refuses both.
+ */
+const NAMED_HOME = /(?:[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s"']+|\/(?:Users|home)\/[^/\s"']+)/;
+const HOME_PATH = new RegExp(`${NAMED_HOME.source}|%USERPROFILE%|\\$HOME\\b|~[\\\\/]\\.?[\\w-]+`);
 const SECRET = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /\bgh[pousr]_[A-Za-z0-9]{20,}\b/,
@@ -332,7 +336,7 @@ export function contentProblem(diff) {
   for (const line of String(diff ?? '').split(/\r?\n/)) {
     if (!line.startsWith('+') || line.startsWith('+++')) continue;
     const text = line.slice(1);
-    if (HOME_PATH.test(text)) return { line: text.trim(), problem: 'a home-folder path' };
+    if (NAMED_HOME.test(text)) return { line: text.trim(), problem: 'a home-folder path' };
     if (SECRET.some((re) => re.test(text))) return { line: text.trim(), problem: 'what looks like a secret' };
     for (const [whole, domain] of text.matchAll(ADDRESS))
       if (whole !== EMAIL && /scott/i.test(domain)) return { line: text.trim(), problem: `the address ${whole}` };
@@ -541,7 +545,9 @@ export async function integrate({
       log(`integrate: RECORD: ${error.message}`);
       return { result: 'record', exit: EXIT.record, line: error.message, record, sentBack };
     }
-    record.state = 'crashed';
+    // A run that reached the push stays "pushing": that state is what makes the next run look at origin/main and finish
+    // the landing's record, and a crash after the push must not hide a landing.
+    if (record.state !== 'pushing') record.state = 'crashed';
     record.error = error.message;
     try {
       save();
@@ -1022,11 +1028,17 @@ async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log, steps,
     // The stale files check:merge plants before verify's build, which the package test then proves no pack contains.
     (await step('verify', 'npm run verify', { MARGOENGINE_PLANT_STALE: '1' }));
   if (failed) return failed;
-  const plan = parsePlan(readFileSync(steps.find((entry) => entry.step === 'plan').log, 'utf8'));
+  const planLog = steps.find((entry) => entry.step === 'plan').log,
+    plan = parsePlan(readFileSync(planLog, 'utf8'));
   for (const [name, env] of [
     ['check:examples-types', {}],
     ['modern:test:packages', { MARGOENGINE_PACKAGE_TEST_PREBUILT: '1' }],
   ]) {
+    // A step the plan skips says so. One it does not mention is a plan this script cannot read, never a pass.
+    if (!(name in plan)) {
+      log(`integrate: the plan in ${planLog} does not mention ${name}; a step is never skipped by silence`);
+      return { ok: false, step: 'plan', log: planLog, steps };
+    }
     if (!plan[name]) continue;
     const bad = await step(name, plan[name], env);
     if (bad) return bad;

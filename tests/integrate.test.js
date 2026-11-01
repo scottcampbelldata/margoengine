@@ -1088,6 +1088,54 @@ test('a refused push leaves every entry READY, writes no landing and closes the 
   }
 });
 
+test('a plan that does not mention a tier 1 step stops the landing: silence never skips a step', async () => {
+  const { paths, done } = setup({ one: `READY ${SHA.a}` });
+  try {
+    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } }),
+      inner = fakeSteps(() => undefined, git),
+      steps = async (command, options) => {
+        const result = await inner(command, options);
+        if (command.includes('--plan')) writeFileSync(options.logFile, PLAN.replace(/.*modern:test:packages.*\n/, ''));
+        return result;
+      };
+    const out = await run(paths, git, steps);
+    assert.deepEqual(git.pushes(), []);
+    assert.equal(out.result, 'nothing');
+    assert.equal(out.sentBack[0].step, 'plan');
+  } finally {
+    done();
+  }
+});
+
+test('added lines may name a config under the reader home; a home folder with a name is still refused', () => {
+  assert.equal(contentProblem('+Add it to `~/.cursor/mcp.json` or $HOME/.config'), null);
+  assert.match(contentProblem(`+see ${['', 'home', 'someone', 'x'].join('/')}`).problem, /home-folder/);
+  assert.match(messageProblem('feat: see ~/.cursor/mcp.json'), /home folder/);
+});
+
+test('a crash after the push leaves the run "pushing", and the next run finishes the landing record', async () => {
+  const { paths, done } = setup({ one: `READY ${SHA.a}` });
+  try {
+    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } }),
+      steps = fakeSteps(() => undefined, git);
+    const mainGit = () => {
+      throw new Error('the main checkout went away');
+    };
+    await assert.rejects(run(paths, git, steps, { mainGit }), /went away/);
+    assert.equal(git.pushes().length, 1);
+    const [crashed] = runs(paths);
+    assert.equal(crashed.state, 'pushing');
+    assert.equal(crashed.error, 'the main checkout went away');
+    const next = await run(paths, git, steps);
+    assert.equal(git.pushes().length, 1);
+    assert.equal(next.record.recovered[0].onMain, true);
+    assert.equal(readLanded(paths.landed)[0].run, crashed.id);
+    assert.equal(readQueue(paths.dir).length, 0);
+  } finally {
+    done();
+  }
+});
+
 test('a crash in the middle of a run leaves a record that says so, and the error is not swallowed', async () => {
   const { paths, done } = setup({ one: `READY ${SHA.a}` });
   try {
