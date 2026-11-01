@@ -5,6 +5,8 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { isAbsolute, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runInNewContext } from 'node:vm';
+import { inputsModuleCode } from './gpu-classify-inputs-entry.mjs';
 import { inputsCases, inputsOracle, INPUTS_CASE_COUNT, requireHardwareAdapter } from './gpu-classify-inputs-cases.mjs';
 const repository = realpathSync(new URL('../../../', import.meta.url));
 function resolveSource(specifier, context, nextResolve) {
@@ -67,6 +69,46 @@ test('CPU split preserves pre-split classification goldens and planes', () => {
 // biome-ignore format: Keep literal imports on one line for Factory auditing.
 const { classifyInputsGPU, classifyGPU, CLASSIFY_INPUTS_WGSL, SOURCE_BOUND } = await import('../src/gpu-classify-inputs.ts');
 const { CLASSIFY_WARP_WGSL } = await import('../src/gpu-classify-warp.ts');
+
+test('hardware_bundle exposes the complete J5 proof graph without starting a browser', { timeout: 15000 }, async () => {
+  const context = {};
+  runInNewContext(await inputsModuleCode(), context, { timeout: 2000 });
+  const proof = context.__margoInputsProof;
+  assert.deepEqual(
+    Object.keys(proof).sort(),
+    [
+      'INPUTS_CASE_COUNT',
+      'buildRegion',
+      'classifier',
+      'classify',
+      'classifyGPU',
+      'classifyInputs',
+      'classifyInputsGPU',
+      'classifyPlanes',
+      'createRelief',
+      'divFloor',
+      'fieldIntegrationCases',
+      'fieldNames',
+      'frameFor',
+      'heightsOf',
+      'holdridge',
+      'inputsCases',
+      'inputsOracle',
+      'presets',
+      'quantizeClimate',
+      'rectFields',
+      'rectFieldsGPU',
+      'warpLattice',
+      'whittaker',
+    ].sort(),
+  );
+  assert.equal(proof.inputsCases(proof).length, INPUTS_CASE_COUNT);
+  assert.equal(
+    proof.fieldIntegrationCases().reduce((sum, s) => sum + s.rectangles.length, 0),
+    16,
+  );
+});
+
 function gpuConstants(t) {
   for (const [name, value] of Object.entries({
     GPUBufferUsage: { STORAGE: 128, COPY_DST: 8, COPY_SRC: 4, UNIFORM: 64, MAP_READ: 1 },

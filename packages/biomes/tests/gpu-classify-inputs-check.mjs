@@ -2,34 +2,13 @@
 // Provenance and arithmetic bounds: ../src/gpu-classify-inputs.ts. No timings or repetitions.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { build } from 'vite';
+import { pathToFileURL } from 'node:url';
+import { inputsModuleCode } from './gpu-classify-inputs-entry.mjs';
 import { requireHardwareAdapter, INPUTS_CASE_COUNT } from './gpu-classify-inputs-cases.mjs';
 import { fieldIntegrationCases } from './gpu-field-integration-cases.mjs';
 import { endTree, runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
 
-export async function inputsModuleCode() {
-  const result = await build({
-    configFile: false,
-    publicDir: false,
-    logLevel: 'silent',
-    build: {
-      write: false,
-      minify: false,
-      target: 'es2022',
-      rollupOptions: {
-        input: fileURLToPath(new URL('./gpu-classify-inputs-entry.mjs', import.meta.url)),
-        preserveEntrySignatures: 'strict',
-        output: { format: 'iife', name: '__margoInputsProof' },
-      },
-    },
-  });
-  assert.ok(
-    !Array.isArray(result) && result.output.length === 1 && result.output[0].type === 'chunk',
-    'Internal inputs fixture must bundle to one self-contained module',
-  );
-  return result.output[0].code;
-}
+export { inputsModuleCode };
 
 async function check() {
   const deadline = setTimeout(() => {
