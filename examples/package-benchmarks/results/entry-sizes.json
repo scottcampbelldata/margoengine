@@ -1,5 +1,5 @@
 {
-  "commit": "922000f83",
+  "commit": "7225eb01f",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -760,8 +760,12 @@
     },
     "@margoengine/lines": {
       ".": {
-        "raw": 47578,
+        "raw": 47582,
         "gzip": 18046
+      },
+      "./edges": {
+        "raw": 11284,
+        "gzip": 4610
       }
     },
     "@margoengine/loaders": {
