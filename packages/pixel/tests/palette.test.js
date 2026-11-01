@@ -41,27 +41,89 @@ test('blue noise ranks every pixel once and repeats for a seed', () => {
   assert.throws(() => blueNoise(3), RangeError);
 });
 
-test('blue noise has less low-frequency energy than the same values shuffled', () => {
-  const size = 32,
-    noise = blueNoise(size),
-    lowEnergy = (m) => {
-      // A 2 x 2 box filter keeps low frequencies: blue noise averages out, white noise does not.
-      let sum = 0;
+// Blue noise by its definition (Ulichney, 1988 and 1993): the power spectrum holds almost nothing at low frequencies and
+// the energy sits at high ones. Power here is the discrete Fourier transform normalised so white noise averages 1 at
+// every frequency, which is what `spectrum` returns as [frequency in cycles per pixel, power] pairs.
+const spectrum = (m, size) => {
+  const n = size * size,
+    mean = m.reduce((sum, v) => sum + v, 0) / n,
+    variance = m.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n,
+    cos = Array.from({ length: size }, (_, i) => Math.cos((2 * Math.PI * i) / size)),
+    sin = Array.from({ length: size }, (_, i) => Math.sin((2 * Math.PI * i) / size)),
+    out = [];
+  for (let v = 0; v < size; v++)
+    for (let u = 0; u < size; u++) {
+      if (!u && !v) continue;
+      let re = 0,
+        im = 0;
       for (let y = 0; y < size; y++)
         for (let x = 0; x < size; x++) {
-          const at = (ax, ay) => m[((y + ay) % size) * size + ((x + ax) % size)];
-          sum += ((at(0, 0) + at(1, 0) + at(0, 1) + at(1, 1)) / 4 - 0.5) ** 2;
+          const turn = (u * x + v * y) % size,
+            value = m[y * size + x] - mean;
+          re += value * cos[turn];
+          im -= value * sin[turn];
         }
-      return sum;
-    };
+      out.push([Math.hypot(Math.min(u, size - u), Math.min(v, size - v)) / size, (re * re + im * im) / (n * variance)]);
+    }
+  return out;
+};
+const average = (pairs, inBand) => {
+  const band = pairs.filter(([f]) => inBand(f));
+  return band.reduce((sum, [, power]) => sum + power, 0) / band.length;
+};
+// The low band: up to where the void-and-cluster filter (a Gaussian of sigma 1.5, response exp(-2 pi^2 sigma^2 f^2)) has
+// fallen to one half, f = 1/8. The method works on exactly these frequencies, so this band is what it must empty.
+const lowBand = (f) => f <= 1 / 8;
+const shuffle = (m) => {
   let state = 12345;
-  const shuffled = [...noise];
-  for (let i = shuffled.length - 1; i > 0; i--) {
+  const out = [...m];
+  for (let i = out.length - 1; i > 0; i--) {
     state = (state * 1664525 + 1013904223) >>> 0;
     const k = state % (i + 1);
-    [shuffled[i], shuffled[k]] = [shuffled[k], shuffled[i]];
+    [out[i], out[k]] = [out[k], out[i]];
   }
-  assert.ok(lowEnergy(noise) < lowEnergy(shuffled) / 2, `${lowEnergy(noise)} vs ${lowEnergy(shuffled)}`);
+  return out;
+};
+
+test('the blue noise spectrum is empty at low frequencies and full at high ones', () => {
+  const size = 32,
+    noise = blueNoise(size),
+    power = spectrum(noise, size);
+  // 20 dB under white in the band the method empties.
+  assert.ok(average(power, lowBand) < 1 / 100, `low band ${average(power, lowBand)}`);
+  // The transform keeps the total (Parseval, average 1), so what left the low band shows above white at the high end.
+  assert.ok(average(power, (f) => f >= 3 / 8) > 1, `high band ${average(power, (f) => f >= 3 / 8)}`);
+  // The same measure tells white noise apart: the same values shuffled keep their low band.
+  const control = average(spectrum(shuffle(noise), size), lowBand);
+  assert.ok(control > 1 / 2, `shuffled low band ${control}`);
+});
+
+test('every grey level of the blue noise is a blue noise pattern', () => {
+  const size = 32,
+    noise = blueNoise(size);
+  // A dither pattern of density g has its first energy at the principal frequency sqrt(min(g, 1 - g)). These levels put it
+  // at 1/4 or above, twice the low band's edge, so that band lies well under it: at least 10 dB under white there.
+  for (const g of [1 / 16, 1 / 8, 1 / 4, 1 / 2, 3 / 4, 7 / 8, 15 / 16]) {
+    const pattern = Float64Array.from(noise, (v) => (v < g ? 1 : 0)),
+      low = average(spectrum(pattern, size), lowBand);
+    assert.ok(low < 1 / 10, `level ${g}: low band ${low}`);
+  }
+});
+
+test('a 2 x 2 average of the blue noise holds a third of the energy of white noise', () => {
+  const size = 32,
+    n = size * size,
+    noise = blueNoise(size);
+  let sum = 0;
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const at = (ax, ay) => noise[((y + ay) % size) * size + ((x + ax) % size)];
+      sum += ((at(0, 0) + at(1, 0) + at(0, 1) + at(1, 1)) / 4 - 0.5) ** 2;
+    }
+  // White noise here is the expectation over every order of these n values, exact: one shuffle is one random sample of it.
+  // Variance of n evenly spaced values, cut by four for the average, with the sampling-without-replacement correction.
+  const white = ((n * ((n * n - 1) / (12 * n * n))) / 4) * (1 - 3 / (n - 1));
+  assert.ok(sum < white / 3, `${sum} vs ${white}`);
 });
 
 test('the 64 x 64 tile the pass uses is ready', () => {
@@ -70,6 +132,8 @@ test('the 64 x 64 tile the pass uses is ready', () => {
   assert.equal(tile.values.length, 4096);
   assert.equal(ditherMatrix('none'), undefined);
   assert.equal(ditherMatrix('bayer4').size, 4);
+  for (const mode of ['bayer3', 'bayer16', 'xxxxx4', 'constructor', ''])
+    assert.throws(() => ditherMatrix(mode), RangeError, mode);
 });
 
 test('palettes read from hex and bytes', () => {

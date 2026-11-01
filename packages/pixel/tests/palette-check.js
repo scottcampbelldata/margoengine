@@ -130,7 +130,13 @@ window.check = {
     {
       const data = gradient(),
         { source, target } = textures(data),
-        pass = PaletteQuantize.attach(instance, { palette: PALETTE, source: () => source, target: () => target });
+        other = engine.gpu.createTexture({
+          size: [WIDTH, HEIGHT],
+          format: 'bgra8unorm',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        });
+      let output = target;
+      const pass = PaletteQuantize.attach(instance, { palette: PALETTE, source: () => source, target: () => output });
       instance.render({ delta: 1 / 60 });
       pass.dither = 'bayer4';
       instance.render({ delta: 1 / 60 });
@@ -141,6 +147,20 @@ window.check = {
       pass.setPalette(SWAP);
       instance.render({ delta: 1 / 60 });
       out.checks['palette changed live'] = wrong(await read(target), reference(data, SWAP, null, { dither: 'bayer4' }));
+      // A target of another format gets its own pipeline and bind group, and back again.
+      output = other;
+      instance.render({ delta: 1 / 60 });
+      const bgra = await read(other);
+      for (let i = 0; i < bgra.length; i += 4) [bgra[i], bgra[i + 2]] = [bgra[i + 2], bgra[i]];
+      out.checks['target format changed live'] = wrong(bgra, reference(data, SWAP, null, { dither: 'bayer4' }));
+      output = target;
+      pass.setPalette(PALETTE);
+      instance.render({ delta: 1 / 60 });
+      out.checks['target format changed back'] = wrong(
+        await read(target),
+        reference(data, PALETTE, null, { dither: 'bayer4' }),
+      );
+      other.destroy();
       pass.dispose();
       const same = PaletteQuantize.attach(instance, { palette: PALETTE, source: target, target });
       try {
