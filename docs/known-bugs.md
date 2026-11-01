@@ -417,6 +417,25 @@ does not own. Each entry says exactly what is needed to close it.
   in three captures; AMD Radeon 680M (driver 32.0.21030.2001): 0 of 30, 0 of 30, 0 pixels. So the plain-page blend
   noise is NVIDIA's (hardware or driver), not Dawn's or Chromium's. The Arc's voxel pixel (101, 72) is a different
   fault of the same kind (one sample takes another's destination), traced above with its own replay repro.
+- **Khronos LightsPunctualLamp, the same fault traced to the arithmetic (RTX A6000, driver 32.0.16.1742, Edge
+  156.0.4314.50, 2026-10-31):** the still frame changes on 3 to 26 pixels by up to 40 of 255 (usually (292, 160-162) by
+  3), so `visual:compat` fails when two native captures catch different frames. One still frame recorded (every object,
+  shader and byte) and replayed 1000 times in a new browser with no Margo code gave 12 distinct frames, 40 of 1000 unlike
+  the most common one, whose pixels equal the live page's on all 640x480. Margo's inputs are therefore out: every frame clears
+  colour and depth, samples only fixed textures (the default transmission path has no scene snapshot or mip chain), and
+  has no validation errors. Left-out draws, 300 frames each: no glass draws 0; tint draw only, 32 frames (4 pixels, max 1);
+  additive glass draw only, 78 (4 pixels, max 26); all draws 23 to 34. The whole frame rewritten to 1x: 0 of 500. Blended
+  pipelines with `mask: 7` or 14: 0 of 300; `mask: 15`: 19 of 300. Hiding the transmission primitive or the point lights
+  was measured live before this trace: 0 changing pixels, and no change. At (292, 160) the opaque samples are
+  `149.150.149 | 77.80.87 | 157.162.161 | 77.80.87`, whose average is 115.118.121. The additive glass draw adds 81.68.63
+  on samples 0 and 2, giving the correct `230.218.212` and `238.230.224`; in the faulty frames both hold `196.186.184`,
+  exactly the average plus the source. So the blend reads the four samples' average as its destination and still applies each
+  sample's source. On the Dawn D3D11 adapter (`--adapter=d3d11`) this pixel held 200 of 200, while 6 of 200 frames differed
+  elsewhere. Not measured on another GPU, and Chromium's software adapter is not available on this PC (Edge and Chrome both
+  report no adapter), so that it is NVIDIA's alone rests on the plain page's three-GPU row above.
+- **Repro of the lamp:** `node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/msaa-blend-repeat-check.mjs
+  --replay=LightsPunctualLamp --pixel=292,160 --replay-frames=1000` (after `npm run build:packages`); `--replay-mask=7`
+  for the comparison.
 - **Earlier notes on the voxel case:** every differing pixel is seen through
   the glass wall, along glass and terrain edges (pixels whose samples hold more than one surface). Between the frames
   nothing that Margo hands the GPU changes: no buffer write but the frame uniform and indirect arguments, bit for bit
@@ -437,7 +456,8 @@ does not own. Each entry says exactly what is needed to close it.
   frame with its replay page sent to Intel (Scott decides both), and their fixes or explanations recorded here; then
   the voxel tolerance can go (the Arc's 9 of 255 is over it, so the voxel checks can fail now and then on that laptop,
   as `--repeat` does there), and ToyCar and
-  IridescenceLamp get an exact repeat-capture check. Margo has no correct way around it: leaving a sample out of the
+  IridescenceLamp get an exact repeat-capture check, and LightsPunctualLamp's recorded exact still frame
+  (`scripts/support/visual-compat-expected.json`) can hold on this GPU. Margo has no correct way around it: leaving a sample out of the
   blend, or drawing a full-screen layer first to change the GPU's tile state, changes or adds work to hide the
   symptom.
 

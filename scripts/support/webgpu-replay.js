@@ -2,11 +2,13 @@
 // buffer and texture bytes) and the same calls, `frames` times on a fresh device. After the last render pass that
 // draws into a multisampled colour view, a compute pass copies the 4 samples of `pixel`; the result lists each
 // distinct sample set and how often it came. `skip` (render pass numbers, from 0 in the frame's order) keeps those
-// passes' clears and loads but drops their draws. Used by scripts/support/webgpu-replay.html.
-import { fromBase64, revive, textureSize } from './webgpu-trace.js';
+// passes' clears and loads but drops their draws. `blendMask` sets that sample mask on every blended multisampled
+// pipeline. `whole` also compares the whole canvas of each frame with the most common frame. Used by
+// scripts/support/webgpu-replay.html.
+import { fromBase64, revive, textureSize, toBase64 } from './webgpu-trace.js';
 
 /** Creates the trace's objects on `device`; returns the id -> object map. */
-export async function buildTrace(device, trace) {
+export async function buildTrace(device, trace, { blendMask } = {}) {
   const made = new Map(),
     get = (id) => made.get(id),
     BU = GPUBufferUsage,
@@ -58,7 +60,11 @@ export async function buildTrace(device, trace) {
         break;
       }
       case 'createRenderPipeline':
-        r = await device.createRenderPipelineAsync(desc);
+        r = await device.createRenderPipelineAsync(
+          blendMask !== undefined && desc.multisample?.count > 1 && desc.fragment?.targets?.some((t) => t?.blend)
+            ? { ...desc, multisample: { ...desc.multisample, mask: blendMask } }
+            : desc,
+        );
         break;
       case 'createComputePipeline':
         r = await device.createComputePipelineAsync(desc);
@@ -72,8 +78,12 @@ export async function buildTrace(device, trace) {
 }
 
 /** Replays the trace's frame `frames` times; returns the distinct sample sets at `pixel` and the frames that differ from the first. */
-export async function replayTrace(device, trace, { frames = 100, pixel = [0, 0], skip = [] } = {}) {
-  const made = await buildTrace(device, trace),
+export async function replayTrace(
+  device,
+  trace,
+  { frames = 100, pixel = [0, 0], skip = [], blendMask, whole = false } = {},
+) {
+  const made = await buildTrace(device, trace, { blendMask }),
     get = (id) => made.get(id),
     skipped = new Set(skip);
   const multisampled = (view) =>
@@ -86,9 +96,10 @@ export async function replayTrace(device, trace, { frames = 100, pixel = [0, 0],
     probed = passes.findLastIndex(
       (c) => drawing.has(c[3]) && multisampled(revive(c[2][0].colorAttachments[0].view, get)),
     );
-  if (probed < 0) throw new Error('webgpu-replay: the frame draws into no multisampled colour view; nothing to probe');
-  const probedPass = passes[probed][3],
-    target = revive(passes[probed][2][0].colorAttachments[0].view, get);
+  if (probed < 0 && !whole)
+    throw new Error('webgpu-replay: the frame draws into no multisampled colour view; nothing to probe');
+  const probedPass = passes[probed]?.[3],
+    target = probed < 0 ? undefined : revive(passes[probed][2][0].colorAttachments[0].view, get);
   const probe = device.createComputePipeline({
     layout: 'auto',
     compute: {
@@ -101,7 +112,9 @@ export async function replayTrace(device, trace, { frames = 100, pixel = [0, 0],
   });
   const ring = device.createBuffer({ size: frames * 256, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
   const live = new Map(),
-    owner = new Map();
+    owner = new Map(),
+    canvases = [];
+  const canvasId = Object.keys(trace.objects).find((id) => trace.objects[id].t === 'canvasTexture');
   for (let f = 0; f < frames; f++) {
     let pass = -1,
       skipping = false;
@@ -135,6 +148,7 @@ export async function replayTrace(device, trace, { frames = 100, pixel = [0, 0],
         }
       }
     }
+    if (whole) canvases.push(await readCanvas(device, made.get(Number(canvasId)), trace.objects[canvasId].desc));
     await device.queue.onSubmittedWorkDone();
   }
   const staging = device.createBuffer({ size: frames * 256, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
@@ -154,7 +168,65 @@ export async function replayTrace(device, trace, { frames = 100, pixel = [0, 0],
     if (value !== first) differ.push(f);
     seen.set(value, (seen.get(value) ?? 0) + 1);
   }
-  return { renderPasses: passes.length, probedPass: probed, values: [...seen], differ };
+  return {
+    renderPasses: passes.length,
+    probedPass: probed,
+    values: [...seen],
+    differ,
+    ...(whole ? compareFrames(canvases) : {}),
+  };
+}
+
+/** The canvas stand-in's bytes (4 per texel, rows tightly packed). */
+async function readCanvas(device, texture, { size: [width, height] }) {
+  const row = Math.ceil((width * 4) / 256) * 256,
+    staging = device.createBuffer({ size: row * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+    encoder = device.createCommandEncoder();
+  encoder.copyTextureToBuffer({ texture }, { buffer: staging, bytesPerRow: row }, [width, height]);
+  device.queue.submit([encoder.finish()]);
+  await staging.mapAsync(GPUMapMode.READ);
+  const mapped = new Uint8Array(staging.getMappedRange()),
+    bytes = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) bytes.set(mapped.subarray(y * row, y * row + width * 4), y * width * 4);
+  staging.destroy();
+  return { width, height, bytes };
+}
+
+/** How each frame differs from the most common frame: `{ frameSets, wholeDiffer: [{ frame, pixels, max, first }], reference }`. */
+export function compareFrames(canvases) {
+  const count = new Map();
+  for (const c of canvases) {
+    let h = 2166136261;
+    for (let i = 0; i < c.bytes.length; i++) h = Math.imul(h ^ c.bytes[i], 16777619);
+    const entry = count.get(h) ?? { n: 0, canvas: c };
+    entry.n++;
+    count.set(h, entry);
+  }
+  const common = [...count.values()].sort((a, b) => b.n - a.n)[0].canvas,
+    wholeDiffer = [];
+  canvases.forEach((c, frame) => {
+    let pixels = 0,
+      max = 0,
+      first;
+    for (let i = 0; i < c.bytes.length; i += 4) {
+      const d = Math.max(
+        Math.abs(c.bytes[i] - common.bytes[i]),
+        Math.abs(c.bytes[i + 1] - common.bytes[i + 1]),
+        Math.abs(c.bytes[i + 2] - common.bytes[i + 2]),
+      );
+      if (d) {
+        pixels++;
+        if (d > max) max = d;
+        first ??= [(i / 4) % c.width, Math.floor(i / 4 / c.width)];
+      }
+    }
+    if (pixels) wholeDiffer.push({ frame, pixels, max, first });
+  });
+  return {
+    frameSets: count.size,
+    wholeDiffer,
+    reference: { width: common.width, height: common.height, bytes: toBase64(common.bytes) },
+  };
 }
 
 /** Four packed RGBA8 samples as 'r.g.b|r.g.b|r.g.b|r.g.b'. */

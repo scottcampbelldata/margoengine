@@ -12,7 +12,7 @@ import {
   toBase64,
   writeRange,
 } from '../scripts/support/webgpu-trace.js';
-import { sampleSet } from '../scripts/support/webgpu-replay.js';
+import { compareFrames, sampleSet } from '../scripts/support/webgpu-replay.js';
 
 test('writeRange takes the bytes queue.writeBuffer writes: element offsets for typed arrays, byte offsets for buffers', () => {
   const floats = new Float32Array([1, 2, 3, 4]);
@@ -79,4 +79,19 @@ test('textureSize and sampleSet read descriptors and probe words as the replay p
   assert.deepEqual(textureSize({ size: [16, 16, 13] }), [16, 16, 13]);
   assert.deepEqual(textureSize({ size: { width: 320, height: 240 } }), [320, 240, 1]);
   assert.equal(sampleSet(new Uint32Array([0xff3e3f41, 0xff6b6f70, 0, 0x01020304])), '65.63.62|112.111.107|0.0.0|4.3.2');
+});
+
+test('compareFrames measures each frame against the most common one, ignoring alpha', () => {
+  const frame = (...bytes) => ({ width: 2, height: 1, bytes: Uint8Array.from(bytes) });
+  const common = [10, 20, 30, 255, 1, 2, 3, 255];
+  const r = compareFrames([
+    frame(13, 20, 30, 255, 1, 2, 3, 255),
+    frame(...common),
+    frame(...common),
+    frame(10, 20, 30, 0, 1, 2, 3, 255),
+  ]);
+  assert.equal(r.frameSets, 3);
+  assert.deepEqual(r.wholeDiffer, [{ frame: 0, pixels: 1, max: 3, first: [0, 0] }]);
+  assert.equal(r.reference.width, 2);
+  assert.deepEqual([...fromBase64(r.reference.bytes)], common);
 });
