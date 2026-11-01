@@ -174,9 +174,9 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/gltf-pro API](https://margoengine.com/llms/api/gltf-pro.md): 9 entry points
 - [@margoengine/loaders API](https://margoengine.com/llms/api/loaders.md): 8 entry points
 - [@margoengine/decoders API](https://margoengine.com/llms/api/decoders.md): 8 entry points
-- [@margoengine/fbx API](https://margoengine.com/llms/api/fbx.md): 2 entry points
+- [@margoengine/fbx API](https://margoengine.com/llms/api/fbx.md): 3 entry points
 - [@margoengine/usdz API](https://margoengine.com/llms/api/usdz.md): 2 entry points
-- [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 25 entry points
+- [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 28 entry points
 - [@margoengine/ifc API](https://margoengine.com/llms/api/ifc.md): 2 entry points
 - [@margoengine/blender API](https://margoengine.com/llms/api/blender.md): 1 entry point
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 2 entry points
@@ -204,7 +204,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/video API](https://margoengine.com/llms/api/video.md): 1 entry point
 - [@margoengine/xr API](https://margoengine.com/llms/api/xr.md): 1 entry point
 - [@margoengine/staging API](https://margoengine.com/llms/api/staging.md): 1 entry point
-- [@margoengine/post API](https://margoengine.com/llms/api/post.md): 18 entry points
+- [@margoengine/post API](https://margoengine.com/llms/api/post.md): 19 entry points
 - [@margoengine/tonemap API](https://margoengine.com/llms/api/tonemap.md): 1 entry point
 - [@margoengine/dof API](https://margoengine.com/llms/api/dof.md): 1 entry point
 - [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 1 entry point
