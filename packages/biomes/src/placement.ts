@@ -905,35 +905,37 @@ class Run {
    * (candidates there would all be thinned away, so skipping them changes nothing). Inside one tile of which only a
    * window is made, the window answers for a rectangle it holds: a biome absent from the window has no weight at any
    * candidate there either, and the cell lies outside the placed tile, so no tallied count depends on the answer.
-   * A rectangle past the window, or over several tiles (a stratum cell larger than a tile, which the placed tile may
-   * tally), throws Missing until its tiles are whole.
+   * A window that has the biome answers true as its whole tile would. A rectangle past the window, or over several
+   * tiles (a stratum cell larger than a tile, which the placed tile may tally), throws Missing until its tiles are whole.
    */
   somewhere(b: number, x0: number, z0: number, x1: number, z1: number): boolean {
     const g = this.geometry,
-      tx0 = Math.max(0, x0) >> g.tileShift,
-      tz0 = Math.max(0, z0) >> g.tileShift,
-      tx1 = Math.min(g.worldX - 1, x1) >> g.tileShift,
-      tz1 = Math.min(g.worldZ - 1, z1) >> g.tileShift;
-    if (tx0 === tx1 && tz0 === tz1) {
-      const f = this.tileFields(tx0, tz0);
-      if (f.present[b]) return true;
-      if (!f.whole) {
-        const ox = tx0 * g.tileTicks,
-          oz = tz0 * g.tileTicks;
+      s = g.tileShift,
+      c = g.cellShift,
+      t = g.tileTicks - 1,
+      tx0 = Math.max(0, x0) >> s,
+      tz0 = Math.max(0, z0) >> s,
+      tx1 = Math.min(g.worldX - 1, x1) >> s,
+      tz1 = Math.min(g.worldZ - 1, z1) >> s,
+      one = tx0 === tx1 && tz0 === tz1;
+    for (let tz = tz0; tz <= tz1; tz++)
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const f = this.tileFields(tx, tz),
+          ox = tx << s,
+          oz = tz << s;
+        if (f.present[b]) return true;
         if (
-          (Math.max(x0, ox) - ox) >> g.cellShift < f.i0 ||
-          (Math.max(z0, oz) - oz) >> g.cellShift < f.j0 ||
-          (Math.min(x1, ox + g.tileTicks - 1) - ox) >> g.cellShift >= f.i1 ||
-          (Math.min(z1, oz + g.tileTicks - 1) - oz) >> g.cellShift >= f.j1
+          !f.whole &&
+          !(
+            one &&
+            Math.max(0, x0 - ox) >> c >= f.i0 &&
+            Math.max(0, z0 - oz) >> c >= f.j0 &&
+            Math.min(t, x1 - ox) >> c < f.i1 &&
+            Math.min(t, z1 - oz) >> c < f.j1
+          )
         )
-          throw new Missing(tx0, tz0);
+          throw new Missing(tx, tz);
       }
-      return false;
-    }
-    for (let tz = tz0; tz <= tz1; tz++)
-      for (let tx = tx0; tx <= tx1; tx++) if (!this.tileFields(tx, tz).whole) throw new Missing(tx, tz);
-    for (let tz = tz0; tz <= tz1; tz++)
-      for (let tx = tx0; tx <= tx1; tx++) if (this.tileFields(tx, tz).present[b]) return true;
     return false;
   }
 
@@ -1215,8 +1217,12 @@ const tileKey = (x: number, z: number) => `${x},${z}`;
 export class BiomePlacement implements Disposable {
   #species: readonly PlacedSpecies[] = [];
   #reach = 0;
-  /** How far reads usually go: `reach` for the first USUAL_ROUNDS rounds (the neighbour band, see #band). */
-  #usual = 0;
+  /**
+   * Cells of a neighbour that placing a tile usually reads (see #place): how far objects read in the first USUAL_ROUNDS
+   * rounds, rounded up to whole stratum cells (a read generates its whole stratum cell; stratum cells are powers of two
+   * anchored to the world, so up to a tile they never cross a tile edge), in world cells, at most the tile.
+   */
+  #band = 0;
   readonly #world: BiomeWorld;
   #options: PlacementOptions;
   #plan: Plan;
@@ -1298,10 +1304,23 @@ export class BiomePlacement implements Disposable {
         }),
       ),
     );
-    const within = plan.within / ONE, // float division: spacing factor
-      across = plan.across / ONE; // float division: spacing factor
-    this.#reach = placementReach(this.#world.biomes, plan.rounds, within, across);
-    this.#usual = placementReach(this.#world.biomes, Math.min(plan.rounds, USUAL_ROUNDS), within, across);
+    const w = this.#world,
+      within = plan.within / ONE, // float division: spacing factor
+      across = plan.across / ONE, // float division: spacing factor
+      cell = w.resolution * TICK;
+    let unit = cell;
+    for (const st of plan.strata) if (st.species.length) unit = Math.max(unit, st.g);
+    this.#reach = placementReach(w.biomes, plan.rounds, within, across);
+    this.#band = Math.min(
+      divFloor(w.tileSize * TICK, cell),
+      divFloor(
+        divFloor(
+          Math.ceil(placementReach(w.biomes, Math.min(plan.rounds, USUAL_ROUNDS), within, across) * TICK) + unit - 1,
+          unit,
+        ) * unit,
+        cell,
+      ),
+    );
     return plan;
   }
 
@@ -1433,44 +1452,26 @@ export class BiomePlacement implements Disposable {
   #place(x: number, z: number, signal?: AbortSignal): Promise<PlacedTile> {
     const w = this.#world,
       cells = divFloor(w.tileSize * TICK, w.resolution * TICK),
-      a = this.#band(),
-      whole: [number, number][] = [[x, z]],
-      parts: [number, number, Rect][] = [],
+      a = this.#band,
+      need: [number, number, Rect?][] = [[x, z]],
       besidePlaced = (nx: number, nz: number) => {
         for (let tz = nz - 1; tz <= nz + 1; tz++)
           for (let tx = nx - 1; tx <= nx + 1; tx++)
             if ((tx !== x || tz !== z) && this.#cache.has(tileKey(tx, tz))) return true;
         return false;
       },
-      block = besidePlaced(x, z);
+      block = a >= cells || besidePlaced(x, z);
     for (let dz = -1; dz <= 1; dz++)
-      for (let dx = -1; dx <= 1; dx++) {
-        if (!dx && !dz) continue;
-        if (a >= cells || block || besidePlaced(x + dx, z + dz)) whole.push([x + dx, z + dz]);
-        else
-          parts.push([
+      for (let dx = -1; dx <= 1; dx++)
+        if (dx || dz)
+          need.push([
             x + dx,
             z + dz,
-            [dx < 0 ? cells - a : 0, dz < 0 ? cells - a : 0, dx > 0 ? a : cells, dz > 0 ? a : cells],
+            block || besidePlaced(x + dx, z + dz)
+              ? undefined
+              : [dx < 0 ? cells - a : 0, dz < 0 ? cells - a : 0, dx > 0 ? a : cells, dz > 0 ? a : cells],
           ]);
-      }
-    return this.#withFields(whole, parts, signal, (fields) => this.#run(x, z, fields));
-  }
-
-  /**
-   * Cells of a neighbour that placing a tile usually reads: how far objects read in the first USUAL_ROUNDS rounds,
-   * rounded up to whole stratum cells (a read generates its whole stratum cell; stratum cells are powers of two
-   * anchored to the world, so up to a tile they never cross a tile edge), in world cells, at most the tile.
-   */
-  #band(): number {
-    const w = this.#world,
-      cellTicks = w.resolution * TICK,
-      tileTicks = w.tileSize * TICK;
-    let unit = cellTicks;
-    for (const st of this.#plan.strata) if (st.species.length) unit = Math.max(unit, st.g);
-    const reach = Math.ceil(this.#usual * TICK),
-      ticks = Math.min(tileTicks, divFloor(reach + unit - 1, unit) * unit);
-    return divFloor(ticks, cellTicks);
+    return this.#withFields(need, signal, (fields) => this.#run(x, z, fields));
   }
 
   /** What placement reads of a world tile or part, kept as long as the world keeps its layers. */
@@ -1491,27 +1492,27 @@ export class BiomePlacement implements Disposable {
   }
 
   /**
-   * Runs `work` with the world tiles it reads: the `whole` tiles and the `parts` (tile, window) first, then, whole, any
-   * tile a lookup reaches past them (the work runs again from the start; its result does not depend on what was loaded
-   * before).
+   * Runs `work` with the world tiles it reads: the `need`ed tiles first (whole, or the window of one when given), then,
+   * whole, any tile a lookup reaches past them (the work runs again from the start; its result does not depend on what
+   * was loaded before).
    */
   async #withFields<T>(
-    whole: readonly (readonly [number, number])[],
-    parts: readonly (readonly [number, number, Rect])[],
+    need: readonly (readonly [number, number, Rect?])[],
     signal: AbortSignal | undefined,
     work: (fields: (x: number, z: number) => Fields | undefined) => T,
   ): Promise<T> {
     const w = this.#world,
       fields = new Map<string, Fields>(),
-      inside = (tx: number, tz: number) => tx >= 0 && tz >= 0 && tx < w.tilesX && tz < w.tilesZ,
-      load = async (tx: number, tz: number) => {
-        if (!inside(tx, tz) || fields.get(tileKey(tx, tz))?.whole) return;
-        fields.set(tileKey(tx, tz), this.#fieldsOf(await w.tile(tx, tz, { signal })));
+      load = async (tx: number, tz: number, window?: Rect) => {
+        const key = tileKey(tx, tz),
+          had = fields.get(key);
+        if (tx < 0 || tz < 0 || tx >= w.tilesX || tz >= w.tilesZ || had?.whole || (window && had)) return;
+        fields.set(
+          key,
+          this.#fieldsOf(await (window ? w.tilePart(tx, tz, window, { signal }) : w.tile(tx, tz, { signal }))),
+        );
       };
-    for (const [tx, tz] of whole) await load(tx, tz);
-    for (const [tx, tz, window] of parts)
-      if (inside(tx, tz) && !fields.has(tileKey(tx, tz)))
-        fields.set(tileKey(tx, tz), this.#fieldsOf(await w.tilePart(tx, tz, window, { signal })));
+    for (const [tx, tz, window] of need) await load(tx, tz, window);
     for (;;) {
       if (signal?.aborted) throw signal.reason;
       this.#live();
@@ -1805,7 +1806,7 @@ export class BiomePlacement implements Disposable {
       tz1 = Math.min(w.tilesZ - 1, Math.floor((rect[3] - w.bounds[1]) / t) + 1); // float division
     const tiles: [number, number][] = [];
     for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) tiles.push([tx, tz]);
-    return this.#withFields(tiles, [], options.signal, (fields) => {
+    return this.#withFields(tiles, options.signal, (fields) => {
       const run = this.#runOf(fields),
         x0 = Math.round((rect[0] - w.bounds[0]) * TICK),
         z0 = Math.round((rect[1] - w.bounds[1]) * TICK),
