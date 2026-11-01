@@ -171,6 +171,12 @@
       <p><strong>Cause.</strong> Drawn tiles belong to a tileset with <code>columns: 0</code> (one image per tile), which the renderer cannot cut from one atlas, or a map built on a plain <code>GPUTexture</code> atlas drew after a device loss (the texture died with the old device).</p>
       <p><strong>Fix.</strong> Pack an image collection into one atlas image and set its <code>columns</code>. After a device loss call <code>setAtlas(name, atlas)</code>, or pass the atlas as pixels or a function so the map makes it again.</p>
     </section>
+    <section id="pixel-low-res">
+      <h2><a href="#pixel-low-res">Low-res 3D view</a></h2>
+      <p class="messages"><code>Render3D needs a camera</code> <code>Invalid Render3D size</code> <code>Invalid Render3D value</code> <code>Render3D needs attaching before its view is read</code> <code>Render3D target differs in size</code> <code>A Render3D camera matrix needs an inverse</code></p>
+      <p><strong>Cause.</strong> A <code>Render3D</code> or <code>renderSpriteFrames</code> option is out of range, its view was read before the plugin was attached, or the target is not the size of the view.</p>
+      <p><strong>Fix.</strong> Attach with <code>Render3D.attach(engine, options)</code> first. Pass whole <code>width</code> and <code>height</code>, a <code>target</code> of that size, an outline <code>color</code> as <code>#rrggbb</code>, and at least one angle.</p>
+    </section>
     <section id="sprite-state">
       <h2><a href="#sprite-state">Sprite layer state</a></h2>
       <p class="messages"><code>Sprite already in a layer</code> <code>Sprite atlas lost with the device; call setAtlas</code> <code>Sprite normals need one sample and a same-size target</code></p>

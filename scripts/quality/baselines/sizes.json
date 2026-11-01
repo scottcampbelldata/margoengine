@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4265006,
+  "total": 4268882,
   "history": [
     {
       "date": "2026-10-24",
@@ -1310,6 +1310,12 @@
       "commit": "78f663ddb",
       "reason": "row 21.6 job 7: MSFT_lod, LOD.fromModel, lod/auto entry with autoLOD and hierarchicalLOD",
       "grew": 2
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "a3b1efae0",
+      "reason": "new entry @margoengine/pixel/render3d: low-res 3D view with outlines from depth and surface direction, sprite sheet capture (row 25 J8; budget 6 KB)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1538,6 +1544,7 @@
     "@margoengine/physics2d": 7993,
     "@margoengine/pixel": 4769,
     "@margoengine/pixel/palette": 4349,
+    "@margoengine/pixel/render3d": 3876,
     "@margoengine/points": 21547,
     "@margoengine/points/copc": 11879,
     "@margoengine/points/e57": 6545,

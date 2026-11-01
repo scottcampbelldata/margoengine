@@ -914,6 +914,10 @@
       "types": "./dist/pixel/palette.d.ts",
       "import": "./dist/pixel/palette.js"
     },
+    "./pixel/render3d": {
+      "types": "./dist/pixel/render3d.d.ts",
+      "import": "./dist/pixel/render3d.js"
+    },
     "./points": {
       "types": "./dist/points.d.ts",
       "import": "./dist/points.js"

@@ -143,3 +143,37 @@ engine.render({delta: 1 / 60});
 | `name` | `palette-1`, ... | Plugin name, unique per scene |
 
 The pattern is fixed to the target's pixels. `shiftPaletteHue(colors, degrees)` and `paletteRamp(from, to, steps)` make palettes in Oklab; `bayerMatrix`, `blueNoise` and `nearestPaletteIndex` are the CPU forms the pass uses.
+
+## 3D to pixels
+
+`margoengine/pixel/render3d` draws the 3D scene small. `Render3D` holds a low-res view with depth, and outlines what it shows from depth and surface direction. Pass its `view` to `render` with your canvas view.
+
+```ts
+import {Camera, EngineKernel, PbrMaterial, box} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {Render3D, renderSpriteFrames} from 'margoengine/pixel/render3d';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [640, 360]});
+const camera = new Camera({position: [3, 2, 4], target: [0, 0, 0]});
+const mesh = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color: '#84d6bd'}));
+const compositor = LayerCompositor.attach(engine, {camera: {width: 160, height: 90}});
+const layer = compositor.addLayer();
+const small = Render3D.attach(engine, {camera, width: 160, height: 90, target: layer.target});
+engine.render({delta: 1 / 60, views: [small.view, {camera, viewport: [0, 0, 1, 1]}]});
+
+const sheet = renderSpriteFrames(engine, mesh, {camera, angles: [0, Math.PI / 4], width: 32, height: 32});
+console.log(sheet.frames.length); // 2; sheet.texture works as a SpriteLayer atlas
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `camera`, `width`, `height` | required | The view and its low-res size |
+| `target` | a texture of its own, `output` | Where the picture ends up, the same size |
+| `outline` | on | `{color: '#000000', depthEdge: 0.1, crease: 0.6}` (world units, radians), or false; read each frame |
+| `background` | `transparent` | What the view clears to |
+| `scene`, `layers` | the engine's, every layer | What the view draws |
+| `samples` | `1` | The engine's samples per pixel: 1 with `exactSize` |
+| `order` | `20` | Frame-graph order of the outline pass |
+| `name` | `render3d-1`, ... | Plugin name, unique per scene |
+
+Every pixel is one colour of the view or the outline colour. For a palette, chain `PaletteQuantize` of `margoengine/pixel/palette`. `outlineMask` is the CPU form of the outline. `renderSpriteFrames` shoots a mesh at each turn about Y into one sheet and puts its rotation back.

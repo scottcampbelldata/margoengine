@@ -309,6 +309,22 @@ export const entries = [
     fix: 'Pack an image collection into one atlas image and set its `columns`. After a device loss call `setAtlas(name, atlas)`, or pass the atlas as pixels or a function so the map makes it again.',
   },
   {
+    id: 'pixel-low-res',
+    title: 'Low-res 3D view',
+    kind: 'family',
+    messages: [
+      'Render3D needs a camera',
+      'Invalid Render3D size',
+      'Invalid Render3D value',
+      'Render3D needs attaching before its view is read',
+      'Render3D target differs in size',
+      'A Render3D camera matrix needs an inverse',
+    ],
+    cause:
+      'A `Render3D` or `renderSpriteFrames` option is out of range, its view was read before the plugin was attached, or the target is not the size of the view.',
+    fix: 'Attach with `Render3D.attach(engine, options)` first. Pass whole `width` and `height`, a `target` of that size, an outline `color` as `#rrggbb`, and at least one angle.',
+  },
+  {
     id: 'sprite-state',
     title: 'Sprite layer state',
     kind: 'family',
