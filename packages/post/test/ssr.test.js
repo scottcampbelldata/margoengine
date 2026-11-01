@@ -419,5 +419,8 @@ test('Bloom, SSAO and SSR before the end of a PostStack hand on linear colour', 
   const first = composites([new SSAO(), new SSR(), new Bloom()]),
     second = composites([new Bloom(), new SSAO()]);
   assert.equal(first.filter((code) => code.includes('return vec4f(c,s.a);')).length, 2, 'SSAO and SSR, not final');
-  assert.ok(second.some((code) => code.includes('return vec4f(max(hdr,vec3f(0))*exp2(settings.y),s.a);')), 'Bloom');
+  assert.ok(
+    second.some((code) => code.includes('return vec4f(max(hdr,vec3f(0))*exp2(settings.y),s.a);')),
+    'Bloom',
+  );
 });

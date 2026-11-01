@@ -181,6 +181,7 @@ test('the batch shader reads each vertex owner and item record', () => {
 test('an invalid shininess names the fix, not other tools', () => {
   assert.throws(
     () => new Material({ shading: 'phong', shininess: -1 }),
-    (error) => error instanceof RangeError && /set a number/.test(error.message) && !/three.js|Crocotile/.test(error.message),
+    (error) =>
+      error instanceof RangeError && /set a number/.test(error.message) && !/three.js|Crocotile/.test(error.message),
   );
 });
