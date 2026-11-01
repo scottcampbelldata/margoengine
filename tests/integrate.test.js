@@ -9,6 +9,7 @@ import {
   demoPath,
   fixWithoutTest,
   integrate,
+  missingFromLog,
   parsePlan,
   parseReady,
   queuePaths,
@@ -39,6 +40,7 @@ function fakeGit({
   author = EMAIL,
   stranger = false,
   commits = [],
+  manifests = {},
 } = {}) {
   const calls = [];
   let head = 'base';
@@ -54,6 +56,11 @@ function fakeGit({
     }
     if (verb === 'merge-base' && args[1] === '--is-ancestor') return { status: 1, stdout: '', stderr: '' };
     if (verb === 'merge-base') return ok('old');
+    if (verb === 'show') {
+      const rev = args[1].split(':')[0];
+      if (!(rev in manifests)) return { status: 1, stdout: '', stderr: 'no package.json' };
+      return ok(JSON.stringify({ dependencies: Object.fromEntries(manifests[rev].map((name) => [name, '1.0.0'])) }));
+    }
     if (verb === 'log' && args[1] === '--format=%ae') return ok(author);
     if (verb === 'log' && args[1] === '--no-merges') return ok(commits.map((c) => c.sha).join('\n'));
     if (verb === 'log' && args[1] === '-1') return ok(commits.find((c) => c.sha === args[3])?.message ?? 'chore: x');
@@ -589,5 +596,50 @@ test('a send-back or landing removes a READY file only while it still holds the 
     } finally {
       done();
     }
+  }
+});
+
+test('missingFromLog reads the names worktree-node-modules.mjs lists', () => {
+  assert.deepEqual(
+    missingFromLog('Error: older than this worktree: run npm install there. Missing: ws, left-pad\n    at x'),
+    ['ws', 'left-pad'],
+  );
+  assert.deepEqual(missingFromLog('fine'), []);
+});
+
+test('a stale install: only the branch whose package.json adds the missing dependency goes back, at once, and the rest land', async () => {
+  const { paths, done } = setup({ sky: `READY ${SHA.a}`, fog: `READY ${SHA.b}`, mid: `READY ${SHA.c}` });
+  try {
+    const git = fakeGit({
+        branches: {
+          [SHA.a]: ['packages/sky/a.ts'],
+          [SHA.b]: ['packages/fog/a.ts', 'package.json'],
+          [SHA.c]: ['packages/world/a.ts'],
+        },
+        manifests: { old: ['biome'], [SHA.a]: ['biome'], [SHA.b]: ['biome', 'ws'], [SHA.c]: ['biome'] },
+      }),
+      steps = fakeSteps(
+        (command, head) =>
+          command === 'node scripts/worktree-node-modules.mjs' && head.includes(SHA.b)
+            ? 'Error: older than this worktree: run npm install there. Missing: ws\n'
+            : undefined,
+        git,
+      ),
+      out = await run(paths, git, steps);
+    assert.equal(out.result, 'landed');
+    assert.deepEqual(out.landed.map((b) => b.branch).sort(), ['mid', 'sky']);
+    assert.deepEqual(
+      out.sentBack.map((b) => b.branch),
+      ['fog'],
+    );
+    const back = JSON.parse(readFileSync(join(paths.sentBack, 'fog.json'), 'utf8'));
+    assert.equal(back.step, 'relink');
+    assert.match(back.reason, /adds ws.*run npm install in the main checkout/);
+    // One failed relink, then one clean run of the gate: no branch was tried alone to find the cause.
+    assert.equal(steps.commands().filter((c) => c === 'node scripts/worktree-node-modules.mjs').length, 2);
+    assert.equal(existsSync(join(paths.sentBack, 'sky.json')), false);
+    assert.equal(existsSync(join(paths.sentBack, 'mid.json')), false);
+  } finally {
+    done();
   }
 });

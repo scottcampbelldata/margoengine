@@ -210,6 +210,30 @@ function dropReady(entry) {
 
 const noreply = (email) => email === EMAIL;
 
+/** The root dependency names a branch's package.json adds over its merge base (none when either side will not parse). */
+function addedDependencies(git, entry) {
+  const names = (rev) => {
+    const shown = git(['show', `${rev}:package.json`]);
+    if (shown.status !== 0) return null;
+    try {
+      const manifest = JSON.parse(shown.stdout);
+      return Object.keys({ ...manifest.dependencies, ...manifest.devDependencies });
+    } catch {
+      return null;
+    }
+  };
+  const before = names(entry.from),
+    after = names(entry.sha);
+  return before && after ? after.filter((name) => !before.includes(name)) : [];
+}
+
+/** The names worktree-node-modules.mjs lists after "Missing:" when the main checkout's install is older. */
+export const missingFromLog = (tail) =>
+  (/Missing: ([^\n]+)/.exec(tail)?.[1] ?? '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+
 const isTestFile = (file) => /(^|\/)tests?\//.test(file) || /\.test\.[^/]*$/.test(file);
 
 /**
@@ -355,8 +379,28 @@ export async function integrate({
       held.push(suspect.entry);
       suspect = null;
     }
-    const tail = lines(readFileSync(gate.log, 'utf8')).slice(-TAIL_LINES).join('\n'),
-      found = suspects(tail, batch, workspaces),
+    const tail = lines(readFileSync(gate.log, 'utf8')).slice(-TAIL_LINES).join('\n');
+    if (gate.step === 'relink') {
+      // A stale install in the main checkout fails every branch alike; only the one whose package.json adds the
+      // dependency can cure it, so only that one goes back, at once.
+      const missing = missingFromLog(tail),
+        culprits = batch.filter((entry) => addedDependencies(git, entry).some((name) => missing.includes(name)));
+      if (culprits.length) {
+        for (const entry of culprits) {
+          const added = addedDependencies(git, entry).filter((name) => missing.includes(name));
+          sendBack(
+            entry,
+            `its package.json adds ${added.join(', ')}, which the main checkout has not installed; run npm install in the main checkout, then write READY again`,
+            'relink',
+            gate.log,
+          );
+        }
+        batch = batch.filter((entry) => !culprits.includes(entry));
+        gate = null;
+        continue;
+      }
+    }
+    const found = suspects(tail, batch, workspaces),
       why = `${gate.step} failed on the batch tip`;
     if (found.branches.length === 1) {
       sendBack(found.branches[0], why, gate.step, gate.log);
@@ -416,7 +460,10 @@ export async function integrate({
     })}\n`,
   );
   for (const entry of batch) dropReady(entry);
-  return report('landed', 0, `${tip} on main: ${landed.map((entry) => entry.branch).join(', ')}`, { landed, tip });
+  return report('landed', 0, `${tip} on main: ${landed.map((entry) => entry.branch).join(', ')}`, {
+    landed,
+    tip,
+  });
 }
 
 /** Rebases the batch onto `base`, in order, in the worktree. A conflict sends that branch back and the rest go on. */
