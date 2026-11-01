@@ -32,11 +32,11 @@ function hue(r,g,b){const M=Math.max(r,g,b),m=Math.min(r,g,b),c=M-m;if(c<1e-9)re
 window.check={
  async run(){
   device.pushErrorScope('validation');
-  const t=presets.temperate,world=await BiomeWorld.create({biomes:[{...t,plants:[{...t.plants[0],density:80,cluster:undefined}],rocks:[],details:[]}]});
+  const t=presets.temperate,world=await BiomeWorld.create({biomes:[{...t,plants:[{...t.plants[0],density:80,cluster:undefined,stands:undefined,size:{...t.plants[0].size,max:1.6}}],rocks:[],details:[]}]});
   const ground=(x,z)=>world.sample(x,z).height,p=engine.camera.position,target=engine.camera.target;
   p[0]=-300;p[1]=ground(-300,200)+40;p[2]=200;target[0]=-300;target[1]=ground(-300,-100);target[2]=-100;
-  let view=await BiomeView.attach(engine,world,{objects:false});const bare=await shot(view);view.dispose();
-  view=await BiomeView.attach(engine,world);const full=await shot(view);view.dispose();world.dispose();
+  const look={canopy:0,far:false};let view=await BiomeView.attach(engine,world,{objects:false,...look});const bare=await shot(view);view.dispose();
+  view=await BiomeView.attach(engine,world,look);const full=await shot(view);view.dispose();world.dispose();
   const {width:W,height:H}=full,mask=new Uint8Array(W*H),seen=new Uint8Array(W*H),L=new Float32Array(W*H),trees=[];
   for(let i=0;i<W*H;i++){L[i]=luma(full.data,i*4);mask[i]=Math.abs(L[i]-luma(bare.data,i*4))>0.02?1:0;}
   for(let i=0;i<W*H;i++){
