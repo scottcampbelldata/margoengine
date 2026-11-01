@@ -12,7 +12,13 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { isAbsolute, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { fieldIntegrationCases, fieldNames, fieldNameSets, frameFor } from './gpu-field-integration-cases.mjs';
+import {
+  fieldIntegrationCases,
+  fieldNames,
+  fieldNameSets,
+  frameFor,
+  requireFieldIntegrationHost,
+} from './gpu-field-integration-cases.mjs';
 
 const repository = realpathSync(new URL('../../../', import.meta.url));
 function resolveSource(specifier, context, nextResolve) {
@@ -46,6 +52,13 @@ const { rectFields, rectFieldsGPU, regionFieldsRef, REGION_FIELD_NAMES, Scratch 
 const cases = fieldIntegrationCases();
 const args = (r) => [r.ox, r.oz, r.width, r.depth];
 const bytes = (data) => Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+
+test('hardware proof host gate accepts the DEV worker OS name and rejects unrelated hosts', () => {
+  for (const name of ['DEV', 'dev', 'SCOTT-DEV', 'scott-dev'])
+    assert.doesNotThrow(() => requireFieldIntegrationHost(name));
+  for (const name of ['', 'OTHER', 'DEV-OTHER', 'OTHER-DEV', 'SCOTT-DEV-OTHER', ' DEV', 'SCOTT-DEV\n'])
+    assert.throws(() => requireFieldIntegrationHost(name), /Run this hardware proof on DEV with its NVIDIA RTX A6000/);
+});
 
 test('shared cases cover distinct seeds, spacing ratios, tile margins and inclusive clamp fractions', () => {
   assert.equal(new Set(cases.map((spec) => spec.seed)).size, 2);

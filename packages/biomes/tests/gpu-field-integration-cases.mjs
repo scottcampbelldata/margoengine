@@ -1,4 +1,10 @@
-// Pure JSON inputs shared by the CPU transport checks and the Chromium hardware proof.
+// Shared inputs and host guard for the CPU transport checks and the Chromium hardware proof.
+export function requireFieldIntegrationHost(name) {
+  // Factory calls this worker DEV; its Windows hostname is SCOTT-DEV. Adapter validation remains mandatory.
+  if (!['DEV', 'SCOTT-DEV'].includes(name.toUpperCase()))
+    throw new Error('Run this hardware proof on DEV with its NVIDIA RTX A6000');
+}
+
 export const fieldNames = [
   'height',
   'slope',

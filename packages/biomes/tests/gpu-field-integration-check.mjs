@@ -6,7 +6,12 @@ import { hostname } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import { requireHardwareAdapter } from './gpu-fixed-lerp-cases.mjs';
-import { fieldIntegrationCases, fieldNameSets, frameFor } from './gpu-field-integration-cases.mjs';
+import {
+  fieldIntegrationCases,
+  fieldNameSets,
+  frameFor,
+  requireFieldIntegrationHost,
+} from './gpu-field-integration-cases.mjs';
 import { endTree, runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
 
 // Bundle internal sources in memory for Chromium and the Node reference without adding a package export.
@@ -70,7 +75,7 @@ async function check() {
       git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', timeout: 10000 }).trim();
     assert.equal(git(['status', '--porcelain']), '', 'Hardware proof requires a clean committed head');
     const head = git(['rev-parse', 'HEAD']);
-    assert.equal(hostname().toUpperCase(), 'DEV', 'Run this hardware proof on DEV with its NVIDIA RTX A6000');
+    requireFieldIntegrationHost(hostname());
     console.log(`Field integration WebGPU correctness head: ${head}`);
     const moduleURL = await fieldModuleURL(),
       module = await import(moduleURL),
