@@ -124,8 +124,10 @@ world.dispose();
   goal G1's 400. The same bytes as before: the gains came from an integer hash table for placement cells, shifts for
   power-of-two cells, classification that finds the nearest envelope only where it is needed and skips the blend
   steps for one-biome cells, a cache of the moisture curve and of the relief lattice. The package tests check a
-  400 ms budget per tile. A later run on the same PC (2026-11-01, medians of 20 with min and max): fields 399 ms per
-  km2 (352 to 863) and stored objects 203 (160 to 669), 602 in all, still above G1's 400.
+  400 ms budget per tile. A later run on the same PC (2026-11-01, medians of 20 with min and max, without the
+  benchmark lock, other work using 12 to 17 % of the CPU): fields 399 ms per km2 (354 to 1,214) and stored objects
+  207 (169 to 548), 606 in all, against 385 and 200 (586) before placement read bands of its neighbours; the same code
+  gave fields medians from 389 to 412 across runs. G1's 400 is not met.
 
 ## Biomes, presets and blends
 
@@ -623,16 +625,19 @@ world.dispose(); // terminates the workers
 | `cache` | 64 | tiles kept on this thread, least recently used first out (a default tile is about 2.6 MB) |
 
 Measured on the reference PC (`bench/biomes/placement.mjs`, R16, an 8 x 8 block of tiles, Node worker threads running
-the same script): fields and stored objects take 1,005 ms per km2 of wall time on one worker and 363 on eight, against
-680 on the page's thread alone and goal G1's 70 on eight workers. A placement reads its neighbours' fields, and each
-worker makes the ones it needs itself, so tiles at the edges of what a worker places are made more than once.
+the same script, 2026-11-01, medians of 20): fields and stored objects take 1,465 ms per km2 of wall time on one
+worker, 530 on four and 292 on eight, against 606 on the page's thread alone and goal G1's 70 on eight workers. A
+placement reads its neighbours' fields, and each worker makes the ones it needs itself, so tiles at the edges of what a
+worker places are made more than once.
 
 A placement makes its own tile whole and, of each neighbour, only the band its first Luby round reads (through
-`world.tilePart`): 128 cells on R16, where the reach of all 6 rounds is wider than the 256 m tile. A read past the band
-makes that neighbour whole and runs again, so the objects are the same bytes. A neighbour beside a tile the placement
-has already placed is made whole, since a block places it too. On the same PC (2026-11-01, five runs each, medians):
-one cold R16 placement takes 148 ms instead of 265 (20 runs, 116 to 169 against 230 to 289); the 8 x 8 block takes
-1,134 ms per km2 on one worker (1,142 before) and 344 on eight (356 before). Eight workers still miss G1's 70.
+`world.tilePart`): 128 cells on R16, where the reach of all 6 rounds is wider than the 256 m tile. A neighbour the world
+already holds whole is read whole. A read past the band makes that neighbour whole and runs again, so the objects are
+the same bytes. On the same PC (2026-11-01, 20 runs each, medians with min and max, without the benchmark lock): one
+cold R16 placement takes 138 ms (134 to 188) instead of 261 (255 to 312). The 8 x 8 block takes 292 ms per km2 on
+eight workers (283 to 311) instead of 362 (351 to 386) and 530 on four (523 to 565) instead of 550 (539 to 571). On
+one worker it takes 1,465 (1,438 to 1,490) instead of 1,119 (1,103 to 1,157): that worker places every tile of the
+block, so the bands it makes of tiles it later places are wasted work. Eight workers still miss G1's 70.
 
 ## Same seed, same bytes, everywhere
 

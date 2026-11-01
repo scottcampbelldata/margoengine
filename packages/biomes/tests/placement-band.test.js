@@ -323,20 +323,24 @@ test('the default biomes on 256 m tiles (R16 and the presets) read bands, though
   );
 });
 
-test('a tile placed beside an earlier one makes its neighbours whole (a block makes each tile once)', async () => {
+test('a neighbour the world already holds whole is read whole, not made again as a band', async () => {
   const world = await scrubWorld(),
     placement = BiomePlacement.attach(world),
     part = world.tilePart.bind(world),
-    parts = [];
-  world.tilePart = (x, z, window, o) => {
-    parts.push(`${x},${z}`);
-    return part(x, z, window, o);
+    windows = new Map();
+  world.tilePart = async (x, z, window, o) => {
+    const p = await part(x, z, window, o);
+    windows.set(`${x},${z}`, [...p.window]);
+    return p;
   };
   await placement.tile(1, 1);
-  assert.equal(parts.length, 8, 'an isolated tile reads bands');
-  parts.length = 0;
-  await placement.tile(2, 1);
-  assert.deepEqual(parts, [], 'beside a placed tile, every neighbour is a whole world tile');
+  assert.equal(windows.size, 8, 'an isolated tile reads bands');
+  windows.clear();
+  // Placing (1, 1) made that world tile whole, and the world keeps it: placing (2, 1) reads it whole.
+  const placed = await placement.tile(2, 1);
+  assert.deepEqual(windows.get('1,1'), [0, 0, 256, 256]);
+  assert.deepEqual(windows.get('3,1'), [0, 0, 40, 256], 'a neighbour not yet made is a band');
+  assert.equal(placedHash(placed), placedHash(await withWholeNeighbours(await scrubWorld(), 2, 1)));
 });
 
 test('a read past a band makes the neighbour whole, with the same bytes', async () => {

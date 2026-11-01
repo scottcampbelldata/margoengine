@@ -1427,31 +1427,19 @@ export class BiomePlacement implements Disposable {
 
   /**
    * Places tile (x, z) from its own world tile, whole, and of each neighbour only the band next to it that placement
-   * usually reads: `#band` cells wide (a tile made whole by the world already is used whole). A neighbour beside
-   * another tile this placement has placed or is placing is made whole instead: a block or a view's area places it
-   * too, and the world keeps it, so a band of it would be made for nothing. A read past a band makes that neighbour
-   * whole and runs again, so the objects are the same whatever was made.
+   * usually reads: `#band` cells wide (a tile made whole by the world already is used whole). A read past a band makes
+   * that neighbour whole and runs again, so the objects are the same whatever was made.
    */
   #place(x: number, z: number, signal?: AbortSignal): Promise<PlacedTile> {
     const c = this.#world.tileSize / this.#world.resolution, // float division: exact
       a = this.#band,
-      need: [number, number, Rect?][] = [],
-      /** Has this placement placed, or begun, a tile other than (x, z) within one tile of (nx, nz)? */
-      besidePlaced = (nx: number, nz: number) => {
-        for (let tz = nz - 1; tz <= nz + 1; tz++)
-          for (let tx = nx - 1; tx <= nx + 1; tx++)
-            if ((tx !== x || tz !== z) && this.#cache.has(tileKey(tx, tz))) return true;
-        return false;
-      },
-      bands = a < c && !besidePlaced(x, z);
+      need: [number, number, Rect?][] = [];
     for (let dz = -1; dz <= 1; dz++)
       for (let dx = -1; dx <= 1; dx++)
         need.push([
           x + dx,
           z + dz,
-          bands && (dx || dz) && !besidePlaced(x + dx, z + dz)
-            ? [dx < 0 ? c - a : 0, dz < 0 ? c - a : 0, dx > 0 ? a : c, dz > 0 ? a : c]
-            : undefined,
+          a < c && (dx || dz) ? [dx < 0 ? c - a : 0, dz < 0 ? c - a : 0, dx > 0 ? a : c, dz > 0 ? a : c] : undefined,
         ]);
     return this.#withFields(need, signal, (fields) => this.#run(x, z, fields));
   }
