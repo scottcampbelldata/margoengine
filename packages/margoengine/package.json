@@ -94,6 +94,10 @@
       "types": "./dist/biomes/region.d.ts",
       "import": "./dist/biomes/region.js"
     },
+    "./biomes/hydrology": {
+      "types": "./dist/biomes/hydrology.d.ts",
+      "import": "./dist/biomes/hydrology.js"
+    },
     "./biomes/relief": {
       "types": "./dist/biomes/relief.d.ts",
       "import": "./dist/biomes/relief.js"

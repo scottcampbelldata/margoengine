@@ -328,6 +328,11 @@ export class BiomeWorld implements Disposable {
     return this.#heights.relief?.rivers ?? [];
   }
 
+  /** The region fields: grids of corner samples over the whole world (`@margoengine/biomes/hydrology` reads its heights). */
+  get region(): Region {
+    return this.#region;
+  }
+
   /** The paint layers in composition order. */
   get paint(): readonly PaintLayer[] {
     return this.#paint;

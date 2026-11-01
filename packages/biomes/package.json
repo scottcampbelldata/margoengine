@@ -42,6 +42,10 @@
       "types": "./dist/region.d.ts",
       "import": "./dist/region.js"
     },
+    "./hydrology": {
+      "types": "./dist/hydrology.d.ts",
+      "import": "./dist/hydrology.js"
+    },
     "./relief": {
       "types": "./dist/relief.d.ts",
       "import": "./dist/relief.js"

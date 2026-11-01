@@ -713,6 +713,32 @@ water[4] = 1;
 console.log(fill[4], distanceTransform(water, 3, 3)[0]); // 4000 2, squared cells from the corner to the middle
 ```
 
+## Hydrology
+
+`@margoengine/biomes/hydrology` runs water over a world's region grid in integers, so the same world gives the same bytes
+everywhere: the filled surface (Priority-Flood), drainage over flats, D8 directions and flow (`multiple: true` adds shares over
+every lower neighbour, Freeman 1991), wetness, height above drainage (HAND), lakes, channels and the distance to water. The
+world's own layers do not change; `hydrologyTile` gives the same fields as rasters of a tile. `riversOf` turns channels into
+lines for `water: { rivers }`, falling to the mouth (the default rivers stay the relief's lines).
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+import { hydrologyOf, hydrologyTile, riversOf } from '@margoengine/biomes/hydrology';
+
+const world = await BiomeWorld.create({ size: [2048, 2048], height: { relief: { coast: 'south', relief: 600 } } });
+const h = hydrologyOf(world, { channelCells: 400 });
+const { lines } = riversOf(world, h); // pass these to BiomeView's water: { rivers: lines }
+const [flow, twi, hand, lake, channel] = hydrologyTile(world, h, 3, 3);
+console.log(lines.length, flow.data[0], twi.data[0], hand.data[0], lake.data[0], channel.data[0]);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `sea` | the world's sea level with `hydrologyOf`, none with `hydrology` | mm; cells below it are outlets |
+| `channelCells` | the cells of 1 km2, at least 8 | flow that makes a cell a channel |
+| `lakeDepth` | 1,000 | fill depth in mm that makes a cell a lake |
+| `multiple` | false | route `shares` over every lower neighbour; wetness reads them |
+
 ## The reference world R16
 
 `R16` (in `/presets`) is the fixed scene of every biomes benchmark and quality report: 16 km by 16 km at 1 m, a western coast, two

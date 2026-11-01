@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4307277,
+  "total": 4311956,
   "history": [
     {
       "date": "2026-10-24",
@@ -1386,6 +1386,12 @@
     {
       "date": "2026-11-01",
       "commit": "b2e7cc033",
+      "reason": "biomes J1: root under the spec's 16,000 B; heights and region fields move to the lazy biomes/region entry, loaded by BiomeWorld.create",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "b2e7cc033",
       "reason": "culling/parts: CulledParts holds pick, setParent, drawShadow and addParts/removeParts in their own entry; the root gives them back",
       "grew": 1
     },
@@ -1397,8 +1403,8 @@
     },
     {
       "date": "2026-11-01",
-      "commit": "b2e7cc033",
-      "reason": "biomes J1: root under the spec's 16,000 B; heights and region fields move to the lazy biomes/region entry, loaded by BiomeWorld.create",
+      "commit": "812d735bc",
+      "reason": "biomes J3: /hydrology new entry, flats, D8, flow, wetness, HAND, lakes, channels, river lines; world.region getter",
       "grew": 1
     }
   ],
@@ -1419,6 +1425,7 @@
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/far": 3996,
+    "@margoengine/biomes/hydrology": 4679,
     "@margoengine/biomes/koppen": 1231,
     "@margoengine/biomes/objects": 3835,
     "@margoengine/biomes/placement": 11951,
