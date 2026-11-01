@@ -698,6 +698,10 @@
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"
     },
+    "./lighting2d": {
+      "types": "./dist/lighting2d.d.ts",
+      "import": "./dist/lighting2d.js"
+    },
     "./lightmap": {
       "types": "./dist/lightmap.d.ts",
       "import": "./dist/lightmap.js"
@@ -1750,6 +1754,7 @@
     "@margoengine/inspector": "^1.0.0",
     "@margoengine/kinematics-constraints": "^1.0.0",
     "@margoengine/labels": "^1.0.0",
+    "@margoengine/lighting2d": "^1.0.0",
     "@margoengine/lightmap": "^1.0.0",
     "@margoengine/lines": "^1.0.0",
     "@margoengine/loaders": "^1.0.0",

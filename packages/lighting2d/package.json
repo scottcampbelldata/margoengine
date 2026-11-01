@@ -1,0 +1,57 @@
+{
+  "name": "@margoengine/lighting2d",
+  "version": "1.0.0",
+  "description": "2D lights for Margo Engine: point, spot and directional lights with normal-mapped shading and hard shadows from occluder edges, for pixel layers.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "2d",
+    "lighting",
+    "shadows",
+    "normal-map"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/lighting2d"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js lighting2d",
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu": "cd ../.. && node packages/lighting2d/tests/browser-check.mjs",
+    "prepack": "npm run build"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "devDependencies": {
+    "@margoengine/physics2d": "^1.0.0",
+    "@margoengine/pixel": "^1.0.0",
+    "@margoengine/sprites": "^1.0.0"
+  }
+}

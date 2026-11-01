@@ -18,4 +18,5 @@ export type { CharacterOptions2D, CharacterMoveResult2D } from './character.js';
 export { interactionGroups } from './shapes.js';
 export type { RapierModule2D } from './rapier-types.js';
 export type { ColliderOptions2D, ColliderSettings2D, ShapeOptions2D, Vec2D } from './shapes.js';
+export { tileMapColliders } from './tilemap.js';
 export type { TileMapSource, TileMapBodyOptions, TileShape } from './tilemap.js';

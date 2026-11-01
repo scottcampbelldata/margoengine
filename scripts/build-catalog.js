@@ -66,6 +66,7 @@ const layers = {
     'lines',
     'text',
     'pixel',
+    'lighting2d',
     'labels',
     'html',
     'video',

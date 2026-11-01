@@ -75,6 +75,7 @@
     "packages/road",
     "packages/tilemap",
     "packages/physics2d",
+    "packages/lighting2d",
     "packages/transitions",
     "packages/toon",
     "packages/water",

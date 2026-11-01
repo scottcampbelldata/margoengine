@@ -373,6 +373,8 @@ export type Vec2D = readonly [number, number];
 
 export function interactionGroups(memberships: number | readonly number[], filter?: number | readonly number[]): number;
 
+export function tileMapColliders(map: TileMapSource, options?: TileMapBodyOptions): ColliderOptions2D[];
+
 // Not exported from this entry, but used by the exports above:
 
 interface BodyOwner2D {

@@ -280,6 +280,21 @@ export const entries = [
     fix: 'Keep `x`, `y`, `z`, scale, pivot and `rotation` finite, `alpha` from 0 to 1, and `rect` as `[x, y, width, height]` in whole texels inside the atlas. `camera.zoom` must be above 0, `tint` is `0xrrggbb`, `#rrggbb` or `#rgb`, atlas bytes are `width * height * 4` long, and a normal atlas is the size of the colour atlas. For too many sprites, split them across layers. Animation clips need at least one frame of whole-texel rectangles, positive durations and `fps`, an event `frame` inside the clip, a `speed` and `dt` of 0 or more, and `play` takes a clip name you passed in `clips`.',
   },
   {
+    id: 'pixel-lighting',
+    title: '2D lighting',
+    kind: 'family',
+    messages: [
+      'Lighting2D needs a target',
+      'Invalid light value',
+      'Unknown occluder shape',
+      'Invalid occluder value',
+      'Lighting2D normals differ in size from the target',
+    ],
+    cause:
+      'A `Light2D` field, an occluder or a `Lighting2D` option is out of range, or the `normals` texture is not the size of the `target`.',
+    fix: 'Keep light positions and angles finite, `intensity`, `height` and `softness` 0 or more (`softness` up to 1), `radius`, `falloff` and `cone` above 0, `color` and `ambient` as `#rrggbb`, and `camera.zoom` above 0. Occluders are polygon, polyline, segment, box or circle shapes with finite numbers. Make `normals` the size of `target`.',
+  },
+  {
     id: 'pixel-palette',
     title: 'Palette pass',
     kind: 'family',

@@ -1147,6 +1147,26 @@
     ]
   },
   {
+    "id": "lighting2d",
+    "title": "Lighting2d",
+    "category": "Rendering and lighting",
+    "package": "@margoengine/lighting2d",
+    "version": "1.0.0",
+    "published": false,
+    "description": "2D lights for Margo Engine: point, spot and directional lights with normal-mapped shading and hard shadows from occluder edges, for pixel layers.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "lighting2d",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/lighting2d@1.0.0",
+    "imports": "import { Light2D } from '@margoengine/lighting2d';",
+    "exports": [
+      "Light2D",
+      "Lighting2D",
+      "inShadow",
+      "lightAt",
+      "occluderEdges"
+    ]
+  },
+  {
     "id": "labels",
     "title": "Labels",
     "package": "@margoengine/labels",
@@ -2210,7 +2230,8 @@
       "CharacterController2D",
       "Joint2D",
       "Physics2D",
-      "interactionGroups"
+      "interactionGroups",
+      "tileMapColliders"
     ],
     "category": "Simulation and games"
   },
