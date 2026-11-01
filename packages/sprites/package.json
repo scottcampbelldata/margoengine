@@ -30,6 +30,14 @@
     "./animation": {
       "types": "./dist/animation.d.ts",
       "import": "./dist/animation.js"
+    },
+    "./aseprite": {
+      "types": "./dist/aseprite.d.ts",
+      "import": "./dist/aseprite.js"
+    },
+    "./atlas": {
+      "types": "./dist/atlas.d.ts",
+      "import": "./dist/atlas.js"
     }
   },
   "files": [

@@ -185,6 +185,15 @@ carry the same citation as a one-line comment in the code.
 | id | formula | file | source |
 | --- | --- | --- | --- |
 | EX1 | Blinn-Phong exponent to/from glTF roughness | exporters/src/model.ts, exporters/src/scene.ts, exporters/src/dae.ts | Walter et al. 2007 sec. 5.2 (Phong-Beckmann correspondence alpha_p = 2 alpha_b^-2 - 2) |
+| EX6 | Packed atlases: MaxRects with best-short-side-fit | exporters/src/atlas.ts | Jylanki 2010, "A Thousand Ways to Pack the Bin" |
+| EX7 | Godot SpriteFrames and TileSet text resources, TileMapLayer.set_cell flips | exporters/src/godot-2d.ts | Godot's public TSCN/TRES format documentation and class reference |
+| EX8 | Unity TextureImporter meta, AnimationClip, Tilemap and TileBase use | exporters/src/unity-2d.ts | Unity's public manual and scripting reference |
+
+### sprites
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| SP1 | Aseprite file layout: header, frames, layer, cel, tag, palette, user data and slice chunks | sprites/src/aseprite.ts | Aseprite's public file format specification document (docs/ase-file-specs.md), read alone; its source was not read |
 
 | EX3 | Animated PNG chunks (acTL, fcTL, fdAT, sequence numbers, delays, dispose and blend ops) | exporters/src/apng.ts | W3C PNG specification, third edition |
 | EX4 | Lossless WebP encoding (VP8L header, colour indexing, subtract green, predictor modes, LZ77 prefix coding, code-length codes) and the animated container (VP8X, ANIM, ANMF) | exporters/src/webp.ts | RFC 9649 WebP Lossless Bitstream Specification; WebP Container Specification |

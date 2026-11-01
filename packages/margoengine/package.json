@@ -506,6 +506,18 @@
       "types": "./dist/exporters/roblox-runtime-restore.d.ts",
       "import": "./dist/exporters/roblox-runtime-restore.js"
     },
+    "./exporters/atlas": {
+      "types": "./dist/exporters/atlas.d.ts",
+      "import": "./dist/exporters/atlas.js"
+    },
+    "./exporters/godot-2d": {
+      "types": "./dist/exporters/godot-2d.d.ts",
+      "import": "./dist/exporters/godot-2d.js"
+    },
+    "./exporters/unity-2d": {
+      "types": "./dist/exporters/unity-2d.d.ts",
+      "import": "./dist/exporters/unity-2d.js"
+    },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
       "import": "./dist/fbx.js"
@@ -1249,6 +1261,14 @@
     "./sprites/animation": {
       "types": "./dist/sprites/animation.d.ts",
       "import": "./dist/sprites/animation.js"
+    },
+    "./sprites/aseprite": {
+      "types": "./dist/sprites/aseprite.d.ts",
+      "import": "./dist/sprites/aseprite.js"
+    },
+    "./sprites/atlas": {
+      "types": "./dist/sprites/atlas.d.ts",
+      "import": "./dist/sprites/atlas.js"
     },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",

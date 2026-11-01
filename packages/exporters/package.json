@@ -144,6 +144,18 @@
     "./roblox-runtime-restore": {
       "types": "./dist/roblox-runtime-restore.d.ts",
       "import": "./dist/roblox-runtime-restore.js"
+    },
+    "./atlas": {
+      "types": "./dist/atlas.d.ts",
+      "import": "./dist/atlas.js"
+    },
+    "./godot-2d": {
+      "types": "./dist/godot-2d.d.ts",
+      "import": "./dist/godot-2d.js"
+    },
+    "./unity-2d": {
+      "types": "./dist/unity-2d.d.ts",
+      "import": "./dist/unity-2d.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4205244,
+  "total": 4223631,
   "history": [
     {
       "date": "2026-10-24",
@@ -1262,6 +1262,12 @@
       "commit": "2d6b7738d",
       "reason": "row 21.6 job 6a: coloured shadows option",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "a3b1efae0",
+      "reason": "row 26 jobs 3-6: new sprites/aseprite, sprites/atlas, exporters/atlas, godot-2d and unity-2d entries",
+      "grew": 5
     }
   ],
   "items": {
@@ -1357,10 +1363,12 @@
     "@margoengine/environment/volumetric": 8462,
     "@margoengine/exporters": 34678,
     "@margoengine/exporters/apng": 2322,
+    "@margoengine/exporters/atlas": 2403,
     "@margoengine/exporters/capture": 7241,
     "@margoengine/exporters/collect": 7934,
     "@margoengine/exporters/dae": 10560,
     "@margoengine/exporters/godot": 10258,
+    "@margoengine/exporters/godot-2d": 3416,
     "@margoengine/exporters/godot-addon": 1609,
     "@margoengine/exporters/godot-flipbook": 3605,
     "@margoengine/exporters/godot-lightmap": 1328,
@@ -1375,6 +1383,7 @@
     "@margoengine/exporters/roblox-runtime-restore": 6130,
     "@margoengine/exporters/skin": 2459,
     "@margoengine/exporters/unity": 41842,
+    "@margoengine/exporters/unity-2d": 7318,
     "@margoengine/exporters/unity-pixel-art": 931,
     "@margoengine/exporters/unity-precision": 25154,
     "@margoengine/exporters/unity-precision-importer": 14647,
@@ -1574,6 +1583,8 @@
     "@margoengine/splines": 1555,
     "@margoengine/sprites": 5136,
     "@margoengine/sprites/animation": 1388,
+    "@margoengine/sprites/aseprite": 4601,
+    "@margoengine/sprites/atlas": 649,
     "@margoengine/stage": 2240,
     "@margoengine/stage/effects": 727,
     "@margoengine/stage/environment": 747,

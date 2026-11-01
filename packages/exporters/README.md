@@ -904,6 +904,69 @@ const webp: Uint8Array = await encodeAnimatedWebP(8, frame, {fps: 12, loops: 0})
   `canvas.convertToBlob({type: 'image/webp', quality})`. At most 16384 pixels per side.
 - Frames of different sizes are refused with a `RangeError`.
 
+### Packed atlases, Godot and Unity 2D
+
+`@margoengine/exporters/atlas` packs images of any size with MaxRects: trimmed borders, padding, extruded edges, a pivot
+per frame, several pages. `atlasManifest` writes the JSON hash layout 2D engines read, and `clipFromAtlas`
+(`margoengine/sprites/atlas`) turns named frames into a `SpriteAnimation` clip.
+
+```ts
+import {atlasManifest, packAtlasFrames} from 'margoengine/exporters/atlas';
+import {encodePNG} from 'margoengine/exporters/capture';
+import {createGodotTileMapScript, godotSpriteFrames, godotTileCells, godotTileSet} from 'margoengine/exporters/godot-2d';
+import {createUnity2DBundle} from 'margoengine/exporters/unity-2d';
+
+const frame = (name: string) => ({name, data: new Uint8Array(16).fill(255), width: 2, height: 2});
+const atlas = packAtlasFrames([frame('walk0'), frame('walk1')], {padding: 2, extrude: 1, pivot: {x: 0.5, y: 1}});
+const manifest = atlasManifest(atlas, {image: 'hero.png'});
+const clips = {walk: {frames: ['walk0', 'walk1'], fps: 8}};
+
+const map = {
+  width: 1, height: 1, tileWidth: 16, tileHeight: 16,
+  tilesets: [{name: 'ground', firstGid: 1, tileWidth: 16, tileHeight: 16, tileCount: 1, columns: 1,
+    image: {source: 'ground.png', width: 16, height: 16},
+    tiles: [{id: 0, collision: [{kind: 'rect', x: 0, y: 0, width: 16, height: 16}]}]}],
+  layers: [{type: 'tile', name: 'floor', width: 1, height: 1, data: new Uint32Array([1])}],
+};
+
+// Godot 4.3: text resources, cells as JSON, and a script that calls set_cell.
+const spriteFrames: string = godotSpriteFrames(manifest, clips, {folder: 'res://art'});
+const tileSet: string = godotTileSet(map, {folder: 'res://art'});
+const cells: string = JSON.stringify(godotTileCells(map));
+const script: string = createGodotTileMapScript();
+
+// Unity: copy these files under Assets/Hero, then run Tools > Margo Export > Hero.
+const files = createUnity2DBundle({
+  folder: 'Hero',
+  manifest,
+  pages: [await encodePNG(atlas.pages[0])],
+  clips,
+  map,
+  tilesetImages: {'ground.png': new Uint8Array()},
+});
+console.log(spriteFrames.length, tileSet.length, cells.length, script.length, files.length);
+```
+
+| `packAtlasFrames` option | Default |
+| --- | --- |
+| `trim`: cut transparent borders; offsets go in the manifest | true |
+| `padding`: empty pixels between frames | 0 |
+| `extrude`: pixels each edge repeats outward | 0 |
+| `pivot`: fractions of the untrimmed image; a source's own `pivot` wins | centre |
+| `maxSize`: largest page side, up to 16384 | 4096 |
+| `powerOfTwo`: round page sides up | false |
+| `pages`: most pages to use | 1 |
+
+- **Pivots from Aseprite:** a slice key's pivot is in pixels from the slice, so pass
+  `{x: (key.x + key.pivot.x) / width, y: (key.y + key.pivot.y) / height}`.
+- **Godot.** Image-collection tilesets are refused (pack them into one image). Godot animates only blocks of consecutive
+  atlas cells, so another order is refused. Tile flips use the transform bits of Godot 4.2 and later. `SpriteFrames`
+  holds no pivot; set the `AnimatedSprite2D` offset.
+- **Unity.** Sprite rects are Y up, and pivots are rebased on the trimmed rect so frames stay put. The C# builds `.anim`
+  clips on `SpriteRenderer`, a `MapTile` asset per used tile, and `Map.prefab` with a `Tilemap` and `TilemapCollider2D` per
+  layer. Unequal tile frame times repeat frames at their common divisor, since Unity runs a tile at one rate.
+- Both engines are checked by hand in the engine, not in CI. Object layers are not exported.
+
 ### Sprite atlases and ZIP archives
 
 The capture subpath also packs frames for game engines and downloads. Each takes `signal` (an `AbortSignal`: the call

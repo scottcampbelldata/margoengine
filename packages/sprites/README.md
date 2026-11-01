@@ -101,3 +101,45 @@ A clip is `frames` (rectangles, or `{ rect, duration }` for a frame with its own
 a frame starts showing, in order even when one `update` skips several frames. `speed` (default 1) scales time and 0
 pauses. `play(name)` keeps going if that clip is already playing; pass `true` to restart. `finished` turns true when a
 `'once'` clip ends. Read `frame` or `rect` instead of `apply` if the sprite is not a `Sprite`.
+
+## Aseprite
+
+`margoengine/sprites/aseprite` reads `.aseprite` and `.ase` files and the JSON sheets Aseprite exports, and writes
+`.aseprite` files. Pure CPU code, Node included.
+
+```ts
+import {SpriteAnimation} from 'margoengine/sprites/animation';
+import {clipsFromAsepriteJSON, encodeAseprite, parseAseprite} from 'margoengine/sprites/aseprite';
+
+const bytes = await encodeAseprite({
+  width: 1,
+  height: 1,
+  frames: [new Uint8Array([255, 0, 0, 255]), new Uint8Array([0, 0, 255, 255])],
+  durations: [100, 300],
+  tags: [{name: 'blink', from: 0, to: 1, direction: 'pingpong'}],
+});
+const {frames, durations, clips, slices, palette} = await parseAseprite(bytes, {columns: 2});
+const blink = new SpriteAnimation({clips});
+blink.play('blink');
+console.log(frames.length, durations, slices.length, palette.length);
+
+const sheet = clipsFromAsepriteJSON({
+  frames: [{frame: {x: 0, y: 0, w: 8, h: 8}, duration: 100}],
+  meta: {frameTags: [{name: 'idle', from: 0, to: 0}]},
+});
+console.log(Object.keys(sheet.clips), sheet.rects, sheet.slices);
+```
+
+| `parseAseprite` option | Default |
+| --- | --- |
+| `columns`: columns of the sheet the clip rects point into | all frames in one row |
+| `maxPixels`: most pixels to decode, over all frames and cels | 2^28 |
+| `signal`: an `AbortSignal`, checked between frames | none |
+
+- RGBA, grayscale and indexed sprites; raw, linked and compressed cels; layer, group and cel opacity; z-index; tags;
+  slices with 9-slice and pivot; palettes (old chunks too); user data text on the sprite, layers, tags and slices.
+- **Blend modes:** every layer composites as Normal. A layer's stored mode is in `layers[i].blend`.
+- **Tilemap layers:** a visible one is refused with `unsupported`; flatten or hide it in Aseprite.
+- **Tags:** without a repeat, a clip loops or ping-pongs through its mode. With one, its frames are written out and it
+  plays once; a ping-pong repeat counts legs. A tag's frame times come from the file.
+- Written from the public `.ase` file format document only.

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { frameGrid, SpriteAnimation } from '../dist/animation.js';
+import { clipFromAtlas } from '../dist/atlas.js';
 
 const rects = frameGrid(8, 8, 4);
 const make = (clip, extra = {}) => {
@@ -137,4 +138,32 @@ test('bad clips, speeds and dts throw coded errors', () => {
   animation.play('c');
   assert.throws(() => animation.update(-1), RangeError);
   assert.throws(() => animation.update(Number.NaN), RangeError);
+});
+
+test('clipFromAtlas keeps the order and times, and each frame knows where it sits in the untrimmed image', () => {
+  const manifest = {
+      frames: {
+        a: {
+          frame: { x: 1, y: 2, w: 3, h: 4 },
+          spriteSourceSize: { x: 5, y: 6, w: 3, h: 4 },
+          sourceSize: { w: 16, h: 16 },
+          pivot: { x: 0.5, y: 1 },
+          page: 1,
+        },
+        b: { frame: { x: 9, y: 9, w: 8, h: 8 } },
+      },
+    },
+    clip = clipFromAtlas(manifest, ['b', 'a'], { durations: [0.1, 0.3], mode: 'once' });
+  assert.equal(clip.mode, 'once');
+  assert.deepEqual(clip.frames, [
+    { rect: [9, 9, 8, 8], duration: 0.1, offset: [0, 0], sourceSize: [8, 8], pivot: { x: 0.5, y: 0.5 }, page: 0 },
+    { rect: [1, 2, 3, 4], duration: 0.3, offset: [5, 6], sourceSize: [16, 16], pivot: { x: 0.5, y: 1 }, page: 1 },
+  ]);
+  const animation = new SpriteAnimation({ clips: { c: clipFromAtlas(manifest, ['a', 'b'], { fps: 10 }) } });
+  animation.play('c');
+  assert.deepEqual(animation.update(0.15).rect, [9, 9, 8, 8]);
+  assert.throws(() => clipFromAtlas(manifest, []), TypeError);
+  assert.throws(() => clipFromAtlas(manifest, ['nope']), /no frame nope/);
+  assert.throws(() => clipFromAtlas(manifest, ['toString']), /no frame toString/);
+  assert.throws(() => clipFromAtlas(manifest, ['a'], { durations: [] }), /0 durations for 1/);
 });
