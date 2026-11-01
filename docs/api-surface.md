@@ -51,7 +51,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/loaders | `.` 142, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2 | 32 |  | 51,519 |
 | @margoengine/lod | `.` 17 |  |  | 10,645 |
 | margoengine | `.` 23, `./game` 43, `./viz` 33, `./web` 15 |  |  | 52 |
-| @margoengine/materials | `.` 112, `./atlas` 8, `./transmission` 8, `./batched` 4 | 48 |  | 60,356 |
+| @margoengine/materials | `.` 112, `./atlas` 8, `./transmission` 8, `./batched` 4 | 48 |  | 60,411 |
 | @margoengine/math | `.` 53, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 3, `./matrix3` 1, `./matrix4` 1, `./color` 15, `./box3` 1, `./sphere` 1, `./plane` 1, `./ray` 2, `./frustum` 1, `./spherical` 1, `./mathutils` 21, `./mat4` 11, `./validate` 3, `./quat` 10, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 87 |  | 12,457 |
 | @margoengine/mcp | `.` 38 | 1 |  | 8,408 |
 | @margoengine/mesh-edit | `.` 88, `./modeling` 48 | 2 |  | 29,560 |
