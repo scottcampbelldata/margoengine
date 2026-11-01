@@ -132,11 +132,15 @@ world.dispose();
 - A valid G1 measurement: `node packages/biomes/bench/placement-valid.mjs --runs=20` from the repository root. It
   builds the committed revision and the last commit before band loading (14e4d813d) from git objects, takes the GPU
   lock exclusively, waits for AC power and an idle CPU and GPU, and settles the machine between cases. Each case runs
-  in its own Node process: 20 samples of relief, fields and stored objects on one thread (a fresh world per sample),
-  and of an 8 x 8 block of tiles on 1 and on 8 worker threads. It checks that every sample and both revisions place the
-  same objects, byte for byte. It exits 1 when the lock, the gate, the sample count, a spread (max minus min, over the median) above 10 % or that check
-  fails; a valid run that misses G1 prints `targetMet: false`. The full result is saved under
-  `test-results/biomes-placement-valid/`.
+  in its own Node process: 20 samples of relief, fields and stored objects on one thread (a fresh world per sample,
+  whole neighbours made before objects are timed), of a cold placement (each tile placed once on a fresh world that
+  made nothing first, so the time includes the bands it reads), and of an 8 x 8 block of tiles on 1 and on 8 worker
+  threads (every worker started, warmed on another block, garbage collected and idle before the timer). It checks that
+  every sample, both one-thread object cases and both revisions place the same objects, byte for byte. Each sample also
+  records the process CPU time and how much of the CPU other processes used meanwhile, and `slowSamples` names why each
+  slow sample was slow. It exits 1 when the lock, the gate, the sample count, a spread (max minus min, over the median)
+  above 10 %, other processes over the quiet limit during a sample or that check fails; a valid run that misses G1
+  prints `targetMet: false`. The full result is saved under `test-results/biomes-placement-valid/`.
 
 ## Biomes, presets and blends
 

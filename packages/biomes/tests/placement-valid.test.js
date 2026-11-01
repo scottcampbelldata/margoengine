@@ -1,14 +1,22 @@
 // The checks of bench/placement-valid.mjs that decide whether a G1 measurement counts: repetition, spread, outputs,
-// lock, quiet gate and host. Pure functions only: nothing here takes the GPU lock or times anything.
+// lock, quiet gate and host; the slow-sample diagnosis; and the cold case's setup. Nothing here takes the GPU lock or
+// times anything.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { BiomeWorld, defineBiome } from '../dist/index.js';
+import { BiomePlacement } from '../dist/placement.js';
+import { presetWorlds } from '../dist/presets.js';
+import { fileURLToPath } from 'node:url';
 import {
+  BenchWorker,
   GATE,
   MIN_RUNS,
   OWNER,
   TARGETS,
   caseFailures,
+  coldPlacement,
   conditionFailures,
+  diagnose,
   g1,
   summarize,
 } from '../bench/placement-valid.mjs';
@@ -82,6 +90,12 @@ test('battery, a skipped or loud CPU gate, an unread or busy GPU and another hos
     [{ gate: gate({ quiet: { cpuLoadPercent: GATE.quietMax + 1, gpu: { checked: true } } }) }, /CPU 21% at the gate/],
     [{ gate: gate({ quiet: { cpuLoadPercent: 3, gpu: { checked: false } } }) }, /could not read GPU load/],
     [
+      {
+        gate: gate({ quiet: { cpuLoadPercent: 3, gpu: { checked: false, reason: 'nvidia-smi exited 9: no driver' } } }),
+      },
+      /could not read GPU load: nvidia-smi exited 9: no driver/,
+    ],
+    [
       { gate: gate({ quiet: { cpuLoadPercent: 3, gpu: { checked: true, busy: true, utilizationPercent: [90] } } }) },
       /GPU busy/,
     ],
@@ -107,4 +121,131 @@ test('G1 sums fields and objects for one thread and reads the eight-worker block
   };
   assert.equal(g1(met).targetMet, true);
   assert.equal(g1({}).targetMet, false);
+});
+
+test('other processes over the quiet limit during a sample, workers without GC or started in the timer all fail', () => {
+  const ok = { samples: steady(100), otherLoad: Array(MIN_RUNS).fill(GATE.quietMax) };
+  assert.deepEqual(caseFailures('x', ok), []);
+  const loud = { ...ok, otherLoad: ok.otherLoad.with(4, 35) };
+  assert.match(caseFailures('x', loud).join(), /other processes kept 35% of the CPU busy during sample 4/);
+  assert.match(caseFailures('x', { ...ok, gcInWorkers: false }).join(), /could not collect garbage/);
+  assert.match(caseFailures('x', { ...ok, workersStartedInTimer: 2 }).join(), /2 workers started inside the timer/);
+});
+
+test('diagnose names the cause of each slow sample from its CPU time and the other processes load', () => {
+  const samples = steady(100),
+    cpu = steady(700),
+    otherLoad = Array(MIN_RUNS).fill(2);
+  samples[3] = 200; // other processes busy
+  otherLoad[3] = 40;
+  samples[7] = 150; // as much more CPU as wall time: work in this process
+  cpu[7] = 1050;
+  samples[11] = 160; // wall time without CPU time: threads waiting
+  assert.deepEqual(
+    diagnose({ samples, cpu, otherLoad }).map(({ index, cause }) => [index, cause]),
+    [
+      [3, 'other processes'],
+      [7, 'more work in this process'],
+      [11, 'waiting in this process'],
+    ],
+  );
+  assert.deepEqual(diagnose({ samples: steady(100) }), []);
+});
+
+const scrubWorld = (biomes, extra) =>
+  BiomeWorld.create({
+    seed: 11,
+    size: [1024, 1024],
+    height: { relief: presetWorlds.temperate.relief },
+    climate: presetWorlds.temperate.climate,
+    biomes,
+    ...extra,
+  });
+
+test('the bench worker places what the world places alone, answers a GC request apart from jobs and exits', async () => {
+  const script = fileURLToPath(new URL('../dist/workers/biomes.js', import.meta.url)),
+    made = [],
+    pooled = await scrubWorld(undefined, {
+      workers: 2,
+      createWorker: () => {
+        const w = new BenchWorker(script);
+        made.push(w);
+        return w;
+      },
+    }),
+    alone = await scrubWorld(undefined, { workers: 0 });
+  try {
+    const [a, b] = await Promise.all([
+      BiomePlacement.attach(pooled).tile(1, 1),
+      BiomePlacement.attach(alone).tile(1, 1),
+    ]);
+    assert.deepEqual(Buffer.from(a.instances), Buffer.from(b.instances));
+    assert.ok(made.length >= 1);
+    // Without --expose-gc (node --test) the worker says it could not collect; the bench runs with it.
+    for (const ok of await Promise.all(made.map((w) => w.gc()))) assert.equal(ok, typeof globalThis.gc === 'function');
+    assert.equal((await BiomePlacement.attach(pooled).tile(2, 1)).x, 2, 'jobs still run after a GC request');
+  } finally {
+    pooled.dispose();
+    alone.dispose();
+  }
+  await Promise.all(made.map((w) => w.exited));
+});
+
+test('the cold case makes nothing before its timer: its own tile whole and only bands of neighbours inside it', async () => {
+  // Small crowns, so every neighbour of an interior tile is read as a band (placement-band.test.js 'scrub').
+  const biomes = [
+    defineBiome({
+      id: 'scrub',
+      climate: {},
+      ground: [{ material: 'grass' }],
+      plants: [{ id: 'gorse', mesh: 'procedural:shrub', density: 900, radius: 0.8, shade: 0.6 }],
+    }),
+  ];
+  const log = [];
+  const create = async (extra) => {
+    const world = await scrubWorld(biomes, extra),
+      tile = world.tile.bind(world),
+      part = world.tilePart.bind(world);
+    assert.equal(world.workers, undefined, 'the cold case runs without workers');
+    world.tile = (x, z, o) => {
+      log.push(`tile ${x},${z}`);
+      return tile(x, z, o);
+    };
+    world.tilePart = (x, z, window, o) => {
+      log.push(`part ${x},${z}`);
+      return part(x, z, window, o);
+    };
+    log.push('world');
+    return world;
+  };
+  const placed = await coldPlacement({
+    create,
+    attach: (world) => BiomePlacement.attach(world),
+    tiles: [
+      [1, 1],
+      [2, 2],
+    ],
+    time: async (fn) => {
+      log.push('start');
+      const value = await fn();
+      log.push('end');
+      return value;
+    },
+  });
+  assert.equal(placed.length, 2);
+  const runs = log.join('|').split('world|').filter(Boolean);
+  assert.equal(runs.length, 2, 'a fresh world for each tile');
+  for (const [k, run] of runs.entries()) {
+    const steps = run.split('|').filter(Boolean),
+      [x, z] = [k + 1, k + 1];
+    assert.equal(steps[0], 'start', `nothing made before the timer: ${steps.join(' ')}`);
+    assert.equal(steps.at(-1), 'end');
+    const inside = new Set(steps.slice(1, -1));
+    assert.deepEqual(
+      [...inside].filter((s) => s.startsWith('tile')),
+      [`tile ${x},${z}`],
+      'only the own tile is made whole',
+    );
+    assert.equal([...inside].filter((s) => s.startsWith('part')).length, 8, 'a band of each of the 8 neighbours');
+  }
 });

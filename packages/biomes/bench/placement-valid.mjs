@@ -6,17 +6,25 @@
 //
 // Cases, each in its own Node process with GC between samples, on R16 tiles (40..47, 30) and the block (40..47, 40..47):
 //   cpu       per sample a fresh world: relief heights of 8 tiles, fields with classification of 8 tiles, then (after
-//             their neighbours are made, untimed) stored objects of the same 8 tiles. G1 one-thread = fields + objects.
-//   workers   per sample a fresh world on 1 or 8 worker threads, warmed far from the block: the 8 x 8 block's fields,
-//             classification and objects, wall time.
-// Every sample's objects are hashed (every byte of each PlacedTile); samples of a case, and the two revisions, must agree.
+//             their whole neighbours are made, untimed) stored objects of the same 8 tiles. G1 one-thread = fields +
+//             objects ('placement', whole neighbours made first).
+//   cold      per sample each of the 8 row tiles placed once on its own fresh world that made nothing first: the own
+//             tile whole plus the band of each neighbour placement reads ('coldPlacement'; before J2, 9 whole tiles).
+//   workers   per sample a fresh world on 1 or 8 worker threads; every worker starts and places a warm block far away,
+//             collects garbage and goes idle; then the 8 x 8 block's fields, classification and objects, wall time.
+// Every sample's objects are hashed (every byte of each PlacedTile); samples of a case, the cpu and cold cases, and the
+// two revisions must agree. Each sample also records this process's CPU time (all threads) and the CPU share other
+// processes used while it ran: a sample during which they used over the quiet limit makes the run invalid, and
+// 'slowSamples' names the cause of each slow sample.
 // Options: --runs=<n> (20 or more), --baseline=<rev>|none (default the pre-J2 commit), --any-host (skip the A6000 check).
 // Snapshots and the full result go to test-results/biomes-placement-valid/ (ignored by git).
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpus } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { Worker } from 'node:worker_threads';
 
 const root = resolve(import.meta.dirname, '../../..');
 
@@ -32,7 +40,8 @@ export const GATE = Object.freeze({ quietMax: 20, quietHold: 20, gpuMax: 20, tim
 export const OWNER = 'biomes-placement-valid';
 const TILE = 256,
   ROW = Object.freeze({ x: [40, 47], z: 30 }),
-  BLOCK = Object.freeze({ x: 40, z: 40, side: 8 });
+  BLOCK = Object.freeze({ x: 40, z: 40, side: 8 }),
+  WARM = Object.freeze({ x: 8, z: 8, side: 8 });
 const km2 = (tiles) => (tiles * TILE * TILE) / 1e6;
 
 /** Median, min, max and spread ((max - min) / median) of a list of numbers. */
@@ -60,6 +69,10 @@ export function caseFailures(id, c, { runs = MIN_RUNS, spreadLimit = SPREAD_LIMI
   if (!(spread <= spreadLimit))
     out.push(`${id}: spread ${(spread * 100).toFixed(1)}% over the ${(spreadLimit * 100).toFixed(0)}% limit`);
   if (c.digests && new Set(c.digests).size !== 1) out.push(`${id}: samples placed different objects`);
+  const loud = (c.otherLoad ?? []).findIndex((v) => !(v <= GATE.quietMax));
+  if (loud >= 0) out.push(`${id}: other processes kept ${c.otherLoad[loud]}% of the CPU busy during sample ${loud}`);
+  if (c.gcInWorkers === false) out.push(`${id}: the workers could not collect garbage before timing`);
+  if (c.workersStartedInTimer > 0) out.push(`${id}: ${c.workersStartedInTimer} workers started inside the timer`);
   return out;
 }
 
@@ -74,7 +87,10 @@ export function conditionFailures({ gate, lockAtEnd, pid, owner = OWNER, host, a
   if (!ours(lockAtEnd)) out.push('the exclusive GPU lock was not held by this run when timing ended');
   if (!gate.quiet || gate.quiet.skipped) out.push('the CPU quiet gate did not run');
   else if (!(gate.quiet.cpuLoadPercent <= GATE.quietMax)) out.push(`CPU ${gate.quiet.cpuLoadPercent}% at the gate`);
-  if (!gate.quiet?.gpu?.checked) out.push('the GPU quiet gate could not read GPU load');
+  if (!gate.quiet?.gpu?.checked)
+    out.push(
+      `the GPU quiet gate could not read GPU load${gate.quiet?.gpu?.reason ? `: ${gate.quiet.gpu.reason}` : ''}`,
+    );
   else if (gate.quiet.gpu.busy) out.push(`GPU busy at the gate (${gate.quiet.gpu.utilizationPercent.join(', ')}%)`);
   for (const s of settles) {
     if (s.ac === false) out.push(`on battery before ${s.case}`);
@@ -123,7 +139,149 @@ function placedHash(t) {
 }
 const blockHash = (tiles) => createHash('sha256').update(tiles.map(placedHash).join()).digest('hex').slice(0, 16);
 
+/**
+ * Why the slow samples of a case are slow, from what each sample recorded: samples over the median by more than half
+ * the spread limit, each with its wall time and this process's CPU time (all its threads) over their medians and the
+ * share of the machine other processes used meanwhile. `cause`: 'other processes' when they used more than the quiet
+ * limit; 'more work in this process' when CPU time rose with wall time (garbage collection, compilation); otherwise
+ * 'waiting in this process' (threads not running: scheduling, a worker waiting on another).
+ */
+export function diagnose(c) {
+  if (!c?.cpu || !c?.otherLoad) return [];
+  const wall = summarize(c.samples).median,
+    cpu = summarize(c.cpu).median,
+    out = [];
+  c.samples.forEach((ms, i) => {
+    if (!(ms > wall * (1 + SPREAD_LIMIT / 2))) return;
+    const wallOver = ms / wall,
+      cpuOver = c.cpu[i] / cpu,
+      other = c.otherLoad[i];
+    out.push({
+      index: i,
+      wallOverMedian: Math.round(wallOver * 1000) / 1000,
+      cpuOverMedian: Math.round(cpuOver * 1000) / 1000,
+      otherLoadPercent: other,
+      cause:
+        other > GATE.quietMax
+          ? 'other processes'
+          : cpuOver - 1 >= (wallOver - 1) / 2
+            ? 'more work in this process'
+            : 'waiting in this process',
+    });
+  });
+  return out;
+}
+
 // ---- child: one case on one built package --------------------------------------------------------------------------
+
+/** Busy CPU time of the whole machine (ms, all cores) and of this process (ms, all its threads). */
+const machineBusy = () => cpus().reduce((s, c) => s + c.times.user + c.times.nice + c.times.sys + c.times.irq, 0);
+const ownCpu = () => {
+  const u = process.cpuUsage();
+  return (u.user + u.system) / 1000;
+};
+
+/**
+ * Times work: `time(fn)` runs GC, then times `fn` and adds its wall time, this process's CPU time and the machine's busy
+ * time to the sample in progress; `take()` ends the sample as { ms, cpuMs, otherLoadPercent } (the share of the
+ * machine's cores that other processes kept busy during the timed work).
+ */
+function meter() {
+  let ms = 0,
+    own = 0,
+    busy = 0;
+  return {
+    async time(fn) {
+      globalThis.gc?.();
+      const b0 = machineBusy(),
+        c0 = ownCpu(),
+        start = performance.now();
+      const value = await fn();
+      ms += performance.now() - start;
+      own += ownCpu() - c0;
+      busy += machineBusy() - b0;
+      return value;
+    },
+    take() {
+      const s = {
+        ms,
+        cpuMs: own,
+        otherLoadPercent: Math.round((Math.max(0, busy - own) / (cpus().length * ms)) * 1000) / 10,
+      };
+      ms = own = busy = 0;
+      return s;
+    },
+  };
+}
+
+/**
+ * One cold-placement sample: each tile placed once on its own fresh world (no workers) that has made nothing, so the
+ * timed `placement.tile` makes its own tile whole and of each neighbour only the band it reads (before J2: 9 whole
+ * tiles). Nothing is made before `time` starts; worlds are created and disposed outside it.
+ */
+export async function coldPlacement({ create, attach, tiles, time }) {
+  const placed = [];
+  for (const [x, z] of tiles) {
+    const world = await create({ cache: 256, workers: 0 }),
+      placement = attach(world);
+    try {
+      placed.push(await time(() => placement.tile(x, z)));
+    } finally {
+      placement.dispose();
+      world.dispose();
+    }
+  }
+  return placed;
+}
+
+/**
+ * A Web Worker over a Node worker thread running the built classic worker script, as tests/thread-worker.js does, plus
+ * what the bench needs around the timer: `gc()` collects the worker's heap (the process runs with --expose-gc, which
+ * worker threads inherit) and resolves whether it could; `terminate()` keeps the exit so the next sample starts only
+ * after this one's threads are gone.
+ */
+export class BenchWorker {
+  #gc = null;
+  constructor(script) {
+    this.thread = new Worker(
+      `const { parentPort } = require('node:worker_threads');
+       globalThis.self = globalThis;
+       globalThis.postMessage = (message, transfer) => parentPort.postMessage(message, transfer);
+       parentPort.on('message', (data) => {
+         if (data && data.benchGc) {
+           if (typeof gc === 'function') gc();
+           parentPort.postMessage({ benchGc: typeof gc === 'function' });
+         } else if (globalThis.onmessage) globalThis.onmessage({ data });
+       });
+       require('node:vm').runInThisContext(require('node:fs').readFileSync(${JSON.stringify(script)}, 'utf8'));`,
+      { eval: true },
+    );
+    this.thread.on('message', (data) => {
+      if (data && 'benchGc' in data) this.#gc?.(data.benchGc);
+      else this.onmessage?.({ data });
+    });
+    this.thread.on('error', (error) => this.onerror?.({ message: error.message, preventDefault() {} }));
+  }
+  postMessage(message, transfer) {
+    this.thread.postMessage(message, transfer);
+  }
+  gc() {
+    return new Promise((resolve) => {
+      this.#gc = resolve;
+      this.thread.postMessage({ benchGc: true });
+    });
+  }
+  terminate() {
+    this.exited = this.thread.terminate();
+  }
+}
+
+/** All 64 tiles of an 8 x 8 block placed at once. */
+const placeBlock = (placement, { x, z, side }) => {
+  const jobs = [];
+  for (let j = 0; j < side; j++) for (let i = 0; i < side; i++) jobs.push(placement.tile(x + i, z + j));
+  return Promise.all(jobs);
+};
 
 /** One case's samples (ms per km2) on the built package at `pkg`; run in a fresh `node --expose-gc` process. */
 export async function measureCase(kind, pkg, runs, workers) {
@@ -140,74 +298,116 @@ export async function measureCase(kind, pkg, runs, workers) {
         climate: R16.climate,
         ...extra,
       });
-  const timed = async (fn) => {
-    globalThis.gc?.();
-    const start = performance.now();
-    await fn();
-    return performance.now() - start;
-  };
+  const m = meter(),
+    /** Ends a sample of `c` over `area` km2: wall and CPU time per km2 and the other processes' load. */
+    record = (c, area, s = m.take()) => {
+      c.samples.push(s.ms / area);
+      c.cpu.push(s.cpuMs / area);
+      c.otherLoad.push(s.otherLoadPercent);
+    },
+    row = Array.from({ length: ROW.x[1] - ROW.x[0] + 1 }, (_, i) => ROW.x[0] + i);
+  if (kind === 'cold') {
+    const c = { samples: [], cpu: [], otherLoad: [], digests: [] };
+    for (let i = -2; i < runs; i++) {
+      const placed = await coldPlacement({
+        create,
+        attach: (world) => BiomePlacement.attach(world),
+        tiles: row.map((x) => [x, ROW.z]),
+        time: (fn) => m.time(fn),
+      });
+      if (i < 0) {
+        m.take();
+        continue;
+      }
+      record(c, km2(row.length));
+      c.digests.push(blockHash(placed));
+    }
+    return { coldPlacement: c };
+  }
   if (kind === 'cpu') {
     const { createRelief } = await import(dist('relief')),
       relief = createRelief(R16.relief),
       heights = new Int32Array(TILE * TILE),
-      row = Array.from({ length: ROW.x[1] - ROW.x[0] + 1 }, (_, i) => ROW.x[0] + i),
-      out = { relief: { samples: [] }, fields: { samples: [] }, placement: { samples: [], digests: [] } };
+      out = {
+        relief: { samples: [], cpu: [], otherLoad: [] },
+        fields: { samples: [], cpu: [], otherLoad: [] },
+        placement: { samples: [], cpu: [], otherLoad: [], digests: [] },
+      };
     let check = 0;
     for (let i = -2; i < runs; i++) {
       const world = await create({ cache: 256 }),
         placement = BiomePlacement.attach(world);
-      const r = await timed(() => {
+      await m.time(() => {
         for (const x of row)
           for (let z = 0, k = 0; z < TILE; z++)
             for (let xi = 0; xi < TILE; xi++)
               heights[k++] = relief.height((x * TILE + xi) * 1000, (ROW.z * TILE + z) * 1000);
         check ^= heights[heights.length - 1];
       });
-      const f = await timed(async () => {
+      const r = m.take();
+      await m.time(async () => {
         for (const x of row) await world.tile(x, ROW.z);
       });
+      const f = m.take();
+      // Whole neighbours made first (untimed): this case times placement reading tiles the world already holds.
       for (let z = ROW.z - 1; z <= ROW.z + 1; z++)
         for (let x = ROW.x[0] - 1; x <= ROW.x[1] + 1; x++) await world.tile(x, z);
       const placed = [];
-      const p = await timed(async () => {
+      await m.time(async () => {
         for (const x of row) placed.push(await placement.tile(x, ROW.z));
       });
+      const p = m.take();
       placement.dispose();
       world.dispose();
       if (i < 0) continue;
-      out.relief.samples.push(r / km2(row.length));
-      out.fields.samples.push(f / km2(row.length));
-      out.placement.samples.push(p / km2(row.length));
+      record(out.relief, km2(row.length), r);
+      record(out.fields, km2(row.length), f);
+      record(out.placement, km2(row.length), p);
       out.placement.digests.push(blockHash(placed));
     }
     out.relief.check = check;
     return out;
   }
-  const { ThreadWebWorker } = await import(pathToFileURL(join(pkg, 'tests', 'thread-worker.js')).href),
-    c = { samples: [], digests: [] };
+  // Every sample: a fresh world whose workers all start and place a whole block far from the timed one (the same jobs
+  // and code paths), collect garbage in every worker and in this thread and go idle; then the block is timed. The
+  // previous sample's threads have exited before the next world starts.
+  const script = join(pkg, 'dist', 'workers', 'biomes.js'),
+    c = { samples: [], cpu: [], otherLoad: [], digests: [] },
+    gcInWorkers = new Set();
+  let startedInTimer = 0;
   for (let i = -1; i < runs; i++) {
-    const world = await create({ workers, createWorker: () => new ThreadWebWorker() }),
+    const made = [],
+      world = await create({
+        workers,
+        createWorker: () => {
+          const w = new BenchWorker(script);
+          made.push(w);
+          return w;
+        },
+      }),
       placement = BiomePlacement.attach(world);
     try {
-      // Warm every worker on tiles far from the block.
-      await Promise.all(
-        Array.from({ length: 2 * workers }, (_, k) => placement.tile(4 + 4 * (k % 8), 4 + 8 * (k >> 3))),
-      );
-      let placed;
-      const t = await timed(async () => {
-        const jobs = [];
-        for (let z = 0; z < BLOCK.side; z++)
-          for (let x = 0; x < BLOCK.side; x++) jobs.push(placement.tile(BLOCK.x + x, BLOCK.z + z));
-        placed = await Promise.all(jobs);
-      });
-      if (i < 0) continue;
-      c.samples.push(t / km2(BLOCK.side * BLOCK.side));
+      await placeBlock(placement, WARM);
+      if (made.length !== workers)
+        throw new Error(`warm-up started ${made.length} of ${workers} workers; every worker must start before timing`);
+      for (const ok of await Promise.all(made.map((w) => w.gc()))) gcInWorkers.add(ok);
+      await new Promise((r) => setTimeout(r, 200));
+      const placed = await m.time(() => placeBlock(placement, BLOCK));
+      startedInTimer += made.length - workers;
+      if (i < 0) {
+        m.take();
+        continue;
+      }
+      record(c, km2(BLOCK.side * BLOCK.side));
       c.digests.push(blockHash(placed));
     } finally {
       placement.dispose();
       world.dispose();
+      await Promise.all(made.map((w) => w.exited));
     }
   }
+  c.gcInWorkers = [...gcInWorkers].every(Boolean);
+  c.workersStartedInTimer = startedInTimer;
   return { [`workers${workers}`]: c };
 }
 
@@ -225,7 +425,6 @@ export function snapshot(rev, dir) {
     'packages/biomes/src',
     'packages/biomes/package.json',
     'packages/biomes/tsconfig.json',
-    'packages/biomes/tests/thread-worker.js',
     'packages/shared',
     'packages/gltf/tsconfig.json',
   ];
@@ -309,6 +508,8 @@ const brief = (c) => {
     max: round(s.max),
     spreadPercent: round(s.spread * 100),
     n: s.n,
+    ...(c.cpu ? { cpuMedian: round(summarize(c.cpu).median) } : {}),
+    ...(c.otherLoad ? { otherLoadMaxPercent: Math.max(...c.otherLoad) } : {}),
   };
 };
 
@@ -337,7 +538,18 @@ async function parent(argv) {
     runs,
     spreadLimit: SPREAD_LIMIT,
     targets: TARGETS,
-    work: { row: ROW, block: BLOCK, tileMetres: TILE, world: 'R16' },
+    work: {
+      row: ROW,
+      block: BLOCK,
+      warm: WARM,
+      tileMetres: TILE,
+      world: 'R16',
+      cases: {
+        placement: 'the row placed after its whole neighbours were made (untimed)',
+        coldPlacement: 'each row tile placed once on a fresh world that made nothing first (the band path)',
+        workers: 'the block on a fresh world whose workers placed the warm block, collected garbage and went idle',
+      },
+    },
   };
   if (failures.length) return finish(result, failures, out);
   for (const r of revs) {
@@ -358,6 +570,7 @@ async function parent(argv) {
     failures.push(...gate.invalid);
     const plan = [
       ['cpu', 1],
+      ['cold', 1],
       ['workers', 1],
       ['workers', 8],
     ];
@@ -390,11 +603,19 @@ async function parent(argv) {
   for (const r of revs) {
     const list = r.name === 'current' ? failures : baselineFailures;
     for (const [id, c] of Object.entries(r.cases)) list.push(...caseFailures(`${r.name}:${id}`, c, { runs }));
+    // The band path and the whole-neighbour path place the same row: every byte must agree.
+    if (r.cases.coldPlacement?.digests[0] !== r.cases.placement?.digests[0])
+      list.push(`${r.name}: cold placement placed different objects from placement after whole neighbours`);
     result[r.name] = {
       revision: r.rev,
       snapshotFiles: r.files,
       build: r.build,
       cases: Object.fromEntries(Object.entries(r.cases).map(([id, c]) => [id, brief(c)])),
+      slowSamples: Object.fromEntries(
+        Object.entries(r.cases)
+          .map(([id, c]) => [id, diagnose(c)])
+          .filter(([, d]) => d.length),
+      ),
       digests: Object.fromEntries(
         Object.entries(r.cases)
           .filter(([, c]) => c.digests)
