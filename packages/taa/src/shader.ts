@@ -35,7 +35,7 @@ export const snapshot = `@group(0) @binding(0) var<storage,read> source:array<ve
 @group(0) @binding(1) var<storage,read_write> destination:array<vec4f>;
 @compute @workgroup_size(256) fn main(@builtin(global_invocation_id) id:vec3u) {if(id.x<arrayLength(&destination)){destination[id.x]=source[id.x];}}`;
 // sRGB decode: IEC 61966-2-1. RGB to/from YCoCg: Malvar & Sullivan, "YCoCg-R" (2003).
-const color = `override manualSRGB:bool=true;
+export const color = `override manualSRGB:bool=true;
 fn linear(c:vec3f)->vec3f{if(!manualSRGB){return c;}return select(c/12.92,pow((c+0.055)/1.055,vec3f(2.4)),c>vec3f(0.04045));}
 fn ycocg(c:vec3f)->vec3f {return vec3f(dot(c,vec3f(0.25,0.5,0.25)),(c.r-c.b)*0.5,dot(c,vec3f(-0.25,0.5,-0.25)));}
 fn rgb(c:vec3f)->vec3f {return vec3f(c.x+c.y-c.z,c.x+c.z,c.x-c.y-c.z);}`;

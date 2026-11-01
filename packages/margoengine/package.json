@@ -1274,6 +1274,10 @@
       "types": "./dist/taa.d.ts",
       "import": "./dist/taa.js"
     },
+    "./taa/upscale": {
+      "types": "./dist/taa/upscale.d.ts",
+      "import": "./dist/taa/upscale.js"
+    },
     "./terrain": {
       "types": "./dist/terrain.d.ts",
       "import": "./dist/terrain.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4176035,
+  "total": 4183159,
   "history": [
     {
       "date": "2026-10-24",
@@ -1226,6 +1226,12 @@
       "commit": "764e66da1",
       "reason": "new entries @margoengine/fbx/export (FBX 7.4 binary and ASCII writer, row 26 job 8, plan budget 8 kB) and @margoengine/exporters/collect (the scene walk the writer shares), with tests",
       "grew": 2
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "764e66da1",
+      "reason": "new entry @margoengine/taa/upscale, row 21.6 job 3",
+      "grew": 1
     }
   ],
   "items": {
@@ -1545,6 +1551,7 @@
     "@margoengine/staging": 6296,
     "@margoengine/stats": 4934,
     "@margoengine/taa": 10390,
+    "@margoengine/taa/upscale": 7124,
     "@margoengine/terrain": 11929,
     "@margoengine/text": 16532,
     "@margoengine/text/msdf": 4556,

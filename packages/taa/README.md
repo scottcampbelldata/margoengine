@@ -33,3 +33,34 @@ velocity texture equals `jitter` within 2e-6 uv (`post-effects-gpu.mjs --only=mo
 picture after TAA must not write `resolved`: TAA reads it as history next frame.
 
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.
+
+## Upscaling: `TAAUpscale`
+
+`@margoengine/taa/upscale` renders the scene below output size and rebuilds the full frame, from jittered frames or, with
+`temporal: false`, with a Lanczos filter. It runs instead of `TAA`, not with it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TAAUpscale} from 'margoengine/taa/upscale';
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+const upscale = TAAUpscale.attach(engine, {scale: 0.67, sharpen: 0.2});
+upscale.options.scale = 0.5; // options are read every frame, so a ResolutionScaler can drive this
+upscale.reset(); // after a camera cut
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `scale` | `0.67` | Render size as a share of output size, 0.25 to 1 |
+| `temporal` | `true` | False upscales each frame with Lanczos, no jitter and no history |
+| `historyWeight` | `0.9` | Share of history in each frame, at least 0 and below 1 |
+| `depthThreshold` | `0.01` | Relative depth difference that rejects history, 0 to 1 |
+| `clampGamma` | `1.5` | Colour range history may keep, in standard deviations of the 3x3 neighbourhood |
+| `sharpen` | `0.2` | Output sharpening, 0 to 1 |
+
+Limits: one full-canvas view; multi-view frames throw. A `PostStack` inside it runs at the render size. Plugins that draw
+after frame-graph order 39, such as `Selection`, draw over the full frame without scene depth. Moving objects are rejected
+through depth and colour, not per-object velocity, so thin fast objects can ghost more than under `TAA`.
+
+Measured on `packages/taa/test/upscale-browser.mjs` (640x480, scale 0.5, 4x MSAA, 50 frames, against a full-size frame):
+31.8 dB accumulated against 30.5 dB for Lanczos, no red pixels trailing a box that crosses the frame.
