@@ -40,6 +40,21 @@ is the SHA-256 of a tile's canonical bytes: the same options give the same diges
 tests lock several of them. `world.update({ climate, height })` recomputes and calls `onChange` listeners with the
 dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 
+`world.tilePart(x, z, [i0, j0, i1, j1])` makes only some cells of a tile (`i1` and `j1` exclusive), with the same bytes
+as those cells of the whole tile. Placement uses it to make only the edge of each neighbour it reads. A part is never
+cached and is made on the calling thread, also on a world with workers; when the world already holds the whole tile,
+it answers with that (`window` is then `[0, 0, cells, cells]`).
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+
+const world = await BiomeWorld.create({ tileSize: 512 });
+// The 64 m strip of tile (1, 0) along its edge with tile (0, 0): 64 x 512 cells at 1 m.
+const strip = await world.tilePart(1, 0, [0, 0, 64, 512]);
+console.log(strip.window, strip.layer('height')!.width); // [0, 0, 64, 512] 64
+world.dispose();
+```
+
 | `BiomeWorld.create` option | Default | Meaning |
 | --- | --- | --- |
 | `seed` | 1 | u32 seed |
@@ -107,7 +122,8 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
   goal G1's 400. The same bytes as before: the gains came from an integer hash table for placement cells, shifts for
   power-of-two cells, classification that finds the nearest envelope only where it is needed and skips the blend
   steps for one-biome cells, a cache of the moisture curve and of the relief lattice. The package tests check a
-  400 ms budget per tile.
+  400 ms budget per tile. A later run on the same PC (2026-11-01, medians of 20 with min and max): fields 399 ms per
+  km2 (352 to 863) and stored objects 203 (160 to 669), 602 in all, still above G1's 400.
 
 ## Biomes, presets and blends
 
@@ -605,8 +621,14 @@ world.dispose(); // terminates the workers
 Measured on the reference PC (`bench/biomes/placement.mjs`, R16, an 8 x 8 block of tiles, Node worker threads running
 the same script): fields and stored objects take 1,005 ms per km2 of wall time on one worker and 363 on eight, against
 680 on the page's thread alone and goal G1's 70 on eight workers. A placement reads its neighbours' fields, and each
-worker makes the ones it needs itself, so tiles at the edges of what a worker places are made more than once; sharing
-made tiles between workers (or making only the strip a placement reads) is what would close the gap.
+worker makes the ones it needs itself, so tiles at the edges of what a worker places are made more than once.
+
+A placement makes its own tile whole and, of each neighbour, only the band its first Luby round reads (through
+`world.tilePart`): 128 cells on R16, where the reach of all 6 rounds is wider than the 256 m tile. A read past the band
+makes that neighbour whole and runs again, so the objects are the same bytes. A neighbour beside a tile the placement
+has already placed is made whole, since a block places it too. On the same PC (2026-11-01, five runs each, medians):
+one cold R16 placement takes 148 ms instead of 265 (20 runs, 116 to 169 against 230 to 289); the 8 x 8 block takes
+1,134 ms per km2 on one worker (1,142 before) and 344 on eight (356 before). Eight workers still miss G1's 70.
 
 ## Same seed, same bytes, everywhere
 

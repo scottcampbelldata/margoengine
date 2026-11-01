@@ -4,7 +4,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type Climate, type ClimateOptions, quantizeClimate } from './climate.js';
 import { checkPaint, type Classifier, classifier, classify, type PaintLayer, type ZoneClassifier } from './classify.js';
 import { type BiomeDefinition, defineBiome } from './define.js';
-import { tileFields } from './fields.js';
+import { rectFields } from './fields.js';
 import { divFloor, imod } from './fixed.js';
 import type { Heights, HeightSource } from './height.js';
 import { DEFAULT_LAYERS, LAYERS, type RasterLayer } from './layers.js';
@@ -417,76 +417,76 @@ export class BiomeWorld implements Disposable {
     return tile;
   }
 
+  /**
+   * Part of one tile: the cells of `window` (`[i0, j0, i1, j1]` in tile cells, `i1` and `j1` exclusive), every layer
+   * `(i1 - i0)` x `(j1 - j0)` cells, row-major, with the same bytes as those cells of {@link BiomeWorld.tile}.
+   * Placement makes the edge of each neighbour it reads this way instead of the whole tile. Answers with the cached
+   * whole tile (window `[0, 0, cells, cells]`) when the world holds one with the layers. A part is never cached, and it
+   * is made on this thread, also on a world with workers.
+   * @throws RangeError for a tile outside the world, a window that is empty or leaves the tile, or an unknown layer
+   * name; MargoError `'disposed'` after dispose. Rejects with the signal's reason when aborted.
+   * @example
+   * // The 64 m strip of tile (1, 0) next to tile (0, 0), on a world of 256 m tiles at 1 m.
+   * const part = await world.tilePart(1, 0, [0, 0, 64, 256]);
+   * const height = part.layer('height')!; // part.window[2] - part.window[0] cells wide
+   */
+  async tilePart(
+    x: number,
+    z: number,
+    window: Rect,
+    options: TileRequest = {},
+  ): Promise<BiomeTile & { readonly window: Rect }> {
+    this.#live();
+    if (!Number.isInteger(x) || !Number.isInteger(z) || x < 0 || z < 0 || x >= this.tilesX || z >= this.tilesZ)
+      throw rangeError(
+        'BiomeWorld tile indices must be integers inside the world (0..tilesX - 1, 0..tilesZ - 1)',
+        'biomes',
+      );
+    const cells = (this.tileSize * 2) / (this.resolution * 2); // float division: 128..1024, exact
+    if (
+      !Array.isArray(window) ||
+      window.length !== 4 ||
+      !window.every(Number.isInteger) ||
+      window[0] < 0 ||
+      window[1] < 0 ||
+      window[2] > cells ||
+      window[3] > cells ||
+      window[0] >= window[2] ||
+      window[1] >= window[3]
+    )
+      throw rangeError(
+        'BiomeWorld tilePart window is [i0, j0, i1, j1] in tile cells with 0 <= i0 < i1 <= cells and 0 <= j0 < j1 <= cells',
+        'biomes',
+      );
+    const names = options.layers ?? DEFAULT_LAYERS;
+    if (!Array.isArray(names) || !names.every((name) => typeof name === 'string' && name in LAYERS))
+      throw rangeError('Unknown biome layer name; use names from LAYERS', 'biomes');
+    aborted(options.signal);
+    const whole = this.#ready.get(`${x},${z}`);
+    if (whole && names.every((name) => whole.layers.includes(name)))
+      return Object.freeze({ ...whole, window: Object.freeze([0, 0, cells, cells] as const) });
+    await Promise.resolve();
+    this.#live();
+    aborted(options.signal);
+    const [i0, j0, i1, j1] = window,
+      layers = this.#layers(x * cells + i0, z * cells + j0, i1 - i0, j1 - j0, names);
+    return Object.freeze({
+      x,
+      z,
+      origin: Object.freeze([this.bounds[0] + x * this.tileSize, this.bounds[1] + z * this.tileSize] as const),
+      cells,
+      resolution: this.resolution,
+      layers: Object.freeze(Object.keys(LAYERS).filter((name) => layers.has(name))),
+      layer: (name: string) => layers.get(name),
+      window: Object.freeze([i0, j0, i1, j1] as const),
+    });
+  }
+
   async #make(x: number, z: number, names: readonly string[]): Promise<BiomeTile> {
     await Promise.resolve();
     this.#live();
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
-      cell = this.resolution * 1000,
-      frame = {
-        climate: this.#climate,
-        region: this.#region,
-        heights: this.#heights,
-        cell,
-        cells,
-        scratch: this.#scratch,
-      },
-      classified = names.includes('biome') || names.includes('biomeWeight');
-    let layers: Map<string, RasterLayer>;
-    if (!classified) layers = tileFields(frame, x, z, names);
-    else {
-      // Classification blurs over a 1-cell margin: compute the fields one cell wider, classify, then crop.
-      const c = this.#classifier,
-        // The wide fields are working arrays: the tile keeps cropped copies.
-        wide = tileFields(
-          frame,
-          x,
-          z,
-          [...new Set([...names, ...c.inputs.filter((n) => !n.startsWith('mask/'))])],
-          1,
-          true,
-        ),
-        n = cells + 2,
-        gx = x * cells - 1,
-        gz = z * cells - 1,
-        ids = new Uint8Array(cells * cells * 4),
-        weights = new Uint8Array(cells * cells * 4);
-      classify(
-        c,
-        {
-          n,
-          gx,
-          gz,
-          seed: this.seed,
-          cell,
-          layer: (name) => wide.get(name)!.data,
-          // The feather's wide read stays inside the world (edge cells repeat), so paint keeps full strength up to
-          // the world's edge instead of fading into cells that do not exist.
-          user: (name, margin = 0) =>
-            margin
-              ? this.#userGrid(name, gx - margin, gz - margin, n + 2 * margin, cells, true)
-              : this.#userGrid(name, gx, gz, n, cells),
-          ecotone: featherCells(this.ecotone, this.resolution),
-        },
-        ids,
-        weights,
-      );
-      layers = new Map();
-      for (const name of names) {
-        if (name === 'biome' || name === 'biomeWeight') continue;
-        layers.set(name, crop(wide.get(name)!, cells));
-      }
-      const info = (name: 'biome' | 'biomeWeight', data: Uint8Array): RasterLayer => ({
-        name,
-        format: 'rgba8',
-        width: cells,
-        depth: cells,
-        data,
-        scale: LAYERS[name].scale,
-        unit: LAYERS[name].unit,
-      });
-      if (names.includes('biome')) layers.set('biome', info('biome', ids));
-      if (names.includes('biomeWeight')) layers.set('biomeWeight', info('biomeWeight', weights));
-    }
+      layers = this.#layers(x * cells, z * cells, cells, cells, names);
     const list = Object.keys(LAYERS).filter((name) => layers.has(name));
     return Object.freeze({
       x,
@@ -499,12 +499,94 @@ export class BiomeWorld implements Disposable {
     });
   }
 
-  /** A user layer over an n x n grid of global cells from (gx, gz): 0..255, -1 where unpainted; undefined when the
+  /**
+   * The named layers of `width` x `depth` cells from global cell (gx, gz): the bytes those cells hold in their tiles,
+   * as every layer is a function of the global cell and classification reads the same global margins around it.
+   */
+  #layers(gx: number, gz: number, width: number, depth: number, names: readonly string[]): Map<string, RasterLayer> {
+    const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
+      cell = this.resolution * 1000,
+      frame = {
+        climate: this.#climate,
+        region: this.#region,
+        heights: this.#heights,
+        cell,
+        scratch: this.#scratch,
+      };
+    if (!names.includes('biome') && !names.includes('biomeWeight'))
+      return rectFields(frame, gx, gz, width, depth, names);
+    // Classification blurs over a 1-cell margin: compute the fields one cell wider, classify, then crop.
+    const c = this.#classifier,
+      // The wide fields are working arrays: the result keeps cropped copies.
+      wide = rectFields(
+        frame,
+        gx - 1,
+        gz - 1,
+        width + 2,
+        depth + 2,
+        [...new Set([...names, ...c.inputs.filter((n) => !n.startsWith('mask/'))])],
+        true,
+      ),
+      n = width + 2,
+      rows = depth + 2,
+      ox = gx - 1,
+      oz = gz - 1,
+      ids = new Uint8Array(width * depth * 4),
+      weights = new Uint8Array(width * depth * 4);
+    classify(
+      c,
+      {
+        n,
+        depth: rows,
+        gx: ox,
+        gz: oz,
+        seed: this.seed,
+        cell,
+        layer: (name) => wide.get(name)!.data,
+        // The feather's wide read stays inside the world (edge cells repeat), so paint keeps full strength up to
+        // the world's edge instead of fading into cells that do not exist.
+        user: (name, margin = 0) =>
+          margin
+            ? this.#userGrid(name, ox - margin, oz - margin, n + 2 * margin, cells, true, rows + 2 * margin)
+            : this.#userGrid(name, ox, oz, n, cells, false, rows),
+        ecotone: featherCells(this.ecotone, this.resolution),
+      },
+      ids,
+      weights,
+    );
+    const layers = new Map<string, RasterLayer>();
+    for (const name of names) {
+      if (name === 'biome' || name === 'biomeWeight') continue;
+      layers.set(name, crop(wide.get(name)!, width, depth));
+    }
+    const info = (name: 'biome' | 'biomeWeight', data: Uint8Array): RasterLayer => ({
+      name,
+      format: 'rgba8',
+      width,
+      depth,
+      data,
+      scale: LAYERS[name].scale,
+      unit: LAYERS[name].unit,
+    });
+    if (names.includes('biome')) layers.set('biome', info('biome', ids));
+    if (names.includes('biomeWeight')) layers.set('biomeWeight', info('biomeWeight', weights));
+    return layers;
+  }
+
+  /** A user layer over an n x rows grid of global cells from (gx, gz): 0..255, -1 where unpainted; undefined when the
    * layer holds nothing. `clamp` reads a cell outside the world at the nearest cell inside it. */
-  #userGrid(name: string, gx: number, gz: number, n: number, cells: number, clamp = false): Int16Array | undefined {
+  #userGrid(
+    name: string,
+    gx: number,
+    gz: number,
+    n: number,
+    cells: number,
+    clamp = false,
+    rows = n,
+  ): Int16Array | undefined {
     const tiles = this.#user.get(name);
     if (!tiles?.size) return undefined;
-    const out = new Int16Array(n * n).fill(-1);
+    const out = new Int16Array(n * rows).fill(-1);
     if (clamp) {
       // In-world runs per row as below, then the columns and rows past the world's edge copy its edge cells.
       const lastX = this.tilesX * cells - 1,
@@ -512,7 +594,7 @@ export class BiomeWorld implements Disposable {
         i0 = Math.max(0, -gx),
         i1 = Math.min(n, lastX + 1 - gx),
         j0 = Math.max(0, -gz),
-        j1 = Math.min(n, lastZ + 1 - gz);
+        j1 = Math.min(rows, lastZ + 1 - gz);
       for (let j = j0; j < j1; j++) {
         const tz = divFloor(gz + j, cells),
           row = (gz + j - tz * cells) * cells,
@@ -529,10 +611,10 @@ export class BiomeWorld implements Disposable {
         out.fill(out[at + i1 - 1], at + i1, at + n);
       }
       for (let j = 0; j < j0; j++) out.copyWithin(j * n, j0 * n, j0 * n + n);
-      for (let j = j1; j < n; j++) out.copyWithin(j * n, (j1 - 1) * n, j1 * n);
+      for (let j = j1; j < rows; j++) out.copyWithin(j * n, (j1 - 1) * n, j1 * n);
       return out;
     }
-    for (let j = 0; j < n; j++) {
+    for (let j = 0; j < rows; j++) {
       const tz = divFloor(gz + j, cells),
         row = (gz + j - tz * cells) * cells;
       for (let i = 0; i < n; ) {
@@ -835,12 +917,12 @@ export class BiomeWorld implements Disposable {
   }
 }
 
-/** The interior `cells` x `cells` of a layer computed with a 1-cell margin. */
-function crop(layer: RasterLayer, cells: number): RasterLayer {
-  const n = cells + 2,
-    data = new (layer.data.constructor as Int32ArrayConstructor)(cells * cells);
-  for (let j = 0; j < cells; j++) data.set(layer.data.subarray((j + 1) * n + 1, (j + 1) * n + 1 + cells), j * cells);
-  return { ...layer, width: cells, depth: cells, data };
+/** The interior `width` x `depth` of a layer computed with a 1-cell margin. */
+function crop(layer: RasterLayer, width: number, depth: number): RasterLayer {
+  const n = width + 2,
+    data = new (layer.data.constructor as Int32ArrayConstructor)(width * depth);
+  for (let j = 0; j < depth; j++) data.set(layer.data.subarray((j + 1) * n + 1, (j + 1) * n + 1 + width), j * width);
+  return { ...layer, width, depth, data };
 }
 
 /** The default biomes: the temperate preset and its neighbours, loaded from the presets entry on first use. */

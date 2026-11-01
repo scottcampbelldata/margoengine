@@ -52,6 +52,9 @@ test('a worker job reuses its working arrays: placement and view tiles make a sm
     materials = groundMaterials(world.biomes);
   // The view job: the world tile with the default layers (shared with placement), then what the view draws.
   const view = async (x, z) => viewTile(world, await world.tile(x, z), materials, 2);
+  // The world tiles around (5, 5) whole, as a worker holds them inside a block (alone, a placement reads only a band
+  // of each neighbour and does not keep it).
+  for (let z = 4; z <= 6; z++) for (let x = 4; x <= 6; x++) await world.tile(x, z);
   await placement.tile(5, 5);
   await view(5, 5);
   // The next tile along: its own column of neighbours is new (three world tiles made), the rest are cached.

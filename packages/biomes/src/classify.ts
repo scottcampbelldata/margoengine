@@ -217,14 +217,17 @@ function farAt(d: Dims, b: number, values: Int32Array, cells: number, k: number)
   return far;
 }
 
-/** Inputs of a classification: layer getters over an n x n grid (the tile plus a 1-cell margin). */
+/** Inputs of a classification: layer getters over an n x depth grid (the tile plus a 1-cell margin). */
 export interface ClassifyInput {
+  /** Cells per grid row. */
   readonly n: number;
+  /** Grid rows; default n (a square grid). */
+  readonly depth?: number;
   layer(name: string): ArrayLike<number>;
   /**
    * A user layer over the grid (0..255 per cell, -1 where unpainted), or undefined when nothing is painted. With a
-   * `margin`, over the grid grown by that many cells on every side ((n + 2 margin)^2 cells from (gx - margin,
-   * gz - margin)).
+   * `margin`, over the grid grown by that many cells on every side ((n + 2 margin) x (depth + 2 margin) cells from
+   * (gx - margin, gz - margin)).
    */
   user(name: string, margin?: number): ArrayLike<number> | undefined;
   /**
@@ -256,13 +259,14 @@ function scratch(at: number, length: number): Int32Array {
 const WARP = 700_000;
 
 /**
- * Classifies the inner (n - 2)^2 cells: writes 4 ids and 4 weights (summing to 255) per cell into `ids` and
- * `weights` (rgba8, row-major over the inner cells). Unused slots hold id 255 and weight 0.
+ * Classifies the inner (n - 2) x (depth - 2) cells: writes 4 ids and 4 weights (summing to 255) per cell into `ids`
+ * and `weights` (rgba8, row-major over the inner cells). Unused slots hold id 255 and weight 0.
  */
 export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, weights: Uint8Array): void {
   const n = input.n,
+    depth = input.depth ?? n,
     count = c.ids.length,
-    cells = n * n,
+    cells = n * depth,
     member = scratch(0, count * cells),
     slots = c.inputs.length,
     modes = c.modes,
@@ -281,7 +285,7 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
   const a0 = input.gx >> 3,
     b0 = input.gz >> 3,
     span = ((input.gx + n) >> 3) - a0 + 2,
-    rows = ((input.gz + n) >> 3) - b0 + 2,
+    rows = ((input.gz + depth) >> 3) - b0 + 2,
     warpA = new Int32Array(span * rows),
     warpB = new Int32Array(span * rows);
   for (let b = 0; b < rows; b++)
@@ -291,7 +295,7 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
       warpA[b * span + a] = fbm(input.seed ^ 0x5eed, lx, lz, 2);
       warpB[b * span + a] = fbm(input.seed ^ 0x7a1e, lz, lx, 2);
     }
-  for (let j = 0; j < n; j++) {
+  for (let j = 0; j < depth; j++) {
     const gz = input.gz + j - b0 * 8,
       fz = (gz & 7) << 13,
       row = (gz >> 3) * span;
@@ -366,13 +370,14 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
   // The 3x3 box sums of every membership plane over the inner cells: rows of three, then three rows (the same integer
   // sums as adding the nine cells).
   const inner = n - 2,
+    innerRows = depth - 2,
     // Every cell of these is written before it is read (rowSum at 1..cells - 2, box at the inner cells).
     rowSum = scratch(4, cells),
     box = scratch(5, count * cells);
   for (let l = 0; l < liveCount; l++) {
     const base = live[l] * cells;
     for (let k = 1; k < cells - 1; k++) rowSum[k] = member[base + k - 1] + member[base + k] + member[base + k + 1];
-    for (let j = 1; j <= inner; j++)
+    for (let j = 1; j <= innerRows; j++)
       for (let i = 1, k = j * n + 1; i <= inner; i++, k++) box[base + k] = rowSum[k - n] + rowSum[k] + rowSum[k + n];
   }
   // Biome weights scale the memberships; with every weight at 1.0 the memberships are used as they are.
@@ -394,7 +399,7 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     paintGrid = paint.map((p) => (p.biome < 0 ? undefined : read(p.layer, p.mode === 2 ? 255 : 0))),
     maskGrid = paint.map((p) => (p.mask ? read(p.mask, 0) : undefined));
   let stale = false;
-  for (let j = 0; j < inner; j++)
+  for (let j = 0; j < innerRows; j++)
     for (let i = 0; i < inner; i++) {
       const k = (j + 1) * n + i + 1,
         out = (j * inner + i) * 4;
@@ -541,14 +546,16 @@ function featherPaint(
     source = input.user(name, reach);
   if (!source) return undefined;
   const n = input.n,
-    side = n + 2 * reach, // the read grid
-    centres = n + reach, // box centres: grid cells moved by -h..h
+    depth = input.depth ?? n,
+    side = n + 2 * reach, // the read grid: side x (depth + 2 reach)
+    centres = n + reach, // box centres: grid cells moved by -h..h, centres x centreRows
+    centreRows = depth + reach,
     width = 2 * h + 1,
     area = width * width,
-    rowValue = new Int32Array(side * centres),
-    rowCount = new Int32Array(side * centres);
+    rowValue = new Int32Array((depth + 2 * reach) * centres),
+    rowCount = new Int32Array((depth + 2 * reach) * centres);
   // Horizontal box sums: rowValue[j][c] sums read cells (c..c + 2h, j).
-  for (let j = 0; j < side; j++) {
+  for (let j = 0; j < depth + 2 * reach; j++) {
     const at = j * side,
       out = j * centres;
     let value = 0,
@@ -580,8 +587,8 @@ function featherPaint(
     }
   }
   // Vertical sums of the row sums, then each grid cell reads the box centred at its warped position.
-  const boxValue = new Int32Array(centres * centres),
-    boxCount = new Int32Array(centres * centres);
+  const boxValue = new Int32Array(centreRows * centres),
+    boxCount = new Int32Array(centreRows * centres);
   for (let c = 0; c < centres; c++) {
     let value = 0,
       count = 0;
@@ -592,13 +599,13 @@ function featherPaint(
     for (let r = 0; ; r++) {
       boxValue[r * centres + c] = value;
       boxCount[r * centres + c] = count;
-      if (r + 1 === centres) break;
+      if (r + 1 === centreRows) break;
       value += rowValue[(r + width) * centres + c] - rowValue[r * centres + c];
       count += rowCount[(r + width) * centres + c] - rowCount[r * centres + c];
     }
   }
-  const out = new Int32Array(n * n);
-  for (let j = 0; j < n; j++)
+  const out = new Int32Array(n * depth);
+  for (let j = 0; j < depth; j++)
     for (let i = 0; i < n; i++) {
       const k = j * n + i,
         // -0.5..0.5 in Q16 to -h..h cells.

@@ -28,8 +28,6 @@ export interface TileFrame {
   readonly heights: Heights;
   /** Cell size, mm. */
   readonly cell: number;
-  /** Cells per tile side. */
-  readonly cells: number;
   /** Working arrays reused from tile to tile (the world's); without it every array is fresh. */
   readonly scratch?: Scratch;
 }
@@ -50,7 +48,8 @@ const ARRAYS = { i32: Int32Array, i16: Int16Array, u16: Uint16Array, u8: Uint8Ar
 
 function raster(
   name: string,
-  cells: number,
+  width: number,
+  depth: number,
   scratch?: Scratch,
 ): RasterLayer & { data: Int32Array | Int16Array | Uint16Array | Uint8Array } {
   const info = LAYERS[name],
@@ -58,41 +57,39 @@ function raster(
   return {
     name,
     format: info.format,
-    width: cells,
-    depth: cells,
-    data: scratch ? scratch.take(name, Type, cells * cells) : new Type(cells * cells),
+    width,
+    depth,
+    data: scratch ? scratch.take(name, Type, width * depth) : new Type(width * depth),
     scale: info.scale,
     unit: info.unit,
   };
 }
 
 /**
- * Computes the named layers of tile (tx, tz), `margin` extra cells on each side. Every layer here is a pure function of
- * the global cell, the heights and the region fields. With the frame's scratch, the layers not asked for and the
- * working arrays are reused; `temporary` reuses the returned layers too (valid until the next call: the caller copies
- * what it keeps).
+ * Computes the named layers over `width` x `depth` cells whose first cell is global cell (ox, oz): a tile, a tile with
+ * a margin (classification blurs over one), or any part of one. Every layer here is a pure function of the global
+ * cell, the heights and the region fields, so a cell holds the same bytes whatever rectangle it is made in. With the
+ * frame's scratch, the layers not asked for and the working arrays are reused; `temporary` reuses the returned layers
+ * too (valid until the next call: the caller copies what it keeps).
  */
-export function tileFields(
+export function rectFields(
   frame: TileFrame,
-  tx: number,
-  tz: number,
+  ox: number,
+  oz: number,
+  width: number,
+  depth: number,
   names: readonly string[],
-  margin = 0,
   temporary = false,
 ): Map<string, RasterLayer> {
   const { climate, region, heights, cell, scratch } = frame,
-    // Output: the tile plus `margin` cells on every side (classification blurs over them).
-    cells = frame.cells + 2 * margin,
-    first = -margin,
     apron = Math.max(1, divFloor(TPI_RADIUS, cell)),
-    side = cells + 2 * apron,
-    gx0 = tx * frame.cells + first - apron,
-    gz0 = tz * frame.cells + first - apron,
-    h = heights.grid(gx0, gz0, side, side, cell, scratch),
+    side = width + 2 * apron,
+    rows = depth + 2 * apron,
+    h = heights.grid(ox - apron, oz - apron, side, rows, cell, scratch),
     want = new Set(names),
     out = new Map<string, RasterLayer>();
   const make = (name: string) => {
-    const layer = raster(name, cells, temporary || !want.has(name) ? scratch : undefined);
+    const layer = raster(name, width, depth, temporary || !want.has(name) ? scratch : undefined);
     if (want.has(name)) out.set(name, layer);
     return layer.data;
   };
@@ -117,11 +114,11 @@ export function tileFields(
     plan = want.has('plan') ? make('plan') : undefined;
   // Box sums of heights for the topographic position index (exact: below 2^53).
   const sat = scratch
-    ? scratch.take('sat', Float64Array, (side + 1) * (side + 1))
-    : new Float64Array((side + 1) * (side + 1));
+    ? scratch.take('sat', Float64Array, (side + 1) * (rows + 1))
+    : new Float64Array((side + 1) * (rows + 1));
   // Row 0 and column 0 are read as zeros and never written (a reused array may hold old sums there).
   sat.fill(0, 0, side + 1);
-  for (let z = 0; z < side; z++) {
+  for (let z = 0; z < rows; z++) {
     sat[(z + 1) * (side + 1)] = 0;
     let row = 0;
     for (let x = 0; x < side; x++) {
@@ -139,10 +136,10 @@ export function tileFields(
     { nx, nz } = region,
     // Bilinear lookups of the region grids (region.ts `bilinear`), split per column and per row once per tile: every
     // grid shares the cell's corner index and Q16 fractions.
-    colIndex = new Int32Array(cells),
-    colFrac = new Int32Array(cells);
-  for (let i = 0; i < cells; i++) {
-    const fx = clampInt((tx * frame.cells + first + i) * toRegion, 0, (nx - 1) * ONE),
+    colIndex = new Int32Array(width),
+    colFrac = new Int32Array(width);
+  for (let i = 0; i < width; i++) {
+    const fx = clampInt((ox + i) * toRegion, 0, (nx - 1) * ONE),
       ix = Math.min(nx - 2, fx >> 16);
     colIndex[i] = ix;
     colFrac[i] = fx - ix * ONE;
@@ -152,12 +149,12 @@ export function tileFields(
       b = grid[at + nx] + Math.floor(((grid[at + nx + 1] - grid[at + nx]) * fx) / ONE);
     return a + Math.floor(((b - a) * fz) / ONE);
   };
-  for (let j = 0; j < cells; j++) {
-    const fz0 = clampInt((tz * frame.cells + first + j) * toRegion, 0, (nz - 1) * ONE),
+  for (let j = 0; j < depth; j++) {
+    const fz0 = clampInt((oz + j) * toRegion, 0, (nz - 1) * ONE),
       iz = Math.min(nz - 2, fz0 >> 16),
       fz = fz0 - iz * ONE;
-    for (let i = 0; i < cells; i++) {
-      const k = j * cells + i,
+    for (let i = 0; i < width; i++) {
+      const k = j * width + i,
         g = (j + apron) * side + i + apron,
         e = h[g],
         a = h[g - side - 1],
