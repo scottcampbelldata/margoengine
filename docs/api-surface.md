@@ -17,7 +17,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/animator | `.` 32, `./graph` 7 | 9 |  | 18,240 |
 | @margoengine/audio | `.` 19 | 2 |  | 7,625 |
 | @margoengine/behavior | `.` 85, `./steering` 27 |  | 1 | 8,737 |
-| @margoengine/biomes | `.` 43, `./toolkit` 34, `./presets` 6, `./region` 5, `./hydrology` 10, `./relief` 7, `./digest` 3, `./koppen` 5, `./zones` 9, `./view` 21, `./rivers` 5, `./cover` 10, `./far` 3, `./objects` 4, `./editor` 7, `./placement` 7, `./stats` 12, `./workers` 3 | 263 |  | 18,247 |
+| @margoengine/biomes | `.` 43, `./toolkit` 34, `./presets` 6, `./region` 5, `./hydrology` 10, `./relief` 7, `./digest` 3, `./koppen` 5, `./zones` 9, `./view` 21, `./rivers` 5, `./cover` 10, `./far` 3, `./objects` 4, `./editor` 7, `./placement` 7, `./stats` 12, `./workers` 3 | 263 |  | 15,399 |
 | @margoengine/blender | `.` 5 |  |  | 3,778 |
 | @margoengine/bvh | `.` 63, `./tree` 23, `./bake` 7, `./lines` 6 | 18 |  | 23,125 |
 | @margoengine/cache | `.` 5, `./manager` 5, `./hashed` 2 | 4 |  | 2,421 |
@@ -47,7 +47,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/inspector | `.` 12, `./frame` 16, `./history` 2, `./snapshot` 6, `./resources` 2 | 1 |  | 9,090 |
 | @margoengine/kinematics-constraints | `.` 21 |  |  | 11,673 |
 | @margoengine/labels | `.` 19 | 2 |  | 4,581 |
-| @margoengine/lighting2d | `.` 10 |  |  |  |
+| @margoengine/lighting2d | `.` 10 |  |  | 4,169 |
 | @margoengine/lightmap | `.` 9, `./global` 4, `./refracted` 6 | 12 |  | 3,801 |
 | @margoengine/lines | `.` 50, `./edges` 6 | 11 |  | 18,046 |
 | @margoengine/loaders | `.` 142, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2, `./mocap` 6, `./vrml` 4, `./gcode` 3 | 39 |  | 51,519 |
@@ -63,7 +63,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/netcode | `.` 47, `./rollback` 4, `./websocket` 2, `./webrtc` 3, `./node` 6, `./rooms` 11, `./generate` 2 | 62 |  | 12,612 |
 | @margoengine/oit | `.` 2, `./meshes` 2 | 2 |  | 2,979 |
 | @margoengine/physics | `.` 43 | 22 |  | 15,883 |
-| @margoengine/physics2d | `.` 29 | 16 |  | 7,744 |
+| @margoengine/physics2d | `.` 29 | 16 |  | 7,753 |
 | @margoengine/pixel | `.` 13, `./palette` 15, `./render3d` 8 |  |  | 4,513 |
 | @margoengine/points | `.` 55, `./las` 16, `./laz` 7, `./e57` 13, `./copc` 4, `./octree` 10 | 25 |  | 20,964 |
 | @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./outline` 2, `./mrt` 4, `./depth` 2, `./contact-shadows` 2 | 21 |  | 39,436 |
