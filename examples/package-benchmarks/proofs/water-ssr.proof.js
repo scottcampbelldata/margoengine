@@ -3,13 +3,13 @@
 // canvas-format and sample-count changes, a terrain heightmap (coastal flow and spray), a sky reflection texture, a
 // shadow source, light edits, a wave-height change, device restoration and disposal.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/water-ssr.proof.js [ref] [pin] [--current]
-// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: 5cf53d7e6 against the
+// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: 268bfc625 against the
 // working tree.
 import assert from 'node:assert/strict';
 import { refs, versions, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('6c20076d', '49f3e971', '5cf53d7e6');
+const { ref, pin } = refs('6c20076d', '49f3e971', '268bfc625');
 await coreAt(pin); // water imports core's extension entry: in a pinned run, core as it was at the pin
 const { baseline, candidate } = await versions('water', ref, undefined, pin);
 

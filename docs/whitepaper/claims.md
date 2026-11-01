@@ -287,7 +287,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> `49f3e971` (the water/terrain SSR commit): terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
-| water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `5cf53d7e6` |
+| water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `268bfc625` |
 | quality-presets | `96daac7` -> `01e5e35` | `33c403984` |
 | post-ssao-perspective | `9c761d5` -> `9702e57`: 3,282 calls | - |
 | probes-decals | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | - |
@@ -439,6 +439,15 @@ Call counts, bind groups, buffers and every buffer write are unchanged. The proo
 `d.fragment?.targets[0].format`, which threw on a fragment with no targets; it reads `targets[0]?.format` now.
 `packages/terrain/test/edge.browser.mjs` checks the pixels on a real GPU (sky only past a corner) and
 `packages/terrain/test/lighting.test.js` the shadow pipeline.
+
+**water-ssr, advanced to `268bfc625` on 2026-11-01 (biome look plan 3, L11 and Scott's S6):** against `5cf53d7e6`, 12 of the 2,744 calls
+differ, 4 in each of the 3 stories, every one the `createShaderModule` of the water surface (14,445 to 15,191 characters; 14,575
+to 15,321 with the horizon). Call counts, pipelines, bind groups, buffers and every buffer write are unchanged. The text changes
+for two reasons. S6 is deliberate and changes pixels with no option set: the shoreline term's foam cap goes from 0.08 to 0.35
+(`SHORE_FOAM`), so views with a Water shore show more foam at the waterline (76.96 to 111.72 at the minimum channel in
+`packages/biomes/tests/water-check.mjs`). The new `still` option adds its code behind `const STILL=false`, as `HORIZON` does: with
+it false every added select returns the old value, so `still` off changes nothing else. A water without `still` or `fill` makes
+no new GPU calls: no fill texture, no prefill pipeline, the same dispatches.
 
 **water-ssr, advanced to `5cf53d7e6` on 2026-10-31 (biome look plan 3, A2, the horizon sea follows the camera):** the
 horizon grid kept regular cells only near the origin, so a camera away from it saw no swell, and it ended in a square
