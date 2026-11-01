@@ -1,5 +1,5 @@
 {
-  "commit": "5a03a0311",
+  "commit": "9de18b29a",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -58,8 +58,8 @@
     },
     "@margoengine/biomes": {
       ".": {
-        "raw": 46941,
-        "gzip": 18247
+        "raw": 39912,
+        "gzip": 15399
       },
       "./toolkit": {
         "raw": 6440,
@@ -68,6 +68,14 @@
       "./presets": {
         "raw": 5908,
         "gzip": 1956
+      },
+      "./region": {
+        "raw": 9552,
+        "gzip": 4416
+      },
+      "./hydrology": {
+        "raw": 9793,
+        "gzip": 4439
       },
       "./relief": {
         "raw": 9215,
@@ -83,7 +91,7 @@
       },
       "./zones": {
         "raw": 8551,
-        "gzip": 3635
+        "gzip": 3634
       },
       "./view": {
         "raw": 24448,
@@ -119,11 +127,11 @@
       },
       "./workers": {
         "raw": 5989,
-        "gzip": 2705
+        "gzip": 2704
       },
       "dist/workers/biomes.js": {
-        "raw": 107159,
-        "gzip": 40218
+        "raw": 108193,
+        "gzip": 39438
       }
     },
     "@margoengine/blender": {
@@ -748,6 +756,12 @@
         "gzip": 4581
       }
     },
+    "@margoengine/lighting2d": {
+      ".": {
+        "raw": 10267,
+        "gzip": 4169
+      }
+    },
     "@margoengine/lightmap": {
       ".": {
         "raw": 8934,
@@ -1040,8 +1054,8 @@
     },
     "@margoengine/physics2d": {
       ".": {
-        "raw": 21131,
-        "gzip": 7744
+        "raw": 21153,
+        "gzip": 7753
       }
     },
     "@margoengine/pixel": {
@@ -1990,9 +2004,9 @@
       "brotli": 2727
     },
     "packages/biomes/dist/workers/biomes.js": {
-      "raw": 106095,
-      "gzip": 40108,
-      "brotli": 34428
+      "raw": 107129,
+      "gzip": 39334,
+      "brotli": 34561
     },
     "packages/voxel/dist/workers/mesher.js": {
       "raw": 13081,

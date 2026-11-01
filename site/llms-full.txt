@@ -303,7 +303,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-97 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+98 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -341,7 +341,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/splats`](packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |
 | [`@margoengine/tiles`](packages/tiles/README.md) | Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf-pro. |
 
-### Rendering and lighting (23)
+### Rendering and lighting (24)
 
 | Package | What it is |
 | --- | --- |
@@ -362,6 +362,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/lines`](packages/lines/README.md) | Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU. |
 | [`@margoengine/text`](packages/text/README.md) | GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU. |
 | [`@margoengine/pixel`](packages/pixel/README.md) | Pixel art rendering: a pixel camera with integer zoom and parallax, and a layer compositor that scales low-res layers by whole numbers and turns them with every output pixel one source pixel. |
+| [`@margoengine/lighting2d`](packages/lighting2d/README.md) | 2D lights for Margo Engine: point, spot and directional lights with normal-mapped shading and hard shadows from occluder edges, for pixel layers. |
 | [`@margoengine/labels`](packages/labels/README.md) | HTML labels and CSS 3D objects positioned over a Margo Engine canvas. |
 | [`@margoengine/html`](packages/html/README.md) | World-space DOM anchors, CSS3D placement and scene-depth occlusion. |
 | [`@margoengine/video`](packages/video/README.md) | WebGPU external video textures and optional Web Audio sampling. |
@@ -2566,6 +2567,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Biome world streaming (`@margoengine/biomes/view`) | Enforced by the check `packages/biomes/tests/flythrough-check.mjs` (run by `check:merge`): a 300 km/h flight over the zero-config world, tiles made by 4 workers as the camera goes, may add at most 0.3 ms to the slowest 1 percent of frames and 1 ms to the worst frame against the same flight with every tile made first; the page spends at most `budget` (default 0.25 ms) a frame sending jobs and copying tiles in. Tile jobs reuse their working arrays: placing the next tile makes 2.1 MB of fresh arrays (24.0 MB before) and a view tile 0.2 MB (4.6 MB before), and a tile's view and placement jobs share one world tile instead of making it twice (`packages/biomes/tests/tile-memory.test.js`). Measured on the RTX A6000 desktop, Edge 156: p99 +0.20 ms, worst +0.00 ms; 111 tiles needed in a flight, 2 arrive after the camera needs them, tile latency p99 337 to 348 ms. On the coordinator's laptop (Ryzen 7 7735HS with a Radeon 680M, 4 workers), three runs from a cool start at the landed code: p99 +0.1, +0.0 and -0.3 ms, worst +0.3, +0.9 and +0.6 ms (before these fixes: p99 +0.3 to +0.6 ms, worst up to +1.8 ms); its prefetched flights themselves vary from run to run (p50 0.8 to 1.4 ms), so a negative figure is that variation, not a gain. | Workers that threw away megabytes of fresh memory per tile slowed the page's own frames on a laptop APU (Ryzen 7 7735HS with a Radeon 680M: cores share memory and power) and failed the check there (p99 +0.3 to +0.6 ms). The fixes on that laptop: a frame sends the jobs it plans within its budget and a frame that plans leaves sending and copying to the next; a send starts only when the budget left covers what a send that reached a worker took lately (a job that only waits in the pool's queue costs nothing and does not count), while copying goes on while budget is left; terrain tiles go in a band of rows at a time; objects have scatter slots for every tile a view keeps (the laptop once ran out of them: `ScatterTiles has no free slot`). The plan of a still camera comes 30 frames after the last plan, not every 30th frame (it once fell right after a plan of the moving camera, and that second plan streamed too: 1 run in 5 failed the plan-frames check); three cool runs with that fix: p99 +0.1, +0.1 and +0.2 ms, worst +0.8, +0.8 and +0.3 ms. The landed code (b8210cd3), three runs: 2 of 3 pass; run 1 p99 +0.1, worst +0.6 ms; run 2 p99 +0.1, worst +1.0 ms, exactly at the limit; run 3 fails: p99 +0.4 ms against 0.3, worst +0.4 ms; every plan, send and packing line was clean in all three. Counting all runs of this streaming code on that laptop, 8 of 9 pass. The one miss is 0.1 ms (one timer step) over the p99 limit, in a run whose streamed flights had fewer frames (703 to 1,083 against about 1,150 to 1,200). On a 680M integrated GPU the margin is thin and the check can miss by one timer step; on the RTX A6000 it passes with p99 +0.10 to +0.20 ms. The limits were not loosened. Figures are medians of three flights per kind. Every worker still runs at once: a fixed cap of half the workers was tried and dropped, it made tiles late on that laptop and cost fast machines late tiles too. | Each world keeps its tile working arrays and each placement its candidate tables between tiles (about 15 MB per worker at the default 256 m tiles) until disposed. The view entry is 7,514 B gzip, over its earlier 7,374 B quality budget; up to 7,516 B accepted by Scott 2026-10-29. | `workers` on `BiomeWorld.create`; `budget`, `lookahead` and `radius` on `BiomeView.attach`; `view.prefetch(rect)` before a planned flight. |
 | Biome world CPU speed (`@margoengine/biomes`, goal G1) | Missed: the goal is 400 ms per km2 on one thread (fields plus placement of R16 at 1 m), and this machine measures fields 376 to 444 ms (best and middle of 30 tiles, RTX A6000 PC with other jobs running) plus placement 177 to 222 ms. On 8 workers each replica makes the 9 whole tiles a placed tile reads, so neighbours are made more than once (`bench/biomes/placement.mjs`). What holds it: exact integer fields per cell (CORDIC aspect, Catmull-Rom heights, climate). The GPU path (row 27.4 B8) is the designed route to the goal; the goal is unchanged. Quiet-machine numbers come with the biomes benchmarks. |
 | Biome objects beyond `radius` (`@margoengine/biomes/view`) | Stored trees, shrubs, rocks and props are drawn only for tiles within `radius` (default 1,000 m) of the camera, and grass and other detail within `detailRadius` (default 120 m). Trees go on to `far.radius` (default 2,500 m) as 12-triangle stand-ins over the world's canopy cover; shrubs, rocks and props stop at `radius`. Measured at the default: the zero-config world holds 172,640 streamed objects in 6.6 MB of GPU memory (`packages/biomes/tests/objects-check.mjs`, RTX A6000). Held objects grow with the area inside `radius`, so about four times as many at 2,000 m (expected from the area, not measured). | A stand-in is one coloured solid, hashed over the cover, not the placed tree: impostors or a far LOD of placed records would be a new scatter system, kept out of v1.0.0. | Stand-ins are lit by the engine light and cast no shadow; past `far.radius` far hills keep the darker canopy ground only. | Raise `far.radius` and `far.count`, or `radius` (memory and placement work grow with its square); `far: false` and your own far layer. |
+| Biome worker file (`dist/workers/biomes.js`) | Measured with `npm run quality -- --gate=sizes`: 39,182 B gzip, against the design's first estimate of about 18 kB. Lazy: only a world created with `workers` loads it, and it counts toward no entry's budget. | A worker runs the whole tile path by itself: world, region, relief, placement, cover, zones and the view's tile functions (root about 15 kB, placement 11.9 kB, relief 4.3 kB, zones 3.6 kB, cover 3.4 kB). Reaching 18 kB would mean taking one of those out of the worker, so it would do less of the tile. | A world with `workers` downloads this one file, once; every worker shares the browser's copy. | Leave `workers` off and tiles are made on the page's thread. About 2.6 kB (digest and presets) is unused on the worker path; taking it out needs a change to the shared package build. |
 | Biome rivers (`@margoengine/biomes/view`) | Fixed for v1.0.0: river water stands still (`water: { rivers: 'auto' }`, 1.5 m over the bed, falling with it); it does not flow. Off by default. | A flowing river needs the shallow-water passes to run on steep beds at a cost not yet measured, so it comes after v1.0.0. The view couples at most 512 water cells a side (16 m on an 8 km world). | Valleys are dry unless asked for. A river under two cells wide can break up, and past 0.375 of the world's side from the camera the water grid coarsens. | Attach your own `Water` with `terrain`, `fill` and, for the flow, no `still`. |
 | Frame allocation (JavaScript heap per steady-state frame) | Measured by the check `npm run test:frame-alloc:browser` ([frame-alloc-browser.mjs](../scripts/frame-alloc-browser.mjs), scenes in [tests/fixtures/frame-alloc](../tests/fixtures/frame-alloc/main.js); run by `check:merge`). RTX A6000 desktop, Edge 156 headless with `--enable-precise-memory-info`: `performance.memory.usedJSHeapSize` read once per frame, 600 warm-up frames (one of them, 60 before recording, late on purpose: a 200 ms stall, so the floors hold for the steady state after a late frame) then 600 recorded, frames with a garbage collection left out, the median frame, largest of three runs, at the item 53.1 commit (`perf(core, shadows, post)`, 2026-10-29). Per frame, before and after (two steps, item 53.1 parts 1 and 2): three lit meshes 1,428 B to 340 B; 10,000 moving instanced boxes 1,076 B to 292 B; the same room with cascaded shadows and eight moving casters 26,920 B to 860 B; with SSAO, Bloom, tone mapping and FXAA 5,116 B to 1,528 B. The room plus 10,000 `DynamicInstances` boxes (@margoengine/culling), every row rewritten each frame through bulk writes and `update()`, measured 396 B in three runs at the item 53.2 commit (56 B over the room alone, among them the 16 B wrapper of its compute pass). The check fails when a median frame passes these floors; they are only ever lowered. | Every byte a frame allocates is a byte the garbage collector must sweep later, and a collection in the middle of a frame is a stutter. Margo reuses its arrays, descriptors and callbacks from frame to frame instead of making new ones. | Not 0 B, and it cannot reach 0 B: every WebGPU call that returns an object (the command encoder and its finished command buffer, each render pass, the canvas's current texture and its view) hands back a new 16 B JavaScript wrapper from the browser, and V8 stores the fractional frame time it passes to frame callbacks and plugins as a heap number. Shadows and post-processing add passes, so they add wrappers. Measured and left as they are: the frame-resources view set clears about 120 B per frame in the post scene (a fix changes the protocol between copies of the resources, judged risky for a frozen core), the SSAO scene walk makes an iterator and an options literal, the fixture setters box about 216 B in the shadowed scene, and each returned WebGPU object costs 16 B. Number boxing in V8's middle tier (Maglev) is gated too: `tests/frame-alloc.test.js` fails a core frame over 780 B, shadows over 620 B and the cascade fit over 128 B there on V8 14 (Node 26) and newer. V8 13 (Node 24, the minimum Node) passes the core limit (628 B) but its Maglev calls Math.sqrt with a boxed argument and result, 32 B a call, so it has its own row for the other two: shadows over 1,120 B (measured 1,081 B, 704 B of it 22 square roots) and the cascade fit over 256 B (measured 242 B, 224 B of it 7 square roots); a square root in JavaScript arithmetic with the same bits would cost every engine more time. Node 22 has no Maglev by default, so the middle-tier probes skip there. A late frame once deoptimized core's frame loop (its delta clamp first ran a compare on a frame past `maxDelta`, with no type feedback), and the loop then ran its next thousands of frames in a tier that boxes numbers: 24 to 84 B more per frame in every scene, seen only when `check:merge` loaded the machine. Fixed in core, and gated twice: the browser check's late warm-up frame, and `tests/frame-alloc.test.js`, which fails when a late frame leaves the loop unoptimized. The Node probes compile on the main thread (`--no-concurrent-recompilation`), so a package build running beside them cannot make them measure a lower tier. `npm run test:frame-alloc:nodes` runs the test on every Node it finds; the probes leave out windows in which V8 collected garbage. In these runs 0 to 3 of 600 recorded frames held a collection. | Keep your own `onFrame` callbacks allocation-free (the check's scenes keep their clock in a `Float64Array`). `node scripts/frame-alloc-browser.mjs --profile --source` names the functions that allocate per frame. |
 | Moving transforms per frame (CPU budget) | Measured by [transforms-budget.mjs](../examples/package-benchmarks/transforms-budget.mjs): every mesh sets `position.y` and `rotation.y` through the setters each frame, one shared geometry and material (one instanced draw), all in view, Node v26.12.0 on an AMD Ryzen 9 9950X (32 threads), a stand-in GPU device so the figure is the CPU work only (the onFrame callback, the Wasm kernel tick, instance patching, the renderer's frame). 120 warm-up frames, 300 timed, the median frame, a binary search for the largest count within 4 ms (a quarter of a 60 Hz frame). Result: 14,500 moving transforms per frame (record: [transforms-budget.json](../examples/package-benchmarks/results/transforms-budget.json), item 53.1 part 2 commit). Three runs on a machine busy with other checks gave 14,500, 16,000 and 17,700; the lowest is the figure. | A scene can move this many objects every frame before the engine's own CPU work passes a quarter of a 60 Hz frame. | The count at 4 ms depends on the CPU, the Node and browser build, and on what else is running; it is the engine's CPU work only, not GPU time, culling of hidden objects or your own callbacks. | Move fewer objects per frame, or leave resting objects untouched: only a changed transform is patched. Run the script on your machine. |
@@ -5751,6 +5753,81 @@ layer.
 
 [README continues: https://margoengine.com/llms/packages/pixel.md]
 
+=== @margoengine/lighting2d (packages/lighting2d/README.md) ===
+
+# @margoengine/lighting2d
+
+2D lights for pixel pictures: point, spot and directional lights, normal-mapped shading from a sprite layer's normals, and
+hard shadows from occluder edges. Each frame the lights add up in one target, which a pixel layer multiplies over what
+is below it. WebGPU only.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {Lighting2D} from 'margoengine/lighting2d';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [640, 360]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 160, height: 90, zoom: 4}});
+const picture = compositor.addLayer();
+const shade = compositor.addLayer({blend: 'multiply', z: 1});
+const lighting = Lighting2D.attach(engine, {target: shade.target, camera: shade.camera, ambient: '#202030'});
+const lamp = lighting.addLight({x: 40, y: 30, radius: 80, color: '#ffd9a0'});
+lighting.setOccluders([{shape: 'box', width: 16, height: 16, offset: [80, 45]}]);
+picture.write({width: 160, height: 90, data: new Uint8Array(160 * 90 * 4).fill(200)});
+engine.render({delta: 1 / 60});
+lamp.x += 1; // read each frame
+```
+
+## Lighting2D
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `target` | required | Where the light goes, a texture or a function such as a layer's `target` |
+| `normals` | flat | Surface directions the size of the target, such as a sprite layer's `normals.target` |
+| `camera` | `{x: 0, y: 0, zoom: 1}` | World units to pixels, such as a layer's `camera`; read each frame |
+| `ambient` | `#000000` | The light everything gets; read each frame |
+| `occluders` | none | What blocks light; see `setOccluders` |
+| `order` | `20` | Frame-graph order, after sprites and maps and before the compositor |
+| `name` | `lighting2d-1`, ... | Plugin name, unique per scene |
+
+`addLight(options)` returns a `Light2D`, `removeLight(light)` takes it away, and `lights` lists them.
+
+## Light2D
+
+Every field is read each frame. Distances are world units, angles radians, and y runs down the screen.
+
+| Field | Default | What it does |
+| --- | --- | --- |
+| `kind` | `'point'` | `'point'`, `'spot'` or `'directional'` |
+| `x`, `y` | `0` | Position |
+| `color`, `intensity` | `#ffffff`, `1` | What it adds at full strength |
+| `radius`, `falloff` | `64`, `2` | Strength is `(1 - distance / radius) ^ falloff` |
+| `height` | `32` | How far in front of the picture it sits; a low light grazes flat surfaces, and 0 leaves them dark |
+| `angle` | `0` | Spot and directional: the way it shines, clockwise from +x |
+| `cone`, `softness` | `Math.PI / 4`, `0` | Spot: half the cone, and the outer part of it that fades, 0 to 1 |
+| `elevation` | `Math.PI / 4` | Directional: how far above the picture |
+| `shadows` | `true` | False lets it through occluders |
+
+A surface gets the strength times the cosine between its normal and the way to the light. Normals follow the sprite
+layer's target: x right, y down the screen, z out of it. Where the normal target holds nothing (alpha 0) the surface is flat.
+
+## Occluders
+
+`setOccluders(list)` replaces what blocks light. Each is `{shape: 'polygon', points}`, `{shape: 'polyline', points}`,
+`{shape: 'segment', from, to}`, `{shape: 'box', width, height, offset, rotation}` or `{shape: 'circle', radius, offset}`,
+in world units. The result of `tileMapColliders(map)` from `margoengine/physics2d` fits as it is, so a tile map's
+collision shapes cast shadows too.
+
+A pixel is in shadow when an occluder edge lies between its centre and the light, so the inside of a closed shape is dark
+to a light outside it. Shadow edges are hard: each pixel is lit or not, with no soft penumbra.
+
+## CPU forms
+
+`lightAt(light, x, y, normal)` is what a light adds at a world point, `occluderEdges(list)` the edges of a list, and
+`inShadow(light, edges, x, y)` the shadow test. They run in Node, for tools and tests.
+
+Trademark notice: names of other tools belong to their owners.
+
 === @margoengine/labels (packages/labels/README.md) ===
 
 # @margoengine/labels
@@ -8210,7 +8287,7 @@ const controller = physics.createCharacterController(hero, {snapToGround: 2});
 physics.on('beforestep', dt => controller.move([60 * dt, 200 * dt]));
 ```
 
-It exports `Physics2D`, `Body2D`, `Joint2D`, `CharacterController2D` and `interactionGroups`. `addTileMap` accepts a `TileMapData` from `@margoengine/tilemap`, or any object of the `TileMapSource` shape. Whole-cell solid tiles merge into outline loops so bodies slide across tile seams without catching; other collision shapes (rectangles, ellipses, polygons, polylines), tile flips and layer offsets are kept. Very fast bodies on a tile map need `ccd: true`, because outlines have no thickness.
+It exports `Physics2D`, `Body2D`, `Joint2D`, `CharacterController2D`, `interactionGroups` and `tileMapColliders`, the collider list `addTileMap` builds. `addTileMap` accepts a `TileMapData` from `@margoengine/tilemap`, or any object of the `TileMapSource` shape. Whole-cell solid tiles merge into outline loops so bodies slide across tile seams without catching; other collision shapes (rectangles, ellipses, polygons, polylines), tile flips and layer offsets are kept. Very fast bodies on a tile map need `ccd: true`, because outlines have no thickness.
 
 Queries (`raycast`, `overlapPoint`, `overlapShape`, `castShape`) see every collider added or moved since the last step: they bring Rapier's broad phase up to date with a zero-length step first, which moves nothing and raises no events.
 
