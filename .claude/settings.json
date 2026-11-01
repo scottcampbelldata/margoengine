@@ -4,6 +4,12 @@
       {
         "hooks": [{ "type": "command", "command": "node scripts/session-start.mjs" }]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent|mcp__ccd_session__start_session|Edit|Write|NotebookEdit|Bash|PowerShell",
+        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/scripts/queue-limit.mjs\" --hook" }]
+      }
     ]
   }
 }

@@ -281,6 +281,32 @@ test('a batch touching a stopped class is refused whole: nothing rebased, built 
   }
 });
 
+test('a queue over 6 lands the first 6, says so loudly and leaves the rest READY', async () => {
+  const shas = ['1111111', '2222222', '3333333', '4444444', '5555555', '6666666', '7777777', '8888888'],
+    { paths, done } = setup(Object.fromEntries(shas.map((sha, i) => [`b${i + 1}`, `READY ${sha}`])));
+  try {
+    const git = fakeGit({ branches: Object.fromEntries(shas.map((sha, i) => [sha, [`packages/p${i}/a.ts`]])) }),
+      lines = [],
+      out = await integrate({
+        git,
+        runStep: fakeSteps(undefined, git),
+        paths,
+        workspaces: WORKSPACES,
+        log: (line) => lines.push(line),
+        now: () => new Date('2026-11-01T00:00:00Z'),
+      });
+    assert.equal(out.result, 'landed');
+    assert.equal(git.calls.filter((a) => a[0] === 'rebase' && a[1] === '-q').length, 6);
+    assert.deepEqual(
+      readQueue(paths.dir).map((e) => e.branch),
+      ['b7', 'b8'],
+    );
+    assert.ok(lines.some((line) => /NEVER MORE THAN 6 IN THE QUEUE: 8 unlanded/.test(line)));
+  } finally {
+    done();
+  }
+});
+
 test('a stop order written while the gate runs still stops the push', async () => {
   const { home, paths, done } = setup({ demo: `READY ${SHA.a}` });
   try {

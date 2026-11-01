@@ -2,6 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { queueNames, queueStatus } from './queue-limit.mjs';
 
 const here = process.cwd();
 let main = here;
@@ -18,6 +19,8 @@ try {
 } catch {
   console.log('private/control.json: not found');
 }
+
+console.log(queueStatus(queueNames(here)));
 
 const rules = readFileSync(resolve(here, 'AGENTS.md'), 'utf8');
 const start = rules.indexOf('## Before every push to main');

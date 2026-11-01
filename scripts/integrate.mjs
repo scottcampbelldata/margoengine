@@ -39,6 +39,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
 import { mainCheckout } from './gpu-lock.mjs';
+import { MAX_QUEUE, queueBanner } from './queue-limit.mjs';
 import { demoSources, dependents, loadWorkspaces, workspaceOf } from './support/affected-gpu.mjs';
 import { CLASSES, classify } from './support/file-classes.mjs';
 import { exitOnHelp } from './support/help.mjs';
@@ -318,6 +319,10 @@ export async function integrate({
       red ? 0 : 6,
       red ? `main is RED (${paths.red}) and no READY entry is marked fix` : 'every entry went back',
     );
+  if (batch.length > MAX_QUEUE) {
+    log(queueBanner(batch.length, `This batch lands the first ${MAX_QUEUE}; the rest stay READY. Start nothing new.`));
+    batch = batch.slice(0, MAX_QUEUE);
+  }
 
   must(git, 'fetch', '-q', 'origin');
   const base = must(git, 'rev-parse', 'origin/main');
