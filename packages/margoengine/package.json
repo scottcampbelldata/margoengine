@@ -170,6 +170,10 @@
       "types": "./dist/cache/manager.d.ts",
       "import": "./dist/cache/manager.js"
     },
+    "./cache/hashed": {
+      "types": "./dist/cache/hashed.d.ts",
+      "import": "./dist/cache/hashed.js"
+    },
     "./cameras": {
       "types": "./dist/cameras.d.ts",
       "import": "./dist/cameras.js"

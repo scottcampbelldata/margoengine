@@ -29,6 +29,10 @@
     "./manager": {
       "types": "./dist/manager.d.ts",
       "import": "./dist/manager.js"
+    },
+    "./hashed": {
+      "types": "./dist/hashed.d.ts",
+      "import": "./dist/hashed.js"
     }
   },
   "files": [

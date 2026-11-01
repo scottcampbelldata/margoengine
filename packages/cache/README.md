@@ -24,6 +24,20 @@ console.log(await cache.usage()); // {bytes, files, quota, usage} (quota/usage f
 await cache.delete('/line-4.glb'); await cache.clear();
 ```
 
+For a release that drops only the files that changed, `margoengine/cache/hashed` versions each file by its SHA-256:
+
+```ts
+import {AssetCache} from 'margoengine/cache';
+import {HashedAssets, hashBytes} from 'margoengine/cache/hashed';
+
+const url = 'https://example.com/helmet.glb';
+const manifest = {[url]: await hashBytes(new Uint8Array(4))};   // build it when you publish
+const assets = new HashedAssets(new AssetCache({name: 'viewer'}), manifest);
+const response = await assets.fetch(url);                        // requests url?v=<hash>, and checks the bytes
+await assets.update({[url]: 'hash of the next release'});        // drops the old copy
+console.log(response.status);
+```
+
 `cachedFetch(url, init)` is the same through a shared default cache (`name: 'margo-assets'`, no version). To make a set
 of files available offline ahead of time, fetch them once and wait for the writes:
 `await Promise.all(urls.map(u => cache.fetch(u).then(r => r.arrayBuffer()))); await cache.flush();`
