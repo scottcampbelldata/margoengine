@@ -1,5 +1,5 @@
 {
-  "commit": "cc659d48e",
+  "commit": "3e89b1907",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {

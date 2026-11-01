@@ -2867,17 +2867,6 @@ does not own. Each entry says exactly what is needed to close it.
   native path's second draw cannot without a scene copy. Also, the native tint encodes the share and multiplies, which
   is exact only for a power curve: within 1 step above about 40 of 255, up to 2 steps below it.
 
-### Headless Edge took over 30 s to close once under heavy CPU load
-
-- **What:** `node scripts/frame-alloc-browser.mjs` measured all five scenes within their floors, then failed with
-  `SHUTDOWN_TIMEOUT` ("still open: browser"): `browser.close()` in `closeAll` (`scripts/support/shutdown.mjs`) did not
-  finish within its 30 s budget.
-- **Repro:** seen once in 10 runs of the check (all scenes) beside a 24-thread CPU burner (worker threads in busy
-  loops) on the RTX A6000 PC, Edge 156 headless, 2026-10-30; not seen in about 20 other runs that day.
-- **Cause:** not known yet. Two fit: the browser's GPU or renderer process slow to exit under load (a slow close, so
-  the budget is too short for a loaded machine), or a close that hangs on a pending GPU request (a defect). Next step:
-  rerun under the burner with `DEBUG=pw:browser` and a process list at the timeout, and see whether the browser ends
-  later by itself.
 ### Findings of the outside audit (2026-10-28)
 
 - **What:** an outside audit of revision 74a01810 (a source review, canary tests on a second laptop with temporary
@@ -3348,18 +3337,11 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 - **Plan (gltf-pro and animation):** create the pipelines a loaded model will draw with
   (`createRenderPipelineAsync` / `createComputePipelineAsync`) while it loads, so the first frame finds them ready.
 
-## Open: browser checks
+## Fixed 2026-10-31 (flaky root tests under load)
 
-### browser.close() can pass the 30 s shutdown budget under extreme CPU load
-
-- **What:** a browser suite that passed every assertion fails with `SHUTDOWN_TIMEOUT` ("still open: browser") from
-  `closeAll` (`scripts/support/shutdown.mjs`, budget 30 s, reached through `withBoundedClose` in `scripts/lib/browser.mjs`).
-- **Repro:** 12 copies of `tests/catalog.test.js` in a loop beside 24 CPU-spinning threads on the 32-thread dev PC, itself
-  at about 80 percent: 12 of 26 runs failed this way in 120 s. With 10 copies and 8 spinning threads: 0 of 100 in 180 s.
-- **Cause:** not proven. `tests/browser/catalog.test.js` records that headless Edge shuts down on low-priority threads, so
-  a loaded machine can take minutes to close it; that fits, but no trace was taken of what Edge was doing.
-- **Not done:** the budget was not raised, since that would only hide it. `tests/catalog.test.js` closes one browser per
-  run. Needed to close: a trace of a slow close, then a fix for what holds it.
+| Bug | Cause | Fix | Regression test |
+| --- | --- | --- | --- |
+| `SHUTDOWN_TIMEOUT` "still open: browser" on a busy machine (`tests/page-ready.test.js`, `tests/catalog.test.js`, `scripts/frame-alloc-browser.mjs`) | headless Edge shuts down on low-priority threads, which CPU-bound work starves: its graceful close took 68 to 146 s beside CPU hogs | `withBoundedClose` ends a Chromium-family browser's process tree before the close, 7 to 17 s on the same load; the 30 s budget is unchanged | `tests/browser-teardown.test.js` (a close that finishes only once the tree is ended; a real browser leaves no process) |
 
 ## Fixed 2026-10-31 (found by the WebGL2 demo comparison)
 
