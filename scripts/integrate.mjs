@@ -10,7 +10,8 @@
 //    file it cannot read, or a tag it does not know, also refuses: a stop order is never skipped over a typo.
 // 3. Rebases each branch onto origin/main in order, in its own detached worktree. A conflict sends that branch back and
 //    the rest go on.
-// 4. Tier 1, once on the batch tip, no GPU suite: verify, then check:examples-types and modern:test:packages narrowed by
+// 4. Tier 1, once on the batch tip, no GPU suite: the llms files refreshed in one commit if a README made them stale
+//    (build-llms.mjs --commit), verify, then check:examples-types and modern:test:packages narrowed by
 //    check:merge's own plan, then land-records --no-build (its short basic-scene browser takes a GPU slot itself).
 // 5. A failure names one branch (the failing output names a package or file of it), which goes back with the log, and
 //    tier 1 runs again on the rest. When the output cannot name one, the last candidate steps out: if that cures it, it
@@ -401,6 +402,8 @@ async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log }) {
   const failed =
     (await step('relink', 'node scripts/worktree-node-modules.mjs')) ??
     (await step('plan', 'node scripts/check-merge.mjs --plan --base=origin/main')) ??
+    // Branches that change a README leave site/llms*.txt stale on the batch tip; one commit refreshes them first.
+    (await step('llms', 'node scripts/build-llms.mjs --commit')) ??
     // The stale files check:merge plants before verify's build, which the package test then proves no pack contains.
     (await step('verify', 'npm run verify', { MARGOENGINE_PLANT_STALE: '1' }));
   if (failed) return failed;

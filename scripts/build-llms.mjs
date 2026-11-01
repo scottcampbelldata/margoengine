@@ -1,10 +1,14 @@
 // Writes site/llms.txt and site/llms-full.txt, the files AI coding tools read to learn Margo (https://llmstxt.org).
 //   node scripts/build-llms.mjs            rewrite both files from the READMEs, api/ reports and docs/
 //   node scripts/build-llms.mjs --check    exit 1 when either file is stale (tests/llms.test.js runs the same check)
+//   node scripts/build-llms.mjs --commit   rewrite both files and, when they changed, make one commit `records: ...`
+//                                          (scripts/integrate.mjs runs it on a rebased batch before verify, because a
+//                                          README changed by any branch makes them stale on the batch tip)
 // llms.txt: title, summary, then sections of links with one-line descriptions. llms-full.txt: the same material as
 // one text file (guides in full, each package README up to a cap). The pages the links point at (/llms/...) are
 // written into site/dist by scripts/build-site.js with writeSitePages(). scripts/land-records.mjs regenerates both
 // files after a rebase, because a README or API change anywhere makes them stale.
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -182,5 +186,38 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
       writeFileSync(join(root, path), text);
       console.log(`${path}: ${text.length} characters`);
     }
+    if (process.argv.includes('--commit')) commitIfChanged();
   }
+}
+
+/** One commit of site/llms.txt and site/llms-full.txt when they differ from HEAD, the way land-records makes its commit. */
+function commitIfChanged() {
+  const files = ['site/llms.txt', 'site/llms-full.txt'],
+    git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8', env });
+  const author = { name: 'Scott Campbell', email: '251750033+scottcampbelldata@users.noreply.github.com' };
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_NAME: author.name,
+    GIT_AUTHOR_EMAIL: author.email,
+    GIT_COMMITTER_NAME: author.name,
+    GIT_COMMITTER_EMAIL: author.email,
+  };
+  if (!git('status', '--porcelain', '--', ...files).stdout.trim()) return console.log('llms files already current');
+  const head = git('rev-parse', '--short', 'HEAD').stdout.trim();
+  for (const args of [
+    ['add', '--', ...files],
+    [
+      'commit',
+      '-m',
+      `records: llms files at ${head}
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`,
+      '--',
+      ...files,
+    ],
+  ]) {
+    const result = git(...args);
+    if (result.status !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr}${result.stdout}`);
+  }
+  console.log(`llms files committed at ${head}`);
 }

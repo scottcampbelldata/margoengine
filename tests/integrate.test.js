@@ -200,11 +200,15 @@ test('a clean batch: rebased in order, tier 1 once, records, one unforced push, 
     assert.deepEqual(steps.commands(), [
       'node scripts/worktree-node-modules.mjs',
       'node scripts/check-merge.mjs --plan --base=origin/main',
+      'node scripts/build-llms.mjs --commit',
       'npm run verify',
       'npm run check:examples-types -- --projects=examples',
       'npm run modern:test:packages -- --packages=sky',
       'node scripts/land-records.mjs --no-build',
     ]);
+    // README-derived llms files are refreshed (one commit) before verify reads them, never after.
+    const order = steps.commands();
+    assert.ok(order.indexOf('node scripts/build-llms.mjs --commit') < order.indexOf('npm run verify'));
     assert.equal(steps.ran.find((r) => r.command === 'npm run verify').env.MARGOENGINE_PLANT_STALE, '1');
     assert.equal(steps.ran.find((r) => r.command.includes('modern:test')).env.MARGOENGINE_PACKAGE_TEST_PREBUILT, '1');
     assert.deepEqual(git.pushes(), [['push', 'origin', 'HEAD:refs/heads/main']]);
@@ -216,7 +220,7 @@ test('a clean batch: rebased in order, tier 1 once, records, one unforced push, 
       ['one', 'two'],
     );
     assert.equal(line.commits.length, 1);
-    assert.equal(line.tier1.length, 6);
+    assert.equal(line.tier1.length, 7);
     assert.deepEqual(readQueue(paths.dir), []);
   } finally {
     done();
