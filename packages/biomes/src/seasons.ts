@@ -413,7 +413,7 @@ export function seasonalMix(state: ArrayLike<number>, offset = 0): [number, numb
   return [
     ...[0, 1, 2].map((c) =>
       amount > 0
-        ? ((AUTUMN[c] * brown * green + DORMANT[c] * (1 - green)) * dark * (1 - snow) + SNOW[c] * snow) / amount
+        ? ((AUTUMN[c] * brown * green + DORMANT[c] * (1 - green)) * dark * (1 - snow) + SNOW[c] * snow) / amount // float division: material colour only
         : 0,
     ),
     amount,

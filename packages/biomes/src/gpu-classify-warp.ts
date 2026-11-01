@@ -105,39 +105,37 @@ export async function classifyWarpGPU(
     gridCount = span * rows,
     ox = gx - a0 * 8,
     oz = gz - b0 * 8;
+  const sizes = [2 * gridCount * 4, 32, bytes];
+  if (
+    sizes.some((n) => n > device.limits.maxBufferSize) ||
+    [sizes[0], bytes].some((n) => n > device.limits.maxStorageBufferBindingSize) ||
+    Math.ceil(n / 8) > device.limits.maxComputeWorkgroupsPerDimension ||
+    Math.ceil(depth / 8) > device.limits.maxComputeWorkgroupsPerDimension
+  )
+    throw rangeError('Ecotone warp rectangle exceeds device limits; split it into smaller rectangles', 'biomes');
+  // Snapshot before any await so later caller writes cannot bypass the checked corner bound.
+  const packed = new Int32Array(2 * gridCount);
+  packed.set(warpA);
+  packed.set(warpB, gridCount);
+  for (const value of packed)
+    if (Math.abs(value) > WARP_CORNER_BOUND)
+      throw rangeError('Warp corner exceeds the safe i32 temperature bound; use corners within +/-13389004', 'biomes');
   const buffers: GPUBuffer[] = [];
   let rejectFailure: (reason: unknown) => void = () => {};
   const failure = new Promise<never>((_, reject) => {
     rejectFailure = reject;
   });
+  const pendingTasks: Promise<unknown>[] = [failure];
   const abort = () => rejectFailure(signal?.reason);
   const uncaptured = (event: GPUUncapturedErrorEvent) =>
     rejectFailure(
       fault('failed', `Ecotone warp GPU error: ${event.error.message}; use a valid WebGPU device`, 'biomes'),
     );
   signal?.addEventListener('abort', abort, { once: true });
-  device.addEventListener('uncapturederror', uncaptured);
   // WebGPU section 22: mapAsync rejects on device loss. Avoid retaining a device.lost callback per request.
   const wait = <T>(pending: Promise<T>) => Promise.race([pending, failure]);
   try {
-    const sizes = [2 * gridCount * 4, 32, bytes];
-    if (
-      sizes.some((n) => n > device.limits.maxBufferSize) ||
-      [sizes[0], bytes].some((n) => n > device.limits.maxStorageBufferBindingSize) ||
-      Math.ceil(n / 8) > device.limits.maxComputeWorkgroupsPerDimension ||
-      Math.ceil(depth / 8) > device.limits.maxComputeWorkgroupsPerDimension
-    )
-      throw rangeError('Ecotone warp rectangle exceeds device limits; split it into smaller rectangles', 'biomes');
-    // Snapshot before any await so later caller writes cannot bypass the checked corner bound.
-    const packed = new Int32Array(2 * gridCount);
-    packed.set(warpA);
-    packed.set(warpB, gridCount);
-    for (const value of packed)
-      if (Math.abs(value) > WARP_CORNER_BOUND)
-        throw rangeError(
-          'Warp corner exceeds the safe i32 temperature bound; use corners within +/-13389004',
-          'biomes',
-        );
+    device.addEventListener('uncapturederror', uncaptured);
     device.pushErrorScope('validation');
     let module: GPUShaderModule, pipelinePromise: Promise<GPUComputePipeline>;
     let compilePromise: Promise<GPUCompilationInfo>;
@@ -145,9 +143,12 @@ export async function classifyWarpGPU(
     try {
       module = device.createShaderModule({ code: CLASSIFY_WARP_WGSL });
       compilePromise = module.getCompilationInfo();
+      pendingTasks.push(compilePromise);
       pipelinePromise = device.createComputePipelineAsync({ layout: 'auto', compute: { module, entryPoint: 'main' } });
+      pendingTasks.push(pipelinePromise);
     } finally {
       scope = device.popErrorScope();
+      pendingTasks.push(scope);
     }
     const [compilation, pipeline, validation] = await wait(Promise.all([compilePromise, pipelinePromise, scope]));
     if (compilation.messages.length || validation)
@@ -184,8 +185,10 @@ export async function classifyWarpGPU(
       encoder.copyBufferToBuffer(dst, 0, readback, 0, bytes);
       device.queue.submit([encoder.finish()]);
       mapping = readback.mapAsync(GPUMapMode.READ);
+      pendingTasks.push(mapping);
     } finally {
       scope = device.popErrorScope();
+      pendingTasks.push(scope);
     }
     const [, error] = await wait(Promise.all([mapping, scope]));
     if (error)
@@ -207,13 +210,15 @@ export async function classifyWarpGPU(
     };
   } catch (error) {
     signal?.throwIfAborted();
-    if (error instanceof RangeError || (error as Error)?.name === 'MargoError') throw error;
+    if ((error as Error)?.name === 'MargoError') throw error;
     throw fault(
       'failed',
       `Ecotone warp failed: ${String(error)}; recreate the WebGPU device and check its limits`,
       'biomes',
     );
   } finally {
+    // Observe promises already created even when a synchronous API failure ends this phase.
+    void Promise.allSettled(pendingTasks);
     signal?.removeEventListener('abort', abort);
     device.removeEventListener('uncapturederror', uncaptured);
     for (const buffer of buffers) buffer.destroy();

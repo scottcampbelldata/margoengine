@@ -266,6 +266,19 @@ function scratch(at: number, length: number): Int32Array {
  * and `weights` (rgba8, row-major over the inner cells). Unused slots hold id 255 and weight 0.
  */
 export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, weights: Uint8Array): void {
+  classifyPlanes(c, input, classifyInputs(c, input), ids, weights);
+}
+
+/** Internal working planes; CPU results are scratch views valid until the next synchronous classification. */
+export interface ClassifyPlanes {
+  readonly warped: Int32Array;
+  readonly member: Int32Array;
+  readonly n2: Int32Array;
+  readonly n1s?: Int32Array;
+}
+
+/** Builds the existing CPU input and membership planes without changing expression or store order. */
+export function classifyInputs(c: Classifier, input: ClassifyInput): ClassifyPlanes {
   const n = input.n,
     depth = input.depth ?? n,
     count = c.ids.length,
@@ -273,7 +286,7 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     member = scratch(0, count * cells),
     slots = c.inputs.length,
     modes = c.modes,
-    { rank, envelopes } = c,
+    { envelopes } = c,
     // Every step below runs over whole planes of cells (one input, one envelope bound at a time), in the same order
     // per cell as a cell-by-cell loop, so the integers are the same and the loops stay small and monomorphic.
     warped = scratch(1, slots * cells),
@@ -321,6 +334,24 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     for (let b = 0; b < count; b++)
       memberships(envelopes, b, warped, cells, member.subarray(b * cells, (b + 1) * cells));
   c.score?.(warped, cells, member);
+  return { warped, member, n2, n1s };
+}
+
+/** Shared synchronous selection tail; it never retains a plane across an await. */
+export function classifyPlanes(
+  c: Classifier,
+  input: ClassifyInput,
+  planes: ClassifyPlanes,
+  ids: Uint8Array,
+  weights: Uint8Array,
+): void {
+  const n = input.n,
+    depth = input.depth ?? n,
+    count = c.ids.length,
+    cells = n * depth,
+    { rank, envelopes } = c,
+    { warped, member, n2, n1s } = planes,
+    feather = input.ecotone ?? 0;
   // The biomes with any weight in this frame, in biome order: the planes of the others are all 0, and stay out of the sums.
   const live = new Int32Array(count);
   let liveCount = 0;
