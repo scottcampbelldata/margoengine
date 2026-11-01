@@ -15,6 +15,7 @@ import { launchBrowser, resolveBrowser } from './lib/browser.mjs';
 import { createServer, preview } from 'vite';
 import { acquire } from './gpu-lock.mjs';
 import { message } from '../examples/needs-webgpu.js';
+import { keptOffLayer } from './support/kept-off-layer.js';
 import { closeAll } from './support/shutdown.mjs';
 
 /** Bytes of a built chunk plus every chunk it imports statically (`from "./x.js"`), each counted once. */
@@ -58,8 +59,8 @@ const LAYER_MARK = 'WEBGL_draw_instanced_base_vertex_base_instance';
 // Pages that load the layer on purpose with WebGPU too: the dual viewport draws one scene natively and on the layer.
 const BOTH_PATHS = new Set(['demos/dual-viewport.html']);
 // Pages kept off the layer (`needsWebGPU(area, { layer: false })`) while docs/known-bugs.md lists them as wrong there:
-// without WebGPU they show the message, as without WebGL2.
-const NOT_ON_LAYER = new Set(['demos/compute-lab.html', 'demos/sciviz-surface.html']);
+// without WebGPU they show the message, as without WebGL2. Read from each built page, so the list cannot go stale.
+const NOT_ON_LAYER = new Set();
 
 async function pages() {
   const found = [];
@@ -96,6 +97,7 @@ try {
     if (!entry || NO_SCENE.has(path)) continue;
     const code = await readFile(join(folder, entry), 'utf8'),
       imports = [...code.matchAll(/import\(`\.\/([^`]+\.js)`\)/g)];
+    if (keptOffLayer(code)) NOT_ON_LAYER.add(path);
     assert.ok(imports.length, `${path}: imports no demo code`);
     for (const [, chunk] of imports) {
       // The demo's chunk and the shared chunks it imports statically: a small demo built on packages keeps their code
