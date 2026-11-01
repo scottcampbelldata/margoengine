@@ -21,9 +21,16 @@ const { blocks } = defineBlocks(),
   SEED = 5,
   closes = (conn) => new Promise((done) => (conn.onclose = (code, reason) => done({ code, reason })));
 
+// The shards each test started. Hooks run in the order they were added and a test makes its folder before its shard, so
+// the folder's hook stops the shards first: one still running would write into a folder that is gone, or make it again.
+const shardsOf = new WeakMap();
+
 function dataDir(t) {
   const dir = mkdtempSync(pathJoin(tmpdir(), 'plaza-shard-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.after(async () => {
+    for (const shard of shardsOf.get(t) ?? []) await shard.shutdown();
+    rmSync(dir, { recursive: true, force: true });
+  });
   return dir;
 }
 
@@ -43,7 +50,7 @@ async function startShard(t, options = {}) {
       snapshotMs: 3_600_000,
       ...options,
     });
-  t.after(() => shard.shutdown());
+  shardsOf.set(t, [...(shardsOf.get(t) ?? []), shard]);
   assert.equal(await shard.start(), true);
   return { shard, clock, url: `ws://${HOST}:${shard.address.port}` };
 }
@@ -402,7 +409,7 @@ test('players spawn on the ring when no test says otherwise, never on a sea floo
 
 test('a new world gets a seed with a dry ring', async (t) => {
   const shard = new PlazaShard({ index: 0, dataDir: dataDir(t), origins: '*', quiet: true, beatMs: 3_600_000 });
-  t.after(() => shard.shutdown());
+  shardsOf.set(t, [shard]);
   await shard.start();
   assert.ok(plazaSpawnRing(shard.world.seed, blocks.table).length >= 32);
 });
@@ -568,4 +575,20 @@ test('idleMs 0 turns the limit off', async (t) => {
   assert.equal(shard.closeIdle(), 0);
   assert.equal(shard.server.players.length, 1);
   a.client.close();
+});
+
+test('a test stops its shard before removing its folder, so the shard writes its last save into a folder still there', async (t) => {
+  let dir;
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  await t.test('a shard with an edit it has not saved', async (inner) => {
+    dir = dataDir(inner);
+    const { shard, url } = await startShard(inner, { dataDir: dir }),
+      a = await joined(shard, url),
+      cell = airNear(a, standing(shard, a));
+    assert.ok(a.client.edit(...cell, BRICKS));
+    assert.ok(await drive([a.client], () => shard.server.metrics.editsAccepted > 0));
+    a.client.close();
+  });
+  // In the other order the shard's last save makes the removed folder again.
+  assert.equal(existsSync(dir), false);
 });
