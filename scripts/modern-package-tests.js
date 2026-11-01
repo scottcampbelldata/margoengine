@@ -12,7 +12,7 @@
 //                                                         mock.module) and need the contributors' Node (root
 //                                                         package.json engines, 24.18 or newer). Below that Node the
 //                                                         flag is required, so they are never left out silently.
-// MARGOENGINE_PACKAGE_TEST_PREBUILT=1 skips the build (check:merge: `verify` just built, and planted stale files).
+// MARGOENGINE_PACKAGE_TEST_PREBUILT=1 skips the build (check:merge: `verify` or the build after a failed verify just built, and planted stale files).
 // The consumer project is kept between runs (os.tmpdir()/margoengine-consumer-cache/<key>) with its third-party
 // node_modules; only our tarballs are extracted again. The key covers the lock file, the dependency declarations of
 // every package, the Node version and the ISO week, so a new dependency or a new week installs afresh.

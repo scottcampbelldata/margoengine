@@ -17,6 +17,17 @@ import { ResultStore, ShadowRun, servingRequested, shadowEnabled } from './suppo
 
 const root = resolve(import.meta.dirname, '..');
 
+/** Puts a stale file in two dist folders; a build that cleans dist removes them, and no pack may contain one. */
+export function plantStale(dir = root) {
+  for (const name of ['core', 'react']) {
+    mkdirSync(join(dir, `packages/${name}/dist`), { recursive: true });
+    writeFileSync(
+      join(dir, `packages/${name}/dist/__stale-package-test.js`),
+      'throw new Error("Stale build artifact");',
+    );
+  }
+}
+
 /** Stage 1: in order. */
 export const SERIAL = ['node scripts/hygiene.js --verify', 'npm run build:packages'];
 
@@ -105,14 +116,7 @@ async function main() {
   let stage = 1,
     failed;
   for (const command of SERIAL) {
-    if (command === 'npm run build:packages' && process.env.MARGOENGINE_PLANT_STALE === '1')
-      for (const name of ['core', 'react']) {
-        mkdirSync(join(root, `packages/${name}/dist`), { recursive: true });
-        writeFileSync(
-          join(root, `packages/${name}/dist/__stale-package-test.js`),
-          'throw new Error("Stale build artifact");',
-        );
-      }
+    if (command === 'npm run build:packages' && process.env.MARGOENGINE_PLANT_STALE === '1') plantStale();
     console.log(`\n=== ${command}`);
     const result = await run(command);
     times.push([command, result.seconds]);

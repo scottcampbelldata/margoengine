@@ -1720,7 +1720,9 @@ and per-step `results` (`command`, `ok` or `skipped`, `seconds`, `driverReset`, 
 
 Build reuse: `verify` builds every package; `modern:test:packages` then reuses that build
 (`MARGOENGINE_PACKAGE_TEST_PREBUILT=1`), and `verify` plants stale marker files (`MARGOENGINE_PLANT_STALE=1`) that no
-pack may contain, so reuse cannot hide a stale-file bug.
+pack may contain, so reuse cannot hide a stale-file bug. A keep-going run whose `verify` failed builds once more and
+plants again (`packageBuild` in `scripts/check-merge.mjs`), and the tarball test packs that build: a build beside the
+other steps empties the dist folders they are reading.
 
 #### 2.10.3 Parallel suites inside check:merge (under way)
 

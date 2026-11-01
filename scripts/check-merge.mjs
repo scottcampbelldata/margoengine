@@ -43,8 +43,8 @@
 // node scripts/compare-check-runs.mjs --serial=<dir> --parallel=test-results
 // Keep going (--keep-going or MARGO_CHECK_KEEP_GOING=1, passed on to check:gpu-packages): a failed step stops nothing, so
 // one run finds every failure it can reach. Only a step that needs the failed one (STEP_AFTER) is not run. A failed verify
-// is followed by one package build: every later step reads that build, and if it fails too nothing else can run. The run
-// ends with the whole list and exit 1. Heat stops and the rerun after a driver reset work as they always do.
+// is followed by one package build (packageBuild): every later step reads that build, the tarball test included, which must
+// not build again beside them, and if it fails too nothing else can run. The run ends with the whole list and exit 1. Heat stops and the rerun after a driver reset work as they always do.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -72,7 +72,7 @@ import {
 } from './support/affected-gpu.mjs';
 import { exampleClosure, matrixClosure, packageScopes } from './support/affected-packages.mjs';
 import { changedUmbrellaReader, umbrellaChangeIsReexportOnly } from './support/umbrella-change.mjs';
-import { PARALLEL, SERIAL } from './verify.mjs';
+import { PARALLEL, plantStale, SERIAL } from './verify.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -302,9 +302,12 @@ async function main() {
     process.env.MARGO_CHECK_KEEP_GOING = '1';
     console.log('keep going: a failed step stops nothing; the run ends with every failure');
   }
-  // After a failed verify: every later step reads this build.
-  const rebuild = async () =>
-    spawnSync('npm run build:packages', { cwd: root, shell: true, stdio: 'inherit' }).status === 0;
+  const builds = packageBuild({
+      planned,
+      build: async () =>
+        (await runLimited('npm run build:packages', { cwd: root, limitMs: BUILD_MINUTES * 60_000 })).ok,
+    }),
+    { rebuild } = builds;
   if (sideBySide)
     for (const job of stepJobs(planned, hasTiming, { keepGoing }))
       console.log(
@@ -318,7 +321,6 @@ async function main() {
       `machine profile ${profile.name} watches the temperature but the ${thermal.name} gives no reading; set MARGO_THERMAL_FILE to a file holding the current temperature (written within MARGO_THERMAL_MAX_AGE_S, default 60 s), or use a profile without a heat watch`,
     );
   if (thermal) console.log(`temperature from the ${thermal.name}`);
-  let built = false;
   const started = performance.now();
   const logDir = join(root, 'test-results/check-merge-logs');
   let cloneCommit;
@@ -328,7 +330,9 @@ async function main() {
       keepGoing,
       rebuild,
       logFor: (id) => join(logDir, `${id.replace(/[^\w.-]+/g, '_')}.log`),
-      before: () => {
+      before: async () => {
+        // --steps without verify: nothing has built yet, and the tarball test must not build beside the others.
+        if (!(await builds.ensure())) throw new Error('npm run build:packages failed; fix the build first');
         if (!planned.some((p) => stepName(p.command) === 'check:fresh-clone' && !p.skip)) return;
         const scratch = mkdtempSync(join(tmpdir(), 'margo-snapshot-'));
         try {
@@ -338,10 +342,7 @@ async function main() {
         }
       },
       run: async (command, name, signal, logFile) => {
-        const env = { ...process.env, MARGO_CHECK_PARALLEL: '1' };
-        if (name === 'verify' && planned.some((p) => stepName(p.command) === 'modern:test:packages'))
-          env.MARGOENGINE_PLANT_STALE = '1';
-        if (name === 'modern:test:packages' && built) env.MARGOENGINE_PACKAGE_TEST_PREBUILT = '1';
+        const env = { ...process.env, MARGO_CHECK_PARALLEL: '1', ...builds.stepEnv(name) };
         if (name === 'check:fresh-clone' && cloneCommit) env.MARGO_FRESH_CLONE_COMMIT = cloneCommit;
         if (logFile) {
           mkdirSync(logDir, { recursive: true });
@@ -356,7 +357,7 @@ async function main() {
           logFile,
         });
         if (result.message) console.error(`\nHUNG: ${result.message}`);
-        if (name === 'verify' && result.ok) built = true;
+        builds.finished(name, result);
         return result;
       },
     });
@@ -375,10 +376,7 @@ async function main() {
         run: async (command, name, signal) => {
           // verify builds every package; the tarball test then reuses that build instead of building again. The stale-file
           // check still holds: verify plants marker files in two dist folders before its build, and no pack may contain them.
-          const env = { ...process.env };
-          if (name === 'verify' && planned.some((p) => stepName(p.command) === 'modern:test:packages'))
-            env.MARGOENGINE_PLANT_STALE = '1';
-          if (name === 'modern:test:packages' && built) env.MARGOENGINE_PACKAGE_TEST_PREBUILT = '1';
+          const env = { ...process.env, ...builds.stepEnv(name) };
           // A heat-watched step runs with runLimited, which ends its whole tree when the watch aborts; any other step runs
           // as it always has.
           const result = signal
@@ -392,7 +390,7 @@ async function main() {
             : { status: spawnSync(command, { cwd: root, shell: true, stdio: 'inherit', env }).status };
           if (!signal) result.ok = result.status === 0;
           if (result.message) console.error(`\nHUNG: ${result.message}`);
-          if (name === 'verify' && result.ok) built = true;
+          builds.finished(name, result);
           return result;
         },
       });
@@ -429,13 +427,53 @@ async function main() {
   console.log(`\n${describe(decision, base)}; ${describeProfile(profile)}\n${lines.join('\n')}`);
   process.exitCode = failed ? 1 : heatStopped ? HEAT_EXIT : 0;
   if (sideBySide) {
-    for (const { step, log } of failures) console.error(`\nFAILED: ${step}\nlog: ${log}\n${tailOf(log)}`);
+    for (const failure of failures) console.error(failureReport(failure));
     const logs = results.filter((r) => r.log);
     if (logs.length)
       console.log(
         `\nStep logs (GPU suites: test-results/gpu-suites):\n${logs.map((r) => `  ${r.command}: ${r.log}`).join('\n')}`,
       );
   }
+}
+
+/** Hard limit for the one package build after a failed verify, in minutes. */
+export const BUILD_MINUTES = 30;
+
+/**
+ * Who has built the packages in this run. `build:packages` empties each dist folder before writing it, so it must never
+ * run beside a step that reads dist: a build in the side-by-side lane left core/dist/extension.js missing for 261 ms and
+ * build:site failed in that gap, taking every GPU step with it. So verify's build, or the one build after a failed verify,
+ * is the only one, and the tarball test packs it (MARGOENGINE_PACKAGE_TEST_PREBUILT). Markers go in before either build,
+ * since a verify that failed before its build planted none. `build()` resolves true when the packages built.
+ */
+export function packageBuild({ planned, build, plant = plantStale }) {
+  const packs = planned.some((p) => stepName(p.command) === 'modern:test:packages' && !p.skip);
+  let built = false;
+  const rebuild = async () => {
+    if (packs) plant();
+    built = await build();
+    return built;
+  };
+  return {
+    rebuild,
+    /** Before the side-by-side lane: true when the tarball test has a build to pack, or does not run. */
+    ensure: async () => built || !packs || rebuild(),
+    /** The variables a step runs with. */
+    stepEnv: (name) => ({
+      ...(name === 'verify' && packs && { MARGOENGINE_PLANT_STALE: '1' }),
+      ...(name === 'modern:test:packages' && built && { MARGOENGINE_PACKAGE_TEST_PREBUILT: '1' }),
+    }),
+    finished: (name, result) => {
+      if (name === 'verify' && result.ok) built = true;
+    },
+  };
+}
+
+/** What the end of a run prints for one failure. Verify has no step log: its output went to the run's own output. */
+export function failureReport({ step, log }) {
+  return log
+    ? `\nFAILED: ${step}\nlog: ${log}\n${tailOf(log)}`
+    : `\nFAILED: ${step}\nits output is above, in this run's log`;
 }
 
 /**
@@ -684,13 +722,13 @@ export async function runStepsParallel(
  */
 export function summary({ results, failed, heatStopped, seconds, failures = [] }) {
   const lines = [];
-  if (failures.length > 1 || failures[0]?.suites?.length) {
+  if (failures.length > 1 || failures[0]?.suites?.length)
     lines.push(
       'FAILURES:',
       ...failures.map(({ step, suites }) => `  FAILED  ${step}${suites?.length ? `: ${suites.join(', ')}` : ''}`),
     );
-    for (const { command, notRun } of results) if (notRun) lines.push(`  NOT RUN  ${command}  (${notRun})`);
-  }
+  // Whatever the number of failures: a step that did not run proved nothing.
+  for (const { command, notRun } of results) if (notRun) lines.push(`  NOT RUN  ${command}  (${notRun})`);
   for (const { command, driverReset } of results)
     if (driverReset)
       lines.push(
