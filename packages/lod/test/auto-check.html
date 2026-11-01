@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>LOD: auto and hierarchical</title><style>body{margin:0;background:#000}canvas{width:640px;height:360px;display:block}</style></head><body><canvas width="640" height="360"></canvas>
+<script type="module">
+// 400 small boxes on a grid, then one far mesh per cell, and one sphere with simplified levels.
+import {Engine,Geometry,box} from '/packages/core/dist/index.js';
+import {LODSystem} from '/packages/lod/dist/index.js';
+import {hierarchicalLOD,autoLOD} from '/packages/lod/dist/auto.js';
+const sphere=(n)=>{const p=[],i=[];for(let y=0;y<=n;y++)for(let x=0;x<=n;x++){const a=x/n*Math.PI*2,b=y/n*Math.PI;p.push(Math.cos(a)*Math.sin(b),Math.cos(b),Math.sin(a)*Math.sin(b));}for(let y=0;y<n;y++)for(let x=0;x<n;x++){const c=y*(n+1)+x,d=c+n+1;i.push(c,d,c+1,c+1,d,d+1);}return new Geometry(p,p,i);};
+const canvas=document.querySelector('canvas'),camera={position:[0,20,20],target:[0,0,0],fov:60},errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const system=LODSystem.attach(engine),geometry=box(0.4,0.4,0.4),meshes=[];
+for(let x=0;x<20;x++)for(let z=0;z<20;z++)meshes.push(engine.createMesh().setGeometry(geometry).setPosition([x-9.5,0,z-9.5]));
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();return engine.stats.visible;};
+await frame();
+const near=await frame();
+window.check={
+  errors,
+  async run(){
+    const built=await hierarchicalLOD(system,meshes,{cell:5,distance:60});
+    engine.camera.position=[0,20,20];
+    const close=(await frame(),await frame());
+    engine.camera.position=[0,200,200];
+    await frame();
+    const far=await frame();
+    const result={near,close,far,cells:built.lods.length,farMeshes:built.meshes.length};
+    engine.camera.position=[0,20,20];
+    await frame();
+    built.remove();
+    await frame();
+    result.restored=await frame();
+    const ball=engine.createMesh().setGeometry(sphere(24)).setPosition([0,1,0]),lod=await autoLOD(system,ball,{ratios:[0.5,0.25]});
+    result.triangles=lod.levels.map(l=>l.object.indices.length/3);
+    await frame();
+    engine.camera.position=[0,1,3];await frame();await frame();result.ballNear=lod.level;
+    engine.camera.position=[0,400,400];await frame();await frame();result.ballFar=lod.level;
+    return result;
+  },
+};
+window.ready=true;
+</script></body></html>

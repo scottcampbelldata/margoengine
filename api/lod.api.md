@@ -58,6 +58,9 @@ export class LOD {
     constructor(system: LODSystem,
     index: number, anchor: Mesh, levels: readonly LODLevel[]);
     get level(): number;
+    static fromModel(system: LODSystem, model: {
+        readonly lods: readonly LODModelEntry[];
+    }): LOD[];
     remove(): void;
 }
 
@@ -66,6 +69,12 @@ export interface LODLevel {
     distance?: number;
     screen?: number;
     hysteresis?: number;
+}
+
+export interface LODModelEntry {
+    node: Mesh;
+    levels: readonly Mesh[];
+    screenCoverage?: readonly number[];
 }
 
 export type LODObject = Mesh | {

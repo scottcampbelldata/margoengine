@@ -118,3 +118,37 @@ Apache-2.0. Optional, tree-shakable package, about 9.9 kB min+gzip ([entry-sizes
 Build and unit tests: npm test --workspace @margoengine/lod. Browser check and benchmark on a real WebGPU adapter:
 `node packages/lod/test/browser-check.mjs`; picking and atlas seams: `node packages/lod/test/imposter-check.mjs` (writes
 `test-results/imposter-check-current.json` with every per-step series).
+
+## Levels from a file: `LOD.fromModel`
+
+A glTF with `MSFT_lod` loads its level nodes too, hidden, as `model.lods`; `extras.MSFT_screencoverage` gives the switches, read as the bounding sphere's height over the viewport's. Only node levels are read, not `MSFT_lod` on materials.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {LOD, LODSystem} from 'margoengine/lod';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/city.glb');
+LOD.fromModel(LODSystem.attach(stage.engine), model);
+```
+
+## Levels built for you: `margoengine/lod/auto`
+
+`autoLOD` simplifies a core mesh's geometry into lower levels. `hierarchicalLOD` merges still core meshes into one far mesh per grid cell and material, shown in their place past `distance`: 400 boxes in 16 cells draw 16 meshes from afar. Both load `@margoengine/mesh-edit` only when they simplify (`autoLOD` always, `hierarchicalLOD` with `ratio` below 1), an optional peer you install.
+
+```ts
+import {createStage} from 'margoengine';
+import {box} from 'margoengine/core';
+import {LODSystem} from 'margoengine/lod';
+import {autoLOD, hierarchicalLOD} from 'margoengine/lod/auto';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const lods = LODSystem.attach(stage.engine);
+const hero = stage.engine.createMesh().setGeometry(box(1, 1, 1));
+await autoLOD(lods, hero, {ratios: [0.5, 0.25]}); // defaults: ratios 0.5, 0.25, 0.125; screens from 0.25, halved; crease 60
+const props = Array.from({length: 100}, (_, i) => stage.engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([i, 0, 0]));
+stage.engine.render(); // places them: the far mesh reads their world matrices
+const city = await hierarchicalLOD(lods, props, {cell: 20}); // defaults: distance 8 cells, ratio 1
+city.remove(); // frees the far meshes, shows the sources
+```
+
+Levels keep positions and normals only, since core geometry holds nothing else. A source moved afterwards does not move its far mesh.

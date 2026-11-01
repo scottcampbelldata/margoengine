@@ -121,6 +121,12 @@ export interface GLTFExtendedMaterials {
 
 export type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | undefined;
 
+export interface GLTFLOD {
+    node: Mesh;
+    levels: Mesh[];
+    screenCoverage?: number[];
+}
+
 export interface GLTFLight {
     node: Mesh;
     nodeIndex: number;
@@ -290,6 +296,7 @@ export class PBRModel implements EnginePlugin {
     prepareDeformation?: (context: PBRDeformationContext) => void;
     createDeformationRenderer?: (model: PBRModel, device: GPUDevice) => PBRDeformationRenderer;
     readonly lights: GLTFLight[];
+    readonly lods: GLTFLOD[];
     readonly cameras: GLTFCamera[];
     readonly pointsAndLines: PBRPrimitive[];
     readonly variants: readonly string[];

@@ -722,6 +722,10 @@
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
     },
+    "./lod/auto": {
+      "types": "./dist/lod/auto.d.ts",
+      "import": "./dist/lod/auto.js"
+    },
     "./materials": {
       "types": "./dist/materials.d.ts",
       "import": "./dist/materials.js"

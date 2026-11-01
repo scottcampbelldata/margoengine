@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./auto": {
+      "types": "./dist/auto.d.ts",
+      "import": "./dist/auto.js"
     }
   },
   "files": [
@@ -37,7 +41,13 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/mesh-edit": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/mesh-edit": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
@@ -46,6 +56,6 @@
     "build": "node ../../scripts/build-optional.js lod",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/lod/test/browser-check.mjs && node packages/lod/test/imposter-check.mjs"
+    "test:gpu": "cd ../.. && node packages/lod/test/browser-check.mjs && node packages/lod/test/imposter-check.mjs && node packages/lod/test/auto-check.mjs"
   }
 }

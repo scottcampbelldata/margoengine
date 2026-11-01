@@ -175,6 +175,18 @@ export interface GLTFCamera {
   orthographic?: { xmag: number; ymag: number; znear: number; zfar: number };
   name?: string;
 }
+/** One object of `PBRModel.lods`, read from a node's `MSFT_lod` extension. */
+export interface GLTFLOD {
+  /** The node that carries the extension: the finest level, and the object's place in the scene. */
+  node: Mesh;
+  /** Every level, finest first: `node`, then its `MSFT_lod` ids. All but the first start hidden. */
+  levels: Mesh[];
+  /**
+   * The node's `extras.MSFT_screencoverage`, when it has them, decreasing: entry `i` is the screen coverage below which
+   * level `i` gives way to the next. An extra last entry hides the object below it.
+   */
+  screenCoverage?: number[];
+}
 /** A node's glTF `extras` object (Blender: the object's custom properties, exported with Include > Custom Properties) and a copy of its world matrix (column-major, translation in 12-14). */
 export interface GLTFNodeExtras {
   node: Mesh;
@@ -1156,6 +1168,18 @@ function wireframeIndices(r: DrawResource): DrawResource['wireframe'] {
   }
   return (r.wireframe = { index, count: indices.length });
 }
+/** The level nodes of a node's `MSFT_lod`; none without the extension. */
+function lodIds(def: GLTFNode, id: number, count: number): number[] {
+  const lod = (def?.extensions as { MSFT_lod?: { ids?: unknown } } | undefined)?.MSFT_lod;
+  if (lod === undefined) return [];
+  const ids = lod?.ids;
+  if (
+    !Array.isArray(ids) ||
+    ids.some((level) => !Number.isInteger(level) || level < 0 || level >= count || level === id)
+  )
+    throw new TypeError(`glTF node ${id} MSFT_lod ids must be other nodes of the file; re-export it`);
+  return ids;
+}
 function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   const p = r.primitive,
     m = p.material,
@@ -1793,6 +1817,8 @@ export class PBRModel implements EnginePlugin {
   /** Optional isolated deformation kernels for another rendering device. */
   createDeformationRenderer?: (model: PBRModel, device: GPUDevice) => PBRDeformationRenderer;
   readonly lights: GLTFLight[] = [];
+  /** The file's `MSFT_lod` objects; `LOD.fromModel` from `@margoengine/lod` drives them. Empty without the extension. */
+  readonly lods: GLTFLOD[] = [];
   readonly cameras: GLTFCamera[] = [];
   /**
    * glTF POINTS, LINES, LINE_LOOP and LINE_STRIP primitives (`topology` set), drawn in the beauty pass only: no shadows,
@@ -1869,6 +1895,10 @@ export class PBRModel implements EnginePlugin {
         parents[c] = id;
       }
     });
+    // A level sits under the finest level's parent: its own transform applies in the same space.
+    defs.forEach((def, id) => {
+      for (const level of lodIds(def, id, defs.length)) if (parents[level] === -1) parents[level] = parents[id];
+    });
     for (let i = 0; i < defs.length; i++) {
       let depth = 0;
       for (let p = i; p !== -1; p = parents[p])
@@ -1891,6 +1921,7 @@ export class PBRModel implements EnginePlugin {
         entry(defs, id, 'node');
         active.add(id);
         for (const c of defs[id].children ?? []) visit(c);
+        for (const level of lodIds(defs[id], id, defs.length)) if (!active.has(level)) visit(level);
       };
     for (const id of roots) visit(id);
     try {
@@ -1906,6 +1937,26 @@ export class PBRModel implements EnginePlugin {
       }
       for (let i = 0; i < defs.length; i++)
         this.nodes[i].setParent(parents[i] < 0 ? this.root : this.nodes[parents[i]]);
+      for (const i of active) {
+        const ids = lodIds(defs[i], i, defs.length);
+        if (!ids.length) continue;
+        const coverage = (defs[i].extras as { MSFT_screencoverage?: number[] } | undefined)?.MSFT_screencoverage;
+        if (
+          coverage !== undefined &&
+          (!Array.isArray(coverage) ||
+            coverage.length > ids.length + 1 ||
+            coverage.some((v, k) => !(v > 0 && v <= 1) || (k > 0 && v >= coverage[k - 1])))
+        )
+          throw new TypeError(
+            `glTF node ${i} MSFT_screencoverage must hold decreasing numbers from 0 to 1, at most one per level; re-export the file`,
+          );
+        for (const level of ids) this.nodes[level].visible = false;
+        this.lods.push({
+          node: this.nodes[i],
+          levels: [this.nodes[i], ...ids.map((level) => this.nodes[level])],
+          ...(coverage ? { screenCoverage: [...coverage] } : {}),
+        });
+      }
       for (const i of active) {
         const d = defs[i],
           light = d.extensions?.KHR_lights_punctual;

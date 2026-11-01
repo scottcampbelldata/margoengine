@@ -24,6 +24,7 @@ export {
 import { MargoError } from '@margoengine/math/errors';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { worldRadius } from '../../shared/sphere.js';
+import { meshTriangles } from '../../shared/mesh-source.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -47,6 +48,12 @@ export interface LODSystemOptions {
   /** Multiplies every evaluated distance: above 1 switches to coarser levels sooner (a quality knob). Default 1. */
   bias?: number;
 }
+/** One object of a gltf-pro model's `lods`, as `LOD.fromModel` reads it. */
+export interface LODModelEntry {
+  node: Mesh;
+  levels: readonly Mesh[];
+  screenCoverage?: readonly number[];
+}
 /** Most levels per LOD. */
 export const MAX_LEVELS = 8;
 
@@ -69,6 +76,31 @@ export class LOD {
   }
   get level(): number {
     return this.system.levelOf(this);
+  }
+  /**
+   * Registers each `MSFT_lod` object of a gltf-pro `model` in `system`, its `screenCoverage` as the `screen` levels
+   * (default 0.25, halved per level). An extra last coverage entry adds an empty level, which hides the object.
+   * @throws as {@link LODSystem.add}.
+   */
+  static fromModel(system: LODSystem, model: { readonly lods: readonly LODModelEntry[] }): LOD[] {
+    return model.lods.map(({ node, levels, screenCoverage: coverage }) => {
+      const out: LODLevel[] = levels.map((object, i) =>
+        i ? { object, screen: coverage?.[i - 1] ?? 0.25 * 0.5 ** (i - 1) } : { object },
+      );
+      if (coverage?.length === levels.length) out.push({ object: null, screen: coverage[levels.length - 1] });
+      let radius = 0;
+      const source = node as unknown as { readonly geometry?: Geometry };
+      for (const level of levels) {
+        const triangles = meshTriangles(level),
+          box = triangles?.kind === 'pbr' ? triangles.source.bounds : undefined;
+        if (box)
+          radius = Math.max(
+            radius,
+            Math.hypot(Math.max(-box[0], box[3]), Math.max(-box[1], box[4]), Math.max(-box[2], box[5])),
+          );
+      }
+      return system.add(node, out, { radius: radius || source.geometry?.bounds[3] || 1 });
+    });
   }
   /** Stops managing the object; the level shown stays shown. */
   remove(): void {

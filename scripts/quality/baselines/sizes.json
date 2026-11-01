@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4262190,
+  "total": 4265006,
   "history": [
     {
       "date": "2026-10-24",
@@ -1304,6 +1304,12 @@
       "commit": "1454595d3",
       "reason": "culling: CulledInstances gains pick, setParent, drawShadow and addParts/removeParts (row 21.6 job 9), a GPU id and caster draw of the part list and a part hierarchy on the CPU",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "78f663ddb",
+      "reason": "row 21.6 job 7: MSFT_lod, LOD.fromModel, lod/auto entry with autoLOD and hierarchicalLOD",
+      "grew": 2
     }
   ],
   "items": {
@@ -1483,7 +1489,8 @@
     "@margoengine/loaders/usd": 7783,
     "@margoengine/loaders/vrml": 5098,
     "@margoengine/loaders/worker": 8576,
-    "@margoengine/lod": 10648,
+    "@margoengine/lod": 11310,
+    "@margoengine/lod/auto": 2165,
     "@margoengine/materials": 61113,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,
@@ -1514,7 +1521,7 @@
     "@margoengine/math/vector4": 925,
     "@margoengine/mcp": 8664,
     "@margoengine/mesh-edit": 30203,
-    "@margoengine/mesh-edit/modeling": 32053,
+    "@margoengine/mesh-edit/modeling": 32042,
     "@margoengine/mixer": 6967,
     "@margoengine/navmesh": 7228,
     "@margoengine/navmesh/build": 11794,

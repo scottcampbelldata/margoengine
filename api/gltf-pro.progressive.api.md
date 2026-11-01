@@ -506,6 +506,12 @@ interface GLTFInstancing {
   attributes: Record<string, number>;
 }
 
+interface GLTFLOD {
+    node: Mesh;
+    levels: Mesh[];
+    screenCoverage?: number[];
+}
+
 interface GLTFLight {
     node: Mesh;
     nodeIndex: number;
@@ -811,6 +817,7 @@ class PBRModel implements EnginePlugin {
     prepareDeformation?: (context: PBRDeformationContext) => void;
     createDeformationRenderer?: (model: PBRModel, device: GPUDevice) => PBRDeformationRenderer;
     readonly lights: GLTFLight[];
+    readonly lods: GLTFLOD[];
     readonly cameras: GLTFCamera[];
     readonly pointsAndLines: PBRPrimitive[];
     readonly variants: readonly string[];
