@@ -3,7 +3,7 @@
 // (shell, node, browser, servers) is ended at the limit and the result names the test and the fix.
 import { spawn } from 'node:child_process';
 import { closeSync, openSync } from 'node:fs';
-import { killTree } from '../gpu-lock.mjs';
+import { endTree } from './shutdown.mjs';
 
 /** Default limit for one GPU test, in minutes. The slowest real test takes under 5. */
 export const DEFAULT_TEST_MINUTES = 10;
@@ -33,13 +33,17 @@ export function testLimitMs(packageMinutes, env = process.env) {
 }
 
 /**
- * Runs `command` in `cwd`, output passed through. Resolves `{ ok, timedOut, aborted, seconds, message? }`; past
- * `limitMs` the whole process tree is killed and `message` names `label` and how to raise the limit. When `signal`
+ * Runs `command` in `cwd`, output passed through. Resolves `{ ok, timedOut, aborted, seconds, message?, survivors? }`;
+ * past `limitMs` the whole process tree is killed and `message` names `label` and how to raise the limit. When `signal`
  * aborts (the heat watch, scripts/support/heat.mjs; a stopped side-by-side run) the tree is killed too and `aborted` is
- * true: the caller states why. With `logFile` the output is appended there instead of passed through, so suites running
- * side by side keep their logs apart.
+ * true: the caller states why. A killed tree is gone when this resolves, so its folder, log and ports are free; `survivors`
+ * lists any pid that outlived the wait. With `logFile` the output is appended there instead of passed through, so suites
+ * running side by side keep their logs apart. `end` and `startLimit` let a test hold the kill and fire the limit itself.
  */
-export function runLimited(command, { cwd, env = process.env, limitMs, label = command, signal, logFile }) {
+export function runLimited(
+  command,
+  { cwd, env = process.env, limitMs, label = command, signal, logFile, end = endTree, startLimit = setTimeout },
+) {
   return new Promise((done) => {
     const t0 = performance.now();
     const windows = process.platform === 'win32';
@@ -53,26 +57,29 @@ export function runLimited(command, { cwd, env = process.env, limitMs, label = c
     });
     if (log !== null) closeSync(log);
     let timedOut = false,
-      aborted = false;
-    const timer = setTimeout(() => {
+      aborted = false,
+      ended = Promise.resolve([]);
+    const timer = startLimit(() => {
       timedOut = true;
-      killTree(child.pid);
+      ended = end(child.pid);
     }, limitMs);
     const abort = () => {
       aborted = true;
-      killTree(child.pid);
+      ended = end(child.pid);
     };
     if (signal?.aborted) abort();
     else signal?.addEventListener('abort', abort, { once: true });
-    const finish = (code) => {
+    const finish = async (code) => {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
+      const survivors = await ended;
       const seconds = Math.round((performance.now() - t0) / 100) / 10;
       done({
         ok: !timedOut && !aborted && code === 0,
         timedOut,
         aborted,
         seconds,
+        ...(survivors.length > 0 && { survivors }),
         ...(timedOut && {
           message: `${label} hung: no result after ${Math.round(limitMs / 1000)} s, process tree killed; find the stuck step (page, server or await) and fix it, or raise the limit with MARGO_GPU_TEST_TIMEOUT_MIN or "margo.gpuTestTimeoutMinutes" in the package's package.json if the test is genuinely slower`,
         }),
