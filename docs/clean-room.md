@@ -634,6 +634,17 @@ Written from the paper below; no Surface Nets code of another project was read.
 | SN1 | one point per net cell the surface crosses, at the mean of its edge crossings; one quad per filled-to-air sample pair; relaxation toward neighbours kept inside the cell | voxel-edit/src/smooth.ts | Sarah Gibson, "Constrained Elastic Surface Nets", MERL TR-99-24 / MICCAI 1998 |
 | SN2 | normals from the density difference across a net cell; a separable box blur by running sums | voxel-edit/src/smooth.ts | Margo-own, central differences and the standard running sum box filter |
 
+## Mesh to voxels: `@margoengine/voxel-edit/voxelize`
+
+Written from the papers below; no voxelizer of another project was read.
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| VZ1 | triangle against box by separating axes: three box normals, the triangle normal, nine edge crosses | voxel-edit/src/voxelize.ts | Tomas Akenine-Moller, "Fast 3D Triangle-Box Overlap Testing", Journal of Graphics Tools, 2001 |
+| VZ2 | solid by crossing parity along x rows through cell centres, the hit point from barycentric coordinates | voxel-edit/src/voxelize.ts | Moller and Trumbore, "Fast, Minimum Storage Ray/Triangle Intersection", Journal of Graphics Tools, 1997 |
+| VZ3 | shared edges on a ray: each edge read in one fixed vertex order and owning its low end, so a closed mesh crosses evenly | voxel-edit/src/voxelize.ts | Margo-own, the half-open crossing rule for point in polygon |
+| VZ4 | palette: cut the box of widest channel range at its weighted median, then box means | voxel-edit/src/voxelize.ts | Paul Heckbert, "Color Image Quantization for Frame Buffer Display", SIGGRAPH 1982 |
+
 ## Rigging: `@margoengine/rigging`
 
 Written clean room from the papers and specifications below. No source code of rigging tools or engines (Blender,
@@ -666,6 +677,7 @@ like) was read.
 | Steering (seek, flee, arrive, pursue, evade, wander, obstacle avoidance, path following, priorities) | C. W. Reynolds, "Steering Behaviors For Autonomous Characters", Game Developers Conference 1999 |
 | Flocking (separation, alignment, cohesion) | C. W. Reynolds, "Flocks, herds and schools: a distributed behavioral model", ACM SIGGRAPH 1987 |
 | Seeded random stream | `@margoengine/math`'s `createRandom` (mulberry32) |
+
 ## Game networking: `@margoengine/netcode`
 
 Written clean room from the articles, talks and specifications below. No source code of networking libraries or

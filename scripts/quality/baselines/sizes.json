@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4235489,
+  "total": 4239213,
   "history": [
     {
       "date": "2026-10-24",
@@ -1280,6 +1280,12 @@
       "commit": "1454595d3",
       "reason": "row 26 job 13: loaders/mocap, /vrml and /gcode, new optional entries",
       "grew": 3
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "2d6b7738d",
+      "reason": "row 26 job 10: voxel-edit/voxelize, new optional entry, mesh to voxels",
+      "grew": 1
     }
   ],
   "items": {
@@ -1656,6 +1662,7 @@
     "@margoengine/voxel-edit/smooth": 2633,
     "@margoengine/voxel-edit/sparse": 6873,
     "@margoengine/voxel-edit/vox": 12202,
+    "@margoengine/voxel-edit/voxelize": 3724,
     "@margoengine/voxel-net": 8267,
     "@margoengine/voxel-net/bot": 9750,
     "@margoengine/voxel-net/server": 16799,

@@ -74,6 +74,10 @@
     "./smooth": {
       "types": "./dist/smooth.d.ts",
       "import": "./dist/smooth.js"
+    },
+    "./voxelize": {
+      "types": "./dist/voxelize.d.ts",
+      "import": "./dist/voxelize.js"
     }
   },
   "files": [

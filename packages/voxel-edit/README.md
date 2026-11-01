@@ -60,6 +60,7 @@ corner coordinates.
 | `./export` | `gridToExportSource`: meshes a grid into one primitive per palette material (corner AO as vertex colours), the `{nodes}` scene `exportGLB`, `exportUSDZ` and `exportOBJ` take |
 | `./formats` | voxel files other tools write: `parseQB` / `writeQB` and `parseQEF` / `writeQEF` (Qubicle), `parseBinvox`, `parseKVX` and `parseVXL`; models, palette, positions, with cell budgets |
 | `./smooth` | `smoothGrid`: a smooth Surface Nets mesh of a grid, with relaxation, optional blur and gradient normals, for `gridToExportSource` |
+| `./voxelize` | `voxelizeMesh`: a triangle mesh to a grid and palette, surface or solid, with vertex or texture colours and median cut; `AbortSignal` |
 | `./assist` | `noiseFill` (seeded random fill), `suggestPalette` (seeded hues, linear sRGB) and `paletteUsage` (cells per index) |
 | `./library` | `fetchLibrary` / `fetchAsset` / `resolveLibraryUrl`: list and fetch `.vox` packs from a JSON index, with a body size limit and abort |
 
@@ -123,6 +124,36 @@ console.log(stats.quads, source.nodes[0].primitives.length);
 `blur` (default 0, up to 8) is a box blur radius over the occupancy: rounder, but a part thinner than `2 * blur + 1` fades
 away. Each quad takes the palette index of the nearest filled voxel. Cells that touch only along an edge or corner share a
 surface point there, so such a model is closed but not manifold at that point.
+
+## Mesh to voxels
+
+`./voxelize` turns any triangle mesh into the grid and palette the rest of this package uses. Pass `size` (cells along
+the longest axis) or `voxelSize` (mesh units per cell). `'surface'` fills each cell a triangle touches, one cell thick at
+least; `'solid'` fills each cell whose centre is inside, which needs a closed mesh (`openRows` counts the x rows that
+show a hole).
+
+```ts
+import { voxelizeMesh } from '@margoengine/voxel-edit/voxelize';
+
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]);
+const indices = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+const uvs = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
+const texture = { width: 1, height: 1, data: new Uint8Array([200, 80, 40, 255]) };
+const { grid, palette, origin, voxelSize, openRows } = await voxelizeMesh(positions, indices, {
+  size: 32,
+  fill: 'solid',
+  colors: { uvs, texture },
+  paletteSize: 64,
+  maxCells: 1_000_000,
+  signal: AbortSignal.timeout(10_000),
+});
+console.log(grid.size, palette.length, origin, voxelSize, openRows);
+```
+
+`colors` is `{vertex}` (RGB or RGBA per vertex, bytes in a `Uint8Array`, 0 to 1 otherwise) or `{uvs, texture}` (RGBA8, nearest
+texel, repeating, row 0 at v = 0). Colours reach the palette as given and alpha is ignored. Without `colors` every cell is
+index 1, white. Over `paletteSize` colours (default 255) median cut merges the nearest ones and `colorsReduced` is true.
+`maxCells` defaults to 16,777,216. The call yields to the event loop while it runs, so a `signal` can stop it.
 
 ## Saved formats
 

@@ -1534,6 +1534,10 @@
       "types": "./dist/voxel-edit/smooth.d.ts",
       "import": "./dist/voxel-edit/smooth.js"
     },
+    "./voxel-edit/voxelize": {
+      "types": "./dist/voxel-edit/voxelize.d.ts",
+      "import": "./dist/voxel-edit/voxelize.js"
+    },
     "./voxel-net": {
       "types": "./dist/voxel-net.d.ts",
       "import": "./dist/voxel-net.js"
