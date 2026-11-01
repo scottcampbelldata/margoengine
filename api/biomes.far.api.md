@@ -101,6 +101,9 @@ class BiomeWorld implements Disposable {
     };
     get climate(): Climate;
     tile(x: number, z: number, options?: TileRequest): Promise<BiomeTile>;
+    tilePart(x: number, z: number, window: Rect, options?: TileRequest): Promise<BiomeTile & {
+        readonly window: Rect;
+    }>;
     readLayer(name: string, x: number, z: number): Uint8Array | undefined;
     writeLayer(name: string, x: number, z: number, data: Uint8Array | undefined): void;
     writeLayers(writes: readonly LayerWrite[]): void;
