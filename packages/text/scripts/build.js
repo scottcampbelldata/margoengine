@@ -17,7 +17,14 @@ await build({
     outDir: resolve(root, 'dist'),
     emptyOutDir: true,
     target: 'es2022',
-    lib: { entry: resolve(root, 'src/index.ts'), formats: ['es'], fileName: 'index' },
+    lib: {
+      entry: {
+        index: resolve(root, 'src/index.ts'),
+        rich: resolve(root, 'src/rich.ts'),
+        msdf: resolve(root, 'src/msdf.ts'),
+      },
+      formats: ['es'],
+    },
     rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
   },
 });

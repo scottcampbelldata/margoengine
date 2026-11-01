@@ -94,6 +94,7 @@ export interface LayoutGlyph {
     advance: number;
     rtl: boolean;
     whitespace: boolean;
+    carets?: ReadonlyArray<readonly [offset: number, distance: number]>;
 }
 
 export interface LayoutLine {
@@ -120,6 +121,7 @@ export interface LayoutOptions {
     direction?: TextDirection;
     whiteSpace?: 'normal' | 'nowrap';
     overflowWrap?: 'normal' | 'break-word';
+    ligatures?: boolean;
 }
 
 export const SDF_DEFAULTS: {
@@ -152,6 +154,7 @@ export class Text {
     fontSize: number;
     lineHeight: number;
     letterSpacing: number;
+    ligatures: boolean;
     maxWidth: number;
     textAlign: TextAlign;
     anchorX: AnchorX;

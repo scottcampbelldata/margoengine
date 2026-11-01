@@ -88,6 +88,43 @@ const arabic = new Text({text: '\u0633\u0644\u0627\u0645'});
 const latin = new Text({text: 'office', ligatures: true});
 ```
 
+## Rich text: `RichText`
+
+`@margoengine/text/rich` turns small markup into one `Text` per styled run: `<b>`, `<i>`, `<color=#f80>`, `<size=1.5>`,
+`<link=url>` and `<img=name>`, with `\<` for a literal bracket. Options: `markup`, `font`, `bold`, `italic`, `boldItalic` (default made
+from `font`), `images`, `position` (default the origin), `linkColor` (default `#4080ff`), `fontSize` (1), `lineHeight` (1.2), `maxWidth`
+(none), `direction` (`'ltr'`) and any `Text` style. It breaks at spaces and newlines.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TextRenderer} from 'margoengine/text';
+import {RichText} from 'margoengine/text/rich';
+declare const canvas: HTMLCanvasElement;
+declare const star: ImageBitmap;
+const engine = await Engine.create(canvas);
+const renderer = TextRenderer.attach(engine);
+const rich = new RichText({
+  markup: 'Plain <b>bold</b> <color=#f80>orange</color> <link=/docs>docs</link> <img=star>',
+  images: {star},
+  maxWidth: 12,
+});
+await rich.load();
+for (const text of rich.texts) renderer.add(text);
+console.log(rich.linkAt(1, -0.5));
+```
+
+## Prebuilt atlases: `BitmapFont`
+
+`@margoengine/text/msdf` reads a BMFont JSON file with PNG pages from a distance-field generator, so text needs no installed font
+and works in workers. Multi-channel atlases reduce to their median channel, which rounds sharp corners slightly.
+
+```ts
+import {Text} from 'margoengine/text';
+import {BitmapFont} from 'margoengine/text/msdf';
+const font = await BitmapFont.load('/fonts/inter.json');
+const label = new Text({text: 'Hello', font});
+```
+
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.

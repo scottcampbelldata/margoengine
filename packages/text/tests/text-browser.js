@@ -276,6 +276,53 @@ window.runTextTests = async () => {
   report.colors = colors;
   report.checks.push('Fill, outline and drop shadow colors render; opacity blends');
 
+  // Rich text: a coloured run and an inline image reach the screen. A prebuilt field: one round glyph from raw pixels.
+  const { RichText } = await import('@margoengine/text/rich'),
+    { BitmapFont } = await import('@margoengine/text/msdf');
+  label.visible = false;
+  const dot = await createImageBitmap(new ImageData(new Uint8ClampedArray([0, 255, 0, 255]), 1, 1)),
+    rich = new RichText({
+      markup: 'plain <color=#ff0000>Red</color> <img=dot>',
+      images: { dot },
+      fontSize: 0.8,
+      position: [-3, 0.5, 0],
+    });
+  await rich.load();
+  for (const piece of rich.texts) renderer.add(piece);
+  image = await frame();
+  const richRed = ink(image, ([r, g, b]) => r > 180 && g < 60 && b < 60).count,
+    richGreen = ink(image, ([r, g, b]) => g > 180 && r < 60 && b < 60).count;
+  for (const piece of rich.texts) renderer.remove(piece);
+  assert(richRed > 50, `Rich text colour did not draw: ${richRed}`);
+  assert(richGreen > 100, `Inline image did not draw: ${richGreen}`);
+  const size = 40,
+    field = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const value = Math.max(0, Math.min(255, 128 + (14 - Math.hypot(x - 19.5, y - 19.5)) * (255 / 8))),
+        i = (y * size + x) * 4;
+      field.set([value, value, value, 255], i);
+    }
+  const bitmapFont = new BitmapFont(
+      {
+        pages: ['a.png'],
+        chars: [{ id: 79, x: 0, y: 0, width: size, height: size, xoffset: 0, yoffset: 0, xadvance: size, page: 0 }],
+        info: { size },
+        common: { lineHeight: size, base: size },
+        distanceField: { fieldType: 'msdf', distanceRange: 8 },
+      },
+      [{ width: size, height: size, data: field }],
+    ),
+    round = new Text({ text: 'O', font: bitmapFont, fontSize: 3, color: '#00ff00', position: [-1.5, 1.5, 0] });
+  renderer.add(round);
+  image = await frame();
+  const fieldInk = ink(image, ([r, g, b]) => g > 180 && r < 60 && b < 60).count;
+  renderer.remove(round);
+  label.visible = true;
+  assert(fieldInk > 500, `A prebuilt distance field did not draw: ${fieldInk}`);
+  report.colors.rich = { richRed, richGreen, fieldInk };
+  report.checks.push('RichText draws coloured runs and inline images; BitmapFont draws a prebuilt field');
+
   // 3. Depth test against a core mesh with reversed-Z, and onTop.
   const mesh = engine
     .createMesh()

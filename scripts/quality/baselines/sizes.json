@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4131428,
+  "total": 4148101,
   "history": [
     {
       "date": "2026-10-24",
@@ -1202,6 +1202,12 @@
       "commit": "6c010a6b7",
       "reason": "BiomeView canopy option and the cover entry (biome look plan 3 L7, Scott's S5): option and its import in the view, the cover code in the worker",
       "grew": 3
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "e4c317ad7",
+      "reason": "row 21.6 job 5: shaped runs in text (160 B of the planned 3 kB); new entries text/rich and text/msdf",
+      "grew": 3
     }
   ],
   "items": {
@@ -1517,7 +1523,9 @@
     "@margoengine/stats": 4934,
     "@margoengine/taa": 10390,
     "@margoengine/terrain": 11929,
-    "@margoengine/text": 15890,
+    "@margoengine/text": 16532,
+    "@margoengine/text/msdf": 4556,
+    "@margoengine/text/rich": 11475,
     "@margoengine/tilemap": 1618,
     "@margoengine/tilemap/autotile": 1605,
     "@margoengine/tilemap/ldtk": 3070,

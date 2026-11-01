@@ -1262,6 +1262,14 @@
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"
     },
+    "./text/rich": {
+      "types": "./dist/text/rich.d.ts",
+      "import": "./dist/text/rich.js"
+    },
+    "./text/msdf": {
+      "types": "./dist/text/msdf.d.ts",
+      "import": "./dist/text/msdf.js"
+    },
     "./tilemap": {
       "types": "./dist/tilemap.d.ts",
       "import": "./dist/tilemap.js"
