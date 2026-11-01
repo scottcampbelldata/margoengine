@@ -199,8 +199,9 @@ function memberships(d: Dims, b: number, values: Int32Array, cells: number, m: I
       const mk = m[k];
       if (!mk) continue;
       const x = values[at + k],
-        dist = Math.max(lo - x, x - hi);
-      m[k] = Math.floor((mk * wendland(clampInt(divFloor((dist + half) * ONE, width), 0, ONE))) / ONE);
+        reach = Math.max(lo - x, x - hi) + half;
+      // Well inside (reach <= 0, wendland(0) = 1.0) keeps mk, past the ramp (reach >= width, wendland(1) = 0) is 0.
+      if (reach > 0) m[k] = reach >= width ? 0 : Math.floor((mk * wendland(divFloor(reach * ONE, width))) / ONE);
     }
   }
 }
@@ -320,14 +321,14 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     else if (mode === 0) for (let k = 0; k < cells; k++) out[k] = Math.max(0, source[k]);
     else if (mode === 1) for (let k = 0; k < cells; k++) out[k] = source[k] + dT[k];
     else if (mode === 2) for (let k = 0; k < cells; k++) out[k] = Math.max(0, source[k] + 2 * dT[k]);
-    else if (mode === 3) for (let k = 0; k < cells; k++) out[k] = clampInt(source[k] + divFloor(dT[k], 10), 0, 365);
+    else if (mode === 3) for (let k = 0; k < cells; k++) out[k] = clampInt(source[k] + Math.floor(dT[k] / 10), 0, 365);
     else if (mode === 4)
       for (let k = 0; k < cells; k++) {
         const v = source[k];
-        out[k] = Math.max(0, v + divFloor(v * n2[k] * 16, 6553600));
+        out[k] = Math.max(0, v + Math.floor((v * n2[k] * 16) / 6553600));
       }
     else if (mode === 5)
-      for (let k = 0; k < cells; k++) out[k] = clampInt(source[k] + divFloor(n2[k] * 10, 32768), 0, 255);
+      for (let k = 0; k < cells; k++) out[k] = clampInt(source[k] + Math.floor((n2[k] * 10) / 32768), 0, 255);
     else out.set(source);
   }
   // Envelope memberships. The nearest envelope (the fallback where no biome has weight) is found only at the cells that
@@ -339,6 +340,17 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     for (let b = 0; b < count; b++)
       memberships(envelopes, b, warped, cells, member.subarray(b * cells, (b + 1) * cells));
   c.score?.(warped, cells, member);
+  // The biomes with any weight in this frame, in biome order: the planes of the others are all 0, and stay out of the sums.
+  const live = new Int32Array(count);
+  let liveCount = 0;
+  for (let b = 0; b < count; b++) {
+    const base = b * cells;
+    for (let k = 0; k < cells; k++)
+      if (member[base + k]) {
+        live[liveCount++] = b;
+        break;
+      }
+  }
   const nearestAt = (k: number) => {
     let best = -1,
       bestFar = 2147483647;
@@ -357,8 +369,8 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     // Every cell of these is written before it is read (rowSum at 1..cells - 2, box at the inner cells).
     rowSum = scratch(4, cells),
     box = scratch(5, count * cells);
-  for (let b = 0; b < count; b++) {
-    const base = b * cells;
+  for (let l = 0; l < liveCount; l++) {
+    const base = live[l] * cells;
     for (let k = 1; k < cells - 1; k++) rowSum[k] = member[base + k - 1] + member[base + k] + member[base + k + 1];
     for (let j = 1; j <= inner; j++)
       for (let i = 1, k = j * n + 1; i <= inner; i++, k++) box[base + k] = rowSum[k - n] + rowSum[k] + rowSum[k + n];
@@ -381,6 +393,7 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     },
     paintGrid = paint.map((p) => (p.biome < 0 ? undefined : read(p.layer, p.mode === 2 ? 255 : 0))),
     maskGrid = paint.map((p) => (p.mask ? read(p.mask, 0) : undefined));
+  let stale = false;
   for (let j = 0; j < inner; j++)
     for (let i = 0; i < inner; i++) {
       const k = (j + 1) * n + i + 1,
@@ -388,8 +401,14 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
       let total = 0,
         only = -1,
         some = 0;
-      for (let b = 0; b < count; b++) {
-        const v = Math.floor(box[b * cells + k] / 9);
+      // The steps below leave weights in biomes that are not live.
+      if (stale) {
+        w.fill(0);
+        stale = false;
+      }
+      for (let l = 0; l < liveCount; l++) {
+        const b = live[l],
+          v = Math.floor(box[b * cells + k] / 9);
         // A member biome keeps at least 1 after scaling, so a weight below 1 never removes a biome from a cell.
         const scaled = claimed && v ? Math.max(1, divFloor(v * claim[b], ONE)) : v;
         w[b] = scaled;
@@ -409,11 +428,12 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
         }
         continue;
       }
+      stale = true;
       if (!total) {
         w[nearestAt(k)] = ONE;
         total = ONE;
       }
-      for (let b = 0; b < count; b++) w[b] = divFloor(w[b] * ONE, total);
+      for (let b = 0; b < count; b++) if (w[b]) w[b] = divFloor(w[b] * ONE, total);
       // Paint layers, in order.
       blocked.fill(0);
       for (let q = 0; q < paint.length; q++) {

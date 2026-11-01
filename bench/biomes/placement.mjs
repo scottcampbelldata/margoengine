@@ -14,6 +14,14 @@ const dist = (entry) => new URL(`../../packages/biomes/dist/${entry}.js`, import
 /** One 256 m tile of R16 near its centre, so mountains, lowland and a river valley are all in the sample. */
 export const TILE = Object.freeze({ x: 2, z: -3, size: 256 });
 
+/** World tiles the placement stage makes in its setup. */
+export const PLACEMENT_SETUP = Object.freeze({ x: [39, 48], z: [29, 37] });
+/**
+ * The bench world's tile cache: it holds every setup tile. Past the default 64, a timed placement run remade evicted
+ * fields and read about twice its real time.
+ */
+export const WORLD_CACHE = 256;
+
 /** The measured stages: `{id, title, run()}`, each run() doing one tile's work at 1 m. */
 export async function stages() {
   const biomes = await import(dist('index')),
@@ -47,6 +55,7 @@ export async function stages() {
           size: R16.size,
           height: { relief: R16.relief },
           climate: R16.climate,
+          cache: WORLD_CACHE,
         });
       },
       async run() {
@@ -64,9 +73,11 @@ export async function stages() {
           size: R16.size,
           height: { relief: R16.relief },
           climate: R16.climate,
+          cache: WORLD_CACHE,
         });
         placement = BiomePlacement.attach(world);
-        for (let z = 29; z <= 37; z++) for (let x = 39; x <= 48; x++) await world.tile(x, z);
+        for (let z = PLACEMENT_SETUP.z[0]; z <= PLACEMENT_SETUP.z[1]; z++)
+          for (let x = PLACEMENT_SETUP.x[0]; x <= PLACEMENT_SETUP.x[1]; x++) await world.tile(x, z);
       },
       async run() {
         await placement.tile(40 + (nextPlaced % 8), 30 + (nextPlaced++ >> 3));
