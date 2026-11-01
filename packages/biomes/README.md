@@ -43,7 +43,9 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 `world.tilePart(x, z, [i0, j0, i1, j1])` makes only some cells of a tile (`i1` and `j1` exclusive), with the same bytes
 as those cells of the whole tile. Placement uses it to make only the edge of each neighbour it reads. A part is never
 cached and is made on the calling thread, also on a world with workers; when the world already holds the whole tile,
-it answers with that (`window` is then `[0, 0, cells, cells]`).
+it answers with that (`window` is then `[0, 0, cells, cells]`). The same bytes need a per-cell classifier: the
+envelopes, `whittaker` and `holdridge` are, and a custom `ZoneClassifier` scorer must weight cell k from cell k of its
+inputs alone.
 
 ```ts
 import { BiomeWorld } from '@margoengine/biomes';
@@ -166,7 +168,9 @@ console.log(world.biomes[first].id, tile.layer('biomeWeight')!.data[0] / 255, wo
   its `zones` (`WHITTAKER`, our rectangles over mean temperature and rainfall from the published diagram); `holdridge`
   by Holdridge life zones (`holdridgeZone(biotemperature, rainfall)`, nearest hexagon in log biotemperature, rainfall
   and PET ratio, such as `'cool-temperate-perhumid'`). `import { whittaker } from '@margoengine/biomes/zones'`, then
-  `BiomeWorld.create({ classifier: whittaker })`.
+  `BiomeWorld.create({ classifier: whittaker })`. A classifier of your own implements `ZoneClassifier`: its scorer
+  must give cell k weights that depend only on cell k of the warped inputs, never on the grid size or on other cells,
+  since a cell gets the same bytes in a whole tile and in a `tilePart` only then.
 
 `presets` holds `temperate`, `boreal`, `alpine`, `wetland`, `tundra`, `desert`, `savanna` and `tropical`, written as
 plant functional type limits over the coldest month, growing degree days and the moisture index, with Korner's

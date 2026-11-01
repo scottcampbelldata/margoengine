@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { BiomePlacement } from '../dist/placement.js';
 import { presets, presetWorlds } from '../dist/presets.js';
+import { holdridge, whittaker } from '../dist/zones.js';
 
 /** Every byte of a placed tile: palette, count, stats, records, crown cover, exclusion and density rasters. */
 function placedHash(t) {
@@ -98,6 +99,26 @@ test('tilePart: every layer of a window equals those cells of the whole tile, by
       ],
     ],
   ];
+  // Zone classifiers: their scorers weight each cell from that cell alone, so parts match whole tiles here too. Both
+  // worlds mix two biomes in these tiles (alpine and tundra; wetland and temperate).
+  for (const [classifier, place] of [
+    [whittaker, presetWorlds.tundra],
+    [holdridge, presetWorlds.temperate],
+  ])
+    worlds.push([
+      await BiomeWorld.create({
+        seed: 5,
+        size: [768, 768],
+        biomes: Object.values(presets).filter((b) => b.id !== 'beach'),
+        classifier,
+        climate: place.climate,
+        height: { relief: place.relief },
+      }),
+      [
+        [1, 1],
+        [2, 0],
+      ],
+    ]);
   // Paint, a paint mask and a 40 m ecotone (a wide feather that reads across tile and part edges).
   const painted = await BiomeWorld.create({
     size: [768, 768],

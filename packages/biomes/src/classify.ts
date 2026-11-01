@@ -28,6 +28,9 @@ export interface ZoneClassifier {
   /**
    * Builds the per-tile scorer for a biome list: it adds each biome's zone weight (Q16, at most 1.0) into `member`
    * (one plane of `cells` per biome) from `warped` (one plane per input slot; `slotOf` names the slots).
+   * Cell k's weights must depend only on cell k of `warped`, never on `cells` or on other cells: the same cell is
+   * classified inside grids of different sizes (a whole tile, or the part of one that `BiomeWorld.tilePart` makes),
+   * and only a per-cell scorer gives it the same bytes in each.
    */
   scorer(
     biomes: readonly BiomeDefinition[],
