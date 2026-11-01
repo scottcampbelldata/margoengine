@@ -1,5 +1,5 @@
 {
-  "commit": "3e89b1907",
+  "commit": "d95370f27",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -58,8 +58,8 @@
     },
     "@margoengine/biomes": {
       ".": {
-        "raw": 46692,
-        "gzip": 18149
+        "raw": 46739,
+        "gzip": 18165
       },
       "./toolkit": {
         "raw": 6440,
@@ -86,8 +86,12 @@
         "gzip": 3635
       },
       "./view": {
-        "raw": 24028,
-        "gzip": 9694
+        "raw": 24448,
+        "gzip": 9856
+      },
+      "./rivers": {
+        "raw": 2486,
+        "gzip": 1311
       },
       "./cover": {
         "raw": 7346,
@@ -118,8 +122,8 @@
         "gzip": 2704
       },
       "dist/workers/biomes.js": {
-        "raw": 106918,
-        "gzip": 40135
+        "raw": 106965,
+        "gzip": 40148
       }
     },
     "@margoengine/blender": {
@@ -1784,12 +1788,16 @@
         "gzip": 8011
       },
       "./server": {
-        "raw": 45404,
-        "gzip": 16431
+        "raw": 45745,
+        "gzip": 16589
       },
       "./bot": {
         "raw": 24884,
         "gzip": 9466
+      },
+      "./file-store": {
+        "raw": 1523,
+        "gzip": 792
       }
     },
     "@margoengine/voxel-pathtracer": {
@@ -1804,8 +1812,8 @@
     },
     "@margoengine/water": {
       ".": {
-        "raw": 60649,
-        "gzip": 19001
+        "raw": 63240,
+        "gzip": 19800
       }
     },
     "@margoengine/weather": {
@@ -1950,9 +1958,9 @@
       "brotli": 2727
     },
     "packages/biomes/dist/workers/biomes.js": {
-      "raw": 105854,
-      "gzip": 40026,
-      "brotli": 34383
+      "raw": 105901,
+      "gzip": 40038,
+      "brotli": 34357
     },
     "packages/voxel/dist/workers/mesher.js": {
       "raw": 13081,

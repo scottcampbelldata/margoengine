@@ -212,7 +212,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 2 entry points
 - [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 1 entry point
 - [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 1 entry point
-- [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 15 entry points
+- [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 16 entry points
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 12 entry points
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 2 entry points
 - [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 14 entry points
@@ -251,7 +251,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/save API](https://margoengine.com/llms/api/save.md): 2 entry points
 - [@margoengine/net API](https://margoengine.com/llms/api/net.md): 1 entry point
 - [@margoengine/netcode API](https://margoengine.com/llms/api/netcode.md): 7 entry points
-- [@margoengine/voxel-net API](https://margoengine.com/llms/api/voxel-net.md): 3 entry points
+- [@margoengine/voxel-net API](https://margoengine.com/llms/api/voxel-net.md): 4 entry points
 - [@margoengine/bvh API](https://margoengine.com/llms/api/bvh.md): 4 entry points
 - [@margoengine/geometry API](https://margoengine.com/llms/api/geometry.md): 7 entry points
 - [@margoengine/mesh-edit API](https://margoengine.com/llms/api/mesh-edit.md): 2 entry points
