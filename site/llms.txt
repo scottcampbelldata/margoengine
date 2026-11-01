@@ -99,7 +99,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/scenery](https://margoengine.com/llms/packages/scenery.md): Procedural moonlit skies and scenery passes for Margo Engine.
 - [@margoengine/scatter](https://margoengine.com/llms/packages/scatter.md): Seeded instancing, distance-based LOD and procedural wind.
 - [@margoengine/road](https://margoengine.com/llms/packages/road.md): Arc-length spline road surfaces, raised curbs and tiled UVs.
-- [@margoengine/tilemap](https://margoengine.com/llms/packages/tilemap.md): 2D tile maps for Margo Engine: the TileMapData format (tilesets, animated tiles, collision shapes, tile and object layers, parallax) shared by the renderer, auto-tiling…
+- [@margoengine/tilemap](https://margoengine.com/llms/packages/tilemap.md): 2D tile maps for Margo Engine: the TileMapData format (tilesets, animated tiles, collision shapes, tile and object layers, parallax), a chunked renderer at exact…
 - [@margoengine/vfx](https://margoengine.com/llms/packages/vfx.md): GPU particle simulation and indirect billboards, with curves over life and sphere, cone and mesh-surface emitters.
 - [@margoengine/creative](https://margoengine.com/llms/packages/creative.md): WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine.
 - [@margoengine/procedural](https://margoengine.com/llms/packages/procedural.md): Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.
