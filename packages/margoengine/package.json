@@ -934,6 +934,10 @@
       "types": "./dist/oit.d.ts",
       "import": "./dist/oit.js"
     },
+    "./oit/meshes": {
+      "types": "./dist/oit/meshes.d.ts",
+      "import": "./dist/oit/meshes.js"
+    },
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4304999,
+  "total": 4305748,
   "history": [
     {
       "date": "2026-10-24",
@@ -1388,6 +1388,12 @@
       "commit": "b2e7cc033",
       "reason": "culling/parts: CulledParts holds pick, setParent, drawShadow and addParts/removeParts in their own entry; the root gives them back",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "7b7662129",
+      "reason": "oit/meshes: addMesh draws a core mesh see-through through a materials copy, own entry",
+      "grew": 3
     }
   ],
   "items": {
@@ -1621,6 +1627,7 @@
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/oit": 3199,
+    "@margoengine/oit/meshes": 747,
     "@margoengine/physics": 16247,
     "@margoengine/physics2d": 7993,
     "@margoengine/pixel": 4769,
@@ -1837,6 +1844,8 @@
     "leak @margoengine/materials -> @margoengine/gltf-pro": 1,
     "leak @margoengine/materials/batched -> @margoengine/gltf-pro": 1,
     "leak @margoengine/mesh-edit -> @margoengine/bvh/tree": 1,
+    "leak @margoengine/oit/meshes -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/oit/meshes -> @margoengine/materials": 1,
     "leak @margoengine/shader -> @margoengine/gltf-pro": 1,
     "leak @margoengine/shader -> @margoengine/materials": 1,
     "leak @margoengine/shader/editor -> @margoengine/gltf-pro": 1,

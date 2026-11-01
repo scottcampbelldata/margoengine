@@ -5,7 +5,7 @@ Import `margoengine/oit` from the `margoengine` package, or `@margoengine/oit` f
 Order-independent transparency for glTF Pro BLEND primitives and `@margoengine/materials` transparent meshes:
 weighted blended OIT (McGuire and Bavoil, JCGT 2013). Overlapping transparent parts (a translucent CAD housing over
 translucent and opaque gears) no longer pop as the camera orbits, because nothing depends on draw order any more. Core
-meshes are opaque only and are not affected. WebGPU only.
+meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through. WebGPU only.
 
 ```ts
 import {OIT} from 'margoengine/oit';
@@ -23,6 +23,24 @@ glTF Pro's declared transparency hook (`PBRModel.setTransparency`, glTF Pro READ
 patches, and without it every GPU call is identical (`examples/package-benchmarks/proofs/oit-detached.proof.js`).
 Size: 2,210 B min+gzip (`examples/package-benchmarks/results/entry-sizes.json`); the hook adds 323 B to glTF Pro's
 root entry. Core and the stage are unchanged.
+
+## Core meshes
+
+```ts
+import {Engine, box, PbrMaterial} from 'margoengine/core';
+import {OIT} from 'margoengine/oit';
+import {addMesh} from 'margoengine/oit/meshes';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const oit = OIT.attach(engine);
+const mesh = engine.createMesh().setGeometry(box(1, 1, 1)).setMaterial(new PbrMaterial({color: '#9cc3e6'}));
+const restore = addMesh(oit, engine, mesh, {opacity: 0.4});
+mesh.setPosition([1, 0, 0]);   // the see-through copy follows
+restore();                     // back to the opaque mesh, the same frame as before
+```
+
+The geometry and material are copied once, so a later `setMaterial` or `setGeometry` needs a new `addMesh`. While
+see-through `mesh.geometry` is null: the mesh casts no shadow and `engine.pick` does not see it, as for every transparent surface.
 
 ## How it works
 

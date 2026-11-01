@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./meshes": {
+      "types": "./dist/meshes.d.ts",
+      "import": "./dist/meshes.js"
     }
   },
   "files": [
@@ -37,7 +41,8 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/materials": "^1.0.0"
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
@@ -45,6 +50,12 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js oit",
     "test": "npm run build && node --test test/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/oit/test/gpu/meshes-check.mjs"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/materials": {
+      "optional": true
+    }
   }
 }

@@ -6,6 +6,7 @@ import { parseGLTF } from '../../gltf-pro/dist/index.js';
 import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
 import { Material, Texture, createMesh } from '../../materials/dist/index.js';
 import { OIT } from '../dist/index.js';
+import { addMesh } from '../dist/meshes.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
 // Opaque, BLEND, BLEND + transmission (keeps the sorted path) and BLEND + clearcoat (physical variant).
@@ -260,4 +261,9 @@ test('two views in one frame keep their own depth scale', async () => {
   assert.notEqual(writes[0][1], writes[1][1], 'the second view writes its own buffer slice');
   assert.ok(scale(writes[0][3]) > scale(writes[1][3]), 'the farther camera has the smaller inverse scale');
   oit.dispose();
+});
+
+test('addMesh refuses a mesh without geometry and an opacity outside 0 to 1', () => {
+  assert.throws(() => addMesh({}, {}, { geometry: null }), /setGeometry/);
+  assert.throws(() => addMesh({}, {}, { geometry: {} }, { opacity: 2 }), /opacity/);
 });
