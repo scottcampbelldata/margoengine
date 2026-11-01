@@ -15,6 +15,23 @@ function attach(engine: EngineKernel) {
 }
 ```
 
+GPU memory and a JSON report are in their own entry:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Stats} from 'margoengine/stats';
+import {GPUMemory, statsReport} from 'margoengine/stats/report';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const memory = GPUMemory.attach(engine.gpu!);   // counts what is made from now on
+const stats = Stats.attach(engine);
+memory.view(stats);                             // a row in the panel
+engine.start();
+console.log(JSON.stringify(statsReport(stats, memory)));
+```
+
+Sizes come from the descriptors, so driver padding is not in them, and objects made before `attach` are not seen.
+
 The engine plugin samples actual frame intervals and counts direct/indirect draw
 and dispatch commands in its frame graph. Render bundle contents and commands
 recorded on other encoders are outside these counters. For a custom encoder,

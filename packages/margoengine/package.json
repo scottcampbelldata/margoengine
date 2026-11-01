@@ -1374,6 +1374,10 @@
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"
     },
+    "./stats/report": {
+      "types": "./dist/stats/report.d.ts",
+      "import": "./dist/stats/report.js"
+    },
     "./taa": {
       "types": "./dist/taa.d.ts",
       "import": "./dist/taa.js"

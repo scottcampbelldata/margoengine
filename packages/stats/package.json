@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./report": {
+      "types": "./dist/report.d.ts",
+      "import": "./dist/report.js"
     }
   },
   "files": [

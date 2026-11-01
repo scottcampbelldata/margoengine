@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4286646,
+  "total": 4288035,
   "history": [
     {
       "date": "2026-10-24",
@@ -1358,6 +1358,12 @@
       "commit": "62a54b159",
       "reason": "clustered/flicker and clustered/budget: flicker curves and a shadow texel budget, own entries, root unchanged",
       "grew": 2
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "62a54b159",
+      "reason": "stats/report: GPUMemory and statsReport, own entry, root unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -1702,6 +1708,7 @@
     "@margoengine/stage/sky": 719,
     "@margoengine/staging": 6296,
     "@margoengine/stats": 4934,
+    "@margoengine/stats/report": 1389,
     "@margoengine/taa": 10390,
     "@margoengine/taa/upscale": 7124,
     "@margoengine/terrain": 11929,
