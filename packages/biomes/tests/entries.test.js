@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { BiomeWorld, DEFAULT_LAYERS, LAYERS } from '../dist/index.js';
 import { canonicalBytes, sha256, tileDigest } from '../dist/digest.js';
 import { LAYER_ABOUT } from '../dist/editor.js';
@@ -41,6 +42,25 @@ test('relief entry: createRelief is the landscape a relief world samples, with i
     assert.equal(height.data[j * 256 + i], relief.height(-256000 + i * 1000, -256000 + j * 1000));
   const water = relief.waterCells([-256000, -256000], 16000, 33, 33);
   assert.ok(water.some((v) => v === 1) && water.every((v) => v === 0 || v === 1));
+});
+
+test('the root entry loads heights and region fields only for a world: no static import reaches them', async () => {
+  const seen = new Set(),
+    walk = (file) => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      const text = readFileSync(new URL(file, import.meta.url), 'utf8');
+      for (const [, name] of text.matchAll(/^import .*?from "\.\/([^"]+)"/gm)) walk('../dist/' + name);
+    };
+  walk('../dist/index.js');
+  const names = [...seen].join(' ');
+  assert.ok(!/region|height/.test(names), names);
+  const { distanceTransform, heightsOf } = await import('../dist/region.js');
+  assert.equal(typeof distanceTransform, 'function');
+  assert.equal(
+    heightsOf(undefined, [0, 0], [256000, 256000], 1, () => ({ height: () => 5 })).grid(0, 0, 1, 1, 4000)[0],
+    5,
+  );
 });
 
 test('relief entry is loaded only by worlds that use it; update to a relief height without it names the fix', () => {

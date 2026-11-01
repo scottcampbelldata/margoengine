@@ -6,7 +6,9 @@
 // passes in integer squared distances); orographic rain, the upslope-condensation model reviewed by Roe 2005 with
 // downwind drift of the condensate and evaporation on descent (Roe and Baker 2006), approximating Smith and Barstad 2004.
 import { type Climate, continentality } from './climate.js';
-import { atan2, clampInt, divFloor, divWide, idiv, imod, isqrt, ONE } from './fixed.js';
+import { atan2, bilinear, clampInt, divFloor, divWide, idiv, imod, isqrt, ONE } from './fixed.js';
+
+export { heightsOf } from './height.js';
 
 /** Region fields of a world: grids of `nx` x `nz` corner samples `step` mm apart, from the world's minimum corner. */
 export interface Region {
@@ -123,20 +125,6 @@ export function priorityFlood(height: Int32Array, nx: number, nz: number, sea: U
   }
   for (let i = 0; i < n; i++) filled[i] -= height[i];
   return filled;
-}
-
-/** Bilinear sample of a region grid at Q16 cell coordinates, clamped to the grid. */
-export function bilinear(grid: Int32Array, nx: number, nz: number, x: number, z: number): number {
-  const fx = clampInt(x, 0, (nx - 1) * ONE),
-    fz = clampInt(z, 0, (nz - 1) * ONE),
-    ix = Math.min(nx - 2, fx >> 16),
-    iz = Math.min(nz - 2, fz >> 16),
-    tx = fx - ix * ONE,
-    tz = fz - iz * ONE,
-    i = iz * nx + ix,
-    a = grid[i] + Math.floor(((grid[i + 1] - grid[i]) * tx) / ONE),
-    b = grid[i + nx] + Math.floor(((grid[i + nx + 1] - grid[i + nx]) * tx) / ONE);
-  return a + Math.floor(((b - a) * tz) / ONE);
 }
 
 /**

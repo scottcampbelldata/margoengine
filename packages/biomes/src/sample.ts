@@ -4,7 +4,8 @@ import type { Climate } from './climate.js';
 import { cellClimate, TPI_RADIUS } from './fields.js';
 import { atan2, clampInt, divFloor, isqrt, ONE } from './fixed.js';
 import type { RasterLayer } from './layers.js';
-import { bilinear, type Region } from './region.js';
+import { bilinear } from './fixed.js';
+import type { Region } from './region.js';
 
 /** Climate values at a point, in plain units (written by `BiomeWorld.sample`). */
 export interface BiomeSample {

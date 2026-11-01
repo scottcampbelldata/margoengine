@@ -38,6 +38,10 @@
       "types": "./dist/presets.d.ts",
       "import": "./dist/presets.js"
     },
+    "./region": {
+      "types": "./dist/region.d.ts",
+      "import": "./dist/region.js"
+    },
     "./relief": {
       "types": "./dist/relief.d.ts",
       "import": "./dist/relief.js"

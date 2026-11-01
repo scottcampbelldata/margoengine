@@ -6,11 +6,11 @@ import { checkPaint, type Classifier, classifier, classify, type PaintLayer, typ
 import { type BiomeDefinition, defineBiome } from './define.js';
 import { tileFields } from './fields.js';
 import { divFloor, imod } from './fixed.js';
-import { type Heights, type HeightSource, heightsOf } from './height.js';
+import type { Heights, HeightSource } from './height.js';
 import { DEFAULT_LAYERS, LAYERS, type RasterLayer } from './layers.js';
 import type { createRelief } from './relief.js';
 import { featherCells, paintReach } from './reach.js';
-import { buildRegion, type Region } from './region.js';
+import type { Region } from './region.js';
 import { Scratch } from './scratch.js';
 import { type BiomeSample, readCell, samplePoint } from './sample.js';
 
@@ -127,7 +127,7 @@ const TILE_SIZES = [128, 256, 512],
 type Rect = readonly [number, number, number, number];
 
 /** createRelief from the relief entry, once a world has loaded it. */
-let relief: typeof createRelief | undefined;
+let relief: typeof createRelief | undefined, regionEntry: typeof import('@margoengine/biomes/region') | undefined;
 
 const aborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw signal.reason;
@@ -243,7 +243,7 @@ export class BiomeWorld implements Disposable {
     this.#kind = options.classifier ?? 'envelopes';
     this.#paint = options.paint ?? [];
     this.#classifier = this.#buildClassifier();
-    this.#heights = heightsOf(options.height, this.#origin, this.#size, this.seed, relief);
+    this.#heights = regionEntry!.heightsOf(options.height, this.#origin, this.#size, this.seed, relief);
     this.#region = this.#buildRegion();
   }
 
@@ -260,6 +260,8 @@ export class BiomeWorld implements Disposable {
     // The procedural relief is its own entry, loaded only for worlds that use it (the default height).
     if (h === undefined || (typeof h === 'object' && h !== null && 'relief' in h))
       relief ??= (await import('@margoengine/biomes/relief')).createRelief;
+    // Heights and region fields are their own entry, so a program that only defines biomes never loads them.
+    regionEntry ??= await import('@margoengine/biomes/region');
     aborted(options.signal);
     const world = new BiomeWorld(options, biomes),
       { workers } = options;
@@ -337,7 +339,7 @@ export class BiomeWorld implements Disposable {
       nz = divFloor(this.#size[1], step) + 1,
       height = this.#heights.grid(0, 0, nx, nz, step),
       water = this.#heights.relief?.waterCells(this.#origin, step, nx, nz);
-    return buildRegion(height, nx, nz, step, this.#climate, water);
+    return regionEntry!.buildRegion(height, nx, nz, step, this.#climate, water);
   }
 
   #live(): void {
@@ -783,7 +785,7 @@ export class BiomeWorld implements Disposable {
   }
 
   #replaceHeights(source: HeightSource): void {
-    this.#heights = heightsOf(source, this.#origin, this.#size, this.seed, relief);
+    this.#heights = regionEntry!.heightsOf(source, this.#origin, this.#size, this.seed, relief);
   }
 
   #emit(rect: Rect): void {

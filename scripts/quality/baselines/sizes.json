@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4305748,
+  "total": 4307277,
   "history": [
     {
       "date": "2026-10-24",
@@ -1394,6 +1394,12 @@
       "commit": "7b7662129",
       "reason": "oit/meshes: addMesh draws a core mesh see-through through a materials copy, own entry",
       "grew": 3
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "b2e7cc033",
+      "reason": "biomes J1: root under the spec's 16,000 B; heights and region fields move to the lazy biomes/region entry, loaded by BiomeWorld.create",
+      "grew": 1
     }
   ],
   "items": {
@@ -1407,8 +1413,8 @@
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
-    "@margoengine/biomes": 18360,
-    "@margoengine/biomes dist/workers/biomes.js": 41083,
+    "@margoengine/biomes": 15776,
+    "@margoengine/biomes dist/workers/biomes.js": 40524,
     "@margoengine/biomes/cover": 3608,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/editor": 3644,
@@ -1417,6 +1423,7 @@
     "@margoengine/biomes/objects": 3835,
     "@margoengine/biomes/placement": 11951,
     "@margoengine/biomes/presets": 2024,
+    "@margoengine/biomes/region": 4672,
     "@margoengine/biomes/relief": 4553,
     "@margoengine/biomes/rivers": 1567,
     "@margoengine/biomes/stats": 2755,

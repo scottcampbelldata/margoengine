@@ -1403,12 +1403,10 @@
       "continentality",
       "defineBiome",
       "degreeDays",
-      "distanceTransform",
       "evapotranspiration",
       "halfAmplitude",
       "heatLoad",
       "moistureIndex",
-      "priorityFlood",
       "quantizeClimate",
       "seasonMean",
       "treelineMargin"

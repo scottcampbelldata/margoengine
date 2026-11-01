@@ -697,6 +697,22 @@ console.log(world.sample(0, 0).height); // the peak is near the middle; every ed
 `quantizeHeights(floats, unit?)` (in `/toolkit`) turns float heights (metres times `unit`) into integer millimetres once, so a
 heightmap from any source enters the integer world the same way everywhere.
 
+## Region fields on your own grid
+
+`@margoengine/biomes/region` holds height sampling and the region fields of a world: `BiomeWorld.create` loads it with
+`import()`, so a program that only calls `defineBiome` or reads the root's climate functions never does. Its Priority-Flood and
+distance transform work on any integer grid.
+
+```ts
+import { distanceTransform, priorityFlood } from '@margoengine/biomes/region';
+
+const heights = Int32Array.of(5000, 5000, 5000, 5000, 1000, 5000, 5000, 5000, 5000); // 3 x 3 cells, millimetres
+const fill = priorityFlood(heights, 3, 3, new Uint8Array(9)); // the middle cell fills 4,000 mm to its rim
+const water = new Uint8Array(9);
+water[4] = 1;
+console.log(fill[4], distanceTransform(water, 3, 3)[0]); // 4000 2, squared cells from the corner to the middle
+```
+
 ## The reference world R16
 
 `R16` (in `/presets`) is the fixed scene of every biomes benchmark and quality report: 16 km by 16 km at 1 m, a western coast, two

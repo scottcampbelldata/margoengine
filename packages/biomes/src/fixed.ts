@@ -354,3 +354,17 @@ export function fade(t: number): number {
     poly = Math.floor((6 * a - 15 * ONE * t + 10 * ONE * ONE) / ONE);
   return Math.floor((cube * poly) / 4294967296);
 }
+
+/** Bilinear sample of a region grid at Q16 cell coordinates, clamped to the grid. */
+export function bilinear(grid: Int32Array, nx: number, nz: number, x: number, z: number): number {
+  const fx = clampInt(x, 0, (nx - 1) * ONE),
+    fz = clampInt(z, 0, (nz - 1) * ONE),
+    ix = Math.min(nx - 2, fx >> 16),
+    iz = Math.min(nz - 2, fz >> 16),
+    tx = fx - ix * ONE,
+    tz = fz - iz * ONE,
+    i = iz * nx + ix,
+    a = grid[i] + Math.floor(((grid[i + 1] - grid[i]) * tx) / ONE),
+    b = grid[i + nx] + Math.floor(((grid[i + nx + 1] - grid[i + nx]) * tx) / ONE);
+  return a + Math.floor(((b - a) * tz) / ONE);
+}

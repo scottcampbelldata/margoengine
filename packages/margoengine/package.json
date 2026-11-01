@@ -90,6 +90,10 @@
       "types": "./dist/biomes/presets.d.ts",
       "import": "./dist/biomes/presets.js"
     },
+    "./biomes/region": {
+      "types": "./dist/biomes/region.d.ts",
+      "import": "./dist/biomes/region.js"
+    },
     "./biomes/relief": {
       "types": "./dist/biomes/relief.d.ts",
       "import": "./dist/biomes/relief.js"

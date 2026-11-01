@@ -10,15 +10,14 @@ import {
   DEFAULT_LAYERS,
   LAYERS,
   degreeDays,
-  distanceTransform,
   moistureIndex,
-  priorityFlood,
   quantizeClimate,
   evapotranspiration,
   halfAmplitude,
   continentality,
   treelineMargin,
 } from '../dist/index.js';
+import { distanceTransform, priorityFlood } from '../dist/region.js';
 import { ONE, qacos } from '../dist/toolkit.js';
 import { random } from './random.js';
 
