@@ -1607,3 +1607,11 @@ test('lightmap: physical irradiance is divided by pi once; every chart is found 
     renderer.dispose();
   }
 });
+
+// 8b461567e: alpha to coverage with filtered alpha gave every leaf layer the same sample mask, so what stood behind a
+// canopy showed at about 50 percent. The cutout edge is sharpened at 0.5.
+test('alpha to coverage takes a sharpened cutout edge', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/render.ts', import.meta.url), 'utf8');
+  assert.ok(source.includes('(s.base.a-0.5)/max(fwidth(s.base.a),0.0001)+0.5,MODE==2u'));
+});

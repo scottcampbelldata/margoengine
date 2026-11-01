@@ -630,3 +630,18 @@ test('setup refuses a device of the WebGL2 compatibility layer with a coded erro
   });
   assert.equal(device.buffers.length, 0, 'nothing was allocated');
 });
+
+// d10222cf2: a comparison and an ampersand mixed without parentheses, which WGSL rejects, so no pipeline could be built.
+// Compiling it is this package's test:gpu; this keeps the mistake from waiting for a GPU run.
+// 789316788: a ray leaving a contact-transmitting blend passes with the glass share over (1 - 0.4 metal).
+// bba322970: without a string annotation the declarations carried the WGSL as literal types, 34 kB in the tarball.
+test('the trace shader source: octant test, metal-and-glass exit, declarations without the WGSL', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/shaders.ts', import.meta.url), 'utf8');
+  assert.ok(source.includes('((d>vec3f(0.0))&(*h==vec3u(0u)))|((d<vec3f(0.0))&(*h==vec3u(1u)))'));
+  assert.doesNotMatch(source, /[<>]vec3f\([^)]*\)&/, 'a comparison next to an ampersand needs its own parentheses');
+  assert.ok(source.includes('rand()>=mc.glass/max(1e-6,1.0-0.4*mc.metal)'));
+  const declarations = await readFile(new URL('../dist/shaders.d.ts', import.meta.url), 'utf8');
+  assert.ok(declarations.length < 4096, `dist/shaders.d.ts is ${declarations.length} B`);
+  assert.doesNotMatch(declarations, /@compute|@group/);
+});

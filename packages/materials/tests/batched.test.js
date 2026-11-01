@@ -176,3 +176,11 @@ test('the batch shader reads each vertex owner and item record', () => {
   for (const name of ['source', 'output', 'items', 'owner', 'counts']) assert.match(batchShader, new RegExp(name));
   assert.match(batchShader, /tint\.w<0\.5/, 'hidden items collapse');
 });
+
+// e01ffe38e: the message named other tools; a message names the rule and the fix.
+test('an invalid shininess names the fix, not other tools', () => {
+  assert.throws(
+    () => new Material({ shading: 'phong', shininess: -1 }),
+    (error) => error instanceof RangeError && /set a number/.test(error.message) && !/three.js|Crocotile/.test(error.message),
+  );
+});

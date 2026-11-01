@@ -172,3 +172,12 @@ test('a texture atlas draws one frame per particle, random at spawn or stepped o
     );
   assert.doesNotThrow(make({ columns: 8, rows: 4, frames: 'lifetime' }));
 });
+
+// 1278ffe4c: sub-pixel embers lit a pixel only when they covered its centre, so they flickered as they moved.
+test('a far particle is drawn at least 1.5 px across with its alpha scaled by the area it gained', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/shader.ts', import.meta.url), 'utf8');
+  assert.ok(source.includes('let grow=select(1.0,max(1.0,1.5/pixels),pixels>0);'));
+  assert.ok(source.includes('*p.velocitySize.w*0.5*grow;'));
+  assert.ok(source.includes('/(grow*grow));return o;'));
+});
