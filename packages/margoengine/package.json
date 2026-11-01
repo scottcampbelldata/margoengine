@@ -1474,6 +1474,10 @@
       "types": "./dist/voxel-edit/export.d.ts",
       "import": "./dist/voxel-edit/export.js"
     },
+    "./voxel-edit/formats": {
+      "types": "./dist/voxel-edit/formats.d.ts",
+      "import": "./dist/voxel-edit/formats.js"
+    },
     "./voxel-edit/assist": {
       "types": "./dist/voxel-edit/assist.d.ts",
       "import": "./dist/voxel-edit/assist.js"

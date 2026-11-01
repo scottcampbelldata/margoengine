@@ -59,6 +59,10 @@
       "types": "./dist/export.d.ts",
       "import": "./dist/export.js"
     },
+    "./formats": {
+      "types": "./dist/formats.d.ts",
+      "import": "./dist/formats.js"
+    },
     "./assist": {
       "types": "./dist/assist.d.ts",
       "import": "./dist/assist.js"

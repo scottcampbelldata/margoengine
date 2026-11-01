@@ -592,6 +592,19 @@ Written clean room; no source of ipywidgets' widget implementations, anywidget, 
 | PNG export (`Figure.to_png`) | RFC 6455 "The WebSocket Protocol" (opening handshake, framing, client masking); the Chrome DevTools Protocol documentation (`Target.attachToTarget` flat sessions, `SystemInfo.getProcessInfo`, `Emulation.setDeviceMetricsOverride`, `Page.navigate`, `Runtime.evaluate`, `Page.captureScreenshot`, `Browser.close`; the `DevToolsActivePort` file) |
 | Polars and xarray inputs | The Polars and xarray user guides (DataFrame and LazyFrame `select` and `collect`, `Series.to_numpy`; DataArray `dims`, `coords` and `attrs`) and the CF conventions (`long_name`, `units`) |
 
+## Voxel files: `@margoengine/voxel-edit/formats`
+
+File layouts, written from each format's public description; no reader or writer of another project was read.
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| VF1 | Qubicle `.qb`: six u32 header fields, matrix name and size, z y x cell order, CODEFLAG 2 and NEXTSLICEFLAG 6 RLE | voxel-edit/src/formats.ts | Minddesk, "Qubicle Binary" file format description (Qubicle documentation) |
+| VF2 | Qubicle Exchange `.qef`: text header, 0 to 1 colours, one `x y z index mask` line per voxel | voxel-edit/src/formats.ts | Minddesk, "Qubicle Exchange Format" description (Qubicle documentation) |
+| VF3 | `binvox`: text header, then value and count byte pairs; x slowest, then z, y fastest | voxel-edit/src/formats.ts | Patrick Min, "binvox voxel file format specification" |
+| VF4 | KVX: header, column offsets, slab records of top, length, cull and colours; 6 bit palette in the last 768 bytes | voxel-edit/src/formats.ts | Ken Silverman, the KVX description in the SLAB6 documentation |
+| VF5 | VXL: columns of spans N, S, E, A with BGRA dwords for top and bottom colours; N of 0 ends a column | voxel-edit/src/formats.ts | Ken Silverman, the VXL format description in the Voxlap documentation |
+| VF6 | over 255 colours: drop the same low bits of each channel until 255 remain, keeping the bucket's centre | voxel-edit/src/formats.ts | Margo-own: deterministic, plain bit truncation; median cut is in the `./voxelize` entry |
+
 ## Rigging: `@margoengine/rigging`
 
 Written clean room from the papers and specifications below. No source code of rigging tools or engines (Blender,

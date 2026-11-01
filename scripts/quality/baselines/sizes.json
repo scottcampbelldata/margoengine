@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4182770,
+  "total": 4187178,
   "history": [
     {
       "date": "2026-10-24",
@@ -1232,6 +1232,12 @@
       "commit": "764e66da1",
       "reason": "new entry @margoengine/taa/upscale, row 21.6 job 3",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "a3b1efae0",
+      "reason": "row 26 job 9: voxel-edit/formats, new optional entry for QB, QEF, binvox, KVX and VXL",
+      "grew": 1
     }
   ],
   "items": {
@@ -1589,6 +1595,7 @@
     "@margoengine/voxel-edit/assist": 1255,
     "@margoengine/voxel-edit/edit": 10734,
     "@margoengine/voxel-edit/export": 9297,
+    "@margoengine/voxel-edit/formats": 4408,
     "@margoengine/voxel-edit/history": 1330,
     "@margoengine/voxel-edit/library": 1255,
     "@margoengine/voxel-edit/mesh": 9456,

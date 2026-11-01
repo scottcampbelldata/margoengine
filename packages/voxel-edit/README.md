@@ -58,6 +58,7 @@ corner coordinates.
 | `./animation` | `packFrames` / `unpackFrames` (each distinct model stored once) and `localFrame` (a clip's clock: offset, speed, loop or hold) |
 | `./history` | `VoxelHistory`: undo/redo of copied grids with depth, per-grid cell and total byte budgets |
 | `./export` | `gridToExportSource`: meshes a grid into one primitive per palette material (corner AO as vertex colours), the `{nodes}` scene `exportGLB`, `exportUSDZ` and `exportOBJ` take |
+| `./formats` | voxel files other tools write: `parseQB` / `writeQB` and `parseQEF` / `writeQEF` (Qubicle), `parseBinvox`, `parseKVX` and `parseVXL`; models, palette, positions, with cell budgets |
 | `./assist` | `noiseFill` (seeded random fill), `suggestPalette` (seeded hues, linear sRGB) and `paletteUsage` (cells per index) |
 | `./library` | `fetchLibrary` / `fetchAsset` / `resolveLibraryUrl`: list and fetch `.vox` packs from a JSON index, with a body size limit and abort |
 
@@ -75,6 +76,32 @@ and the one Margo Voxel Studio saves. `'pivot-v1'` turns the model about its cor
 `@margoengine/voxel-pathtracer` `magicaVoxelMatrix`. Each name is a fixed contract; a new convention gets a new name.
 The resolver uses the key in force at the frame (the latest at or before it, else the earliest; the first listed
 among keys of one frame), while `pasteVoxModel` uses each track's first-listed key.
+
+## Voxel files
+
+`./formats` reads the files other voxel tools write into the grid and palette the rest of this package uses. Index i of
+the palette sits at `4 * i`, as in `parseVox`.
+
+```ts
+import { parseQB, writeQEF } from '@margoengine/voxel-edit/formats';
+
+const bytes = new Uint8Array(await (await fetch('/models/robot.qb')).arrayBuffer());
+const { models, palette, colorsReduced } = parseQB(bytes, { maxCells: 16_000_000 });
+if (colorsReduced) console.warn('over 255 colours: nearby ones were merged');
+const text = writeQEF(models[0].grid, palette);
+```
+
+| Format | Read | Write | What to know |
+| --- | --- | --- | --- |
+| Qubicle `.qb` | `parseQB` | `writeQB` | every matrix with its name and position; RGBA or BGRA, RLE or plain, left or right handed; alpha 0 is air; a visibility mask counts as opaque |
+| Qubicle `.qef` | `parseQEF` | `writeQEF` | one model; text; mask 0 is hidden; no alpha |
+| `binvox` | `parseBinvox` | | one model of index 1, plus the header's `translate` and `scale` |
+| KVX | `parseKVX` | | the first, largest mip; colour 255 is air; file colour k is index k + 1; `pivot` in cells |
+| VXL | `parseVXL` | | Voxlap maps, with a header or bare (`size`, default 512 x 512 x 64); solid cells without a colour take the last one above them |
+
+KVX and VXL have z running down in the file, so they turn to Y up on reading: the file's y becomes z. A true-colour file
+with over 255 colours loses low bits from each channel, the same on every run, until 255 are left, and `colorsReduced`
+is true. Minecraft `.schematic` and Goxel `.gox` are left out on purpose.
 
 ## Saved formats
 
