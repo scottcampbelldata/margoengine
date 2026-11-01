@@ -63,6 +63,7 @@ export interface BiomeViewOptions {
     readonly shadows?: BiomeShadows;
     readonly water?: boolean | 'auto' | BiomeWaterSettings;
     readonly sky?: BiomeSky;
+    readonly seasons?: BiomeSeasons;
 }
 
 export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon' | 'terrain' | 'spray' | 'fill' | 'still'> & {
@@ -161,6 +162,30 @@ interface BiomeSample {
     soil: number;
     biomes: string[];
     weights: number[];
+}
+
+class BiomeSeasons implements Disposable {
+    readonly world: BiomeWorld;
+    private constructor();
+    static attach(world: BiomeWorld, options: BiomeSeasonsOptions): BiomeSeasons;
+    get dayOfYear(): number;
+    get weather(): Required<SeasonWeather>;
+    set(options: BiomeSeasonsOptions): void;
+    onChange(listener: () => void): () => void;
+    stateOf(tile: BiomeTile): RasterLayer;
+    tile(x: number, z: number, options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<RasterLayer>;
+    at(x: number, z: number, out?: Uint8Array): Uint8Array;
+    colorAt(base: readonly [number, number, number], x: number, z: number): [number, number, number];
+    isSeasonal(biome: string, species?: string): boolean;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+interface BiomeSeasonsOptions {
+    readonly dayOfYear?: number;
+    readonly weather?: SeasonWeather;
 }
 
 interface BiomeTile {
@@ -397,6 +422,11 @@ interface ReliefOptions {
     readonly shelf?: number;
     readonly valley?: ValleyOptions;
     readonly islands?: IslandOptions;
+}
+
+interface SeasonWeather {
+    readonly snowfall?: number;
+    readonly rain?: number;
 }
 
 type SizeDistribution = {

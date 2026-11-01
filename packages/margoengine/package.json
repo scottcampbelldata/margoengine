@@ -98,6 +98,10 @@
       "types": "./dist/biomes/hydrology.d.ts",
       "import": "./dist/biomes/hydrology.js"
     },
+    "./biomes/seasons": {
+      "types": "./dist/biomes/seasons.d.ts",
+      "import": "./dist/biomes/seasons.js"
+    },
     "./biomes/relief": {
       "types": "./dist/biomes/relief.d.ts",
       "import": "./dist/biomes/relief.js"

@@ -784,6 +784,64 @@ console.log(lines.length, flow.data[0], twi.data[0], hand.data[0], lake.data[0],
 | `lakeDepth` | 1,000 | fill depth in mm that makes a cell a lake |
 | `multiple` | false | route `shares` over every lower neighbour; wetness reads them |
 
+## Seasons
+
+`@margoengine/biomes/seasons` gives each cell a state for one day of the year, 4 bytes in integers (the same bytes
+everywhere): R green-up, G senescence, B snow and A wetness, each 0 to 255. It reads the temperature, warmest-month,
+rainfall and moisture layers the world already makes and adds none, so tiles, placement and their digests do not change.
+
+- **Green-up** counts degree days above 5 C from the spring crossing (the partial-year integral of the sinusoidal year,
+  McMaster and Wilhelm 1997); 200 C day is full green. A cell above 5 C all year stays green.
+- **Senescence** grows from the warmest day to the autumn crossing of 5 C, as the share of the cooling between them,
+  and stays full through the dormant season.
+- **Snow** is the precipitation of the days below 0 C since the autumn crossing, melted at 3 mm per thaw degree day (Hock
+  2003) from the spring crossing; 50 mm of snow water covers the ground. Snow that outlasts the summer lies all year.
+- **Wetness** is the soil moisture, raised toward 255 by `weather.rain`.
+
+The counts start at the season crossings, not at 1 January, so 31 December runs into 1 January without a step. South
+of the equator the year is half a year on. `seasonalColor(base, state)` turns a colour with the state: autumn orange,
+bare straw in winter, darker on wet ground and white under snow. Species with `color: { seasonal: true }` and biomes
+with `tint: { seasonal: true }` follow it when `BiomeView` or `BiomeObjects` gets the seasons.
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeSeasons, seasonalColor } from '@margoengine/biomes/seasons';
+
+const world = await BiomeWorld.create({ size: [1024, 1024], climate: { latitude: 50 } });
+using seasons = BiomeSeasons.attach(world, { dayOfYear: 300, weather: { rain: 0.4 } });
+const state = await seasons.tile(1, 1); // rgba8, one texel per cell
+const [green, autumn, snow, wet] = seasons.at(0, 0);
+const leaf = seasonalColor([0.14, 0.3, 0.05], state.data, 0);
+seasons.set({ dayOfYear: 20 }); // midwinter; views and objects that hold these seasons repaint
+console.log(green, autumn, snow, wet, leaf);
+```
+
+With a view, pass the seasons as an option. The plant cover ground of seasonal biomes and the foliage of seasonal
+species take the state at the world's centre, one colour per material (a per-texel tint needs a terrain feature that
+is not built yet). Without `seasons` the view draws exactly what it drew before.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld, defineBiome } from '@margoengine/biomes';
+import { presets } from '@margoengine/biomes/presets';
+import { BiomeSeasons } from '@margoengine/biomes/seasons';
+import { BiomeView } from '@margoengine/biomes/view';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const temperate = defineBiome({ ...presets.temperate, tint: { seasonal: true } });
+const world = await BiomeWorld.create({ biomes: [temperate, presets.alpine] });
+const seasons = BiomeSeasons.attach(world, { dayOfYear: 290 });
+const view = await BiomeView.attach(engine, world, { seasons });
+seasons.set({ dayOfYear: 120 }); // spring green-up
+console.log(view.materials);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `dayOfYear` | required | integer 1 to 365, 1 is 1 January |
+| `weather.snowfall` | 1 | share of the cold season's precipitation that lies as snow, 0 to 1 |
+| `weather.rain` | 0 | rain now, 0 to 1: wetness rises from the soil moisture toward 255 |
+
 ## The reference world R16
 
 `R16` (in `/presets`) is the fixed scene of every biomes benchmark and quality report: 16 km by 16 km at 1 m, a western coast, two

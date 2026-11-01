@@ -137,3 +137,49 @@ test('each tree, shrub and rock part gets its LOD mesh chain, per-instance tint 
   assert.ok(luma(greens[0]) > 0.162 && luma(greens[1]) > 0.162 && luma(greens[2]) > 0.115, `brighter: ${greens}`);
   objects.dispose();
 });
+
+test('seasons tint the foliage of seasonal species only, follow seasons.set, and leave the rest as it was', async () => {
+  const { BiomeWorld } = await import('../dist/index.js'),
+    { presets } = await import('../dist/presets.js'),
+    { BiomeSeasons } = await import('../dist/seasons.js'),
+    [first, ...rest] = presets.temperate.plants,
+    forest = { ...presets.temperate, plants: [{ ...first, color: { seasonal: true } }, ...rest] },
+    world = await BiomeWorld.create({ size: [256, 256], biomes: [forest], height: { field: () => 1000 } }),
+    seasons = BiomeSeasons.attach(world, { dayOfYear: 20 }),
+    engine = { camera: { position: [0, 0, 0] }, use() {} },
+    species = [
+      { key: 'temperate/a', id: first.id, biome: 'temperate', mesh: 'procedural:broadleaf', layer: 1 },
+      { key: 'temperate/b', id: 'not-seasonal', biome: 'temperate', mesh: 'procedural:broadleaf', layer: 1 },
+    ],
+    placement = { tile() {}, species, details: [], tileSize: 256 },
+    bounds = [-128, -128, 128, 128],
+    color = (part) => [...part.options.material.data.slice(0, 3)],
+    near = (a, b) => a.every((c, i) => Math.abs(c - b[i]) < 1e-6),
+    leaf = [0.14, 0.3, 0.05];
+  await assert.rejects(
+    BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds, seasons: {} }),
+    TypeError,
+  );
+  const plain = await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds }),
+    tinted = await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds, seasons });
+  // [a trunk, a canopy, b trunk, b canopy, snag trunk, ...]: only the seasonal canopy moves.
+  const [pa, pc, pb, pd] = plain.casters,
+    [ta, tc, tb, td] = tinted.casters;
+  assert.equal(plain.seasonalMaterials.length, 0);
+  assert.equal(tinted.seasonalMaterials.length, 1);
+  assert.ok(near(color(pc), leaf));
+  assert.ok(near(color(tc), seasons.colorAt(leaf, 0, 0)) && !near(color(tc), leaf), `winter ${color(tc)}`);
+  for (const [p, t] of [
+    [pa, ta],
+    [pb, tb],
+    [pd, td],
+  ])
+    assert.deepEqual(color(t), color(p));
+  const winter = color(tc);
+  seasons.set({ dayOfYear: 200 });
+  assert.ok(near(color(tc), seasons.colorAt(leaf, 0, 0)) && !near(color(tc), winter), `summer ${color(tc)}`);
+  tinted.dispose();
+  seasons.set({ dayOfYear: 20 });
+  assert.ok(!near(color(tc), winter), 'a disposed BiomeObjects no longer follows the seasons');
+  plain.dispose();
+});

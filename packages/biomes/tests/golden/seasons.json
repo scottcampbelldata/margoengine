@@ -1,0 +1,6 @@
+{
+  "$comment": "SHA-256 of the canonical bytes of BiomeSeasons tile(1, 0) for the 512 m temperate preset world, seed 1 (seasons.test.js). A change here changes every season state; advance it only with a reason in the commit.",
+  "temperate-1-day1": "2d23944f6e44765ca3f0ff50db9c1252fd2d8c9454dd4d57a24f6a18440676b2",
+  "temperate-1-day180": "e5ea4dd4dbbcc87c7601d0358c293e337c35f82f5619660d09203050a29f89ba",
+  "temperate-1-day365": "f23a1b6a0476179b1816ec468542314bf9697271152e7e7260bc75f7b4f0d314"
+}

@@ -109,6 +109,12 @@ export interface StandRule {
 export interface ColorVariation {
   readonly hue?: number;
   readonly value?: number;
+  /**
+   * Follow the seasons: with a `BiomeSeasons` (`@margoengine/biomes/seasons`) given to `BiomeView` or `BiomeObjects`,
+   * the colour goes through `seasonalColor` (green-up, autumn colour, bare winter, snow and wet ground). On a species'
+   * `color` it tints that species' foliage; on a biome's `tint` it tints every species and detail of the biome and its
+   * plant cover ground. Placement is unchanged. Default false.
+   */
   readonly seasonal?: boolean;
 }
 

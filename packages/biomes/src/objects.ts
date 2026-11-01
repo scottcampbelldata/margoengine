@@ -4,11 +4,12 @@
 // snags; every detail species (grass, ferns, reeds) is a camera-following `Scatter` whose density map is the
 // placement's detail map, so grass is drawn per frame and never stored. Meshes come from `@margoengine/procedural`
 // (the `procedural:<name>` keys of the presets). Scatter, its tiles entry, procedural and core are loaded on attach.
-import type { EngineKernel, Geometry } from '@margoengine/core';
+import type { EngineKernel, Geometry, PbrMaterial } from '@margoengine/core';
 import type { Scatter } from '@margoengine/scatter';
 import type { ScatterTiles } from '@margoengine/scatter/tiles';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { BiomePlacement, PlacedTile } from './placement.js';
+import type { BiomeSeasons } from './seasons.js';
 import type { BiomeWorld } from './world.js';
 
 /** Settings of {@link BiomeObjects.attach}. */
@@ -33,6 +34,13 @@ export interface BiomeObjectsOptions {
    * to `far.count` of them (default 300,000), lit by the engine light, no shadows. Default none.
    */
   readonly far?: { readonly radius: number; readonly count?: number; readonly world: BiomeWorld };
+  /**
+   * Seasons from `@margoengine/biomes/seasons` over the placement's world: the foliage of species with `color.seasonal`
+   * (and of every species and detail of a biome with `tint.seasonal`) takes `seasonalColor` of its base colour under the
+   * state at the centre of `bounds`, and follows each `seasons.set`. Placement and instances are unchanged; only colour
+   * moves. Default none: the colours stay as they are.
+   */
+  readonly seasons?: BiomeSeasons;
 }
 
 /** Default {@link BiomeObjectsOptions.detailBudget}: 128 MiB of detail maps. */
@@ -180,8 +188,11 @@ function partsOf(key: string, p: Procedural, make: (data: Data) => Geometry): Pa
 export class BiomeObjects implements Disposable {
   readonly #engine: EngineKernel;
   readonly #placement: BiomePlacement;
-  readonly #options: Required<Omit<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far'>> &
-    Pick<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far'>;
+  readonly #options: Required<Omit<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far' | 'seasons'>> &
+    Pick<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far' | 'seasons'>;
+  /** Foliage materials that follow the seasons, with their base colours, and the seasons listener's remover. */
+  readonly #seasonal: { material: PbrMaterial; base: readonly [number, number, number] }[] = [];
+  #offSeasons?: () => void;
   readonly #modules: Modules;
   /** Per species key: its ScatterTiles (one per mesh part) and the distance it is drawn within. */
   readonly #species = new Map<string, { tiles: ScatterTiles[]; radius: number }>();
@@ -221,6 +232,8 @@ export class BiomeObjects implements Disposable {
         throw rangeError(`BiomeObjects ${key} must be above 0`, 'biomes');
     if (!(b[2] > b[0] && b[3] > b[1]))
       throw rangeError('BiomeObjects bounds must be [minX, minZ, maxX, maxZ] with max above min', 'biomes');
+    if (options.seasons !== undefined && typeof options.seasons?.colorAt !== 'function')
+      throw typeError('BiomeObjects seasons must be a BiomeSeasons from @margoengine/biomes/seasons', 'biomes');
     // Checked before anything is allocated: a huge world or a fine resolution must not ask for gigabytes of maps.
     const limit = (engine as unknown as { gpu?: GPUDevice }).gpu?.limits.maxTextureDimension2D ?? 8192;
     if (!detailFits(b, options.detailResolution ?? 2, placement.details.length, limit, options.detailBudget))
@@ -237,6 +250,10 @@ export class BiomeObjects implements Disposable {
     ]);
     const objects = new BiomeObjects(engine, placement, options, { tiles, scatter, procedural, core });
     objects.#build();
+    if (objects.#seasonal.length)
+      objects.#offSeasons = options.seasons!.onChange(() => {
+        for (const { material, base } of objects.#seasonal) material.set({ color: objects.#tint(base) });
+      });
     if (options.far) {
       const { FarForest } = await import('@margoengine/biomes/far'),
         r = objects.#options.radius,
@@ -283,7 +300,8 @@ export class BiomeObjects implements Disposable {
     const { radius, detailRadius, detailResolution, bounds, heightmap } = this.#options,
       side = this.#placement.tileSize,
       // Canopy trees are drawn within the full radius, smaller plants, rocks and props within 300 m.
-      tiles = (key: string, near: boolean) => {
+      seasons = this.#options.seasons,
+      tiles = (key: string, near: boolean, seasonal = false) => {
         const r = near ? Math.min(radius, 300) : radius,
           // Room for every tile within the draw distance plus a tile: a view keeps a tile's objects until it is a whole
           // tile beyond (sized for the distance alone, a view with tiles queued ran out of slots in a frame).
@@ -301,7 +319,7 @@ export class BiomeObjects implements Disposable {
               lod: [r * 0.15, r * 0.4, r],
               lodFade: 0,
               // Lit by the engine's sun and sky and shadowed by an attached Shadows, like the terrain under it.
-              material: this.#material(part.color),
+              material: this.#material(part.color, seasonal && part.kind === 'foliage'),
               // Each object its own tint; leaves shade as clusters (a few vertex operations, shadows unchanged).
               ...OBJECT_LOOKS[part.kind],
               maxSlope: 90,
@@ -313,7 +331,8 @@ export class BiomeObjects implements Disposable {
           );
         return { radius: r, tiles: list };
       };
-    for (const s of this.#placement.species) this.#species.set(s.key, tiles(s.mesh, s.layer !== 1));
+    for (const s of this.#placement.species)
+      this.#species.set(s.key, tiles(s.mesh, s.layer !== 1, !!seasons?.isSeasonal(s.biome, s.id)));
     this.#snags = tiles('procedural:snag', false);
     const [x0, z0, x1, z1] = bounds,
       width = Math.ceil((x1 - x0) / detailResolution), // float division: view only
@@ -337,7 +356,10 @@ export class BiomeObjects implements Disposable {
         lod: [detailRadius * 0.3, detailRadius * 0.6, detailRadius],
         lodFade: 0,
         edgeShrink: detailRadius * 0.2,
-        material: this.#material(parts[0].color),
+        material: this.#material(
+          parts[0].color,
+          !!seasons?.world.biomes.some((b) => b.tint?.seasonal && b.details?.some((r) => r.id === d.id)),
+        ),
         maxSlope: 60,
         wind: [1, 0, 0.5],
         ...(parts[0].blades ? { blades: {} } : {}),
@@ -346,9 +368,26 @@ export class BiomeObjects implements Disposable {
     }
   }
 
-  /** A rough, double-sided PBR material of a part's colour (linear RGB). */
-  #material(color: readonly [number, number, number]) {
-    return new this.#modules.core.PbrMaterial({ color, roughness: 0.85 });
+  /**
+   * A rough, double-sided PBR material of a part's colour (linear RGB); a `seasonal` one takes the seasons' tint and is
+   * kept to follow them.
+   */
+  #material(color: readonly [number, number, number], seasonal = false) {
+    if (!seasonal) return new this.#modules.core.PbrMaterial({ color, roughness: 0.85 });
+    const material = new this.#modules.core.PbrMaterial({ color: this.#tint(color), roughness: 0.85 });
+    this.#seasonal.push({ material, base: color });
+    return material;
+  }
+
+  /** A base colour under the season state at the centre of `bounds`. */
+  #tint(base: readonly [number, number, number]): [number, number, number] {
+    const [x0, z0, x1, z1] = this.#options.bounds;
+    return this.#options.seasons!.colorAt(base, (x0 + x1) / 2, (z0 + z1) / 2);
+  }
+
+  /** Foliage materials that follow the seasons (with `seasons` set): one per seasonal species part and detail. */
+  get seasonalMaterials(): readonly PbrMaterial[] {
+    return this.#seasonal.map((entry) => entry.material);
   }
 
   /**
@@ -551,6 +590,7 @@ export class BiomeObjects implements Disposable {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#offSeasons?.();
     this.#far?.dispose();
     // Sharing parts first, then the part whose buffers they read.
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])

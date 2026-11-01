@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4317099,
+  "total": 4321735,
   "history": [
     {
       "date": "2026-10-24",
@@ -1418,6 +1418,12 @@
       "commit": "a56903ca9",
       "reason": "biomes/placement measured 12306 B gzip against its 11951 B budget (+355 B): band loading (5b8f66045 to 7e3fa7060, branch agent-build-step-1-biomes-j2-reduce-cp-376b3c27) makes only the band of each neighbour that placement reads; no size authorisation is on record in the repository, so the growth is left to manager review",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "88d62ef4",
+      "reason": "biomes J4: /seasons entry, seasonal tint in view/objects; sky K1 sunPath (Spencer 1971)",
+      "grew": 4
     }
   ],
   "items": {
@@ -1439,15 +1445,16 @@
     "@margoengine/biomes/far": 3996,
     "@margoengine/biomes/hydrology": 4679,
     "@margoengine/biomes/koppen": 1231,
-    "@margoengine/biomes/objects": 3835,
+    "@margoengine/biomes/objects": 4203,
     "@margoengine/biomes/placement": 12676,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/region": 4672,
     "@margoengine/biomes/relief": 4553,
     "@margoengine/biomes/rivers": 1567,
+    "@margoengine/biomes/seasons": 3286,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 3176,
-    "@margoengine/biomes/view": 9943,
+    "@margoengine/biomes/view": 10458,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,
@@ -1752,7 +1759,7 @@
     "@margoengine/sky/night": 2523,
     "@margoengine/sky/preetham": 953,
     "@margoengine/sky/reflection": 1325,
-    "@margoengine/sky/sun": 1917,
+    "@margoengine/sky/sun": 2384,
     "@margoengine/sky/weather": 5874,
     "@margoengine/splats": 24851,
     "@margoengine/splats/data": 17665,

@@ -477,6 +477,17 @@ test('sky and material relief: bad options are errors before anything loads', as
     );
 });
 
+test('seasons: a view takes BiomeSeasons of its own world only, refused before anything loads', async () => {
+  const { BiomeSeasons } = await import('../dist/seasons.js'),
+    world = await BiomeWorld.create({ size: [512, 512] }),
+    other = await BiomeWorld.create({ size: [512, 512] });
+  for (const seasons of [null, 3, {}, BiomeSeasons.attach(other, { dayOfYear: 10 })])
+    await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { seasons }), {
+      name: 'TypeError',
+      message: /seasons/,
+    });
+});
+
 test('the sea defaults are an ocean swell the water draws without folding', () => {
   assert.equal(SEA.segments, 512);
   assert.equal(SEA.foamDistance, 6);

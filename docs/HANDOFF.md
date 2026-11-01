@@ -1,5 +1,17 @@
 # Margo Engine handoff
 
+## Biomes J4 (2026-11-01): seasons and the sun path, with follow-ups
+
+- Built: `@margoengine/biomes/seasons` (`BiomeSeasons`, per-cell rgba8 green-up, senescence, snow, wetness from the
+  partial-year degree-day integral; `seasonalColor`), the `seasons` option of `BiomeView` and `BiomeObjects`, and
+  `sunPath` in `@margoengine/sky/sun` (Spencer 1971). Tile, placement and climate digests are unchanged
+  (packages/biomes/tests/seasons.test.js checks them against the existing goldens).
+- Follow-up, not built: the ground tint is one colour per seasonal material, from the state at the world's centre. A
+  per-texel tint (the seasons raster sampled by the terrain shader) needs an optional extra texture in
+  `@margoengine/terrain`, which is terrain feature work. Objects likewise take one colour per seasonal species.
+- Follow-up: the biomes GPU checks (`test:gpu`, `test:gpu:objects`) did not run on this branch (the Beelink baseline
+  biomes GPU smoke hung before J4). Run them at this revision on the A6000 before calling the seasons path GPU-proven.
+
 ## Landed 2026-10-30: core cleanup, audit items P1 to P3 (approved by Scott)
 
 - P1: core's copy of a view's depth into a caller depth of another format or sample count is gone. A view target

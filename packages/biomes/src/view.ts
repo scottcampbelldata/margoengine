@@ -17,6 +17,7 @@ import { type BiomeDefinition, type Dimension, fieldDimension } from './define.j
 import { clampInt, divFloor, hash3, ONE, wendland } from '@margoengine/biomes/toolkit';
 import type { PlacedTile } from './placement.js';
 import type { BiomeSample } from './sample.js';
+import type { BiomeSeasons } from './seasons.js';
 import type { BiomeTile, BiomeWorld } from './world.js';
 
 /** The look of a ground material: sRGB colour 0..1, the contrast of its generated detail 0..1 and its relief. */
@@ -117,6 +118,28 @@ export interface BiomeViewOptions {
    * their own `reflection` or `lights` win. Default none.
    */
   readonly sky?: BiomeSky;
+  /**
+   * Seasons from `@margoengine/biomes/seasons` over this world. The plant cover ground materials of biomes with
+   * `tint.seasonal` (grass, meadow, moss and the like; not rock, scree, gravel, sand, mud or snow) take `seasonalColor`
+   * of their look under the state at the world's centre, and the objects get the same `seasons` (`BiomeObjects`). Each
+   * `seasons.set` repaints those materials. The tint is one colour per material over the world, not per texel. Default
+   * none: the view draws exactly what it draws without seasons.
+   */
+  readonly seasons?: BiomeSeasons;
+}
+
+/** Ground materials that are bare ground, not plant cover: seasons leave them alone. */
+const MINERAL = ['rock', 'scree', 'gravel', 'sand', 'red-sand', 'mud', 'snow', 'laterite'];
+
+/** The plant cover ground materials of biomes with `tint.seasonal`, and the canopy when any biome has it. */
+function seasonalGround(biomes: readonly BiomeDefinition[], materials: readonly string[]): Set<string> {
+  const keys = new Set<string>();
+  for (const b of biomes)
+    if (b.tint?.seasonal) {
+      for (const g of b.ground) if (!MINERAL.includes(g.material)) keys.add(g.material);
+      if (materials.includes('canopy')) keys.add('canopy');
+    }
+  return keys;
 }
 
 /** What `BiomeViewOptions.sky` needs: a `Sky` (`@margoengine/sky`), of which only these two are read. */
@@ -651,6 +674,10 @@ export class BiomeView implements Disposable {
   #textures?: { device: GPUDevice; height: GPUTexture; weights: GPUTexture[] };
   #off: () => void;
   #offObjects?: () => void;
+  /** With `seasons`: the ground layer texture, a repaint of the seasonal layers into it, and the listener's remover. */
+  #layers?: GPUTexture;
+  #retint?: () => void;
+  #offSeasons?: () => void;
   /** Removers of the casters added to `options.shadows`. */
   #offShadows: (() => void)[] = [];
   /** Streaming: tiles drawn at full detail, tiles whose objects are on the GPU, jobs on their way (`v` view, `p`
@@ -730,7 +757,35 @@ export class BiomeView implements Disposable {
       // The terrain needs 4 to 16 layers: repeat the last material when there are fewer.
       layerKeys = [...this.materials];
     while (layerKeys.length < 4) layerKeys.push(layerKeys[layerKeys.length - 1]);
-    const pixels = layerKeys.map((key, i) => materialPixels(key, looks[Math.min(i, looks.length - 1)]));
+    // With seasons, plant cover of seasonal biomes takes the season's colour at the world's centre; without, every look
+    // is the material's own (the same pixels as a view that knows nothing of seasons).
+    const seasons = options.seasons,
+      seasonal = seasons ? seasonalGround(world.biomes, this.materials) : new Set<string>(),
+      lookOf = (i: number) => {
+        const m = looks[Math.min(i, looks.length - 1)];
+        return seasonal.has(layerKeys[i])
+          ? { ...m, color: seasons!.colorAt(m.color, (x0 + x1) / 2, (z0 + z1) / 2) }
+          : m;
+      },
+      pixels = layerKeys.map((key, i) => materialPixels(key, lookOf(i))),
+      write = (device: GPUDevice, layers: GPUTexture, layer: number, levels: Uint8Array[]) =>
+        levels.forEach((data, mip) => {
+          const s = 256 >> mip;
+          device.queue.writeTexture(
+            { texture: layers, mipLevel: mip, origin: [0, 0, layer] },
+            data as Uint8Array<ArrayBuffer>,
+            { bytesPerRow: s * 4, rowsPerImage: s },
+            [s, s, 1],
+          );
+        });
+    if (seasonal.size)
+      this.#retint = () => {
+        const device = this.#textures?.device;
+        if (!device || !this.#layers) return;
+        layerKeys.forEach((key, i) => {
+          if (seasonal.has(key)) write(device, this.#layers!, i, materialPixels(key, lookOf(i)));
+        });
+      };
     this.#heights = this.#overviewHeights();
     // The far-field ground weights arrive in `#overview` (on the workers when the world has them), before any tile.
     this.#weights = Array.from(
@@ -761,23 +816,23 @@ export class BiomeView implements Disposable {
             usage,
             mipLevelCount: 9,
           });
+        // Seasonal layers take the season in force now (a restored device must not fall back to the attach-time one).
         pixels.forEach((levels, layer) =>
-          levels.forEach((data, mip) => {
-            const s = 256 >> mip;
-            device.queue.writeTexture(
-              { texture: layers, mipLevel: mip, origin: [0, 0, layer] },
-              data as Uint8Array<ArrayBuffer>,
-              { bytesPerRow: s * 4, rowsPerImage: s },
-              [s, s, 1],
-            );
-          }),
+          write(
+            device,
+            layers,
+            layer,
+            seasonal.has(layerKeys[layer]) ? materialPixels(layerKeys[layer], lookOf(layer)) : levels,
+          ),
         );
+        if (view.#retint) view.#layers = layers;
         view.#textures = { device, height, weights };
         view.#upload(0, 0, view.#width, view.#depth);
         return { heightmap: height, layers, weights };
       },
     });
     this.#off = world.onChange((rect) => this.#dirty(rect, 'v'));
+    if (this.#retint) this.#offSeasons = seasons!.onChange(this.#retint);
     this.ready = new Promise((done) => {
       this.#firstDone = done;
     });
@@ -809,6 +864,9 @@ export class BiomeView implements Disposable {
         'BiomeView sky must be a Sky from @margoengine/sky (it reads reflectionTexture and lights)',
         'biomes',
       );
+    const seasons = options.seasons;
+    if (seasons !== undefined && (typeof seasons?.colorAt !== 'function' || seasons.world !== world))
+      throw typeError('BiomeView seasons must be a BiomeSeasons attached to the same world', 'biomes');
     for (const [key, m] of Object.entries(options.materials ?? {}))
       if (![m?.bump ?? 0, m?.macro ?? 0].every((v) => typeof v === 'number' && v >= 0 && v <= 1))
         throw rangeError(
@@ -849,6 +907,7 @@ export class BiomeView implements Disposable {
         detailRadius: options.detailRadius ?? 120,
         detailResolution: detail,
         detailBudget: options.detailBudget,
+        ...(seasons ? { seasons } : {}),
         ...(options.far === false || (!options.far && view.#radius >= 2500)
           ? {}
           : { far: { radius: 2500, ...options.far, world } }),
@@ -1420,6 +1479,7 @@ export class BiomeView implements Disposable {
     this.#disposed = true;
     this.#off();
     this.#offObjects?.();
+    this.#offSeasons?.();
     for (const off of this.#offShadows.splice(0)) off();
     for (const job of this.#pending.values()) job.controller.abort();
     this.#pending.clear();
