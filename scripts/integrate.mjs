@@ -1,6 +1,6 @@
 // The one script that pushes to main (AGENTS.md, "Before every push to main"). One run lands one batch, then exits; the
 // coordinator, a runner or Agent Factory starts it after each READY, every 30 min, or at 3 READY entries.
-//   node scripts/integrate.mjs [--worktree=<path>] [--limit=<min>] [--wait-max=<min>] [--notify=<command>]
+//   node scripts/integrate.mjs [--worktree=<path>] [--only=<branch>@<sha>] [--limit=<min>] [--wait-max=<min>]
 // An agent declares a branch ready with a file private/queue/<branch>.ready in the main checkout, holding one line:
 //   READY <sha>        or        READY <sha> fix
 // A run, under test-results/land.lock (gpu-lock.mjs: heartbeat, hard limit, whole tree killed past it), and it stops
@@ -10,7 +10,8 @@
 //    earlier run that pushed and died before its record was complete (the push is on origin/main: it is recorded now, its
 //    READY files go; or it is not: the entries stay READY). Commits on origin/main that no record covers (a hand push) are
 //    written to landed.log as a hand-push line, so every commit on main is accounted for.
-// 2. Reads the entries, fix entries first, then oldest first. Never more than 6: the seventh and later go back at once,
+// 2. Reads the entries, fix entries first, then oldest first. --only pins one exact READY under the lock and leaves
+//    unrelated entries untouched. Never more than 6 in a batch: the seventh and later go back at once,
 //    loudly, with the banner. While private/queue/RED.json exists only fix entries are taken. RED.held.json is a RED set
 //    aside on Scott's order: it holds nothing and is noted in the record.
 // 3. Intake, per branch, before anything is built: the commit exists; it is not on main already; every commit's author
@@ -34,16 +35,21 @@
 //    --notify. If main moved meanwhile, the push is refused and every entry stays READY for the next run.
 // A branch sent back is private/queue/sent-back/<branch>.json: the reason, the step and the log. Its .ready file is gone,
 // and every READY file this script removes, for any reason, is one line of private/queue/queue.log and of the run record.
+// private/queue/retirements/ journals each removal before moving READY to a tombstone, so a failed log write is recoverable.
 // Everything git and every command go through `git` and `runStep`, so tests/integrate.test.js runs it all with neither.
 // Exit: 0 landed, nothing queued or held by RED; 4 refused; 5 main moved; 6 nothing could land; 7 the lock was lost;
 // 8 the record could not be written; 124 past the hard limit.
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import {
   appendFileSync,
   existsSync,
+  linkSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -102,6 +108,7 @@ export function queuePaths(main) {
     landed: join(dir, 'landed.log'),
     latest: join(dir, 'latest-landing.json'),
     ledger: join(dir, 'queue.log'),
+    retirements: join(dir, 'retirements'),
     runs: join(dir, 'runs'),
     sentBack: join(dir, 'sent-back'),
     logs: join(dir, 'logs'),
@@ -125,10 +132,12 @@ export function readQueue(dir) {
     .filter((name) => name.endsWith('.ready'))
     .map((name) => {
       const file = join(dir, name),
-        parsed = parseReady(readFileSync(file, 'utf8'));
+        raw = readFileSync(file, 'utf8'),
+        parsed = parseReady(raw);
       return {
         branch: name.slice(0, -6),
         file,
+        raw,
         taken: parsed?.sha,
         mtime: statSync(file).mtimeMs,
         ...(parsed ?? { invalid: true }),
@@ -372,19 +381,23 @@ const readJson = (file) => {
   }
 };
 
-/** Every line of landed.log that parses, oldest first. */
+/** Every landed.log line, oldest first. A corrupt or unreadable record blocks further landings. */
 export function readLanded(file) {
   let text;
   try {
     text = readFileSync(file, 'utf8');
-  } catch {
-    return [];
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw margoError('INTEGRATE_RECORD_FAILED', `cannot read landing record ${file} (${error.message})`);
   }
-  return lines(text).flatMap((line) => {
+  return lines(text).map((line, index) => {
     try {
-      return [JSON.parse(line)];
-    } catch {
-      return [];
+      return JSON.parse(line);
+    } catch (error) {
+      throw margoError(
+        'INTEGRATE_RECORD_FAILED',
+        `landing record ${file} has invalid JSON on line ${index + 1} (${error.message})`,
+      );
     }
   });
 }
@@ -458,6 +471,7 @@ export async function integrate({
   stepMinutes = STEP_MINUTES,
   holding = () => null,
   lockPollMs = LOCK_POLL_MS,
+  only = null,
   notify = null,
   by = runner(),
 }) {
@@ -471,44 +485,167 @@ export async function integrate({
     return { result: 'record', exit: EXIT.record, line: error.message, record: null, sentBack: [] };
   }
   const sentBack = [];
-  /** Removes an entry's READY file only while it still holds the sha this run took, and writes down that it did. */
+  /** Move the exact READY file aside first, so an interrupted ledger write can restore it on the next run. */
   const retire = (entry, action, reason, extra = {}) => {
-    let removed = false,
-      newer = null;
-    if (entry.taken) {
+    const id = randomUUID(),
+      metaFile = join(paths.retirements, `${id}.json`),
+      tombstone = join(paths.retirements, `${id}.ready`);
+    let moved = false,
+      removed = false,
+      kept = null;
+    try {
+      mkdirSync(paths.retirements, { recursive: true });
+      writeJson(metaFile, {
+        id,
+        branch: entry.branch,
+        file: entry.file,
+        tombstone,
+        run: record.id,
+        action,
+        state: 'prepared',
+        at: now().toISOString(),
+      });
       try {
-        newer = parseReady(readFileSync(entry.file, 'utf8'));
-      } catch {
-        newer = null;
+        renameSync(entry.file, tombstone);
+        moved = true;
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        kept = 'the READY file was already absent';
+        writeJson(metaFile, {
+          id,
+          branch: entry.branch,
+          file: entry.file,
+          tombstone,
+          run: record.id,
+          action,
+          state: 'absent',
+          at: now().toISOString(),
+        });
       }
-      if (newer && newer.sha === entry.taken) newer = null;
-    }
-    if (!newer) {
-      rmSync(entry.file, { force: true });
-      removed = true;
+      if (moved) {
+        const raw = readFileSync(tombstone, 'utf8'),
+          parsed = parseReady(raw),
+          exact =
+            typeof entry.raw === 'string' ? raw === entry.raw : Boolean(entry.taken && parsed?.sha === entry.taken);
+        if (exact) {
+          removed = true;
+        } else {
+          // The producer changed READY after intake. An exclusive hard link restores it without overwriting a newer file.
+          linkSync(tombstone, entry.file);
+          rmSync(tombstone);
+          moved = false;
+          kept = parsed
+            ? `a newer READY ${parsed.sha} stays for the next run`
+            : 'a changed READY stays for the next run';
+        }
+      }
+    } catch (error) {
+      throw margoError(
+        'INTEGRATE_RECORD_FAILED',
+        `READY retirement ${id} could not be prepared (${error.message}); recover ${metaFile} before another landing`,
+      );
     }
     const line = {
       at: now().toISOString(),
       run: record.id,
+      retirementId: id,
       branch: entry.branch,
       sha: entry.sha ?? entry.taken ?? null,
       action,
       reason,
       ...extra,
       removed,
-      ...(newer && { kept: `a newer READY ${newer.sha} stays for the next run` }),
+      ...(kept && { kept }),
     };
-    record.ledger.push(line);
     try {
       mkdirSync(dirname(paths.ledger), { recursive: true });
       appendFileSync(paths.ledger, `${JSON.stringify(line)}\n`);
+      record.ledger.push(line);
+      writeJson(metaFile, {
+        id,
+        branch: entry.branch,
+        file: entry.file,
+        tombstone,
+        run: record.id,
+        action,
+        state: 'recorded',
+        line,
+      });
+      if (moved) rmSync(tombstone, { force: true });
     } catch (error) {
       throw margoError(
         'INTEGRATE_RECORD_FAILED',
-        `${paths.ledger} could not be appended (${error.message}); a READY file is never removed unrecorded`,
+        `READY retirement ${id} could not be recorded (${error.message}); ${metaFile} and its tombstone are kept for recovery`,
       );
     }
     return line;
+  };
+  /** Restore a READY moved by a failed retirement, or finish one whose ledger append succeeded. */
+  const recoverRetirements = () => {
+    if (!existsSync(paths.retirements)) return;
+    let recorded = new Set();
+    if (existsSync(paths.ledger)) {
+      try {
+        recorded = new Set(
+          readFileSync(paths.ledger, 'utf8')
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .map((line) => JSON.parse(line).retirementId)
+            .filter(Boolean),
+        );
+      } catch (error) {
+        throw margoError(
+          'INTEGRATE_RECORD_FAILED',
+          `cannot read ${paths.ledger} for READY recovery (${error.message})`,
+        );
+      }
+    }
+    for (const name of readdirSync(paths.retirements).filter((file) => file.endsWith('.json'))) {
+      const metaFile = join(paths.retirements, name),
+        meta = readJson(metaFile);
+      if (
+        !meta ||
+        meta.id !== name.slice(0, -5) ||
+        dirname(meta.file ?? '') !== paths.dir ||
+        meta.tombstone !== join(paths.retirements, `${meta.id}.ready`)
+      )
+        throw margoError('INTEGRATE_RECORD_FAILED', `invalid READY retirement journal ${metaFile}`);
+      const tombstoneExists = existsSync(meta.tombstone);
+      if (meta.state === 'absent' && !tombstoneExists) continue;
+      if (meta.state === 'restored' && !tombstoneExists) continue;
+      if (meta.state === 'recorded' && !recorded.has(meta.id))
+        throw margoError('INTEGRATE_RECORD_FAILED',
+          `READY retirement ${meta.id} is missing from ${paths.ledger}; reconcile its journal before landing`);
+      if (meta.state === 'recorded' || recorded.has(meta.id)) {
+        if (tombstoneExists) rmSync(meta.tombstone, { force: true });
+        if (meta.state !== 'recorded')
+          writeJson(metaFile, { ...meta, state: 'recorded', recoveredAt: now().toISOString() });
+        continue;
+      }
+      if (meta.state !== 'prepared' && meta.state !== 'restored')
+        throw margoError('INTEGRATE_RECORD_FAILED', `unknown READY retirement state in ${metaFile}`);
+      if (tombstoneExists) {
+        if (existsSync(meta.file)) {
+          const moved = statSync(meta.tombstone, { bigint: true }),
+            restored = statSync(meta.file, { bigint: true });
+          if (moved.dev !== restored.dev || moved.ino === 0n || moved.ino !== restored.ino)
+            throw margoError(
+              'INTEGRATE_RECORD_FAILED',
+              `READY changed during recovery; ${meta.tombstone} is preserved and must be reconciled with ${meta.file}`,
+            );
+        } else {
+          linkSync(meta.tombstone, meta.file);
+        }
+        rmSync(meta.tombstone);
+        log(`integrate: restored ${meta.file} after interrupted READY retirement ${meta.id}`);
+      } else if (!existsSync(meta.file)) {
+        throw margoError(
+          'INTEGRATE_RECORD_FAILED',
+          `READY retirement ${meta.id} has neither its original file nor its tombstone; inspect ${metaFile}`,
+        );
+      }
+      writeJson(metaFile, { ...meta, state: 'restored', recoveredAt: now().toISOString() });
+    }
   };
   const sendBack = (entry, reason, step = 'intake', logFile = null) => {
     mkdirSync(paths.sentBack, { recursive: true });
@@ -558,7 +695,29 @@ export async function integrate({
   async function land() {
     const unlocked = lockLost();
     if (unlocked) return unlocked;
+    recoverRetirements();
     let batch = readQueue(paths.dir);
+    if (only) {
+      const selected = batch.find((entry) => entry.branch === only.branch);
+      if (!selected || selected.invalid || selected.sha?.toLowerCase() !== only.sha)
+        return finish(
+          'refused',
+          `--only ${only.branch}@${only.sha} no longer matches its exact READY file; no queue entry was changed`,
+        );
+      const unrelatedRecovery = pendingRuns().find(
+        ({ earlier }) =>
+          !Array.isArray(earlier.entries) ||
+          earlier.entries.length !== 1 ||
+          earlier.entries[0].branch !== only.branch ||
+          earlier.entries[0].sha !== only.sha,
+      );
+      if (unrelatedRecovery)
+        return finish(
+          'refused',
+          `earlier run ${unrelatedRecovery.earlier.id} needs recovery before --only can land; no queue entry was changed`,
+        );
+      batch = [selected];
+    }
     record.queue = batch.map(({ branch, sha, fix, invalid, mtime }) => ({
       branch,
       sha: sha ?? null,
@@ -602,7 +761,8 @@ export async function integrate({
         ),
       );
     recoverPushed(base);
-    accountForMain(base);
+    const mainIssue = accountForMain(base);
+    if (mainIssue) return finish('refused', mainIssue);
     // A recovery retires the entries of the landing it finished; anything else that vanished since the queue was read
     // was not this run's doing, and is said so.
     batch = batch.filter((entry) => {
@@ -727,7 +887,7 @@ export async function integrate({
     record.push = { tip, state: 'pushing', at: landing.at };
     record.landing = landing;
     record.state = 'pushing';
-    record.entries = batch.map(({ branch, file, taken, sha }) => ({ branch, file, taken, sha }));
+    record.entries = batch.map(({ branch, file, taken, sha, raw }) => ({ branch, file, taken, sha, raw }));
     save();
     const pushed = git(['push', 'origin', 'HEAD:refs/heads/main']);
     if (pushed.status !== 0) {
@@ -839,27 +999,29 @@ export async function integrate({
     }
   }
 
-  /** Commits on origin/main that no landing covers: a hand push. They are written to landed.log so main stays accounted for. */
+  /** Record linear hand pushes; a rewritten origin/main needs explicit reconciliation before a new landing. */
   function accountForMain(base) {
     const last = readLanded(paths.landed)
       .filter((entry) => typeof entry.to === 'string')
       .at(-1);
-    if (!last || last.to === base) return;
+    if (!last || last.to === base) return null;
     const linear = git(['merge-base', '--is-ancestor', last.to, base]).status === 0;
+    if (!linear)
+      return `origin/main ${base} does not descend from the last recorded landing ${last.to}; reconcile rewritten history before landing`;
     const line = {
       kind: 'hand-push',
       at: now().toISOString(),
       run: record.id,
       from: last.to,
       to: base,
-      commits: linear ? lines(must(git, 'log', '--format=%H %s', `${last.to}..${base}`)) : [],
-      ...(!linear && { note: `${last.to} is not an ancestor of ${base}: history moved under the records` }),
+      commits: lines(must(git, 'log', '--format=%H %s', `${last.to}..${base}`)),
     };
     record.handPush = line;
     log(
-      `integrate: origin/main holds ${linear ? `${line.commits.length} commit(s)` : 'history'} no landing recorded (${last.to.slice(0, 9)}..${base.slice(0, 9)}); written to ${paths.landed} as a hand push`,
+      `integrate: origin/main holds ${line.commits.length} commit(s) no landing recorded (${last.to.slice(0, 9)}..${base.slice(0, 9)}); written to ${paths.landed} as a hand push`,
     );
     appendFileSync(paths.landed, `${JSON.stringify(line)}\n`);
+    return null;
   }
 
   /** Why a branch cannot enter the batch, or null: identity, messages, content, the fix gate. */
@@ -1048,14 +1210,75 @@ async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log, steps,
   return { ok: true, steps };
 }
 
-/** Makes a detached worktree at `path` from origin/main when it does not exist yet. */
+/** Makes or validates the detached integration worktree without discarding another checkout's files. */
 export function ensureWorktree(path, cwd = root) {
-  if (existsSync(join(path, '.git'))) return;
-  const made = spawnSync('git', ['worktree', 'add', '-q', '--detach', path, 'origin/main'], { cwd, encoding: 'utf8' });
-  if (made.status !== 0)
+  const command = (at, args) =>
+    spawnSync('git', ['-C', at, ...args], { encoding: 'utf8', timeout: 30_000, maxBuffer: 1 << 20 });
+  if (!existsSync(join(path, '.git'))) {
+    const made = spawnSync('git', ['worktree', 'add', '-q', '--detach', path, 'origin/main'], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    if (made.status !== 0)
+      throw margoError(
+        'INTEGRATE_GIT_FAILED',
+        `git worktree add ${path} failed (${lines(made.stderr).at(-1)}); pass another --worktree=<path>`,
+      );
+  }
+  const top = command(path, ['rev-parse', '--show-toplevel']),
+    common = command(path, ['rev-parse', '--path-format=absolute', '--git-common-dir']),
+    expected = command(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  const sameLocation = (left, right) => {
+    const a = statSync(left, { bigint: true }),
+      b = statSync(right, { bigint: true });
+    if (a.dev === b.dev && a.ino !== 0n && a.ino === b.ino) return true;
+    return (
+      realpathSync(left).replaceAll('\\', '/').toLowerCase() === realpathSync(right).replaceAll('\\', '/').toLowerCase()
+    );
+  };
+  if (
+    top.status !== 0 ||
+    common.status !== 0 ||
+    expected.status !== 0 ||
+    !sameLocation(String(top.stdout).trim(), path) ||
+    !sameLocation(String(common.stdout).trim(), String(expected.stdout).trim())
+  )
+    throw margoError(
+      'INTEGRATE_WORKTREE_INVALID',
+      `${path} is not a linked worktree of this Margo checkout; choose another --worktree path`,
+    );
+  const branch = command(path, ['symbolic-ref', '-q', '--short', 'HEAD']);
+  if (branch.status === 0)
+    throw margoError(
+      'INTEGRATE_WORKTREE_INVALID',
+      `${path} has branch ${String(branch.stdout).trim()} checked out; use a detached worktree`,
+    );
+  const status = command(path, ['status', '--porcelain=v1', '--untracked-files=all']);
+  if (status.status !== 0 || String(status.stdout).trim())
+    throw margoError(
+      'INTEGRATE_WORKTREE_DIRTY',
+      `${path} has tracked or untracked changes; preserve or clean them before integration (nothing was reset)`,
+    );
+}
+
+/** Remove only a clean worktree whose fresh path this integrator generated beside the main checkout. */
+export function removeManagedWorktree(path, home) {
+  const prefix = `${home}-wt-integrator-`;
+  if (!path.startsWith(prefix) || !/^[a-f0-9-]{36}$/i.test(path.slice(prefix.length)))
+    throw margoError('INTEGRATE_WORKTREE_INVALID', `${path} is not a managed integrator worktree`);
+  if (!lstatSync(path).isDirectory() || lstatSync(path).isSymbolicLink())
+    throw margoError('INTEGRATE_WORKTREE_INVALID', `managed worktree ${path} changed its path`);
+  ensureWorktree(path, home);
+  const removed = spawnSync('git', ['worktree', 'remove', '--force', path], {
+    cwd: home,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  if (removed.status !== 0)
     throw margoError(
       'INTEGRATE_GIT_FAILED',
-      `git worktree add ${path} failed (${lines(made.stderr).at(-1)}); pass another --worktree=<path>`,
+      `managed worktree ${path} could not be removed (${lines(removed.stderr).at(-1)})`,
     );
 }
 
@@ -1099,6 +1322,14 @@ export function lockWatch(lockDir) {
 export const flag = (args, name, fallback) =>
   args.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 
+/** Factory pins a landing to one flat branch and its full READY commit. */
+export function parseOnly(value) {
+  if (value == null) return null;
+  const match = /^([A-Za-z0-9][A-Za-z0-9._-]{0,119})@([a-f0-9]{40})$/i.exec(value);
+  if (!match) throw margoError('INTEGRATE_TARGET_INVALID', '--only requires <flat-branch>@<full-40-character-sha>');
+  return { branch: match[1], sha: match[2].toLowerCase() };
+}
+
 export const USAGE = `usage: node scripts/integrate.mjs [options]
 
 Lands one batch of the READY branches in private/queue/ to main: intake, rebase, tier 1 once, records, one push, never
@@ -1107,7 +1338,8 @@ forced. Only this script pushes to main. An agent queues a branch with a file pr
 Non-interactive: nothing is read from stdin, every answer is in the run record and on stdout.
 
 Options:
-  --worktree=<path>          its detached worktree (default <main checkout>-wt-integrator, made when missing)
+  --worktree=<path>          use this detached worktree; without it, a fresh managed worktree is made for each run
+  --only=<branch>@<sha>      land only this exact READY branch and full 40-character commit
   --limit=<min>              hard limit of the whole run, tree killed past it (default ${DEFAULT_LIMIT_MINUTES})
   --wait-max=<min>           how long to wait for another integrator (default 5)
   --notify=<command>         run after a landing with the landing's JSON file as its one argument (2 min limit)
@@ -1128,8 +1360,10 @@ Example:
 async function main() {
   const args = process.argv.slice(2),
     home = mainCheckout(root),
-    worktree = resolve(flag(args, 'worktree', `${home}-wt-integrator`)),
-    notifyCommand = flag(args, 'notify', null);
+    worktree = resolve(flag(args, 'worktree', `${home}-wt-integrator-${randomUUID()}`)),
+    only = parseOnly(flag(args, 'only', null)),
+    notifyCommand = flag(args, 'notify', null),
+    managed = args.includes('--managed-worktree') || !args.some((arg) => arg.startsWith('--worktree='));
   if (!args.includes('--locked')) {
     // Under the landing lock, as every landing was: gpu-lock.mjs gives it the heartbeat, the limit and the tree kill, and
     // points the GPU work inside at the GPU lock.
@@ -1146,6 +1380,8 @@ async function main() {
         'scripts/integrate.mjs',
         '--locked',
         `--worktree=${worktree}`,
+        ...(managed ? ['--managed-worktree'] : []),
+        ...(only ? [`--only=${only.branch}@${only.sha}`] : []),
         ...(notifyCommand ? [`--notify=${notifyCommand}`] : []),
       ],
       { cwd: root, stdio: 'inherit', env: { ...process.env, MARGO_GPU_LOCK: join(home, 'test-results', 'land.lock') } },
@@ -1179,8 +1415,16 @@ async function main() {
     paths,
     workspaces: loadWorkspaces(root),
     holding,
+    only,
     notify,
   });
+  if (managed) {
+    try {
+      removeManagedWorktree(worktree, home);
+    } catch (error) {
+      console.log(`integrate: managed worktree ${worktree} was preserved (${error.message})`);
+    }
+  }
   process.exitCode = out.exit;
 }
 

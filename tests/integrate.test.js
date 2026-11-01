@@ -2,8 +2,10 @@
 // never the real queue. Every guarantee of the landing contract (AGENTS.md, "Before every push to main") has a test here.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import {
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -20,17 +22,20 @@ import {
   MAX_QUEUE,
   contentProblem,
   demoPath,
+  ensureWorktree,
   fixWithoutTest,
   integrate,
   lockWatch,
   messageProblem,
   missingFromLog,
   parsePlan,
+  parseOnly,
   parseReady,
   queuePaths,
   readLanded,
   readQueue,
   readStopped,
+  removeManagedWorktree,
   stepEnv,
   stoppedHits,
   suspects,
@@ -191,6 +196,78 @@ test('parseReady takes READY <sha> and READY <sha> fix, nothing else', () => {
   assert.deepEqual(parseReady('READY abc1234 fix'), { sha: 'abc1234', fix: true });
   for (const bad of ['', 'READY', 'READY main', 'ready abc1234', 'READY abc1234 now'])
     assert.equal(parseReady(bad), null);
+});
+
+test('--only requires one flat branch and the exact full READY commit', () => {
+  assert.deepEqual(parseOnly(`agent-step@${'A'.repeat(40)}`), { branch: 'agent-step', sha: 'a'.repeat(40) });
+  for (const bad of [
+    'agent-step@aaaaaaa',
+    `../main@${'a'.repeat(40)}`,
+    `agent/step@${'a'.repeat(40)}`,
+    `agent-step@${'g'.repeat(40)}`,
+    '',
+  ])
+    assert.throws(() => parseOnly(bad), /--only requires/);
+});
+
+test('a reused integrator worktree must belong to this clone, be detached, and be clean', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-integrate-worktree-')),
+    main = join(dir, 'main'),
+    worktree = join(dir, 'integrator'),
+    foreign = join(dir, 'foreign');
+  const git = (...args) => {
+    const out = spawnSync('git', args, { encoding: 'utf8', timeout: 30_000 });
+    assert.equal(out.status, 0, out.stderr);
+    return out.stdout.trim();
+  };
+  try {
+    git('init', '-q', '--initial-branch=main', main);
+    writeFileSync(join(main, 'tracked.txt'), 'original\n');
+    git('-C', main, 'add', 'tracked.txt');
+    git('-C', main, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'initial');
+    git('-C', main, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+    ensureWorktree(worktree, main);
+    ensureWorktree(worktree, main);
+    writeFileSync(join(worktree, 'tracked.txt'), 'my uncommitted work\n');
+    assert.throws(() => ensureWorktree(worktree, main), /tracked or untracked changes/);
+    assert.equal(readFileSync(join(worktree, 'tracked.txt'), 'utf8'), 'my uncommitted work\n');
+    git('-C', worktree, 'checkout', '--', 'tracked.txt');
+    writeFileSync(join(worktree, 'untracked.txt'), 'keep me\n');
+    assert.throws(() => ensureWorktree(worktree, main), /tracked or untracked changes/);
+    assert.equal(readFileSync(join(worktree, 'untracked.txt'), 'utf8'), 'keep me\n');
+    git('init', '-q', foreign);
+    assert.throws(() => ensureWorktree(foreign, main), /not a linked worktree/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('managed worktrees are removed only when clean and in the exact generated sibling path', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-integrate-managed-')),
+    main = join(dir, 'main'),
+    managed = `${main}-wt-integrator-00000000-0000-4000-8000-000000000000`,
+    dirty = `${main}-wt-integrator-00000000-0000-4000-8000-000000000001`;
+  const git = (...args) => {
+    const out = spawnSync('git', args, { encoding: 'utf8', timeout: 30_000 });
+    assert.equal(out.status, 0, out.stderr);
+  };
+  try {
+    git('init', '-q', '--initial-branch=main', main);
+    writeFileSync(join(main, 'tracked.txt'), 'original\n');
+    git('-C', main, 'add', 'tracked.txt');
+    git('-C', main, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'initial');
+    git('-C', main, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+    ensureWorktree(managed, main);
+    removeManagedWorktree(managed, main);
+    assert.equal(existsSync(managed), false);
+    ensureWorktree(dirty, main);
+    writeFileSync(join(dirty, 'untracked.txt'), 'preserve\n');
+    assert.throws(() => removeManagedWorktree(dirty, main), /tracked or untracked changes/);
+    assert.equal(readFileSync(join(dirty, 'untracked.txt'), 'utf8'), 'preserve\n');
+    assert.throws(() => removeManagedWorktree(main, main), /not a managed integrator worktree/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('readQueue: fix entries first, then oldest first; a bad file is marked', () => {
@@ -699,9 +776,15 @@ test('a run record that cannot be written stops the run before anything happens:
 test('the record says "pushing" before the push; landed.log that cannot be appended after it is a failed landing (exit 8), and the next run finishes the record', async () => {
   const { paths, done } = setup({ one: `READY ${SHA.a}` });
   try {
-    mkdirSync(paths.landed); // a folder in the way of landed.log
-    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } }),
-      out = await run(paths, git, fakeSteps(undefined, git));
+    const inner = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } }),
+      git = (args) => {
+        if (args[0] === 'push') mkdirSync(paths.landed); // the record path becomes blocked only after preflight
+        return inner(args);
+      };
+    git.calls = inner.calls;
+    git.pushes = inner.pushes;
+    git.head = inner.head;
+    const out = await run(paths, git, fakeSteps(undefined, git));
     assert.equal(out.result, 'record');
     assert.equal(out.exit, EXIT.record);
     assert.equal(git.pushes().length, 1);
@@ -802,6 +885,198 @@ test('every READY file the run removes is one ledger line, with its reason', asy
     );
     assert.ok(lines.every((l) => l.reason && l.run === out.record.id));
     assert.deepEqual(out.record.ledger, lines);
+  } finally {
+    done();
+  }
+});
+
+test('--only lands one exact READY and leaves every unrelated or invalid READY untouched', async () => {
+  const target = 'a'.repeat(40),
+    other = 'b'.repeat(40);
+  const { paths, done } = setup({ selected: `READY ${target}`, other: `READY ${other} fix`, invalid: 'not READY' });
+  try {
+    const git = fakeGit({ branches: { [target]: ['packages/sky/a.ts'], [other]: ['packages/fog/a.ts'] } });
+    const out = await run(paths, git, fakeSteps(undefined, git), { only: { branch: 'selected', sha: target } });
+    assert.equal(out.result, 'landed');
+    assert.deepEqual(
+      out.landed.map((entry) => entry.branch),
+      ['selected'],
+    );
+    assert.deepEqual(
+      readQueue(paths.dir)
+        .map((entry) => entry.branch)
+        .sort(),
+      ['invalid', 'other'],
+    );
+    assert.deepEqual(
+      ledger(paths).map((line) => line.branch),
+      ['selected'],
+    );
+  } finally {
+    done();
+  }
+});
+
+test('--only refuses a changed or missing target without retiring any READY or pushing', async () => {
+  const target = 'a'.repeat(40),
+    other = 'b'.repeat(40);
+  const { paths, done } = setup({ selected: `READY ${target}`, other: `READY ${other}` });
+  try {
+    const git = fakeGit({ branches: { [target]: ['packages/sky/a.ts'], [other]: ['packages/fog/a.ts'] } });
+    const out = await run(paths, git, fakeSteps(undefined, git), { only: { branch: 'selected', sha: other } });
+    assert.equal(out.result, 'refused');
+    assert.equal(out.exit, EXIT.refused);
+    assert.deepEqual(
+      readQueue(paths.dir)
+        .map((entry) => entry.branch)
+        .sort(),
+      ['other', 'selected'],
+    );
+    assert.deepEqual(git.pushes(), []);
+    assert.equal(existsSync(paths.ledger), false);
+  } finally {
+    done();
+  }
+});
+
+test('--only does not silently recover and retire an unrelated earlier landing', async () => {
+  const target = 'a'.repeat(40),
+    other = 'b'.repeat(40);
+  const { paths, done } = setup({ selected: `READY ${target}`, other: `READY ${other}` });
+  try {
+    mkdirSync(paths.runs);
+    writeFileSync(
+      join(paths.runs, 'earlier.json'),
+      `${JSON.stringify({
+        id: 'earlier',
+        state: 'pushing',
+        push: { tip: 'prior-tip' },
+        entries: [{ branch: 'other', sha: other }],
+      })}\n`,
+    );
+    const git = fakeGit({ branches: { [target]: ['packages/sky/a.ts'], [other]: ['packages/fog/a.ts'] } });
+    const out = await run(paths, git, fakeSteps(undefined, git), { only: { branch: 'selected', sha: target } });
+    assert.equal(out.result, 'refused');
+    assert.match(out.line, /earlier run earlier needs recovery/);
+    assert.deepEqual(
+      readQueue(paths.dir)
+        .map((entry) => entry.branch)
+        .sort(),
+      ['other', 'selected'],
+    );
+    assert.deepEqual(git.pushes(), []);
+    assert.equal(existsSync(paths.ledger), false);
+  } finally {
+    done();
+  }
+});
+
+test('rewritten origin/main is refused instead of being normalized as a hand push', async () => {
+  const { paths, done } = setup({ one: `READY ${SHA.a}` });
+  try {
+    writeFileSync(paths.landed, `${JSON.stringify({ from: 'older', to: 'recorded-tip', branches: [] })}\n`);
+    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] }, remoteMain: 'rewritten-tip' });
+    const out = await run(paths, git, fakeSteps(undefined, git));
+    assert.equal(out.result, 'refused');
+    assert.match(out.line, /does not descend from the last recorded landing/);
+    assert.equal(readLanded(paths.landed).length, 1);
+    assert.equal(readQueue(paths.dir).length, 1);
+    assert.deepEqual(git.pushes(), []);
+  } finally {
+    done();
+  }
+});
+
+test('a malformed landing log blocks a new push instead of silently ignoring its last line', async () => {
+  const { paths, done } = setup({ one: `READY ${SHA.a}` });
+  try {
+    writeFileSync(paths.landed, '{not-json}\n');
+    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } });
+    const out = await run(paths, git, fakeSteps(undefined, git));
+    assert.equal(out.result, 'record');
+    assert.match(out.line, /invalid JSON on line 1/);
+    assert.equal(readQueue(paths.dir).length, 1);
+    assert.deepEqual(git.pushes(), []);
+  } finally {
+    done();
+  }
+});
+
+test('a failed queue ledger append leaves a recoverable READY tombstone', async () => {
+  const { paths, done } = setup({ bad: 'not READY' });
+  try {
+    mkdirSync(paths.ledger);
+    const git = fakeGit();
+    const first = await run(paths, git, fakeSteps(undefined, git));
+    assert.equal(first.result, 'record');
+    assert.deepEqual(readQueue(paths.dir), []);
+    assert.equal(readdirSync(paths.retirements).filter((name) => name.endsWith('.ready')).length, 1);
+    assert.deepEqual(git.pushes(), []);
+    rmSync(paths.ledger, { recursive: true });
+    const second = await run(paths, git, fakeSteps(undefined, git));
+    assert.equal(second.result, 'nothing');
+    assert.equal(ledger(paths).length, 1);
+    assert.equal(ledger(paths)[0].action, 'sent-back');
+    assert.equal(readdirSync(paths.retirements).filter((name) => name.endsWith('.ready')).length, 0);
+    assert.deepEqual(git.pushes(), []);
+    assert.equal((await run(paths, git, fakeSteps(undefined, git))).result, 'idle');
+  } finally {
+    done();
+  }
+});
+
+test('a queue ledger failure after push recovers the exact landing without a second push', async () => {
+  const { paths, done } = setup({ one: `READY ${SHA.a}` });
+  try {
+    mkdirSync(paths.ledger);
+    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } });
+    const first = await run(paths, git, fakeSteps(undefined, git));
+    assert.equal(first.result, 'record');
+    assert.equal(git.pushes().length, 1);
+    assert.equal(readLanded(paths.landed).length, 1);
+    assert.equal(readdirSync(paths.retirements).filter((name) => name.endsWith('.ready')).length, 1);
+    rmSync(paths.ledger, { recursive: true });
+    const second = await run(paths, git, fakeSteps(undefined, git));
+    assert.equal(second.result, 'idle');
+    assert.equal(git.pushes().length, 1);
+    assert.equal(readLanded(paths.landed).length, 1);
+    assert.equal(readQueue(paths.dir).length, 0);
+    assert.equal(ledger(paths).length, 1);
+    assert.equal(ledger(paths)[0].action, 'landed');
+    assert.equal((await run(paths, git, fakeSteps(undefined, git))).result, 'idle');
+  } finally {
+    done();
+  }
+});
+
+test('retirement recovery finishes a restored READY hard link after an interrupted cleanup', async () => {
+  const { paths, done } = setup({ one: `READY ${SHA.a}` });
+  try {
+    mkdirSync(paths.retirements);
+    const id = 'retirement-interrupted-after-link',
+      source = join(paths.dir, 'one.ready'),
+      tombstone = join(paths.retirements, `${id}.ready`),
+      metaFile = join(paths.retirements, `${id}.json`);
+    linkSync(source, tombstone);
+    writeFileSync(
+      metaFile,
+      `${JSON.stringify({
+        id,
+        branch: 'one',
+        file: source,
+        tombstone,
+        run: 'old-run',
+        action: 'sent-back',
+        state: 'prepared',
+      })}\n`,
+    );
+    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } });
+    const out = await run(paths, git, fakeSteps(undefined, git), { only: { branch: 'missing', sha: 'b'.repeat(40) } });
+    assert.equal(out.result, 'refused');
+    assert.equal(readFileSync(source, 'utf8').trim(), `READY ${SHA.a}`);
+    assert.equal(existsSync(tombstone), false);
+    assert.equal(JSON.parse(readFileSync(metaFile, 'utf8')).state, 'restored');
+    assert.deepEqual(git.pushes(), []);
   } finally {
     done();
   }
