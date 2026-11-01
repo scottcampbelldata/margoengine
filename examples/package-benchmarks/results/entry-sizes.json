@@ -1,5 +1,5 @@
 {
-  "commit": "1f01cbd08",
+  "commit": "7da88ae89",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -522,6 +522,18 @@
       "./roblox-runtime-restore": {
         "raw": 21250,
         "gzip": 5874
+      },
+      "./atlas": {
+        "raw": 4386,
+        "gzip": 2150
+      },
+      "./godot-2d": {
+        "raw": 6812,
+        "gzip": 3160
+      },
+      "./unity-2d": {
+        "raw": 18082,
+        "gzip": 7062
       }
     },
     "@margoengine/fbx": {
@@ -586,8 +598,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 177636,
-        "gzip": 55871
+        "raw": 177969,
+        "gzip": 55977
       },
       "./asset": {
         "raw": 17265,
@@ -610,16 +622,16 @@
         "gzip": 17223
       },
       "./progressive": {
-        "raw": 195526,
-        "gzip": 62254
+        "raw": 195859,
+        "gzip": 62356
       },
       "./coordinates": {
         "raw": 1380,
         "gzip": 563
       },
       "./worker": {
-        "raw": 179432,
-        "gzip": 56258
+        "raw": 179765,
+        "gzip": 56357
       },
       "dist/workers/gltf.js": {
         "raw": 62657,
@@ -1306,8 +1318,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 46762,
-        "gzip": 16078
+        "raw": 51728,
+        "gzip": 17136
       },
       "./virtual": {
         "raw": 40974,
@@ -1384,6 +1396,14 @@
       "./animation": {
         "raw": 2327,
         "gzip": 1132
+      },
+      "./aseprite": {
+        "raw": 10535,
+        "gzip": 4345
+      },
+      "./atlas": {
+        "raw": 650,
+        "gzip": 393
       }
     },
     "@margoengine/stage": {
@@ -1526,8 +1546,8 @@
         "gzip": 9568
       },
       "dist/workers/usdz.js": {
-        "raw": 198825,
-        "gzip": 64710
+        "raw": 199158,
+        "gzip": 64810
       }
     },
     "@margoengine/vfx": {
@@ -1672,8 +1692,8 @@
         "gzip": 1090
       },
       "./export": {
-        "raw": 26020,
-        "gzip": 9040
+        "raw": 26026,
+        "gzip": 9045
       },
       "./formats": {
         "raw": 9983,
@@ -1686,6 +1706,10 @@
       "./library": {
         "raw": 2673,
         "gzip": 1095
+      },
+      "./smooth": {
+        "raw": 5409,
+        "gzip": 2377
       }
     },
     "@margoengine/voxel-net": {
@@ -1800,9 +1824,9 @@
       "brotli": 26165
     },
     "packages/shadows/dist/index.js": {
-      "raw": 46762,
-      "gzip": 16078,
-      "brotli": 14266
+      "raw": 51728,
+      "gzip": 17136,
+      "brotli": 15172
     },
     "packages/decoders/dist/decoder.worker.js": {
       "raw": 10691,
@@ -1845,9 +1869,9 @@
       "brotli": 45020
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 196418,
-      "gzip": 64535,
-      "brotli": 55720
+      "raw": 196751,
+      "gzip": 64619,
+      "brotli": 55816
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 20756,
