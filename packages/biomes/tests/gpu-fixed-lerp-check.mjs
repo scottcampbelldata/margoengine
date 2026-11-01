@@ -20,7 +20,12 @@ async function check() {
       async () => {
         const { openBrowser } = await import('../../../scripts/browser.js');
         // This existing page has no scripts, engine imports or rendering work.
-        context = await openBrowser({ startPath: '/tests/wgsl-check.html', port: 'free', compat: false });
+        context = await openBrowser({
+          startPath: '/tests/wgsl-check.html',
+          port: 'free',
+          compat: false,
+          args: ['--enable-webgpu-developer-features'],
+        });
         const { page } = context;
         page.on('pageerror', (error) => pageErrors.push(error.message));
         page.on('console', (message) => {
@@ -38,8 +43,8 @@ async function check() {
             const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : '';
             gl?.getExtension('WEBGL_lose_context')?.loseContext();
             const identity = {
-              name: info?.description?.trim() || renderer,
-              nameSource: info?.description?.trim() ? 'webgpu' : 'webgl',
+              name: info?.description?.trim(),
+              nameSource: 'webgpu',
               vendor: info?.vendor,
               architecture: info?.architecture,
               device: info?.device,
