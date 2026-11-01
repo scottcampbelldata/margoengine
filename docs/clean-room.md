@@ -204,6 +204,8 @@ carry the same citation as a one-line comment in the code.
 | id | formula | file | source |
 | --- | --- | --- | --- |
 | EX2 | FBX shininess to roughness | fbx/src/material.ts | Walter et al. 2007 sec. 5.2, (2/(n+2))^(1/4) like materials and exporters (square root restored 2026-10-24) |
+| EX9 | Unreal UCX_, UBX_, USP_ collision names and Python material graph | exporters/src/unreal-import.ts | Unreal's public collision naming documentation and Python API reference |
+| EX10 | Unity AnimationClip curves on a material property, Roblox TextureID and CollisionFidelity | exporters/src/unity-uv.ts, exporters/src/roblox-uv.ts | Unity's and Roblox's public API references |
 | EX3 | FBX 7.4 writer: node records, typed and deflated arrays, object and connection layout | fbx/src/export.ts | The Blender Foundation's public description of the binary format and the public ASCII structure; no exporter source read. Header, FileId, footer constants and record names checked against the bytes of the repository's own `packages/fbx/test/fixtures/blender-rig.fbx` (CC0) |
 | EX4 | Euler XYZ to and from quaternion, slerp, Hermite sampling of glTF cubic keys | fbx/src/export.ts | Textbook rotation algebra (Shoemake 1985 for slerp); glTF 2.0 specification, appendix C, for the cubic spline |
 

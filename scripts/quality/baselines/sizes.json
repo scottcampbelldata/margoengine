@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4251092,
+  "total": 4259647,
   "history": [
     {
       "date": "2026-10-24",
@@ -1292,6 +1292,12 @@
       "commit": "1454595d3",
       "reason": "row 21.6 job 8: points/copc entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "2d6b7738d",
+      "reason": "New entries for row 26 job 7: Unreal, Unity and Roblox collision and UV animation exports",
+      "grew": 3
     }
   ],
   "items": {
@@ -1405,12 +1411,15 @@
     "@margoengine/exporters/roblox-chunks": 9679,
     "@margoengine/exporters/roblox-runtime": 21053,
     "@margoengine/exporters/roblox-runtime-restore": 6130,
+    "@margoengine/exporters/roblox-uv": 3602,
     "@margoengine/exporters/skin": 2459,
     "@margoengine/exporters/unity": 41842,
     "@margoengine/exporters/unity-2d": 7318,
     "@margoengine/exporters/unity-pixel-art": 931,
     "@margoengine/exporters/unity-precision": 25154,
     "@margoengine/exporters/unity-precision-importer": 14647,
+    "@margoengine/exporters/unity-uv": 2001,
+    "@margoengine/exporters/unreal-import": 2952,
     "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,

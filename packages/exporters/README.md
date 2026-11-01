@@ -725,6 +725,52 @@ const usdz = exportUSDZ({
 // usdz holds scene.usda and textures/albedo.png.
 ``` Quick Look presentation remains untested on Apple hardware. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the eight small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with rotation and repeat and mirror wrapping, and rotation +30 and -30 degrees alone) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
 
+## Collision and UV animation per engine
+
+Name nodes with the `-col`, `-convcol`, `-colonly` and `-convcolonly` suffixes and author `materialAnimations` once; each
+engine gets them its own way.
+
+| Engine | Collision | UV animation (STEP base-color cels) |
+| --- | --- | --- |
+| Godot | Suffixes read directly at import (`godot`) | `createGodotFlipbookPlayer` (`godot-flipbook`) |
+| Unity | Colliders from the suffixes (`unity`) | `createUnityUVClips` (`unity-uv`): constant keys on `material.baseColorTexture_ST` |
+| Unreal | `unrealCollisionNames` (`unreal-import`): `UCX_`, `UBX_`, `USP_`; `-col` meshes use complex-as-simple | `createUnrealImportScript`: a Material that steps a cel grid at one rate |
+| Roblox | `createRobloxCollisionScript` (`roblox-uv`): `-colonly` parts turn invisible with CanCollide | `createRobloxUVSwap`: one PNG per cel and a Luau `TextureID` swap with an id map you fill |
+
+```ts
+import {createRobloxCollisionScript, createRobloxUVSwap} from 'margoengine/exporters/roblox-uv';
+import {createUnityUVClips} from 'margoengine/exporters/unity-uv';
+import {createUnrealImportScript, unrealCollisionNames} from 'margoengine/exporters/unreal-import';
+import type {ExportScene} from 'margoengine/exporters';
+
+const material = {name: 'water'};
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+  normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+};
+const scene: ExportScene = {
+  nodes: [{name: 'pool', geometry, material}, {name: 'wall-convcolonly', geometry, material}],
+  materialAnimations: [{name: 'flow', channels: [
+    {material, texture: 'baseColorTexture', property: 'scale', interpolation: 'STEP', times: [0], values: [0.5, 1]},
+    {material, texture: 'baseColorTexture', property: 'offset', interpolation: 'STEP', times: [0, 0.5], values: [0, 0, 0.5, 0]},
+  ]}],
+};
+
+const names = unrealCollisionNames(scene); // wall-convcolonly becomes UCX_wall_00: rename the node before exporting
+const python = createUnrealImportScript(scene, {contentPath: '/Game/Hero'});
+const unity = createUnityUVClips(scene, {folder: 'Hero'});
+const luau = createRobloxCollisionScript(scene);
+const roblox = await createRobloxUVSwap(scene, {
+  texture: () => ({data: new Uint8Array(16), width: 2, height: 2}),
+});
+console.log(names, python.length, unity.length, luau.length, roblox.length);
+```
+
+- **Refused, with the fix named:** a channel that is not STEP (bake it to cels), a material no node draws, and in Unreal cels
+  of unequal times or sizes or off a regular grid. Unreal also refuses a concave `-colonly`: split it into `-convcolonly` pieces.
+- `exportRobloxGLB` still refuses `materialAnimations`: leave them out of its scene, then run `createRobloxUVSwap` on the full one.
+- All three are checked by hand in the engine, not in CI.
+
 ## Roblox GLB (`@margoengine/exporters/roblox`)
 
 Roblox Studio refuses a MeshPart over 20,000 triangles. `exportRobloxGLB` writes the ordinary GLB with every mesh

@@ -518,6 +518,18 @@
       "types": "./dist/exporters/unity-2d.d.ts",
       "import": "./dist/exporters/unity-2d.js"
     },
+    "./exporters/unreal-import": {
+      "types": "./dist/exporters/unreal-import.d.ts",
+      "import": "./dist/exporters/unreal-import.js"
+    },
+    "./exporters/unity-uv": {
+      "types": "./dist/exporters/unity-uv.d.ts",
+      "import": "./dist/exporters/unity-uv.js"
+    },
+    "./exporters/roblox-uv": {
+      "types": "./dist/exporters/roblox-uv.d.ts",
+      "import": "./dist/exporters/roblox-uv.js"
+    },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
       "import": "./dist/fbx.js"

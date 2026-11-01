@@ -156,6 +156,18 @@
     "./unity-2d": {
       "types": "./dist/unity-2d.d.ts",
       "import": "./dist/unity-2d.js"
+    },
+    "./unreal-import": {
+      "types": "./dist/unreal-import.d.ts",
+      "import": "./dist/unreal-import.js"
+    },
+    "./unity-uv": {
+      "types": "./dist/unity-uv.d.ts",
+      "import": "./dist/unity-uv.js"
+    },
+    "./roblox-uv": {
+      "types": "./dist/roblox-uv.d.ts",
+      "import": "./dist/roblox-uv.js"
     }
   },
   "files": [
