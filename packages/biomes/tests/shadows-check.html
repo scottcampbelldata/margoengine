@@ -28,7 +28,7 @@ const luma=(d)=>{const out=new Float32Array(d.length/4);for(let k=0;k<out.length
 window.check={
  async run(){
   const out={};device.pushErrorScope('validation');
-  const world=await BiomeWorld.create({size:[512,512],biomes:[presets.temperate],height:{field:(x,z)=>40+3*Math.sin(x/37)*Math.cos(z/41)},climate:{latitude:47,rainfall:1000}});
+  const world=await BiomeWorld.create({size:[512,512],biomes:[{...presets.temperate,plants:presets.temperate.plants.map(({stands,...p})=>p)}],height:{field:(x,z)=>40+3*Math.sin(x/37)*Math.cos(z/41)},climate:{latitude:47,rainfall:1000}});
   const plain=await BiomeView.attach(engine,world,{radius:600});await plain.ready;await plain.whenIdle();
   const a=luma(await shot());out.objects=plain.objects.count;plain.dispose();
   // The view adds its casters through `add` and removes each on dispose: counted here around a real Shadows.

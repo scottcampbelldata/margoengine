@@ -396,11 +396,17 @@ test('regression: clipmapLevels reaches the whole world, so the terrain no longe
   );
 });
 
+/** A preset's plants without the placement data of S4 (dry land, stands, tree size 2.4), for tests pinned to the bytes before it. */
+const asBefore = (b) => ({
+  ...b,
+  plants: b.plants?.map(({ suitability, stands, ...p }) => (p.size ? { ...p, size: { ...p.size, max: 1.6 } } : p)),
+});
+
 test('canopy cover: a temperate world is mostly crowns, a desert empty, stands open clearings, the sea has none', async () => {
   const flat = { field: () => 40 },
     make = (biomes, height = flat) =>
       BiomeWorld.create({ size: [512, 512], biomes, height, climate: { latitude: 47, rainfall: 1000 } });
-  const temperate = await make([presets.temperate]),
+  const temperate = await make([asBefore(presets.temperate)]),
     full = canopyCover(temperate);
   assert.equal(full.width, 33);
   assert.equal(full.depth, 33);
@@ -417,7 +423,7 @@ test('canopy cover: a temperate world is mostly crowns, a desert empty, stands o
     canopyCover(desert).data.every((v) => v === 0),
     'a desert has no canopy',
   );
-  const under = await make([presets.temperate], { field: (x) => (x < 0 ? -20 : 40) }),
+  const under = await make([asBefore(presets.temperate)], { field: (x) => (x < 0 ? -20 : 40) }),
     sea = canopyCover(under);
   assert.equal(sea.data[16 * 33 + 2], 0, 'none under the sea');
   assert.equal(sea.data[16 * 33 + 30], 174, 'crowns on land');
@@ -434,10 +440,33 @@ test('canopy cover: a temperate world is mostly crowns, a desert empty, stands o
   for (const w of [temperate, desert, under, stands]) w.dispose();
 });
 
+test('alpine scree lies in hollows: concave ground at 20 degrees takes it, the same slope on a dome does not', async () => {
+  const at = async (sign) => {
+    const world = await BiomeWorld.create({
+        size: [512, 512],
+        biomes: [presets.alpine],
+        height: { field: (x, z) => 3000 + sign * 0.002 * (x * x + z * z) },
+        climate: { latitude: 46, rainfall: 1400 },
+      }),
+      materials = groundMaterials(world.biomes),
+      tile = await world.tile(1, 1),
+      view = viewTile(world, tile, materials, 2),
+      i = materials.indexOf('scree');
+    // Tile (1, 1) runs from the origin to +256 at 2 m a texel: the point (91, 0) slopes at 20 degrees.
+    const weight = view.weights[i >> 2][45 * 4 + (i & 3)];
+    world.dispose();
+    return weight;
+  };
+  const hollow = await at(1),
+    dome = await at(-1);
+  assert.ok(hollow > 40, `scree in the hollow: ${hollow}`);
+  assert.equal(dome, 0, 'no scree on the dome');
+});
+
 test('the canopy material takes its share of the ground and each texel still sums to 255', async () => {
   const world = await BiomeWorld.create({
       size: [512, 512],
-      biomes: [presets.temperate],
+      biomes: [asBefore(presets.temperate)],
       height: { field: () => 40 },
       climate: { latitude: 47, rainfall: 1000 },
     }),

@@ -479,6 +479,9 @@ How it works, per tile and each layer in turn (rocks, canopy trees, understory, 
 - **Clusters** (`cluster`): `parents * offspring` plants per hectare cluster around hashed parents, by a Thomas
   (Gaussian), Matern (disc) or Clark 2Dt (fat-tailed: clusters with scattered outliers) kernel; the rest of the
   density is random. This is a shot-noise Cox process, the Neyman-Scott process with Poisson offspring.
+- **The presets' plants**: forest trees stand in clumps (`stands: { scale: 300, cover: 0.7 }`) and grow to 2.4 times their
+  mesh; every tree and shrub keeps above 3 m and 50 m from the sea or a river (`suitability`). Savanna's acacia stays open
+  woodland, no stands and 1.6.
 - **Stands** (`stands: { scale, cover }`, default none): a species gathers at a larger scale than its clusters, so a
   forest has stands and clearings. `cover` (0.1..1) of the ground, in patches about `scale` metres across (50..2000),
   holds the species' whole density and the rest holds none, with a soft edge, so the mean over a large area stays

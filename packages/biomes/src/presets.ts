@@ -21,13 +21,27 @@ function freeze<T>(value: T): T {
   return value;
 }
 
-const tree = (id: string, mesh: string, density: number, radius: number, shade: number): SpeciesRule => ({
+// Woody plants keep above the shore's 3 m and out of the rivers, whose water a view can stand 48 m each side of the line.
+const dryLand = { height: [3, null], waterDistance: [50, null] } as const;
+// Stands of a forest tree: 70 percent of the land in clumps at 300 m, clearings between them.
+const stands = { scale: 300, cover: 0.7 } as const;
+
+const tree = (
+  id: string,
+  mesh: string,
+  density: number,
+  radius: number,
+  shade: number,
+  forest = true,
+): SpeciesRule => ({
   id,
   mesh: `procedural:${mesh}`,
   density,
   radius,
   shade,
-  size: { kind: 'reverse-j', q: 1.4, max: 1.6 },
+  suitability: dryLand,
+  ...(forest ? { stands } : {}),
+  size: { kind: 'reverse-j', q: 1.4, max: forest ? 2.4 : 1.6 },
   // Half the stems in fat-tailed 2Dt clusters (seed shadows with scattered outliers, Clark et al. 1999), half at random.
   cluster: { kind: '2dt', parents: 3, spread: 10, offspring: density / 6 },
 });
@@ -37,6 +51,7 @@ const shrub = (id: string, mesh: string, density: number, radius: number): Speci
   density,
   radius,
   shade: 0.6,
+  suitability: dryLand,
 });
 const rock = (density: number): SpeciesRule => ({
   id: 'boulder',
@@ -105,9 +120,10 @@ export const presets: Readonly<Record<PresetId, BiomeDefinition>> = Object.freez
     climate: { treeline: [null, 0], coldest: [-15, null] },
     zones: ['tundra', 'subpolar-humid', 'subpolar-perhumid', 'subpolar-subhumid'],
     ground: [
-      { material: 'meadow', slope: [null, 25] },
-      { material: 'scree', slope: [25, 40] },
-      { material: 'rock', slope: [35, null] },
+      { material: 'meadow', slope: [null, 30] },
+      // Talus: scree gathers in the hollows at the foot of the slopes, where the ground is concave.
+      { material: 'scree', slope: [15, 40], curvature: [null, 0] },
+      { material: 'rock', slope: [30, null] },
       // Snow outweighs the rock it lies on (weight 3: a quarter rock), so a snowy peak reads as snow, not grey.
       { material: 'snow', height: [2800, null], temperature: [null, -3], weight: 3 },
     ],
@@ -168,7 +184,11 @@ export const presets: Readonly<Record<PresetId, BiomeDefinition>> = Object.freez
     zones: ['tropical-seasonal-forest-savanna', 'woodland-shrubland', 'tropical-semiarid', 'warm-temperate-semiarid'],
     ground: [{ material: 'dry-grass' }, { material: 'laterite', slope: [10, null] }],
     plants: [
-      { ...tree('acacia', 'acacia', 25, 5, 0.1), cluster: { kind: 'matern', parents: 0.5, spread: 25, offspring: 4 } },
+      {
+        // Open woodland: no stands, and crowns already 5 m in radius (larger leaves the self-thinning band).
+        ...tree('acacia', 'acacia', 25, 5, 0.1, false),
+        cluster: { kind: 'matern', parents: 0.5, spread: 25, offspring: 4 },
+      },
       shrub('thornbush', 'shrub', 80, 1.2),
     ],
     rocks: [rock(4)],

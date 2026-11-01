@@ -12,6 +12,7 @@ import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { BiomeEditor } from '../dist/editor.js';
 import { BiomePlacement } from '../dist/placement.js';
 import { presets, presetWorlds } from '../dist/presets.js';
+import { createRelief } from '../dist/relief.js';
 import {
   andersonDarling,
   globalEnvelope,
@@ -700,7 +701,18 @@ test('sea level: no species stands on ground below the sea, and inland objects d
   // so none grows below `climate.seaLevel`: stored objects and detail cover alike. Removing the submerged candidates
   // only frees room for plants within a few metres of the shore (they were killed by phantom trees in the water).
   const { createHash } = await import('node:crypto'),
-    w = await BiomeWorld.create({ size: [2048, 2048], ...presetWorldOptions('wetland') }),
+    // The presets now keep woody plants off the shore themselves (dry land, Scott's S4); placement must hold without it.
+    options = presetWorldOptions('wetland'),
+    w = await BiomeWorld.create({
+      size: [2048, 2048],
+      ...options,
+      biomes: options.biomes.map((b) => ({
+        ...b,
+        plants: b.plants?.map(({ suitability, stands, ...p }) =>
+          p.size ? { ...p, size: { ...p.size, max: 1.6 } } : p,
+        ),
+      })),
+    }),
     p = BiomePlacement.attach(w),
     sea = w.climate.sea,
     side = w.tileSize, // 256 cells of 1 m
@@ -761,6 +773,51 @@ test('sea level: no species stands on ground below the sea, and inland objects d
     golden['wetland-coast-inland'],
     'objects more than 30 m from the sea are those of the unfixed placement',
   );
+});
+
+test('preset woody plants: none near a river line or the shore, forest trees grow past 1.6', async () => {
+  const relief = { seed: 3, relief: 300, base: 60, rivers: 2, coast: 'south' },
+    lines = createRelief(relief).rivers,
+    w = await BiomeWorld.create({
+      biomes: [presets.temperate],
+      climate: presetWorlds.temperate.climate,
+      height: { relief },
+    }),
+    p = BiomePlacement.attach(w),
+    woody = new Set(presets.temperate.plants.map((s) => `temperate/${s.id}`)),
+    near = (i, reach) => {
+      for (const line of lines)
+        for (let s = 0; s + 3 < line.length; s += 2) {
+          const ax = line[s] / 1000, // float division
+            az = line[s + 1] / 1000, // float division
+            bx = line[s + 2] / 1000 - ax, // float division
+            bz = line[s + 3] / 1000 - az, // float division
+            t = Math.max(0, Math.min(1, ((i.x - ax) * bx + (i.z - az) * bz) / (bx * bx + bz * bz))); // float division
+          if (Math.hypot(i.x - ax - bx * t, i.z - az - bz * t) < reach) return true;
+        }
+      return false;
+    };
+  let checked = 0,
+    largest = 0,
+    close = 0,
+    low = 0;
+  for (let tz = 0; tz < w.tilesZ; tz += 2)
+    for (let tx = 0; tx < w.tilesX; tx += 2) {
+      const t = await p.tile(tx, tz);
+      t.forEachInstance((i) => {
+        if (!woody.has(i.key)) return;
+        checked++;
+        if (i.scale > largest) largest = i.scale;
+        // The rule keeps 50 m from the region cells on the line, which lie up to 16 m off it.
+        if (near(i, 34)) close++;
+        if (w.heightAt(i.x, i.z) < 2.5) low++;
+      });
+    }
+  assert.ok(checked > 1000, `woody plants ${checked}`);
+  assert.equal(close, 0, 'nothing woody stands by a river');
+  assert.equal(low, 0, 'nothing woody stands on the shore');
+  assert.ok(largest > 1.6, `trees past the old 1.6: ${largest}`);
+  w.dispose();
 });
 
 /** Objects per 50 m cell of a 1,024 m square, and the positions, for a species rule on a flat world. */
