@@ -79,6 +79,7 @@ class BiomePlacement implements Disposable {
         readonly signal?: AbortSignal;
         readonly priority?: number;
         readonly detail?: number;
+        readonly ahead?: readonly (readonly [number, number])[];
     }): Promise<PlacedTile>;
     tiles(rect: Rect, options?: {
         readonly focus?: readonly [number, number];
@@ -484,6 +485,7 @@ interface ValleyOptions {
 
 interface ZoneClassifier {
     readonly kind: 'whittaker' | 'holdridge';
+    readonly perCell?: true;
     scorer(biomes: readonly BiomeDefinition[], slotOf: (layer: string) => number): (warped: Int32Array, cells: number, member: Int32Array) => void;
 }
 ```

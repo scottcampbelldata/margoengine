@@ -420,8 +420,9 @@ export class BiomeWorld implements Disposable {
   /**
    * Part of one tile: the cells of `window` (`[i0, j0, i1, j1]` in tile cells, `i1` and `j1` exclusive), every layer
    * `(i1 - i0)` x `(j1 - j0)` cells, row-major, with the same bytes as those cells of {@link BiomeWorld.tile}.
-   * Placement makes the edge of each neighbour it reads this way instead of the whole tile. Answers with the cached
-   * whole tile (window `[0, 0, cells, cells]`) when the world holds one with the layers. A part is never cached, and it
+   * Placement makes the edge of each neighbour it reads this way instead of the whole tile. Answers with the whole
+   * tile (window `[0, 0, cells, cells]`) when the world holds one with the layers, and, made by {@link BiomeWorld.tile},
+   * when a classified layer is asked of a world whose zone classifier is not `perCell`. A part is never cached, and it
    * is made on this thread, also on a world with workers.
    * @throws RangeError for a tile outside the world, a window that is empty or leaves the tile, or an unknown layer
    * name; MargoError `'disposed'` after dispose. Rejects with the signal's reason when aborted.
@@ -462,7 +463,12 @@ export class BiomeWorld implements Disposable {
     if (!Array.isArray(names) || !names.every((name) => typeof name === 'string' && name in LAYERS))
       throw rangeError('Unknown biome layer name; use names from LAYERS', 'biomes');
     aborted(options.signal);
-    const whole = this.#ready.get(`${x},${z}`);
+    // A zone scorer that is not marked per cell may read the grid it classifies: only the whole tile has its bytes.
+    const k = this.#kind,
+      whole =
+        k !== 'envelopes' && !k.perCell && (names.includes('biome') || names.includes('biomeWeight'))
+          ? await this.tile(x, z, options)
+          : this.#ready.get(`${x},${z}`);
     if (whole && names.every((name) => whole.layers.includes(name)))
       return Object.freeze({ ...whole, window: Object.freeze([0, 0, cells, cells] as const) });
     await Promise.resolve();

@@ -63,6 +63,7 @@ const classesOf = (slotOf: (layer: string) => number): Dims =>
  */
 export const whittaker: ZoneClassifier = Object.freeze<ZoneClassifier>({
   kind: 'whittaker',
+  perCell: true,
   scorer(biomes, slotOf) {
     const classes = classesOf(slotOf),
       classBiomes = Object.keys(WHITTAKER).map((name) =>
@@ -95,6 +96,7 @@ const zoneName = (j: number, m: number) =>
  */
 export const holdridge: ZoneClassifier = Object.freeze<ZoneClassifier>({
   kind: 'holdridge',
+  perCell: true,
   scorer(biomes, slotOf) {
     const codes = new Map<string, number>();
     for (let belt = 0; belt < 6; belt++)

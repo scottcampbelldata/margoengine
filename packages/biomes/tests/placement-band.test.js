@@ -323,24 +323,114 @@ test('the default biomes on 256 m tiles (R16 and the presets) read bands, though
   );
 });
 
+/** Counts what a world makes for placement: tiles asked for whole, and the windows asked of tilePart. */
+function counted(world) {
+  const tile = world.tile.bind(world),
+    part = world.tilePart.bind(world),
+    seen = { whole: new Set(), windows: new Map() };
+  world.tile = (x, z, o) => {
+    seen.whole.add(`${x},${z}`);
+    return tile(x, z, o);
+  };
+  world.tilePart = async (x, z, window, o) => {
+    const p = await part(x, z, window, o);
+    seen.windows.set(`${x},${z}`, [...p.window]);
+    return p;
+  };
+  return seen;
+}
+
 test('a neighbour the world already holds whole is read whole, not made again as a band', async () => {
   const world = await scrubWorld(),
     placement = BiomePlacement.attach(world),
-    part = world.tilePart.bind(world),
-    windows = new Map();
-  world.tilePart = async (x, z, window, o) => {
-    const p = await part(x, z, window, o);
-    windows.set(`${x},${z}`, [...p.window]);
-    return p;
-  };
+    seen = counted(world);
   await placement.tile(1, 1);
-  assert.equal(windows.size, 8, 'an isolated tile reads bands');
-  windows.clear();
-  // Placing (1, 1) made that world tile whole, and the world keeps it: placing (2, 1) reads it whole.
-  const placed = await placement.tile(2, 1);
-  assert.deepEqual(windows.get('1,1'), [0, 0, 256, 256]);
-  assert.deepEqual(windows.get('3,1'), [0, 0, 40, 256], 'a neighbour not yet made is a band');
-  assert.equal(placedHash(placed), placedHash(await withWholeNeighbours(await scrubWorld(), 2, 1)));
+  assert.equal(seen.windows.size, 8, 'an isolated tile reads bands');
+  await world.tile(3, 3);
+  seen.windows.clear();
+  // Tile (3, 2) is not next to (1, 1), so its neighbours are bands, except (3, 3), which the world holds whole.
+  const placed = await placement.tile(3, 2);
+  assert.deepEqual(seen.windows.get('3,3'), [0, 0, 256, 256]);
+  assert.deepEqual(seen.windows.get('2,2'), [216, 0, 256, 256], 'a neighbour not yet made is a band');
+  assert.equal(placedHash(placed), placedHash(await withWholeNeighbours(await scrubWorld(), 3, 2)));
+});
+
+// Regression (review of a4ba40aa4): one worker placing an 8 x 8 block took 1,465 ms per km2 instead of 1,119, as each
+// tile made bands of neighbours it then placed whole. Neighbours that will be placed too are now made whole.
+test('placing an area tile by tile makes whole the neighbours it will place', async () => {
+  const world = await scrubWorld(),
+    placement = BiomePlacement.attach(world),
+    seen = counted(world);
+  await placement.tile(1, 1);
+  seen.windows.clear();
+  seen.whole.clear();
+  // (2, 1) is next to a tile this placement placed: an area, so all its neighbours are whole, as before bands.
+  const next = await placement.tile(2, 1);
+  assert.equal(seen.windows.size, 0, `bands made: ${[...seen.windows.keys()].join(' ')}`);
+  assert.deepEqual([...seen.whole].sort(), ['1,0', '1,1', '1,2', '2,0', '2,1', '2,2', '3,0', '3,1', '3,2']);
+  assert.equal(placedHash(next), placedHash(await withWholeNeighbours(await scrubWorld(), 2, 1)));
+  // `ahead` names the tiles placed next: those neighbours are whole, the rest bands.
+  const fresh = await scrubWorld(),
+    other = counted(fresh),
+    ahead = await BiomePlacement.attach(fresh).tile(1, 1, {
+      ahead: [
+        [2, 1],
+        [2, 2],
+        [9, 9],
+      ],
+    });
+  assert.deepEqual([...other.whole].sort(), ['1,1', '2,1', '2,2']);
+  assert.deepEqual([...other.windows.keys()].sort(), ['0,0', '0,1', '0,2', '1,0', '1,2', '2,0']);
+  assert.equal(placedHash(ahead), placedHash(await withWholeNeighbours(await scrubWorld(), 1, 1)));
+  await assert.rejects(BiomePlacement.attach(fresh).tile(0, 0, { ahead: [1, 2] }), TypeError);
+});
+
+// Regression (review of a4ba40aa4): with a scorer that reads its grid size, a part classified alone had other bytes
+// than those cells of the whole tile, and band placement other objects. Such a scorer is not `perCell`, so tilePart
+// makes the whole tile.
+test('tilePart and band placement keep the bytes of a zone scorer that is not per cell', async () => {
+  // The biome of every cell is chosen by the number of cells classified together.
+  const bySize = {
+      kind: 'whittaker',
+      scorer: (biomes) => (warped, cells, member) => {
+        const b = cells % biomes.length;
+        member.fill(65536, b * cells, (b + 1) * cells);
+      },
+    },
+    make = () =>
+      BiomeWorld.create({
+        size: [768, 768],
+        workers: 0,
+        classifier: bySize,
+        biomes: Object.values(presets).filter((b) => b.id !== 'beach'),
+        climate: presetWorlds.temperate.climate,
+        height: { relief: presetWorlds.temperate.relief },
+      }),
+    world = await make(),
+    windows = [
+      [0, 0, 256, 37],
+      [256 - 128, 0, 256, 256],
+      [3, 5, 70, 9],
+    ],
+    parts = [];
+  for (const window of windows) parts.push(await world.tilePart(1, 1, window));
+  const whole = await world.tile(1, 1);
+  for (const part of parts) {
+    const [i0, j0, i1, j1] = part.window;
+    for (const name of ['biome', 'biomeWeight', 'height']) {
+      const per = name === 'height' ? 1 : 4,
+        a = part.layer(name).data,
+        b = whole.layer(name).data;
+      for (let j = j0; j < j1; j++)
+        assert.deepEqual(
+          a.subarray((j - j0) * (i1 - i0) * per, (j - j0 + 1) * (i1 - i0) * per),
+          b.subarray((j * 256 + i0) * per, (j * 256 + i1) * per),
+          `${name} row ${j} of window ${windows[parts.indexOf(part)]}`,
+        );
+    }
+  }
+  const banded = await BiomePlacement.attach(await make()).tile(1, 1);
+  assert.equal(placedHash(banded), placedHash(await withWholeNeighbours(await make(), 1, 1)));
 });
 
 test('a read past a band makes the neighbour whole, with the same bytes', async () => {

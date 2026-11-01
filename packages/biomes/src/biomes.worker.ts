@@ -127,7 +127,9 @@ async function run(m: Message): Promise<unknown> {
       return tileData(await world!.tile(m.x as number, m.z as number, { layers: m.layers as string[] | undefined }));
     case 'place':
       return placedData(
-        await placements.get(m.pid as number)!.tile(m.x as number, m.z as number),
+        await placements
+          .get(m.pid as number)!
+          .tile(m.x as number, m.z as number, { ahead: m.ahead as [number, number][] }),
         !!m.split,
         m.detail as number | undefined,
       );

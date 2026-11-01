@@ -150,6 +150,38 @@ test('posts counts the messages that reached a worker: a job queued behind a bus
   world.dispose();
 });
 
+// Regression (review of a4ba40aa4): a worker placing a block made bands of neighbours it then placed whole (one worker:
+// 1,465 ms per km2 instead of 1,119). A placement job now names the tiles the same replica places after it there.
+test('a placement job carries the tiles its worker places after it, as ahead', async () => {
+  const sent = [];
+  let worker;
+  const world = await BiomeWorld.create({
+      ...options,
+      workers: 1,
+      createWorker: () => (worker = { postMessage: (message) => sent.push(message), terminate() {} }),
+    }),
+    pool = world.workers,
+    jobs = [
+      pool.run({ op: 'place', pid: 7, x: 1, z: 1 }),
+      pool.run({ op: 'place', pid: 7, x: 2, z: 1 }),
+      pool.run({ op: 'place', pid: 8, x: 3, z: 1 }),
+      pool.run({ op: 'tile', x: 0, z: 0 }),
+      pool.run({ op: 'place', pid: 7, x: 2, z: 2 }),
+    ];
+  // The first job left at once, before the others were queued.
+  assert.deepEqual(sent[1].ahead, []);
+  worker.onmessage({ data: { id: sent[1].id, result: 1 } });
+  assert.deepEqual([sent[2].x, sent[2].ahead], [2, [[2, 2]]], 'placement 7 places (2, 2) after (2, 1) on this worker');
+  worker.onmessage({ data: { id: sent[2].id, result: 2 } });
+  assert.deepEqual(sent[3].ahead, [], 'placement 8 has nothing after it');
+  worker.onmessage({ data: { id: sent[3].id, result: 3 } });
+  assert.equal(sent[4].ahead, undefined, 'a tile job has no ahead');
+  worker.onmessage({ data: { id: sent[4].id, result: 4 } });
+  worker.onmessage({ data: { id: sent[5].id, result: 5 } });
+  assert.deepEqual(await Promise.all(jobs), [1, 2, 3, 4, 5]);
+  world.dispose();
+});
+
 test('a crashed worker rejects its job with failed and a fresh replica takes the next', {
   timeout: 240000,
 }, async () => {

@@ -299,8 +299,15 @@ export class BiomeWorkers implements Disposable {
       JOB_LIMIT,
     );
     try {
+      const m = job.message,
+        // A placement job gets the tiles the same replica places after it on this worker (`ahead`): it makes those of its
+        // neighbours whole, and only bands of the rest.
+        ahead =
+          m.op === 'place'
+            ? slot.queue.flatMap(({ message: q }) => (q.op === 'place' && q.pid === m.pid ? [[q.x, q.z]] : []))
+            : undefined;
       // A change goes to every worker as a copy; a job's own arrays move.
-      slot.worker.postMessage({ id: job.id, ...job.message }, job.barrier ? [] : [...transferables(job.message)]);
+      slot.worker.postMessage({ id: job.id, ...m, ahead }, job.barrier ? [] : [...transferables(m)]);
       this.#posts++;
     } catch (error) {
       slot.busy = undefined;

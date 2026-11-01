@@ -1361,8 +1361,10 @@ export class BiomePlacement implements Disposable {
 
   /**
    * The objects of tile (x, z), cached. Makes what it reads of the world first: its own tile, and of each neighbour
-   * the edge that placement can reach (the whole neighbour only when a read goes past that edge).
-   * @throws RangeError for a tile outside the world. Rejects with the signal's reason when aborted.
+   * the edge that placement can reach (the whole neighbour when it will be placed too, see `ahead`, or when a read goes
+   * past that edge).
+   * @throws RangeError for a tile outside the world; TypeError for an `ahead` that is not a list of pairs. Rejects with
+   * the signal's reason when aborted.
    */
   async tile(
     x: number,
@@ -1373,6 +1375,13 @@ export class BiomePlacement implements Disposable {
       readonly priority?: number;
       /** On a world with workers: also sample the detail maps every this many cells (`DensityMap.sampled`). */
       readonly detail?: number;
+      /**
+       * On a world without workers: the tiles you will place next. Neighbours among them are made whole (placing them
+       * needs them whole), the others as bands. Default: neighbours are whole when this placement placed or is placing
+       * a tile next to (x, z), as when an area is placed tile by tile, and bands otherwise. A world with workers sends
+       * each worker the tiles queued after this one there.
+       */
+      readonly ahead?: readonly (readonly [number, number])[];
     } = {},
   ): Promise<PlacedTile> {
     this.#live();
@@ -1383,6 +1392,8 @@ export class BiomePlacement implements Disposable {
         'biomes',
       );
     if (options.signal?.aborted) throw options.signal.reason;
+    if (options.ahead && !options.ahead.every?.((p) => Array.isArray(p)))
+      throw typeError('BiomePlacement tile ahead is a list of [x, z] tile indices', 'biomes');
     const key = tileKey(x, z);
     let pending = this.#cache.get(key);
     if (pending) {
@@ -1397,7 +1408,7 @@ export class BiomePlacement implements Disposable {
               { near: [x, z], priority: options.priority, signal: options.signal },
             )
             .then(placed)
-        : this.#place(x, z, options.signal);
+        : this.#place(x, z, options.signal, options.ahead);
       this.#cache.set(key, pending);
       if (this.#cache.size > CACHE) this.#cache.delete(this.#cache.keys().next().value!);
       pending.catch(() => {
@@ -1427,19 +1438,31 @@ export class BiomePlacement implements Disposable {
 
   /**
    * Places tile (x, z) from its own world tile, whole, and of each neighbour only the band next to it that placement
-   * usually reads: `#band` cells wide (a tile made whole by the world already is used whole). A read past a band makes
-   * that neighbour whole and runs again, so the objects are the same whatever was made.
+   * usually reads: `#band` cells wide (a tile made whole by the world already is used whole). Neighbours that will be
+   * placed too are made whole instead: those in `ahead`, or without it every neighbour when this placement holds a tile
+   * next to (x, z). A read past a band makes that neighbour whole and runs again, so the objects are the same whatever
+   * was made.
    */
-  #place(x: number, z: number, signal?: AbortSignal): Promise<PlacedTile> {
+  #place(
+    x: number,
+    z: number,
+    signal?: AbortSignal,
+    ahead?: readonly (readonly [number, number])[],
+  ): Promise<PlacedTile> {
     const c = this.#world.tileSize / this.#world.resolution, // float division: exact
-      a = this.#band,
+      next = new Set(ahead?.map(([i, j]) => tileKey(i, j))),
       need: [number, number, Rect?][] = [];
+    let a = this.#band;
+    for (let dz = -1; dz <= 1; dz++)
+      for (let dx = -1; dx <= 1; dx++) if (!ahead && this.#cache.has(tileKey(x + dx, z + dz))) a = c;
     for (let dz = -1; dz <= 1; dz++)
       for (let dx = -1; dx <= 1; dx++)
         need.push([
           x + dx,
           z + dz,
-          a < c && (dx || dz) ? [dx < 0 ? c - a : 0, dz < 0 ? c - a : 0, dx > 0 ? a : c, dz > 0 ? a : c] : undefined,
+          a < c && (dx || dz) && !next.has(tileKey(x + dx, z + dz))
+            ? [dx < 0 ? c - a : 0, dz < 0 ? c - a : 0, dx > 0 ? a : c, dz > 0 ? a : c]
+            : undefined,
         ]);
     return this.#withFields(need, signal, (fields) => this.#run(x, z, fields));
   }

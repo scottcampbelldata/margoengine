@@ -380,6 +380,7 @@ interface ViewTile {
 
 interface ZoneClassifier {
     readonly kind: 'whittaker' | 'holdridge';
+    readonly perCell?: true;
     scorer(biomes: readonly BiomeDefinition[], slotOf: (layer: string) => number): (warped: Int32Array, cells: number, member: Int32Array) => void;
 }
 ```
