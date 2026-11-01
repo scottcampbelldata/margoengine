@@ -187,6 +187,30 @@ function must(git, ...args) {
 
 const noreply = (email) => email === EMAIL;
 
+const isTestFile = (file) => /(^|\/)tests?\//.test(file) || /\.test\.[^/]*$/.test(file);
+
+/**
+ * The bug-fix gate. A commit whose subject starts with `fix` (a scope or `!` may follow) must change a test file or carry a
+ * body line `Regression: <repo path>` naming a test that exists. `commits` is `[{ sha, message, files, exists(path) }]`;
+ * returns the sha and reason of the first commit that does neither, or null.
+ */
+export function fixWithoutTest(commits) {
+  for (const { sha, message, files, exists } of commits) {
+    const [subject = '', ...body] = message.split(/\r?\n/);
+    if (!/^fix(\([^)]*\))?!?:/i.test(subject.trim())) continue;
+    if (files.some(isTestFile)) continue;
+    const named = body.map((line) => /^Regression:\s*(\S+)\s*$/.exec(line)?.[1]).filter(Boolean);
+    if (named.some((path) => exists(path))) continue;
+    return {
+      sha,
+      reason: named.length
+        ? `fix commit ${sha.slice(0, 9)} names "Regression: ${named[0]}" but no such file exists`
+        : `fix commit ${sha.slice(0, 9)} "${subject.trim()}" changes no test and has no "Regression: <repo path>" body line; add the test that fails without the fix, or type the commit something other than fix`,
+    };
+  }
+  return null;
+}
+
 /**
  * Lands one batch. `git(args)` resolves to `{ status, stdout, stderr }`, `runStep(command, { env, logFile, limitMs })` to
  * `{ ok, timedOut? }` and writes its output to logFile. `paths` is queuePaths(); `now()` a Date. Returns `{ result, exit,
@@ -252,6 +276,17 @@ export async function integrate({
     const authors = lines(must(git, 'log', '--format=%ae', `${entry.from}..${entry.sha}`)).filter((e) => !noreply(e));
     if (authors.length) {
       sendBack(entry, `a commit's author is not the noreply address; rewrite it to ${EMAIL} before READY`);
+      continue;
+    }
+    const commits = lines(must(git, 'log', '--no-merges', '--format=%H', `${entry.from}..${entry.sha}`)).map((sha) => ({
+      sha,
+      message: must(git, 'log', '-1', '--format=%B', sha),
+      files: lines(must(git, 'diff-tree', '--no-commit-id', '--name-only', '-r', '--no-renames', sha)),
+      exists: (path) => git(['cat-file', '-e', `${entry.sha}:${path}`]).status === 0,
+    }));
+    const untested = fixWithoutTest(commits);
+    if (untested) {
+      sendBack(entry, untested.reason);
       continue;
     }
     entry.paths = lines(must(git, 'diff', '--name-only', '--no-renames', entry.from, entry.sha));

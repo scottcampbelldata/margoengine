@@ -34,6 +34,9 @@ Scott's rule (2026-10-24): as few bugs as possible at release, and every fix is 
   loosened tests or tolerances, no skipped tests, no "left as is" notes.
 - Every fix ships with a regression test that fails without it. When a whole class of bug slipped through, add a
   check to `check:merge` that catches the class.
+- The integrator enforces it at intake: a commit typed `fix` or `fix(scope)` must change a test file (under a `tests/`
+  or `test/` folder, or `*.test.*`) or carry a body line `Regression: <repo path>` naming an existing test. No size
+  or kind exemption: a commit that is not a bug fix is not typed `fix`.
 - A bug you cannot fix now goes into `docs/known-bugs.md` with a repro and its cause. That list must be empty
   before release.
 

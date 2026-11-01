@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import {
   EMAIL,
   demoPath,
+  fixWithoutTest,
   integrate,
   parsePlan,
   parseReady,
@@ -31,7 +32,14 @@ const WORKSPACES = [
 ];
 
 /** A fake clone. `branches`: sha to its changed paths. `conflicts`: shas whose rebase fails. Records every call. */
-function fakeGit({ branches = {}, conflicts = [], pushFails = false, author = EMAIL, stranger = false } = {}) {
+function fakeGit({
+  branches = {},
+  conflicts = [],
+  pushFails = false,
+  author = EMAIL,
+  stranger = false,
+  commits = [],
+} = {}) {
   const calls = [];
   let head = 'base';
   const ok = (stdout = '') => ({ status: 0, stdout, stderr: '' });
@@ -47,6 +55,11 @@ function fakeGit({ branches = {}, conflicts = [], pushFails = false, author = EM
     if (verb === 'merge-base' && args[1] === '--is-ancestor') return { status: 1, stdout: '', stderr: '' };
     if (verb === 'merge-base') return ok('old');
     if (verb === 'log' && args[1] === '--format=%ae') return ok(author);
+    if (verb === 'log' && args[1] === '--no-merges') return ok(commits.map((c) => c.sha).join('\n'));
+    if (verb === 'log' && args[1] === '-1') return ok(commits.find((c) => c.sha === args[3])?.message ?? 'chore: x');
+    if (verb === 'diff-tree') return ok((commits.find((c) => c.sha === args.at(-1))?.files ?? []).join('\n'));
+    if (verb === 'cat-file')
+      return { status: commits.some((c) => c.tests?.includes(args[2].split(':')[1])) ? 0 : 1, stdout: '', stderr: '' };
     if (verb === 'log' && args[1] === '--format=%ae %ce')
       return ok(stranger ? `${EMAIL} other@example.com` : `${EMAIL} ${EMAIL}`);
     if (verb === 'log') return ok(`${head} a commit`);
@@ -508,5 +521,48 @@ test('a READY file that does not parse or names no commit goes back; the rest go
     assert.deepEqual(out.sentBack.map((b) => b.branch).sort(), ['bad', 'gone']);
   } finally {
     done();
+  }
+});
+
+test('fixWithoutTest: a fix needs a changed test file or a Regression line naming an existing file', () => {
+  const exists = (path) => path === 'tests/real.test.js';
+  const commit = (message, files = ['src/a.ts']) => ({ sha: 'a'.repeat(40), message, files, exists });
+  for (const subject of ['fix: x', 'fix(bench): x', 'Fix(core)!: x', 'fix(a/b): x'])
+    assert.match(fixWithoutTest([commit(subject)]).reason, /Regression: <repo path>/, subject);
+  assert.equal(fixWithoutTest([commit('fix(a): x', ['src/a.ts', 'tests/a.test.js'])]), null);
+  assert.equal(fixWithoutTest([commit('fix(a): x', ['packages/a/test/b.js'])]), null);
+  assert.equal(fixWithoutTest([commit('fix(a): x', ['scripts/x.test.mjs'])]), null);
+  assert.equal(fixWithoutTest([commit(['fix(a): x', '', 'body', 'Regression: tests/real.test.js'].join('\n'))]), null);
+  assert.match(
+    fixWithoutTest([commit(['fix(a): x', '', 'Regression: tests/gone.test.js'].join('\n'))]).reason,
+    /no such file/,
+  );
+  for (const subject of ['feat: x', 'fixture: x', 'docs: fix x', 'chore(fix): x'])
+    assert.equal(fixWithoutTest([commit(subject)]), null, subject);
+});
+
+test('a branch with a fix commit and no test goes back at intake; with a test or a Regression line it lands', async () => {
+  const fix = (extra) => ({
+    sha: SHA.a,
+    message: 'fix(sky): stop the flicker',
+    files: ['packages/sky/a.ts'],
+    ...extra,
+  });
+  const regression = (path) => `fix(sky): x\n\nRegression: ${path}`;
+  for (const [commits, result] of [
+    [[fix()], 'nothing'],
+    [[fix({ files: ['packages/sky/a.ts', 'packages/sky/tests/a.test.js'] })], 'landed'],
+    [[fix({ message: regression('tests/sky.test.js'), tests: ['tests/sky.test.js'] })], 'landed'],
+    [[fix({ message: regression('tests/missing.test.js') })], 'nothing'],
+  ]) {
+    const { paths, done } = setup({ one: `READY ${SHA.a}` });
+    try {
+      const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] }, commits }),
+        out = await run(paths, git, fakeSteps(undefined, git));
+      assert.equal(out.result, result);
+      if (result === 'nothing') assert.match(out.sentBack[0].reason, /fix commit/);
+    } finally {
+      done();
+    }
   }
 });
