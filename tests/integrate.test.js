@@ -17,6 +17,7 @@ import {
   readStopped,
   stoppedHits,
   suspects,
+  syncMainCheckout,
 } from '../scripts/integrate.mjs';
 
 const PLAN = `check:merge: AFFECTED GPU run
@@ -118,9 +119,10 @@ function setup(entries = {}) {
 }
 
 const SHA = { a: 'aaaaaaa', b: 'bbbbbbb', c: 'ccccccc' };
-const run = (paths, git, runStep) =>
+const run = (paths, git, runStep, mainGit = null) =>
   integrate({
     git,
+    mainGit,
     runStep,
     paths,
     workspaces: WORKSPACES,
@@ -597,6 +599,78 @@ test('a send-back or landing removes a READY file only while it still holds the 
       done();
     }
   }
+});
+
+/** A fake main checkout: `branch` it is on, `ffFails` the stderr of a merge that cannot fast-forward. Records every call. */
+function fakeMain({ branch = 'main', ffFails = null } = {}) {
+  const calls = [];
+  const main = (args) => {
+    calls.push(args);
+    if (args[0] === 'symbolic-ref')
+      return {
+        status: 0,
+        stdout: `${branch}
+`,
+        stderr: '',
+      };
+    if (args[0] === 'merge')
+      return ffFails ? { status: 128, stdout: '', stderr: ffFails } : { status: 0, stdout: '', stderr: '' };
+    return { status: 0, stdout: '', stderr: '' };
+  };
+  main.calls = calls;
+  return main;
+}
+
+test('after the push the main checkout is fast-forwarded to origin/main, and the landing line says so', async () => {
+  const { paths, done } = setup({ one: `READY ${SHA.a}` });
+  try {
+    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } }),
+      main = fakeMain(),
+      out = await run(paths, git, fakeSteps(undefined, git), main);
+    assert.equal(out.result, 'landed');
+    assert.deepEqual(
+      main.calls.filter((a) => a[0] === 'merge'),
+      [['merge', '--ff-only', 'origin/main']],
+    );
+    assert.match(out.mainCheckout, /fast-forwarded/);
+    assert.equal(JSON.parse(readFileSync(paths.landed, 'utf8')).mainCheckout, out.mainCheckout);
+  } finally {
+    done();
+  }
+});
+
+test('a main checkout that cannot fast-forward does not undo the landing: one line, recorded, tried once, nothing reset or stashed', async () => {
+  const { paths, done } = setup({ one: `READY ${SHA.a}` });
+  try {
+    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } }),
+      main = fakeMain({ ffFails: 'error: Your local changes would be overwritten by merge.' }),
+      lines = [],
+      out = await integrate({
+        git,
+        mainGit: main,
+        runStep: fakeSteps(undefined, git),
+        paths,
+        workspaces: WORKSPACES,
+        log: (line) => lines.push(line),
+        now: () => new Date('2026-11-01T00:00:00Z'),
+      });
+    assert.equal(out.result, 'landed');
+    assert.equal(out.exit, 0);
+    assert.equal(git.pushes().length, 1);
+    assert.equal(main.calls.filter((a) => a[0] === 'merge').length, 1);
+    assert.ok(!main.calls.some((a) => ['reset', 'stash', 'checkout', 'clean'].includes(a[0])));
+    assert.equal(lines.filter((line) => /main checkout is behind/.test(line)).length, 1);
+    assert.match(out.mainCheckout, /behind origin[/]main.*could not fast-forward.*not touched/);
+    assert.equal(JSON.parse(readFileSync(paths.landed, 'utf8')).mainCheckout, out.mainCheckout);
+  } finally {
+    done();
+  }
+});
+
+test('a main checkout that is on another branch is left alone', () => {
+  const main = fakeMain({ branch: 'some-work' });
+  assert.match(syncMainCheckout(main), /not on main/);
+  assert.ok(!main.calls.some((a) => a[0] === 'merge'));
 });
 
 test('missingFromLog reads the names worktree-node-modules.mjs lists', () => {

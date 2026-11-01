@@ -234,6 +234,20 @@ export const missingFromLog = (tail) =>
     .map((name) => name.trim())
     .filter(Boolean);
 
+/**
+ * Fast-forwards the main checkout to origin/main after a push. Never resets, stashes or retries: a checkout that cannot
+ * move (another branch, or local changes in the way) stays as it is. Returns the line that says what happened.
+ */
+export function syncMainCheckout(mainGit) {
+  const branch = mainGit(['symbolic-ref', '-q', '--short', 'HEAD']);
+  if (branch.status !== 0 || String(branch.stdout).trim() !== 'main')
+    return 'the main checkout is behind origin/main: it is not on main, so it was left alone; update it by hand';
+  const moved = mainGit(['merge', '--ff-only', 'origin/main']);
+  if (moved.status === 0) return 'the main checkout fast-forwarded to origin/main';
+  const why = lines(moved.stderr).at(-1) ?? `exit ${moved.status}`;
+  return `the main checkout is behind origin/main: it could not fast-forward (${why}); its own changes were not touched; update it by hand`;
+}
+
 const isTestFile = (file) => /(^|\/)tests?\//.test(file) || /\.test\.[^/]*$/.test(file);
 
 /**
@@ -265,6 +279,7 @@ export function fixWithoutTest(commits) {
  */
 export async function integrate({
   git,
+  mainGit = null,
   runStep,
   paths,
   workspaces = [],
@@ -445,6 +460,8 @@ export async function integrate({
       5,
       `the push was refused (${lines(pushed.stderr).at(-1) ?? 'no reason given'}); every entry stays READY for the next run`,
     );
+  const synced = mainGit ? syncMainCheckout(mainGit) : null;
+  if (synced) log(`integrate: ${synced}`);
   const landed = batch.map(({ branch, sha, fix }) => ({ branch, sha, ...(fix && { fix }) }));
   appendFileSync(
     paths.landed,
@@ -457,12 +474,14 @@ export async function integrate({
       tier1: gate.logs,
       sentBack: sentBack.map((entry) => entry.branch),
       stillReady: held.map((entry) => entry.branch),
+      ...(synced && { mainCheckout: synced }),
     })}\n`,
   );
   for (const entry of batch) dropReady(entry);
   return report('landed', 0, `${tip} on main: ${landed.map((entry) => entry.branch).join(', ')}`, {
     landed,
     tip,
+    ...(synced && { mainCheckout: synced }),
   });
 }
 
@@ -612,6 +631,7 @@ async function main() {
   ensureWorktree(worktree);
   const { exit } = await integrate({
     git: gitIn(worktree),
+    mainGit: gitIn(home),
     runStep: stepIn(worktree),
     paths: queuePaths(home),
     workspaces: loadWorkspaces(root),
