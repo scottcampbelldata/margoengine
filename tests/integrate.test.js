@@ -566,3 +566,28 @@ test('a branch with a fix commit and no test goes back at intake; with a test or
     }
   }
 });
+
+test('a send-back or landing removes a READY file only while it still holds the sha the run took', async () => {
+  // The helper writes a newer READY for the same branch while the run is going; the old sha's outcome must not delete it.
+  for (const conflicts of [[SHA.a], []]) {
+    const { paths, done } = setup({ one: `READY ${SHA.a}` });
+    try {
+      const inner = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] }, conflicts }),
+        git = (args) => {
+          if (args[0] === 'rebase' && args[1] === '-q') writeFileSync(join(paths.dir, 'one.ready'), `READY ${SHA.b}\n`);
+          return inner(args);
+        };
+      git.calls = inner.calls;
+      git.pushes = inner.pushes;
+      git.head = inner.head;
+      await run(paths, git, fakeSteps(undefined, git));
+      assert.equal(
+        readFileSync(join(paths.dir, 'one.ready'), 'utf8').trim(),
+        `READY ${SHA.b}`,
+        `conflict=${conflicts.length}`,
+      );
+    } finally {
+      done();
+    }
+  }
+});

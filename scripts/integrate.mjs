@@ -90,7 +90,13 @@ export function readQueue(dir) {
     .map((name) => {
       const file = join(dir, name),
         parsed = parseReady(readFileSync(file, 'utf8'));
-      return { branch: name.slice(0, -6), file, mtime: statSync(file).mtimeMs, ...(parsed ?? { invalid: true }) };
+      return {
+        branch: name.slice(0, -6),
+        file,
+        taken: parsed?.sha,
+        mtime: statSync(file).mtimeMs,
+        ...(parsed ?? { invalid: true }),
+      };
     });
   const rank = (entry) => (entry.fix ? 0 : 1);
   return entries.sort((a, b) => rank(a) - rank(b) || a.mtime - b.mtime || a.branch.localeCompare(b.branch));
@@ -185,6 +191,23 @@ function must(git, ...args) {
   return String(result.stdout ?? '').trim();
 }
 
+/**
+ * Removes an entry's READY file only if it still holds the sha this run took. A helper may have written a newer READY
+ * while the run was going; that one stays for the next run.
+ */
+function dropReady(entry) {
+  if (entry.taken) {
+    let now = null;
+    try {
+      now = parseReady(readFileSync(entry.file, 'utf8'));
+    } catch {
+      return;
+    }
+    if (now && now.sha !== entry.taken) return;
+  }
+  rmSync(entry.file, { force: true });
+}
+
 const noreply = (email) => email === EMAIL;
 
 const isTestFile = (file) => /(^|\/)tests?\//.test(file) || /\.test\.[^/]*$/.test(file);
@@ -234,7 +257,7 @@ export async function integrate({
       join(paths.sentBack, `${entry.branch}.json`),
       `${JSON.stringify({ branch: entry.branch, sha: entry.sha ?? null, at: now().toISOString(), step, reason, log: logFile }, null, 2)}\n`,
     );
-    rmSync(entry.file, { force: true });
+    dropReady(entry);
     sentBack.push({ branch: entry.branch, step, reason, log: logFile });
     log(`integrate: ${entry.branch} goes back: ${reason}${logFile ? ` (log ${logFile})` : ''}`);
   };
@@ -269,7 +292,7 @@ export async function integrate({
     entry.sha = String(resolved.stdout).trim();
     if (git(['merge-base', '--is-ancestor', entry.sha, base]).status === 0) {
       log(`integrate: ${entry.branch} is already on main; its READY entry is removed`);
-      rmSync(entry.file, { force: true });
+      dropReady(entry);
       continue;
     }
     entry.from = must(git, 'merge-base', entry.sha, base);
@@ -392,7 +415,7 @@ export async function integrate({
       stillReady: held.map((entry) => entry.branch),
     })}\n`,
   );
-  for (const entry of batch) rmSync(entry.file, { force: true });
+  for (const entry of batch) dropReady(entry);
   return report('landed', 0, `${tip} on main: ${landed.map((entry) => entry.branch).join(', ')}`, { landed, tip });
 }
 
