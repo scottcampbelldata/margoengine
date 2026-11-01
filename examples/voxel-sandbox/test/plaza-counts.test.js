@@ -24,9 +24,16 @@ const { blocks } = defineBlocks(),
   wait = (ms) => new Promise((done) => setTimeout(done, ms)),
   SEED = 5;
 
+// The shards each test started. Hooks run in the order they were added and a test makes its folder before its shard, so
+// the folder's hook stops the shards first: one still running would write into a folder that is gone, or make it again.
+const shardsOf = new WeakMap();
+
 function dataDir(t) {
   const dir = mkdtempSync(pathJoin(tmpdir(), 'plaza-counts-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.after(async () => {
+    for (const shard of shardsOf.get(t) ?? []) await shard.shutdown();
+    rmSync(dir, { recursive: true, force: true });
+  });
   return dir;
 }
 
@@ -47,7 +54,7 @@ async function startShard(t, options = {}) {
       proxied: true,
       ...options,
     });
-  t.after(() => shard.shutdown());
+  shardsOf.set(t, [...(shardsOf.get(t) ?? []), shard]);
   assert.equal(await shard.start(), true);
   return { shard, clock, url: `ws://${HOST}:${shard.address.port}` };
 }
@@ -440,4 +447,21 @@ test('nothing the client gets, and nothing the shard logs or hands the router, h
     everything = [...seen, ...lines, handed].join('\n');
   for (const secret of [identity, salt, '203.0.113.1']) assert.ok(!everything.includes(secret), secret);
   a.client.close();
+});
+
+test('a test stops its shard before removing its folder, so the shard writes its last save into a folder still there', async (t) => {
+  let dir;
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  await t.test('a shard with an edit it has not saved', async (inner) => {
+    dir = dataDir(inner);
+    const { shard, url } = await startShard(inner, { dataDir: dir }),
+      a = await player(shard, url, '203.0.113.1'),
+      [ore] = cellsNear(shard, a, 1);
+    stamp(shard, [a], ore, TIN);
+    a.client.edit(...ore, 0);
+    assert.ok(await drive([a], () => tinOf(a) === 1));
+    a.client.close();
+  });
+  // In the other order the shard's last save makes the removed folder again.
+  assert.equal(existsSync(dir), false);
 });
