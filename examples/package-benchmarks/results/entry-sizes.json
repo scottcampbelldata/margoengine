@@ -1,5 +1,5 @@
 {
-  "commit": "7da88ae89",
+  "commit": "160f2d756",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -66,8 +66,8 @@
         "gzip": 2920
       },
       "./presets": {
-        "raw": 5761,
-        "gzip": 1877
+        "raw": 5908,
+        "gzip": 1956
       },
       "./relief": {
         "raw": 9215,
@@ -115,11 +115,11 @@
       },
       "./workers": {
         "raw": 5989,
-        "gzip": 2705
+        "gzip": 2704
       },
       "dist/workers/biomes.js": {
-        "raw": 106760,
-        "gzip": 40081
+        "raw": 106918,
+        "gzip": 40135
       }
     },
     "@margoengine/blender": {
@@ -755,6 +755,18 @@
         "raw": 6774,
         "gzip": 2905
       },
+      "./mocap": {
+        "raw": 4206,
+        "gzip": 1894
+      },
+      "./vrml": {
+        "raw": 11494,
+        "gzip": 4842
+      },
+      "./gcode": {
+        "raw": 3758,
+        "gzip": 1721
+      },
       "dist/workers/usd.js": {
         "raw": 20980,
         "gzip": 8183
@@ -994,12 +1006,16 @@
         "gzip": 4860
       },
       "./laz": {
-        "raw": 23348,
-        "gzip": 7868
+        "raw": 23530,
+        "gzip": 7929
       },
       "./e57": {
         "raw": 15846,
         "gzip": 6289
+      },
+      "./copc": {
+        "raw": 32759,
+        "gzip": 11533
       },
       "./octree": {
         "raw": 20915,
@@ -1710,6 +1726,10 @@
       "./smooth": {
         "raw": 5409,
         "gzip": 2377
+      },
+      "./voxelize": {
+        "raw": 7957,
+        "gzip": 3468
       }
     },
     "@margoengine/voxel-net": {
@@ -1884,9 +1904,9 @@
       "brotli": 2727
     },
     "packages/biomes/dist/workers/biomes.js": {
-      "raw": 105696,
-      "gzip": 39966,
-      "brotli": 34324
+      "raw": 105854,
+      "gzip": 40026,
+      "brotli": 34383
     },
     "packages/voxel/dist/workers/mesher.js": {
       "raw": 13081,
