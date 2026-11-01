@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4288035,
+  "total": 4289567,
   "history": [
     {
       "date": "2026-10-24",
@@ -1364,6 +1364,12 @@
       "commit": "62a54b159",
       "reason": "stats/report: GPUMemory and statsReport, own entry, root unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "62a54b159",
+      "reason": "scatter/paint: DensityBrush paints a density map and reads splat maps, own entry, root unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -1664,6 +1670,7 @@
     "@margoengine/save": 6955,
     "@margoengine/save/node": 939,
     "@margoengine/scatter": 15271,
+    "@margoengine/scatter/paint": 1532,
     "@margoengine/scatter/tiles": 3448,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,

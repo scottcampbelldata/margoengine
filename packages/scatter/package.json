@@ -29,6 +29,10 @@
     "./tiles": {
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"
+    },
+    "./paint": {
+      "types": "./dist/paint.d.ts",
+      "import": "./dist/paint.js"
     }
   },
   "files": [

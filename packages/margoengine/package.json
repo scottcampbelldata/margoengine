@@ -1206,6 +1206,10 @@
       "types": "./dist/scatter/tiles.d.ts",
       "import": "./dist/scatter/tiles.js"
     },
+    "./scatter/paint": {
+      "types": "./dist/scatter/paint.d.ts",
+      "import": "./dist/scatter/paint.js"
+    },
     "./scenery": {
       "types": "./dist/scenery.d.ts",
       "import": "./dist/scenery.js"

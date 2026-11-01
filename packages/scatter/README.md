@@ -303,6 +303,22 @@ const grass = Scatter.attach(engine, blade, {
 });
 ```
 
+`@margoengine/scatter/paint` makes that map from a brush or a splat map. It uploads only the rectangle that changed:
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {Scatter} from 'margoengine/scatter';
+import {DensityBrush} from 'margoengine/scatter/paint';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const bounds = [-50, -50, 50, 50] as const;
+const brush = new DensityBrush({bounds, resolution: 512});
+brush.paint(0, 0, {radius: 10, strength: 1, hardness: 0.5});   // strength below 0 erases
+brush.fromSplat(new Uint8Array(4 * 4 * 4), 4, 4, [0, 1, 0, 0]); // or: the green layer of a splat map
+Scatter.attach(engine, box(0.1, 0.5, 0.1), {bounds, densityMap: () => brush.texture(engine.gpu!)});
+engine.start();
+```
+
 `@margoengine/scatter/tiles` draws stored instances per tile: `ScatterTiles` takes 8-byte records (u16 x and z inside the
 tile, palette index, log scale, yaw, variant and age, as `@margoengine/biomes/placement` writes them) and expands them on
 the GPU every frame with scatter's own culling, LOD rings, fades, wind and shading. Add tiles as they stream in and
