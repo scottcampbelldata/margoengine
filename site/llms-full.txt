@@ -5185,7 +5185,7 @@ Import `margoengine/oit` from the `margoengine` package, or `@margoengine/oit` f
 Order-independent transparency for glTF Pro BLEND primitives and `@margoengine/materials` transparent meshes:
 weighted blended OIT (McGuire and Bavoil, JCGT 2013). Overlapping transparent parts (a translucent CAD housing over
 translucent and opaque gears) no longer pop as the camera orbits, because nothing depends on draw order any more. Core
-meshes are opaque only and are not affected. WebGPU only.
+meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through. WebGPU only.
 
 ```ts
 import {OIT} from 'margoengine/oit';
@@ -5203,6 +5203,24 @@ glTF Pro's declared transparency hook (`PBRModel.setTransparency`, glTF Pro READ
 patches, and without it every GPU call is identical (`examples/package-benchmarks/proofs/oit-detached.proof.js`).
 Size: 2,210 B min+gzip (`examples/package-benchmarks/results/entry-sizes.json`); the hook adds 323 B to glTF Pro's
 root entry. Core and the stage are unchanged.
+
+## Core meshes
+
+```ts
+import {Engine, box, PbrMaterial} from 'margoengine/core';
+import {OIT} from 'margoengine/oit';
+import {addMesh} from 'margoengine/oit/meshes';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const oit = OIT.attach(engine);
+const mesh = engine.createMesh().setGeometry(box(1, 1, 1)).setMaterial(new PbrMaterial({color: '#9cc3e6'}));
+const restore = addMesh(oit, engine, mesh, {opacity: 0.4});
+mesh.setPosition([1, 0, 0]);   // the see-through copy follows
+restore();                     // back to the opaque mesh, the same frame as before
+```
+
+The geometry and material are copied once, so a later `setMaterial` or `setGeometry` needs a new `addMesh`. While
+see-through `mesh.geometry` is null: the mesh casts no shadow and `engine.pick` does not see it, as for every transparent surface.
 
 ## How it works
 
@@ -5237,18 +5255,6 @@ orthographic.
 
 Over a `TransparentCanvas` the recovered alpha is within 0.002 of 1 − Π(1 − alpha) and the premultiplied colour within
 1.1 for 1, 2 and 4 layers. Inside a `PostStack` (Bloom + FXAA, HDR capture) one layer equals the sorted path exactly.
-
-Popping: a 50 % double-sided housing over two opaque gears and a 55 % gear, orbited 360° in 1° steps at 640×360,
-MSAA 4x, against a reference that sorts every translucent triangle separately. A pop is a pixel that jumps by more than
-16 between steps where the reference stays within 3.
-
-| Path | Steps with > 1 % of covered pixels popping | Steps with > 0.1 % | Worst step | Mean / p95 error vs reference |
-| --- | --- | --- | --- | --- |
-| Sorted per primitive (default) | 13 | 78 | 1.41 % | 7.5 / 29.8 |
-| OIT | 0 | 5 | 0.36 % | 6.7 / 22.8 |
-
-GPU time (Stats timestamp profiler, median, MSAA 4x, the same scene; diagnostic, measured while other jobs kept the
-CPU at 45-100 %):
 
 [README continues: https://margoengine.com/llms/packages/oit.md]
 
@@ -5342,15 +5348,16 @@ console.log(await parts.readCounts()); // parts drawn per batch in the last fram
 Parts are not core meshes. That is where the CPU saving comes from (core's kernel and batch collection never see
 them), and also the main limit: no core `engine.pick`, no mesh BVH raycasts, no section caps. Section clipping itself
 does apply, because the parts are drawn with core's own frame shader. Picking, hierarchy, shadows and streaming are the
-package's own:
+package's own, in the `CulledParts` subclass from `margoengine/culling/parts`, so pages that use only culling do not
+download them:
 
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
-import {CulledInstances} from 'margoengine/culling';
+import {CulledParts} from 'margoengine/culling/parts';
 import {Shadows} from 'margoengine/shadows';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
-const parts = CulledInstances.attach(engine, [
+const parts = CulledParts.attach(engine, [
   // capacity reserves slots for addParts; transforms may start empty.
   {geometry: box(), material: new PbrMaterial({color: '#8d99a6'}), transforms: new Float32Array(0), capacity: 1000},
 ]);
@@ -5377,7 +5384,7 @@ parts.removeParts(0, [hand]);
 - A part with a parent stores a local matrix on the CPU. The fold runs when a matrix is set and costs one record write per
   part in the subtree; parts that never call `setParent` cost nothing. A part with children cannot be removed alone.
 - `addParts` past `capacity` throws: buffers are sized at attach. New geometry or materials need a new
-  `CulledInstances`. Each free slot still costs its record and one test per frame.
+  `CulledParts`. Each free slot still costs its record and one test per frame.
 
 ## Core meshes: `CulledMeshes`
 
