@@ -65,6 +65,7 @@ export class BiomeWorld implements Disposable {
     get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
     get rivers(): readonly Int32Array[];
+    get region(): Region;
     get paint(): readonly PaintLayer[];
     overview(): {
         readonly width: number;
@@ -361,8 +362,6 @@ export function degreeDays<T extends {
     [index: number]: number;
 }>(mean: number, half: number, base: number, out: T): T;
 
-export function distanceTransform(source: Uint8Array, nx: number, nz: number): Int32Array;
-
 export function evapotranspiration(climate: Climate, mean: number, half: number, range: number): number;
 
 export function halfAmplitude(climate: Climate, continentality: number): number;
@@ -370,8 +369,6 @@ export function halfAmplitude(climate: Climate, continentality: number): number;
 export function heatLoad(climate: Climate, gx: number, gz: number, slope: number): number;
 
 export function moistureIndex(pet: number, rainfall: number): number;
-
-export function priorityFlood(height: Int32Array, nx: number, nz: number, sea: Uint8Array): Int32Array;
 
 export function quantizeClimate(options?: ClimateOptions): Climate;
 
@@ -382,4 +379,16 @@ export function treelineMargin(seasonTemperature: number, days: number): number;
 // Not exported from this entry, but used by the exports above:
 
 type Rect = readonly [number, number, number, number];
+
+interface Region {
+    readonly nx: number;
+    readonly nz: number;
+    readonly step: number;
+    readonly height: Int32Array;
+    readonly fill: Int32Array;
+    readonly rain: Int32Array;
+    readonly exposure: Int32Array;
+    readonly water: Int32Array;
+    readonly continentality: Int32Array;
+}
 ```

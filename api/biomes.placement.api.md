@@ -186,6 +186,7 @@ class BiomeWorld implements Disposable {
     get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
     get rivers(): readonly Int32Array[];
+    get region(): Region;
     get paint(): readonly PaintLayer[];
     overview(): {
         readonly width: number;
@@ -369,6 +370,18 @@ interface RasterLayer {
 type Rect = readonly [number, number, number, number];
 
 type Rect = readonly [number, number, number, number];
+
+interface Region {
+    readonly nx: number;
+    readonly nz: number;
+    readonly step: number;
+    readonly height: Int32Array;
+    readonly fill: Int32Array;
+    readonly rain: Int32Array;
+    readonly exposure: Int32Array;
+    readonly water: Int32Array;
+    readonly continentality: Int32Array;
+}
 
 interface ReliefOptions {
     readonly seed?: number;
