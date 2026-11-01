@@ -1,5 +1,5 @@
 {
-  "commit": "ab248b127",
+  "commit": "060887905",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -86,16 +86,20 @@
         "gzip": 3635
       },
       "./view": {
-        "raw": 23954,
-        "gzip": 9653
+        "raw": 24028,
+        "gzip": 9694
       },
       "./cover": {
         "raw": 7346,
         "gzip": 3352
       },
+      "./far": {
+        "raw": 7995,
+        "gzip": 3755
+      },
       "./objects": {
-        "raw": 8660,
-        "gzip": 3579
+        "raw": 8929,
+        "gzip": 3690
       },
       "./editor": {
         "raw": 7872,
@@ -111,11 +115,11 @@
       },
       "./workers": {
         "raw": 5989,
-        "gzip": 2703
+        "gzip": 2705
       },
       "dist/workers/biomes.js": {
-        "raw": 106081,
-        "gzip": 39886
+        "raw": 106760,
+        "gzip": 40081
       }
     },
     "@margoengine/blender": {
@@ -1066,12 +1070,20 @@
       "./depth": {
         "raw": 10018,
         "gzip": 3782
+      },
+      "./contact-shadows": {
+        "raw": 17167,
+        "gzip": 6180
       }
     },
     "@margoengine/procedural": {
       ".": {
         "raw": 30419,
         "gzip": 12602
+      },
+      "./standin": {
+        "raw": 711,
+        "gzip": 417
       },
       "./noise": {
         "raw": 4524,
@@ -1294,8 +1306,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 45503,
-        "gzip": 15769
+        "raw": 46762,
+        "gzip": 16078
       },
       "./virtual": {
         "raw": 40974,
@@ -1788,9 +1800,9 @@
       "brotli": 26165
     },
     "packages/shadows/dist/index.js": {
-      "raw": 45503,
-      "gzip": 15769,
-      "brotli": 14009
+      "raw": 46762,
+      "gzip": 16078,
+      "brotli": 14266
     },
     "packages/decoders/dist/decoder.worker.js": {
       "raw": 10691,
@@ -1848,9 +1860,9 @@
       "brotli": 2727
     },
     "packages/biomes/dist/workers/biomes.js": {
-      "raw": 105017,
-      "gzip": 39767,
-      "brotli": 34074
+      "raw": 105696,
+      "gzip": 39966,
+      "brotli": 34324
     },
     "packages/voxel/dist/workers/mesher.js": {
       "raw": 13081,
