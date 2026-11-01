@@ -8,8 +8,8 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createServer, request } from 'node:http';
-import { withBoundedClose } from '../scripts/lib/browser.mjs';
-import { closeAll } from '../scripts/support/shutdown.mjs';
+import { launchBrowser, withBoundedClose } from '../scripts/lib/browser.mjs';
+import { closeAll, endTree, taskkillPids } from '../scripts/support/shutdown.mjs';
 
 const root = new URL('..', import.meta.url);
 
@@ -112,6 +112,92 @@ test('a browser that closes normally still resolves, and arguments pass through'
   assert.deepEqual(calls, [[{ reason: 'done' }]]);
   assert.equal(withBoundedClose(undefined), undefined);
   assert.deepEqual(withBoundedClose({}), {});
+});
+
+test('a Chromium browser has its processes ended before the close, whose own shutdown a busy machine starves', async () => {
+  // Headless Edge shuts down on low-priority threads: its graceful close took 68 to 146 s beside CPU hogs and failed the
+  // 30 s budget. Here the close only finishes once the process tree has been ended, so a graceful wait cannot pass.
+  const steps = [];
+  let ended;
+  const treeEnded = new Promise((resolve) => (ended = resolve));
+  const fake = {
+    browserType: () => ({ name: () => 'chromium' }),
+    isConnected: () => true,
+    newBrowserCDPSession: async () => ({
+      send: async (method) => {
+        steps.push(method);
+        return {
+          processInfo: [
+            { type: 'renderer', id: 2 },
+            { type: 'browser', id: 1 },
+          ],
+        };
+      },
+    }),
+    close: async () => {
+      await treeEnded;
+      steps.push('close');
+    },
+  };
+  await withBoundedClose(fake, {
+    end: async (pid) => {
+      steps.push(`end ${pid}`);
+      ended();
+      return [];
+    },
+  }).close();
+  assert.deepEqual(steps, ['SystemInfo.getProcessInfo', 'end 1', 'close']);
+});
+
+test('Firefox and a browser already gone close the ordinary way', async () => {
+  for (const fake of [
+    { browserType: () => ({ name: () => 'firefox' }), isConnected: () => true },
+    { browserType: () => ({ name: () => 'chromium' }), isConnected: () => false },
+  ]) {
+    let closed = false;
+    fake.close = async () => (closed = true);
+    await withBoundedClose(fake, { end: () => assert.fail('nothing to end') }).close();
+    assert.equal(closed, true);
+  }
+});
+
+test('a real browser: close ends its main process and everything under it', { timeout: 5 * 60_000 }, async () => {
+  const browser = await launchBrowser({ headless: true, needs: 'none' });
+  const session = await browser.newBrowserCDPSession();
+  const pids = (await session.send('SystemInfo.getProcessInfo')).processInfo.map((process) => process.id);
+  assert.ok(pids.length > 1);
+  await browser.close();
+  const alive = pids.filter((pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  assert.deepEqual(alive, []);
+});
+
+test('endTree waits for every process taskkill named, and returns the ones past the limit', async () => {
+  let polls = 0;
+  const gone = await endTree(1, {
+    kill: async () => [11, 12],
+    alive: (pid) => pid === 12 && ++polls < 3,
+  });
+  assert.deepEqual(gone, []);
+  assert.equal(polls, 3, 'it kept asking until the last process was gone');
+  const left = await endTree(1, { kill: async () => [13], alive: () => true, waitMs: 20 });
+  assert.deepEqual(left, [13]);
+});
+
+test('the pids come from taskkill lines, never the parent it names', () => {
+  assert.deepEqual(
+    taskkillPids(
+      'SUCCESS: The process with PID 95380 (child process of PID 55468) has been terminated.\r\nSUCCESS: The process with PID 55468 (child process of PID 102216) has been terminated.\r\n',
+    ),
+    [95380, 55468],
+  );
+  assert.deepEqual(taskkillPids(''), []);
 });
 
 test('a server with a connected client is dropped and closed (the case that hung check:depth and check:no-webgpu)', async () => {

@@ -1,14 +1,14 @@
 // The packed-browser step of `modern:test:packages` waited a fixed 30 s for `window.modern` and missed it when the
 // machine was busy (docs/known-bugs.md, fixed 2026-10-31). It now waits on the dev server (scripts/support/page-ready.js)
-// with a hard outer limit. The first test holds the page's last module back in a real dev server and a real browser:
-// the fixed wait fails, the new wait passes.
+// with a hard outer limit. The first test holds the page's last module back in a real dev server and a real browser, for
+// as long as the test says, so the order is the same however busy the machine is: the fixed wait fails, the new wait passes.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openBrowser } from '../scripts/browser.js';
 import { waitForPageReady } from '../scripts/support/page-ready.js';
 
-const HOLD_MS = 4000;
-const held = (hold) => ({
+const FIXED_WAIT_MS = 1000;
+const held = ({ asked, release }) => ({
   name: 'hold-the-last-module-back',
   configureServer(server) {
     server.middlewares.use('/held.html', (_request, response) => {
@@ -21,31 +21,49 @@ const held = (hold) => ({
   resolveId: (id) => (id === 'held-last' ? '\0held-last' : undefined),
   async load(id) {
     if (id !== '\0held-last') return undefined;
-    await new Promise((resolve) => setTimeout(resolve, hold));
+    asked.resolve();
+    await release.promise;
     return 'window.modern = { ready: true };';
   },
 });
 
-test('a page whose last module the dev server serves late: the fixed wait fails, waiting on the server passes', async () => {
-  const browser = await openBrowser({ startPath: '/held.html', plugins: [held(HOLD_MS)], port: 'free' });
+test('a page whose last module the dev server serves late: the fixed wait fails, waiting on the server passes', {
+  timeout: 5 * 60_000,
+}, async () => {
+  const asked = Promise.withResolvers(),
+    release = Promise.withResolvers();
+  const browser = await openBrowser({ startPath: '/held.html', plugins: [held({ asked, release })], port: 'free' });
   try {
     const { page } = browser;
+    await asked.promise;
     // The old code: a fixed limit against load.
     await assert.rejects(
-      page.waitForFunction(() => window.modern, undefined, { timeout: HOLD_MS / 4 }),
+      page.waitForFunction(() => window.modern, undefined, { timeout: FIXED_WAIT_MS }),
       /Timeout/,
       'a fixed wait shorter than the load fails',
     );
+    let served = false,
+      polls = 0;
     const waited = await waitForPageReady({
       what: 'held page',
-      ready: () => page.evaluate(() => Boolean(window.modern)).catch(() => false),
+      ready: async () => {
+        const ready = await page.evaluate(() => Boolean(window.modern)).catch(() => false);
+        // The module is let go only after the wait has seen a page not ready, with the server still on it.
+        if (!ready && ++polls === 3) {
+          served = true;
+          release.resolve();
+        }
+        return ready;
+      },
       idle: () => browser.server.waitForRequestsIdle(),
     });
+    assert.ok(served, 'the wait held on while the server had the module');
     assert.ok(
       waited >= 0 && (await page.evaluate(() => window.modern.ready)),
       'the server finished and the page is ready',
     );
   } finally {
+    release.resolve();
     await browser.close();
   }
 });

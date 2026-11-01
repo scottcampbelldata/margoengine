@@ -15,7 +15,7 @@ before(async () => {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   url = `http://127.0.0.1:${server.address().port}`;
-  // One browser for the file: closing Edge is the slow step on a loaded machine (docs/known-bugs.md), so do it once.
+  // One browser for the file.
   browser = await launchBrowser({ headless: true });
 });
 after(async () => {

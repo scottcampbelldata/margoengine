@@ -3,7 +3,7 @@
 // from; closing the server first, with the browser still open, never called back and the suite (every assertion
 // passed) was killed after 600 s. So: browser context, then browser, then the servers' connections, then the servers,
 // then the child processes' whole trees, all inside one budget that names what was still open when it ran out.
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 
 /** How long `closeAll` may take in all before it throws. */
 export const SHUTDOWN_BUDGET_MS = 30_000;
@@ -25,6 +25,62 @@ export async function killTree(child) {
   for (const stream of [child.stdin, child.stdout, child.stderr]) stream?.destroy();
   if (running && child.exitCode === null && child.signalCode === null)
     await new Promise((resolve) => child.once('exit', resolve));
+}
+
+/** Whether `pid` is still running. On Windows this reads the exit code, which is set before the process's handles close. */
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+}
+
+/** The processes `taskkill /T` says it ended, from its lines `SUCCESS: The process with PID 12 (child process of PID 3) ...`. */
+export function taskkillPids(output) {
+  return [...output.matchAll(/^\S.*?PID (\d+)/gm)].map((match) => Number(match[1]));
+}
+
+function taskkillTree(pid, timeout) {
+  return new Promise((resolve) => {
+    // Exit code 128 only says one process had already ended, so the lines say what happened, not the code.
+    execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { timeout, windowsHide: true }, (_, stdout) =>
+      resolve(taskkillPids(String(stdout))),
+    );
+  });
+}
+
+/**
+ * Ends `pid` and everything it started, and resolves when none of them runs any more. Never waits past `waitMs`: it
+ * resolves to the pids still running then, normally none.
+ * @param {number} pid
+ * @param {{ waitMs?: number, kill?: (pid: number, timeout: number) => Promise<number[]>, alive?: (pid: number) => boolean }} [options]
+ * @returns {Promise<number[]>}
+ */
+export async function endTree(pid, { waitMs = SHUTDOWN_BUDGET_MS, kill, alive = isAlive } = {}) {
+  if (!pid) return [];
+  const begun = Date.now();
+  let pids;
+  if (kill) pids = await kill(pid, waitMs);
+  else if (process.platform === 'win32') pids = await taskkillTree(pid, waitMs);
+  else {
+    pids = [pid];
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      try {
+        process.kill(pid, 'SIGKILL');
+      } catch {}
+    }
+  }
+  for (;;) {
+    pids = pids.filter(alive);
+    // wall-clock: a bound on the wait for processes already killed, far from normal.
+    if (!pids.length || Date.now() - begun > waitMs) return pids;
+    // fixed-wait: polling the process table, which has no event to wait on.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 /**

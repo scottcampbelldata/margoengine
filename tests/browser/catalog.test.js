@@ -1,5 +1,4 @@
 // Real-browser catalog check (Edge): layout overflow, real clicks and the browser clipboard. Not part of `verify`:
-// headless Edge shuts down on low-priority threads, so on a loaded machine browser.close() can take 4-6 minutes.
 // `tests/catalog.test.js` runs nearly the same checks inside verify. Run under the GPU lock:
 //   node scripts/gpu-lock.mjs run --owner=<agent id> -- npm run test:catalog:browser
 import { test, before, after } from 'node:test';

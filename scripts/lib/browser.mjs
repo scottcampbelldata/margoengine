@@ -1,6 +1,6 @@
 import { chromium, firefox } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
-import { closeAll } from '../support/shutdown.mjs';
+import { closeAll, endTree } from '../support/shutdown.mjs';
 
 /**
  * Which browser the repository's browser checks drive, and how it is launched, in one place.
@@ -138,14 +138,35 @@ export function chromiumLaunchOptions({ name, args = [], webgpu = true, env, pla
 }
 
 /**
+ * Ends a Chromium-family browser's processes. Its own shutdown runs on low-priority threads, which a busy machine starves:
+ * 68 to 146 s beside CPU hogs, past the shared budget, against 7 to 17 s for this. A suite's browser has a throwaway
+ * profile, so nothing is lost by not waiting for it. Firefox has no such route and closes the ordinary way. Playwright only
+ * finishes a context's videos and traces in `context.close()`, so a suite that records them closes that first, as it must.
+ */
+async function endChromium(browser, end) {
+  if (browser.browserType?.().name() !== 'chromium' || !browser.isConnected()) return;
+  const session = await browser.newBrowserCDPSession();
+  const { processInfo } = await session.send('SystemInfo.getProcessInfo');
+  await end(processInfo.find((process) => process.type === 'browser').id);
+}
+
+/**
  * Makes `browser.close()` a bounded teardown (bug 70): it throws `SHUTDOWN_TIMEOUT` naming the browser if the close has
  * not finished within the shared budget (scripts/support/shutdown.mjs), instead of leaving a suite that has passed every
- * assertion hanging on its cleanup. The browser still closes the same way; only the wait for it is bounded.
+ * assertion hanging on its cleanup. A Chromium-family browser's processes are ended first (see `endChromium`).
  */
-export function withBoundedClose(browser) {
+export function withBoundedClose(browser, { end = endTree } = {}) {
   if (typeof browser?.close !== 'function') return browser;
   const close = browser.close.bind(browser);
-  browser.close = (...args) => closeAll({ browser: { close: () => close(...args) } });
+  browser.close = (...args) =>
+    closeAll({
+      browser: {
+        close: async () => {
+          await endChromium(browser, end);
+          return close(...args);
+        },
+      },
+    });
   return browser;
 }
 
