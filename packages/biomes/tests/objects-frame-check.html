@@ -17,13 +17,15 @@ const world=await BiomeWorld.create(),ground=(x,z)=>world.sample(x,z).height;
 const CAMERAS={
  '01':{position:[0,ground(0,0)+330,1000],target:[0,ground(0,-400)-20,-400]},
  '02':{position:[-300,ground(-300,200)+1.8,200],target:[-100,ground(-300,200)+1.8,-200]},
+ // Over the far hills, as scene 04 looks along a coast: most of the frame is ground past the stored objects.
+ 'far':{position:[-1700,ground(-1700,1700)+60,1700],target:[1000,ground(1000,-1000),-1000]},
 };
 const frame=async()=>{engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();};
 window.check={
- async frame(name,withShadows){
+ async frame(name,withShadows,extra={}){
   const camera=CAMERAS[name],shadows=withShadows?Shadows.attach(engine):undefined;
   for(let i=0;i<3;i++){engine.camera.position[i]=camera.position[i];engine.camera.target[i]=camera.target[i];}
-  const view=await BiomeView.attach(engine,world,{...(shadows?{shadows}:{}),water:'auto'});
+  const view=await BiomeView.attach(engine,world,{...(shadows?{shadows}:{}),water:'auto',...extra});
   await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();await waitForPipelines(frame);
   // fixed-wait: warm-up before the timed frames (clocks and caches settle; the measurement is the point of the check)
   for(let i=0;i<30;i++)await frame();

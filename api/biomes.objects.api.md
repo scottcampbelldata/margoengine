@@ -11,6 +11,7 @@ export class BiomeObjects implements Disposable {
     static attach(engine: EngineKernel, placement: BiomePlacement, options: BiomeObjectsOptions): Promise<BiomeObjects>;
     dropped: number;
     get gpuBytes(): number;
+    get farCount(): number;
     get count(): number;
     get casters(): readonly ScatterTiles[];
     stream(rect: readonly [number, number, number, number], options?: {
@@ -30,6 +31,11 @@ export interface BiomeObjectsOptions {
     readonly detailRadius?: number;
     readonly detailResolution?: number;
     readonly detailBudget?: number;
+    readonly far?: {
+        readonly radius: number;
+        readonly count?: number;
+        readonly world: BiomeWorld;
+    };
 }
 
 export const DETAIL_BUDGET = 134217728;

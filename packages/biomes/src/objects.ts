@@ -9,6 +9,7 @@ import type { Scatter } from '@margoengine/scatter';
 import type { ScatterTiles } from '@margoengine/scatter/tiles';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { BiomePlacement, PlacedTile } from './placement.js';
+import type { BiomeWorld } from './world.js';
 
 /** Settings of {@link BiomeObjects.attach}. */
 export interface BiomeObjectsOptions {
@@ -27,6 +28,11 @@ export interface BiomeObjectsOptions {
    * kept on this thread and as a GPU texture). Default 128 MiB.
    */
   readonly detailBudget?: number;
+  /**
+   * Trees beyond `radius`, out to `far.radius` metres: a 12-triangle stand-in per tree over the world's `canopyCover`, up
+   * to `far.count` of them (default 300,000), lit by the engine light, no shadows. Default none.
+   */
+  readonly far?: { readonly radius: number; readonly count?: number; readonly world: BiomeWorld };
 }
 
 /** Default {@link BiomeObjectsOptions.detailBudget}: 128 MiB of detail maps. */
@@ -174,8 +180,8 @@ function partsOf(key: string, p: Procedural, make: (data: Data) => Geometry): Pa
 export class BiomeObjects implements Disposable {
   readonly #engine: EngineKernel;
   readonly #placement: BiomePlacement;
-  readonly #options: Required<Omit<BiomeObjectsOptions, 'heightmap' | 'bounds'>> &
-    Pick<BiomeObjectsOptions, 'heightmap' | 'bounds'>;
+  readonly #options: Required<Omit<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far'>> &
+    Pick<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far'>;
   readonly #modules: Modules;
   /** Per species key: its ScatterTiles (one per mesh part) and the distance it is drawn within. */
   readonly #species = new Map<string, { tiles: ScatterTiles[]; radius: number }>();
@@ -183,6 +189,7 @@ export class BiomeObjects implements Disposable {
   readonly #details: { id: string; scatter: Scatter; texture?: GPUTexture; data: Uint8Array }[] = [];
   /** Held tiles and their object counts. */
   readonly #held = new Map<string, number>();
+  #far?: import('@margoengine/biomes/far').FarForest;
   #disposed = false;
 
   private constructor(engine: EngineKernel, placement: BiomePlacement, options: BiomeObjectsOptions, modules: Modules) {
@@ -230,6 +237,17 @@ export class BiomeObjects implements Disposable {
     ]);
     const objects = new BiomeObjects(engine, placement, options, { tiles, scatter, procedural, core });
     objects.#build();
+    if (options.far) {
+      const { FarForest } = await import('@margoengine/biomes/far'),
+        r = objects.#options.radius,
+        side = placement.tileSize;
+      // Stand-ins come in over the last tile of the stored trees.
+      objects.#far = await FarForest.attach(
+        engine,
+        { scatter, core },
+        { ...options.far, heightmap: options.heightmap, bounds: b, inner: Math.max(0, r - side), fade: side },
+      );
+    }
     return objects;
   }
 
@@ -245,6 +263,11 @@ export class BiomeObjects implements Disposable {
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
       for (const t of entry.tiles) n += t.gpuBytes;
     return n;
+  }
+
+  /** Far stand-ins drawn at most (`far`), 0 without them. */
+  get farCount(): number {
+    return this.#far?.count ?? 0;
   }
 
   /** Objects drawn now (stored records held on the GPU). */
@@ -528,6 +551,7 @@ export class BiomeObjects implements Disposable {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#far?.dispose();
     // Sharing parts first, then the part whose buffers they read.
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
       for (const t of [...entry.tiles].reverse()) t.dispose();

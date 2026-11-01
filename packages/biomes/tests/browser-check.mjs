@@ -98,6 +98,15 @@ await runSuite(
     assert.equal(edited.readyPending, 0, 'ready waits for the changed tile');
     assert.equal(edited.partIn, true, 'two steps put records in');
     assert.equal(edited.partLeft, false, 'remove takes a tile whose steps ran in part off whole');
+    // Biome look plan 3, B3: trees past the radius. Off, the far hillside is bare; on, it reads as forest.
+    console.log('far', JSON.stringify(r.far));
+    assert.deepEqual(r.far.errors, []);
+    assert.ok(r.far.off.n > 2000, `pixels on the far hillside: ${r.far.off.n}`);
+    assert.ok(r.far.on.share > 0.25, `far forest: ${r.far.on.share} of far pixels are green`);
+    assert.ok(
+      r.far.on.share > r.far.off.share + 0.15,
+      `far forest adds green: ${r.far.on.share} over ${r.far.off.share}`,
+    );
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-browser-check.json', JSON.stringify({ hardware, result: r }, null, 1));

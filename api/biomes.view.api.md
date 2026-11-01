@@ -50,6 +50,10 @@ export interface BiomeViewOptions {
         readonly levels?: number;
     };
     readonly canopy?: number;
+    readonly far?: false | {
+        readonly radius?: number;
+        readonly count?: number;
+    };
     readonly signal?: AbortSignal;
     readonly objects?: boolean;
     readonly detailRadius?: number;

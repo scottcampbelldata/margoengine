@@ -114,6 +114,10 @@
       "types": "./dist/biomes/cover.d.ts",
       "import": "./dist/biomes/cover.js"
     },
+    "./biomes/far": {
+      "types": "./dist/biomes/far.d.ts",
+      "import": "./dist/biomes/far.js"
+    },
     "./biomes/objects": {
       "types": "./dist/biomes/objects.d.ts",
       "import": "./dist/biomes/objects.js"
@@ -969,6 +973,10 @@
     "./procedural": {
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"
+    },
+    "./procedural/standin": {
+      "types": "./dist/procedural/standin.d.ts",
+      "import": "./dist/procedural/standin.js"
     },
     "./procedural/noise": {
       "types": "./dist/procedural/noise.d.ts",

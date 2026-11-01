@@ -434,6 +434,24 @@ console.log(cover.width, cover.depth, cover.data[0], cover.kinds.length);
 engine.start();
 ```
 
+Far trees follow the same cover. Beyond the view's `radius`, out to `far.radius` (default 2,500 m, count 300,000; `far:
+false` turns them off, and they stay off when `radius` already reaches that far) one camera-following `Scatter` per
+tree kind draws `generateTreeStandIn` (`@margoengine/procedural/standin`), a 12-triangle tree. They take over from the
+stored trees over the last tile of `radius`, are lit by the engine light and cast no shadow. Their positions are
+hashed, so a far tree does not grow into the stored tree that replaces it; at that distance a tree is about 5 pixels.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const view = await BiomeView.attach(engine, await BiomeWorld.create(), { far: { radius: 4000, count: 500000 } });
+await view.ready;
+console.log(view.objects?.farCount); // stand-ins drawn at most
+engine.start();
+```
+
 ## Trees, shrubs, rocks and props
 
 `@margoengine/biomes/placement` places every species rule of the world's biomes (`plants`, `rocks`, `props`) as stored

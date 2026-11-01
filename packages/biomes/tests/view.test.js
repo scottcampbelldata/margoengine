@@ -461,3 +461,9 @@ test('the canopy material takes its share of the ground and each texel still sum
   assert.ok(Math.abs(over.weights[i >> 2][i & 3] - b.weights[i >> 2][i & 3]) <= 1);
   world.dispose();
 });
+
+test('far forest: its cover raster stays within reason on huge worlds', async () => {
+  const { farStep } = await import('../dist/far.js');
+  assert.equal(farStep({ bounds: [-2048, -2048, 2048, 2048] }), 16);
+  assert.equal(farStep({ bounds: [-32768, -32768, 32768, 32768] }), 64);
+});

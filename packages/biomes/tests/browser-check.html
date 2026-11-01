@@ -201,6 +201,17 @@ async function edited(){
  sky.dispose();e.dispose();canvas.remove();
  return out;
 }
+// Shot 04's kind of view on a temperate world with a low coast: from a camera looking over land, the share of green-dominant
+// pixels on ground 1.2 to 2.4 km away, with and without the far forest (no far: the ground stands bare past the radius).
+async function farForest(){
+ const world=await BiomeWorld.create({biomes:[presets.temperate],climate:{latitude:47,rainfall:1000},height:{relief:{seed:9,relief:600,base:160}}}),[bx,bz]=world.bounds;
+ const position=[bx+300,world.heightAt(bx+300,bz+300)+60,bz+300],target=[bx+2300,world.heightAt(bx+2300,bz+2300),bz+2300];
+ const s=await shotEngine(position,target),W=s.canvas.width,H=s.canvas.height;
+ const green=(d)=>{let g=0,n=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=hit(world,position,s.ray(x,y));if(!p)continue;const dist=Math.hypot(p[0]-position[0],p[2]-position[2]);if(dist<1200||dist>2400)continue;n++;const k=(y*W+x)*4;if(d[k+1]>d[k]*1.05&&d[k+1]>d[k+2]*1.05)g++;}return {share:g/Math.max(1,n),n};};
+ const off=await s.pixels(world,{objects:true,far:false,canopy:0,radius:1000}),on=await s.pixels(world,{objects:true,far:{radius:2500},canopy:0,radius:1000}),both=await s.pixels(world,{objects:true,radius:1000});
+ const out={off:green(off),on:green(on),both:green(both),errors:s.errs.splice(0)};
+ s.dispose();world.dispose();return out;
+}
 window.check={
  async run(){
   const out={};device.pushErrorScope('validation');
@@ -234,6 +245,7 @@ window.check={
   out.clip=await clip();
   out.edge=await edge(24);out.edgeOff=await edge(0);
   out.edited=await edited();
+  out.far=await farForest();
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);
   return out;

@@ -5,7 +5,7 @@
 import { typeError } from '../../shared/errors.js';
 import { type BiomeTile, BiomeWorld, type BiomeWorldOptions } from './world.js';
 import { BiomePlacement, type PlacedTile, type PlacementOptions } from './placement.js';
-import { canopyCorners, darkenTile } from './cover.js';
+import { canopyCorners, canopyCover, darkenTile } from './cover.js';
 import { overviewRows, viewTile } from './view.js';
 
 let world: BiomeWorld | undefined,
@@ -140,6 +140,8 @@ async function run(m: Message): Promise<unknown> {
       if (m.canopy) darkenTile(world!, made, m.step as number, m.materials as string[], m.canopy as number);
       return made;
     }
+    case 'cover':
+      return canopyCover(world!, m.step as number);
     case 'overview':
       // A band of texel rows of a view's far-field ground weights (from the region fields, never a cached tile).
       return overviewRows(

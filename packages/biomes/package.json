@@ -62,6 +62,10 @@
       "types": "./dist/cover.d.ts",
       "import": "./dist/cover.js"
     },
+    "./far": {
+      "types": "./dist/far.d.ts",
+      "import": "./dist/far.js"
+    },
     "./objects": {
       "types": "./dist/objects.d.ts",
       "import": "./dist/objects.js"

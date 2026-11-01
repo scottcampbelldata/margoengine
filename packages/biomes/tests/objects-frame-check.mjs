@@ -45,6 +45,18 @@ await runSuite(
           `camera ${name}, shadows ${shadows ? 'on' : 'off'}: median ${r.median.toFixed(2)} ms, mean ${r.mean.toFixed(2)} ms (before ${BEFORE[key]} ms on the RTX A6000)`,
         );
       }
+    // Biome look plan 3, B3: the far forest's cost where it fills the frame, limit 1.0 ms (the middle of three alternating
+    // pairs of medians; on the A6000 at this landing +0.1, -0.7 and +0.6 ms).
+    const costs = [];
+    // fixed-wait: three timed pairs, the measurement is the point
+    for (let i = 0; i < 3; i++) {
+      const off = await page.evaluate(() => window.check.frame('far', false, { far: false })),
+        on = await page.evaluate(() => window.check.frame('far', false));
+      assert.deepEqual([...off.errors, ...on.errors], []);
+      costs.push(on.median - off.median);
+      console.log(`far forest: off ${off.median.toFixed(2)} ms, on ${on.median.toFixed(2)} ms`);
+    }
+    const farCost = costs.sort((a, b) => a - b)[1];
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-objects-frame.json', JSON.stringify({ hardware, times }, null, 1));
     assert.deepEqual(pageErrors, []);
@@ -64,7 +76,8 @@ await runSuite(
         `camera 02, shadows ${shadows}: ${at02.toFixed(2)} ms, before ${BEFORE[`02 ${shadows}`]} ms`,
       );
     }
-    console.log('ok biomes objects frame: cameras 01 and 02 within their limits');
+    assert.ok(farCost <= 1, `far forest costs ${farCost.toFixed(2)} ms, limit 1.0 ms`);
+    console.log('ok biomes objects frame: cameras 01 and 02 and the far forest within their limits');
   },
   async () => {
     try {

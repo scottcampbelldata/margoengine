@@ -76,6 +76,12 @@ export interface BiomeViewOptions {
    * is added for worlds without trees or with 16 ground materials already. Default 0.6 with `objects`, 0 without.
    */
   readonly canopy?: number;
+  /**
+   * Trees beyond `radius`: a 12-triangle stand-in per tree over the world's canopy cover (`BiomeObjects` `far`), from
+   * the last tile of the stored trees out to `far.radius`. Needs `objects`. `false` turns it off. Default radius 2,500 m
+   * and count 300,000; off when the view's `radius` reaches that far.
+   */
+  readonly far?: false | { readonly radius?: number; readonly count?: number };
   /** Rejects `attach` and stops streaming when aborted. */
   readonly signal?: AbortSignal;
   /** Draws the stored objects (trees, shrubs, rocks) and the detail (grass, ferns) of the world's biomes through
@@ -827,6 +833,9 @@ export class BiomeView implements Disposable {
         detailRadius: options.detailRadius ?? 120,
         detailResolution: detail,
         detailBudget: options.detailBudget,
+        ...(options.far === false || (!options.far && view.#radius >= 2500)
+          ? {}
+          : { far: { radius: 2500, ...options.far, world } }),
       });
       view.#offObjects = placement.onChange((rect) => view.#dirty(rect, 'p'));
     }

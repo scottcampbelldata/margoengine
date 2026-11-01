@@ -26,6 +26,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./standin": {
+      "types": "./dist/standin.d.ts",
+      "import": "./dist/standin.js"
+    },
     "./noise": {
       "types": "./dist/noise.d.ts",
       "import": "./dist/noise.js"

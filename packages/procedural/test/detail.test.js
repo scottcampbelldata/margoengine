@@ -170,3 +170,31 @@ test('detail 0 stays under 600 canopy triangles for every species and keeps unit
       assert.ok(Math.abs(Math.hypot(g.normals[i], g.normals[i + 1], g.normals[i + 2]) - 1) < 1e-3, `${name} normal`);
   }
 });
+
+test('a far tree is 12 triangles and fits the full mesh within 10 percent of its height and width', async () => {
+  const { generateTreeStandIn } = await import('../dist/standin.js');
+  const full = {
+    broadleaf: generateTreeMesh('broadleaf', { detail: 2 }),
+    conifer: generateTreeMesh('conifer', { detail: 2 }),
+    palm: generatePalmMesh({ detail: 2 }),
+  };
+  const box = (p) => {
+    const lo = [Infinity, Infinity, Infinity],
+      hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < p.length; i++) {
+      lo[i % 3] = Math.min(lo[i % 3], p[i]);
+      hi[i % 3] = Math.max(hi[i % 3], p[i]);
+    }
+    return [hi[0] - lo[0], hi[1], hi[2] - lo[2]];
+  };
+  for (const [kind, mesh] of Object.entries(full)) {
+    const s = generateTreeStandIn(kind);
+    assert.equal(s.indices.length, 36, kind);
+    const a = box(s.positions),
+      b = box(mesh.canopy.positions);
+    for (let i = 0; i < 3; i++)
+      assert.ok(Math.abs(a[i] - b[i]) <= 0.1 * b[i], `${kind} axis ${i}: ${a[i]} against ${b[i]}`);
+    assert.ok(s.indices.every((v) => v < s.positions.length / 3));
+  }
+  assert.throws(() => generateTreeStandIn('fir'), RangeError);
+});
