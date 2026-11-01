@@ -1,29 +1,42 @@
-// The one script that pushes to main (AGENTS.md; private/handoffs/forward-plan-2026-10-31.md, sections 1 to 3). One run
-// lands one batch, then exits; the coordinator or a runner starts it every 30 min or at 3 READY entries.
-//   node scripts/integrate.mjs [--worktree=<path>] [--limit=<min>] [--wait-max=<min>]
+// The one script that pushes to main (AGENTS.md, "Before every push to main"). One run lands one batch, then exits; the
+// coordinator, a runner or Agent Factory starts it after each READY, every 30 min, or at 3 READY entries.
+//   node scripts/integrate.mjs [--worktree=<path>] [--limit=<min>] [--wait-max=<min>] [--notify=<command>]
 // An agent declares a branch ready with a file private/queue/<branch>.ready in the main checkout, holding one line:
 //   READY <sha>        or        READY <sha> fix
-// A run, under test-results/land.lock (gpu-lock.mjs: heartbeat, hard limit, whole tree killed past it):
-// 1. Reads the entries, fix entries first. While private/queue/RED.json exists only fix entries are taken.
-// 2. Refuses the whole batch, pushing nothing, when it touches a class stopped in private/control.json
-//    ({ "stopped": ["demos"] }: "demos" is demoPath below, any other tag a file class of file-classes.mjs). A control
-//    file it cannot read, or a tag it does not know, also refuses: a stop order is never skipped over a typo.
-// 3. Rebases each branch onto origin/main in order, in its own detached worktree. A conflict sends that branch back and
+// A run, under test-results/land.lock (gpu-lock.mjs: heartbeat, hard limit, whole tree killed past it), and it stops
+// itself, pushing nothing, the moment that lock entry is no longer the one it started under (a second integrator took
+// over, or the wrapper died): exactly one integrator runs at a time.
+// 1. Writes its run record private/queue/runs/<stamp>.json first, and keeps it current through every phase. Finishes any
+//    earlier run that pushed and died before its record was complete (the push is on origin/main: it is recorded now, its
+//    READY files go; or it is not: the entries stay READY). Commits on origin/main that no record covers (a hand push) are
+//    written to landed.log as a hand-push line, so every commit on main is accounted for.
+// 2. Reads the entries, fix entries first, then oldest first. Never more than 6: the seventh and later go back at once,
+//    loudly, with the banner. While private/queue/RED.json exists only fix entries are taken. RED.held.json is a RED set
+//    aside on Scott's order: it holds nothing and is noted in the record.
+// 3. Intake, per branch, before anything is built: the commit exists; it is not on main already; every commit's author
+//    and committer are the noreply address; no commit message holds an em or en dash, a home-folder path, a secret or an
+//    address outside the allowed ones; no added line holds a home-folder path or a secret; a `fix` commit changes a test
+//    or names one with `Regression: <path>`; nothing touches a class stopped in private/control.json (a control file it
+//    cannot read, or a tag it does not know, refuses the batch: a stop order is never skipped over a typo).
+// 4. Rebases each branch onto origin/main in order, in its own detached worktree. A conflict sends that branch back and
 //    the rest go on.
-// 4. Tier 1, once on the batch tip, no GPU suite: build, api:check (on the reports the branches committed), then
-//    land-records --no-build (its short basic-scene browser takes a GPU slot itself), then verify on those records, then
-//    check:examples-types and modern:test:packages narrowed by check:merge's own plan. Records come before verify
-//    because verify reads them: a new package has no entry-sizes row until they are measured, and a generated file both
-//    sides changed keeps main's copy on the rebase.
-// 5. A failure names one branch (the failing output names a package or file of it), which goes back with the log, and
-//    tier 1 runs again on the rest. When the output cannot name one, the last candidate steps out: if that cures it, it
-//    was the one and goes back; if not, it stays READY for the next batch and the next candidate steps out.
-// 6. Checks RED.json and control.json once more, checks every commit's identity, pushes once, never forced, and appends
-//    the batch's commits and logs to private/queue/landed.log. If main moved meanwhile, the push is refused and every
-//    entry stays READY for the next run.
-// A branch sent back is private/queue/sent-back/<branch>.json: the reason, the step and the log. Its .ready file is gone.
+// 5. Tier 1, once on the batch tip, no GPU suite and nothing skippable by a flag or an environment variable: relink,
+//    check:merge's plan, build, api:check (on the reports the branches committed), land-records --no-build
+//    (its short basic-scene browser takes a GPU slot itself), verify on those records, then check:examples-types and
+//    modern:test:packages narrowed by the plan. Every step has a hard limit; past it the whole tree is killed and the
+//    record says it hung.
+// 6. A failure names a branch directly: the output names a file or package a branch changed (or a package that depends on
+//    one), or the batch has one branch. Every named branch goes back with the log and the gate runs again on the rest. A
+//    failure that names nobody stops the run: every entry stays READY, the record names the step and the log, and nobody
+//    is stepped out one at a time to find out (that took 28 minutes once). No rerun without a change.
+// 7. Checks the lock, RED.json, control.json and every commit's identity once more, writes the record as "pushing",
+//    pushes once, never forced, appends the landing to private/queue/landed.log, writes latest-landing.json and runs
+//    --notify. If main moved meanwhile, the push is refused and every entry stays READY for the next run.
+// A branch sent back is private/queue/sent-back/<branch>.json: the reason, the step and the log. Its .ready file is gone,
+// and every READY file this script removes, for any reason, is one line of private/queue/queue.log and of the run record.
 // Everything git and every command go through `git` and `runStep`, so tests/integrate.test.js runs it all with neither.
-// Exit: 0 landed, nothing queued or held by RED; 4 refused; 5 main moved; 6 nothing could land; 124 past the hard limit.
+// Exit: 0 landed, nothing queued or held by RED; 4 refused; 5 main moved; 6 nothing could land; 7 the lock was lost;
+// 8 the record could not be written; 124 past the hard limit.
 import { spawnSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -31,11 +44,13 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { hostname, userInfo } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
 import { mainCheckout } from './gpu-lock.mjs';
@@ -59,7 +74,23 @@ const IDENTITY = {
 /** How many minutes one tier 1 step may take; the whole run's limit is --limit. */
 export const STEP_MINUTES = 30;
 export const DEFAULT_LIMIT_MINUTES = 170;
-const TAIL_LINES = 80;
+/** How much of a failed step's log is read to name a branch (its end). */
+const LOG_BYTES = 4 << 20;
+/** How often the lock is checked while a step runs. */
+const LOCK_POLL_MS = 15_000;
+export { MAX_QUEUE };
+
+/** Exit codes, by result. */
+export const EXIT = {
+  idle: 0,
+  held: 0,
+  landed: 0,
+  refused: 4,
+  moved: 5,
+  nothing: 6,
+  lost: 7,
+  record: 8,
+};
 
 /** Where the queue's files live under a main checkout. */
 export function queuePaths(main) {
@@ -67,7 +98,11 @@ export function queuePaths(main) {
   return {
     dir,
     red: join(dir, 'RED.json'),
+    redHeld: join(dir, 'RED.held.json'),
     landed: join(dir, 'landed.log'),
+    latest: join(dir, 'latest-landing.json'),
+    ledger: join(dir, 'queue.log'),
+    runs: join(dir, 'runs'),
     sentBack: join(dir, 'sent-back'),
     logs: join(dir, 'logs'),
     control: join(main, 'private', 'control.json'),
@@ -152,27 +187,27 @@ export function parsePlan(text) {
 }
 
 /**
- * Which branches a failure can be pinned on, from the end of its log. A branch is `direct` when the log names a file it
- * changed or a package it changed, else `dependent` when a named package depends on one it changed. Returns the first
- * group with anyone in it, or the whole batch (`named: false`) when the log names none of them.
+ * Which branches a failure can be pinned on, from a failed step's output. A branch is `direct` when the output names a
+ * file it changed or a package it changed, else `dependent` when a named package depends on one it changed. Returns the
+ * first group with anyone in it, or `{ branches: [], named: false }` when the output names none of them.
  */
-export function suspects(tail, batch, workspaces = []) {
+export function suspects(text, batch, workspaces = []) {
   const named = new Set();
-  for (const match of tail.matchAll(/@margoengine\/([a-z0-9-]+)/g)) named.add(`@margoengine/${match[1]}`);
-  for (const match of tail.matchAll(/\b(packages|examples|apps)[\\/]([a-z0-9-]+)\b/g)) {
+  for (const match of text.matchAll(/@margoengine\/([a-z0-9-]+)/g)) named.add(`@margoengine/${match[1]}`);
+  for (const match of text.matchAll(/\b(packages|examples|apps)[\\/]([a-z0-9-]+)\b/g)) {
     const owner = workspaces.find((w) => w.dir === `${match[1]}/${match[2]}`);
     if (owner) named.add(owner.name);
   }
-  const text = tail.replaceAll('\\', '/'),
+  const plain = text.replaceAll('\\', '/'),
     changed = (branch) => [...new Set(branch.paths.map((file) => workspaceOf(workspaces, file)?.name).filter(Boolean))];
   const direct = batch.filter(
-    (branch) => branch.paths.some((file) => text.includes(file)) || changed(branch).some((name) => named.has(name)),
+    (branch) => branch.paths.some((file) => plain.includes(file)) || changed(branch).some((name) => named.has(name)),
   );
   if (direct.length) return { branches: direct, named: true };
   const dependent = batch.filter((branch) =>
     [...dependents(workspaces, changed(branch))].some((name) => named.has(name)),
   );
-  return dependent.length ? { branches: dependent, named: true } : { branches: batch, named: false };
+  return dependent.length ? { branches: dependent, named: true } : { branches: [], named: false };
 }
 
 const lines = (text) =>
@@ -190,23 +225,6 @@ function must(git, ...args) {
     );
   }
   return String(result.stdout ?? '').trim();
-}
-
-/**
- * Removes an entry's READY file only if it still holds the sha this run took. A helper may have written a newer READY
- * while the run was going; that one stays for the next run.
- */
-function dropReady(entry) {
-  if (entry.taken) {
-    let now = null;
-    try {
-      now = parseReady(readFileSync(entry.file, 'utf8'));
-    } catch {
-      return;
-    }
-    if (now && now.sha !== entry.taken) return;
-  }
-  rmSync(entry.file, { force: true });
 }
 
 const noreply = (email) => email === EMAIL;
@@ -273,10 +291,157 @@ export function fixWithoutTest(commits) {
   return null;
 }
 
+/** Text that must never reach main: a home folder, a secret, or an address at a domain of Scott's own. */
+const HOME_PATH =
+  /(?:[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s"']+|\/(?:Users|home)\/[^/\s"']+|%USERPROFILE%|\$HOME\b|~[\\/]\.?[\w-]+)/;
+const SECRET = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}\b/,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}\b/,
+  /\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}\b/,
+  /\bAKIA[0-9A-Z]{16}\b/,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/,
+  /\bey[A-Za-z0-9_-]{20,}\.ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/,
+];
+const ADDRESS = /\b[\w.+-]+@([\w-]+(?:\.[\w-]+)+)\b/g;
+/** Domains an address in a commit message may use besides the noreply address itself. */
+const ADDRESS_DOMAINS = ['users.noreply.github.com', 'anthropic.com', 'example.com', 'example.invalid'];
+
 /**
- * Lands one batch. `git(args)` resolves to `{ status, stdout, stderr }`, `runStep(command, { env, logFile, limitMs })` to
- * `{ ok, timedOut? }` and writes its output to logFile. `paths` is queuePaths(); `now()` a Date. Returns `{ result, exit,
- * line, landed?, sentBack? }`; result is idle, held, refused, moved, nothing or landed.
+ * What a commit message must not carry: an em or en dash, a home-folder path, a secret, or an address that is neither the
+ * noreply one nor at an allowed domain. Returns the first problem as text, or null.
+ */
+/** The en dash and the em dash, by code point: neither may appear in a commit message (nor in this file). */
+const DASHES = new RegExp(`[${String.fromCodePoint(0x2013)}${String.fromCodePoint(0x2014)}]`);
+
+export function messageProblem(message) {
+  if (DASHES.test(message)) return 'holds an em or en dash; write it again with plain punctuation';
+  if (HOME_PATH.test(message)) return 'names a home folder; leave paths like that out of the message';
+  if (SECRET.some((re) => re.test(message))) return 'looks like it holds a secret; take it out and rotate it';
+  for (const [whole, domain] of message.matchAll(ADDRESS))
+    if (whole !== EMAIL && !ADDRESS_DOMAINS.includes(domain.toLowerCase()))
+      return `carries the address ${whole}; only ${EMAIL} and ${ADDRESS_DOMAINS.join(', ')} may appear`;
+  return null;
+}
+
+/**
+ * The first added line of a diff that must not reach main: a home-folder path, a secret, or an address at a domain of
+ * Scott's own. `diff` is `git diff --unified=0` text. Returns `{ line, problem }`, or null.
+ */
+export function contentProblem(diff) {
+  for (const line of String(diff ?? '').split(/\r?\n/)) {
+    if (!line.startsWith('+') || line.startsWith('+++')) continue;
+    const text = line.slice(1);
+    if (HOME_PATH.test(text)) return { line: text.trim(), problem: 'a home-folder path' };
+    if (SECRET.some((re) => re.test(text))) return { line: text.trim(), problem: 'what looks like a secret' };
+    for (const [whole, domain] of text.matchAll(ADDRESS))
+      if (whole !== EMAIL && /scott/i.test(domain)) return { line: text.trim(), problem: `the address ${whole}` };
+  }
+  return null;
+}
+
+/**
+ * The environment tier 1 steps run with: the caller's, less every MARGO* and MARGOENGINE* variable that is not the lock
+ * code's own (MARGO_GPU_*), so nothing a caller exports can narrow, skip, cache or widen a step; then `extra` and the
+ * noreply identity.
+ */
+export function stepEnv(base, extra = {}) {
+  const env = {};
+  for (const [key, value] of Object.entries(base))
+    if (!/^MARGO/i.test(key) || /^MARGO_GPU_/.test(key)) env[key] = value;
+  return { ...env, ...extra, ...IDENTITY };
+}
+
+/** Writes JSON to `file` whole: the text goes to a sibling first, then takes the name, so a reader never sees half of it. */
+function writeJson(file, value) {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`);
+  renameSync(tmp, file);
+}
+
+const readJson = (file) => {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+};
+
+/** Every line of landed.log that parses, oldest first. */
+export function readLanded(file) {
+  let text;
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch {
+    return [];
+  }
+  return lines(text).flatMap((line) => {
+    try {
+      return [JSON.parse(line)];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** Who runs this: enough for a stranger to ask the right person or machine. */
+function runner() {
+  let user = null;
+  try {
+    user = userInfo().username;
+  } catch {}
+  return {
+    user,
+    host: hostname(),
+    pid: process.pid,
+    ppid: process.ppid,
+    cwd: process.cwd(),
+    argv: process.argv.slice(1),
+    node: process.version,
+    factoryJob: process.env.AGENT_FACTORY_JOB ?? null,
+  };
+}
+
+/**
+ * The run record: one JSON file per run under private/queue/runs/, written when the run starts and again after every
+ * phase, so a stranger can read what happened and a crash leaves the phase it reached. `save` throws
+ * INTEGRATE_RECORD_FAILED when the file cannot be written: nothing is pushed on a record that cannot be kept.
+ */
+function openRecord(paths, stamp, now, by) {
+  const file = join(paths.runs, `${stamp}.json`);
+  const record = {
+    id: stamp,
+    file,
+    schema: 2,
+    startedAt: now().toISOString(),
+    by,
+    state: 'running',
+    ledger: [],
+    batch: [],
+    attempts: [],
+  };
+  const save = () => {
+    record.updatedAt = now().toISOString();
+    try {
+      writeJson(file, record);
+    } catch (error) {
+      throw margoError(
+        'INTEGRATE_RECORD_FAILED',
+        `the run record ${file} could not be written (${error.message}); nothing lands until it can`,
+      );
+    }
+  };
+  save();
+  return { record, save };
+}
+
+/**
+ * Lands one batch. `git(args)` resolves to `{ status, stdout, stderr }`, `runStep(command, { env, logFile, limitMs,
+ * signal })` to `{ ok, timedOut?, aborted?, seconds? }` and writes its output to logFile. `paths` is queuePaths(); `now()` a
+ * Date; `holding()` null while this run still holds the landing lock, else why not; `notify(landing)` runs after a landing.
+ * Returns `{ result, exit, line, record, landed?, sentBack }`; result is idle, held, refused, moved, nothing, lost,
+ * record or landed.
  */
 export async function integrate({
   git,
@@ -287,207 +452,496 @@ export async function integrate({
   now = () => new Date(),
   log = console.log,
   stepMinutes = STEP_MINUTES,
+  holding = () => null,
+  lockPollMs = LOCK_POLL_MS,
+  notify = null,
+  by = runner(),
 }) {
   const stamp = now().toISOString().replace(/[:.]/g, '-'),
-    sentBack = [],
     logDir = join(paths.logs, stamp);
+  let record, save;
+  try {
+    ({ record, save } = openRecord(paths, stamp, now, by));
+  } catch (error) {
+    log(`integrate: RECORD: ${error.message}`);
+    return { result: 'record', exit: EXIT.record, line: error.message, record: null, sentBack: [] };
+  }
+  const sentBack = [];
+  /** Removes an entry's READY file only while it still holds the sha this run took, and writes down that it did. */
+  const retire = (entry, action, reason, extra = {}) => {
+    let removed = false,
+      newer = null;
+    if (entry.taken) {
+      try {
+        newer = parseReady(readFileSync(entry.file, 'utf8'));
+      } catch {
+        newer = null;
+      }
+      if (newer && newer.sha === entry.taken) newer = null;
+    }
+    if (!newer) {
+      rmSync(entry.file, { force: true });
+      removed = true;
+    }
+    const line = {
+      at: now().toISOString(),
+      run: record.id,
+      branch: entry.branch,
+      sha: entry.sha ?? entry.taken ?? null,
+      action,
+      reason,
+      ...extra,
+      removed,
+      ...(newer && { kept: `a newer READY ${newer.sha} stays for the next run` }),
+    };
+    record.ledger.push(line);
+    try {
+      mkdirSync(dirname(paths.ledger), { recursive: true });
+      appendFileSync(paths.ledger, `${JSON.stringify(line)}\n`);
+    } catch (error) {
+      throw margoError(
+        'INTEGRATE_RECORD_FAILED',
+        `${paths.ledger} could not be appended (${error.message}); a READY file is never removed unrecorded`,
+      );
+    }
+    return line;
+  };
   const sendBack = (entry, reason, step = 'intake', logFile = null) => {
     mkdirSync(paths.sentBack, { recursive: true });
     writeFileSync(
       join(paths.sentBack, `${entry.branch}.json`),
-      `${JSON.stringify({ branch: entry.branch, sha: entry.sha ?? null, at: now().toISOString(), step, reason, log: logFile }, null, 2)}\n`,
+      `${JSON.stringify({ branch: entry.branch, sha: entry.sha ?? null, at: now().toISOString(), run: record.id, step, reason, log: logFile }, null, 2)}\n`,
     );
-    dropReady(entry);
-    sentBack.push({ branch: entry.branch, step, reason, log: logFile });
+    retire(entry, 'sent-back', reason, { step, log: logFile });
+    sentBack.push({ branch: entry.branch, sha: entry.sha ?? null, step, reason, log: logFile });
     log(`integrate: ${entry.branch} goes back: ${reason}${logFile ? ` (log ${logFile})` : ''}`);
   };
-  const report = (result, exit, line, extra = {}) => {
+  const finish = (result, line, extra = {}) => {
+    record.state = result === 'landed' ? 'landed' : 'done';
+    record.result = result;
+    record.exit = EXIT[result];
+    record.line = line;
+    record.finishedAt = now().toISOString();
+    Object.assign(record, extra.stillReady ? { stillReady: extra.stillReady } : {});
+    save();
+    log(`integrate: RECORD: ${record.file}`);
     log(`integrate: ${result.toUpperCase()}: ${line}`);
-    return { result, exit, line, sentBack, ...extra };
+    return { result, exit: EXIT[result], line, record, sentBack, ...extra };
+  };
+  const lockLost = () => {
+    const why = holding();
+    if (!why) return null;
+    return finish('lost', `${why}; this run stops here and pushes nothing; every entry stays READY`);
   };
 
-  let batch = readQueue(paths.dir);
-  for (const entry of batch.filter((e) => e.invalid))
-    sendBack(entry, `the file does not read "READY <sha>" or "READY <sha> fix"; write it again`);
-  batch = batch.filter((entry) => !entry.invalid);
-  if (!batch.length && !sentBack.length) return report('idle', 0, 'nothing is READY');
-  const red = existsSync(paths.red);
-  if (red) batch = batch.filter((entry) => entry.fix);
-  if (!batch.length)
-    return report(
-      red ? 'held' : 'nothing',
-      red ? 0 : 6,
-      red ? `main is RED (${paths.red}) and no READY entry is marked fix` : 'every entry went back',
-    );
-  if (batch.length > MAX_QUEUE) {
-    log(queueBanner(batch.length, `This batch lands the first ${MAX_QUEUE}; the rest stay READY. Start nothing new.`));
-    batch = batch.slice(0, MAX_QUEUE);
+  try {
+    return await land();
+  } catch (error) {
+    if (error.code === 'INTEGRATE_RECORD_FAILED') {
+      log(`integrate: RECORD: ${error.message}`);
+      return { result: 'record', exit: EXIT.record, line: error.message, record, sentBack };
+    }
+    record.state = 'crashed';
+    record.error = error.message;
+    try {
+      save();
+    } catch {}
+    throw error;
   }
 
-  must(git, 'fetch', '-q', 'origin');
-  const base = must(git, 'rev-parse', 'origin/main');
-  const known = [];
-  for (const entry of batch) {
-    const resolved = git(['rev-parse', '--verify', '-q', `${entry.sha}^{commit}`]);
-    if (resolved.status !== 0) {
-      sendBack(entry, `no commit ${entry.sha} in this clone; commit it, then write READY again`);
-      continue;
+  async function land() {
+    const unlocked = lockLost();
+    if (unlocked) return unlocked;
+    let batch = readQueue(paths.dir);
+    record.queue = batch.map(({ branch, sha, fix, invalid, mtime }) => ({
+      branch,
+      sha: sha ?? null,
+      fix: Boolean(fix),
+      invalid: Boolean(invalid),
+      readyAt: new Date(mtime).toISOString(),
+    }));
+    record.redHeld = existsSync(paths.redHeld);
+    if (record.redHeld)
+      log(`integrate: ${paths.redHeld} exists: a RED set aside on Scott's order; it holds nothing and stays as it is`);
+    for (const entry of batch.filter((e) => e.invalid))
+      sendBack(entry, `the file does not read "READY <sha>" or "READY <sha> fix"; write it again`);
+    batch = batch.filter((entry) => !entry.invalid);
+    if (batch.length > MAX_QUEUE) {
+      const extra = batch.slice(MAX_QUEUE);
+      log(
+        queueBanner(
+          batch.length,
+          `${extra.map((e) => e.branch).join(', ')} came after the ${MAX_QUEUE}th and go back now. Start nothing new.`,
+        ),
+      );
+      for (const [i, entry] of extra.entries())
+        sendBack(
+          entry,
+          `NEVER MORE THAN ${MAX_QUEUE} IN THE QUEUE: this READY was number ${MAX_QUEUE + i + 1}; write READY again after a landing`,
+        );
+      batch = batch.slice(0, MAX_QUEUE);
+      record.overLimit = extra.map((e) => e.branch);
     }
-    entry.sha = String(resolved.stdout).trim();
-    if (git(['merge-base', '--is-ancestor', entry.sha, base]).status === 0) {
-      log(`integrate: ${entry.branch} is already on main; its READY entry is removed`);
-      dropReady(entry);
-      continue;
+    if (!batch.length && !sentBack.length && !pendingRuns().length) return finish('idle', 'nothing is READY');
+
+    must(git, 'fetch', '-q', 'origin');
+    const base = must(git, 'rev-parse', 'origin/main');
+    record.base = base;
+    record.unlanded = unlandedNames(git, batch);
+    if (record.unlanded.length > MAX_QUEUE)
+      log(
+        queueBanner(
+          record.unlanded.length,
+          `Unlanded: ${record.unlanded.join(', ')}. This run lands; nothing else starts.`,
+        ),
+      );
+    recoverPushed(base);
+    accountForMain(base);
+    // A recovery retires the entries of the landing it finished; anything else that vanished since the queue was read
+    // was not this run's doing, and is said so.
+    batch = batch.filter((entry) => {
+      if (existsSync(entry.file)) return true;
+      if (!record.ledger.some((line) => line.branch === entry.branch && line.action === 'landed'))
+        log(
+          `integrate: ${entry.file} vanished while this run started; not this run's doing, so it is not recorded here`,
+        );
+      return false;
+    });
+    save();
+
+    if (!batch.length)
+      return finish(
+        sentBack.length ? 'nothing' : 'idle',
+        sentBack.length ? 'every entry went back' : 'nothing is READY',
+      );
+    const red = existsSync(paths.red);
+    record.red = red;
+    if (red) batch = batch.filter((entry) => entry.fix);
+    if (!batch.length) return finish('held', `main is RED (${paths.red}) and no READY entry is marked fix`);
+
+    const known = [];
+    for (const entry of batch) {
+      const resolved = git(['rev-parse', '--verify', '-q', `${entry.sha}^{commit}`]);
+      if (resolved.status !== 0) {
+        sendBack(entry, `no commit ${entry.sha} in this clone; commit it, then write READY again`);
+        continue;
+      }
+      entry.sha = String(resolved.stdout).trim();
+      if (git(['merge-base', '--is-ancestor', entry.sha, base]).status === 0) {
+        retire(entry, 'already-on-main', `${entry.sha} is already on main; its READY entry is removed`);
+        log(`integrate: ${entry.branch} is already on main; its READY entry is removed`);
+        continue;
+      }
+      entry.from = must(git, 'merge-base', entry.sha, base);
+      const problem = intakeProblem(entry);
+      if (problem) {
+        sendBack(entry, problem);
+        continue;
+      }
+      entry.paths = lines(must(git, 'diff', '--name-only', '--no-renames', entry.from, entry.sha));
+      known.push(entry);
     }
-    entry.from = must(git, 'merge-base', entry.sha, base);
-    const authors = lines(must(git, 'log', '--format=%ae', `${entry.from}..${entry.sha}`)).filter((e) => !noreply(e));
-    if (authors.length) {
-      sendBack(entry, `a commit's author is not the noreply address; rewrite it to ${EMAIL} before READY`);
-      continue;
+    batch = known;
+    record.batch = batch.map(({ branch, sha, fix, from, paths: files }) => ({
+      branch,
+      ready: sha,
+      fix: Boolean(fix),
+      from,
+      files: files.length,
+      rebased: null,
+    }));
+    save();
+    if (!batch.length) return finish(sentBack.length ? 'nothing' : 'idle', 'no branch left to land');
+
+    // Before anything is rebased or built, and again before the push: a stop order may come while the gate runs.
+    const stop = refusedByStop(batch);
+    if (stop) return stop;
+
+    let attempt = 0,
+      gate = null;
+    mkdirSync(logDir, { recursive: true });
+    while (batch.length) {
+      const lost = lockLost();
+      if (lost) return lost;
+      attempt++;
+      batch = assemble({ git, base, batch, sendBack });
+      for (const entry of batch) record.batch.find((b) => b.branch === entry.branch).rebased = entry.rebased;
+      if (!batch.length) break;
+      const tip = must(git, 'rev-parse', 'HEAD');
+      const steps = [];
+      record.attempts.push({ attempt, tip, branches: batch.map((e) => e.branch), steps });
+      save();
+      gate = await tierOne({ git, runStep, logDir, attempt, stepMinutes, log, steps, save, holding, lockPollMs });
+      if (gate.ok) break;
+      if (gate.lost)
+        return finish('lost', `${gate.lost}; this run stops here and pushes nothing; every entry stays READY`);
+      const blamed = blame(gate, batch);
+      if (!blamed.branches.length) {
+        record.unblamed = { attempt, step: gate.step, log: gate.log };
+        return finish(
+          'nothing',
+          `${gate.step} failed on the batch tip (${gate.timedOut ? 'hung past its limit, tree killed' : 'see the log'}) and its output names no branch of ${batch.map((e) => e.branch).join(', ')}; nobody is stepped out to find it; every entry stays READY; read ${gate.log} and fix the cause, or take the branch that owns it out`,
+          { stillReady: batch.map((e) => e.branch) },
+        );
+      }
+      for (const entry of blamed.branches) sendBack(entry, blamed.reason(entry), gate.step, gate.log);
+      batch = batch.filter((entry) => !blamed.branches.includes(entry));
+      gate = null;
     }
-    const commits = lines(must(git, 'log', '--no-merges', '--format=%H', `${entry.from}..${entry.sha}`)).map((sha) => ({
+    if (!gate?.ok) return finish('nothing', 'nothing passed tier 1');
+
+    const late = refusedByStop(batch);
+    if (late) return late;
+    if (existsSync(paths.red) && !batch.every((entry) => entry.fix))
+      return finish('held', `main went RED during the gate (${paths.red}); the batch stays READY`);
+    const tip = must(git, 'rev-parse', 'HEAD');
+    const strangers = lines(must(git, 'log', '--format=%ae %ce', `${base}..${tip}`)).filter(
+      (line) => line !== `${EMAIL} ${EMAIL}`,
+    );
+    if (strangers.length)
+      return finish(
+        'refused',
+        `${strangers.length} commit(s) do not carry ${EMAIL} as author and committer; nothing was pushed`,
+      );
+    const lost = lockLost();
+    if (lost) return lost;
+
+    const landing = {
+      at: now().toISOString(),
+      run: record.id,
+      from: base,
+      to: tip,
+      branches: batch.map(({ branch, sha, fix, rebased }) => ({ branch, sha, landedAs: rebased, ...(fix && { fix }) })),
+      commits: lines(must(git, 'log', '--format=%H %s', `${base}..${tip}`)),
+      tier1: gate.steps.map(({ step, ok, log: file, seconds }) => ({ step, ok, log: file, seconds })),
+      attempts: attempt,
+      sentBack: sentBack.map(({ branch, step, reason, log: file }) => ({ branch, step, reason, log: file })),
+      by: { user: by.user, host: by.host, pid: by.pid },
+    };
+    record.push = { tip, state: 'pushing', at: landing.at };
+    record.landing = landing;
+    record.state = 'pushing';
+    record.entries = batch.map(({ branch, file, taken, sha }) => ({ branch, file, taken, sha }));
+    save();
+    const pushed = git(['push', 'origin', 'HEAD:refs/heads/main']);
+    if (pushed.status !== 0) {
+      record.push.state = 'rejected';
+      record.push.stderr = lines(pushed.stderr).slice(-5);
+      return finish(
+        'moved',
+        `the push was refused (${lines(pushed.stderr).at(-1) ?? 'no reason given'}); every entry stays READY for the next run`,
+      );
+    }
+    record.push.state = 'pushed';
+    return await concludeLanding(landing, batch);
+  }
+
+  /** The earlier runs that wrote "pushing" and never finished their record. */
+  function pendingRuns() {
+    if (!existsSync(paths.runs)) return [];
+    return readdirSync(paths.runs)
+      .filter((name) => name.endsWith('.json'))
+      .sort()
+      .map((name) => ({ file: join(paths.runs, name), earlier: readJson(join(paths.runs, name)) }))
+      .filter(({ earlier }) => earlier?.state === 'pushing' && earlier.push?.tip && earlier.id !== record.id);
+  }
+
+  /**
+   * What the run has pushed is on main: records it in landed.log, retires the entries, writes the notice, syncs the main
+   * checkout and runs `notify`. The landed.log line comes first: the push is irreversible, so its record is the one thing
+   * that must not be lost, and a line already there (a recovery) is not written twice.
+   */
+  async function concludeLanding(landing, entries) {
+    const synced = mainGit ? syncMainCheckout(mainGit) : null;
+    if (synced) log(`integrate: ${synced}`);
+    const line = { ...landing, ...(synced && { mainCheckout: synced }) };
+    if (!readLanded(paths.landed).some((entry) => entry.run === landing.run && entry.to === landing.to)) {
+      try {
+        appendFileSync(paths.landed, `${JSON.stringify(line)}\n`);
+      } catch (error) {
+        throw margoError(
+          'INTEGRATE_RECORD_FAILED',
+          `${paths.landed} could not be appended after the push of ${landing.to} (${error.message}); the run record ${record.file} says "pushing" and the next run finishes this landing's record`,
+        );
+      }
+    }
+    for (const entry of entries) {
+      retire(entry, 'landed', `landed on main at ${landing.to}`);
+      rmSync(join(paths.sentBack, `${entry.branch}.json`), { force: true });
+    }
+    try {
+      writeJson(paths.latest, line);
+    } catch (error) {
+      log(`integrate: ${paths.latest} could not be written (${error.message}); the landing is in ${paths.landed}`);
+    }
+    record.push.state = 'landed';
+    record.state = 'landed';
+    save();
+    if (notify) {
+      try {
+        await notify(line);
+        record.notified = true;
+      } catch (error) {
+        record.notified = `failed: ${error.message}`;
+        log(
+          `integrate: the landing notice failed (${error.message}); the landing itself is recorded in ${paths.landed}`,
+        );
+      }
+    }
+    return finish('landed', `${landing.to} on main: ${landing.branches.map((entry) => entry.branch).join(', ')}`, {
+      landed: landing.branches,
+      tip: landing.to,
+      ...(synced && { mainCheckout: synced }),
+    });
+  }
+
+  /**
+   * An earlier run wrote "pushing" and never finished its record. Its push either reached origin/main (the tip is an
+   * ancestor of the base now: its landing is recorded now and its entries retired) or did not (the record says so and the
+   * entries stay READY). Nothing lands twice: an entry already on main is retired at intake.
+   */
+  function recoverPushed(base) {
+    for (const { file, earlier } of pendingRuns()) {
+      const onMain = git(['merge-base', '--is-ancestor', earlier.push.tip, base]).status === 0;
+      log(
+        `integrate: run ${earlier.id} pushed ${earlier.push.tip} and never finished its record; the push ${onMain ? 'is' : 'is not'} on origin/main`,
+      );
+      (record.recovered ??= []).push({ run: earlier.id, tip: earlier.push.tip, onMain });
+      if (onMain) {
+        const entries = (earlier.entries ?? []).map((e) => ({ ...e }));
+        const landing = { ...earlier.landing, run: earlier.id, to: earlier.push.tip };
+        const synced = mainGit ? syncMainCheckout(mainGit) : null;
+        const line = { ...landing, ...(synced && { mainCheckout: synced }), recoveredBy: record.id };
+        if (!readLanded(paths.landed).some((entry) => entry.run === earlier.id && entry.to === earlier.push.tip))
+          appendFileSync(paths.landed, `${JSON.stringify(line)}\n`);
+        for (const entry of entries) {
+          retire(entry, 'landed', `landed on main at ${earlier.push.tip} by run ${earlier.id}, recorded now`);
+          rmSync(join(paths.sentBack, `${entry.branch}.json`), { force: true });
+        }
+        earlier.push.state = 'landed';
+        earlier.state = 'landed';
+        earlier.recoveredBy = record.id;
+      } else {
+        earlier.push.state = 'not on main';
+        earlier.state = 'done';
+        earlier.result = 'moved';
+        earlier.exit = EXIT.moved;
+        earlier.line = `the push of ${earlier.push.tip} never reached origin/main; every entry stayed READY (recorded by run ${record.id})`;
+        earlier.recoveredBy = record.id;
+      }
+      writeJson(file, earlier);
+    }
+  }
+
+  /** Commits on origin/main that no landing covers: a hand push. They are written to landed.log so main stays accounted for. */
+  function accountForMain(base) {
+    const last = readLanded(paths.landed)
+      .filter((entry) => typeof entry.to === 'string')
+      .at(-1);
+    if (!last || last.to === base) return;
+    const linear = git(['merge-base', '--is-ancestor', last.to, base]).status === 0;
+    const line = {
+      kind: 'hand-push',
+      at: now().toISOString(),
+      run: record.id,
+      from: last.to,
+      to: base,
+      commits: linear ? lines(must(git, 'log', '--format=%H %s', `${last.to}..${base}`)) : [],
+      ...(!linear && { note: `${last.to} is not an ancestor of ${base}: history moved under the records` }),
+    };
+    record.handPush = line;
+    log(
+      `integrate: origin/main holds ${linear ? `${line.commits.length} commit(s)` : 'history'} no landing recorded (${last.to.slice(0, 9)}..${base.slice(0, 9)}); written to ${paths.landed} as a hand push`,
+    );
+    appendFileSync(paths.landed, `${JSON.stringify(line)}\n`);
+  }
+
+  /** Why a branch cannot enter the batch, or null: identity, messages, content, the fix gate. */
+  function intakeProblem(entry) {
+    const commits = lines(must(git, 'log', '--no-merges', '--format=%H %ae %ce', `${entry.from}..${entry.sha}`)).map(
+      (line) => {
+        const [sha, author, committer] = line.split(' ');
+        return { sha, author, committer };
+      },
+    );
+    for (const { sha, author, committer } of commits) {
+      if (!noreply(author) || !noreply(committer))
+        return `commit ${sha.slice(0, 9)}'s ${noreply(author) ? 'committer' : 'author'} is not the noreply address; rewrite it to ${EMAIL} before READY`;
+    }
+    const detailed = commits.map(({ sha }) => ({
       sha,
       message: must(git, 'log', '-1', '--format=%B', sha),
       files: lines(must(git, 'diff-tree', '--no-commit-id', '--name-only', '-r', '--no-renames', sha)),
       exists: (path) => git(['cat-file', '-e', `${entry.sha}:${path}`]).status === 0,
     }));
-    const untested = fixWithoutTest(commits);
-    if (untested) {
-      sendBack(entry, untested.reason);
-      continue;
+    for (const { sha, message } of detailed) {
+      const problem = messageProblem(message);
+      if (problem) return `commit ${sha.slice(0, 9)}'s message ${problem}`;
     }
-    entry.paths = lines(must(git, 'diff', '--name-only', '--no-renames', entry.from, entry.sha));
-    known.push(entry);
+    const content = contentProblem(must(git, 'diff', '--no-renames', '--unified=0', entry.from, entry.sha));
+    if (content)
+      return `an added line holds ${content.problem} ("${content.line.slice(0, 80)}"); nothing like that reaches main`;
+    return fixWithoutTest(detailed)?.reason ?? null;
   }
-  batch = known;
-  if (!batch.length)
-    return report(sentBack.length ? 'nothing' : 'idle', sentBack.length ? 6 : 0, 'no branch left to land');
 
-  // Before anything is rebased or built, and again before the push: a stop order may come while the gate runs.
-  const refused = (entries) => {
+  function refusedByStop(entries) {
     const hits = stoppedHits([...new Set(entries.flatMap((e) => e.paths))], readStopped(paths.control), workspaces);
     if (!hits.length) return null;
     const who = entries.filter((e) => hits.some((hit) => e.paths.includes(hit.file))).map((e) => e.branch);
-    return report(
+    record.stopped = hits;
+    return finish(
       'refused',
-      4,
       `${[...new Set(hits.map((hit) => hit.tag))].join(', ')} stopped in ${paths.control}; ${who.join(', ')} touch ${hits[0].file}${hits.length > 1 ? ` and ${hits.length - 1} more` : ''}; nothing was pushed; take those READY entries out, or lift the stop`,
       { hits },
     );
-  };
-  const stop = refused(batch);
-  if (stop) return stop;
-
-  const held = [];
-  let suspect = null,
-    attempt = 0,
-    gate;
-  mkdirSync(logDir, { recursive: true });
-  while (batch.length) {
-    attempt++;
-    const rebased = assemble({ git, base, batch, sendBack });
-    batch = rebased.batch;
-    if (!batch.length) break;
-    gate = await tierOne({ git, runStep, logDir, attempt, stepMinutes, log });
-    if (gate.ok) {
-      if (suspect) sendBack(suspect.entry, `tier 1 passed once it left: ${suspect.why}`, suspect.step, suspect.log);
-      suspect = null;
-      break;
-    }
-    if (suspect) {
-      log(`integrate: ${suspect.entry.branch} was not the cause; it stays READY for the next batch`);
-      held.push(suspect.entry);
-      suspect = null;
-    }
-    const tail = lines(readFileSync(gate.log, 'utf8')).slice(-TAIL_LINES).join('\n');
-    if (gate.step === 'relink') {
-      // A stale install in the main checkout fails every branch alike; only the one whose package.json adds the
-      // dependency can cure it, so only that one goes back, at once.
-      const missing = missingFromLog(tail),
-        culprits = batch.filter((entry) => addedDependencies(git, entry).some((name) => missing.includes(name)));
-      if (culprits.length) {
-        for (const entry of culprits) {
-          const added = addedDependencies(git, entry).filter((name) => missing.includes(name));
-          sendBack(
-            entry,
-            `its package.json adds ${added.join(', ')}, which the main checkout has not installed; run npm install in the main checkout, then write READY again`,
-            'relink',
-            gate.log,
-          );
-        }
-        batch = batch.filter((entry) => !culprits.includes(entry));
-        gate = null;
-        continue;
-      }
-    }
-    const found = suspects(tail, batch, workspaces),
-      why = `${gate.step} failed on the batch tip`;
-    if (found.branches.length === 1) {
-      sendBack(found.branches[0], why, gate.step, gate.log);
-      batch = batch.filter((entry) => entry !== found.branches[0]);
-    } else {
-      const entry = found.branches.at(-1);
-      log(
-        `integrate: ${why}; the output names ${found.named ? 'several branches' : 'none'}; ${entry.branch} steps out`,
-      );
-      suspect = { entry, why, step: gate.step, log: gate.log };
-      batch = batch.filter((other) => other !== entry);
-    }
-    gate = null;
   }
-  // The last one in a batch that never passed: it failed alone, so a remaining suspect stays READY with the others.
-  if (suspect) held.push(suspect.entry);
-  if (!gate?.ok)
-    return report(
-      'nothing',
-      6,
-      `nothing passed tier 1${held.length ? `; still READY: ${held.map((e) => e.branch).join(', ')}` : ''}`,
-    );
 
-  const late = refused(batch);
-  if (late) return late;
-  if (existsSync(paths.red) && !batch.every((entry) => entry.fix))
-    return report('held', 0, `main went RED during the gate (${paths.red}); the batch stays READY`);
-  const tip = must(git, 'rev-parse', 'HEAD');
-  const strangers = lines(must(git, 'log', '--format=%ae %ce', `${base}..${tip}`)).filter(
-    (line) => line !== `${EMAIL} ${EMAIL}`,
-  );
-  if (strangers.length)
-    return report(
-      'refused',
-      4,
-      `${strangers.length} commit(s) do not carry ${EMAIL} as author and committer; nothing was pushed`,
-    );
-  const pushed = git(['push', 'origin', 'HEAD:refs/heads/main']);
-  if (pushed.status !== 0)
-    return report(
-      'moved',
-      5,
-      `the push was refused (${lines(pushed.stderr).at(-1) ?? 'no reason given'}); every entry stays READY for the next run`,
-    );
-  const synced = mainGit ? syncMainCheckout(mainGit) : null;
-  if (synced) log(`integrate: ${synced}`);
-  const landed = batch.map(({ branch, sha, fix }) => ({ branch, sha, ...(fix && { fix }) }));
-  appendFileSync(
-    paths.landed,
-    `${JSON.stringify({
-      at: now().toISOString(),
-      from: base,
-      to: tip,
-      branches: landed,
-      commits: lines(must(git, 'log', '--format=%H %s', `${base}..${tip}`)),
-      tier1: gate.logs,
-      sentBack: sentBack.map((entry) => entry.branch),
-      stillReady: held.map((entry) => entry.branch),
-      ...(synced && { mainCheckout: synced }),
-    })}\n`,
-  );
-  for (const entry of batch) dropReady(entry);
-  return report('landed', 0, `${tip} on main: ${landed.map((entry) => entry.branch).join(', ')}`, {
-    landed,
-    tip,
-    ...(synced && { mainCheckout: synced }),
-  });
+  /** The branches a failed gate names, and the reason each goes back. `{ branches, reason(entry) }`. */
+  function blame(failed, batch) {
+    let text = '';
+    try {
+      const size = statSync(failed.log).size,
+        whole = readFileSync(failed.log, 'utf8');
+      text = size > LOG_BYTES ? whole.slice(-LOG_BYTES) : whole;
+    } catch {}
+    if (failed.step === 'relink') {
+      // A stale install in the main checkout fails every branch alike; only the one whose package.json adds the
+      // dependency can cure it, so only that one goes back.
+      const missing = missingFromLog(text),
+        culprits = batch.filter((entry) => addedDependencies(git, entry).some((name) => missing.includes(name)));
+      if (culprits.length)
+        return {
+          branches: culprits,
+          reason: (entry) =>
+            `its package.json adds ${addedDependencies(git, entry)
+              .filter((name) => missing.includes(name))
+              .join(
+                ', ',
+              )}, which the main checkout has not installed; run npm install in the main checkout, then write READY again`,
+        };
+    }
+    const hung = failed.timedOut ? ` (it hung past ${stepMinutes} min and its process tree was killed)` : '';
+    const found = suspects(text, batch, workspaces);
+    if (found.branches.length)
+      return {
+        branches: found.branches,
+        reason: () =>
+          `${failed.step} failed on the batch tip${hung} and its output names ${found.branches.length === 1 ? 'this branch' : `these ${found.branches.length} branches`}`,
+      };
+    if (batch.length === 1)
+      return {
+        branches: batch,
+        reason: () => `${failed.step} failed on the batch tip${hung} with this branch alone in it`,
+      };
+    return { branches: [], reason: () => '' };
+  }
+}
+
+/** The unlanded names git and the queue know: every local branch but main, every READY file, once. */
+function unlandedNames(git, batch) {
+  const refs = git(['for-each-ref', '--format=%(refname:short)', 'refs/heads']);
+  const branches = refs.status === 0 ? lines(refs.stdout) : [];
+  return [...new Set([...branches, ...batch.map((e) => e.branch)])].filter((name) => name !== 'main').sort();
 }
 
 /** Rebases the batch onto `base`, in order, in the worktree. A conflict sends that branch back and the rest go on. */
@@ -500,6 +954,7 @@ function assemble({ git, base, batch, sendBack }) {
     const result = git(['rebase', '-q', '--onto', tip, entry.from, entry.sha]);
     if (result.status === 0) {
       tip = must(git, 'rev-parse', 'HEAD');
+      entry.rebased = tip;
       kept.push(entry);
       continue;
     }
@@ -512,23 +967,48 @@ function assemble({ git, base, batch, sendBack }) {
       'rebase',
     );
   }
-  return { batch: kept, tip };
+  return kept;
 }
 
 /**
- * Tier 1 on the worktree's HEAD, each step once: relink, check:merge's plan, build, api:check, the records, verify,
- * the narrowed example types and package test. The build looks like a repeat of verify's and stays: the records measure
- * built packages, and verify must also prove its own build with the stale files planted. Returns `{ ok, step?, log?, logs }`.
+ * Tier 1 on the worktree's HEAD, each step once, in this order: relink, check:merge's plan, build, api:check,
+ * the records, verify, then the narrowed example types and package test. The build looks like a repeat of verify's and
+ * stays: the records measure built packages, and verify must also prove its own build with the stale files planted.
+ * The lock is checked before each step and every `lockPollMs` while one runs: lost, the step's tree is killed. Each step
+ * goes into `steps` as it runs and `save()` keeps the record current. Returns `{ ok, step?, log?, timedOut?, lost?, steps }`.
  */
-async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log }) {
-  const logs = [],
-    limitMs = stepMinutes * 60_000;
+async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log, steps, save, holding, lockPollMs }) {
+  const limitMs = stepMinutes * 60_000;
   const step = async (name, command, env = {}) => {
+    const why = holding();
+    if (why) return { ok: false, lost: why, steps };
     const logFile = join(logDir, `${attempt}-${name.replace(/[^\w.-]+/g, '_')}.log`);
+    const entry = { step: name, command, startedAt: new Date().toISOString(), ok: null, log: logFile };
+    steps.push(entry);
+    save();
     log(`integrate: attempt ${attempt}: ${command}`);
-    const result = await runStep(command, { env, logFile, limitMs });
-    logs.push({ step: name, ok: result.ok, log: logFile });
-    return result.ok ? null : { ok: false, step: name, log: logFile, logs };
+    const controller = new AbortController();
+    let lost = null;
+    const watch = setInterval(() => {
+      lost ??= holding();
+      if (lost) controller.abort();
+    }, lockPollMs);
+    const t0 = performance.now();
+    let result;
+    try {
+      result = await runStep(command, { env, logFile, limitMs, signal: controller.signal });
+    } finally {
+      clearInterval(watch);
+    }
+    entry.ok = Boolean(result.ok);
+    entry.seconds = result.seconds ?? Math.round((performance.now() - t0) / 100) / 10;
+    entry.timedOut = Boolean(result.timedOut);
+    if (lost) entry.aborted = lost;
+    save();
+    if (lost) return { ok: false, lost, step: name, log: logFile, steps };
+    if (result.timedOut)
+      log(`integrate: ${name} hung past ${stepMinutes} min; its process tree was killed (log ${logFile})`);
+    return result.ok ? null : { ok: false, step: name, log: logFile, timedOut: entry.timedOut, steps };
   };
   must(git, 'lfs', 'checkout');
   const failed =
@@ -542,7 +1022,7 @@ async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log }) {
     // The stale files check:merge plants before verify's build, which the package test then proves no pack contains.
     (await step('verify', 'npm run verify', { MARGOENGINE_PLANT_STALE: '1' }));
   if (failed) return failed;
-  const plan = parsePlan(readFileSync(logs.find((entry) => entry.step === 'plan').log, 'utf8'));
+  const plan = parsePlan(readFileSync(steps.find((entry) => entry.step === 'plan').log, 'utf8'));
   for (const [name, env] of [
     ['check:examples-types', {}],
     ['modern:test:packages', { MARGOENGINE_PACKAGE_TEST_PREBUILT: '1' }],
@@ -553,7 +1033,7 @@ async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log }) {
   }
   // The checks rewrite the size records; the committed ones are what lands, and the next attempt wants a clean tree.
   git(['checkout', '--', 'examples/package-benchmarks/results']);
-  return { ok: true, logs };
+  return { ok: true, steps };
 }
 
 /** Makes a detached worktree at `path` from origin/main when it does not exist yet. */
@@ -579,10 +1059,28 @@ export function gitIn(cwd, env = process.env) {
     });
 }
 
-/** The `runStep` for integrate(): the whole tree of a step is killed past its limit (run-limited.mjs). */
+/** The `runStep` for integrate(): the whole tree of a step is killed past its limit or when `signal` aborts (run-limited.mjs). */
 export function stepIn(cwd, base = process.env) {
-  return (command, { env, logFile, limitMs }) =>
-    runLimited(command, { cwd, env: { ...base, ...env, ...IDENTITY }, limitMs, label: command, logFile });
+  return (command, { env, logFile, limitMs, signal }) =>
+    runLimited(command, { cwd, env: stepEnv(base, env), limitMs, label: command, logFile, signal });
+}
+
+/**
+ * Whether this process still runs under the landing lock entry it started under: `lockDir` is the lock folder (the parent
+ * of MARGO_GPU_LOCK_NESTED under gpu-lock.mjs `run`). Returns a `holding()` for integrate(): null while the entry still
+ * holds the token read at the start, else why not. A second integrator that took the lock over writes its own token.
+ */
+export function lockWatch(lockDir) {
+  const file = join(lockDir, 'exclusive.json'),
+    token = readJson(file)?.token ?? null;
+  if (!token) return () => `no landing lock entry in ${lockDir}: this run is not under the lock`;
+  return () => {
+    const entry = readJson(file);
+    if (!entry) return `the landing lock entry ${file} is gone (the lock wrapper died or the entry was reclaimed)`;
+    if (entry.token !== token)
+      return `another integrator holds the landing lock now (${entry.owner ?? 'unknown'}, pid ${entry.pid ?? '?'}, since ${entry.takenAt ?? '?'})`;
+    return null;
+  };
 }
 
 /** A flag's value from the arguments, or `fallback`. */
@@ -591,26 +1089,35 @@ export const flag = (args, name, fallback) =>
 
 export const USAGE = `usage: node scripts/integrate.mjs [options]
 
-Lands one batch of the READY branches in private/queue/ to main: rebase, tier 1 once, records, one push, never forced.
-Only this script pushes to main. An agent queues a branch with a file private/queue/<branch>.ready holding
-"READY <sha>", or "READY <sha> fix" for the fix of a RED main. Takes test-results/land.lock.
+Lands one batch of the READY branches in private/queue/ to main: intake, rebase, tier 1 once, records, one push, never
+forced. Only this script pushes to main. An agent queues a branch with a file private/queue/<branch>.ready holding
+"READY <sha>", or "READY <sha> fix" for the fix of a RED main. Takes test-results/land.lock; exactly one run at a time.
+Non-interactive: nothing is read from stdin, every answer is in the run record and on stdout.
 
 Options:
   --worktree=<path>          its detached worktree (default <main checkout>-wt-integrator, made when missing)
   --limit=<min>              hard limit of the whole run, tree killed past it (default ${DEFAULT_LIMIT_MINUTES})
   --wait-max=<min>           how long to wait for another integrator (default 5)
+  --notify=<command>         run after a landing with the landing's JSON file as its one argument (2 min limit)
   -h, --help                 print this help and exit
 
-Exit codes: 0 landed, nothing queued, or held by RED; 4 refused by a stop order; 5 main moved; 6 nothing could land;
-124 past the limit.
+Exit codes: 0 landed, nothing queued, or held by RED; 4 refused by a stop order or an identity; 5 main moved under the
+push; 6 nothing could land; 7 the landing lock was lost; 8 the run record could not be written; 124 past the limit.
+
+Output: lines "integrate: <what>"; "integrate: RECORD: <file>" names the run record; the last line is
+"integrate: <LANDED|IDLE|HELD|REFUSED|MOVED|NOTHING|LOST|RECORD>: <why>".
+Files: private/queue/runs/<stamp>.json (one per run: who, queue, intake, every step with its log and seconds, the push),
+private/queue/landed.log (one JSON line per landing or hand push), private/queue/latest-landing.json (the last landing),
+private/queue/queue.log (every READY file removed, with its reason), private/queue/sent-back/<branch>.json.
 
 Example:
-  node scripts/integrate.mjs --limit=120`;
+  node scripts/integrate.mjs --limit=120 --notify="node scripts/my-watcher.mjs"`;
 
 async function main() {
   const args = process.argv.slice(2),
     home = mainCheckout(root),
-    worktree = resolve(flag(args, 'worktree', `${home}-wt-integrator`));
+    worktree = resolve(flag(args, 'worktree', `${home}-wt-integrator`)),
+    notifyCommand = flag(args, 'notify', null);
   if (!args.includes('--locked')) {
     // Under the landing lock, as every landing was: gpu-lock.mjs gives it the heartbeat, the limit and the tree kill, and
     // points the GPU work inside at the GPU lock.
@@ -627,6 +1134,7 @@ async function main() {
         'scripts/integrate.mjs',
         '--locked',
         `--worktree=${worktree}`,
+        ...(notifyCommand ? [`--notify=${notifyCommand}`] : []),
       ],
       { cwd: root, stdio: 'inherit', env: { ...process.env, MARGO_GPU_LOCK: join(home, 'test-results', 'land.lock') } },
     );
@@ -634,14 +1142,34 @@ async function main() {
     return;
   }
   ensureWorktree(worktree);
-  const { exit } = await integrate({
+  const nested = process.env.MARGO_GPU_LOCK_NESTED,
+    holding = nested
+      ? lockWatch(dirname(nested))
+      : () => 'MARGO_GPU_LOCK_NESTED is not set: this run is not under the landing lock';
+  const paths = queuePaths(home);
+  const notify = notifyCommand
+    ? async (landing) => {
+        const logFile = join(paths.logs, `${landing.run}-notify.log`);
+        const ran = await runLimited(`${notifyCommand} "${paths.latest}"`, {
+          cwd: home,
+          env: stepEnv(process.env),
+          limitMs: 2 * 60_000,
+          label: notifyCommand,
+          logFile,
+        });
+        console.log(`integrate: notify ${ran.ok ? 'ran' : `failed (log ${logFile})`}: ${notifyCommand}`);
+      }
+    : null;
+  const out = await integrate({
     git: gitIn(worktree),
     mainGit: gitIn(home),
     runStep: stepIn(worktree),
-    paths: queuePaths(home),
+    paths,
     workspaces: loadWorkspaces(root),
+    holding,
+    notify,
   });
-  process.exitCode = exit;
+  process.exitCode = out.exit;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
