@@ -6,7 +6,7 @@
 // Whittaker and Holdridge classifiers live in the zones entry and plug in through `ZoneClassifier`.
 import { type BiomeDefinition, type Dimension, envelopeOf } from './define.js';
 import { clampInt, divFloor, ONE, wendland } from './fixed.js';
-import { fbm } from './hash.js';
+import { warpLattice, warpPlanes } from './classify-warp.js';
 
 /** Paint layer composition modes, applied in the world's paint order. */
 export type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
@@ -261,9 +261,6 @@ function scratch(at: number, length: number): Int32Array {
   return plane.length === length ? plane : plane.subarray(0, length);
 }
 
-/** Wavelength of the ecotone warp, mm. */
-const WARP = 700_000;
-
 /**
  * Classifies the inner (n - 2) x (depth - 2) cells: writes 4 ids and 4 weights (summing to 255) per cell into `ids`
  * and `weights` (rgba8, row-major over the inner cells). Unused slots hold id 255 and weight 0.
@@ -285,42 +282,16 @@ export function classify(c: Classifier, input: ClassifyInput, ids: Uint8Array, w
     feather = input.ecotone ?? 0,
     // The x warp noise, kept per cell only when paint is feathered (it moves where the paint is read).
     n1s = feather && c.paint.length ? scratch(6, cells) : undefined;
-  // Warp noise on the 8-cell lattice covering this grid: lattice point (a, b) is global cell (8 (a0 + a), 8 (b0 + b)).
-  // The lattice spans both axes on their own: a point's grid (sample) need not start at the same lattice phase in x
-  // and z (a tile's always does).
-  const a0 = input.gx >> 3,
-    b0 = input.gz >> 3,
-    span = ((input.gx + n) >> 3) - a0 + 2,
-    rows = ((input.gz + depth) >> 3) - b0 + 2,
-    warpA = new Int32Array(span * rows),
-    warpB = new Int32Array(span * rows);
-  for (let b = 0; b < rows; b++)
-    for (let a = 0; a < span; a++) {
-      const lx = divFloor((a0 + a) * 8 * input.cell * ONE, WARP),
-        lz = divFloor((b0 + b) * 8 * input.cell * ONE, WARP);
-      warpA[b * span + a] = fbm(input.seed ^ 0x5eed, lx, lz, 2);
-      warpB[b * span + a] = fbm(input.seed ^ 0x7a1e, lz, lx, 2);
-    }
-  for (let j = 0; j < depth; j++) {
-    const gz = input.gz + j - b0 * 8,
-      fz = (gz & 7) << 13,
-      row = (gz >> 3) * span;
-    for (let i = 0; i < n; i++) {
-      const k = j * n + i,
-        gx = input.gx + i - a0 * 8,
-        fx = (gx & 7) << 13,
-        at = row + (gx >> 3),
-        // The warp is smooth (700 m): noise on a global 8-cell lattice, bilinear between lattice points.
-        topA = warpA[at] + Math.floor(((warpA[at + 1] - warpA[at]) * fx) / ONE),
-        bottomA = warpA[at + span] + Math.floor(((warpA[at + span + 1] - warpA[at + span]) * fx) / ONE),
-        topB = warpB[at] + Math.floor(((warpB[at + 1] - warpB[at]) * fx) / ONE),
-        bottomB = warpB[at + span] + Math.floor(((warpB[at + span + 1] - warpB[at + span]) * fx) / ONE),
-        n1 = topA + Math.floor(((bottomA - topA) * fz) / ONE) - 32768; // -0.5..0.5 in Q16
-      n2[k] = topB + Math.floor(((bottomB - topB) * fz) / ONE) - 32768;
-      if (n1s) n1s[k] = n1;
-      dT[k] = Math.floor((n1 * 160) / 32768); // +-1.6 K at the extremes, cK
-    }
-  }
+  warpPlanes(
+    warpLattice(input.seed, input.cell, input.gx, input.gz, n, depth),
+    input.gx,
+    input.gz,
+    n,
+    depth,
+    n2,
+    dT,
+    n1s,
+  );
   // The warped inputs, one plane per input.
   for (let s = 0; s < slots; s++) {
     const mode = modes[s],
