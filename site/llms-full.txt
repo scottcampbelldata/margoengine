@@ -6427,19 +6427,22 @@ is the SHA-256 of a tile's canonical bytes: the same options give the same diges
 tests lock several of them. `world.update({ climate, height })` recomputes and calls `onChange` listeners with the
 dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 
-| `BiomeWorld.create` option | Default | Meaning |
-| --- | --- | --- |
-| `seed` | 1 | u32 seed |
-| `size` | [4096, 4096] | world extent in metres, 256..65,536, multiples of `regionResolution` |
-| `origin` | `-size / 2` | minimum corner in metres |
-| `height` | `{ relief: {} }` | `{ samples, width, depth, unit? }` (Int32Array mm or Float32Array m, corners on the world's corners), `{ field: (x, z) => metres }` or `{ relief: ReliefOptions }` (loads `/relief`; `update` to a relief height needs it loaded, by a relief world or `import('@margoengine/biomes/relief')`) |
-| `climate` | see below | climate settings |
-| `tileSize` | 256 | 128, 256 or 512 m |
-| `resolution` | 1 | tile cell size: 0.5, 1, 2 or 4 m |
-| `regionResolution` | 16 | region cell size in metres (power of two, 4 x `resolution` up to `tileSize`) |
-| `ecotone` | 24 | metres, 0..128, over which a painted edge blends into its neighbour: paint and paint masks are read at the warped cell through a box that wide, so painted borders ramp and wander like the climate ones; 0 composes paint cell by cell (a one-cell step) |
-| `backend` | `'auto'` | `'auto'` or `'cpu'`; `'gpu'` is not available yet and throws `unsupported` |
-| `signal` | none | rejects `create` with its reason |
+`world.tilePart(x, z, [i0, j0, i1, j1])` makes only some cells of a tile (`i1` and `j1` exclusive), with the same bytes
+as those cells of the whole tile. Placement uses it to make only the edge of each neighbour it reads. A part is never
+cached and is made on the calling thread, also on a world with workers; when the world already holds the whole tile,
+it answers with that (`window` is then `[0, 0, cells, cells]`). The envelopes, `whittaker` and `holdridge` classify
+only the cells asked for. A `ZoneClassifier` of your own does too when it sets `perCell: true`; without it, `tilePart`
+makes the whole tile and answers with that, so a part always has the whole tile's bytes.
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+
+const world = await BiomeWorld.create({ tileSize: 512 });
+// The 64 m strip of tile (1, 0) along its edge with tile (0, 0): 64 x 512 cells at 1 m.
+const strip = await world.tilePart(1, 0, [0, 0, 64, 512]);
+console.log(strip.window, strip.layer('height')!.width); // [0, 0, 64, 512] 64
+world.dispose();
+```
 
 [README continues: https://margoengine.com/llms/packages/biomes.md]
 

@@ -692,6 +692,8 @@ export const entries = [
       'BiomePlacement update takes { exclusions?, conflicts? }',
       'BiomePlacement onChange takes a function',
       'BiomePlacement inspect takes a [minX, minZ, maxX, maxZ] rectangle in metres',
+      'BiomePlacement tile ahead is a list of [x, z] tile indices',
+      'BiomeWorld tilePart window is [i0, j0, i1, j1] in tile cells with 0 <= i0 < i1 <= cells and 0 <= j0 < j1 <= cells',
       'A pattern is { x, z, window: [minX, minZ, maxX, maxZ] } with x and z of equal length',
       'Statistic radii must be 0 or more',
       'pairCorrelation bandwidth must be above 0',
