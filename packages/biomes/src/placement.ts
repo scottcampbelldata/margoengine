@@ -910,31 +910,21 @@ class Run {
    */
   somewhere(b: number, x0: number, z0: number, x1: number, z1: number): boolean {
     const g = this.geometry,
-      s = g.tileShift,
-      c = g.cellShift,
-      t = g.tileTicks - 1,
-      tx0 = Math.max(0, x0) >> s,
-      tz0 = Math.max(0, z0) >> s,
-      tx1 = Math.min(g.worldX - 1, x1) >> s,
-      tz1 = Math.min(g.worldZ - 1, z1) >> s,
-      one = tx0 === tx1 && tz0 === tz1;
-    for (let tz = tz0; tz <= tz1; tz++)
-      for (let tx = tx0; tx <= tx1; tx++) {
-        const f = this.tileFields(tx, tz),
-          ox = tx << s,
-          oz = tz << s;
+      s = g.tileShift;
+    x0 = Math.max(0, x0);
+    z0 = Math.max(0, z0);
+    x1 = Math.min(g.worldX - 1, x1);
+    z1 = Math.min(g.worldZ - 1, z1);
+    for (let tz = z0 >> s; tz <= z1 >> s; tz++)
+      for (let tx = x0 >> s; tx <= x1 >> s; tx++) {
+        const f = this.tileFields(tx, tz);
         if (f.present[b]) return true;
-        if (
-          !f.whole &&
-          !(
-            one &&
-            Math.max(0, x0 - ox) >> c >= f.i0 &&
-            Math.max(0, z0 - oz) >> c >= f.j0 &&
-            Math.min(t, x1 - ox) >> c < f.i1 &&
-            Math.min(t, z1 - oz) >> c < f.j1
-          )
-        )
-          throw new Missing(tx, tz);
+        if (!f.whole) {
+          if (((x0 ^ x1) | (z0 ^ z1)) >> s) throw new Missing(tx, tz);
+          // Inside one tile: at() throws Missing unless both corners, and so the whole rectangle, are in the window.
+          this.at(x0, z0, this.look);
+          this.at(x1, z1, this.look);
+        }
       }
     return false;
   }
@@ -1305,21 +1295,14 @@ export class BiomePlacement implements Disposable {
       ),
     );
     const w = this.#world,
-      within = plan.within / ONE, // float division: spacing factor
-      across = plan.across / ONE, // float division: spacing factor
+      reach = (rounds: number) => placementReach(w.biomes, rounds, plan.within / ONE, plan.across / ONE), // float division: metres
       cell = w.resolution * TICK;
     let unit = cell;
     for (const st of plan.strata) if (st.species.length) unit = Math.max(unit, st.g);
-    this.#reach = placementReach(w.biomes, plan.rounds, within, across);
+    this.#reach = reach(plan.rounds);
     this.#band = Math.min(
       divFloor(w.tileSize * TICK, cell),
-      divFloor(
-        divFloor(
-          Math.ceil(placementReach(w.biomes, Math.min(plan.rounds, USUAL_ROUNDS), within, across) * TICK) + unit - 1,
-          unit,
-        ) * unit,
-        cell,
-      ),
+      divFloor(-divFloor(-Math.ceil(reach(Math.min(plan.rounds, USUAL_ROUNDS)) * TICK), unit) * unit, cell),
     );
     return plan;
   }
@@ -1450,27 +1433,26 @@ export class BiomePlacement implements Disposable {
    * whole and runs again, so the objects are the same whatever was made.
    */
   #place(x: number, z: number, signal?: AbortSignal): Promise<PlacedTile> {
-    const w = this.#world,
-      cells = divFloor(w.tileSize * TICK, w.resolution * TICK),
+    const c = this.#world.tileSize / this.#world.resolution, // float division: exact
       a = this.#band,
-      need: [number, number, Rect?][] = [[x, z]],
+      need: [number, number, Rect?][] = [],
+      /** Has this placement placed, or begun, a tile other than (x, z) within one tile of (nx, nz)? */
       besidePlaced = (nx: number, nz: number) => {
         for (let tz = nz - 1; tz <= nz + 1; tz++)
           for (let tx = nx - 1; tx <= nx + 1; tx++)
             if ((tx !== x || tz !== z) && this.#cache.has(tileKey(tx, tz))) return true;
         return false;
       },
-      block = a >= cells || besidePlaced(x, z);
+      bands = a < c && !besidePlaced(x, z);
     for (let dz = -1; dz <= 1; dz++)
       for (let dx = -1; dx <= 1; dx++)
-        if (dx || dz)
-          need.push([
-            x + dx,
-            z + dz,
-            block || besidePlaced(x + dx, z + dz)
-              ? undefined
-              : [dx < 0 ? cells - a : 0, dz < 0 ? cells - a : 0, dx > 0 ? a : cells, dz > 0 ? a : cells],
-          ]);
+        need.push([
+          x + dx,
+          z + dz,
+          bands && (dx || dz) && !besidePlaced(x + dx, z + dz)
+            ? [dx < 0 ? c - a : 0, dz < 0 ? c - a : 0, dx > 0 ? a : c, dz > 0 ? a : c]
+            : undefined,
+        ]);
     return this.#withFields(need, signal, (fields) => this.#run(x, z, fields));
   }
 
