@@ -40,7 +40,7 @@
 // Exit: 0 landed, nothing queued or held by RED; 4 refused; 5 main moved; 6 nothing could land; 7 the lock was lost;
 // 8 the record could not be written; 124 past the hard limit.
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   appendFileSync,
   existsSync,
@@ -80,6 +80,19 @@ const IDENTITY = {
 /** How many minutes one tier 1 step may take; the whole run's limit is --limit. */
 export const STEP_MINUTES = 30;
 export const DEFAULT_LIMIT_MINUTES = 170;
+/** Factory may reuse an exact, clean pre-rebase verification for disjoint package work. */
+const FACTORY_PROOF = /^([a-f0-9]{40}):([a-f0-9]{64})$/i;
+/** Build-phase proof names the command digest so it cannot be mistaken for the full verify proof. */
+const FACTORY_BUILD_PROOF = /^([a-f0-9]{40}):([a-f0-9]{64}):([a-f0-9]{64})$/i;
+/** One explicit bootstrap for this process patch, never a general verification fallback. */
+export const PROCESS_BUILD_COMMANDS = [
+  'node scripts/worktree-node-modules.mjs',
+  'npm run lint',
+  'node --test tests/integrate.test.js',
+];
+export const PROCESS_BUILD_COMMAND_DIGEST = createHash('sha256')
+  .update(PROCESS_BUILD_COMMANDS.join('\n'))
+  .digest('hex');
 /** How much of a failed step's log is read to name a branch (its end). */
 const LOG_BYTES = 4 << 20;
 /** How often the lock is checked while a step runs. */
@@ -274,6 +287,60 @@ export function syncMainCheckout(mainGit) {
   if (moved.status === 0) return 'the main checkout fast-forwarded to origin/main';
   const why = lines(moved.stderr).at(-1) ?? `exit ${moved.status}`;
   return `the main checkout is behind origin/main: it could not fast-forward (${why}); its own changes were not touched; update it by hand`;
+}
+
+/**
+ * Reuse Factory's exact committed verification only when a clean rebase preserved every file in the
+ * reviewed branch and upstream changed no package/build input. The combined tree is still not an
+ * independently verified release tip; the landing receipt says so explicitly.
+ */
+export function reusableFactoryProof({ git, base, batch, tip, proof }) {
+  const refused = (reason) => ({ ok: false, reason });
+  const scope = proof?.scope ?? 'release';
+  if (scope !== 'release' && scope !== 'build') return refused('Factory proof scope is unknown');
+  if (!/^[a-f0-9]{40}$/i.test(proof?.head ?? '') || !/^[a-f0-9]{64}$/i.test(proof?.fingerprint ?? ''))
+    return refused('Factory proof head or input fingerprint is invalid');
+  if (scope === 'build' && !/^[a-f0-9]{64}$/i.test(proof?.commandDigest ?? ''))
+    return refused('Factory build proof command digest is invalid');
+  if (batch.length !== 1) return refused('proof reuse requires one exact READY branch');
+  const [entry] = batch;
+  if (entry.sha?.toLowerCase() !== proof.head || !entry.from || !entry.rebased || entry.rebased !== tip)
+    return refused('the reviewed branch or rebased tip differs from the Factory proof');
+  const upstreamPaths = lines(must(git, 'diff', '--name-only', '--no-renames', entry.from, base));
+  const branchPaths = entry.paths || [];
+  const branchSet = new Set(branchPaths);
+  const overlap = upstreamPaths.filter((file) => branchSet.has(file));
+  if (overlap.length) return refused(`upstream changed reviewed paths: ${overlap.slice(0, 5).join(', ')}`);
+  // Main may advance in records, docs, or the integrator itself while a package branch is reviewed.
+  // Source, package dependencies, root checks and other tests invalidate this narrow proof reuse.
+  const unrelatedUpstream = upstreamPaths.filter(
+    (file) =>
+      !/^(?:docs\/api-surface\.md$|examples\/package-benchmarks\/results\/(?:basic-scene-network|entry-sizes)\.json$|scripts\/integrate\.mjs$|tests\/integrate\.test\.js$)/.test(
+        file,
+      ),
+  );
+  if (unrelatedUpstream.length)
+    return refused(`upstream changed build or test inputs: ${unrelatedUpstream.slice(0, 5).join(', ')}`);
+  const changedReviewed = branchPaths.length
+    ? lines(must(git, 'diff', '--name-only', '--no-renames', entry.sha, tip, '--', ...branchPaths))
+    : [];
+  if (changedReviewed.length)
+    return refused(`rebase changed reviewed file bytes: ${changedReviewed.slice(0, 5).join(', ')}`);
+  return {
+    ok: true,
+    status: scope === 'build' ? 'reused_factory_build_proof' : 'reused_factory_proof',
+    scope,
+    sourceHead: proof.head,
+    sourceFingerprint: proof.fingerprint,
+    ...(scope === 'build' && { commandDigest: proof.commandDigest }),
+    rebasedTip: tip,
+    branch: entry.branch,
+    reviewedPaths: branchPaths,
+    upstreamPaths,
+    combinedTreeVerified: false,
+    releaseGate:
+      scope === 'build' ? 'full-verification-and-combined-tree-pending' : 'combined-tree-verification-pending',
+  };
 }
 
 const isTestFile = (file) => /(^|\/)tests?\//.test(file) || /\.test\.[^/]*$/.test(file);
@@ -472,6 +539,8 @@ export async function integrate({
   holding = () => null,
   lockPollMs = LOCK_POLL_MS,
   only = null,
+  factoryProof = null,
+  buildCheck = null,
   notify = null,
   by = runner(),
 }) {
@@ -614,8 +683,10 @@ export async function integrate({
       if (meta.state === 'absent' && !tombstoneExists) continue;
       if (meta.state === 'restored' && !tombstoneExists) continue;
       if (meta.state === 'recorded' && !recorded.has(meta.id))
-        throw margoError('INTEGRATE_RECORD_FAILED',
-          `READY retirement ${meta.id} is missing from ${paths.ledger}; reconcile its journal before landing`);
+        throw margoError(
+          'INTEGRATE_RECORD_FAILED',
+          `READY retirement ${meta.id} is missing from ${paths.ledger}; reconcile its journal before landing`,
+        );
       if (meta.state === 'recorded' || recorded.has(meta.id)) {
         if (tombstoneExists) rmSync(meta.tombstone, { force: true });
         if (meta.state !== 'recorded')
@@ -697,6 +768,11 @@ export async function integrate({
     if (unlocked) return unlocked;
     recoverRetirements();
     let batch = readQueue(paths.dir);
+    if (buildCheck === 'process' && (batch.length !== 1 || !only))
+      return finish(
+        'refused',
+        'the process bootstrap needs one exact READY file and --only; no queue entry was changed',
+      );
     if (only) {
       const selected = batch.find((entry) => entry.branch === only.branch);
       if (!selected || selected.invalid || selected.sha?.toLowerCase() !== only.sha)
@@ -808,6 +884,15 @@ export async function integrate({
       known.push(entry);
     }
     batch = known;
+    if (
+      buildCheck === 'process' &&
+      (batch.length !== 1 ||
+        batch[0].paths.some((file) => !['scripts/integrate.mjs', 'tests/integrate.test.js'].includes(file)))
+    )
+      return finish(
+        'refused',
+        'the process bootstrap only accepts scripts/integrate.mjs and tests/integrate.test.js in one READY commit; no checks ran and every READY entry remains',
+      );
     record.batch = batch.map(({ branch, sha, fix, from, paths: files }) => ({
       branch,
       ready: sha,
@@ -837,7 +922,42 @@ export async function integrate({
       const steps = [];
       record.attempts.push({ attempt, tip, branches: batch.map((e) => e.branch), steps });
       save();
-      gate = await tierOne({ git, runStep, logDir, attempt, stepMinutes, log, steps, save, holding, lockPollMs });
+      let proofReuse = null;
+      if (factoryProof) {
+        proofReuse = reusableFactoryProof({ git, base, batch, tip, proof: factoryProof });
+        if (!proofReuse.ok) {
+          record.factoryProofReuse = {
+            status: 'refused',
+            reason: proofReuse.reason,
+            scope: factoryProof.scope ?? 'release',
+            sourceHead: factoryProof.head,
+            sourceFingerprint: factoryProof.fingerprint,
+            ...(factoryProof.commandDigest && { commandDigest: factoryProof.commandDigest }),
+            rebasedTip: tip,
+          };
+          save();
+          return finish(
+            'refused',
+            `Factory ${factoryProof.scope === 'build' ? 'build' : 'verification'} proof cannot be reused: ${proofReuse.reason}; no tests were run and every READY entry remains`,
+          );
+        }
+        record.factoryProofReuse = proofReuse;
+        save();
+      }
+      gate = await tierOne({
+        git,
+        runStep,
+        logDir,
+        attempt,
+        stepMinutes,
+        log,
+        steps,
+        save,
+        holding,
+        lockPollMs,
+        factoryProofReuse: proofReuse,
+        buildCheck,
+      });
       if (gate.ok) break;
       if (gate.lost)
         return finish('lost', `${gate.lost}; this run stops here and pushes nothing; every entry stays READY`);
@@ -879,7 +999,32 @@ export async function integrate({
       to: tip,
       branches: batch.map(({ branch, sha, fix, rebased }) => ({ branch, sha, landedAs: rebased, ...(fix && { fix }) })),
       commits: lines(must(git, 'log', '--format=%H %s', `${base}..${tip}`)),
-      tier1: gate.steps.map(({ step, ok, log: file, seconds }) => ({ step, ok, log: file, seconds })),
+      tier1: gate.steps.map(
+        ({ step, ok, log: file, seconds, status, sourceHead, sourceFingerprint, commandDigest }) => ({
+          step,
+          ok,
+          log: file ?? null,
+          seconds: seconds ?? 0,
+          ...(status && { status }),
+          ...(sourceHead && { sourceHead }),
+          ...(sourceFingerprint && { sourceFingerprint }),
+          ...(commandDigest && { commandDigest }),
+        }),
+      ),
+      ...(record.factoryProofReuse?.ok && { factoryProofReuse: record.factoryProofReuse }),
+      ...((record.factoryProofReuse?.scope === 'build' || buildCheck === 'process') && {
+        verificationScope: 'build',
+        releaseGate: 'full-verification-and-combined-tree-pending',
+        ...(buildCheck === 'process' && {
+          processBuildCheck: { source: 'integrator', tip, commandDigest: PROCESS_BUILD_COMMAND_DIGEST },
+        }),
+        releaseDebt: [
+          'Tier 0 full verify and affected GPU check',
+          'Tier 1 relink, plan, build, API check, generated records, full verify, example types and package tests',
+          'entry-sizes.json and basic-scene-network.json refresh',
+          'Tier 2 uncached full GPU and browser check on the landed main tip',
+        ],
+      }),
       attempts: attempt,
       sentBack: sentBack.map(({ branch, step, reason, log: file }) => ({ branch, step, reason, log: file })),
       by: { user: by.user, host: by.host, pid: by.pid },
@@ -1145,8 +1290,52 @@ function assemble({ git, base, batch, sendBack }) {
  * The lock is checked before each step and every `lockPollMs` while one runs: lost, the step's tree is killed. Each step
  * goes into `steps` as it runs and `save()` keeps the record current. Returns `{ ok, step?, log?, timedOut?, lost?, steps }`.
  */
-async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log, steps, save, holding, lockPollMs }) {
+async function tierOne({
+  git,
+  runStep,
+  logDir,
+  attempt,
+  stepMinutes,
+  log,
+  steps,
+  save,
+  holding,
+  lockPollMs,
+  factoryProofReuse = null,
+  buildCheck = null,
+}) {
   const limitMs = stepMinutes * 60_000;
+  if (factoryProofReuse?.scope === 'build') {
+    // Factory has a clean, successful, owner-selected focused proof at the exact READY commit. The disjoint-rebase
+    // guard above proved that the reviewed files are byte-identical on this tip. Rerunning the broad landing gate
+    // would repeat its build and run size benchmarks and a GPU browser through land-records on an unfinished package.
+    steps.push({
+      step: 'factory-build-proof',
+      ok: null,
+      log: null,
+      seconds: 0,
+      status: 'reused_factory_build_proof',
+      sourceHead: factoryProofReuse.sourceHead,
+      sourceFingerprint: factoryProofReuse.sourceFingerprint,
+      commandDigest: factoryProofReuse.commandDigest,
+    });
+    for (const name of [
+      'relink',
+      'plan',
+      'build',
+      'api:check',
+      'land-records',
+      'verify',
+      'check:examples-types',
+      'modern:test:packages',
+    ])
+      steps.push({ step: name, ok: null, log: null, seconds: 0, status: 'deferred_owner_build_phase' });
+    log(
+      `integrate: focused Factory build proof at ${factoryProofReuse.sourceHead} accepted after a disjoint rebase; no Tier 1 command was rerun; generated size/network records and full release verification remain pending`,
+    );
+    save();
+    return { ok: true, steps };
+  }
   const step = async (name, command, env = {}) => {
     const why = holding();
     if (why) return { ok: false, lost: why, steps };
@@ -1178,6 +1367,27 @@ async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log, steps,
       log(`integrate: ${name} hung past ${stepMinutes} min; its process tree was killed (log ${logFile})`);
     return result.ok ? null : { ok: false, step: name, log: logFile, timedOut: entry.timedOut, steps };
   };
+  if (buildCheck === 'process') {
+    for (const [index, command] of PROCESS_BUILD_COMMANDS.entries()) {
+      const failed = await step(['relink', 'lint', 'process-tests'][index], command);
+      if (failed) return failed;
+    }
+    for (const name of [
+      'plan',
+      'build',
+      'api:check',
+      'land-records',
+      'verify',
+      'check:examples-types',
+      'modern:test:packages',
+    ])
+      steps.push({ step: name, ok: null, log: null, seconds: 0, status: 'deferred_owner_build_phase' });
+    log(
+      `integrate: process bootstrap checked exact rebased tip with digest ${PROCESS_BUILD_COMMAND_DIGEST}; full release verification remains pending`,
+    );
+    save();
+    return { ok: true, steps };
+  }
   must(git, 'lfs', 'checkout');
   const failed =
     (await step('relink', 'node scripts/worktree-node-modules.mjs')) ??
@@ -1187,9 +1397,24 @@ async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log, steps,
     (await step('api:check', 'npm run api:check')) ??
     // One records commit, which also refreshes the llms files a README made stale; verify then reads all of it.
     (await step('land-records', 'node scripts/land-records.mjs --no-build')) ??
-    // The stale files check:merge plants before verify's build, which the package test then proves no pack contains.
-    (await step('verify', 'npm run verify', { MARGOENGINE_PLANT_STALE: '1' }));
+    // Factory already ran this exact committed branch; a reusable proof is recorded, never called a new pass.
+    (factoryProofReuse ? null : await step('verify', 'npm run verify', { MARGOENGINE_PLANT_STALE: '1' }));
   if (failed) return failed;
+  if (factoryProofReuse) {
+    steps.push({
+      step: 'verify',
+      ok: null,
+      log: null,
+      seconds: 0,
+      status: 'reused_factory_proof',
+      sourceHead: factoryProofReuse.sourceHead,
+      sourceFingerprint: factoryProofReuse.sourceFingerprint,
+    });
+    log(
+      `integrate: verify reused Factory proof at ${factoryProofReuse.sourceHead}; the rebased combined tip was not retested`,
+    );
+    save();
+  }
   const planLog = steps.find((entry) => entry.step === 'plan').log,
     plan = parsePlan(readFileSync(planLog, 'utf8'));
   for (const [name, env] of [
@@ -1202,6 +1427,18 @@ async function tierOne({ git, runStep, logDir, attempt, stepMinutes, log, steps,
       return { ok: false, step: 'plan', log: planLog, steps };
     }
     if (!plan[name]) continue;
+    if (factoryProofReuse) {
+      steps.push({
+        step: name,
+        ok: null,
+        log: null,
+        seconds: 0,
+        status: 'deferred_owner_build_phase',
+      });
+      log(`integrate: ${name} deferred by owner for the build phase; Factory did not run this check`);
+      save();
+      continue;
+    }
     const bad = await step(name, plan[name], env);
     if (bad) return bad;
   }
@@ -1330,6 +1567,30 @@ export function parseOnly(value) {
   return { branch: match[1], sha: match[2].toLowerCase() };
 }
 
+/** Parse mutually exclusive Factory proof modes before taking the landing lock. */
+export function parseFactoryProofFlags({ full = null, build = null, only = null } = {}) {
+  if (full !== null && build !== null)
+    throw margoError('INTEGRATE_FACTORY_PROOF_INVALID', 'Factory full and build proofs are mutually exclusive');
+  if (full === null && build === null) return null;
+  const match = full !== null ? FACTORY_PROOF.exec(full) : FACTORY_BUILD_PROOF.exec(build);
+  if (!match)
+    throw margoError(
+      'INTEGRATE_FACTORY_PROOF_INVALID',
+      full !== null
+        ? 'Factory full proof must be <full40sha>:<sha256-fingerprint>'
+        : 'Factory build proof must be <full40sha>:<sha256-fingerprint>:<sha256-command-digest>',
+    );
+  const proof = {
+    scope: build !== null ? 'build' : 'release',
+    head: match[1].toLowerCase(),
+    fingerprint: match[2].toLowerCase(),
+    ...(build !== null && { commandDigest: match[3].toLowerCase() }),
+  };
+  if (!only || only.sha !== proof.head)
+    throw margoError('INTEGRATE_FACTORY_PROOF_INVALID', 'Factory proof must name the exact --only READY commit');
+  return proof;
+}
+
 export const USAGE = `usage: node scripts/integrate.mjs [options]
 
 Lands one batch of the READY branches in private/queue/ to main: intake, rebase, tier 1 once, records, one push, never
@@ -1340,6 +1601,16 @@ Non-interactive: nothing is read from stdin, every answer is in the run record a
 Options:
   --worktree=<path>          use this detached worktree; without it, a fresh managed worktree is made for each run
   --only=<branch>@<sha>      land only this exact READY branch and full 40-character commit
+  --reuse-factory-proof=<sha>:<fingerprint>
+                             reuse successful clean Factory verification for the exact --only commit
+                             only when reviewed paths survive a disjoint rebase; records skipped tests
+                             honestly and leaves combined-tip/release verification pending
+  --reuse-factory-build-proof=<sha>:<fingerprint>:<command-digest>
+                             reuse an owner-selected clean focused build proof for the exact --only commit
+                             only after the same disjoint-rebase guard; no Tier 1 check or benchmark is rerun
+                             full verification and generated size/network records remain release debt
+  --build-check=process        one-time exact-tip process bootstrap for an integrator-only READY commit;
+                             runs relink, lint and integrator unit tests under the landing lock
   --limit=<min>              hard limit of the whole run, tree killed past it (default ${DEFAULT_LIMIT_MINUTES})
   --wait-max=<min>           how long to wait for another integrator (default 5)
   --notify=<command>         run after a landing with the landing's JSON file as its one argument (2 min limit)
@@ -1362,8 +1633,18 @@ async function main() {
     home = mainCheckout(root),
     worktree = resolve(flag(args, 'worktree', `${home}-wt-integrator-${randomUUID()}`)),
     only = parseOnly(flag(args, 'only', null)),
+    factoryProof = parseFactoryProofFlags({
+      full: flag(args, 'reuse-factory-proof', null),
+      build: flag(args, 'reuse-factory-build-proof', null),
+      only,
+    }),
+    buildCheck = flag(args, 'build-check', null),
     notifyCommand = flag(args, 'notify', null),
     managed = args.includes('--managed-worktree') || !args.some((arg) => arg.startsWith('--worktree='));
+  if (buildCheck !== null && buildCheck !== 'process')
+    throw margoError('INTEGRATE_BUILD_CHECK_INVALID', '--build-check accepts only process');
+  if (buildCheck && (factoryProof || !only))
+    throw margoError('INTEGRATE_BUILD_CHECK_INVALID', '--build-check=process requires --only and no Factory proof');
   if (!args.includes('--locked')) {
     // Under the landing lock, as every landing was: gpu-lock.mjs gives it the heartbeat, the limit and the tree kill, and
     // points the GPU work inside at the GPU lock.
@@ -1382,6 +1663,14 @@ async function main() {
         `--worktree=${worktree}`,
         ...(managed ? ['--managed-worktree'] : []),
         ...(only ? [`--only=${only.branch}@${only.sha}`] : []),
+        ...(factoryProof
+          ? [
+              factoryProof.scope === 'build'
+                ? `--reuse-factory-build-proof=${factoryProof.head}:${factoryProof.fingerprint}:${factoryProof.commandDigest}`
+                : `--reuse-factory-proof=${factoryProof.head}:${factoryProof.fingerprint}`,
+            ]
+          : []),
+        ...(buildCheck ? [`--build-check=${buildCheck}`] : []),
         ...(notifyCommand ? [`--notify=${notifyCommand}`] : []),
       ],
       { cwd: root, stdio: 'inherit', env: { ...process.env, MARGO_GPU_LOCK: join(home, 'test-results', 'land.lock') } },
@@ -1416,6 +1705,8 @@ async function main() {
     workspaces: loadWorkspaces(root),
     holding,
     only,
+    factoryProof,
+    buildCheck,
     notify,
   });
   if (managed) {

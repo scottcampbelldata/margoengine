@@ -28,6 +28,9 @@ import {
   lockWatch,
   messageProblem,
   missingFromLog,
+  parseFactoryProofFlags,
+  PROCESS_BUILD_COMMANDS,
+  PROCESS_BUILD_COMMAND_DIGEST,
   parsePlan,
   parseOnly,
   parseReady,
@@ -40,6 +43,7 @@ import {
   stoppedHits,
   suspects,
   syncMainCheckout,
+  reusableFactoryProof,
 } from '../scripts/integrate.mjs';
 
 const PLAN = `check:merge: AFFECTED GPU run
@@ -208,6 +212,53 @@ test('--only requires one flat branch and the exact full READY commit', () => {
     '',
   ])
     assert.throws(() => parseOnly(bad), /--only requires/);
+});
+
+test('Factory build proof is typed, exact-head and cannot be confused with the full verify proof', () => {
+  const sha = 'a'.repeat(40),
+    fingerprint = 'b'.repeat(64),
+    digest = 'c'.repeat(64),
+    only = { branch: 'biomes-j4', sha };
+  assert.deepEqual(parseFactoryProofFlags({ build: `${sha}:${fingerprint}:${digest}`, only }), {
+    scope: 'build',
+    head: sha,
+    fingerprint,
+    commandDigest: digest,
+  });
+  assert.deepEqual(parseFactoryProofFlags({ full: `${sha}:${fingerprint}`, only }), {
+    scope: 'release',
+    head: sha,
+    fingerprint,
+  });
+  for (const flags of [
+    { build: `${sha}:${fingerprint}`, only },
+    { build: `${sha}:${fingerprint}:invalid`, only },
+    { build: `${sha}:${fingerprint}:${digest}`, only: null },
+    { build: `${sha}:${fingerprint}:${digest}`, only: { branch: 'biomes-j4', sha: 'd'.repeat(40) } },
+    { build: `${sha}:${fingerprint}:${digest}`, full: `${sha}:${fingerprint}`, only },
+  ])
+    assert.throws(() => parseFactoryProofFlags(flags), /Factory .*proof/i);
+});
+
+test('Factory build proof rebase guard refuses changed reviewed bytes or build inputs', () => {
+  const sha = 'a'.repeat(40),
+    proof = { scope: 'build', head: sha, fingerprint: 'b'.repeat(64), commandDigest: 'c'.repeat(64) },
+    branch = 'packages/biomes/src/seasons.ts',
+    batch = [{ branch: 'biomes-j4', sha, from: 'old', rebased: 'tip', paths: [branch] }],
+    runGuard = (upstream, changed) =>
+      reusableFactoryProof({
+        git: (args) => ({ status: 0, stdout: args.includes('old') ? upstream : changed, stderr: '' }),
+        base: 'base',
+        batch,
+        tip: 'tip',
+        proof,
+      });
+  assert.equal(runGuard('', '').ok, true);
+  assert.equal(runGuard('scripts/integrate.mjs\ntests/integrate.test.js', '').ok, true);
+  assert.match(runGuard(branch, '').reason, /upstream changed reviewed paths/);
+  assert.match(runGuard('package.json', '').reason, /upstream changed build or test inputs/);
+  assert.match(runGuard('', branch).reason, /rebase changed reviewed file bytes/);
+  assert.match(runGuard('', '').releaseGate, /full-verification/);
 });
 
 test('a reused integrator worktree must belong to this clone, be detached, and be clean', () => {
@@ -1327,6 +1378,83 @@ test('a new package lands: verify reads the records, and api:check runs before t
     assert.equal(git.pushes().length, 1);
   } finally {
     done();
+  }
+});
+
+test('a scoped Factory build proof lands one unchanged READY commit without rerunning Tier 1 or size/GPU records', async () => {
+  const sha = 'a'.repeat(40),
+    { paths, done } = setup({ 'biomes-j4': `READY ${sha}` });
+  try {
+    const inner = fakeGit({ branches: { [sha]: ['packages/biomes/src/seasons.ts'] } }),
+      git = (args) =>
+        args[0] === 'diff' && args.includes('base')
+          ? { status: 0, stdout: '', stderr: '' }
+          : args[0] === 'diff' && args.includes('--')
+            ? { status: 0, stdout: '', stderr: '' }
+            : inner(args),
+      steps = fakeSteps(undefined, inner),
+      out = await run(paths, git, steps, {
+        only: { branch: 'biomes-j4', sha },
+        factoryProof: { scope: 'build', head: sha, fingerprint: 'b'.repeat(64), commandDigest: 'c'.repeat(64) },
+      });
+    assert.equal(out.result, 'landed');
+    assert.deepEqual(steps.commands(), [], 'no duplicate build, verify, benchmark, GPU or browser command');
+    assert.equal(inner.pushes().length, 1);
+    const landing = out.record.landing;
+    assert.equal(landing.verificationScope, 'build');
+    assert.equal(landing.releaseGate, 'full-verification-and-combined-tree-pending');
+    assert.equal(
+      landing.tier1.find((step) => step.step === 'factory-build-proof').status,
+      'reused_factory_build_proof',
+    );
+    for (const name of ['build', 'api:check', 'land-records', 'verify', 'modern:test:packages'])
+      assert.equal(landing.tier1.find((step) => step.step === name).status, 'deferred_owner_build_phase');
+  } finally {
+    done();
+  }
+});
+
+test('process bootstrap runs one fixed check on the rebased tip and records release debt without a Factory proof', async () => {
+  const sha = 'a'.repeat(40),
+    { paths, done } = setup({ process: `READY ${sha}` });
+  try {
+    const git = fakeGit({ branches: { [sha]: ['scripts/integrate.mjs', 'tests/integrate.test.js'] } }),
+      steps = fakeSteps(undefined, git),
+      out = await run(paths, git, steps, { only: { branch: 'process', sha }, buildCheck: 'process' });
+    assert.equal(out.result, 'landed');
+    assert.deepEqual(steps.commands(), PROCESS_BUILD_COMMANDS);
+    assert.equal(
+      steps.ran.every((step) => step.head === out.tip),
+      true,
+      'all checks run on the rebased tip',
+    );
+    assert.equal(git.pushes().length, 1);
+    assert.equal(out.record.landing.verificationScope, 'build');
+    assert.equal(out.record.landing.processBuildCheck.commandDigest, PROCESS_BUILD_COMMAND_DIGEST);
+    assert.equal(out.record.landing.factoryProofReuse, undefined);
+    assert.equal(out.record.landing.tier1.find((step) => step.step === 'verify').status, 'deferred_owner_build_phase');
+  } finally {
+    done();
+  }
+});
+
+test('process bootstrap refuses extra READY entries or non-process changes before running a check', async () => {
+  for (const [entries, changed] of [
+    [{ process: `READY ${'a'.repeat(40)}`, another: `READY ${'b'.repeat(40)}` }, ['scripts/integrate.mjs']],
+    [{ process: `READY ${'a'.repeat(40)}` }, ['packages/biomes/src/seasons.ts']],
+  ]) {
+    const { paths, done } = setup(entries);
+    try {
+      const sha = 'a'.repeat(40),
+        git = fakeGit({ branches: { [sha]: changed, ['b'.repeat(40)]: ['packages/biomes/src/seasons.ts'] } }),
+        steps = fakeSteps(undefined, git),
+        out = await run(paths, git, steps, { only: { branch: 'process', sha }, buildCheck: 'process' });
+      assert.equal(out.result, 'refused');
+      assert.deepEqual(steps.commands(), []);
+      assert.deepEqual(git.pushes(), []);
+    } finally {
+      done();
+    }
   }
 });
 
