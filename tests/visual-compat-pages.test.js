@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { allCases } from '../scripts/support/visual-compat-pages.js';
@@ -41,4 +41,18 @@ test('the compatibility check opens only demos that exist', () => {
 test('case ids are unique', () => {
   const ids = allCases.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+test('the sciviz points status line states its plot time, so the compatibility check paints it over', () => {
+  // The line changes run to run ("plotted in 12 ms"), which swung the layer difference between 0.20% and 0.02%.
+  const page = readFileSync(resolve(root, 'examples/sciviz-points.ts'), 'utf8');
+  assert.match(
+    page,
+    /plotted in \$\{[^}]*performance\.now\(\)[^}]*\} ms/,
+    'the page no longer states a time; drop this mask',
+  );
+  assert.match(readFileSync(resolve(root, 'examples/sciviz-points.html'), 'utf8'), /id="status"/);
+  const points = allCases.find((c) => c.id === 'sciviz-points');
+  assert.ok(points, 'sciviz-points is one of the compatibility cases');
+  assert.ok((points.demo.mask ?? []).includes('#status'), 'sciviz-points must mask #status');
 });
