@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/exporters.test.js",
+    "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build",
     "test:png:browser": "cd ../.. && node packages/exporters/tests/png-browser.mjs",
