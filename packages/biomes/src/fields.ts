@@ -5,6 +5,7 @@
 // Zevenbergen and Thorne 1987 (3x3 quadratic fit: general, profile and plan); topographic position index, Guisan,
 // Weiss and Weiss 1999; soil depth from soil production against transport, Heimsath et al. 1997 and Pelletier and
 // Rasmussen 2009 (depth from the log of convexity, deep in hollows, thin on steep ground); climate in climate.ts.
+import { typeError } from '../../shared/errors.js';
 import {
   type Climate,
   degreeDays,
@@ -16,6 +17,7 @@ import {
   treelineMargin,
 } from './climate.js';
 import { atan2, clampInt, divFloor, isqrt, ONE, qexp2, qlog2 } from './fixed.js';
+import type { RegionFields } from './gpu-region-fields.js';
 import type { Heights } from './height.js';
 import { LAYERS, type RasterLayer } from './layers.js';
 import type { Region } from './region.js';
@@ -71,6 +73,7 @@ function raster(
  * cell, the heights and the region fields, so a cell holds the same bytes whatever rectangle it is made in. With the
  * frame's scratch, the layers not asked for and the working arrays are reused; `temporary` reuses the returned layers
  * too (valid until the next call: the caller copies what it keeps).
+ * @param raw Internal raw upsampled region samples in regionFieldsRef layout; omitted uses CPU interpolation.
  */
 export function rectFields(
   frame: TileFrame,
@@ -80,7 +83,15 @@ export function rectFields(
   depth: number,
   names: readonly string[],
   temporary = false,
+  raw?: RegionFields,
 ): Map<string, RasterLayer> {
+  if (raw !== undefined)
+    for (const name of ['rain', 'continentality', 'exposure', 'water', 'fill'] as const)
+      if (!(raw?.[name] instanceof Int32Array) || raw[name].length !== width * depth)
+        throw typeError(
+          `Raw region ${name} must be an Int32Array of width * depth samples; supply the full plane`,
+          'biomes',
+        );
   const { climate, region, heights, cell, scratch } = frame,
     apron = Math.max(1, divFloor(TPI_RADIUS, cell)),
     side = width + 2 * apron,
@@ -220,11 +231,11 @@ export function rectFields(
       // Region fields at this cell.
       const at = iz * nx + colIndex[i],
         fx = colFrac[i],
-        rain = Math.max(0, lerp(region.rain, at, fx, fz)),
-        cont = clampInt(lerp(region.continentality, at, fx, fz), 0, ONE),
-        expo = clampInt(lerp(region.exposure, at, fx, fz), 0, 255),
-        dist = clampInt(lerp(region.water, at, fx, fz), 0, 65535),
-        fill = Math.max(0, lerp(region.fill, at, fx, fz));
+        rain = Math.max(0, raw ? raw.rain[k] : lerp(region.rain, at, fx, fz)),
+        cont = clampInt(raw ? raw.continentality[k] : lerp(region.continentality, at, fx, fz), 0, ONE),
+        expo = clampInt(raw ? raw.exposure[k] : lerp(region.exposure, at, fx, fz), 0, 255),
+        dist = clampInt(raw ? raw.water[k] : lerp(region.water, at, fx, fz), 0, 65535),
+        fill = Math.max(0, raw ? raw.fill[k] : lerp(region.fill, at, fx, fz));
       rainfall[k] = Math.min(65535, rain);
       exposure[k] = expo;
       water[k] = dist;
