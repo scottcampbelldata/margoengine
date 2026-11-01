@@ -361,6 +361,8 @@ RTX A6000 (Ampere), Windows 11, Edge 155 (headless, WebGPU, D3D12), 2026-10-20, 
 | Same, denoised (no glass, metal or glossy coat: no caustic chain) | 14.42-14.61 ms | 256 MiB |
 | Same, 4 samples per frame | 42.07-42.40 ms | 98 MiB |
 
+Committed run, 2026-10-31, same PC (RTX A6000, Edge 156, one exclusive run of all five GPU scripts and the timing case, every check passed; every number, the adapter and the commit are in `bench/results.json`, written by `bench/run.mjs`): material scene 19.92 ms and 95 MiB, denoised 28.05 ms and 348 MiB; dense 256^3 model 14.35 ms and 98 MiB, denoised 18.35 ms and 256 MiB, 4 samples per frame 61.54 ms and 98 MiB. These rows run slower than the table above, which was measured on 2026-10-20; compare rows from one run only.
+
 The same day, before the viewport denoiser kept history, the denoised material scene took 20.97-21.23 ms and 285 MiB;
 before the caustic chain was skipped for scenes without focusing materials, the denoised dense scene took 18.74-19.01
 ms and 351 MiB. The previous day's run gave 12.39, 19.92, 9.90 and 36.96 ms for the other rows: compare rows from one

@@ -1,0 +1,2272 @@
+{
+ "about": "Everything the path tracer GPU checks measured on one machine in one run (packages/voxel-pathtracer/bench/run.mjs). timings are seconds per case; results are the checks' own numbers; passed is false when a check failed.",
+ "passed": true,
+ "commit": "4b69ef853ed3ef25bb927acd6dd759701ab4d201",
+ "dirty": false,
+ "date": "2026-11-01T02:35:36.266Z",
+ "machine": {
+  "cpu": "AMD Ryzen 9 9950X 16-Core Processor            ",
+  "memoryGiB": 94,
+  "platform": "win32",
+  "node": "v26.12.0",
+  "gpu": {
+   "vendor": "nvidia",
+   "architecture": "ampere",
+   "device": "",
+   "description": "",
+   "fallback": false
+  },
+  "browser": "chromium 156.0.4314.50",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0",
+  "launchArgs": [],
+  "powerPreference": "high-performance"
+ },
+ "steps": {
+  "base": {
+   "script": "test:gpu",
+   "cases": [
+    "agx",
+    "groundprecision",
+    "denoiseholdout",
+    "compat",
+    "compile",
+    "preview",
+    "traversal",
+    "analytic",
+    "glasslight",
+    "sky",
+    "projections",
+    "arealight",
+    "dispersion",
+    "microfacet",
+    "energy",
+    "environment",
+    "textures",
+    "cutout",
+    "shapes",
+    "transparent",
+    "determinism",
+    "convergence"
+   ],
+   "passed": true,
+   "wallSeconds": 55,
+   "date": "2026-11-01T02:30:53.486Z",
+   "timings": {
+    "agx": {
+     "seconds": 10.7,
+     "longestGpuWait": 4
+    },
+    "groundprecision": {
+     "seconds": 11.6,
+     "longestGpuWait": 5
+    },
+    "denoiseholdout": {
+     "seconds": 3.3,
+     "longestGpuWait": 1
+    },
+    "compat": {
+     "seconds": 2.2,
+     "longestGpuWait": 1
+    },
+    "compile": {
+     "seconds": 0,
+     "longestGpuWait": 0
+    },
+    "preview": {
+     "seconds": 0,
+     "longestGpuWait": 0
+    },
+    "traversal": {
+     "seconds": 0.1,
+     "longestGpuWait": 0
+    },
+    "analytic": {
+     "seconds": 1.3,
+     "longestGpuWait": 1
+    },
+    "glasslight": {
+     "seconds": 4.8,
+     "longestGpuWait": 1
+    },
+    "sky": {
+     "seconds": 1.5,
+     "longestGpuWait": 1
+    },
+    "projections": {
+     "seconds": 0.3,
+     "longestGpuWait": 0
+    },
+    "arealight": {
+     "seconds": 0.5,
+     "longestGpuWait": 1
+    },
+    "dispersion": {
+     "seconds": 0.3,
+     "longestGpuWait": 0
+    },
+    "microfacet": {
+     "seconds": 1.2,
+     "longestGpuWait": 1
+    },
+    "energy": {
+     "seconds": 2.4,
+     "longestGpuWait": 1
+    },
+    "environment": {
+     "seconds": 0.1,
+     "longestGpuWait": 0
+    },
+    "textures": {
+     "seconds": 0,
+     "longestGpuWait": 0
+    },
+    "cutout": {
+     "seconds": 0,
+     "longestGpuWait": 0
+    },
+    "shapes": {
+     "seconds": 0.7,
+     "longestGpuWait": 1
+    },
+    "transparent": {
+     "seconds": 0.8,
+     "longestGpuWait": 1
+    },
+    "determinism": {
+     "seconds": 0,
+     "longestGpuWait": 0
+    },
+    "convergence": {
+     "seconds": 11.1,
+     "longestGpuWait": 1
+    }
+   },
+   "results": {
+    "agx": {
+     "capture": {
+      "max": 0,
+      "within1": 1,
+      "pixels": 633
+     },
+     "viewport": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633,
+      "samples": 1
+     },
+     "restored": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633,
+      "replaced": true
+     },
+     "combinedHDR": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633,
+      "converged": true,
+      "frames": 11
+     },
+     "tonemap": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633
+     },
+     "imagePost": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633
+     },
+     "tonemapEV-4": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633
+     },
+     "imagePostEV-4": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633
+     },
+     "tonemapEV0": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633
+     },
+     "imagePostEV0": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633
+     },
+     "tonemapEV3": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633
+     },
+     "imagePostEV3": {
+      "max": 1,
+      "within1": 1,
+      "pixels": 633
+     },
+     "alpha": [
+      118,
+      118,
+      118,
+      127
+     ],
+     "errors": []
+    },
+    "groundprecision": {
+     "raw": {
+      "worst": 4.768371580921027e-8,
+      "dim": 0,
+      "badGuide": 0
+     },
+     "denoised": {
+      "worst": 9.238719939075324e-8,
+      "dim": 0,
+      "badGuide": 0
+     },
+     "control": {
+      "dim": 4763
+     },
+     "sun": {
+      "dark": 11,
+      "lit": 72883
+     },
+     "errors": []
+    },
+    "denoiseholdout": {
+     "analyticDetail": {
+      "raw": {
+       "rmse": 9.685727763193319e-9,
+       "max": 1.1920928955078125e-7,
+       "channels": 36864
+      },
+      "denoised": {
+       "rmse": 1.8368216762722718e-8,
+       "max": 1.7881393432617188e-7,
+       "channels": 36864
+      }
+     },
+     "glassFireflyEdges": {
+      "4": {
+       "raw": [
+        {
+         "rmse": 0.01037502204063865,
+         "edgeRMSE": 0.016225419451821592,
+         "linearRMSE": 0.36807672816232445,
+         "bias": 0.0040132827102558255
+        },
+        {
+         "rmse": 0.013367410387137265,
+         "edgeRMSE": 0.01778121948099376,
+         "linearRMSE": 0.4032571670825501,
+         "bias": 0.0011016312514618575
+        },
+        {
+         "rmse": 0.008839829875042822,
+         "edgeRMSE": 0.013220977198602268,
+         "linearRMSE": 0.1963202264503913,
+         "bias": 0.0010947511141299708
+        }
+       ],
+       "denoised": [
+        {
+         "rmse": 0.008464405969347914,
+         "edgeRMSE": 0.012502419845112696,
+         "linearRMSE": 0.35894767591988963,
+         "bias": 0.003976990550098134
+        },
+        {
+         "rmse": 0.013268207876731438,
+         "edgeRMSE": 0.017582899216180857,
+         "linearRMSE": 0.40318269281595426,
+         "bias": 0.0010913046199417765
+        },
+        {
+         "rmse": 0.008809197484457786,
+         "edgeRMSE": 0.01319708936913213,
+         "linearRMSE": 0.1963164121061616,
+         "bias": 0.0010856243706352789
+        }
+       ]
+      },
+      "16": {
+       "raw": [
+        {
+         "rmse": 0.011098359005401072,
+         "edgeRMSE": 0.017752022742640556,
+         "linearRMSE": 0.1918921297089093,
+         "bias": 0.0017135318871175237
+        },
+        {
+         "rmse": 0.013502923798562062,
+         "edgeRMSE": 0.018083058596215684,
+         "linearRMSE": 0.3138635411988707,
+         "bias": 0.0004906116815209858
+        },
+        {
+         "rmse": 0.011230312607041177,
+         "edgeRMSE": 0.010734371954126559,
+         "linearRMSE": 0.12683234351545164,
+         "bias": 0.001506687728070639
+        }
+       ],
+       "denoised": [
+        {
+         "rmse": 0.010079292605797758,
+         "edgeRMSE": 0.015832098011688632,
+         "linearRMSE": 0.1908249202890227,
+         "bias": 0.0016532497714249097
+        },
+        {
+         "rmse": 0.013173474509701235,
+         "edgeRMSE": 0.017396705422750278,
+         "linearRMSE": 0.3138493633881857,
+         "bias": 0.00048030128463002103
+        },
+        {
+         "rmse": 0.005027115493332493,
+         "edgeRMSE": 0.004483581168161351,
+         "linearRMSE": 0.1178107101885349,
+         "bias": 0.0011464753486528762
+        }
+       ]
+      },
+      "64": {
+       "raw": [
+        {
+         "rmse": 0.014913368445494101,
+         "edgeRMSE": 0.020957270300133595,
+         "linearRMSE": 0.08746286815609594,
+         "bias": 0.0008274492692194712
+        },
+        {
+         "rmse": 0.007931056442424388,
+         "edgeRMSE": 0.008879471107740169,
+         "linearRMSE": 0.06548934112101983,
+         "bias": 0.00008702451274411076
+        },
+        {
+         "rmse": 0.01260004999892685,
+         "edgeRMSE": 0.013022345780133525,
+         "linearRMSE": 0.09297176573416271,
+         "bias": 0.0013126904705087906
+        }
+       ],
+       "denoised": [
+        {
+         "rmse": 0.01035929617662817,
+         "edgeRMSE": 0.015836847062353773,
+         "linearRMSE": 0.08513759535952131,
+         "bias": 0.0006398855706728617
+        },
+        {
+         "rmse": 0.005405615983318605,
+         "edgeRMSE": 0.0046013618807550435,
+         "linearRMSE": 0.06515076579096946,
+         "bias": 0.00005416926548044947
+        },
+        {
+         "rmse": 0.007563511375070941,
+         "edgeRMSE": 0.007637626937431393,
+         "linearRMSE": 0.09105740139175561,
+         "bias": 0.0011475353496755198
+        }
+       ]
+      },
+      "referenceNoise": 0.0011152576736218754,
+      "edgePixels": 5995
+     },
+     "errors": []
+    },
+    "compat": {
+     "rough metal compensation true": {
+      "pixels": 1459,
+      "mean": 0.9993152399435691,
+      "sd": 0.01871670621866528
+     },
+     "rough metal compensation false": {
+      "pixels": 1459,
+      "mean": 0.7077462748356924,
+      "sd": 0.03397406939853629
+     },
+     "metalColor 0.5": {
+      "pixels": 1459,
+      "mean": 0.5236314003233881,
+      "sd": 0.049266347701263515
+     },
+     "coat layered": {
+      "pixels": 1459,
+      "mean": 0.5425042302090473,
+      "sd": 0.047234753829530976
+     },
+     "coat additive": {
+      "pixels": 1459,
+      "mean": 0.585264522625699,
+      "sd": 0.09444028838000663
+     },
+     "untinted glass": {
+      "pixels": 1459,
+      "mean": 1,
+      "sd": 0
+     },
+     "voxelwise blend": {
+      "pixels": 1459,
+      "mean": 0.9973761994516792,
+      "sd": 0.0023526596061812345
+     },
+     "contact transmission false": {
+      "pixels": 1024,
+      "mean": 0.5010318756103516,
+      "sd": 0.01589033369143076
+     },
+     "contact transmission true": {
+      "pixels": 1024,
+      "mean": 0.2505769729614258,
+      "sd": 0.013714368508787258
+     },
+     "background": [
+      0.20000003278255463,
+      0.40000006556510925,
+      0.6000000238418579
+     ],
+     "grid": [
+      0.35772705078125,
+      0,
+      0.6422728300094604
+     ],
+     "edges": [
+      0.11753902662993572,
+      0,
+      0.8824609733700642
+     ],
+     "camera emission 0.5": {
+      "pixels": 1459,
+      "mean": 0.5,
+      "sd": 0
+     },
+     "diffuse cap 1": {
+      "pixels": 1024,
+      "mean": 0.49984967487398535,
+      "sd": 0.0016117249371510717
+     },
+     "diffuse cap 2": {
+      "pixels": 1024,
+      "mean": 0.49984967487398535,
+      "sd": 0.0016117249371510717
+     },
+     "diffuse cap 3": {
+      "pixels": 1024,
+      "mean": 0.6252410673187114,
+      "sd": 0.010551749253162972
+     },
+     "diffuse sunSpecular true": {
+      "pixels": 1024,
+      "mean": 0.49937622403376736,
+      "sd": 0.000007666035578856792
+     },
+     "rough metal sunSpecular true": {
+      "pixels": 1024,
+      "mean": 3.077074019354768,
+      "sd": 0.5369932681757271
+     },
+     "diffuse sunSpecular false": {
+      "pixels": 1024,
+      "mean": 0.49937621792196296,
+      "sd": 0.000007666435643668394
+     },
+     "rough metal sunSpecular false": {
+      "pixels": 1024,
+      "mean": 0,
+      "sd": 0
+     },
+     "floor under glass transparentShadows true": {
+      "pixels": 1024,
+      "mean": 0.4905324644932989,
+      "sd": 0.009355969080668429
+     },
+     "floor under glass transparentShadows false": {
+      "pixels": 1024,
+      "mean": 9.536701668366732e-7,
+      "sd": 0.000030502540602676306
+     },
+     "cloud sunInMedia true": {
+      "pixels": 1815,
+      "mean": 0.17755962743497,
+      "sd": 0.09046766144366793
+     },
+     "cloud sunInMedia false": {
+      "pixels": 1815,
+      "mean": 8.332272612923295e-12,
+      "sd": 1.4467954319517873e-10
+     },
+     "sunlit cloud sunInMedia false": {
+      "pixels": 1815,
+      "mean": 0.17755962743497,
+      "sd": 0.09046766144366793
+     },
+     "sunlit cloud scatter cap 1": {
+      "pixels": 1815,
+      "mean": 0.17755962743497,
+      "sd": 0.09046766144366793
+     },
+     "sunlit slab transparentShadows true": {
+      "pixels": 1024,
+      "mean": 0.352114319044631,
+      "sd": 0.011812036570890742
+     },
+     "sunlit slab transparentShadows false": {
+      "pixels": 1024,
+      "mean": 0.352114319044631,
+      "sd": 0.011812036570890742
+     },
+     "ground fade": {
+      "pixels": 64,
+      "mean": 0.8147826697677374,
+      "sd": 0.0018523637941369583
+     },
+     "ground fade start": {
+      "pixels": 64,
+      "mean": 0.5007894020527601,
+      "sd": 0.001478949986797804
+     },
+     "model fade true": {
+      "pixels": 64,
+      "mean": 0.8147826697677374,
+      "sd": 0.0018523637941369583
+     },
+     "model fade false": {
+      "pixels": 64,
+      "mean": 0.5,
+      "sd": 0
+     },
+     "fog floor": {
+      "pixels": 64,
+      "mean": 0.3477962831966579,
+      "sd": 0.00011649418436599973
+     },
+     "fog sky 0.5": {
+      "pixels": 64,
+      "mean": 0.5,
+      "sd": 0
+     },
+     "aces gamma byte": {
+      "byte": 175,
+      "green": 175
+     },
+     "errors": []
+    },
+    "compile": {
+     "status": "ready",
+     "stats": {
+      "samples": 1,
+      "frameMs": 0,
+      "gpuBytes": 13896272,
+      "converged": false,
+      "width": 320,
+      "height": 240,
+      "requestedWidth": 320,
+      "requestedHeight": 240,
+      "sceneRevision": 1,
+      "packedModels": 7,
+      "reusedModels": 0,
+      "renders": 0
+     },
+     "messages": [],
+     "errors": []
+    },
+    "preview": {
+     "litWhileCompiling": -1,
+     "readyAt": 34.400000005960464,
+     "errors": []
+    },
+    "traversal": {
+     "perspective": {
+      "pixels": 19200,
+      "hits": 10567,
+      "same": 19200,
+      "maxRelativeDepth": 0.0000025156712194595745,
+      "mismatch": []
+     },
+     "orthographic": {
+      "pixels": 19200,
+      "hits": 10496,
+      "same": 19200,
+      "maxRelativeDepth": 0.0000011706715476086922,
+      "mismatch": []
+     },
+     "errors": []
+    },
+    "analytic": {
+     "diffuse 0.5": {
+      "pixels": 1861,
+      "mean": 0.5,
+      "sd": 0
+     },
+     "diffuse 1": {
+      "pixels": 1861,
+      "mean": 1,
+      "sd": 0
+     },
+     "smooth metal 1": {
+      "pixels": 1861,
+      "mean": 1,
+      "sd": 0
+     },
+     "rough metal 1": {
+      "pixels": 1861,
+      "mean": 0.999893587613093,
+      "sd": 0.012297143918236325
+     },
+     "smooth plastic 1": {
+      "pixels": 1861,
+      "mean": 1,
+      "sd": 0
+     },
+     "rough plastic 1": {
+      "pixels": 1861,
+      "mean": 0.9757607974780624,
+      "sd": 0.04826898325681892
+     },
+     "clear glass": {
+      "pixels": 1861,
+      "mean": 1,
+      "sd": 0
+     },
+     "rough glass": {
+      "pixels": 1861,
+      "mean": 1.0022771813932252,
+      "sd": 0.010036467758728289
+     },
+     "white media": {
+      "pixels": 1861,
+      "mean": 0.9999485743551854,
+      "sd": 0.00031921111590151377
+     },
+     "white blend": {
+      "pixels": 1861,
+      "mean": 0.9992841522518119,
+      "sd": 0.004257039695071384
+     },
+     "diffuse 0.5 env map": {
+      "pixels": 1861,
+      "mean": 0.49984149967131597,
+      "sd": 0.0056328739837566465
+     },
+     "emission 3": {
+      "pixels": 1861,
+      "mean": 3,
+      "sd": 0
+     },
+     "beer-lambert exp(-1)": {
+      "pixels": 1024,
+      "mean": 0.3677978515625,
+      "sd": 0.030744517527672124
+     },
+     "emissive media sigma 0": {
+      "pixels": 1024,
+      "mean": 15.995986938476562,
+      "sd": 0,
+      "expected": 16
+     },
+     "emissive media sigma 0.125": {
+      "pixels": 1024,
+      "mean": 10.110542312264442,
+      "sd": 0.18402221757346401,
+      "expected": 10.113928941256923
+     },
+     "emissive media sigma 0.5": {
+      "pixels": 1024,
+      "mean": 3.9271761623676866,
+      "sd": 0.11914149666610556,
+      "expected": 3.926737444445063
+     },
+     "tinted glass slab": {
+      "pixels": 1024,
+      "mean": 0.33205027552321553,
+      "sd": 0.0048714639646179935
+     },
+     "sun 0": {
+      "pixels": 1024,
+      "mean": 0.5,
+      "sd": 0
+     },
+     "sun 0.2": {
+      "pixels": 1024,
+      "mean": 0.5000013833923731,
+      "sd": 0.00005544088964988007
+     },
+     "emissive ceiling 2/3": {
+      "pixels": 1024,
+      "mean": 0.6671089823357761,
+      "sd": 0.016201560640123173
+     },
+     "area light 1": {
+      "pixels": 1024,
+      "mean": 0.9999544298625551,
+      "sd": 0.0014096017589516768
+     },
+     "white subsurface": {
+      "pixels": 1861,
+      "mean": 0.9997691093498119,
+      "sd": 0.0006836237009468155
+     },
+     "media shadow": {
+      "pixels": 1024,
+      "mean": 0.18393971025943756,
+      "sd": 0
+     },
+     "env map plane": {
+      "pixels": 1024,
+      "mean": 0.45907342834186243,
+      "sd": 0.022105342584448837,
+      "expected": 0.45905699455543325
+     },
+     "errors": []
+    },
+    "glasslight": {
+     "slab shadow 0 deg": {
+      "pixels": 1024,
+      "mean": 0.4989205354650039,
+      "sd": 0.0025616172734785,
+      "expected": 0.5004331411660942,
+      "slabReflectance": 0.15544406006765027
+     },
+     "slab shadow 40 deg": {
+      "pixels": 1024,
+      "mean": 0.3800242355209775,
+      "sd": 0.07616177643167628,
+      "expected": 0.37897509309339544,
+      "slabReflectance": 0.15544406006765027
+     },
+     "slab shadow 40 deg point sun": {
+      "pixels": 1024,
+      "mean": 0.3779196246759966,
+      "sd": 0.006264408396691704,
+      "expected": 0.3781824416241227,
+      "slabReflectance": 0.15544406006765027
+     },
+     "floor under glass": {
+      "pixels": 576,
+      "mean": 0.2501095249576287,
+      "sd": 0.0026750146984573634,
+      "expected": 0.2523137510957858,
+      "internalReflectance": 0.5963452756692367
+     },
+     "mirror wall point sun": {
+      "pixels": 1024,
+      "mean": 0.6646636724472046,
+      "sd": 0,
+      "expected": 0.6646636959699408,
+      "reflectance": 0.9010320766830237
+     },
+     "mirror wall": {
+      "pixels": 1024,
+      "mean": 0.664664366224315,
+      "sd": 0.00013194676340043087,
+      "expected": 0.6646636959699408,
+      "reflectance": 0.9010320766830237
+     },
+     "glass cube ior 1.5: light vs path sampling": {
+      "pixels": 336,
+      "mean": 0.24005937806907154,
+      "sd": 0.052300219189012814,
+      "expected": 0.24079475409927822
+     },
+     "glass cube ior 1.33: light vs path sampling": {
+      "pixels": 503,
+      "mean": 0.12777481810236072,
+      "sd": 0.019800732390069305,
+      "expected": 0.12828292576207317
+     },
+     "errors": []
+    },
+    "sky": {
+     "T 3 sun 40 deg zenith": {
+      "luminance": 0.6525494099804898,
+      "expected": 0.6525041112282448,
+      "x": 0.24441573053740182,
+      "y": 0.2505255302495793,
+      "xz": 0.2444118911053031,
+      "yz": 0.250520792709004
+     },
+     "T 3 sun 40 deg, elevation 30 azimuth 0": {
+      "ratio": 3.7567271177136448,
+      "expected": 3.7572047078134383
+     },
+     "T 3 sun 40 deg, elevation 30 azimuth 90": {
+      "ratio": 1.0726341652758027,
+      "expected": 1.0726262592209228
+     },
+     "T 3 sun 40 deg, elevation 30 azimuth 180": {
+      "ratio": 0.868453185602529,
+      "expected": 0.8684474811358386
+     },
+     "T 3 sun 40 deg, elevation 60 azimuth 45": {
+      "ratio": 1.5003982675276446,
+      "expected": 1.5003969299912103
+     },
+     "T 3 sun 40 deg, elevation 10 azimuth 120": {
+      "ratio": 1.150469986146736,
+      "expected": 1.150573646652448
+     },
+     "T 3 sun 40 deg floor": {
+      "luminance": 0.4384230357369178,
+      "expected": 0.43857134660476305
+     },
+     "T 6 sun 25 deg zenith": {
+      "luminance": 0.8045779707903974,
+      "expected": 0.8045333602358582,
+      "x": 0.2681244669258421,
+      "y": 0.2854272990606524,
+      "xz": 0.268121097809272,
+      "yz": 0.2854221342119575
+     },
+     "T 6 sun 25 deg, elevation 30 azimuth 0": {
+      "ratio": 3.512270175223584,
+      "expected": 3.5130460600575737
+     },
+     "T 6 sun 25 deg, elevation 30 azimuth 90": {
+      "ratio": 0.9251064490450919,
+      "expected": 0.9251098803431016
+     },
+     "T 6 sun 25 deg, elevation 30 azimuth 180": {
+      "ratio": 0.7052410386636906,
+      "expected": 0.7052481914578105
+     },
+     "T 6 sun 25 deg, elevation 60 azimuth 45": {
+      "ratio": 1.3329631059009448,
+      "expected": 1.3329609127325914
+     },
+     "T 6 sun 25 deg, elevation 10 azimuth 120": {
+      "ratio": 0.7502011618416962,
+      "expected": 0.7502049825801652
+     },
+     "T 6 sun 25 deg floor": {
+      "luminance": 0.47004348784582695,
+      "expected": 0.4701852466523425
+     },
+     "errors": []
+    },
+    "projections": {
+     "panorama az 0 el 0": {
+      "measured": [
+       256.0633802816901,
+       128.1056338028169
+      ],
+      "expected": [
+       256,
+       128
+      ],
+      "error": 0.12318912453896792
+     },
+     "panorama az 90 el 30": {
+      "measured": [
+       384.03846153846155,
+       85.29807692307692
+      ],
+      "expected": [
+       384,
+       85.33333333333334
+      ],
+      "error": 0.052175707038796176
+     },
+     "panorama az -135 el -20": {
+      "measured": [
+       64.02542372881356,
+       156.41525423728814
+      ],
+      "expected": [
+       64,
+       156.44444444444446
+      ],
+      "error": 0.03870961354256129
+     },
+     "panorama az 170 el 60": {
+      "measured": [
+       497.7828282828283,
+       42.74242424242424
+      ],
+      "expected": [
+       497.77777777777777,
+       42.66666666666667
+      ],
+      "error": 0.07592573928470767
+     },
+     "panorama az 45 el -70": {
+      "measured": [
+       319.9751773049645,
+       227.5709219858156
+      ],
+      "expected": [
+       320,
+       227.55555555555554
+      ],
+      "error": 0.029194063913093607
+     },
+     "panorama by height az 0 el 0": {
+      "measured": [
+       192.0737704918033,
+       127.95901639344262
+      ],
+      "expected": [
+       192,
+       128
+      ],
+      "error": 0.08439041099170379
+     },
+     "panorama by height az 90 el 30": {
+      "measured": [
+       320.0238095238095,
+       85.3
+      ],
+      "expected": [
+       320,
+       85.33333333333334
+      ],
+      "error": 0.04096345365259081
+     },
+     "panorama by height az -100 el -20": {
+      "measured": [
+       49.82631578947368,
+       156.4473684210526
+      ],
+      "expected": [
+       49.77777777777777,
+       156.44444444444446
+      ],
+      "error": 0.04862600352277922
+     },
+     "fisheye equidistant 180 theta 0 at 0": {
+      "measured": [
+       127.98571428571428,
+       127.98571428571428
+      ],
+      "expected": [
+       128,
+       128
+      ],
+      "error": 0.02020305089105168
+     },
+     "fisheye equidistant 180 theta 30 at 45": {
+      "measured": [
+       158.2155172413793,
+       97.88793103448276
+      ],
+      "expected": [
+       158.16988933062603,
+       97.83011066937398
+      ],
+      "error": 0.0736552839993237
+     },
+     "fisheye equidistant 180 theta 60 at 200": {
+      "measured": [
+       47.80769230769231,
+       157.13247863247864
+      ],
+      "expected": [
+       47.81289635960249,
+       157.18571889712373
+      ],
+      "error": 0.05349399906310906
+     },
+     "fisheye equidistant 180 theta 85 at 300": {
+      "measured": [
+       188.42198581560282,
+       232.67730496453902
+      ],
+      "expected": [
+       188.44444444444446,
+       232.69284881305214
+      ],
+      "error": 0.027313023194897704
+     },
+     "fisheye equisolid 200 theta 30 at 45": {
+      "measured": [
+       158.63,
+       97.38
+      ],
+      "expected": [
+       158.5799827315838,
+       97.42001726841622
+      ],
+      "error": 0.0640555142927797
+     },
+     "fisheye equisolid 200 theta 60 at 200": {
+      "measured": [
+       49.47435897435897,
+       156.508547008547
+      ],
+      "expected": [
+       49.49237779803664,
+       156.57443764453112
+      ],
+      "error": 0.06830998402223934
+     },
+     "fisheye equisolid 200 theta 95 at 120": {
+      "measured": [
+       66.39583333333333,
+       21.333333333333332
+      ],
+      "expected": [
+       66.40337857718879,
+       21.311522121105384
+      ],
+      "error": 0.023079421216550898
+     },
+     "fisheye stereographic 90 theta 0 at 0": {
+      "measured": [
+       192.00413223140495,
+       127.99586776859505
+      ],
+      "expected": [
+       192,
+       128
+      ],
+      "error": 0.005843857695747623
+     },
+     "fisheye stereographic 90 theta 20 at 45": {
+      "measured": [
+       230.54891304347825,
+       89.46467391304348
+      ],
+      "expected": [
+       230.52915001261698,
+       89.47084998738302
+      ],
+      "error": 0.020705585793958717
+     },
+     "fisheye stereographic 90 theta 45 at 200": {
+      "measured": [
+       71.71361058601134,
+       171.75330812854443
+      ],
+      "expected": [
+       71.71934453940372,
+       171.7785783456856
+      ],
+      "error": 0.02591258566540853
+     },
+     "fisheye stereographic 90 theta 60 at 170": {
+      "measured": [
+       16.2890625,
+       97.0046875
+      ],
+      "expected": [
+       16.29808838307673,
+       97.01901241988236
+      ],
+      "error": 0.01693132880050242
+     },
+     "distortion at 0, 0": {
+      "measured": [
+       160.0151515151515,
+       120.04312354312354
+      ],
+      "expected": [
+       160,
+       120
+      ],
+      "error": 0.045707859093532005
+     },
+     "distortion at 0.5, 0.3": {
+      "measured": [
+       217.16666666666666,
+       85.18376068376068
+      ],
+      "expected": [
+       217.1428,
+       85.18392
+      ],
+      "error": 0.0238671983995131
+     },
+     "distortion at -0.8, 0.6": {
+      "measured": [
+       71.0819774718398,
+       52.56883604505632
+      ],
+      "expected": [
+       71.07999999999998,
+       52.55999999999999
+      ],
+      "error": 0.009054616894980168
+     },
+     "distortion at 1.1, -0.7": {
+      "measured": [
+       273.12792877225866,
+       190.58528584817245
+      ],
+      "expected": [
+       273.09400000000005,
+       190.57799999999997
+      ],
+      "error": 0.03470223581512584
+     },
+     "distortion at -1.2, -0.8": {
+      "measured": [
+       28.96177750155376,
+       204.0052827843381
+      ],
+      "expected": [
+       29.105920000000026,
+       203.93472000000003
+      ],
+      "error": 0.16048727797515175
+     },
+     "traversal panorama": {
+      "pixels": 12800,
+      "hits": 553,
+      "same": 12800,
+      "maxRelativeDepth": 0.00000324916426025542,
+      "mismatch": []
+     },
+     "traversal fisheye": {
+      "pixels": 16384,
+      "hits": 1436,
+      "same": 16384,
+      "maxRelativeDepth": 8.446023653818356e-7,
+      "mismatch": []
+     },
+     "traversal distorted": {
+      "pixels": 19200,
+      "hits": 9337,
+      "same": 19200,
+      "maxRelativeDepth": 0.000003665082178569341,
+      "mismatch": []
+     },
+     "errors": []
+    },
+    "arealight": {
+     "shadow area": {
+      "area": 16,
+      "floorPixels": 15872
+     },
+     "shadow area, opaque false": {
+      "area": 0,
+      "floorPixels": 16384
+     },
+     "front": {
+      "radiance": 3
+     },
+     "back": {
+      "radiance": 0
+     },
+     "back, opaque false": {
+      "radiance": 0.25
+     },
+     "occluded ceiling": {
+      "mean": 0.37624185299500823,
+      "pixels": 64,
+      "expected": 0.3774336512968012
+     },
+     "occluded ceiling, opaque false": {
+      "mean": 0.9313541417941451,
+      "pixels": 64,
+      "expected": 0.9315600752763731
+     },
+     "errors": []
+    },
+    "dispersion": {
+     "calibration": {
+      "line": 176,
+      "pixelsPerUnit": 32
+     },
+     "abbe 0 550 nm": {
+      "measured": 2.7533183047159557,
+      "expected": 2.751560016726065,
+      "n": 1.5
+     },
+     "abbe 20 450 nm": {
+      "measured": 2.8350596560001335,
+      "expected": 2.833271966497776,
+      "n": 1.5267225626753755
+     },
+     "abbe 20 550 nm": {
+      "measured": 2.7699866246626628,
+      "expected": 2.7682370400094807,
+      "n": 1.5053592841528889
+     },
+     "abbe 20 650 nm": {
+      "measured": 2.731485136699497,
+      "expected": 2.7297805937832353,
+      "n": 1.4930722387541568
+     },
+     "spectrum": {
+      "red": 2.734232511141961,
+      "green": 2.7724084661102646,
+      "blue": 2.8449803089606824
+     },
+     "furnace": {
+      "mean": [
+       1.002541785051847,
+       0.9992676046444228,
+       0.9968058651073974
+      ],
+      "pixels": 1861
+     },
+     "errors": []
+    },
+    "microfacet": {
+     "plastic r0.4 20 deg": {
+      "measured": 0.9987254854705598,
+      "sd": 0.0006861317907616227,
+      "pixels": 576,
+      "integrated": 0.9987056853102884
+     },
+     "plastic r0.4 60 deg": {
+      "measured": 0.9948997594830062,
+      "sd": 0.0017441462758561203,
+      "pixels": 576,
+      "integrated": 0.9948331220992548
+     },
+     "plastic r0.4 80 deg": {
+      "measured": 0.7849121550098062,
+      "sd": 0.004522968657695976,
+      "pixels": 576,
+      "integrated": 0.784921614374308
+     },
+     "plastic r0.8 20 deg": {
+      "measured": 0.9825952783640888,
+      "sd": 0.0024079027985554422,
+      "pixels": 576,
+      "integrated": 0.9825070281745113
+     },
+     "plastic r0.8 60 deg": {
+      "measured": 0.9614719720557332,
+      "sd": 0.002608227261482458,
+      "pixels": 576,
+      "integrated": 0.9614465769424024
+     },
+     "plastic r0.8 80 deg": {
+      "measured": 0.6514547144373258,
+      "sd": 0.0037439648032737208,
+      "pixels": 576,
+      "integrated": 0.6515215710472875
+     },
+     "errors": []
+    },
+    "energy": {
+     "metal r0.2 20 deg": {
+      "rgb": [
+       1.000921672520538,
+       1.000921672520538,
+       1.000921672520538
+      ],
+      "pixels": 576
+     },
+     "glass r0.2 20 deg": {
+      "rgb": [
+       1.000706005634533,
+       1.000706005634533,
+       1.000706005634533
+      ],
+      "pixels": 576
+     },
+     "metal r0.2 60 deg": {
+      "rgb": [
+       1.0016128150746226,
+       1.0016128150746226,
+       1.0016128150746226
+      ],
+      "pixels": 576
+     },
+     "glass r0.2 60 deg": {
+      "rgb": [
+       1.0012215503181021,
+       1.0012215503181021,
+       1.0012215503181021
+      ],
+      "pixels": 576
+     },
+     "metal r0.2 80 deg": {
+      "rgb": [
+       1.0079221106651757,
+       1.0079221106651757,
+       1.0079221106651757
+      ],
+      "pixels": 576
+     },
+     "glass r0.2 80 deg": {
+      "rgb": [
+       1.0032688337895606,
+       1.0032688337895606,
+       1.0032688337895606
+      ],
+      "pixels": 576
+     },
+     "metal r0.5 20 deg": {
+      "rgb": [
+       1.0002662499124806,
+       1.0002662499124806,
+       1.0002662499124806
+      ],
+      "pixels": 576
+     },
+     "glass r0.5 20 deg": {
+      "rgb": [
+       1.0028003436616726,
+       1.0028003436616726,
+       1.0028003436616726
+      ],
+      "pixels": 576
+     },
+     "metal r0.5 60 deg": {
+      "rgb": [
+       0.9996743518859148,
+       0.9996743518859148,
+       0.9996743518859148
+      ],
+      "pixels": 576
+     },
+     "glass r0.5 60 deg": {
+      "rgb": [
+       1.001916692385243,
+       1.001916692385243,
+       1.001916692385243
+      ],
+      "pixels": 576
+     },
+     "metal r0.5 80 deg": {
+      "rgb": [
+       0.9992801058623526,
+       0.9992801058623526,
+       0.9992801058623526
+      ],
+      "pixels": 576
+     },
+     "glass r0.5 80 deg": {
+      "rgb": [
+       1.0014476235955954,
+       1.0014476235955954,
+       1.0014476235955954
+      ],
+      "pixels": 576
+     },
+     "metal r0.8 20 deg": {
+      "rgb": [
+       0.9986882732353277,
+       0.9986882732353277,
+       0.9986882732353277
+      ],
+      "pixels": 576
+     },
+     "glass r0.8 20 deg": {
+      "rgb": [
+       0.9984592393868499,
+       0.9984592393868499,
+       0.9984592393868499
+      ],
+      "pixels": 576
+     },
+     "metal r0.8 60 deg": {
+      "rgb": [
+       0.9989518024441268,
+       0.9989518024441268,
+       0.9989518024441268
+      ],
+      "pixels": 576
+     },
+     "glass r0.8 60 deg": {
+      "rgb": [
+       0.9979027623517646,
+       0.9979027623517646,
+       0.9979027623517646
+      ],
+      "pixels": 576
+     },
+     "metal r0.8 80 deg": {
+      "rgb": [
+       0.9991259302736984,
+       0.9991259302736984,
+       0.9991259302736984
+      ],
+      "pixels": 576
+     },
+     "glass r0.8 80 deg": {
+      "rgb": [
+       0.9972996750018663,
+       0.9972996750018663,
+       0.9972996750018663
+      ],
+      "pixels": 576
+     },
+     "metal r1 20 deg": {
+      "rgb": [
+       0.999951382064157,
+       0.999951382064157,
+       0.999951382064157
+      ],
+      "pixels": 576
+     },
+     "glass r1 20 deg": {
+      "rgb": [
+       0.9976889432097474,
+       0.9976889432097474,
+       0.9976889432097474
+      ],
+      "pixels": 576
+     },
+     "metal r1 60 deg": {
+      "rgb": [
+       1.0000408502916496,
+       1.0000408502916496,
+       1.0000408502916496
+      ],
+      "pixels": 576
+     },
+     "glass r1 60 deg": {
+      "rgb": [
+       0.9979451651581459,
+       0.9979451651581459,
+       0.9979451651581459
+      ],
+      "pixels": 576
+     },
+     "metal r1 80 deg": {
+      "rgb": [
+       0.999334905607005,
+       0.999334905607005,
+       0.999334905607005
+      ],
+      "pixels": 576
+     },
+     "glass r1 80 deg": {
+      "rgb": [
+       0.9931515218276117,
+       0.9931515218276117,
+       0.9931515218276117
+      ],
+      "pixels": 576
+     },
+     "gold r0.5 60 deg": {
+      "rgb": [
+       0.9996743518859148,
+       0.728594561210937,
+       0.2873032254477342
+      ],
+      "pixels": 576,
+      "expected": [
+       1,
+       0.7288435603458853,
+       0.2873875926635796
+      ],
+      "singleScattering": [
+       0.8572655744177089,
+       0.6485360718030337,
+       0.27282296709658815
+      ]
+     },
+     "gold r0.8 20 deg": {
+      "rgb": [
+       0.9986882732353277,
+       0.6397650330844853,
+       0.20157766298183966
+      ],
+      "pixels": 576,
+      "expected": [
+       1,
+       0.6406321841873267,
+       0.20181533882348612
+      ],
+      "singleScattering": [
+       0.5584780355137171,
+       0.41890246648800245,
+       0.16766644224172134
+      ]
+     },
+     "gold r1 80 deg": {
+      "rgb": [
+       0.999334905607005,
+       0.6482600033697155,
+       0.23044160929405028
+      ],
+      "pixels": 576,
+      "expected": [
+       1,
+       0.6485049119386551,
+       0.23049434627060958
+      ],
+      "singleScattering": [
+       0.6681905526424367,
+       0.5051609264989843,
+       0.21170759944011472
+      ]
+     },
+     "errors": [],
+     "worst": 0.007922110665175675
+    },
+    "environment": {
+     "-z": [
+      0,
+      0,
+      1
+     ],
+     "+x": [
+      1,
+      1,
+      0
+     ],
+     "-x": [
+      0,
+      1,
+      0
+     ],
+     "+z": [
+      1,
+      0,
+      0
+     ],
+     "errors": []
+    },
+    "textures": {
+     "hits": 2574,
+     "same": 2574,
+     "faces": [
+      0,
+      2,
+      4
+     ],
+     "bad": [],
+     "errors": []
+    },
+    "cutout": {
+     "wall": {
+      "checked": 4096,
+      "right": 4096,
+      "bad": []
+     },
+     "shadow": {
+      "lit": 0.47746580138078165,
+      "dark": 0.000001186990783203023,
+      "expected": 0.477464829275686,
+      "pixels": 4608
+     },
+     "errors": []
+    },
+    "shapes": {
+     "traversal": {
+      "pixels": 19200,
+      "hits": 7344,
+      "same": 19200,
+      "maxRelativeDepth": 0.000018198266624127942,
+      "mismatch": []
+     },
+     "cutout": {
+      "lit": 0.47746566073813784,
+      "dark": 0.0000010506916788312337,
+      "expected": 0.477464829275686,
+      "pixels": 4608
+     },
+     "emissive lower slabs 2/3": {
+      "pixels": 1024,
+      "mean": 0.6671204859158024,
+      "sd": 0.016180345306823427
+     },
+     "emissive upper slabs 2/3": {
+      "pixels": 1024,
+      "mean": 0.6671277206623927,
+      "sd": 0.01617706794512038
+     },
+     "emissive whole slabs 2/3": {
+      "pixels": 1024,
+      "mean": 0.6671089823357761,
+      "sd": 0.016201560640123173
+     },
+     "errors": []
+    },
+    "transparent": {
+     "centre": {
+      "alpha": 1,
+      "color": [
+       0.7370401620864868,
+       0.510650098323822,
+       0.39639008045196533
+      ],
+      "opaque": [
+       0.7370401620864868,
+       0.510650098323822,
+       0.39639008045196533
+      ]
+     },
+     "corner": {
+      "alpha": 0,
+      "color": [
+       0,
+       0,
+       0
+      ],
+      "opaque": [
+       0.6000000238418579,
+       0.6999998688697815,
+       1
+      ]
+     },
+     "partial": 68,
+     "denoised": {
+      "centre": 1,
+      "corner": 0,
+      "cornerColor": [
+       0,
+       0,
+       0
+      ]
+     },
+     "errors": []
+    },
+    "determinism": {
+     "values": 18432,
+     "identical": 18432,
+     "differentWithOtherSeed": 16482,
+     "errors": []
+    },
+    "convergence": {
+     "perspective": {
+      "16": {
+       "rmse": 0.021586569292630923,
+       "mae": 0.019537511766478596
+      },
+      "64": {
+       "rmse": 0.01140392862786728,
+       "mae": 0.010089727512999325
+      },
+      "256": {
+       "rmse": 0.0057461374328585625,
+       "mae": 0.005187584700434758
+      },
+      "1024": {
+       "rmse": 0.0030138673325614987,
+       "mae": 0.0027862231628917643
+      }
+     },
+     "orthographic": {
+      "16": {
+       "rmse": 0.020646104022675138,
+       "mae": 0.01686172759347298
+      },
+      "64": {
+       "rmse": 0.010456694947527236,
+       "mae": 0.008408861499890175
+      },
+      "256": {
+       "rmse": 0.005588755872025652,
+       "mae": 0.004574978675509764
+      },
+      "1024": {
+       "rmse": 0.0028229255632443275,
+       "mae": 0.002273385948367437
+      }
+     },
+     "glossy perspective": {
+      "16": {
+       "rmse": 0.03387184593612933,
+       "mae": 0.027507002992843504
+      },
+      "64": {
+       "rmse": 0.024249285207653078,
+       "mae": 0.015643354320167325
+      },
+      "256": {
+       "rmse": 0.018167697200862924,
+       "mae": 0.009363787966274632
+      },
+      "1024": {
+       "rmse": 0.011135743758810336,
+       "mae": 0.005430298861123806
+      }
+     },
+     "errors": []
+    }
+   }
+  },
+  "denoise": {
+   "script": "test:gpu:denoise",
+   "cases": [
+    "denoise-diffuse",
+    "denoise-opaque",
+    "denoisepeak",
+    "denoisehistory"
+   ],
+   "passed": true,
+   "wallSeconds": 40.2,
+   "date": "2026-11-01T02:31:47.849Z",
+   "timings": {
+    "denoise-diffuse": {
+     "seconds": 20.9,
+     "longestGpuWait": 7
+    },
+    "denoise-opaque": {
+     "seconds": 12.7,
+     "longestGpuWait": 1
+    },
+    "denoisepeak": {
+     "seconds": 2.1,
+     "longestGpuWait": 1
+    },
+    "denoisehistory": {
+     "seconds": 2.3,
+     "longestGpuWait": 1
+    }
+   },
+   "results": {
+    "denoise": {
+     "diffuse": {
+      "4": {
+       "raw": 0.03868918512620287,
+       "denoised": 0.01385449750348746,
+       "rawEdges": 0.062269906818723623,
+       "denoisedEdges": 0.054093508037253976
+      },
+      "16": {
+       "raw": 0.020901647908446144,
+       "denoised": 0.007927980648646277,
+       "rawEdges": 0.03269356446750154,
+       "denoisedEdges": 0.028577843189177166
+      },
+      "64": {
+       "raw": 0.010992580758067097,
+       "denoised": 0.004746645149095677,
+       "rawEdges": 0.01653836371154546,
+       "denoisedEdges": 0.015363790738549774
+      },
+      "1024": {
+       "raw": 0.0028853837312760437,
+       "denoised": 0.001781558656376455,
+       "rawEdges": 0.0044393415690803266,
+       "denoisedEdges": 0.004386255399839264
+      },
+      "edgePixels": 4591,
+      "refNoise": 0
+     },
+     "opaque": {
+      "4": {
+       "raw": 0.05004625596703556,
+       "denoised": 0.021049853939231013,
+       "rawEdges": 0.07197251086705449,
+       "denoisedEdges": 0.05608426916908421
+      },
+      "16": {
+       "raw": 0.0327986405722143,
+       "denoised": 0.01518759834047153,
+       "rawEdges": 0.046465591184183676,
+       "denoisedEdges": 0.037709099143110575
+      },
+      "64": {
+       "raw": 0.024009059364686246,
+       "denoised": 0.010788691944621846,
+       "rawEdges": 0.03430490361180456,
+       "denoisedEdges": 0.02606203816758054
+      },
+      "1024": {
+       "raw": 0.011248549850839144,
+       "denoised": 0.00561120861182795,
+       "rawEdges": 0.018823146590110605,
+       "denoisedEdges": 0.013723332873688094
+      },
+      "edgePixels": 4591,
+      "refNoise": 0
+     }
+    },
+    "denoisepeak": {
+     "16": {
+      "level": 0.9115780250586938,
+      "raw": 0.14931223079663405,
+      "denoised": 0.07496123522092035
+     },
+     "64": {
+      "level": 0.9669682105769888,
+      "raw": 0.051348378234497845,
+      "denoised": 0.03710019110021781
+     },
+     "peak": 3.641049618244171,
+     "pixels": 264
+    },
+    "denoisehistory": {
+     "moving": 5.313862161967403,
+     "raw": 16.001172510206523,
+     "still": 2.7786410984808145,
+     "errors": []
+    }
+   }
+  },
+  "denoise-materials": {
+   "script": "test:gpu:denoise-materials",
+   "cases": [
+    "denoise-materials"
+   ],
+   "passed": true,
+   "wallSeconds": 78.4,
+   "date": "2026-11-01T02:32:29.295Z",
+   "timings": {
+    "denoise-materials": {
+     "seconds": 75.8,
+     "longestGpuWait": 7
+    }
+   },
+   "results": {
+    "denoise": {
+     "materials": {
+      "4": {
+       "raw": 0.07199398942412234,
+       "denoised": 0.030129115140897514,
+       "rawEdges": 0.086192206862403,
+       "denoisedEdges": 0.06221044570712619
+      },
+      "16": {
+       "raw": 0.04485586694228326,
+       "denoised": 0.02035705429756769,
+       "rawEdges": 0.05390926670751737,
+       "denoisedEdges": 0.040758358346084024
+      },
+      "64": {
+       "raw": 0.03156398974959246,
+       "denoised": 0.01508317418030189,
+       "rawEdges": 0.03449485625101134,
+       "denoisedEdges": 0.026807671693341674
+      },
+      "1024": {
+       "raw": 0.01905177435121484,
+       "denoised": 0.009267633490171425,
+       "rawEdges": 0.024935744570257632,
+       "denoisedEdges": 0.015877748033289823
+      },
+      "edgePixels": 5696,
+      "refNoise": 0.006889737968111158
+     }
+    }
+   }
+  },
+  "denoise-caustics": {
+   "script": "test:gpu:denoise-caustics",
+   "cases": [
+    "denoise-caustics"
+   ],
+   "passed": true,
+   "wallSeconds": 75.4,
+   "date": "2026-11-01T02:33:46.308Z",
+   "timings": {
+    "denoise-caustics": {
+     "seconds": 73.9,
+     "longestGpuWait": 4
+    }
+   },
+   "results": {
+    "denoise": {
+     "caustics": {
+      "4": {
+       "raw": 0.09169563343962411,
+       "denoised": 0.042047817499484524,
+       "rawEdges": 0.10577185321117204,
+       "denoisedEdges": 0.07731656598068407
+      },
+      "16": {
+       "raw": 0.055427966570159574,
+       "denoised": 0.02794820305506751,
+       "rawEdges": 0.06352862574495094,
+       "denoisedEdges": 0.047281390149923684
+      },
+      "64": {
+       "raw": 0.03769192890795274,
+       "denoised": 0.020234470109775946,
+       "rawEdges": 0.04379789357201334,
+       "denoisedEdges": 0.0330421428567231
+      },
+      "1024": {
+       "raw": 0.023043083871770065,
+       "denoised": 0.013707031294946478,
+       "rawEdges": 0.029066303632050657,
+       "denoisedEdges": 0.02144883940295554
+      },
+      "edgePixels": 5560,
+      "refNoise": 0.010272145944582952
+     }
+    }
+   }
+  },
+  "viewport": {
+   "script": "test:gpu:viewport",
+   "cases": [
+    "motion",
+    "lens",
+    "viewport",
+    "bloom",
+    "capture",
+    "materialtables",
+    "largemodels",
+    "native4k"
+   ],
+   "passed": true,
+   "wallSeconds": 18.9,
+   "date": "2026-11-01T02:35:01.703Z",
+   "timings": {
+    "motion": {
+     "seconds": 5.1,
+     "longestGpuWait": 4
+    },
+    "lens": {
+     "seconds": 0.3,
+     "longestGpuWait": 0
+    },
+    "viewport": {
+     "seconds": 0.3,
+     "longestGpuWait": 0
+    },
+    "bloom": {
+     "seconds": 0.2,
+     "longestGpuWait": 0
+    },
+    "capture": {
+     "seconds": 2.1,
+     "longestGpuWait": 1
+    },
+    "materialtables": {
+     "seconds": 4.5,
+     "longestGpuWait": 3
+    },
+    "largemodels": {
+     "seconds": 0.3,
+     "longestGpuWait": 0
+    },
+    "native4k": {
+     "seconds": 4.9,
+     "longestGpuWait": 1
+    }
+   },
+   "results": {
+    "motion": {
+     "cases": [
+      {
+       "name": "quarter-turn",
+       "rms": 0.002847111768957833,
+       "maximum": 0.03076171875,
+       "actualEnergy": 62.4873046875,
+       "expectedEnergy": 62.58251953125,
+       "energyRatio": 0.9984785712613815,
+       "arcPixels": 0,
+       "arcRatio": null,
+       "nonfinite": 0,
+       "timeIntegrationBins": 2048,
+       "renderSamples": 1024
+      },
+      {
+       "name": "half-turn",
+       "rms": 0.0029938350753004692,
+       "maximum": 0.03271484375,
+       "actualEnergy": 63.16015625,
+       "expectedEnergy": 62.5771484375,
+       "energyRatio": 1.0093166247912733,
+       "arcPixels": 838,
+       "arcRatio": 1.0077768605813096,
+       "nonfinite": 0,
+       "timeIntegrationBins": 2048,
+       "renderSamples": 1024
+      },
+      {
+       "name": "reflected-scaled-moving",
+       "rms": 0.0028681263542878676,
+       "maximum": 0.0244140625,
+       "actualEnergy": 61.0966796875,
+       "expectedEnergy": 61.16259765625,
+       "energyRatio": 0.9989222503412873,
+       "arcPixels": 1046,
+       "arcRatio": 0.9965140542530992,
+       "nonfinite": 0,
+       "timeIntegrationBins": 2048,
+       "renderSamples": 1024
+      }
+     ],
+     "errors": []
+    },
+    "lens": {
+     "sharp": {
+      "near": 2,
+      "far": 2
+     },
+     "focused": {
+      "near": 6,
+      "far": 2
+     },
+     "still": {
+      "lit": 18,
+      "full": 16,
+      "max": 1
+     },
+     "blurred": {
+      "lit": 69,
+      "full": 0,
+      "max": 0.33984375
+     },
+     "camera": {
+      "pixelsPerUnit": 8,
+      "shift": 0.9977080314239934,
+      "width": 0.6455260947986947,
+      "sharpWidth": 0.28641098093474
+     },
+     "errors": []
+    },
+    "viewport": {
+     "disabled": {
+      "differing": 0,
+      "max": 0
+     },
+     "traced": {
+      "differing": 76800,
+      "max": 250
+     },
+     "restored": {
+      "differing": 0,
+      "max": 0
+     },
+     "afterDispose": {
+      "differing": 0,
+      "max": 0
+     },
+     "newDevice": true,
+     "statsBefore": {
+      "samples": 16,
+      "frameMs": 7.5,
+      "gpuBytes": 4059216,
+      "converged": true,
+      "width": 320,
+      "height": 240,
+      "requestedWidth": 320,
+      "requestedHeight": 240,
+      "sceneRevision": 1,
+      "packedModels": 7,
+      "reusedModels": 0,
+      "renders": 0
+     },
+     "statsAfter": {
+      "samples": 16,
+      "frameMs": 8.200000017881393,
+      "gpuBytes": 4059216,
+      "converged": true,
+      "width": 320,
+      "height": 240,
+      "requestedWidth": 320,
+      "requestedHeight": 240,
+      "sceneRevision": 1,
+      "packedModels": 7,
+      "reusedModels": 0,
+      "renders": 0
+     },
+     "resized": {
+      "samples": 4,
+      "frameMs": 8.200000017881393,
+      "gpuBytes": 4980816,
+      "converged": false,
+      "width": 400,
+      "height": 240,
+      "requestedWidth": 400,
+      "requestedHeight": 240,
+      "sceneRevision": 1,
+      "packedModels": 7,
+      "reusedModels": 0,
+      "renders": 0
+     },
+     "errors": [],
+     "messages": []
+    },
+    "bloom": {
+     "difference": {
+      "differing": 74403,
+      "max": 124
+     },
+     "errors": [],
+     "messages": []
+    },
+    "capture": {
+     "size": [
+      1500,
+      1100
+     ],
+     "bytes": 833153,
+     "ms": 1760.1000000238419,
+     "cancelledAfterMs": 305.5,
+     "reason": "AbortError",
+     "drainMs": 0.20000001788139343,
+     "renders": 0,
+     "gpuBytesAtRejection": 371840,
+     "gpuBytesAfter": 371840,
+     "errors": []
+    },
+    "materialtables": {
+     "identical": {
+      "differ": 0,
+      "max": 0,
+      "values": 57600
+     },
+     "wall": {
+      "models": 300,
+      "seen": 300,
+      "worst": 2.8610229518832853e-8,
+      "palettes": [
+       1
+      ]
+     },
+     "errors": []
+    },
+    "largemodels": {
+     "glass": {
+      "one": {
+       "band": 0,
+       "all": 0
+      },
+      "tiles": {
+       "band": 0.035257134220397446,
+       "all": 0.8506667870661512
+      }
+     },
+     "world": {
+      "relativeRms": 0.000014681023623925418,
+      "max": 0.00041258707642555237,
+      "mean": 0.28795854518510494,
+      "packMs": 5.600000023841858
+     },
+     "errors": []
+    },
+    "native4k": {
+     "results": {
+      "raw": {
+       "canvas": [
+        3840,
+        2160
+       ],
+       "traced": [
+        3840,
+        2160
+       ],
+       "requested": [
+        3840,
+        2160
+       ],
+       "limitedBy": null,
+       "gpuMs": 76.414976,
+       "gpuBytes": 398512208,
+       "limits": {
+        "binding": 134217728,
+        "texture": 8192
+       }
+      },
+      "denoised": {
+       "canvas": [
+        3840,
+        2160
+       ],
+       "traced": [
+        3840,
+        2160
+       ],
+       "requested": [
+        3840,
+        2160
+       ],
+       "limitedBy": null,
+       "gpuMs": 118.161408,
+       "gpuBytes": 1460202064,
+       "limits": {
+        "binding": 134217728,
+        "texture": 8192
+       }
+      }
+     },
+     "errors": [],
+     "messages": []
+    }
+   }
+  },
+  "timing": {
+   "script": "timing",
+   "cases": [
+    "timing"
+   ],
+   "passed": true,
+   "wallSeconds": 16.5,
+   "date": "2026-11-01T02:35:20.644Z",
+   "timings": {
+    "timing": {
+     "seconds": 15.2,
+     "longestGpuWait": 5
+    }
+   },
+   "results": {
+    "timing": {
+     "results": {
+      "materials 1 spp": {
+       "size": [
+        1920,
+        1080
+       ],
+       "gpuMs": 19.922944,
+       "gpuMinMs": 19.595264,
+       "cpuEncodeMs": 0.30000001192092896,
+       "attachMs": 5.300000011920929,
+       "setSceneSameRevisionMs": 1,
+       "gpuBytes": 99907664,
+       "samples": 0
+      },
+      "materials 1 spp denoised": {
+       "size": [
+        1920,
+        1080
+       ],
+       "gpuMs": 28.049408,
+       "gpuMinMs": 27.656192,
+       "cpuEncodeMs": 0.4000000059604645,
+       "attachMs": 1.9000000059604645,
+       "setSceneSameRevisionMs": 0.7999999821186066,
+       "gpuBytes": 365335120,
+       "samples": 0
+      },
+      "dense 256^3 1 spp": {
+       "size": [
+        1920,
+        1080
+       ],
+       "gpuMs": 14.352384,
+       "gpuMinMs": 13.76256,
+       "cpuEncodeMs": 0.20000001788139343,
+       "attachMs": 79.80000001192093,
+       "setSceneSameRevisionMs": 0.4000000059604645,
+       "gpuBytes": 102759852,
+       "samples": 0
+      },
+      "dense 256^3 1 spp denoised": {
+       "size": [
+        1920,
+        1080
+       ],
+       "gpuMs": 18.35008,
+       "gpuMinMs": 18.0224,
+       "cpuEncodeMs": 0.20000001788139343,
+       "attachMs": 72.40000000596046,
+       "setSceneSameRevisionMs": 0.4000000059604645,
+       "gpuBytes": 268654508,
+       "samples": 0
+      },
+      "dense 256^3 4 spp": {
+       "size": [
+        1920,
+        1080
+       ],
+       "gpuMs": 61.538304,
+       "gpuMinMs": 61.079552,
+       "cpuEncodeMs": 0.29999998211860657,
+       "attachMs": 68.40000000596046,
+       "setSceneSameRevisionMs": 0.19999998807907104,
+       "gpuBytes": 102765996,
+       "samples": 0
+      }
+     },
+     "dense": {
+      "occupied": 3967601,
+      "buildDenseArrayMs": 437.5,
+      "attachAndPackMs": 42.400000005960464,
+      "repackMs": 49.400000005960464
+     },
+     "errors": []
+    }
+   }
+  }
+ }
+}
