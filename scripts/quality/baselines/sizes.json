@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4239213,
+  "total": 4251092,
   "history": [
     {
       "date": "2026-10-24",
@@ -1286,6 +1286,12 @@
       "commit": "2d6b7738d",
       "reason": "row 26 job 10: voxel-edit/voxelize, new optional entry, mesh to voxels",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "1454595d3",
+      "reason": "row 21.6 job 8: points/copc entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -1511,6 +1517,7 @@
     "@margoengine/pixel": 4769,
     "@margoengine/pixel/palette": 4349,
     "@margoengine/points": 21547,
+    "@margoengine/points/copc": 11879,
     "@margoengine/points/e57": 6545,
     "@margoengine/points/las": 5116,
     "@margoengine/points/laz": 8099,

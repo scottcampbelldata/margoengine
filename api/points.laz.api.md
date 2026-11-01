@@ -25,6 +25,8 @@ export interface LazItem {
 
 export function createLazDecoder(): LazDecoder;
 
+export function decodeLazChunk(chunk: Uint8Array, count: number, header: LASHeader, records: readonly LASRecord[]): Uint8Array;
+
 export function lazChunks(file: Uint8Array, header: LASHeader, records: readonly LASRecord[], options?: LazChunkOptions): AsyncGenerator<Uint8Array, void, undefined>;
 
 export function lazInfo(records: readonly LASRecord[]): LazInfo;

@@ -1430,6 +1430,23 @@ export async function* lazChunks(
 }
 
 /**
+ * Decodes one chunk held by itself (a COPC node's bytes): `count` uncompressed point records, for a file with `header`
+ * and `records`. Throws as `lazChunks`.
+ */
+export function decodeLazChunk(
+  chunk: Uint8Array,
+  count: number,
+  header: LASHeader,
+  records: readonly LASRecord[],
+): Uint8Array {
+  const info = lazInfo(records);
+  checkItems(info, header);
+  const out = new Uint8Array(count * header.pointRecordLength);
+  decodeChunk(chunk, { start: 0, end: chunk.byteLength, count }, 0, header.pointRecordLength, readersFor(info), out);
+  return out;
+}
+
+/**
  * A LAZ decoder for `parseLAS` / `loadLAS`: `parseLAS(bytes, { laz: createLazDecoder() })`. Point formats 0 to 3
  * (POINT10, GPSTIME11, RGB12 and extra bytes, version 2) and 6 to 8 (POINT14, RGB14, RGBNIR14 and extra bytes,
  * layered version 3), fixed or variable chunks. Decodes one chunk at a time into the point arrays.

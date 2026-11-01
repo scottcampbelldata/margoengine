@@ -275,6 +275,22 @@ OctreeCloud.attach(engine, points, octree, { pointBudget: 1_000_000, material: {
 
 A failing node is reported to `onError(listener)` (or `engine.onError`) and skipped until `retry()`.
 
+## COPC files (`margoengine/points/copc`)
+
+A Cloud Optimized Point Cloud is a LAZ 1.4 file that a viewer reads in pieces. `CopcSource.open` reads the header and every hierarchy page by HTTP range requests, then `OctreeCloud` fetches each node's chunk when it is shown:
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { PointsPlugin } from 'margoengine/points';
+import { OctreeCloud } from 'margoengine/points/octree';
+import { CopcSource } from 'margoengine/points/copc';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const source = await CopcSource.open('/scan.copc.laz'); // options: fetch, signal
+OctreeCloud.attach(engine, PointsPlugin.attach(engine, { pointBudget: 2_000_000 }), source, { pointBudget: 2_000_000 });
+```
+
+Positions and bounds are relative to `source.origin`, the cube's centre, which keeps float32 positions exact for a scan far from zero. Reads only: there is no COPC writer. It reads point formats 6 to 8, as the specification requires. Tested against files written here from the public specification with the package's own test encoder, not yet against files from another tool.
+
 ## Colours and measures
 
 `classificationColors(classes, {palette, hidden})` colours by ASPRS class (`ASPRS_CLASSES` names them; hidden classes

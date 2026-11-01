@@ -914,6 +914,10 @@
       "types": "./dist/points/e57.d.ts",
       "import": "./dist/points/e57.js"
     },
+    "./points/copc": {
+      "types": "./dist/points/copc.d.ts",
+      "import": "./dist/points/copc.js"
+    },
     "./points/octree": {
       "types": "./dist/points/octree.d.ts",
       "import": "./dist/points/octree.js"
