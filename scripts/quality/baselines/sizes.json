@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4148101,
+  "total": 4154083,
   "history": [
     {
       "date": "2026-10-24",
@@ -1208,6 +1208,12 @@
       "commit": "e4c317ad7",
       "reason": "row 21.6 job 5: shaped runs in text (160 B of the planned 3 kB); new entries text/rich and text/msdf",
       "grew": 3
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "764e66da1",
+      "reason": "row 26 jobs 1-2: new exporters/apng and exporters/webp entries",
+      "grew": 2
     }
   ],
   "items": {
@@ -1300,7 +1306,8 @@
     "@margoengine/environment/reflector": 10886,
     "@margoengine/environment/refractor": 10843,
     "@margoengine/environment/volumetric": 8462,
-    "@margoengine/exporters": 34679,
+    "@margoengine/exporters": 34678,
+    "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/capture": 7241,
     "@margoengine/exporters/dae": 10560,
     "@margoengine/exporters/godot": 10258,
@@ -1325,6 +1332,7 @@
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
     "@margoengine/exporters/usdz": 11341,
+    "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 18653,
     "@margoengine/fbx dist/workers/fbx.js": 51819,
     "@margoengine/fbx/worker": 19547,

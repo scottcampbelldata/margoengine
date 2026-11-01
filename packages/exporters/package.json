@@ -53,6 +53,14 @@
       "types": "./dist/capture.d.ts",
       "import": "./dist/capture.js"
     },
+    "./apng": {
+      "types": "./dist/apng.d.ts",
+      "import": "./dist/apng.js"
+    },
+    "./webp": {
+      "types": "./dist/webp.d.ts",
+      "import": "./dist/webp.js"
+    },
     "./roblox": {
       "types": "./dist/roblox.d.ts",
       "import": "./dist/roblox.js"

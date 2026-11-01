@@ -804,7 +804,7 @@ flipbooks on an imported scene. Native imports are run by the application's own 
 
 ## Render to file
 
-`@margoengine/exporters/capture` saves stills, image sequences, animated GIFs and WebM videos. Your code drives time:
+`@margoengine/exporters/capture` saves stills, image sequences, animated GIFs and WebM videos (animated PNG and WebP are below). Your code drives time:
 each encoder asks `frame(i)` for frame `i`, so set the scene state for that frame there, then call `capture`.
 
 ```ts
@@ -871,6 +871,38 @@ const webm = await encodeWEBM(120, frame, {fps: 30});    // browser only
   1/fps s of wall time and pausing while the next is produced. A throwaway one-frame recording warms the browser's
   media pipeline first (cold, it starts about 1 s late and keeps paused time). Durations follow timers, so they are
   close to 1/fps, and the codec (VP8/VP9) and bit rate are the browser's. Keep the window visible while recording.
+
+### Animated PNG and lossless WebP
+
+`@margoengine/exporters/apng` and `@margoengine/exporters/webp` take the same frame source as `encodeGIF`, keep every
+colour and every alpha level exactly, and run anywhere, Node included.
+
+```ts
+import {encodeAPNG} from 'margoengine/exporters/apng';
+import {encodeAnimatedWebP, encodeWebP} from 'margoengine/exporters/webp';
+
+const red = {data: new Uint8Array([255, 0, 0, 255]), width: 1, height: 1};
+const clear = {data: new Uint8Array(4), width: 1, height: 1};
+const frame = (i: number) => (i % 2 ? clear : red);
+
+const apng: Uint8Array = await encodeAPNG(8, frame, {fps: 12, loops: 0, dispose: 'none', blend: 'source'});
+const still: Uint8Array = await encodeWebP(red);
+const webp: Uint8Array = await encodeAnimatedWebP(8, frame, {fps: 12, loops: 0});
+```
+
+| Option | Applies to | Default |
+| --- | --- | --- |
+| `fps` | `encodeAPNG` (1000/65535 to 1000), `encodeAnimatedWebP` (1000/16777215 to 1000) | 30. APNG stores a whole rate exactly as 1/fps; other delays are whole milliseconds, rounded cumulatively so the total stays exact |
+| `loops` | Both (WebP up to 65535) | 0, loops forever |
+| `dispose` | `encodeAPNG`: `'none'`, `'background'`, `'previous'` | `'none'` |
+| `blend` | `encodeAPNG`: `'source'` replaces the frame's area, alpha included; `'over'` draws on top | `'source'` |
+
+- **Cut-out sprites.** The defaults replace the whole frame, so a transparent pixel never shows the frame before it.
+  GIF does the same with a transparent index and dispose-to-background on every frame.
+- **WebP is lossless only here,** written from the WebP lossless specification (VP8L): colour indexing up to 256
+  colours, otherwise subtract green and predict, then LZ77 and prefix codes. For lossy WebP use the browser's encoder:
+  `canvas.convertToBlob({type: 'image/webp', quality})`. At most 16384 pixels per side.
+- Frames of different sizes are refused with a `RangeError`.
 
 ### Sprite atlases and ZIP archives
 

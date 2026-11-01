@@ -410,6 +410,14 @@
       "types": "./dist/exporters/capture.d.ts",
       "import": "./dist/exporters/capture.js"
     },
+    "./exporters/apng": {
+      "types": "./dist/exporters/apng.d.ts",
+      "import": "./dist/exporters/apng.js"
+    },
+    "./exporters/webp": {
+      "types": "./dist/exporters/webp.d.ts",
+      "import": "./dist/exporters/webp.js"
+    },
     "./exporters/roblox": {
       "types": "./dist/exporters/roblox.d.ts",
       "import": "./dist/exporters/roblox.js"

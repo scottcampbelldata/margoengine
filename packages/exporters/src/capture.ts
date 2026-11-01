@@ -4,6 +4,7 @@
 import type { Camera, EngineKernel, RenderView } from '@margoengine/core';
 import { LinearToSRGB, parseColor, type ColorInput } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
+import { checkCount, checked, type FrameSource, type Pixels } from './frames.js';
 export {
   encodeAtlasZIP,
   encodeSequenceZIP,
@@ -28,14 +29,7 @@ export type {
 // The PNG encoder loads on first use, as in model.js, so no module of this package imports it both ways.
 const png: typeof import('./png.js').png = async (...args) => (await import('./png.js')).png(...args);
 
-/** RGBA8 pixels, 4 bytes per pixel, top row first, not premultiplied: an `ImageData` or a {@link capture} result. */
-export interface Pixels {
-  readonly data: Uint8Array | Uint8ClampedArray;
-  readonly width: number;
-  readonly height: number;
-}
-/** Produces frame `index` (0-based) for an encoder: set the scene state for that frame, then return a capture. */
-export type FrameSource = (index: number) => Pixels | Promise<Pixels>;
+export type { FrameSource, Pixels } from './frames.js';
 
 /** Options for {@link capture}. */
 export interface CaptureOptions {
@@ -183,22 +177,6 @@ function tile(
   };
 }
 
-function checked(pixels: Pixels): Pixels {
-  const { data, width, height } = pixels ?? {};
-  if (!(data instanceof Uint8Array || data instanceof Uint8ClampedArray))
-    throw new TypeError('Frame pixels need data as a Uint8Array or Uint8ClampedArray; pass an ImageData or a capture');
-  if (!(Number.isInteger(width) && Number.isInteger(height) && width >= 1 && height >= 1))
-    throw new RangeError(`Frame size ${width}x${height} is invalid; pass whole numbers of pixels >= 1`);
-  if (data.length !== width * height * 4)
-    throw new RangeError(
-      `Frame ${width}x${height} has ${data.length} bytes, not ${width * height * 4}; pass RGBA8 rows`,
-    );
-  return pixels;
-}
-function checkCount(count: number): void {
-  if (!(Number.isInteger(count) && count >= 1))
-    throw new RangeError(`Frame count ${count} is invalid; pass a whole number >= 1`);
-}
 const imageData = ({ data, width, height }: Pixels): ImageData =>
   new ImageData(
     new Uint8ClampedArray(data.buffer, data.byteOffset, data.length) as Uint8ClampedArray<ArrayBuffer>,

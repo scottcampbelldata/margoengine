@@ -186,6 +186,10 @@ carry the same citation as a one-line comment in the code.
 | --- | --- | --- | --- |
 | EX1 | Blinn-Phong exponent to/from glTF roughness | exporters/src/model.ts, exporters/src/scene.ts, exporters/src/dae.ts | Walter et al. 2007 sec. 5.2 (Phong-Beckmann correspondence alpha_p = 2 alpha_b^-2 - 2) |
 
+| EX3 | Animated PNG chunks (acTL, fcTL, fdAT, sequence numbers, delays, dispose and blend ops) | exporters/src/apng.ts | W3C PNG specification, third edition |
+| EX4 | Lossless WebP encoding (VP8L header, colour indexing, subtract green, predictor modes, LZ77 prefix coding, code-length codes) and the animated container (VP8X, ANIM, ANMF) | exporters/src/webp.ts | RFC 9649 WebP Lossless Bitstream Specification; WebP Container Specification |
+| EX5 | Length-limited canonical prefix codes | exporters/src/prefix-codes.ts | Huffman 1952; canonical order as RFC 9649 defines it. Over-long trees are rebuilt with a raised count floor |
+
 ### fbx
 
 | id | formula | file | source |
