@@ -67,7 +67,7 @@ test('uploads parts once and draws them with compute culling and indirect draws,
   assert.equal(h.passes[1].colorAttachments[0].loadOp, 'load');
   assert.equal(h.passes[1].depthStencilAttachment.view, h.originalDepth);
   assert.equal(h.passes[1].depthStencilAttachment.stencilReadOnly, true);
-  const records = new Float32Array(h.resources.find((r) => r.size === 3 * 96 && r.usage === (128 | 8)).data);
+  const records = new Float32Array(parts['buffers'].records.data);
   assert.deepEqual(Array.from(records.subarray(24 + 12, 24 + 16)), [4, 0, 0, 1]);
   assert.equal(records[23], -1, 'no core mesh id');
   assert.equal(records[48 + 22], 0, 'single-sided material flag reaches the shader');
@@ -207,7 +207,7 @@ test('transform and visibility updates write only the changed part', () => {
     parts = new CulledInstances(batches());
   h.engine.use(parts);
   h.run();
-  const records = h.resources.find((r) => r.size === 3 * 96 && r.usage === (128 | 8)),
+  const records = parts['buffers'].records,
     hidden = parts['buffers'].hidden;
   parts.setTransform(0, 1, translate(-2, 1, 0));
   h.run();
@@ -258,7 +258,7 @@ test('moving many parts costs one records upload per frame, covering only the ch
   for (let i = 0; i < n; i++) parts.setTransform(0, i, translate(i, 0, 0));
   h.engine.use(parts);
   h.run();
-  const records = h.resources.find((r) => r.size === n * 96 && r.usage === (128 | 8)),
+  const records = parts['buffers'].records,
     to = (buffer) => h.bufferWrites.filter((w) => w.buffer === buffer);
   h.bufferWrites.length = 0;
   for (let i = 10; i < 600; i++) parts.setTransform(0, i, translate(i, 2, 0));
@@ -411,4 +411,131 @@ test('CulledMeshes culls core batches on the GPU and redirects core draws; stora
   assert.equal(batches[0].redirect, undefined, 'dispose restores core draws');
   assert.ok(h.resources.every((r) => r.destroyed));
   assert.throws(() => new CulledMeshes({ minRadius: -1 }), /options/);
+});
+
+const worldY = (parts, b, i) => parts.getWorldMatrix(b, i)[13];
+test('setParent folds parent matrices at write time, through a whole subtree, and detach keeps the world place', () => {
+  const parts = new CulledInstances(batches()),
+    root = { batch: 0, index: 0 },
+    mid = { batch: 0, index: 1 };
+  parts.setParent(0, 1, root);
+  parts.setParent(1, 0, mid);
+  const version = parts.shadowVersion;
+  parts.setTransform(0, 0, translate(0, 10, 0));
+  assert.ok(parts.shadowVersion > version);
+  assert.equal(worldY(parts, 0, 1), 10);
+  assert.equal(worldY(parts, 1, 0), 16, 'the child goes through the scale of its parent');
+  parts.setTransform(0, 1, translate(4, 1, 0, 2));
+  assert.equal(worldY(parts, 0, 1), 11);
+  assert.equal(worldY(parts, 1, 0), 17);
+  parts.setParent(1, 0, null);
+  assert.equal(worldY(parts, 1, 0), 17);
+  parts.setTransform(0, 0, translate(0, 0, 0));
+  assert.equal(worldY(parts, 1, 0), 17, 'a detached part no longer follows');
+  assert.equal(worldY(parts, 0, 1), 1);
+});
+
+test('setParent refuses a parent inside the subtree and a part that is not alive', () => {
+  const parts = new CulledInstances(batches());
+  parts.setParent(0, 1, { batch: 0, index: 0 });
+  assert.throws(() => parts.setParent(0, 0, { batch: 0, index: 1 }), /subtree/);
+  assert.throws(() => parts.setParent(0, 0, { batch: 0, index: 0 }), /subtree/);
+  assert.throws(() => parts.setParent(0, 9, null), /instance/);
+});
+
+test('a mirroring parent counts its subtree as mirrored, so the batch leaves the back-culled pipeline', () => {
+  const parts = new CulledInstances(batches());
+  parts.setParent(1, 0, { batch: 0, index: 0 });
+  assert.equal(parts.flips[1], 0);
+  parts.setTransform(0, 0, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  assert.equal(parts.flips[1], 1);
+  parts.removeParts(1, [0]);
+  assert.equal(parts.flips[1], 0, 'a removed part stops counting');
+});
+
+test('capacity reserves slots; addParts and removeParts reuse them without new buffers', () => {
+  const h = harness(),
+    list = batches();
+  list[0].capacity = 4;
+  const parts = new CulledInstances(list);
+  h.engine.use(parts);
+  h.run();
+  assert.equal(parts.count, 3);
+  assert.deepEqual(parts.starts, [0, 4]);
+  assert.equal(parts.hidden[2], 2, 'a free slot is out of every draw');
+  const buffers = h.counts.buffers;
+  assert.deepEqual(parts.addParts(0, new Float32Array(translate(7, 7, 7))), [2]);
+  assert.equal(parts.count, 4);
+  assert.equal(worldY(parts, 0, 2), 7);
+  assert.equal(parts.hidden[2], 0);
+  parts.removeParts(0, [0, 2]);
+  assert.equal(parts.count, 2);
+  assert.throws(() => parts.setTransform(0, 0, translate(0, 0, 0)), /instance/, 'a removed part is not alive');
+  assert.throws(() => parts.removeParts(0, [1, 1]), /once/);
+  assert.deepEqual(parts.addParts(0, new Float32Array([...translate(1, 0, 0), ...translate(2, 0, 0)])).length, 2);
+  assert.equal(parts.count, 4);
+  h.run();
+  assert.equal(h.counts.buffers, buffers, 'no rebuild');
+  assert.throws(
+    () => parts.addParts(0, new Float32Array([...translate(0, 0, 0), ...translate(1, 0, 0)])),
+    /free slots|capacity/,
+  );
+  assert.throws(() => parts.addParts(9, new Float32Array(16)), /batch index/);
+  assert.throws(() => parts.addParts(0, new Float32Array(3)), /Float32Array/);
+});
+
+test('a batch may start empty only with a capacity, and a bad matrix in addParts adds nothing', () => {
+  const [one] = batches();
+  assert.throws(() => new CulledInstances([{ ...one, transforms: new Float32Array(0) }]), /non-empty/);
+  assert.throws(() => new CulledInstances([{ ...one, capacity: 1 }]), /capacity/);
+  assert.throws(() => new CulledInstances([{ ...one, capacity: 2.5 }]), /capacity/);
+  const parts = new CulledInstances([{ ...one, transforms: new Float32Array(0), capacity: 2 }]);
+  assert.equal(parts.count, 0);
+  assert.throws(() => parts.setVisible(0, 0, true), /instance/);
+  assert.throws(() => parts.addParts(0, new Float32Array([...translate(1, 0, 0), ...new Array(16).fill(0)])), /affine/);
+  assert.equal(parts.count, 0);
+  assert.deepEqual(parts.addParts(0, new Float32Array(translate(1, 0, 0))), [0]);
+});
+
+test('a part with children is removed only with them', () => {
+  const parts = new CulledInstances(batches());
+  parts.setParent(0, 1, { batch: 0, index: 0 });
+  assert.throws(() => parts.removeParts(0, [0]), /children/);
+  assert.equal(parts.count, 3);
+  parts.removeParts(0, [0, 1]);
+  assert.equal(parts.count, 1);
+});
+
+test('drawShadow draws every slot of each batch at its flat first instance, and uploads edits first', () => {
+  const h = harness(),
+    parts = new CulledInstances(batches());
+  h.engine.use(parts);
+  h.run();
+  const draws = [],
+    pass = {
+      setPipeline() {},
+      setBindGroup() {},
+      setVertexBuffer() {},
+      setIndexBuffer() {},
+      drawIndexed: (...args) => draws.push(args),
+    };
+  parts.setVisible(0, 0, false);
+  assert.equal(parts.hiddenHigh, 1);
+  parts.drawShadow({ context: { device: parts.device }, pass, matrix: new Float32Array(16), cascade: 2 });
+  assert.equal(parts.hiddenHigh, 0, 'a shadow pass runs before the plugin pass, so it uploads first');
+  assert.deepEqual(
+    draws.map((d) => [d[1], d[4]]),
+    [
+      [2, 0],
+      [1, 2],
+    ],
+  );
+});
+
+test('pick rejects before attach and for bad pixels', async () => {
+  const parts = new CulledInstances(batches());
+  await assert.rejects(parts.pick(1, 1), /not attached/);
+  const h = harness();
+  h.engine.use(parts);
+  await assert.rejects(parts.pick(Number.NaN, 1), /finite/);
 });

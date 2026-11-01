@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4259647,
+  "total": 4262190,
   "history": [
     {
       "date": "2026-10-24",
@@ -1298,6 +1298,12 @@
       "commit": "2d6b7738d",
       "reason": "New entries for row 26 job 7: Unreal, Unity and Roblox collision and UV animation exports",
       "grew": 3
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "1454595d3",
+      "reason": "culling: CulledInstances gains pick, setParent, drawShadow and addParts/removeParts (row 21.6 job 9), a GPU id and caster draw of the part list and a part hierarchy on the CPU",
+      "grew": 1
     }
   ],
   "items": {
@@ -1371,7 +1377,7 @@
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,
-    "@margoengine/culling": 10778,
+    "@margoengine/culling": 13321,
     "@margoengine/culling/dynamic": 7461,
     "@margoengine/cutscene": 6845,
     "@margoengine/decoders": 492515,

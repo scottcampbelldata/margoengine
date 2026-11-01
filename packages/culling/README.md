@@ -26,9 +26,44 @@ console.log(await parts.readCounts()); // parts drawn per batch in the last fram
 ```
 
 Parts are not core meshes. That is where the CPU saving comes from (core's kernel and batch collection never see
-them), and also the main limit: no core `engine.pick`, no hierarchy, no mesh BVH raycasts,
-no section caps, no shadows. Section clipping itself does apply, because the parts are drawn with core's own frame
-shader.
+them), and also the main limit: no core `engine.pick`, no mesh BVH raycasts, no section caps. Section clipping itself
+does apply, because the parts are drawn with core's own frame shader. Picking, hierarchy, shadows and streaming are the
+package's own:
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {CulledInstances} from 'margoengine/culling';
+import {Shadows} from 'margoengine/shadows';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const parts = CulledInstances.attach(engine, [
+  // capacity reserves slots for addParts; transforms may start empty.
+  {geometry: box(), material: new PbrMaterial({color: '#8d99a6'}), transforms: new Float32Array(0), capacity: 1000},
+]);
+const at = (x: number, y = 0, z = 0) => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
+
+// Streaming: new parts go into free slots, with no rebuild. Removing frees the slots; other indices stay.
+const [arm, hand] = parts.addParts(0, new Float32Array([...at(0), ...at(2)]));
+
+// Hierarchy: hand's matrix is now relative to arm, and moving arm moves hand too.
+parts.setParent(0, hand, {batch: 0, index: arm});
+parts.setTransform(0, arm, at(0, 3));
+console.log(parts.getWorldMatrix(0, hand)[13]);   // 3
+
+// Shadows: casts every shown part, inside the camera view or not; receiving works as on core meshes.
+Shadows.attach(engine, {resolution: 2048}).add(parts);
+engine.start();
+
+console.log(await parts.pick(200, 150));   // {batch, index} under a CSS pixel, or null
+parts.removeParts(0, [hand]);
+```
+
+- `pick` finds parts only; compare with `engine.pick` when core meshes share the view. It draws every shown part once,
+  so it costs more than `engine.pick` on a large list.
+- A part with a parent stores a local matrix on the CPU. The fold runs when a matrix is set and costs one record write per
+  part in the subtree; parts that never call `setParent` cost nothing. A part with children cannot be removed alone.
+- `addParts` past `capacity` throws: buffers are sized at attach. New geometry or materials need a new
+  `CulledInstances`. Each free slot still costs its record and one test per frame.
 
 ## Core meshes: `CulledMeshes`
 
@@ -107,7 +142,9 @@ replay of it (SSAO, outline, post) with core's own shader and every shader patch
 - WebGL2 compatibility layer: the same test runs on the CPU from the rows (O(n) per frame), the records are uploaded.
   The `@margoengine/webgl` renderer is not supported (`MargoError` `'unsupported'`).
 
-Pixel check on the GPU (`npm run test:gpu -w @margoengine/culling`, `packages/culling/test/gpu/dynamic-check.mjs`): 576
+Pixel checks on the GPU (`npm run test:gpu -w @margoengine/culling`): `test/gpu/parts-check.mjs` compares `CulledInstances`
+with core meshes through hides, hierarchy moves, removes, adds and shadows, and compares picks with `engine.pick`.
+`packages/culling/test/gpu/dynamic-check.mjs`: 576
 boxes drawn as DynamicInstances and as core meshes, through moves, hides, deletes, adds into freed and new rows and
 camera moves, with and without shadows: 0 differing pixels in every frame, and `crowd.pick` names the box `engine.pick`
 names. RTX A6000, Edge 156.
