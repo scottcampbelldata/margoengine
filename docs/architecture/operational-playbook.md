@@ -184,7 +184,7 @@ Every brief also carries these, each from a trap that cost a landing round (2026
   gates such as fixed waits, error-page entries, teardown and file classes) and `npm run api:check`. Helpers that ran
   only their package tests failed these at landing three times in one day.
 - A change that alters exports commits the output of `npm run api:update`. Skipping it because `land-records`
-  regenerates the API reports fails: `check:merge` runs `verify`, and so `api:check`, before `land-records` runs.
+  regenerates the API reports fails: the integrator runs `api:check` before `land-records`.
 - After a README change, `npm run modern:test:packages -- --packages=<pkg>`. README examples are type-checked there,
   which sits late in `check:merge` (about 27 minutes in on one run), so a failure otherwise costs a whole run.
 - Builders never run `check:merge`, narrowed or full (session rule 24). It runs once, at landing, in the mode it

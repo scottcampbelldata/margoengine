@@ -200,15 +200,13 @@ test('a clean batch: rebased in order, tier 1 once, records, one unforced push, 
     assert.deepEqual(steps.commands(), [
       'node scripts/worktree-node-modules.mjs',
       'node scripts/check-merge.mjs --plan --base=origin/main',
-      'node scripts/build-llms.mjs --commit',
+      'npm run build:packages',
+      'npm run api:check',
+      'node scripts/land-records.mjs --no-build',
       'npm run verify',
       'npm run check:examples-types -- --projects=examples',
       'npm run modern:test:packages -- --packages=sky',
-      'node scripts/land-records.mjs --no-build',
     ]);
-    // README-derived llms files are refreshed (one commit) before verify reads them, never after.
-    const order = steps.commands();
-    assert.ok(order.indexOf('node scripts/build-llms.mjs --commit') < order.indexOf('npm run verify'));
     assert.equal(steps.ran.find((r) => r.command === 'npm run verify').env.MARGOENGINE_PLANT_STALE, '1');
     assert.equal(steps.ran.find((r) => r.command.includes('modern:test')).env.MARGOENGINE_PACKAGE_TEST_PREBUILT, '1');
     assert.deepEqual(git.pushes(), [['push', 'origin', 'HEAD:refs/heads/main']]);
@@ -220,7 +218,7 @@ test('a clean batch: rebased in order, tier 1 once, records, one unforced push, 
       ['one', 'two'],
     );
     assert.equal(line.commits.length, 1);
-    assert.equal(line.tier1.length, 7);
+    assert.equal(line.tier1.length, 8);
     assert.deepEqual(readQueue(paths.dir), []);
   } finally {
     done();
@@ -375,6 +373,28 @@ test('a failure naming nobody, cured when the last one steps out: only that one 
       ['guilty'],
     );
     assert.match(out.sentBack[0].reason, /passed once it left/);
+  } finally {
+    done();
+  }
+});
+
+// Bug (2026-11-01): verify ran before land-records, so a new package could never land: tests/sizes-page.test.js needs
+// its entry-sizes row and tests/public-truth.test.js the package count in docs/api-surface.md, and only records write them.
+test('a new package lands: verify reads the records, and api:check runs before they are rewritten', async () => {
+  const { paths, done } = setup({ sky: `READY ${SHA.a}` });
+  try {
+    const git = fakeGit({ branches: { [SHA.a]: ['packages/sky/a.ts'] } });
+    let recorded = false,
+      checkedBefore = false;
+    const steps = fakeSteps((command) => {
+        if (command === 'npm run api:check') checkedBefore = !recorded;
+        if (command.includes('land-records')) recorded = true;
+        return command === 'npm run verify' && !recorded ? 'entry-sizes.json has no sizes' : undefined;
+      }, git),
+      out = await run(paths, git, steps);
+    assert.deepEqual(out.sentBack, []);
+    assert.equal(checkedBefore, true, 'api:check sees what the branch committed');
+    assert.equal(git.pushes().length, 1);
   } finally {
     done();
   }
