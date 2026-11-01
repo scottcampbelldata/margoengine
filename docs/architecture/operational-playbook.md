@@ -2,6 +2,8 @@
 
 Reference, not rules; AGENTS.md wins.
 
+**Never more than 6 in the queue (Scott, 2026-11-01): at most 6 unlanded branches exist at once, READY or being built, counting every helper. The coordinator counts `private/queue/*.ready` and the unlanded branches before starting or resuming any builder, and when 6 exist no new branch starts until one lands.**
+
 ## Purpose
 
 This document describes how the Margo Engine project is run and verified, in enough detail to build the same systems
