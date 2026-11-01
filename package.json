@@ -81,6 +81,7 @@
     "packages/sky",
     "packages/selection",
     "packages/scatter",
+    "packages/headless",
     "packages/html",
     "packages/video",
     "packages/shader",

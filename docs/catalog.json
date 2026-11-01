@@ -1224,6 +1224,25 @@
     "category": "Rendering and lighting"
   },
   {
+    "id": "headless",
+    "title": "Headless",
+    "category": "Rendering and lighting",
+    "package": "@margoengine/headless",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Render without a browser page: a stand-in canvas for core, GPU globals from the WebGPU binding you pass in, and readback to RGBA pixels or PNG bytes.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "headless",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/headless@1.0.0",
+    "imports": "import { createHeadlessCanvas } from '@margoengine/headless';",
+    "exports": [
+      "createHeadlessCanvas",
+      "installGPU",
+      "readPixels",
+      "toPNG"
+    ]
+  },
+  {
     "id": "staging",
     "title": "Staging",
     "category": "Rendering and lighting",

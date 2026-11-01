@@ -198,6 +198,23 @@ export const entries = [
     fix: 'Pass `{camera, viewport}` objects; use 1-sample target colour; give a target depth the scene depth format (`depth32float-stencil8` when the device has it, else `depth32float`) and sample count (4 with 4x MSAA, else 1), or omit it (a package can resolve the core depth itself with a `SceneTarget`); draw extra attachments with `clear: false`; keep rectangles inside the target; pass finite numbers to `pick`.',
   },
   {
+    id: 'headless',
+    title: 'Rendering without a page',
+    kind: 'family',
+    messages: [
+      'installGPU needs a gpu with requestAdapter',
+      'Invalid headless canvas size',
+      'Headless canvas is not configured',
+      'readPixels needs an engine on createHeadlessCanvas',
+      'readPixels needs the WebGPU backend',
+      'No frame to read: call engine.render() first',
+      'readPixels reads rgba8unorm or bgra8unorm only',
+    ],
+    cause:
+      'A `@margoengine/headless` call got something it cannot use: no WebGPU binding, a size that is not a whole number, an engine on a page canvas or the WebGL2 backend, a read before the first frame, or an HDR format.',
+    fix: "Pass `installGPU` the `gpu` from your binding, give `createHeadlessCanvas` whole sizes from 1, create the engine on that canvas with `backend: 'webgpu'`, and call `engine.render()` before `readPixels` or `toPNG`. HDR output cannot be read this way; leave the canvas format at its default.",
+  },
+  {
     id: 'pixel-options',
     title: 'Pixel camera and layer options',
     kind: 'family',

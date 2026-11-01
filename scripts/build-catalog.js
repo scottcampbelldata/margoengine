@@ -70,6 +70,7 @@ const layers = {
     'html',
     'video',
     'xr',
+    'headless',
     'staging',
   ],
   'Post-processing': ['post', 'tonemap', 'dof', 'taa', 'transitions'],

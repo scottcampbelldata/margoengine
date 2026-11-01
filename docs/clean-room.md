@@ -901,3 +901,9 @@ Written from the WebGPU and WGSL specifications only (`textureLoad`, `@builtin(p
 offsets) and plain rotation maths. No other engine's pixel-art code was read. Each output pixel turns back into the
 layer and floors to one source pixel; the tests compare every frame byte for byte with an image composed on the CPU in
 the test itself, with quarter turns done by moving pixels forward rather than by the shader's formula.
+
+## Rendering without a page: `@margoengine/headless`
+
+Written from the WebGPU specification (GPUCanvasContext, the 256-byte `copyTextureToBuffer` row alignment, the flag values
+of `GPUBufferUsage` and its siblings) and the W3C PNG specification. No other project's headless code or binding source
+was read. The real-GPU test compares the bytes with a screenshot of the same scene on a page canvas.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4278460,
+  "total": 4281327,
   "history": [
     {
       "date": "2026-10-24",
@@ -1334,6 +1334,12 @@
       "commit": "98c65987a",
       "reason": "react: Bounds, Billboard, Float in react/helpers and the owner-name code in react/devtools, each out of the root",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "1454595d3",
+      "reason": "new optional package @margoengine/headless: stand-in canvas, GPU globals, readback and PNG for rendering with no page (row 32, job 1; budget 3,000 B)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1487,6 +1493,7 @@
     "@margoengine/gltf-pro/progressive": 63493,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/worker": 57046,
+    "@margoengine/headless": 2867,
     "@margoengine/html": 5013,
     "@margoengine/ifc": 2819,
     "@margoengine/ifc dist/workers/ifc.js": 3443,

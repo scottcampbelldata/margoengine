@@ -622,6 +622,10 @@
       "types": "./dist/gltf-pro/worker.d.ts",
       "import": "./dist/gltf-pro/worker.js"
     },
+    "./headless": {
+      "types": "./dist/headless.d.ts",
+      "import": "./dist/headless.js"
+    },
     "./html": {
       "types": "./dist/html.d.ts",
       "import": "./dist/html.js"
@@ -1691,6 +1695,7 @@
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/gltf": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/headless": "^1.0.0",
     "@margoengine/html": "^1.0.0",
     "@margoengine/ifc": "^1.0.0",
     "@margoengine/input": "^1.0.0",

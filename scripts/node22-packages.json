@@ -7,6 +7,7 @@
     "tests/trailing-data.test.js"
   ],
   "node": {
+    "@margoengine/headless": "renders in Node through a WebGPU binding the app passes in: thumbnails and the asset pipeline",
     "@margoengine/mcp": "bin margoengine-mcp: an MCP server over stdio (node:fs, node:child_process, node:readline)",
     "@margoengine/netcode": "@margoengine/netcode/node: the WebSocket game server on node:http",
     "@margoengine/net": "imported by the netcode and voxel-net servers",
