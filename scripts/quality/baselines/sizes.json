@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4316374,
+  "total": 4317099,
   "history": [
     {
       "date": "2026-10-24",
@@ -1412,6 +1412,12 @@
       "commit": "000616d0e",
       "reason": "new optional package @margoengine/lighting2d: point, spot and directional 2D lights, normal-mapped shading, hard shadows from occluder edges (row 25 J7; budget 10 KB)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "8f5243386",
+      "reason": "biomes/placement +355 B (11951 to 12306 gzip): band loading makes only the strip of each neighbour placement reads; one-worker placement block 1,138 to 1,070 ms/km2 and eight workers 382 to 281 ms/km2 (exploratory, unlocked); Scott authorized a documented biomes placement size increase 2026-11-01",
+      "grew": 1
     }
   ],
   "items": {
@@ -1434,7 +1440,7 @@
     "@margoengine/biomes/hydrology": 4679,
     "@margoengine/biomes/koppen": 1231,
     "@margoengine/biomes/objects": 3835,
-    "@margoengine/biomes/placement": 11951,
+    "@margoengine/biomes/placement": 12676,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/region": 4672,
     "@margoengine/biomes/relief": 4553,
