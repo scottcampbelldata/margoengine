@@ -28,7 +28,7 @@
   "scripts": {
     "test": "node --test test/*.test.js ../../tests/modern-scene-fade-lifecycle.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/post/test/image-browser.mjs && node packages/post/test/outline-browser.mjs"
+    "test:gpu": "cd ../.. && node packages/post/test/image-browser.mjs && node packages/post/test/outline-browser.mjs && node packages/post/test/contact-shadows-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -107,6 +107,10 @@
     "./depth": {
       "types": "./dist/depth.d.ts",
       "import": "./dist/depth.js"
+    },
+    "./contact-shadows": {
+      "types": "./dist/contact-shadows.d.ts",
+      "import": "./dist/contact-shadows.js"
     }
   },
   "files": [

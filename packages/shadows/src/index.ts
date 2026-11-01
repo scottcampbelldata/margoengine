@@ -96,6 +96,12 @@ export interface ShadowOptions {
    * texels; the phone quality tier uses 2. Ignored with `bounds` or `frustum` (always one map). Fixed at construction.
    */
   cascades?: number;
+  /**
+   * Frames between updates of each cascade, near to far, such as `[1, 1, 2, 4]`: a whole number of 1 or more per
+   * cascade, and a missing one means 1. A held cascade keeps its last map and matrix, so far shadows lag by up to that
+   * many frames and cost less. Any change that marks the map stale redraws every cascade. Default every cascade every frame.
+   */
+  cadence?: readonly number[];
 }
 /** What a custom `ShadowSource.drawShadow` receives for one cascade. Borrowed: use it synchronously. */
 export interface ShadowContext {
@@ -254,6 +260,8 @@ const powerOfTwo = (v: number) => Number.isInteger(v) && v >= 16 && Number.isInt
 export class Shadows implements EnginePlugin {
   readonly name = 'shadows';
   readonly matrices = new Float32Array(64);
+  private readonly heldMatrices = new Float32Array(64);
+  private readonly heldRanges = new Float32Array(4);
   readonly splits = new Float32Array(4);
   readonly stats = { staticDraws: 0, dynamicDraws: 0, cacheHits: 0 };
   private engine?: Engine;
@@ -368,6 +376,9 @@ export class Shadows implements EnginePlugin {
     return effect;
   }
   private validate(): void {
+    const cadence = this.options.cadence;
+    if (cadence !== undefined && !(Array.isArray(cadence) && cadence.every((n) => Number.isInteger(n) && n >= 1)))
+      throw new RangeError('Shadows cadence must be an array of whole numbers of 1 or more; pass frames per cascade');
     const o = this.options;
     if (
       o.bounds !== undefined &&
@@ -815,6 +826,11 @@ export class Shadows implements EnginePlugin {
     if (clipped || this.clipped) this.dirty = true;
     this.clipped = clipped;
     for (let i = 0; i < 3; i++) this.light[i] = this.engine!.lighting.direction[i];
+    const cadence = this.options.cadence;
+    if (cadence) {
+      this.heldMatrices.set(this.matrices);
+      this.heldRanges.set(this.ranges);
+    }
     if (this.options.bounds || this.options.frustum) {
       this.fitBounds();
       // All visible receivers select layer zero, including when the camera orbits outside the fixed box.
@@ -837,7 +853,13 @@ export class Shadows implements EnginePlugin {
         this.cascadeCount,
       );
     }
-    for (let i = 0; i < 64; i++) if (this.matrices[i] !== this.previous[i]) this.dirty = true;
+    if (cadence && !this.dirty) {
+      for (let i = 0; i < this.cascadeCount; i++)
+        if (this.frameSerial % (cadence[i] ?? 1)) {
+          this.matrices.set(this.heldMatrices.subarray(i * 16, i * 16 + 16), i * 16);
+          this.ranges[i] = this.heldRanges[i];
+        }
+    } else if (!cadence) for (let i = 0; i < 64; i++) if (this.matrices[i] !== this.previous[i]) this.dirty = true;
     for (let i = this.sources.length - 1; i >= 0; i--) {
       const r = this.sources[i];
       if (
@@ -900,6 +922,7 @@ export class Shadows implements EnginePlugin {
       if (r.cast && 'prepareShadow' in r.source && r.source.prepareShadow && (this.dirty || !r.static))
         r.source.prepareShadow(prepare);
     }
+    if (cadence) return this.renderCadence(c, cadence, moving);
     const rendered = this.dirty;
     if (this.dirty) {
       for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, true);
@@ -914,6 +937,32 @@ export class Shadows implements EnginePlugin {
     if (moving) for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, false);
     if ((this.options.filter ?? 'soft') !== 'soft') this.nearestStale ||= rendered || moving;
     else if (rendered || moving || this.nearestStale) this.nearest(c);
+  }
+  /** The depth passes under `cadence`: each cascade redraws, recopies and draws its moving casters only on its own frames. */
+  private renderCadence(c: ShadowPassContext, cadence: readonly number[], moving: boolean): void {
+    let changed = false;
+    const size = { width: this.width, height: this.height, depthOrArrayLayers: 1 };
+    for (let i = 0; i < this.cascadeCount; i++) {
+      const due = this.frameSerial % (cadence[i] ?? 1) === 0,
+        from = i * 16;
+      let stale = this.dirty;
+      if (due) for (let k = from; k < from + 16; k++) stale ||= this.matrices[k] !== this.previous[k];
+      if (stale) {
+        this.depth(c, i, true);
+        this.previous.set(this.matrices.subarray(from, from + 16), from);
+      } else if (due) this.stats.cacheHits++;
+      if (!stale && !(due && moving)) continue;
+      changed = true;
+      c.encoder.copyTextureToTexture(
+        { texture: this.cached!, origin: [0, 0, i] },
+        { texture: this.combined!, origin: [0, 0, i] },
+        size,
+      );
+      if (moving) this.depth(c, i, false);
+    }
+    this.dirty = false;
+    if ((this.options.filter ?? 'soft') !== 'soft') this.nearestStale ||= changed;
+    else if (changed || this.nearestStale) this.nearest(c);
   }
   /**
    * Reduces each layer of the combined map to its nearest depth and copies it into the frame uniform: the PCSS search

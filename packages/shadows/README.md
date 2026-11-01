@@ -132,3 +132,15 @@ A frame draws the camera's view at half size per axis to find the pages it needs
 Sources with their own `drawShadow` (terrain, scatter, voxels, VAT, culling) cannot cast here: their uniforms are per cascade, and a page needs its own matrix. `add` throws a `TypeError` naming the fix: add them with `{castShadow:false}` to receive, or use `Shadows`, which they cast into.
 
 Memory at the default pool size is 134,218,752 B (two 64 MiB pools and an 8 KiB page table; `memoryBytes` reports it). WebGPU only, directional light only.
+
+## Update scheduling: `cadence`
+
+`cadence` updates far cascades less often. A held cascade keeps its map and its matrix, so a far shadow can lag by those frames.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+Shadows.attach(engine, {cadence: [1, 1, 2, 4]});
+```

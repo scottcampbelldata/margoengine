@@ -39,6 +39,7 @@ export interface ShadowOptions {
     };
     filter?: ShadowFilter;
     cascades?: number;
+    cadence?: readonly number[];
 }
 
 export interface ShadowPrepareContext {

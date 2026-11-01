@@ -86,6 +86,7 @@ interface ShadowOptions {
     };
     filter?: ShadowFilter;
     cascades?: number;
+    cadence?: readonly number[];
 }
 
 type ShadowPassContext = Extract<PassContext, {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4191847,
+  "total": 4198283,
   "history": [
     {
       "date": "2026-10-24",
@@ -1187,12 +1187,6 @@
     },
     {
       "date": "2026-11-01",
-      "commit": "6c010a6b7",
-      "reason": "BiomeView canopy option and the cover entry (biome look plan 3 L7, Scott's S5): option and its import in the view, the cover code in the worker",
-      "grew": 3
-    },
-    {
-      "date": "2026-11-01",
       "commit": "4516f36ad",
       "reason": "new entry @margoengine/tilemap/ldtk: the LDtk JSON importer (row 25 J4b, plan budget 5 KB), with tests",
       "grew": 1
@@ -1202,6 +1196,12 @@
       "commit": "764e66da1",
       "reason": "new entry @margoengine/pixel/palette: quantize, Bayer and blue-noise dither, palette swap, Oklab helpers (row 25 J6), with tests",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "6c010a6b7",
+      "reason": "BiomeView canopy option and the cover entry (biome look plan 3 L7, Scott's S5): option and its import in the view, the cover code in the worker",
+      "grew": 3
     },
     {
       "date": "2026-11-01",
@@ -1244,6 +1244,12 @@
       "commit": "c2a9bf6d0",
       "reason": "BiomeView far option and the far and standin entries (biome look plan 3 L9, Scott's S5, far forest on by default, measured within 1.0 ms)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "46d4b3154",
+      "reason": "ContactShadows moves to its own post entry, post/contact-shadows, as a PostStack pass",
+      "grew": 1
     }
   ],
   "items": {
@@ -1470,6 +1476,7 @@
     "@margoengine/post": 40343,
     "@margoengine/post/afterimage": 5661,
     "@margoengine/post/bloom": 6716,
+    "@margoengine/post/contact-shadows": 6436,
     "@margoengine/post/decals": 4760,
     "@margoengine/post/depth": 3876,
     "@margoengine/post/fxaa": 4732,

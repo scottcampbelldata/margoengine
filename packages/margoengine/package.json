@@ -970,6 +970,10 @@
       "types": "./dist/post/depth.d.ts",
       "import": "./dist/post/depth.js"
     },
+    "./post/contact-shadows": {
+      "types": "./dist/post/contact-shadows.d.ts",
+      "import": "./dist/post/contact-shadows.js"
+    },
     "./procedural": {
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"

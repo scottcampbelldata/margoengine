@@ -534,6 +534,20 @@ PostStack.attach(stage.engine, [invert]);
 Build the pipeline and bind group once and rebuild them only when `output.format` or `input` changes; the example keeps them
 in `render` to stay short. Release what you create in `dispose`.
 
+## Contact shadows: `ContactShadows`
+
+`@margoengine/post/contact-shadows` marches a short ray toward the light through the frame's depth, in a `PostStack`. It catches the
+small gaps where an object meets the ground. Options: `distance` (0.4), `thickness` (0.2), `strength` (0.7), `steps` (16), `enabled`
+(true). It sees only what is on screen, and it darkens ambient light too in the pixels it hits.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {ContactShadows} from 'margoengine/post/contact-shadows';
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+ContactShadows.attach(engine, {distance: 0.3});
+```
+
 ## Multiple render targets: `SceneTargets`
 
 `@margoengine/post/mrt` draws the scene's surfaces into several named textures in one pass. Each output is a built-in
