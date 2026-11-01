@@ -197,7 +197,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/points API](https://margoengine.com/llms/api/points.md): 5 entry points
 - [@margoengine/sprites API](https://margoengine.com/llms/api/sprites.md): 2 entry points
 - [@margoengine/lines API](https://margoengine.com/llms/api/lines.md): 1 entry point
-- [@margoengine/text API](https://margoengine.com/llms/api/text.md): 1 entry point
+- [@margoengine/text API](https://margoengine.com/llms/api/text.md): 3 entry points
 - [@margoengine/pixel API](https://margoengine.com/llms/api/pixel.md): 2 entry points
 - [@margoengine/labels API](https://margoengine.com/llms/api/labels.md): 1 entry point
 - [@margoengine/html API](https://margoengine.com/llms/api/html.md): 1 entry point
@@ -210,7 +210,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 1 entry point
 - [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 1 entry point
 - [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 1 entry point
-- [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 13 entry points
+- [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 14 entry points
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 12 entry points
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 2 entry points
 - [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 11 entry points
@@ -218,7 +218,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 2 entry points
 - [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 2 entry points
 - [@margoengine/road API](https://margoengine.com/llms/api/road.md): 1 entry point
-- [@margoengine/tilemap API](https://margoengine.com/llms/api/tilemap.md): 3 entry points
+- [@margoengine/tilemap API](https://margoengine.com/llms/api/tilemap.md): 4 entry points
 - [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 9 entry points
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 8 entry points
 - [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 5 entry points
