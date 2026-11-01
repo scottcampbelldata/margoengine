@@ -1415,8 +1415,8 @@
     },
     {
       "date": "2026-11-01",
-      "commit": "8f5243386",
-      "reason": "biomes/placement +355 B (11951 to 12306 gzip): band loading makes only the strip of each neighbour placement reads; one-worker placement block 1,138 to 1,070 ms/km2 and eight workers 382 to 281 ms/km2 (exploratory, unlocked); Scott authorized a documented biomes placement size increase 2026-11-01",
+      "commit": "a56903ca9",
+      "reason": "biomes/placement measured 12306 B gzip against its 11951 B budget (+355 B): band loading (5b8f66045 to 7e3fa7060, branch agent-build-step-1-biomes-j2-reduce-cp-376b3c27) makes only the band of each neighbour that placement reads; no size authorisation is on record in the repository, so the growth is left to manager review",
       "grew": 1
     }
   ],
