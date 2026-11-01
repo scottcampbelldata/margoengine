@@ -107,3 +107,39 @@ straight alpha and converts. A `smooth` camera's `'view'` layers have one extra 
 Exact bytes need one sample per pixel, which `exactSize` gives; an engine with MSAA draws the same picture. Targets come
 back by themselves after a device loss, with the last `write` in them, so read `layer.texture` each frame rather than
 keeping it.
+
+## Palettes and dithering
+
+`margoengine/pixel/palette` reduces a low-res picture to a palette: one pass from a layer into another, with each pixel becoming exactly one palette colour. Matching is in Oklab or plain sRGB. Ordered Bayer 2, 4 and 8 and a 64 x 64 blue-noise tile dither before matching. `swap` draws other colours for the same matches.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {LayerCompositor} from 'margoengine/pixel';
+import {PaletteQuantize, paletteRamp} from 'margoengine/pixel/palette';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [320, 180]});
+const compositor = LayerCompositor.attach(engine, {camera: {width: 320, height: 180}});
+const drawn = compositor.addLayer({visible: false}); // sprites and maps draw here
+const shown = compositor.addLayer();
+PaletteQuantize.attach(engine, {
+  palette: paletteRamp('#101820', '#f4e9d8', 4),
+  source: drawn.target,
+  target: shown.target,
+  dither: 'bayer4',
+});
+engine.render({delta: 1 / 60});
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `palette` | required | 1 to 256 colours, `#rrggbb` or `[r, g, b]` bytes. `setPalette` swaps it |
+| `swap` | the palette | Colours to draw for each match, same length |
+| `source`, `target` | required | Different textures, or functions returning them; `target` is cleared first |
+| `distance` | `'oklab'` | `'oklab'` or `'srgb'` |
+| `dither` | `'none'` | `'none'`, `'bayer2'`, `'bayer4'`, `'bayer8'`, `'blue-noise'`, read each frame |
+| `spread` | `0.125` | How far the pattern moves a colour, in sRGB values, read each frame |
+| `premultiplied` | `true` | Colours are multiplied by alpha, as in a pixel layer |
+| `order` | `20` | Frame-graph order, after sprites and maps and before the compositor |
+| `name` | `palette-1`, ... | Plugin name, unique per scene |
+
+The pattern is fixed to the target's pixels. `shiftPaletteHue(colors, degrees)` and `paletteRamp(from, to, steps)` make palettes in Oklab; `bayerMatrix`, `blueNoise` and `nearestPaletteIndex` are the CPU forms the pass uses.

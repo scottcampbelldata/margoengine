@@ -846,6 +846,10 @@
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"
     },
+    "./pixel/palette": {
+      "types": "./dist/pixel/palette.d.ts",
+      "import": "./dist/pixel/palette.js"
+    },
     "./points": {
       "types": "./dist/points.d.ts",
       "import": "./dist/points.js"

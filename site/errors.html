@@ -153,6 +153,12 @@
       <p><strong>Cause.</strong> A <code>SpriteLayer</code> option or a <code>Sprite</code> field is out of range. Sprite fields are read each frame, so a bad value throws from the frame that first reads it: a non-finite position, an <code>alpha</code> outside 0 to 1, or a <code>rect</code> that is not whole texels inside the atlas.</p>
       <p><strong>Fix.</strong> Keep <code>x</code>, <code>y</code>, <code>z</code>, scale, pivot and <code>rotation</code> finite, <code>alpha</code> from 0 to 1, and <code>rect</code> as <code>[x, y, width, height]</code> in whole texels inside the atlas. <code>camera.zoom</code> must be above 0, <code>tint</code> is <code>0xrrggbb</code>, <code>#rrggbb</code> or <code>#rgb</code>, atlas bytes are <code>width * height * 4</code> long, and a normal atlas is the size of the colour atlas. For too many sprites, split them across layers. Animation clips need at least one frame of whole-texel rectangles, positive durations and <code>fps</code>, an event <code>frame</code> inside the clip, a <code>speed</code> and <code>dt</code> of 0 or more, and <code>play</code> takes a clip name you passed in <code>clips</code>.</p>
     </section>
+    <section id="pixel-palette">
+      <h2><a href="#pixel-palette">Palette pass</a></h2>
+      <p class="messages"><code>A palette holds 1 to 256 colours</code> <code>Invalid palette colour</code> <code>Invalid palette value</code> <code>A palette swap has as many colours as its palette</code> <code>PaletteQuantize needs a palette, a source and a target</code> <code>Palette source and target must differ</code></p>
+      <p><strong>Cause.</strong> A <code>PaletteQuantize</code> option or a palette helper argument is out of range, or the pass was asked to read and write one texture, which WebGPU forbids.</p>
+      <p><strong>Fix.</strong> Pass 1 to 256 colours as <code>#rrggbb</code> or <code>[r, g, b]</code> bytes, a <code>swap</code> of the same length, a known <code>dither</code> and <code>distance</code>, a <code>spread</code> of 0 or more, and two different textures: draw into one pixel layer and show another.</p>
+    </section>
     <section id="sprite-state">
       <h2><a href="#sprite-state">Sprite layer state</a></h2>
       <p class="messages"><code>Sprite already in a layer</code> <code>Sprite atlas lost with the device; call setAtlas</code> <code>Sprite normals need one sample and a same-size target</code></p>

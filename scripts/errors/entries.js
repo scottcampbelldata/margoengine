@@ -263,6 +263,22 @@ export const entries = [
     fix: 'Keep `x`, `y`, `z`, scale, pivot and `rotation` finite, `alpha` from 0 to 1, and `rect` as `[x, y, width, height]` in whole texels inside the atlas. `camera.zoom` must be above 0, `tint` is `0xrrggbb`, `#rrggbb` or `#rgb`, atlas bytes are `width * height * 4` long, and a normal atlas is the size of the colour atlas. For too many sprites, split them across layers. Animation clips need at least one frame of whole-texel rectangles, positive durations and `fps`, an event `frame` inside the clip, a `speed` and `dt` of 0 or more, and `play` takes a clip name you passed in `clips`.',
   },
   {
+    id: 'pixel-palette',
+    title: 'Palette pass',
+    kind: 'family',
+    messages: [
+      'A palette holds 1 to 256 colours',
+      'Invalid palette colour',
+      'Invalid palette value',
+      'A palette swap has as many colours as its palette',
+      'PaletteQuantize needs a palette, a source and a target',
+      'Palette source and target must differ',
+    ],
+    cause:
+      'A `PaletteQuantize` option or a palette helper argument is out of range, or the pass was asked to read and write one texture, which WebGPU forbids.',
+    fix: 'Pass 1 to 256 colours as `#rrggbb` or `[r, g, b]` bytes, a `swap` of the same length, a known `dither` and `distance`, a `spread` of 0 or more, and two different textures: draw into one pixel layer and show another.',
+  },
+  {
     id: 'sprite-state',
     title: 'Sprite layer state',
     kind: 'family',
