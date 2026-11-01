@@ -60,6 +60,8 @@ export interface WaterOptions {
     foamDistance?: number;
     depth?: () => GPUTexture | undefined;
     terrain?: WaterTerrain;
+    fill?: (x: number, z: number) => number | undefined;
+    still?: boolean;
     reflection?: () => GPUTexture | undefined;
     sceneColor?: () => GPUTexture | undefined;
     lights?: readonly WaterLight[];

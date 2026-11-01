@@ -58,6 +58,10 @@
       "types": "./dist/view.d.ts",
       "import": "./dist/view.js"
     },
+    "./rivers": {
+      "types": "./dist/rivers.d.ts",
+      "import": "./dist/rivers.js"
+    },
     "./cover": {
       "types": "./dist/cover.d.ts",
       "import": "./dist/cover.js"

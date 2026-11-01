@@ -48,6 +48,35 @@ async function sea(){
  sky.dispose();e.dispose();world.dispose();c2.remove();
  return {drawn:on.drawn,share:n/(W*H),mean,sd:Math.sqrt(Math.max(0,q/n-mean*mean)),texture:Math.sqrt(tq/Math.max(1,tn)),band,foam:foam/Math.max(1,band),errors};
 }
+// River water at a 4 km coast world's river (relief: coast south, one river): the state the water stands on, along the
+// line, is 1.5 m over the ground and above the sea, and from above the river shows where `water: 'auto'` has only land.
+async function river(){
+ const c2=document.createElement('canvas');c2.className='sea';c2.width=720;c2.height=450;document.body.append(c2);
+ const world=await BiomeWorld.create({biomes:[presets.temperate],climate:{latitude:46,rainfall:1200},height:{relief:{seed:3,relief:900,base:300,rivers:1,coast:'south'}}});
+ const line=world.rivers[0],at=(k)=>[line[2*k]/1000,line[2*k+1]/1000];
+ const [mx,mz]=at(4),e=await Engine.create(c2,{backend:'webgpu',camera:{position:[mx-30,world.heightAt(mx,mz)+420,mz+260],target:[mx,world.heightAt(mx,mz),mz],near:0.5,far:20000}});
+ const errors=[];e.gpu.addEventListener('uncapturederror',ev=>errors.push(ev.error.message));
+ const sky=Sky.attach(e,{hours:12,timeScale:0,lighting:{intensity:3},environment:true});
+ const frame=async()=>{e.render({delta:1/60});await e.gpu.queue.onSubmittedWorkDone();};
+ async function grab(water){
+  const view=await BiomeView.attach(e,world,{objects:false,sky,water});
+  await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();await waitForPipelines(frame);
+  let state;
+  if(typeof water==='object'){
+   const texture=view.water.coastalDepthTexture,w=texture.width,h=texture.height,read=e.gpu.createBuffer({size:w*h*16,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST}),enc=e.gpu.createCommandEncoder();
+   enc.copyTextureToBuffer({texture},{buffer:read,bytesPerRow:w*16},[w,h]);e.gpu.queue.submit([enc.finish()]);await read.mapAsync(GPUMapMode.READ);state={w,h,data:new Float32Array(read.getMappedRange()).slice()};read.unmap();read.destroy();
+  }
+  e.render({delta:1/60});
+  const c=new OffscreenCanvas(c2.width,c2.height).getContext('2d');c.drawImage(c2,0,0);
+  const {data}=c.getImageData(0,0,c2.width,c2.height);view.dispose();return {data,state};
+ }
+ const on=await grab({rivers:'auto'}),off=await grab('auto'),{w,h,data}=on.state,[x0,z0,x1,z1]=world.bounds;
+ const stand=(x,z)=>{const i=Math.floor((x-x0)/(x1-x0)*w),j=Math.floor((z-z0)/(z1-z0)*h),o=(j*w+i)*4;return {depth:data[o],surface:data[o]+data[o+1]};};
+ const points=[];for(let k=1;k<=8;k++){const [x,z]=at(k),g=world.heightAt(x,z),s=stand(x,z);points.push({k,x,z,ground:g,depth:s.depth,surface:s.surface});}
+ let changed=0;for(let i=0;i<on.data.length;i+=4)if(Math.abs(on.data[i]-off.data[i])+Math.abs(on.data[i+1]-off.data[i+1])+Math.abs(on.data[i+2]-off.data[i+2])>30)changed++;
+ sky.dispose();e.dispose();world.dispose();c2.remove();
+ return {points,share:changed/(c2.width*c2.height),errors};
+}
 window.check={
  async run(){
   const {climate,relief}=presetWorlds.wetland,world=await BiomeWorld.create({climate,height:{relief}});
@@ -75,6 +104,7 @@ window.check={
   out.validation=error?.message??null;out.errors=errors.splice(0);
   engine.dispose();world.dispose();
   out.sea=await sea();
+  out.river=await river();
   return out;
  }
 };

@@ -281,7 +281,7 @@ tile in takes 0.1 ms at the median and 0.3 ms at the 99th percentile on the page
 
 The sea comes with the world: a world whose relief runs below `climate.seaLevel` (the wetland preset's west coast,
 `coast` on `createRelief`) gets a water surface there with no option. The terrain hides it under land, so the shore
-follows the coastline, with the water's shoreline foam. Rivers stay dry valleys in v1.0.0 (docs/limits.md). The sea
+follows the coastline, with the water's shoreline foam. Rivers stay dry valleys unless you ask for water in them (below). The sea
 is not `Water`'s pond default: `SEA` gives it a 512-cell grid (8 m cells on a 4 km world), two swell trains of 48 m and
 27 m (0.9 m and 0.44 m high, their crests break into foam), 6 m of shoreline foam and a sea-blue body. Pass the scene's
 `Sky` as `sky` and the sea reflects it: from the wetland shore at noon the sea's mean sRGB luma goes from 0.27 (a dark
@@ -298,6 +298,22 @@ const { climate, relief } = presetWorlds.wetland;
 const world = await BiomeWorld.create({ climate, height: { relief } });
 const view = await BiomeView.attach(engine, world); // water: 'auto' finds the sea on the west side
 console.log(view.water !== undefined); // true
+```
+
+`water: { rivers: 'auto' }` puts still water in the world's rivers, 1.5 m over the bed and falling with it toward the sea
+(`@margoengine/biomes/rivers`, loaded only when asked for). The terrain hides it where the ground stands higher, so the
+banks draw its edge. A world from `samples` has no lines of its own: pass yours, `rivers: [line]`, each an Int32Array of
+`[x, z, ...]` millimetres. It stands still in v1.0.0 (docs/limits.md); the coupled grid has at most 512 cells a side.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const world = await BiomeWorld.create({ height: { relief: { coast: 'south', rivers: 2 } } });
+const view = await BiomeView.attach(engine, world, { water: { rivers: 'auto' } });
+console.log(world.rivers.length, view.water !== undefined); // 2 true
 ```
 
 ```ts

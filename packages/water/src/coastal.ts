@@ -1,6 +1,6 @@
 import { group, compute } from '../../shared/gpu.js';
 
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number; COPY_DST: number };
 declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
 export const waterFrame = `
 struct Wave {wave:vec4f,shape:vec4f}
@@ -44,6 +44,19 @@ const initialize =
  let index=id.y*size.x+id.x+1u;let edge=id.x==0u||id.y==0u||id.x==size.x-1u||id.y==size.y-1u;
  connected[index]=select(select(index,0u,edge),0xffffffffu,ground>=frame.settings.y);
  textureStore(state,p,vec4f(max(0.0,frame.settings.y-ground),ground,0,0));textureStore(flux,p,vec4f(0));
+}`;
+// Standing water from `WaterOptions.fill`, written over the initial state: depth up to the fill's surface. A cell keeps
+// that surface in w even when its ground stands above it; a still surface reads it there (`STILL` in the water shader).
+const prefill =
+  waterFrame +
+  `
+@group(0) @binding(1) var terrain:texture_2d<f32>;
+@group(0) @binding(2) var fill:texture_2d<f32>;
+@group(0) @binding(3) var state:texture_storage_2d<rgba32float,write>;
+@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){
+ let size=textureDimensions(state);if(any(id.xy>=size)){return;}
+ let p=vec2i(id.xy);let ground=textureLoad(terrain,p,0).r;let level=textureLoad(fill,p,0).r;
+ textureStore(state,p,vec4f(max(max(0.0,frame.settings.y-ground),level-ground),ground,0,level));
 }`;
 const topology = `
 @group(0) @binding(0) var terrain:texture_2d<f32>;
@@ -121,6 +134,9 @@ const integrate =
  textureStore(next,p,vec4f(h,v.y,foam,breaker));
 }`;
 
+/** The fill texel value of a cell with no fill: below any water surface. */
+export const NO_FILL = -1e30;
+
 /** Conservative shore flow; connected offshore cells supply waves while inland basins retain volume. */
 export class CoastalFlow {
   readonly states: GPUTexture[] = [];
@@ -139,11 +155,18 @@ export class CoastalFlow {
   private readonly compressGroup: GPUBindGroup;
   private readonly descriptor: GPUComputePassDescriptor = {};
   private initialized = false;
+  private readonly fillTexture?: GPUTexture;
+  private readonly filling?: GPUComputePipeline;
+  private readonly fillGroup?: GPUBindGroup;
   current = 0;
   constructor(
     device: GPUDevice,
     uniform: GPUBuffer,
     readonly terrain: GPUTexture,
+    // Fill surface per texel (`NO_FILL` for none), rows of increasing z; without it the terrain's sea level alone.
+    fill?: Float32Array,
+    // No flow: the first step's state stands.
+    private readonly still = false,
   ) {
     try {
       this.connected = device.createBuffer({
@@ -189,6 +212,26 @@ export class CoastalFlow {
         fluxViews[0],
         { buffer: this.connected },
       ]);
+      if (fill) {
+        this.fillTexture = device.createTexture({
+          size: [terrain.width, terrain.height],
+          format: 'r32float',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        device.queue.writeTexture(
+          { texture: this.fillTexture },
+          fill as Float32Array<ArrayBuffer>,
+          { bytesPerRow: terrain.width * 4, rowsPerImage: terrain.height },
+          [terrain.width, terrain.height],
+        );
+        this.filling = compute(device, prefill);
+        this.fillGroup = group(device, this.filling, [
+          { buffer: uniform },
+          terrain.createView(),
+          this.fillTexture.createView(),
+          this.views[0],
+        ]);
+      }
       for (let i = 0; i < 2; i++) {
         this.flowGroups.push(
           group(device, this.flowing, [{ buffer: uniform }, this.views[i], fluxViews[i], fluxViews[1 - i]]),
@@ -209,6 +252,7 @@ export class CoastalFlow {
     }
   }
   step(encoder: GPUCommandEncoder): void {
+    if (this.still && this.initialized) return;
     const pass = encoder.beginComputePass(this.descriptor),
       x = Math.ceil(this.terrain.width / 8),
       y = Math.ceil(this.terrain.height / 8);
@@ -222,7 +266,16 @@ export class CoastalFlow {
       pass.setPipeline(this.compressor);
       pass.setBindGroup(0, this.compressGroup);
       pass.dispatchWorkgroups(x, y);
+      if (this.filling) {
+        pass.setPipeline(this.filling);
+        pass.setBindGroup(0, this.fillGroup!);
+        pass.dispatchWorkgroups(x, y);
+      }
       this.initialized = true;
+    }
+    if (this.still) {
+      pass.end();
+      return;
     }
     // shortcut: three substeps suit coastal cells >= 0.5m, increase substeps for finer maps.
     for (let i = 0; i < 3; i++) {
@@ -238,6 +291,7 @@ export class CoastalFlow {
   }
   dispose(): void {
     this.connected?.destroy();
+    this.fillTexture?.destroy();
     for (let i = 0; i < this.states.length; i++) this.states[i].destroy();
     for (let i = 0; i < this.fluxes.length; i++) this.fluxes[i].destroy();
   }

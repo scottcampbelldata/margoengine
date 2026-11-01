@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4281327,
+  "total": 4284030,
   "history": [
     {
       "date": "2026-10-24",
@@ -1340,6 +1340,12 @@
       "commit": "1454595d3",
       "reason": "new optional package @margoengine/headless: stand-in canvas, GPU globals, readback and PNG for rendering with no page (row 32, job 1; budget 3,000 B)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "ea0704032",
+      "reason": "still river water (biome look plan 3 L11, S7): water fill and still options and the prefill pass; biomes/rivers new entry loaded only for water rivers, holds the river ground texture so biomes/view stays inside its old limit",
+      "grew": 2
     }
   ],
   "items": {
@@ -1364,6 +1370,7 @@
     "@margoengine/biomes/placement": 11951,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/relief": 4553,
+    "@margoengine/biomes/rivers": 1567,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 3176,
     "@margoengine/biomes/view": 9943,
@@ -1745,7 +1752,7 @@
     "@margoengine/voxel/render": 24125,
     "@margoengine/voxel/stream": 13408,
     "@margoengine/voxel/vox": 12969,
-    "@margoengine/water": 19258,
+    "@margoengine/water": 20394,
     "@margoengine/weather": 5252,
     "@margoengine/weather/hail": 4287,
     "@margoengine/webgl": 3277,

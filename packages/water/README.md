@@ -82,6 +82,40 @@ higher depressions start dry. Resize preserves simulation state, while replacing
 the height texture or restoring the device resets it. All simulation textures,
 bind groups and pass descriptors are retained between frames.
 
+Standing water above the sea takes `fill` and `still`. `fill(x, z)` gives the surface height per heightmap texel (undefined
+for none), read once when the flow starts: cells below it fill up to it, cells whose ground stands above it stay dry and
+hold that height for the mesh around them. `still: true` stops the flow there: the surface stands, a sloped one included,
+and no flow pass runs after the first frame, so a river costs only its draw. Without `still`, a fill starts the flow.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Water } from '@margoengine/water';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+// A channel 12 m wide along z, its bed rising 2 m per 100 m, on banks 30 m higher.
+const side = 128;
+const ground = new Float32Array(side * side);
+for (let j = 0; j < side; j++)
+  for (let i = 0; i < side; i++) {
+    const x = (i + 0.5) * 4 - 256;
+    const z = (j + 0.5) * 4 - 256;
+    ground[j * side + i] = 15 + z * 0.02 + (Math.abs(x) <= 6 ? 0 : 30);
+  }
+const heightmap = engine.gpu!.createTexture({
+  size: [side, side],
+  format: 'r32float',
+  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+});
+engine.gpu!.queue.writeTexture({ texture: heightmap }, ground, { bytesPerRow: side * 4 }, [side, side]);
+Water.attach(engine, {
+  size: [512, 512],
+  segments: 128,
+  terrain: { heightmap: () => heightmap, origin: [-256, -256], size: [512, 512] },
+  fill: (x, z) => (Math.abs(x) <= 14 ? 16.5 + z * 0.02 : undefined),
+  still: true,
+});
+```
+
 Rendering blends offshore swells into the shallow simulation according to ocean
 connectivity and seabed depth, including blend derivatives in the surface normals.
 Deep ocean keeps the same wave field on both sides of the map boundary. The outer

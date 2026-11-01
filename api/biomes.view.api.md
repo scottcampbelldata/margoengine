@@ -65,7 +65,9 @@ export interface BiomeViewOptions {
     readonly sky?: BiomeSky;
 }
 
-export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon' | 'terrain' | 'spray'>;
+export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon' | 'terrain' | 'spray' | 'fill' | 'still'> & {
+    readonly rivers?: 'auto' | readonly Int32Array[];
+};
 
 export const MATERIALS: Readonly<Record<string, MaterialLook>>;
 
@@ -184,6 +186,7 @@ class BiomeWorld implements Disposable {
     static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
     get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
+    get rivers(): readonly Int32Array[];
     get paint(): readonly PaintLayer[];
     overview(): {
         readonly width: number;

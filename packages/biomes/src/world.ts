@@ -318,6 +318,14 @@ export class BiomeWorld implements Disposable {
     return this.#biomes;
   }
 
+  /**
+   * River centre lines of a world with a procedural relief, in millimetres, mouth first (`Relief.rivers`). Empty for a
+   * world from `samples` or `source` heights.
+   */
+  get rivers(): readonly Int32Array[] {
+    return this.#heights.relief?.rivers ?? [];
+  }
+
   /** The paint layers in composition order. */
   get paint(): readonly PaintLayer[] {
     return this.#paint;

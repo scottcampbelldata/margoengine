@@ -9,7 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { acquireDepth, group } from '../../shared/gpu.js';
-import { CoastalFlow, waterFrame, oceanWaves } from './coastal.js';
+import { CoastalFlow, NO_FILL, waterFrame, oceanWaves } from './coastal.js';
 import { Spray } from './spray.js';
 import { displayShader } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
@@ -89,6 +89,17 @@ export interface WaterOptions {
   depth?: () => GPUTexture | undefined;
   /** Shallow-water coupling with a terrain heightmap. Omitted: open water only. */
   terrain?: WaterTerrain;
+  /**
+   * Standing water over `terrain`, read once per heightmap texel when the flow starts: the water surface height at world
+   * `(x, z)`, or undefined for none (a non-finite result counts as none). Cells below it fill up to it; a cell whose ground
+   * stands above it stays dry and holds that height for the mesh around it. Needs `terrain`.
+   */
+  fill?: (x: number, z: number) => number | undefined;
+  /**
+   * The water stands: no flow passes after the first frame, the surface stays at `fill` (a sloped one included) and at
+   * sea level, and costs nothing but the draw. Needs `terrain`, not `spray`. Default false.
+   */
+  still?: boolean;
   /** Borrowed sky texture (sampleable `rgba16float`), e.g. `() => sky.reflectionTexture`. Omitted: a sky gradient. */
   reflection?: () => GPUTexture | undefined;
   /** Borrowed viewport-sized `rgba16float` scene colour with COPY_SRC, for refraction. Omitted: an approximate seabed. */
@@ -116,6 +127,9 @@ const shader =
   oceanWaves +
   `
 const HORIZON=false;
+const STILL=false;
+// The most the shoreline term alone makes foam, before the grain.
+const SHORE_FOAM=0.35;
 @group(0) @binding(1) var depth:texture_depth_2d;
 @group(0) @binding(2) var history:texture_2d<f32>;
 @group(0) @binding(3) var coast:texture_2d<f32>;
@@ -131,21 +145,25 @@ fn coastBlend(xz:vec2f)->vec3f {
  var gradient=vec2f(0);if(distance==edges.x){gradient.x=slope;}else if(distance==edges.y){gradient.y=slope;}else if(distance==edges.z){gradient.x=-slope;}else{gradient.y=-slope;}
  return vec3f(gradient,t*t*(3.0-2.0*t));
 }
-struct CoastalSample {water:vec4f,normal:vec3f,surface:f32,blend:vec3f,ocean:f32}
+struct CoastalSample {water:vec4f,normal:vec3f,surface:f32,blend:vec3f,ocean:f32,edge:f32}
 fn coastal(xz:vec2f)->CoastalSample {
  let size=vec2i(textureDimensions(coast));let uv=(xz-frame.coast.xy)/frame.coast.zw;
  let pixel=clamp(uv*vec2f(size)-0.5,vec2f(0),vec2f(size-1));let lo=vec2i(floor(pixel));let hi=min(lo+1,size-1);let t=fract(pixel);
  let a=textureLoad(coast,lo,0);let b=textureLoad(coast,vec2i(hi.x,lo.y),0);let c=textureLoad(coast,vec2i(lo.x,hi.y),0);let d=textureLoad(coast,hi,0);
- let weights=vec4f((1.0-t.x)*(1.0-t.y),t.x*(1.0-t.y),(1.0-t.x)*t.y,t.x*t.y)*step(vec4f(0.003),vec4f(a.x,b.x,c.x,d.x));
- let total=dot(weights,vec4f(1));let surface=select(frame.settings.y,dot(weights,vec4f(a.x+a.y,b.x+b.y,c.x+c.y,d.x+d.y))/max(0.0001,total),total>0.0001);
- let h=vec4f(select(surface,a.x+a.y,a.x>0.003),select(surface,b.x+b.y,b.x>0.003),select(surface,c.x+c.y,c.x>0.003),select(surface,d.x+d.y,d.x>0.003));
+ let standing=vec4f(a.x,b.x,c.x,d.x);var levels=vec4f(a.x+a.y,b.x+b.y,c.x+c.y,d.x+d.y);var has=standing;var signed=standing;
+ // A still surface: a dry cell keeps its fill's level, so the mesh beside a narrow channel is not pulled down to the sea,
+ // and its negative depth puts the waterline between texels, where a clamped 0 would stair it along them.
+ if(STILL){let fill=vec4f(a.w,b.w,c.w,d.w);levels=select(fill,levels,standing>vec4f(0.003));has=select(standing,vec4f(1),fill>vec4f(-1e29));signed=select(select(vec4f(-1),fill-vec4f(a.y,b.y,c.y,d.y),fill>vec4f(-1e29)),standing,standing>vec4f(0.003));}
+ let weights=vec4f((1.0-t.x)*(1.0-t.y),t.x*(1.0-t.y),(1.0-t.x)*t.y,t.x*t.y)*step(vec4f(0.003),has);
+ let total=dot(weights,vec4f(1));let surface=select(frame.settings.y,dot(weights,levels)/max(0.0001,total),total>0.0001);
+ let h=select(vec4f(surface),levels,has>vec4f(0.003));
  let dx=mix(h.y-h.x,h.w-h.z,t.y)/max(0.0001,frame.flow.y);let dz=mix(h.z-h.x,h.w-h.y,t.x)/max(0.0001,frame.flow.z);
  let depths=max(vec4f(0),vec4f(frame.settings.y)-vec4f(a.y,b.y,c.y,d.y));
  let indices=vec4u(u32(lo.y*size.x+lo.x),u32(lo.y*size.x+hi.x),u32(hi.y*size.x+lo.x),u32(hi.y*size.x+hi.x))+1u;
  let sea=smoothstep(vec4f(0.65),vec4f(2.4),depths)*vec4f(select(0.0,1.0,connected[indices.x]==0u),select(0.0,1.0,connected[indices.y]==0u),select(0.0,1.0,connected[indices.z]==0u),select(0.0,1.0,connected[indices.w]==0u));
  let ocean=mix(mix(sea.x,sea.y,t.x),mix(sea.z,sea.w,t.x),t.y);let gradient=vec2f(mix(sea.y-sea.x,sea.w-sea.z,t.y)/frame.flow.y,mix(sea.z-sea.x,sea.w-sea.y,t.x)/frame.flow.z);let edge=coastBlend(xz);
  let blend=vec3f(edge.xy*(1.0-ocean)-edge.z*gradient,edge.z*(1.0-ocean));
- return CoastalSample(mix(mix(a,b,t.x),mix(c,d,t.x),t.y),normalize(vec3f(-dx,1,-dz)),surface,blend,ocean);
+ return CoastalSample(mix(mix(a,b,t.x),mix(c,d,t.x),t.y),normalize(vec3f(-dx,1,-dz)),surface,blend,ocean,mix(mix(signed.x,signed.y,t.x),mix(signed.z,signed.w,t.x),t.y));
 }
 struct Surface {position:vec3f,normal:vec3f,crest:f32}
 fn surface(xz:vec2f,sampleWidth:f32)->Surface {
@@ -224,13 +242,13 @@ ${displayShader}
 @fragment fn fragment(i:Output)->Result{
  let pixel=vec2i(i.clip.xy);let waterDistance=linear(i.clip.z);let sceneDepth=textureLoad(depth,pixel,0);
  var gap=50.0;if(sceneDepth>0){gap=max(0.0,linear(sceneDepth)-waterDistance)*abs(frame.eye.y-i.world.y)/max(0.0001,waterDistance);}
- var movement=i.crest;let isCoast=inCoast(i.xz);var refraction=1.0;var dry=false;
+ var movement=i.crest;let isCoast=inCoast(i.xz);var refraction=1.0;var dry=false;var river=false;
  if(frame.flow.w>0.5){
   let sample=coastal(i.xz);let v=sample.water;refraction=coastBlend(i.xz).z;
   // shortcut: uncharted seabed deepens at 0.35 m/m; supply a larger heightmap for distant shoals.
   let outside=max(max(frame.coast.xy-i.xz,i.xz-frame.coast.xy-frame.coast.zw),vec2f(0));let bed=max(0.0,i.world.y-v.y)+length(outside)*0.35;
   gap=mix(gap,min(gap,bed),select(sample.ocean,1.0,isCoast));
-  if(isCoast){dry=v.x<0.003;gap=mix(gap,v.x,sample.blend.z);movement=mix(movement,v.z,sample.blend.z);}
+  if(isCoast){dry=select(v.x<0.003,sample.edge<=0.0,STILL);gap=mix(gap,v.x,sample.blend.z);movement=mix(movement,v.z,sample.blend.z);river=STILL&&v.y>frame.settings.y;}
  }
  let footprint=max(length(dpdx(i.world.xz)),length(dpdy(i.world.xz)));let edge=max(0.015,fwidth(gap)*1.5);
  let normalWidth=length(fwidth(i.normal));
@@ -240,7 +258,7 @@ ${displayShader}
  // Gradient noise is centred on zero with the same 0.21 spread as the former 0..1 value noise.
  if(grainDetail>0){grain=0.5+noise(i.world.xz*2.4+vec2f(frame.settings.x*0.22,0)).x*grainDetail;}
  let shore=1.0-smoothstep(0.0,max(frame.settings.z*0.5,edge*2.0),max(0.0,gap+(grain-0.5)*0.08));
- let pattern=mix(0.45,1.0,grain);let fresh=clamp((shore*0.08+movement*0.9)*pattern,0.0,1.0);
+ let pattern=mix(0.45,1.0,grain);let fresh=clamp((select(shore,0.0,river)*SHORE_FOAM+movement*0.9)*pattern,0.0,1.0);
  var foam=fresh;if(frame.flow.w<0.5){foam=max(fresh,textureLoad(history,pixel,0).r*exp(-frame.cameraData.z*3.0)*shore);}
  var ripple=vec3f(0);
  if(footprint<6.0){
@@ -466,6 +484,13 @@ export class Water implements EnginePlugin {
       (typeof options.shadows?.pbr !== 'function' || typeof options.shadows?.bindings !== 'function')
     )
       throw new TypeError('Water shadows need pbr() and bindings(); pass a Shadows from @margoengine/shadows');
+    if (
+      (options.fill !== undefined && (typeof options.fill !== 'function' || !options.terrain)) ||
+      (options.still !== undefined && (typeof options.still !== 'boolean' || !options.terrain || options.spray))
+    )
+      throw new TypeError(
+        'Invalid water fill or still; fill takes a function, still a boolean, both need options.terrain and still does not take spray',
+      );
     this.validateLights();
     this.horizon = options.horizon ?? false;
     this.cell = [size[0] / segments, size[1] / segments];
@@ -697,6 +722,23 @@ export class Water implements EnginePlugin {
         );
     }
   }
+  // The fill surface per heightmap texel centre, or undefined with no fill and no still.
+  private fillCells(terrain: GPUTexture): Float32Array | undefined {
+    const { fill, still, terrain: place } = this.options;
+    if (!fill && !still) return undefined;
+    const { width, height } = terrain,
+      cells = new Float32Array(width * height).fill(NO_FILL);
+    if (fill)
+      for (let j = 0; j < height; j++)
+        for (let i = 0; i < width; i++) {
+          const level = fill(
+            place!.origin[0] + ((i + 0.5) * place!.size[0]) / width, // float division: metres
+            place!.origin[1] + ((j + 0.5) * place!.size[1]) / height, // float division: metres
+          );
+          if (level !== undefined && Number.isFinite(level)) cells[j * width + i] = level;
+        }
+    return cells;
+  }
   private drawSurface(c: Context): void {
     resolveMSAA(c);
     const samples = c.descriptor.multisample?.count ?? 1;
@@ -860,7 +902,9 @@ export class Water implements EnginePlugin {
     if (this.format !== format) {
       // Shadow sampling goes after the surface functions, which GPU probes compile on their own.
       const code =
-        shader.replace('const HORIZON=false;', `const HORIZON=${this.horizon};`) +
+        shader
+          .replace('const HORIZON=false;', `const HORIZON=${this.horizon};`)
+          .replace('const STILL=false;', `const STILL=${!!this.options.still};`) +
         (shadows ? '\n' + shadows.pbr(1).declarations + shadowed : unshadowed);
       this.shaderCode = fog ? foggedShader(code) : code;
       const module = c.device.createShaderModule({ code: this.shaderCode });
@@ -945,7 +989,7 @@ export class Water implements EnginePlugin {
         this.spray?.dispose();
         this.spray = undefined;
         this.coastal?.dispose();
-        this.coastal = new CoastalFlow(c.device, this.uniform!, terrain);
+        this.coastal = new CoastalFlow(c.device, this.uniform!, terrain, this.fillCells(terrain), this.options.still);
         if (this.options.spray) this.spray = new Spray(c.device, this.uniform!, this.coastal);
         this.values[101] = this.values[98] / terrain.width;
         this.values[102] = this.values[99] / terrain.height;

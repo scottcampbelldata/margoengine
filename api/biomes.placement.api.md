@@ -185,6 +185,7 @@ class BiomeWorld implements Disposable {
     static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
     get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
+    get rivers(): readonly Int32Array[];
     get paint(): readonly PaintLayer[];
     overview(): {
         readonly width: number;

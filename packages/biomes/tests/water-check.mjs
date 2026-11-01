@@ -29,7 +29,7 @@ await runSuite(
     // Landing E (biome look plan 2, item 2): the sea from the biome shots' camera 06 under a noon Sky passed as `sky`.
     // Before (BASE b88424755, RTX A6000, 720 x 450): a flat dark teal plane, wave texture 0.0130 (sRGB luma less its
     // 5 x 5 mean, RMS), mean luma 0.266, no foam-white pixel in the shore band. Now: texture 0.0485, mean 0.74, shore band
-    // 11 percent foam-white (the swell's crests break; the water's own shoreline term is at most 8 percent foam).
+    // 11 percent foam-white (the swell's crests break; the water's own shoreline term is at most 35 percent foam).
     const sea = r.sea;
     assert.deepEqual(sea.errors, []);
     assert.equal(sea.drawn, true);
@@ -39,6 +39,23 @@ await runSuite(
     assert.ok(
       sea.band > 500 && sea.foam > 0.02,
       `shore band (${sea.band} px) foam-white share above 2 percent: ${sea.foam}`,
+    );
+    // Biome look plan 3 L11: water in the rivers. 1.5 m over the ground along the line and rising with it: main drew
+    // nothing above the sea, everywhere the sea plane.
+    const river = r.river;
+    assert.deepEqual(river.errors, []);
+    assert.ok(river.share > 0.002, `river pixels from above: ${river.share}`);
+    for (const p of river.points) {
+      assert.ok(p.depth > 0.5, `water at line point ${p.k}: depth ${p.depth}`);
+      assert.ok(
+        Math.abs(p.surface - p.ground - 1.5) < 1,
+        `line point ${p.k}: surface ${p.surface}, ground ${p.ground}`,
+      );
+    }
+    const ends = [river.points[0], river.points[river.points.length - 1]];
+    assert.ok(
+      ends[1].surface - ends[0].surface > 10,
+      `the surface rises upstream: ${ends[0].surface} to ${ends[1].surface}`,
     );
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });

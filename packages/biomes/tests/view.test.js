@@ -20,6 +20,7 @@ import {
   terrainColorsFor,
   viewTile,
 } from '../dist/view.js';
+import { riverWater, riverWaterOptions } from '../dist/rivers.js';
 import { canopyCorners, canopyCover, canopyShare, CANOPY_KINDS, darkenTile } from '../dist/cover.js';
 
 test('ground materials are the unique ground layers in first-use order, all of them', () => {
@@ -314,6 +315,152 @@ test('the overview is the same whatever tiles were made, and its row bands are t
 test('water: a bad option is a TypeError before anything loads', async () => {
   const world = await BiomeWorld.create({ size: [512, 512] });
   await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { water: 'yes' }), TypeError);
+});
+
+test('riverWaterOptions makes the ground texture once per device and destroys it', async () => {
+  const usage = globalThis.GPUTextureUsage;
+  globalThis.GPUTextureUsage = { TEXTURE_BINDING: 4, COPY_DST: 2 };
+  try {
+    const gpu = () => {
+        const made = {
+          textures: [],
+          writes: 0,
+          createTexture(descriptor) {
+            const texture = { descriptor, destroyed: 0, destroy: () => texture.destroyed++ };
+            made.textures.push(texture);
+            return texture;
+          },
+          queue: { writeTexture: () => made.writes++ },
+        };
+        return made;
+      },
+      first = gpu(),
+      second = gpu();
+    let device;
+    const river = riverWaterOptions(
+        {
+          bounds: [0, 0, 100, 100],
+          heights: new Float32Array(25).fill(10),
+          width: 5,
+          depth: 5,
+          lines: [new Int32Array([0, 50000, 100000, 50000])],
+          heightAt: () => 10,
+          sea: 0,
+        },
+        () => device,
+      ),
+      { heightmap } = river.options.terrain;
+    assert.equal(river.options.still, true);
+    assert.deepEqual(river.options.terrain.origin, [0, 0]);
+    assert.deepEqual(river.options.terrain.size, [100, 100]);
+    assert.equal(river.options.fill(50, 50), 11.5);
+    assert.equal(heightmap(), undefined, 'no device yet, no texture');
+    device = first;
+    const texture = heightmap();
+    assert.equal(heightmap(), texture, 'one texture per device');
+    assert.deepEqual([first.textures.length, first.writes], [1, 1]);
+    assert.deepEqual(texture.descriptor.size, [4, 4]);
+    assert.equal(texture.descriptor.format, 'r32float');
+    device = second;
+    assert.notEqual(heightmap(), texture, 'made again after a device restore');
+    river.dispose();
+    assert.equal(second.textures[0].destroyed, 1);
+  } finally {
+    globalThis.GPUTextureUsage = usage;
+  }
+});
+
+test('river water: bad rivers are a TypeError before anything loads', async () => {
+  const world = await BiomeWorld.create({ size: [512, 512] });
+  await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { water: { rivers: 'all' } }), TypeError);
+  world.dispose();
+});
+
+test('riverWater stands the surface 1.5 m over the ground along the line, inside a corridor', async () => {
+  const world = await BiomeWorld.create({
+      height: { relief: { seed: 3, relief: 900, base: 300, rivers: 1, coast: 'south' } },
+    }),
+    { width, depth, height: heights } = world.overview(),
+    line = world.rivers[0],
+    river = riverWater({
+      bounds: world.bounds,
+      heights,
+      width,
+      depth,
+      lines: world.rivers,
+      heightAt: (x, z) => world.heightAt(x, z),
+      sea: 0,
+    });
+  assert.equal(world.rivers.length, 1);
+  assert.ok(river.width >= 2 && river.width <= 512 && river.ground.length === river.width * river.depth);
+  const cell = 4096 / river.width; // float division: metres per cell
+  const levels = [];
+  for (let k = 1; k < line.length / 2; k++) {
+    const x = line[2 * k] / 1000, // float division
+      z = line[2 * k + 1] / 1000, // float division
+      level = river.fill(x, z),
+      ground = world.heightAt(x, z);
+    assert.ok(level !== undefined, `surface at line point ${k}`);
+    assert.ok(Math.abs(level - ground - 1.5) < 1, `line point ${k}: surface ${level}, ground ${ground}`);
+    levels.push(level);
+    // The cell under the line holds water; the ground is at or below the bed there.
+    const i = Math.floor((x - world.bounds[0]) / cell), // float division
+      j = Math.floor((z - world.bounds[1]) / cell); // float division
+    assert.ok(river.ground[j * river.width + i] <= level - 1, `cut to the bed at line point ${k}`);
+  }
+  assert.ok(levels[levels.length - 1] > levels[0] + 10, `the surface rises upstream: ${levels}`);
+  // Far from the line there is no fill.
+  const [mx, mz] = [line[8] / 1000, line[9] / 1000]; // float division
+  assert.equal(river.fill(mx + 400, mz), undefined);
+  assert.equal(river.fill(1e7, 0), undefined);
+  // Under water below the sea no fill: the sea's own.
+  assert.equal(
+    riverWater({
+      bounds: [0, 0, 64, 64],
+      heights: new Float32Array(25).fill(-9),
+      width: 5,
+      depth: 5,
+      lines: [new Int32Array([0, 32000, 64000, 32000])],
+      heightAt: () => -9,
+      sea: 0,
+    }).fill(32, 32),
+    undefined,
+  );
+  // Lines are checked.
+  assert.throws(
+    () =>
+      riverWater({
+        bounds: [0, 0, 64, 64],
+        heights: new Float32Array(4),
+        width: 2,
+        depth: 2,
+        lines: [[0, 0, 1, 1]],
+        heightAt: () => 0,
+        sea: 0,
+      }),
+    TypeError,
+  );
+  assert.throws(
+    () =>
+      riverWater({
+        bounds: [0, 0, 0, 64],
+        heights: new Float32Array(4),
+        width: 2,
+        depth: 2,
+        lines: [],
+        heightAt: () => 0,
+        sea: 0,
+      }),
+    RangeError,
+  );
+  // A world from samples has no lines.
+  const flat = await BiomeWorld.create({
+    size: [512, 512],
+    height: { samples: new Float32Array(25), width: 5, depth: 5 },
+  });
+  assert.deepEqual(flat.rivers, []);
+  flat.dispose();
+  world.dispose();
 });
 
 test('sky and material relief: bad options are errors before anything loads', async () => {
