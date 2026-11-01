@@ -70,6 +70,10 @@
     "./library": {
       "types": "./dist/library.d.ts",
       "import": "./dist/library.js"
+    },
+    "./smooth": {
+      "types": "./dist/smooth.d.ts",
+      "import": "./dist/smooth.js"
     }
   },
   "files": [

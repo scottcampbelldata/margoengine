@@ -614,6 +614,15 @@ File layouts, written from each format's public description; no reader or writer
 | VF5 | VXL: columns of spans N, S, E, A with BGRA dwords for top and bottom colours; N of 0 ends a column | voxel-edit/src/formats.ts | Ken Silverman, the VXL format description in the Voxlap documentation |
 | VF6 | over 255 colours: drop the same low bits of each channel until 255 remain, keeping the bucket's centre | voxel-edit/src/formats.ts | Margo-own: deterministic, plain bit truncation; median cut is in the `./voxelize` entry |
 
+## Smooth voxel meshes: `@margoengine/voxel-edit/smooth`
+
+Written from the paper below; no Surface Nets code of another project was read.
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| SN1 | one point per net cell the surface crosses, at the mean of its edge crossings; one quad per filled-to-air sample pair; relaxation toward neighbours kept inside the cell | voxel-edit/src/smooth.ts | Sarah Gibson, "Constrained Elastic Surface Nets", MERL TR-99-24 / MICCAI 1998 |
+| SN2 | normals from the density difference across a net cell; a separable box blur by running sums | voxel-edit/src/smooth.ts | Margo-own, central differences and the standard running sum box filter |
+
 ## Rigging: `@margoengine/rigging`
 
 Written clean room from the papers and specifications below. No source code of rigging tools or engines (Blender,

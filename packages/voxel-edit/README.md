@@ -59,6 +59,7 @@ corner coordinates.
 | `./history` | `VoxelHistory`: undo/redo of copied grids with depth, per-grid cell and total byte budgets |
 | `./export` | `gridToExportSource`: meshes a grid into one primitive per palette material (corner AO as vertex colours), the `{nodes}` scene `exportGLB`, `exportUSDZ` and `exportOBJ` take |
 | `./formats` | voxel files other tools write: `parseQB` / `writeQB` and `parseQEF` / `writeQEF` (Qubicle), `parseBinvox`, `parseKVX` and `parseVXL`; models, palette, positions, with cell budgets |
+| `./smooth` | `smoothGrid`: a smooth Surface Nets mesh of a grid, with relaxation, optional blur and gradient normals, for `gridToExportSource` |
 | `./assist` | `noiseFill` (seeded random fill), `suggestPalette` (seeded hues, linear sRGB) and `paletteUsage` (cells per index) |
 | `./library` | `fetchLibrary` / `fetchAsset` / `resolveLibraryUrl`: list and fetch `.vox` packs from a JSON index, with a body size limit and abort |
 
@@ -102,6 +103,26 @@ const text = writeQEF(models[0].grid, palette);
 KVX and VXL have z running down in the file, so they turn to Y up on reading: the file's y becomes z. A true-colour file
 with over 255 colours loses low bits from each channel, the same on every run, until 255 are left, and `colorsReduced`
 is true. Minecraft `.schematic` and Goxel `.gox` are left out on purpose.
+
+## Smooth meshes
+
+`./smooth` meshes a grid as a rounded surface in place of cubes. Its mesh has the same shape as `meshGrid`'s, so
+`partitionMesh` and the exporters take it.
+
+```ts
+import { gridToExportSource } from '@margoengine/voxel-edit/export';
+import { smoothGrid } from '@margoengine/voxel-edit/smooth';
+
+const grid = { size: [3, 3, 3] as const, voxels: new Uint8Array(27).fill(1) };
+const { mesh, stats } = smoothGrid(grid, { iterations: 4, blur: 1 });
+const source = gridToExportSource(grid, [{ index: 1, color: [0.8, 0.3, 0.1] }], { mesh });
+console.log(stats.quads, source.nodes[0].primitives.length);
+```
+
+`iterations` (default 2, up to 64) relaxes the points; each stays inside its own net cell, so the model never drifts.
+`blur` (default 0, up to 8) is a box blur radius over the occupancy: rounder, but a part thinner than `2 * blur + 1` fades
+away. Each quad takes the palette index of the nearest filled voxel. Cells that touch only along an edge or corner share a
+surface point there, so such a model is closed but not manifold at that point.
 
 ## Saved formats
 

@@ -36,7 +36,7 @@ export interface VoxelExportPrimitive {
 
 /**
  * A plain data scene. `nodes` is what `exportGLB`, `exportUSDZ` and `exportOBJ` require.
- * `mesh` is the hard cubic mesh the primitives were split from.
+ * `mesh` is the mesh the primitives were split from, hard cubic unless one was passed.
  */
 export interface VoxelExportSource {
   /** One node holding every primitive. */
@@ -54,13 +54,21 @@ export interface VoxelExportSource {
 export function gridToExportSource(
   grid: VoxelGrid,
   materials: readonly ExportMaterial[],
-  options: { name?: string; ambientOcclusion?: boolean; smoothNormals?: boolean } = {},
+  options: {
+    name?: string;
+    ambientOcclusion?: boolean;
+    smoothNormals?: boolean;
+    /** A mesh already built from the grid, such as `smoothGrid`'s, used in place of the hard cubic one. */
+    mesh?: GridMesh;
+  } = {},
 ): VoxelExportSource {
   const name = options.name ?? 'voxels';
-  const { mesh } = meshGrid(grid, {
-    ambientOcclusion: options.ambientOcclusion,
-    smoothNormals: options.smoothNormals,
-  });
+  const mesh =
+    options.mesh ??
+    meshGrid(grid, {
+      ambientOcclusion: options.ambientOcclusion,
+      smoothNormals: options.smoothNormals,
+    }).mesh;
   const byIndex = new Map(materials.map((material) => [material.index, material]));
   const primitives = partitionMesh(mesh).map((part) => {
     const material = byIndex.get(part.paletteIndex);

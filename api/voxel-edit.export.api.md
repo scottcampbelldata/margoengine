@@ -42,6 +42,7 @@ export function gridToExportSource(grid: VoxelGrid, materials: readonly ExportMa
     name?: string;
     ambientOcclusion?: boolean;
     smoothNormals?: boolean;
+    mesh?: GridMesh;
 }): VoxelExportSource;
 
 // Not exported from this entry, but used by the exports above:

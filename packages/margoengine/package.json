@@ -1518,6 +1518,10 @@
       "types": "./dist/voxel-edit/library.d.ts",
       "import": "./dist/voxel-edit/library.js"
     },
+    "./voxel-edit/smooth": {
+      "types": "./dist/voxel-edit/smooth.d.ts",
+      "import": "./dist/voxel-edit/smooth.js"
+    },
     "./voxel-net": {
       "types": "./dist/voxel-net.d.ts",
       "import": "./dist/voxel-net.js"

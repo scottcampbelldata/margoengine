@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4223631,
+  "total": 4226264,
   "history": [
     {
       "date": "2026-10-24",
@@ -1268,6 +1268,12 @@
       "commit": "a3b1efae0",
       "reason": "row 26 jobs 3-6: new sprites/aseprite, sprites/atlas, exporters/atlas, godot-2d and unity-2d entries",
       "grew": 5
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "a0cb192d1",
+      "reason": "row 26 job 11: voxel-edit/smooth, new optional entry, Surface Nets meshing",
+      "grew": 1
     }
   ],
   "items": {
@@ -1638,6 +1644,7 @@
     "@margoengine/voxel-edit/library": 1255,
     "@margoengine/voxel-edit/mesh": 9456,
     "@margoengine/voxel-edit/pick": 7239,
+    "@margoengine/voxel-edit/smooth": 2633,
     "@margoengine/voxel-edit/sparse": 6873,
     "@margoengine/voxel-edit/vox": 12202,
     "@margoengine/voxel-net": 8267,
