@@ -78,6 +78,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/html](https://margoengine.com/llms/packages/html.md): World-space DOM anchors, CSS3D placement and scene-depth occlusion.
 - [@margoengine/video](https://margoengine.com/llms/packages/video.md): WebGPU external video textures and optional Web Audio sampling.
 - [@margoengine/xr](https://margoengine.com/llms/packages/xr.md): Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine.
+- [@margoengine/headless](https://margoengine.com/llms/packages/headless.md): Render without a browser page: a stand-in canvas for core, GPU globals from the WebGPU binding you pass in, and readback to RGBA pixels or PNG bytes.
 - [@margoengine/staging](https://margoengine.com/llms/packages/staging.md): Product-shot staging: soft ground contact shadows (shadow-catcher plane) for core meshes and glTF models.
 
 ## Packages: Post-processing
@@ -203,10 +204,11 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/html API](https://margoengine.com/llms/api/html.md): 1 entry point
 - [@margoengine/video API](https://margoengine.com/llms/api/video.md): 1 entry point
 - [@margoengine/xr API](https://margoengine.com/llms/api/xr.md): 1 entry point
+- [@margoengine/headless API](https://margoengine.com/llms/api/headless.md): 1 entry point
 - [@margoengine/staging API](https://margoengine.com/llms/api/staging.md): 1 entry point
 - [@margoengine/post API](https://margoengine.com/llms/api/post.md): 20 entry points
 - [@margoengine/tonemap API](https://margoengine.com/llms/api/tonemap.md): 1 entry point
-- [@margoengine/dof API](https://margoengine.com/llms/api/dof.md): 1 entry point
+- [@margoengine/dof API](https://margoengine.com/llms/api/dof.md): 3 entry points
 - [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 2 entry points
 - [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 1 entry point
 - [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 1 entry point

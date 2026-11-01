@@ -1,5 +1,5 @@
 {
-  "commit": "254ff3891",
+  "commit": "cc659d48e",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -370,8 +370,16 @@
     },
     "@margoengine/dof": {
       ".": {
-        "raw": 24402,
-        "gzip": 7746
+        "raw": 24530,
+        "gzip": 7805
+      },
+      "./lens": {
+        "raw": 2593,
+        "gzip": 1263
+      },
+      "./autofocus": {
+        "raw": 3975,
+        "gzip": 1936
       }
     },
     "@margoengine/ecs": {
@@ -654,6 +662,12 @@
         "gzip": 14980
       }
     },
+    "@margoengine/headless": {
+      ".": {
+        "raw": 5287,
+        "gzip": 2611
+      }
+    },
     "@margoengine/html": {
       ".": {
         "raw": 14149,
@@ -682,8 +696,8 @@
     },
     "@margoengine/inspector": {
       ".": {
-        "raw": 25982,
-        "gzip": 9066
+        "raw": 26026,
+        "gzip": 9090
       },
       "./frame": {
         "raw": 23576,
@@ -1168,12 +1182,12 @@
     },
     "@margoengine/react": {
       ".": {
-        "raw": 20319,
-        "gzip": 8031
+        "raw": 20369,
+        "gzip": 8061
       },
       "./controls": {
-        "raw": 10811,
-        "gzip": 4090
+        "raw": 10863,
+        "gzip": 4123
       },
       "./gltf-pro": {
         "raw": 8343,
@@ -1196,8 +1210,8 @@
         "gzip": 1273
       },
       "./shadows": {
-        "raw": 8187,
-        "gzip": 3583
+        "raw": 8239,
+        "gzip": 3616
       },
       "./sky": {
         "raw": 1515,
@@ -1208,12 +1222,12 @@
         "gzip": 1409
       },
       "./geometry": {
-        "raw": 5341,
-        "gzip": 2147
+        "raw": 5393,
+        "gzip": 2180
       },
       "./materials": {
-        "raw": 9941,
-        "gzip": 4060
+        "raw": 9993,
+        "gzip": 4091
       },
       "./post": {
         "raw": 11013,
@@ -1236,12 +1250,24 @@
         "gzip": 1944
       },
       "./physics": {
-        "raw": 15551,
-        "gzip": 5969
+        "raw": 15605,
+        "gzip": 6004
       },
       "./xr": {
-        "raw": 8342,
-        "gzip": 3562
+        "raw": 8394,
+        "gzip": 3591
+      },
+      "./lines": {
+        "raw": 1399,
+        "gzip": 764
+      },
+      "./devtools": {
+        "raw": 1454,
+        "gzip": 752
+      },
+      "./helpers": {
+        "raw": 8490,
+        "gzip": 3543
       }
     },
     "@margoengine/rigging": {
