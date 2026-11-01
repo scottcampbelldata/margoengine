@@ -2014,6 +2014,9 @@ export class PBRModel implements EnginePlugin {
           get shadowPrimitives() {
             return model.nodeShadowPrimitives(node);
           },
+          get tintPrimitives() {
+            return model.tintPrimitives.filter((p) => p.node === node);
+          },
           prepareDeformation(context) {
             model.prepareDeformation?.(context);
           },
@@ -2709,6 +2712,24 @@ export class PBRModel implements EnginePlugin {
   get shadowPrimitives(): ShadowCasterRecord[] {
     const out: ShadowCasterRecord[] = [];
     this.writeShadowPrimitives(out);
+    return out;
+  }
+  /**
+   * Transmissive and blended primitives for coloured shadows (`Shadows` `colored`), with the light each lets through:
+   * the transmission tint, or the base colour weighed by alpha.
+   */
+  get tintPrimitives(): (ShadowCasterRecord & { tint: readonly number[] })[] {
+    const out: (ShadowCasterRecord & { tint: readonly number[] })[] = [];
+    for (let i = 0; i < this.resources.length; i++) {
+      const r = this.resources[i],
+        p = r.primitive,
+        m = p.material;
+      if (p.topology || (m.settings[0] !== 2 && !primitiveAfterOpaque(p))) continue;
+      const record = {} as ShadowCasterRecord & { tint: readonly number[] };
+      fillShadow(r, record);
+      record.tint = m.tint ?? [0, 1, 2].map((k) => 1 - m.base[3] * (1 - m.base[k]));
+      out.push(record);
+    }
     return out;
   }
   /** Borrowed current draw buffers; picking never substitutes bind-pose geometry. */

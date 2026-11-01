@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4204166,
+  "total": 4205244,
   "history": [
     {
       "date": "2026-10-24",
@@ -1256,6 +1256,12 @@
       "commit": "d87899b14",
       "reason": "tilemap root gains the TileMap renderer (row 25 J3b, plan budget 9 KB): chunked instanced draws, flips, animation lookup",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "2d6b7738d",
+      "reason": "row 21.6 job 6a: coloured shadows option",
+      "grew": 1
     }
   ],
   "items": {
@@ -1550,7 +1556,7 @@
     "@margoengine/shader/noise": 4753,
     "@margoengine/shader/raw": 9906,
     "@margoengine/shader/readback": 7620,
-    "@margoengine/shadows": 16243,
+    "@margoengine/shadows": 17321,
     "@margoengine/shadows/virtual": 14601,
     "@margoengine/sky": 16485,
     "@margoengine/sky/base": 7066,

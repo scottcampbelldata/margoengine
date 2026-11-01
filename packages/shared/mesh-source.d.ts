@@ -65,6 +65,8 @@ export interface MeshSource {
   /** Borrowed live draw buffers, including current deformation after animation. */
   readonly draws: readonly MeshDraw[];
   readonly shadowPrimitives: MeshSourceOwner['shadowPrimitives'];
+  /** Coloured shadow casters of this node (`Shadows` `colored`). */
+  readonly tintPrimitives?: readonly { node: unknown; tint: readonly number[] }[];
   prepareDeformation(context: MeshDeformationContext): void;
   readPickingGeometry(): Promise<readonly MeshPose[]>;
 }

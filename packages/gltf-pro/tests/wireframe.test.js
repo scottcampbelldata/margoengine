@@ -199,3 +199,18 @@ test('invalid live wireframe flags report the boolean fix', async (t) => {
     assert.throws(() => f.frame(), { name: 'TypeError', message: /wireframe.*boolean/i });
   }
 });
+
+test('tintPrimitives gives blended and transmissive primitives with the light they let through', async (t) => {
+  const f = await fixture(t),
+    m = f.primitive.material;
+  assert.deepEqual(f.model.tintPrimitives, [], 'an opaque primitive blocks light');
+  m.settings[0] = 2;
+  m.base = [1, 0.5, 0, 0.5];
+  const blended = f.model.tintPrimitives[0];
+  assert.deepEqual([...blended.tint], [1, 0.75, 0.5], 'alpha weighs the base colour');
+  assert.equal(blended.index, f.primitive.buffers.index);
+  assert.equal(blended.stride, 80);
+  m.tint = [0.2, 0.4, 0.6];
+  assert.deepEqual(f.model.tintPrimitives[0].tint, [0.2, 0.4, 0.6], 'a transmission tint wins');
+  assert.equal(meshTriangles(f.primitive.node).source.tintPrimitives.length, 1);
+});

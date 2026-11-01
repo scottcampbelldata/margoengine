@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadows: coloured</title><style>body{margin:0;background:#000}canvas{width:640px;height:360px;display:block}</style></head><body><canvas width="640" height="360"></canvas>
+<script type="module">
+// A floor, a light from the side so a caster's shadow falls clear of it, and three casters: a red pane, a box that
+// blocks, and a small box between the light and the pane, which the pane must not tint.
+// colored-browser.mjs reads known floor points.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const camera={position:[0,10,5],target:[0,0,0],fov:60};
+const engine=await Engine.create(canvas,{backend:'webgpu',camera}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.createMesh().setGeometry(box(14,0.1,14)).setPosition([0,-0.05,0]);
+engine.lighting.direction.set([-1,1,0].map(v=>v*Math.SQRT1_2));
+const pane=engine.createMesh().setGeometry(box(2,0.05,2)).setPosition([-2,2,0]);
+const blocker=engine.createMesh().setGeometry(box(1,1,1)).setPosition([-2,2,4]);
+// Above the pane, on the light's side: lit in full, whatever colour the pane is.
+const riser=engine.createMesh().setGeometry(box(0.4,0.4,0.4)).setPosition([-3.2,3.2,0.6]);
+let plugin,removers=[];
+const render=async(n=3)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],unit=v=>{const l=Math.hypot(...v);return v.map(x=>x/l);};
+window.check={
+  // mode: 'off' a plain Shadows with the pane blocking; 'tint' coloured; 'empty' coloured with no tinting caster;
+  // 'hidden' coloured with the pane hidden; 'removed' coloured, the pane's tint removed.
+  async show(mode,filter='pcf'){
+    removers.forEach(r=>r());removers=[];plugin?.dispose();pane.visible=true;
+    plugin=Shadows.attach(engine,{resolution:1024,filter,bounds:{min:[-7,-1,-7],max:[7,5,7]},...(mode==='off'?{}:{colored:true})});
+    removers.push(plugin.add(blocker),plugin.add(riser));
+    if(mode==='off')removers.push(plugin.add(pane));
+    else if(mode==='tint'||mode==='hidden'||mode==='removed'){
+      const remove=plugin.add(pane,{tint:[1,0.1,0.1]});
+      if(mode==='removed'){await render();remove();}else removers.push(remove);
+    }
+    if(mode==='hidden')pane.visible=false;
+    await render();
+    return errors.splice(0);
+  },
+  pixel(p){
+    const f=unit(camera.target.map((v,i)=>v-camera.position[i])),r=unit(cross(f,[0,1,0])),u=cross(r,f),d=p.map((v,i)=>v-camera.position[i]);
+    const z=d[0]*f[0]+d[1]*f[1]+d[2]*f[2],k=1/Math.tan(camera.fov*Math.PI/360),a=canvas.width/canvas.height;
+    return [Math.round((1+(d[0]*r[0]+d[1]*r[1]+d[2]*r[2])*k/(z*a))*canvas.clientWidth/2),Math.round((1-(d[0]*u[0]+d[1]*u[1]+d[2]*u[2])*k/z)*canvas.clientHeight/2)];
+  },
+};
+window.ready=true;
+</script></body></html>

@@ -108,6 +108,28 @@ Static geometry renders into a cached depth array. Each frame copies that array 
 
 At resolution 2048, the two four-layer maps occupy 128 MiB (width × height × layers × 4 bytes each). Choose smaller maps for constrained devices. All resources are released by `dispose()`/`destroy()` and recreated after device restoration. `cascadeSplits()` and `fitCascades()` are exported for custom cameras. The package has no core/stage imports from other feature packages and does not enter their base bundle.
 
+## Coloured shadows
+
+Light through stained glass or a tinted pane takes the pane's colour. Create the `Shadows` with `colored: true` and add the caster with `tint`, linear RGB from 0 to 1:
+
+```ts
+import { EngineKernel, box } from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const floor = engine.createMesh().setGeometry(box(14, 0.1, 14));
+const pane = engine.createMesh().setGeometry(box(2, 0.05, 2)).setPosition([-2, 2, 0]);
+const shadows = Shadows.attach(engine, {colored: true});
+shadows.add(floor);
+shadows.add(pane, {tint: [1, 0.1, 0.1]});
+engine.start();
+```
+
+A gltf-pro model added to such a `Shadows` casts this way by itself: its transmissive and blended primitives (`model.tintPrimitives`) tint with their transmission colour or their base colour weighed by alpha. Any other source can give `tintPrimitives`.
+
+Off by default, and off the receivers' shaders and the frame are unchanged. On, it costs an `rgba8unorm` and a `depth32float` array of the map's size, three more bindings (27 to 29, two textures) on every receiver, and two draws per cascade for each tinting caster, every frame.
+
+Limits: the tint's edge is bilinear, with no penumbra, under every filter. The tint map keeps the nearest tinting caster's depth, so a surface between two panes takes both colours. A `drawShadow` source cannot tint.
+
 ## Virtual shadow maps
 
 `margoengine/shadows/virtual` is a second, optional entry for one directional light: `VirtualShadows` keeps the texel density a camera needs at every distance, in small pages of depth, and renders only the pages that are seen and have changed. Importing it costs `Shadows` users nothing; the root entry does not reach it.

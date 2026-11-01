@@ -61,7 +61,14 @@ const filters: Record<ShadowFilter, string> = {
 // last cascade (its split equals splits.w) and unused ones never switch. Comments stay out of the WGSL: they would ship.
 // `anisotropic` (a non-square map or an explicit frustum): light-space x and y map to UVs at different scales, so the
 // receiver-plane slope and the PCSS radii take each axis's own row length and texel; otherwise the text is unchanged.
-export function shadowSampling(group: number, filter: ShadowFilter = 'soft', anisotropic = false): string {
+// `colored`: the tint map of Shadows' `colored` option. The map's depth tells a receiver behind the tinting casters
+// from one in front; it adds three bindings past the other lighting effects' (27 to 29) and changes shadowLit.
+export function shadowSampling(
+  group: number,
+  filter: ShadowFilter = 'soft',
+  anisotropic = false,
+  colored = false,
+): string {
   const body = anisotropic
     ? filters[filter]
         .replaceAll('length(rowX)*0.5', 'vec2f(length(rowX),length(rowY))*0.5')
@@ -94,7 +101,26 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {
   if(abs(lightNormal.z)>0.001){slope=clamp(${anisotropic ? 'vec2f(-lightNormal.x/length(rowX),lightNormal.y/length(rowY))*2*length(rowZ)/lightNormal.z' : 'vec2f(-lightNormal.x,lightNormal.y)*2*length(rowZ)/(length(rowX)*lightNormal.z)'},vec2f(-2),vec2f(2));}
   reference-=dot(abs(slope),texel)*0.5;${body}
 }
-fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal);}
+${
+  colored
+    ? `@group(${group}) @binding(27) var shadowTintMap:texture_2d_array<f32>;
+@group(${group}) @binding(28) var shadowTintDepth:texture_depth_2d_array;
+@group(${group}) @binding(29) var shadowTintSampler:sampler;
+fn shadowTint(position:vec3f,normal:vec3f)->vec3f {
+  let depth=-(shadowFrame.view*vec4f(position,1)).z;
+  if(depth>shadowFrame.splits.w){return vec3f(1);}
+  let cascade=u32(depth>shadowFrame.splits.x)+u32(depth>shadowFrame.splits.y)+u32(depth>shadowFrame.splits.z);
+  let split=shadowFrame.splits[cascade];
+  let band=0.1*(split-select(0.0,shadowFrame.splits[max(cascade,1u)-1u],cascade>0u));
+  let layer=cascade+u32(split<shadowFrame.splits.w&&depth>split-band*(1.0-shadowNoise(position).y));
+  let projected=shadowFrame.matrices[layer]*vec4f(position+normalize(normal)*shadowFrame.settings.z,1);
+  let uv=projected.xy*vec2f(0.5,-0.5)+0.5;let reference=projected.z-shadowFrame.settings.y;
+  if(any(uv<vec2f(0))||any(uv>vec2f(1))||reference<=0||reference>=1){return vec3f(1);}
+  return mix(textureSampleLevel(shadowTintMap,shadowTintSampler,uv,i32(layer),0).rgb,vec3f(1),textureSampleCompareLevel(shadowTintDepth,shadowSampler,uv,i32(layer),reference));
+}
+`
+    : ''
+}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal)${colored ? '*shadowTint(position,normal)' : ''};}
 `;
 }
 // Each layer's nearest depth for the PCSS search (shadowFrame.nearest): a workgroup takes the minimum of a 32x32 block,

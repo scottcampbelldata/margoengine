@@ -40,6 +40,7 @@ export interface ShadowOptions {
     filter?: ShadowFilter;
     cascades?: number;
     cadence?: readonly number[];
+    colored?: boolean;
 }
 
 export interface ShadowPrepareContext {
@@ -86,6 +87,7 @@ export interface ShadowSource {
     shadowVersion?: number;
     drawShadow?(context: ShadowContext): void;
     prepareShadow?(context: ShadowPrepareContext): void;
+    tintPrimitives?: readonly TintedShadowPrimitive[];
     addLighting?(effect: Shadows): () => void;
     disposed?: boolean;
 }
@@ -104,10 +106,11 @@ export class Shadows implements EnginePlugin {
     get depthTexture(): GPUTexture | undefined;
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ShadowOptions): Shadows;
-    add(source: ShadowSource | MeshHandle, { static: cached, castShadow, receiveShadow }?: {
+    add(source: ShadowSource | MeshHandle, { static: cached, castShadow, receiveShadow, tint }?: {
         static?: boolean;
         castShadow?: boolean;
         receiveShadow?: boolean;
+        tint?: readonly number[];
     }): () => void;
     invalidate(): void;
     bindings(): GPUBindGroupEntry[];
@@ -122,6 +125,10 @@ export class Shadows implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
     destroy(): void;
+}
+
+export interface TintedShadowPrimitive extends ShadowPrimitive {
+    tint: readonly number[];
 }
 
 export function cascadeSplits(near: number, far: number, lambda?: number, out?: Float32Array<ArrayBuffer>, count?: number): Float32Array;

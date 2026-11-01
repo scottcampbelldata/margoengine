@@ -102,6 +102,13 @@ export interface ShadowOptions {
    * many frames and cost less. Any change that marks the map stale redraws every cascade. Default every cascade every frame.
    */
   cadence?: readonly number[];
+  /**
+   * Coloured shadows (default false): light through a caster added with `tint`, or through a source's `tintPrimitives`
+   * (gltf-pro transmissive and blended primitives), takes the caster's colour instead of being blocked. Adds an
+   * `rgba8unorm` and a `depth32float` array of the map's size and two texture bindings on every receiver; those casters
+   * redraw every frame, twice. Fixed at construction. Off, the receivers' shaders and the frame are unchanged.
+   */
+  colored?: boolean;
 }
 /** What a custom `ShadowSource.drawShadow` receives for one cascade. Borrowed: use it synchronously. */
 export interface ShadowContext {
@@ -171,6 +178,11 @@ export interface ShadowPrimitive {
   /** Skinned, morphed, instanced, or deformed casters redraw every frame. Unset casters are cached while they stay put. */
   dynamic?: boolean;
 }
+/** A caster of `ShadowSource.tintPrimitives`: the light it lets through. */
+export interface TintedShadowPrimitive extends ShadowPrimitive {
+  /** Linear RGB, each 0 to 1, that multiplies the light behind the caster. */
+  tint: readonly number[];
+}
 /**
  * Anything `shadows.add` takes besides a core mesh: a gltf-pro model, materials mesh, `Terrain`, `ScatterInstances`, or
  * a custom caster with `drawShadow`. It needs `shadowPrimitives` or `drawShadow`.
@@ -187,6 +199,11 @@ export interface ShadowSource {
    * cascades share (scatter culls its instances per cascade here). Not called on frames this source draws nothing.
    */
   prepareShadow?(context: ShadowPrepareContext): void;
+  /**
+   * Casters that tint light instead of blocking it, read every frame when the `Shadows` has `colored`. gltf-pro models
+   * give their transmissive and blended primitives here.
+   */
+  tintPrimitives?: readonly TintedShadowPrimitive[];
   /** Lets the source receive shadows (patches its shader); returns the remover. */
   addLighting?(effect: Shadows): () => void;
   /** True once disposed; such a source is rejected, or dropped once added. */
@@ -197,6 +214,8 @@ interface Source {
   static: boolean;
   /** Draws into the shadow map (`castShadow`). */
   cast: boolean;
+  /** Draws into the tint map with this colour instead (`tint`). */
+  tint?: readonly number[];
   version: number;
   removeLighting?: () => void;
   meshPrimitive?: ShadowPrimitive[];
@@ -241,9 +260,38 @@ const batchDepth = /* wgsl */ `@group(0) @binding(0) var<uniform> camera:mat4x4f
 @group(0) @binding(1) var<storage,read> models:array<mat4x4f>;
 @vertex fn vertex(@location(0) position:vec3f,@builtin(instance_index) k:u32)->@builtin(position) vec4f {return camera*models[k]*vec4f(position,1);}`;
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
+const validTint = (tint: unknown): tint is readonly number[] =>
+  Array.isArray(tint) && tint.length === 3 && tint.every((v) => v >= 0 && v <= 1);
 /** A shader cache key: filter, bind group and anisotropy as one number (bit 1 is left for the receive patch). */
 const shaderKey = (filter: string, group: number, anisotropic: boolean) =>
   group * 16 + (filter === 'soft' ? 0 : filter === 'pcf' ? 4 : 8) + (anisotropic ? 1 : 0);
+/** A tint map pipeline: no depth, and what it draws multiplies the map by the pass's blend constant. */
+const tintPipeline = (
+  device: GPUDevice,
+  module: GPUShaderModule,
+  stride: number,
+  displaced: boolean,
+  instanced: boolean,
+  lines: boolean,
+) =>
+  device.createRenderPipeline({
+    layout: 'auto',
+    vertex: { module, entryPoint: 'vertex', buffers: casterBuffers(stride, displaced, instanced) },
+    fragment: {
+      module,
+      entryPoint: 'fragment',
+      targets: [
+        {
+          format: 'rgba8unorm',
+          blend: {
+            color: { srcFactor: 'zero', dstFactor: 'constant', operation: 'add' },
+            alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+          },
+        },
+      ],
+    },
+    ...(lines ? { primitive: { topology: 'line-list' as const } } : {}),
+  });
 const powerOfTwo = (v: number) => Number.isInteger(v) && v >= 16 && Number.isInteger(Math.log2(v));
 /**
  * Directional shadows from the engine's light: up to four cascades (practical splits, stable texel-snapped
@@ -358,10 +406,29 @@ export class Shadows implements EnginePlugin {
   private readonly copySource: GPUTexelCopyTextureInfo = { texture: undefined! };
   private readonly copyDestination: GPUTexelCopyTextureInfo = { texture: undefined! };
   private readonly copySize = { width: 0, height: 0, depthOrArrayLayers: 4 };
+  private readonly colored: boolean;
+  private tintMap?: GPUTexture;
+  private tintDepth?: GPUTexture;
+  private tintViews: GPUTextureView[] = [];
+  private tintDepthViews: GPUTextureView[] = [];
+  private tintSampler?: GPUSampler;
+  /** The tint maps hold something other than white, or nothing yet. */
+  private tintStale = true;
+  private tintDraws = new Map<Mesh, Map<object, Draw>>();
+  private readonly tintList: ShadowPrimitive[] = [];
+  private readonly tintColors: (readonly number[])[] = [];
+  private readonly tintAttachment: GPURenderPassColorAttachment = {
+    view: undefined!,
+    loadOp: 'clear',
+    storeOp: 'store',
+    clearValue: [1, 1, 1, 1],
+  };
+  private readonly tintPass: GPURenderPassDescriptor = { colorAttachments: [this.tintAttachment] };
   constructor(readonly options: ShadowOptions = {}) {
     this.options = preset('shadows', options);
     this.cascadeCount = this.options.bounds || this.options.frustum ? 1 : (this.options.cascades ?? 4);
     this.copySize.depthOrArrayLayers = this.cascadeCount;
+    this.colored = this.options.colored === true;
     this.validate();
   }
   get depthTexture(): GPUTexture | undefined {
@@ -439,6 +506,8 @@ export class Shadows implements EnginePlugin {
       throw new RangeError(
         'Shadow bounds mode, frustum mode and cascade count cannot change after construction; create a new Shadows instead',
       );
+    if ((o.colored ?? false) !== this.colored)
+      throw new TypeError('Shadow colored is fixed at construction and a boolean; create a new Shadows instead');
     const filter = o.filter ?? 'soft';
     if (filter !== 'soft' && filter !== 'pcf' && filter !== 'hard')
       throw new RangeError(`Invalid shadow filter '${String(filter)}': use 'soft', 'pcf' or 'hard'`);
@@ -490,7 +559,9 @@ export class Shadows implements EnginePlugin {
    * with their own lighting (`addLighting`: gltf-pro models, materials meshes, terrain), a receiver. `castShadow: false`
    * keeps it out of the shadow map; `receiveShadow: false` leaves its lighting unshadowed (both default true, as
    * Crocotile's per-object Cast Shadows and Receive Shadows). For a core mesh `receiveShadow: false` sets
-   * `mesh.receiveShadow = false` and the remover restores it. `static` caches it in the still map. Returns the remover.
+   * `mesh.receiveShadow = false` and the remover restores it. `static` caches it in the still map. `tint` (linear RGB,
+   * each 0 to 1, on a `Shadows` with `colored`) makes it tint the light behind it instead of blocking it. Returns the
+   * remover.
    */
   add(
     source: ShadowSource | MeshHandle,
@@ -498,7 +569,8 @@ export class Shadows implements EnginePlugin {
       static: cached = false,
       castShadow = true,
       receiveShadow = true,
-    }: { static?: boolean; castShadow?: boolean; receiveShadow?: boolean } = {},
+      tint,
+    }: { static?: boolean; castShadow?: boolean; receiveShadow?: boolean; tint?: readonly number[] } = {},
   ): () => void {
     if (
       this.disposed ||
@@ -508,6 +580,13 @@ export class Shadows implements EnginePlugin {
       typeof receiveShadow !== 'boolean'
     )
       throw new TypeError('Invalid shadow source; pass a live mesh, group or shadow source and boolean options.');
+    if (tint !== undefined) {
+      if (!this.colored)
+        throw new TypeError('A shadow tint needs coloured maps; create the Shadows with colored: true');
+      if (!validTint(tint)) throw new RangeError('Invalid shadow tint; give [r, g, b], each from 0 to 1');
+      if ('drawShadow' in source && source.drawShadow)
+        throw new TypeError('A drawShadow source cannot tint; give it shadowPrimitives or tintPrimitives');
+    }
     const runtime = casterRuntime<object, ReturnType<typeof meshRuntime> | ShadowSource>(
       source,
       this.engine,
@@ -549,7 +628,7 @@ export class Shadows implements EnginePlugin {
         }
       };
     }
-    const r: Source = { source: runtime, static: cached, cast: castShadow, version: -1, removeLighting };
+    const r: Source = { source: runtime, static: cached, cast: castShadow && !tint, tint, version: -1, removeLighting };
     this.sources.push(r);
     this.invalidate();
     return () => {
@@ -591,7 +670,7 @@ export class Shadows implements EnginePlugin {
         'unsupported',
         "Shadows require the standard PBR lighting shader; remove the plugin that replaced core's shader",
       );
-    const output = shadowSampling(group, filter, anisotropic) + code;
+    const output = shadowSampling(group, filter, anisotropic, this.colored) + code;
     if (!cache) {
       cache = new Map();
       this.shaders.set(key, cache);
@@ -608,7 +687,7 @@ export class Shadows implements EnginePlugin {
       this.hooks.set(
         key,
         (hooks = {
-          declarations: shadowSampling(group, filter, anisotropic),
+          declarations: shadowSampling(group, filter, anisotropic, this.colored),
           direct: (d) => `shadowLit(${d},i.position,s.n)`,
         }),
       );
@@ -690,6 +769,23 @@ export class Shadows implements EnginePlugin {
     );
     this.mapWidth = this.width;
     this.mapHeight = this.height;
+    if (this.colored) this.tintTextures();
+  }
+  private tintTextures(): void {
+    this.tintMap?.destroy();
+    this.tintDepth?.destroy();
+    const device = this.device!,
+      size = [this.width, this.height, this.cascadeCount],
+      usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      layers = (texture: GPUTexture) =>
+        Array.from({ length: this.cascadeCount }, (_, baseArrayLayer) =>
+          texture.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
+        );
+    this.tintMap = device.createTexture({ size, format: 'rgba8unorm', usage });
+    this.tintDepth = device.createTexture({ size, format: 'depth32float', usage });
+    this.tintViews = layers(this.tintMap);
+    this.tintDepthViews = layers(this.tintDepth);
+    this.tintStale = true;
   }
   /** Receiver bindings: a fresh array view whenever the maps are reallocated, so receivers rebuild their groups. */
   private bind(): void {
@@ -698,6 +794,14 @@ export class Shadows implements EnginePlugin {
       { binding: 2, resource: (this.combinedView = this.combined!.createView({ dimension: '2d-array' })) },
       { binding: 3, resource: this.sampler! },
     ];
+    if (this.colored) {
+      this.tintSampler ??= this.device!.createSampler({ magFilter: 'linear', minFilter: 'linear' });
+      this.entries.push(
+        { binding: 27, resource: this.tintMap!.createView({ dimension: '2d-array' }) },
+        { binding: 28, resource: this.tintDepth!.createView({ dimension: '2d-array' }) },
+        { binding: 29, resource: this.tintSampler },
+      );
+    }
     this.nearestGroup = undefined;
     this.dirty = true;
   }
@@ -715,7 +819,10 @@ export class Shadows implements EnginePlugin {
           c.shader = this.shader(c.shader)
             .replace('@binding(1) var<uniform> shadowFrame', `@binding(${base}) var<uniform> shadowFrame`)
             .replace('@binding(2) var shadowMap', `@binding(${base + 1}) var shadowMap`)
-            .replace('@binding(3) var shadowSampler', `@binding(${base + 2}) var shadowSampler`);
+            .replace('@binding(3) var shadowSampler', `@binding(${base + 2}) var shadowSampler`)
+            .replace('@binding(27) var shadowTintMap', `@binding(${base + 26}) var shadowTintMap`)
+            .replace('@binding(28) var shadowTintDepth', `@binding(${base + 27}) var shadowTintDepth`)
+            .replace('@binding(29) var shadowTintSampler', `@binding(${base + 28}) var shadowTintSampler`);
           c.bindings.push(...this.bindings().map((entry) => ({ ...entry, binding: entry.binding + base - 1 })));
         } else {
           c.shader = this.shader(c.shader);
@@ -937,6 +1044,56 @@ export class Shadows implements EnginePlugin {
     if (moving) for (let cascade = 0; cascade < this.cascadeCount; cascade++) this.depth(c, cascade, false);
     if ((this.options.filter ?? 'soft') !== 'soft') this.nearestStale ||= rendered || moving;
     else if (rendered || moving || this.nearestStale) this.nearest(c);
+    if (this.colored) this.tints(c);
+  }
+  /** The light through this frame's tinting casters, in the tint map, and how near they are, in its depth. */
+  private tints(c: ShadowPassContext): void {
+    const list = this.tintList,
+      colors = this.tintColors,
+      store = this.engine!.store,
+      section = sectionState(c);
+    let count = 0;
+    for (let i = 0; i < this.sources.length; i++) {
+      const r = this.sources[i];
+      if (r.tint) {
+        const primitives = this.casters(r, this.primitiveDepth);
+        for (let j = 0; j < primitives.length; j++)
+          if (!hiddenInTree(store, primitives[j].node.id)) {
+            list[count] = primitives[j];
+            colors[count++] = r.tint;
+          }
+      } else if (r.cast) {
+        const source = r.source,
+          triangles = 'id' in source ? meshTriangles(source) : undefined,
+          owner = (triangles?.kind === 'pbr' ? triangles.source : source) as ShadowSource,
+          tinted = owner.tintPrimitives;
+        if (tinted)
+          for (let j = 0; j < tinted.length; j++)
+            if (!hiddenInTree(store, tinted[j].node.id)) {
+              list[count] = tinted[j];
+              colors[count++] = tinted[j].tint;
+            }
+      }
+    }
+    if (!count && !this.tintStale) return;
+    this.tintStale = count > 0;
+    for (let cascade = 0; cascade < this.cascadeCount; cascade++) {
+      const matrix = this.cascadeMatrices[cascade];
+      this.depthAttachment.view = this.tintDepthViews[cascade];
+      this.depthAttachment.depthLoadOp = 'clear';
+      let pass = c.encoder.beginRenderPass(this.depthPass);
+      for (let i = 0; i < count; i++) this.draw(pass, list[i], matrix, cascade, section);
+      pass.end();
+      this.tintAttachment.view = this.tintViews[cascade];
+      pass = c.encoder.beginRenderPass(this.tintPass);
+      for (let i = 0; i < count; i++) {
+        const color = colors[i];
+        // The tint pipeline multiplies what the map holds by the blend constant: each caster only sets the constant.
+        pass.setBlendConstant([color[0], color[1], color[2], 1]);
+        this.draw(pass, list[i], matrix, cascade, section, true);
+      }
+      pass.end();
+    }
   }
   /** The depth passes under `cadence`: each cascade redraws, recopies and draws its moving casters only on its own frames. */
   private renderCadence(c: ShadowPassContext, cadence: readonly number[], moving: boolean): void {
@@ -1145,7 +1302,7 @@ export class Shadows implements EnginePlugin {
   }
   private casters(record: Source, level: number): readonly ShadowPrimitive[] {
     const source = record.source;
-    if (!record.cast || ('drawShadow' in source && source.drawShadow)) return emptyPrimitives;
+    if ((!record.cast && !record.tint) || ('drawShadow' in source && source.drawShadow)) return emptyPrimitives;
     if ('id' in source) {
       // A core mesh is read directly: meshTriangles builds an object on every call, and this runs every pass.
       const geometry = source.geometry;
@@ -1360,6 +1517,7 @@ export class Shadows implements EnginePlugin {
     matrix: Float32Array,
     cascade: number,
     scene?: GPUBufferBinding,
+    tinted = false,
   ): void {
     if (p.stride !== 24 && p.stride !== 80)
       throw new RangeError('Unsupported shadow vertex stride; use 24-byte or 80-byte vertices.');
@@ -1391,10 +1549,15 @@ export class Shadows implements EnginePlugin {
         (section ? 8 : 0) +
         (displacement ? 16 : 0) +
         (material ? 32 : 0) +
-        (opacity ? 64 : 0);
+        (opacity ? 64 : 0) +
+        (tinted ? 128 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
+      if (tinted)
+        code = code
+          .replace('@fragment fn fragment(i:Out){', '@fragment fn fragment(i:Out)->@location(0) vec4f{')
+          .replace('{discard;}}', '{discard;}return vec4f(1);}');
       if (displacement) code = displacedDepth(code, 1);
       if (inst) code = instancedDepth(code);
       if (opacity) code = opacityDepth(code, 0);
@@ -1405,12 +1568,14 @@ export class Shadows implements EnginePlugin {
         code = sectionShader(code, 0, 3, material ? 'materialClip' : 'section');
       }
       const module = this.device!.createShaderModule({ code });
-      pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
+      pipeline = tinted
+        ? tintPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines)
+        : casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
       this.pipelines.set(key, pipeline);
     }
     // Primitives sharing a node can have different alpha maps and geometry.
     const identity = p.primitive ?? p.index,
-      records = nodeRecords(this.draws, p.node);
+      records = nodeRecords(tinted ? this.tintDraws : this.draws, p.node);
     let record = records.get(identity);
     if (staleCaster(record, p, pipeline, displacement) || record.section !== section?.buffer) {
       if (record) for (const b of record.uniforms) b.destroy();
@@ -1475,16 +1640,21 @@ export class Shadows implements EnginePlugin {
     );
   }
   private clearDraws(): void {
-    for (const records of this.draws.values())
-      for (const r of records.values()) for (const b of r.uniforms) b.destroy();
-    this.draws.clear();
+    for (const draws of [this.draws, this.tintDraws]) {
+      for (const records of draws.values()) for (const r of records.values()) for (const b of r.uniforms) b.destroy();
+      draws.clear();
+    }
     this.casterStates.length = 0;
     // Batches hold a geometry's buffers as keys: drop them with the casters they were built for.
     this.clearBatches();
   }
   private release(): void {
     this.clearDraws();
-    for (const texture of [this.cached, this.combined, this.white]) texture?.destroy();
+    for (const texture of [this.cached, this.combined, this.white, this.tintMap, this.tintDepth]) texture?.destroy();
+    this.tintMap = this.tintDepth = this.tintSampler = undefined;
+    this.tintViews = [];
+    this.tintDepthViews = [];
+    this.tintList.length = this.tintColors.length = 0;
     this.uniform?.destroy();
     this.nearestBuffer?.destroy();
     this.nearestRoute?.destroy();

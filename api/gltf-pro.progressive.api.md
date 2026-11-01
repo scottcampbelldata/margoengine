@@ -849,6 +849,9 @@ class PBRModel implements EnginePlugin {
     setTransmission(hook: PBRTransmission): () => void;
     selectVariant(variant?: string | number): void;
     get shadowPrimitives(): ShadowCasterRecord[];
+    get tintPrimitives(): (ShadowCasterRecord & {
+        tint: readonly number[];
+    })[];
     get pickingPrimitives(): {
         primitive: PBRPrimitive;
         node: Mesh;

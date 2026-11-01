@@ -87,6 +87,7 @@ interface ShadowOptions {
     filter?: ShadowFilter;
     cascades?: number;
     cadence?: readonly number[];
+    colored?: boolean;
 }
 
 type ShadowPassContext = Extract<PassContext, {
@@ -137,6 +138,7 @@ interface ShadowSource {
     shadowVersion?: number;
     drawShadow?(context: ShadowContext): void;
     prepareShadow?(context: ShadowPrepareContext): void;
+    tintPrimitives?: readonly TintedShadowPrimitive[];
     addLighting?(effect: Shadows): () => void;
     disposed?: boolean;
 }
@@ -155,10 +157,11 @@ class Shadows implements EnginePlugin {
     get depthTexture(): GPUTexture | undefined;
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: ShadowOptions): Shadows;
-    add(source: ShadowSource | MeshHandle, { static: cached, castShadow, receiveShadow }?: {
+    add(source: ShadowSource | MeshHandle, { static: cached, castShadow, receiveShadow, tint }?: {
         static?: boolean;
         castShadow?: boolean;
         receiveShadow?: boolean;
+        tint?: readonly number[];
     }): () => void;
     invalidate(): void;
     bindings(): GPUBindGroupEntry[];
@@ -173,5 +176,9 @@ class Shadows implements EnginePlugin {
     dispose(): void;
     [Symbol.dispose]: () => void;
     destroy(): void;
+}
+
+interface TintedShadowPrimitive extends ShadowPrimitive {
+    tint: readonly number[];
 }
 ```
