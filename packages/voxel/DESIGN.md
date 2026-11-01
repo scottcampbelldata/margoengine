@@ -242,7 +242,7 @@ Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (render
   `pending`, `save()`; `VoxelGenerateContext`; `@margoengine/procedural` is a dependency. ~800 generated chunks/s with
   2 workers under load; unpacking 8 chunks a frame costs 1.2-1.5 ms on the main thread at full speed.
 - .vox: `VoxChunk`; records keep their raw `attributes`; all 48 rotation bytes; `pasteVoxModel` pastes a whole scene
-  (z up becomes world y, y becomes world -z). Pasting is about 1 s per million voxels (per-cell setBlock): batch later.
+  (z up becomes world y, y becomes world -z). Pasting writes chunk by chunk (`writeChunkCells`, 1028862d4): about 40-50 ms per million voxels, against 70-290 ms with one setBlock each (printed by vox.test.js); a test pins that the cells, dirty set and onChange events match the per-cell path.
 - Rapier: `new VoxelPhysics(physics, world, {radius})`, `colliders`; colliders follow every non-fixed body and are
   kept until no body is within radius + 1. Rapier 0.21.0 panics on ball-vs-voxel edges (dimforge/rapier #1046 reports it; see #1029, #1043,
   #993, fix PR #1030), so chunks near a ball get a FIX_INTERNAL_EDGES triangle mesh and keep a disabled voxel
