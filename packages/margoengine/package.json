@@ -702,6 +702,10 @@
       "types": "./dist/lines.d.ts",
       "import": "./dist/lines.js"
     },
+    "./lines/edges": {
+      "types": "./dist/lines/edges.d.ts",
+      "import": "./dist/lines/edges.js"
+    },
     "./loaders": {
       "types": "./dist/loaders.d.ts",
       "import": "./dist/loaders.js"

@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/lines.test.js tests/fog.test.js tests/clipping.test.js tests/skeleton-helper.test.js tests/helpers.test.js",
+    "test": "npm run build && node --test tests/lines.test.js tests/edges.test.js tests/fog.test.js tests/clipping.test.js tests/skeleton-helper.test.js tests/helpers.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   },
@@ -34,6 +34,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./edges": {
+      "types": "./dist/edges.d.ts",
+      "import": "./dist/edges.js"
     }
   },
   "files": [

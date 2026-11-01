@@ -198,6 +198,27 @@ A hit gives the `line`, the `segment` index, the world `point` on the centre lin
 - Dashes run continuously through joins, and caps apply to line ends only, not to each dash. World-unit widths ignore the mesh scale.
 - `ArrowHelper` draws its head as a wire cone, and `PlaneHelper` draws an outline with diagonals; there are no filled meshes. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
 
+## Feature edges and gradients
+
+`@margoengine/lines/edges` (`margoengine/lines/edges`) finds the creases of a mesh and colours a line along its length. Pages that use neither do not load it.
+
+```ts
+import {box} from 'margoengine/core';
+import {Line, Lines} from 'margoengine/lines';
+import {EdgesHelper, featureEdges, gradientColors} from 'margoengine/lines/edges';
+
+const lines = new Lines();
+// Edges whose faces meet at more than 30 degrees (the default), and the outline of open surfaces.
+lines.add(new EdgesHelper(box(2, 1, 1), {color: '#20242a', width: 2}));
+console.log(featureEdges(box(2, 1, 1)).length / 6);   // 12
+
+// One rgb per point, by distance along the line.
+const positions = [0, 0, 0, 1, 1, 0, 2, 0, 0];
+lines.add(new Line({positions, colors: gradientColors(positions, ['#ff0000', '#0000ff'])}));
+```
+
+Vertices at one position count as one (`tolerance`, default 1e-5), so hard-shaded meshes with split normals work. An edge with three or more faces is always kept. `gradientColors` takes `mode: 'segments'` to run over each pair of points, and `stops`. The shader blends between points, so add points where a stop inside a long segment must be exact.
+
 ## Tests
 
 `node scripts/gpu-lock.mjs run --owner=fog-all -- node scripts/fog-all-gpu-check.js` (repository root, real GPU) checks

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4290442,
+  "total": 4295308,
   "history": [
     {
       "date": "2026-10-24",
@@ -1376,6 +1376,12 @@
       "commit": "62a54b159",
       "reason": "cache/hashed: HashedAssets versions each file by content hash, own entry, root unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "7c80e06ec",
+      "reason": "lines: new entry lines/edges, featureEdges, EdgesHelper and gradientColors (row 21.61101)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1550,6 +1556,7 @@
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/refracted": 7846,
     "@margoengine/lines": 18511,
+    "@margoengine/lines/edges": 4866,
     "@margoengine/loaders": 52602,
     "@margoengine/loaders dist/workers/usd.js": 8439,
     "@margoengine/loaders/common": 3423,
