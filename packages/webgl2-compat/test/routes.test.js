@@ -12,11 +12,17 @@ import { COMPAT_VENDOR, compatTier, loadCompatRoute } from '../../shared/compat.
 const packages = fileURLToPath(new URL('../../', import.meta.url));
 /**
  * The compat chunk the package's build split off for its `import('./compat.js')`: the one its root imports lazily (a
- * package with several entries may also get packages/shared/compat.js as a chunk of the same name stem).
+ * package with several entries may also get packages/shared/compat.js as a chunk of the same name stem). With several
+ * entries the root can be a re-export of a shared chunk, so the root's code is the file plus what it imports statically.
  */
 async function route(name) {
-  const root = readFileSync(`${packages}${name}/dist/index.js`, 'utf8'),
-    file = readdirSync(`${packages}${name}/dist`).find(
+  const dist = `${packages}${name}/dist`,
+    entry = readFileSync(`${dist}/index.js`, 'utf8'),
+    root = [
+      entry,
+      ...[...entry.matchAll(/from\s*["'`]\.\/([\w.-]+\.js)["'`]/g)].map((m) => readFileSync(`${dist}/${m[1]}`, 'utf8')),
+    ].join('\n'),
+    file = readdirSync(dist).find(
       (f) =>
         /^compat-[\w-]+\.js$/.test(f) &&
         new RegExp(`import\\(\\s*["'\`]\\./${f.replace('.', '\\.')}["'\`]\\s*\\)`).test(root),

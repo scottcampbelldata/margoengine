@@ -1,8 +1,8 @@
-// Browser side of parts-check.mjs: engine A draws boxes as CulledInstances parts, engine B the same boxes as core meshes,
+// Browser side of parts-check.mjs: engine A draws boxes as CulledParts parts, engine B the same boxes as core meshes,
 // over one core floor each. Each batch holds one colour and spare slots. Positions sit on a grid of eighths, so the sum
 // of a parent's translation and a child's stays exact and both engines hold the same floats.
 import { Engine, box, PbrMaterial } from '../../../core/dist/index.js';
-import { CulledInstances } from '../../dist/index.js';
+import { CulledParts } from '../../dist/parts.js';
 
 const errors = [],
   camera = { fov: 50, near: 0.1, far: 200, position: [14, 10, 18], target: [0, 0, 0] },
@@ -38,7 +38,7 @@ async function setup(withShadows, culling) {
     per[batch].push(...translated(entry.position));
     boxes.push(entry);
   }
-  parts = CulledInstances.attach(
+  parts = CulledParts.attach(
     a,
     per.map((list, i) => ({
       geometry,

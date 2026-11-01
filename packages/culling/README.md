@@ -28,15 +28,16 @@ console.log(await parts.readCounts()); // parts drawn per batch in the last fram
 Parts are not core meshes. That is where the CPU saving comes from (core's kernel and batch collection never see
 them), and also the main limit: no core `engine.pick`, no mesh BVH raycasts, no section caps. Section clipping itself
 does apply, because the parts are drawn with core's own frame shader. Picking, hierarchy, shadows and streaming are the
-package's own:
+package's own, in the `CulledParts` subclass from `margoengine/culling/parts`, so pages that use only culling do not
+download them:
 
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
-import {CulledInstances} from 'margoengine/culling';
+import {CulledParts} from 'margoengine/culling/parts';
 import {Shadows} from 'margoengine/shadows';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
-const parts = CulledInstances.attach(engine, [
+const parts = CulledParts.attach(engine, [
   // capacity reserves slots for addParts; transforms may start empty.
   {geometry: box(), material: new PbrMaterial({color: '#8d99a6'}), transforms: new Float32Array(0), capacity: 1000},
 ]);
@@ -63,7 +64,7 @@ parts.removeParts(0, [hand]);
 - A part with a parent stores a local matrix on the CPU. The fold runs when a matrix is set and costs one record write per
   part in the subtree; parts that never call `setParent` cost nothing. A part with children cannot be removed alone.
 - `addParts` past `capacity` throws: buffers are sized at attach. New geometry or materials need a new
-  `CulledInstances`. Each free slot still costs its record and one test per frame.
+  `CulledParts`. Each free slot still costs its record and one test per frame.
 
 ## Core meshes: `CulledMeshes`
 

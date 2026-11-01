@@ -3,7 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { Geometry, PbrMaterial } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
-import { computeShader, depthShader, partsPickShader, partsShadowShader } from './shaders.js';
+import { computeShader, depthShader } from './shaders.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 export { CulledMeshes } from './meshes.js';
@@ -31,18 +31,8 @@ export interface CulledBatch {
   geometry: Geometry;
   /** Shared by every part of the batch. */
   material: PbrMaterial;
-  /** Column-major affine world matrices, 16 floats per instance. May be empty when `capacity` is set. */
+  /** Column-major affine world matrices, 16 floats per instance. */
   transforms: Float32Array;
-  /**
-   * Parts this batch can hold at once, for {@link CulledInstances.addParts}. Fixed; each free slot costs its 96-byte
-   * record and one test per frame. Default: the parts in `transforms`, so nothing can be added.
-   */
-  capacity?: number;
-}
-/** One part: its batch, and its index inside that batch. */
-export interface CulledPart {
-  batch: number;
-  index: number;
 }
 /** `CulledInstances` settings. */
 export interface CulledInstancesOptions {
@@ -62,94 +52,38 @@ const vertexLayout: GPUVertexBufferLayout = {
   arrayStride: 24,
   attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
 };
-// The whole part list as instance data, for the caster and id draws: a part's record and its hidden word.
-const partLayouts: GPUVertexBufferLayout[] = [
-  vertexLayout,
-  {
-    arrayStride: 96,
-    stepMode: 'instance',
-    attributes: [
-      ...[2, 3, 4, 5].map((shaderLocation, i) => ({
-        shaderLocation,
-        offset: i * 16,
-        format: 'float32x4' as const,
-      })),
-      { shaderLocation: 6, offset: 80, format: 'float32x4' },
-    ],
-  },
-  { arrayStride: 4, stepMode: 'instance', attributes: [{ shaderLocation: 7, offset: 0, format: 'uint32' }] },
-];
-const FREE = 2; // A slot's word in `hidden`: 0 shown, 1 hidden by setVisible, 2 holds no part.
 let serial = 0;
-
-/** Validates a matrix as a part's world transform; returns its determinant. */
-function determinant(m: ArrayLike<number>): number {
-  if (m?.length !== 16) throw new TypeError('Expected 16 matrix values');
-  // One finiteness test for the matrix (a NaN or infinite float32 value makes the sum non-finite; 16 finite float32
-  // values cannot overflow a double); plain arrays are also checked for non-numbers, typed arrays hold numbers.
-  let sum = 0;
-  for (let k = 0; k < 16; k++) sum += Math.fround(m[k]);
-  if (!Number.isFinite(sum)) throw new RangeError('Invalid instance transform: pass 16 finite float32 values');
-  if (!ArrayBuffer.isView(m))
-    for (let k = 0; k < 16; k++)
-      if (typeof m[k] !== 'number') throw new RangeError('Invalid instance transform: pass 16 finite float32 values');
-  const det =
-    m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
-  if (m[3] || m[7] || m[11] || m[15] !== 1 || !Number.isFinite(det) || !det)
-    throw new RangeError('Expected nonsingular affine instance transforms');
-  return det;
-}
 
 /**
  * Static parts drawn without per-part CPU work: instances are uploaded once, and every frame a compute pass tests each
  * part against the frustum and a Hi-Z pyramid, compacts the visible ones in their original order and writes indirect
- * draw arguments. Parts are not core meshes (no `engine.pick` or sections caps); they have their own {@link pick},
- * {@link setParent}, {@link drawShadow} and {@link addParts}.
+ * draw arguments. Parts are not core meshes (no core picking, hierarchy or sections caps); `CulledParts` from
+ * `@margoengine/culling/parts` adds its own picking, hierarchy, shadows and streaming.
  */
 export class CulledInstances implements EnginePlugin {
   readonly name = 'culling:' + ++serial;
   /** First slot of each batch in the flat order of all slots; a batch holds `capacity` slots. */
   readonly starts: readonly number[];
-  /** Bumped when a part changes, for `shadows.add(parts, {static: true})`: the cached still map re-renders. */
-  shadowVersion = 0;
   culling: CullingMode;
   /** See {@link CulledInstancesOptions.occluderSize}. */
   occluderSize: number;
   disposed = false;
-  private engine?: Engine;
-  private device?: GPUDevice;
-  private readonly batches: readonly CulledBatch[];
+  protected engine?: Engine;
+  protected device?: GPUDevice;
+  protected readonly batches: readonly CulledBatch[];
   /** Slots in all batches, free ones included; the buffers and kernels cover this many. */
-  private readonly slots: number;
-  private live = 0;
-  // Per batch, the free indices inside it, the lowest last.
-  private readonly free: number[][];
-  // Allocated by the first setParent. Per slot: the parent's slot or -1, and the matrix relative to that parent.
-  private parents?: Int32Array;
-  private locals?: Float32Array;
-  private children?: Map<number, number[]>;
-  private readonly product = new Float32Array(16);
-  private shadow?: { pipeline: GPURenderPipeline; uniforms: GPUBuffer[]; groups: GPUBindGroup[] };
-  private picker?: {
-    pipeline: GPURenderPipeline;
-    uniform: GPUBuffer;
-    ids: GPUTexture;
-    depth: GPUTexture;
-    group: GPUBindGroup;
-    descriptor: GPURenderPassDescriptor;
-  };
-  private picking?: Promise<CulledPart | null>;
-  private readonly records: Float32Array;
+  protected readonly slots: number;
+  protected readonly records: Float32Array;
   // Per batch: the geometry's local bounding sphere (the cull pass places it under each part's matrix).
   private readonly bounds: Float32Array;
-  private readonly batchOf: Uint32Array;
-  private readonly table: Uint32Array;
+  protected readonly batchOf: Uint32Array;
+  protected readonly table: Uint32Array;
   private readonly args: Uint32Array;
   private readonly earlyReset: Uint32Array;
-  private readonly hidden: Uint32Array;
+  protected readonly hidden: Uint32Array;
   // 1 for a part whose transform mirrors it (negative determinant); per batch, how many such parts it has.
-  private readonly flipped: Uint8Array;
-  private readonly flips: Uint32Array;
+  protected readonly flipped: Uint8Array;
+  protected readonly flips: Uint32Array;
   // Parts changed since the last upload, [low, high): one write per buffer before the next frame's culling.
   private low = Infinity;
   private high = 0;
@@ -161,8 +95,8 @@ export class CulledInstances implements EnginePlugin {
   private readonly frame = new Float32Array(32);
   // The WebGL2 layer's route (./compat.js): frustum tests and compaction on the CPU, kept records uploaded.
   private route?: ReturnType<typeof import('./compat.js').instancesRoute>;
-  private buffers: Record<string, GPUBuffer> = {};
-  private geometryBuffers = new Map<Geometry, { vertex: GPUBuffer; index: GPUBuffer }>();
+  protected buffers: Record<string, GPUBuffer> = {};
+  protected geometryBuffers = new Map<Geometry, { vertex: GPUBuffer; index: GPUBuffer }>();
   private compute?: {
     early: GPUComputePipeline;
     depth0: GPUComputePipeline;
@@ -228,23 +162,19 @@ export class CulledInstances implements EnginePlugin {
         !(b?.geometry instanceof Geometry) ||
         !(b.material instanceof PbrMaterial) ||
         !(b.transforms instanceof Float32Array) ||
-        !(b.transforms.length || b.capacity) ||
+        !b.transforms.length ||
         b.transforms.length % 16
       )
         throw new TypeError(
           'Invalid culled batch; give each batch a geometry, a PbrMaterial and a non-empty Float32Array of 16-float matrices',
         );
-      const slots = b.capacity ?? b.transforms.length / 16;
-      if (!Number.isInteger(slots) || slots < b.transforms.length / 16)
-        throw new RangeError('Invalid culled batch capacity; pass a whole number no smaller than its part count');
       starts.push(count);
-      count += slots;
+      count += b.transforms.length / 16;
     }
     if (count > 1_000_000) throw new RangeError('Culled instances: at most 1,000,000');
     this.batches = batches.map((b) => ({ ...b }));
     this.slots = count;
     this.starts = starts;
-    this.free = batches.map(() => []);
     this.records = new Float32Array(count * 24);
     this.bounds = new Float32Array(batches.length * 4);
     this.batchOf = new Uint32Array(count);
@@ -256,8 +186,7 @@ export class CulledInstances implements EnginePlugin {
     this.earlyReset = new Uint32Array(batches.length * 5);
     batches.forEach((b, batch) => {
       const start = starts[batch],
-        parts = b.transforms.length / 16,
-        end = start + (b.capacity ?? parts);
+        end = start + b.transforms.length / 16;
       this.table.set([start, end, b.geometry.indices.length, 0], batch * 4);
       this.bounds.set(b.geometry.bounds, batch * 4);
       this.args[batch * 5] = this.earlyReset[batch * 5] = b.geometry.indices.length;
@@ -265,18 +194,13 @@ export class CulledInstances implements EnginePlugin {
         this.batchOf[i] = batch;
         this.records.set(b.material.data, i * 24 + 16);
         this.records[i * 24 + 23] = -1; // no core mesh ID
-        if (i - start < parts) this.write(i, b.transforms.subarray((i - start) * 16, (i - start + 1) * 16));
+        this.write(i, b.transforms.subarray((i - start) * 16, (i - start + 1) * 16));
       }
-      for (let i = end - start - 1; i >= parts; i--) {
-        this.hidden[start + i] = FREE;
-        this.free[batch].push(i);
-      }
-      this.live += parts;
     });
   }
-  /** Parts alive now, hidden ones included. */
+  /** Parts in all batches. */
   get count(): number {
-    return this.live;
+    return this.slots;
   }
 
   /**
@@ -284,149 +208,15 @@ export class CulledInstances implements EnginePlugin {
    * write per buffer covering every part changed since the last frame, so moving many parts costs no per-part GPU call.
    */
   setTransform(batch: number, index: number, matrix: ArrayLike<number>): void {
-    this.place(this.index(batch, index), matrix);
-  }
-  /**
-   * Makes a part follow another: from now on its matrix (the one it has, and each later {@link setTransform}) is relative
-   * to `parent`, and moving the parent moves the whole subtree, one record write per part there. `null` detaches it,
-   * keeping its world position. A parent may be hidden, which makes it a plain group node.
-   * @throws RangeError for a part not alive or a parent inside the part's own subtree.
-   */
-  setParent(batch: number, index: number, parent: CulledPart | null): void {
-    const i = this.index(batch, index),
-      p = parent ? this.index(parent.batch, parent.index) : -1;
-    const parents = (this.parents ??= new Int32Array(this.slots).fill(-1)),
-      locals = (this.locals ??= new Float32Array(this.slots * 16)),
-      children = (this.children ??= new Map());
-    for (let a = p; a >= 0; a = parents[a])
-      if (a === i) throw new RangeError("Invalid culled parent; pick a part outside this part's own subtree");
-    const old = parents[i];
-    if (old >= 0) this.unlink(i, old);
-    else if (p >= 0) locals.set(this.records.subarray(i * 24, i * 24 + 16), i * 16);
-    parents[i] = p;
-    if (p >= 0) {
-      const list = children.get(p);
-      if (list) list.push(i);
-      else children.set(p, [i]);
-      this.place(i, locals.subarray(i * 16, i * 16 + 16));
-    }
-  }
-  /** Writes a part's world matrix into `out` (default a new array) and returns it. */
-  getWorldMatrix(batch: number, index: number, out: number[] | Float32Array = new Float32Array(16)): typeof out {
-    const at = this.index(batch, index) * 24;
-    for (let k = 0; k < 16; k++) out[k] = this.records[at + k];
-    return out;
-  }
-  /**
-   * Adds parts to a batch's free slots, shown, without touching the rest: one upload per changed range with the next
-   * frame, as for {@link setTransform}. Returns each new part's index inside the batch.
-   * @throws RangeError when the batch has too few free slots; reserve them with {@link CulledBatch.capacity}.
-   */
-  addParts(batch: number, transforms: Float32Array): number[] {
-    const free = this.free[batch];
-    if (!free) throw new RangeError('Invalid culled batch index; pass a batch index from 0 up to the batch count');
-    if (!(transforms instanceof Float32Array) || transforms.length % 16)
-      throw new TypeError('Invalid culled parts; pass a Float32Array of 16-float matrices');
-    const n = transforms.length / 16;
-    if (n > free.length)
-      throw new RangeError(
-        `Culled batch ${batch} has ${free.length} free slots for ${n} parts; set a larger capacity on the batch`,
-      );
-    for (let k = 0; k < n; k++) determinant(transforms.subarray(k * 16, k * 16 + 16));
-    const added: number[] = [];
-    for (let k = 0; k < n; k++) {
-      const index = free.pop()!,
-        i = this.starts[batch] + index;
-      this.show(i, 0);
-      this.place(i, transforms.subarray(k * 16, k * 16 + 16));
-      added.push(index);
-    }
-    this.live += n;
-    return added;
-  }
-  /**
-   * Removes parts, freeing their slots for {@link addParts}; other parts keep their indices. Detaches each from its parent.
-   * @throws RangeError for a part not alive, listed twice, or still the parent of a part that is not removed with it.
-   */
-  removeParts(batch: number, indices: readonly number[]): void {
-    const slots = indices.map((index) => this.index(batch, index)),
-      gone = new Set(slots);
-    if (gone.size !== slots.length) throw new RangeError('Invalid culled parts; list each part to remove once');
-    for (const i of slots)
-      if (this.children?.get(i)?.some((child) => !gone.has(child)))
-        throw new RangeError('Culled part still has children; detach them with setParent or remove them too');
-    slots.forEach((i, k) => {
-      const parent = this.parents?.[i] ?? -1;
-      if (parent >= 0) this.unlink(i, parent);
-      if (this.parents) this.parents[i] = -1;
-      this.flips[batch] -= this.flipped[i];
-      this.flipped[i] = 0;
-      this.show(i, FREE);
-      this.free[batch].push(indices[k]);
-    });
-    this.live -= slots.length;
+    const i = this.index(batch, index);
+    this.write(i, matrix);
+    this.dirty(i);
   }
   /** Hides or shows one part (uploaded with the next frame, like {@link setTransform}). */
   setVisible(batch: number, index: number, visible: boolean): void {
     const i = this.index(batch, index);
     if (typeof visible !== 'boolean') throw new TypeError('Invalid visibility; pass true or false');
     this.show(i, +!visible);
-  }
-  /**
-   * The shown part under CSS pixel (x, y) through the engine camera, or null. Other drawing does not count: to find what
-   * is nearest overall, compare with `engine.pick`. A GPU readback of one draw of every shown part (culled ones can
-   * never be the answer) into a 1x1 id target; overlapping calls run one after another. Follows core's single-sided rule.
-   */
-  pick(x: number, y: number): Promise<CulledPart | null> {
-    if (!this.engine || !this.device)
-      return Promise.reject(new MargoError('state', 'CulledInstances is not attached; attach it to an engine first'));
-    if (!Number.isFinite(x) || !Number.isFinite(y))
-      return Promise.reject(new RangeError('Invalid pick; pass finite CSS pixels'));
-    const run = (this.picking ?? Promise.resolve(null)).then(
-      () => this.pickNow(x, y),
-      () => this.pickNow(x, y),
-    );
-    this.picking = run;
-    return run;
-  }
-  /**
-   * Draws every shown part into one shadow cascade (the `ShadowSource` contract of @margoengine/shadows:
-   * `shadows.add(parts)`). Parts outside the camera view still cast, so this does not use the camera's culled list.
-   */
-  drawShadow({
-    context,
-    pass,
-    matrix,
-    cascade,
-  }: {
-    context: { device: GPUDevice };
-    pass: GPURenderPassEncoder;
-    matrix: Float32Array;
-    cascade: number;
-  }): void {
-    const d = context.device;
-    if (!this.device) return;
-    const s = (this.shadow ??= (() => {
-      const module = d.createShaderModule({ code: partsShadowShader }),
-        pipeline = d.createRenderPipeline({
-          layout: 'auto',
-          vertex: { module, entryPoint: 'vertex', buffers: partLayouts },
-          depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
-        }),
-        uniforms: GPUBuffer[] = [],
-        groups: GPUBindGroup[] = [];
-      for (let i = 0; i < 4; i++) {
-        const buffer = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-        uniforms.push(buffer);
-        groups.push(this.bind(pipeline, [[0, { buffer }]]));
-      }
-      return { pipeline, uniforms, groups };
-    })());
-    this.flush(d);
-    d.queue.writeBuffer(s.uniforms[cascade], 0, matrix as Float32Array<ArrayBuffer>);
-    pass.setPipeline(s.pipeline);
-    pass.setBindGroup(0, s.groups[cascade]);
-    this.drawParts(pass);
   }
   /** Reads back how many parts of each batch were drawn in the latest submitted frame (for tests and benchmarks). */
   async readCounts(): Promise<number[]> {
@@ -538,136 +328,12 @@ export class CulledInstances implements EnginePlugin {
     });
   }
 
-  // One draw per batch of all its slots: firstInstance is the flat slot, so instance_index names the part.
-  private drawParts(pass: GPURenderPassEncoder): void {
-    pass.setVertexBuffer(1, this.buffers.records);
-    pass.setVertexBuffer(2, this.buffers.hidden);
-    this.batches.forEach((batch, i) => {
-      const g = this.geometryBuffers.get(batch.geometry)!,
-        table = this.table;
-      pass.setVertexBuffer(0, g.vertex);
-      pass.setIndexBuffer(g.index, 'uint32');
-      pass.drawIndexed(batch.geometry.indices.length, table[i * 4 + 1] - table[i * 4], 0, 0, table[i * 4]);
-    });
-  }
-  private async pickNow(x: number, y: number): Promise<CulledPart | null> {
-    const engine = this.engine,
-      d = this.device;
-    if (!engine || !d) return null;
-    const canvas = engine.canvas,
-      w = canvas.clientWidth || canvas.width,
-      h = canvas.clientHeight || canvas.height;
-    if (x < 0 || y < 0 || x >= w || y >= h) return null;
-    const t = (this.picker ??= (() => {
-      const module = d.createShaderModule({ code: partsPickShader }),
-        pipeline = d.createRenderPipeline({
-          layout: 'auto',
-          vertex: { module, entryPoint: 'vertex', buffers: partLayouts },
-          fragment: { module, entryPoint: 'fragment', targets: [{ format: 'r32uint' }] },
-          depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater-equal' },
-        }),
-        uniform = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
-        ids = d.createTexture({ size: [1, 1], format: 'r32uint', usage: 16 | 1 }),
-        depth = d.createTexture({ size: [1, 1], format: 'depth32float', usage: 16 });
-      return {
-        pipeline,
-        uniform,
-        ids,
-        depth,
-        group: this.bind(pipeline, [[0, { buffer: uniform }]]),
-        descriptor: {
-          colorAttachments: [
-            { view: ids.createView(), clearValue: [4294967295, 0, 0, 0], loadOp: 'clear', storeOp: 'store' },
-          ],
-          depthStencilAttachment: {
-            view: depth.createView(),
-            depthClearValue: 0,
-            depthLoadOp: 'clear',
-            depthStoreOp: 'discard',
-          },
-        } as GPURenderPassDescriptor,
-      };
-    })());
-    // The camera matrix scaled and offset so the picked device pixel fills the 1x1 target.
-    const camera = engine.camera.matrix,
-      matrix = this.product,
-      px = Math.floor((x * canvas.width) / w) + 0.5,
-      py = Math.floor((y * canvas.height) / h) + 0.5;
-    for (let c = 0; c < 4; c++) {
-      const wc = camera[c * 4 + 3];
-      matrix[c * 4] = camera[c * 4] * canvas.width - (2 * px - canvas.width) * wc;
-      matrix[c * 4 + 1] = camera[c * 4 + 1] * canvas.height + (2 * py - canvas.height) * wc;
-      matrix[c * 4 + 2] = camera[c * 4 + 2];
-      matrix[c * 4 + 3] = wc;
-    }
-    d.queue.writeBuffer(t.uniform, 0, matrix as Float32Array<ArrayBuffer>);
-    this.flush(d);
-    const read = d.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-    try {
-      const encoder = d.createCommandEncoder(),
-        pass = encoder.beginRenderPass(t.descriptor);
-      pass.setPipeline(t.pipeline);
-      pass.setBindGroup(0, t.group);
-      this.drawParts(pass);
-      pass.end();
-      encoder.copyTextureToBuffer({ texture: t.ids }, { buffer: read }, [1, 1]);
-      d.queue.submit([encoder.finish()]);
-      await read.mapAsync(GPUMapMode.READ);
-      const id = new Uint32Array(read.getMappedRange().slice(0))[0];
-      read.unmap();
-      if (id >= this.slots || this.hidden[id]) return null;
-      const batch = this.batchOf[id];
-      return { batch, index: id - this.starts[batch] };
-    } finally {
-      read.destroy();
-    }
-  }
-  private unlink(i: number, parent: number): void {
-    const list = this.children!.get(parent)!;
-    list.splice(list.indexOf(i), 1);
-    if (!list.length) this.children!.delete(parent);
-  }
-  private show(i: number, word: number): void {
+  protected show(i: number, word: number): void {
     this.hidden[i] = word;
     if (i < this.hiddenLow) this.hiddenLow = i;
     if (i >= this.hiddenHigh) this.hiddenHigh = i + 1;
-    this.shadowVersion++;
   }
-  // A part's own matrix (relative to its parent, if it has one), then the world matrices of its subtree, parents first.
-  private place(i: number, matrix: ArrayLike<number>): void {
-    const parent = this.parents?.[i] ?? -1;
-    if (parent >= 0) {
-      this.write(i, this.fold(parent, matrix, 0));
-      this.locals!.set(matrix, i * 16);
-    } else this.write(i, matrix);
-    this.dirty(i);
-    this.shadowVersion++;
-    const below = this.children?.get(i);
-    if (!below) return;
-    const stack = [...below];
-    while (stack.length) {
-      const k = stack.pop()!;
-      this.write(k, this.fold(this.parents![k], this.locals!, k * 16));
-      this.dirty(k);
-      const more = this.children!.get(k);
-      if (more) stack.push(...more);
-    }
-  }
-  // The world matrix of `parent` times the 16 values of `m` from `at`, in a shared scratch array.
-  private fold(parent: number, m: ArrayLike<number>, at: number): Float32Array {
-    const a = this.records,
-      p = parent * 24,
-      out = this.product;
-    for (let c = 0; c < 4; c++)
-      for (let r = 0; r < 4; r++)
-        out[c * 4 + r] =
-          a[p + r] * m[at + c * 4] +
-          a[p + 4 + r] * m[at + c * 4 + 1] +
-          a[p + 8 + r] * m[at + c * 4 + 2] +
-          a[p + 12 + r] * m[at + c * 4 + 3];
-    return out;
-  }
-  private index(batch: number, index: number): number {
+  protected index(batch: number, index: number): number {
     const start = this.starts[batch],
       end = batch + 1 < this.starts.length ? this.starts[batch + 1] : this.slots;
     if (
@@ -675,18 +341,17 @@ export class CulledInstances implements EnginePlugin {
       start === undefined ||
       !Number.isInteger(index) ||
       index < 0 ||
-      start + index >= end ||
-      this.hidden[start + index] === FREE
+      start + index >= end
     )
       throw new RangeError('Invalid culled instance; pass a batch index and an instance index inside that batch');
     return start + index;
   }
-  private dirty(i: number): void {
+  protected dirty(i: number): void {
     if (i < this.low) this.low = i;
     if (i >= this.high) this.high = i + 1;
   }
   // The changed parts' records, and the changed visibility flags, one contiguous range each.
-  private flush(d: GPUDevice): void {
+  protected flush(d: GPUDevice): void {
     if (this.high > this.low) {
       const { low, high } = this;
       d.queue.writeBuffer(
@@ -706,14 +371,31 @@ export class CulledInstances implements EnginePlugin {
       this.hiddenHigh = 0;
     }
   }
-  private write(i: number, m: ArrayLike<number>): void {
-    const det = determinant(m);
+  /** Validates a matrix as a part's world transform; returns its determinant. */
+  protected determinant(m: ArrayLike<number>): number {
+    if (m?.length !== 16) throw new TypeError('Expected 16 matrix values');
+    // One finiteness test for the matrix (a NaN or infinite float32 value makes the sum non-finite; 16 finite float32
+    // values cannot overflow a double); plain arrays are also checked for non-numbers, typed arrays hold numbers.
+    let sum = 0;
+    for (let k = 0; k < 16; k++) sum += Math.fround(m[k]);
+    if (!Number.isFinite(sum)) throw new RangeError('Invalid instance transform: pass 16 finite float32 values');
+    if (!ArrayBuffer.isView(m))
+      for (let k = 0; k < 16; k++)
+        if (typeof m[k] !== 'number') throw new RangeError('Invalid instance transform: pass 16 finite float32 values');
+    const det =
+      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
+    if (m[3] || m[7] || m[11] || m[15] !== 1 || !Number.isFinite(det) || !det)
+      throw new RangeError('Expected nonsingular affine instance transforms');
+    return det;
+  }
+  protected write(i: number, m: ArrayLike<number>): void {
+    const det = this.determinant(m);
     this.records.set(m, i * 24);
     const flip = +(det < 0);
     this.flips[this.batchOf[i]] += flip - this.flipped[i];
     this.flipped[i] = flip;
   }
-  private bind(
+  protected bind(
     pipeline: GPUComputePipeline | GPURenderPipeline,
     entries: [number, GPUBindingResource][],
   ): GPUBindGroup {
@@ -988,14 +670,9 @@ export class CulledInstances implements EnginePlugin {
     });
     main.end();
   }
-  private release(): void {
+  protected release(): void {
     this.route = undefined;
     for (const buffer of Object.values(this.buffers)) buffer.destroy();
-    for (const buffer of this.shadow?.uniforms ?? []) buffer.destroy();
-    this.picker?.uniform.destroy();
-    this.picker?.ids.destroy();
-    this.picker?.depth.destroy();
-    this.shadow = this.picker = undefined;
     for (const g of this.geometryBuffers.values()) {
       g.vertex.destroy();
       g.index.destroy();

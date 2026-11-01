@@ -1,4 +1,4 @@
-// Real-GPU check for CulledInstances' picking, hierarchy, shadows and streaming: engine A draws boxes as parts, engine B
+// Real-GPU check for CulledParts' picking, hierarchy, shadows and streaming: engine A draws boxes as parts, engine B
 // the same boxes as core meshes. Every step's frames must match, with and without shadows, in frustum and occlusion
 // culling; picks must name the box engine.pick names; part counts follow adds and removes; shadows must darken the floor.
 // Takes a GPU slot itself. Run from the repository root after building packages:

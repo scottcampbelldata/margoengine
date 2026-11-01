@@ -29,6 +29,10 @@
     "./dynamic": {
       "types": "./dist/dynamic.d.ts",
       "import": "./dist/dynamic.js"
+    },
+    "./parts": {
+      "types": "./dist/parts.d.ts",
+      "import": "./dist/parts.js"
     }
   },
   "files": [

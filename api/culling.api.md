@@ -10,37 +10,45 @@ export interface CulledBatch {
     geometry: Geometry;
     material: PbrMaterial;
     transforms: Float32Array;
-    capacity?: number;
 }
 
 export class CulledInstances implements EnginePlugin {
     readonly name: string;
     readonly starts: readonly number[];
-    shadowVersion: number;
     culling: CullingMode;
     occluderSize: number;
     disposed: boolean;
+    protected engine?: Engine;
+    protected device?: GPUDevice;
+    protected readonly batches: readonly CulledBatch[];
+    protected readonly slots: number;
+    protected readonly records: Float32Array;
+    protected readonly batchOf: Uint32Array;
+    protected readonly table: Uint32Array;
+    protected readonly hidden: Uint32Array;
+    protected readonly flipped: Uint8Array;
+    protected readonly flips: Uint32Array;
+    protected buffers: Record<string, GPUBuffer>;
+    protected geometryBuffers: Map<Geometry, {
+        vertex: GPUBuffer;
+        index: GPUBuffer;
+    }>;
     static attach(engine: EngineKernel, batches: readonly CulledBatch[], options?: CulledInstancesOptions): CulledInstances;
     constructor(batches: readonly CulledBatch[], { culling, occluderSize }?: CulledInstancesOptions);
     get count(): number;
     setTransform(batch: number, index: number, matrix: ArrayLike<number>): void;
-    setParent(batch: number, index: number, parent: CulledPart | null): void;
-    getWorldMatrix(batch: number, index: number, out?: number[] | Float32Array): typeof out;
-    addParts(batch: number, transforms: Float32Array): number[];
-    removeParts(batch: number, indices: readonly number[]): void;
     setVisible(batch: number, index: number, visible: boolean): void;
-    pick(x: number, y: number): Promise<CulledPart | null>;
-    drawShadow({ context, pass, matrix, cascade }: {
-        context: {
-            device: GPUDevice;
-        };
-        pass: GPURenderPassEncoder;
-        matrix: Float32Array;
-        cascade: number;
-    }): void;
     readCounts(): Promise<number[]>;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    protected show(i: number, word: number): void;
+    protected index(batch: number, index: number): number;
+    protected dirty(i: number): void;
+    protected flush(d: GPUDevice): void;
+    protected determinant(m: ArrayLike<number>): number;
+    protected write(i: number, m: ArrayLike<number>): void;
+    protected bind(pipeline: GPUComputePipeline | GPURenderPipeline, entries: [number, GPUBindingResource][]): GPUBindGroup;
+    protected release(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -67,11 +75,6 @@ export class CulledMeshes implements EnginePlugin {
 
 export interface CulledMeshesOptions {
     minRadius?: number;
-}
-
-export interface CulledPart {
-    batch: number;
-    index: number;
 }
 
 export type CullingMode = 'none' | 'frustum' | 'occlusion';

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box, PbrMaterial } from '@margoengine/core';
 import { CulledInstances } from '../dist/index.js';
+import { CulledParts } from '../dist/parts.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { wgsl } from '../../core/src/shaders.ts';
 
@@ -415,7 +416,7 @@ test('CulledMeshes culls core batches on the GPU and redirects core draws; stora
 
 const worldY = (parts, b, i) => parts.getWorldMatrix(b, i)[13];
 test('setParent folds parent matrices at write time, through a whole subtree, and detach keeps the world place', () => {
-  const parts = new CulledInstances(batches()),
+  const parts = new CulledParts(batches()),
     root = { batch: 0, index: 0 },
     mid = { batch: 0, index: 1 };
   parts.setParent(0, 1, root);
@@ -436,7 +437,7 @@ test('setParent folds parent matrices at write time, through a whole subtree, an
 });
 
 test('setParent refuses a parent inside the subtree and a part that is not alive', () => {
-  const parts = new CulledInstances(batches());
+  const parts = new CulledParts(batches());
   parts.setParent(0, 1, { batch: 0, index: 0 });
   assert.throws(() => parts.setParent(0, 0, { batch: 0, index: 1 }), /subtree/);
   assert.throws(() => parts.setParent(0, 0, { batch: 0, index: 0 }), /subtree/);
@@ -444,7 +445,7 @@ test('setParent refuses a parent inside the subtree and a part that is not alive
 });
 
 test('a mirroring parent counts its subtree as mirrored, so the batch leaves the back-culled pipeline', () => {
-  const parts = new CulledInstances(batches());
+  const parts = new CulledParts(batches());
   parts.setParent(1, 0, { batch: 0, index: 0 });
   assert.equal(parts.flips[1], 0);
   parts.setTransform(0, 0, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -457,7 +458,7 @@ test('capacity reserves slots; addParts and removeParts reuse them without new b
   const h = harness(),
     list = batches();
   list[0].capacity = 4;
-  const parts = new CulledInstances(list);
+  const parts = new CulledParts(list);
   h.engine.use(parts);
   h.run();
   assert.equal(parts.count, 3);
@@ -486,10 +487,10 @@ test('capacity reserves slots; addParts and removeParts reuse them without new b
 
 test('a batch may start empty only with a capacity, and a bad matrix in addParts adds nothing', () => {
   const [one] = batches();
-  assert.throws(() => new CulledInstances([{ ...one, transforms: new Float32Array(0) }]), /non-empty/);
-  assert.throws(() => new CulledInstances([{ ...one, capacity: 1 }]), /capacity/);
-  assert.throws(() => new CulledInstances([{ ...one, capacity: 2.5 }]), /capacity/);
-  const parts = new CulledInstances([{ ...one, transforms: new Float32Array(0), capacity: 2 }]);
+  assert.throws(() => new CulledParts([{ ...one, transforms: new Float32Array(0) }]), /non-empty/);
+  assert.throws(() => new CulledParts([{ ...one, capacity: 1 }]), /capacity/);
+  assert.throws(() => new CulledParts([{ ...one, capacity: 2.5 }]), /capacity/);
+  const parts = new CulledParts([{ ...one, transforms: new Float32Array(0), capacity: 2 }]);
   assert.equal(parts.count, 0);
   assert.throws(() => parts.setVisible(0, 0, true), /instance/);
   assert.throws(() => parts.addParts(0, new Float32Array([...translate(1, 0, 0), ...new Array(16).fill(0)])), /affine/);
@@ -498,7 +499,7 @@ test('a batch may start empty only with a capacity, and a bad matrix in addParts
 });
 
 test('a part with children is removed only with them', () => {
-  const parts = new CulledInstances(batches());
+  const parts = new CulledParts(batches());
   parts.setParent(0, 1, { batch: 0, index: 0 });
   assert.throws(() => parts.removeParts(0, [0]), /children/);
   assert.equal(parts.count, 3);
@@ -508,7 +509,7 @@ test('a part with children is removed only with them', () => {
 
 test('drawShadow draws every slot of each batch at its flat first instance, and uploads edits first', () => {
   const h = harness(),
-    parts = new CulledInstances(batches());
+    parts = new CulledParts(batches());
   h.engine.use(parts);
   h.run();
   const draws = [],
@@ -533,9 +534,16 @@ test('drawShadow draws every slot of each batch at its flat first instance, and 
 });
 
 test('pick rejects before attach and for bad pixels', async () => {
-  const parts = new CulledInstances(batches());
+  const parts = new CulledParts(batches());
   await assert.rejects(parts.pick(1, 1), /not attached/);
   const h = harness();
   h.engine.use(parts);
   await assert.rejects(parts.pick(Number.NaN, 1), /finite/);
+});
+
+test('the plain class holds none of the parts entry: the root stays free of pick, hierarchy, shadows and streaming', () => {
+  const parts = new CulledInstances(batches());
+  for (const name of ['pick', 'setParent', 'getWorldMatrix', 'addParts', 'removeParts', 'drawShadow'])
+    assert.equal(parts[name], undefined, name);
+  assert.equal(new CulledParts(batches()) instanceof CulledInstances, true);
 });

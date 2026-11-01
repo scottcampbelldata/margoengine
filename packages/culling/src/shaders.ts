@@ -120,36 +120,6 @@ fn unoccluded(s:vec4f)->bool {
 }
 `;
 
-// Caster and id draws of the whole part list: hidden and free slots collapse to a point outside clip space.
-const partInput =
-  'struct Input {@builtin(instance_index) n:u32,@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@location(4) c:vec4f,@location(5) d:vec4f,@location(6) factors:vec4f,@location(7) hidden:u32}\nconst away=vec4f(2.0,2.0,2.0,1.0);\n';
-/** Depth-only caster draw for @margoengine/shadows' cascade passes. */
-export const partsShadowShader =
-  partInput +
-  `
-@group(0) @binding(0) var<uniform> light:mat4x4f;
-@vertex fn vertex(i:Input)->@builtin(position) vec4f {
-  if(i.hidden!=0u){return away;}
-  return light*mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);
-}
-`;
-/** One id per part (its flat slot) into a 1x1 r32uint target, with core's single-sided rule. */
-export const partsPickShader =
-  partInput +
-  `
-@group(0) @binding(0) var<uniform> camera:mat4x4f;
-struct Output {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) id:u32,@location(1) @interpolate(flat) side:vec2f}
-@vertex fn vertex(i:Input)->Output {
-  let m=mat4x4f(i.a,i.b,i.c,i.d);var o:Output;o.clip=away;
-  if(i.hidden==0u){o.clip=camera*m*vec4f(i.p,1);}
-  o.id=i.n;o.side=vec2f(sign(dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))),i.factors.z);return o;
-}
-@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) u32 {
-  if(front!=(i.side.x>0.0)&&i.side.y<0.5){discard;}
-  return i.id;
-}
-`;
-
 /** Depth-only prepass of last frame's visible parts. Positions are computed exactly as in core's vertex shader. */
 export const depthShader =
   common +

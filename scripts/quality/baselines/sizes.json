@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4295308,
+  "total": 4304999,
   "history": [
     {
       "date": "2026-10-24",
@@ -1382,6 +1382,12 @@
       "commit": "7c80e06ec",
       "reason": "lines: new entry lines/edges, featureEdges, EdgesHelper and gradientColors (row 21.61101)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "b2e7cc033",
+      "reason": "culling/parts: CulledParts holds pick, setParent, drawShadow and addParts/removeParts in their own entry; the root gives them back",
+      "grew": 1
     }
   ],
   "items": {
@@ -1459,8 +1465,9 @@
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,
-    "@margoengine/culling": 13321,
+    "@margoengine/culling": 11106,
     "@margoengine/culling/dynamic": 7461,
+    "@margoengine/culling/parts": 11906,
     "@margoengine/cutscene": 6845,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,
