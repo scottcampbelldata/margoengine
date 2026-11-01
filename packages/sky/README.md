@@ -36,7 +36,7 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/fog` | `fog` | 1.7 kB |
 | `/reflection` | `reflectionTexture` | 0.8 kB |
 | `/lighting` | `lighting` (engine sun/moon light, ambient) | 1.0 kB |
-| `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky` (not a `Sky` feature) | 1.6 kB |
+| `/sun` | typed angles, `setSun` / `setAmbient` over core's light, `sunlitSky`, `sunPath` (not a `Sky` feature) | 2.1 kB |
 | `/weather` | `Weather`, its own plugin (not a `Sky` feature): rain, snow, lightning, thunder timing | 5.6 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
@@ -153,6 +153,21 @@ console.log(getSun(engine).direction, fromMath.degrees, sky.name);
   colours light surfaces, above the `skyEnvironmentFloor`). It needs the `lighting` feature (the root `Sky` has it). A
   `Sky` without `lighting`, its default, draws a backdrop and lights nothing: existing scenes and their pixels stay as
   they were.
+- **`sunPath({latitude, dayOfYear, hour})`** places the sun for a latitude (an `Angle`, -90 to 90), a day of the year
+  (integer 1 to 366) and local solar time (`hour` 0 to 24, 12 is solar noon), from Spencer's 1971 Fourier series for
+  the declination and the equation of time. It returns `azimuth` and `elevation` (ready for `setSun` or `sunlitSky`),
+  the unit `direction`, the `declination` and `equationOfTime` (minutes). World axes match `@margoengine/biomes`: north
+  is -Z and east is +X, so azimuth 0 (+Z) is due south. Polar night gives a negative elevation, never NaN.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {degrees, setSun, sunPath} from 'margoengine/sky/sun';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const sun = sunPath({latitude: degrees(47), dayOfYear: 172, hour: 16});
+setSun(engine, {azimuth: sun.azimuth, elevation: sun.elevation});
+console.log(sun.elevation.degrees, sun.equationOfTime);
+```
+
 - **Exposure.** Core has no exposure setting. Scene exposure is `exposure` (stops, default 0) on `Tonemap` from
   `@margoengine/tonemap`, read every frame: `Tonemap.attach(engine, {exposure: 1})`, then
   `tonemap.options.exposure = 0.5`. The sky's own `exposure` option brightens only the sky backdrop.

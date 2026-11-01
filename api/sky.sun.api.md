@@ -46,6 +46,20 @@ export interface SunOptions {
     intensity?: number;
 }
 
+export interface SunPath {
+    azimuth: Angle;
+    elevation: Angle;
+    direction: Vec3;
+    declination: Angle;
+    equationOfTime: number;
+}
+
+export interface SunPathOptions {
+    latitude: Angle;
+    dayOfYear: number;
+    hour: number;
+}
+
 export interface SunlitSkyOptions {
     azimuth?: Angle;
     elevation?: Angle;
@@ -68,6 +82,8 @@ export function setAmbient(target: LightingTarget, options: AmbientOptions): Amb
 export function setSun(target: LightingTarget, options: SunOptions): SunLight;
 
 export function sunDirectionFrom(azimuth: Angle, elevation: Angle): Vec3;
+
+export function sunPath(options: SunPathOptions): SunPath;
 
 export function sunlitSky(options?: SunlitSkyOptions): SkyOptions & {
     lighting: SkyLightingOptions;

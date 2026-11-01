@@ -165,6 +165,81 @@ export function sunDirectionFrom(azimuth: Angle, elevation: Angle): Vec3 {
   return [Math.sin(az) * c, Math.sin(el.radians), Math.cos(az) * c];
 }
 
+/** Options for {@link sunPath}. Every field is required. */
+export interface SunPathOptions {
+  /** Latitude, `degrees(-90)` (south pole) to `degrees(90)` (north pole). */
+  latitude: Angle;
+  /** Day of the year, an integer 1..366 (1 is 1 January). */
+  dayOfYear: number;
+  /** Local apparent solar time in hours, 0..24: 12 is solar noon, when the sun crosses the meridian. */
+  hour: number;
+}
+
+/** Where the sun is, from {@link sunPath}. */
+export interface SunPath {
+  /** Compass angle in this module's convention ({@link SunOptions.azimuth}): 0 is +Z (south), 90 is +X (east). */
+  azimuth: Angle;
+  /** Height above the horizon, -90 to 90 degrees; below 0 the sun is down. */
+  elevation: Angle;
+  /** Unit vector toward the sun, as {@link sunDirectionFrom} gives for `azimuth` and `elevation`. */
+  direction: Vec3;
+  /** Solar declination (Spencer 1971). */
+  declination: Angle;
+  /** Equation of time in minutes (Spencer 1971): apparent minus mean solar time. */
+  equationOfTime: number;
+}
+
+/**
+ * The sun's place for a latitude, day and solar hour, from Spencer's Fourier series (J. W. Spencer, "Fourier series
+ * representation of the position of the sun", Search 2(5), 1971) and the standard spherical formulas. World axes match
+ * `@margoengine/biomes`: north is -Z, east is +X, up is +Y, so `azimuth` 0 (+Z) points south and the noon sun of a
+ * northern latitude is there. Pass `azimuth` and `elevation` to {@link setSun} or {@link sunlitSky}. Polar day and night
+ * work: the elevation simply stays above or below 0.
+ * @throws TypeError when `latitude` is not an {@link Angle} or a value is not a number.
+ * @throws RangeError for a latitude outside -90..90 degrees, a day that is not an integer 1..366, or an hour outside 0..24.
+ * @example const { azimuth, elevation } = sunPath({ latitude: degrees(52), dayOfYear: 172, hour: 15 });
+ */
+export function sunPath(options: SunPathOptions): SunPath {
+  if (typeof options !== 'object' || options === null)
+    throw new TypeError('Pass sun path options as { latitude, dayOfYear, hour }.');
+  const lat = angle(options.latitude, 'latitude'),
+    { dayOfYear: day, hour } = options;
+  if (Math.abs(lat.degrees) > 90) throw new RangeError(`Invalid latitude ${lat}; use -90 to 90 degrees.`);
+  if (typeof day !== 'number' || typeof hour !== 'number') throw new TypeError('dayOfYear and hour must be numbers.');
+  if (!Number.isInteger(day) || day < 1 || day > 366)
+    throw new RangeError(`Invalid dayOfYear ${day}; use an integer from 1 to 366.`);
+  if (!(hour >= 0 && hour <= 24)) throw new RangeError(`Invalid hour ${hour}; use solar time from 0 to 24.`);
+  const g = (2 * Math.PI * (day - 1)) / 365,
+    c = (k: number) => Math.cos(k * g),
+    s = (k: number) => Math.sin(k * g),
+    decl =
+      0.006918 -
+      0.399912 * c(1) +
+      0.070257 * s(1) -
+      0.006758 * c(2) +
+      0.000907 * s(2) -
+      0.002697 * c(3) +
+      0.00148 * s(3),
+    eot = 229.18 * (0.000075 + 0.001868 * c(1) - 0.032077 * s(1) - 0.014615 * c(2) - 0.040849 * s(2)),
+    h = (hour - 12) * 15 * toRadians,
+    phi = lat.radians,
+    // Local east, north and up components of the unit vector toward the sun.
+    east = -Math.cos(decl) * Math.sin(h),
+    north = Math.sin(decl) * Math.cos(phi) - Math.cos(decl) * Math.sin(phi) * Math.cos(h),
+    up = Math.sin(decl) * Math.sin(phi) + Math.cos(decl) * Math.cos(phi) * Math.cos(h),
+    elevation = radians(Math.asin(Math.max(-1, Math.min(1, up)))),
+    // Bearing clockwise from north to this module's azimuth (0 at +Z, south): 180 degrees minus the bearing.
+    bearing = Math.atan2(east, north) / toRadians,
+    azimuth = degrees((((180 - bearing) % 360) + 360) % 360);
+  return {
+    azimuth,
+    elevation,
+    direction: sunDirectionFrom(azimuth, elevation),
+    declination: radians(decl),
+    equationOfTime: eot,
+  };
+}
+
 /**
  * Sets the scene's sun (core's directional light) with named options; see {@link SunOptions} for the defaults.
  * Writes `lighting.direction` (xyz, w = intensity) and `lighting.radiance` (rgb = colour); every value is checked

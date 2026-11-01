@@ -12,6 +12,7 @@ import {
   setAmbient,
   getAmbient,
   sunlitSky,
+  sunPath,
 } from '@margoengine/sky/sun';
 import { Sky, sunDirectionFromAngles, skyEnvironmentFloor } from '@margoengine/sky';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
@@ -151,4 +152,61 @@ test('sunlitSky lights the scene from a 35 degree sun with core-like strength', 
   } finally {
     sky.dispose();
   }
+});
+
+test('sunPath: Spencer 1971 declination, solstice noon elevation and the compass', () => {
+  // Spencer's declination peaks near 23.44 degrees at the June solstice (day 172).
+  const june = sunPath({ latitude: degrees(0), dayOfYear: 172, hour: 12 });
+  close(june.declination.degrees, 23.44, 0.05);
+  // At solar noon of the solstice the sun stands 90 - |latitude - 23.44| degrees high, north or south of the tropic.
+  for (const lat of [0, 23.44, 45, 60, -30]) {
+    const p = sunPath({ latitude: degrees(lat), dayOfYear: 172, hour: 12 });
+    close(p.elevation.degrees, 90 - Math.abs(lat - 23.44), 0.05);
+    close(p.elevation.degrees, 90 - Math.abs(lat - p.declination.degrees), 1e-9);
+    close(Math.hypot(...p.direction), 1, 1e-12);
+  }
+  // North of the sun at noon it stands due south (+Z, azimuth 0); south of it, due north (-Z, azimuth 180).
+  close(sunPath({ latitude: degrees(45), dayOfYear: 172, hour: 12 }).azimuth.degrees, 0, 1e-9);
+  close(sunPath({ latitude: degrees(-30), dayOfYear: 172, hour: 12 }).azimuth.degrees, 180, 1e-9);
+  // Equinox: the declination crosses 0 between 20 and 21 March (days 79 and 80).
+  const a = sunPath({ latitude: degrees(0), dayOfYear: 79, hour: 12 }).declination.degrees,
+    b = sunPath({ latitude: degrees(0), dayOfYear: 80, hour: 12 }).declination.degrees;
+  assert.ok(Math.abs(a) < 0.6 && Math.abs(b) < 0.6 && Math.min(Math.abs(a), Math.abs(b)) < 0.25, `equinox ${a}, ${b}`);
+  // The December solstice mirrors June.
+  close(sunPath({ latitude: degrees(0), dayOfYear: 355, hour: 12 }).declination.degrees, -23.44, 0.1);
+  // Morning and afternoon mirror about the meridian: same height, east and west of south.
+  for (const lat of [10, 45, -35]) {
+    const am = sunPath({ latitude: degrees(lat), dayOfYear: 100, hour: 9 }),
+      pm = sunPath({ latitude: degrees(lat), dayOfYear: 100, hour: 15 });
+    close(am.elevation.degrees, pm.elevation.degrees, 1e-9);
+    close(am.direction[0], -pm.direction[0], 1e-12);
+    close(am.direction[2], pm.direction[2], 1e-12);
+  }
+  // The morning sun is in the east (+X), the afternoon sun in the west.
+  assert.ok(sunPath({ latitude: degrees(45), dayOfYear: 172, hour: 8 }).direction[0] > 0);
+  assert.ok(sunPath({ latitude: degrees(45), dayOfYear: 172, hour: 16 }).direction[0] < 0);
+  // Equation of time: Spencer's curve reaches about -14 minutes in February and +16 in early November.
+  assert.ok(sunPath({ latitude: degrees(0), dayOfYear: 42, hour: 12 }).equationOfTime < -13.5);
+  assert.ok(sunPath({ latitude: degrees(0), dayOfYear: 307, hour: 12 }).equationOfTime > 16);
+  // Polar night and polar day: no NaN, the sun stays below or above the horizon all day.
+  for (let hour = 0; hour <= 24; hour += 1.5) {
+    const night = sunPath({ latitude: degrees(80), dayOfYear: 355, hour }),
+      day = sunPath({ latitude: degrees(80), dayOfYear: 172, hour }),
+      pole = sunPath({ latitude: degrees(-90), dayOfYear: 172, hour });
+    assert.ok(night.elevation.degrees < 0, `polar night ${night.elevation}`);
+    assert.ok(day.elevation.degrees > 0, `polar day ${day.elevation}`);
+    for (const p of [night, day, pole])
+      assert.ok([p.azimuth.degrees, p.elevation.degrees, ...p.direction].every(Number.isFinite));
+  }
+  // Validation names the fix.
+  assert.throws(() => sunPath({ latitude: 45, dayOfYear: 1, hour: 12 }), TypeError);
+  assert.throws(() => sunPath(null), TypeError);
+  assert.throws(() => sunPath({ latitude: degrees(91), dayOfYear: 1, hour: 12 }), RangeError);
+  assert.throws(() => sunPath({ latitude: degrees(45), dayOfYear: 0, hour: 12 }), RangeError);
+  assert.throws(() => sunPath({ latitude: degrees(45), dayOfYear: 367, hour: 12 }), RangeError);
+  assert.throws(() => sunPath({ latitude: degrees(45), dayOfYear: 1.5, hour: 12 }), RangeError);
+  assert.throws(() => sunPath({ latitude: degrees(45), dayOfYear: 1, hour: 24.5 }), RangeError);
+  assert.throws(() => sunPath({ latitude: degrees(45), dayOfYear: 1, hour: Number.NaN }), RangeError);
+  assert.throws(() => sunPath({ latitude: degrees(45), dayOfYear: '1', hour: 12 }), TypeError);
+  assert.doesNotThrow(() => sunPath({ latitude: degrees(45), dayOfYear: 366, hour: 24 }));
 });
