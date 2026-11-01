@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4272593,
+  "total": 4278460,
   "history": [
     {
       "date": "2026-10-24",
@@ -1322,6 +1322,18 @@
       "commit": "b2e7cc033",
       "reason": "dof: dof/lens tilt-shift and bokeh blades, dof/autofocus a depth read that never stalls, each in its own entry with a small lens hook in the root",
       "grew": 2
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "1454595d3",
+      "reason": "react: Billboard, Bounds and Float in the root, a once-per-mount development component name in Mesh (row 21.6 job 10); new entries react/lines and react/devtools",
+      "grew": 3
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "98c65987a",
+      "reason": "react: Bounds, Billboard, Float in react/helpers and the owner-name code in react/devtools, each out of the root",
+      "grew": 1
     }
   ],
   "items": {
@@ -1588,15 +1600,18 @@
     "@margoengine/quality": 3681,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 6511,
-    "@margoengine/react": 8256,
+    "@margoengine/react": 8317,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/controls": 4346,
+    "@margoengine/react/devtools": 1008,
     "@margoengine/react/dof": 1157,
     "@margoengine/react/environment": 3131,
     "@margoengine/react/fbx": 3843,
     "@margoengine/react/geometry": 2403,
     "@margoengine/react/gltf-pro": 3809,
+    "@margoengine/react/helpers": 3799,
     "@margoengine/react/html": 1529,
+    "@margoengine/react/lines": 999,
     "@margoengine/react/materials": 4316,
     "@margoengine/react/physics": 6225,
     "@margoengine/react/post": 4243,

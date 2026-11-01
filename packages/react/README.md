@@ -577,3 +577,47 @@ The measured breakdown of a React build, package by package, is in [docs/limits.
 - **Next.js error about hooks in a server component.** Put the `Canvas` in a file that starts with `'use client'`.
 
 Apache-2.0 licensed.
+
+## Helpers and development panels
+
+```tsx
+import {Canvas, Mesh} from '@margoengine/react';
+import {Billboard, Bounds, Float, useBounds} from '@margoengine/react/helpers';
+import {Box} from '@margoengine/react/geometry';
+import {Grid} from '@margoengine/react/lines';
+import {DevTools} from '@margoengine/react/devtools';
+
+function Part() {
+  const bounds = useBounds();
+  return <Box position={[2, 0, 0]} onClick={(event) => bounds.fit(event.object)} />;
+}
+
+export function App() {
+  return (
+    <Canvas>
+      <DevTools />
+      <Grid size={20} divisions={20} />
+      <Bounds fit clip observe margin={1.3}>
+        <Part />
+        <Float speed={2} floatingRange={[0, 0.3]}>
+          <Mesh position={[-2, 0, 0]} />
+        </Float>
+        <Billboard lockX position={[0, 2, 0]}>
+          <Box args={[1, 1, 0.1]} />
+        </Billboard>
+      </Bounds>
+    </Canvas>
+  );
+}
+```
+
+- `Bounds` frames its content when it first has geometry, keeping the viewing direction, and `useBounds().fit(mesh)` frames
+  one mesh. `clip` also sets the camera's near and far. Defaults: margin 1.2, duration 0.3 s.
+- `Billboard` keeps +Z towards the camera, whatever its parents do. `lockX` keeps it upright, `lockY` stops it turning sideways.
+  It assumes parents without shear.
+- `Float` adds its motion inside its own group, so `position` and `rotation` stay yours. It moves on frames, so it stands still
+  with `frameloop="demand"` until something asks for a frame.
+- `Grid` needs `@margoengine/lines`, and lets go of its plugin on unmount.
+- `DevTools` needs `@margoengine/inspector` and `@margoengine/stats`, loaded only when it opens, and is off in a production
+  build unless you pass `enabled`. In React 19 development builds a mesh without a `name` shows the components that made it,
+  such as "Box in Part".

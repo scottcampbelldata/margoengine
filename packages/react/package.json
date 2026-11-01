@@ -127,6 +127,21 @@
       "types": "./dist/xr.d.ts",
       "react-server": "./dist/rsc/xr.js",
       "import": "./dist/xr.js"
+    },
+    "./lines": {
+      "types": "./dist/lines.d.ts",
+      "react-server": "./dist/rsc/lines.js",
+      "import": "./dist/lines.js"
+    },
+    "./devtools": {
+      "types": "./dist/devtools.d.ts",
+      "react-server": "./dist/rsc/devtools.js",
+      "import": "./dist/devtools.js"
+    },
+    "./helpers": {
+      "types": "./dist/helpers.d.ts",
+      "react-server": "./dist/rsc/helpers.js",
+      "import": "./dist/helpers.js"
     }
   },
   "files": [
@@ -163,7 +178,10 @@
     "react": "^18.0.0 || ^19.0.0",
     "@margoengine/stage": "^1.0.0",
     "@margoengine/cameras": "^1.0.0",
-    "@margoengine/voxel": "^1.0.0"
+    "@margoengine/voxel": "^1.0.0",
+    "@margoengine/lines": "^1.0.0",
+    "@margoengine/inspector": "^1.0.0",
+    "@margoengine/stats": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/materials": {
@@ -233,6 +251,15 @@
       "optional": true
     },
     "@margoengine/voxel": {
+      "optional": true
+    },
+    "@margoengine/lines": {
+      "optional": true
+    },
+    "@margoengine/inspector": {
+      "optional": true
+    },
+    "@margoengine/stats": {
       "optional": true
     }
   }

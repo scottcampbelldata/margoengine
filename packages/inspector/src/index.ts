@@ -40,6 +40,8 @@ export interface InspectorOptions {
   pick?: boolean;
   /** Most edits the undo history keeps, 1 to 100,000. Default 200. */
   historyLimit?: number;
+  /** Tree label of an entity without a name, such as the component that made it. Default `Entity <id>`. */
+  label?: (mesh: Mesh) => string | undefined;
 }
 type Mode = 'wireframe' | 'normals' | 'bounds' | 'lights';
 interface DebugLines {
@@ -167,6 +169,7 @@ export class Inspector implements EnginePlugin {
   /** Every edit made in the panel, undoable with `undo()` / Ctrl+Z. */
   readonly history: EditHistory;
   private readonly pickEnabled: boolean;
+  private readonly label?: (mesh: Mesh) => string | undefined;
   private query = '';
   private shader = '';
   private pickCount = 0;
@@ -175,7 +178,8 @@ export class Inspector implements EnginePlugin {
   private readonly details = new Map<string, HTMLDetailsElement>();
   private readonly outputs = new Map<string, HTMLElement>();
 
-  constructor({ parent = document.body, effects, pick = true, historyLimit = 200 }: InspectorOptions = {}) {
+  constructor({ parent = document.body, effects, pick = true, historyLimit = 200, label }: InspectorOptions = {}) {
+    this.label = label;
     if (typeof pick !== 'boolean') throw new TypeError('Inspector pick must be true or false; pass a boolean');
     this.history = new EditHistory(historyLimit);
     this.pickEnabled = pick;
@@ -760,7 +764,7 @@ export class Inspector implements EnginePlugin {
           item.dataset.entity = String(mesh.id);
           row.className = 'row';
           name.className = 'name';
-          name.textContent = mesh.name || `Entity ${mesh.id}`;
+          name.textContent = mesh.name || this.label?.(mesh) || `Entity ${mesh.id}`;
           if (!mesh.visible) name.classList.add('muted');
           row.addEventListener('click', () => {
             this.select(mesh);

@@ -44,7 +44,7 @@ try {
     const deadline = Date.now() + 30_000;
     for (;;) {
       const image = await decodePNG(
-        await page.locator('canvas').screenshot({ path: `test-results/react-extras-${mode}.png` }),
+        await page.locator('#app canvas').screenshot({ path: `test-results/react-extras-${mode}.png` }),
       );
       if (drawn(image) || Date.now() > deadline) return image;
       const frames = await page.evaluate(() => window.extras.state.frames);
@@ -65,6 +65,36 @@ try {
   assert.ok(dominant(first, 0), `the first batched item is red, got ${first}`);
   assert.ok(dominant(second, 2), `the second batched item is blue, got ${second}`);
   result.checks.push({ name: 'BatchedMesh: two items, one batch, own colours and places', first, second });
+
+  image = await shot('helpers', (i) => dominant(sample(i, 0.5, 0.5), 0) && dominant(sample(i, 0.5, 0.7), 0));
+  const framed = [sample(image, 0.5, 0.5), sample(image, 0.5, 0.7)];
+  for (const rgb of framed) assert.ok(dominant(rgb, 0), `Bounds frames the far box, got ${rgb}`);
+  const panels = await page.evaluate(
+    () =>
+      new Promise((done) =>
+        setTimeout(
+          () =>
+            done(
+              document.documentElement.innerHTML.length &&
+                [...document.querySelectorAll('*')]
+                  .flatMap((e) =>
+                    e.shadowRoot ? [...e.shadowRoot.querySelectorAll('.name')] : [...(e.matches('.name') ? [e] : [])],
+                  )
+                  .map((n) => n.textContent),
+            ),
+          1000,
+        ),
+      ),
+  );
+  assert.ok(
+    panels.some((name) => /^Red in App$/.test(name)),
+    `the inspector tree names the Red component, got ${panels}`,
+  );
+  result.checks.push({
+    name: 'Bounds, Float, Billboard, Grid and DevTools on a real engine',
+    framed,
+    panels: panels.length,
+  });
 
   image = await shot('voxels', (i) => dominant(sample(i, 0.5, 0.5), 0));
   const block = sample(image, 0.5, 0.5),

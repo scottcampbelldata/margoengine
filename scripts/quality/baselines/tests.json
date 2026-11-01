@@ -1,14 +1,30 @@
 {
   "gate": "tests",
   "about": "packages with no test in verify; public entries no test imports",
-  "total": 0,
+  "total": 3,
   "history": [
     {
       "date": "2026-10-24",
       "commit": "5c34c002",
       "reason": "Initial baseline: what main held at 5c34c002 when the quality gate landed",
       "grew": 51
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "1454595d3",
+      "reason": "react: Billboard, Bounds and Float in the root, a once-per-mount development component name in Mesh (row 21.6 job 10); new entries react/lines and react/devtools",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "98c65987a",
+      "reason": "react: Bounds, Billboard, Float in react/helpers and the owner-name code in react/devtools, each out of the root",
+      "grew": 1
     }
   ],
-  "items": {}
+  "items": {
+    "unimported @margoengine/react/devtools": 1,
+    "unimported @margoengine/react/helpers": 1,
+    "unimported @margoengine/react/lines": 1
+  }
 }

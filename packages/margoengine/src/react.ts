@@ -17,3 +17,6 @@ export * from '@margoengine/react/tonemap';
 export * from '@margoengine/react/taa';
 export * from '@margoengine/react/voxel';
 export * from '@margoengine/react/xr';
+export * from '@margoengine/react/lines';
+export * from '@margoengine/react/devtools';
+export * from '@margoengine/react/helpers';

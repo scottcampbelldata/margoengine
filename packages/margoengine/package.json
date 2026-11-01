@@ -1142,6 +1142,18 @@
       "types": "./dist/react/xr.d.ts",
       "import": "./dist/react/xr.js"
     },
+    "./react/lines": {
+      "types": "./dist/react/lines.d.ts",
+      "import": "./dist/react/lines.js"
+    },
+    "./react/devtools": {
+      "types": "./dist/react/devtools.d.ts",
+      "import": "./dist/react/devtools.js"
+    },
+    "./react/helpers": {
+      "types": "./dist/react/helpers.d.ts",
+      "import": "./dist/react/helpers.js"
+    },
     "./rigging": {
       "types": "./dist/rigging.d.ts",
       "import": "./dist/rigging.js"

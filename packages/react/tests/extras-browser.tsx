@@ -6,11 +6,22 @@ import { BlockTypes, VoxelWorld } from '@margoengine/voxel';
 import { BlockTextures } from '@margoengine/voxel/render';
 import { Sphere } from '@margoengine/react/geometry';
 import { Sky } from '@margoengine/react/sky';
-import { Canvas, Mesh, BoxGeometry, PbrMaterial, Scene, RenderView, useFrame } from '@margoengine/react';
+import {
+  Canvas,
+  Mesh,
+  BoxGeometry,
+  PbrMaterial,
+  Scene,
+  RenderView,
+  useFrame,
+} from '@margoengine/react';
+import { DevTools } from '@margoengine/react/devtools';
+import { Billboard, Bounds, Float } from '@margoengine/react/helpers';
+import { Grid } from '@margoengine/react/lines';
 import { BatchedMesh, BatchedItem } from '@margoengine/react/materials';
 import { Voxels } from '@margoengine/react/voxel';
 
-type Mode = 'views' | 'batched' | 'voxels' | 'sky-metal' | 'sky-metal-off';
+type Mode = 'views' | 'batched' | 'voxels' | 'sky-metal' | 'sky-metal-off' | 'helpers';
 // A 4 x 4 x 4 block of one red stone type, textured from raw pixels (no image files).
 const blocks = new BlockTypes(),
   stone = blocks.define('stone'),
@@ -63,6 +74,21 @@ function App({ mode }: { mode: Mode }) {
             <BatchedItem geometry={cube} position={[-2.2, 0, 0]} color="#ff2020" />
             <BatchedItem geometry={cube} position={[2.2, 0, 0]} color="#2020ff" />
           </BatchedMesh>
+        )}
+        {/* The box starts far outside the view: only Bounds brings it in. Two grids share the Canvas. */}
+        {mode === 'helpers' && (
+          <>
+            <DevTools />
+            <Grid size={4} position={[40, -2, 0]} />
+            <Grid size={8} position={[40, -3, 0]} />
+            <Bounds fit clip duration={0} margin={1.05} position={[40, 0, 0]}>
+              <Float floatingRange={[0, 0.01]} rotationIntensity={0}>
+                <Billboard>
+                  <Red />
+                </Billboard>
+              </Float>
+            </Bounds>
+          </>
         )}
         {mode === 'voxels' && <Voxels world={world} textures={textures} />}
         {/* A metal sphere whose only light is the Sky; the fallback environment is what lights it. */}

@@ -46,6 +46,7 @@ import {
 } from './internal.js';
 export type { MargoPointerEvent, PointerHandlers } from './internal.js';
 import { warnLowercaseTags, warnPickingWithoutWebGPU } from './dev-warnings.js';
+import { ownerHook } from './dev-names.js';
 import { capPixelRatio } from './pixel-ratio.js';
 // Bundlers replace process.env.NODE_ENV; without one `process` is absent and the development hints stay off.
 declare const process: { env: { NODE_ENV?: string } } | undefined;
@@ -658,6 +659,8 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
   const parentScene = useScene(),
     { engine, registry: parent, pointerHandlers, world } = parentScene;
   const [node, setNode] = useState<EngineMesh | null>(null);
+  // Once per mount, while rendering, the only time React gives the owner stack.
+  const [owner] = useState(() => ownerHook.capture?.());
   const registry = useMemo<Registry>(
     () => ({
       current: null,
@@ -679,6 +682,7 @@ export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(
     // In the enclosing <Scene>'s engine scene, else the default one.
     const mesh = (world ?? engine).createMesh() as EngineMesh;
     registry.current = mesh;
+    ownerHook.remember?.(mesh, owner);
     try {
       parent?.register(mesh);
       for (const child of registry.children) if (engine.meshes.get(child.id) === child) child.setParent(mesh);

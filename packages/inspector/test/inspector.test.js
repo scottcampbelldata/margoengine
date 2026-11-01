@@ -191,3 +191,17 @@ test('the light helpers toggle draws the sun, clustered lists and a hemisphere l
   engine.plugins.delete('clustered:ies');
   engine.plugins.delete('environment:hemisphere');
 });
+
+test('label names an entity without a name; its own name still wins', async (t) => {
+  const { engine, inspector } = await scene(t),
+    named = engine.createMesh(),
+    labelled = engine.createMesh(),
+    plain = engine.createMesh();
+  named.name = 'Own';
+  inspector.label = (mesh) => (mesh === plain ? undefined : 'Box in Car');
+  inspector.refresh();
+  const names = [...inspector.root.querySelectorAll('.name')].map((n) => n.textContent);
+  assert.ok(names.includes('Own'));
+  assert.ok(names.includes('Box in Car'), labelled.id + ' uses its label');
+  assert.ok(names.includes(`Entity ${plain.id}`));
+});

@@ -36,6 +36,11 @@ class Node {
     Object.assign(this.position, { x, y, z });
     return this;
   }
+  setQuaternion(value) {
+    const length = Math.hypot(...value);
+    this.quaternion = value.map((v) => v / length);
+    return this;
+  }
   setRotation([x, y, z]) {
     Object.assign(this.rotation, { x, y, z });
     return this;
@@ -250,8 +255,49 @@ mock.module('@margoengine/text', {
     },
   },
 });
+const lineGrids = [],
+  panels = [];
+class Panel {
+  constructor(kind, options) {
+    Object.assign(this, { kind, options, disposals: 0 });
+    panels.push(this);
+  }
+  dispose() {
+    this.disposals++;
+  }
+}
+mock.module('@margoengine/inspector', {
+  namedExports: { Inspector: { attach: (_, options) => new Panel('inspector', options) } },
+});
+mock.module('@margoengine/stats', {
+  namedExports: { Stats: { attach: (_, options) => new Panel('stats', options) } },
+});
+mock.module('@margoengine/lines', {
+  namedExports: {
+    GridHelper: class {
+      constructor(options) {
+        this.options = options;
+      }
+      setMatrix(matrix) {
+        this.matrix = matrix;
+      }
+    },
+    Lines: class {
+      name = 'lines';
+      disposals = 0;
+      add(grid) {
+        grid.owner = this;
+        lineGrids.push(grid);
+      }
+      dispose() {
+        this.disposals++;
+      }
+    },
+  },
+});
 const { Context } = await import('../dist/internal.js');
 const { Mesh } = await (await import('./entries.js')).allEntries();
+const { Billboard, Bounds, DevTools, Float, Grid, useBounds } = await (await import('./entries.js')).allEntries();
 const { Box, Sphere, Plane, Sky, ContactShadows, Center, PointerLock, TransformControls, Text } = await (
   await import('./entries.js')
 ).allEntries();
@@ -824,3 +870,226 @@ for (const [name, make, disposed] of [
     await flush();
     assert.equal(current, null, `${name} ref is cleared on unmount`);
   });
+
+const axis = (q, v) => {
+  // v rotated by unit quaternion q.
+  const [x, y, z, w] = q,
+    c = [y * v[2] - z * v[1] + w * v[0], z * v[0] - x * v[2] + w * v[1], x * v[1] - y * v[0] + w * v[2]];
+  return [v[0] + 2 * (y * c[2] - z * c[1]), v[1] + 2 * (z * c[0] - x * c[2]), v[2] + 2 * (x * c[1] - y * c[0])];
+};
+const near = (actual, expected) =>
+  assert.ok(
+    Array.from(actual).every((v, i) => Math.abs(v - expected[i]) < 1e-5),
+    actual + ' is not ' + expected,
+  );
+
+test('Billboard turns its children to the camera in world space, under a rotated parent, and honours its locks', async () => {
+  const scene = makeScene(),
+    inner = createRef();
+  scene.engine.camera.position = [3, 4, 0];
+  // A parent turned a quarter about Y: its columns are local X -> world -Z, local Z -> world X.
+  const content = (props) => React.createElement(Billboard, props, React.createElement(Mesh, { ref: inner }));
+  const view = render(tree(scene, content({})));
+  await flush();
+  const billboard = scene.engine.meshes.get(scene.engine.store.parents[inner.current.id]),
+    outer = scene.engine.meshes.get(scene.engine.store.parents[billboard.id]),
+    tick = scene.engine.store.tick;
+  scene.engine.store.tick = () => {
+    tick();
+    outer.matrix.set([0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]);
+  };
+  await frame(scene);
+  // The world direction (0.6, 0.8, 0) is local (0, 0.8, 0.6) in that parent.
+  near(axis(billboard.quaternion, [0, 0, 1]), [0, 0.8, 0.6]);
+  view.rerender(tree(scene, content({ lockX: true })));
+  await frame(scene);
+  near(axis(billboard.quaternion, [0, 0, 1]), [0, 0, 1]);
+  const before = billboard.quaternion;
+  view.rerender(tree(scene, content({ follow: false })));
+  await frame(scene);
+  assert.equal(billboard.quaternion, before, 'follow false leaves it alone');
+  view.unmount();
+});
+
+test('Float bobs inside floatingRange around its own position and stops with its intensities at 0', async () => {
+  const scene = makeScene(),
+    inner = createRef(),
+    outer = createRef();
+  const content = (props) =>
+    React.createElement(
+      Float,
+      { ref: outer, position: [5, 5, 5], floatingRange: [1, 2], ...props },
+      React.createElement(Mesh, { ref: inner }),
+    );
+  const view = render(tree(scene, content({})));
+  await flush();
+  const group = scene.engine.meshes.get(scene.engine.store.parents[inner.current.id]),
+    heights = [];
+  for (let i = 0; i < 40; i++) {
+    await frame(scene, 0.25);
+    heights.push(group.position.y);
+  }
+  assert.ok(Math.min(...heights) >= 1 && Math.max(...heights) <= 2);
+  assert.ok(Math.max(...heights) - Math.min(...heights) > 0.9, 'it covers the range');
+  assert.deepEqual(outer.current.position, { x: 5, y: 5, z: 5 }, 'the declared position stays');
+  view.rerender(tree(scene, content({ floatIntensity: 0, rotationIntensity: 0 })));
+  await frame(scene);
+  assert.equal(Math.abs(group.position.y), 0);
+  assert.equal(Math.abs(group.rotation.x), 0);
+  view.unmount();
+});
+
+test('Bounds waits for content, fits it, clips, refits on resize, and useBounds fits one mesh', async () => {
+  const scene = makeScene(),
+    fits = [],
+    box = createRef();
+  let api;
+  Object.assign(scene.engine.camera, {
+    fov: 60,
+    near: 0.1,
+    far: 1000,
+    fitToBoundingBox: (min, max, options) => fits.push({ min, max, options }),
+  });
+  const Grab = () => {
+    api = useBounds();
+    return null;
+  };
+  const content = (children) =>
+    React.createElement(Bounds, { fit: true, clip: true, observe: true, margin: 1.5, duration: 0 }, children);
+  const view = render(tree(scene, content(React.createElement(Grab))));
+  await flush();
+  await frame(scene);
+  assert.equal(fits.length, 0, 'no geometry yet');
+  view.rerender(
+    tree(
+      scene,
+      content([
+        React.createElement(Grab, { key: 'grab' }),
+        React.createElement(Box, { key: 'box', ref: box, position: [10, 0, 0] }),
+      ]),
+    ),
+  );
+  await flush();
+  box.current.geometry.vertices = new Float32Array([-1, -1, -1, 0, 0, 0, 1, 1, 1, 0, 0, 0]);
+  await frame(scene);
+  assert.equal(fits.length, 1);
+  near(fits[0].min, [9, -1, -1]);
+  near(fits[0].max, [11, 1, 1]);
+  assert.equal(fits[0].options.padding, 1.5);
+  assert.ok(scene.engine.camera.far > scene.engine.camera.near);
+  assert.ok(scene.engine.camera.far < 1000, 'clip closes the far plane in');
+  await frame(scene);
+  assert.equal(fits.length, 1, 'once');
+  Object.defineProperty(scene.engine.canvas, 'clientWidth', { configurable: true, value: 640 });
+  Object.defineProperty(scene.engine.canvas, 'clientHeight', { configurable: true, value: 320 });
+  await frame(scene);
+  assert.equal(fits.length, 2, 'observe refits');
+  assert.equal(fits[1].options.aspect, 2);
+  assert.equal(api.fit(box.current), true);
+  assert.equal(fits.length, 3);
+  view.unmount();
+});
+
+test('a failed Bounds fit goes to onError once and is not retried each frame', async () => {
+  const scene = makeScene(),
+    errors = [],
+    box = createRef();
+  let calls = 0;
+  Object.assign(scene.engine.camera, {
+    fitToBoundingBox() {
+      calls++;
+      throw new RangeError('Bounds exceed far');
+    },
+  });
+  const view = render(
+    tree(
+      scene,
+      React.createElement(
+        Bounds,
+        { fit: true, onError: (e) => errors.push(e) },
+        React.createElement(Box, { ref: box }),
+      ),
+    ),
+  );
+  await flush();
+  box.current.geometry.vertices = new Float32Array([0, 0, 0, 0, 0, 0]);
+  await frame(scene);
+  await frame(scene);
+  assert.equal(calls, 1);
+  assert.match(errors[0].message, /far/);
+  assert.equal(scene.engine.errors.length, 1, 'the Canvas hears it too');
+  scene.engine.errors.length = 0;
+  view.unmount();
+});
+
+test('Grid draws one GridHelper with its props, and rebuilds when they change', async () => {
+  const scene = makeScene();
+  lineGrids.length = 0;
+  const view = render(
+    tree(scene, React.createElement(Grid, { size: 4, divisions: 2, color: '#123456', position: [1, 2, 3] })),
+  );
+  await flush();
+  assert.equal(lineGrids.length, 1);
+  assert.deepEqual(lineGrids[0].options, { size: 4, divisions: 2, color1: undefined, color2: '#123456' });
+  assert.deepEqual(lineGrids[0].matrix.slice(12), [1, 2, 3, 1]);
+  assert.ok(scene.engine.plugins.has('lines'));
+  view.rerender(tree(scene, React.createElement(Grid, { size: 8 })));
+  await flush();
+  assert.equal(lineGrids.at(-1).options.size, 8);
+  assert.ok(lineGrids.at(-2).owner.disposals >= 1, 'the old grid goes');
+  view.unmount();
+});
+
+test('DevTools opens both panels, names meshes by their components, closes them, and stays out when disabled', async () => {
+  const scene = makeScene(),
+    inner = createRef();
+  panels.length = 0;
+  const Car = () => React.createElement(Mesh, { ref: inner });
+  const view = render(
+    tree(scene, [React.createElement(DevTools, { key: 'd' }), React.createElement(Car, { key: 'c' })]),
+  );
+  await flush();
+  const open = panels.filter((p) => !p.disposals);
+  assert.deepEqual(open.map((p) => p.kind).sort(), ['inspector', 'stats']);
+  const label = open.find((p) => p.kind === 'inspector').options.label;
+  // React 18 has no owner stacks (the packed run installs it): the mesh then simply has no component name.
+  if (React.captureOwnerStack) assert.match(label(inner.current), /^Car/);
+  else assert.equal(label(inner.current), undefined);
+  assert.equal(label({}), undefined);
+  view.unmount();
+  await flush();
+  assert.ok(panels.every((p) => p.disposals >= 1));
+  panels.length = 0;
+  const off = render(tree(scene, React.createElement(DevTools, { enabled: false })));
+  await flush();
+  assert.equal(panels.length, 0);
+  const only = render(tree(scene, React.createElement(DevTools, { stats: false })));
+  await flush();
+  assert.deepEqual(
+    panels.filter((p) => !p.disposals).map((p) => p.kind),
+    ['inspector'],
+  );
+  off.unmount();
+  only.unmount();
+});
+
+test('DevTools on a React without owner stacks opens its panels and leaves meshes unnamed', async () => {
+  const scene = makeScene(),
+    inner = createRef(),
+    capture = React.captureOwnerStack;
+  panels.length = 0;
+  delete React.captureOwnerStack;
+  try {
+    const Car = () => React.createElement(Mesh, { ref: inner });
+    const view = render(
+      tree(scene, [React.createElement(DevTools, { key: 'd' }), React.createElement(Car, { key: 'c' })]),
+    );
+    await flush();
+    const open = panels.filter((p) => !p.disposals);
+    assert.equal(open.find((p) => p.kind === 'inspector').options.label(inner.current), undefined);
+    view.unmount();
+    await flush();
+  } finally {
+    if (capture) React.captureOwnerStack = capture;
+  }
+});

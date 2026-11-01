@@ -54,7 +54,7 @@ export class Inspector implements EnginePlugin {
         lights: boolean;
     };
     readonly history: EditHistory;
-    constructor({ parent, effects, pick, historyLimit }?: InspectorOptions);
+    constructor({ parent, effects, pick, historyLimit, label }?: InspectorOptions);
     static attach(engine: EngineKernel, options?: InspectorOptions): Inspector;
     get selected(): MeshHandle | null;
     select(handle: MeshHandle | null): void;
@@ -81,6 +81,7 @@ export interface InspectorOptions {
     };
     pick?: boolean;
     historyLimit?: number;
+    label?: (mesh: Mesh) => string | undefined;
 }
 
 export interface MeshSnapshot {
