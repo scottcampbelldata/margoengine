@@ -1,5 +1,5 @@
 {
-  "commit": "160f2d756",
+  "commit": "a2346e604",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -320,8 +320,8 @@
     },
     "@margoengine/culling": {
       ".": {
-        "raw": 32061,
-        "gzip": 10745
+        "raw": 39972,
+        "gzip": 12933
       },
       "./dynamic": {
         "raw": 19985,
@@ -534,6 +534,18 @@
       "./unity-2d": {
         "raw": 18082,
         "gzip": 7062
+      },
+      "./unreal-import": {
+        "raw": 6627,
+        "gzip": 2696
+      },
+      "./unity-uv": {
+        "raw": 3994,
+        "gzip": 1745
+      },
+      "./roblox-uv": {
+        "raw": 7316,
+        "gzip": 3401
       }
     },
     "@margoengine/fbx": {
@@ -598,8 +610,8 @@
     },
     "@margoengine/gltf-pro": {
       ".": {
-        "raw": 177969,
-        "gzip": 55977
+        "raw": 178858,
+        "gzip": 56276
       },
       "./asset": {
         "raw": 17265,
@@ -622,16 +634,16 @@
         "gzip": 17223
       },
       "./progressive": {
-        "raw": 195859,
-        "gzip": 62356
+        "raw": 196748,
+        "gzip": 62668
       },
       "./coordinates": {
         "raw": 1380,
         "gzip": 563
       },
       "./worker": {
-        "raw": 179765,
-        "gzip": 56357
+        "raw": 180654,
+        "gzip": 56657
       },
       "dist/workers/gltf.js": {
         "raw": 62657,
@@ -774,8 +786,12 @@
     },
     "@margoengine/lod": {
       ".": {
-        "raw": 27393,
-        "gzip": 10645
+        "raw": 28182,
+        "gzip": 10980
+      },
+      "./auto": {
+        "raw": 4104,
+        "gzip": 1909
       }
     },
     "margoengine": {
@@ -912,8 +928,8 @@
         "gzip": 29560
       },
       "./modeling": {
-        "raw": 93841,
-        "gzip": 31119
+        "raw": 93860,
+        "gzip": 31108
       }
     },
     "@margoengine/mixer": {
@@ -1562,8 +1578,8 @@
         "gzip": 9568
       },
       "dist/workers/usdz.js": {
-        "raw": 199158,
-        "gzip": 64810
+        "raw": 200047,
+        "gzip": 65101
       }
     },
     "@margoengine/vfx": {
@@ -1889,9 +1905,9 @@
       "brotli": 45020
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 196751,
-      "gzip": 64619,
-      "brotli": 55816
+      "raw": 197640,
+      "gzip": 64900,
+      "brotli": 56095
     },
     "packages/loaders/dist/workers/usd.js": {
       "raw": 20756,
