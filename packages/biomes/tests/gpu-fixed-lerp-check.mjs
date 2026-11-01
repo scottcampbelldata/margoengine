@@ -39,6 +39,7 @@ async function check() {
             gl?.getExtension('WEBGL_lose_context')?.loseContext();
             const identity = {
               name: info?.description?.trim() || renderer,
+              nameSource: info?.description?.trim() ? 'webgpu' : 'webgl',
               vendor: info?.vendor,
               architecture: info?.architecture,
               device: info?.device,

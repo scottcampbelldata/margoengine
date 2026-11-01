@@ -40,5 +40,14 @@ export function requireHardwareAdapter(info) {
     /swiftshader|llvmpipe|lavapipe|softpipe|basic render|\bwarp\b|software|virtual|vmware|virgl|qemu|parallels|remote display/i,
     'Require a physical hardware GPU',
   );
+  if (info.nameSource === 'webgl') {
+    assert.ok(
+      typeof info.vendor === 'string' &&
+        info.vendor.trim().length > 0 &&
+        typeof info.renderer === 'string' &&
+        info.renderer.toLowerCase().includes(info.vendor.trim().toLowerCase()),
+      'WebGPU adapter vendor does not match the WebGL renderer; cannot identify the GPU that ran WGSL',
+    );
+  }
   return info.name;
 }
