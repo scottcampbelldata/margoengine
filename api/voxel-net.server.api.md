@@ -7,6 +7,7 @@ import { Vec3 } from "@margoengine/core";
 import { BlockTypes, PackedChunk, VoxelWorld } from "@margoengine/voxel";
 import { NoiseTerrainOptions } from "@margoengine/voxel/generate";
 import { VoxelCharacter, VoxelCharacterOptions } from "@margoengine/voxel/query";
+import { ChunkStore } from "@margoengine/voxel/stream";
 
 export interface AcceptWebSocketOptions extends WebSocketOptions {
     origins?: readonly string[] | '*';
@@ -109,7 +110,7 @@ export interface VoxelServerOptions {
     authenticate?: VoxelAuthenticate;
     authTimeout?: number;
     maxEditedChunks?: number;
-    store?: VoxelEditStore;
+    store?: VoxelEditStore | ChunkStore;
     character?: VoxelCharacterOptions;
     filterName?: (name: string, id: number) => string;
     allowEdit?: (player: VoxelServerPlayer, x: number, y: number, z: number, state: number, previous: number) => boolean;

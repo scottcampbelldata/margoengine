@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4284030,
+  "total": 4285078,
   "history": [
     {
       "date": "2026-10-24",
@@ -1346,6 +1346,12 @@
       "commit": "ea0704032",
       "reason": "still river water (biome look plan 3 L11, S7): water fill and still options and the prefill pass; biomes/rivers new entry loaded only for water rivers, holds the river ground texture so biomes/view stays inside its old limit",
       "grew": 2
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "1454595d3",
+      "reason": "voxel-net file-store entry (FileChunkStore, new, 792 B gzip) and the server store option taking a ChunkStore (voxel finish plan V5)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1738,6 +1744,7 @@
     "@margoengine/voxel-edit/voxelize": 3724,
     "@margoengine/voxel-net": 8267,
     "@margoengine/voxel-net/bot": 9750,
+    "@margoengine/voxel-net/file-store": 1048,
     "@margoengine/voxel-net/server": 16799,
     "@margoengine/voxel-pathtracer": 80311,
     "@margoengine/voxel-pathtracer/studio": 1313,

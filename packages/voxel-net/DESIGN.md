@@ -49,8 +49,11 @@ Depends on `@margoengine/voxel` and `@margoengine/net`; no other runtime depende
 - **Generation.** `node:worker_threads` workers run `noiseTerrain` (packages/voxel/src/generate.ts), or a game's own
   generator module, and `encodeChunk` in the same job, so the main thread gets back both the packed chunk and the bytes
   to send. Same seed, same chunk, so dropping and remaking is safe. Default workers: a quarter of the cores, 1 to 8.
-- **Edited chunks** stay in memory as `VoxelChunk`s for the life of the process (saving to disk is later work), so an
-  edit is never lost by unloading.
+- **Edited chunks** stay in memory as `VoxelChunk`s up to `maxEditedChunks`, so an edit is never lost by unloading.
+  With a `store` (a `VoxelEditStore`, or a `ChunkStore` such as `FileChunkStore` from `./file-store`, one deflated
+  `encodeChunk` file per chunk written by temporary file and rename) the least recently edited go to it past the limit,
+  `close()` saves the rest, and a chunk that loads reads the store first: edits survive a restart. A store cannot be
+  listed, so a chunk is found by its position when a player needs it. Without a store, edits last as long as the process.
 - **No light on the server.** Chunks go out without light bytes; clients light them with `VoxelLighting` as single
   player does today. That saves server CPU and bytes.
 - **Tick: 20 per second** (50 ms budget). Windows timers are coarse (about 15 ms), so the loop schedules each tick from

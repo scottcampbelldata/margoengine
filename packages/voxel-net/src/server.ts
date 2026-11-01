@@ -31,6 +31,7 @@ import {
   STEP_SECONDS,
   type ServerMessage,
 } from './protocol.js';
+import type { ChunkStore } from '@margoengine/voxel/stream';
 import { acceptWebSocket, type WebSocketConnection } from './websocket.js';
 
 /** Options of {@link VoxelServer}. Distances in chunks unless named otherwise. */
@@ -129,10 +130,11 @@ export interface VoxelServerOptions {
   maxEditedChunks?: number;
   /**
    * Where edited chunks go when more than `maxEditedChunks` are held, and on {@link VoxelServer.close}: disk, a
-   * database, anything with `save` and `load`. Also read when a chunk loads, so a world persists across restarts.
-   * Default none (edits last as long as the process).
+   * database, anything with `save` and `load` ({@link VoxelEditStore}), or a `ChunkStore` of `@margoengine/voxel/stream`
+   * such as `FileChunkStore` from `@margoengine/voxel-net/file-store`. Also read when a chunk loads, so a world
+   * persists across restarts. Default none (edits last as long as the process).
    */
-  store?: VoxelEditStore;
+  store?: VoxelEditStore | ChunkStore;
   /** Body of every player; clients must use the same options. */
   character?: VoxelCharacterOptions;
   /**
@@ -182,6 +184,20 @@ export interface VoxelEditStore {
    */
   delete?(key: string): void | Promise<void>;
 }
+
+const isEditStore = (s: unknown): s is VoxelEditStore =>
+  typeof (s as VoxelEditStore)?.save === 'function' && typeof (s as VoxelEditStore).load === 'function';
+const isChunkStore = (s: unknown): s is ChunkStore =>
+  ['get', 'put', 'delete', 'flush'].every((m) => typeof (s as Record<string, unknown>)?.[m] === 'function');
+// A ChunkStore as the edit store the server uses: 'cx,cy,cz' keys become chunk coordinates, packed chunks VoxelChunks.
+const editStoreOf = (store: ChunkStore): VoxelEditStore => {
+  const at = (key: string): [number, number, number] => key.split(',').map(Number) as [number, number, number];
+  return {
+    save: (key, packed) => store.put(...at(key), VoxelChunk.unpack(packed)),
+    load: async (key) => (await store.get(...at(key)))?.pack(),
+    delete: (key) => store.delete(...at(key)),
+  };
+};
 
 /** A player as the server holds it. */
 export interface VoxelServerPlayer {
@@ -686,9 +702,11 @@ export class VoxelServer {
     this.#authenticate = o.authenticate;
     this.#authTimeout = integer('authTimeout', o.authTimeout ?? 5000, 1, 600_000);
     this.#maxEdited = integer('maxEditedChunks', o.maxEditedChunks ?? 65_536, 1, 2 ** 31 - 1);
-    if (o.store !== undefined && (typeof o.store?.save !== 'function' || typeof o.store?.load !== 'function'))
-      throw new TypeError('VoxelServer store must have save(key, chunk) and load(key) functions');
-    this.#store = o.store;
+    if (o.store !== undefined && !isEditStore(o.store) && !isChunkStore(o.store))
+      throw new TypeError(
+        'VoxelServer store must have save(key, chunk) and load(key) functions, or be a ChunkStore (get, put, delete, flush)',
+      );
+    this.#store = o.store === undefined || isEditStore(o.store) ? o.store : editStoreOf(o.store);
     this.#characterOptions = o.character;
     this.#allowEdit = o.allowEdit;
     if (o.filterName !== undefined && typeof o.filterName !== 'function')

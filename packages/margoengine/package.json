@@ -1602,6 +1602,10 @@
       "types": "./dist/voxel-net/bot.d.ts",
       "import": "./dist/voxel-net/bot.js"
     },
+    "./voxel-net/file-store": {
+      "types": "./dist/voxel-net/file-store.d.ts",
+      "import": "./dist/voxel-net/file-store.js"
+    },
     "./voxel-pathtracer": {
       "types": "./dist/voxel-pathtracer.d.ts",
       "import": "./dist/voxel-pathtracer.js"
