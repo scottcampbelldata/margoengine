@@ -821,9 +821,11 @@ console.log(green, autumn, snow, wet, leaf);
 ```
 
 With a view, pass the seasons as an option. The plant cover ground of seasonal biomes is drawn through a tint texture
-of `tintAt` over the world (the terrain's `tint`, at most 256 texels a side), so each place shows its own snow, wet
-ground and green-up, and ground of other biomes keeps its look. The foliage of seasonal species takes the state at the
-centre of the objects' bounds, one colour per species. Without `seasons` the view draws exactly what it drew before.
+of `tintAt` over the world (the terrain's `tint`, a texel every `regionResolution` metres, 16 m by default, or every
+`textureResolution` when that is coarser), so each place shows its own snow, wet ground and green-up, and ground of
+other biomes keeps its look. The foliage of seasonal species takes the state at the centre of the objects' bounds, one
+colour per species. Each `seasons.set` and each world change repaints the tint and the foliage colours. Without
+`seasons` the view draws exactly what it drew before.
 
 ```ts
 import { Engine } from '@margoengine/core';

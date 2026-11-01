@@ -768,6 +768,7 @@ export const entries = [
       'BiomeSeasons reads the temperature, warmest, rainfall and moisture layers; request the tile with them',
       'BiomeSeasons is disposed; attach a new one',
       'BiomeObjects seasons must be a BiomeSeasons from @margoengine/biomes/seasons',
+      "BiomeObjects seasons must be a BiomeSeasons attached to the placement's world",
       'BiomeView seasons must be a BiomeSeasons attached to the same world',
       "BiomeWorld classifier is 'envelopes' or whittaker or holdridge from '@margoengine/biomes/zones'",
       'BiomeWorld is disposed; create a new one with BiomeWorld.create()',

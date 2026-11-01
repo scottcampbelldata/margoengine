@@ -234,6 +234,8 @@ export class BiomeObjects implements Disposable {
       throw rangeError('BiomeObjects bounds must be [minX, minZ, maxX, maxZ] with max above min', 'biomes');
     if (options.seasons !== undefined && typeof options.seasons?.colorAt !== 'function')
       throw typeError('BiomeObjects seasons must be a BiomeSeasons from @margoengine/biomes/seasons', 'biomes');
+    if (options.seasons !== undefined && options.seasons.world !== placement.world)
+      throw typeError("BiomeObjects seasons must be a BiomeSeasons attached to the placement's world", 'biomes');
     // Checked before anything is allocated: a huge world or a fine resolution must not ask for gigabytes of maps.
     const limit = (engine as unknown as { gpu?: GPUDevice }).gpu?.limits.maxTextureDimension2D ?? 8192;
     if (!detailFits(b, options.detailResolution ?? 2, placement.details.length, limit, options.detailBudget))
@@ -250,10 +252,18 @@ export class BiomeObjects implements Disposable {
     ]);
     const objects = new BiomeObjects(engine, placement, options, { tiles, scatter, procedural, core });
     objects.#build();
-    if (objects.#seasonal.length)
-      objects.#offSeasons = options.seasons!.onChange(() => {
-        for (const { material, base } of objects.#seasonal) material.set({ color: objects.#tint(base) });
-      });
+    if (objects.#seasonal.length) {
+      // Each `seasons.set` and each change of the placement's world (climate, heights, biomes) re-tints the foliage.
+      const retint = () => {
+          for (const { material, base } of objects.#seasonal) material.set({ color: objects.#tint(base) });
+        },
+        offSet = options.seasons!.onChange(retint),
+        offWorld = placement.onChange(retint);
+      objects.#offSeasons = () => {
+        offSet();
+        offWorld();
+      };
+    }
     if (options.far) {
       const { FarForest } = await import('@margoengine/biomes/far'),
         r = objects.#options.radius,

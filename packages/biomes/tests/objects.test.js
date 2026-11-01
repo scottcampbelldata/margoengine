@@ -151,15 +151,40 @@ test('seasons tint the foliage of seasonal species only, follow seasons.set, and
       { key: 'temperate/a', id: first.id, biome: 'temperate', mesh: 'procedural:broadleaf', layer: 1 },
       { key: 'temperate/b', id: 'not-seasonal', biome: 'temperate', mesh: 'procedural:broadleaf', layer: 1 },
     ],
-    placement = { tile() {}, species, details: [], tileSize: 256 },
+    changes = new Set(),
+    placement = {
+      tile() {},
+      species,
+      details: [],
+      tileSize: 256,
+      world,
+      onChange(listener) {
+        const off = world.onChange(listener);
+        changes.add(off);
+        return () => {
+          changes.delete(off);
+          off();
+        };
+      },
+    },
     bounds = [-128, -128, 128, 128],
     color = (part) => [...part.options.material.data.slice(0, 3)],
     near = (a, b) => a.every((c, i) => Math.abs(c - b[i]) < 1e-6),
-    leaf = [0.14, 0.3, 0.05];
+    leaf = [0.14, 0.3, 0.05],
+    other = await BiomeWorld.create({ size: [256, 256], biomes: [forest], height: { field: () => 1000 } });
   await assert.rejects(
     BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds, seasons: {} }),
     TypeError,
   );
+  await assert.rejects(
+    BiomeObjects.attach(engine, placement, {
+      heightmap: () => undefined,
+      bounds,
+      seasons: BiomeSeasons.attach(other, { dayOfYear: 20 }),
+    }),
+    { name: 'TypeError', message: /placement's world/ },
+  );
+  other.dispose();
   const plain = await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds }),
     tinted = await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds, seasons });
   // [a trunk, a canopy, b trunk, b canopy, snag trunk, ...]: only the seasonal canopy moves.
@@ -178,8 +203,16 @@ test('seasons tint the foliage of seasonal species only, follow seasons.set, and
   const winter = color(tc);
   seasons.set({ dayOfYear: 200 });
   assert.ok(near(color(tc), seasons.colorAt(leaf, 0, 0)) && !near(color(tc), winter), `summer ${color(tc)}`);
+  // A colder world re-tints the foliage without seasons.set.
+  const summer = color(tc);
+  world.update({ climate: { equatorTemperature: -5, poleTemperature: -40 } });
+  assert.ok(near(color(tc), seasons.colorAt(leaf, 0, 0)) && !near(color(tc), summer), `colder ${color(tc)}`);
+  const colder = color(tc);
   tinted.dispose();
-  seasons.set({ dayOfYear: 20 });
-  assert.ok(!near(color(tc), winter), 'a disposed BiomeObjects no longer follows the seasons');
+  assert.equal(changes.size, 0, 'dispose removes the world listener');
+  world.update({ climate: {} });
+  seasons.set({ dayOfYear: 200 });
+  assert.ok(!near(seasons.colorAt(leaf, 0, 0), colder), 'the world and seasons moved on');
+  assert.ok(near(color(tc), colder), 'a disposed BiomeObjects no longer follows the seasons');
   plain.dispose();
 });

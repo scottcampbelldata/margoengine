@@ -121,10 +121,11 @@ export interface BiomeViewOptions {
   /**
    * Seasons from `@margoengine/biomes/seasons` over this world. The plant cover ground materials of biomes with
    * `tint.seasonal` (grass, meadow, moss and the like; not rock, scree, gravel, sand, mud or snow) are drawn through a
-   * tint texture of `seasons.tintAt` over the world (the terrain's `tint`, at most 256 texels a side): each place shows
-   * its own green-up, senescence, snow and wetness, and ground where no seasonal biome grows keeps its look. The
-   * objects get the same `seasons` (`BiomeObjects`). Each `seasons.set` repaints the texture. Default none: the view
-   * draws exactly what it draws without seasons.
+   * tint texture of `seasons.tintAt` over the world (the terrain's `tint`, a texel every `world.regionResolution` metres
+   * or every `textureResolution` when that is coarser, coarser by halves only past the device's largest texture): each
+   * place shows its own green-up, senescence, snow and wetness, and ground where no seasonal biome grows keeps its look.
+   * The objects get the same `seasons` (`BiomeObjects`). Each `seasons.set` repaints the texture, and each world change
+   * repaints its rectangle. Default none: the view draws exactly what it draws without seasons.
    */
   readonly seasons?: BiomeSeasons;
 }
@@ -677,7 +678,7 @@ export class BiomeView implements Disposable {
   #offObjects?: () => void;
   /** With `seasons`: the CPU copy of the tint texture, its repaint (on attach and each `seasons.set`) and the remover. */
   #tint?: { readonly width: number; readonly depth: number; readonly data: Uint8Array<ArrayBuffer> };
-  #retint?: () => void;
+  #retint?: (rect?: readonly [number, number, number, number]) => void;
   #offSeasons?: () => void;
   /** Removers of the casters added to `options.shadows`. */
   #offShadows: (() => void)[] = [];
@@ -759,29 +760,42 @@ export class BiomeView implements Disposable {
       layerKeys = [...this.materials];
     while (layerKeys.length < 4) layerKeys.push(layerKeys[layerKeys.length - 1]);
     const pixels = layerKeys.map((key, i) => materialPixels(key, looks[Math.min(i, looks.length - 1)]));
-    // With seasons, the plant cover layers of seasonal biomes take a tint texture of `seasons.tintAt` over the world (at
-    // most 256 texels a side, as fine as the weights): each texel its own state, 0 where no seasonal biome grows.
-    // Without, nothing of it exists and the terrain draws what it drew.
+    // With seasons, the plant cover layers of seasonal biomes take a tint texture of `seasons.tintAt` over the world, a
+    // texel every `regionResolution` metres (the finest the states change at) or every weight texel when those are
+    // coarser, and coarser by halves only past the device's largest texture: each texel its own state, 0 where no
+    // seasonal biome grows. Without, nothing of it exists and the terrain draws what it drew.
     const seasons = options.seasons,
       seasonal = seasons ? seasonalGround(world.biomes, this.materials) : new Set<string>();
     if (seasonal.size) {
-      let step = this.textureResolution;
-      while ((x1 - x0) / step + 1 > 256 || (z1 - z0) / step + 1 > 256) step *= 2; // float division
+      let step = Math.max(world.regionResolution, this.textureResolution);
+      while ((x1 - x0) / step + 1 > limit || (z1 - z0) / step + 1 > limit) step *= 2; // float division
       const tw = Math.round((x1 - x0) / step) + 1, // float division: exact
         td = Math.round((z1 - z0) / step) + 1, // float division
         data = new Uint8Array(tw * td * 4);
       this.#tint = { width: tw, depth: td, data };
-      this.#retint = () => {
+      this.#retint = (rect = world.bounds) => {
+        // The texels whose centres fall in `rect`, a texel wider each side, clamped to the texture.
+        const i0 = Math.max(0, Math.floor(((rect[0] - x0) * tw) / (x1 - x0)) - 1), // float division: texel span
+          j0 = Math.max(0, Math.floor(((rect[1] - z0) * td) / (z1 - z0)) - 1), // float division
+          i1 = Math.min(tw, Math.ceil(((rect[2] - x0) * tw) / (x1 - x0)) + 1), // float division
+          j1 = Math.min(td, Math.ceil(((rect[3] - z0) * td) / (z1 - z0)) + 1); // float division
+        if (i0 >= i1 || j0 >= j1) return;
         // Texel (i, j) is sampled at its centre, where the terrain's bilinear sampling reads it whole.
-        for (let j = 0; j < td; j++)
-          for (let i = 0; i < tw; i++)
+        for (let j = j0; j < j1; j++)
+          for (let i = i0; i < i1; i++)
             seasons!.tintAt(
               x0 + ((i + 0.5) * (x1 - x0)) / tw, // float division: texel centre
               z0 + ((j + 0.5) * (z1 - z0)) / td, // float division
               data.subarray(4 * (j * tw + i), 4 * (j * tw + i) + 4),
             );
         const t = this.#textures;
-        if (t?.tint) t.device.queue.writeTexture({ texture: t.tint }, data, { bytesPerRow: tw * 4 }, [tw, td]);
+        if (t?.tint)
+          t.device.queue.writeTexture(
+            { texture: t.tint, origin: [i0, j0] },
+            data,
+            { offset: 4 * (j0 * tw + i0), bytesPerRow: tw * 4 },
+            [i1 - i0, j1 - j0],
+          );
       };
       this.#retint();
     }
@@ -846,8 +860,13 @@ export class BiomeView implements Disposable {
         return { heightmap: height, layers, weights, ...(tint ? { tint } : {}) };
       },
     });
-    this.#off = world.onChange((rect) => this.#dirty(rect, 'v'));
-    if (this.#retint) this.#offSeasons = seasons!.onChange(this.#retint);
+    // A world change repaints the tint over its rectangle too (the world's region fields are rebuilt before it tells
+    // listeners, and reading them there is allowed); each `seasons.set` repaints all of it.
+    this.#off = world.onChange((rect) => {
+      this.#dirty(rect, 'v');
+      this.#retint?.(rect);
+    });
+    if (this.#retint) this.#offSeasons = seasons!.onChange(() => this.#retint!());
     this.ready = new Promise((done) => {
       this.#firstDone = done;
     });

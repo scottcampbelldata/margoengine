@@ -1256,6 +1256,11 @@ export class BiomePlacement implements Disposable {
     return new BiomePlacement(world, options);
   }
 
+  /** The world this placement places on. */
+  get world(): BiomeWorld {
+    return this.#world;
+  }
+
   /** The world palette, in placement order within each layer. */
   get species(): readonly PlacedSpecies[] {
     return this.#species;

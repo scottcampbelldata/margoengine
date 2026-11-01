@@ -488,6 +488,109 @@ test('seasons: a view takes BiomeSeasons of its own world only, refused before a
     });
 });
 
+// A view with seasons on a CPU stand-in device: the tint texture it makes and each upload into it, by texel.
+async function seasonsView(dayOfYear = 20) {
+  const usage = globalThis.GPUTextureUsage;
+  globalThis.GPUTextureUsage = { TEXTURE_BINDING: 4, COPY_DST: 2 };
+  const { BiomeSeasons } = await import('../dist/seasons.js'),
+    // 8192 m at 16 m regions: 513 tint texels a side, twice what a 256-texel cap allows. Heights climb across the
+    // world, so the states change from texel to texel.
+    world = await BiomeWorld.create({
+      size: [8192, 8192],
+      biomes: [{ ...presets.temperate, tint: { seasonal: true } }],
+      height: { field: (x) => 100 + (x + 4096) * 0.4 },
+      climate: { latitude: 45 },
+    }),
+    seasons = BiomeSeasons.attach(world, { dayOfYear }),
+    textures = [],
+    device = {
+      limits: { maxTextureDimension2D: 8192 },
+      createTexture(descriptor) {
+        const texture = { descriptor, destroy() {} };
+        textures.push(texture);
+        return texture;
+      },
+      queue: { writeTexture: () => {} },
+    },
+    engine = { backend: 'webgpu', gpu: device, camera: { position: [0, 0, 0] }, use() {}, removePlugin() {} },
+    view = await BiomeView.attach(engine, world, {
+      seasons,
+      objects: false,
+      water: false,
+      radius: 50,
+      textureResolution: 16,
+    });
+  // Every upload into the tint lands in `texels`, as the GPU would hold it.
+  let texels, width, depth;
+  device.queue.writeTexture = (dest, data, layout, size) => {
+    const d = dest.texture.descriptor;
+    if (d.format !== 'rgba8unorm-srgb' || d.size.length !== 2) return;
+    [width, depth] = d.size;
+    texels ??= new Uint8Array(width * depth * 4);
+    const [ox, oz] = dest.origin ?? [0, 0],
+      offset = layout.offset ?? 0;
+    for (let j = 0; j < size[1]; j++)
+      texels.set(
+        data.subarray(offset + j * layout.bytesPerRow, offset + j * layout.bytesPerRow + size[0] * 4),
+        ((oz + j) * width + ox) * 4,
+      );
+  };
+  view.terrain.options.textures(device);
+  globalThis.GPUTextureUsage = usage;
+  assert.equal(
+    textures.filter((t) => t.descriptor.format === 'rgba8unorm-srgb' && t.descriptor.size.length === 2).length,
+    1,
+  );
+  return { world, seasons, view, width, depth, texels };
+}
+
+test('seasons: the tint texture has a texel per region cell, each its own state, over a world past 256 texels', async () => {
+  const { world, seasons, view, width, depth, texels } = await seasonsView(),
+    [x0, z0, x1, z1] = world.bounds;
+  try {
+    assert.deepEqual([width, depth], [8192 / 16 + 1, 8192 / 16 + 1]);
+    // Along a row every texel is the state at its own centre, so wherever the state changes between two places 16 m
+    // apart, neighbouring texels differ.
+    let differ = 0;
+    const row = 256,
+      at = (k) => [...texels.subarray(4 * (row * width + k), 4 * (row * width + k) + 4)];
+    for (let i = 0; i < width; i++) {
+      assert.deepEqual(
+        at(i),
+        [...seasons.tintAt(x0 + ((i + 0.5) * (x1 - x0)) / width, z0 + ((row + 0.5) * (z1 - z0)) / depth)],
+        `texel ${i} is the state at its centre`,
+      );
+      if (i + 1 < width && at(i).join() !== at(i + 1).join()) differ++;
+    }
+    assert.ok(differ >= 10, `neighbouring texels 16 m apart differ where the state changes (${differ})`);
+  } finally {
+    view.dispose();
+    seasons[Symbol.dispose]();
+    world.dispose();
+  }
+});
+
+test('seasons: a world change repaints the tint without seasons.set', async () => {
+  const { world, seasons, view, texels } = await seasonsView(300),
+    before = texels.slice();
+  try {
+    world.update({ climate: { latitude: 45, equatorTemperature: 5, poleTemperature: -30 } });
+    assert.notDeepEqual(texels, before, 'a colder climate changes the uploaded tint');
+    const [x0, z0, x1, z1] = world.bounds,
+      width = 513,
+      i = 100,
+      j = 300;
+    assert.deepEqual(
+      [...texels.subarray(4 * (j * width + i), 4 * (j * width + i) + 4)],
+      [...seasons.tintAt(x0 + ((i + 0.5) * (x1 - x0)) / width, z0 + ((j + 0.5) * (z1 - z0)) / width)],
+    );
+  } finally {
+    view.dispose();
+    seasons[Symbol.dispose]();
+    world.dispose();
+  }
+});
+
 test('the sea defaults are an ocean swell the water draws without folding', () => {
   assert.equal(SEA.segments, 512);
   assert.equal(SEA.foamDistance, 6);

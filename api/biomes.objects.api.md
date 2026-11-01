@@ -67,6 +67,7 @@ interface BiomeDefinition {
 class BiomePlacement implements Disposable {
     private constructor();
     static attach(world: BiomeWorld, options?: PlacementOptions): BiomePlacement;
+    get world(): BiomeWorld;
     get species(): readonly PlacedSpecies[];
     get tileSize(): number;
     get details(): readonly {

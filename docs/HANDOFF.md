@@ -7,16 +7,18 @@
   and `BiomeObjects`, and `sunPath` in `@margoengine/sky/sun` (Spencer 1971). Tile, placement and climate digests are
   unchanged (packages/biomes/tests/seasons.test.js checks them against the existing goldens).
 - Ground: `BiomeView` with `seasons` draws plant cover layers of `tint.seasonal` biomes through a per-texel tint
-  texture (`seasons.tintAt` over the world, at most 256 texels a side), the new optional `TerrainTextures.tint` with
-  `TerrainLayer.tint`. Ground of biomes without `tint.seasonal` keeps its look. Without a tint the terrain shader,
-  bindings and rules are unchanged.
+  texture (`seasons.tintAt` over the world, a texel every `regionResolution` metres or every `textureResolution` when
+  coarser, halved only past the device's largest texture), the new optional `TerrainTextures.tint` with
+  `TerrainLayer.tint`. World changes repaint the tint over their rectangle and re-tint the objects' foliage. Ground of
+  biomes without `tint.seasonal` keeps its look. Without a tint the terrain shader, bindings and rules are unchanged.
 - Follow-up: objects take one colour per seasonal species, from the state at the centre of their bounds.
-- Follow-up: the biomes and terrain GPU checks (`test:gpu`, `test:gpu:objects`, terrain `test:gpu`) did not run on this
-  branch (the Beelink baseline biomes GPU smoke hung before J4). Run them at this revision on the A6000 before calling
-  the seasons path GPU-proven.
-- Follow-up: the review pass could not build or test `@margoengine/terrain` in its sandbox, nor regenerate the API
-  reports and entry sizes; the tier 0 verify and the integrator's records must produce them (terrain, biomes/seasons
-  and biomes/view grow).
+- Follow-up: GPU validation is pending on the A6000 at this exact revision. The biomes and terrain GPU checks
+  (`test:gpu`, `test:gpu:objects`, terrain `test:gpu`) did not run on this branch (the Beelink baseline biomes GPU
+  smoke hung before J4); the seasons path is not GPU-proven until they pass there.
+- Follow-up: the entry sizes of `@margoengine/terrain`, `biomes/view` and `biomes/objects` after the 2026-11-01 review
+  repair (tint texel per region cell, world-change repaint, `BiomePlacement.world`) are not yet measured: the repair
+  sandbox refused the size tool. The tier 0 `npm run quality -- --gate=sizes` measures them; growth over a budget goes
+  under the 2026-11-01 history reason.
 
 ## Landed 2026-10-30: core cleanup, audit items P1 to P3 (approved by Scott)
 
