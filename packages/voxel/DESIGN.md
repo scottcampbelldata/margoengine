@@ -246,8 +246,10 @@ Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (render
 - Rapier: `new VoxelPhysics(physics, world, {radius})`, `colliders`; colliders follow every non-fixed body and are
   kept until no body is within radius + 1. Rapier 0.21.0 panics on ball-vs-voxel edges (dimforge/rapier #1046 reports it; see #1029, #1043,
   #993, fix PR #1030), so chunks near a ball get a FIX_INTERNAL_EDGES triangle mesh and keep a disabled voxel
-  collider; a cave-heavy chunk near a ball costs ~125 ms to build (not yet spread over frames). Voxel contacts produce
-  no `Physics` collision events.
+  collider. The builds are spread over physics steps by `VoxelPhysics.budget` (default 2 ms a step, live; nearest chunk
+  first, at least one unit a step): a cave-heavy chunk near a ball is meshed in 25 steps of at most 1.8 ms instead of
+  one step of 37 ms (60 pieces of at most 2,048 triangles; physics.test.js, which counts triangles meshed per step). Voxel colliders belong to the fixed
+  body `VoxelPhysics.body`, so contacts with them raise the usual `Physics` collision events (`chunkOf(collider)` names the chunk).
 - Renderer (phase 4): `VoxelRendererOptions` as designed; `VoxelRendererStats` {chunks, visible, quads, bytes, draws};
   `BlockTextures` (constructor `{images, size}`, `load(urls)`, `fromAtlas(image, {size})`, `layers`, live
   `set(layer, image)`, `dispose()`). The quad pool starts at 4 MiB (not 64) and doubles to `maxQuadBytes`; the static index buffer holds the
