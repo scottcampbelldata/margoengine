@@ -103,7 +103,7 @@ const text = writeQEF(models[0].grid, palette);
 
 KVX and VXL have z running down in the file, so they turn to Y up on reading: the file's y becomes z. A true-colour file
 with over 255 colours loses low bits from each channel, the same on every run, until 255 are left, and `colorsReduced`
-is true. Minecraft `.schematic` and Goxel `.gox` are left out on purpose.
+is true. Block-game `.schematic` and Goxel `.gox` are left out on purpose.
 
 ## Smooth meshes
 

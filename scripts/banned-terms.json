@@ -1,5 +1,5 @@
 {
-  "about": "Terms no tracked text file, and no tracked PDF's printed text, may contain (scripts/check-banned-terms.mjs, in verify through tests/banned-terms.test.js). Each entry is the first 24 hex digits of SHA-256 of 'margo-banned:' + the lowercased term, so this file never names them. 'tokens' match whole words (as written and with hyphens removed); 'pairs' match two adjacent pieces of an 'a/b/c' path. 'pathTokens' match, like 'tokens', a whole piece of a tracked file's path (split at every character that is not a letter or digit, and between camelCase words), so a file or folder name cannot bring a removed name back either. 'allow' lists { path, reason } entries; it is empty on purpose.",
+  "about": "Terms no tracked text file, and no tracked PDF's printed text, may contain (scripts/check-banned-terms.mjs, in verify through tests/banned-terms.test.js). Each entry is the first 24 hex digits of SHA-256 of 'margo-banned:' + the lowercased term, so this file never names them. 'tokens' match whole words (as written, with hyphens removed, and each piece of a hyphenated compound); 'pairs' match two adjacent pieces of an 'a/b/c' path. 'pathTokens' match, like 'tokens', a whole piece of a tracked file's path (split at every character that is not a letter or digit, and between camelCase words), so a file or folder name cannot bring a removed name back either. 'allow' lists { path, reason } entries; it is empty on purpose, bar one entry that waits for a ruling.",
   "tokens": [
     "41273cbe89746cba15fe90a2",
     "5392dc1fdcc32f016e65ff7a",
@@ -43,7 +43,8 @@
     "42064a6e03b51377251a041e",
     "ca83d105581d96a646abc8d9",
     "3417117123a8422af4fca227",
-    "06f863add81a85f67265e913"
+    "06f863add81a85f67265e913",
+    "57747c23c1a05544d5469c6e"
   ],
   "pairs": [
     "3ea53541f37d23ebedd721b1",
@@ -55,5 +56,10 @@
   "pathTokens": [
     "cebdbc76e83dbc5a0848aac9"
   ],
-  "allow": []
+  "allow": [
+    {
+      "path": "packages/voxel/DESIGN.md",
+      "reason": "The goal line of the design history still names the game it was modelled on; its rewording is Scott's ruling (voxel finish plan, decision 4), then this entry goes."
+    }
+  ]
 }

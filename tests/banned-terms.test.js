@@ -101,3 +101,11 @@ test('the text a PDF shows is read through its fonts, so a banned name in a prin
 test('no tracked file, and no tracked PDF page, contains a banned term', () => {
   assert.deepEqual(scanRepo(), []);
 });
+
+test('the name of the block game is reported alone, possessive, and inside a hyphenated compound', () => {
+  const game = word(77, 105, 110, 101, 99, 114, 97, 102, 116); // the block game the voxel docs once compared themselves to
+  for (const text of [game, game.toLowerCase(), `${game}'s order`, `${game}-like worlds`, `${game}-style game`])
+    assert.notDeepEqual(hitsInLine(`a line with ${text} in it`), [], text);
+  assert.deepEqual(hitsInLine('a block-world game, a voxel-like grid, a mine-cart and a craft-fair'), []);
+  assert.notDeepEqual(hitsInPath(`packages/voxel/${game}-notes.md`), []);
+});

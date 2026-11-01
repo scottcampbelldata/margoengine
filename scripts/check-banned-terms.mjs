@@ -33,7 +33,9 @@ export function hitsInLine(line) {
   const found = [];
   for (const [word] of line.matchAll(/[a-z0-9]+(?:-[a-z0-9]+)*/gi)) {
     const w = word.toLowerCase();
-    for (const form of new Set([w, w.replaceAll('-', '')])) if (TOKENS.has(hash(form))) found.push(hash(form));
+    // As written, hyphens removed, and each piece of a hyphenated compound (`word-like`, `word-style`).
+    for (const form of new Set([w, w.replaceAll('-', ''), ...w.split('-')]))
+      if (TOKENS.has(hash(form))) found.push(hash(form));
   }
   // Every adjacent pair of a path, so `a/b/c` checks both `a/b` and `b/c`.
   for (const [path] of line.matchAll(/[a-z0-9-]+(?:\/[a-z0-9-]+)+/gi)) {

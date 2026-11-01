@@ -45,7 +45,7 @@ export interface VoxelCharacterOptions {
   size?: Vec3;
   /** Tallest ledge walked onto without jumping. Default 0.6. */
   stepHeight?: number;
-  /** Downward acceleration, blocks/s². Default 32 (Minecraft-like: the default 9 blocks/s jump rises 1.27 blocks). */
+  /** Downward acceleration, blocks/s². Default 32 (the default 9 blocks/s jump rises 1.27 blocks). */
   gravity?: number;
   /** Speeds in blocks/s. Defaults: walk 4.317, sprint 5.612, swim 2, fly 11, jump 9 (the take-off speed). */
   speeds?: { walk?: number; sprint?: number; swim?: number; fly?: number; jump?: number };
@@ -69,7 +69,7 @@ export interface VoxelMoveIntent {
 const EPS = 1e-6, // contact tolerance in blocks: a box may touch, or overlap by this much, a solid cell
   STEP = 1 / 120, // the character's fixed step, seconds
   MAX_TIME = 0.25, // most time one update simulates; the rest of a longer stall (a background tab) is dropped
-  TERMINAL = 78.4, // fall speed limit, blocks/s (Minecraft's)
+  TERMINAL = 78.4, // fall speed limit, blocks/s (terminal velocity of a long fall)
   SINK = 0.2, // share of gravity left in liquid after buoyancy
   // Share of the gap to the wished velocity closed per step at k/s: acceleration, and friction when the wish is 0.
   rate = (k: number) => 1 - Math.exp(-k * STEP),

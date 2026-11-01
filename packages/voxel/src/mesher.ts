@@ -310,8 +310,8 @@ function merge(w: Work, d: number, s: number, n: number): void {
       grow: for (; v + height < 32; height++)
         for (let k = m + (height << 5), end = k + width; k < end; k++) if (keys[k] !== A || lights[k] !== B) break grow;
     for (let j = 0; j < height; j++) for (let k = m + (j << 5), end = k + width; k < end; k++) keys[k] = 0;
-    // AO picks the diagonal: split along the brighter pair so a lone dark corner stays in one triangle (0fps.net,
-    // "Ambient occlusion for Minecraft-like worlds", Mikola Lysenko, 2013).
+    // AO picks the diagonal: split along the brighter pair so a lone dark corner stays in one triangle
+    // (Mikola Lysenko, 2013, 0fps.net, ambient occlusion for voxel worlds).
     const flip = o1 + o3 > o0 + o2 ? 1 << 28 : 0;
     push(
       w,
@@ -407,9 +407,10 @@ function faces(w: Work, materials: Uint16Array): void {
           if (!side || !liquid || drop >= ((states[q + SY] & 0xffff) === id ? 0 : (states[q] >>> 16) & 7)) continue;
         }
         // Per vertex, from its two edge cells and its diagonal cell in the front layer: AO is 0 when both edges are
-        // opaque cubes, else 3 minus their count (0fps.net, "Ambient occlusion for Minecraft-like worlds", Mikola
-        // Lysenko, 2013). Smooth light is the mean of the open cells among those and the front cell, the diagonal
-        // counting only past an open edge, so the open count is AO + 1 when the front cell is open (AO otherwise).
+        // opaque cubes, else 3 minus their count (Mikola Lysenko, 2013, 0fps.net,
+        // ambient occlusion for voxel worlds). Smooth light is the mean of the open cells among those and the front
+        // cell, the diagonal counting only past an open edge, so the open count is AO + 1 when the front cell is open
+        // (AO otherwise).
         // `spread` holds open cells' light as sky << 8 | block and opaque ones as 0: one sum adds both channels.
         const a = occ[q - sU],
           b = occ[q + sU],
@@ -994,7 +995,7 @@ export function sortQuads(words: Uint32Array, eye: Vec3): Uint32Array {
     distance[i] = (centers[i * 3] - ex) ** 2 + (centers[i * 3 + 1] - ey) ** 2 + (centers[i * 3 + 2] - ez) ** 2;
     order[i] = i;
   }
-  // ponytail: centre distance (Minecraft's order) can misorder a large merged quad against a small one beside it; a
+  // ponytail: centre distance can misorder a large merged quad against a small one beside it; a
   // topological sort of the quads if that shows.
   order.sort((a, b) => distance[b] - distance[a] || a - b);
   const copy = words.slice();

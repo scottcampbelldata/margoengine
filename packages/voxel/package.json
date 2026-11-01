@@ -6,8 +6,7 @@
     "margoengine",
     "webgpu",
     "3d",
-    "voxel",
-    "minecraft"
+    "voxel"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {
