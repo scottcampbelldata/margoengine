@@ -207,13 +207,13 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/post API](https://margoengine.com/llms/api/post.md): 19 entry points
 - [@margoengine/tonemap API](https://margoengine.com/llms/api/tonemap.md): 1 entry point
 - [@margoengine/dof API](https://margoengine.com/llms/api/dof.md): 1 entry point
-- [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 1 entry point
+- [@margoengine/taa API](https://margoengine.com/llms/api/taa.md): 2 entry points
 - [@margoengine/transitions API](https://margoengine.com/llms/api/transitions.md): 1 entry point
 - [@margoengine/terrain API](https://margoengine.com/llms/api/terrain.md): 1 entry point
 - [@margoengine/biomes API](https://margoengine.com/llms/api/biomes.md): 14 entry points
 - [@margoengine/voxel API](https://margoengine.com/llms/api/voxel.md): 12 entry points
 - [@margoengine/voxel-pathtracer API](https://margoengine.com/llms/api/voxel-pathtracer.md): 2 entry points
-- [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 11 entry points
+- [@margoengine/voxel-edit API](https://margoengine.com/llms/api/voxel-edit.md): 12 entry points
 - [@margoengine/water API](https://margoengine.com/llms/api/water.md): 1 entry point
 - [@margoengine/scenery API](https://margoengine.com/llms/api/scenery.md): 2 entry points
 - [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 2 entry points
