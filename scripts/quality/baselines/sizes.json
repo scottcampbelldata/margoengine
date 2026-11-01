@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4154083,
+  "total": 4160181,
   "history": [
     {
       "date": "2026-10-24",
@@ -1214,6 +1214,12 @@
       "commit": "764e66da1",
       "reason": "row 26 jobs 1-2: new exporters/apng and exporters/webp entries",
       "grew": 2
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "4516f36ad",
+      "reason": "new entry @margoengine/post/outline, row 21.6 job 2; Selection.maskTexture feeds its per-object mask",
+      "grew": 1
     }
   ],
   "items": {
@@ -1446,6 +1452,7 @@
     "@margoengine/post/lens-flare": 6573,
     "@margoengine/post/motion-blur": 7762,
     "@margoengine/post/mrt": 3753,
+    "@margoengine/post/outline": 6098,
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/smaa": 6314,
     "@margoengine/post/ssao": 9601,

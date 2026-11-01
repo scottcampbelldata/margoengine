@@ -155,6 +155,7 @@ export class Selection implements EnginePlugin {
     add(source: PickingSource): () => void;
     set(meshes: Iterable<Mesh | ModelLike>): void;
     setup(engine: Engine): void;
+    get maskTexture(): GPUTexture | undefined;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

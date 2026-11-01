@@ -120,3 +120,13 @@ test('selection mask reuses renderer bindings and texture views, replacing them 
       else delete globalThis[key];
   }
 });
+
+test('maskTexture is the mask while something is selected, and undefined otherwise', () => {
+  const selection = Object.create(Selection.prototype),
+    mask = {};
+  selection.mask = mask;
+  selection.selected = new Set();
+  assert.equal(selection.maskTexture, undefined);
+  selection.selected.add({});
+  assert.equal(selection.maskTexture, mask);
+});

@@ -37,6 +37,7 @@ test('native Bloom and SSAO imports exclude the other effects', async () => {
     ['lens-flare', 'const GHOSTS', ['bloom:capture', 'ssao:capture', 'ssr:gbuffer', 'motion-blur:after-taa']],
     ['smaa', 'smaa:capture', ['bloom:capture', 'ssao:capture', 'fxaa:capture', 'post:stack:capture']],
     ['glitch', 'tears:array<vec4f,4>', ['bloom:capture', 'ssao:capture', 'fxaa:capture', 'smaa:capture']],
+    ['outline', 'fn away(', ['bloom:capture', 'ssao:capture', 'smaa:capture', 'tears:array']],
     ['afterimage', 'var<uniform> fade:vec4f', ['bloom:capture', 'ssao:capture', 'smaa:capture', 'tears:array']],
   ]) {
     const code = await staticClosure('@margoengine/post/' + entry);

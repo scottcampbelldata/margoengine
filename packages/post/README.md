@@ -453,6 +453,87 @@ trails.reset();       // drop the trail, e.g. on a camera cut
 - **Limits.** Screen-space trails: a moving camera smears the whole frame. Two full-size `rgba16float` history
   textures. GPU cost not measured yet. WebGPU only.
 
+## Outlines: `Outline`
+
+`@margoengine/post/outline` draws lines where a Sobel filter finds a step in scene depth and, when you give it normals,
+a crease. It is an LDR effect: place it after the display effect and before `SMAA` or `FXAA`.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {SceneTargets} from 'margoengine/post/mrt';
+import {Outline} from 'margoengine/post/outline';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const targets = SceneTargets.attach(stage.engine, {outputs: {normal: 'normal'}});
+const outline = new Outline({color: [0.05, 0.05, 0.1, 1], width: 1, normal: () => targets.texture('normal')});
+PostStack.attach(stage.engine, [outline]);
+outline.options.width = 2; // options are read every frame
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `color` | `[0, 0, 0, 1]` | Display-encoded red, green, blue, opacity |
+| `width` | `1` | Filter radius in whole pixels, 1 to 16; a line covers about twice this |
+| `depthThreshold` | `0.03` | Depth step per pixel, as a share of the pixel's distance |
+| `normalThreshold` | `0.4` | Normal change, about a 30 degree crease |
+| `normal` | none | World normals texture; without it creases draw no line |
+| `mask` | none | Red channel limits lines to marked objects; no texture means no lines |
+| `maskId` | any above 0 | The red value that counts as marked |
+| `enabled` | `true` | False passes frames through |
+
+For per-object lines use `mask: () => selection.maskTexture` with `Selection` from `@margoengine/selection`. That mask is
+drawn after the stack, so it is one frame old. Selection's own outline is separate and needs no stack.
+
+## Writing your own effect
+
+`PostStack` takes any plugin with a `joinStack(host)` method. It returns a stage: `kind` says where the stage goes in the
+order (`'hdr'`, `'display'` or `'ldr'`), and `render(context, input, output)` draws `input` into `output.view`. `host.depthTexture`
+is the shared resolved depth. `output.hdr` is false when your stage is last or follows the display effect, so an `'hdr'` stage
+must then encode for display itself.
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const code = `
+@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
+ return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);
+}
+@group(0) @binding(0) var image:texture_2d<f32>;
+@fragment fn fragment(@builtin(position) at:vec4f)->@location(0) vec4f {
+ let c=textureLoad(image,vec2i(at.xy),0);
+ return vec4f(1-c.rgb,c.a);
+}`;
+const invert = {
+  name: 'invert',
+  setup() {},
+  dispose() {},
+  joinStack() {
+    return {
+      kind: 'ldr' as const,
+      render(c: any, input: GPUTextureView, output: {view: GPUTextureView; format: GPUTextureFormat; multisample: GPUMultisampleState}) {
+        const module = c.device.createShaderModule({code});
+        const pipeline = c.device.createRenderPipeline({
+          layout: 'auto',
+          vertex: {module, entryPoint: 'vertex'},
+          fragment: {module, entryPoint: 'fragment', targets: [{format: output.format}]},
+          multisample: output.multisample,
+        });
+        const pass = c.encoder.beginRenderPass({colorAttachments: [{view: output.view, loadOp: 'clear', storeOp: 'store'}]});
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, c.device.createBindGroup({layout: pipeline.getBindGroupLayout(0), entries: [{binding: 0, resource: input}]}));
+        pass.draw(3);
+        pass.end();
+      },
+    };
+  },
+};
+PostStack.attach(stage.engine, [invert]);
+```
+
+Build the pipeline and bind group once and rebuild them only when `output.format` or `input` changes; the example keeps them
+in `render` to stay short. Release what you create in `dispose`.
+
 ## Multiple render targets: `SceneTargets`
 
 `@margoengine/post/mrt` draws the scene's surfaces into several named textures in one pass. Each output is a built-in

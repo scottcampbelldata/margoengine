@@ -946,6 +946,10 @@
       "types": "./dist/post/afterimage.d.ts",
       "import": "./dist/post/afterimage.js"
     },
+    "./post/outline": {
+      "types": "./dist/post/outline.d.ts",
+      "import": "./dist/post/outline.js"
+    },
     "./post/mrt": {
       "types": "./dist/post/mrt.d.ts",
       "import": "./dist/post/mrt.js"

@@ -269,6 +269,13 @@ export class Selection implements EnginePlugin {
     this.jump = compute(engine.gpu, jumpCode);
     this.sources.setup(engine);
   }
+  /**
+   * The selection as an `r8unorm` mask at the drawing size, from the last frame drawn, or undefined while nothing is
+   * selected. Pass it to `@margoengine/post/outline`: `new Outline({mask: () => selection.maskTexture})`.
+   */
+  get maskTexture(): GPUTexture | undefined {
+    return this.selected.size ? this.mask : undefined;
+  }
   registerPasses(graph: FrameGraph): void {
     graph.add({
       name: this.name + ':outline',

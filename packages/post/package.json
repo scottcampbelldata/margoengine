@@ -28,7 +28,7 @@
   "scripts": {
     "test": "node --test test/*.test.js ../../tests/modern-scene-fade-lifecycle.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/post/test/image-browser.mjs"
+    "test:gpu": "cd ../.. && node packages/post/test/image-browser.mjs && node packages/post/test/outline-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -95,6 +95,10 @@
     "./afterimage": {
       "types": "./dist/afterimage.d.ts",
       "import": "./dist/afterimage.js"
+    },
+    "./outline": {
+      "types": "./dist/outline.d.ts",
+      "import": "./dist/outline.js"
     },
     "./mrt": {
       "types": "./dist/mrt.d.ts",
