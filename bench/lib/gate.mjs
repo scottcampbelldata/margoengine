@@ -8,17 +8,22 @@
 import { acPower } from '../../examples/package-benchmarks/parts/power.mjs';
 import { acquire, lockDir, status } from '../../scripts/gpu-lock.mjs';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
-import { gpus } from './env.mjs';
+import { nvidiaSmi } from './env.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function gpuIdle(max, timeout, log) {
+/**
+ * Waits until NVIDIA GPU utilisation stays at or under `max` % for 3 readings. `{ checked: false, reason }` when
+ * nvidia-smi gives no reading (the reason is nvidia-smi's own failure); `smi` is the query (tests pass a stand-in).
+ */
+export async function gpuIdle(max, timeout, log, smi = nvidiaSmi) {
   const start = Date.now();
   for (;;) {
     const samples = [];
     for (let i = 0; i < 3; i++) {
-      const u = gpus().find((g) => Number.isFinite(g.utilizationPercent))?.utilizationPercent;
-      if (u === undefined) return { checked: false };
+      const read = smi(),
+        u = read.gpus.find((g) => Number.isFinite(g.utilizationPercent))?.utilizationPercent;
+      if (u === undefined) return { checked: false, reason: read.error ?? 'nvidia-smi gave no utilisation reading' };
       samples.push(u);
       await sleep(1000);
     }

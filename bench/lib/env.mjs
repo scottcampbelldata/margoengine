@@ -19,14 +19,53 @@ const run = (file, args) => {
 };
 export const git = (...args) => run('git', ['-C', root, ...args]);
 
+const SMI_ARGS = ['--query-gpu=name,driver_version,utilization.gpu', '--format=csv,noheader,nounits'];
+
+/**
+ * NVIDIA GPUs from one nvidia-smi query: `{ gpus }` with name, driver and utilisation, or `{ gpus: [], error }` saying
+ * why there are none (not found, timed out, its exit status and message, no output, no utilisation reading), so a
+ * gate that cannot read GPU load records the reason. `exec` is execFileSync's signature (tests pass a stand-in).
+ */
+export function nvidiaSmi(exec = execFileSync) {
+  let out;
+  try {
+    out = String(
+      exec('nvidia-smi', SMI_ARGS, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: 20_000,
+        windowsHide: true,
+      }),
+    ).trim();
+  } catch (error) {
+    const said = (s) =>
+      String(s ?? '')
+        .trim()
+        .split('\n')[0];
+    const why =
+      error?.code === 'ENOENT'
+        ? 'nvidia-smi was not found on PATH'
+        : error?.code === 'ETIMEDOUT' || (error?.signal && error.status == null)
+          ? `nvidia-smi did not finish within 20 s (${error.signal ?? error.code})`
+          : error?.status != null
+            ? `nvidia-smi exited ${error.status}: ${said(error.stderr) || said(error.stdout) || 'no message'}`
+            : `nvidia-smi could not run: ${error?.code ?? error?.message ?? error}`;
+    return { gpus: [], error: `${why} (command: nvidia-smi ${SMI_ARGS.join(' ')})` };
+  }
+  if (!out) return { gpus: [], error: 'nvidia-smi printed nothing' };
+  const list = out.split('\n').map((line) => {
+    const [name, driver, utilization] = line.split(',').map((s) => s.trim());
+    return { name, driver, utilizationPercent: Number(utilization), source: 'nvidia-smi' };
+  });
+  if (!list.some((g) => Number.isFinite(g.utilizationPercent)))
+    return { gpus: list, error: `nvidia-smi gave no utilisation reading: ${JSON.stringify(out.split('\n')[0])}` };
+  return { gpus: list };
+}
+
 /** Name, driver and (NVIDIA only) utilisation of the machine's GPUs, from nvidia-smi or the OS. */
 export function gpus() {
-  const smi = run('nvidia-smi', ['--query-gpu=name,driver_version,utilization.gpu', '--format=csv,noheader,nounits']);
-  if (smi)
-    return smi.split('\n').map((line) => {
-      const [name, driver, utilization] = line.split(',').map((s) => s.trim());
-      return { name, driver, utilizationPercent: Number(utilization), source: 'nvidia-smi' };
-    });
+  const smi = nvidiaSmi();
+  if (smi.gpus.length) return smi.gpus;
   if (platform() === 'win32') {
     const json = run('powershell', [
       '-NoProfile',
