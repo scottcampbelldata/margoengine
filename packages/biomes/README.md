@@ -124,10 +124,11 @@ world.dispose();
   goal G1's 400. The same bytes as before: the gains came from an integer hash table for placement cells, shifts for
   power-of-two cells, classification that finds the nearest envelope only where it is needed and skips the blend
   steps for one-biome cells, a cache of the moisture curve and of the relief lattice. The package tests check a
-  400 ms budget per tile. A later run on the same PC (2026-11-01, medians of 20 with min and max, without the
-  benchmark lock, other work using 12 to 17 % of the CPU): fields 399 ms per km2 (354 to 1,214) and stored objects
-  207 (169 to 548), 606 in all, against 385 and 200 (586) before placement read bands of its neighbours; the same code
-  gave fields medians from 389 to 412 across runs. G1's 400 is not met.
+  400 ms budget per tile. Exploratory runs on the same PC (2026-11-01, `--runs=20`, without the benchmark lock, which
+  this session could not take): fields 396 ms per km2 (353 to 1,382) and stored objects 209 (165 to 553), 605 in
+  all, at 7e3fa7060, against 404 (354 to 1,260) and 204 (163 to 554), 608, at 14e4d813d. One slow run per stage puts
+  the spread of both rows far over the 10 % validity limit of `docs/benchmarking.md`, so neither row is valid; the
+  medians differ by less than the run to run noise. G1's 400 is not met.
 
 ## Biomes, presets and blends
 
@@ -624,20 +625,21 @@ world.dispose(); // terminates the workers
 | `createWorker` | the package's worker script | makes one worker (custom bundlers, tests) |
 | `cache` | 64 | tiles kept on this thread, least recently used first out (a default tile is about 2.6 MB) |
 
-Measured on the reference PC (`bench/biomes/placement.mjs`, R16, an 8 x 8 block of tiles, Node worker threads running
-the same script, 2026-11-01, medians of 20): fields and stored objects take 1,465 ms per km2 of wall time on one
-worker, 530 on four and 292 on eight, against 606 on the page's thread alone and goal G1's 70 on eight workers. A
-placement reads its neighbours' fields, and each worker makes the ones it needs itself, so tiles at the edges of what a
-worker places are made more than once.
-
 A placement makes its own tile whole and, of each neighbour, only the band its first Luby round reads (through
-`world.tilePart`): 128 cells on R16, where the reach of all 6 rounds is wider than the 256 m tile. A neighbour the world
-already holds whole is read whole. A read past the band makes that neighbour whole and runs again, so the objects are
-the same bytes. On the same PC (2026-11-01, 20 runs each, medians with min and max, without the benchmark lock): one
-cold R16 placement takes 138 ms (134 to 188) instead of 261 (255 to 312). The 8 x 8 block takes 292 ms per km2 on
-eight workers (283 to 311) instead of 362 (351 to 386) and 530 on four (523 to 565) instead of 550 (539 to 571). On
-one worker it takes 1,465 (1,438 to 1,490) instead of 1,119 (1,103 to 1,157): that worker places every tile of the
-block, so the bands it makes of tiles it later places are wasted work. Eight workers still miss G1's 70.
+`world.tilePart`): 128 cells on R16, where the reach of all 6 rounds is wider than the 256 m tile. A neighbour that
+will be placed too is made whole instead, since placing it needs it whole: one named in the `ahead` option of
+`placement.tile`, or, without `ahead`, every neighbour of a tile next to one this placement placed or is placing (an area
+placed tile by tile). On a world with workers, each placement job names the tiles queued after it on the same worker.
+A neighbour the world already holds whole is read whole. A read past the band makes that neighbour whole and runs
+again, so the objects are the same bytes.
+
+Exploratory runs on the reference PC (`bench/biomes/placement.mjs --runs=20`, R16, an 8 x 8 block of tiles, Node
+worker threads running the same script, 2026-11-01, without the benchmark lock, which this session could not take;
+the bench times the block once per run, so these are single runs): fields and stored objects take 1,070 and 1,076 ms
+per km2 of wall time on one worker (two runs), 484 on four and 281 on eight at 7e3fa7060, against 1,138 and 1,135,
+554 and 382 at 14e4d813d. Goal G1 asks for 70 on eight workers; it is not met. A placement reads its neighbours'
+fields and each worker makes the ones it needs itself, so tiles at the edges of what a worker places are still made
+by more than one worker.
 
 ## Same seed, same bytes, everywhere
 
