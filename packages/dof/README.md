@@ -19,6 +19,31 @@ Passes capture linear HDR and sampleable reversed-Z depth before drawing, calcul
 
 Standalone output uses Margo's display curve (Khronos PBR Neutral, then sRGB), as core does. For color grading, attach DOF first, then `Tonemap.attach(stage.engine, {source:()=>dof.outputTexture})`. The current HDR `outputTexture` and `depthTexture` are undefined before the first frame and change on resize/restoration. With TAA, supply `depth:()=>dof.depthTexture` to TAA. Destroy dependent effects before DOF. Alone, SSAO and Creative PostProcessing own conflicting scene captures and are rejected. To combine DOF with SSAO, Bloom, Tonemap, Creative PostProcessing or FXAA, add it to a `PostStack` from `@margoengine/post/stack`, e.g. `PostStack.attach(stage.engine, [new SSAO(), new DOF(), new Bloom(), new Tonemap()])`; there it reads the stack's shared HDR capture and depth, and its `depthTexture` is the stack's.
 
+## Autofocus, tilt-shift and blades
+
+Each is its own entry, so a page using neither downloads neither.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {DOF} from 'margoengine/dof';
+import {Autofocus} from 'margoengine/dof/autofocus';
+import {DOFLens} from 'margoengine/dof/lens';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// blades: 3 to 16 sided bokeh; tilt in radians, positive moves the focal plane further away towards tiltDirection.
+const lens = new DOFLens({blades: 6, bladeRotation: 0.2, tilt: 0.3, tiltDirection: [0, 1]});
+const dof = DOF.attach(engine, {focalLength: 0.05, aperture: 1.4, lens});
+const autofocus = Autofocus.attach(engine, dof, {smoothing: 0.2});
+addEventListener('pointermove', (e) => { autofocus.options.point = [e.offsetX, e.offsetY]; });
+// Or follow a world point with no depth read:
+autofocus.options.target = [0, 1, 0];
+lens.tilt = 0.1;
+engine.start();
+```
+
+- `Autofocus` sets `dof.options.focalDistance`. It reads one depth texel into a buffer and maps it later without waiting, so the focus follows a frame or two behind and a frame never stalls. The sky leaves the focus where it was. Attach it after the `DOF`, alone or in a `PostStack`.
+- `DOFLens` is read when the effect attaches; only `tilt` and `tiltDirection` change afterwards. A perspective plane stays a plane: `1/focus` is linear across the screen, and past the horizon of the plane everything counts as in front of it. It is checked on WebGPU; autofocus and the lens are not checked on the WebGL2 layer.
+
 ## Cost
 
 GPU time of the DOF passes (CoC, wide-disk 2x2-block gather, bokeh), Intel Arc 140V laptop iGPU, Edge 155, DamagedHelmet scene (the earlier test model) with environment light in a `PostStack` [DOF, Tonemap], median of 6 alternating old/new rounds x 90 frames (`examples/package-benchmarks/gates/dof.mjs`, `results/gates-dof.json`). "Before" is the 64-tap full-resolution gather of `5b9dbbd`.

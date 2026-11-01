@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
@@ -10,6 +11,13 @@ const name = process.argv[2];
 assert.ok(['dof', 'tonemap'].includes(name), 'Expected dof or tonemap');
 const repository = fileURLToPath(new URL('..', import.meta.url)),
   root = resolve(repository, 'packages', name);
+const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+const entries = Object.fromEntries(
+  Object.values(manifest.exports).map((entry) => {
+    const module = entry.import.slice('./dist/'.length, -'.js'.length);
+    return [module, resolve(root, 'src', module + '.ts')];
+  }),
+);
 await copyLegal(root);
 await build({
   root,
@@ -20,7 +28,7 @@ await build({
     outDir: resolve(root, 'dist'),
     emptyOutDir: true,
     target: 'es2022',
-    lib: { entry: resolve(root, 'src/index.ts'), formats: ['es'], fileName: 'index' },
+    lib: { entry: entries, formats: ['es'], fileName: (_format, module) => module + '.js' },
     rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
   },
 });

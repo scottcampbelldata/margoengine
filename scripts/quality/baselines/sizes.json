@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4268882,
+  "total": 4272593,
   "history": [
     {
       "date": "2026-10-24",
@@ -1316,6 +1316,12 @@
       "commit": "a3b1efae0",
       "reason": "new entry @margoengine/pixel/render3d: low-res 3D view with outlines from depth and surface direction, sprite sheet capture (row 25 J8; budget 6 KB)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "b2e7cc033",
+      "reason": "dof: dof/lens tilt-shift and bokeh blades, dof/autofocus a depth read that never stalls, each in its own entry with a small lens hook in the root",
+      "grew": 2
     }
   ],
   "items": {
@@ -1401,6 +1407,8 @@
     "@margoengine/decoders/tga": 1614,
     "@margoengine/decoders/tiff": 4129,
     "@margoengine/dof": 7880,
+    "@margoengine/dof/autofocus": 2192,
+    "@margoengine/dof/lens": 1519,
     "@margoengine/ecs": 1606,
     "@margoengine/environment": 29930,
     "@margoengine/environment/cube-camera": 5727,

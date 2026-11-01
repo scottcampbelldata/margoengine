@@ -362,6 +362,14 @@
       "types": "./dist/dof.d.ts",
       "import": "./dist/dof.js"
     },
+    "./dof/lens": {
+      "types": "./dist/dof/lens.d.ts",
+      "import": "./dist/dof/lens.js"
+    },
+    "./dof/autofocus": {
+      "types": "./dist/dof/autofocus.d.ts",
+      "import": "./dist/dof/autofocus.js"
+    },
     "./ecs": {
       "types": "./dist/ecs.d.ts",
       "import": "./dist/ecs.js"

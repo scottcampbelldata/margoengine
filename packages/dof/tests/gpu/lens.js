@@ -1,0 +1,84 @@
+// Browser side of lens-check.mjs: bright boxes on a dark background, one engine per case.
+import { Engine, box, PbrMaterial } from '../../../core/dist/index.js';
+import { DOF } from '../../dist/index.js';
+import { DOFLens } from '../../dist/lens.js';
+import { Autofocus } from '../../dist/autofocus.js';
+
+const errors = [],
+  white = new PbrMaterial({ color: '#ffffff', emissive: [6, 6, 6], roughness: 1, metalness: 0 });
+addEventListener('error', (e) => errors.push(e.message));
+addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
+
+const canvas = document.querySelector('canvas');
+let engine, dof, focus;
+const settle = async (n = 12) => {
+  for (let i = 0; i < n; i++) {
+    engine.render();
+    await engine.gpu.queue.onSubmittedWorkDone();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+};
+const start = async (boxes) => {
+  engine?.dispose?.();
+  engine = await Engine.create(canvas, { backend: 'webgpu' });
+  engine.camera.fov = 50;
+  engine.camera.near = 0.1;
+  engine.camera.far = 100;
+  engine.camera.position = [0, 0, 10];
+  engine.camera.target = [0, 0, 0];
+  for (const [x, y, z, s] of boxes)
+    engine
+      .createMesh()
+      .setGeometry(box(s, s, s))
+      .setMaterial(white)
+      .setPosition([x, y, z]);
+};
+window.check = {
+  errors,
+  // A near box in the middle and a far one to the side: the focus follows the pixel, then a world point.
+  async autofocus() {
+    await start([
+      [0, 0, 4, 1],
+      [2, 0, -5, 1],
+    ]);
+    dof = DOF.attach(engine, { focalDistance: 5, focalLength: 0.05, aperture: 1.4 });
+    focus = Autofocus.attach(engine, dof, { smoothing: 0 });
+    await settle();
+    const middle = dof.options.focalDistance;
+    focus.options.point = [256 + 256 / (7.5 * Math.tan((25 * Math.PI) / 180)), 256];
+    await settle();
+    const side = dof.options.focalDistance;
+    focus.options.target = [0, 0, 7];
+    await settle(3);
+    const target = dof.options.focalDistance;
+    return { middle, side, target };
+  },
+  // A small box in the near field, whose bokeh spreads over the background.
+  async blades(blades) {
+    await start([[0, 0, 7, 0.1]]);
+    DOF.attach(engine, {
+      focalDistance: 20,
+      focalLength: 0.1,
+      aperture: 0.5,
+      maxRadius: 16,
+      lens: blades ? new DOFLens({ blades, bladeRotation: Math.PI / 2 }) : undefined,
+    });
+    await settle(4);
+  },
+  // Two boxes at one depth, above and below the middle.
+  async tilt(tilt, focalDistance) {
+    await start([
+      [0, 2.8, 0, 0.3],
+      [0, -2.8, 0, 0.3],
+    ]);
+    DOF.attach(engine, {
+      focalDistance,
+      focalLength: 0.1,
+      aperture: 0.05,
+      maxRadius: 32,
+      lens: new DOFLens({ tilt, tiltDirection: [0, -1] }),
+    });
+    await settle(4);
+  },
+};
+window.ready = true;

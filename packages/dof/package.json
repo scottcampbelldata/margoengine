@@ -25,6 +25,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./lens": {
+      "types": "./dist/lens.d.ts",
+      "import": "./dist/lens.js"
+    },
+    "./autofocus": {
+      "types": "./dist/autofocus.d.ts",
+      "import": "./dist/autofocus.js"
     }
   },
   "files": [
@@ -46,6 +54,7 @@
     "prepack": "npm run build",
     "test": "node --test tests/*.test.js",
     "dev": "vite --config vite.config.js --open /examples/index.html",
-    "build:demo": "vite build --config vite.config.js"
+    "build:demo": "vite build --config vite.config.js",
+    "test:gpu": "cd ../.. && node packages/dof/tests/gpu/lens-check.mjs"
   }
 }

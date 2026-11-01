@@ -16,6 +16,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
 import { coreShaderRequired, linearShader } from '../../shared/display.js';
 import { loadCompatRoute } from '../../shared/compat.js';
+import type { DOFLens } from './lens.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -38,6 +39,8 @@ export interface DOFOptions {
   maxRadius?: number;
   /** False skips the blur and presents the scene sharp. Default true; also settable as `dof.enabled`. */
   enabled?: boolean;
+  /** Tilt-shift and polygon bokeh, from `@margoengine/dof/lens`. Read when the effect attaches. Default: none. */
+  lens?: DOFLens;
 }
 
 /**
@@ -156,12 +159,14 @@ export class DOF implements EnginePlugin {
       throw new MargoError('state', 'DOF owns scene capture; attach it before Tonemap, without SSAO or PostProcessing');
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const source = { cocShader, coarseShader, bokehShader, groupMax },
+      shaders = this.options.lens?.shaders(source) ?? source;
     this.cocPipeline = engine.gpu.createComputePipeline({
       layout: 'auto',
-      compute: { module: engine.gpu.createShaderModule({ code: cocShader }), entryPoint: 'main' },
+      compute: { module: engine.gpu.createShaderModule({ code: shaders.cocShader }), entryPoint: 'main' },
     });
-    this.bokehPipeline = compute(engine.gpu, bokehShader);
-    this.coarsePipeline = compute(engine.gpu, coarseShader);
+    this.bokehPipeline = compute(engine.gpu, shaders.bokehShader);
+    this.coarsePipeline = compute(engine.gpu, shaders.coarseShader);
     const uniform = this.uniform,
       route = loadCompatRoute(engine.gpu, () => import('./compat.js'));
     // Alone, DOF skips its CoC and blur until its WebGL2 route has loaded: its WebGPU route there takes the CPU tier,
@@ -176,7 +181,7 @@ export class DOF implements EnginePlugin {
           coc: this.cocPipeline,
           tiles: this.tilesPipeline,
           bokeh: this.bokehPipeline,
-        } = dofCompatPipelines(engine.gpu!, { cocShader, bokehShader, groupMax }));
+        } = dofCompatPipelines(engine.gpu!, shaders));
         this.releaseTextures();
       },
       (error) => {
@@ -225,7 +230,7 @@ export class DOF implements EnginePlugin {
     this.validate();
     const o = this.options,
       v = this.values;
-    const [, viewHeight] = viewSize(c);
+    const [viewWidth, viewHeight] = viewSize(c);
     v[0] = o.focalDistance ?? 5;
     v[1] = o.focalLength ?? 0.05;
     v[2] = o.aperture ?? 2.8;
@@ -244,6 +249,7 @@ export class DOF implements EnginePlugin {
       v[6] = (v[1] * viewHeight * ortho.sy * v[0]) / (4 * v[2] * (v[0] - v[1]));
       v[8] = 1;
     }
+    o.lens?.write(v, c.camera, viewWidth / viewHeight);
     if (!Number.isFinite(v[6]))
       throw new RangeError(
         'DOF lens scale exceeds float32; use a larger aperture or a focalDistance further from focalLength',

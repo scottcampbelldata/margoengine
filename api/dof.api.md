@@ -30,5 +30,34 @@ export interface DOFOptions {
     aperture?: number;
     maxRadius?: number;
     enabled?: boolean;
+    lens?: DOFLens;
+}
+
+// Not exported from this entry, but used by the exports above:
+
+class DOFLens {
+    tilt: number;
+    tiltDirection: readonly [number, number];
+    constructor({ blades, bladeRotation, tilt, tiltDirection }?: DOFLensOptions);
+    shaders(source: DOFLensShaders): DOFLensShaders;
+    write(values: Float32Array, camera: {
+        fov: number;
+        matrix: Float32Array;
+        position: ArrayLike<number>;
+    }, aspect: number): void;
+}
+
+interface DOFLensOptions {
+    blades?: number;
+    bladeRotation?: number;
+    tilt?: number;
+    tiltDirection?: readonly [number, number];
+}
+
+interface DOFLensShaders {
+    readonly cocShader: string;
+    readonly coarseShader: string;
+    readonly bokehShader: string;
+    readonly groupMax: string;
 }
 ```

@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DOF } from '../dist/index.js';
+import { DOFLens } from '../dist/lens.js';
+import { Autofocus } from '../dist/autofocus.js';
 import { gpuHarness } from '../../../tests/support/postfx-gpu.js';
 import { Camera } from '../../core/dist/index.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
@@ -185,4 +187,110 @@ test('DOF alone on the WebGL2 layer shows the sharp scene, as outputTexture too,
   assert.notEqual(dof.outputTexture, dof.depthTexture);
   assert.equal(dof.outputTexture.usage & GPUTextureUsage.STORAGE_BINDING, GPUTextureUsage.STORAGE_BINDING);
   dof.dispose();
+});
+
+const shaderCodes = (h) => h.pipelines.map((p) => p.compute?.module.code).filter(Boolean);
+test('without a lens DOF builds the plain kernels and leaves the three free uniform slots at zero', () => {
+  const h = gpuHarness();
+  DOF.attach(h.engine, { focalDistance: 5 });
+  h.frame();
+  const codes = shaderCodes(h);
+  assert.equal(codes.length, 3);
+  for (const code of codes) assert.ok(!code.includes('fn shape'));
+  assert.ok(codes[0].includes('1.0-p.lens.x/z'));
+  assert.deepEqual([h.writes[9], h.writes[10], h.writes[11]], [0, 0, 0]);
+});
+
+test('DOFLens validates its options, edits every kernel it should, and writes the tilt per clip unit each frame', () => {
+  for (const options of [
+    { blades: 2 },
+    { blades: 17 },
+    { blades: 4.5 },
+    { bladeRotation: NaN },
+    { tilt: 1.6 },
+    { tiltDirection: [0, 0] },
+  ])
+    assert.throws(() => new DOFLens(options), RangeError);
+  const h = gpuHarness(),
+    lens = new DOFLens({ blades: 6, tilt: Math.PI / 4, tiltDirection: [3, 4] });
+  DOF.attach(h.engine, { focalDistance: 5, lens });
+  const [coc, bokeh, coarse] = shaderCodes(h);
+  assert.ok(coc.includes('let focus=max('));
+  assert.ok(!coc.includes('1.0-p.lens.x/z,'));
+  for (const code of [bokeh, coarse])
+    assert.ok(code.includes('fn shape(a:f32)') && code.includes('*shape(angle)*vec2f'));
+  assert.ok(bokeh.includes('radius*shape(f32(i)*2.39996323)'));
+  h.context.camera.matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0]);
+  h.context.camera.position = [0, 0, 0];
+  h.frame();
+  const half = Math.tan(Math.PI / 6);
+  assert.ok(Math.abs(h.writes[9] - 0.6 * half * (128 / 96)) < 1e-5);
+  assert.ok(Math.abs(h.writes[10] - 0.8 * half) < 1e-5);
+  lens.tilt = 2;
+  assert.throws(() => h.frame(), RangeError);
+});
+
+test('a lens whose shaders do not match its DOF refuses to build', () => {
+  const lens = new DOFLens();
+  assert.throws(
+    () => lens.shaders({ cocShader: 'changed', coarseShader: '', bokehShader: '', groupMax: '' }),
+    /update both together/,
+  );
+});
+
+test('Autofocus maps its read in a later frame, never waits, and leaves the focus alone on the sky', async () => {
+  const h = gpuHarness();
+  globalThis.GPUMapMode = { READ: 1 };
+  globalThis.GPUBufferUsage.MAP_READ = 1;
+  let copies = 0,
+    maps = 0,
+    depth = 0.25,
+    finish;
+  h.context.encoder.copyTextureToBuffer = () => copies++;
+  const create = h.engine.gpu.createBuffer.bind(h.engine.gpu);
+  h.engine.gpu.createBuffer = (descriptor) =>
+    Object.assign(create(descriptor), {
+      mapAsync() {
+        maps++;
+        return new Promise((done) => (finish = done));
+      },
+      getMappedRange: () => new Float32Array([depth]).buffer,
+      unmap() {},
+    });
+  h.engine.canvas = { clientWidth: 128, clientHeight: 96, width: 128, height: 96 };
+  const dof = DOF.attach(h.engine, { focalDistance: 5 }),
+    focus = Autofocus.attach(h.engine, dof, { smoothing: 0, point: [10, 20] });
+  h.frame();
+  assert.deepEqual([copies, maps], [1, 0], 'the first frame copies and cannot map yet');
+  h.frame();
+  assert.deepEqual([copies, maps], [1, 1], 'the next frame maps without copying over it');
+  h.frame();
+  assert.deepEqual([copies, maps], [1, 1], 'a slow map holds no frame and starts no second read');
+  finish();
+  await new Promise(setImmediate);
+  const z = (0.1 * 100) / (0.1 + 0.25 * (100 - 0.1));
+  assert.ok(Math.abs(dof.options.focalDistance - z) < 1e-4);
+  depth = 0;
+  h.frame();
+  h.frame();
+  finish();
+  await new Promise(setImmediate);
+  assert.ok(Math.abs(dof.options.focalDistance - z) < 1e-4, 'the sky keeps the focus');
+  focus.dispose();
+  assert.equal(h.engine.hasPlugin('dof-autofocus'), false);
+  assert.throws(() => new Autofocus(), /Expected a DOF/);
+});
+
+test('Autofocus on a world point uses its distance along the view with no read', () => {
+  const h = gpuHarness();
+  h.engine.canvas = { clientWidth: 128, clientHeight: 96, width: 128, height: 96 };
+  let copies = 0;
+  h.context.encoder.copyTextureToBuffer = () => copies++;
+  const dof = DOF.attach(h.engine, { focalDistance: 5 });
+  h.context.camera.matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, -1, 0, 0, 0.1, 0]);
+  h.context.camera.position = [0, 0, 0];
+  Autofocus.attach(h.engine, dof, { smoothing: 0, target: [0, 0, -8] });
+  h.frame();
+  assert.ok(Math.abs(dof.options.focalDistance - 8) < 1e-6);
+  assert.equal(copies, 0);
 });
