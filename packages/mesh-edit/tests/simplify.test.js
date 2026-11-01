@@ -98,3 +98,24 @@ test('README simplification example runs as written', () => {
     [true, true, true],
   );
 });
+
+test('a collapse never makes a face of corners a hair apart: a sphere whose pole float noise left unwelded', () => {
+  const segments = 16,
+    positions = [],
+    indices = [];
+  for (let y = 0; y <= segments; y++)
+    for (let x = 0; x <= segments; x++) {
+      const a = (x / segments) * Math.PI * 2,
+        b = (y / segments) * Math.PI;
+      positions.push(Math.cos(a) * Math.sin(b), Math.cos(b), Math.sin(a) * Math.sin(b));
+    }
+  for (let y = 0; y < segments; y++)
+    for (let x = 0; x < segments; x++) {
+      const i = y * (segments + 1) + x,
+        j = i + segments + 1;
+      indices.push(i, i + 1, j, i + 1, j + 1, j);
+    }
+  const chain = K.meshLODChain(K.polygonMeshFromTriangles({ positions, indices }).mesh, { ratios: [0.5, 0.25] });
+  assert.ok(chain[1].triangles.after < chain[0].triangles.after);
+  assert.ok(chain[0].triangles.after < indices.length / 3);
+});

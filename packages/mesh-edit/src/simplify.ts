@@ -282,6 +282,8 @@ export function simplifyMesh(mesh: PolygonMesh, options: SimplifyOptions = {}): 
         lb = Math.hypot(before[0], before[1], before[2]);
       if (!(la > tiny) || after[0] * before[0] + after[1] * before[1] + after[2] * before[2] <= 0.2 * la * lb)
         return false;
+      // Corners a hair apart (a sphere's pole, unwelded by float noise) pass the area test, and the validator refuses them.
+      if (polygonGeometryError(corners.map((w) => P[w]))) return false;
       const uv = tv[t].map((w, k) => (w === u ? replacement.get(t)! : tuv[t][k])),
         oldUV = tuv[t],
         cross = (x: readonly number[][]) =>
