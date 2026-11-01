@@ -517,9 +517,9 @@ export class BiomeObjects implements Disposable {
     device.queue.writeTexture({ texture: entry.texture, origin: [u0, v0] }, block, { bytesPerRow: w }, [w, h]);
   }
 
-  /** Takes one tile's objects off the GPU. */
+  /** Takes one tile's objects off the GPU, also those of a tile whose `steps` only ran in part. */
   remove(key: string): void {
-    if (!this.#held.delete(key)) return;
+    this.#held.delete(key);
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
       entry.tiles[0].removeTile(key);
   }

@@ -1077,8 +1077,11 @@ export class BiomeView implements Disposable {
         this.#drainTimer ??= setTimeout(this.#drain, 50);
       },
       () => {
-        if (this.#pending.get(key) === job) this.#pending.delete(key);
-        this.#first?.delete(key);
+        // A job cancelled and made again leaves the new job, and `ready`'s wait for it, alone.
+        if (this.#pending.get(key) === job) {
+          this.#pending.delete(key);
+          this.#first?.delete(key);
+        }
         this.#settled();
       },
     );
@@ -1094,6 +1097,8 @@ export class BiomeView implements Disposable {
 
   /** Finished tiles made ahead by `prefetch`, by job key (at most 1,024). */
   readonly #made = new Map<string, ViewTile | PlacedTile>();
+  /** Dirty rectangles seen so far, terrain and objects apart: a prefetch started before one may hold the old tile. */
+  readonly #edits = { v: 0, p: 0 };
 
   /**
    * Makes the tiles of a world rectangle (metres) ahead of time, terrain and objects, so a camera that goes there
@@ -1117,9 +1122,10 @@ export class BiomeView implements Disposable {
         for (const kind of this.#objects ? (['v', 'p'] as const) : (['v'] as const)) {
           const key = kind + `${x},${z}`;
           if (this.#made.has(key) || this.#made.size >= 1024) continue;
+          const edits = this.#edits[kind];
           jobs.push(
             this.#make(kind, x, z, 0, options.signal).then((result) => {
-              this.#made.set(key, result);
+              if (edits === this.#edits[kind]) this.#made.set(key, result);
             }),
           );
         }
@@ -1179,20 +1185,31 @@ export class BiomeView implements Disposable {
 
   /**
    * A dirty world rectangle: its tiles (terrain `v` or objects `p`) are made again when in range (the old ones drawn
-   * until the new ones are in); jobs on their way and prefetched tiles there are dropped.
+   * until the new ones are in). Everything made before the change is dropped: jobs on their way, prefetched tiles and
+   * tiles that arrived but still wait to be copied in, which would otherwise land over the new tile when it is nearer
+   * the camera and goes in first. A tile `ready` waits for stays waited for.
    */
   #dirty(rect: readonly [number, number, number, number], kind: 'v' | 'p'): void {
     const w = this.#world,
       side = w.tileSize,
       held = kind === 'v' ? [...this.#drawn] : [...this.#placed.keys()],
-      keys = [...this.#pending.keys(), ...this.#made.keys()].filter((k) => k[0] === kind).map((k) => k.slice(1));
+      keys = [...this.#pending.keys(), ...this.#made.keys(), ...this.#arrived.map((a) => a.key)]
+        .filter((k) => k[0] === kind)
+        .map((k) => k.slice(1)),
+      dropped: string[] = [];
+    this.#edits[kind]++;
     for (const key of new Set([...held, ...keys])) {
       const [x, z] = key.split(',').map(Number),
         x0 = w.bounds[0] + x * side,
         z0 = w.bounds[1] + z * side;
       if (x0 < rect[2] && x0 + side > rect[0] && z0 < rect[3] && z0 + side > rect[1]) {
-        this.#made.delete(kind + key);
-        this.#cancel(kind + key);
+        const job = kind + key;
+        this.#made.delete(job);
+        this.#pending.get(job)?.controller.abort();
+        this.#pending.delete(job);
+        dropped.push(job);
+        for (let i = this.#arrived.length; i--; ) if (this.#arrived[i].key === job) this.#arrived.splice(i, 1);
+        this.#work.delete(job);
         // Terrain is made again by the next plan; objects are placed again now (they stay until the new ones are in).
         if (kind === 'v') this.#drawn.delete(key);
         else if (this.#placed.has(key)) {
@@ -1203,10 +1220,13 @@ export class BiomeView implements Disposable {
             z,
             Math.hypot(Math.max(0, x0 - e[0], e[0] - x0 - side), Math.max(0, z0 - e[2], e[2] - z0 - side)),
           );
-        }
+        } else this.#objects?.remove(key); // Its first species may be in already; the next plan places it whole.
       }
     }
     this.#plan(false);
+    // A tile the plan did not fetch again is out of range now: `ready` no longer waits for it.
+    for (const job of dropped) if (!this.#pending.has(job)) this.#first?.delete(job);
+    this.#settled();
   }
 
   /** Heights from the world's region overview, bilinear to the texel grid. */

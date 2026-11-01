@@ -143,6 +143,61 @@ async function clip(){
  const errors=s.errs.splice(0);s.dispose();world.dispose();
  return {autoVsFull:diff(auto,full),error,errors};
 }
+// A view with workers, one step copied in per frame: a change to a tile that waits to be copied in, or to one a prefetch
+// is making, ends as a fresh view of the changed world draws it. The workers' replies are held until every tile is made,
+// so the painted tile's copy surely waits. The camera then goes to it, so the new tile is nearest and goes in first; the
+// old copy, not dropped, landed over it. Reads the share of canvas pixels more than 8/255 from a fresh view's.
+async function edited(){
+ const out={errors:[]},full=new Uint8Array(256*256).fill(255);
+ const base={workers:4,size:[2048,2048],biomes:[presets.temperate,presets.desert],climate:{latitude:47,rainfall:1000}};
+ const canvas=document.createElement('canvas');canvas.width=480;canvas.height=300;canvas.style.cssText='width:480px;height:300px';document.body.append(canvas);
+ const e=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,900,1],target:[0,0,0],near:1,far:6000}}),sky=Sky.attach(e,{hours:12,timeScale:0,lighting:{intensity:3},environment:true});
+ e.gpu.addEventListener('uncapturederror',ev=>out.errors.push(ev.error.message));
+ const frame=async()=>{e.render({delta:0});await e.gpu.queue.onSubmittedWorkDone();await new Promise(r=>setTimeout(r,4));};
+ const look=(world,x,z)=>{const y=world.heightAt(x+128,z+128);e.camera.position=[x+128,y+300,z+129];e.camera.target=[x+128,y,z+128];};
+ const pixels=async(view)=>{await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();e.render({delta:0});const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+ const paintAt=(tx,tz)=>(world)=>world.writeLayer('paint/desert',tx,tz,full);
+ const fresh=async(tx,tz,radius)=>{const world=await BiomeWorld.create(base),[bx,bz]=world.bounds;paintAt(tx,tz)(world);look(world,bx+tx*256,bz+tz*256);const view=await BiomeView.attach(e,world,{radius});await view.ready;const data=await pixels(view);view.dispose();world.dispose();return data;};
+ const apart=(a,b)=>{let n=0;for(let k=0;k<a.length;k+=4)if(Math.max(Math.abs(a[k]-b[k]),Math.abs(a[k+1]-b[k+1]),Math.abs(a[k+2]-b[k+2]))>8)n++;return n/(a.length/4);};
+ {const world=await BiomeWorld.create(base),[bx,bz]=world.bounds,[tx,tz]=[7,4],pool=world.workers,run=pool.run.bind(pool);
+  let gate=null,open,made=0;
+  pool.run=(...job)=>run(...job).then(v=>{if(!gate)return v;made++;return gate.then(()=>v);});
+  e.camera.position=[0,900,1];e.camera.target=[0,0,0];
+  const view=await BiomeView.attach(e,world,{radius:1000,budget:1e-6});
+  gate=new Promise(r=>{open=r;});
+  const jobs=view.streaming.pending,limit=performance.now()+120000;
+  while(made<jobs&&performance.now()<limit)await new Promise(r=>setTimeout(r,20));
+  open();gate=null;
+  while(view.streaming.pending&&performance.now()<limit)await Promise.resolve();
+  out.jobs=jobs;out.waiting=view.streaming.arrived;
+  look(world,bx+tx*256,bz+tz*256);paintAt(tx,tz)(world);
+  // fixed-wait: frames paced under the view's 100 ms drain, one copy step each, until the new tile has arrived
+  while(view.streaming.pending){e.render({delta:0});await new Promise(r=>setTimeout(r,50));}
+  const data=await pixels(view);view.dispose();world.dispose();
+  out.waitingApart=apart(data,await fresh(tx,tz,1000));}
+ // A prefetch made before the change must not go in after it.
+ {const world=await BiomeWorld.create(base),[bx,bz]=world.bounds,[tx,tz]=[6,6],x=bx+tx*256,z=bz+tz*256;
+  e.camera.position=[bx+128,900,bz+129];e.camera.target=[bx+128,0,bz+128];
+  const view=await BiomeView.attach(e,world,{radius:300});await view.ready;await view.whenIdle();
+  const made=view.prefetch([x,z,x+256,z+256]);
+  paintAt(tx,tz)(world);await made;look(world,x,z);
+  const data=await pixels(view);view.dispose();world.dispose();
+  out.prefetchApart=apart(data,await fresh(tx,tz,300));}
+ // A change while the first tiles load: `ready` still means they are all in.
+ {const world=await BiomeWorld.create(base);e.camera.position=[0,900,1];e.camera.target=[0,0,0];
+  const view=await BiomeView.attach(e,world,{radius:1000});paintAt(7,4)(world);await view.ready;
+  out.readyPending=view.streaming.pending;view.dispose();world.dispose();}
+ // A tile whose steps ran in part comes off whole: remove leaves no records of the species already in.
+ {const world=await BiomeWorld.create(base);e.camera.position=[0,900,1];e.camera.target=[0,0,0];
+  const view=await BiomeView.attach(e,world,{radius:300}),{BiomePlacement}=await import('/packages/biomes/dist/placement.js');
+  await view.ready;await view.whenIdle();
+  const place=BiomePlacement.attach(world),tile=await place.tile(7,4,{}),objects=view.objects,some=()=>objects.casters.map(t=>t.removeTile('7,4')).some(Boolean);
+  const part=()=>{for(const step of objects.steps(tile,0).slice(0,2))step();};
+  part();out.partIn=some();part();objects.remove('7,4');out.partLeft=some();
+  place.dispose();view.dispose();world.dispose();}
+ sky.dispose();e.dispose();canvas.remove();
+ return out;
+}
 window.check={
  async run(){
   const out={};device.pushErrorScope('validation');
@@ -175,6 +230,7 @@ window.check={
   out.alpine=await alpine();
   out.clip=await clip();
   out.edge=await edge(24);out.edgeOff=await edge(0);
+  out.edited=await edited();
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);
   return out;

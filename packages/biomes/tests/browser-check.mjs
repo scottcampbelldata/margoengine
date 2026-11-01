@@ -77,6 +77,17 @@ await runSuite(
       `default clipmap draws what 12 rings draw: ${r.clip.autoVsFull} of pixels differ`,
     );
     assert.match(r.clip.error ?? '', /clipmap reaches 496 m but radius is 1600 m/);
+    // Row 27.41: a change to a tile that waits to be copied in or to a prefetched one draws as a fresh view of the changed
+    // world draws it (main: the old copy landed last, the tile stayed grass with its trees).
+    const edited = r.edited;
+    console.log('edited', JSON.stringify(edited));
+    assert.deepEqual(edited.errors, []);
+    assert.ok(edited.waiting > 200, `tiles still wait to be copied in when the change comes: ${edited.waiting}`);
+    assert.ok(edited.waitingApart < 0.01, `change while the tile waits: ${edited.waitingApart} of pixels apart`);
+    assert.ok(edited.prefetchApart < 0.01, `change while prefetching: ${edited.prefetchApart} of pixels apart`);
+    assert.equal(edited.readyPending, 0, 'ready waits for the changed tile');
+    assert.equal(edited.partIn, true, 'two steps put records in');
+    assert.equal(edited.partLeft, false, 'remove takes a tile whose steps ran in part off whole');
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-browser-check.json', JSON.stringify({ hardware, result: r }, null, 1));

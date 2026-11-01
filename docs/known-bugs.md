@@ -308,19 +308,6 @@ does not own. Each entry says exactly what is needed to close it.
   `packageMinutes` in `scripts/support/run-limited.mjs`); the view and objects steps keep 600 s. Test:
   `tests/gpu-timing-lock.test.js`.
 
-### BiomeView: a world or placement change while a tile waits to be copied in can leave the old tile drawn
-
-- **Repro:** on a `BiomeView` with workers, paint or edit a rectangle (or change the placement) in the short time a
-  tile of that rectangle has arrived but is not yet copied in (it waits in the view's frame work, a few frames at
-  most, longer when many tiles are queued). Objects: the old placement is put on the GPU and the tile is not placed
-  again, so the edit does not show there until the tile leaves range and comes back. Terrain: the tile is made again,
-  but when the old copy waits longer than the new tile takes to make, the old copy lands last.
-- **Cause:** `#dirty` in `packages/biomes/src/view.ts` drops jobs on their way and prefetched tiles, and places held
-  object tiles again, but it does not look at tiles that already arrived and wait in `#arrived`.
-- **Fix needed:** in `#dirty`, drop the waiting steps of the tiles in the rectangle and make them again (objects too
-  when they were not yet held); with a browser check that edits while a tile waits (no frames drawn, so it waits for
-  the drain timer) and compares the drawn tile with a fresh view of the edited world.
-
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
 - **What:** the Windows System log shows nine `nvlddmkm` event 153 entries ("Error occurred on GPUID: 100") on
