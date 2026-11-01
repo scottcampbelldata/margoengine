@@ -831,7 +831,8 @@ export class VoxelServer {
   /**
    * Makes the edited chunks exactly `edits`, the output of {@link VoxelServer.exportEdits}: a chunk in `edits` replaces
    * what the world holds, an edited chunk not in it goes back to the generator's, and one that already matches is left
-   * alone. All of it happens between two ticks, or nothing does. Every client holding a changed chunk gets it again;
+   * alone (one that only the store holds cannot be compared at that moment, so it is replaced and sent again). All of it
+   * happens between two ticks, or nothing does. Every client holding a changed chunk gets it again;
    * players stay where they are (a player inside a restored block can walk out). Works before {@link VoxelServer.listen},
    * to start from a saved snapshot.
    * @throws MargoError `'state'` (rejects) when the server is closed, or when a chunk must go back to the generator's
@@ -879,7 +880,9 @@ export class VoxelServer {
     }
     const deletes: Promise<void>[] = [];
     for (const [key, chunk] of chunks) {
-      const had = this.#edited.get(key);
+      // A chunk past maxEditedChunks is compared too, when the world holds it: that copy is the current one.
+      const had =
+        this.#edited.get(key) ?? (this.#evicted.has(key) ? this.world.getChunk(...this.#position(key)) : undefined);
       if (had && samePacked(had.pack(), edits.get(key) as PackedChunk)) continue;
       this.#replace(key, chunk);
       this.#edited.delete(key);

@@ -232,7 +232,11 @@ test('two clients: export, edit, import, and both see the old state', { timeout:
     a = await join(url, { name: 'a' }),
     b = await join(url, { name: 'b' }),
     clients = [a.client, b.client];
-  assert.ok(await drive(clients, ready(clients)), 'both spawned with both chunks');
+  // The server's "loaded", not the two chunks the edits need: until it comes, the rest of the view is still arriving.
+  assert.ok(
+    await drive(clients, () => ready(clients)() && clients.every((c) => c.loaded)),
+    'both hold their whole view',
+  );
   const same = (cell, want) => [server.world, a.world, b.world].every((w) => w.getBlock(...cell) === want);
   const breakCell = async (cell) => {
     assert.equal(a.client.edit(...cell, 0), true);
@@ -247,14 +251,15 @@ test('two clients: export, edit, import, and both see the old state', { timeout:
   // Importing what the server already holds sends nothing.
   const quiet = b.client.stats.chunks;
   await server.importEdits(await server.exportEdits());
-  await wait(150);
-  assert.equal(b.client.stats.chunks, quiet, 'no chunk changed, none is sent');
-  // After the snapshot: one more edit in the same chunk, and the first edit of another chunk.
+  // After the snapshot: one more edit in the same chunk, and the first edit of another chunk. Each one's blocks message
+  // is written by a later tick than the one before, on the same socket, so whatever the import sent has come by now.
   await breakCell(later);
   await breakCell(other);
+  assert.equal(b.client.stats.chunks, quiet, 'no chunk changed, none is sent');
   assert.equal(server.counts.editedChunks, 2);
   await server.importEdits(snapshot);
   assert.ok(await drive(clients, () => same(later, STONE) && same(other, STONE)), 'both clients see the old state');
+  assert.equal(b.client.stats.chunks, quiet + 2, 'the two changed chunks, once each');
   assert.ok(same(kept, 0), 'the edit inside the snapshot stays');
   assert.equal(server.counts.editedChunks, 1, 'the other chunk is the generator again');
   assert.deepEqual([...(await server.exportEdits()).keys()], ['0,0,0']);
@@ -369,6 +374,42 @@ test('with a store: evicted chunks are exported, and going back deletes them', {
     (e) => e.name === 'MargoError' && e.code === 'state' && /delete\(key\)/.test(e.message),
   );
   assert.equal(blocked.server.world.getBlock(31, 7, 7), 0);
+});
+
+test('with a store: importing an evicted chunk the world still holds, unchanged, sends nothing', {
+  timeout: 60_000,
+}, async (t) => {
+  const saved = new Map(),
+    store = { save: (key, chunk) => void saved.set(key, chunk), load: (key) => saved.get(key) },
+    { server, url } = await start(t, { store, maxEditedChunks: 1 }),
+    a = await join(url);
+  assert.ok(await drive([a.client], () => ready([a.client])() && a.client.loaded), 'holds its whole view');
+  const breakCell = async (...cell) => {
+    a.client.edit(...cell, 0);
+    assert.ok(await drive([a.client], () => a.world.getBlock(...cell) === 0), `break ${cell}`);
+  };
+  await breakCell(31, 7, 7);
+  await breakCell(32, 7, 7);
+  assert.ok(await drive([a.client], () => saved.has('0,0,0')), 'the older chunk went to the store');
+  const held = server.world.getChunk(0, 0, 0),
+    quiet = a.client.stats.chunks;
+  assert.ok(held);
+  await server.importEdits(await server.exportEdits());
+  assert.equal(server.world.getChunk(0, 0, 0), held, 'left alone');
+  assert.equal(server.counts.editedChunks, 1, 'still in the store only');
+  // Each blocks message is written by a later tick than the one before, on the same socket.
+  await breakCell(33, 7, 7);
+  await breakCell(34, 7, 7);
+  assert.equal(a.client.stats.chunks, quiet, 'no chunk changed, none is sent');
+  // A difference is still a change: the snapshot with the first cell back in place goes out.
+  const whole = new VoxelWorld({ blocks }).addChunk(0, 0, 0),
+    before = server.world.getChunk(0, 0, 0);
+  for (let y = 0; y < 32; y++)
+    for (let z = 0; z < 32; z++)
+      for (let x = 0; x < 32; x++) whole.set(x, y, z, x === 31 && y === 7 && z === 7 ? STONE : before.get(x, y, z));
+  await server.importEdits(new Map([...(await server.exportEdits()), ['0,0,0', whole.pack()]]));
+  assert.ok(await drive([a.client], () => a.world.getBlock(31, 7, 7) === STONE), 'the client sees it');
+  assert.equal(a.client.stats.chunks, quiet + 1, 'that chunk, once');
 });
 
 test('a chunk just past the view is unloaded, not left stale, when it changes', { timeout: 60_000 }, async (t) => {

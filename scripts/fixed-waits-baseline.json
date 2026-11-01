@@ -18,7 +18,7 @@
     "packages/voxel-net/tests/app-message.test.js": 1,
     "packages/voxel-net/tests/heartbeat.test.js": 1,
     "packages/voxel-net/tests/held-inputs.test.js": 10,
-    "packages/voxel-net/tests/names-edits.test.js": 2,
+    "packages/voxel-net/tests/names-edits.test.js": 1,
     "packages/voxel-net/tests/on-close.test.js": 5,
     "packages/voxel/tests/render-browser-check.html": 1,
     "packages/water/test/flow.browser.mjs": 2,
