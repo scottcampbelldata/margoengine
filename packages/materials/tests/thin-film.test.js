@@ -69,3 +69,14 @@ test('a real film colours the reflection and its colour depends on thickness', (
   assert.ok(Math.max(...a) - Math.min(...a) > 0.01);
   assert.ok(Math.max(...a.map((v, c) => Math.abs(v - b[c]))) > 0.01);
 });
+
+// 8a0f78eb6: `base<film` compared a vec3f with an f32, which WGSL rejects; the mock GPU and this file's evaluator do not
+// type-check, so every iridescent material compiled nowhere but here. The compile itself is the khronos-IridescenceLamp view.
+test('the film phase compares the base IOR per channel', async () => {
+  assert.match(iridescenceWGSL, /filmBase<vec3f\(filmEta\)/);
+  assert.doesNotMatch(iridescenceWGSL, /filmBase<filmEta\b/);
+  const { readFile } = await import('node:fs/promises');
+  const pro = await readFile(new URL('../../gltf-pro/src/shader.ts', import.meta.url), 'utf8');
+  assert.match(pro, /base<vec3f\(film\)/);
+  assert.doesNotMatch(pro, /base<film\b/);
+});

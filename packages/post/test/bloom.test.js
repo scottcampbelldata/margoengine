@@ -109,3 +109,15 @@ test('Bloom radius: validated, weights each up step, and switches back to the un
   effect.dispose();
   assert.equal(weights.destroyed, true);
 });
+
+// 13654e6bd: Night Citadel's glints gained and lost their glow from frame to frame: the first blur read every other row,
+// the glow came back through textureLoad (nearest) and one bright pixel lit a whole level.
+test('Bloom filters its chain, reads the glow back filtered and dithers the result', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../src/bloom.ts', import.meta.url), 'utf8');
+  assert.match(source, /var c=textureSampleLevel\(source,bilinear,uv\+o\[i\]\*t,0\.0\)/, '13 filtered taps, every row');
+  assert.match(source, /s\[3\]\+s\[4\]\+s\[8\]\+s\[9\]/, 'overlapping boxes, the firefly-safe downsample');
+  assert.match(source, /tent\(bloom,bilinear,p\.xy\/vec2f\(textureDimensions\(scene\)\)\)/, 'glow through the sampler');
+  assert.doesNotMatch(source, /textureLoad\(bloom,/);
+  assert.match(source, /o\+dither\(p\.xy\)/, 'dithered');
+});

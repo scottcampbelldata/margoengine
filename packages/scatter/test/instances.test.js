@@ -306,3 +306,28 @@ test('wind uploads a single clock to the color pass and every shadow cascade, wi
   bad.windDetail = 1;
   assert.throws(() => new ScatterInstances(() => [bad]).setup(h.engine), /wind detail/);
 });
+
+// 968c88bec, 91344b918: a varying at a fixed location collided with the one a patch had already added to core's Output
+// (terrain's mesh id): invalid WGSL, then 'World unavailable' on the island.
+test('lit instances take the first free varying locations after what a patch added to Output', () => {
+  const h = optionalGPU();
+  h.engine.lighting = {
+    direction: new Float32Array([-1, 0.13, 0, 1]),
+    radiance: new Float32Array([1, 0.8, 0.54, 0.18]),
+  };
+  h.context.shader = wgsl
+    .replace('let linear=direct*', 'let linear=direct*0.5*')
+    .replace(/struct Output \{[^}]+\}/, (s) => s.replace('}', ',@location(4) @interpolate(flat) terrainId:f32 }'));
+  const leaves = batch();
+  leaves.translucency = 0.8;
+  const scatter = new ScatterInstances(() => [batch(), leaves]);
+  h.engine.use(scatter);
+  h.engine.frameGraph.execute(h.context);
+  const code = h.pipelines.find((p) => p.fragment).vertex.module.code,
+    output = /struct Output \{[^}]+\}/.exec(code)[0],
+    locations = [...output.matchAll(/@location\((\d+)\)/g)].map((m) => Number(m[1]));
+  assert.match(output, /terrainId/);
+  assert.match(output, /@location\(5\) emissive:vec3f/);
+  assert.equal(new Set(locations).size, locations.length, `each varying once: ${locations}`);
+  scatter.dispose();
+});

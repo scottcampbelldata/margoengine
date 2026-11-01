@@ -8,7 +8,7 @@ import { PBRInstances } from '../../gltf-pro/dist/instancing.js';
 import { Material, Texture, createMesh } from '../../materials/dist/index.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 import { wgsl } from '../../core/dist/shaders.js';
-import { PostStack, SSR, SSAO } from '../dist/index.js';
+import { Bloom, PostStack, SSR, SSAO } from '../dist/index.js';
 
 function harness(samples = 4, shader = wgsl) {
   const gpu = mockGPU(),
@@ -402,4 +402,22 @@ test("SSR's capture declarations: margoCapture for gltf-pro's PBR Surface, margo
     assert.doesNotMatch(code, /margoCapture/, 'no reference to a Surface the shader does not have');
   }
   h.engine.removePlugin('post:stack');
+});
+
+// e6d5e9a27: the HDR variants stripped the display transform with a replace that still looked for the old curve's text,
+// so inside a stack each effect tone-mapped and encoded before the next one.
+test('Bloom, SSAO and SSR before the end of a PostStack hand on linear colour', () => {
+  const composites = (effects) => {
+    const h = harness();
+    return modules(
+      h.gpu.record(() => {
+        h.engine.use(new PostStack(effects));
+        h.frame();
+      }),
+    );
+  };
+  const first = composites([new SSAO(), new SSR(), new Bloom()]),
+    second = composites([new Bloom(), new SSAO()]);
+  assert.equal(first.filter((code) => code.includes('return vec4f(c,s.a);')).length, 2, 'SSAO and SSR, not final');
+  assert.ok(second.some((code) => code.includes('return vec4f(max(hdr,vec3f(0))*exp2(settings.y),s.a);')), 'Bloom');
 });

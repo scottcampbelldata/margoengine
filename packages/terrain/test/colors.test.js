@@ -274,3 +274,22 @@ test('wet sand borrows depth through a stable view without moving terrain colors
     assert.ok(h.resources.every((r) => r.destroyed));
   }
 });
+
+// 968c88bec: terrainId sat at a fixed @location(6); a struct another patch had already extended declared it twice.
+test('terrainId takes the first location the Output struct does not use', async () => {
+  const engine = await webgl(),
+    mesh = engine.createMesh();
+  engine.use(new TerrainColors(mesh, { ...options, variation: 0.1 }));
+  const c = {
+    backend: 'webgpu',
+    shader: wgsl.replace(/struct Output \{[^}]+\}/, (s) => s.replace('}', ',@location(6) other:f32 }')),
+    bindings: [],
+    draw() {},
+  };
+  engine.frameGraph.execute(c);
+  const output = /struct Output \{[^}]+\}/.exec(c.shader)[0],
+    locations = [...output.matchAll(/@location\((\d+)\)/g)].map((m) => Number(m[1]));
+  assert.match(output, /@location\(7\) @interpolate\(flat\) terrainId:f32/);
+  assert.equal(new Set(locations).size, locations.length, `each varying once: ${locations}`);
+  engine.dispose();
+});
