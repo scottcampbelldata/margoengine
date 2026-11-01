@@ -319,10 +319,12 @@ export class BiomeSeasons implements Disposable {
   }
 
   /**
-   * The ground tint at world (x, z), 4 bytes: an sRGB colour and an amount, so that mixing a colour toward that colour by
-   * the amount gives {@link seasonalColor} of it under the state there ({@link seasonalMix}). The amount is scaled by the
-   * share of the biomes there with `tint.seasonal`, so it is 0 where no biome follows the seasons. `BiomeView` draws
-   * plant cover ground through a texture of these.
+   * The ground tint at world (x, z), 4 bytes for an `rgba8unorm-srgb` texel: RGB is the linear colour of
+   * {@link seasonalMix} there, each channel encoded with the sRGB transfer function and rounded to a byte, and A is the
+   * linear amount times 255. A texture of these decodes to that linear colour, so mixing a decoded linear colour toward
+   * it by the amount gives {@link seasonalColor} of that colour under the state there. The amount is scaled by the share
+   * of the biomes there with `tint.seasonal`, so it is 0 where no biome follows the seasons. `BiomeView` draws plant
+   * cover ground through a texture of these.
    * @throws RangeError for a non-finite x or z.
    */
   tintAt(x: number, z: number, out: Uint8Array = new Uint8Array(4)): Uint8Array {
@@ -333,7 +335,10 @@ export class BiomeSeasons implements Disposable {
     s.biomes.forEach((id, i) => {
       if (this.isSeasonal(id)) share += s.weights[i];
     });
-    for (let c = 0; c < 3; c++) out[c] = Math.round(mix[c] * 255);
+    for (let c = 0; c < 3; c++) {
+      const v = mix[c];
+      out[c] = Math.round((v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055) * 255);
+    }
     out[3] = Math.round(mix[3] * Math.min(1, share) * 255);
     return out;
   }
@@ -363,13 +368,13 @@ export class BiomeSeasons implements Disposable {
   }
 }
 
-/** Colours a season state moves toward: autumn leaves, dormant straw and bark, and snow. */
+/** Colours a season state moves toward (linear RGB): autumn leaves, dormant straw and bark, and snow. */
 const AUTUMN = [0.62, 0.33, 0.1],
   DORMANT = [0.42, 0.35, 0.24],
   SNOW = [0.95, 0.96, 0.99];
 
 /**
- * A base colour (RGB, 0..1, linear or sRGB alike) under a season state (4 bytes at `offset`, as {@link BiomeSeasons}
+ * A base colour (linear RGB, 0..1) under a season state (4 bytes at `offset`, as {@link BiomeSeasons}
  * makes): senescence turns it toward autumn orange, the leafless share (255 minus green-up) toward dormant straw, ground
  * wetter than one half darkens it by up to 30 %, and snow whitens it. Full green-up with no senescence, snow or extra
  * wetness gives the base back. Species with `color.seasonal` and biomes with `tint.seasonal` are drawn through it.
@@ -394,9 +399,9 @@ export function seasonalColor(
 
 /**
  * {@link seasonalColor} as one mix for any base: `[r, g, b, amount]` such that `base + (rgb - base) * amount` is
- * `seasonalColor(base, state, offset)`, so a shader can apply a season state to every texel of a texture. The colour is
- * a blend of the autumn, dormant and snow colours and black (wet darkening), each 0..1; amount 0 gives black and keeps
- * the base.
+ * `seasonalColor(base, state, offset)`, so a shader can apply a season state to every texel of a texture. All in linear
+ * RGB: the colour is a blend of the autumn, dormant and snow colours and black (wet darkening), each 0..1; amount 0
+ * gives black and keeps the base. Mix in linear light, as the terrain does with decoded sRGB textures.
  * @example const [r, g, b, amount] = seasonalMix(seasons.at(0, 0));
  */
 export function seasonalMix(state: ArrayLike<number>, offset = 0): [number, number, number, number] {

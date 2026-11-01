@@ -15,10 +15,10 @@
 - Follow-up: GPU validation is pending on the A6000 at this exact revision. The biomes and terrain GPU checks
   (`test:gpu`, `test:gpu:objects`, terrain `test:gpu`) did not run on this branch (the Beelink baseline biomes GPU
   smoke hung before J4); the seasons path is not GPU-proven until they pass there.
-- Follow-up: the entry sizes of `@margoengine/terrain`, `biomes/view` and `biomes/objects` after the 2026-11-01 review
-  repair (tint texel per region cell, world-change repaint, `BiomePlacement.world`) are not yet measured: the repair
-  sandbox refused the size tool. The tier 0 `npm run quality -- --gate=sizes` measures them; growth over a budget goes
-  under the 2026-11-01 history reason.
+- Colour: `seasonalColor` and `seasonalMix` are linear RGB; `tintAt` sRGB encodes the colour bytes so the
+  `rgba8unorm-srgb` tint texture decodes to the linear mix the terrain applies in linear light.
+- Sizes (gzip, measured by the sizes gate): biomes/seasons 3,261 B (new), biomes/view 10,372 B, biomes/objects
+  3,990 B, terrain 12,086 B, sky/sun 2,128 B. Core 21,134 B + stage 1,984 B = 23,118 B, unchanged and under 25,000 B.
 
 ## Landed 2026-10-30: core cleanup, audit items P1 to P3 (approved by Scott)
 

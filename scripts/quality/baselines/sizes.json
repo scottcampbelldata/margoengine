@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4321735,
+  "total": 4322755,
   "history": [
     {
       "date": "2026-10-24",
@@ -1422,8 +1422,8 @@
     {
       "date": "2026-11-01",
       "commit": "88d62ef4",
-      "reason": "biomes J4: /seasons entry, seasonal tint in view/objects; sky K1 sunPath (Spencer 1971)",
-      "grew": 4
+      "reason": "biomes J4: /seasons entry, seasonal tint in view/objects; sky K1 sunPath (Spencer 1971); terrain tint texture binding (TerrainTextures.tint, a layer rule tint flag). Measured gzip: biomes/seasons 3261 B (new), biomes/view 10372 B, biomes/objects 3990 B, terrain 12086 B, sky/sun 2128 B; budgets are measured + max(256 B, 3 %); core and stage unchanged",
+      "grew": 5
     }
   ],
   "items": {
@@ -1445,16 +1445,16 @@
     "@margoengine/biomes/far": 3996,
     "@margoengine/biomes/hydrology": 4679,
     "@margoengine/biomes/koppen": 1231,
-    "@margoengine/biomes/objects": 4203,
+    "@margoengine/biomes/objects": 4246,
     "@margoengine/biomes/placement": 12676,
     "@margoengine/biomes/presets": 2024,
     "@margoengine/biomes/region": 4672,
     "@margoengine/biomes/relief": 4553,
     "@margoengine/biomes/rivers": 1567,
-    "@margoengine/biomes/seasons": 3286,
+    "@margoengine/biomes/seasons": 3517,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 3176,
-    "@margoengine/biomes/view": 10458,
+    "@margoengine/biomes/view": 10684,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,
@@ -1780,7 +1780,7 @@
     "@margoengine/stats/report": 1389,
     "@margoengine/taa": 10390,
     "@margoengine/taa/upscale": 7124,
-    "@margoengine/terrain": 11929,
+    "@margoengine/terrain": 12449,
     "@margoengine/text": 16532,
     "@margoengine/text/msdf": 4556,
     "@margoengine/text/rich": 11475,

@@ -804,8 +804,9 @@ The counts start at the season crossings, not at 1 January, so 31 December runs 
 of the equator the year is half a year on. `seasonalColor(base, state)` turns a colour with the state: autumn orange,
 bare straw in winter, darker on wet ground and white under snow. Species with `color: { seasonal: true }` and biomes
 with `tint: { seasonal: true }` follow it when `BiomeView` or `BiomeObjects` gets the seasons. `seasonalMix(state)`
-is the same curve as one mix, `[r, g, b, amount]`, for a shader: `base + (rgb - base) * amount`. `seasons.tintAt(x, z)`
-gives that mix at a place as 4 bytes (sRGB colour, amount), the amount scaled by the share of seasonal biomes there.
+is the same curve as one mix, `[r, g, b, amount]`, for a shader: `base + (rgb - base) * amount`. Both work in linear
+RGB, so mix in linear light. `seasons.tintAt(x, z)` gives that mix at a place as 4 bytes for an `rgba8unorm-srgb`
+texture: the linear colour sRGB encoded, then the linear amount, scaled by the share of seasonal biomes there.
 
 ```ts
 import { BiomeWorld } from '@margoengine/biomes';

@@ -763,7 +763,8 @@ export class BiomeView implements Disposable {
     // With seasons, the plant cover layers of seasonal biomes take a tint texture of `seasons.tintAt` over the world, a
     // texel every `regionResolution` metres (the finest the states change at) or every weight texel when those are
     // coarser, and coarser by halves only past the device's largest texture: each texel its own state, 0 where no
-    // seasonal biome grows. Without, nothing of it exists and the terrain draws what it drew.
+    // seasonal biome grows. The texture is rgba8unorm-srgb, so its sRGB encoded colour bytes decode to the linear mix the
+    // terrain applies in linear light. Without, nothing of it exists and the terrain draws what it drew.
     const seasons = options.seasons,
       seasonal = seasons ? seasonalGround(world.biomes, this.materials) : new Set<string>();
     if (seasonal.size) {

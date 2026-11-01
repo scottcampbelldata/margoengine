@@ -213,12 +213,88 @@ test('tintAt: each place its own state, nothing where no biome follows the seaso
     [490, high],
   ]) {
     const mix = seasonalMix(seasons.at(x, 256));
-    assert.deepEqual([...tint], [...mix.slice(0, 3).map((c) => Math.round(c * 255)), Math.round(mix[3] * 255)]);
+    assert.deepEqual([...tint], [...mix.slice(0, 3).map((c) => Math.round(encode(c) * 255)), Math.round(mix[3] * 255)]);
     assert.ok(tint[3] > 0, 'winter tints seasonal ground');
   }
   const none = BiomeSeasons.attach(plain, { dayOfYear: 30 });
   assert.equal(none.tintAt(20, 256)[3], 0, 'a biome without tint.seasonal keeps its look');
   assert.equal(none.tintAt(490, 256)[3], 0);
+});
+
+// The sRGB transfer function and its inverse (IEC 61966-2-1), as an rgba8unorm-srgb texture encodes and decodes.
+function encode(v) {
+  return v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055;
+}
+function decode(c) {
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+test('tintAt bytes decode through sRGB to the linear seasonalMix, so the ground mixes as seasonalColor does', async () => {
+  // Regression: tintAt wrote the linear mix straight into bytes of an rgba8unorm-srgb texture, so the GPU decoded a
+  // dormant 0.42 (byte 107) to about 0.15 and seasonal ground drew far darker than seasonalColor on object materials.
+  const world = await BiomeWorld.create({
+      size: [512, 512],
+      biomes: [{ ...presets.temperate, tint: { seasonal: true } }],
+      height: { field: (x) => 100 + x * 5 },
+      climate: { latitude: 45 },
+    }),
+    seasons = BiomeSeasons.attach(world, { dayOfYear: 1 }),
+    seen = { dormant: false, autumn: false, snow: false, wet: false };
+  // Winter (dormant and snow), autumn, and a wet summer, at the valley and the summit.
+  for (const [dayOfYear, weather] of [
+    [1, { snowfall: 1, rain: 0 }],
+    [60, { snowfall: 1, rain: 0 }],
+    [290, { snowfall: 1, rain: 0 }],
+    [180, { snowfall: 1, rain: 1 }],
+  ]) {
+    seasons.set({ dayOfYear, weather });
+    for (const x of [20, 256, 490]) {
+      const state = seasons.at(x, 256),
+        mix = seasonalMix(state),
+        tint = seasons.tintAt(x, 256);
+      seen.dormant ||= state[0] < 128;
+      seen.autumn ||= state[1] > 64;
+      seen.snow ||= state[2] > 64;
+      seen.wet ||= state[3] > 160;
+      // One byte holds the encoded value rounded, so the decoded value is off by at most half of the larger 8-bit sRGB
+      // step beside that byte; the amount, stored linear, by at most half a step of 1 / 255.
+      const step = (b) =>
+          Math.max(
+            decode(Math.min(255, b + 1) / 255) - decode(b / 255),
+            decode(b / 255) - decode(Math.max(0, b - 1) / 255),
+          ) / 2,
+        amount = tint[3] / 255;
+      for (let c = 0; c < 3; c++) {
+        const got = decode(tint[c] / 255);
+        assert.ok(
+          Math.abs(got - mix[c]) <= step(tint[c]) + 1e-12,
+          `day ${dayOfYear} x ${x} channel ${c}: ${got} vs ${mix[c]}`,
+        );
+      }
+      assert.ok(
+        Math.abs(amount - mix[3]) <= 0.5 / 255 + 1e-12,
+        `day ${dayOfYear} x ${x} amount: ${amount} vs ${mix[3]}`,
+      );
+      // The terrain mixes a decoded layer colour toward the decoded tint by the amount, in linear light.
+      for (const srgbBase of [
+        [0.35, 0.52, 0.2],
+        [0.76, 0.7, 0.5],
+      ]) {
+        const base = srgbBase.map((c) => decode(Math.round(c * 255) / 255)),
+          want = seasonalColor(base, state);
+        for (let c = 0; c < 3; c++) {
+          const tc = decode(tint[c] / 255),
+            got = base[c] + (tc - base[c]) * amount,
+            bound = step(tint[c]) * mix[3] + Math.abs(mix[c] - base[c]) * (0.5 / 255) + step(tint[c]) * (0.5 / 255);
+          assert.ok(
+            Math.abs(got - want[c]) <= bound + 1e-12,
+            `day ${dayOfYear} x ${x} ${srgbBase} channel ${c}: ${got} vs ${want[c]}`,
+          );
+        }
+      }
+    }
+  }
+  assert.deepEqual(seen, { dormant: true, autumn: true, snow: true, wet: true }, 'the cases cover each kind of state');
 });
 
 test('seasonalColor: summer gives the base, autumn turns orange, winter bare or white, wet ground darker', () => {
