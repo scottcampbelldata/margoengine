@@ -402,6 +402,10 @@
       "types": "./dist/exporters/model.d.ts",
       "import": "./dist/exporters/model.js"
     },
+    "./exporters/collect": {
+      "types": "./dist/exporters/collect.d.ts",
+      "import": "./dist/exporters/collect.js"
+    },
     "./exporters/dae": {
       "types": "./dist/exporters/dae.d.ts",
       "import": "./dist/exporters/dae.js"
@@ -505,6 +509,10 @@
     "./fbx/worker": {
       "types": "./dist/fbx/worker.d.ts",
       "import": "./dist/fbx/worker.js"
+    },
+    "./fbx/export": {
+      "types": "./dist/fbx/export.d.ts",
+      "import": "./dist/fbx/export.js"
     },
     "./fsm": {
       "types": "./dist/fsm.d.ts",

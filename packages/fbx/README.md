@@ -25,6 +25,33 @@ animation.play('Walking');
 - Lambert/Phong dielectric materials, diffuse/emissive colors, opacity/transparency, shininess-derived roughness, and embedded or external PNG/JPEG diffuse and normal textures.
 - Multiple animation stacks, one layer per stack, STEP and LINEAR curves, missing-axis rest values, and interpolation at common key times. LINEAR transform tracks are adaptively baked for Euler motion and moving pivots, with sampled translation/scale tolerance `1e-5 * max(1, magnitude)` and angular tolerance `1e-4` radians. These are sampling criteria, not a proof of continuous error bounds. Rotation segments are subdivided to preserve full turns.
 
+## Export
+
+`exportFBX` from `margoengine/fbx/export` writes a scene as FBX 7.4, binary by default or ASCII with `ascii: true`. It takes what the other scene exporters take: an engine or a plain data scene.
+
+```ts
+import {exportFBX} from 'margoengine/fbx/export';
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+  normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+  indices: new Uint32Array([0, 1, 2]),
+};
+const {fbx, textures} = await exportFBX({nodes: [{name: 'Triangle', geometry}]});
+console.log(fbx.byteLength, textures.size);
+```
+
+Options, with defaults: `ascii` false; `embedTextures` true (false names each texture by a relative path and returns its bytes in `textures`, to save beside the file); `signal` none; `maxBytes` 1 GiB, at most 4 GiB less one byte; plus `onlyVisible`, `root`, `geometryData` and `materialData` of every scene exporter.
+
+Written: `GlobalSettings` in centimetres and Y up; polygons with quads kept, per-corner normals, two UV sets and vertex colours, control points welded where position, skin and morph data agree; one material slot per polygon; node hierarchy as `Null`, `Mesh` and `LimbNode` models; Phong materials (metalness goes to `ReflectionFactor` and the specular colour) with base color, normal and emissive textures as embedded PNG or JPEG; skins as `Skin` and `Cluster` deformers; morph targets as `BlendShape` channels; node and weight clips, one `AnimationStack` each. Output is the same bytes on every run.
+
+Changed on the way: rotations become XYZ Euler curves, with keys added where straight Euler lines would leave the quaternion arc by more than about 1e-3 radians. CUBICSPLINE keys are sampled at 8 steps per segment into linear keys. Translation curves scale to centimetres.
+
+Not written, as FBX has no common slot or the data has no file form here: tangents (tools derive them), the metallic-roughness and occlusion textures, texture transforms, cameras, lights, material animations, and `extras`. Mixing a material with none in one node's primitives rejects with the fix named.
+
+Children of a node with an uneven scale get `InheritType` 1, the plain parent x local product a scene means. This importer rejects such files and zero scales; other tools read them. Blender reads binary FBX only, so use the ASCII form with other tools.
+
+`node packages/fbx/test/write-acceptance.js <folder>` writes the files for a manual import check, after a build.
+
 ## Explicit limits
 
 Input is capped at 64 MiB, converted GLB at 128 MiB, expanded position vertices at 1,000,000 across mesh instances, and decoded texture pixels at 16,000,000. Parsing also bounds cumulative decoded arrays to 64 MiB, allocation accounting to 128 MiB, node/property counts, hierarchy depth, and work. Geometry, deformation, and animation have additional work/output limits. These are import budgets, not a zero-allocation or peak-heap guarantee. The downstream glTF runtime separately limits GLB/buffer bytes to 64 MiB, so a larger `convertFBX` result may be exportable but cannot be attached by `parseFBX`.

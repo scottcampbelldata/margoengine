@@ -45,6 +45,10 @@
       "types": "./dist/model.d.ts",
       "import": "./dist/model.js"
     },
+    "./collect": {
+      "types": "./dist/collect.d.ts",
+      "import": "./dist/collect.js"
+    },
     "./dae": {
       "types": "./dist/dae.d.ts",
       "import": "./dist/dae.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4160181,
+  "total": 4176035,
   "history": [
     {
       "date": "2026-10-24",
@@ -1220,6 +1220,12 @@
       "commit": "4516f36ad",
       "reason": "new entry @margoengine/post/outline, row 21.6 job 2; Selection.maskTexture feeds its per-object mask",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "764e66da1",
+      "reason": "new entries @margoengine/fbx/export (FBX 7.4 binary and ASCII writer, row 26 job 8, plan budget 8 kB) and @margoengine/exporters/collect (the scene walk the writer shares), with tests",
+      "grew": 2
     }
   ],
   "items": {
@@ -1315,6 +1321,7 @@
     "@margoengine/exporters": 34678,
     "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/capture": 7241,
+    "@margoengine/exporters/collect": 7934,
     "@margoengine/exporters/dae": 10560,
     "@margoengine/exporters/godot": 10258,
     "@margoengine/exporters/godot-addon": 1609,
@@ -1341,6 +1348,7 @@
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 18653,
     "@margoengine/fbx dist/workers/fbx.js": 51819,
+    "@margoengine/fbx/export": 7920,
     "@margoengine/fbx/worker": 19547,
     "@margoengine/fsm": 1131,
     "@margoengine/geometry": 20731,

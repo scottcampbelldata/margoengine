@@ -204,7 +204,6 @@ export function id(value: unknown): bigint {
 export function objectName(node: FBXNode): string {
   const value = node.properties[1];
   if (typeof value !== 'string') return node.name;
-  const name = value.split('\0', 1)[0],
-    separator = name.indexOf('::');
-  return separator < 0 ? name : name.slice(separator + 2);
+  // Binary stores Name\0\x01Class, so all before the zero is the name, namespace included; ASCII stores Class::Name.
+  return value.includes('\0') ? value.split('\0', 1)[0] : value.replace(/^.*?::/s, '');
 }

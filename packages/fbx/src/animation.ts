@@ -209,7 +209,8 @@ function axes(ctx: SceneContext, node: FBXNode, cache: Map<bigint, Curve>): Axes
   for (const c of ctx.incoming.get(id(node.properties[0])) ?? []) {
     const source = ctx.document.objects.get(c.child)!;
     if (c.kind !== 'OP' || source.name !== 'AnimationCurve') continue;
-    const axis = ['d|X', 'd|Y', 'd|Z'].indexOf(c.property ?? '');
+    // A weight curve is d|DeformPercent, one value on the channel's first axis.
+    const axis = ['d|X', 'd|Y', 'd|Z', 'd|DeformPercent'].indexOf(c.property ?? '') % 3;
     if (axis === -1)
       throw new TypeError('Unsupported FBX animation axis; bake or remove it in your 3D tool before export');
     if (out[axis]) throw new TypeError('Duplicate FBX animation axis; keep one per target when exporting');
