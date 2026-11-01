@@ -129,6 +129,14 @@ world.dispose();
   all, at 7e3fa7060, against 404 (354 to 1,260) and 204 (163 to 554), 608, at 14e4d813d. One slow run per stage puts
   the spread of both rows far over the 10 % validity limit of `docs/benchmarking.md`, so neither row is valid; the
   medians differ by less than the run to run noise. G1's 400 is not met.
+- A valid G1 measurement: `node packages/biomes/bench/placement-valid.mjs --runs=20` from the repository root. It
+  builds the committed revision and the last commit before band loading (14e4d813d) from git objects, takes the GPU
+  lock exclusively, waits for AC power and an idle CPU and GPU, and settles the machine between cases. Each case runs
+  in its own Node process: 20 samples of relief, fields and stored objects on one thread (a fresh world per sample),
+  and of an 8 x 8 block of tiles on 1 and on 8 worker threads. It checks that every sample and both revisions place the
+  same objects, byte for byte. It exits 1 when the lock, the gate, the sample count, a spread (max minus min, over the median) above 10 % or that check
+  fails; a valid run that misses G1 prints `targetMet: false`. The full result is saved under
+  `test-results/biomes-placement-valid/`.
 
 ## Biomes, presets and blends
 
