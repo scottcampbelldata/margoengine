@@ -279,6 +279,36 @@ export const entries = [
     fix: 'Pass 1 to 256 colours as `#rrggbb` or `[r, g, b]` bytes, a `swap` of the same length, a known `dither` and `distance`, a `spread` of 0 or more, and two different textures: draw into one pixel layer and show another.',
   },
   {
+    id: 'tilemap-options',
+    title: 'Tile map renderer options',
+    kind: 'family',
+    messages: [
+      'TileMap needs a map',
+      'TileMap needs atlases',
+      'Tileset has no atlas',
+      'Tileset larger than its atlas',
+      'Invalid tile map order',
+      'Invalid tile map clear',
+      'Invalid tile map camera',
+      'Invalid tile atlas pixels',
+      'Unknown tile layer',
+      'Tile outside the layer',
+      'Tile layer too large for the device',
+    ],
+    cause:
+      'A `TileMap` option does not fit its map: a tileset that drawn tiles use has no entry in `atlases`, its `columns`, `tileCount`, `margin` and `spacing` reach past the atlas image, a `mapLayers` or `setTile` name is not a tile layer of the map, a cell is outside its layer, or `camera.zoom` is not above 0.',
+    fix: 'Pass `atlases` keyed by tileset name, with images at least as large as the tileset says. Use tile layer names and whole cells inside the layer. Split a layer too large for the device limit `maxStorageBufferBindingSize` into several.',
+  },
+  {
+    id: 'tilemap-state',
+    title: 'Tile map renderer state',
+    kind: 'family',
+    messages: ['Image collection tilesets are not drawn', 'Tile atlas lost with the device; call setAtlas'],
+    cause:
+      'Drawn tiles belong to a tileset with `columns: 0` (one image per tile), which the renderer cannot cut from one atlas, or a map built on a plain `GPUTexture` atlas drew after a device loss (the texture died with the old device).',
+    fix: 'Pack an image collection into one atlas image and set its `columns`. After a device loss call `setAtlas(name, atlas)`, or pass the atlas as pixels or a function so the map makes it again.',
+  },
+  {
     id: 'sprite-state',
     title: 'Sprite layer state',
     kind: 'family',

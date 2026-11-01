@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4198283,
+  "total": 4204166,
   "history": [
     {
       "date": "2026-10-24",
@@ -1250,6 +1250,12 @@
       "commit": "46d4b3154",
       "reason": "ContactShadows moves to its own post entry, post/contact-shadows, as a PostStack pass",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "d87899b14",
+      "reason": "tilemap root gains the TileMap renderer (row 25 J3b, plan budget 9 KB): chunked instanced draws, flips, animation lookup",
+      "grew": 1
     }
   ],
   "items": {
@@ -1577,7 +1583,7 @@
     "@margoengine/text": 16532,
     "@margoengine/text/msdf": 4556,
     "@margoengine/text/rich": 11475,
-    "@margoengine/tilemap": 1618,
+    "@margoengine/tilemap": 7501,
     "@margoengine/tilemap/autotile": 1605,
     "@margoengine/tilemap/ldtk": 3070,
     "@margoengine/tilemap/tiled": 4264,

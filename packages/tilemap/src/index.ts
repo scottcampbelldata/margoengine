@@ -1,5 +1,26 @@
 import type { Vec2 } from '@margoengine/math';
 
+export {
+  TileMap,
+  type TileAtlas,
+  type TileCamera,
+  type TileMapOptions,
+  type TileMapStats,
+  type TilePixels,
+  type TileTarget,
+} from './renderer.js';
+export {
+  animatedTile,
+  TILE_CHUNK_SIZE,
+  chunkGrid,
+  fillChunk,
+  mapColor,
+  tileReach,
+  visibleChunks,
+  type ChunkRange,
+  type TileReach,
+} from './chunks.js';
+
 /** A property value as Tiled and LDtk store it: text, numbers, booleans, lists, or nested objects (Tiled "class"). */
 export type PropertyValue =
   | string

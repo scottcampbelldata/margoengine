@@ -63,7 +63,7 @@
     "@margoengine/kinematics-constraints": "kinematics with no GPU or DOM",
     "@margoengine/rigging": "rigging with no GPU or DOM",
     "@margoengine/road": "road generation with no GPU or DOM",
-    "@margoengine/tilemap": "tile map data helpers with no GPU or DOM",
+    "@margoengine/tilemap": "tile map data helpers and importers run with no GPU or DOM; the renderer needs WebGPU only when attached",
     "@margoengine/mixer": "the animation mixer with no GPU or DOM",
     "@margoengine/lightmap": "lightmap baking with no GPU or DOM",
     "@margoengine/animator": {

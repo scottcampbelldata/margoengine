@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
+import { atlasTexture } from '../../shared/atlas-texture.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { applyView, checkLayers, ViewStates } from '../../shared/view-rect.js';
 import { packSprites, sortSprites, Sprite, SPRITE_FLOATS, type SpriteCamera, type SpriteOptions } from './sprite.js';
@@ -16,7 +17,6 @@ export {
 } from './sprite.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
-declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 type SpritesPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -298,35 +298,17 @@ export class SpriteLayer implements EnginePlugin {
     this.uploadAll = true;
     this.generation++;
   }
-  private makeAtlas(device: GPUDevice, atlas: SpriteAtlas): OwnedAtlas {
-    if (typeof atlas === 'function') return { texture: atlas(device), owned: false };
-    if ('createView' in atlas) return { texture: atlas, owned: false };
-    const { width, height } = atlas,
-      pixels = 'data' in atlas ? atlas : undefined;
-    if (pixels && (!(width > 0) || !(height > 0) || pixels.data.length !== width * height * 4))
-      throw rangeError('Invalid sprite pixels', 'sprite-options');
-    const texture = device.createTexture({
-      size: [width, height],
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-    if (pixels)
-      device.queue.writeTexture({ texture }, pixels.data as Uint8Array<ArrayBuffer>, { bytesPerRow: width * 4 }, [
-        width,
-        height,
-      ]);
-    else device.queue.copyExternalImageToTexture({ source: atlas as ImageBitmap }, { texture }, [width, height]);
-    return { texture, owned: true };
-  }
   private prepare(device: GPUDevice): void {
     if (this.device !== device) {
       if (this.device) this.release();
       this.device = device;
     }
     if (this.stale) throw fault('state', 'Sprite atlas lost with the device; call setAtlas', 'sprite-state');
-    this.colorAtlas ??= this.makeAtlas(device, this.atlas);
+    this.colorAtlas ??= atlasTexture(device, this.atlas, () => rangeError('Invalid sprite pixels', 'sprite-options'));
     if (this.normals && !this.normalAtlas) {
-      this.normalAtlas = this.makeAtlas(device, this.normals.atlas);
+      this.normalAtlas = atlasTexture(device, this.normals.atlas, () =>
+        rangeError('Invalid sprite pixels', 'sprite-options'),
+      );
       if (
         this.normalAtlas.texture.width !== this.colorAtlas.texture.width ||
         this.normalAtlas.texture.height !== this.colorAtlas.texture.height

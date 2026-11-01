@@ -2,7 +2,7 @@
 
 Import `margoengine/tilemap` from the `margoengine` package, or `@margoengine/tilemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. The root entry has types and small helpers only (no renderer yet); the Tiled importer is its own entry. Orthogonal maps only. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
+The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. The root entry has the types, small helpers and the `TileMap` renderer; auto-tiling and the Tiled importer are their own entries. Orthogonal maps only. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
 
 ```ts
 import {createTileLayer, encodeTile, FLIP_H, tileAt, validateTileMap, type TileMapData} from 'margoengine/tilemap';
@@ -17,6 +17,45 @@ console.log(tileAt(ground, 1, 0)); // 2147483650: tile 2, mirrored left to right
 ```
 
 Layer values keep the low 28 bits for the global tile id (0 is empty) and the top bits for `FLIP_H`, `FLIP_V` and `FLIP_D`, exactly as Tiled stores them, so imported data is used as is. `decodeTile` and `encodeTile` split and join them; `tilesetForGid` and `tileDefForGid` find the tileset and the per-tile entry; `validateTileMap` throws a `TypeError` or `RangeError` that names the field.
+
+## Drawing a map
+
+`TileMap` draws the tile layers with exact pixels: one instanced draw per visible 64 x 64 chunk per tileset, texels read with no filtering. Pass each tileset's atlas by name, as pixels, an `ImageBitmap`, a `GPUTexture` or a function.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {createTileLayer, TileMap, type TileMapData} from 'margoengine/tilemap';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [320, 180]});
+const map: TileMapData = {
+  width: 2, height: 1, tileWidth: 16, tileHeight: 16,
+  layers: [createTileLayer('ground', 2, 1, Uint32Array.of(1, 2))],
+  tilesets: [{name: 'grass', firstGid: 1, tileWidth: 16, tileHeight: 16, tileCount: 2, columns: 2}],
+};
+const image = await createImageBitmap(await (await fetch('grass.png')).blob());
+const tiles = TileMap.attach(engine, {map, atlases: {grass: image}, camera: {x: 0, y: 0, zoom: 1}});
+tiles.setTile('ground', 1, 0, 1); // only this cell's chunk goes up again
+engine.render({delta: 1 / 60});
+console.log(tiles.stats.draws); // 1
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `map` | required | The `TileMapData`. `setMap` swaps it |
+| `atlases` | required | Tileset name to atlas. `setAtlas` swaps one |
+| `camera` | `{x: 0, y: 0, zoom: 1}` | Map point at the top left and target pixels per map pixel, read each frame |
+| `snap` | `true` | Rounds each layer's top left to a whole pixel, read each frame |
+| `mapLayers` | every tile layer | Names of the tile layers to draw |
+| `parallax` | `true` | Scrolls each layer by its own `parallax`; false when the camera carries it |
+| `target` | the frame's colour target | Draw into this texture, or a function returning one |
+| `clear` | the map's `backgroundColor`, else transparent | With `target`: colour to clear to, false draws over it |
+| `order` | `10` | Frame-graph order |
+| `layers` | `1` | Render-layer bits |
+| `name` | `tilemap-1`, ... | Plugin name, unique per scene |
+
+To draw into a compositor layer of `margoengine/pixel`, pass `target: layer.target, camera: layer.camera, parallax: false, mapLayers: ['ground']`, with one `TileMap` per layer that scrolls on its own.
+
+Tiles animate by their `animation` steps on the `time` clock (milliseconds; each frame adds its delta), which changes a small lookup and no cells. A tile larger than the cell sits on the cell's bottom left, as in Tiled. Layer `offset`, `opacity`, `tint`, `visible` and `parallax` and tileset `margin`, `spacing` and `tileOffset` are honoured. Overlapping oversize tiles of different tilesets draw tileset by tileset. Object layers are data only: draw tile objects with `margoengine/sprites`. Image collection tilesets (`columns: 0`) must be packed into one atlas first. After writing into `layer.data` yourself, call `invalidate(layer)`.
 
 ## Auto-tiling
 

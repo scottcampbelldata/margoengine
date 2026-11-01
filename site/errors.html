@@ -159,6 +159,18 @@
       <p><strong>Cause.</strong> A <code>PaletteQuantize</code> option or a palette helper argument is out of range, or the pass was asked to read and write one texture, which WebGPU forbids.</p>
       <p><strong>Fix.</strong> Pass 1 to 256 colours as <code>#rrggbb</code> or <code>[r, g, b]</code> bytes, a <code>swap</code> of the same length, a known <code>dither</code> and <code>distance</code>, a <code>spread</code> of 0 or more, and two different textures: draw into one pixel layer and show another.</p>
     </section>
+    <section id="tilemap-options">
+      <h2><a href="#tilemap-options">Tile map renderer options</a></h2>
+      <p class="messages"><code>TileMap needs a map</code> <code>TileMap needs atlases</code> <code>Tileset has no atlas</code> <code>Tileset larger than its atlas</code> <code>Invalid tile map order</code> <code>Invalid tile map clear</code> <code>Invalid tile map camera</code> <code>Invalid tile atlas pixels</code> <code>Unknown tile layer</code> <code>Tile outside the layer</code> <code>Tile layer too large for the device</code></p>
+      <p><strong>Cause.</strong> A <code>TileMap</code> option does not fit its map: a tileset that drawn tiles use has no entry in <code>atlases</code>, its <code>columns</code>, <code>tileCount</code>, <code>margin</code> and <code>spacing</code> reach past the atlas image, a <code>mapLayers</code> or <code>setTile</code> name is not a tile layer of the map, a cell is outside its layer, or <code>camera.zoom</code> is not above 0.</p>
+      <p><strong>Fix.</strong> Pass <code>atlases</code> keyed by tileset name, with images at least as large as the tileset says. Use tile layer names and whole cells inside the layer. Split a layer too large for the device limit <code>maxStorageBufferBindingSize</code> into several.</p>
+    </section>
+    <section id="tilemap-state">
+      <h2><a href="#tilemap-state">Tile map renderer state</a></h2>
+      <p class="messages"><code>Image collection tilesets are not drawn</code> <code>Tile atlas lost with the device; call setAtlas</code></p>
+      <p><strong>Cause.</strong> Drawn tiles belong to a tileset with <code>columns: 0</code> (one image per tile), which the renderer cannot cut from one atlas, or a map built on a plain <code>GPUTexture</code> atlas drew after a device loss (the texture died with the old device).</p>
+      <p><strong>Fix.</strong> Pack an image collection into one atlas image and set its <code>columns</code>. After a device loss call <code>setAtlas(name, atlas)</code>, or pass the atlas as pixels or a function so the map makes it again.</p>
+    </section>
     <section id="sprite-state">
       <h2><a href="#sprite-state">Sprite layer state</a></h2>
       <p class="messages"><code>Sprite already in a layer</code> <code>Sprite atlas lost with the device; call setAtlas</code> <code>Sprite normals need one sample and a same-size target</code></p>

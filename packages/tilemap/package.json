@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/tilemap",
   "version": "1.0.0",
-  "description": "2D tile maps for Margo Engine: the TileMapData format (tilesets, animated tiles, collision shapes, tile and object layers, parallax) shared by the renderer, auto-tiling and the Tiled and LDtk importers.",
+  "description": "2D tile maps for Margo Engine: the TileMapData format (tilesets, animated tiles, collision shapes, tile and object layers, parallax), a chunked renderer at exact pixels, auto-tiling and the Tiled and LDtk importers.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -56,6 +56,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js tilemap",
     "test": "npm run build && node --test test/*.test.js",
+    "test:gpu": "cd ../.. && node packages/tilemap/test/browser-check.mjs",
     "prepack": "npm run build"
   }
 }
