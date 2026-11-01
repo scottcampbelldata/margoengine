@@ -1262,6 +1262,10 @@
       "types": "./dist/tilemap/autotile.d.ts",
       "import": "./dist/tilemap/autotile.js"
     },
+    "./tilemap/ldtk": {
+      "types": "./dist/tilemap/ldtk.d.ts",
+      "import": "./dist/tilemap/ldtk.js"
+    },
     "./tilemap/tiled": {
       "types": "./dist/tilemap/tiled.d.ts",
       "import": "./dist/tilemap/tiled.js"

@@ -30,6 +30,10 @@
       "types": "./dist/autotile.d.ts",
       "import": "./dist/autotile.js"
     },
+    "./ldtk": {
+      "types": "./dist/ldtk.d.ts",
+      "import": "./dist/ldtk.js"
+    },
     "./tiled": {
       "types": "./dist/tiled.d.ts",
       "import": "./dist/tiled.js"

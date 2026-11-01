@@ -26,7 +26,8 @@ export const num = (o: Obj, key: string, fallback = 0): number => {
   const v = o[key];
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 };
-export const str = (o: Obj, key: string): string | undefined => (typeof o[key] === 'string' ? (o[key] as string) : undefined);
+export const str = (o: Obj, key: string): string | undefined =>
+  typeof o[key] === 'string' ? (o[key] as string) : undefined;
 export const list = (o: Obj, key: string): readonly unknown[] => (Array.isArray(o[key]) ? (o[key] as unknown[]) : []);
 
 /** Keep the id bits and the three flip bits; drop Tiled's hex rotation bit. */
@@ -45,7 +46,11 @@ export function parseJson(format: string, input: unknown): Obj {
     try {
       value = JSON.parse(value);
     } catch {
-      throw new MapImportError(format, 'syntax', 'the text is not valid JSON; pass the file contents as saved by the editor.');
+      throw new MapImportError(
+        format,
+        'syntax',
+        'the text is not valid JSON; pass the file contents as saved by the editor.',
+      );
     }
   }
   if (!isObj(value)) throw new MapImportError(format, 'syntax', 'expected a JSON object at the top level.');
