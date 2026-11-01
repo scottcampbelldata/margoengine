@@ -47,6 +47,9 @@ Every parser returns the same `LoadedGeometry`:
 | `parseTMX` (async), `tmxLayerQuads` | See [Tiled TMX](#tiled-tmx) |
 | `parseTTF`, `textGeometry` (`/font`) | See [Fonts and 3D text](#fonts-and-3d-text) |
 | `parseSVG` (`/svg`) | See [SVG](#svg) |
+| `parseBVH` (`/mocap`) | See [Motion capture](#motion-capture-bvh) |
+| `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
+| `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
@@ -326,6 +329,56 @@ function frame(delta: number): void {
 ```
 
 `Skin` takes no morph targets, so a morph is blended on the CPU (`morphDAE`), and a skin over a morph re-binds with `bindDAESkin(dae, instance, {weights})` and `setGeometry`. Without the animation package, `flattenDAE(dae, poseDAE(dae, seconds))` bakes any frame on the CPU.
+
+## Motion capture (BVH)
+
+`parseBVH(textOrBytes, {scale, name, maxJoints, maxKeys})` from `./mocap` reads Biovision HIERARCHY and MOTION into bones and a clip the animation package plays. BVH has no unit: `scale: 0.01` turns centimetres to metres (default 1). Euler channels apply in the order the file lists them, and a position channel moves the joint from its OFFSET. `End Site` offsets sit on the bone as `endSite`. The defaults are 4,096 joints and 4,000,000 keys.
+
+```ts
+import { Skeleton, applyKeyframeClip, createKeyframeClip } from '@margoengine/animation';
+import { parseBVH } from '@margoengine/loaders/mocap';
+
+const file = `HIERARCHY
+ROOT Hips { OFFSET 0 90 0 CHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation }
+MOTION
+Frames: 2
+Frame Time: 0.5
+0 0 0 0 0 0
+0 0 10 0 45 0
+`;
+const { bones, clip } = parseBVH(file, { scale: 0.01 });
+const skeleton = new Skeleton(bones);
+applyKeyframeClip(createKeyframeClip(clip), skeleton, 0.25);
+```
+
+## VRML and X3D
+
+`parseVRML(textOrBytes, options)` reads VRML97 (`#VRML V2.0 utf8`) and `parseX3D(textOrBytes, options)` reads X3D XML, both from `./vrml`, into one `LoadedGeometry` with a group per Shape, so `toGeometry` takes the result. Transform (with `center` and `scaleOrientation`), Group, Anchor, Collision and Billboard nest and bake into world space; Shape, Appearance, Material, IndexedFaceSet with normals, colours and texture coordinates per vertex or per face, `ccw` and DEF/USE are read. `v` turns to Margo's convention, with 0 at the image's top. Anything else, such as Box, Inline, PROTO instances and textures, is left out and named in `warnings`. `maxNodes` (default 1,000,000) counts each USE again, so a file of nested USEs stops early.
+
+```ts
+import { parseVRML } from '@margoengine/loaders/vrml';
+
+const scene = parseVRML(`#VRML V2.0 utf8
+Transform { translation 0 1 0 children
+  Shape {
+    appearance Appearance { material Material { diffuseColor 1 0.5 0 } }
+    geometry IndexedFaceSet { coord Coordinate { point [0 0 0, 1 0 0, 0 1 0] } coordIndex [0 1 2 -1] }
+  }
+}`);
+console.log(scene.groups?.[0].color, scene.warnings);
+```
+
+## G-code
+
+`parseGCode(textOrBytes, {maxVertices})` from `./gcode` reads RepRap toolpaths: G0 and G1 with X, Y, Z, E; G90, G91, M82, M83; G92; G20, G21; G28. Layers come by rising Z, each with `extrusion` (moves that push material) and `travel` (moves that lead into it), two points per segment. Coordinates stay the machine's: millimetres, Z up. G2 and G3 arcs move the position without drawing and add a warning.
+
+```ts
+import { parseGCode } from '@margoengine/loaders/gcode';
+
+const { layers, filament, min, max } = parseGCode('G1 Z0.2\nG1 X10 E1\nG1 Y10 E2\n');
+const first = { mode: 'segments', positions: layers[0].extrusion };
+console.log(first.positions.length, filament, min, max);
+```
 
 ## Tiled TMX
 

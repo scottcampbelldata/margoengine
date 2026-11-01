@@ -4121,11 +4121,10 @@ Every parser returns the same `LoadedGeometry`:
 | `parseTMX` (async), `tmxLayerQuads` | See [Tiled TMX](#tiled-tmx) |
 | `parseTTF`, `textGeometry` (`/font`) | See [Fonts and 3D text](#fonts-and-3d-text) |
 | `parseSVG` (`/svg`) | See [SVG](#svg) |
+| `parseBVH` (`/mocap`) | See [Motion capture](#motion-capture-bvh) |
+| `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
+| `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
-
-Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
-
-## How it works
 
 [README continues: https://margoengine.com/llms/packages/loaders.md]
 

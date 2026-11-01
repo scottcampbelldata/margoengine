@@ -601,6 +601,17 @@ Written clean room; no source of ipywidgets' widget implementations, anywidget, 
 | PNG export (`Figure.to_png`) | RFC 6455 "The WebSocket Protocol" (opening handshake, framing, client masking); the Chrome DevTools Protocol documentation (`Target.attachToTarget` flat sessions, `SystemInfo.getProcessInfo`, `Emulation.setDeviceMetricsOverride`, `Page.navigate`, `Runtime.evaluate`, `Page.captureScreenshot`, `Browser.close`; the `DevToolsActivePort` file) |
 | Polars and xarray inputs | The Polars and xarray user guides (DataFrame and LazyFrame `select` and `collect`, `Series.to_numpy`; DataArray `dims`, `coords` and `attrs`) and the CF conventions (`long_name`, `units`) |
 
+## Motion capture, VRML, X3D and G-code: `@margoengine/loaders`
+
+File formats written from their public descriptions; no reader of another project was read.
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| LF1 | BVH HIERARCHY and MOTION; Euler channels multiplied in listed order | loaders/src/mocap.ts | Meredith and Maddock, "Motion Capture File Formats Explained", University of Sheffield, 2001 |
+| LF2 | VRML97 grammar and nodes; Transform as T * C * R * SR * S * -SR * -C | loaders/src/vrml.ts | ISO/IEC 14772-1:1997 |
+| LF3 | X3D XML encoding, DEF and USE attributes, containerField | loaders/src/vrml.ts | ISO/IEC 19776-1 |
+| LF4 | G0, G1, G90, G91, M82, M83, G92, G20, G21, G28 | loaders/src/gcode.ts | RepRap wiki, "G-code" |
+
 ## Voxel files: `@margoengine/voxel-edit/formats`
 
 File layouts, written from each format's public description; no reader or writer of another project was read.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4226264,
+  "total": 4235489,
   "history": [
     {
       "date": "2026-10-24",
@@ -1274,6 +1274,12 @@
       "commit": "a0cb192d1",
       "reason": "row 26 job 11: voxel-edit/smooth, new optional entry, Surface Nets meshing",
       "grew": 1
+    },
+    {
+      "date": "2026-11-01",
+      "commit": "1454595d3",
+      "reason": "row 26 job 13: loaders/mocap, /vrml and /gcode, new optional entries",
+      "grew": 3
     }
   ],
   "items": {
@@ -1442,10 +1448,13 @@
     "@margoengine/loaders dist/workers/usd.js": 8439,
     "@margoengine/loaders/common": 3423,
     "@margoengine/loaders/font": 6590,
+    "@margoengine/loaders/gcode": 1977,
+    "@margoengine/loaders/mocap": 2150,
     "@margoengine/loaders/mtl": 8186,
     "@margoengine/loaders/render": 3148,
     "@margoengine/loaders/svg": 11643,
     "@margoengine/loaders/usd": 7783,
+    "@margoengine/loaders/vrml": 5098,
     "@margoengine/loaders/worker": 8576,
     "@margoengine/lod": 10648,
     "@margoengine/materials": 61113,

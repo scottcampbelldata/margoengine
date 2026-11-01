@@ -694,6 +694,18 @@
       "types": "./dist/loaders/render.d.ts",
       "import": "./dist/loaders/render.js"
     },
+    "./loaders/mocap": {
+      "types": "./dist/loaders/mocap.d.ts",
+      "import": "./dist/loaders/mocap.js"
+    },
+    "./loaders/vrml": {
+      "types": "./dist/loaders/vrml.d.ts",
+      "import": "./dist/loaders/vrml.js"
+    },
+    "./loaders/gcode": {
+      "types": "./dist/loaders/gcode.d.ts",
+      "import": "./dist/loaders/gcode.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
