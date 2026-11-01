@@ -85,7 +85,7 @@ const MIME = /** @type {Record<string, string>} */ ({
 });
 
 /** @param {string} uri @returns {Uint8Array|null} */
-function dataUri(uri) {
+export function dataUri(uri) {
   const match = /^data:[^,]*?(;base64)?,/.exec(uri);
   if (!match) return null;
   const body = uri.slice(match[0].length);

@@ -5,7 +5,7 @@ import { existsSync, realpathSync, statSync } from 'node:fs';
 import { isAbsolute, posix, relative, resolve, win32 } from 'node:path';
 
 /** The MargoError shape (name `MargoError`, a `code`; docs/conventions.md), local because the tool ships on its own. */
-const margoError = (/** @type {string} */ code, /** @type {string} */ message) =>
+export const margoError = (/** @type {string} */ code, /** @type {string} */ message) =>
   Object.assign(new Error(message), { name: 'MargoError', code });
 
 /** True when target (absolute) is folder itself or below it. @param {string} folder @param {string} target */

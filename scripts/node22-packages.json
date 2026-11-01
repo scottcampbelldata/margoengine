@@ -22,7 +22,8 @@
       "tests": [
         "tests/margo-convert-audio.test.js",
         "tests/margo-convert-pipeline.test.js",
-        "tests/margo-convert-textures.test.js"
+        "tests/margo-convert-textures.test.js",
+        "tests/margo-convert-thumbnail.test.js"
       ]
     },
     "create-margo": {

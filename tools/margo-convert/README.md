@@ -108,6 +108,29 @@ From code: `import {build} from 'margo-convert/build'`, `import {optimizeModel} 
 - **Audio codecs.** Without an ffmpeg that has `libvorbis`, no Ogg, MP3 or Opus is written; MP3, AAC and Opus inputs
   are never decoded, so only WAV is mixed down and resampled.
 
+## Thumbnail
+
+Render one model to a PNG with no page, for server thumbnails and asset checks.
+
+```sh
+npm i webgpu sharp                                        # your choice of binding; sharp only for textured models
+npx margo-convert thumbnail helmet.glb --out helmet.png --size 512
+npx margo-convert thumbnail helmet.glb --out helmet.png --views front,iso   # helmet.front.png, helmet.iso.png
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `--out <file>` | `<name>.thumb.png` | The PNG. With several views, each file adds its view: `<name>.<view>.png`. |
+| `--size <px>` | `512` | Width and height, 1 to 4096. |
+| `--views <list>` | `iso` | Comma-separated: `front`, `back`, `left`, `right`, `top`, `iso`. The camera fits the whole model. |
+| `--gpu <module>` | `webgpu` | The WebGPU binding to import from your project, or a path to one. It exports `create(args)` or `gpu`, and optionally `globals`. |
+| `--no-sharp` | off | Ignore an installed sharp. A model with textures then fails with an error. |
+
+margo-convert ships no binding, because one is a large download that runs code when installed. A missing binding,
+a textured model without sharp, and a model that uses Draco or KTX2 (their decoders need Workers) each fail with a coded
+error that names the fix. For Draco or KTX2, export the model uncompressed; `margo-convert optimize` then compresses it
+with meshopt, which decodes in Node. Lighting is core's default.
+
 ## Tests
 
 `node --test tests/margo-convert-pipeline.test.js tests/margo-convert-textures.test.js tests/margo-convert-audio.test.js tests/margo-convert-paths.test.js` from the repository root (part of `npm run verify`).

@@ -130,6 +130,20 @@ npx margo-convert build ./art --out public/art --preset mobile --mipmaps
 `rock.webp`, `zap.wav` a mono 22.05 kHz `zap.wav` (or `zap.ogg` when ffmpeg is installed). The size report ends with a
 line per kind. sharp and ffmpeg are used only when already installed; the manifest's `encoders` says what was found.
 
+## Thumbnails
+
+`margo-convert thumbnail` renders a model to a PNG with no page. Install a WebGPU binding first: none ships with the
+tool. Textured models also need sharp.
+
+```sh
+npm i webgpu sharp                                        # your choice of binding; sharp only for textured models
+npx margo-convert thumbnail helmet.glb --out helmet.png --size 512
+npx margo-convert thumbnail helmet.glb --out helmet.png --views front,iso   # helmet.front.png, helmet.iso.png
+```
+
+The options are in the [margo-convert README](../../tools/margo-convert/README.md#thumbnail). To render your own scene
+from Node, use [`@margoengine/headless`](../../packages/headless/README.md).
+
 ## What is not done
 
 - Draco compression: the repository has a Draco decoder only, no encoder. Meshopt is used instead.

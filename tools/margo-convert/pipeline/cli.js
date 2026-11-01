@@ -18,6 +18,8 @@ build walks a folder (or takes one file), optimises every model, texture and aud
 the results with margo-manifest.json (hashes and sizes) and margo-size-report.txt to --out (default ./dist).
 Inputs whose content and settings did not change since the last build are skipped.
 optimize does the same for one model and writes one GLB (default <name>.optimized.glb).
+thumbnail renders one model to a PNG with no page. --views takes front, back, left, right, top, iso, comma-separated
+(several write <name>.<view>.png). --gpu names the WebGPU binding to import; none ships with this tool.
 
 Options:
   --preset <name>           ${PRESET_NAMES.join(' | ')} (default web)
