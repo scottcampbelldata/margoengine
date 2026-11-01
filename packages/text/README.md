@@ -6,7 +6,7 @@ Crisp GPU text for Margo Engine: signed distance field glyphs generated at runti
 
 Build from source with `npm run build` in `packages/text`.
 
-SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew and emoji (no Arabic or Indic shaping and no ligatures; see Limits), for labels and signage.
+SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew, Arabic, Indic scripts and emoji (shaped by the browser; see Shaping), for labels and signage.
 
 ```ts
 import {Engine, box} from 'margoengine/core';
@@ -76,10 +76,22 @@ title.layout.bounds;                  // {left, right, top, bottom}
 
 `TextRenderer` takes `name` (`'text'`), `order` (`22`, after the scene and lines, before post-processing), `atlasSize` (`1024`), `colorAtlasSize` (`512`) and `maxPages` (`64`, capped by `maxTextureArrayLayers`). `layoutText(text, options, measurer)`, `hitTest`, `caretRect`, `alphaToSdf`, `squaredDistanceTransform` and `ShelfPacker` are exported for use without the renderer.
 
+## Shaping
+
+Arabic and Indic words draw as one shaped run, so the browser's shaper forms joined letters and conjuncts. Runs do not break
+across lines. `caretRect` and `hitTest` still move through a run by grapheme, measured from its prefixes. Set `ligatures: true`
+for the same on Latin words (fi, fl and whatever else the font forms).
+
+```ts
+import {Text} from 'margoengine/text';
+const arabic = new Text({text: '\u0633\u0644\u0627\u0645'});
+const latin = new Text({text: 'office', ligatures: true});
+```
+
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
-- Each cluster is rasterized in isolation, so scripts that need contextual shaping (Arabic joining, Indic conjuncts) render as isolated forms, and ligatures are not formed. Hebrew and other non-joining right-to-left scripts work. Bidi is simplified: no explicit embeddings, isolates or weak-type rules beyond digits staying left to right.
+- Shaping needs the browser's text stack: a worker without the font draws isolated fallback forms. A shaped run is at most 16 em across, and wider runs clip. Letter spacing applies between runs, not inside them.
 - Outlines plus shadow blur are limited by the field range to about 0.14 em together. Very small text (under about 6 px) loses thin strokes, as with any SDF text.
 - Emoji are bitmaps scaled from 48 px, so they soften when magnified far beyond that.
 - No extruded 3D glyph geometry; that needs vector outlines a browser canvas does not expose.

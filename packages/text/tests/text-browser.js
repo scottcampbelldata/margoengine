@@ -375,6 +375,16 @@ window.runTextTests = async () => {
     `Expected one draw call: ${JSON.stringify(renderer.stats)}`,
   );
   report.checks.push('String updates reuse GPU buffers; one draw call per text block');
+  // Shaping: joined Arabic is narrower than its isolated letters, and a shaped run is one bitmap. Skips with no Arabic font.
+  const shaper = new Font({ family: 'sans-serif' }),
+    word = '\u0633\u0644\u0627\u0645',
+    isolated = [...word].reduce((sum, letter) => sum + shaper.advance(letter), 0),
+    joined = shaper.advance(word),
+    bitmap = shaper.glyph(word);
+  if (isolated > joined * 1.02) {
+    if (!bitmap || bitmap.width < 48) throw new Error('A shaped Arabic run rasterizes as one bitmap');
+    report.checks.push('Arabic runs are measured and rasterized joined, narrower than their isolated letters');
+  }
   await settle(runtime.gpu);
 
   // 7. Emoji render as color bitmaps.

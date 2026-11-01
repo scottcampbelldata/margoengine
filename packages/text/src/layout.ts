@@ -1,5 +1,5 @@
 /**
- * Text layout: grapheme clusters, line breaking, simple bidi reordering, alignment and anchoring.
+ * Text layout: grapheme clusters, shaped runs, line breaking, simple bidi reordering, alignment and anchoring.
  * Pure CPU code. Measurements come from a TextMeasurer, so tests can pass a deterministic mock.
  */
 
@@ -44,6 +44,8 @@ export interface LayoutOptions {
   whiteSpace?: 'normal' | 'nowrap';
   /** 'break-word' splits a word wider than maxWidth; 'normal' lets it overflow. Default 'break-word'. */
   overflowWrap?: 'normal' | 'break-word';
+  /** True forms Latin ligatures (fi, fl and what the font has): each Latin word draws as one shaped run. Arabic and Indic runs are always shaped. Default false. */
+  ligatures?: boolean;
 }
 
 /** One positioned grapheme cluster, in the text block's local space (x right, y up, world units). */
@@ -62,6 +64,8 @@ export interface LayoutGlyph {
   advance: number;
   rtl: boolean;
   whitespace: boolean;
+  /** Set on a shaped run (several graphemes drawn as one): UTF-16 offsets inside the run, each with its distance from the run's reading start in world units. */
+  carets?: ReadonlyArray<readonly [offset: number, distance: number]>;
 }
 
 /** One laid-out line, in the text block's local space (x right, y up, world units). */
@@ -185,6 +189,14 @@ export function graphemes(text: string): Array<{ cluster: string; index: number 
 
 // --- Layout ------------------------------------------------------------------------------------
 
+// Scripts whose letters change shape with their neighbours: runs of them draw as one item, so the browser's shaper forms them.
+const ARABIC =
+  /^[\u0600-\u065f\u066e-\u06ff\u0700-\u074f\u0750-\u077f\u07c0-\u07ff\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufefc]/;
+const INDIC = /^[\u0900-\u0dff\u0f00-\u0fff\u1000-\u109f\u1780-\u17ff]/;
+const LATIN = /^\p{Script=Latin}/u;
+const runKind = (cluster: string, ligatures: boolean): number =>
+  ARABIC.test(cluster) ? 1 : INDIC.test(cluster) ? 2 : ligatures && LATIN.test(cluster) ? 3 : 0;
+
 const ALIGNS: readonly TextAlign[] = ['left', 'center', 'right', 'justify'];
 const ANCHORS_X: readonly AnchorX[] = ['left', 'center', 'right'];
 const ANCHORS_Y: readonly AnchorY[] = ['top', 'middle', 'bottom', 'baseline', 'bottom-baseline'];
@@ -209,7 +221,9 @@ export function validateLayoutOptions(options: LayoutOptions): Required<LayoutOp
     direction: options.direction ?? 'auto',
     whiteSpace: options.whiteSpace ?? 'normal',
     overflowWrap: options.overflowWrap ?? 'break-word',
+    ligatures: options.ligatures ?? false,
   };
+  if (typeof o.ligatures !== 'boolean') throw new TypeError('ligatures must be a boolean; pass true or false');
   if (typeof o.fontSize !== 'number' || !Number.isFinite(o.fontSize) || o.fontSize <= 0)
     throw new RangeError('fontSize must be a positive finite number');
   if (typeof o.lineHeight !== 'number' || !Number.isFinite(o.lineHeight) || o.lineHeight <= 0)
@@ -232,6 +246,7 @@ interface Item {
   kern: number;
   space: boolean;
   bidi: 'R' | 'L' | 'N';
+  carets?: Array<readonly [number, number]>;
 }
 
 /** Lays out `text` with a measurer. Pure and deterministic for a deterministic measurer. */
@@ -252,13 +267,27 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
   const all = graphemes(text),
     paragraphs: Item[][] = [[]],
     ends: number[] = [];
+  let kind = 0;
   for (const { cluster, index } of all) {
     if (cluster === '\n' || cluster === '\r\n' || cluster === '\r' || cluster === ' ') {
       ends.push(index);
       paragraphs.push([]);
+      kind = 0;
       continue;
     }
-    paragraphs[paragraphs.length - 1].push({
+    const items = paragraphs[paragraphs.length - 1],
+      next = runKind(cluster, o.ligatures),
+      run = items[items.length - 1];
+    if (next && next === kind && run) {
+      const offset = run.cluster.length,
+        joined = run.cluster + cluster;
+      (run.carets ??= []).push([offset, measurer.advance(run.cluster) * fs]);
+      run.cluster = joined;
+      run.advance = measurer.advance(joined) * fs;
+      continue;
+    }
+    kind = next;
+    items.push({
       cluster,
       index,
       advance: measurer.advance(cluster) * fs,
@@ -403,6 +432,7 @@ export function layoutText(text: string, options: LayoutOptions, measurer: TextM
         advance: item.advance,
         rtl,
         whitespace: item.space,
+        ...(item.carets && { carets: item.carets }),
       });
     // Hanging trailing spaces sit past the end edge: to the left of right-to-left lines.
     if (base === 1) {
@@ -554,7 +584,11 @@ export function caretRect(layout: TextLayout, index: number): { x: number; top: 
   const at = glyphs.find((g) => g.index === index),
     before = glyphs.find((g) => g.index + g.length === index);
   let x = line.rtl ? line.right : line.left;
-  if (at) x = at.rtl ? at.x + at.advance : at.x;
+  const run = glyphs.find((g) => g.carets && index > g.index && index < g.index + g.length);
+  if (run) {
+    const distance = run.carets!.find((c) => run.index + c[0] >= index)?.[1] ?? run.advance;
+    x = run.rtl ? run.x + run.advance - distance : run.x + distance;
+  } else if (at) x = at.rtl ? at.x + at.advance : at.x;
   else if (before) x = before.rtl ? before.x : before.x + before.advance;
   return { x, top: line.top, bottom: line.bottom, line: lineIndex };
 }
@@ -576,6 +610,18 @@ export function hitTest(layout: TextLayout, x: number, y: number): number {
       distance = d;
       best = glyph;
     }
+  }
+  if (best.carets) {
+    const along = best.rtl ? best.x + best.advance - x : x - best.x;
+    let offset = 0,
+      nearest = Math.abs(along);
+    for (const [at, distance] of best.carets)
+      if (Math.abs(along - distance) < nearest) {
+        nearest = Math.abs(along - distance);
+        offset = at;
+      }
+    if (Math.abs(along - best.advance) < nearest) offset = best.length;
+    return best.index + offset;
   }
   const leftHalf = x < best.x + best.advance / 2;
   return leftHalf !== best.rtl ? best.index : best.index + best.length;

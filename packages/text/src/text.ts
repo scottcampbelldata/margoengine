@@ -85,6 +85,7 @@ const LAYOUT_KEYS = [
   'fontSize',
   'lineHeight',
   'letterSpacing',
+  'ligatures',
   'maxWidth',
   'textAlign',
   'anchorX',
@@ -104,6 +105,7 @@ export class Text {
   fontSize = 1;
   lineHeight = 1.2;
   letterSpacing = 0;
+  ligatures = false;
   maxWidth = Infinity;
   textAlign: TextAlign = 'left';
   anchorX: AnchorX = 'left';

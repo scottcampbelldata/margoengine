@@ -606,3 +606,43 @@ test('the in-memory colour test font is a well-formed sfnt with COLR/CPAL and bo
     COLOR_FONT_PALETTE,
   );
 });
+
+test('Arabic and Indic words lay out as one shaped run with carets by grapheme', () => {
+  const arabic = '\u0633\u0644\u0627\u0645',
+    byLength = { ...mock, advance: (cluster) => 0.5 * cluster.length },
+    l = layoutText(arabic, {}, byLength);
+  assert.equal(l.glyphs.length, 1);
+  assert.equal(l.glyphs[0].cluster, arabic);
+  assert.equal(l.glyphs[0].rtl, true);
+  assert.deepEqual(
+    l.glyphs[0].carets.map((c) => c[0]),
+    [1, 2, 3],
+  );
+  const g = l.glyphs[0];
+  close(caretRect(l, 1).x, g.x + g.advance - g.carets[0][1], 'rtl caret');
+  assert.equal(hitTest(l, g.x + g.advance - g.carets[1][1], -0.5), 2);
+  const words = layout(arabic + ' ' + arabic);
+  assert.equal(words.glyphs.length, 3, 'a space ends a run');
+  const devanagari = '\u0915\u094d\u0937\u093f \u0928';
+  const d = layout(devanagari);
+  assert.equal(d.glyphs.filter((x) => !x.whitespace).length, 2);
+  assert.equal(d.glyphs[0].rtl, false);
+  assert.equal(layout(arabic + '\u0928').glyphs.length, 2, 'scripts do not join');
+});
+
+test('a shaped run stays whole across a line break', () => {
+  const l = layout('\u0633\u0644\u0627\u0645\u0633\u0644\u0627\u0645', { maxWidth: 1 });
+  assert.equal(l.lines.length, 1);
+  assert.equal(l.glyphs.length, 1);
+});
+
+test('ligatures joins Latin words only when asked', () => {
+  assert.equal(layout('office').glyphs.length, 6);
+  const l = layout('office hi', { ligatures: true });
+  assert.deepEqual(
+    l.glyphs.map((g) => g.cluster),
+    ['office', ' ', 'hi'],
+  );
+  close(caretRect(l, 3).x, l.glyphs[0].x + l.glyphs[0].carets[2][1], 'latin caret');
+  assert.throws(() => layout('a', { ligatures: 1 }), TypeError);
+});

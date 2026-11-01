@@ -241,7 +241,8 @@ export class Font implements TextMeasurer {
       this.glyphs.set(cluster, empty);
       return null;
     }
-    const width = Math.min(x1 - x0 + 2 * b, 4 * this.size),
+    // A shaped run is a whole word, so it gets more room across than a single cluster needs.
+    const width = Math.min(x1 - x0 + 2 * b, 16 * this.size),
       height = Math.min(y1 - y0 + 2 * b, 4 * this.size);
     const context = this.ctx(width, height);
     context.clearRect(0, 0, width, height);
