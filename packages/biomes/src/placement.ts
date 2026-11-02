@@ -30,6 +30,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type BiomeDefinition, type Dimension, fieldDimension, type SpeciesRule } from './define.js';
 import { placementReach, STRATA } from './reach.js';
 import { standAt, type Stands, standsOf, TICK } from './stands.js';
+import { placementBridges, type CandidateSource } from './gpu-placement-flow-internal.js';
 
 /** Perfect plasticity cells: 32 m, world-anchored, inside every tile size. */
 const PPA_SHIFT = 13; // 2^13 ticks = 32 m
@@ -850,6 +851,7 @@ class Run {
     readonly shapes: Shapes,
     /** Pools of earlier runs to reuse (a run goes start to finish in one call, so one run uses them at a time). */
     reuse: Pool[] = [],
+    readonly source?: CandidateSource,
   ) {
     this.pools = plan.strata.map((st, s) => {
       const bits = windowBits(geometry.tileTicks, st.gs);
@@ -995,17 +997,20 @@ class Run {
             !this.somewhere(sp.biomeIndex, gx * sp.gen, gz * sp.gen, (gx + 1) * sp.gen - 1, (gz + 1) * sp.gen - 1)
           )
             continue;
-          const n = poisson(sp.mu, sp.e0, hash5(this.seed, sp.code, gx, gz, 0));
+          const n = this.source
+            ? this.source.count(sp, gx, gz)
+            : poisson(sp.mu, sp.e0, hash5(this.seed, sp.code, gx, gz, 0));
           generated += n;
           for (let i = 1; i <= n; i++) {
-            const h0 = hash5(this.seed, sp.code, gx, gz, i),
-              h1 = pcg(h0),
-              h2 = pcg(h1),
-              h3 = pcg(h2),
-              h4 = pcg(h3),
-              x = gx * sp.gen + Math.floor(((h0 >>> 8) * sp.gen) / 16777216),
-              z = gz * sp.gen + Math.floor(((h1 >>> 8) * sp.gen) / 16777216),
-              stand = sp.stands ? this.stand(sp.stands, x, z) : ONE;
+            const raw = this.source?.candidate(sp, gx, gz, i),
+              h0 = raw ? raw.h0 : hash5(this.seed, sp.code, gx, gz, i),
+              h1 = raw ? raw.h1 : pcg(h0),
+              h2 = raw ? raw.h2 : pcg(h1),
+              h3 = raw ? raw.h3 : pcg(h2),
+              h4 = raw ? raw.h4 : pcg(h3),
+              x = raw ? raw.x : gx * sp.gen + Math.floor(((h0 >>> 8) * sp.gen) / 16777216),
+              z = raw ? raw.z : gz * sp.gen + Math.floor(((h1 >>> 8) * sp.gen) / 16777216),
+              stand = raw ? raw.stand : sp.stands ? this.stand(sp.stands, x, z) : ONE;
             // The thinning below keeps a candidate at most `stand` of the time: most of a clearing's stop here, cheaply.
             if (h2 >>> 16 >= stand) continue;
             if (!this.at(x, z, look)) continue;
@@ -1039,7 +1044,7 @@ class Run {
               const curv = f.layers.curvature[k];
               p = qmul(p, ONE + clampInt(curv * 131, 0, ONE));
             }
-            if (sp.cluster) p = qmul(p, this.cluster(sp.cluster, x, z));
+            if (sp.cluster) p = qmul(p, raw ? raw.cluster : this.cluster(sp.cluster, x, z));
             if (sp.stands) p = qmul(p, qmul(stand, sp.stands.boost));
             // Thinning against the candidate's own number: p is the intensity over the candidate rate.
             const limit = divFloor(p * ONE, sp.kappa); // Q16 survival probability
@@ -1236,6 +1241,55 @@ export class BiomePlacement implements Disposable {
     this.#shapes = shapesOf(options.exclusions, [world.bounds[0], world.bounds[1]]);
     this.#workers = world.workers;
     this.#workers?.attach(this.#pid, options);
+    placementBridges.set(this, (x, z) => {
+      this.#live();
+      if (!Number.isInteger(x) || !Number.isInteger(z) || x < 0 || z < 0 || x >= world.tilesX || z >= world.tilesZ)
+        throw rangeError('GPU placement needs tile indices inside the world', 'biomes');
+      const plan = this.#plan,
+        tileTicks = world.tileSize * TICK;
+      return {
+        plan,
+        seed: world.seed,
+        tileTicks,
+        worldX: world.tilesX * tileTicks,
+        worldZ: world.tilesZ * tileTicks,
+        open: async (windows, source, signal) => {
+          const need: [number, number][] = [];
+          const seen = new Set<string>();
+          for (const [x0, z0, x1, z1] of windows)
+            for (
+              let tz = Math.max(0, Math.floor(z0 / tileTicks));
+              tz < Math.min(world.tilesZ, Math.ceil(z1 / tileTicks));
+              tz++
+            )
+              for (
+                let tx = Math.max(0, Math.floor(x0 / tileTicks));
+                tx < Math.min(world.tilesX, Math.ceil(x1 / tileTicks));
+                tx++
+              ) {
+                const key = tileKey(tx, tz);
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  need.push([tx, tz]);
+                }
+              }
+          return this.#withFields(need, signal, (fields) => {
+            if (plan !== this.#plan)
+              throw fault('failed', 'World changed during GPU placement; request the tile again', 'biomes');
+            const run = this.#runOf(fields, source);
+            return {
+              run,
+              render: () => {
+                this.#live();
+                if (plan !== this.#plan)
+                  throw fault('failed', 'World changed during GPU placement; request the tile again', 'biomes');
+                return this.#run(x, z, fields, run);
+              },
+            };
+          });
+        },
+      };
+    });
     this.#off = world.onChange((rect) => {
       // Biomes or climate may have changed: rebuild the plan, drop the tiles the change reaches.
       const reach = this.#reach;
@@ -1523,7 +1577,7 @@ export class BiomePlacement implements Disposable {
     }
   }
 
-  #runOf(fields: (x: number, z: number) => Fields | undefined): Run {
+  #runOf(fields: (x: number, z: number) => Fields | undefined, source?: CandidateSource): Run {
     const w = this.#world,
       tileTicks = w.tileSize * TICK;
     return new Run(
@@ -1541,14 +1595,15 @@ export class BiomePlacement implements Disposable {
         sea: w.climate.sea,
       },
       this.#shapes,
-      this.#pools,
+      source ? [] : this.#pools,
+      source,
     );
   }
 
-  #run(tx: number, tz: number, fields: (x: number, z: number) => Fields | undefined): PlacedTile {
+  #run(tx: number, tz: number, fields: (x: number, z: number) => Fields | undefined, prepared?: Run): PlacedTile {
     const w = this.#world,
       plan = this.#plan,
-      run = this.#runOf(fields),
+      run = prepared ?? this.#runOf(fields),
       { tileTicks, cellTicks, cells } = run.geometry,
       x0 = tx * tileTicks,
       z0 = tz * tileTicks,

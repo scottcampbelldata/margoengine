@@ -8,6 +8,7 @@ import { rangeError, typeError } from '../../shared/errors.js';
 import { bilinear, divFloor, idiv, imod, isqrt, ONE, qexp2, qlog2 } from './fixed.js';
 import type { RasterLayer } from './layers.js';
 import { distanceTransform, priorityFlood } from './region.js';
+import { flowBridge, type FlowState } from './gpu-placement-flow-internal.js';
 
 /** Neighbour offsets of a D8 direction: 0 is +x, then clockwise seen from above with +z down the grid. */
 const DX = [1, 1, 0, -1, -1, -1, 0, 1],
@@ -263,6 +264,12 @@ function routeShares(g: HeightGrid, filled: Int32Array, mask: Int32Array, direct
  * console.log(h.flow[128 * 257 + 128], h.channel[128 * 257 + 128]);
  */
 export function hydrology(grid: HeightGrid, options: HydrologyOptions = {}): Hydrology {
+  const state = prepareFlow(grid, options);
+  cpuDirections(state);
+  return finishFlow(state);
+}
+
+function prepareFlow(grid: HeightGrid, options: HydrologyOptions): FlowState {
   const { height, nx, nz, step } = grid;
   if (!(height instanceof Int32Array))
     throw typeError('hydrology needs height as an Int32Array of millimetres', 'biomes');
@@ -281,6 +288,19 @@ export function hydrology(grid: HeightGrid, options: HydrologyOptions = {}): Hyd
     flat = new Uint8Array(n),
     mask = new Int32Array(n);
   for (let c = 0; c < n; c++) filled[c] = height[c] + fill[c];
+  return { grid, options: { sea, lakeDepth, multiple, channelCells }, n, ocean, fill, filled, direction, flat, mask };
+}
+
+function cpuDirections(state: FlowState): void {
+  const {
+    grid: { nx, nz },
+    n,
+    ocean,
+    filled,
+    direction,
+    flat,
+    mask,
+  } = state;
   let flats = false;
   for (let z = 0, c = 0; z < nz; z++)
     for (let x = 0; x < nx; x++, c++) {
@@ -290,8 +310,22 @@ export function hydrology(grid: HeightGrid, options: HydrologyOptions = {}): Hyd
       if (flat[c]) flats = true;
     }
   if (flats) drainFlats(filled, direction, flat, nx, nz, mask);
+}
+
+function finishFlow(state: FlowState, suppliedFlow?: Int32Array): Hydrology {
+  const {
+    grid,
+    options: { lakeDepth = 1000, multiple = false, channelCells = 8 },
+    n,
+    ocean,
+    fill,
+    filled,
+    direction,
+    mask,
+  } = state;
+  const { height, nx, nz, step } = grid;
   // Upstream first: a cell comes after everything that drains into it.
-  const flow = new Int32Array(n).fill(1),
+  const flow = suppliedFlow ?? new Int32Array(n).fill(1),
     waiting = new Int32Array(n),
     order = new Int32Array(n),
     target = new Int32Array(n);
@@ -306,7 +340,7 @@ export function hydrology(grid: HeightGrid, options: HydrologyOptions = {}): Hyd
     const c = order[q],
       t = target[c];
     if (t >= 0) {
-      flow[t] += flow[c];
+      if (!suppliedFlow) flow[t] += flow[c];
       if (!--waiting[t]) order[tail++] = t;
     }
   }
@@ -502,3 +536,9 @@ export function hydrologyTile(world: HydrologyWorld, h: Hydrology, x: number, z:
   });
   return [layer('flow', flow), layer('twi', twi), layer('hand', hand), layer('lake', lake), layer('channel', channel)];
 }
+flowBridge.prepare = prepareFlow;
+flowBridge.drain = (state) => {
+  if (state.flat.some(Boolean))
+    drainFlats(state.filled, state.direction, state.flat, state.grid.nx, state.grid.nz, state.mask);
+};
+flowBridge.finish = finishFlow;
