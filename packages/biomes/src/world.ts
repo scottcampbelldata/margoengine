@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// BiomeWorld: a finite world (decision D1, up to 64 km) of tiles with climate fields, built on the CPU in integers.
+// BiomeWorld: a finite world (decision D1, up to 64 km) of tiles with integer climate fields.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type Climate, type ClimateOptions, quantizeClimate } from './climate.js';
 import { checkPaint, type Classifier, classifier, classify, type PaintLayer, type ZoneClassifier } from './classify.js';
@@ -45,9 +45,11 @@ export interface BiomeWorldOptions {
   readonly resolution?: 0.5 | 1 | 2 | 4;
   /** Region cell size in metres, a power of two from 4 x `resolution` up to `tileSize`. Default 16. */
   readonly regionResolution?: number;
-  /** `'auto'` and `'cpu'` compute on the CPU; `'gpu'` is not available yet and throws. Output is identical either way.
+  /** `'auto'` and `'cpu'` compute on the CPU; `'gpu'` needs `device` and no workers. Tile output is byte-identical.
    * Default `'auto'`. */
   readonly backend?: 'auto' | 'gpu' | 'cpu';
+  /** Used only with backend `'gpu'`. The caller owns this device; the world never destroys it. */
+  readonly device?: GPUDevice;
   /** Biomes to classify into, at most 254. Default: the temperate preset and its neighbours (alpine, wetland, boreal). */
   readonly biomes?: readonly BiomeDefinition[];
   /** `'envelopes'` (each biome's climate envelope), or `whittaker` or `holdridge` from `@margoengine/biomes/zones`
@@ -68,6 +70,7 @@ export interface BiomeWorldOptions {
    * Web Workers that make tiles and stored objects off the page's thread, 0..16 (`false` is 0). Default: hardware
    * threads less one, at most 4, where workers exist (browsers); none elsewhere. The output is byte for byte the same
    * either way. A `field` height source keeps the work on this thread (a function cannot be sent to a worker).
+   * GPU worlds start no workers and require 0 or false when this option is supplied.
    */
   readonly workers?: number | false;
   /** Makes one worker, for bundlers that copy worker scripts their own way and for tests. Default: the package's
@@ -128,10 +131,31 @@ type Rect = readonly [number, number, number, number];
 
 /** createRelief from the relief entry, once a world has loaded it. */
 let relief: typeof createRelief | undefined, regionEntry: typeof import('@margoengine/biomes/region') | undefined;
+let gpuFields: typeof import('./gpu-fields.js') | undefined,
+  gpuClassify: typeof import('./gpu-classify-inputs.js') | undefined;
 
 const aborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw signal.reason;
 };
+
+/** Cancellation belongs to the caller, not to a cached tile shared by other callers. */
+async function withSignal<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return pending;
+  aborted(signal);
+  let abort: () => void = () => {};
+  const cancelled = new Promise<never>((_, reject) => {
+    abort = () => reject(signal.reason);
+    signal.addEventListener('abort', abort, { once: true });
+  });
+  try {
+    return await Promise.race([pending, cancelled]);
+  } catch (error) {
+    aborted(signal);
+    throw error;
+  } finally {
+    signal.removeEventListener('abort', abort);
+  }
+}
 
 /**
  * A biome world: climate fields over a finite heightmap, as tiles. Everything that decides the output is integer
@@ -183,6 +207,9 @@ export class BiomeWorld implements Disposable {
   /** The options as given (climate and heights unquantised), for worker replicas. */
   #given: BiomeWorldOptions;
   #remote?: Remote;
+  readonly #device?: GPUDevice;
+  readonly #gpuAbort?: AbortController;
+  #lost = false;
 
   private constructor(options: BiomeWorldOptions, biomes: readonly BiomeDefinition[]) {
     const seed = options.seed ?? 1,
@@ -220,8 +247,28 @@ export class BiomeWorld implements Disposable {
     if (!Array.isArray(origin) || origin.length !== 2 || !origin.every((v) => Number.isFinite(v) && Math.abs(v) <= 1e6))
       throw rangeError('BiomeWorld origin must be [x, z] in metres within 1,000 km', 'biomes');
     if (!BACKENDS.includes(backend)) throw rangeError("BiomeWorld backend must be 'auto', 'gpu' or 'cpu'", 'biomes');
-    if (backend === 'gpu')
-      throw fault('unsupported', "The biomes GPU backend is not available yet; use backend 'auto' or 'cpu'", 'biomes');
+    if (
+      options.workers !== undefined &&
+      options.workers !== false &&
+      !(Number.isInteger(options.workers) && options.workers >= 0 && options.workers <= 16)
+    )
+      throw rangeError('BiomeWorld workers must be an integer 0..16 or false', 'biomes');
+    if (backend === 'gpu') {
+      const device = options.device;
+      if (
+        !device ||
+        typeof device !== 'object' ||
+        typeof device.createBuffer !== 'function' ||
+        typeof device.createShaderModule !== 'function' ||
+        !device.queue ||
+        typeof device.lost?.then !== 'function'
+      )
+        throw typeError("BiomeWorld backend 'gpu' requires the device option (a GPUDevice)", 'biomes');
+      if (options.workers && options.workers > 0)
+        throw rangeError("BiomeWorld backend 'gpu' runs on this thread; pass workers: 0", 'biomes');
+      this.#device = device;
+      this.#gpuAbort = new AbortController();
+    }
     if (typeof ecotone !== 'number' || !(ecotone >= 0 && ecotone <= 128))
       throw rangeError('BiomeWorld ecotone must be a number of metres, 0..128 (0 keeps painted edges hard)', 'biomes');
     if (!Number.isInteger(cache) || cache < 1 || cache > 4096)
@@ -249,7 +296,7 @@ export class BiomeWorld implements Disposable {
 
   /**
    * Makes a world: validates the options, samples the region heights and builds the region fields (on this thread).
-   * @throws TypeError or RangeError for bad options; MargoError `'unsupported'` for `backend: 'gpu'`.
+   * @throws TypeError for a missing GPU `device`; RangeError for bad options or GPU workers (pass `workers: 0`).
    */
   static async create(options: BiomeWorldOptions = {}): Promise<BiomeWorld> {
     if (typeof options !== 'object' || options === null)
@@ -265,11 +312,17 @@ export class BiomeWorld implements Disposable {
     aborted(options.signal);
     const world = new BiomeWorld(options, biomes),
       { workers } = options;
-    if (workers !== undefined && workers !== false && !(Number.isInteger(workers) && workers >= 0 && workers <= 16))
-      throw rangeError('BiomeWorld workers must be an integer 0..16 or false', 'biomes');
+    if (world.#device) {
+      void world.#device.lost.then(() => {
+        world.#lost = true;
+        world.#gpuAbort!.abort(fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes'));
+      });
+      gpuFields ??= await import('./gpu-fields.js');
+      gpuClassify ??= await import('./gpu-classify-inputs.js');
+    }
     // Workers are their own entry, loaded only for a world that uses them (by default where Web Workers exist).
     const auto = workers === undefined && typeof Worker === 'function' && typeof globalThis.location !== 'undefined';
-    if ((auto || (workers && workers > 0)) && !(h && typeof h === 'object' && 'field' in h)) {
+    if (!world.#device && (auto || (workers && workers > 0)) && !(h && typeof h === 'object' && 'field' in h)) {
       const { BiomeWorkers, defaultWorkers } = await import('@margoengine/biomes/workers'),
         count = workers || defaultWorkers();
       if (count) world.#remote = new BiomeWorkers(count, world, () => world.#state(), options.createWorker);
@@ -352,6 +405,11 @@ export class BiomeWorld implements Disposable {
       throw fault('disposed', 'BiomeWorld is disposed; create a new one with BiomeWorld.create()', 'biomes');
   }
 
+  #gpuLive(): void {
+    this.#live();
+    if (this.#lost) throw fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes');
+  }
+
   /**
    * The region heights as a quick overview of the whole world: corner samples every `regionResolution` metres, in
    * metres, rows of increasing z (`width` x `depth`). Views draw it while the 1 m tiles are made.
@@ -390,6 +448,7 @@ export class BiomeWorld implements Disposable {
     if (!Array.isArray(names) || !names.every((name) => typeof name === 'string' && name in LAYERS))
       throw rangeError('Unknown biome layer name; use names from LAYERS', 'biomes');
     aborted(options.signal);
+    this.#gpuLive();
     const key = `${x},${z}:${[...names].sort().join(',')}`;
     let pending = this.#cache.get(key);
     if (pending) {
@@ -412,8 +471,9 @@ export class BiomeWorld implements Disposable {
         () => this.#cache.delete(key),
       );
     }
-    const tile = await pending;
+    const tile = await withSignal(pending, options.signal);
     aborted(options.signal);
+    this.#gpuLive();
     return tile;
   }
 
@@ -463,6 +523,7 @@ export class BiomeWorld implements Disposable {
     if (!Array.isArray(names) || !names.every((name) => typeof name === 'string' && name in LAYERS))
       throw rangeError('Unknown biome layer name; use names from LAYERS', 'biomes');
     aborted(options.signal);
+    this.#gpuLive();
     // A zone scorer that is not marked per cell may read the grid it classifies: only the whole tile has its bytes.
     const k = this.#kind,
       whole =
@@ -475,7 +536,7 @@ export class BiomeWorld implements Disposable {
     this.#live();
     aborted(options.signal);
     const [i0, j0, i1, j1] = window,
-      layers = this.#layers(x * cells + i0, z * cells + j0, i1 - i0, j1 - j0, names);
+      layers = await this.#layers(x * cells + i0, z * cells + j0, i1 - i0, j1 - j0, names, options.signal);
     return Object.freeze({
       x,
       z,
@@ -492,7 +553,7 @@ export class BiomeWorld implements Disposable {
     await Promise.resolve();
     this.#live();
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
-      layers = this.#layers(x * cells, z * cells, cells, cells, names);
+      layers = await this.#layers(x * cells, z * cells, cells, cells, names);
     const list = Object.keys(LAYERS).filter((name) => layers.has(name));
     return Object.freeze({
       x,
@@ -509,7 +570,42 @@ export class BiomeWorld implements Disposable {
    * The named layers of `width` x `depth` cells from global cell (gx, gz): the bytes those cells hold in their tiles,
    * as every layer is a function of the global cell and classification reads the same global margins around it.
    */
-  #layers(gx: number, gz: number, width: number, depth: number, names: readonly string[]): Map<string, RasterLayer> {
+  async #layers(
+    gx: number,
+    gz: number,
+    width: number,
+    depth: number,
+    names: readonly string[],
+    signal?: AbortSignal,
+  ): Promise<Map<string, RasterLayer>> {
+    if (this.#gpuAbort)
+      signal = signal ? AbortSignal.any([signal, this.#gpuAbort.signal]) : this.#gpuAbort.signal;
+    try {
+      const layers = await this.#computeLayers(gx, gz, width, depth, names, signal);
+      aborted(signal);
+      this.#gpuLive();
+      return layers;
+    } catch (error) {
+      aborted(signal);
+      this.#gpuLive();
+      if (
+        !this.#device ||
+        ((error as Error)?.name === 'MargoError' && ['failed', 'disposed'].includes((error as { code: string }).code))
+      )
+        throw error;
+      throw fault('failed', `BiomeWorld GPU tile failed: ${String(error)}; recreate the WebGPU device`, 'biomes');
+    }
+  }
+
+  async #computeLayers(
+    gx: number,
+    gz: number,
+    width: number,
+    depth: number,
+    names: readonly string[],
+    signal?: AbortSignal,
+  ): Promise<Map<string, RasterLayer>> {
+    this.#gpuLive();
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
       cell = this.resolution * 1000,
       frame = {
@@ -519,13 +615,15 @@ export class BiomeWorld implements Disposable {
         cell,
         scratch: this.#scratch,
       };
-    if (!names.includes('biome') && !names.includes('biomeWeight'))
-      return rectFields(frame, gx, gz, width, depth, names);
+    const fields = (x: number, z: number, w: number, d: number, wanted: readonly string[], temporary = false) =>
+      this.#device
+        ? gpuFields!.rectFieldsGPU(this.#device, frame, x, z, w, d, wanted, { temporary: false, signal })
+        : rectFields(frame, x, z, w, d, wanted, temporary);
+    if (!names.includes('biome') && !names.includes('biomeWeight')) return fields(gx, gz, width, depth, names);
     // Classification blurs over a 1-cell margin: compute the fields one cell wider, classify, then crop.
     const c = this.#classifier,
       // The wide fields are working arrays: the result keeps cropped copies.
-      wide = rectFields(
-        frame,
+      wideResult = fields(
         gx - 1,
         gz - 1,
         width + 2,
@@ -533,33 +631,36 @@ export class BiomeWorld implements Disposable {
         [...new Set([...names, ...c.inputs.filter((n) => !n.startsWith('mask/'))])],
         true,
       ),
+      // CPU scratch is consumed synchronously; GPU layers own their arrays across awaits.
+      wide = wideResult instanceof Promise ? await wideResult : wideResult,
       n = width + 2,
       rows = depth + 2,
       ox = gx - 1,
       oz = gz - 1,
       ids = new Uint8Array(width * depth * 4),
       weights = new Uint8Array(width * depth * 4);
-    classify(
-      c,
-      {
-        n,
-        depth: rows,
-        gx: ox,
-        gz: oz,
-        seed: this.seed,
-        cell,
-        layer: (name) => wide.get(name)!.data,
-        // The feather's wide read stays inside the world (edge cells repeat), so paint keeps full strength up to
-        // the world's edge instead of fading into cells that do not exist.
-        user: (name, margin = 0) =>
-          margin
-            ? this.#userGrid(name, ox - margin, oz - margin, n + 2 * margin, cells, true, rows + 2 * margin)
-            : this.#userGrid(name, ox, oz, n, cells, false, rows),
-        ecotone: featherCells(this.ecotone, this.resolution),
-      },
-      ids,
-      weights,
-    );
+    aborted(signal);
+    this.#gpuLive();
+    const input = {
+      n,
+      depth: rows,
+      gx: ox,
+      gz: oz,
+      seed: this.seed,
+      cell,
+      layer: (name: string) => wide.get(name)!.data,
+      // The feather's wide read stays inside the world (edge cells repeat), so paint keeps full strength up to
+      // the world's edge instead of fading into cells that do not exist.
+      user: (name: string, margin = 0) =>
+        margin
+          ? this.#userGrid(name, ox - margin, oz - margin, n + 2 * margin, cells, true, rows + 2 * margin)
+          : this.#userGrid(name, ox, oz, n, cells, false, rows),
+      ecotone: featherCells(this.ecotone, this.resolution),
+    };
+    if (this.#device) await gpuClassify!.classifyGPU(this.#device, c, input, ids, weights, { signal });
+    else classify(c, input, ids, weights);
+    aborted(signal);
+    this.#gpuLive();
     const layers = new Map<string, RasterLayer>();
     for (const name of names) {
       if (name === 'biome' || name === 'biomeWeight') continue;
@@ -910,6 +1011,7 @@ export class BiomeWorld implements Disposable {
   /** Frees the cache and listeners; later calls throw MargoError `'disposed'`. */
   dispose(): void {
     this.#disposed = true;
+    this.#gpuAbort?.abort(fault('disposed', 'BiomeWorld is disposed; create a new one with BiomeWorld.create()', 'biomes'));
     this.#remote?.dispose();
     this.#remote = undefined;
     this.#cache.clear();

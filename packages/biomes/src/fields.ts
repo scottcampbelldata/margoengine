@@ -73,6 +73,7 @@ function raster(
  * cell, the heights and the region fields, so a cell holds the same bytes whatever rectangle it is made in. With the
  * frame's scratch, the layers not asked for and the working arrays are reused; `temporary` reuses the returned layers
  * too (valid until the next call: the caller copies what it keeps).
+ * Async callers must keep `temporary` false so requested layers survive reuse of the frame's scratch.
  * @param raw Internal raw upsampled region samples in regionFieldsRef layout; omitted uses CPU interpolation.
  */
 export function rectFields(

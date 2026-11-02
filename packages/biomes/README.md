@@ -68,7 +68,8 @@ world.dispose();
 | `resolution` | 1 | tile cell size: 0.5, 1, 2 or 4 m |
 | `regionResolution` | 16 | region cell size in metres (power of two, 4 x `resolution` up to `tileSize`) |
 | `ecotone` | 24 | metres, 0..128, over which a painted edge blends into its neighbour: paint and paint masks are read at the warped cell through a box that wide, so painted borders ramp and wander like the climate ones; 0 composes paint cell by cell (a one-cell step) |
-| `backend` | `'auto'` | `'auto'` or `'cpu'`; `'gpu'` is not available yet and throws `unsupported` |
+| `backend` | `'auto'` | `'auto'` and `'cpu'` compute on the CPU. `'gpu'` needs `device` and `workers: 0` (also the GPU default); `tile` and `tilePart` field layers and classification use that device, with byte-identical output to `'cpu'`. Paint, zone scoring, fallback and selection run on the CPU. |
+| `device` | none | `GPUDevice` required by `'gpu'`, owned by the caller and never destroyed by the world; ignored by `'auto'` and `'cpu'` |
 | `signal` | none | rejects `create` with its reason |
 
 | `climate` option | Default | Meaning |

@@ -123,6 +123,18 @@ export const RUNNER_SMOKE = [
 ];
 /** Browser scripts under packages/ that are tools, not tests (the guard below skips them). */
 const TOOLS = {
+  'packages/biomes/tests/gpu-region-fields-check.mjs':
+    'exact-head region-fields hardware proof pinned to the RTX A6000, run directly',
+  'packages/biomes/tests/gpu-fixed-lerp-check.mjs':
+    'exact-head fixed-lerp hardware proof pinned to the RTX A6000, run directly',
+  'packages/biomes/tests/gpu-field-integration-check.mjs':
+    'exact-head field-integration hardware proof pinned to the RTX A6000, run directly',
+  'packages/biomes/tests/gpu-classify-warp-check.mjs':
+    'exact-head classify-warp hardware proof pinned to the RTX A6000, run directly',
+  'packages/biomes/tests/gpu-classify-inputs-check.mjs':
+    'exact-head classify-inputs hardware proof pinned to the RTX A6000, run directly',
+  'packages/biomes/tests/gpu-placement-flow-check.mjs':
+    'exact-head placement-flow hardware proof pinned to the RTX A6000, run directly',
   'packages/vfx/test/bench-soft.mjs':
     'benchmark of soft particles with the GPU held exclusively (test:gpu checks the pixels)',
   'packages/voxel-pathtracer/tests/magicavoxel/mv-vox.mjs': 'renders .vox files for a side-by-side comparison',
