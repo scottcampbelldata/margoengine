@@ -3,6 +3,7 @@
 // #buffer-mapping, #computepass, #error-scopes, #dom-gpudevice-lost:
 // ordered dispatch/readback, validation scopes and loss notification. These prove no numerical parity.
 import { fault, rangeError } from '../../shared/errors.js';
+import { divFloor } from './fixed.js';
 
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number };
 declare const GPUMapMode: { READ: number };
@@ -13,7 +14,7 @@ export function dispatchShape(device: GPUDevice, n: number): [number, number] {
   if (!Number.isSafeInteger(n) || n < 1 || n > 2147483647 || !(limit >= 1))
     throw rangeError('GPU work needs 1..2147483647 invocations and valid device limits', 'biomes');
   const x = Math.min(Math.ceil(n / 64), limit),
-    y = Math.ceil(n / (64 * x));
+    y = -divFloor(-n, 64 * x);
   if (y > limit) throw rangeError('GPU work exceeds dispatch limits; use a smaller input', 'biomes');
   if (!(device.limits.maxComputeInvocationsPerWorkgroup >= 64) || !(device.limits.maxComputeWorkgroupSizeX >= 64))
     throw rangeError('GPU work needs 64 compute invocations per workgroup', 'biomes');

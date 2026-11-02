@@ -1258,13 +1258,13 @@ export class BiomePlacement implements Disposable {
           const seen = new Set<string>();
           for (const [x0, z0, x1, z1] of windows)
             for (
-              let tz = Math.max(0, Math.floor(z0 / tileTicks));
-              tz < Math.min(world.tilesZ, Math.ceil(z1 / tileTicks));
+              let tz = Math.max(0, divFloor(z0, tileTicks));
+              tz < Math.min(world.tilesZ, -divFloor(-z1, tileTicks));
               tz++
             )
               for (
-                let tx = Math.max(0, Math.floor(x0 / tileTicks));
-                tx < Math.min(world.tilesX, Math.ceil(x1 / tileTicks));
+                let tx = Math.max(0, divFloor(x0, tileTicks));
+                tx < Math.min(world.tilesX, -divFloor(-x1, tileTicks));
                 tx++
               ) {
                 const key = tileKey(tx, tz);

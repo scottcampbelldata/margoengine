@@ -18,7 +18,7 @@
 // inter-stratum shade/blocking, conflict CSR, records, canopy, exclusion and detail density. No speed claim.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { BiomePlacement, PlacedTile } from './placement.js';
-import { qmul } from './fixed.js';
+import { divFloor, qmul } from './fixed.js';
 import {
   placementBridges,
   type CandidateSource,
@@ -204,10 +204,10 @@ function windowsFor(bridge: PlacementBridge, x: number, z: number): TickRect[] {
     // g >= dmax, so this pad is >= 2*K*dmax+g; it also protects the outer whole-cell generation.
     const pad = (plan.rounds + 1) * (st.dmax + st.g);
     result[s] = [
-      Math.max(0, Math.floor((x0 - pad) / st.g) * st.g),
-      Math.max(0, Math.floor((z0 - pad) / st.g) * st.g),
-      Math.min(Math.ceil(bridge.worldX / st.g) * st.g, Math.ceil((x1 + pad) / st.g) * st.g),
-      Math.min(Math.ceil(bridge.worldZ / st.g) * st.g, Math.ceil((z1 + pad) / st.g) * st.g),
+      Math.max(0, divFloor(x0 - pad, st.g) * st.g),
+      Math.max(0, divFloor(z0 - pad, st.g) * st.g),
+      Math.min(-divFloor(-bridge.worldX, st.g) * st.g, -divFloor(-(x1 + pad), st.g) * st.g),
+      Math.min(-divFloor(-bridge.worldZ, st.g) * st.g, -divFloor(-(z1 + pad), st.g) * st.g),
     ];
   }
   return result;
@@ -216,7 +216,7 @@ function windowsFor(bridge: PlacementBridge, x: number, z: number): TickRect[] {
 function graphOf(p: GPUPool, factor: Int32Array, species: number, g: number, reach: number): Uint32Array {
   const bins = new Map<string, number[]>();
   for (let i = 0; i < p.n; i++) {
-    const k = `${Math.floor(p.x[i] / g)},${Math.floor(p.z[i] / g)}`;
+    const k = `${divFloor(p.x[i], g)},${divFloor(p.z[i], g)}`;
     let bin = bins.get(k);
     if (!bin) bins.set(k, (bin = []));
     bin.push(i);
@@ -225,8 +225,8 @@ function graphOf(p: GPUPool, factor: Int32Array, species: number, g: number, rea
     edges: number[] = [];
   for (let i = 0; i < p.n; i++) {
     starts.push(2 + p.n + edges.length);
-    for (let z = Math.floor((p.z[i] - reach) / g); z <= Math.floor((p.z[i] + reach) / g); z++)
-      for (let x = Math.floor((p.x[i] - reach) / g); x <= Math.floor((p.x[i] + reach) / g); x++)
+    for (let z = divFloor(p.z[i] - reach, g); z <= divFloor(p.z[i] + reach, g); z++)
+      for (let x = divFloor(p.x[i] - reach, g); x <= divFloor(p.x[i] + reach, g); x++)
         for (const j of bins.get(`${x},${z}`) ?? []) {
           if (
             j === i ||
@@ -277,12 +277,13 @@ export async function placeTileGPU(
   for (let s = 0; s < plan.strata.length; s++) {
     const [x0, z0, x1, z1] = windows[s];
     for (const sp of plan.strata[s].species) {
-      const count = ((x1 - x0) / sp.gen) * ((z1 - z0) / sp.gen);
+      const count = divFloor(x1 - x0, sp.gen) * divFloor(z1 - z0, sp.gen);
       cellCount += count;
       checkWords(device, 1 + cellCount * 40 * 18 + plan.specs.length * 257);
       dispatchShape(device, Math.max(1, cellCount * 40));
-      for (let gz = z0 / sp.gen; gz < z1 / sp.gen; gz++)
-        for (let gx = x0 / sp.gen; gx < x1 / sp.gen; gx++) cells.push({ sp, gx, gz, start: 0, count: 0 });
+      for (let gz = divFloor(z0, sp.gen); gz < divFloor(z1, sp.gen); gz++)
+        for (let gx = divFloor(x0, sp.gen); gx < divFloor(x1, sp.gen); gx++)
+          cells.push({ sp, gx, gz, start: 0, count: 0 });
     }
   }
   // Worst-case 40-step inverse CDF output; validate before the first GPU call/await.
@@ -353,8 +354,8 @@ export async function placeTileGPU(
       const st = plan.strata[s];
       if (!st.species.length) continue;
       const r = windows[s];
-      for (let cz = r[1] / st.g; cz < r[3] / st.g; cz++)
-        for (let cx = r[0] / st.g; cx < r[2] / st.g; cx++) opened.run.cell(s, cx, cz);
+      for (let cz = divFloor(r[1], st.g); cz < divFloor(r[3], st.g); cz++)
+        for (let cx = divFloor(r[0], st.g); cx < divFloor(r[2], st.g); cx++) opened.run.cell(s, cx, cz);
       const pool = opened.run.pools[s],
         n = pool.n;
       if (!n) continue;
