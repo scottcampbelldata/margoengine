@@ -105,7 +105,7 @@ test('pre-J6 hydrology byte goldens, flat drainage, sea, partial groups and sign
     assert.ok(fake.dispatch.some((d) => d[0] === 'accumulate'));
   }
 });
-test('auto/cpu/default retain identical bytes; world GPU remains unsupported', { timeout: 15000 }, async () => {
+test('auto/cpu/default retain identical bytes; world GPU requires a device', { timeout: 15000 }, async () => {
   const s = m.placementCases(m)[0];
   for (const backend of ['auto', 'cpu', undefined])
     await worldCase({ ...s, options: { ...s.options, backend } }, async (p) =>
@@ -113,7 +113,7 @@ test('auto/cpu/default retain identical bytes; world GPU remains unsupported', {
     );
   await assert.rejects(
     m.BiomeWorld.create({ ...s.options, backend: 'gpu' }),
-    (e) => e.name === 'MargoError' && e.code === 'unsupported',
+    (e) => e instanceof TypeError && /device/.test(e.message),
   );
 });
 test('inputs are snapshotted before await', async (t) => {

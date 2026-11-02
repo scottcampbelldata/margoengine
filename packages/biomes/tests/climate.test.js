@@ -333,7 +333,10 @@ test('validation, abort, update, onChange and dispose', async () => {
     { height: { samples: new Float32Array(3), width: 2, depth: 2 } },
   ])
     await assert.rejects(BiomeWorld.create(bad), RangeError, JSON.stringify(bad));
-  await assert.rejects(BiomeWorld.create({ backend: 'gpu' }), { name: 'MargoError', code: 'unsupported' });
+  await assert.rejects(
+    BiomeWorld.create({ backend: 'gpu' }),
+    (e) => e instanceof TypeError && /device/.test(e.message),
+  );
   await assert.rejects(BiomeWorld.create({ height: { field: 3 } }), TypeError);
   const controller = new AbortController();
   controller.abort(new Error('stop'));

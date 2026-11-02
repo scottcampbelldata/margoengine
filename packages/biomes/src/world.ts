@@ -149,11 +149,24 @@ const aborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw signal.reason;
 };
 
-// Capture only cancellation state: a caller-owned device can outlive many disposed worlds.
-function abortOnDeviceLoss(device: GPUDevice, controller: WeakRef<AbortController>): void {
-  void device.lost.then(() => {
-    controller.deref()?.abort(fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes'));
-  });
+const deviceLoss = new WeakMap<GPUDevice, { controllers: Set<AbortController>; lost: boolean }>();
+
+// Share one reaction across worlds because device.lost retains reactions until the device is lost.
+function abortOnDeviceLoss(device: GPUDevice, controller: AbortController): void {
+  let state = deviceLoss.get(device);
+  if (!state) {
+    state = { controllers: new Set(), lost: false };
+    deviceLoss.set(device, state);
+    const loss = state;
+    void device.lost.then(() => {
+      loss.lost = true;
+      for (const active of loss.controllers)
+        active.abort(fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes'));
+      loss.controllers.clear();
+    });
+  }
+  if (state.lost) controller.abort(fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes'));
+  else state.controllers.add(controller);
 }
 
 /** Cancellation belongs to the caller, not to a cached tile shared by other callers. */
@@ -336,7 +349,6 @@ export class BiomeWorld implements Disposable {
     const world = new BiomeWorld(options, biomes),
       { workers } = options;
     if (world.#device) {
-      abortOnDeviceLoss(world.#device, new WeakRef(world.#gpuAbort!));
       gpuFields ??= await import('./gpu-fields.js');
       gpuClassify ??= await import('./gpu-classify-inputs.js');
     }
@@ -348,6 +360,7 @@ export class BiomeWorld implements Disposable {
       if (count) world.#remote = new BiomeWorkers(count, world, () => world.#state(), options.createWorker);
     }
     aborted(options.signal);
+    if (world.#device) abortOnDeviceLoss(world.#device, world.#gpuAbort!);
     return world;
   }
 
@@ -534,7 +547,9 @@ export class BiomeWorld implements Disposable {
           if (this.#cache.get(key) === pending && DEFAULT_LAYERS.every((name) => tile.layers.includes(name)))
             this.#ready.set(`${x},${z}`, tile);
         },
-        () => this.#cache.delete(key),
+        () => {
+          if (this.#cache.get(key) === pending) this.#cache.delete(key);
+        },
       );
     }
     const tile = await withSignal(pending, options.signal);
@@ -1071,6 +1086,7 @@ export class BiomeWorld implements Disposable {
   /** Frees the cache and listeners; later calls throw MargoError `'disposed'`. */
   dispose(): void {
     this.#disposed = true;
+    if (this.#device) deviceLoss.get(this.#device)?.controllers.delete(this.#gpuAbort!);
     this.#gpuAbort?.abort(
       fault('disposed', 'BiomeWorld is disposed; create a new one with BiomeWorld.create()', 'biomes'),
     );

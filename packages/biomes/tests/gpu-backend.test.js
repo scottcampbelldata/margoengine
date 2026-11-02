@@ -455,6 +455,65 @@ test('CPU callback failures preserve identity on GPU tiles and parts', async (t)
     }
 });
 
+test('a stale GPU rejection preserves the replacement tile cache entry', { timeout: 10000 }, async (t) => {
+  constants(t);
+  const gates = [];
+  let secondMapped;
+  const replacementMapping = new Promise((resolve) => {
+    secondMapped = resolve;
+  });
+  const fake = fakeDevice('tail', () => {
+    if (gates.length >= 2) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      gates.push({ resolve, reject });
+      if (gates.length === 2) secondMapped();
+    });
+  });
+  const world = await BiomeWorld.create({ ...options, backend: 'gpu', device: fake.device });
+  try {
+    const first = world.tile(0, 0);
+    const rejected = assert.rejects(first, failed);
+    await fake.mappingStarted;
+    world.update({ climate: { latitude: 20 } });
+    const replacement = world.tile(0, 0);
+    // A rejects after B reaches readback and occupies the cache key.
+    await replacementMapping;
+    gates[0].reject(Error('stale readback failed'));
+    await rejected;
+    gates[1].resolve();
+    const tile = await replacement;
+    const allocations = fake.buffers.length;
+    assert.equal(await world.tile(0, 0), tile);
+    assert.equal(fake.buffers.length, allocations, 'cache hit starts no new GPU work');
+    assert.ok(fake.buffers.every((buffer) => buffer.destroyed));
+  } finally {
+    for (const gate of gates) gate.resolve();
+    world.dispose();
+  }
+});
+
+test('GPU worlds share one device loss reaction and unregister on disposal', async (t) => {
+  const fake = fakeDevice();
+  const then = t.mock.method(fake.device.lost, 'then');
+  const abort = t.mock.method(AbortController.prototype, 'abort');
+  for (let i = 0; i < 32; i++) {
+    const world = await BiomeWorld.create({ ...options, backend: 'gpu', device: fake.device });
+    world.dispose();
+  }
+  const disposedAborts = abort.mock.callCount();
+  fake.lose();
+  await setImmediate();
+  assert.equal(abort.mock.callCount(), disposedAborts, 'no disposed controller remains registered');
+  assert.equal(then.mock.callCount(), 1, 'one reaction for the caller-owned device');
+  const world = await BiomeWorld.create({ ...options, backend: 'gpu', device: fake.device });
+  try {
+    await assert.rejects(world.tile(0, 0), failed);
+    assert.equal(then.mock.callCount(), 1, 'new worlds observe prior loss without another reaction');
+  } finally {
+    world.dispose();
+  }
+});
+
 test('a live caller-owned device does not retain disposed GPU worlds', async () => {
   setFlagsFromString('--expose-gc');
   const gc = runInNewContext('gc');
