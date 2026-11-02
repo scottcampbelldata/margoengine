@@ -2,7 +2,8 @@
 // its declaration from the emitted dist/*.d.ts (comments and private class members dropped), plus the package-local
 // types those declarations reference but the entry does not export. One report per entry in api/, like API Extractor's
 // .api.md. `npm run api:check` (default) fails with a diff when a report changed; `npm run api:update` rewrites them and
-// docs/api-surface.md. Needs `npm run build:packages` first. Uses TypeScript 7's checker through its
+// docs/api-surface.md. `--package=<name>` and optional `--entry=<subpath>` limit checking and updates to one package
+// or entry. Needs the selected declarations to be built first. Uses TypeScript 7's checker through its
 // `typescript/unstable/sync` API (no extra dependency); that API is marked unstable, so a TypeScript bump may need edits.
 import { API, SymbolFlags } from 'typescript/unstable/sync';
 import { SyntaxKind } from 'typescript/unstable/ast';
@@ -19,12 +20,13 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { isUmbrellaAlias } from './umbrella.mjs';
+import { mergeScopedApiSurface, packageMatchesApiReportScope, parseApiReportArguments } from './api-report-scope.mjs';
 
 // The canonical path: the checker reports files by their real long path, so a checkout reached through a Windows 8.3
 // name (C:\Users\\..., what os.tmpdir() gives) matched no package and every cross-package import line
 // vanished from the reports (found by the fresh-clone check).
 const root = realpathSync.native(resolve(import.meta.dirname, '..'));
-const update = process.argv.includes('--update');
+const { update, packageSelector, entrySelector } = parseApiReportArguments(process.argv.slice(2));
 const apiDir = join(root, 'api');
 const slash = (p) => p.replaceAll('\\', '/');
 const key = (p) => slash(p).toLowerCase(); // the checker reports lower-cased paths on Windows
@@ -36,13 +38,14 @@ for (const dir of readdirSync(join(root, 'packages')).sort(byText)) {
   const file = join(root, 'packages', dir, 'package.json');
   if (!existsSync(file)) continue;
   const manifest = JSON.parse(readFileSync(file, 'utf8'));
+  const selected = packageMatchesApiReportScope(packageSelector, dir, manifest.name);
   // margoengine/<x> aliases re-export @margoengine/<x>, which has its own report (scripts/umbrella.mjs).
   const entries = Object.entries(manifest.exports ?? {})
     .filter(([subpath]) => !isUmbrellaAlias(manifest.name, subpath))
     .map(([subpath, target]) => {
       const types = typeof target === 'string' ? target.replace(/\.js$/, '.d.ts') : target.types;
       const dts = join(root, 'packages', dir, types);
-      if (!existsSync(dts))
+      if (selected && !existsSync(dts))
         throw new Error(`${manifest.name} "${subpath}": ${types} missing; run npm run build:packages`);
       const suffix = subpath === '.' ? '' : '.' + subpath.slice(2).replaceAll('/', '-');
       return {
@@ -55,6 +58,16 @@ for (const dir of readdirSync(join(root, 'packages')).sort(byText)) {
   if (entries.length)
     packages.push({ dir, name: manifest.name, home: key(join(root, 'packages', dir)) + '/', entries });
 }
+const scopedPackage = packageSelector
+  ? packages.find((pkg) => packageMatchesApiReportScope(packageSelector, pkg.dir, pkg.name))
+  : undefined;
+if (packageSelector && !scopedPackage)
+  throw new RangeError(
+    `Unknown API report package ${packageSelector}; use a packages/<dir> name or its full package name`,
+  );
+if (entrySelector && !scopedPackage.entries.some((entry) => entry.subpath === entrySelector))
+  throw new RangeError(`Package ${scopedPackage.name} has no exports entry ${entrySelector}`);
+const reportPackages = scopedPackage ? [scopedPackage] : packages;
 const shared = key(join(root, 'packages', 'shared')) + '/'; // copied into each bundle, so it counts as package-local
 // The package a declaration file belongs to; undefined for TypeScript's own lib files.
 const ownerOf = (path) => {
@@ -81,7 +94,7 @@ writeFileSync(
       skipLibCheck: true,
       noEmit: true,
     },
-    files: packages.flatMap((pkg) => pkg.entries.map((entry) => entry.dts)),
+    files: (scopedPackage ? [scopedPackage] : packages).flatMap((pkg) => pkg.entries.map((entry) => entry.dts)),
   }),
 );
 const api = new API({ cwd: root });
@@ -94,14 +107,18 @@ try {
   const { checker, program } = project;
   for (const pkg of packages)
     for (const entry of pkg.entries) {
-      for (const symbol of checker.getExportsOfModule(checker.getSymbolAtLocation(program.getSourceFile(entry.dts)))) {
+      const source = program.getSourceFile(entry.dts);
+      if (!source) continue;
+      const module = checker.getSymbolAtLocation(source);
+      if (!module) continue;
+      for (const symbol of checker.getExportsOfModule(module)) {
         const target = symbol.flags & SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
         const path = target.declarations?.[0]?.path;
         if (path && key(path).startsWith(pkg.home) && !exportedBy.has(target.id))
           exportedBy.set(target.id, entry.specifier);
       }
     }
-  reports = packages.map((pkg) => pkg.entries.map((entry) => ({ pkg, entry, ...report(project, pkg, entry) })));
+  reports = reportPackages.map((pkg) => pkg.entries.map((entry) => ({ pkg, entry, ...report(project, pkg, entry) })));
 } finally {
   api.close();
   rmSync(temp, { recursive: true, force: true });
@@ -302,21 +319,34 @@ function stripComments(text) {
 }
 
 // Write or compare.
-const expected = new Map(reports.flat().map((r) => [r.entry.report, r.text]));
-const summary = surface();
+const selectedReports = reports.flat().filter((item) => !entrySelector || item.entry.subpath === entrySelector);
+const expected = new Map(selectedReports.map((item) => [item.entry.report, item.text]));
+const summary = scopedPackage
+  ? mergeScopedApiSurface(readFileSync(join(root, 'docs', 'api-surface.md'), 'utf8'), {
+      packageName: scopedPackage.name,
+      row: surfaceRow(reports[0]),
+      entries: reports[0].length,
+      exports: reports[0].reduce((sum, item) => sum + item.counts.exports, 0),
+    })
+  : surface();
 if (update) {
   mkdirSync(apiDir, { recursive: true });
-  for (const file of readdirSync(apiDir))
-    if (file.endsWith('.api.md') && !expected.has(file)) rmSync(join(apiDir, file));
+  if (!scopedPackage)
+    for (const file of readdirSync(apiDir))
+      if (file.endsWith('.api.md') && !expected.has(file)) rmSync(join(apiDir, file));
   for (const [file, text] of expected) writeIfChanged(join(apiDir, file), text);
   writeIfChanged(join(root, 'docs', 'api-surface.md'), summary);
   console.log(
-    `API reports: ${expected.size} entries, ${total('exports')} exports written to api/ and docs/api-surface.md.`,
+    scopedPackage
+      ? `API reports: ${expected.size} selected ${expected.size === 1 ? 'entry' : 'entries'} for ${scopedPackage.name} written without changing other packages.`
+      : `API reports: ${expected.size} entries, ${total('exports')} exports written to api/ and docs/api-surface.md.`,
   );
 } else {
   const problems = [];
-  const present = existsSync(apiDir) ? readdirSync(apiDir).filter((f) => f.endsWith('.api.md')) : [];
-  for (const file of present) if (!expected.has(file)) problems.push(`api/${file}: entry no longer exists`);
+  if (!scopedPackage) {
+    const present = existsSync(apiDir) ? readdirSync(apiDir).filter((f) => f.endsWith('.api.md')) : [];
+    for (const file of present) if (!expected.has(file)) problems.push(`api/${file}: entry no longer exists`);
+  }
   for (const [file, text] of expected) {
     const path = join(apiDir, file);
     if (!existsSync(path)) {
@@ -326,6 +356,11 @@ if (update) {
     const old = readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
     if (old !== text) problems.push(`api/${file} changed:\n${diff(old, text)}`);
   }
+  if (scopedPackage) {
+    const surfacePath = join(root, 'docs', 'api-surface.md');
+    const oldSurface = readFileSync(surfacePath, 'utf8').replaceAll('\r\n', '\n');
+    if (oldSurface !== summary) problems.push(`docs/api-surface.md changed:\n${diff(oldSurface, summary)}`);
+  }
   if (problems.length) {
     console.error(problems.join('\n\n'));
     console.error(
@@ -333,7 +368,11 @@ if (update) {
     );
     process.exit(1);
   }
-  console.log(`API reports match: ${expected.size} entries, ${total('exports')} exports.`);
+  console.log(
+    scopedPackage
+      ? `API reports match: ${expected.size} selected ${expected.size === 1 ? 'entry' : 'entries'} for ${scopedPackage.name}.`
+      : `API reports match: ${expected.size} entries, ${total('exports')} exports.`,
+  );
 }
 
 function writeIfChanged(path, text) {
@@ -374,13 +413,7 @@ function diff(a, b) {
 function surface() {
   const sizesFile = join(root, 'examples', 'package-benchmarks', 'results', 'entry-sizes.json');
   const sizes = existsSync(sizesFile) ? JSON.parse(readFileSync(sizesFile, 'utf8')) : {};
-  const rows = reports.map((entries) => {
-    const { pkg } = entries[0];
-    const list = entries.map((r) => `\`${r.entry.subpath}\` ${r.counts.exports}`).join(', ');
-    const sum = (field) => entries.reduce((s, r) => s + r.counts[field], 0);
-    const gzip = sizes.packages?.[pkg.name]?.['.']?.gzip;
-    return `| ${pkg.name} | ${list} | ${sum('unexported') || ''} | ${sum('any') || ''} | ${gzip ? gzip.toLocaleString('en-US') : ''} |`;
-  });
+  const rows = reports.map((entries) => surfaceRow(entries, sizes));
   return [
     '# Public API surface',
     '',
@@ -400,4 +433,14 @@ function surface() {
     ...rows,
     '',
   ].join('\n');
+}
+
+function surfaceRow(entries, providedSizes) {
+  const sizesFile = join(root, 'examples', 'package-benchmarks', 'results', 'entry-sizes.json');
+  const sizes = providedSizes ?? (existsSync(sizesFile) ? JSON.parse(readFileSync(sizesFile, 'utf8')) : {});
+  const { pkg } = entries[0];
+  const list = entries.map((item) => `\`${item.entry.subpath}\` ${item.counts.exports}`).join(', ');
+  const sum = (field) => entries.reduce((total, item) => total + item.counts[field], 0);
+  const gzip = sizes.packages?.[pkg.name]?.['.']?.gzip;
+  return `| ${pkg.name} | ${list} | ${sum('unexported') || ''} | ${sum('any') || ''} | ${gzip ? gzip.toLocaleString('en-US') : ''} |`;
 }
