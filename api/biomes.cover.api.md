@@ -134,6 +134,7 @@ interface BiomeWorldOptions {
     readonly resolution?: 0.5 | 1 | 2 | 4;
     readonly regionResolution?: number;
     readonly backend?: 'auto' | 'gpu' | 'cpu';
+    readonly device?: GPUDevice;
     readonly biomes?: readonly BiomeDefinition[];
     readonly classifier?: 'envelopes' | ZoneClassifier;
     readonly paint?: readonly PaintLayer[];
