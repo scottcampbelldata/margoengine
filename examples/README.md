@@ -38,6 +38,8 @@ All pages need a browser with WebGPU. A page shows a short notice when WebGPU is
 | [tokyo-diorama.html](tokyo-diorama.html) | A street corner animated in Blender and played back by the animation package |
 | [weather.html](weather.html) | Weather presets that blend: rain, snow, hail, lightning, wind and wet or snowy ground |
 | [windy-meadow.html](windy-meadow.html) | Grass, wind and a changing sky |
+| [molten-words/](molten-words/index.html) | Any typed word as dripping liquid chrome |
+| [cathedral-light/](cathedral-light/index.html) | Sun through stained glass into a dusty hall, with a time-of-day slider |
 
 The same server also serves the loader examples:
 

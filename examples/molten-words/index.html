@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#060709">
+  <meta name="description" content="Type any word and watch it turn into dripping liquid chrome, rendered live in WebGPU with Margo Engine.">
+  <title>Molten Words · Margo Engine</title>
+  <!-- Margo engine made for Margie -->
+  <style>
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;background:#060709;color:#eef0f2;font:16px/1.4 Georgia,'Times New Roman',serif;overflow:hidden}
+    #viewport{position:fixed;inset:0}canvas{touch-action:none;display:block}
+    h1{position:fixed;top:20px;left:24px;margin:0;font-size:16px;font-weight:400;color:#c9cdd2}
+    h1 a{color:inherit}
+    form{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(520px,calc(100% - 32px));padding:10px 14px 14px;background:#0a0b0ee0;border:1px solid #4e535a;border-radius:4px}
+    label{display:block;margin-bottom:6px;font-size:16px;color:#c9cdd2}
+    input{display:block;width:100%;min-height:52px;padding:10px 16px;background:#0d0f12e6;color:#fff;border:1px solid #6d737b;border-radius:4px;font:700 22px/1.2 Arial,Helvetica,sans-serif}
+    input:focus-visible{outline:3px solid #ffb35c;outline-offset:2px}
+    #status{position:fixed;top:44%;left:0;right:0;margin:0;padding:0 24px;text-align:center}#error{position:fixed;top:56px;left:24px;right:24px;margin:0;color:#ffd9b5}#error:empty{display:none}
+  </style>
+</head>
+<body>
+  <main id="viewport" aria-label="A word made of dripping liquid chrome above a chrome pool"></main>
+  <h1>Molten Words, <a href="../../">Margo Engine</a></h1>
+  <form id="form">
+    <label for="word">Type a word</label>
+    <input id="word" maxlength="16" value="MOLTEN" autocomplete="off" spellcheck="false">
+  </form>
+  <p id="status" role="status">Heating the chrome. The first load can take up to half a minute.</p>
+  <p id="error" role="alert"></p>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+  </script>
+</body>
+</html>

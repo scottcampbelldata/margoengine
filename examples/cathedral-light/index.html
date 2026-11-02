@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0a0d">
+  <meta name="description" content="Sunlight falls through stained glass into a dusty stone hall. Scrub the time of day. Rendered live in WebGPU with Margo Engine.">
+  <title>Cathedral Light · Margo Engine</title>
+  <!-- Margo engine made for Margie -->
+  <style>
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;background:#0b0a0d;color:#f1ebdf;font:16px/1.4 Georgia,'Times New Roman',serif;overflow:hidden}
+    #viewport{position:fixed;inset:0}canvas{touch-action:none;display:block}
+    h1{position:fixed;top:20px;left:24px;margin:0;font-size:16px;font-weight:400;color:#d8cfbf}
+    h1 a{color:inherit}
+    form{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(620px,calc(100% - 32px));padding:12px 16px;background:#100e12d9;border:1px solid #6f6658;border-radius:4px}
+    label{display:flex;justify-content:space-between;font-size:16px}
+    output{font-variant-numeric:tabular-nums}
+    .row{display:flex;gap:12px;align-items:center}
+    input{flex:1;min-width:0;height:44px;margin:0;accent-color:#e7b65f}
+    button{min-width:72px;min-height:44px;background:transparent;color:inherit;border:1px solid #a89a82;border-radius:4px;font:inherit;cursor:pointer}
+    :focus-visible{outline:3px solid #ffd98a;outline-offset:2px}
+    #status{position:fixed;top:44%;left:0;right:0;margin:0;padding:0 24px;text-align:center}#error{position:fixed;top:56px;left:24px;right:24px;margin:0;color:#ffd9b5}#error:empty{display:none}
+  </style>
+</head>
+<body>
+  <main id="viewport" aria-label="A stone hall lit through stained glass windows; drag to look around"></main>
+  <h1>Cathedral Light, <a href="../../">Margo Engine</a></h1>
+  <form id="form">
+    <label for="hour">Time of day <output id="clock" for="hour">9:30</output></label>
+    <div class="row">
+      <input id="hour" type="range" min="5" max="21" step="0.01" value="9.5">
+      <button id="play" type="button" aria-pressed="false">Play</button>
+    </div>
+  </form>
+  <p id="status" role="status">Opening the doors. The first load can take up to half a minute.</p>
+  <p id="error" role="alert"></p>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+  </script>
+</body>
+</html>

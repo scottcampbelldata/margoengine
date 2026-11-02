@@ -139,6 +139,14 @@ for (const name of ['dof', 'tonemap', 'animator'])
     publicDir: false,
     build: { outDir: `${out}/demos/${name}`, target: 'es2022' },
   });
+for (const name of ['molten-words', 'cathedral-light'])
+  await site({
+    configFile: false,
+    root: `examples/${name}`,
+    base: './',
+    publicDir: false,
+    build: { outDir: `${out}/demos/${name}`, target: 'es2022' },
+  });
 // The in-browser benchmark (bench/): the CLI's scene page and harness behind a runner page, with the models its glTF
 // scenes open (copied unhashed: the scenes name them).
 await site({
