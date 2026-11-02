@@ -45,7 +45,9 @@ export interface BiomeWorldOptions {
   readonly resolution?: 0.5 | 1 | 2 | 4;
   /** Region cell size in metres, a power of two from 4 x `resolution` up to `tileSize`. Default 16. */
   readonly regionResolution?: number;
-  /** `'auto'` and `'cpu'` compute on the CPU; `'gpu'` needs `device` and no workers. Tile output is byte-identical.
+  /** `'auto'` and `'cpu'` compute on the CPU; `'gpu'` needs `device` and no workers.
+   * GPU region axes allow at most 32768 corners; heights and classification sources must be within +/-1073741824
+   * (heights in mm). Tile output is byte-identical within this domain; use `'cpu'` for larger domains.
    * Default `'auto'`. */
   readonly backend?: 'auto' | 'gpu' | 'cpu';
   /** Used only with backend `'gpu'`. The caller owns this device; the world never destroys it. */
@@ -138,6 +140,13 @@ const aborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw signal.reason;
 };
 
+// Capture only cancellation state: a caller-owned device can outlive many disposed worlds.
+function abortOnDeviceLoss(device: GPUDevice, controller: WeakRef<AbortController>): void {
+  void device.lost.then(() => {
+    controller.deref()?.abort(fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes'));
+  });
+}
+
 /** Cancellation belongs to the caller, not to a cached tile shared by other callers. */
 async function withSignal<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return pending;
@@ -209,7 +218,6 @@ export class BiomeWorld implements Disposable {
   #remote?: Remote;
   readonly #device?: GPUDevice;
   readonly #gpuAbort?: AbortController;
-  #lost = false;
 
   private constructor(options: BiomeWorldOptions, biomes: readonly BiomeDefinition[]) {
     const seed = options.seed ?? 1,
@@ -266,6 +274,11 @@ export class BiomeWorld implements Disposable {
         throw typeError("BiomeWorld backend 'gpu' requires the device option (a GPUDevice)", 'biomes');
       if (options.workers && options.workers > 0)
         throw rangeError("BiomeWorld backend 'gpu' runs on this thread; pass workers: 0", 'biomes');
+      if (size.some((v) => v / regionResolution + 1 > 32768))
+        throw rangeError(
+          "BiomeWorld backend 'gpu' allows at most 32768 region corners per axis; use a larger regionResolution or smaller size",
+          'biomes',
+        );
       this.#device = device;
       this.#gpuAbort = new AbortController();
     }
@@ -313,10 +326,7 @@ export class BiomeWorld implements Disposable {
     const world = new BiomeWorld(options, biomes),
       { workers } = options;
     if (world.#device) {
-      void world.#device.lost.then(() => {
-        world.#lost = true;
-        world.#gpuAbort!.abort(fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes'));
-      });
+      abortOnDeviceLoss(world.#device, new WeakRef(world.#gpuAbort!));
       gpuFields ??= await import('./gpu-fields.js');
       gpuClassify ??= await import('./gpu-classify-inputs.js');
     }
@@ -397,6 +407,11 @@ export class BiomeWorld implements Disposable {
       nz = divFloor(this.#size[1], step) + 1,
       height = this.#heights.grid(0, 0, nx, nz, step),
       water = this.#heights.relief?.waterCells(this.#origin, step, nx, nz);
+    if (this.#device && height.some((v) => Math.abs(v) > 1073741824))
+      throw rangeError(
+        "BiomeWorld backend 'gpu' heights must be within +/-1073741824 mm; rescale the height source or use backend 'cpu'",
+        'biomes',
+      );
     return regionEntry!.buildRegion(height, nx, nz, step, this.#climate, water);
   }
 
@@ -407,7 +422,7 @@ export class BiomeWorld implements Disposable {
 
   #gpuLive(): void {
     this.#live();
-    if (this.#lost) throw fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes');
+    this.#gpuAbort?.signal.throwIfAborted();
   }
 
   /**
@@ -578,8 +593,7 @@ export class BiomeWorld implements Disposable {
     names: readonly string[],
     signal?: AbortSignal,
   ): Promise<Map<string, RasterLayer>> {
-    if (this.#gpuAbort)
-      signal = signal ? AbortSignal.any([signal, this.#gpuAbort.signal]) : this.#gpuAbort.signal;
+    if (this.#gpuAbort) signal = signal ? AbortSignal.any([signal, this.#gpuAbort.signal]) : this.#gpuAbort.signal;
     try {
       const layers = await this.#computeLayers(gx, gz, width, depth, names, signal);
       aborted(signal);
@@ -590,6 +604,7 @@ export class BiomeWorld implements Disposable {
       this.#gpuLive();
       if (
         !this.#device ||
+        error instanceof RangeError ||
         ((error as Error)?.name === 'MargoError' && ['failed', 'disposed'].includes((error as { code: string }).code))
       )
         throw error;
@@ -1011,7 +1026,9 @@ export class BiomeWorld implements Disposable {
   /** Frees the cache and listeners; later calls throw MargoError `'disposed'`. */
   dispose(): void {
     this.#disposed = true;
-    this.#gpuAbort?.abort(fault('disposed', 'BiomeWorld is disposed; create a new one with BiomeWorld.create()', 'biomes'));
+    this.#gpuAbort?.abort(
+      fault('disposed', 'BiomeWorld is disposed; create a new one with BiomeWorld.create()', 'biomes'),
+    );
     this.#remote?.dispose();
     this.#remote = undefined;
     this.#cache.clear();

@@ -168,6 +168,14 @@ export async function upsampleRegionFieldsGPU(
   const count = width * depth,
     bytes = 6 * count * 4,
     gridCount = region.nx * region.nz;
+  const sizes = [5 * gridCount * 4, (width + depth) * 8, 16, bytes];
+  if (
+    sizes.some((n) => n > device.limits.maxBufferSize) ||
+    [sizes[0], sizes[1], bytes].some((n) => n > device.limits.maxStorageBufferBindingSize) ||
+    Math.ceil(width / 8) > device.limits.maxComputeWorkgroupsPerDimension ||
+    Math.ceil(depth / 8) > device.limits.maxComputeWorkgroupsPerDimension
+  )
+    throw rangeError('Region rectangle exceeds device limits; split it into smaller rectangles', 'biomes');
   const buffers: GPUBuffer[] = [];
   let rejectFailure: (reason: unknown) => void = () => {};
   const failure = new Promise<never>((_, reject) => {
@@ -183,14 +191,6 @@ export async function upsampleRegionFieldsGPU(
   // WebGPU section 22: mapAsync rejects on device loss. Avoid retaining a device.lost callback per request.
   const wait = <T>(pending: Promise<T>) => Promise.race([pending, failure]);
   try {
-    const sizes = [5 * gridCount * 4, (width + depth) * 8, 16, bytes];
-    if (
-      sizes.some((n) => n > device.limits.maxBufferSize) ||
-      [sizes[0], sizes[1], bytes].some((n) => n > device.limits.maxStorageBufferBindingSize) ||
-      Math.ceil(width / 8) > device.limits.maxComputeWorkgroupsPerDimension ||
-      Math.ceil(depth / 8) > device.limits.maxComputeWorkgroupsPerDimension
-    )
-      throw rangeError('Region rectangle exceeds device limits; split it into smaller rectangles', 'biomes');
     device.pushErrorScope('validation');
     let module: GPUShaderModule, pipelinePromise: Promise<GPUComputePipeline>;
     let compilePromise: Promise<GPUCompilationInfo>;
@@ -257,7 +257,7 @@ export async function upsampleRegionFieldsGPU(
     return unpack(values.subarray(0, 5 * count), count);
   } catch (error) {
     signal?.throwIfAborted();
-    if (error instanceof RangeError || (error as Error)?.name === 'MargoError') throw error;
+    if ((error as Error)?.name === 'MargoError') throw error;
     throw fault(
       'failed',
       `Region upsampling failed: ${String(error)}; recreate the WebGPU device and check its limits`,
