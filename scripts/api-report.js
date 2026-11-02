@@ -363,8 +363,11 @@ if (update) {
   }
   if (problems.length) {
     console.error(problems.join('\n\n'));
+    const updateCommand = scopedPackage
+      ? `node scripts/api-report.js --update --package=${scopedPackage.dir}${entrySelector ? ` --entry=${entrySelector}` : ''}`
+      : 'npm run api:update';
     console.error(
-      `\nPublic API changed in ${problems.length} report(s). If intended, run \`npm run api:update\` and commit the api/ diff.`,
+      `\nPublic API changed in ${problems.length} report(s). If intended, run \`${updateCommand}\` and commit the selected API diff.`,
     );
     process.exit(1);
   }
