@@ -4,6 +4,7 @@
 //   - packages/mcp/scripts/build-corpus.mjs writes the index that the @margoengine/mcp server searches.
 // Pure file reading, no network, deterministic order, LF line endings.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
 
 export const SITE = 'https://margoengine.com';
@@ -124,13 +125,22 @@ export function collectCorpus(root = resolve(import.meta.dirname, '..', '..')) {
   packages.sort((a, b) => (catalogOrder.get(a.id) ?? 1e6) - (catalogOrder.get(b.id) ?? 1e6) || byText(a.id, b.id));
   // Every docs page except the working notes (HANDOFF, dated roadmaps and records) and the generated catalog pages.
   const skip = /(^|\/)(HANDOFF|README)\.md$|-20\d\d-\d\d-\d\d\.md$|roadmap\.md$|^docs\/whitepaper\//;
+  let trackedDocs = null;
+  try {
+    trackedDocs = new Set(
+      execFileSync('git', ['ls-files', '--', 'docs/**/*.md', 'docs/*.md'], { cwd: root, encoding: 'utf8' })
+        .split(/\r?\n/)
+        .filter(Boolean),
+    );
+  } catch {}
   const docPaths = [];
   const walk = (dir) => {
     for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
       const path = `${dir}/${entry.name}`;
       if (entry.isDirectory()) {
         if (entry.name !== 'whitepaper' && entry.name !== 'examples') walk(path);
-      } else if (entry.name.endsWith('.md') && !skip.test(path)) docPaths.push(path);
+      } else if (entry.name.endsWith('.md') && !skip.test(path) && (!trackedDocs || trackedDocs.has(path)))
+        docPaths.push(path);
     }
   };
   walk('docs');

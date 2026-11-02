@@ -1,9 +1,9 @@
 // `npm run check:merge`: the pre-push check, with the work narrowed to what the change can affect (session rule 20:
-// never narrow by skipping a test the change can affect; the nightly full run is the backstop).
+// never narrow by skipping a test the change can affect; explicit full validation remains available).
 //   npm run check:merge         the affected work only
-//   npm run check:merge:full    everything, as before (the nightly job: scripts/nightly-full.mjs); MARGO_FULL=1 does the same
+//   npm run check:merge:full    everything; MARGO_FULL=1 does the same
 //   node scripts/check-merge.mjs --steps=a,b   exactly those check:merge steps, whole, under the same heat watch (the
-//                               nightly's light GPU checks on the small machines)
+//                               selected light GPU checks on constrained machines)
 //   node scripts/check-merge.mjs --plan [--files=a,b]    print the mode, the reason and the commands, run nothing
 //                               (--files pretends those files changed; --base=<ref> diffs against that ref, not origin/main)
 // Every changed file has a class (scripts/support/file-classes.mjs; tests/file-classes.test.js fails on a tracked file
@@ -54,9 +54,8 @@ import { exitOnHelp } from './support/help.mjs';
 import { margoError } from '../packages/shared/errors.js';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { snapshot } from './fresh-clone-check.mjs';
-import { pauseText, plan, runPlan, testId } from './gpu-package-tests.mjs';
+import { HEAT_EXIT, pauseText, plan, runPlan, testId } from './gpu-package-tests.mjs';
 import { keepGoingMode, parallelMode, runJobs, tailOf } from './support/parallel-run.mjs';
-import { HEAT_EXIT } from './nightly-full.mjs';
 import { thermalSource } from './support/heat.mjs';
 import { describeProfile, machineProfile } from './support/machine-profile.mjs';
 import { runLimited } from './support/run-limited.mjs';
@@ -221,8 +220,8 @@ function planDecision(ctx, decision, files) {
 
 /**
  * The plan for `--steps=<name>,<name>`: exactly those check:merge steps, in that order, whole (no narrowing), through
- * the same runner and heat watch as a full check:merge. The nightly's light GPU checks on the small machines run this
- * way (scripts/nightly-full.mjs). A name that is not a step of `check:merge:steps` throws CHECK_MERGE_STEP_UNKNOWN.
+ * the same runner and heat watch as a full check:merge. A name that is not a step of `check:merge:steps` throws
+ * CHECK_MERGE_STEP_UNKNOWN.
  */
 export function stepsPlan(names, steps) {
   const known = steps.map(stepName),

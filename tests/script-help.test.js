@@ -7,16 +7,14 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // `--help` and `-h` print the usage and exit 0 before any build, GPU lock or browser starts (bug: gpu-package-tests
-// started `npm run build:packages` and took a GPU slot on --help; gpu-lock threw; check-merge, land-records,
-// nightly-full and visual-regression ran their full work).
+// started `npm run build:packages` and took a GPU slot on --help; gpu-lock threw; check-merge,
+// visual-regression ran its full work).
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const scripts = {
   'gpu-package-tests.mjs': ['--select=', '<dir>/<script>', '--no-build', '--only=', '--list'],
   'check-merge.mjs': ['--full', '--base='],
   'visual-regression.js': ['--only=', '--update'],
   'gpu-lock.mjs': ['--owner=', '--exclusive'],
-  'land-records.mjs': ['--no-commit'],
-  'nightly-full.mjs': ['usage'],
 };
 
 for (const [name, mentions] of Object.entries(scripts))

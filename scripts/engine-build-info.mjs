@@ -1,4 +1,4 @@
-// Vite plugin for the Margo apps: stamps the engine commit that `engine:sync` recorded (<app>/.engine/manifest.json)
+// Vite plugin for Margo apps: stamps the prepared engine commit recorded in <app>/.engine/manifest.json
 // into every build, as `<meta name="margo-engine" content="<commit>">` in index.html and `build-info.json` beside it,
 // and as `import.meta.env.MARGO_ENGINE_COMMIT` for an About box.
 import { existsSync, readFileSync } from 'node:fs';
@@ -17,7 +17,7 @@ export function engineBuildInfo(options = {}) {
       command = env.command;
       const file = join(options.root ?? process.cwd(), '.engine', 'manifest.json');
       if (!existsSync(file)) {
-        if (env.command === 'build') throw new Error(`${file} is missing; run npm run engine:sync before building`);
+        if (env.command === 'build') throw new Error(`${file} is missing; prepare the verified private engine dependency before building`);
         return;
       }
       manifest = JSON.parse(readFileSync(file, 'utf8'));

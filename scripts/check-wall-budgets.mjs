@@ -1,7 +1,7 @@
 // Wall-clock budgets in checks: an assert that reads a clock (performance.now, Date.now, hrtime) and compares what has
 // passed against a fixed number. That measures the machine's other work as much as the code: packages/biomes/tests/
-// climate.test.js asked for one tile in under 400 ms, measures about 30 ms alone, and read 714.8 ms during a landing
-// with GPU jobs on the PC, which stopped the landing.
+// climate.test.js asked for one tile in under 400 ms, measures about 30 ms alone, and read 714.8 ms during a busy
+// multi-job run.
 // Two honest forms replace it:
 //  - A budget on how fast code is: read this thread's CPU time with cpuTimer() from scripts/support/cpu-budget.mjs,
 //    which does not count waiting for a CPU. A budget that really is about wall time belongs in a bench.
@@ -83,7 +83,7 @@ if (import.meta.url === `file:///${process.argv[1]?.replaceAll('\\', '/').replac
       );
   }
   for (const [file, allowed] of Object.entries(baseline.files)) {
-    // A file not in this tree yet (its branch is still in the landing queue) has nothing to compare.
+    // A file not in this tree yet has nothing to compare.
     if (!existsSync(join(root, file))) continue;
     const now = found[file]?.length ?? 0;
     if (now < allowed) lower[file] = now;

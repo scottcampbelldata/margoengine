@@ -16,7 +16,7 @@ import { GUIDES, collectCorpus, summaryOf } from '../scripts/support/llms-corpus
 
 // site/llms.txt and site/llms-full.txt are what AI coding tools read to learn Margo. They are generated from the
 // package READMEs, the api/ reports and docs/, so any change to those makes them stale; this test is the check that
-// fails then (fix: node scripts/build-llms.mjs). scripts/land-records.mjs regenerates them when a change lands.
+// fails then (fix: node scripts/build-llms.mjs).
 
 const corpus = collectCorpus();
 
@@ -88,10 +88,9 @@ test('the site pages hold each README, API report and doc verbatim, and the exam
   }
 });
 
-test('the AI-tools guide, the HANDOFF notes and the whitepaper are handled as intended', () => {
+test('the AI-tools guide and the whitepaper are handled as intended', () => {
   const paths = corpus.docs.map((doc) => doc.path);
   assert.ok(paths.includes('docs/ai-tools.md'));
-  assert.ok(!paths.includes('docs/HANDOFF.md'), 'working notes are not published');
   assert.ok(!paths.some((path) => path.startsWith('docs/whitepaper/')));
   assert.ok(!paths.some((path) => /-20\d\d-\d\d-\d\d\.md$/.test(path)));
 });

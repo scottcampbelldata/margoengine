@@ -1,6 +1,6 @@
 // scripts/gpu-lock.mjs against the one-holder lock it replaced (tests/fixtures/gpu-lock-v1.mjs), which agents in older
 // worktrees still run on the same folder: each waits for the other, both ways, and they take turns. Also which commands
-// count as benchmarks (exclusive), and the landing lock's hold limit.
+// count as benchmarks (exclusive), and a custom lock's hold limit.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -196,14 +196,14 @@ test('benchmarks are exclusive: bench* npm scripts and scripts under bench/ or b
     assert.equal(now.measuresSpeed(['node', 'x.mjs'], 'bench:gltf'), true, 'run from a bench* npm script');
   }));
 
-test('every lock other than gpu.lock (the landing lock) is exclusive with a 30 min hold limit', async () => {
+test('every explicitly selected lock other than gpu.lock is exclusive with a 30 min hold limit', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-compat-')),
     saved = process.env.MARGO_GPU_LOCK;
   try {
-    process.env.MARGO_GPU_LOCK = join(folder, 'land.lock');
-    const land = await import(`../scripts/gpu-lock.mjs?land=${copies++}`);
-    assert.equal(land.resolveMode(undefined), 'exclusive');
-    assert.equal(land.defaultMaxMinutes('exclusive'), 30);
+    process.env.MARGO_GPU_LOCK = join(folder, 'other.lock');
+    const custom = await import(`../scripts/gpu-lock.mjs?custom=${copies++}`);
+    assert.equal(custom.resolveMode(undefined), 'exclusive');
+    assert.equal(custom.defaultMaxMinutes('exclusive'), 30);
     process.env.MARGO_GPU_LOCK = join(folder, 'gpu.lock');
     const gpu = await import(`../scripts/gpu-lock.mjs?defaults=${copies++}`);
     assert.equal(gpu.defaultMaxMinutes('shared'), 20);

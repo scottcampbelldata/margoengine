@@ -3,7 +3,7 @@
 // tests outside packages/ are the place for comparisons.
 // Items: `mention <file>` -> matches of ENGINES in that text file; `dependency <package> <name>` -> 1 for each
 // dependencies / optionalDependencies / peerDependencies entry that is not a Margo package.
-// Allowed without a baseline entry (the AGENTS.md rule is about copying code, not about libraries an app brings itself):
+// Allowed without a baseline entry (the clean-room rule is about copying code, not about libraries an app brings itself):
 //  - an OPTIONAL PEER dependency (peerDependenciesMeta optional) that THIRD-PARTY-NOTICES.md lists as "optional peer"
 //    for that package, with its licence and reason (scripts/supply-chain.mjs keeps that file true);
 //  - a mention in ALLOWED_MENTIONS: a test that asserts the engine is NOT used.

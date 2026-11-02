@@ -1,7 +1,7 @@
 // Captures the golden outputs of the --current proofs into baselines/ (golden.js): each proof rebuilds its baseline from
 // Git, must pass against the working tree, and only then stores what the baseline emitted. Run it on a checkout that
-// has the reference commits, after `npm run build:packages`, when a proof's current reference advances (AGENTS.md:
-// "advance that proof's current reference ... and say why in docs/whitepaper/claims.md"):
+// has the reference commits, after `npm run build:packages`, when a proof's current reference advances; record why in
+// docs/whitepaper/claims.md:
 //   node examples/package-benchmarks/proofs/capture.mjs [--only=post-ssr,splats]
 // It then runs the same proofs as `npm run proofs -- --current` does (from baselines/ alone) to show they pass there.
 import { spawnSync } from 'node:child_process';

@@ -114,15 +114,15 @@ test('a failed start removes its cache folder', async () => {
   );
 });
 
-// The worktree setup script no longer links the caches (tests/worktree-node-modules.test.js), but a worktree set up
-// before that keeps its link until the script runs again; its verify fails here, naming the command.
+// A checkout prepared by an obsolete shared-dependency setup can still link mutable caches. Refuse it so two Vite
+// servers never share cache output.
 test('this checkout’s tool caches are its own, not links to another checkout’s', () => {
   for (const name of ['.vite', '.vite-temp', '.cache']) {
     const path = resolve('node_modules', name);
     if (!existsSync(path)) continue;
     assert.ok(
       !lstatSync(path).isSymbolicLink(),
-      `node_modules/${name} links to another checkout's cache, so this checkout's Vite servers share it with every worktree linked the same way; run node scripts/worktree-node-modules.mjs to give this worktree its own`,
+      `node_modules/${name} links to another checkout's cache; replace the shared node_modules with npm ci in this checkout`,
     );
   }
 });

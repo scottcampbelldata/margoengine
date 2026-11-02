@@ -1,6 +1,5 @@
 // Every package's bin script checks out with LF endings (.gitattributes). npm rewrites a bin's CRLF shebang line to LF
-// when it links it, so a CRLF checkout (core.autocrlf on Windows) came back modified after every npm ci, which stopped
-// scripts/land-records.mjs ("needs a clean tree") inside the landing lock.
+// when it links it, so a CRLF checkout (core.autocrlf on Windows) came back modified after every npm ci.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

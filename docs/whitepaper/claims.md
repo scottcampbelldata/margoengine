@@ -208,10 +208,9 @@ failed with "page.waitForFunction: Timeout 30000ms exceeded" waiting for `window
 worktrees, with no GPU reset in the window. Under load with another suite running it failed 3 times in about 24 runs.
 Each time the page had loaded its modules within 0.5 s, the dev server had no request pending, and
 `node_modules/.vite/deps/react_jsx-runtime.js` had answered 504 (Vite's "Outdated Optimize Dep"), so the module graph
-never ran. Cause: `scripts/worktree-node-modules.mjs` linked the main checkout's `node_modules/.vite` into every
-worktree, so all their dev servers shared one dependency cache and one re-optimized what another was serving. Each
-worktree now keeps its own tool caches (`tests/worktree-node-modules.test.js`); after the fix the same load ran 10 of
-10, 8 of them beside another suite. A worktree made before the fix keeps the shared link until it runs the script again.
+never ran. Cause: an obsolete checkout setup linked the main checkout's `node_modules/.vite` into every isolated
+checkout, so all their dev servers shared one dependency cache and one re-optimized what another was serving. Each
+checkout now keeps its own tool caches; after the fix the same load ran 10 of 10, 8 of them beside another suite.
 
 **Pinned runs and the core of their time (bug 6, 2026-10-27).** `npm run proofs` (pinned) failed nine proofs on a
 checkout holding their commits: color-output, environment-volumetric, post-ssr, post-ssr-models, post-stack,
@@ -248,11 +247,10 @@ math-consolidation and water-ssr. None was retired; each now reproduces its reco
   vanished in it. Passes are still new objects, now sharing one set of methods; the rounds take 3.3 / 2.0 ms again
   (1.60x and 1.64x on Node 26.12) and the recorded calls are unchanged. `tests/proofs-pinned-core.test.js` checks it.
 
-Only `--current` ran in any check, so the pinned failures went unnoticed for days. The nightly job
-(`scripts/nightly-full.mjs`) now runs `npm run proofs` (pinned, about 4.5 minutes on the RTX A6000 PC: 50 pass,
-procedural-deps HISTORICAL as before) after `check:merge:full`, alone under the GPU lock. It stays out of each
-landing's `check:merge` on purpose: about 40 pinned proofs time their claim's speed-up, and the smallest margins on
-2026-10-27 were loaders 1.05x, bvh 1.07x and creative 1.08x, which a busy landing machine can erase. A clone without
+Only `--current` ran in any check, so the pinned failures went unnoticed for days. A full release validation runs
+`npm run proofs` (pinned, about 4.5 minutes on the RTX A6000 PC: 50 pass, procedural-deps HISTORICAL as before) after
+`check:merge:full`, alone on the selected GPU machine. It stays out of ordinary focused checks on purpose: about 40 pinned proofs time their claim's speed-up, and the smallest margins on
+2026-10-27 were loaders 1.05x, bvh 1.07x and creative 1.08x, which a busy machine can erase. A clone without
 the commits reports them HISTORICAL and passes.
 
 **NaN payloads.** `geometry.proof.js` (pinned) failed at random on its degenerate-input case ("degenerate bounds"):

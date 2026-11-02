@@ -74,7 +74,7 @@ try {
     };
   };
   await page.addInitScript(instrument);
-  // Desktops start on the light tier (1× MSAA, docs/HANDOFF.md "Quality tiers"); `?quality=high` is the 4× tier.
+  // Desktops start on the light tier (1× MSAA); `?quality=high` is the 4× tier.
   const earth = async (search) => {
     await page.goto(`${server.resolvedUrls.local[0]}examples/earth/${search}`);
     await page.waitForFunction(() => document.body.dataset.ready === 'true' || document.body.dataset.error === 'true');

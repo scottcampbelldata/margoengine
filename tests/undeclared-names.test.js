@@ -1,6 +1,6 @@
 // Bug 70 follow-up: the bug 70 change added `await closeAll(...)` to bundler-matrix.mjs and profile-pbr-locked-drag.mjs
 // without importing it (the import went into a generated page's source instead), so `modern:test:bundlers` died with
-// `ReferenceError: closeAll is not defined` only after the landing lock had been held for an hour. Node reports a
+// `ReferenceError: closeAll is not defined` only after an hour-long full check. Node reports a
 // missing name only when the line runs; Biome's `noUndeclaredVariables` rule reports it from the source. This runs
 // the rule over every tracked .mjs file (scripts, tests, tools, examples) and every .js file under scripts/, and fails
 // on a name that is neither imported, declared, nor a global. Page code that a script sends to the browser is declared in

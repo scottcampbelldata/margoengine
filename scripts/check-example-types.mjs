@@ -40,7 +40,7 @@ export async function checkExampleTypes({
   if (!existsSync(compiler))
     throw margoError(
       'EXAMPLE_TYPES_NO_COMPILER',
-      `${compiler} is missing; run npm install (or node scripts/worktree-node-modules.mjs)`,
+      `${compiler} is missing; run npm ci in this checkout`,
     );
   if (!existsSync(resolve(cwd, 'packages/core/dist/index.d.ts')))
     throw margoError('EXAMPLE_TYPES_NOT_BUILT', 'packages/core/dist is missing; run npm run build:packages first');

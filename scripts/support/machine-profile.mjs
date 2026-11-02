@@ -1,5 +1,5 @@
 // Machine profiles (scripts/support/machine-profiles.json, item 57.1a): which GPU tests a machine may run, whether its
-// temperature is watched, whether heavy suites run as short steps, and its nightly plan. The profile is chosen by name
+// temperature is watched, and whether heavy suites run as short steps. The profile is chosen by name
 // with MARGO_MACHINE_PROFILE, never by hostname, so no machine names or paths live in public files.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,11 +35,10 @@ function checkProfile(name, profile, file) {
   for (const [key, reason] of Object.entries(profile.exclude ?? {}))
     if (typeof reason !== 'string' || !reason.trim())
       throw bad(`exclude.${key} must state the reason the package does not run there`);
-  if (!Array.isArray(profile.nightly)) throw bad('nightly must list the nightly steps this machine runs');
 }
 
 /**
- * The profile for this run: `{ name, description, heat, split, exclude, nightly }`. MARGO_MACHINE_PROFILE picks it by
+ * The profile for this run: `{ name, description, heat, split, exclude }`. MARGO_MACHINE_PROFILE picks it by
  * name (unset: the file's default). An unknown name throws MACHINE_PROFILE_UNKNOWN listing the known ones.
  */
 export function machineProfile(env = process.env, file = PROFILES_FILE) {

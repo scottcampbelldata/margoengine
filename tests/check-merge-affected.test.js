@@ -16,7 +16,6 @@ import {
 } from '../scripts/check-merge.mjs';
 import { MATRIX_DIRS, packageScopes } from '../scripts/support/affected-packages.mjs';
 import { PARALLEL, SERIAL, TEST_CONCURRENCY } from '../scripts/verify.mjs';
-import { nightlyCommand, stamp } from '../scripts/nightly-full.mjs';
 import { PREPARE, RUNNER_SMOKE, splitSteps, testId } from '../scripts/gpu-package-tests.mjs';
 import {
   analyse,
@@ -370,12 +369,12 @@ test('more affected packages than the limit runs everything', () => {
 
 test('documents, site pages and licences change nothing on the GPU; a catalog asset runs the catalog suite', () => {
   for (const file of [
-    'docs/HANDOFF.md',
+    'docs/known-bugs.md',
     'README.md',
     'packages/b/README.md',
     'site/index.html',
     'LICENSE',
-    'AGENTS.md',
+    'docs/clean-room.md',
     'scripts/quality/baselines/sizes.json', // a recorded baseline, read only by npm run quality
   ]) {
     const result = run([file]);
@@ -410,7 +409,7 @@ test('every check:merge step is either narrowed GPU work or plain; a new step ha
 });
 
 test('a documents-only change skips every GPU step, the example types and the bundler matrix, and keeps the others', () => {
-  const { decision, planned } = planFor(['docs/HANDOFF.md', 'AGENTS.md', 'packages/dof/README.md']);
+  const { decision, planned } = planFor(['docs/known-bugs.md', 'docs/clean-room.md', 'packages/dof/README.md']);
   assert.equal(decision.mode, 'affected');
   for (const { command, skip } of planned) {
     const name = stepName(command);
@@ -439,7 +438,7 @@ test('a Python package change runs only the Python notebook suite, not the full 
 });
 
 test('a documents-only change outside any package still runs the packed smoke test, with no package examples', () => {
-  const { planned } = planFor(['docs/HANDOFF.md']);
+  const { planned } = planFor(['docs/known-bugs.md']);
   assert.equal(
     planned.find((p) => stepName(p.command) === 'modern:test:packages').command,
     'npm run modern:test:packages -- --packages=',
@@ -632,13 +631,6 @@ test('the mode line names the mode and the reason', () => {
   );
 });
 
-test('the nightly job runs check:merge:full under the GPU lock, with a dated log name', () => {
-  assert.equal(stamp(new Date(2026, 9, 25, 3, 5)), '2026-10-25T0305');
-  const [, args] = nightlyCommand();
-  assert.deepEqual(args.slice(0, 3), ['scripts/gpu-lock.mjs', 'run', '--owner=nightly-full']);
-  assert.deepEqual(args.slice(-3), ['npm', 'run', 'check:merge:full']);
-});
-
 // ---- Rule 20 on the real repository: the closure scan, the runner smoke list and the five planned cases. ----
 const stepsOf = stepClosure(root, workspaces, manifest.scripts, {
   verify: [...SERIAL, ...PARALLEL.flat()],
@@ -654,7 +646,7 @@ test('stepClosure places check files in the steps that run them, and standalone 
   assert.deepEqual(stepsOf.placed('scripts/support/msaa-blend-repeat.html'), []);
   // The site build makes the bench page, which imports the quiet gate; the site build always runs.
   assert.deepEqual(stepsOf.placed('scripts/quiet-gate.mjs').filter(isGpuId), []);
-  for (const file of ['scripts/nightly-full.mjs', 'scripts/benchmark-bvh.js', 'scripts/fuzz/run.js'])
+  for (const file of ['scripts/benchmark-bvh.js', 'scripts/fuzz/run.js'])
     assert.deepEqual(stepsOf.placed(file).filter(isGpuId), [], file);
   assert.ok(stepsOf.placed('scripts/gpu-lock.mjs').includes('check:gpu-packages'));
   assert.ok(stepsOf.placed('scripts/check-wgsl.mjs').includes('check:wgsl'));
@@ -768,7 +760,6 @@ test('case 3: a package.json of one package runs that package and its dependents
 
 test('case 5: runner files run the smoke list plus the tests of the packages that changed', () => {
   const { decision, planned } = planFor([
-    'scripts/nightly-full.mjs',
     'scripts/gpu-package-tests.mjs',
     'scripts/support/run-limited.mjs',
     'scripts/support/heat.mjs',

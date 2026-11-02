@@ -6,7 +6,7 @@
 // CLI: node scripts/gpu-lock.mjs run --owner=<agent id> -- <command...>   (holds the lock only while the command runs)
 //      node scripts/gpu-lock.mjs status
 // Scripts that take test-results/gpu.lock themselves use MARGO_GPU_LOCK_NESTED (a folder inside the held lock; it
-// excuses only that lock, so a GPU test inside the landing lock still takes the GPU lock) when
+// excuses only that lock, so a GPU test inside a different lock still takes the GPU lock) when
 // run under `run`, so wrapping them can't deadlock; acquire() is a no-op there too.
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -47,8 +47,7 @@ export function status() {
 /** Waits (polling every `poll` ms) until the lock is ours. Returns a release function that only removes our own lock. */
 export async function acquire({ owner, poll = 30_000, log = console.error } = {}) {
   if (!owner) throw new Error('gpu-lock: pass an owner (agent id)');
-  // Inside `run` of this same lock the command already holds it; a different lock (the landing lock around GPU
-  // tests, say) is still taken.
+  // Inside `run` of this same lock the command already holds it; a different lock is still taken.
   if (process.env.MARGO_GPU_LOCK_NESTED === join(lockDir, 'nested')) return () => {};
   const token = `${owner}:${process.pid}:${Date.now()}`;
   for (let waited = 0; ; waited += poll) {

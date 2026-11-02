@@ -102,7 +102,7 @@ test('check:merge runs the example projects a change can reach, all of them for 
     const command = planFiles(ctx, files).planned.find((p) => p.command.includes('check:examples-types'));
     return command.skip ? [] : (/--projects=(\S+)/.exec(command.command)?.[1].split(',') ?? ['all']);
   };
-  assert.deepEqual(ids(['docs/HANDOFF.md']), []);
+  assert.deepEqual(ids(['docs/known-bugs.md']), []);
   assert.deepEqual(ids(['examples/scene-targets.ts']), ['examples']);
   assert.deepEqual(ids(['examples/tokyo-diorama.js']), ['js']);
   assert.deepEqual(ids(['examples/vite/src/main.tsx']), ['vite']);

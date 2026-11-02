@@ -33,29 +33,23 @@ The folder names matter: each app finds the engine at `../margoengine`.
 ## Order
 
 1. Clone the engine and run `npm ci` in `margoengine` (`npm ci` installs the locked versions without rewriting
-   `package-lock.json`; `npm install` can rewrite it, and `engine:sync` refuses a changed engine checkout).
-2. Clone each app and run `npm install` in it. Its `postinstall` runs `npm run engine:sync`.
+   `package-lock.json`).
+2. Clone each app and run `npm install` in it.
 
-## What `engine:sync` does
+## Engine dependency preparation
 
-Each app's `engine:sync` runs the engine's `scripts/engine-sync.mjs`. It runs before `dev`, `test` and `build` and
-after `npm install`:
-
-- fetches `../margoengine` and fast-forwards its `main` to `origin/main`;
-- fails if the engine checkout has uncommitted changes, is on another branch or cannot fast-forward; offline, it
-  warns and continues only when local `main` equals the last fetched `origin/main`;
-- runs `npm ci` in the engine if it has no `node_modules`, and `npm run build:packages` when a package the app
-  uses was not built from the current commit;
-- writes `<app>/.engine/manifest.json` (ignored by git) with the engine commit and packages.
+Existing Margo applications call `scripts/engine-sync.mjs` from the private sibling checkout. It is a compatibility
+boundary for application dependencies, not a workflow controller: it never fetches, merges, creates branches or
+worktrees, commits, or pushes. It verifies that the engine has no tracked changes, builds missing package artifacts
+from the checkout already selected by the user or Agent Factory, and writes the ignored app-local
+`.engine/manifest.json`.
 
 Each app's Vite config uses `engineBuildInfo()` from `scripts/engine-build-info.mjs`: every build carries the engine
 commit as `<meta name="margo-engine">` in `index.html`, in `build-info.json` beside it and as
 `import.meta.env.MARGO_ENGINE_COMMIT` for an About box. A build without `.engine/manifest.json` fails.
 
-If `../margoengine` is missing, the app's `engine:sync` stops with the `git clone` command to run.
-
-Each app's `check:engine-apis` runs `engine-sync.mjs --check`: every `@margoengine` dependency must be
-`file:../margoengine/packages/<name>` and resolve there, each package the app uses must be built from engine HEAD,
-and nothing engine-related (`vendor/margo*`, `.engine/`, tarballs) may be committed in the app.
+Every `@margoengine` dependency must resolve from the verified private sibling checkout at
+`file:../margoengine/packages/<name>`. `engine-sync.mjs --check` validates those links, build stamps, and the manifest
+boundary. Do not commit vendored engine source, `.engine/`, or engine tarballs in an app.
 
 Never pin, copy or vendor an engine version in an app.

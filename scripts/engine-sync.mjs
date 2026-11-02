@@ -1,13 +1,9 @@
-// The one way a Margo app gets the engine: the sibling checkout `../margoengine`, always on the latest `origin/main`.
-// Apps run it through their `engine:sync` script (predev, pretest, prebuild, postinstall).
+// Compatibility boundary used by existing Margo applications that consume the private sibling checkout.
+// This prepares engine package artifacts and an app-local manifest; it does not create jobs, branches, worktrees,
+// commits, or pushes. Agent Factory owns those workflow and Git operations.
 //
-//   node <engine>/scripts/engine-sync.mjs [--app <dir>]   fast-forward, build if needed, write <app>/.engine/manifest.json
-//   node <engine>/scripts/engine-sync.mjs --check [--app <dir>]   check the app only (its check:engine-apis runs this)
-//
-// Sync fails loudly when the engine checkout has tracked changes, is not on main, or cannot fast-forward. Offline, it
-// warns and continues only when local main equals the last fetched origin/main. It builds only when a package the app
-// uses has no build of the current commit. `--check` fails when an @margoengine package resolves anywhere but the
-// engine's packages folder, a used package's build is older than engine HEAD, or the app commits engine files.
+//   node <engine>/scripts/engine-sync.mjs [--app <dir>]   prepare packages and write <app>/.engine/manifest.json
+//   node <engine>/scripts/engine-sync.mjs --check [--app <dir>]   validate the app only
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -115,10 +111,9 @@ if (checkOnly) {
   process.exit(0);
 }
 
-// One sync at a time per engine checkout (several apps may run their hooks together).
+// One preparation at a time per engine checkout because several apps may run hooks together.
 const lock = join(engine, 'node_modules', '.cache', 'engine-sync.lock');
 mkdirSync(dirname(lock), { recursive: true });
-// The lock holds this process's ID; a lock whose process has ended is taken over, and waiting stops after 5 minutes.
 const alive = (pid) => {
   try {
     process.kill(pid, 0);
@@ -150,42 +145,13 @@ for (;;) {
     spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},500)']);
   }
 }
-// fail() exits without unwinding, so release the lock on every exit.
 process.on('exit', () => rmSync(lock, { recursive: true, force: true }));
 try {
-  if (git('branch', '--show-current') !== 'main') fail(`${engine} is not on main; check out main there`);
   if (git('status', '--porcelain', '--untracked-files=no'))
-    fail(`${engine} has uncommitted changes; commit, land or stash them there first`);
-  let offline = false;
-  try {
-    execFileSync('git', ['-C', engine, 'fetch', '--quiet', 'origin', 'main'], {
-      stdio: ['ignore', 'ignore', 'pipe'],
-      timeout: 60_000,
-    });
-  } catch {
-    offline = true;
-  }
-  const local = git('rev-parse', 'HEAD'),
-    remote = git('rev-parse', 'origin/main');
-  if (offline) {
-    if (local !== remote)
-      fail(
-        `cannot fetch origin and local main (${local.slice(0, 8)}) is not the last fetched origin/main (${remote.slice(0, 8)})`,
-      );
-    console.warn(`engine:sync: offline; using local main ${local.slice(0, 8)}, the last fetched origin/main`);
-  } else if (local !== remote) {
-    try {
-      git('merge', '--ff-only', '--quiet', 'origin/main');
-    } catch {
-      fail(`${engine} main cannot fast-forward to origin/main; it has commits that are not on origin/main`);
-    }
-  }
+    fail(`${engine} has tracked changes; finish or discard them before preparing app dependencies`);
   const head = git('rev-parse', 'HEAD');
-  if (!existsSync(join(engine, 'node_modules', 'typescript'))) {
-    console.log('engine:sync: installing engine dependencies (npm ci)');
-    const install = spawnSync(npm, ['ci'], { cwd: engine, stdio: 'inherit', shell: process.platform === 'win32' });
-    if (install.status !== 0) fail('npm ci in the engine failed');
-  }
+  if (!existsSync(join(engine, 'node_modules', 'typescript')))
+    fail(`engine dependencies are missing; run npm ci in ${engine}`);
   const { all } = packagesOf(app);
   const stale = all.filter((name) => builtAt(name) !== head);
   if (stale.length) {
@@ -198,13 +164,11 @@ try {
       shell: process.platform === 'win32',
     });
     if (build.status !== 0) fail('npm run build:packages in the engine failed');
-    // The build regenerates tracked files (docs/catalog.json); on a sound main they come out unchanged.
     const changed = git('status', '--porcelain', '--untracked-files=no');
     if (changed)
       fail(
-        `building engine main ${head.slice(0, 8)} changed tracked files, so main is missing a regenerated file:\n${changed}\nland that file on engine main, then run git -C "${engine}" checkout -- . and sync again`,
+        `building engine ${head.slice(0, 8)} changed tracked files:\n${changed}\ncommit the generated source changes before preparing the app again`,
       );
-    // build:packages builds every package, so every app finds its packages current.
     for (const name of readdirSync(join(engine, 'packages')))
       if (existsSync(join(engine, 'packages', name, 'dist'))) writeFileSync(stamp(name), `${head}\n`);
   }
@@ -212,7 +176,7 @@ try {
   mkdirSync(out, { recursive: true });
   const record = { engine: 'margoengine', commit: head, packages: all };
   writeFileSync(join(out, 'manifest.json'), `${JSON.stringify(record, null, 2)}\n`);
-  console.log(`engine:sync: ${relative(dirname(engine), app).split(sep).join('/')} on engine main ${head.slice(0, 8)}`);
+  console.log(`engine:sync: ${relative(dirname(engine), app).split(sep).join('/')} on engine ${head.slice(0, 8)}`);
 } finally {
   rmSync(lock, { recursive: true, force: true });
 }

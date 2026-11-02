@@ -14,10 +14,9 @@ import {
   NO_GPU_STEPS,
   runSteps,
   SELF_WATCHED_STEPS,
-  stepsPlan,
   summary,
 } from '../scripts/check-merge.mjs';
-import { HEAT_EXIT } from '../scripts/nightly-full.mjs';
+import { HEAT_EXIT } from '../scripts/gpu-package-tests.mjs';
 import { thermalSource } from '../scripts/support/heat.mjs';
 import { machineProfile } from '../scripts/support/machine-profile.mjs';
 import { runLimited } from '../scripts/support/run-limited.mjs';
@@ -28,7 +27,6 @@ const laptopLike = (heat = {}) => ({
   description: 'a test profile',
   split: true,
   exclude: {},
-  nightly: [],
   heat: { stopC: 88, resumeC: 75, maxWaitMin: 0.02, maxResumesPerStep: 2, pollS: 5, ...heat },
 });
 const steps = (...names) => names.map((name) => ({ command: `npm run ${name}` }));
@@ -103,7 +101,6 @@ test('a GPU step that reaches the stop is ended, waits for the resume temperatur
     thermal.done();
   }
 });
-
 test('a step that keeps reaching the stop ends the run as PAUSED FOR HEAT: NOT RESUMED after maxResumesPerStep', async () => {
   const thermal = thermalFile(60),
     record = [];
@@ -251,43 +248,4 @@ test('every check:merge step that drives the GPU is heat-watched by check:merge 
   ])
     assert.ok(heatWatched(name), `${name} drives the GPU and must be heat-watched`);
   assert.equal(heatWatched('check:gpu-packages'), false);
-});
-
-// The small machines ran their light nightly GPU checks (check:wgsl, check:views, check:depth, check:no-webgpu,
-// modern:test:bundlers) straight through npm, with no heat watch; they now go through check:merge --steps, the same
-// runSteps. On a heat profile the full nightly check holds no outer exclusive lock, so no lock is held while it cools.
-test('the nightly light GPU checks run through check:merge --steps, and stepsPlan names only real steps', async () => {
-  const { NIGHTLY_STEPS, heatFullCommand, nightlyCommand, nightlySteps } = await import('../scripts/nightly-full.mjs');
-  const steps = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts['check:merge:steps'].split(' && ');
-  for (const name of ['mini-pc', 'thermal-limited']) {
-    const profile = machineProfile({ MARGO_MACHINE_PROFILE: name });
-    for (const { label, command } of nightlySteps(profile).steps.slice(1)) {
-      const [, args] = command;
-      assert.equal(args[0], 'scripts/check-merge.mjs', label);
-      const names = args[1].replace('--steps=', '').split(',');
-      const { decision, planned } = stepsPlan(names, steps);
-      assert.equal(decision.mode, 'steps');
-      assert.deepEqual(
-        planned.map((p) => p.command),
-        names.map((n) => `npm run ${n}`),
-      );
-      for (const n of names) assert.ok(heatWatched(n), `${label}: ${n} is heat-watched`);
-    }
-  }
-  assert.throws(
-    () => stepsPlan(['check:nope'], steps),
-    (error) => error.code === 'CHECK_MERGE_STEP_UNKNOWN' && /check:nope/.test(error.message),
-  );
-  assert.throws(
-    () => stepsPlan([], steps),
-    (error) => error.code === 'CHECK_MERGE_STEP_UNKNOWN',
-  );
-  // Heat profile: the full check runs with no outer lock; the workstation keeps its one exclusive hold.
-  const laptop = nightlySteps(machineProfile({ MARGO_MACHINE_PROFILE: 'laptop' })).steps[0].command,
-    work = nightlySteps(machineProfile({ MARGO_MACHINE_PROFILE: 'workstation' })).steps[0].command;
-  assert.deepEqual(laptop, heatFullCommand());
-  assert.deepEqual(laptop[1], ['scripts/check-merge.mjs', '--full']);
-  assert.deepEqual(work, nightlyCommand());
-  assert.ok(work[1].includes('--exclusive'));
-  assert.deepEqual(NIGHTLY_STEPS['full check:merge'](machineProfile({})), nightlyCommand());
 });

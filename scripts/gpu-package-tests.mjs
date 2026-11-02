@@ -44,6 +44,7 @@ import { STEPS } from './modern-extension-suite.mjs';
 import { packageMinutes, runLimited, testLimitMs } from './support/run-limited.mjs';
 
 const root = resolve(import.meta.dirname, '..');
+export const HEAT_EXIT = 75;
 const json = (file) => JSON.parse(readFileSync(join(root, file), 'utf8'));
 
 /** Root suites run here. */
@@ -79,7 +80,7 @@ export const ROOT = {
  */
 export const RELEASE_ONLY = {
   'modern:test:stress': '500 sessions of 120 frames, hours of GPU; the release checks it once',
-  'test:basic-scene': 'runs in every landing: scripts/land-records.mjs measures the network record with it',
+  'test:basic-scene': 'the release record command measures the basic-scene network with it',
 };
 /**
  * Browser suites (`test:*`, `modern:test:*`) that no check runs, each with its reason (unrunBrowserSuites fails the
@@ -587,7 +588,7 @@ export const exitCode = (results) =>
   results.some((r) => r.outcome === 'fail')
     ? 1
     : results.some((r) => r.outcome === 'heat-not-resumed' || r.outcome === 'not-run')
-      ? 75
+      ? HEAT_EXIT
       : 0;
 
 /** The summary lines of a run: one per step, then a count of each outcome other than a plain pass. */
@@ -862,7 +863,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     code = exitCode(results);
   if (failed.length)
     console.error(`${failed.length} of ${results.length} failed: ${failed.map((r) => r.label).join(', ')}`);
-  else if (code === 75)
+  else if (code === HEAT_EXIT)
     console.error(
       'No test failed, but a heat stop was not resumed: the run is incomplete (exit 75). Rerun the steps named above when the machine is cool, or on a profile that can take the load.',
     );

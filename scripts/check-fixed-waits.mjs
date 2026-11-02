@@ -136,7 +136,7 @@ if (import.meta.url === `file:///${process.argv[1]?.replaceAll('\\', '/').replac
       );
   }
   for (const [file, allowed] of Object.entries(baseline.files)) {
-    // A file not in this tree yet (its branch is still in the landing queue) has nothing to compare.
+    // A file not in this tree yet has nothing to compare.
     if (!existsSync(join(root, file))) continue;
     const now = found[file]?.length ?? 0;
     if (now < allowed) lower[file] = now;

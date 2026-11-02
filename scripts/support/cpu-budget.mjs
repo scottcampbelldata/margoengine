@@ -1,5 +1,5 @@
 // A time budget on how fast code is, for a test that runs while the machine does other work. A wall clock counts the
-// time this thread waits for a CPU: one biomes tile, about 30 ms alone, read 714.8 ms during a landing with GPU jobs on
+// time this thread waits for a CPU: one biomes tile, about 30 ms alone, read 714.8 ms during a busy run with GPU jobs on
 // the PC and 816.8 ms pinned to one CPU beside 7 busy processes, where its CPU time stayed at 8 to 58 ms. Neither of the
 // other clocks Node offers will do: process.cpuUsage adds the JIT and GC threads (66 ms against this thread's 39 ms on
 // the same run), and performance.eventLoopUtilization reads 0 for work that never gives the event loop a turn and

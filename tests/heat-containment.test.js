@@ -9,8 +9,16 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { exitCode, plan, planSteps, report, runPlan, splitSteps, summaryLines } from '../scripts/gpu-package-tests.mjs';
-import { HEAT_EXIT, NIGHTLY_STEPS, nightlySteps, runNightly } from '../scripts/nightly-full.mjs';
+import {
+  HEAT_EXIT,
+  exitCode,
+  plan,
+  planSteps,
+  report,
+  runPlan,
+  splitSteps,
+  summaryLines,
+} from '../scripts/gpu-package-tests.mjs';
 import { coolDown, fileTemperature, hottestZone, thermalSource, toCelsius } from '../scripts/support/heat.mjs';
 import { machineProfile, PROFILES_FILE, readProfiles } from '../scripts/support/machine-profile.mjs';
 import { runLimited } from '../scripts/support/run-limited.mjs';
@@ -21,7 +29,6 @@ const heatProfile = (heat = {}) => ({
   description: 'a test profile',
   split: true,
   exclude: {},
-  nightly: [],
   heat: { stopC: 80, resumeC: 70, maxWaitMin: 0.05, maxResumesPerStep: 2, pollS: 5, ...heat },
 });
 const step = (id) => ({ id, label: `pkg ${id}`, part: [1, 1] });
@@ -86,7 +93,6 @@ test('a heat stop pauses, releases the lock, resumes at the paused step and repo
   );
   assert.match(summary, /paused for heat and resumed: 1 step\(s\)/);
 });
-
 test('a cooldown that passes its maximum wait is PAUSED FOR HEAT: NOT RESUMED, the rest NOT RUN, exit 75, never a failure', async () => {
   let temp = 50;
   const calls = [];
@@ -121,7 +127,6 @@ test('a cooldown that passes its maximum wait is PAUSED FOR HEAT: NOT RESUMED, t
   assert.doesNotMatch(summary, /FAIL/);
   assert.equal(report(results).json.passedAfterDriverReset, false);
 });
-
 test('a step that keeps reaching the stop ends after its resume limit with the reason, and the run goes on', async () => {
   let temp = 50;
   const calls = [];
@@ -215,7 +220,6 @@ test('a temperature file drives the watch: millidegrees or degrees, a stale file
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
 test('the hottest readable thermal zone counts; a zone that cannot be read is left out', () => {
   const dir = mkdtempSync(join(tmpdir(), 'zones-'));
   try {
@@ -347,7 +351,7 @@ test('profiles are chosen by name, are checked, and hold no machine names or hom
       JSON.stringify({
         default: 'a',
         profiles: {
-          a: { heat: { stopC: 70, resumeC: 75, maxWaitMin: 5, maxResumesPerStep: 1, pollS: 5 }, nightly: [] },
+          a: { heat: { stopC: 70, resumeC: 75, maxWaitMin: 5, maxResumesPerStep: 1, pollS: 5 } },
         },
       }),
     );
@@ -355,81 +359,6 @@ test('profiles are chosen by name, are checked, and hold no machine names or hom
       () => readProfiles(file),
       (error) => error.code === 'MACHINE_PROFILES_INVALID' && /resumeC/.test(error.message),
     );
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('the nightly plan follows the profile and a heat stop ends the night as PAUSED-FOR-HEAT, not FAIL', async () => {
-  const work = nightlySteps(machineProfile({ MARGO_MACHINE_PROFILE: 'workstation' })),
-    laptop = nightlySteps(machineProfile({ MARGO_MACHINE_PROFILE: 'laptop' })),
-    light = [
-      'gpu package tests',
-      'check:wgsl',
-      'check:views',
-      'check:depth',
-      'check:no-webgpu',
-      'modern:test:bundlers',
-    ];
-  assert.deepEqual(
-    work.steps.map((s) => s.label),
-    ['full check:merge', 'pinned proofs'],
-  );
-  assert.deepEqual(work.after, []);
-  // The laptop is the nightly backstop for check:merge's narrowing (session rule 20): everything, path tracer included.
-  assert.deepEqual(
-    laptop.steps.map((s) => s.label),
-    ['full check:merge', 'pinned proofs'],
-  );
-  assert.deepEqual(laptop.after, ['nightly-status']);
-  assert.deepEqual(machineProfile({ MARGO_MACHINE_PROFILE: 'laptop' }).exclude, {});
-  // The small machines add the light GPU checks after the package tests, which build every package first.
-  for (const name of ['mini-pc', 'thermal-limited']) {
-    const hot = nightlySteps(machineProfile({ MARGO_MACHINE_PROFILE: name }));
-    assert.deepEqual(
-      hot.steps.map((s) => s.label),
-      light,
-      name,
-    );
-    assert.deepEqual(hot.after, ['nightly-status'], name);
-    assert.deepEqual(
-      hot.left.map((s) => s.label),
-      ['full check:merge', 'pinned proofs'],
-      name,
-    );
-  }
-  // Each light step runs the package.json script of the same name, after what it reads is built, through check:merge's
-  // step runner (--steps), so the profile's heat watch covers it (tests/check-merge-heat.test.js).
-  const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts;
-  for (const label of light.slice(1)) {
-    const [, args] = NIGHTLY_STEPS[label]();
-    assert.ok(scripts[label], label);
-    assert.equal(args[0], 'scripts/check-merge.mjs', label);
-    assert.ok(args[1].startsWith('--steps=') && args[1].endsWith(label), label);
-  }
-  assert.equal(NIGHTLY_STEPS['check:no-webgpu']()[1][1], '--steps=build:site,check:no-webgpu');
-  assert.equal(NIGHTLY_STEPS['modern:test:bundlers']()[1][1], '--steps=modern:test:packages,modern:test:bundlers');
-  assert.throws(
-    () => nightlySteps({ name: 'x', nightly: ['nope'] }),
-    (error) => error.code === 'NIGHTLY_STEP_UNKNOWN',
-  );
-  const dir = mkdtempSync(join(tmpdir(), 'nightly-heat-'));
-  try {
-    const code = await runNightly({
-      steps: [{ label: 'gpu package tests', command: [process.execPath, ['-e', `process.exit(${HEAT_EXIT})`]] }],
-      dir,
-      env: { ...process.env, MARGO_NIGHTLY_NO_ALERT: '1' },
-      quiet: true,
-      header: ['nightly plan: test'],
-    });
-    assert.equal(code, HEAT_EXIT);
-    const status = JSON.parse(readFileSync(join(dir, 'last-status.json'), 'utf8'));
-    assert.equal(status.result, 'paused-for-heat');
-    assert.equal(status.steps[0].result, 'paused-for-heat');
-    const log = readFileSync(status.log, 'utf8');
-    assert.match(log, /^nightly plan: test/);
-    assert.match(log, /PAUSED FOR HEAT, NOT RESUMED \(exit 75, not a failure/);
-    assert.match(log, /nightly RESULT PAUSED-FOR-HEAT at step "gpu package tests"/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

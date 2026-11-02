@@ -1,4 +1,4 @@
-// Standard colour-map tables, recorded as published data (AGENTS.md's exception for standard files every engine uses;
+// Standard colour-map tables, recorded as published data (the clean-room standard-file exception;
 // sources and licences in THIRD-PARTY-NOTICES.md and docs/clean-room.md). Data only: 256 sRGB colours per map, each
 // rounded to 8 bits. Each map is written as its first colour in six hex digits, then, for every following colour, the
 // change of each channel from the colour before as one letter: 'O' (code 79) is no change, 'P' is +1/255, 'N' -1/255.

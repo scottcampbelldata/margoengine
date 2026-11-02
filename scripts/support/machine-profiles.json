@@ -1,13 +1,12 @@
 {
-  "$comment": "Which GPU tests a machine runs and how it guards its temperature (item 57.1a). Choose one with MARGO_MACHINE_PROFILE=<name>; unset means `default`. Read by scripts/support/machine-profile.mjs for scripts/gpu-package-tests.mjs, scripts/check-merge.mjs (the heat watch on every GPU step) and scripts/nightly-full.mjs. `heat` null: no heat watch. `heat.stopC` sits below the machine's own heat guard, which stays the safety net. `split`: heavy suites run as short steps (package.json `margo.gpuTestSteps` and `&&` chains). `exclude`: package directory (or `root`) to the stated reason it does not run here. `nightly`: the nightly steps this machine runs (scripts/nightly-full.mjs NIGHTLY_STEPS).",
+  "$comment": "Which GPU tests a machine can run and how it guards its temperature. Choose one with MARGO_MACHINE_PROFILE=<name>; unset means `default`. Read by scripts/support/machine-profile.mjs for scripts/gpu-package-tests.mjs and scripts/check-merge.mjs. `heat` null means no heat watch. `split` runs heavy suites as short steps. `exclude` records packages this hardware must not run and why.",
   "default": "workstation",
   "profiles": {
     "workstation": {
       "description": "a desktop with a discrete GPU and active cooling, the maintainer's RTX A6000 PC; every test runs as one step",
       "heat": null,
       "split": false,
-      "exclude": {},
-      "nightly": ["full check:merge", "pinned proofs"]
+      "exclude": {}
     },
     "mini-pc": {
       "description": "a small Windows PC with an AMD iGPU; its elevated temperature logger feeds MARGO_THERMAL_FILE",
@@ -15,15 +14,13 @@
       "split": true,
       "exclude": {
         "voxel-pathtracer": "the path tracer froze this machine once; it runs only on the workstation profile"
-      },
-      "nightly": ["gpu package tests", "check:wgsl", "check:views", "check:depth", "check:no-webgpu", "modern:test:bundlers", "nightly-status"]
+      }
     },
     "laptop": {
       "description": "a laptop with an integrated GPU (Intel Arc class) and a temperature logger feeding MARGO_THERMAL_FILE; heavy suites run as short steps",
       "heat": { "stopC": 88, "resumeC": 75, "maxWaitMin": 30, "maxResumesPerStep": 2, "pollS": 5 },
       "split": true,
-      "exclude": {},
-      "nightly": ["full check:merge", "pinned proofs", "nightly-status"]
+      "exclude": {}
     },
     "thermal-limited": {
       "description": "a fanless Linux test server with Intel UHD graphics (Mesa) and a 10 W power cap; its heat guard stops jobs at 82 C",
@@ -31,8 +28,7 @@
       "split": true,
       "exclude": {
         "voxel-pathtracer": "path tracing at up to 3840 x 2160 holds the GPU at full load for minutes, past this machine's thermal budget even in short steps; it runs on the workstation profile"
-      },
-      "nightly": ["gpu package tests", "check:wgsl", "check:views", "check:depth", "check:no-webgpu", "modern:test:bundlers", "nightly-status"]
+      }
     }
   }
 }

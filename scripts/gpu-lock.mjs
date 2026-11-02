@@ -3,10 +3,10 @@
 //   exclusive  anything that measures speed: `--exclusive` / acquire({mode: 'exclusive'}), and automatically every
 //              `bench*` npm script and every script under bench/, benchmarks/ or *-benchmarks/ (or named bench*.mjs).
 //              It waits until no holder is left and, while it waits, new shared holders queue behind it, so it cannot
-//              starve. Every lock other than `gpu.lock` (the landing lock, say) is exclusive.
+//              starve. Every explicitly selected non-GPU lock is exclusive.
 // Nothing hangs while holding or waiting:
-//   hold limit  every holder has a maximum hold time (default 20 min shared, 60 min exclusive, 30 min for any other lock
-//               such as the landing lock; `--max=<min>` / acquire({max})). `run` kills the command's whole process tree
+//   hold limit  every holder has a maximum hold time (default 20 min shared, 60 min exclusive, 30 min for any other
+//               explicitly selected lock; `--max=<min>` / acquire({max})). `run` kills the command's whole process tree
 //               (Windows: taskkill /T /F) when it is exceeded, frees the lock and exits 124 with
 //               "TIMEOUT after N min: <command>". A holder that called acquire() itself is ended the same way by its
 //               heartbeat process, a few seconds after the limit.
@@ -29,7 +29,7 @@
 // Env: MARGO_GPU_SLOTS=<n> shared slots (default 3); MARGO_GPU_EXCLUSIVE=1 makes every acquire exclusive (it can only
 // raise a request to exclusive, never lower it); MARGO_GPU_LOCK=<folder> uses another lock.
 // Scripts that take the lock themselves use MARGO_GPU_LOCK_NESTED (a folder inside the held lock; it excuses only that
-// lock, so a GPU test inside the landing lock still takes the GPU lock) when run under `run`, so wrapping them can't
+// lock, so a GPU test inside a different lock still takes the GPU lock) when run under `run`, so wrapping them can't
 // deadlock; acquire() is a no-op there. MARGO_GPU_LOCK_NESTED_MODE names the outer holder's mode: an exclusive request
 // inside a shared hold would wait on itself forever, so it throws and says to start the outer command with --exclusive.
 import {
@@ -53,7 +53,7 @@ import { exitOnHelp } from './support/help.mjs';
 /**
  * The main checkout of the clone that holds `root`, so every worktree shares one lock folder. A git worktree's `.git`
  * is a file naming `<main>/.git/worktrees/<name>` wherever the worktree folder is (a worktree outside
- * `.claude/worktrees` once got a lock of its own and shared no GPU slots and no landing turn with anyone).
+ * the main checkout once got a lock of its own and shared no GPU slots with anyone).
  * @param {string} root A checkout's top folder.
  */
 export function mainCheckout(root) {
@@ -370,8 +370,7 @@ export async function acquire({
 } = {}) {
   if (!owner) throw new Error('gpu-lock: pass an owner (agent id)');
   const mode = resolveMode(requested);
-  // Inside `run` of this same lock the command already holds it; a different lock (the landing lock around GPU
-  // tests, say) is still taken.
+  // Inside `run` of this same lock the command already holds it; a different lock is still taken.
   if (process.env.MARGO_GPU_LOCK_NESTED === join(lockDir, 'nested')) {
     if (mode === 'exclusive' && process.env.MARGO_GPU_LOCK_NESTED_MODE === 'shared')
       throw new Error(
@@ -563,9 +562,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const maxMinutes = given('max') ?? defaultMaxMinutes(release.mode),
       env = {
         ...process.env,
-        // MARGO_GPU_LOCK chose the lock this run holds. Under another lock (the landing lock) the command's own GPU
-        // work must take the GPU lock beside it, not this one again: inherited, it made every GPU test inside the
-        // landing lock skip the GPU lock and fail its exclusive requests as if nested in a shared slot.
+        // MARGO_GPU_LOCK chose the lock this run holds. Under another lock the command's own GPU work must take the GPU
+        // lock beside it, not this one again.
         ...(isGpuLock ? {} : { MARGO_GPU_LOCK: join(dirname(lockDir), 'gpu.lock') }),
         MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested'),
         MARGO_GPU_LOCK_NESTED_MODE: release.mode,

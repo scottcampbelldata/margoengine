@@ -1,5 +1,5 @@
 // scripts/gpu-lock.mjs: `run` passes arguments exactly as given (spaces and quotes survive, on Windows too, where cmd.exe
-// starts it); the nested marker covers only the lock being held, so a GPU test inside the landing lock still takes the
+// starts it); the nested marker covers only the lock being held, so a GPU test inside a different lock still takes the
 // GPU lock; and the reader/writer rules: shared slots, an exclusive request that waits without starving, stale holders.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,11 +43,11 @@ const acquireUnder = (lock, nested) =>
 
 test('the nested marker excuses only the held lock: a different lock is still taken', () => {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
-    landing = join(folder, 'land.lock'),
+    other = join(folder, 'other.lock'),
     gpu = join(folder, 'gpu.lock');
   try {
-    // A GPU test inside the landing lock's run: the GPU lock is really taken.
-    const inside = acquireUnder(gpu, join(landing, 'nested'));
+    // A GPU test inside a different lock's run: the GPU lock is really taken.
+    const inside = acquireUnder(gpu, join(other, 'nested'));
     assert.equal(inside.status, 0, inside.stderr);
     assert.equal(JSON.parse(inside.stdout.trim()).holders[0].owner, 'child');
     rmSync(gpu, { recursive: true, force: true });
@@ -60,19 +60,19 @@ test('the nested marker excuses only the held lock: a different lock is still ta
   }
 });
 
-test('run under the landing lock points the command at the GPU lock beside it, which it then really takes', () => {
+test('run under another lock points the command at the GPU lock beside it, which it then really takes', () => {
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-')),
-    landing = join(folder, 'land.lock'),
+    other = join(folder, 'other.lock'),
     gpu = join(folder, 'gpu.lock');
   try {
-    // A GPU test inside the landing lock: its exclusive request takes the GPU lock instead of failing as nested.
+    // A GPU test inside another lock: its exclusive request takes the GPU lock instead of failing as nested.
     const probe = [
       "const m = await import('./scripts/gpu-lock.mjs');",
       "const release = await m.acquire({ owner: 'gpu-test', mode: 'exclusive', poll: 10 });",
       'console.log(process.env.MARGO_GPU_LOCK + "|" + JSON.stringify(m.status()));',
       'release();',
     ].join(' ');
-    const out = run(landing, [process.execPath, '--input-type=module', '-e', probe]);
+    const out = run(other, [process.execPath, '--input-type=module', '-e', probe]);
     assert.equal(out.status, 0, out.stderr);
     const [lock, status] = out.stdout.trim().split('|');
     assert.equal(lock, gpu);
@@ -251,9 +251,9 @@ test('MARGO_GPU_EXCLUSIVE raises a shared request to exclusive; other locks are 
   );
   const folder = mkdtempSync(join(tmpdir(), 'gpu-lock-'));
   try {
-    const landing = await lockIn(join(folder, 'land.lock')),
-      first = await take(landing, 'one'),
-      second = take(landing, 'two');
+    const other = await lockIn(join(folder, 'other.lock')),
+      first = await take(other, 'one'),
+      second = take(other, 'two');
     assert.equal(first.mode, 'exclusive');
     assert.equal(await settled(second), 'waiting');
     first();

@@ -1,6 +1,6 @@
 // scripts/support/cpu-budget.mjs: the clock behind every time budget in a unit test counts this thread's work and
 // nothing else. A wall clock read 816.8 ms where this one read 39 ms, one biomes tile pinned to a CPU beside 7 busy
-// processes, and a limit on it stopped a landing.
+// processes, and a limit on it stopped an otherwise valid build.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

@@ -4,7 +4,7 @@
 //   node scripts/record-test-count.mjs [--commit=HEAD] [--from-log=<file>]
 // It runs verify's unit-test command (PARALLEL in scripts/verify.mjs) and the two sandbox workspaces' tests, fails if any
 // test failed, then rewrites examples/package-benchmarks/results/test-count.json, the statements in the white paper and in
-// docs/whitepaper/claims.md, and the line in docs/HANDOFF.md. `--commit` names the commit the count is stated at: pass
+// docs/whitepaper/claims.md. `--commit` names the commit the count is stated at: pass
 // HEAD~1 when HEAD is a docs-only commit that adds no test. `--from-log` reads the "ℹ tests N" summary from a saved
 // verify log instead of running the tests. scripts/support/public-truth.mjs (tests/public-truth.test.js, in verify) fails
 // when a statement and the JSON differ.
@@ -86,7 +86,7 @@ export async function main(argv = process.argv.slice(2)) {
       workspaces,
     };
   writeFileSync(file, `${JSON.stringify(record, null, 2)}\n`);
-  for (const path of [...TEST_COUNT_FILES, 'docs/HANDOFF.md']) {
+  for (const path of TEST_COUNT_FILES) {
     const full = join(root, path),
       before = readFileSync(full, 'utf8'),
       crlf = before.includes('\r\n'),

@@ -93,7 +93,7 @@ export function snapshot(scratch) {
 function linkModules(clone) {
   const source = join(root, 'node_modules'),
     target = join(clone, 'node_modules');
-  if (!existsSync(source)) throw new Error('fresh-clone: run npm ci (or scripts/worktree-node-modules.mjs) first');
+  if (!existsSync(source)) throw new Error('fresh-clone: run npm ci in this checkout first');
   mkdirSync(join(target, '@margoengine'), { recursive: true });
   for (const name of readdirSync(source))
     if (name !== '@margoengine' && name !== 'margoengine' && name !== '.bin' && !name.startsWith('.'))

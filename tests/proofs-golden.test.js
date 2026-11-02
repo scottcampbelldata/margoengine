@@ -174,7 +174,7 @@ test('a pinned run whose commit this clone lacks is HISTORICAL with the commit n
 });
 
 // A proof that exits 0 as HISTORICAL passes, so only Git's own "no" may lead there. Any other failure of `git` once meant
-// the same (a landing's proofs-pinned-core test returned 0 while another worktree rewrote .git/config), and a failed
+// the same (a proofs-pinned-core test returned 0 while another worktree rewrote .git/config), and a failed
 // `git show` silently read the working tree in place of the pinned file.
 const history = (body, env = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'margo-golden-'));

@@ -37,7 +37,6 @@ const KEY_VERSION = 2;
  */
 export const EXCLUDED_PATHS = [
   [/^test-results\/gpu[^/]*\.lock(\/|$)/, 'the GPU lock folder is coordination between processes, not an input'],
-  [/^test-results\/land\.lock(\/|$)/, 'the landing lock folder is coordination between processes, not an input'],
   [
     /^node_modules\/\.vite[^/]*(\/|$)/,
     'per-server Vite caches hold derived copies of inputs that are hashed themselves',

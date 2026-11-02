@@ -15,7 +15,7 @@ examples/assets/kaykit/**/*.bin filter=lfs diff=lfs merge=lfs -text
 examples/assets/kaykit/**/*.png filter=lfs diff=lfs merge=lfs -text
 
 # Package bin scripts: npm rewrites a bin's CRLF shebang line to LF on install, which left a CRLF checkout modified
-# (mixed endings) after every npm ci on Windows and stopped scripts/land-records.mjs; tests/package-bins.test.js
+# (mixed endings) after every npm ci on Windows; tests/package-bins.test.js
 packages/*/bin/** text eol=lf
 
 # Margo-made fixtures whose CRLF line endings are part of what the tests exercise
@@ -29,16 +29,6 @@ packages/gltf-pro/tests/fixtures/*.wgsl text eol=lf
 packages/decoders/vendor/draco/* -text
 packages/decoders/vendor/basis/* -text
 examples/assets/parity-clip.webm filter=lfs diff=lfs merge=lfs -text
-
-# Generated records: a rebase keeps main's copy and scripts/land-records.mjs regenerates it; quality baselines merge item by item
-# (scripts/merge-driver.mjs, registered by scripts/setup-merge-drivers.mjs)
-api/*.api.md merge=margo-derived
-docs/api-surface.md merge=margo-derived
-site/llms.txt merge=margo-derived
-site/llms-full.txt merge=margo-derived
-examples/package-benchmarks/results/entry-sizes.json merge=margo-derived
-examples/package-benchmarks/results/basic-scene-network.json merge=margo-derived
-scripts/quality/baselines/*.json merge=margo-ratchet
 
 # WGSL corpus of @margoengine/webgl2-compat: the manifest pins the SHA-256 of the decompressed sources
 packages/webgl2-compat/test/corpus/manifest.json text eol=lf

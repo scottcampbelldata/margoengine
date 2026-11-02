@@ -5,8 +5,7 @@ lighting and post-processing formula in the engine comes from.
 
 ## The rule
 
-Scott's rule (2026-10-24), in [AGENTS.md](../AGENTS.md#clean-room-no-files-from-other-repos): Margo never uses files
-from other repositories, whatever their licence. Code is written from public specifications, papers and
+Scott's rule (2026-10-24): Margo never uses files from other repositories, whatever their licence. Code is written from public specifications, papers and
 descriptions; nobody copies, adapts or reads another engine's or application's source while writing the matching
 Margo code. Other engines run only where they live (`../engine-bench`). The one exception is large standard files
 every engine uses (sample models, test assets, prebuilt decoders), each recorded in
@@ -41,8 +40,7 @@ Each area went through four steps, with a different agent at each step so no wri
 
 ## Rewrites of 2026-10-24
 
-From the [handoff entry](HANDOFF.md#landed-2026-10-24-clean-room-rewrites-ac465a00ccb4a164-and-follow-ups)
-(commits ac465a00..ccb4a164 and follow-ups), every area the 2026-10-21 audit found close to other engines' or
+From commits ac465a00..ccb4a164 and their follow-ups, every area the 2026-10-21 audit found close to other engines' or
 libraries' code:
 
 - geometry (primitives, curves, extrusion, earcut triangulation, edges, convex hull, subdivision, utilities)
@@ -574,7 +572,7 @@ expect; the documentation describes behaviour, not code.
 Written clean room from the sources below. No source code of plotting or visualisation libraries (plotly, vtk.js,
 deck.gl, regl, three.js, matplotlib, ParaView, napari, ipyvolume, anywidget and the like) was read. Margo's own colour maps are
 computed from their published definitions. The five standard maps are the authors' published tables, recorded as data
-under the AGENTS.md exception for standard files (THIRD-PARTY-NOTICES.md, `packages/sciviz/NOTICE.md`).
+under the standard-file exception documented above (THIRD-PARTY-NOTICES.md, `packages/sciviz/NOTICE.md`).
 
 | Area | Source |
 | --- | --- |

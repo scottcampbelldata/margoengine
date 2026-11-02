@@ -846,8 +846,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
 - **Cause:** shared helpers are bundled into every package that uses them. So merging a copy saves nothing in a package
   that held only one copy, and each call adds a few bytes. In the frozen core, the shared GGX helper alone would have
   added 92 B.
-- **Trade-off:** core keeps its own copies of five things, which are recorded as accepted duplicates in
-  [HANDOFF](../HANDOFF.md):
+- **Trade-off:** core keeps its own copies of five accepted duplicates:
   - the `#rrggbb` check;
   - the GGX text;
   - the view-rectangle check;
@@ -862,7 +861,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   - Core 20,015 B and core + stage 22,253 B, both unchanged.
   - The package root entries total 30 B less than before the cleanup.
   - The duplicates baseline went from 92 items (1,182 lines) to 4 (15 lines) (`1938d3e5`).
-  - Sources: `docs/HANDOFF.md`, `scripts/quality/baselines/duplicates.json` and `sizes.json`.
+  - Sources: `scripts/quality/baselines/duplicates.json` and `sizes.json`.
 - **Rerun:** `npm run quality`, then `npm run measure:size`.
 - **Guard:** `scripts/quality/duplicates.js` with its baseline, the sizes gate, and `tests/quality-gate.test.js`.
 

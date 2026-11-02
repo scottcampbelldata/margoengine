@@ -40,7 +40,7 @@ export function outputPaths(text) {
     found = new Set();
   for (const m of code.matchAll(/['"`]test-results\/([\w.-]+)/g)) found.add(m[1]);
   for (const m of code.matchAll(/['"`]test-results['"`]\s*,\s*['"`]([\w.-]+)/g)) found.add(m[1]);
-  for (const name of ['.venv-data', 'gpu-packages.json', 'gpu.lock', 'land.lock']) found.delete(name);
+  for (const name of ['.venv-data', 'gpu-packages.json', 'gpu.lock']) found.delete(name);
   return [...found].sort().map((name) => `test-results/${name}`);
 }
 

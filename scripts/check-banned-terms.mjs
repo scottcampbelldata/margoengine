@@ -1,6 +1,6 @@
 // Fails when a tracked file's path, a tracked text file, or the text a tracked PDF shows, contains a term from
 // scripts/banned-terms.json: CAD
-// import and CAD tooling are not part of this repository (AGENTS.md), so their package, file, function and format names
+// import and CAD tooling are not part of this repository, so their package, file, function and format names
 // must not come back. The list holds hashes, never the words. To fix a hit: remove the text from the public file (for a
 // PDF, from the page it is printed from, then print it again). A new allow entry needs a reason and a review.
 import { createHash } from 'node:crypto';

@@ -722,7 +722,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 ## Fixed 2026-10-31
 
 All were found by `npm run modern:test:extensions` and the other `test:release` suites, which no check ran from about
-2026-10-16 (see "Release gates no check runs" in docs/HANDOFF.md). They run in `check:gpu-packages` now, and
+2026-10-16. They run in `check:gpu-packages` now, and
 `unrunReleaseGates` fails a suite that drops out again.
 
 | Bug | Cause | Fix | Regression test |
