@@ -1,14 +1,24 @@
 import { BiomeWorld } from '../src/world.ts';
 import { LAYERS } from '../src/layers.ts';
 import { presetWorlds, R16 } from '../src/presets.ts';
+import { defineBiome } from '../src/define.ts';
 
-export const BACKEND_CASE_COUNT = 9;
+export const BACKEND_CASE_COUNT = 10;
 
 function equalTile(cpu, gpu, label) {
   for (const name of Object.keys(LAYERS)) {
-    const a = cpu.layer(name), b = gpu.layer(name);
-    if (!a || !b || a.format !== b.format || a.width !== b.width || a.depth !== b.depth ||
-        a.scale !== b.scale || a.unit !== b.unit) throw Error(`${label}: ${name} metadata differs`);
+    const a = cpu.layer(name),
+      b = gpu.layer(name);
+    if (
+      !a ||
+      !b ||
+      a.format !== b.format ||
+      a.width !== b.width ||
+      a.depth !== b.depth ||
+      a.scale !== b.scale ||
+      a.unit !== b.unit
+    )
+      throw Error(`${label}: ${name} metadata differs`);
     const x = new Uint8Array(a.data.buffer, a.data.byteOffset, a.data.byteLength);
     const y = new Uint8Array(b.data.buffer, b.data.byteOffset, b.data.byteLength);
     if (x.length !== y.length) throw Error(`${label}: ${name} byte length differs`);
@@ -18,17 +28,68 @@ function equalTile(cpu, gpu, label) {
 }
 
 export async function runBackendCases(device) {
-  const r16 = { seed: R16.seed, origin: R16.origin, size: R16.size, height: { relief: R16.relief }, climate: R16.climate };
+  const r16 = {
+    seed: R16.seed,
+    origin: R16.origin,
+    size: R16.size,
+    height: { relief: R16.relief },
+    climate: R16.climate,
+  };
   const island = presetWorlds.island;
   const cases = [
-    { name: 'default', options: {}, tiles: [[8, 8], [0, 15]] },
-    { name: 'R16', options: r16, tiles: [[34, 29], [35, 29]], part: [34, 29, [3, 5, 30, 23]] },
-    { name: 'island', options: { climate: island.climate, height: { relief: island.relief }, biomes: island.biomes }, tiles: [[8, 8]] },
-    ...[0, 24].map((ecotone) => ({ name: `paint-${ecotone}`, options: { ecotone }, tiles: [[8, 8]],
-      paint: true, ...(ecotone === 24 ? { part: [8, 8, [0, 9, 39, 31]] } : {}) })),
+    {
+      name: 'default',
+      options: {},
+      tiles: [
+        [8, 8],
+        [0, 15],
+      ],
+    },
+    {
+      name: 'banded-envelopes',
+      options: {
+        resolution: 0.5,
+        biomes: Array.from({ length: 80 }, (_, i) =>
+          defineBiome({
+            id: `band-${i}`,
+            climate: { temperature: [(i % 8) * 5 - 20, (i % 8) * 5 + 10], height: [-500, 3000] },
+            ground: [{ material: 'rock' }],
+          }),
+        ),
+      },
+      tiles: [[8, 8]],
+    },
+    {
+      name: 'R16',
+      options: r16,
+      tiles: [
+        [34, 29],
+        [35, 29],
+      ],
+      part: [34, 29, [3, 5, 30, 23]],
+    },
+    {
+      name: 'island',
+      options: { climate: island.climate, height: { relief: island.relief }, biomes: island.biomes },
+      tiles: [[8, 8]],
+    },
+    ...[0, 24].map((ecotone) => ({
+      name: `paint-${ecotone}`,
+      options: { ecotone },
+      tiles: [[8, 8]],
+      paint: true,
+      ...(ecotone === 24 ? { part: [8, 8, [0, 9, 39, 31]] } : {}),
+    })),
   ];
   let gpuCases = 0;
   for (const spec of cases) {
+    if (
+      spec.name === 'banded-envelopes' &&
+      8 * (9 + 80) * 514 * 514 <= Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize)
+    )
+      throw Error(
+        'Banded case requires a default-limits device so full classification planes exceed its buffer limits',
+      );
     const cpu = await BiomeWorld.create({ ...spec.options, backend: 'cpu', workers: 0 });
     let gpu;
     try {
@@ -37,7 +98,8 @@ export async function runBackendCases(device) {
       if (spec.paint) {
         const [x, z] = spec.tiles[0];
         unpainted = await cpu.digest(x, z);
-        const cells = cpu.tileSize / cpu.resolution, data = new Uint8Array(cells * cells);
+        const cells = cpu.tileSize / cpu.resolution,
+          data = new Uint8Array(cells * cells);
         for (let j = 0; j < cells; j++)
           for (let i = 0; i < cells; i++) data[j * cells + i] = i < cells / 2 && j % 48 < 32 ? 255 : 0;
         const name = `paint/${cpu.biomes[1].id}`;
@@ -61,7 +123,8 @@ export async function runBackendCases(device) {
         const a = await cpu.tile(x, z, { layers: Object.keys(LAYERS) });
         const b = gpuTiles[i];
         equalTile(a, b, `${spec.name} tile ${x},${z}`);
-        const expected = await cpu.digest(x, z), actual = await gpu.digest(x, z);
+        const expected = await cpu.digest(x, z),
+          actual = await gpu.digest(x, z);
         if (expected !== actual) throw Error(`${spec.name}: world.digest differs`);
         if (spec.paint) {
           if (expected === unpainted) throw Error(`${spec.name}: paint did not change the digest`);
@@ -70,7 +133,10 @@ export async function runBackendCases(device) {
         }
         gpuCases++;
       }
-    } finally { gpu?.dispose(); cpu.dispose(); }
+    } finally {
+      gpu?.dispose();
+      cpu.dispose();
+    }
   }
   if (gpuCases !== BACKEND_CASE_COUNT) throw Error(`Expected ${BACKEND_CASE_COUNT} GPU cases, got ${gpuCases}`);
   return gpuCases;

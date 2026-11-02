@@ -46,7 +46,9 @@ export interface BiomeWorldOptions {
   /** Region cell size in metres, a power of two from 4 x `resolution` up to `tileSize`. Default 16. */
   readonly regionResolution?: number;
   /** `'auto'` and `'cpu'` compute on the CPU; `'gpu'` needs `device` and no workers.
-   * GPU region axes allow at most 32768 corners; heights and classification sources must be within +/-1073741824
+   * GPU region axes allow at most 32768 corners and the packed region must fit device buffer limits.
+   * Tile rows are banded to fit; at least one row plus margins must fit (a non-perCell zone scorer needs a full tile).
+   * Heights and classification sources must be within +/-1073741824
    * (heights in mm). Tile output is byte-identical within this domain; use `'cpu'` for larger domains.
    * Default `'auto'`. */
   readonly backend?: 'auto' | 'gpu' | 'cpu';
@@ -302,7 +304,8 @@ export class BiomeWorld implements Disposable {
     this.#biomes = biomes;
     this.#kind = options.classifier ?? 'envelopes';
     this.#paint = options.paint ?? [];
-    this.#classifier = this.#buildClassifier();
+    [this.#biomes, this.#classifier] = this.#buildClassifier();
+    this.#gpuBandDepth(this.#classifier);
     this.#heights = regionEntry!.heightsOf(options.height, this.#origin, this.#size, this.seed, relief);
     this.#region = this.#buildRegion();
   }
@@ -360,22 +363,63 @@ export class BiomeWorld implements Disposable {
     return this.#remote as import('@margoengine/biomes/workers').BiomeWorkers | undefined;
   }
 
-  #buildClassifier(): Classifier {
-    const biomes = this.#biomes;
+  #buildClassifier(
+    biomes = this.#biomes,
+    kind = this.#kind,
+    paint = this.#paint,
+  ): readonly [readonly BiomeDefinition[], Classifier] {
     if (!Array.isArray(biomes) || biomes.length < 1 || biomes.length > 254)
       throw rangeError('BiomeWorld biomes must be 1 to 254 biome definitions', 'biomes');
     const checked = biomes.map((b) => defineBiome(b)),
       ids = checked.map((b) => b.id);
     if (new Set(ids).size !== ids.length) throw rangeError('BiomeWorld biome ids must be unique', 'biomes');
-    if (this.#kind !== 'envelopes' && typeof (this.#kind as ZoneClassifier)?.scorer !== 'function')
+    if (kind !== 'envelopes' && typeof (kind as ZoneClassifier)?.scorer !== 'function')
       throw rangeError(
         "BiomeWorld classifier is 'envelopes' or whittaker or holdridge from '@margoengine/biomes/zones'",
         'biomes',
       );
-    if (!checkPaint(this.#paint, ids))
+    if (!checkPaint(paint, ids))
       throw rangeError('A paint layer names a biome of this world, an optional mode and an optional mask', 'biomes');
-    this.#biomes = checked;
-    return classifier(checked, this.#kind, this.#paint);
+    return [checked, classifier(checked, kind, paint)];
+  }
+
+  /** Largest tile band whose wide fields and classification planes fit the device. */
+  #gpuBandDepth(c: Classifier, kind = this.#kind): number {
+    const cells = this.tileSize / this.resolution;
+    if (!this.#device) return cells;
+    const limits = this.#device.limits,
+      limit = Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize),
+      nx = this.#size[0] / (this.regionResolution * 1000) + 1,
+      nz = this.#size[1] / (this.regionResolution * 1000) + 1;
+    if (5 * nx * nz * 4 > limit)
+      throw rangeError(
+        "BiomeWorld backend 'gpu' packed region exceeds device buffer limits; use a smaller size or larger regionResolution",
+        'biomes',
+      );
+    const n = cells + 2,
+      slots = c.inputs.length,
+      planes = slots + (c.score ? 0 : c.ids.length),
+      rows = Math.floor(
+        Math.min(
+          limit / (n * Math.max(24, 8 * planes)),
+          0x7fffffff / (planes * n),
+          limits.maxComputeWorkgroupsPerDimension * 8,
+        ),
+      ),
+      depth = Math.min(cells, rows - 2),
+      table = 4 * (2 * slots + c.ids.length + 1 + 4 * c.envelopes.slot.length);
+    if (
+      depth < 1 ||
+      table > limit ||
+      limits.maxBufferSize < 32 ||
+      [Math.ceil(n / 8), slots, c.score ? 1 : c.ids.length].some((v) => v > limits.maxComputeWorkgroupsPerDimension) ||
+      (kind !== 'envelopes' && !kind.perCell && depth < cells)
+    )
+      throw rangeError(
+        "BiomeWorld backend 'gpu' tile row and margins exceed device limits (non-perCell zone scorers need a full tile); use fewer biomes or classifier inputs, smaller tileSize, larger resolution, or backend 'cpu'",
+        'biomes',
+      );
+    return depth;
   }
 
   /** The biome definitions in force (the indices in the `biome` layer point into this list). */
@@ -401,18 +445,18 @@ export class BiomeWorld implements Disposable {
     return this.#paint;
   }
 
-  #buildRegion(): Region {
+  #buildRegion(heights = this.#heights, climate = this.#climate): Region {
     const step = this.regionResolution * 1000,
       nx = divFloor(this.#size[0], step) + 1,
       nz = divFloor(this.#size[1], step) + 1,
-      height = this.#heights.grid(0, 0, nx, nz, step),
-      water = this.#heights.relief?.waterCells(this.#origin, step, nx, nz);
+      height = heights.grid(0, 0, nx, nz, step),
+      water = heights.relief?.waterCells(this.#origin, step, nx, nz);
     if (this.#device && height.some((v) => Math.abs(v) > 1073741824))
       throw rangeError(
         "BiomeWorld backend 'gpu' heights must be within +/-1073741824 mm; rescale the height source or use backend 'cpu'",
         'biomes',
       );
-    return regionEntry!.buildRegion(height, nx, nz, step, this.#climate, water);
+    return regionEntry!.buildRegion(height, nx, nz, step, climate, water);
   }
 
   #live(): void {
@@ -595,20 +639,34 @@ export class BiomeWorld implements Disposable {
   ): Promise<Map<string, RasterLayer>> {
     if (this.#gpuAbort) signal = signal ? AbortSignal.any([signal, this.#gpuAbort.signal]) : this.#gpuAbort.signal;
     try {
-      const layers = await this.#computeLayers(gx, gz, width, depth, names, signal);
+      const bandDepth = this.#gpuBandDepth(this.#classifier);
+      let layers: Map<string, RasterLayer>;
+      if (depth <= bandDepth) layers = await this.#computeLayers(gx, gz, width, depth, names, signal);
+      else {
+        layers = new Map();
+        for (let row = 0; row < depth; row += bandDepth) {
+          const band = await this.#computeLayers(gx, gz + row, width, Math.min(bandDepth, depth - row), names, signal);
+          aborted(signal);
+          this.#gpuLive();
+          for (const [name, layer] of band) {
+            let out = layers.get(name);
+            if (!out) {
+              const Type = layer.data.constructor as new (length: number) => RasterLayer['data'];
+              out = { ...layer, depth, data: new Type((layer.data.length / layer.depth) * depth) };
+              layers.set(name, out);
+            }
+            out.data.set(layer.data, (row * layer.data.length) / layer.depth);
+          }
+        }
+      }
       aborted(signal);
       this.#gpuLive();
       return layers;
     } catch (error) {
       aborted(signal);
       this.#gpuLive();
-      if (
-        !this.#device ||
-        error instanceof RangeError ||
-        ((error as Error)?.name === 'MargoError' && ['failed', 'disposed'].includes((error as { code: string }).code))
-      )
-        throw error;
-      throw fault('failed', `BiomeWorld GPU tile failed: ${String(error)}; recreate the WebGPU device`, 'biomes');
+      // Kernels wrap device errors; shared CPU callbacks keep their original exceptions.
+      throw error;
     }
   }
 
@@ -970,31 +1028,30 @@ export class BiomeWorld implements Disposable {
       );
     if (typeof changes !== 'object' || changes === null)
       throw typeError('BiomeWorld update takes { biomes?, classifier?, paint?, climate?, height? }', 'biomes');
-    const before = [this.#biomes, this.#kind, this.#paint] as const;
-    if (changes.biomes) this.#biomes = changes.biomes;
-    if (changes.classifier) this.#kind = changes.classifier;
-    if (changes.paint) this.#paint = changes.paint;
-    try {
-      this.#classifier = this.#buildClassifier();
-    } catch (error) {
-      [this.#biomes, this.#kind, this.#paint] = before;
-      throw error;
-    }
-    if (changes.climate) this.#climate = quantizeClimate(changes.climate);
-    if (changes.height) this.#replaceHeights(changes.height);
+    const kind = changes.classifier ?? this.#kind,
+      paint = changes.paint ?? this.#paint,
+      [biomes, classifier] = this.#buildClassifier(changes.biomes ?? this.#biomes, kind, paint),
+      climate = changes.climate ? quantizeClimate(changes.climate) : this.#climate;
+    this.#gpuBandDepth(classifier, kind);
+    const heights = changes.height
+        ? regionEntry!.heightsOf(changes.height, this.#origin, this.#size, this.seed, relief)
+        : this.#heights,
+      region = changes.climate || changes.height ? this.#buildRegion(heights, climate) : this.#region;
+    this.#biomes = biomes;
+    this.#classifier = classifier;
+    this.#kind = kind;
+    this.#paint = paint;
+    this.#climate = climate;
+    this.#heights = heights;
+    this.#region = region;
     this.#given = { ...this.#given, ...changes };
     if (this.#remote && !this.#remote.change(changes)) {
       this.#remote.dispose();
       this.#remote = undefined;
     }
-    if (changes.climate || changes.height) this.#region = this.#buildRegion();
     this.#cache.clear();
     this.#ready.clear();
     this.#emit(this.bounds);
-  }
-
-  #replaceHeights(source: HeightSource): void {
-    this.#heights = regionEntry!.heightsOf(source, this.#origin, this.#size, this.seed, relief);
   }
 
   #emit(rect: Rect): void {

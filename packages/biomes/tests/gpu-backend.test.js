@@ -22,7 +22,12 @@ function fakeDevice(mode = 'pipeline') {
       lose = resolve;
     }),
     limits: { maxBufferSize: 2 ** 30, maxStorageBufferBindingSize: 2 ** 30, maxComputeWorkgroupsPerDimension: 65535 },
-    queue: { writeBuffer() {}, submit() {} },
+    queue: {
+      writeBuffer(buffer, _offset, data) {
+        buffer.values = new Uint32Array(data);
+      },
+      submit() {},
+    },
     pushErrorScope() {},
     popErrorScope: async () => (mode === 'validation' ? { message: 'validation failure' } : null),
     createShaderModule: () => ({
@@ -32,15 +37,21 @@ function fakeDevice(mode = 'pipeline') {
       if (mode === 'pipeline') throw Error('pipeline failure');
       return { getBindGroupLayout: () => ({}) };
     },
-    createBuffer: () => {
+    createBuffer: ({ size }) => {
       if (mode === 'allocation' && buffers.length === 1) throw RangeError('allocation failure');
       const buffer = {
+        size,
         destroyed: false,
         destroy() {
           this.destroyed = true;
         },
+        getMappedRange() {
+          return this.values.buffer;
+        },
+        unmap() {},
         mapAsync() {
           mapped();
+          if (mode === 'tail') return Promise.resolve();
           if (mode === 'uncaptured') {
             device.dispatchEvent(Object.assign(new Event('uncapturederror'), { error: { message: 'GPU failure' } }));
             return new Promise(() => {});
@@ -54,12 +65,31 @@ function fakeDevice(mode = 'pipeline') {
       buffers.push(buffer);
       return buffer;
     },
-    createBindGroup: () => ({}),
-    createCommandEncoder: () => ({
-      beginComputePass: () => ({ setPipeline() {}, setBindGroup() {}, dispatchWorkgroups() {}, end() {} }),
-      copyBufferToBuffer() {},
-      finish: () => ({}),
-    }),
+    createBindGroup: (group) => group,
+    createCommandEncoder: () => {
+      let shape;
+      return {
+        beginComputePass: () => ({
+          setPipeline() {},
+          setBindGroup(_index, group) {
+            shape = group.entries.find(
+              ({ resource }) => resource.buffer.values?.length === 4 || resource.buffer.size === 32,
+            )?.resource.buffer.values;
+          },
+          dispatchWorkgroups() {},
+          end() {},
+        }),
+        copyBufferToBuffer(_src, _srcOffset, dst) {
+          if (mode !== 'tail') return;
+          // Transport stubs only: zero payload with execution markers reaches the CPU callback error paths.
+          dst.values = new Int32Array(dst.size / 4);
+          const count = shape[0] * shape[1],
+            total = shape.length === 4 ? 5 * count : shape[7] ? shape[3] : 3 * count;
+          for (let k = 0; k < dst.values.length - total; k++) dst.values[total + k] = k + 1;
+        },
+        finish: () => ({}),
+      };
+    },
     destroy() {
       assert.fail('The world must never destroy its caller-owned device');
     },
@@ -162,18 +192,181 @@ test('GPU height domain errors name the bound and fix; CPU still makes the tile'
   }
 });
 
-test('GPU input-domain RangeErrors remain input errors for tiles and parts', async () => {
+test('GPU region upload limits reject at create before sampling', async () => {
   const fake = fakeDevice();
   fake.device.limits.maxStorageBufferBindingSize = 1;
+  let sampled = false;
+  await assert.rejects(
+    BiomeWorld.create({
+      ...options,
+      backend: 'gpu',
+      device: fake.device,
+      height: {
+        field() {
+          sampled = true;
+          return 20;
+        },
+      },
+    }),
+    (e) => e instanceof RangeError && /size/.test(e.message) && /regionResolution/.test(e.message),
+  );
+  assert.equal(sampled, false);
+  assert.equal(fake.buffers.length, 0);
+});
+
+test('failed GPU updates keep heights, climate, options, region and cached tiles', async (t) => {
+  constants(t);
+  const fake = fakeDevice('tail');
   const world = await BiomeWorld.create({ ...options, backend: 'gpu', device: fake.device });
   try {
-    const domainError = (e) => e instanceof RangeError && e.code !== 'failed' && !/recreate/.test(e.message);
-    await assert.rejects(world.tile(0, 0), domainError);
-    await assert.rejects(world.tilePart(0, 0, [0, 0, 4, 3]), domainError);
-    assert.equal(fake.buffers.length, 0);
+    const region = world.region,
+      climate = world.climate,
+      height = world.heightAt(0, 0),
+      tile = await world.tile(0, 0, { layers: ['height'] });
+    const unchanged = () => {
+      assert.equal(world.region, region);
+      assert.equal(world.climate, climate);
+      assert.equal(world.heightAt(0, 0), height);
+      assert.ok(world.region.height.every((v) => v === 20000));
+    };
+    assert.throws(() => world.update({ height: { field: () => 1_500_000 }, climate: { latitude: 20 } }), RangeError);
+    unchanged();
+    assert.equal(await world.tile(0, 0, { layers: ['height'] }), tile);
+    // An unrelated valid update must keep using the state from before the rejection.
+    world.update({ paint: [] });
+    unchanged();
+    fake.device.limits.maxBufferSize = 1;
+    assert.throws(
+      () => world.update({ height: { field: () => 30 }, climate: { latitude: 20 } }),
+      (e) => e instanceof RangeError && /size/.test(e.message) && /regionResolution/.test(e.message),
+    );
+    unchanged();
   } finally {
     world.dispose();
   }
+});
+
+test('GPU minimum classification bands reject at create and update atomically', async () => {
+  const fake = fakeDevice(),
+    biomes = Array.from({ length: 254 }, (_, i) =>
+      defineBiome({ id: `b${i}`, climate: {}, ground: [{ material: 'rock' }] }),
+    );
+  // Fits the region and default classifier, but not a single wide row of 254 envelope biomes.
+  fake.device.limits.maxStorageBufferBindingSize = 20000;
+  await assert.rejects(
+    BiomeWorld.create({ ...options, biomes, backend: 'gpu', device: fake.device }),
+    (e) => e instanceof RangeError && /resolution/.test(e.message) && /biomes/.test(e.message),
+  );
+  const world = await BiomeWorld.create({ ...options, backend: 'gpu', device: fake.device });
+  try {
+    const before = world.biomes;
+    assert.throws(() => world.update({ biomes }), RangeError);
+    assert.equal(world.biomes, before);
+  } finally {
+    world.dispose();
+  }
+});
+
+test('GPU tile and part dispatch row bands within device limits', async (t) => {
+  constants(t);
+  for (const part of [false, true]) {
+    const fake = fakeDevice('tail'),
+      regionShapes = [],
+      biomes = Array.from({ length: 80 }, (_, i) =>
+        defineBiome({ id: `b${i}`, climate: {}, ground: [{ material: 'rock' }] }),
+      ),
+      reason = new TypeError('stop after first band');
+    fake.device.limits.maxStorageBufferBindingSize = 134217728;
+    fake.device.limits.maxBufferSize = 268435456;
+    const write = fake.device.queue.writeBuffer;
+    fake.device.queue.writeBuffer = (buffer, offset, data) => {
+      if (buffer.size === 16 && data.length === 4) regionShapes.push([...data]);
+      write(buffer, offset, data);
+    };
+    let reads = 0;
+    const world = await BiomeWorld.create({
+      ...options,
+      tileSize: 256,
+      resolution: 0.5,
+      biomes,
+      height: {
+        field() {
+          if (reads > 0) throw reason;
+          return 20;
+        },
+      },
+      backend: 'gpu',
+      device: fake.device,
+    });
+    // Fail in the shared CPU tail after the first band upload; no fake output is used as byte-parity proof.
+    reads++;
+    try {
+      await assert.rejects(part ? world.tilePart(0, 0, [0, 0, 512, 512]) : world.tile(0, 0), (e) => e === reason);
+      assert.equal(regionShapes.length, 1);
+      assert.equal(regionShapes[0][0], 514);
+      assert.ok(regionShapes[0][1] >= 3 && regionShapes[0][1] < 514, 'full tile was split before dispatch');
+      assert.ok(8 * (9 + 80) * regionShapes[0][0] * regionShapes[0][1] <= 134217728);
+      assert.ok(fake.buffers.every((b) => b.destroyed));
+    } finally {
+      world.dispose();
+    }
+  }
+});
+
+test('CPU callback failures preserve identity on GPU tiles and parts', async (t) => {
+  constants(t);
+  for (const backend of ['cpu', 'gpu'])
+    for (const kind of ['height', 'score', 'user']) {
+      const reason = kind === 'height' ? new TypeError('height callback failed') : Error(`${kind} callback failed`);
+      let throwing = false;
+      const extra =
+        kind === 'height'
+          ? {
+              height: {
+                field() {
+                  if (throwing) throw reason;
+                  return 20;
+                },
+              },
+            }
+          : kind === 'score'
+            ? {
+                classifier: {
+                  kind: 'whittaker',
+                  perCell: true,
+                  scorer: () => () => {
+                    throw reason;
+                  },
+                },
+              }
+            : {
+                biomes: [
+                  defineBiome({
+                    id: 'mask',
+                    climate: { custom: { 'mask/custom': [0, 1] } },
+                    ground: [{ material: 'rock' }],
+                  }),
+                ],
+              };
+      const fake = fakeDevice('tail');
+      const world = await BiomeWorld.create({ ...options, ...extra, backend, device: fake.device, workers: 0 });
+      try {
+        throwing = true;
+        if (kind === 'user') {
+          const data = new Uint8Array(32 * 32);
+          data.slice = () => data;
+          world.writeLayer('mask/custom', 0, 0, data);
+          // Inject a read failure in the stored raster without relying on private world state.
+          data.subarray = () => {
+            throw reason;
+          };
+        }
+        await assert.rejects(world.tile(0, 0), (e) => e === reason);
+        await assert.rejects(world.tilePart(0, 0, [0, 0, 4, 3]), (e) => e === reason);
+      } finally {
+        world.dispose();
+      }
+    }
 });
 
 test('a live caller-owned device does not retain disposed GPU worlds', async () => {
