@@ -4,7 +4,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type Climate, type ClimateOptions, quantizeClimate } from './climate.js';
 import { checkPaint, type Classifier, classifier, classify, type PaintLayer, type ZoneClassifier } from './classify.js';
 import { type BiomeDefinition, defineBiome } from './define.js';
-import { rectFields } from './fields.js';
+import { rectFields, type TileFrame } from './fields.js';
 import { divFloor, imod } from './fixed.js';
 import type { Heights, HeightSource } from './height.js';
 import { DEFAULT_LAYERS, LAYERS, type RasterLayer } from './layers.js';
@@ -13,6 +13,13 @@ import { featherCells, paintReach } from './reach.js';
 import type { Region } from './region.js';
 import { Scratch } from './scratch.js';
 import { type BiomeSample, readCell, samplePoint } from './sample.js';
+
+interface LayerState {
+  readonly frame: TileFrame;
+  readonly classifier: Classifier;
+  readonly user: ReadonlyMap<string, ReadonlyMap<string, Uint8Array>>;
+  readonly ecotone: number;
+}
 
 /** One user layer raster write of {@link BiomeWorld.writeLayers}. */
 export interface LayerWrite {
@@ -591,7 +598,7 @@ export class BiomeWorld implements Disposable {
           : this.#ready.get(`${x},${z}`);
     if (whole && names.every((name) => whole.layers.includes(name)))
       return Object.freeze({ ...whole, window: Object.freeze([0, 0, cells, cells] as const) });
-    await Promise.resolve();
+    if (!this.#device) await Promise.resolve();
     this.#live();
     aborted(options.signal);
     const [i0, j0, i1, j1] = window,
@@ -609,7 +616,7 @@ export class BiomeWorld implements Disposable {
   }
 
   async #make(x: number, z: number, names: readonly string[]): Promise<BiomeTile> {
-    await Promise.resolve();
+    if (!this.#device) await Promise.resolve();
     this.#live();
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
       layers = await this.#layers(x * cells, z * cells, cells, cells, names);
@@ -639,13 +646,36 @@ export class BiomeWorld implements Disposable {
   ): Promise<Map<string, RasterLayer>> {
     if (this.#gpuAbort) signal = signal ? AbortSignal.any([signal, this.#gpuAbort.signal]) : this.#gpuAbort.signal;
     try {
-      const bandDepth = this.#gpuBandDepth(this.#classifier);
+      // Updates replace frames and rasters; keep this revision for every awaited band and CPU tail.
+      const state: LayerState | undefined = this.#device
+        ? {
+            frame: Object.freeze({
+              climate: this.#climate,
+              region: this.#region,
+              heights: this.#heights,
+              cell: this.resolution * 1000,
+              scratch: this.#scratch,
+            }),
+            classifier: this.#classifier,
+            user: new Map([...this.#user].map(([name, tiles]) => [name, new Map(tiles)])),
+            ecotone: featherCells(this.ecotone, this.resolution),
+          }
+        : undefined;
+      const bandDepth = this.#gpuBandDepth(state?.classifier ?? this.#classifier);
       let layers: Map<string, RasterLayer>;
-      if (depth <= bandDepth) layers = await this.#computeLayers(gx, gz, width, depth, names, signal);
+      if (depth <= bandDepth) layers = await this.#computeLayers(gx, gz, width, depth, names, signal, state);
       else {
         layers = new Map();
         for (let row = 0; row < depth; row += bandDepth) {
-          const band = await this.#computeLayers(gx, gz + row, width, Math.min(bandDepth, depth - row), names, signal);
+          const band = await this.#computeLayers(
+            gx,
+            gz + row,
+            width,
+            Math.min(bandDepth, depth - row),
+            names,
+            signal,
+            state,
+          );
           aborted(signal);
           this.#gpuLive();
           for (const [name, layer] of band) {
@@ -677,11 +707,12 @@ export class BiomeWorld implements Disposable {
     depth: number,
     names: readonly string[],
     signal?: AbortSignal,
+    state?: LayerState,
   ): Promise<Map<string, RasterLayer>> {
     this.#gpuLive();
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
       cell = this.resolution * 1000,
-      frame = {
+      frame = state?.frame ?? {
         climate: this.#climate,
         region: this.#region,
         heights: this.#heights,
@@ -694,7 +725,7 @@ export class BiomeWorld implements Disposable {
         : rectFields(frame, x, z, w, d, wanted, temporary);
     if (!names.includes('biome') && !names.includes('biomeWeight')) return fields(gx, gz, width, depth, names);
     // Classification blurs over a 1-cell margin: compute the fields one cell wider, classify, then crop.
-    const c = this.#classifier,
+    const c = state?.classifier ?? this.#classifier,
       // The wide fields are working arrays: the result keeps cropped copies.
       wideResult = fields(
         gx - 1,
@@ -725,10 +756,19 @@ export class BiomeWorld implements Disposable {
       // The feather's wide read stays inside the world (edge cells repeat), so paint keeps full strength up to
       // the world's edge instead of fading into cells that do not exist.
       user: (name: string, margin = 0) =>
-        margin
-          ? this.#userGrid(name, ox - margin, oz - margin, n + 2 * margin, cells, true, rows + 2 * margin)
-          : this.#userGrid(name, ox, oz, n, cells, false, rows),
-      ecotone: featherCells(this.ecotone, this.resolution),
+        userGrid(
+          state?.user ?? this.#user,
+          this.tilesX,
+          this.tilesZ,
+          name,
+          ox - margin,
+          oz - margin,
+          n + 2 * margin,
+          cells,
+          !!margin,
+          rows + 2 * margin,
+        ),
+      ecotone: state?.ecotone ?? featherCells(this.ecotone, this.resolution),
     };
     if (this.#device) await gpuClassify!.classifyGPU(this.#device, c, input, ids, weights, { signal });
     else classify(c, input, ids, weights);
@@ -751,62 +791,6 @@ export class BiomeWorld implements Disposable {
     if (names.includes('biome')) layers.set('biome', info('biome', ids));
     if (names.includes('biomeWeight')) layers.set('biomeWeight', info('biomeWeight', weights));
     return layers;
-  }
-
-  /** A user layer over an n x rows grid of global cells from (gx, gz): 0..255, -1 where unpainted; undefined when the
-   * layer holds nothing. `clamp` reads a cell outside the world at the nearest cell inside it. */
-  #userGrid(
-    name: string,
-    gx: number,
-    gz: number,
-    n: number,
-    cells: number,
-    clamp = false,
-    rows = n,
-  ): Int16Array | undefined {
-    const tiles = this.#user.get(name);
-    if (!tiles?.size) return undefined;
-    const out = new Int16Array(n * rows).fill(-1);
-    if (clamp) {
-      // In-world runs per row as below, then the columns and rows past the world's edge copy its edge cells.
-      const lastX = this.tilesX * cells - 1,
-        lastZ = this.tilesZ * cells - 1,
-        i0 = Math.max(0, -gx),
-        i1 = Math.min(n, lastX + 1 - gx),
-        j0 = Math.max(0, -gz),
-        j1 = Math.min(rows, lastZ + 1 - gz);
-      for (let j = j0; j < j1; j++) {
-        const tz = divFloor(gz + j, cells),
-          row = (gz + j - tz * cells) * cells,
-          at = j * n;
-        for (let i = i0; i < i1; ) {
-          const tx = divFloor(gx + i, cells),
-            x = gx + i - tx * cells,
-            run = Math.min(i1 - i, cells - x),
-            data = tiles.get(`${tx},${tz}`);
-          if (data) out.set(data.subarray(row + x, row + x + run), at + i);
-          i += run;
-        }
-        out.fill(out[at + i0], at, at + i0);
-        out.fill(out[at + i1 - 1], at + i1, at + n);
-      }
-      for (let j = 0; j < j0; j++) out.copyWithin(j * n, j0 * n, j0 * n + n);
-      for (let j = j1; j < rows; j++) out.copyWithin(j * n, (j1 - 1) * n, j1 * n);
-      return out;
-    }
-    for (let j = 0; j < rows; j++) {
-      const tz = divFloor(gz + j, cells),
-        row = (gz + j - tz * cells) * cells;
-      for (let i = 0; i < n; ) {
-        const tx = divFloor(gx + i, cells),
-          x = gx + i - tx * cells,
-          run = Math.min(n - i, cells - x),
-          data = tiles.get(`${tx},${tz}`);
-        if (data) out.set(data.subarray(row + x, row + x + run), j * n + i);
-        i += run;
-      }
-    }
-    return out;
   }
 
   /**
@@ -983,7 +967,11 @@ export class BiomeWorld implements Disposable {
       this.#climate,
       this.#region,
       this.#classifier,
-      { seed: this.seed, cell: this.resolution * 1000, user: (name) => this.#userGrid(name, gx, gz, 1, cells)?.[0] },
+      {
+        seed: this.seed,
+        cell: this.resolution * 1000,
+        user: (name) => userGrid(this.#user, this.tilesX, this.tilesZ, name, gx, gz, 1, cells)?.[0],
+      },
       this.#origin,
       x,
       z,
@@ -1111,4 +1099,63 @@ function crop(layer: RasterLayer, width: number, depth: number): RasterLayer {
 async function defaultBiomes(): Promise<readonly BiomeDefinition[]> {
   const { presets } = await import('@margoengine/biomes/presets');
   return [presets.temperate, presets.alpine, presets.wetland, presets.boreal];
+}
+
+/** A user layer over an n x rows grid of global cells from (gx, gz): 0..255, -1 where unpainted; undefined when the
+ * layer holds nothing. `clamp` reads a cell outside the world at the nearest cell inside it. */
+function userGrid(
+  user: ReadonlyMap<string, ReadonlyMap<string, Uint8Array>>,
+  tilesX: number,
+  tilesZ: number,
+  name: string,
+  gx: number,
+  gz: number,
+  n: number,
+  cells: number,
+  clamp = false,
+  rows = n,
+): Int16Array | undefined {
+  const tiles = user.get(name);
+  if (!tiles?.size) return undefined;
+  const out = new Int16Array(n * rows).fill(-1);
+  if (clamp) {
+    // In-world runs per row as below, then the columns and rows past the world's edge copy its edge cells.
+    const lastX = tilesX * cells - 1,
+      lastZ = tilesZ * cells - 1,
+      i0 = Math.max(0, -gx),
+      i1 = Math.min(n, lastX + 1 - gx),
+      j0 = Math.max(0, -gz),
+      j1 = Math.min(rows, lastZ + 1 - gz);
+    for (let j = j0; j < j1; j++) {
+      const tz = divFloor(gz + j, cells),
+        row = (gz + j - tz * cells) * cells,
+        at = j * n;
+      for (let i = i0; i < i1; ) {
+        const tx = divFloor(gx + i, cells),
+          x = gx + i - tx * cells,
+          run = Math.min(i1 - i, cells - x),
+          data = tiles.get(`${tx},${tz}`);
+        if (data) out.set(data.subarray(row + x, row + x + run), at + i);
+        i += run;
+      }
+      out.fill(out[at + i0], at, at + i0);
+      out.fill(out[at + i1 - 1], at + i1, at + n);
+    }
+    for (let j = 0; j < j0; j++) out.copyWithin(j * n, j0 * n, j0 * n + n);
+    for (let j = j1; j < rows; j++) out.copyWithin(j * n, (j1 - 1) * n, j1 * n);
+    return out;
+  }
+  for (let j = 0; j < rows; j++) {
+    const tz = divFloor(gz + j, cells),
+      row = (gz + j - tz * cells) * cells;
+    for (let i = 0; i < n; ) {
+      const tx = divFloor(gx + i, cells),
+        x = gx + i - tx * cells,
+        run = Math.min(n - i, cells - x),
+        data = tiles.get(`${tx},${tz}`);
+      if (data) out.set(data.subarray(row + x, row + x + run), j * n + i);
+      i += run;
+    }
+  }
+  return out;
 }

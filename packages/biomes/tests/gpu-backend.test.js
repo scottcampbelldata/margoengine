@@ -10,7 +10,7 @@ const options = { size: [256, 256], tileSize: 128, resolution: 4, height: { fiel
 const failed = (error) => error.name === 'MargoError' && error.code === 'failed';
 
 // Error transport only: this fake never computes fields or claims WGSL parity.
-function fakeDevice(mode = 'pipeline') {
+function fakeDevice(mode = 'pipeline', onMap) {
   const buffers = [],
     events = new EventTarget();
   let lose, rejectMap, mapped;
@@ -51,7 +51,7 @@ function fakeDevice(mode = 'pipeline') {
         unmap() {},
         mapAsync() {
           mapped();
-          if (mode === 'tail') return Promise.resolve();
+          if (mode === 'tail') return onMap?.() ?? Promise.resolve();
           if (mode === 'uncaptured') {
             device.dispatchEvent(Object.assign(new Event('uncapturederror'), { error: { message: 'GPU failure' } }));
             return new Promise(() => {});
@@ -308,6 +308,92 @@ test('GPU tile and part dispatch row bands within device limits', async (t) => {
       assert.ok(8 * (9 + 80) * regionShapes[0][0] * regionShapes[0][1] <= 134217728);
       assert.ok(fake.buffers.every((b) => b.destroyed));
     } finally {
+      world.dispose();
+    }
+  }
+});
+
+test('GPU bands keep the request state across updates and raster writes', { timeout: 20000 }, async (t) => {
+  constants(t);
+  for (const part of [false, true]) {
+    let resume,
+      maps = 0,
+      paintReads = 0,
+      maskReads = 0;
+    const gate = new Promise((resolve) => {
+      resume = resolve;
+    });
+    const fake = fakeDevice('tail', () => (++maps === 1 ? gate : Promise.resolve()));
+    fake.device.limits.maxStorageBufferBindingSize = 20000;
+    const regionPayloads = [],
+      tables = [],
+      shapes = [];
+    const bind = fake.device.createBindGroup;
+    fake.device.createBindGroup = (group) => {
+      const buffers = group.entries.map(({ resource }) => resource.buffer);
+      if (buffers.length === 4 && buffers[2].size === 16) {
+        regionPayloads.push(buffers[0].values.slice());
+        shapes.push([...buffers[2].values]);
+      }
+      if (buffers.length === 5 && buffers[3].size === 32) tables.push(buffers[2].values.slice());
+      return bind(group);
+    };
+    const biomes = [0, 1].map((i) =>
+      defineBiome({
+        id: `snapshot-${i}`,
+        climate: { height: [i * 10, 100], custom: { 'mask/custom': [0, 1] } },
+        ground: [{ material: 'rock' }],
+      }),
+    );
+    const world = await BiomeWorld.create({ ...options, biomes, backend: 'gpu', device: fake.device });
+    const paint = new Uint8Array(32 * 32).fill(127),
+      mask = new Uint8Array(32 * 32).fill(63);
+    // Observe the CPU tail's raster inputs, not fake shader output or parity.
+    for (const [data, read] of [
+      [paint, () => paintReads++],
+      [mask, () => maskReads++],
+    ]) {
+      data.slice = () => data;
+      data.subarray = (...args) => {
+        read();
+        return Uint8Array.prototype.subarray.apply(data, args);
+      };
+    }
+    world.writeLayer('paint/snapshot-1', 0, 0, paint);
+    world.writeLayer('mask/custom', 0, 0, mask);
+    try {
+      const pending = part ? world.tilePart(0, 0, [1, 0, 31, 32]) : world.tile(0, 0);
+      await fake.mappingStarted;
+      world.update({
+        climate: { latitude: 20, rainfall: 2000 },
+        height: { field: () => 30 },
+        biomes: biomes.map((b) => defineBiome({ ...b, climate: { height: [200, 300] } })),
+      });
+      for (const name of ['paint/snapshot-1', 'mask/custom']) {
+        const replacement = new Uint8Array(32 * 32).fill(255);
+        replacement.slice = () => replacement;
+        replacement.subarray = () => {
+          throw Error('in-flight request read a replacement raster');
+        };
+        world.writeLayer(name, 0, 0, replacement);
+      }
+      resume();
+      const tile = await pending;
+      assert.ok(regionPayloads.length > 1 && tables.length > 1, 'request completed multiple bands');
+      assert.ok(
+        shapes.every((shape) => shape[1] < 34),
+        'request used row bands',
+      );
+      for (const payload of regionPayloads) assert.deepEqual(payload, regionPayloads[0]);
+      for (const table of tables) assert.deepEqual(table, tables[0]);
+      assert.ok(
+        tile.layer('height').data.every((v) => v === 20000),
+        'height source stays at request revision',
+      );
+      assert.ok(paintReads > 32 && maskReads > 32, 'every band reads the original paint and mask');
+      assert.ok(fake.buffers.every((buffer) => buffer.destroyed));
+    } finally {
+      resume();
       world.dispose();
     }
   }

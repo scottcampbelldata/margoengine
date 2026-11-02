@@ -63,10 +63,10 @@ export async function runBackendCases(device) {
       name: 'R16',
       options: r16,
       tiles: [
-        [34, 29],
-        [35, 29],
+        [51, 1],
+        [52, 1],
       ],
-      part: [34, 29, [3, 5, 30, 23]],
+      part: [51, 1, [3, 5, 30, 23]],
     },
     {
       name: 'island',
@@ -113,6 +113,8 @@ export async function runBackendCases(device) {
         const b = await gpu.tilePart(x, z, window, { layers: Object.keys(LAYERS) });
         if (String(a.window) !== String(window) || String(b.window) !== String(window))
           throw Error(`${spec.name}: tilePart returned a whole cached tile`);
+        if (spec.name === 'R16' && !a.layer('height').data.some((height) => height > 900000))
+          throw Error(`R16 part ${x},${z} must include mountain cells above 900 m`);
         equalTile(a, b, `${spec.name} part`);
         gpuCases++;
       }
@@ -122,6 +124,8 @@ export async function runBackendCases(device) {
         const [x, z] = spec.tiles[i];
         const a = await cpu.tile(x, z, { layers: Object.keys(LAYERS) });
         const b = gpuTiles[i];
+        if (spec.name === 'R16' && !a.layer('height').data.some((height) => height > 900000))
+          throw Error(`R16 tile ${x},${z} must include mountain cells above 900 m`);
         equalTile(a, b, `${spec.name} tile ${x},${z}`);
         const expected = await cpu.digest(x, z),
           actual = await gpu.digest(x, z);
