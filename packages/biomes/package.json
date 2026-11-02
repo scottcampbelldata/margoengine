@@ -46,6 +46,10 @@
       "types": "./dist/hydrology.d.ts",
       "import": "./dist/hydrology.js"
     },
+    "./disturbance": {
+      "types": "./dist/disturbance.d.ts",
+      "import": "./dist/disturbance.js"
+    },
     "./seasons": {
       "types": "./dist/seasons.d.ts",
       "import": "./dist/seasons.js"
