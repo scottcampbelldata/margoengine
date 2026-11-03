@@ -80,6 +80,8 @@ export interface PlacementBridge {
     render(): PlacedTile;
   }>;
 }
+export const worldGPU = new WeakMap<object, { device: GPUDevice; signal: AbortSignal }>();
+
 export const placementBridges = new WeakMap<BiomePlacement, (x: number, z: number) => PlacementBridge>();
 
 export interface FlowState {

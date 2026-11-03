@@ -76,6 +76,10 @@ export function hydrology(grid: HeightGrid, options?: HydrologyOptions): Hydrolo
 
 export function hydrologyOf(world: HydrologyWorld, options?: HydrologyOptions): Hydrology;
 
+export function hydrologyOfAsync(world: HydrologyWorld, options?: HydrologyOptions, { signal }?: {
+    readonly signal?: AbortSignal;
+}): Promise<Hydrology>;
+
 export function hydrologyTile(world: HydrologyWorld, h: Hydrology, x: number, z: number): RasterLayer[];
 
 export function riversOf(world: HydrologyWorld, h: Hydrology, minimumCells?: number): HydrologyRivers;

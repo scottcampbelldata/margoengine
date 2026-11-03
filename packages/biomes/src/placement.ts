@@ -30,7 +30,7 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type BiomeDefinition, type Dimension, fieldDimension, type SpeciesRule } from './define.js';
 import { placementReach, STRATA } from './reach.js';
 import { standAt, type Stands, standsOf, TICK } from './stands.js';
-import { placementBridges, type CandidateSource } from './gpu-placement-flow-internal.js';
+import { placementBridges, worldGPU, type CandidateSource } from './gpu-placement-flow-internal.js';
 
 /** Perfect plasticity cells: 32 m, world-anchored, inside every tile size. */
 const PPA_SHIFT = 13; // 2^13 ticks = 32 m
@@ -526,6 +526,13 @@ interface Fields {
   readonly whole: boolean;
 }
 
+interface GPUCall {
+  readonly need: readonly (readonly [number, number, Rect?])[];
+  readonly whole: ReadonlySet<string>;
+  readonly missed: Set<string>;
+  error?: { readonly reason: unknown };
+}
+
 /**
  * Thrown when a lookup needs a world tile not yet made, or a cell outside the window made of it; the driver makes the
  * whole tile and runs again.
@@ -826,7 +833,7 @@ class Run {
     let f = this.#byTile[key];
     if (!f) {
       f = this.fields(tx, tz);
-      if (!f) throw new Missing(tx, tz);
+      if (!f) this.missing(tx, tz);
       this.#byTile[key] = f;
     }
     return f;
@@ -852,11 +859,18 @@ class Run {
     /** Pools of earlier runs to reuse (a run goes start to finish in one call, so one run uses them at a time). */
     reuse: Pool[] = [],
     readonly source?: CandidateSource,
+    readonly onMissing?: (x: number, z: number) => void,
   ) {
     this.pools = plan.strata.map((st, s) => {
       const bits = windowBits(geometry.tileTicks, st.gs);
       return reuse[s] ? reuse[s].reset(bits) : (reuse[s] = new Pool(bits));
     });
+  }
+
+  missing(x: number, z: number): never {
+    // GPU transport wraps Missing, so retain its tile before crossing that boundary.
+    this.onMissing?.(x, z);
+    throw new Missing(x, z);
   }
 
   /**
@@ -876,7 +890,7 @@ class Run {
     const f = this.#fields!,
       i = (x - tx * g.tileTicks) >> g.cellShift,
       j = (z - tz * g.tileTicks) >> g.cellShift;
-    if (i < f.i0 || j < f.j0 || i >= f.i1 || j >= f.j1) throw new Missing(tx, tz);
+    if (i < f.i0 || j < f.j0 || i >= f.i1 || j >= f.j1) this.missing(tx, tz);
     out.f = f;
     out.k = (j - f.j0) * (f.i1 - f.i0) + i - f.i0;
     return true;
@@ -922,7 +936,7 @@ class Run {
         const f = this.tileFields(tx, tz);
         if (f.present[b]) return true;
         if (!f.whole) {
-          if (((x0 ^ x1) | (z0 ^ z1)) >> s) throw new Missing(tx, tz);
+          if (((x0 ^ x1) | (z0 ^ z1)) >> s) this.missing(tx, tz);
           // Inside one tile: at() throws Missing unless both corners, and so the whole rectangle, are in the window.
           this.at(x0, z0, this.look);
           this.at(x1, z1, this.look);
@@ -1233,6 +1247,7 @@ export class BiomePlacement implements Disposable {
   readonly #pid = ++serial;
   /** Candidate pools reused from tile to tile (tens of megabytes of tables per tile otherwise). */
   readonly #pools: Pool[] = [];
+  #gpuCall?: GPUCall;
 
   private constructor(world: BiomeWorld, options: PlacementOptions) {
     this.#world = world;
@@ -1246,6 +1261,7 @@ export class BiomePlacement implements Disposable {
       if (!Number.isInteger(x) || !Number.isInteger(z) || x < 0 || z < 0 || x >= world.tilesX || z >= world.tilesZ)
         throw rangeError('GPU placement needs tile indices inside the world', 'biomes');
       const plan = this.#plan,
+        context = this.#gpuCall,
         tileTicks = world.tileSize * TICK;
       return {
         plan,
@@ -1254,9 +1270,13 @@ export class BiomePlacement implements Disposable {
         worldX: world.tilesX * tileTicks,
         worldZ: world.tilesZ * tileTicks,
         open: async (windows, source, signal) => {
-          const need: [number, number][] = [];
+          const need: (readonly [number, number, Rect?])[] = context ? [...context.need] : [];
+          for (const key of context?.whole ?? []) {
+            const [tx, tz] = key.split(',').map(Number);
+            need.push([tx, tz]);
+          }
           const seen = new Set<string>();
-          for (const [x0, z0, x1, z1] of windows)
+          for (const [x0, z0, x1, z1] of context ? [] : windows)
             for (
               let tz = Math.max(0, divFloor(z0, tileTicks));
               tz < Math.min(world.tilesZ, -divFloor(-z1, tileTicks));
@@ -1273,19 +1293,34 @@ export class BiomePlacement implements Disposable {
                   need.push([tx, tz]);
                 }
               }
+          const cpu = <T>(work: () => T): T => {
+            try {
+              return work();
+            } catch (error) {
+              if (context && !(error instanceof Missing)) context.error = { reason: error };
+              throw error;
+            }
+          };
           return this.#withFields(need, signal, (fields) => {
             if (plan !== this.#plan)
               throw fault('failed', 'World changed during GPU placement; request the tile again', 'biomes');
-            const run = this.#runOf(fields, source);
+            const run = this.#runOf(
+              fields,
+              source,
+              context ? (tx, tz) => context.missed.add(tileKey(tx, tz)) : undefined,
+            );
             return {
-              run,
+              run: { pools: run.pools, cell: (s: number, cx: number, cz: number) => cpu(() => run.cell(s, cx, cz)) },
               render: () => {
                 this.#live();
                 if (plan !== this.#plan)
                   throw fault('failed', 'World changed during GPU placement; request the tile again', 'biomes');
-                return this.#run(x, z, fields, run);
+                return cpu(() => this.#run(x, z, fields, run));
               },
             };
+          }).catch((error: unknown) => {
+            if (context && !(error instanceof Missing)) context.error = { reason: error };
+            throw error;
           });
         },
       };
@@ -1423,7 +1458,7 @@ export class BiomePlacement implements Disposable {
    * the edge that placement can reach (the whole neighbour when it will be placed too, see `ahead`, or when a read goes
    * past that edge).
    * @throws RangeError for a tile outside the world; TypeError for an `ahead` that is not a list of pairs. Rejects with
-   * the signal's reason when aborted.
+   * the signal's reason when aborted, or MargoError code 'failed' on device loss or GPU execution errors.
    */
   async tile(
     x: number,
@@ -1467,7 +1502,9 @@ export class BiomePlacement implements Disposable {
               { near: [x, z], priority: options.priority, signal: options.signal },
             )
             .then(placed)
-        : this.#place(x, z, options.signal, options.ahead);
+        : worldGPU.has(w)
+          ? this.#placeGPU(x, z, options.signal, options.ahead)
+          : this.#place(x, z, options.signal, options.ahead);
       this.#cache.set(key, pending);
       if (this.#cache.size > CACHE) this.#cache.delete(this.#cache.keys().next().value!);
       pending.catch(() => {
@@ -1508,6 +1545,10 @@ export class BiomePlacement implements Disposable {
     signal?: AbortSignal,
     ahead?: readonly (readonly [number, number])[],
   ): Promise<PlacedTile> {
+    return this.#withFields(this.#needOf(x, z, ahead), signal, (fields) => this.#run(x, z, fields));
+  }
+
+  #needOf(x: number, z: number, ahead?: readonly (readonly [number, number])[]): [number, number, Rect?][] {
     const c = this.#world.tileSize / this.#world.resolution, // float division: exact
       next = new Set(ahead?.map(([i, j]) => tileKey(i, j))),
       need: [number, number, Rect?][] = [];
@@ -1523,7 +1564,45 @@ export class BiomePlacement implements Disposable {
             ? [dx < 0 ? c - a : 0, dz < 0 ? c - a : 0, dx > 0 ? a : c, dz > 0 ? a : c]
             : undefined,
         ]);
-    return this.#withFields(need, signal, (fields) => this.#run(x, z, fields));
+    return need;
+  }
+
+  async #placeGPU(
+    x: number,
+    z: number,
+    signal?: AbortSignal,
+    ahead?: readonly (readonly [number, number])[],
+  ): Promise<PlacedTile> {
+    const gpu = worldGPU.get(this.#world)!,
+      combined = signal ? AbortSignal.any([signal, gpu.signal]) : gpu.signal,
+      need = this.#needOf(x, z, ahead),
+      whole = new Set<string>(),
+      plan = this.#plan;
+    combined.throwIfAborted();
+    const { placeTileGPU } = await import('./gpu-placement.js');
+    for (;;) {
+      combined.throwIfAborted();
+      this.#live();
+      if (plan !== this.#plan)
+        throw fault('failed', 'World changed during GPU placement; request the tile again', 'biomes');
+      const context: GPUCall = { need, whole, missed: new Set() };
+      try {
+        let pending: Promise<PlacedTile>;
+        // The kernel captures this context in its bridge before its first await.
+        this.#gpuCall = context;
+        try {
+          pending = placeTileGPU(gpu.device, this, x, z, { signal: combined });
+        } finally {
+          this.#gpuCall = undefined;
+        }
+        return await pending;
+      } catch (error) {
+        combined.throwIfAborted();
+        if (context.error) throw context.error.reason;
+        if (![...context.missed].some((key) => !whole.has(key))) throw error;
+        for (const key of context.missed) whole.add(key);
+      }
+    }
   }
 
   /** What placement reads of a world tile or part, kept as long as the world keeps its layers. */
@@ -1577,7 +1656,11 @@ export class BiomePlacement implements Disposable {
     }
   }
 
-  #runOf(fields: (x: number, z: number) => Fields | undefined, source?: CandidateSource): Run {
+  #runOf(
+    fields: (x: number, z: number) => Fields | undefined,
+    source?: CandidateSource,
+    onMissing?: (x: number, z: number) => void,
+  ): Run {
     const w = this.#world,
       tileTicks = w.tileSize * TICK;
     return new Run(
@@ -1597,6 +1680,7 @@ export class BiomePlacement implements Disposable {
       this.#shapes,
       source ? [] : this.#pools,
       source,
+      onMissing,
     );
   }
 

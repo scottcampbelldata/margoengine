@@ -156,6 +156,7 @@
     "test:gpu:shadows": "cd ../.. && node packages/biomes/tests/shadows-check.mjs",
     "test:gpu:flythrough": "cd ../.. && node packages/biomes/tests/flythrough-check.mjs",
     "test:gpu:objects-frame": "cd ../.. && node packages/biomes/tests/objects-frame-check.mjs",
-    "test:gpu:backend": "cd ../.. && node packages/biomes/tests/gpu-backend-check.mjs"
+    "test:gpu:backend": "cd ../.. && node packages/biomes/tests/gpu-backend-check.mjs",
+    "test:gpu:backend-placement": "cd ../.. && node packages/biomes/tests/gpu-backend-placement-check.mjs"
   }
 }

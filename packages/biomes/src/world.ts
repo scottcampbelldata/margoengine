@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // BiomeWorld: a finite world (decision D1, up to 64 km) of tiles with integer climate fields.
+import { worldGPU } from './gpu-placement-flow-internal.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type Climate, type ClimateOptions, quantizeClimate } from './climate.js';
 import { checkPaint, type Classifier, classifier, classify, type PaintLayer, type ZoneClassifier } from './classify.js';
@@ -303,6 +304,7 @@ export class BiomeWorld implements Disposable {
         );
       this.#device = device;
       this.#gpuAbort = new AbortController();
+      worldGPU.set(this, { device, signal: this.#gpuAbort.signal });
     }
     if (typeof ecotone !== 'number' || !(ecotone >= 0 && ecotone <= 128))
       throw rangeError('BiomeWorld ecotone must be a number of metres, 0..128 (0 keeps painted edges hard)', 'biomes');

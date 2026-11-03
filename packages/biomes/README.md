@@ -509,6 +509,10 @@ engine.start();
 `@margoengine/biomes/placement` places every species rule of the world's biomes (`plants`, `rocks`, `props`) as stored
 objects: 8 bytes each, per tile, the same bytes in any tile order, tile size or machine.
 
+On a GPU world, placement uses the world's device and produces byte-identical records, stats and density maps.
+Neighbour bands and `ahead` keep the same loading rules. Device loss or GPU execution errors reject with
+`MargoError` code `failed`; an aborted request rejects with the signal's reason.
+
 ```ts
 import { BiomeWorld } from '@margoengine/biomes';
 import { BiomePlacement } from '@margoengine/biomes/placement';
@@ -767,12 +771,16 @@ every lower neighbour, Freeman 1991), wetness, height above drainage (HAND), lak
 world's own layers do not change; `hydrologyTile` gives the same fields as rasters of a tile. `riversOf` turns channels into
 lines for `water: { rivers }`, falling to the mouth (the default rivers stay the relief's lines).
 
+`await hydrologyOfAsync(world, options, { signal })` uses the world's device on a GPU world and the CPU otherwise,
+with byte-identical typed arrays. It rejects with the signal's reason on abort, or `MargoError` code `failed` on
+device loss or GPU execution errors. The synchronous `hydrologyOf(world, options)` always runs on the CPU.
+
 ```ts
 import { BiomeWorld } from '@margoengine/biomes';
-import { hydrologyOf, hydrologyTile, riversOf } from '@margoengine/biomes/hydrology';
+import { hydrologyOfAsync, hydrologyTile, riversOf } from '@margoengine/biomes/hydrology';
 
 const world = await BiomeWorld.create({ size: [2048, 2048], height: { relief: { coast: 'south', relief: 600 } } });
-const h = hydrologyOf(world, { channelCells: 400 });
+const h = await hydrologyOfAsync(world, { channelCells: 400 });
 const { lines } = riversOf(world, h); // pass these to BiomeView's water: { rivers: lines }
 const [flow, twi, hand, lake, channel] = hydrologyTile(world, h, 3, 3);
 console.log(lines.length, flow.data[0], twi.data[0], hand.data[0], lake.data[0], channel.data[0]);
@@ -780,7 +788,7 @@ console.log(lines.length, flow.data[0], twi.data[0], hand.data[0], lake.data[0],
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `sea` | the world's sea level with `hydrologyOf`, none with `hydrology` | mm; cells below it are outlets |
+| `sea` | the world's sea level with `hydrologyOf` or `hydrologyOfAsync`, none with `hydrology` | mm; cells below it are outlets |
 | `channelCells` | the cells of 1 km2, at least 8 | flow that makes a cell a channel |
 | `lakeDepth` | 1,000 | fill depth in mm that makes a cell a lake |
 | `multiple` | false | route `shares` over every lower neighbour; wetness reads them |

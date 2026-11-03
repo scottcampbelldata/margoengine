@@ -8,7 +8,7 @@ import { rangeError, typeError } from '../../shared/errors.js';
 import { bilinear, divFloor, idiv, imod, isqrt, ONE, qexp2, qlog2 } from './fixed.js';
 import type { RasterLayer } from './layers.js';
 import { distanceTransform, priorityFlood } from './region.js';
-import { flowBridge, type FlowState } from './gpu-placement-flow-internal.js';
+import { flowBridge, worldGPU, type FlowState } from './gpu-placement-flow-internal.js';
 
 /** Neighbour offsets of a D8 direction: 0 is +x, then clockwise seen from above with +z down the grid. */
 const DX = [1, 1, 0, -1, -1, -1, 0, 1],
@@ -269,7 +269,7 @@ export function hydrology(grid: HeightGrid, options: HydrologyOptions = {}): Hyd
   return finishFlow(state);
 }
 
-function prepareFlow(grid: HeightGrid, options: HydrologyOptions): FlowState {
+function validateFlow(grid: HeightGrid, options: HydrologyOptions) {
   const { height, nx, nz, step } = grid;
   if (!(height instanceof Int32Array))
     throw typeError('hydrology needs height as an Int32Array of millimetres', 'biomes');
@@ -279,6 +279,11 @@ function prepareFlow(grid: HeightGrid, options: HydrologyOptions): FlowState {
     channelCells = options.channelCells ?? Math.max(8, Math.ceil(1e12 / (step * step))); // float division: cells of 1 km2
   if (!(channelCells >= 1) || !(lakeDepth > 0))
     throw rangeError('hydrology channelCells must be 1 or more and lakeDepth above 0', 'biomes');
+  return { height, nx, nz, step, sea, lakeDepth, multiple, channelCells };
+}
+
+function prepareFlow(grid: HeightGrid, options: HydrologyOptions): FlowState {
+  const { height, nx, nz, sea, lakeDepth, multiple, channelCells } = validateFlow(grid, options);
   const n = nx * nz,
     ocean = new Uint8Array(n);
   if (sea !== undefined) for (let c = 0; c < n; c++) ocean[c] = height[c] < sea ? 1 : 0;
@@ -410,6 +415,37 @@ export interface HydrologyWorld {
  */
 export function hydrologyOf(world: HydrologyWorld, options: HydrologyOptions = {}): Hydrology {
   return hydrology(world.region, { sea: world.climate.sea, ...options });
+}
+
+/**
+ * The hydrology of a world's region, using its device on a GPU world and the CPU otherwise.
+ * Uses the world's sea level unless `options.sea` overrides it. Rerun after heights or climate change.
+ * The synchronous {@link hydrologyOf} always uses the CPU.
+ * @throws what {@link hydrology} throws for invalid inputs. Rejects with the signal's reason on abort,
+ * or MargoError code `failed` on device loss or GPU execution errors.
+ * @example
+ * const h = await hydrologyOfAsync(world, { multiple: true }, { signal });
+ * const { lines } = riversOf(world, h);
+ */
+export async function hydrologyOfAsync(
+  world: HydrologyWorld,
+  options: HydrologyOptions = {},
+  { signal }: { readonly signal?: AbortSignal } = {},
+): Promise<Hydrology> {
+  signal?.throwIfAborted();
+  const grid = world.region,
+    settings = { sea: world.climate.sea, ...options };
+  validateFlow(grid, settings);
+  const gpu = worldGPU.get(world);
+  if (gpu) {
+    const combined = signal ? AbortSignal.any([signal, gpu.signal]) : gpu.signal;
+    combined.throwIfAborted();
+    const { hydrologyGPU } = await import('./gpu-flow.js');
+    return hydrologyGPU(gpu.device, grid, settings, { signal: combined });
+  }
+  await Promise.resolve();
+  signal?.throwIfAborted();
+  return hydrologyOf(world, options);
 }
 
 /** River lines of {@link riversOf}. */
