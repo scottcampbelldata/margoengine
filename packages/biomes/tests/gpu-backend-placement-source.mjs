@@ -4,6 +4,23 @@ import { hydrologyOf, hydrologyOfAsync } from '../src/hydrology.ts';
 
 export const BACKEND_PLACEMENT_CASE_COUNT = 11;
 
+export function backendHydrologyCases() {
+  const island = presetWorlds.island;
+  return [
+    { name: 'coast-south', options: { size: [512, 512], height: { relief: { coast: 'south', relief: 600 } } } },
+    { name: 'island', options: { size: [512, 512], height: { relief: island.relief }, climate: island.climate } },
+    {
+      name: 'samples-flats',
+      options: {
+        size: [256, 256],
+        tileSize: 128,
+        regionResolution: 16,
+        height: { samples: m.flowCases()[0].grid.height, width: 11, depth: 9, unit: 'mm' },
+      },
+    },
+  ];
+}
+
 function equalRecord(a, b, label) {
   if (ArrayBuffer.isView(a)) {
     if (!ArrayBuffer.isView(b) || a.constructor !== b.constructor || a.byteLength !== b.byteLength)
@@ -140,20 +157,7 @@ export async function runBackendPlacementCases(device) {
     }
   }
   if (!coldBands) throw Error('No cold GPU placement exercised neighbour bands');
-  const flows = [
-    { name: 'coast-south', options: { size: [512, 512], height: { relief: { coast: 'south', relief: 600 } } } },
-    { name: 'island', options: { size: [512, 512], height: { relief: island.relief }, climate: island.climate } },
-    {
-      name: 'samples-flats',
-      options: {
-        size: [128, 128],
-        tileSize: 128,
-        regionResolution: 16,
-        height: { samples: m.flowCases()[0].grid.height, width: 11, depth: 9, unit: 'mm' },
-      },
-    },
-  ];
-  for (const spec of flows) {
+  for (const spec of backendHydrologyCases()) {
     const cpu = await m.BiomeWorld.create({ ...spec.options, backend: 'cpu', workers: 0 });
     let gpu;
     try {

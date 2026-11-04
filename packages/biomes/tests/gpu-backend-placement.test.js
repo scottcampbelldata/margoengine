@@ -8,6 +8,7 @@ const m = await import('./gpu-placement-flow-source.mjs');
 const { hydrologyOf, hydrologyOfAsync } = await import('../src/hydrology.ts');
 const { fakeDevice, installGPUConstants } = await import('./gpu-placement-flow-fake.mjs');
 const { placementBridges } = await import('../src/gpu-placement-flow-internal.ts');
+const { backendHydrologyCases } = await import('./gpu-backend-placement-source.mjs');
 
 const failed = (e) => e.name === 'MargoError' && e.code === 'failed';
 const bytesHash = (tile) => {
@@ -377,6 +378,28 @@ test('concurrent GPU placements capture independent loading contexts and cached 
     'cached neighbours keep the existing whole-tile heuristic',
   );
   fake.assertFreed();
+});
+
+test('hardware hydrology fixtures construct valid worlds and retain sampled flats', async () => {
+  const cases = backendHydrologyCases();
+  assert.deepEqual(
+    cases.map(({ name }) => name),
+    ['coast-south', 'island', 'samples-flats'],
+  );
+  for (const spec of cases) {
+    const world = await m.BiomeWorld.create({ ...spec.options, backend: 'cpu', workers: 0 });
+    try {
+      const options = { multiple: true, channelCells: 4, lakeDepth: 500 };
+      const expected = hydrologyOf(world, options);
+      assert.deepEqual(await hydrologyOfAsync(world, options), expected, spec.name);
+      if (spec.name === 'samples-flats') {
+        assert.ok(expected.height.includes(5000), 'sampled plateau remains in the hydrology grid');
+        assert.ok(new Set(expected.height).size > 1, 'samples also exercise non-flat heights');
+      }
+    } finally {
+      world.dispose();
+    }
+  }
 });
 
 test('the hardware runner bundles the full public placement/hydrology matrix', async () => {
