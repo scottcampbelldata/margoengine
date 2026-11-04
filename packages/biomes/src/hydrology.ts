@@ -436,16 +436,22 @@ export async function hydrologyOfAsync(
   const grid = world.region,
     settings = { sea: world.climate.sea, ...options };
   validateFlow(grid, settings);
-  const gpu = worldGPU.get(world);
-  if (gpu) {
-    const combined = signal ? AbortSignal.any([signal, gpu.signal]) : gpu.signal;
-    combined.throwIfAborted();
+  const gpu = worldGPU.get(world),
+    combined = gpu ? (signal ? AbortSignal.any([signal, gpu.signal]) : gpu.signal) : signal;
+  combined?.throwIfAborted();
+  // The CPU accepts non-finite thresholds; keep those settings outside the GPU kernel's domain.
+  if (
+    gpu &&
+    (settings.sea === undefined || Number.isFinite(settings.sea)) &&
+    (settings.channelCells === undefined || Number.isFinite(settings.channelCells)) &&
+    (settings.lakeDepth === undefined || Number.isFinite(settings.lakeDepth))
+  ) {
     const { hydrologyGPU } = await import('./gpu-flow.js');
-    return hydrologyGPU(gpu.device, grid, settings, { signal: combined });
+    return hydrologyGPU(gpu.device, grid, { ...settings, multiple: !!settings.multiple }, { signal: combined });
   }
   await Promise.resolve();
-  signal?.throwIfAborted();
-  return hydrologyOf(world, options);
+  combined?.throwIfAborted();
+  return hydrology(grid, settings);
 }
 
 /** River lines of {@link riversOf}. */

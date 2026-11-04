@@ -510,8 +510,9 @@ engine.start();
 objects: 8 bytes each, per tile, the same bytes in any tile order, tile size or machine.
 
 On a GPU world, placement uses the world's device and produces byte-identical records, stats and density maps.
-Neighbour bands and `ahead` keep the same loading rules. Device loss or GPU execution errors reject with
-`MargoError` code `failed`; an aborted request rejects with the signal's reason.
+Neighbour bands and `ahead` keep the same loading rules. Device loss, GPU execution errors or emission storage
+exceeding device limits after count readback reject with `MargoError` code `failed`; an aborted request rejects
+with the signal's reason.
 
 ```ts
 import { BiomeWorld } from '@margoengine/biomes';

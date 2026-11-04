@@ -8,7 +8,7 @@ const m = await import('./gpu-placement-flow-source.mjs');
 const { hydrologyOf, hydrologyOfAsync } = await import('../src/hydrology.ts');
 const { fakeDevice, installGPUConstants } = await import('./gpu-placement-flow-fake.mjs');
 const { placementBridges } = await import('../src/gpu-placement-flow-internal.ts');
-const { backendHydrologyCases } = await import('./gpu-backend-placement-source.mjs');
+const { backendHydrologyCases, BACKEND_PLACEMENT_CASE_COUNT } = await import('./gpu-backend-placement-source.mjs');
 
 const failed = (e) => e.name === 'MargoError' && e.code === 'failed';
 const bytesHash = (tile) => {
@@ -146,6 +146,31 @@ test('GPU async hydrology routes options and the sync entry stays CPU-only', asy
   fake.assertFreed();
 });
 
+test('CPU and GPU async hydrology capture the grid and sea level before yielding', async (t) => {
+  installGPUConstants(t);
+  for (const gpu of [false, true]) {
+    const { world, fake } = await fixture(t, {}, gpu);
+    const expected = hydrologyOf(world);
+    const pending = hydrologyOfAsync(world);
+    world.update({ climate: { seaLevel: 9000 } });
+    assert.notDeepEqual(hydrologyOf(world), expected, 'the update changes the hydrology result');
+    assert.deepEqual(await pending, expected, gpu ? 'GPU snapshot' : 'CPU snapshot');
+    fake.assertFreed();
+  }
+});
+
+test('GPU async hydrology preserves CPU options outside the kernel domain', async (t) => {
+  installGPUConstants(t);
+  const { world, fake } = await fixture(t);
+  for (const options of [{ sea: Infinity }, { channelCells: Infinity }, { lakeDepth: Infinity }, { multiple: 1 }]) {
+    const dispatches = fake.dispatch.length;
+    assert.deepEqual(await hydrologyOfAsync(world, options), hydrologyOf(world, options));
+    if (options.multiple) assert.ok(fake.dispatch.length > dispatches, 'truthy multiple uses the GPU');
+    else assert.equal(fake.dispatch.length, dispatches, 'non-finite settings use the CPU snapshot');
+    fake.assertFreed();
+  }
+});
+
 test('public GPU entries reject storage limits before device work and placement retries after recovery', {
   timeout: 15000,
 }, async (t) => {
@@ -234,7 +259,10 @@ test('GPU placement checks actual emission limits after count readback and frees
     assert.ok(descriptor.size <= limit, 'oversized emission is rejected before allocation');
     return createBuffer(descriptor);
   });
-  await assert.rejects(p.tile(0, 0), /GPU storage exceeds device limits/);
+  await assert.rejects(
+    p.tile(0, 0),
+    (error) => failed(error) && /GPU storage exceeds device limits/.test(error.message),
+  );
   assert.deepEqual(
     fake.dispatch.map(([name]) => name),
     ['counts'],
@@ -295,6 +323,23 @@ test('GPU loss during work and pipeline creation failures reject with failed', {
   await setImmediate();
   await assert.rejects(p.tile(0, 0), failed);
   await assert.rejects(hydrologyOfAsync(world), failed);
+  fake.assertFreed();
+});
+
+test('device loss rejects cached GPU tiles and digests after option validation', async (t) => {
+  installGPUConstants(t);
+  const { placement: p, fake } = await fixture(t);
+  const cached = await p.tile(0, 0);
+  assert.equal(await p.tile(0, 0), cached);
+  fake.lose({ message: 'lost after caching a tile' });
+  await setImmediate();
+  await assert.rejects(p.tile(0, 0), failed);
+  await assert.rejects(p.digest(0, 0), failed);
+  await assert.rejects(p.tile(-1, 0), RangeError);
+  await assert.rejects(p.tile(0, 0, { ahead: 1 }), TypeError);
+  const reason = { cancelled: true };
+  await assert.rejects(p.tile(0, 0, { signal: AbortSignal.abort(reason) }), (e) => e === reason);
+  fake.assertFreed();
 });
 
 test('updates invalidate GPU placement and an in-flight plan change fails without poisoning its replacement', {
@@ -382,6 +427,7 @@ test('concurrent GPU placements capture independent loading contexts and cached 
 
 test('hardware hydrology fixtures construct valid worlds and retain sampled flats', async () => {
   const cases = backendHydrologyCases();
+  assert.equal(BACKEND_PLACEMENT_CASE_COUNT, 8 + cases.length * 2);
   assert.deepEqual(
     cases.map(({ name }) => name),
     ['coast-south', 'island', 'samples-flats'],
@@ -389,12 +435,13 @@ test('hardware hydrology fixtures construct valid worlds and retain sampled flat
   for (const spec of cases) {
     const world = await m.BiomeWorld.create({ ...spec.options, backend: 'cpu', workers: 0 });
     try {
-      const options = { multiple: true, channelCells: 4, lakeDepth: 500 };
-      const expected = hydrologyOf(world, options);
-      assert.deepEqual(await hydrologyOfAsync(world, options), expected, spec.name);
-      if (spec.name === 'samples-flats') {
-        assert.ok(expected.height.includes(5000), 'sampled plateau remains in the hydrology grid');
-        assert.ok(new Set(expected.height).size > 1, 'samples also exercise non-flat heights');
+      for (const options of [{}, { multiple: true, channelCells: 4, lakeDepth: 500 }]) {
+        const expected = hydrologyOf(world, options);
+        assert.deepEqual(await hydrologyOfAsync(world, options), expected, spec.name);
+        if (spec.name === 'samples-flats') {
+          assert.ok(expected.height.includes(5000), 'sampled plateau remains in the hydrology grid');
+          assert.ok(new Set(expected.height).size > 1, 'samples also exercise non-flat heights');
+        }
       }
     } finally {
       world.dispose();

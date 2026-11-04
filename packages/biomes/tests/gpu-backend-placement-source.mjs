@@ -2,7 +2,7 @@ import * as m from './gpu-placement-flow-source.mjs';
 import { presetWorlds, R16 } from '../src/presets.ts';
 import { hydrologyOf, hydrologyOfAsync } from '../src/hydrology.ts';
 
-export const BACKEND_PLACEMENT_CASE_COUNT = 11;
+export const BACKEND_PLACEMENT_CASE_COUNT = 14;
 
 export function backendHydrologyCases() {
   const island = presetWorlds.island;
@@ -162,10 +162,12 @@ export async function runBackendPlacementCases(device) {
     let gpu;
     try {
       gpu = await m.BiomeWorld.create({ ...spec.options, backend: 'gpu', workers: 0, device });
-      const options = { multiple: true, channelCells: 4, lakeDepth: 500 };
-      equalRecord(hydrologyOf(cpu, options), await hydrologyOfAsync(gpu, options), spec.name);
-      console.log('hydrology parity: ' + spec.name);
-      gpuCases++;
+      for (const options of [{}, { multiple: true, channelCells: 4, lakeDepth: 500 }]) {
+        const label = spec.name + (options.multiple ? ' multiple' : ' default');
+        equalRecord(hydrologyOf(cpu, options), await hydrologyOfAsync(gpu, options), label);
+        console.log('hydrology parity: ' + label);
+        gpuCases++;
+      }
     } finally {
       gpu?.dispose();
       cpu.dispose();

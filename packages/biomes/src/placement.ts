@@ -1458,7 +1458,8 @@ export class BiomePlacement implements Disposable {
    * the edge that placement can reach (the whole neighbour when it will be placed too, see `ahead`, or when a read goes
    * past that edge).
    * @throws RangeError for a tile outside the world; TypeError for an `ahead` that is not a list of pairs. Rejects with
-   * the signal's reason when aborted, or MargoError code 'failed' on device loss or GPU execution errors.
+   * the signal's reason when aborted, or MargoError code 'failed' on device loss, GPU execution errors or emission
+   * storage exceeding device limits after count readback.
    */
   async tile(
     x: number,
@@ -1488,6 +1489,7 @@ export class BiomePlacement implements Disposable {
     if (options.signal?.aborted) throw options.signal.reason;
     if (options.ahead && !options.ahead.every?.((p) => Array.isArray(p)))
       throw typeError('BiomePlacement tile ahead is a list of [x, z] tile indices', 'biomes');
+    worldGPU.get(w)?.signal.throwIfAborted();
     const key = tileKey(x, z);
     let pending = this.#cache.get(key);
     if (pending) {
