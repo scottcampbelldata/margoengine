@@ -145,6 +145,42 @@ test('GPU async hydrology routes options and the sync entry stays CPU-only', asy
   fake.assertFreed();
 });
 
+test('public GPU entries reject storage limits before device work and placement retries after recovery', {
+  timeout: 15000,
+}, async (t) => {
+  installGPUConstants(t);
+  for (const limit of ['maxBufferSize', 'maxStorageBufferBindingSize']) {
+    const { world, cpu, fake, placement: p, spec, loads } = await fixture(t);
+    const reference = m.BiomePlacement.attach(cpu, spec.placement);
+    t.after(() => reference.dispose());
+    let pipelines = 0;
+    const createPipeline = fake.device.createComputePipelineAsync;
+    t.mock.method(fake.device, 'createComputePipelineAsync', (descriptor) => {
+      pipelines++;
+      return createPipeline(descriptor);
+    });
+    const original = fake.device.limits[limit];
+    fake.device.limits[limit] = 4;
+    const storageError = (error) =>
+      error instanceof RangeError && /GPU storage exceeds device limits/.test(error.message);
+    await assert.rejects(p.tile(0, 0), storageError, limit);
+    await assert.rejects(p.digest(0, 0), storageError, limit);
+    await assert.rejects(hydrologyOfAsync(world), storageError, limit);
+    assert.equal(pipelines, 0, 'storage preflight precedes pipeline creation');
+    assert.equal(fake.buffers.length, 0, 'storage preflight precedes buffer allocation');
+    assert.equal(fake.dispatch.length, 0, 'storage preflight precedes dispatch');
+    assert.deepEqual(loads, [], 'placement preflight precedes field loading');
+    fake.assertFreed();
+
+    fake.device.limits[limit] = original;
+    assert.deepEqual(m.tileBytes(await p.tile(0, 0)), m.tileBytes(await reference.tile(0, 0)));
+    assert.equal(await p.digest(0, 0), await reference.digest(0, 0));
+    assert.deepEqual(await hydrologyOfAsync(world), hydrologyOf(cpu));
+    assert.ok(pipelines > 0, 'recovered requests execute on the GPU backend');
+    fake.assertFreed();
+  }
+});
+
 test('abort during CPU/GPU work preserves reason and rejected placement cache entries retry', {
   timeout: 15000,
 }, async (t) => {
