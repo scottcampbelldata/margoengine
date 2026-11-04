@@ -273,23 +273,25 @@ export async function placeTileGPU(
         'biomes',
       );
   }
+  const tableWords = plan.specs.filter((sp) => sp.cluster).length * 257;
   let cellCount = 0;
   for (let s = 0; s < plan.strata.length; s++) {
     const [x0, z0, x1, z1] = windows[s];
     for (const sp of plan.strata[s].species) {
       const count = divFloor(x1 - x0, sp.gen) * divFloor(z1 - z0, sp.gen);
       cellCount += count;
-      checkWords(device, 1 + cellCount * 40 * 18 + plan.specs.length * 257);
-      dispatchShape(device, Math.max(1, cellCount * 40));
+      checkWords(device, 1 + cellCount * 18 + tableWords);
+      checkWords(device, cellCount * 2);
+      dispatchShape(device, Math.max(1, cellCount));
       for (let gz = divFloor(z0, sp.gen); gz < divFloor(z1, sp.gen); gz++)
         for (let gx = divFloor(x0, sp.gen); gx < divFloor(x1, sp.gen); gx++)
           cells.push({ sp, gx, gz, start: 0, count: 0 });
     }
   }
-  // Worst-case 40-step inverse CDF output; validate before the first GPU call/await.
-  dispatchShape(device, Math.max(1, cells.length * 40));
-  checkWords(device, 1 + cells.length * 40 * 18 + plan.specs.length * 257);
-  checkWords(device, cells.length * 40 * 10);
+  // Count buffers are known now; emission buffers depend on the GPU's actual counts.
+  dispatchShape(device, Math.max(1, cells.length));
+  checkWords(device, 1 + cells.length * 18 + tableWords);
+  checkWords(device, cells.length * 2);
   const countsInput = packed(cells, bridge.seed, false);
   const session = new ComputeSession(device, signal);
   try {
@@ -322,6 +324,9 @@ export async function placeTileGPU(
     });
     if (!Number.isSafeInteger(total) || total > 2147483647)
       throw rangeError('GPU candidate prefix exceeds i32; use a smaller placement window', 'biomes');
+    dispatchShape(device, Math.max(1, total));
+    checkWords(device, 1 + total * 18 + tableWords);
+    checkWords(device, total * 10);
     const raw = await runKernel(emit, packed(cells, bridge.seed, true), 9);
     const source: CandidateSource = {
       count(sp, gx, gz) {

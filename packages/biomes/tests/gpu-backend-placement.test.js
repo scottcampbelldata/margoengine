@@ -181,6 +181,69 @@ test('public GPU entries reject storage limits before device work and placement 
   }
 });
 
+test('GPU placement admits actual buffers that fit below the forty-candidate bound', {
+  timeout: 15000,
+}, async (t) => {
+  installGPUConstants(t);
+  const { cpu, fake, placement: p, spec } = await fixture(t);
+  const reference = m.BiomePlacement.attach(cpu, spec.placement);
+  t.after(() => reference.dispose());
+  const limit = 2 ** 24;
+  fake.device.limits.maxBufferSize = limit;
+  fake.device.limits.maxStorageBufferBindingSize = limit;
+  const createBuffer = fake.device.createBuffer;
+  t.mock.method(fake.device, 'createBuffer', (descriptor) => {
+    assert.ok(descriptor.size <= limit, 'every actual allocation fits the device');
+    return createBuffer(descriptor);
+  });
+  const actual = await p.tile(0, 0);
+  assert.deepEqual(m.tileBytes(actual), m.tileBytes(await reference.tile(0, 0)));
+  assert.equal(await p.digest(0, 0), await reference.digest(0, 0));
+  const countsInput = fake.buffers.find((buffer) => new Int32Array(buffer.bytes)[0] > 0);
+  const cellCount = new Int32Array(countsInput.bytes)[0];
+  assert.ok((1 + cellCount * 40 * 18) * 4 > limit, 'the old speculative bound rejects this input');
+  assert.ok(fake.dispatch.some(([name]) => name === 'counts'));
+  assert.ok(fake.dispatch.some(([name]) => name === 'emit'));
+  fake.assertFreed();
+});
+
+test('GPU placement checks actual emission limits after count readback and frees count buffers', {
+  timeout: 15000,
+}, async (t) => {
+  installGPUConstants(t);
+  let fake,
+    forceMaximum = true;
+  const fixtureResult = await fixture(t, {
+    onMap() {
+      if (!forceMaximum) return;
+      // A valid count response can require more emission storage than the count stage.
+      const count = new Int32Array(fake.buffers[0].bytes)[0];
+      new Int32Array(fake.buffers.at(-1).bytes).fill(40, 0, count);
+    },
+  });
+  const { cpu, placement: p, spec } = fixtureResult;
+  fake = fixtureResult.fake;
+  const reference = m.BiomePlacement.attach(cpu, spec.placement);
+  t.after(() => reference.dispose());
+  const limit = 2 ** 24;
+  fake.device.limits.maxBufferSize = limit;
+  fake.device.limits.maxStorageBufferBindingSize = limit;
+  const createBuffer = fake.device.createBuffer;
+  t.mock.method(fake.device, 'createBuffer', (descriptor) => {
+    assert.ok(descriptor.size <= limit, 'oversized emission is rejected before allocation');
+    return createBuffer(descriptor);
+  });
+  await assert.rejects(p.tile(0, 0), /GPU storage exceeds device limits/);
+  assert.deepEqual(
+    fake.dispatch.map(([name]) => name),
+    ['counts'],
+  );
+  fake.assertFreed();
+  forceMaximum = false;
+  assert.deepEqual(m.tileBytes(await p.tile(0, 0)), m.tileBytes(await reference.tile(0, 0)));
+  fake.assertFreed();
+});
+
 test('abort during CPU/GPU work preserves reason and rejected placement cache entries retry', {
   timeout: 15000,
 }, async (t) => {
