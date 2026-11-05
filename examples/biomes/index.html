@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11160f">
+  <meta name="description" content="A 4 km landscape whose forests, meadows, snow and sand come from its height and climate. Change the climate, paint a biome, export the maps. Live in WebGPU with Margo Engine.">
+  <title>Biomes · Margo Engine</title>
+  <!-- Margo engine ❤️ made for Margie -->
+  <style>
+    :root{--bg:#11160f;--panel:#141b12f2;--line:#55634c;--text:#eef1e8;--soft:#c9d1bf;--accent:#e2bd62;--ink:#151a10}
+    *{box-sizing:border-box}html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,'Segoe UI',sans-serif;overflow:hidden}
+    #viewport{position:fixed;inset:0}canvas{touch-action:none;display:block}
+    #viewport canvas{outline-offset:-4px}
+    aside{position:fixed;top:16px;left:16px;bottom:16px;width:min(372px,calc(100% - 32px));overflow:auto;overscroll-behavior:contain;padding:18px 18px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+    h1{margin:0 0 6px;font:400 26px/1.15 Georgia,'Times New Roman',serif}h1 a{color:var(--soft);font-size:16px}
+    p{margin:0 0 12px;color:var(--soft)}
+    figure{margin:0 0 12px}
+    #map{width:100%;max-width:336px;aspect-ratio:1;border:1px solid var(--line);border-radius:4px;background:#1d2618;touch-action:none;cursor:crosshair}
+    #legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:8px 0 0;padding:0;list-style:none;font-size:16px;color:var(--soft)}
+    #legend li{display:flex;align-items:center;gap:6px}#legend i{display:inline-block;width:14px;height:14px;border-radius:2px;border:1px solid #0006}
+    #legend .ramp{flex-basis:100%;height:12px;border-radius:2px}#legend .ends{flex-basis:100%;display:flex;justify-content:space-between}
+    #probe{min-height:2.9em;margin:8px 0 0;color:var(--text)}
+    fieldset{border:0;margin:0 0 6px;padding:0}legend{padding:0;margin-bottom:4px;font-weight:600}
+    .choices{display:flex;flex-wrap:wrap;gap:6px}
+    .choices label{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:4px 12px;border:1px solid var(--line);border-radius:4px;cursor:pointer}
+    .choices input{accent-color:var(--accent);margin:0}
+    .choices label:has(input:checked){border-color:var(--accent);background:#2a2716}
+    details{border-top:1px solid var(--line);padding:2px 0}
+    summary{min-height:44px;display:flex;align-items:center;font:400 19px/1.2 Georgia,'Times New Roman',serif;cursor:pointer}
+    details>div{padding:0 0 10px}
+    label.row{display:block;margin-top:8px}label.row output{float:right;font-variant-numeric:tabular-nums;color:var(--text)}
+    input[type=range]{display:block;width:100%;min-height:32px;margin:2px 0;accent-color:var(--accent)}
+    input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);margin:0 8px 0 0;vertical-align:-4px}
+    label.check{display:flex;align-items:center;min-height:44px}
+    select,input[type=number]{width:100%;min-height:44px;margin-top:4px;padding:6px 10px;background:#1e2719;color:var(--text);border:1px solid var(--line);border-radius:4px;font:inherit}
+    .pair{display:flex;gap:8px;align-items:flex-end}.pair>:first-child{flex:1}
+    .buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    button{min-height:44px;padding:8px 14px;border:1px solid var(--accent);border-radius:4px;background:transparent;color:var(--text);font:inherit;cursor:pointer}
+    button.primary,button[aria-pressed=true]{background:var(--accent);color:var(--ink)}
+    button:disabled{opacity:.55;cursor:default}
+    :focus-visible{outline:3px solid #f4dc9a;outline-offset:2px}
+    #timing{margin:10px 0 4px;font-variant-numeric:tabular-nums;color:var(--soft)}
+    #status{margin:0;color:var(--text)}#error{margin:8px 0 0;color:#ffd2b0}#error:empty{display:none}
+    .hint{color:var(--soft);margin:8px 0 0}
+    @media (max-width:720px){
+      aside{top:auto;left:0;right:0;bottom:0;width:100%;max-height:50svh;border-radius:6px 6px 0 0;border-width:1px 0 0;padding:14px 16px 10px}
+      h1{font-size:22px}#map{max-width:240px}
+    }
+  </style>
+</head>
+<body>
+  <main id="viewport" aria-label="A landscape whose ground, trees and snow follow its biome map"></main>
+  <aside aria-label="Biome controls">
+    <h1>Biomes <a href="../../">Margo Engine</a></h1>
+    <p>Every forest, meadow, snowfield and beach here follows from the height of the land and a few climate settings. Change them, or paint a biome by hand.</p>
+    <figure>
+      <canvas id="map" width="256" height="256" aria-label="Map of the whole world, north up"></canvas>
+      <ul id="legend" aria-label="Map legend"></ul>
+      <p id="probe" aria-live="polite">Tap the map or the land to read the climate there.</p>
+    </figure>
+    <fieldset>
+      <legend>Map shows</legend>
+      <div class="choices" id="layers">
+        <label><input type="radio" name="layer" value="biome" checked> Biome</label>
+        <label><input type="radio" name="layer" value="koppen"> Koppen</label>
+        <label><input type="radio" name="layer" value="temperature"> Temperature</label>
+        <label><input type="radio" name="layer" value="rainfall"> Rainfall</label>
+        <label><input type="radio" name="layer" value="soil"> Soil</label>
+      </div>
+    </fieldset>
+    <details open>
+      <summary>World</summary>
+      <div>
+        <label class="row" for="preset">Starting climate</label>
+        <select id="preset">
+          <option value="coast" selected>Coast and mountains</option>
+          <option value="temperate">Temperate hills</option>
+          <option value="boreal">Boreal north</option>
+          <option value="alpine">High alpine</option>
+          <option value="wetland">Wetland coast</option>
+          <option value="tundra">Tundra</option>
+          <option value="desert">Desert</option>
+          <option value="savanna">Savanna</option>
+          <option value="tropical">Tropical</option>
+          <option value="island">Tropical island</option>
+        </select>
+        <div class="pair">
+          <label class="row" for="seed">Seed<input id="seed" type="number" min="1" max="4294967295" step="1" value="1" inputmode="numeric"></label>
+          <button id="roll" type="button">New seed</button>
+        </div>
+        <label class="check"><input id="rivers" type="checkbox" checked> Water in the river valleys</label>
+      </div>
+    </details>
+    <details open>
+      <summary>Climate</summary>
+      <div>
+        <label class="row" for="temperature">Temperature <output id="temperature-value" for="temperature">0 C</output></label>
+        <input id="temperature" type="range" min="-12" max="12" step="1" value="0">
+        <label class="row" for="rainfall">Rainfall <output id="rainfall-value" for="rainfall">1,100 mm</output></label>
+        <input id="rainfall" type="range" min="50" max="3500" step="10" value="1100">
+        <label class="row" for="relief">Mountain height <output id="relief-value" for="relief">1,600 m</output></label>
+        <input id="relief" type="range" min="0" max="3000" step="100" value="1600">
+      </div>
+    </details>
+    <details>
+      <summary>Paint</summary>
+      <div>
+        <label class="row" for="brush-biome">Biome</label>
+        <select id="brush-biome"></select>
+        <label class="row" for="brush-size">Brush radius <output id="brush-size-value" for="brush-size">80 m</output></label>
+        <input id="brush-size" type="range" min="20" max="300" step="10" value="80">
+        <div class="buttons">
+          <button id="paint" type="button" aria-pressed="false">Paint</button>
+          <button id="erase" type="button" aria-pressed="false">Erase</button>
+          <button id="undo" type="button" disabled>Undo</button>
+          <button id="redo" type="button" disabled>Redo</button>
+          <button id="clear" type="button" disabled>Clear paint</button>
+        </div>
+        <p class="hint">With Paint or Erase on, drag on the land or the map. Turn both off to move the camera again.</p>
+      </div>
+    </details>
+    <details>
+      <summary>Trees</summary>
+      <div>
+        <label class="check"><input id="trees" type="checkbox" checked> Draw trees, shrubs, rocks and grass</label>
+        <label class="row" for="density">Tree density <output id="density-value" for="density">100 %</output></label>
+        <input id="density" type="range" min="0" max="200" step="10" value="100">
+        <label class="check"><input id="stands" type="checkbox" checked> Forests grow in stands with clearings</label>
+      </div>
+    </details>
+    <details>
+      <summary>Files</summary>
+      <div>
+        <p class="hint">Each export covers the 1 km square around the middle of the view, at 1 m cells.</p>
+        <div class="buttons">
+          <button id="export-height" type="button" class="primary">Height PNG</button>
+          <button id="export-masks" type="button">Biome masks</button>
+          <button id="export-world" type="button">World file</button>
+        </div>
+      </div>
+    </details>
+    <p id="timing" aria-live="off"></p>
+    <p id="status" role="status">Growing the landscape. The first load can take a few seconds.</p>
+    <p id="error" role="alert"></p>
+  </aside>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+  </script>
+</body>
+</html>

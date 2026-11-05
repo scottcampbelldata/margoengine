@@ -139,7 +139,7 @@ for (const name of ['dof', 'tonemap', 'animator'])
     publicDir: false,
     build: { outDir: `${out}/demos/${name}`, target: 'es2022' },
   });
-for (const name of ['molten-words', 'cathedral-light'])
+for (const name of ['molten-words', 'cathedral-light', 'biomes'])
   await site({
     configFile: false,
     root: `examples/${name}`,

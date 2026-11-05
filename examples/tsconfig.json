@@ -12,6 +12,7 @@
   },
   "include": [
     "*.ts",
+    "biomes/*.ts",
     "blender-loader/*.ts",
     "boulder/*.ts",
     "gallery/*.ts",

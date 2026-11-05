@@ -344,15 +344,32 @@ try {
       `${packageName(name)} must ship Margo's NOTICE`,
     );
     if (!inScope(name)) continue;
-    const markdown = await readFile(join(fixture, `node_modules/${packageName(name)}/README.md`), 'utf8');
-    // Standalone examples have imports; continuation blocks retain the preceding setup.
-    const examples = [];
-    for (const [, code] of markdown.matchAll(/```tsx?\r?\n([\s\S]*?)```/g)) {
-      if (!examples.length || /^\s*(?:import\s|const\s+\{[^}]+\}\s*=\s*await\s+import\s*\()/m.test(code))
-        examples.push(code);
-      else examples[examples.length - 1] += '\n' + code;
+    // The README, then the package's guides (packages/<name>/docs/*.md, kept in the repository, not packed): each
+    // guide's `ts` blocks are checked like the README's, so moving a section out of a README keeps its check.
+    const guides = existsSync(`packages/${name}/docs`)
+      ? (await readdir(`packages/${name}/docs`)).filter((file) => file.endsWith('.md')).sort()
+      : [];
+    const documents = [
+      ['readme', await readFile(join(fixture, `node_modules/${packageName(name)}/README.md`), 'utf8')],
+      ...(await Promise.all(
+        guides.map(async (file) => [
+          `docs-${basename(file, '.md')}`,
+          await readFile(`packages/${name}/docs/${file}`, 'utf8'),
+        ]),
+      )),
+    ];
+    for (const [document, markdown] of documents) {
+      // Standalone examples have imports; continuation blocks retain the preceding setup.
+      const examples = [];
+      for (const [, code] of markdown.matchAll(/```tsx?\r?\n([\s\S]*?)```/g)) {
+        if (!examples.length || /^\s*(?:import\s|const\s+\{[^}]+\}\s*=\s*await\s+import\s*\()/m.test(code))
+          examples.push(code);
+        else examples[examples.length - 1] += '\n' + code;
+      }
+      const prefix = document === 'readme' ? name : `${name}-${document}`;
+      for (const [index, code] of examples.entries())
+        await writeFile(join(fixture, `${prefix}-${index}-readme.tsx`), code);
     }
-    for (const [index, code] of examples.entries()) await writeFile(join(fixture, `${name}-${index}-readme.tsx`), code);
   }
   // The README quickstart and the task guides (docs/guides) are one program each; their `ts` blocks are type-checked
   // like a package README, against the packed umbrella. scripts/docs-browser-test.mjs runs the same programs.

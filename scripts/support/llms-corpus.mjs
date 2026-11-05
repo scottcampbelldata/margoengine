@@ -104,7 +104,17 @@ export function collectCorpus(root = resolve(import.meta.dirname, '..', '..')) {
     const manifest = JSON.parse(read(root, `packages/${id}/package.json`));
     if (manifest.private) continue;
     const readmePath = `packages/${id}/README.md`,
-      readme = existsSync(join(root, readmePath)) ? read(root, readmePath) : '';
+      guidesPath = join(root, 'packages', id, 'docs'),
+      // A package's guides (packages/<id>/docs/*.md, linked from its README) follow the README, so a section moved
+      // out of a README stays in the package's llms page and in what the MCP server searches.
+      guides = existsSync(guidesPath)
+        ? readdirSync(guidesPath)
+            .filter((file) => file.endsWith('.md'))
+            .sort(byText)
+            .map((file) => read(root, `packages/${id}/docs/${file}`).trim())
+        : [],
+      own = existsSync(join(root, readmePath)) ? read(root, readmePath) : '',
+      readme = guides.length ? `${[own.trimEnd(), ...guides].filter(Boolean).join('\n\n')}\n` : own;
     const entries = [];
     for (const subpath of Object.keys(manifest.exports ?? {})) {
       const suffix = subpath === '.' ? '' : '.' + subpath.slice(2).replaceAll('/', '-'),

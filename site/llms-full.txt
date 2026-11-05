@@ -6387,62 +6387,71 @@ and one GPU copy per frame. Terrain owns that snapshot, not the provider texture
 
 # @margoengine/biomes
 
+A biome map turns a heightmap and a few climate settings into tiled layers: climate fields, biome weights and masks
+that terrain, scatter and a terrain editor read. Forests, meadows, snow and sand land where the climate puts them, and
+the same seed gives the same bytes on every machine. This package is optional and tree-shakable and adds 0 bytes to
+core and the stage. This release has the integer foundation, climate fields, biome classification with presets, a
+terrain view, editor hooks and the placement of trees, shrubs, rocks and props, drawn through scatter by the view.
+
+## Install
+
 Import `margoengine/biomes` from the `margoengine` package, or `@margoengine/biomes` from this package alone; the two
 are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that
 work today (run in a clone, or install local tarballs).
 
-A biome map turns a heightmap and a few climate settings into tiled layers: climate fields, biome weights and masks
-that terrain, scatter and a terrain editor read. This package is optional and tree-shakable and adds 0 bytes to core
-and the stage. It is built in milestones: this release has the integer foundation, climate fields, biome classification with
-presets, a terrain view, editor hooks and the placement of trees, shrubs, rocks and props; drawn through scatter
-by the view.
-
-Entries, each loaded only when used: the root (`BiomeWorld`, fields, classification), `/presets` (eight biomes, their
-worlds and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld.create` loads it only for a
-relief height, the default), `/digest` (canonical bytes and SHA-256, loaded by `world.digest`), `/zones` (Whittaker and
-Holdridge classifiers), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/placement` (stored objects), `/stats`
-(point-pattern statistics), `/view`, `/objects` (stored objects and detail drawn through scatter) and `/editor`. The
-lazily loaded ones come through the package name, so an app holds one copy of each module.
-
-## A world in three lines
+## Hello world
 
 ```ts
+import { Engine } from '@margoengine/core';
 import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
 
-// Seed 1, a 4 km seeded landscape centred on the origin, latitude 45, westerly wind.
-const world = await BiomeWorld.create();
-const tile = await world.tile(8, 8); // tile indices: 256 m tiles from the world's minimum corner
-const temperature = tile.layer('temperature')!; // i16 in 0.01 C, 256 x 256 cells at 1 m
-console.log(temperature.data[0] * temperature.scale, world.sample(0, 0).rainfall, await world.digest(8, 8));
-world.dispose(); // or `using world = await BiomeWorld.create()` inside a block
+const camera = { position: [-1700, 1500, 1300], target: [0, 300, 0], far: 20000 } as const;
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu', camera });
+const world = await BiomeWorld.create(); // seed 1, a 4 km landscape centred on the origin, latitude 45
+const view = await BiomeView.attach(engine, world); // terrain, ground materials, trees, grass and the sea
+await view.ready; // the tiles around the camera are in at full detail
+engine.start();
+console.log(world.sample(0, 0).biomes, world.heightAt(0, 0)); // the biomes and the ground height at the origin
 ```
 
-`world.sample(x, z)` answers point queries for gameplay (synchronous: exact from a finished tile, otherwise from
-the region fields; `world.sampleRegion(x, z)` always from the region fields, whatever tiles were made).
-`world.heightAt(x, z)` is the quick one for placing a character or a camera: the ground height in metres, blended
-between the four height cells around the point (the values the tiles hold), without tiles, with no allocation once
-warm, and the edge's height outside the world. A `BiomeView` draws the same surface to within its `textureResolution`.
-`world.tiles(rect, { focus })` yields the tiles of a rectangle nearest first. `world.digest(x, z)`
-is the SHA-256 of a tile's canonical bytes: the same options give the same digest on every machine, and the package
-tests lock several of them. `world.update({ climate, height })` recomputes and calls `onChange` listeners with the
-dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
+The [Biomes demo](../../examples/biomes/index.html) (`npm run dev:examples`, then open `/examples/biomes/`) shows the
+same world with every control below: climate sliders, presets, a map of each layer, painting and the file exports.
 
-`world.tilePart(x, z, [i0, j0, i1, j1])` makes only some cells of a tile (`i1` and `j1` exclusive), with the same bytes
-as those cells of the whole tile. Placement uses it to make only the edge of each neighbour it reads. A part is never
-cached and is made on the calling thread, also on a world with workers; when the world already holds the whole tile,
-it answers with that (`window` is then `[0, 0, cells, cells]`). The envelopes, `whittaker` and `holdridge` classify
-only the cells asked for. A `ZoneClassifier` of your own does too when it sets `perCell: true`; without it, `tilePart`
-makes the whole tile and answers with that, so a part always has the whole tile's bytes.
+## The layer gallery
 
-```ts
-import { BiomeWorld } from '@margoengine/biomes';
+Every tile holds these layers, 256 x 256 cells at 1 m by default; `tile.layer(name)` returns one and `LAYERS` lists
+their formats and units. What each one looks like as a map:
 
-const world = await BiomeWorld.create({ tileSize: 512 });
-// The 64 m strip of tile (1, 0) along its edge with tile (0, 0): 64 x 512 cells at 1 m.
-const strip = await world.tilePart(1, 0, [0, 0, 64, 512]);
-console.log(strip.window, strip.layer('height')!.width); // [0, 0, 64, 512] 64
-world.dispose();
-```
+| Layer | As a map |
+| --- | --- |
+| `height`, `slope`, `aspect`, `curvature`, `tpi` | the land itself: ridges, valley floors, sunny and shaded sides, crests and hollows |
+| `temperature`, `coldest`, `warmest` | cold on the peaks and in night-time cold-air pools, warm on low sunny slopes |
+| `gdd5`, `season`, `treeline` | where the growing season is long enough for trees; the treeline margin crosses 0 at the tree limit |
+| `rainfall` | wet on the windward side of mountains, a rain shadow behind them |
+| `alpha`, `moisture`, `exposure` | dry ridges, damp hollows and stream sides, wind-blasted crests |
+| `waterDistance`, `soil` | distance to the sea or a river; soil deep in hollows, thin on convex crests and steep slopes |
+| `biome`, `biomeWeight` | the four strongest biomes of every cell and their shares, blended across wandering borders |
+
+`koppen(tile)` (entry `/koppen`) adds Koppen-Geiger climate labels, and painted `paint/<biome>` and `mask/<name>`
+layers sit on top of the climate. The demo draws the biome, Koppen, temperature, rainfall and soil maps side by side
+with the terrain.
+
+## Guides
+
+| Guide | What it covers |
+| --- | --- |
+| [Worlds, tiles and climate](docs/worlds-and-climate.md) | `BiomeWorld.create` options, tiles and tile parts, every layer, how the climate is made, the G1 speed numbers, region fields, the reference world R16 |
+| [Biomes, presets, painting and editing](docs/biomes-and-painting.md) | `defineBiome`, envelopes, Whittaker and Holdridge, the presets, painting, clearings, Koppen labels, `BiomeEditor` with undo |
+| [Drawing a world as terrain](docs/terrain-view.md) | `BiomeView` options, materials, the sea and river water, trees and grass, shadows, the forest floor and far trees |
+| [Trees, shrubs, rocks and props](docs/placement.md) | `BiomePlacement`: clusters, stands, the hard core, shade, sizes, exclusions, the record layout, `/stats` |
+| [Workers](docs/workers.md) | tiles and objects on Web Workers, caching, what a placement reads from its neighbours |
+| [Same seed, same bytes, everywhere](docs/determinism.md) | the integer toolkit (`/toolkit`) behind byte-identical output |
+| [Files in and out](docs/files.md) | `/io`: heightmaps, weight maps, biome masks, layer dumps, `saveWorld` and `loadWorld` |
+| [Procedural relief and hydrology](docs/relief-and-hydrology.md) | `createRelief` (coasts, islands, river valleys) and `/hydrology` (flow, wetness, lakes, channels) |
+| [Seasons](docs/seasons.md) | `/seasons`: green-up, autumn, snow and wet ground for any day of the year |
+
+## Entries
 
 [README continues: https://margoengine.com/llms/packages/biomes.md]
 
@@ -9439,6 +9448,7 @@ The `Model` line needs a `.glb` file at `public/model.glb`; delete it for a scen
 - `examples/windy-meadow.html`: Grass, wind and a changing sky
 - `examples/molten-words/index.html`: Any typed word as dripping liquid chrome
 - `examples/cathedral-light/index.html`: Sun through stained glass into a dusty hall, with a time-of-day slider
+- `examples/biomes/index.html`: A 4 km landscape from a biome map: climate controls, a Koppen and layer map, biome painting and height and mask exports
 - `examples/blender-loader/`: Loading a `.margo` file exported from Blender
 - `examples/usdz-loader/`: Loading USDZ and USDA files
 - `examples/webxr-orbit/`: A WebXR session around a simple scene
