@@ -57,6 +57,18 @@ await runSuite(
       ends[1].surface - ends[0].surface > 10,
       `the surface rises upstream: ${ends[0].surface} to ${ends[1].surface}`,
     );
+    // Job E: lakes at the hydrology's fill level and rivers along its channels, on the default world. Main drew neither
+    // (lakes lived in data only, channels were never drawn).
+    const lakes = r.lakes;
+    assert.deepEqual(lakes.errors, []);
+    assert.ok(lakes.lines >= 1, `hydrology channels: ${lakes.lines}`);
+    assert.ok(lakes.lake.depth > 1, `water over the deepest lake cell: depth ${lakes.lake.depth}`);
+    assert.ok(
+      Math.abs(lakes.lake.surface - lakes.lake.level) < 0.5,
+      `lake surface ${lakes.lake.surface} at the fill level ${lakes.lake.level}`,
+    );
+    assert.ok(lakes.lake.share > 0.01, `lake pixels from above: ${lakes.lake.share}`);
+    assert.ok(lakes.river > 0.002, `hydrology river pixels from above: ${lakes.river}`);
     assert.deepEqual(pageErrors, []);
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-water-check.json', JSON.stringify({ hardware, result: r }, null, 1));

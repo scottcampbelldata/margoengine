@@ -67,7 +67,8 @@ export interface BiomeViewOptions {
 }
 
 export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon' | 'terrain' | 'spray' | 'fill' | 'still'> & {
-    readonly rivers?: 'auto' | readonly Int32Array[];
+    readonly rivers?: 'auto' | 'hydrology' | readonly Int32Array[];
+    readonly lakes?: 'auto' | false;
 };
 
 export const MATERIALS: Readonly<Record<string, MaterialLook>>;

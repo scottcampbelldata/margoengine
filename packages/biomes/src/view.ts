@@ -108,8 +108,8 @@ export interface BiomeViewOptions {
    * the horizon, loaded with import() only when drawn. The terrain hides it under land, so its shore
    * follows the coast, with the water's shoreline foam. `'auto'` draws it when the world's heights reach below sea
    * level; an object draws it with those `Water` settings over the sea defaults (`SEA`; pass
-   * `depth: () => bloom.depthTexture` when Bloom, SSAO or DOF owns the scene depth). Rivers stay dry valleys unless the
-   * settings ask for them (`rivers`). Default `'auto'`.
+   * `depth: () => bloom.depthTexture` when Bloom, SSAO or DOF owns the scene depth). Rivers and lakes stay dry unless the
+   * settings ask for them (`rivers`, `lakes`). Default `'auto'`.
    */
   readonly water?: boolean | 'auto' | BiomeWaterSettings;
   /**
@@ -175,12 +175,15 @@ export type BiomeWaterSettings = Omit<
 > & {
   /**
    * Still water in the rivers, 1.5 m over the bed and falling with it, loaded with import() only when asked for: `'auto'`
-   * the world's own lines (`BiomeWorld.rivers`, a relief's), or lines of your own for a world from `samples`, each an
-   * Int32Array of `[x, z, ...]` millimetres. Heights are read when the view attaches. The water grid has at most 512 cells
-   * a side (16 m on an 8 km world), so a river narrower than two cells can break up, and its surface coarsens past 0.375
-   * of the world's side from the camera (`Water`'s outer rows). Default none: dry valleys.
+   * the world's own lines (`BiomeWorld.rivers`, a relief's), `'hydrology'` the channels of the world's hydrology
+   * (`riversOf`), or lines of your own for a world from `samples`, each an Int32Array of `[x, z, ...]` millimetres.
+   * Heights are read when the view attaches. The water grid has at most 512 cells a side (16 m on an 8 km world), so a
+   * river narrower than two cells can break up, and its surface coarsens past 0.375 of the world's side from the camera
+   * (`Water`'s outer rows). Default none: dry valleys.
    */
-  readonly rivers?: 'auto' | readonly Int32Array[];
+  readonly rivers?: 'auto' | 'hydrology' | readonly Int32Array[];
+  /** `'auto'`: still lakes at the fill level of the world's hydrology pits (`lakeLevels`). Default none. */
+  readonly lakes?: 'auto' | false;
 };
 
 /** What `BiomeViewOptions.shadows` needs: a `Shadows` (`@margoengine/shadows`), of which only `add` is used. */
@@ -891,9 +894,15 @@ export class BiomeView implements Disposable {
       sky = options.sky;
     if (water !== true && water !== false && water !== 'auto' && (typeof water !== 'object' || water === null))
       throw typeError("BiomeView water must be true, false, 'auto' or Water settings", 'biomes');
-    const { rivers, ...waterSettings } = typeof water === 'object' ? water : ({} as BiomeWaterSettings);
-    if (rivers !== undefined && rivers !== 'auto' && !Array.isArray(rivers))
-      throw typeError("BiomeView water rivers must be 'auto' or an array of river lines", 'biomes');
+    const { rivers, lakes, ...waterSettings } = typeof water === 'object' ? water : ({} as BiomeWaterSettings);
+    if (
+      (rivers !== undefined && rivers !== 'auto' && rivers !== 'hydrology' && !Array.isArray(rivers)) ||
+      (lakes !== undefined && lakes !== 'auto' && lakes !== false)
+    )
+      throw typeError(
+        "BiomeView water rivers must be 'auto', 'hydrology' or river lines; lakes 'auto' or false",
+        'biomes',
+      );
     if (sky !== undefined && (typeof sky !== 'object' || sky === null || !('reflectionTexture' in sky) || !sky.lights))
       throw typeError(
         'BiomeView sky must be a Sky from @margoengine/sky (it reads reflectionTexture and lights)',
@@ -963,21 +972,22 @@ export class BiomeView implements Disposable {
       const { Water } = await import('@margoengine/water'),
         [x0, z0, x1, z1] = world.bounds,
         side = (a: number, b: number) => Math.min(100000, 2 * Math.max(Math.abs(a), Math.abs(b))),
-        lines = rivers === 'auto' ? world.rivers : rivers,
-        river = lines?.length
-          ? (await import('@margoengine/biomes/rivers')).riverWaterOptions(
-              {
-                bounds: world.bounds,
-                heights: view.#heights,
-                width: view.#width,
-                depth: view.#depth,
-                lines,
-                heightAt: (x, z) => world.heightAt(x, z),
-                sea,
-              },
-              () => view.#textures?.device,
-            )
-          : undefined;
+        river =
+          rivers || lakes
+            ? await (await import('@margoengine/biomes/rivers')).viewWater(
+                world,
+                { rivers, lakes },
+                {
+                  bounds: world.bounds,
+                  heights: view.#heights,
+                  width: view.#width,
+                  depth: view.#depth,
+                  heightAt: (x, z) => world.heightAt(x, z),
+                  sea,
+                },
+                () => view.#textures?.device,
+              )
+            : undefined;
       // The water surface is sized to cover the whole world from the origin; the horizon rows reach out past it.
       view.#river = river;
       if (!view.#disposed)

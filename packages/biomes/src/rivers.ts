@@ -1,8 +1,10 @@
-// Still river water for a BiomeView (entry `@margoengine/biomes/rivers`, loaded only for a view with `water: { rivers }`):
-// from river centre lines and the world's heights, the water surface and the coarse ground `@margoengine/water` stands it
-// on. The surface runs a fixed depth above the bed along each line, so it falls with the bed. The world's terrain hides
-// the water wherever the real ground is above it, so the banks draw the river's edge, not this grid. Our own layout.
+// Still river and lake water for a BiomeView (entry `@margoengine/biomes/rivers`, loaded only for a view with
+// `water: { rivers }` or `water: { lakes }`): from river centre lines, lake levels and the world's heights, the water
+// surface and the coarse ground `@margoengine/water` stands it on. A river's surface runs a fixed depth above the bed along
+// each line, so it falls with the bed; a lake's is its fill level. The world's terrain hides the water wherever the real
+// ground is above it, so the banks draw the edge, not this grid. Our own layout.
 import { rangeError, typeError } from '../../shared/errors.js';
+import type { Hydrology, HydrologyWorld } from './hydrology.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 
@@ -27,6 +29,114 @@ export interface RiverWaterSource {
   readonly heightAt: (x: number, z: number) => number;
   /** Sea level. Water at it is the sea's: lines give no fill there. */
   readonly sea: number;
+  /** Still lakes over a grid of corners from `bounds`' corner ({@link lakeLevels}). Default none. */
+  readonly lakes?: LakeLevels;
+}
+
+/** Lake surfaces per grid corner, from {@link lakeLevels}. */
+export interface LakeLevels {
+  /** Corners a side, `step` mm apart, from the world's `[x0, z0]`. */
+  readonly nx: number;
+  readonly nz: number;
+  readonly step: number;
+  /** The surface in mm at each corner, rows of increasing z, or {@link NO_LAKE}. */
+  readonly level: Int32Array;
+}
+
+/** A corner of {@link LakeLevels} with no lake. */
+export const NO_LAKE = -2147483648;
+
+/** What {@link lakeLevels} reads of a hydrology (`@margoengine/biomes/hydrology`). */
+type LakeHydrology = Pick<Hydrology, 'nx' | 'nz' | 'step' | 'height' | 'filled' | 'lake'>;
+
+/**
+ * The lakes of a hydrology as still surfaces: each lake cell (fill depth past `lakeDepth`) and every cell of the same
+ * flat fill joined to it takes the fill's surface, and the ring of dry corners around it holds that level, so the water's
+ * mesh meets the shore at the surface and the terrain draws the edge. Integers only: the same hydrology, the same bytes.
+ * @example
+ * const lakes = lakeLevels(hydrologyOf(world));
+ * const river = riverWater({ ...source, lines: [], lakes });
+ */
+export function lakeLevels(h: LakeHydrology): LakeLevels {
+  const { nx, nz, step, height, filled, lake } = h,
+    level = new Int32Array(nx * nz).fill(NO_LAKE),
+    qx = new Int32Array(nx * nz),
+    qz = new Int32Array(nx * nz);
+  for (let s = 0, sz = 0; sz < nz; sz++)
+    for (let sx = 0; sx < nx; sx++, s++) {
+      if (!lake[s] || level[s] !== NO_LAKE) continue;
+      // The flat fill around this lake cell, 8-connected: Priority-Flood makes a pit's fill one level up to its spill.
+      const surface = filled[s];
+      let tail = 1;
+      level[s] = surface;
+      qx[0] = sx;
+      qz[0] = sz;
+      for (let q = 0; q < tail; q++) {
+        const x = qx[q],
+          z = qz[q];
+        for (let dz = -1; dz <= 1; dz++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const u = x + dx,
+              v = z + dz,
+              d = v * nx + u;
+            if (u < 0 || v < 0 || u >= nx || v >= nz || level[d] !== NO_LAKE) continue;
+            if (filled[d] === surface && filled[d] > height[d]) {
+              level[d] = surface;
+              qx[tail] = u;
+              qz[tail++] = v;
+            }
+          }
+      }
+    }
+  // The dry ring: a neighbour of a lake stands at or above its surface, so holding the level there keeps the shore dry.
+  const ring = level.slice();
+  for (let z = 0, c = 0; z < nz; z++)
+    for (let x = 0; x < nx; x++, c++) {
+      if (level[c] !== NO_LAKE) continue;
+      for (let dz = -1; dz <= 1; dz++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const u = x + dx,
+            v = z + dz;
+          if (u < 0 || v < 0 || u >= nx || v >= nz) continue;
+          const l = level[v * nx + u];
+          if (l > ring[c]) ring[c] = l;
+        }
+    }
+  return { nx, nz, step, level: ring };
+}
+
+/** A view's choice of still water (`BiomeWaterSettings` of `@margoengine/biomes/view`). */
+export interface ViewWaterChoice {
+  /** `'auto'` the world's own lines, `'hydrology'` the channels of its hydrology (`riversOf`), or lines of your own. */
+  readonly rivers?: 'auto' | 'hydrology' | readonly Int32Array[];
+  /** `'auto'`: the lakes of the world's hydrology ({@link lakeLevels}). */
+  readonly lakes?: 'auto' | false;
+}
+
+/**
+ * The still water a view asks for: river lines and lakes, the hydrology entry loaded with import() only for
+ * `'hydrology'` rivers or `'auto'` lakes. Undefined when that leaves no line and no lake.
+ * @throws what {@link riverWater} throws.
+ * @example
+ * const water = await viewWater(world, { rivers: 'hydrology', lakes: 'auto' }, source, () => engine.gpu);
+ * if (water) Water.attach(engine, { ...water.options, height: 0 });
+ */
+export async function viewWater(
+  world: HydrologyWorld & { readonly rivers: readonly Int32Array[] },
+  choice: ViewWaterChoice,
+  source: Omit<RiverWaterSource, 'lines' | 'lakes'>,
+  device: () => GPUDevice | undefined,
+): Promise<ReturnType<typeof riverWaterOptions> | undefined> {
+  const { rivers, lakes } = choice;
+  let lines = rivers === 'auto' ? world.rivers : rivers === 'hydrology' ? [] : (rivers ?? []),
+    levels: LakeLevels | undefined;
+  if (rivers === 'hydrology' || lakes === 'auto') {
+    const { hydrologyOf, riversOf } = await import('@margoengine/biomes/hydrology'),
+      h = hydrologyOf(world);
+    if (rivers === 'hydrology') lines = riversOf(world, h).lines;
+    if (lakes === 'auto' && h.lake.includes(1)) levels = lakeLevels(h);
+  }
+  return lines.length || levels ? riverWaterOptions({ ...source, lines, lakes: levels }, device) : undefined;
 }
 
 /** The result of {@link riverWater}: the ground and the surface for a `Water`'s `terrain` and `fill`. */
@@ -45,8 +155,9 @@ export interface RiverWater {
 
 /**
  * Builds still river water: a surface {@link RIVER_DEPTH} over the ground along each line, in a corridor around it, and
- * the coarse ground it stands on. Cells are the world over at most 512 a side: a 4 km world has 8 m cells, an 8 km world
- * 16 m. Cost on the calling thread: one height per half cell of line and one per cell near it.
+ * the coarse ground it stands on, and with `lakes` each lake cell at its level where that is higher. Cells are the world
+ * over at most 512 a side: a 4 km world has 8 m cells, an 8 km world 16 m. Cost on the calling thread: one height per
+ * half cell of line and one per cell near it, and with lakes one look-up per cell.
  * @throws TypeError when a line is not an Int32Array of at least two points; RangeError for a bad grid or `bounds`.
  * @example
  * const river = riverWater({ bounds: world.bounds, heights, width, depth, lines: world.rivers, heightAt, sea: 0 });
@@ -60,6 +171,9 @@ export function riverWater(source: RiverWaterSource): RiverWater {
       'riverWater needs bounds with x1 > x0 and z1 > z0, and width x depth heights of at least 2 x 2',
       'biomes',
     );
+  const lakes = source.lakes;
+  if (lakes && !(lakes.nx >= 1 && lakes.nz >= 1 && lakes.step >= 1 && lakes.level?.length === lakes.nx * lakes.nz))
+    throw rangeError('riverWater lakes need nx x nz levels and a step of at least 1 mm (lakeLevels)', 'biomes');
   for (const line of lines)
     if (!(line instanceof Int32Array) || line.length < 4 || line.length % 2)
       throw typeError('River lines must be Int32Arrays of [x, z, ...] millimetres with at least two points', 'biomes');
@@ -88,6 +202,7 @@ export function riverWater(source: RiverWaterSource): RiverWater {
       ground[j * nx + i] = low;
     }
   }
+  const lowest = source.lakes ? ground.slice() : undefined;
   // Each cell takes the surface of its nearest point along the lines.
   const step = Math.min(cx, cz) / 2; // float division: half a cell
   for (const line of lines)
@@ -137,6 +252,22 @@ export function riverWater(source: RiverWaterSource): RiverWater {
       const h = heightAt(x0 + (i + 0.5) * cx, z0 + (j + 0.5) * cz);
       ground[c] = Math.max(bank, d <= 1.5 * cell ? Math.min(h, level - RIVER_DEPTH) : h);
     }
+  // A lake's surface wins where it is the higher one, over the lowest ground under the cell (no river bank in a lake).
+  if (source.lakes && lowest) {
+    const { nx: lx, nz: lz, step: ls, level: lake } = source.lakes;
+    for (let j = 0; j < nz; j++) {
+      const v = Math.min(lz - 1, Math.max(0, Math.round(((j + 0.5) * cz * 1000) / ls))); // float division: nearest corner
+      for (let i = 0; i < nx; i++) {
+        const u = Math.min(lx - 1, Math.max(0, Math.round(((i + 0.5) * cx * 1000) / ls))), // float division: nearest corner
+          l = lake[v * lx + u],
+          m = l / 1000, // float division: mm to metres
+          c = j * nx + i;
+        if (l === NO_LAKE || m <= sea || levels[c] >= m) continue;
+        levels[c] = m;
+        ground[c] = lowest[c];
+      }
+    }
+  }
   return {
     width: nx,
     depth: nz,

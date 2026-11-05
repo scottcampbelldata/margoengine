@@ -341,6 +341,18 @@ console.log(view.water !== undefined); // true
 banks draw its edge. A world from `samples` has no lines of its own: pass yours, `rivers: [line]`, each an Int32Array of
 `[x, z, ...]` millimetres. It stands still in v1.0.0 (docs/limits.md); the coupled grid has at most 512 cells a side.
 
+The world's hydrology can fill the water in too. `water: { lakes: 'auto' }` puts a still lake in every pit whose fill
+passes `lakeDepth` (1 m), at the fill's level, with the shallow edge of the same fill joined to it; `rivers: 'hydrology'`
+draws the channels of the hydrology (`riversOf`) instead of the relief's lines, so a world from `samples` or with no relief
+rivers gets them too. The hydrology entry loads with import() only for these two. `lakeLevels(h)` and `viewWater` in
+`@margoengine/biomes/rivers` give the same water for a `Water` of your own. A lake's surface wins over a river's where it
+is higher; below the sea both are the sea's.
+
+```ts
+const world = await BiomeWorld.create();
+const view = await BiomeView.attach(engine, world, { water: { lakes: 'auto', rivers: 'hydrology' } });
+```
+
 ```ts
 import { Engine } from '@margoengine/core';
 import { BiomeWorld } from '@margoengine/biomes';

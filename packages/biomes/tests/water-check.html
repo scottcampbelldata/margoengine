@@ -8,6 +8,7 @@ import {Sky} from '/packages/sky/dist/index.js';
 import {BiomeWorld} from '/packages/biomes/dist/index.js';
 import {presets,presetWorlds} from '/packages/biomes/dist/presets.js';
 import {BiomeView} from '/packages/biomes/dist/view.js';
+import {hydrologyOf,riversOf} from '/packages/biomes/dist/hydrology.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 const canvas=document.querySelector('canvas');
 const luma=(d,k)=>(0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2])/255;
@@ -77,6 +78,42 @@ async function river(){
  sky.dispose();e.dispose();world.dispose();c2.remove();
  return {points,share:changed/(c2.width*c2.height),errors};
 }
+// Job E: lakes and hydrology rivers on the default world (no sea, no relief rivers). Before, its lakes lived in the
+// hydrology's data only and no view drew them. Over its deepest lake the state the water stands on is at the fill level
+// (`h.filled`), and from above `water: { lakes: 'auto' }` changes pixels that `water: {}` (a sea hidden under land) does
+// not; `water: { rivers: 'hydrology' }` shows water along the longest channel.
+async function lakes(){
+ const c2=document.createElement('canvas');c2.className='sea';c2.width=720;c2.height=450;document.body.append(c2);
+ const world=await BiomeWorld.create({}),h=hydrologyOf(world),{lines}=riversOf(world,h),[x0,z0,x1,z1]=world.bounds;
+ let deep=-1;for(let c=0;c<h.lake.length;c++)if(h.lake[c]&&(deep<0||h.filled[c]-h.height[c]>h.filled[deep]-h.height[deep]))deep=c;
+ const lx=x0+(deep%h.nx)*h.step/1000,lz=z0+Math.floor(deep/h.nx)*h.step/1000,level=h.filled[deep]/1000;
+ const e=await Engine.create(c2,{backend:'webgpu',camera:{position:[lx-30,level+420,lz+260],target:[lx,level,lz],near:0.5,far:20000}});
+ const errors=[];e.gpu.addEventListener('uncapturederror',ev=>errors.push(ev.error.message));
+ const sky=Sky.attach(e,{hours:12,timeScale:0,lighting:{intensity:3},environment:true});
+ const frame=async()=>{e.render({delta:1/60});await e.gpu.queue.onSubmittedWorkDone();};
+ async function grab(water,read){
+  const view=await BiomeView.attach(e,world,{objects:false,sky,water});
+  await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();await waitForPipelines(frame);
+  let state;
+  if(read){
+   const texture=view.water.coastalDepthTexture,w=texture.width,hh=texture.height,buf=e.gpu.createBuffer({size:w*hh*16,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST}),enc=e.gpu.createCommandEncoder();
+   enc.copyTextureToBuffer({texture},{buffer:buf,bytesPerRow:w*16},[w,hh]);e.gpu.queue.submit([enc.finish()]);await buf.mapAsync(GPUMapMode.READ);state={w,h:hh,data:new Float32Array(buf.getMappedRange()).slice()};buf.unmap();buf.destroy();
+  }
+  e.render({delta:1/60});
+  const c=new OffscreenCanvas(c2.width,c2.height).getContext('2d');c.drawImage(c2,0,0);
+  const {data}=c.getImageData(0,0,c2.width,c2.height);view.dispose();return {data,state};
+ }
+ const changed=(a,b)=>{let n=0;for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>30)n++;return n/(c2.width*c2.height);};
+ const on=await grab({lakes:'auto'},true),off=await grab({}),{w,h:hh,data}=on.state;
+ const i=Math.floor((lx+1-x0)/(x1-x0)*w),j=Math.floor((lz+1-z0)/(z1-z0)*hh),o=(j*w+i)*4;
+ const lake={level,depth:data[o],surface:data[o]+data[o+1],share:changed(on.data,off.data)};
+ // The longest channel, the camera over its middle point.
+ const line=lines.reduce((a,b)=>b.length>a.length?b:a),k=Math.floor(line.length/4)*2,mx=line[k]/1000,mz=line[k+1]/1000;
+ e.camera.position=[mx-30,world.heightAt(mx,mz)+420,mz+260];e.camera.target=[mx,world.heightAt(mx,mz),mz];
+ const river=changed((await grab({rivers:'hydrology'})).data,(await grab({})).data);
+ sky.dispose();e.dispose();world.dispose();c2.remove();
+ return {lake,river,lines:lines.length,errors};
+}
 window.check={
  async run(){
   const {climate,relief}=presetWorlds.wetland,world=await BiomeWorld.create({climate,height:{relief}});
@@ -105,6 +142,7 @@ window.check={
   engine.dispose();world.dispose();
   out.sea=await sea();
   out.river=await river();
+  out.lakes=await lakes();
   return out;
  }
 };
