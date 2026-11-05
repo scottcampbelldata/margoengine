@@ -147,7 +147,7 @@ every transform write bit for bit, and the animator has skipped unchanged writes
 `options.speed` since `6a1c6bb`, so only its pinned run can match.
 
 **Baselines: golden outputs, not commits (2026-10-27).** A fresh clone of main failed `npm run verify`: 14 of the 20
-current proofs rebuilt their baselines with `git rev-parse` / `git show` on commits (`57250a49`, `2d192a71`, `2cd81c1`,
+current proofs rebuilt their baselines with `git rev-parse` / `git show` on commits (`6a958e532`, `2d192a71`, `2cd81c1`,
 `2484971`, `b3ed8ac`, `6c20076d`) that exist only in one checkout's pre-rewrite history, and the history scrub before
 the repository goes public rewrites every commit id again. A current run now compares the working tree with golden
 outputs in `proofs/baselines/` (`golden.js`) and reads nothing from Git: per proof, every value the baseline emitted
@@ -267,13 +267,13 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | animation-vat (measurement, no baseline) | gltf-pro + animation at `700838e` | - |
 | materials-atlas (measurement, no baseline) | geometry + materials at `700838e` | - |
 | binding-limit | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | - |
-| gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `667d1a26` |
+| gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `6a958e532` |
 | materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `641246d3`: 1,085 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `2d192a71` (per-line clipping planes at `86063c47`: the style uniform grew from 128 to 224 bytes and the shader gained a world-position varying and a zero-count plane loop; then `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose both times) |
 | math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
-| post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `57250a49` |
+| post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `6a958e532` |
 | selection-xray-off | `46f9484` -> `80d4cfb`: 10,586 calls | `b3ed8ac` |
-| clustered-local-shadows | `0ed56b9` -> `590278e`: 482 calls, 8 params.z writes | `57250a49` |
+| clustered-local-shadows | `0ed56b9` -> `590278e`: 482 calls, 8 params.z writes | `6a958e532` |
 | clustered-area-lights | `67e0172` -> `dab9633`: 482 calls | `57250a49` |
 | clustered-light-hooks | `6c20076d` -> `b4700864`: 482 calls without the directional, IES and projector entries and with each attached but empty | `57250a49` |
 | environment-hemisphere | `6c20076d` -> `b4700864`: 53 shader texts (IBL, Fog, LightProbes on six core variants, gltf-pro's four shader kinds) and 23 calls without a HemisphereLight | `57250a49` |
@@ -281,12 +281,12 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | deformed-shadows | `38d448e` -> `282e751` | `667d1a26` |
 | environment-volumetric | `7c47a09` -> `366ebff` | `2cd81c1`: 70 root calls; 344/533 isolated calls |
 | oit-detached | `b803d56` -> `0e02ead`: 2,864 calls (2,964 until a later change replaced the story's transmission material with a plain BLEND one: transmission now draws twice by design) | `641246d3`: 2,392 calls |
-| post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `151aa744`: 12,431 calls (AgX normalised for older refs, see below) |
+| post-ssr | `7c47a09` -> `3cf1453`: 9,269 calls | `6a958e532`: 12,431 calls (AgX normalised for older refs, see below) |
 | post-ssr-models | `3cf1453` -> `838ae6e`: 30,858 calls | `151aa744`: 37,182 calls |
 | taa-velocity | `6c20076d` (before the `taa.velocity` getter) -> `e1a20e13` (the motion-blur commit): 16,923 calls at 1x and 4x, the getter read every frame | `8149bf4e` |
 | terrain-ssr | `6c20076d` (before terrain's capture hook) -> `49f3e971` (the water/terrain SSR commit): terrain.proof.js's story, 6,458 calls in two of its three terrains | `6c20076d` |
 | water-ssr | `6c20076d` (before water's capture hook) -> `49f3e971` (the water/terrain SSR commit): 2,762 calls in 3 stories | `268bfc625` |
-| quality-presets | `96daac7` -> `01e5e35` | `33c403984` |
+| quality-presets | `96daac7` -> `01e5e35` | `6a958e532` |
 | post-ssao-perspective | `9c761d5` -> `9702e57`: 3,282 calls | - |
 | probes-decals | `ecdcb31` -> `7d144fb`: 15 identical entry bundles, 135 + 12,320 calls | - |
 | procedural-deps | HISTORICAL: `ed53ec5` -> `fff47af`; the baseline imports simplex-noise and isosurface, since removed from the lockfile, so the runner reports it instead of failing | - |
@@ -424,6 +424,8 @@ under the default `'soft'` filter, a `writeBuffer` seeding the buffer with 1.0, 
 the nearest depth, takes its first search read at the receiver's texel and compares with `min(plane offset, 0)`;
 `'pcf'` and `'hard'` receivers change only by the appended struct member. Against the old references the first
 difference in each story is the uniform's size and the new buffer.
+
+**environment-hemisphere, advanced to `a1f778bdc` on 2026-11-05:** the transmissive shader gains the surface tint functions, so its text differs; the lit draw is as before.
 
 **clustered-area-lights, clustered-light-hooks, clustered-local-shadows, environment-hemisphere, gltf-pro-lighting-hooks, post-ssr-models and quality-presets, advanced to `6a958e532` on 2026-11-05:** the IBL, sky, probe, clustered and SSR shaders take the dielectric Fresnel ends as arguments, so their text differs. Plain materials pass 0.04 and 1, which give the old numbers; the calls, bindings and uploads are as before.
 

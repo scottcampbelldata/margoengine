@@ -773,6 +773,7 @@ interface PBRMaterial extends GLTFMaterial {
     physical?: number[];
     extended?: Omit<ExtendedPlan, 'slots'>;
     tint?: number[];
+    attenuation?: number[];
     volume?: number[];
     renderState?: PBRRenderState;
     extension?: MaterialExtension;
