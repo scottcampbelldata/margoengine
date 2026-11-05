@@ -2555,7 +2555,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-048). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-049). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2622,6 +2622,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Polygon booleans and offsets (`@margoengine/geometry/polygon`) | Enforced by method: all points go onto one grid of about 2^26 steps across the input. A vertex at a crossing moves up to half a step, edges closer than a step touch, and parts under two steps wide are dropped. | One exact grid is what makes every test safe: no epsilon to tune, and no failed or crossing output at any scale. | Two features 1e-8 of the input's width apart merge. Very large plans with very fine detail lose the detail. | Run distant parts separately, or scale up the part that needs the detail. |
 | Project and unproject (`@margoengine/math/project`) | Enforced by method: core's `camera.matrix` is Float32 and holds zeros until the first frame; a point at or behind the camera plane returns null; a matrix with no inverse throws `RangeError`. | One matrix serves every camera, orthographic included; null keeps a point behind the camera from showing up mirrored on screen. | Results carry float32 precision, not float64, and depth z follows the camera (WebGPU near = 1, far = 0; WebGL near = -1, far = 1). | Pass your own `{matrix}` as a Float64Array for float64 results. Take depth from `projectPoint` instead of hard-coding it. |
 | Spherical harmonics (`@margoengine/math/sh`) | Enforced by method: three bands, 9 RGB coefficients, CPU only. No rotation of a coefficient set. | Three bands hold diffuse light to within a few percent, and match the layout `@margoengine/environment` reads. | A single point of light overshoots: a distant light reads 17/16 of its irradiance facing it and 1/16 facing away, where the truth is 1 and 0. Results are not clamped. | For sharp light use a real light and keep SH for the soft part. To turn a probe, project it again from rotated samples. |
+| Sweep and loft (`@margoengine/geometry/sweep`) | Enforced by method: sections stay flat and are matched by their share of the way round, with no point-to-point control. A loft has no holes in its sections. | One rule fits any pair of outlines and keeps every corner. | A twisted quad is two flat triangles, so a twisted solid loses volume in proportion to the step (0.4 percent at 128 steps for a quarter turn). A sharp bend in a path pinches the profile. | Raise `steps`, round the path, or pass 3D rings with matching points and `align: false`. |
 
 ## Copies of a model
 
@@ -8945,12 +8946,13 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
 | `CurveFlow`, `flowGeometry` from `@margoengine/geometry/flow` |
 | `delaunayTriangulate`, `triangulateConstrained` from `@margoengine/geometry/delaunay` |
+| `sweepGeometry`, `loftGeometry` from `@margoengine/geometry/sweep` |
 | `polygonUnion`, `polygonDifference`, `polygonIntersection`, `polygonXor`, `polygonOffset`, `polygonStroke`, `polygonArea`, `polygonShapes` from `@margoengine/geometry/polygon` |
 | `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon, sweep), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and

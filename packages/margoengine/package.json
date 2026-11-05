@@ -662,6 +662,10 @@
       "types": "./dist/geometry/polygon.d.ts",
       "import": "./dist/geometry/polygon.js"
     },
+    "./geometry/sweep": {
+      "types": "./dist/geometry/sweep.d.ts",
+      "import": "./dist/geometry/sweep.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"

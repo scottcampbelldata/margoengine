@@ -56,12 +56,13 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
 | `CurveFlow`, `flowGeometry` from `@margoengine/geometry/flow` |
 | `delaunayTriangulate`, `triangulateConstrained` from `@margoengine/geometry/delaunay` |
+| `sweepGeometry`, `loftGeometry` from `@margoengine/geometry/sweep` |
 | `polygonUnion`, `polygonDifference`, `polygonIntersection`, `polygonXor`, `polygonOffset`, `polygonStroke`, `polygonArea`, `polygonShapes` from `@margoengine/geometry/polygon` |
 | `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon, sweep), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -420,6 +421,60 @@ const notched = polygonDifference(disc, [[0, -0.5], [3, -0.5], [3, 0.5], [0, 0.5
 - All points go onto one grid of about 2^26 steps across the input, so results are exact on that grid at any scale, and
   edges closer than one step (1.5e-8 of the width) count as touching. Parts thinner than two steps are dropped.
 
+## Sweep and loft
+
+`@margoengine/geometry/sweep` builds handrails, bottles, ducts and organic shapes. A sweep takes one profile along a path,
+with scale and twist that change along it. A loft skins a surface over several different profiles.
+
+```ts
+import {CatmullRomCurve3} from 'margoengine/geometry';
+import {loftGeometry, sweepGeometry} from 'margoengine/geometry/sweep';
+
+const circle = (radius, corners = 32) =>
+  Array.from({length: corners}, (_, i) => {
+    const angle = (i / corners) * Math.PI * 2;
+    return [Math.cos(angle) * radius, Math.sin(angle) * radius];
+  });
+const square = (half) => [[-half, -half], [half, -half], [half, half], [-half, half]];
+const path = new CatmullRomCurve3([[0, 0, 0], [2, 1, 0], [4, 1, 2], [6, 2, 2]]);
+
+// A handrail that stays level as it climbs. Corners sharper than 40 degrees get hard edges.
+const rail = sweepGeometry(square(0.04), path, {steps: 96, up: [0, 1, 0]});
+
+// A horn: wider towards the end, with half a turn along the way.
+const horn = sweepGeometry(square(0.2), path, {scale: (t) => 1 + 2 * t * t, twist: Math.PI});
+
+// A bottle: the surface runs smoothly through every section.
+const bottle = loftGeometry([
+  {profile: circle(0.4), position: [0, 0, 0]},
+  {profile: circle(0.42), position: [0, 0, 1]},
+  {profile: circle(0.15), position: [0, 0, 1.5]},
+  {profile: circle(0.14), position: [0, 0, 2]},
+]);
+
+// A duct that goes from square to round, with a bend.
+const duct = loftGeometry([
+  {profile: square(1), position: [0, 0, 0]},
+  {profile: circle(0.8), position: [0, 2, 4], normal: [0, 1, 1]},
+], {smooth: false, steps: 12});
+```
+
+- `sweepGeometry(profile, path, options)`: `profile` is a ring of `[x, y]` points, a `Shape` with holes, or a `Path`, and
+  `path` is any curve. The profile's +x and +y follow the path's parallel-transport frames, so it does not spin by
+  itself. Options: `steps` (64 rows), `scale` and `twist` (a value, or a function of `t` from 0 to 1 by length; a plain
+  `twist` is the total in radians), `up` (keeps the profile's +y leaning that way), `closed` (the path is a loop, with no
+  caps; scale and twist should match at both ends), `closedProfile` (default true; false makes an open ribbon).
+- `loftGeometry(sections, options)`: a section is a profile, which goes at `[0, 0, i]` for section `i`, a placement
+  `{profile, position, normal, scale}`, or a ring of `[x, y, z]` points used as it is. Points are matched by their share
+  of the way round each ring, from the starting points that twist least, and every corner of every section stays.
+  Options: `smooth` (default true, a Catmull-Rom curve through the sections; false is straight lines), `steps` (rows
+  between sections, 8 when smooth or else 1), `closed` (join the last section to the first), `segments` (even points
+  around every section instead) and `align` (default true; false keeps each ring's own first point).
+- Both take `caps` (default true), `creaseAngle` (40 degrees) and `curveSegments` (12, for `Shape` and `Path` profiles).
+  Rings may run either way: walls always face out. Normals are smooth across the first row and column and hard only at
+  sharper corners. Caps are group 0 and walls group 1, as in `extrudeGeometry`, and UVs run round the profile in u and
+  along the length in v. A scale of 0 ends in a point with no cap.
+
 ## Bending along a curve
 
 `@margoengine/geometry/flow` deforms a mesh to follow a curve, or places rigid copies along it: trains on tracks, text
@@ -517,6 +572,7 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
 - `computeTangents` follows UVs with v up, as the primitives have them. UVs stored v down, as in glTF files, give the opposite `w`; flip v first or negate `w`.
 - By default a shape with collinear points on its outline can leave T-junctions between the extruded caps and walls, because `triangulateShape` drops those points. Pass `triangulate: triangulateConstrained` to keep them.
 - Polygon results are exact on a grid of 2^26 steps across the input, not in doubles: a vertex at a crossing moves by up to half a step, and features under two steps wide are dropped. A round join is a chain of chords, so a rounded outset is up to `arcTolerance` smaller than the true curve.
+- `sweepGeometry` turns frames smoothly, so a path with a sharp corner pinches the profile there: round the corner in the path. A profile wider than the path's bend folds through itself. `loftGeometry` sections cannot have holes, and turning a section more than about 90 degrees from its neighbour twists the surface in a way `align` cannot undo.
 - `edgesGeometry` and `wireframe` return index pairs, not a line geometry; core has no line primitive.
 - Core's `Geometry` accepts up to 1,000,000 vertices, so `toGeometry` throws above that.
 
@@ -547,5 +603,9 @@ constraints, holes in any winding or touching the outline, and watertight extrus
 operation on random concave outlines point by point and through area identities, that no two result edges cross,
 shared edges, touching corners, gaps from 1e-3 to -1e-7, coordinates scaled by 2^500 and 2^-500, 1,000 overlapping
 triangles, fill rules, offsets and strokes point by point against true distances, and extruded results being closed.
+The sweep tests check boxes, cylinders, frustums, pyramids and tori against closed forms, radial normals with no seam,
+hard edges, twist landing on the right corners, a match with `tubeGeometry`, level rails and holes. The loft tests check
+square to circle, sections of different counts and starts, smooth lofts passing through every section, closed rings and
+3D rings in either direction.
 
 Apache-2.0 licensed.

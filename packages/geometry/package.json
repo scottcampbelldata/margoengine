@@ -81,6 +81,10 @@
     "./polygon": {
       "types": "./dist/polygon.d.ts",
       "import": "./dist/polygon.js"
+    },
+    "./sweep": {
+      "types": "./dist/sweep.d.ts",
+      "import": "./dist/sweep.js"
     }
   },
   "files": [

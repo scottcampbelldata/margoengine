@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4452192,
+  "total": 4458997,
   "history": [
     {
       "date": "2026-10-24",
@@ -1580,6 +1580,12 @@
       "commit": "b8548b4b1",
       "reason": "New math entry ./sh: SH3 order-3 spherical harmonics and shBasis, for probes and irradiance on the CPU; also exported from the math root. Core and core + stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "b8548b4b1",
+      "reason": "geometry: new optional entry geometry/sweep",
+      "grew": 1
     }
   ],
   "items": {
@@ -1739,6 +1745,7 @@
     "@margoengine/geometry/primitives": 4058,
     "@margoengine/geometry/sample": 1980,
     "@margoengine/geometry/shapes": 3840,
+    "@margoengine/geometry/sweep": 6805,
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 6285,
