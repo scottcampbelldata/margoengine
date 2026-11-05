@@ -520,15 +520,6 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
   [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md), "Moving instances on the GPU"). The checked
   `setMatrixAt` stays about 15% over three at 100,000, the validation cost.
 
-### Bare class fields in other packages may cost the same as they did in math
-
-- **What:** `@margoengine/math` lost 40% of its `setFromEuler` time to class fields declared before the constructor
-  (perf-history entry 53). TypeScript's `useDefineForClassFields` emits them for every package, so a class of number
-  fields written every frame elsewhere pays the same. Not measured outside math.
-- **Repro:** look for bare `x;` lines before `constructor(` in `packages/*/dist/*.js`; `packages/math/test/field-types.test.js` is the check.
-- **Plan:** set the option in the shared tsconfig once a run of every package's tests and proofs shows no class relied on
-  the define behaviour.
-
 ### DynamicInstances: about 15-35% more GPU time than InstancedMesh at 100,000 and 250,000 moving boxes
 
 - **What:** `boxes-100000` moving, every box in view: GPU 1.41 ms against three.js WebGPU `InstancedMesh` 1.23 ms; at

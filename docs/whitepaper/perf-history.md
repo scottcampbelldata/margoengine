@@ -1486,6 +1486,21 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Guard:** `packages/culling/test/dynamic.test.js` and the browser test above.
 - **Still open:** the rest of the gap ([known-bugs.md](../known-bugs.md#dynamicinstances-about-15-35-more-gpu-time-than-instancedmesh-at-100000-and-250000-moving-boxes)).
 
+### 55. Number fields that stay numbers, in every package on the shared tsconfig
+
+- **Loss:** entry 53 found that bare class fields made `@margoengine/math` allocate on each write of a fraction. 86 of the 98
+  built packages declared fields the same way.
+- **Fix:** `useDefineForClassFields: false` moved from the math package to `packages/gltf/tsconfig.json`, which 92 packages
+  extend. Same arithmetic, same results.
+- **After:** Node 26, this PC, 2026-11-05, three runs of each: 10,000 `Spring.update` calls took 0.41 ms and take 0.28 ms.
+  `Spring` is the only class measured; other packages get the same change without a number of their own.
+- **Not changed:** `@margoengine/materials` keeps its declarations, because `Material.copy` lists its values with
+  `Object.keys(new Material())` and an optional field must exist for that. Material fields are not written per frame.
+  `core`, `stage`, `kernel`, `shared`, `react` and `margoengine` have their own tsconfig and were left alone; `core` and
+  `stage` output is unchanged.
+- **Limit:** `#private` fields must be declared, so a bare one still starts as `undefined`. None was measured.
+- **Guard:** `tests/class-fields.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

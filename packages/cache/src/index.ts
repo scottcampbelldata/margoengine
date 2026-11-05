@@ -72,7 +72,7 @@ export class AssetCache {
   readonly maxBytes: number;
   readonly timeout: number;
   private db: Promise<IDBDatabase | null>;
-  private network: typeof fetch;
+  private network: typeof globalThis.fetch;
   private checked = new Set<string>();
   private pending = new Set<Promise<unknown>>();
   private writes: Promise<unknown> = Promise.resolve();
