@@ -53,10 +53,11 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `loopSubdivide` |
 | `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry` from `@margoengine/geometry/extras` |
 | `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` from `@margoengine/geometry/nurbs` |
+| `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -157,6 +158,42 @@ const mesh = nurbsSurfaceGeometry(patch, 24, 24);
 Curves and surfaces are fixed once built; to change one, build a new one. Invalid degrees, knots, weights or
 coordinates throw `RangeError` or `TypeError` naming the fix.
 
+## Surface sampling
+
+`@margoengine/geometry/sample` picks random points on any mesh, for scattering grass, fur, debris and particles.
+
+```ts
+import {sphereGeometry} from 'margoengine/geometry';
+import {MeshSurfaceSampler} from 'margoengine/geometry/sample';
+
+const rock = sphereGeometry(1, 32, 16);
+
+// Even over the surface. Flat arrays, ready for an instance buffer.
+const sampler = new MeshSurfaceSampler(rock);
+const {positions, normals, uvs} = sampler.samplePoints(10_000);
+
+// Or by density: 5 points per square unit.
+const dense = sampler.samplePoints(Math.round(sampler.area * 5));
+
+// A painted map: one weight per vertex, here more points towards +y.
+const weights = Array.from({length: rock.positions.length / 3}, (_, v) => Math.max(0, rock.positions[v * 3 + 1]));
+const moss = new MeshSurfaceSampler(rock, {weights, seed: 7});
+
+// One at a time; pass the last sample back to skip the allocation.
+let point = moss.sample();
+point = moss.sample(point);
+console.log(point.position, point.normal, point.uv, point.color, point.triangle, point.barycentric);
+```
+
+- `new MeshSurfaceSampler(data, {weights, colors, random, seed = 1})`: `normals` and `uvs` may be empty. `colors` holds 3
+  or 4 values per vertex, because `GeometryData` has no colour slot; without it samples are white.
+- Without `weights` density is even per area. With them, density follows the weight linearly across each triangle, so
+  one big quad with a painted gradient still gives a gradient, not one flat level per triangle.
+- The same mesh and seed give the same points. Pass `random` (a function returning [0, 1)) to use your own generator.
+- Normals are the interpolated vertex normals, renormalized; the face normal where those are missing or cancel out.
+- A sample costs one binary search over the triangles; building the sampler reads the mesh once. It keeps a reference
+  to `data`, so changing the arrays afterwards changes what samples read but not the triangle weights.
+
 ## How it works
 
 - **Tested from first principles.** Primitive parameters, defaults, segment clamping, UV conventions and groups are pinned by `tests/primitives.test.js`: closed solids have no boundary edges and face outward, normals are unit length, areas and volumes match the analytic shapes, and recorded counts, areas and volumes hold to 1e-5. Vertex order inside a primitive is not part of the API.
@@ -227,6 +264,8 @@ point), parametric spheres and tori (area, volume, Euler characteristic 2 and 0,
 vertex inside the box, UVs 0 to 1 matching the box coordinates, footprint area x * y on planes, turned and mirrored
 world matrices). The NURBS tests check circles and arcs at radius to 1e-12 at every parameter, the Bezier special
 case, rational derivatives to third order against differences, spheres and tori against their closed forms (radius,
-radial normals, closed after welding, area and volume), and creases at repeated knots.
+radial normals, closed after welding, area and volume), and creases at repeated knots. The sampler tests check the
+share of points per triangle, a chi-squared test over a square, the moments of a linear density on a single quad,
+zero-weight triangles, interpolated attributes, seeds and the ends of the random range.
 
 Apache-2.0 licensed.

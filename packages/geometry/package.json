@@ -61,6 +61,10 @@
     "./nurbs": {
       "types": "./dist/nurbs.d.ts",
       "import": "./dist/nurbs.js"
+    },
+    "./sample": {
+      "types": "./dist/sample.d.ts",
+      "import": "./dist/sample.js"
     }
   },
   "files": [

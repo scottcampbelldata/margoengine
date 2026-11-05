@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4415306,
+  "total": 4417286,
   "history": [
     {
       "date": "2026-10-24",
@@ -1514,6 +1514,12 @@
       "commit": "214a946ba",
       "reason": "geometry: new optional entry geometry/nurbs (NURBS curves and surfaces)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "55cf87e54",
+      "reason": "geometry: new optional entry geometry/sample (mesh surface sampler)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1667,6 +1673,7 @@
     "@margoengine/geometry/extrude": 8562,
     "@margoengine/geometry/nurbs": 5307,
     "@margoengine/geometry/primitives": 4058,
+    "@margoengine/geometry/sample": 1980,
     "@margoengine/geometry/shapes": 3840,
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 5406,
