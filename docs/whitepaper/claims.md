@@ -288,7 +288,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | materials-atlas (measurement, no baseline) | geometry + materials at `700838e` | - |
 | binding-limit | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | - |
 | gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `6a958e532` |
-| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `641246d3`: 1,085 calls |
+| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `fa2a70f3`: 1,085 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `2d192a71` (per-line clipping planes at `86063c47`: the style uniform grew from 128 to 224 bytes and the shader gained a world-position varying and a zero-count plane loop; then `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose both times) |
 | math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
 | post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `6a958e532` |
@@ -422,6 +422,8 @@ draws and shader modules, byte for byte); only 30 calls of frame 9 move: the tex
 chain (`writeTexture`, views, the mip bind groups, passes and draws) now come before the beauty pass's
 `beginRenderPass` instead of after it. Both orders upload before the frame's commands run. The full trace matches
 `e2cb3815`.
+
+**materials-uv-transform, advanced to `fa2a70f3` on 2026-11-05 (perf-history entry 50):** gltf-pro trims a pipeline to the vertex inputs its finished shader reads. The story's one material with no maps changes: of 1,085 calls, one shader module and one render pipeline differ, and every other call, binding and upload is as before. `packages/materials/test/vertex-inputs-browser.mjs` shows the pixels do not change.
 
 **gltf-pro-lighting-hooks, oit-detached and materials-uv-transform, advanced to `641246d3` on 2026-10-26 (speed matrix
 row 12.7, perf-history entry 32):** gltf-pro makes one default view per texture and one sampler per device and sampler
