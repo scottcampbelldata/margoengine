@@ -2811,6 +2811,32 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### Apple GPUs: 4x MSAA edges of scatter instances change from frame to frame
+
+- **What:** on an Apple M6 Mac mini (Metal 3, Chrome for Testing 156), a still biome view at 4x MSAA draws different
+  pixels each frame: in the biomes shadows-check scene, about 420 of 76,800 pixels differed across four frames with no
+  time step, by up to 0.075 in luminance (a third of some pixels' brightness), as speckle inside the hazel shrubs and on
+  tree edges. The terrain alone draws the same bits every frame. The RTX A6000 (D3D12) draws the same bits. It made
+  `npm run test:gpu:shadows -w @margoengine/biomes` report "shadows brighten nothing" on 52 to 60 pixels (2026-11-05):
+  two views without shadows already differed in 428 pixels there, so the shadows were not the cause.
+- **Repro:** `node packages/biomes/tests/shadows-check.mjs --msaa` on the Mac fails at the control step ("two views
+  without shadows draw the same bits: 1169 values differ"); without `--msaa` (single-sampled, the check's default) it
+  passes there and on the A6000.
+- **Cause, measured:** scatter's GPU cull appends each visible instance at `atomicAdd` slots, so the ring buffers hold
+  the same instances in a new order every frame (buffer captures: the same 32-byte entries, sorted, no duplicates). On
+  the M6, at 4x MSAA, edge pixels inside an instance follow that order, even on an isolated shrub. Each of these makes
+  the frames identical there: single-sampled drawing (`exactSize`), or the cull rewritten to write instance `i` at slot
+  `i` (a diagnostic only: it draws culled instances as empty ones). None of these removes it: `greater` in place of
+  `greater-equal` (so not depth ties), colour interpolated at the pixel centre in place of `centroid`, back faces drawn,
+  or the shaded colour replaced by the interpolated world position (so the winning fragment changes, not its lighting).
+  The GPU's own mechanism is not traced.
+- **Needed to close:** an order-stable cull on scatter's WebGPU route in place of the atomic append. Its WebGL2 route
+  (`packages/scatter/src/compat.ts`) already compacts in candidate order with `PrefixCount` (`packages/shared/prefix.js`);
+  its note that depth makes WebGPU's order not matter does not hold on the M6 at 4x MSAA. The new cull's cost is
+  measured against the atomic one, and a frame-repeat check of a scatter scene at 4x MSAA is exact on the Mac; then
+  `--msaa` passes there. Two views still stream tiles into different pages, so a fixed cull order makes each view
+  steady, and two views can still differ at 4x MSAA.
+
 ### `KHR_materials_specular` weight does not reach ambient light on gltf-pro's native paths
 
 - **What:** direct light and the `Transmission` pass follow the spec since 2026-11-05 (`specular * (f0 + (1 - f0) * (1 - v.h)^5)`,
