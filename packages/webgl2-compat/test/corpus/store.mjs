@@ -164,6 +164,11 @@ function renameModules(pipeline, keys) {
   return copy;
 }
 
+/** The modules of a read corpus as `writeCorpus` records, so a recording can add to them. All of them compiled. */
+export function recordsOf({ modules }) {
+  return modules.map((module) => ({ ...module, errors: 0 }));
+}
+
 /** Reads the corpus: the manifest and every module's source, checked against the manifest's hash. */
 export function readCorpus(dir = here) {
   const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')),

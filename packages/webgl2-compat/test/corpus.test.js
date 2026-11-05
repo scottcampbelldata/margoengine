@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { classify, entryPoints, flagsOf, readCorpus, writeCorpus } from './corpus/store.mjs';
+import { classify, entryPoints, flagsOf, readCorpus, recordsOf, writeCorpus } from './corpus/store.mjs';
 
 const root = resolve(import.meta.dirname, '..', '..', '..');
 const { manifest, modules } = readCorpus();
@@ -52,6 +52,24 @@ test('the corpus covers every package whose source holds WGSL', () => {
     [],
     `record the corpus again (npm run record:wgsl-corpus); not covered: ${missing.join(', ')}`,
   );
+});
+
+test('a recording added to the corpus keeps every module, its pipelines and its owner', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wgsl-corpus-add-'));
+  try {
+    const code = '@compute @workgroup_size(1) fn added() {}';
+    writeCorpus([...recordsOf({ manifest, modules }), { key: 'page', code, errors: 0, packages: ['biomes'] }], { dir });
+    const again = readCorpus(dir).modules,
+      strip = ({ key, package: owner, packages, pipelines }) => ({ key, owner, packages, pipelines: pipelines.length });
+    assert.equal(again.length, modules.length + 1);
+    assert.equal(again.find((m) => m.code === code).package, 'biomes');
+    assert.deepEqual(
+      again.filter((m) => m.code !== code).map(strip),
+      modules.map(strip),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('every stage appears, with pipelines and binding types recorded', () => {

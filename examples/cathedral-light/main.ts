@@ -8,6 +8,8 @@ import { Bloom } from '@margoengine/post/bloom';
 import { RawMesh, RawShaderMaterial, RawShaders } from '@margoengine/shader/raw';
 import { paceEngine } from '@margoengine/quality';
 
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
+
 // The light model both materials share: where a ray toward the sun leaves the hall decides its colour.
 const light = /* wgsl */ `
 const W = 6.0; const L = 24.0; const BAY = 6.0; const COL = 4.1; const RCOL = 0.46;
@@ -262,11 +264,7 @@ const hall = new RawShaderMaterial({
     depthTest: false,
     depthWrite: false,
     cull: 'none',
-    name: 'cathedral-hall',
-    onError: (error) => {
-      document.querySelector('#error')!.textContent = error.message;
-    },
-  }),
+    name: 'cathedral-hall',  }),
   dust = new RawShaderMaterial({
     vertexShader: dustShader,
     uniforms: uniforms(),
@@ -276,11 +274,7 @@ const hall = new RawShaderMaterial({
     depthTest: false,
     depthWrite: false,
     cull: 'none',
-    name: 'cathedral-dust',
-    onError: (error) => {
-      document.querySelector('#error')!.textContent = error.message;
-    },
-  });
+    name: 'cathedral-dust',  });
 const raw = RawShaders.attach(stage.engine);
 raw.add(new RawMesh({ material: hall, vertexCount: 3 }));
 raw.add(new RawMesh({ material: dust, vertexCount: 6, instanceCount: 3500 }));

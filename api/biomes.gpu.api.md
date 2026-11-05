@@ -31,6 +31,7 @@ export class GpuTiles {
     fits(c?: Classifier, kind?: 'envelopes' | ZoneClassifier, height?: ArrayLike<number>): boolean;
     layers(r: GpuRequest, caller?: AbortSignal, live?: () => void, cpu?: () => Map<string, RasterLayer>): Promise<Map<string, RasterLayer>>;
     dispose(reason?: unknown): void;
+    [Symbol.dispose](): void;
 }
 
 export function hydrologyGPU(device: GPUDevice, grid: HeightGrid, options?: HydrologyOptions, { signal }?: {

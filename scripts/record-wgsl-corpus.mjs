@@ -8,6 +8,8 @@
 //   node scripts/record-wgsl-corpus.mjs --no-build              dist is current
 //   node scripts/record-wgsl-corpus.mjs --keep --suites=...     add to the shards of the last run (rerun a suite that
 //                                                               failed for a reason outside the recorder)
+//   node scripts/record-wgsl-corpus.mjs --add --suites=...      add these suites' modules to the corpus on disk, for a
+//                                                               package that gained shaders
 // Each suite runs as it does in check:merge, with NODE_OPTIONS=--import=scripts/support/wgsl-corpus-hook.mjs and
 // MARGO_WGSL_CORPUS=test-results/wgsl-corpus, so every browser it launches records into a shard; the suites take the
 // GPU lock themselves. A suite that fails is reported and the run exits 1 after writing what was recorded, so a broken
@@ -20,7 +22,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runLimited } from './support/run-limited.mjs';
 import { mergeShards } from './support/wgsl-corpus.mjs';
-import { writeCorpus } from '../packages/webgl2-compat/test/corpus/store.mjs';
+import { readCorpus, recordsOf, writeCorpus } from '../packages/webgl2-compat/test/corpus/store.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   dir = join(root, 'test-results', 'wgsl-corpus'),
@@ -63,7 +65,7 @@ if (!process.argv.includes('--merge-only')) {
 }
 
 const { shards, modules } = mergeShards(dir),
-  summary = writeCorpus([...modules.values()]);
+  summary = writeCorpus([...(process.argv.includes('--add') ? recordsOf(readCorpus()) : []), ...modules.values()]);
 console.log(
   `record-wgsl-corpus: ${shards} shards, ${modules.size} distinct modules seen; kept ${summary.kept} (${summary.bytes} bytes of WGSL, ${summary.packages.length} packages), dropped ${summary.fragments} that failed to compile alone (fragments) and ${summary.unknown} whose compile result never arrived`,
 );

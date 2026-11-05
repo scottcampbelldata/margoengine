@@ -9,6 +9,8 @@ import { RawMesh, RawShaderMaterial, RawShaders } from '@margoengine/shader/raw'
 import { alphaToSdf } from '@margoengine/text';
 import { paceEngine } from '@margoengine/quality';
 
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
+
 const WIDTH = 1024,
   HEIGHT = 256,
   SDF = { size: 48, buffer: 8, radius: 32, cutoff: 0.5 };
@@ -204,11 +206,7 @@ const material = new RawShaderMaterial({
   depthTest: false,
   depthWrite: false,
   cull: 'none',
-  name: 'molten-words',
-  onError: (error) => {
-    document.querySelector('#error')!.textContent = error.message;
-  },
-});
+  name: 'molten-words',});
 const raw = RawShaders.attach(stage.engine);
 raw.add(new RawMesh({ material, vertexCount: 3 }));
 

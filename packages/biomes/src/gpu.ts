@@ -265,4 +265,9 @@ export class GpuTiles {
     deviceLoss.get(this.device)?.controllers.delete(this.#abort);
     if (reason !== undefined) this.#abort.abort(reason);
   }
+
+  /** Lets `using tiles = ...` stop the watch at the end of a block. */
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
 }

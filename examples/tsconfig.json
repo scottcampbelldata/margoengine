@@ -15,7 +15,9 @@
     "biomes/*.ts",
     "blender-loader/*.ts",
     "boulder/*.ts",
+    "cathedral-light/*.ts",
     "gallery/*.ts",
+    "molten-words/*.ts",
     "quickstart/*.ts",
     "usdz-loader/*.ts",
     "webxr-orbit/*.ts"
