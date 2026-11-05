@@ -1375,6 +1375,29 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node bench/cli.mjs parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5
   --warmup=1 --no-compare --no-fail`.
 - **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, `packages/animation/tests/clone.test.js`.
+### 50. Materials with no maps fetch only what they read
+
+- **Loss:** `createInstancedMesh` boxes at 50,000 took 0.615 ms of GPU against three's WebGL2 `InstancedMesh`, because
+  gltf-pro's vertex stage read all five vec4 of its 80-byte vertex for a material with no map.
+- **Fix:** `packages/gltf-pro/src/vertex-inputs.ts` reads the finished shader text when a pipeline is built. With a flat
+  normal (materials' bare standard material) the tangent frame's terms are exact zeros, so it goes; then each field of
+  `Out` no fragment reads goes, and each vertex input and the instance UV row nothing reads. It runs after every patch,
+  so no patch anchors on a trimmed stage. Text it cannot read for certain keeps every input.
+- **After:** RTX A6000, Chromium 156, 2026-11-05, three runs, diagnostic (the machine was shared). GPU ms a frame:
+
+  | Boxes | Before | After | three WebGL2 | three WebGPU |
+  | --- | --- | --- | --- | --- |
+  | 10,000 | 0.154 | 0.146 | 0.127 | 0.135 |
+  | 50,000 | 0.615 | 0.546 | 0.469 | 0.351 |
+
+  The first entry's 0.47 ms for this page with position and normal alone did not repeat: the same page now takes 0.546.
+  A first three.js WebGL2 run read 0.322 ms at 50,000, marked noisy; the row above is the later run.
+- **Same output:** `packages/materials/test/vertex-inputs-browser.mjs` draws plain, mirrored, vertex-coloured and mapped
+  meshes with the trimming on and off: no pixel differs.
+- **Rerun:** `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3`.
+- **Guard:** `packages/gltf-pro/tests/vertex-inputs.test.js` and the browser test above, which also asserts the
+  pipelines' attribute counts.
+- **Still open:** the rest of the gap ([known-bugs.md](../known-bugs.md#createinstancedmesh-draws-50000-boxes-slower-than-threejs)).
 
 ## Open losses
 

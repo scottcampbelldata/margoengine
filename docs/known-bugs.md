@@ -488,19 +488,18 @@ The entries below were measured with `npm run bench -- instanced --engines=margo
 machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md),
 "Instanced: fixes and what is left"). Each cause was measured, not guessed.
 
-### createInstancedMesh reads vertex attributes its material does not use
+### createInstancedMesh draws 50,000 boxes slower than three.js
 
-- **What:** `@margoengine/materials` `createInstancedMesh` boxes at 50,000: GPU 0.63 ms against three's WebGL2
-  `InstancedMesh` 0.47 ms (10,000: 0.156 against 0.128 ms). `CulledInstances` draws the same scene in 0.30 ms.
-- **Cause (measured):** gltf-pro's vertex is 80 bytes (position, normal, tangent, two UV sets, colour as five vec4)
-  and its vertex stage reads all of them even when the material uses no UV, tangent or vertex colour. The same page
-  with the vertex stage reading only position and normal draws 50k in 0.47 ms; texture reads at one fixed texel
-  (0.643 ms) and dropping the node x instance matrix product (0.642 ms) change nothing.
-- **Plan:** gltf-pro chooses the vertex inputs per primitive from what the finished shader reads: a material with no
-  map and no tangent-space lobe (materials' bare standard material) drops the tangent frame, and the vertex stage then
-  writes constant UV and tangent outputs without fetching them. It needs the instancing patch to anchor on the
-  vertex stage after that choice (today it patches `o.uv=i.uv; o.color=...` last) and a pixel check that untextured
-  materials draw the same frames.
+- **What:** `@margoengine/materials` `createInstancedMesh` boxes at 50,000: GPU 0.546 ms against three's WebGL2
+  `InstancedMesh` 0.469 ms and WebGPU 0.351 ms (10,000: 0.146 against 0.127 and 0.135 ms; run of 2026-11-05, diagnostic).
+  `CulledInstances` draws the same scene in 0.298 ms.
+- **Fixed part:** gltf-pro now fetches and passes only what the finished shader reads (0.615 to 0.546 ms, perf-history
+  entry 50).
+- **Cause of the rest: not found.** Ruled out by measurement on the same page: the fragment stage (a shader returning the
+  vertex colour: 0.539 ms), the vertex colour fetch (0.547 ms), the outputs between the stages (0.546 ms) and, in the first
+  measurement of this entry, texture reads and the node x instance matrix product. The time is in the vertex stage or
+  before it. **Next to test:** the 80-byte vertex stride and the 96-byte instance stride, against a compact position and
+  normal stream.
 
 ### A package's own render pass costs a fixed MSAA store and reload
 

@@ -39,6 +39,7 @@ import {
   type RowsState,
 } from './draw-batch.js';
 import { rowsPerBinding, rowsShader } from './instanced-shader.js';
+import { vertexInputs } from './vertex-inputs.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
@@ -4319,7 +4320,8 @@ export class PBRModel implements EnginePlugin {
     // bindings: the batch draws with its instanced variant (see `build`).
     if (!pipeline && build) {
       checkDrawLimits(c.device, code, m, transmission, this.lighting);
-      const module = c.device.createShaderModule({ code }),
+      const inputs = vertexInputs(code),
+        module = c.device.createShaderModule({ code: inputs.code }),
         format = mode === 'beauty' ? c.format : 'rgba16float';
       const descriptor: GPURenderPipelineDescriptor = {
         layout: 'auto',
@@ -4329,9 +4331,9 @@ export class PBRModel implements EnginePlugin {
           buffers: [
             {
               arrayStride: 80,
-              attributes: Array.from({ length: 5 }, (_, i) => ({
-                shaderLocation: i,
-                offset: i * 16,
+              attributes: inputs.locations.map((location) => ({
+                shaderLocation: location,
+                offset: location * 16,
                 format: 'float32x4' as const,
               })),
             },

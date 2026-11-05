@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Materials vertex inputs</title><style>body{margin:0;background:#000}canvas{width:512px;height:384px;display:block}</style></head><body><canvas width="512" height="384" aria-label="Boxes"></canvas>
+<script type="module">
+// Materials with no maps drawn alone, instanced, mirrored, with vertex colours and beside a textured mesh.
+// vertex-inputs-browser.mjs takes this page's frame with gltf-pro's input trimming on and off.
+import {Engine} from '/packages/core/dist/index.js';
+import {Material,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {boxGeometry} from '/packages/geometry/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[],fetched=[];
+const create=GPUDevice.prototype.createRenderPipeline;
+GPUDevice.prototype.createRenderPipeline=function(d){const n=d.vertex.buffers?.[0]?.attributes?.length;if(d.vertex.buffers?.[0]?.arrayStride===80)fetched.push(n);return create.call(this,d);};
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[4,3.5,7],target:[0,0,0],fov:50}});engine.stop();
+engine.gpu.addEventListener?.('uncapturederror',(e)=>errors.push(e.error.message));
+const turn=(x,y,z,a,s=1)=>{const c=Math.cos(a)*s,n=Math.sin(a)*s;return [c,0,-n,0,0,s,0,0,n,0,c,0,x,y,z,1];};
+const box=boxGeometry(0.7,0.7,0.7);
+const plain=createInstancedMesh(engine,box,new Material({color:'#ffffff',roughness:0.4,side:'front'}),24);
+const off=createInstancedMesh(engine,box,new Material({color:'#ddeeff',roughness:0.7,vertexColors:false,side:'front'}),6);
+const mirrored=createInstancedMesh(engine,box,new Material({color:'#ffcc88',metalness:0.6,roughness:0.3}),4);
+for(let i=0;i<24;i++){plain.instances.setMatrixAt(i,turn((i%6)-2.5,Math.floor(i/6)-1.5,-1,i*0.4));plain.instances.setColorAt(i,[0.3+(i%3)*0.3,0.9-(i%4)*0.2,0.5]);}
+for(let i=0;i<6;i++)off.instances.setMatrixAt(i,turn(i-2.5,-2.6,0.6,i*0.7,0.8));
+for(let i=0;i<4;i++){const m=turn(i-1.5,0.6,1.6,i*0.5);if(i%2){m[0]=-m[0];m[1]=-m[1];m[2]=-m[2];}mirrored.instances.setMatrixAt(i,m);}
+const colors=new Float32Array(box.positions.length/3*4);for(let i=0;i<colors.length;i+=4){colors[i]=(i>>2)%2;colors[i+1]=((i>>3)%2);colors[i+2]=0.5;colors[i+3]=1;}
+const painted=createMesh(engine,{...box,colors},new Material({roughness:0.5}));painted.root.setPosition([-2.4,1.8,1]);
+const texture=new Texture({data:new Uint8Array([255,40,40,255,40,255,40,255,40,40,255,255,255,255,40,255]),width:2,height:2},{magFilter:'nearest',minFilter:'nearest'});
+const mapped=createMesh(engine,box,new Material({map:texture,roughness:0.5}));mapped.root.setPosition([2.4,1.8,1]);
+for(let i=0;i<3;i++){engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();}
+window.errors=errors;window.fetched=fetched;window.ready=true;
+</script></body></html>

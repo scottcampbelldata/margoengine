@@ -245,6 +245,9 @@ Unmeasured: that cost on other GPUs, one kernel rotation-sync call, and cross-ma
 
 ## 3. Rendering backends and hardware tiers
 
+gltf-pro trims each pipeline to the vertex inputs its finished shader reads (`packages/gltf-pro/src/vertex-inputs.ts`), after
+every shader patch. Evidence: `packages/materials/test/vertex-inputs-browser.mjs` (no pixel differs, RTX A6000 only).
+
 ### 3.1 Fallback ladder
 
 | Tier | Behavior | Loading and cost |

@@ -152,6 +152,10 @@ Reading (diagnostic only):
   cost; 0.038-0.039 against 0.030 ms), and CPU for moving instances (1.2-1.3 against 0.62 ms; three's WebGPU
   renderer 0.91 ms).
 
+
+Update (2026-11-05): `createInstancedMesh` fetches only what its shader reads. 50,000 boxes went from 0.615 to 0.546 ms,
+against three's WebGL2 0.469 and WebGPU 0.351 ms ([perf-history.md](perf-history.md) entry 50, diagnostic).
+
 ## Moving instances on the GPU (item 53.2, 2026-10-29; diagnostic, busy machine)
 
 `npm run bench -- dynamic --engines=margo,three-webgpu` (suite `bench/suites/dynamic.mjs`): boxes on a grid, every
