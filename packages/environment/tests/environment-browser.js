@@ -712,12 +712,14 @@ window.runEnvironmentTests = async () => {
 @group(0) @binding(2) var<storage, read> iblBrdf: array<u32>;
 @group(0) @binding(3) var<uniform> iblSh: array<vec4f, 9>;
 @group(0) @binding(4) var<uniform> iblParams: vec4f;
-@group(0) @binding(5) var<storage, read_write> out: array<vec4f, 4>;
+@group(0) @binding(5) var<storage, read_write> out: array<vec4f, 6>;
 @compute @workgroup_size(1) fn main() {
-  out[0] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 0.0, 1.0), 1.0);
-  out[1] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 1.0, 0.0), 1.0);
+  out[0] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 0.0, 1.0, vec3f(0.04), 1.0), 1.0);
+  out[1] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 1.0, 0.0, vec3f(0.04), 1.0), 1.0);
   out[2] = vec4f(iblIrradiance(iblSh, vec3f(0.0, 1.0, 0.0)), 1.0);
-  out[3] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 1.0, 1.0), 1.0);
+  out[3] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(1.0), 1.0, 1.0, vec3f(0.04), 1.0), 1.0);
+  out[4] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(0.0), 0.0, 0.5, vec3f(0.0), 0.0), 1.0);
+  out[5] = vec4f(iblShade(iblSpecular, iblSampler, iblSh, iblParams, vec3f(0.0, 1.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(0.0), 0.0, 0.5, vec3f(0.04), 1.0), 1.0);
 }`,
     });
     const c = [0.5, 1.25, 3],
@@ -736,8 +738,8 @@ window.runEnvironmentTests = async () => {
       layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
       compute: { module, entryPoint: 'main' },
     });
-    const out = device.createBuffer({ size: 64, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
-      read = device.createBuffer({ size: 64, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const out = device.createBuffer({ size: 96, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
+      read = device.createBuffer({ size: 96, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const encoder = device.createCommandEncoder(),
       pass = encoder.beginComputePass();
     pass.setPipeline(pipeline);
@@ -750,7 +752,7 @@ window.runEnvironmentTests = async () => {
     );
     pass.dispatchWorkgroups(1);
     pass.end();
-    encoder.copyBufferToBuffer(out, 0, read, 0, 64);
+    encoder.copyBufferToBuffer(out, 0, read, 0, 96);
     device.queue.submit([encoder.finish()]);
     await read.mapAsync(GPUMapMode.READ);
     const values = new Float32Array(read.getMappedRange().slice(0));
@@ -760,6 +762,9 @@ window.runEnvironmentTests = async () => {
     // A white furnace: a rough white dielectric, a smooth white metal and (with multiple scattering) a rough white metal
     // all return close to the environment radiance.
     for (let k = 0; k < 3; k++) {
+      // KHR_materials_specular 0 on a black dielectric: nothing reflects, where the default ends do.
+      assert(values[16 + k] === 0, `specular 0 reflects ${values[16 + k]}`);
+      assert(values[20 + k] > 0.01 * c[k], `default dielectric reflects ${values[20 + k]}`);
       assert(Math.abs(values[12 + k] - c[k]) < 0.03 * c[k], `rough metal furnace ${values[12 + k]} vs ${c[k]}`);
       assert(Math.abs(values[8 + k] - c[k]) < 0.01 * c[k], `iblIrradiance ${values[8 + k]} vs ${c[k]}`);
       assert(Math.abs(values[4 + k] - c[k]) < 0.03 * c[k], `smooth metal furnace ${values[4 + k]} vs ${c[k]}`);

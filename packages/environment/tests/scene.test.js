@@ -89,7 +89,7 @@ test('EnvironmentLighting patches core meshes only while the environment is live
   // The IBL term is named margoAmbient (the convention post's SSAO occludes) and added where the constant ambient was.
   assert.match(
     fragment(patched),
-    /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblSh,iblParams,n,v,i\.color,i\.material\.y,i\.material\.x\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\*frame\.ambient\.rgb\+margoAmbient;/,
+    /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblSh,iblParams,n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\*frame\.ambient\.rgb\+margoAmbient;/,
   );
   assert.doesNotMatch(fragment(patched), /frame\.radiance\.w/, 'IBL replaces the constant ambient term');
   assert.deepEqual(
@@ -321,7 +321,7 @@ test('glTF-pro models: applyTo lights and fogs opaque and blended primitives in 
       assert.match(code, /fn ambient\(s:Surface\)->vec3f \{return vec3f\(0\);\}/);
       assert.match(
         code,
-        /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblSh,iblParams,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness\)\*s\.occlusion;var color=direct\+ambient\(s\)\+s\.emissive\+margoAmbient;/,
+        /let margoAmbient=iblShade\(iblSpecular,iblSampler,iblSh,iblParams,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness,(?:s\.f0,s\.sw|vec3f\(0\.04\),1\.0)\)\*s\.occlusion;var color=direct\+ambient\(s\)\+s\.emissive\+margoAmbient;/,
       );
       assert.match(
         code,

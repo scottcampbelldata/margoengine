@@ -17,6 +17,7 @@ declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 /** glTF-pro's lighting hooks (its `PBRLighting`, declared here so environment does not import glTF-pro). */
 export interface PBRHooks {
   readonly declarations: string;
+  /** vec3f ambient light in terms of `s`. `s.f0` and `s.sw` are the dielectric Fresnel ends: the glTF defaults where the Surface has no such fields. */
   readonly ambient?: string;
   /** Sky light toward the unit normal `n`, replacing gltf-pro's built-in sky gradient (gltf-pro PBRLighting `sky`). */
   readonly sky?: string;
@@ -141,8 +142,8 @@ export abstract class ShaderEffect {
   }
 }
 
-const iblCall = (n: string, v: string, base: string, metal: string, roughness: string) =>
-  `iblShade(iblSpecular,iblSampler,iblSh,iblParams,${n},${v},${base},${metal},${roughness})`;
+const iblCall = (n: string, v: string, base: string, metal: string, roughness: string, f0: string, f90: string) =>
+  `iblShade(iblSpecular,iblSampler,iblSh,iblParams,${n},${v},${base},${metal},${roughness},${f0},${f90})`;
 
 /** `EnvironmentLighting.load` options: the Environment's, UltraHDR decoding for `.jpg` URLs and a cancellation signal. */
 export type EnvironmentLoadOptions = EnvironmentOptions & UltraHDROptions & { signal?: AbortSignal };
@@ -242,14 +243,14 @@ export class EnvironmentLighting extends ShaderEffect {
     const code = source.replace(
       /let linear=([^;]+);/,
       (_, terms: string) =>
-        `let margoAmbient=${iblCall('n', 'v', 'i.color', 'i.material.y', 'i.material.x')};let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`,
+        `let margoAmbient=${iblCall('n', 'v', 'i.color', 'i.material.y', 'i.material.x', 'vec3f(0.04)', '1.0')};let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`,
     );
     return code === source ? source : this.declarations(group) + code;
   }
   protected hooks(group: number): PBRHooks {
     return {
       declarations: this.declarations(group),
-      ambient: iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness') + '*s.occlusion',
+      ambient: iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness', 's.f0', 's.sw') + '*s.occlusion',
       coat: 'iblPrefiltered(iblSpecular,iblSampler,iblParams,reflect(-v,s.cn),s.cr)*iblParams.w*s.occlusion',
       // Sheen: its albedo (gltf-pro's margoSheenAlbedo, the physical shader declares it) times the spherical-harmonic
       // irradiance at the base normal, where the sheen lies.

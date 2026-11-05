@@ -57,11 +57,11 @@ function assertDisposed(h) {
 test('unconfigured clustered lighting retains the exact baseline sampling source and bindings', () => {
   assert.equal(
     createHash('sha256').update(clusteredSampling(0)).digest('hex'),
-    'ed5e3d585b78966e37f457170dc896ea02bba8819863c4fd4bfdb04defef62ff',
+    '0d481b539f3b9bca7c25f25ac776fac8aca983258418b71e4ca9c7d4a2def4fa',
   );
   assert.equal(
     createHash('sha256').update(clusteredSampling(2)).digest('hex'),
-    'ac80dcd0458aa09edce7562b623441dd189a3e099bf31765c3a3189503ec83ce',
+    '431160d2518756d721c1292f5fe41aa6c612d14d2eb3cd53a91bb76b3725a4a5',
   );
   const h = harness(),
     effect = new Clustered({ grid: [2, 2, 2] });
@@ -86,7 +86,7 @@ test('unconfigured clustered lighting retains the exact baseline sampling source
       clusteredSampling(0) +
         wgsl.replace(
           /let linear=([^;]+);/,
-          'let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,i.color,i.material.x,i.material.y);',
+          'let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,i.color,i.material.x,i.material.y,vec3f(0.04),1.0);',
         ),
     );
     assert.doesNotMatch(h.context.shader, /clusterShadow|localShadow|binding\(1[678]\)/);

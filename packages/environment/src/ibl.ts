@@ -43,15 +43,18 @@ fn iblBrdfTerms(nv: f32, roughness: f32) -> vec2f {
 // Complete ambient term for a metallic-roughness material. n and v are unit world vectors (v points to the eye).
 // Multiple scattering (Fdez-Aguera 2019): single-scattering GGX loses the energy of light that bounces between
 // microfacets, so rough metals came out dark; the lost share (1 - Ess) returns as diffuse-like light tinted by the
-// average Fresnel, and the diffuse keeps what neither specular term reflects.
+// average Fresnel, and the diffuse keeps what neither specular term reflects. dielectricF0 and dielectricF90 are the
+// dielectric Fresnel ends (0.04 and 1 by default; KHR_materials_ior and KHR_materials_specular change them).
 fn iblShade(specular: texture_cube<f32>, s: sampler, sh: array<vec4f, 9>, params: vec4f,
-            n: vec3f, v: vec3f, baseColor: vec3f, metalness: f32, roughness: f32) -> vec3f {
+            n: vec3f, v: vec3f, baseColor: vec3f, metalness: f32, roughness: f32,
+            dielectricF0: vec3f, dielectricF90: f32) -> vec3f {
   let nv = clamp(dot(n, v), 1e-4, 1.0);
-  let f0 = mix(vec3f(0.04), baseColor, metalness);
+  let f0 = mix(dielectricF0, baseColor, metalness);
+  let f90 = mix(dielectricF90, 1.0, metalness);
   let ab = iblBrdfTerms(nv, roughness);
-  let single = f0 * ab.x + ab.y;
+  let single = f0 * ab.x + f90 * ab.y;
   let lost = 1.0 - (ab.x + ab.y);
-  let favg = f0 + (1.0 - f0) / 21.0;
+  let favg = f0 + (f90 - f0) / 21.0;
   let multiple = single * favg / (1.0 - lost * favg) * lost;
   let radiance = iblPrefiltered(specular, s, params, reflect(-v, n), roughness);
   let irradiance = iblIrradiance(sh, iblRotate(n, params));

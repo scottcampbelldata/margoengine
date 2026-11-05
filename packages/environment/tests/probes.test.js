@@ -125,7 +125,7 @@ test('LightProbes replaces the ambient term on every core shader variant, with o
   // Named margoAmbient (SSAO occludes it); without an environment the fallback is core's own ambient term, so unbaked probes change nothing.
   assert.match(
     fragment(patched),
-    /let margoAmbient=probeShade\(i\.position,n,v,i\.color,i\.material\.y,i\.material\.x,i\.color\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w\*frame\.ambient\.rgb\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\*frame\.ambient\.rgb\+clusterLighting\([^;]+\)\+margoAmbient;/,
+    /let margoAmbient=probeShade\(i\.position,n,v,i\.color,i\.material\.y,i\.material\.x,i\.color\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w\*frame\.ambient\.rgb,vec3f\(0\.04\),1\.0\);let linear=direct\*frame\.radiance\.xyz\*frame\.light\.w\+i\.color\*\(1\.0-i\.material\.y\)\*0\.0\*frame\.ambient\.rgb\+clusterLighting\([^;]+\)\+margoAmbient;/,
   );
   assert.doesNotMatch(patched, /iblSpecular/, 'no texture bindings without an environment');
   assert.deepEqual(
@@ -137,7 +137,7 @@ test('LightProbes replaces the ambient term on every core shader variant, with o
     coreShader.replace('+i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb', '+base*frame.radiance.w');
   assert.match(
     probes.shader(terrain, 0),
-    /probeShade\(i\.position,n,v,base,i\.material\.y,i\.material\.x,base\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w\)/,
+    /probeShade\(i\.position,n,v,base,i\.material\.y,i\.material\.x,base\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w,vec3f\(0\.04\),1\.0\)/,
   );
   assert.throws(() => probes.shader('@fragment fn custom() {}', 0), /standard core PBR shader/);
   // Never together with EnvironmentLighting (both own margoAmbient): the environment goes to LightProbes instead.
@@ -153,7 +153,7 @@ test('LightProbes replaces the ambient term on every core shader variant, with o
   assert.match(code, /let ab=iblBrdfTerms\(nv,rough\);/);
   assert.match(
     fragment(code),
-    /let margoAmbient=probeShade\(i\.position,n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\)\);/,
+    /let margoAmbient=probeShade\(i\.position,n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\),vec3f\(0\.04\),1\.0\);/,
   );
   assert.deepEqual(
     withEnv.bindings().map((e) => e.binding),
@@ -269,7 +269,7 @@ test('LightProbes reach gltf-pro models through the ambient hook and the bake ca
     .find((code) => code.includes('fn surface('));
   assert.match(
     modelCode,
-    /let margoAmbient=probeShade\(i\.position,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness,\(s\.base\.rgb\*\(1\.0-s\.metal\)[^;]+\*margoView\.radiance\.w\)\*s\.occlusion;/,
+    /let margoAmbient=probeShade\(i\.position,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness,\(s\.base\.rgb\*\(1\.0-s\.metal\)[^;]+\*margoView\.radiance\.w,vec3f\(0\.04\),1\.0\)\*s\.occlusion;/,
   );
   assert.match(
     modelCode,

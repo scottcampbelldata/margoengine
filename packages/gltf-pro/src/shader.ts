@@ -635,7 +635,7 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {
     plan.iridescence
       ? `
   var m=o; m.metal=1; m.base=vec4f(s.ir.rgb,1); sum+=s.ir.w*margoAmbientTerm(i,m,v);
-  m.base=vec4f(mix(vec3f(0.04),o.base.rgb,o.metal),1); sum-=s.ir.w*margoAmbientTerm(i,m,v);`
+  m.base=vec4f(mix(s.f0,o.base.rgb,o.metal),1); sum-=s.ir.w*margoAmbientTerm(i,m,v);`
       : ''
   }${
     plan.diffuseTransmission

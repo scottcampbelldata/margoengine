@@ -75,13 +75,13 @@ test('LightProbes without an environment fall back to the hemisphere in either o
     const f = fragment(code);
     assert.match(
       f,
-      /probeShade\(i\.position,n,v,i\.color,i\.material\.y,i\.material\.x,i\.color\*\(1\.0-i\.material\.y\)\*margoSkyLight\(n\)\)/,
+      /probeShade\(i\.position,n,v,i\.color,i\.material\.y,i\.material\.x,i\.color\*\(1\.0-i\.material\.y\)\*margoSkyLight\(n\),vec3f\(0\.04\),1\.0\)/,
     );
     assert.ok(!linearLine(code).includes('margoSkyLight'), 'not twice');
     assert.doesNotMatch(f, /frame\.radiance\.w/);
   }
   for (const code of [sky.shader(envProbes.shader(coreShader, 0), 0), envProbes.shader(sky.shader(coreShader, 0), 0)])
-    assert.ok(linearLine(code).includes('*margoSkyLight(n)') && fragment(code).includes(',vec3f(0));'), 'adds to IBL');
+    assert.ok(linearLine(code).includes('*margoSkyLight(n)') && fragment(code).includes(',vec3f(0),vec3f(0.04),1.0);'), 'adds to IBL');
 });
 
 test("gltf-pro's sky hook replaces the fixed gradient in every gltf-pro-family shader, beside IBL, inside probes' fallback", () => {
@@ -115,7 +115,7 @@ test("gltf-pro's sky hook replaces the fixed gradient in every gltf-pro-family s
       lightPBR(lightPBR(code, hooks.sky), hooks.probes),
     ]) {
       assert.ok(both.includes('fn ambient(s:Surface)->vec3f {return vec3f(0);}'), `${name}: probes own the ambient`);
-      assert.ok(both.includes('margoSkyHook(s.n))*s.occlusion') && !both.includes(gradient), name);
+      assert.ok(both.includes('margoSkyHook(s.n),') && !both.includes(gradient), name);
     }
   }
   assert.throws(() => lightPBR(lightPBR(pbrShader, hooks.sky), { declarations: '', sky: 'vec3f(1)' }), /Two sky/);

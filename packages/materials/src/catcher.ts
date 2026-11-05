@@ -61,7 +61,7 @@ export function catcherLit(code: string): string {
     ),
     unshadowed = areaShadowed ? stripped?.replace('clusterAreaLighting(', 'margoCatcherArea(') : stripped,
     shadowed = unshadowed !== loop,
-    args = '(i.clip.xy,i.position,n,f.eye.xyz,vec3f(1),1.0,0.0),w)',
+    args = '(i.clip.xy,i.position,n,f.eye.xyz,vec3f(1),1.0,0.0,vec3f(0.04),1.0),w)',
     // Unshadowed local lights count too: they make a shadow of the others lighter.
     local = !loop
       ? ''

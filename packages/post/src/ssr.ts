@@ -59,9 +59,10 @@ const replayTail = (code: string) => {
     probes = code.includes('fn probeSpecular(');
   return `
 ${probes ? 'var<private> margoPosition:vec3f;\n' : ''}struct MargoSSR {@location(0) specular:vec4f,@location(1) weight:vec4f,@location(2) normal:vec4f}
-fn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {
-let nv=clamp(dot(n,v),1e-4,1.0);let f0=mix(vec3f(0.04),base,metal);
-${ibl ? 'let ab=iblBrdfTerms(nv,rough);let w=f0*ab.x+ab.y;' : 'let r=rough*vec4f(-1,-0.0275,-0.572,0.022)+vec4f(1,0.0425,1.04,-0.04);let k=min(r.x*r.x,exp2(-9.28*nv))*r.x+r.y;let w=f0*(r.z-1.04*k)+(r.w+1.04*k);'}${
+fn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {return margoSSRFresnel(n,v,base,metal,rough,vec3f(0.04),1.0);}
+fn margoSSRFresnel(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32,dielectricF0:vec3f,dielectricF90:f32)->MargoSSR {
+let nv=clamp(dot(n,v),1e-4,1.0);let f0=mix(dielectricF0,base,metal);let f90=mix(dielectricF90,1.0,metal);
+${ibl ? 'let ab=iblBrdfTerms(nv,rough);let w=f0*ab.x+f90*ab.y;' : 'let r=rough*vec4f(-1,-0.0275,-0.572,0.022)+vec4f(1,0.0425,1.04,-0.04);let k=min(r.x*r.x,exp2(-9.28*nv))*r.x+r.y;let w=f0*(r.z-1.04*k)+f90*(r.w+1.04*k);'}${
   probes
     ? 'let e=probeSpecular(margoPosition,n,v,rough)*w;'
     : ibl
@@ -80,7 +81,7 @@ const modelTail = (code: string) =>
   (pbrSurface.test(code)
     ? `
 struct MargoCapture {@location(0) specular:vec4f,@location(1) weight:vec4f,@location(2) normal:vec4f}
-fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {let m=margoSSR(s.n,v,s.base.rgb,s.metal,s.roughness);let o=k*s.occlusion;return MargoCapture(vec4f(m.specular.rgb*o,m.specular.a),vec4f(m.weight.rgb*o,1),m.normal);}
+fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {let m=margoSSRFresnel(s.n,v,s.base.rgb,s.metal,s.roughness,${code.includes(' f0:vec3f') ? 's.f0' : 'vec3f(0.04)'},${code.includes(' sw:f32') ? 's.sw' : '1.0'});let o=k*s.occlusion;return MargoCapture(vec4f(m.specular.rgb*o,m.specular.a),vec4f(m.weight.rgb*o,1),m.normal);}
 `
     : '');
 const lit = (code: string) => code.includes('let margoAmbient=') && code.includes('fn iblBrdfTerms(');

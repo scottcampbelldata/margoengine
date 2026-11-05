@@ -18,6 +18,13 @@ const skyText = (text) => text.replace(gradient, 'margoSkyHook($1)').replaceAll(
 const hasGradient = (text) => text !== undefined && new RegExp(gradient.source).test(text);
 // Keep the miss-only replacement closures outside the hot cache lookup's function context.
 function composeLightPBR(code, hooks, cache) {
+  // Hooks read the dielectric Fresnel ends as s.f0 and s.sw. A Surface without those fields has the glTF defaults.
+  const dielectric = (text) =>
+    text &&
+    (code.includes(' f0:vec3f') ? text : text.replaceAll('s.f0', 'vec3f(0.04)')).replaceAll(
+      's.sw',
+      code.includes(' sw:f32') ? 's.sw' : '1.0',
+    );
   let out = code;
   // A hook may return its anchor unchanged, so a miss is tested on the anchor, not on the result.
   const edit = (from, to) => {
@@ -37,8 +44,8 @@ function composeLightPBR(code, hooks, cache) {
     if (layered) {
       const n = out.split('fn margoLocal').length - 1;
       edit('var color=', `var color=margoLocal${n}(i,margoFront(s),v)+`);
-      out += `\nfn margoLocal${n}(i:Out,s:Surface,v:vec3f)->vec3f {return ${hooks.light};}\n`;
-    } else edit('var color=', 'var color=' + hooks.light + '+');
+      out += `\nfn margoLocal${n}(i:Out,s:Surface,v:vec3f)->vec3f {return ${dielectric(hooks.light)};}\n`;
+    } else edit('var color=', 'var color=' + dielectric(hooks.light) + '+');
   }
   // A sky hook composed before: an ambient hook that falls back to the built-in sky (light probes) uses the hook's sky
   // there; one that does not (image-based light) leaves the sky ambient in place, so the two add.
@@ -49,12 +56,12 @@ function composeLightPBR(code, hooks, cache) {
     if (layered)
       edit(
         'fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return vec3f(0);}',
-        () => `fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return ${hooks.ambient};}`,
+        () => `fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return ${dielectric(hooks.ambient)};}`,
       );
     edit(
       /var color=([^;]+)\+s\.emissive;/,
       (_, terms) =>
-        `let margoAmbient=${layered ? 'margoAmbientLayers(i,s,v)' : hooks.ambient};var color=${terms}+s.emissive+margoAmbient;`,
+        `let margoAmbient=${layered ? 'margoAmbientLayers(i,s,v)' : dielectric(hooks.ambient)};var color=${terms}+s.emissive+margoAmbient;`,
     );
   }
   // Physical materials (gltf-pro's layers) light their clearcoat and sheen through these two functions.

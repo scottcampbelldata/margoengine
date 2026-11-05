@@ -177,17 +177,6 @@ does not own. Each entry says exactly what is needed to close it.
   `--msaa` passes there. Two views still stream tiles into different pages, so a fixed cull order makes each view
   steady, and two views can still differ at 4x MSAA.
 
-### `KHR_materials_specular` weight does not reach ambient light on gltf-pro's native paths
-
-- **What:** direct light and the `Transmission` pass follow the spec since 2026-11-05 (`specular * (f0 + (1 - f0) * (1 - v.h)^5)`,
-  base weighted by one number). Ambient light from an ambient hook does not: `environment`, `sky` and `clustered` take base
-  and metal only, so they use F0 0.04 and F90 1 whatever the specular or IOR. A surface with specular 0 under an IBL still
-  reflects. The built-in hemisphere ambient does read the weighted F0.
-- **Repro:** a material with `KHR_materials_specular: {specularFactor: 0}` through `loadGLTF`, lit by an `Environment`.
-- **Cause:** the hook calls in `packages/environment/src/lighting.ts`, `packages/sky/src/lighting.ts` and `clustered`.
-- **Needed to close:** either hooks that take F0 and F90, or gltf-pro evaluating each hook on modified surfaces as it does for
-  thin film (`margoAmbientLayers`), with a shader variant so only these materials pay for the extra hook calls.
-
 ### gltf-pro's native tint draw reads factors, never maps
 
 - **What:** transmitted light on the default path (no `install`, no `Transmission`) is a multiply draw that binds no

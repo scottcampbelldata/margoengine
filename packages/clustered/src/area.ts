@@ -59,7 +59,7 @@ fn areaIntegral(m:mat3x3f,a:vec3f,b:vec3f,c:vec3f,d:vec3f)->f32 {
   let sum=areaClip(p0,p1,&leave,&enter)+areaClip(p1,p2,&leave,&enter)+areaClip(p2,p3,&leave,&enter)+areaClip(p3,p0,&leave,&enter);
   return sum+areaEdge(areaUnit(leave),areaUnit(enter));
 }
-fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughness:f32,metal:f32)->vec3f {
+fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughness:f32,metal:f32,dielectricF0:vec3f,dielectricF90:f32)->vec3f {
   let st=vec2f(clamp(roughness,0.045,1.0),sqrt(1-nv))*${ltcSize - 1}.0;let t1=vec4f(areaLut(st,0u),areaLut(st,1u));let t2=areaLut(st,2u);
   var t=v-n*dot(n,v);if(dot(t,t)<1e-8){t=cross(n,select(vec3f(1,0,0),vec3f(0,0,1),abs(n.x)>0.5));}
   let x=normalize(t);let local=transpose(mat3x3f(x,cross(n,x),n));
@@ -71,8 +71,8 @@ fn clusterAreaLighting(position:vec3f,n:vec3f,v:vec3f,nv:f32,base:vec3f,roughnes
     let a=c-r-u;let b=c-r+u;let e=c+r+u;let d=c+r-u;${shadow ? `let radiance=light.color.rgb${shadow};` : ''}
     specular+=${shadow ? 'radiance' : 'light.color.rgb'}*max(side*areaIntegral(lobe,a,b,e,d),0.0);diffuse+=${shadow ? 'radiance' : 'light.color.rgb'}*max(side*areaIntegral(local,a,b,e,d),0.0);
   }
-  let f0=mix(vec3f(0.04),base,metal);
-  return (f0*t2.x+(1-f0)*t2.y)*specular+(1-metal)*base*diffuse;
+  let f0=mix(dielectricF0,base,metal);
+  return (f0*t2.x+(mix(dielectricF90,1.0,metal)-f0)*t2.y)*specular+(1-metal)*base*diffuse;
 }
 `;
 /**

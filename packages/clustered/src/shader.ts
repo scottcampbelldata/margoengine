@@ -49,7 +49,7 @@ const directionalLoop = (shadow: string) => /* wgsl */ `
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
     let d=${ggxD};
     let g=${smithG};
-    let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
+    let f0=mix(dielectricF0,base,metal);let fresnel=f0+(mix(dielectricF90,1.0,metal)-f0)*pow(1-vh,5.0);
     result+=${clusterBrdf}*nl*light.color.rgb${shadow};
   }`;
 /** Light-loop hooks beyond shadows and area lights: `Clustered.directional`, `Clustered.ies` and `Clustered.projector`. */
@@ -102,7 +102,7 @@ export function clusteredSampling(
     /* wgsl */ `
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;${receive ? '\nvar<private> clusterReceive=true;' : ''}
-fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,roughness:f32,metal:f32)->vec3f {
+fn clusterLighting(pixel:vec2f,position:vec3f,n:vec3f,eye:vec3f,base:vec3f,roughness:f32,metal:f32,dielectricF0:vec3f,dielectricF90:f32)->vec3f {
 ${/* @__PURE__ */ clusterCell('position')}
   let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;
   for(var j=0u;j<count;j++){
@@ -111,11 +111,11 @@ ${/* @__PURE__ */ clusterCell('position')}
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
     let d=${ggxD};
     let g=${smithG};
-    let f0=mix(vec3f(0.04),base,metal);let fresnel=f0+(1-f0)*pow(1-vh,5.0);
+    let f0=mix(dielectricF0,base,metal);let fresnel=f0+(mix(dielectricF90,1.0,metal)-f0)*pow(1-vh,5.0);
     ${decay ? decayTerms : legacyTerms}
     result+=${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}${hook ? term('clusterShadow(light,position,n)') : ''}${shadows ? term('clusterShadowVisibility(light,position,n)') : ''};
   }${directional ? directionalLoop(directionalShadow ? term(directionalShadow) : '') : ''}
-  return ${area ? '(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal))' : 'result'}*clusterFrame.intensity.x;
+  return ${area ? '(result+clusterAreaLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90))' : 'result'}*clusterFrame.intensity.x;
 }`;
   return shadows ? localShadowSampling(group) + code : code;
 }

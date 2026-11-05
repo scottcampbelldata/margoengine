@@ -74,7 +74,7 @@ test('the shadow catcher counts castShadow directional and area lights against u
   assert.ok(code.includes('*clusterDirectionalShadow(j,position,n,l)'), 'the lit loop keeps the directional shadow');
   assert.ok(code.includes('*clusterAreaShadow(j,position,n,c,r,u)'), 'the lit area lights keep theirs');
   assert.ok(lights && !lights.includes('clusterDirectionalShadow'), 'the unshadowed loop drops the directional factor');
-  assert.ok(lights.includes('margoCatcherArea(position,n,v,nv,base,roughness,metal)'), 'and calls the open area copy');
+  assert.ok(lights.includes('margoCatcherArea(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)'), 'and calls the open area copy');
   assert.ok(area && !area.includes('clusterAreaShadow'), 'the area copy has no shadow factor');
   assert.ok(code.includes('lit+=dot(clusterLighting(') && code.includes('all+=dot(margoCatcherLights('));
 });

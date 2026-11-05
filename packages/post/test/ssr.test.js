@@ -145,7 +145,7 @@ test('SSR replaces the IBL specular from EnvironmentLighting (margoAmbient + its
   assert.equal(code.length, 1);
   assert.match(
     code[0],
-    /let ab=iblBrdfTerms\(nv,rough\);let w=f0\*ab\.x\+ab\.y;let e=iblPrefiltered\(iblSpecular,iblSampler,iblParams,reflect\(-v,n\),rough\)\*w\*iblParams\.w;/,
+    /let ab=iblBrdfTerms\(nv,rough\);let w=f0\*ab\.x\+f90\*ab\.y;let e=iblPrefiltered\(iblSpecular,iblSampler,iblParams,reflect\(-v,n\),rough\)\*w\*iblParams\.w;/,
   );
 });
 

@@ -398,6 +398,8 @@ Known rendering gaps:
 - Visual profiles do not cover every GPU/browser/OS combination.
 - Compatibility path-tracer kernels remain outside the supported compilation budget.
 
+
+**Dielectric Fresnel ends in lighting hooks (2026-11-05).** Ambient and local-light hooks read `s.f0` and `s.sw` (F0 and F90 of `KHR_materials_ior` and `KHR_materials_specular`); `lightPBR` writes the glTF defaults into shaders whose `Surface` has no such fields, so plain materials keep their numbers. Evidence: `tests/specular-ambient.test.js` and the `environment` browser check (specular 0 on a black dielectric reflects exactly 0 under an IBL).
 ## 4. Quality architecture
 
 ### 4.1 Gate map

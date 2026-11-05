@@ -252,12 +252,12 @@ fn probeSpecular(p:vec3f,n:vec3f,v:vec3f,rough:f32)->vec3f {
 }
 // The receiver's ambient term with the probes: diffuse from the volume, specular from the reflection probes, the rest from
 // the environment (or \`ambient\`, the receiver's own ambient, without one). Split-sum weights as EnvironmentLighting.
-fn probeShade(p:vec3f,n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32,ambient:vec3f)->vec3f {
-  let nv=clamp(dot(n,v),1e-4,1.0);let f0=mix(vec3f(0.04),base,metal);
+fn probeShade(p:vec3f,n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32,ambient:vec3f,dielectricF0:vec3f,dielectricF90:f32)->vec3f {
+  let nv=clamp(dot(n,v),1e-4,1.0);let f0=mix(dielectricF0,base,metal);let f90=mix(dielectricF90,1.0,metal);
   ${
     environment
-      ? 'let ab=iblBrdfTerms(nv,rough);let sw=f0*ab.x+ab.y;'
-      : 'let c=rough*vec4f(-1,-0.0275,-0.572,0.022)+vec4f(1,0.0425,1.04,-0.04);let a=min(c.x*c.x,exp2(-9.28*nv))*c.x+c.y;let sw=f0*(c.z-1.04*a)+(c.w+1.04*a);'
+      ? 'let ab=iblBrdfTerms(nv,rough);let sw=f0*ab.x+f90*ab.y;'
+      : 'let c=rough*vec4f(-1,-0.0275,-0.572,0.022)+vec4f(1,0.0425,1.04,-0.04);let a=min(c.x*c.x,exp2(-9.28*nv))*c.x+c.y;let sw=f0*(c.z-1.04*a)+f90*(c.w+1.04*a);'
   }
   let diffuse=(1.0-sw)*(1.0-metal)*base;let e=probeIrradiance(p,n);
   ${environment ? 'let fallback=diffuse*iblIrradiance(iblSh,iblRotate(n,iblParams))*iblParams.w;' : 'let fallback=ambient;'}
@@ -672,7 +672,7 @@ export class LightProbes extends ShaderEffect {
         fallback = env
           ? 'vec3f(0)'
           : `${base}*(1.0-i.material.y)*${sky ? HEMISPHERE_TERM : `frame.radiance.w${color}`}`;
-      return `let margoAmbient=probeShade(i.position,n,v,${base},i.material.y,i.material.x,${fallback});let linear=${(sky ? terms.replace(`*${HEMISPHERE_TERM}`, '*0.0') : terms).replace('frame.radiance.w', '0.0')}+margoAmbient;`;
+      return `let margoAmbient=probeShade(i.position,n,v,${base},i.material.y,i.material.x,${fallback},vec3f(0.04),1.0);let linear=${(sky ? terms.replace(`*${HEMISPHERE_TERM}`, '*0.0') : terms).replace('frame.radiance.w', '0.0')}+margoAmbient;`;
     });
     return code === source ? source : shadingWgsl(group, env) + code;
   }
@@ -681,10 +681,10 @@ export class LightProbes extends ShaderEffect {
     // Ground (0.35, 0.3, 0.25) and the 0.5 specular weight are Margo design choices.
     const ambient = this.environment
       ? 'vec3f(0)'
-      : '(s.base.rgb*(1.0-s.metal)+mix(vec3f(0.04),s.base.rgb,s.metal)*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w';
+      : '(s.base.rgb*(1.0-s.metal)+mix(s.f0,s.base.rgb,s.metal)*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w';
     return {
       declarations: shadingWgsl(group, !!this.environment),
-      ambient: `probeShade(i.position,s.n,v,s.base.rgb,s.metal,s.roughness,${ambient})*s.occlusion`,
+      ambient: `probeShade(i.position,s.n,v,s.base.rgb,s.metal,s.roughness,${ambient},s.f0,s.sw)*s.occlusion`,
     };
   }
   /** Adds the probe lighting to a model (gltf-pro, materials, terrain); models with a `draw` method are also captured by `bake`. */

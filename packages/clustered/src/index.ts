@@ -438,7 +438,7 @@ export class Clustered implements EnginePlugin {
     if (!hook) {
       hook = {
         declarations: this.sampling(group, shadows),
-        light: 'clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)',
+        light: 'clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal,s.f0,s.sw)',
       };
       this.hooks.set(key, hook);
     }
@@ -466,12 +466,12 @@ export class Clustered implements EnginePlugin {
     const base = source.includes('let base=terrainColor') ? 'base' : 'i.color';
     let code = source.replace(
       /let linear=([^;]+);/,
-      `${receive ? `clusterReceive=${coreReceives};` : ''}let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y);`,
+      `${receive ? `clusterReceive=${coreReceives};` : ''}let linear=$1+clusterLighting(i.clip.xy,i.position,n,frame.eye.xyz,${base},i.material.x,i.material.y,vec3f(0.04),1.0);`,
     );
     if (code === source)
       code = source.replace(
         'var color=',
-        'var color=clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal)+',
+        'var color=clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal,vec3f(0.04),1.0)+',
       );
     if (code === source)
       throw new MargoError(

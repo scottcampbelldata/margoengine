@@ -103,7 +103,7 @@ struct ProbePoint {position:vec4f,normal:vec4f}
 @compute @workgroup_size(64) fn probeMain(@builtin(global_invocation_id) id:vec3u){
   if(id.x>=arrayLength(&probePoints)){return;}
   let p=probePoints[id.x];
-  probeOut[id.x]=vec4f(clusterLighting(vec2f(0.5),p.position.xyz,normalize(p.normal.xyz),probeEye.xyz,vec3f(1),1.0,0.0),1);
+  probeOut[id.x]=vec4f(clusterLighting(vec2f(0.5),p.position.xyz,normalize(p.normal.xyz),probeEye.xyz,vec3f(1),1.0,0.0,vec3f(0.04),1.0),1);
 }`;
 async function messages(code: string): Promise<string[]> {
   const info = await device.createShaderModule({ code }).getCompilationInfo();

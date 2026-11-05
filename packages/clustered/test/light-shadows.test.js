@@ -86,15 +86,15 @@ test('without castShadow, directional and area lights leave the pre-shadow shade
   ]);
   h.frame();
   h.frame();
-  assert.equal(hash(h.context.shader), '57351b0799ae4b6b0e4e483d984ab5a7de559eb33e43e853688d10016f3d6380');
-  assert.equal(hash(lights.pbr(2).declarations), '19d6130b6257e569a8b09076f93c43fd79cfce1e515a37dbd11b77ecf8817233');
+  assert.equal(hash(h.context.shader), '8c07cea6bbbf971d9e5a76c486388af01266b521d93bf2c92414ca329eecafde');
+  assert.equal(hash(lights.pbr(2).declarations), '5f04d99ef6c255ebbd5e7b1c160d8f676abdc1f0cd91cadc692b97dff03c47b4');
   assert.equal(
     hash(lights['unshadowed'].pbr(2).declarations),
-    'a0ff7a0330d335a7e90114d47363f26fe511bb59e263bc35023358ff018c9edf',
+    '4303e6aa03e3fc10f8ccdc506061872966e0bdfde025d84220982e25898465ce',
   );
   assert.equal(
     hash(clusteredSampling(0, local, area, false, false, true, { directional: sun })),
-    '4c23c13a8233b585cbf452585f5fe33fccceb61a4c048876e8740cb0a93969d5',
+    'e51a8c7a2340af090240ba3ab8808da472becf29e3a7eca2762ad4ce6cf32710',
   );
   assert.equal(hash(local.declarations(2)), '961f6b98277b21a35fb25375081db417e5364bb85c5b1ef39d54d879d1e76c6d');
   assert.deepEqual(

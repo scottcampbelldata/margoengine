@@ -87,7 +87,7 @@ test('area lights add shader code, binding 17 and one buffer only while there ar
     area.setLights([{ position: [0, 2, 0], direction: [0, -1, 0], width: 2, height: 1, intensity: 5 }]);
     const lit = frame();
     assert.match(lit.shader, /@binding\(17\) var<storage,read> areaLights/);
-    assert.match(lit.shader, /\(result\+clusterAreaLighting\(position,n,v,nv,base,roughness,metal\)\)\*clusterFrame/);
+    assert.match(lit.shader, /\(result\+clusterAreaLighting\(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90\)\)\*clusterFrame/);
     assert.deepEqual(lit.bindings, [...plain.bindings, 17]);
     assert.equal(h.counts.buffers, buffers + 1);
     assert.match(lights.pbr(2).declarations, /@group\(2\) @binding\(17\)/);

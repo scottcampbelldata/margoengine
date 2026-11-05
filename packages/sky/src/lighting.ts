@@ -34,11 +34,11 @@ fn skyIrradiance(n:vec3f)->vec3f {
 }
 // Diffuse sky light plus split-sum specular (Karis 2013): the sky map blurred through its mips by roughness, times
 // Karis's analytic environment BRDF (2014) instead of a lookup table.
-fn skyLighting(n:vec3f,v:vec3f,base:vec3f,metal:f32,roughness:f32)->vec3f {
+fn skyLighting(n:vec3f,v:vec3f,base:vec3f,metal:f32,roughness:f32,dielectricF0:vec3f,dielectricF90:f32)->vec3f {
  let rough=clamp(roughness,0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let r=reflect(-v,n);
  let k=rough*vec4f(-1.0,-0.0275,-0.572,0.022)+vec4f(1.0,0.0425,1.04,-0.04);
  let a=min(k.x*k.x,exp2(-9.28*nv))*k.x+k.y;let ab=vec2f(-1.04,1.04)*a+k.zw;
- let specular=mix(vec3f(0.04),base,metal)*ab.x+ab.y;
+ let specular=mix(dielectricF0,base,metal)*ab.x+mix(dielectricF90,1.0,metal)*ab.y;
  let uv=vec2f(atan2(r.z,r.x)/6.2831853+0.5,acos(clamp(r.y,-1.0,1.0))/3.14159265);
  return (vec3f(1.0)-specular)*(1.0-metal)*base*skyIrradiance(n)+textureSampleLevel(skyLightMap,skyLightSampler,uv,rough*3.0).rgb*specular;
 }
@@ -148,7 +148,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
         if (!value) {
           value = {
             declarations: declarations.replaceAll('@group(0)', `@group(${group})`),
-            ambient: 'skyLighting(s.n,v,s.base.rgb,s.metal,s.roughness)*s.occlusion',
+            ambient: 'skyLighting(s.n,v,s.base.rgb,s.metal,s.roughness,s.f0,s.sw)*s.occlusion',
           };
           hooks.set(group, value);
         }
@@ -193,7 +193,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
               "Sky ambient requires the standard PBR shader; remove the plugin that replaced core's shader",
             );
           // Core's constant ambient term drops out; margoAmbient carries the sky's diffuse and specular light.
-          const linear = `let margoAmbient=skyLighting(n,v,i.color,i.material.y,i.material.x);let linear=${anchor[1].replace('frame.radiance.w', '0.0')}+margoAmbient;`;
+          const linear = `let margoAmbient=skyLighting(n,v,i.color,i.material.y,i.material.x,vec3f(0.04),1.0);let linear=${anchor[1].replace('frame.radiance.w', '0.0')}+margoAmbient;`;
           source = c.shader;
           shader = declarations + c.shader.replace(anchor[0], () => linear);
         }

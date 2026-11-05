@@ -115,7 +115,7 @@ test('SSAO replays the RGB ambient and Sky replaces the constant ambient with it
     // The engine's constant ambient term drops to zero; margoAmbient (SH diffuse plus sky reflections) replaces it.
     assert.match(
       h.context.shader,
-      /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x\);let linear=[^;]*i\.color\*\(1\.0-i\.material\.y\)\*0\.0\*frame\.ambient\.rgb\+margoAmbient;/,
+      /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);let linear=[^;]*i\.color\*\(1\.0-i\.material\.y\)\*0\.0\*frame\.ambient\.rgb\+margoAmbient;/,
     );
   } finally {
     ssao.dispose();

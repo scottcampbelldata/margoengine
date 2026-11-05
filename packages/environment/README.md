@@ -494,7 +494,7 @@ Five bindings, any group and binding numbers. `iblLayoutEntries(firstBinding)` a
   `diffuse = albedo * max(0, sum_k c_k * Y_k(n))`
 
   with `Y_0 = 0.282094792`, `Y_1 = 0.488602512 n.y`, `Y_2 = 0.488602512 n.z`, `Y_3 = 0.488602512 n.x`, `Y_4 = 1.092548431 n.x n.y`, `Y_5 = 1.092548431 n.y n.z`, `Y_6 = 0.315391565 (3 n.z^2 - 1)`, `Y_7 = 1.092548431 n.x n.z`, `Y_8 = 0.546274215 (n.x^2 - n.y^2)`. The plain radiance projection `L_k` is at byte offset 256 of the same buffer (and in `environment.sh.radiance`); `c_k = L_k * A_l / PI` with `A_l / PI = 1, 2/3, 1/4` for bands 0, 1, 2.
-- **Combined.** `iblShade(specular, sampler, sh, params, n, v, baseColor, metalness, roughness)` returns `(diffuse * (1 - F) * (1 - metalness) + prefiltered * F) * intensity` with `F = F0 * scale + bias` and `F0 = mix(0.04, baseColor, metalness)`. It outputs linear radiance; tone map like core.
+- **Combined.** `iblShade(specular, sampler, sh, params, n, v, baseColor, metalness, roughness, dielectricF0, dielectricF90)` returns `(diffuse * (1 - F) * (1 - metalness) + prefiltered * F) * intensity` with `F = F0 * scale + F90 * bias`, `F0 = mix(dielectricF0, baseColor, metalness)` and `F90 = mix(dielectricF90, 1, metalness)`. Pass `vec3f(0.04), 1.0` for a plain metal/rough material; gltf-pro passes the F0 and F90 that `KHR_materials_ior` and `KHR_materials_specular` set. It outputs linear radiance; tone map like core.
 - **Conventions.** Cube layers are +X, -X, +Y, -Y, +Z, -Z (WebGPU). Equirect `u = 0.5 + atan2(d.x, -d.z) / 2PI` (image center faces -Z), `v = acos(d.y) / PI` (row 0 is +Y).
 
 ## Options
