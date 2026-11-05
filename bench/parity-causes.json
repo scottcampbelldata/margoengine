@@ -116,8 +116,8 @@
     ]
   },
   "12.7": {
-    "cause": "every cloneModel copy repacked its vertices (now shared per asset), core Engine.remove scanned every slot of the parent column for each removed mesh (now each mesh keeps its children), and every copy uploaded its own vertex and index buffers, re-baked its static parts and made a view and sampler per map slot (now counted per asset, reused and cached). Still slower (CPU profile): installBatches runs two engine-wide kernel ticks per model, quadratic in the copies (about 6.5 of 17.6 ms), then per-copy uniforms and bind groups and core node creation; three clones on the CPU only",
-    "knownBug": "clonemodel-two-engine-wide-ticks-per-copy",
+    "cause": "two ticks per copy became one (perf-history entry 59): 16.8 -> 14.3 ms against three's 8.1, busy machine. Before that: every cloneModel copy repacked its vertices (now shared per asset), core Engine.remove scanned every slot of the parent column for each removed mesh (now each mesh keeps its children), and every copy uploaded its own vertex and index buffers, re-baked its static parts and made a view and sampler per map slot (now counted per asset, reused and cached). Still slower (CPU profile): installBatches runs two engine-wide kernel ticks per model, quadratic in the copies (about 6.5 of 17.6 ms), then per-copy uniforms and bind groups and core node creation; three clones on the CPU only",
+    "knownBug": "clonemodel-one-engine-wide-tick-per-copy",
     "fixes": [
       {
         "commit": "63a7edec",

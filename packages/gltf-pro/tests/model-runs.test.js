@@ -161,6 +161,36 @@ test('copies of one asset share their baked static batch arrays and its buffers'
   assert.notEqual(moved['staticBatches'][0].primitive.vertices, one.primitive.vertices, 'another pose bakes anew');
 });
 
+test('a model with a static batch costs one engine tick to set up, and its first draw still finds the batch node placed', async (t) => {
+  // p-skeleton-clone: two ticks per copy, and a tick runs every mesh of the engine.
+  const f = await fixture(t),
+    doc = { ...f.doc, materials: [{}], nodes: [{ mesh: 0 }, { mesh: 0, translation: [3, 0, 0] }] },
+    a = parseGLTF(f.engine, doc, f.buffers);
+  if (f.engine.plugins.get(a.name) !== a) f.engine.use(a);
+  const store = f.engine.store,
+    tick = store.tick;
+  let ticks = 0;
+  store.tick = function (...args) {
+    ticks++;
+    return tick.apply(this, args);
+  };
+  t.after(() => {
+    store.tick = tick;
+  });
+  const b = new PBRModel(f.engine, a.asset, []);
+  b.root.setPosition([0, 2, 0]);
+  f.engine.use(b);
+  assert.equal(ticks, 1, 'one tick before baking, none after');
+  const [batch] = b['staticBatches'];
+  assert.ok(batch, 'the copy bakes its two parts');
+  f.frame();
+  assert.deepEqual([...batch.node.matrix], [...b.root.matrix], 'a draw with no engine tick publishes the batch node');
+  assert.equal(batch.node.matrix[13], 2);
+  ticks = 0;
+  f.frame();
+  assert.equal(ticks, 0, 'a published batch node asks for no tick');
+});
+
 test('copies of one textured asset compile the mip pipelines once per device', async (t) => {
   // p-morph: every cloneModel copy kept its own mip pipelines (gpuCache is per model), so 100 copies created 200
   // shader modules and pipelines, compiled while the first frame waited (a 300 ms first frame).

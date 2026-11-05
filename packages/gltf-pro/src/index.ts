@@ -2479,7 +2479,7 @@ export class PBRModel implements EnginePlugin {
         this.created.push(node);
         return node;
       });
-      this.engine.store.tick(false);
+      // No tick for the batch nodes: a tick runs every mesh of the engine, and the next one publishes them (`pose`).
     }
     if (this.resources.some((r) => r.batch)) return;
     const byPrimitive = new Map(this.resources.map((r) => [r.primitive, r]));
@@ -2511,7 +2511,16 @@ export class PBRModel implements EnginePlugin {
   /** True while every baked part still has the captured root-relative pose, material and visibility, and is in `context`'s view. */
   private pose(batch: StaticBatch, context?: Context): boolean {
     this.relative ??= new Float32Array(16);
-    if (!invertMatrixStable(this.root.matrix, this.inverse, this.workspace)) return false;
+    // A batch node sits at the root. It differs only before its first tick, which every engine frame and pick has run
+    // by now: this serves a draw made without one (`frameGraph.execute`).
+    const root = this.root.matrix,
+      own = batch.node.matrix;
+    for (let c = 0; c < 16; c++)
+      if (own[c] !== root[c]) {
+        this.engine.store.tick(false);
+        break;
+      }
+    if (!invertMatrixStable(root, this.inverse, this.workspace)) return false;
     const relative = this.relative;
     for (let i = 0; i < batch.parts.length; i++) {
       const part = batch.parts[i],

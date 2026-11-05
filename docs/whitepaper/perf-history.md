@@ -631,7 +631,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   | --- | --- | --- | --- |
   | `p-skeleton-clone`, ms a call | 47.9 | 17.6 | 7.8 (WebGL), slower |
 
-  Still open, in [known-bugs.md](../known-bugs.md#clonemodel-two-engine-wide-ticks-per-copy): `installBatches`
+  Still open, in [known-bugs.md](../known-bugs.md#clonemodel-one-engine-wide-tick-per-copy): `installBatches`
   runs two engine-wide kernel ticks per model, quadratic in the copies (about 6.5 ms), then per-copy uniforms and bind
   groups and core node creation.
 - **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity --cases=p-skeleton-clone
@@ -1558,6 +1558,20 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, "a plain material keeps its shader and pipeline between
   frames, and every edit still shows" (fails with the kept path disabled); `tests/replica.test.js` caught mirrored
   instances, which is why instances stay out.
+
+### 59. `cloneModel`: one tick per copy, not two
+
+- **Loss:** `p-skeleton-clone` 16.8 ms a call against three's 8.1 (run `20261105-234620`).
+- **Cause:** `installBatches` ran a tick before baking and another to publish the new batch nodes, and a tick runs every
+  mesh of the engine: 100 ticks a call, 6.4 ms, measured by timing `store.tick` in the scene.
+- **Fix:** the tick after baking is gone. Every engine frame and pick ticks before it draws, which publishes the batch
+  nodes. A batch node sits at its model's root, so `PBRModel.pose`, which draws and shadows both pass through, ticks if
+  the two differ: that serves a draw made with no tick (`frameGraph.execute`), and an engine frame never reaches it.
+- **After:** 14.3 ms against 8.1 (run `20261105-235810`, `--no-gate`, busy machine, diagnostic). The planned baking on
+  first use was not built: the tick before baking also publishes node matrices that code may read right after loading.
+- **Left:** see [known-bugs.md](../known-bugs.md#clonemodel-one-engine-wide-tick-per-copy).
+- **Rerun:** `node bench/cli.mjs parity --cases=p-skeleton-clone --engines=margo,three-webgl-parity --runs=3`.
+- **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, "a model with a static batch costs one engine tick to set up".
 
 ## Open losses
 
