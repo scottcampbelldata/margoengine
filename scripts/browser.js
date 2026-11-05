@@ -467,6 +467,9 @@ export async function openBrowser({
   ),
   reassociate = process.env.MARGO_REASSOCIATE_MATH === '1' || process.argv.includes('--reassociate-math'),
   compat = compatRun(),
+  // A caller that tests the browser harness or the page, not the GPU (tests/page-ready.test.js), runs on whatever adapter
+  // the machine has, including a software one on a runner without a GPU.
+  softwareAdapterOk = false,
 } = {}) {
   await mkdir('test-results', { recursive: true });
   const { server, close: stopServer } = await startDevServer({ startPath, aliases, plugins, port }),
@@ -560,9 +563,10 @@ export async function openBrowser({
         await server.waitForRequestsIdle();
       }
     }
-    if (browserName === 'chromium') {
-      // A real-GPU check never runs on SwiftShader by accident (MARGO_SOFTWARE_GPU=1 asks for it).
-      const refusal = softwareAdapterReason(resolveBrowser({ name: channel }), hardware.webgpu);
+    if (browserName === 'chromium' && !softwareAdapterOk) {
+      // A real-GPU check never runs on SwiftShader by accident (MARGO_SOFTWARE_GPU=1 or an explicit
+      // --use-webgpu-adapter=swiftshader in BROWSER_ARGS asks for it).
+      const refusal = softwareAdapterReason(resolveBrowser({ name: channel }), hardware.webgpu, { args });
       if (refusal) throw new Error(refusal);
     }
     hardware.browserName = browserName;

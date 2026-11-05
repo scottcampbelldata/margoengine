@@ -32,7 +32,13 @@ test('a page whose last module the dev server serves late: the fixed wait fails,
 }, async () => {
   const asked = Promise.withResolvers(),
     release = Promise.withResolvers();
-  const browser = await openBrowser({ startPath: '/held.html', plugins: [held({ asked, release })], port: 'free' });
+  // The page is plain HTML: no GPU is needed, so a runner's software adapter is fine here.
+  const browser = await openBrowser({
+    startPath: '/held.html',
+    plugins: [held({ asked, release })],
+    port: 'free',
+    softwareAdapterOk: true,
+  });
   try {
     const { page } = browser;
     await asked.promise;

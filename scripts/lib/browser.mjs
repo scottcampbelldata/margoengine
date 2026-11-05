@@ -99,8 +99,10 @@ export function launchArgs(browser, extra = [], { webgpu = true, gpu = gpuAdapte
  * The reason a GPU check must not run on the adapter the browser gave it, or null. A software or fallback adapter
  * (SwiftShader) is refused unless software was asked for (MARGO_SOFTWARE_GPU=1). `adapter` is the probe's `hardware.webgpu`.
  */
-export function softwareAdapterReason(browser, adapter) {
-  if (browser.software || !adapter) return null;
+export function softwareAdapterReason(browser, adapter, { args = [] } = {}) {
+  // Asked for on purpose: MARGO_SOFTWARE_GPU=1, or a launch argument that names the SwiftShader adapter (the Windows
+  // runners in .github/workflows/browser.yml pass one through BROWSER_ARGS).
+  if (browser.software || args.includes('--use-webgpu-adapter=swiftshader') || !adapter) return null;
   const soft =
     adapter.fallback === true || /swiftshader/i.test(`${adapter.architecture ?? ''} ${adapter.description ?? ''}`);
   if (!soft) return null;
