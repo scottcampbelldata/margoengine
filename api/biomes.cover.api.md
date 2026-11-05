@@ -226,6 +226,16 @@ interface Dimension {
     readonly width: number;
 }
 
+interface ErosionOptions {
+    readonly iterations?: number;
+    readonly talus?: number;
+    readonly thermal?: number;
+    readonly capacity?: number;
+    readonly incision?: number;
+    readonly deposition?: number;
+    readonly sea?: number;
+}
+
 interface GroundLayer {
     readonly material: string;
     readonly slope?: Range;
@@ -301,6 +311,10 @@ interface Region {
     readonly continentality: Int32Array;
 }
 
+interface ReliefErosionOptions extends Omit<ErosionOptions, 'sea'> {
+    readonly step?: number;
+}
+
 interface ReliefOptions {
     readonly seed?: number;
     readonly origin?: readonly [number, number];
@@ -313,6 +327,7 @@ interface ReliefOptions {
     readonly shelf?: number;
     readonly valley?: ValleyOptions;
     readonly islands?: IslandOptions;
+    readonly erosion?: ReliefErosionOptions;
 }
 
 type SizeDistribution = {

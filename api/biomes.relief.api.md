@@ -14,6 +14,7 @@ export interface Relief {
     readonly rivers: readonly RiverLine[];
     readonly valleyWidth: number;
     readonly islands: readonly ReliefIsland[];
+    readonly erosion?: Erosion;
     waterCells(origin: readonly [number, number], step: number, nx: number, nz: number): Uint8Array;
     readonly settings: Readonly<{
         seed: number;
@@ -55,6 +56,7 @@ export interface ReliefOptions {
     readonly shelf?: number;
     readonly valley?: ValleyOptions;
     readonly islands?: IslandOptions;
+    readonly erosion?: ReliefErosionOptions;
 }
 
 export type RiverLine = Int32Array;
@@ -66,4 +68,36 @@ export interface ValleyOptions {
 }
 
 export function createRelief(options?: ReliefOptions): Relief;
+
+// Not exported from this entry, but used by the exports above:
+
+interface Erosion extends HeightGrid {
+    readonly height: Int32Array;
+    readonly flow: Int32Array;
+    readonly direction: Int8Array;
+    readonly wear: Int32Array;
+    readonly deposit: Int32Array;
+    readonly outflow: number;
+}
+
+interface ErosionOptions {
+    readonly iterations?: number;
+    readonly talus?: number;
+    readonly thermal?: number;
+    readonly capacity?: number;
+    readonly incision?: number;
+    readonly deposition?: number;
+    readonly sea?: number;
+}
+
+interface HeightGrid {
+    readonly height: Int32Array;
+    readonly nx: number;
+    readonly nz: number;
+    readonly step: number;
+}
+
+interface ReliefErosionOptions extends Omit<ErosionOptions, 'sea'> {
+    readonly step?: number;
+}
 ```

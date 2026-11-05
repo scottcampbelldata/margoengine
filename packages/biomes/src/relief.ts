@@ -3,7 +3,9 @@
 // optional coast or islands and river valleys. It is the default height of a BiomeWorld and the terrain of the reference world
 // R16. Every step works on integers below 2^53 with plain arithmetic, floors and integer square roots (value and simplex noise
 // from hash.ts), which every JavaScript engine computes identically, so the same options give the same heights everywhere. Our own layout; the noise is cited in hash.ts.
-import { rangeError, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
+import type { Erosion, ReliefErosionOptions } from './erosion.js';
+import { erosionHook } from './erosion-hook.js';
 import { clampInt, divFloor, divWide, imod, isqrt, ONE, sincos } from './fixed.js';
 import { fbm, hash3, ridged } from './hash.js';
 
@@ -57,6 +59,12 @@ export interface ReliefOptions {
   readonly valley?: ValleyOptions;
   /** Islands, with `coast: 'island'` only. Default `{ count: 1 }`. */
   readonly islands?: IslandOptions;
+  /**
+   * Thermal and hydraulic erosion of the landscape on a grid over the world (`erodeRelief` of
+   * `@margoengine/biomes/erosion`, which must be loaded first; `BiomeWorld.create` loads it for a relief height with this
+   * option). Default: none.
+   */
+  readonly erosion?: ReliefErosionOptions;
 }
 
 /** A river centre line in millimetres, `[x0, z0, x1, z1, ...]`, from its mouth upstream. */
@@ -82,6 +90,8 @@ export interface Relief {
   readonly valleyWidth: number;
   /** The islands of a `coast: 'island'` relief (empty for every other coast). */
   readonly islands: readonly ReliefIsland[];
+  /** The erosion grid of a relief made with the `erosion` option (height, flow, wear, deposit), else undefined. */
+  readonly erosion?: Erosion;
   /**
    * The cells of a grid (`nx` x `nz` corner samples `step` mm apart from world `origin` in mm) along the river centre
    * lines, within half a cell: 1 for water, 0 elsewhere. Worlds take them as water sources.
@@ -255,8 +265,14 @@ export function createRelief(options: ReliefOptions = {}): Relief {
       seed: (seed + 17 * i) | 0,
     });
   }
-  // Rivers: mouth at the coast (or the low-x edge), 8 segments inland, meandering by hashed offsets. On islands each
-  // runs from the sea beyond the coast in to an eighth of the radius from the peak, in a hashed direction.
+  // How far a straight coast's shelf edge moves inland at position v along it, mm: the outline warp, 600 m at most.
+  const coastWarp = (v: number) =>
+    Math.floor(((fbm(seed + 3, divFloor(v * ONE, 3_000_000), 0, 3) - 32768) * 600_000) / 32768);
+  // Rivers: 8 segments inland from the mouth, meandering by hashed offsets. On a straight coast the mouth is on the
+  // shelf's outer edge (the sea floor), so the valley is carved across the whole shelf down to the sea: a mouth inland
+  // of the warped shore left the shelf's land between it and the sea as a ridge, closing the river in a basin. Without
+  // a coast it is a third of the shelf in from the low-x edge. On islands each runs from the sea beyond the coast in to
+  // an eighth of the radius from the peak, in a hashed direction.
   const rivers: Int32Array[] = [];
   for (let r = 0; r < count; r++) {
     const line = new Int32Array(18);
@@ -279,9 +295,15 @@ export function createRelief(options: ReliefOptions = {}): Relief {
     }
     let v = divFloor(along * (2 * r + 1), 2 * count);
     for (let k = 0; k <= 8; k++) {
-      const u = Math.floor((across * k) / 9) + (k === 0 ? Math.floor(shelf / 3) : 0);
       if (k) v += Math.floor(((hash3(seed, r, k) >>> 16) - 32768) * Math.floor(along / 14 / 32768));
       v = clampInt(v, Math.floor(along / 16), along - Math.floor(along / 16));
+      const next = Math.floor(across / 9),
+        u =
+          k > 0
+            ? Math.floor((across * k) / 9)
+            : coast === 'none'
+              ? Math.floor(shelf / 3)
+              : clampInt(coastWarp(v), 0, next);
       // Back to world coordinates.
       const [x, z] =
         coast === 'east'
@@ -380,7 +402,7 @@ export function createRelief(options: ReliefOptions = {}): Relief {
     }
     if (coast !== 'none' && !isle) {
       const [u, v] = frame(x, z),
-        warp = Math.floor(((fbm(seed + 3, lattice(v, 3_000_000), 0, 3) - 32768) * 600_000) / 32768),
+        warp = coastWarp(v),
         d = u - warp;
       if (d < shelf) {
         // Smoothstep from the sea floor at the edge to the land height at the shelf's inner end.
@@ -429,7 +451,7 @@ export function createRelief(options: ReliefOptions = {}): Relief {
     }
     return h;
   };
-  return {
+  const made: Relief = {
     height,
     rivers,
     valleyWidth: width,
@@ -448,6 +470,17 @@ export function createRelief(options: ReliefOptions = {}): Relief {
       islands: isle ? Object.freeze({ count: islandCount, radius, shelf }) : null,
     }),
   };
+  const erosion = options.erosion;
+  if (erosion === undefined) return made;
+  if (typeof erosion !== 'object' || erosion === null)
+    throw typeError('Relief erosion must be an object of erosion settings; pass {} for the defaults', 'biomes');
+  if (!erosionHook.erode)
+    throw fault(
+      'state',
+      "A relief with erosion needs the erosion entry; await import('@margoengine/biomes/erosion') first (BiomeWorld.create loads it)",
+      'biomes',
+    );
+  return erosionHook.erode(made, erosion);
 }
 
 /** Region cells along river centre lines (within half a cell), as water sources. */

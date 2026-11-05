@@ -7,6 +7,7 @@ import { BiomeWorld } from '../dist/index.js';
 import { defineBiome } from '../dist/index.js';
 import { presets, presetWorlds } from '../dist/presets.js';
 import { createRelief } from '../dist/relief.js';
+import { hydrology } from '../dist/hydrology.js';
 import { hash3, ONE, ridged, valueNoise } from '../dist/toolkit.js';
 
 const island = (extra = {}) => createRelief({ ...presetWorlds.island.relief, ...extra });
@@ -343,4 +344,43 @@ test('relief: the foot of a mountain range starts level, with no crease', () => 
   assert.ok(shares.length > 30, `${shares.length} feet`);
   const median = shares[shares.length >> 1];
   assert.ok(median < 0.12, `median rise over 20 m is ${median} of that over 80 m`);
+});
+
+test('coastal rivers reach the sea: no shelf ridge between the mouth and the shore, no closed basin (bug from job E)', () => {
+  // Before the fix the mouth sat a third of the shelf in from the world edge whatever the warped shore did: with these
+  // settings it ended at z 1,548 m at 2 m high, a 73 m shelf ridge stood between it and the shore at z 1,990 m and the
+  // hydrology filled the valley to 70.8 m.
+  const cases = [
+    { seed: 3, relief: 900, base: 300, rivers: 1, coast: 'south' },
+    ...['west', 'east', 'north', 'south'].flatMap((coast) => [1, 2, 7].map((seed) => ({ seed, coast, rivers: 2 }))),
+  ];
+  for (const settings of cases) {
+    const r = createRelief(settings),
+      [ox, oz] = r.settings.origin,
+      [sx, sz] = r.settings.size,
+      step = 16000,
+      nx = sx / step + 1,
+      nz = sz / step + 1,
+      height = new Int32Array(nx * nz);
+    for (let j = 0; j < nz; j++)
+      for (let i = 0; i < nx; i++) height[j * nx + i] = r.height(ox + i * step, oz + j * step);
+    const h = hydrology({ height, nx, nz, step }, { sea: 0 }),
+      name = JSON.stringify(settings);
+    for (const line of r.rivers) {
+      // The mouth is in the sea (or on the world's edge where the shore lies beyond it).
+      const [mx, mz] = [line[0], line[1]],
+        edge = mx === ox || mx === ox + sx || mz === oz || mz === oz + sz;
+      assert.ok(r.height(mx, mz) <= 0 || edge, `${name}: mouth in the sea or on the edge`);
+      // Along the first two segments the valley floor stays at its bed (at most 12 m): no ridge across it.
+      for (let k = 0; k < 2; k++)
+        for (let s = 0; s <= 64; s++) {
+          const x = line[2 * k] + Math.floor(((line[2 * k + 2] - line[2 * k]) * s) / 64),
+            z = line[2 * k + 1] + Math.floor(((line[2 * k + 3] - line[2 * k + 1]) * s) / 64);
+          assert.ok(r.height(x, z) <= 12000, `${name}: no ridge across the river at ${x}, ${z}`);
+          // And no lake there: the region cell nearest the line drains to the sea.
+          const c = Math.round((z - oz) / step) * nx + Math.round((x - ox) / step); // float division: test cell
+          assert.ok(h.filled[c] - height[c] < 1000, `${name}: no closed basin at ${x}, ${z}`);
+        }
+    }
+  }
 });

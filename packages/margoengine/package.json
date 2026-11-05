@@ -106,6 +106,10 @@
       "types": "./dist/biomes/seasons.d.ts",
       "import": "./dist/biomes/seasons.js"
     },
+    "./biomes/erosion": {
+      "types": "./dist/biomes/erosion.d.ts",
+      "import": "./dist/biomes/erosion.js"
+    },
     "./biomes/relief": {
       "types": "./dist/biomes/relief.d.ts",
       "import": "./dist/biomes/relief.js"

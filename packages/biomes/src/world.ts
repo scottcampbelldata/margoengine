@@ -310,8 +310,11 @@ export class BiomeWorld implements Disposable {
     const biomes = options.biomes ?? (await defaultBiomes()),
       h = options.height;
     // The procedural relief is its own entry, loaded only for worlds that use it (the default height).
-    if (h === undefined || (typeof h === 'object' && h !== null && 'relief' in h))
+    if (h === undefined || (typeof h === 'object' && h !== null && 'relief' in h)) {
       relief ??= (await import('@margoengine/biomes/relief')).createRelief;
+      // So is erosion, loaded only for a relief that asks for it.
+      if (h?.relief?.erosion) await import('@margoengine/biomes/erosion');
+    }
     // Heights and region fields are their own entry, so a program that only defines biomes never loads them.
     regionEntry ??= await import('@margoengine/biomes/region');
     // The GPU checks, bands and kernels are their own entry, loaded only for a world that may compute on a device.

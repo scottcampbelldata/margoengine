@@ -42,6 +42,32 @@ interface Climate {
     readonly radiation: readonly [number, number];
 }
 
+interface Erosion extends HeightGrid {
+    readonly height: Int32Array;
+    readonly flow: Int32Array;
+    readonly direction: Int8Array;
+    readonly wear: Int32Array;
+    readonly deposit: Int32Array;
+    readonly outflow: number;
+}
+
+interface ErosionOptions {
+    readonly iterations?: number;
+    readonly talus?: number;
+    readonly thermal?: number;
+    readonly capacity?: number;
+    readonly incision?: number;
+    readonly deposition?: number;
+    readonly sea?: number;
+}
+
+interface HeightGrid {
+    readonly height: Int32Array;
+    readonly nx: number;
+    readonly nz: number;
+    readonly step: number;
+}
+
 type HeightSource = {
     readonly samples: Int32Array | Float32Array;
     readonly width: number;
@@ -69,6 +95,7 @@ interface Relief {
     readonly rivers: readonly RiverLine[];
     readonly valleyWidth: number;
     readonly islands: readonly ReliefIsland[];
+    readonly erosion?: Erosion;
     waterCells(origin: readonly [number, number], step: number, nx: number, nz: number): Uint8Array;
     readonly settings: Readonly<{
         seed: number;
@@ -92,6 +119,10 @@ interface Relief {
     }>;
 }
 
+interface ReliefErosionOptions extends Omit<ErosionOptions, 'sea'> {
+    readonly step?: number;
+}
+
 interface ReliefIsland {
     readonly x: number;
     readonly z: number;
@@ -110,6 +141,7 @@ interface ReliefOptions {
     readonly shelf?: number;
     readonly valley?: ValleyOptions;
     readonly islands?: IslandOptions;
+    readonly erosion?: ReliefErosionOptions;
 }
 
 type RiverLine = Int32Array;

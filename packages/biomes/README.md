@@ -741,6 +741,10 @@ console.log(metres, relief.rivers.length);
 | `islands.count` | 1 | 1..8 islands, each centred from the seed |
 | `islands.radius` | a third of the shorter side | outer shelf edge on the long axis in metres, 100 m to 0.39 of the shorter side (a sixth for 2 to 4 islands, a ninth for 5 to 8) |
 | `islands.shelf` | `shelf`, else 0.3 of the radius | shelf width from the sea floor up to the beach in metres |
+| `erosion` | none | thermal and hydraulic erosion on a grid over the world, see [Erosion](#erosion); needs the `/erosion` entry loaded (a world loads it) |
+
+On a straight coast each river's mouth lies on the shelf's outer edge, under the sea, so its valley is carved across
+the whole shelf and the river always reaches the sea (or the world's edge where the warped shore lies beyond it).
 
 Each island is an ellipse (a hashed turn and stretch) warped by noise into bays and headlands, a shelf from the sea
 floor up to a beach ring 1 to 4 m above the sea and 60 to 120 m wide, then land that climbs to a peak with ridge spurs
@@ -805,6 +809,55 @@ console.log(lines.length, flow.data[0], twi.data[0], hand.data[0], lake.data[0],
 | `channelCells` | the cells of 1 km2, at least 8 | flow that makes a cell a channel |
 | `lakeDepth` | 1,000 | fill depth in mm that makes a cell a lake |
 | `multiple` | false | route `shares` over every lower neighbour; wetness reads them |
+
+## Erosion
+
+`@margoengine/biomes/erosion` wears a height grid down in integers: each round, material slides down slopes steeper than
+the angle of repose (thermal erosion), then the water of every cell runs to an outlet over the filled surface, cutting its
+bed where it can carry more than it holds and dropping the rest, and lakes fill with sediment (hydraulic erosion). A fixed
+number of rounds in a fixed order, Q16 rates and integer heights: the same grid gives the same bytes on every machine and
+in every worker. No sediment is lost to rounding: the heights' sum falls by exactly `outflow`, what the flow carried out
+through the border and the sea.
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+import { erode } from '@margoengine/biomes/erosion';
+
+// A world whose relief is eroded: BiomeWorld.create loads the entry, tiles, region and workers all see the result.
+const world = await BiomeWorld.create({ height: { relief: { coast: 'west', rivers: 1, erosion: { iterations: 48 } } } });
+
+// Any grid of millimetres, here the region grid of a world: height, flow, direction, wear and deposit come back.
+const e = erode(world.region, { sea: world.climate.sea });
+console.log(e.wear[0], e.deposit[0], e.flow[0], e.outflow);
+```
+
+`erodeRelief(relief, options)` does the same to a relief from `createRelief` (a relief made with the `erosion` option is
+already that), with its grid on the relief's corner: `relief.erosion` holds the grids, and `relief.height(x, z)` adds the
+change, bilinear between grid corners, to the relief's own heights, so the detail between corners stays. A world's region
+grid at the default 16 m is the erosion grid itself. For rivers drawn on the eroded ground, run
+`riversOf(world, hydrologyOf(world))` from `/hydrology`: it reads the eroded region.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `iterations` | 32 | rounds of thermal then hydraulic erosion, 0..1,024 |
+| `talus` | 35 | angle of repose in degrees, 0..89 |
+| `thermal` | 0.25 | share of a cell's steepest excess over the talus slope that slides per round, 0..0.5; 0 turns it off |
+| `capacity` | 0.01 | sediment a flow carries per cell drained, per mm of cell side, per unit of slope, 0..1; 0 turns hydraulic erosion off |
+| `incision` | 0.25 | share of the spare capacity a flow cuts from its bed per round, 0..1 |
+| `deposition` | 0.5 | share of the load over capacity a flow drops per round, 0..1 |
+| `sea` | none (`erode`), 0 m (relief) | mm; cells below it are outlets like the border |
+| `step` | 16 m, doubled until the world is at most 512 cells across | relief only: grid spacing in metres, 1..1,024 |
+
+| Output | Type | Meaning |
+| --- | --- | --- |
+| `height` | Int32Array, mm | the eroded heights |
+| `flow` | Int32Array, cells | cells draining through each cell, itself included |
+| `direction` | Int8Array | D8 direction (0 is +x, then clockwise) to the cell it drains to, -1 at an outlet; the filled surface never rises along it |
+| `wear`, `deposit` | Int32Array, mm | how far each cell was lowered or raised; masks for ground layers, scree and river beds |
+| `outflow` | number, mm of a cell | sediment carried out of the grid |
+
+Limits: at most 2,097,152 cells, heights within +-33,554,432 mm, cells of 1 mm to 1,048,576 mm. A relief world's erosion
+runs once on each thread that holds the world (the page and every worker replica), on a 4 km world about 257 x 257 cells.
 
 ## Seasons
 

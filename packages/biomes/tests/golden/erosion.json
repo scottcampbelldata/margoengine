@@ -1,0 +1,7 @@
+{
+  "$comment": "SHA-256 of erode output (height, flow, direction, wear, deposit bytes) and of an eroded relief world tile (erosion.test.js). A change here changes every eroded world; advance it only with a reason in the commit.",
+  "coast": "a15a27976188b2180a75f5fffddddddbe5a0219f18b95b4fe87155317dd78ffc",
+  "coastOutflow": 34234078,
+  "rough": "2876d751122104449a031b58b6f6c9b852179ea33ed56dddc36a9402e285120f",
+  "world12": "97cf07437f8e0bd7a22c345313cd144e6949ba137f78c49527b2f80b85c269b6"
+}
