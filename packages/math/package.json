@@ -64,6 +64,10 @@
       "types": "./dist/box3.d.ts",
       "import": "./dist/box3.js"
     },
+    "./obb": {
+      "types": "./dist/obb.d.ts",
+      "import": "./dist/obb.js"
+    },
     "./sphere": {
       "types": "./dist/sphere.d.ts",
       "import": "./dist/sphere.js"

@@ -2,7 +2,7 @@
 
 Import `margoengine/math` from the `margoengine` package, or `@margoengine/math` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, Sphere, Plane, Ray, Frustum, Spherical and MathUtils. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
+Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Sphere, Plane, Ray, Frustum, Spherical and MathUtils. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
 
 ```ts
 import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
@@ -17,6 +17,27 @@ Each type is its own module: `import {Vector3} from '@margoengine/math/vector3'`
 Array helpers: the other Margo packages work on plain arrays (`number[]`, `Float32Array`, `Float64Array`) rather than these classes, and share one copy of those helpers from here, each bundled into the package that uses it. `@margoengine/math/mat4`: `multiplyMatrices(a, b, out)`, `invertMatrix(m, out)` (cofactors), `invertMatrixStable(m, out, workspace?)` (pivoted, rejects non-finite input and Float32 overflow; `out` may be `m`) and `composeMatrix(t, q, s, out)`, column-major like `camera.matrix`, float64 arithmetic; the inverses return null (`out` untouched) when they fail. `@margoengine/math/quat`: `eulerToQuaternion(x, y, z)` (XYZ, like `Mesh.setRotation`), `multiplyQuaternions(a, b)`, `axisAngleToQuaternion(axis, angle)`, `conjugateQuaternion(q)`, `normalizeQuaternion(q)` and `rotateByQuaternion(v, q)`, returning new arrays, and `rotationToQuaternion(m, out?, sx?, sy?, sz?)`: the rotation of a column-major 3x3 or 4x4 (columns divided by the given scales; a negative `sx` undoes a mirror), the one conversion every package uses.
 
 Checked contracts for saved data (each reproduces Margo Voxel Studio's saved arithmetic bit for bit, `test/checked.test.js`; nothing else changes): `@margoengine/math/quat` `interpolateQuaternions(a, b, t, linearAbove)` interpolates along the shorter arc, linearly above dot `linearAbove` (0.9995 is Studio's saved curve) and spherically below, always normalized; `Quaternion.slerp` keeps its own switch. `@margoengine/math/mat4` `transformPointChecked(m, p, minW = 1e-12)` divides by w like `Vector3.applyMatrix4` but returns `{ok: false, reason, w}` for a non-finite w, |w| below `minW` or a non-finite point instead of a NaN or huge point. `@margoengine/math/affine` `decomposeAffine(matrix, tolerance = 1e-5)` returns `Matrix4.decompose`'s translation, rotation (normalized) and scale with what that reading drops: Gram-Schmidt `shear` factors, `handedness` (`'right'`, `'left'` for a reflection, `'degenerate'`), `projective`, and the recomposition `error` with `lossless` (error <= tolerance). `Matrix4.decompose` always returns parts, even for a sheared matrix; check `lossless` before treating them as the whole transform. `@margoengine/math/color` also has `parseColor(value, out?, offset?)` for the packages' `ColorInput` (`'#rrggbb'`, `'#rgb'`, `0xrrggbb` decoded from sRGB, CSS `color(display-p3 r g b)` and the `srgb`, `srgb-linear` and `display-p3-linear` spaces, or linear `[r, g, b]`). Display P3 input: `ColorSpace` has `'display-p3'` and `'display-p3-linear'` (`Color.setRGB/setHex/setHSL/setStyle/getRGB/getHex/getHSL` take them), `P3_TO_SRGB`/`SRGB_TO_P3` are the linear matrices derived from the two sets of primaries (D65), `linearP3ToLinearSRGB` and `linearSRGBToLinearP3` apply them, and colours outside sRGB keep their negative linear sRGB channels for the shaders that carry them to a wide-gamut canvas (tonemap's excess output with environment's `ColorOutput`). `clipToSRGB(rgb)` desaturates such a colour toward its luminance until no channel is negative, for inputs that take sRGB only, such as core's sun. `@margoengine/math/vec3`: `add`, `sub`, `scale`, `dot`, `cross`, `length`, `normalize` on `[x, y, z]` (new arrays). `@margoengine/math/validate`: `finiteVector(v, size, name)` throws unless `v` is `size` Float32-finite numbers. These are kept bit-for-bit identical to the package copies they replaced (`examples/package-benchmarks/proofs/math-consolidation.proof.js`), so their operand order is fixed. Bit for bit means on the same JavaScript engine: the sRGB curves use `**`, and `length`, `normalize` and `eulerToQuaternion` use `Math.hypot`, `Math.sin` and `Math.cos`, which each engine may round in its own way, so their last bit can differ between engines and versions (Node 26 on Windows computes `**` with the C library's pow, Node 22 with V8's own). Everything built only from `+ - * /` and `Math.sqrt`, such as the matrix products and inverses, gives the same bits everywhere.
+
+Oriented boxes (`OBB`, also `@margoengine/math/obb`): `center`, `halfSize` and a pure-rotation `rotation` (Matrix3).
+`fromBox3(box)` starts from an axis-aligned box and `applyMatrix4(world)` moves it (rotation, translation, mirroring,
+and scale along the box's own axes, folded into `halfSize`). Queries: `containsPoint`, `clampPoint`, `distanceToPoint`,
+`intersectsBox3`, `intersectsSphere`, `intersectsPlane`, `intersectsOBB(other, epsilon = 1e-6)` (separating-axis test
+over the 15 face and edge axes; `epsilon` keeps near-parallel edges from reporting a false gap), and `intersectRay(ray,
+out)` / `intersectsRay(ray)` (the nearest entry point, the origin when the ray starts inside, null on a miss). Touching
+boxes intersect. `set`, the constructor, `fromBox3` and `applyMatrix4` throw `TypeError` or `RangeError` with the fix
+for non-finite values, a negative half size, a rotation that is not orthonormal, an empty box, a projective or
+zero-scale matrix, or a scale that would shear the box.
+
+```ts
+import {Box3, Matrix4, OBB, Quaternion, Ray, Vector3} from 'margoengine/math';
+const turn = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 4);
+const crate = new OBB()
+  .fromBox3(new Box3(new Vector3(-1, 0, -1), new Vector3(1, 2, 1)))
+  .applyMatrix4(new Matrix4().compose(new Vector3(5, 0, 0), turn, new Vector3(1, 1, 1)));
+const door = new OBB(new Vector3(6.2, 1, 0), new Vector3(0.1, 1, 0.5));
+console.log(crate.intersectsOBB(door)); // true
+console.log(crate.intersectRay(new Ray(new Vector3(0, 1, 0), new Vector3(1, 0, 0)), new Vector3())); // entry near x = 3.59
+```
 
 Core interop: `toArray()` with no target returns a tuple that `setPosition`, `setScale`, `setRotation`, `setQuaternion`, `camera.position` and `fitToBoundingBox` accept. `copy()` reads any `{x, y, z}`, including `mesh.position`; `Euler.setFromVector3(mesh.rotation)` reads core's XYZ angles. `Matrix4.fromArray` reads `camera.matrix` and world matrices from `@margoengine/core/extension`. `Frustum.fromArray(camera.planes)` and `setFromProjectionMatrix` use core's plane order and WebGPU depth range ([0, 1], reversed-Z included); pass `false` for WebGL [-1, 1]. `Color` stores linear sRGB; hex, CSS and HSL inputs are decoded from sRGB.
 
@@ -54,7 +75,7 @@ for (const mesh of billboards) {
 }
 ```
 
-Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Line3, Triangle, Cylindrical, Matrix2, `Vector3.project`/`unproject` (no camera object), `Euler.reorder`, ColorManagement and Display-P3, `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
+Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation outside `OBB`, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Line3, Triangle, Cylindrical, Matrix2, `Vector3.project`/`unproject` (no camera object), `Euler.reorder`, ColorManagement and Display-P3, `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

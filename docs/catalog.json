@@ -96,6 +96,7 @@
       "MathUtils",
       "Matrix3",
       "Matrix4",
+      "OBB",
       "P3_TO_SRGB",
       "Plane",
       "Quaternion",

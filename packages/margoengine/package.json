@@ -858,6 +858,10 @@
       "types": "./dist/math/box3.d.ts",
       "import": "./dist/math/box3.js"
     },
+    "./math/obb": {
+      "types": "./dist/math/obb.d.ts",
+      "import": "./dist/math/obb.js"
+    },
     "./math/sphere": {
       "types": "./dist/math/sphere.d.ts",
       "import": "./dist/math/sphere.js"

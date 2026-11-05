@@ -278,6 +278,34 @@ export type NumberArray = {
     [index: number]: number;
 };
 
+export class OBB {
+    center: Vector3;
+    halfSize: Vector3;
+    rotation: Matrix3;
+    constructor(center?: Vector3, halfSize?: Vector3, rotation?: Matrix3);
+    set(center: Vec3Like, halfSize: Vec3Like, rotation: MatrixLike): this;
+    copy(obb: OBB): this;
+    clone(): OBB;
+    fromBox3(box: BoxLike): this;
+    applyMatrix4(m: MatrixLike): this;
+    containsPoint(p: Vec3Like): boolean;
+    clampPoint<T extends Vec3Like>(p: Vec3Like, out: T): T;
+    distanceToPoint(p: Vec3Like): number;
+    intersectsBox3(box: BoxLike, epsilon?: number): boolean;
+    intersectsSphere(sphere: SphereLike): boolean;
+    intersectsOBB(obb: OBB, epsilon?: number): boolean;
+    intersectsPlane(plane: PlaneLike): boolean;
+    intersectRay<T extends Vec3Like>(ray: {
+        origin: Vec3Like;
+        direction: Vec3Like;
+    }, out: T): T | null;
+    intersectsRay(ray: {
+        origin: Vec3Like;
+        direction: Vec3Like;
+    }): boolean;
+    equals(obb: OBB, epsilon?: number): boolean;
+}
+
 export const P3_TO_SRGB: readonly number[];
 
 export class Plane {

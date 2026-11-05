@@ -100,7 +100,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `Points`, `Sprite` | `@margoengine/points` |
 | troika-three-text | `@margoengine/text` |
 | `CSS2DRenderer`, `CSS3DRenderer` | `@margoengine/labels` (`@margoengine/html` adds depth occlusion) |
-| `Vector3`, `Matrix4`, `Quaternion`, `Color`, `Box3` | `@margoengine/math` |
+| `Vector3`, `Matrix4`, `Quaternion`, `Color`, `Box3`, `OBB` (addons `math/OBB.js`) | `@margoengine/math` (`OBB` also as `@margoengine/math/obb`) |
 | stats.js | `@margoengine/stats` |
 | `renderer.info`, Spector.js, lil-gui scene inspectors | `@margoengine/inspector` (`@margoengine/inspector/frame`: frame debugger) |
 | `ViewHelper` | `@margoengine/viewcube` |
@@ -1187,7 +1187,7 @@ features add no core or stage functionality.
 | --- | --- |
 | Shadows from alpha cut-outs, `alphaHash`, object-space normal maps, your own mip levels | Missing, planned before v1.0.0 (shadows, materials) |
 | Picking fat lines, soft particles | Missing, planned before v1.0.0 (lines, vfx) |
-| Rendering in a worker, render into layers, compute writing textures, SSAA and upscaling, environment blend, KTX2 arrays and cubes, NRRD, subsurface blur, OBB | Missing, after v1.0.0 |
+| Rendering in a worker, render into layers, compute writing textures, SSAA and upscaling, environment blend, KTX2 arrays and cubes, NRRD, subsurface blur | Missing, after v1.0.0 |
 | WebXR plane detection, depth, light estimation, controller and hand models, plugin passes in XR | Needs a headset test first (`@margoengine/xr`) |
 | WebGL2 for every package | In development: `@margoengine/webgl2-compat` |
 | Long-tail loaders, Draco, KTX2 or G-code writers, stereo on a flat screen, deferred shading, meshlets, cloth, fluids | Not planned for v1.0.0 |

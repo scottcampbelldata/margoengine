@@ -19,6 +19,7 @@ export {
 } from './color.js';
 export type { ColorGrade, ColorLike, HSL } from './color.js';
 export { Box3 } from './box3.js';
+export { OBB } from './obb.js';
 export { Sphere } from './sphere.js';
 export { Plane } from './plane.js';
 export { Ray } from './ray.js';
