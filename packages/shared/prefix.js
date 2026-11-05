@@ -1,5 +1,5 @@
 // An exact exclusive prefix count of flag words without atomics or workgroup memory, for the packages' routes on the
-// WebGL2 compatibility layer (docs/webgl2-compat-roadmap.md, "Package routes"), where every kernel here runs as a point
+// WebGL2 compatibility layer (the WebGL2 roadmap, "Package routes"), where every kernel here runs as a point
 // draw: each invocation stores one word at its own index. Sums of 16 go up the levels until a level has at most 16
 // words; then each index takes its parent's count plus at most 15 neighbours on the way down. Integers, so the result
 // is exact and independent of draw order. Only the routes import this file, so WebGPU pages never download it.
