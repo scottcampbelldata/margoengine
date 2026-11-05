@@ -65,11 +65,12 @@ test('draws its instances through core: own batch redirected to GPU-compacted re
   assert.equal(b.drawn.size, 1000 * 96);
   assert.deepEqual(
     h.pipelines.filter((p) => p.compute).map((p) => p.compute.entryPoint),
-    ['cull', 'scan', 'scatter'],
+    ['cull', 'scan', 'scatter', 'fill'],
   );
   const code = h.pipelines.find((p) => p.compute).compute.module.code;
-  assert.match(code, /drawn\[p\]=world\[i\]/, 'order-keeping compaction');
-  assert.match(code, /if\(row\.w==1u\)/, 'only shown rows');
+  assert.match(code, /drawn\[p\]=record\(i\)/, 'order-keeping compaction, kept rows only');
+  assert.match(code, /rows\[i\]\.w==1u/, 'only shown rows');
+  assert.equal(code.match(/world\[i\]=/g).length, 1, 'only `fill` writes every row');
   assert.match(code, /finite\(matrices\[k\+j\]\)/, 'non-finite rows draw nothing');
   // Rows: 12 floats of affine columns, attributes rgb tint + state word.
   assert.deepEqual(Array.from(new Float32Array(b.matrices.data, 48, 12)), [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0]);
@@ -303,4 +304,26 @@ test('the WebGL2 layer route culls on the CPU: kept rows in order, every live ro
     world.slice(48, 96).every((v) => v === 0),
     'hidden and non-finite rows are zero',
   );
+});
+
+test('`world` is built only for what reads it: once per cull, on the shadow pass encoder', () => {
+  const h = harness(),
+    crowd = make();
+  h.engine.use(crowd);
+  crowd.addInstance();
+  h.run();
+  const encoder = h.context.encoder,
+    begin = encoder.beginComputePass;
+  let passes = 0;
+  encoder.beginComputePass = function (...args) {
+    passes++;
+    return begin.apply(this, args);
+  };
+  crowd.prepareShadow({ context: h.context });
+  crowd.prepareShadow({ context: h.context });
+  assert.equal(passes, 1, 'one fill however many sources ask');
+  h.run();
+  assert.equal(passes, 2, 'the frame runs its cull and builds no `world`');
+  crowd.prepareShadow({ context: h.context });
+  assert.equal(passes, 3, 'each cull needs its own fill');
 });

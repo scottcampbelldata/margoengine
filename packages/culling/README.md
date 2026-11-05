@@ -126,15 +126,16 @@ console.log(await crowd.pick(200, 150)); // the instance index under a CSS pixel
 ```
 
 Each frame, before any core draw, the plugin uploads the blocks of 256 rows that were written (one `writeBuffer` per run
-of them) and runs one compute pass: each live row's 96-byte core instance record is built on the GPU, its bounding
-sphere (the kernel's bound, padded for float32) is tested against the frustum and, with `minRadius`, its size on
-screen, and the kept rows are compacted in index order with indirect draw arguments. Core then draws them as one batch
+of them) and runs one compute pass: each live row's bounding sphere (the kernel's bound, padded for float32) is tested
+against the frustum and, with `minRadius`, its size on screen, and the kept rows' 96-byte core instance records are
+built on the GPU, compacted in index order, with indirect draw arguments. Core then draws them as one batch
 through `Batch.redirect`, core's GPU-culling hook: a batch with a redirect is drawn even when core collected no
 instances for it, which is the one line of core this class needs. So the instances draw in core's main pass and every
 replay of it (SSAO, outline, post) with core's own shader and every shader patch, shadow receiving included.
 
 - Shadows: `shadows.add(crowd)` (@margoengine/shadows) casts every live, shown instance, including those outside the
-  camera view (one draw of all rows per cascade).
+  camera view (one draw of all rows per cascade). Those rows are built by `prepareShadow`, which Shadows calls: once per
+  cull, and a frame with no shadows or `crowd.pick` skips the work.
 - Picking: `engine.pick` never returns instances (they are not core meshes); `crowd.pick(x, y)` returns the index.
 - GPU-side motion: `crowd.transforms` is the GPU copy of `matrices`; an app compute pass that writes it animates
   instances with no upload at all.
@@ -154,7 +155,7 @@ Measured (diagnostic, busy machine; RTX A6000, Edge 156, 1280 x 720; `npm run be
 250,000 instances. With every box moving and its matrix set each frame, 7.7 ms CPU and 1.5 ms GPU at 100,000 boxes
 against 15.6 and 2.7 ms as core meshes; 18.8 and 2.8 ms at 250,000 against 45.7 and 6.0 ms. The GPU time is still
 above a plain instanced draw with no culling: [known-bugs.md](../../docs/known-bugs.md), "DynamicInstances: about
-25-35% more GPU time".
+15-35% more GPU time".
 
 ## Modes
 

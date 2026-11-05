@@ -3233,17 +3233,18 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
 - **Plan:** set the option in the shared tsconfig once a run of every package's tests and proofs shows no class relied on
   the define behaviour.
 
-### DynamicInstances: about 25-35% more GPU time than InstancedMesh at 100,000 and 250,000 moving boxes
+### DynamicInstances: about 15-35% more GPU time than InstancedMesh at 100,000 and 250,000 moving boxes
 
-- **What:** `boxes-100000` moving, every box in view: GPU 1.55 ms against three.js WebGPU `InstancedMesh` 1.26 ms;
-  at 250,000, 3.26 against 2.45 ms (busy machine, diagnostic; run `20261030-010010-28e2c5b8-dev` and a stopped run before it).
-- **Cause (not yet split per pass):** `DynamicInstances` runs a compute pass three does not (each row's 96-byte core
-  record built, frustum-tested and compacted in order, about 300 bytes of GPU memory traffic per instance), and three
-  draws its instances with culling off. In a partial view the cull pays back (the pixel check's close view drew 204 of
-  576 boxes). Part of it is overhead with no reason: every row's record is written twice (`world` for shadows and
-  picking, then `drawn`), also when nothing reads `world`.
-- **Plan:** write `world` only while a shadow source or a pick needs it, scatter from the rows instead; then measure the
-  passes one by one with the harness's timestamps and publish before and after.
+- **What:** `boxes-100000` moving, every box in view: GPU 1.41 ms against three.js WebGPU `InstancedMesh` 1.23 ms; at
+  250,000, 2.73 against 2.00 ms (2026-11-05, diagnostic; perf-history entry 54).
+- **Fixed part:** `world` is now built only for shadows and picking (2.76 to 2.73 ms at 250,000, 1.47 to 1.41 ms at 100,000).
+- **Ruled out, by measurement at 250,000:** the compute passes cost little (skipping their dispatches: still 2.51 ms
+  moving, 1.38 ms static, against 2.73 and 1.50 with them), so the cull is not the gap. Moving the upload's barrier ahead of the
+  timed passes changed nothing (2.70 ms).
+- **Cause of the rest: not found.** Moving costs about 1.1 ms more in the timed passes than a still frame, even when the
+  moved rows reach no draw (compute skipped, so `drawn` is stale). The 12 MB upload runs then, and the CPU takes 15 ms a
+  frame, so the GPU idles between frames: either could slow the passes. **Next to test:** a moving frame with the upload
+  held and the CPU work kept, then the reverse. three's still frame at 250,000 was not measured in the same run.
 
 The two entries below come from the three.js speed matrix ([whitepaper/perf-vs-threejs.md](whitepaper/perf-vs-threejs.md),
 rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their first causes are fixed (perf-history entry

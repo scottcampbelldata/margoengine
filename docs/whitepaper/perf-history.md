@@ -1465,6 +1465,27 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Guard:** `packages/math/test/field-types.test.js`.
 - **Still open:** the upload ([known-bugs.md](../known-bugs.md#moving-instances-spend-more-cpu-than-threes-webgl2-renderer)).
 
+### 54. `DynamicInstances` builds `world` only for what reads it
+
+- **Loss:** moving boxes took 1.47 ms (100,000) and 2.76 ms (250,000) of GPU against three's WebGPU `InstancedMesh` 1.23 and
+  2.00 ms.
+- **Fix:** the cull wrote every row's 96-byte record to `world` and the scatter copied the kept ones to `drawn`. The scatter
+  now builds kept records from the rows; a `fill` kernel writes `world` only for shadows (`prepareShadow`) and `pick`, once
+  per cull. A scene with shadows pays what it paid before. The compatibility route is unchanged.
+- **After:** RTX A6000, Chromium 156, 2026-11-05, three runs, diagnostic (the machine was shared). GPU ms a frame:
+
+  | Boxes | Before | After | three WebGPU |
+  | --- | --- | --- | --- |
+  | 100,000 moving | 1.47 | 1.41 | 1.23 |
+  | 250,000 moving | 2.76 | 2.73 | 2.00 |
+  | 250,000 still | 1.54 | 1.50 | not measured |
+
+  Smaller than expected: the removed traffic was not the main cost.
+- **Same output:** `packages/culling/test/gpu/dynamic-check.mjs` compares frames with core meshes with shadows on and off, and picks.
+- **Rerun:** `npm run bench -- dynamic --engines=margo,three-webgpu --runs=3`.
+- **Guard:** `packages/culling/test/dynamic.test.js` and the browser test above.
+- **Still open:** the rest of the gap ([known-bugs.md](../known-bugs.md#dynamicinstances-about-15-35-more-gpu-time-than-instancedmesh-at-100000-and-250000-moving-boxes)).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

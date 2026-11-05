@@ -28,6 +28,11 @@ export class DynamicInstances implements EnginePlugin {
     update(from?: number, to?: number): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    prepareShadow({ context }: {
+        context: {
+            encoder: GPUCommandEncoder;
+        };
+    }): void;
     drawShadow({ context, pass, matrix, cascade }: {
         context: {
             device: GPUDevice;

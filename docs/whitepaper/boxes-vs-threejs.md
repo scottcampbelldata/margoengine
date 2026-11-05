@@ -180,7 +180,7 @@ this is diagnostic. CPU ms / GPU ms per frame:
 - Against the core mesh path: 2.0x less CPU and 1.8x less GPU at 100,000, 2.4x and 1.8x at 250,000.
 - GPU: 23-33% over three at 100,000 and 250,000, a loss with a partial reason (per-instance frustum culling three does
   not do, which pays back in partial views) and a part with none (each record written twice). Open in
-  [known-bugs.md](../known-bugs.md), "DynamicInstances: about 25-35% more GPU time".
+  [known-bugs.md](../known-bugs.md), "DynamicInstances: about 15-35% more GPU time".
 - three.js core meshes (`Mesh` per box) at 100,000 moving: 546 ms CPU per frame on WebGPU; the 250,000 case was not
   run (about 1.4 s a frame).
 

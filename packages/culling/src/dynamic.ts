@@ -49,9 +49,10 @@ const BLOCK = 256;
 /** `factors.w` of every record: past core's 2^23 entity ids, so a record never names a core mesh. */
 const NO_MESH = 16777216;
 
-// The cull kernel builds each live row's 96-byte core instance record into `world` (all rows, for shadows; free, hidden
-// and non-finite rows stay zero, which draws nothing) and tests it like CulledMeshes; then the CulledMeshes scan and an
-// order-keeping scatter write the kept records and the indirect arguments.
+// The cull kernel tests each live row like CulledMeshes; then the CulledMeshes scan and an order-keeping scatter build the
+// kept rows' 96-byte core instance records and the indirect arguments. `fill` builds `world`, every row's record in row
+// order (free, hidden and non-finite rows zero, which draws nothing), only for what reads it: shadows and picking. Written
+// every frame it was 192 bytes of GPU memory traffic per instance that drawing never used.
 const shader = `
 struct Frame {camera:mat4x4f,planes:array<vec4f,6>,size:vec4f}
 struct Part {count:u32,indices:u32,pad:vec2u,sphere:vec4f,factors:vec4f,base:vec4f}
@@ -76,19 +77,18 @@ fn keep(m:mat4x4f)->bool {
   return f.size.z<=0.0||w<=r||r*f.size.y/w>=f.size.z;
 }
 fn finite(x:f32)->bool {return (bitcast<u32>(x)&0x7f800000u)!=0x7f800000u;}
+fn shown(i:u32)->bool {
+  let k=i*12u;var ok=rows[i].w==1u;for(var j=0u;j<12u;j++){ok=ok&&finite(matrices[k+j]);}
+  return ok;
+}
+fn matrix(i:u32)->mat4x4f {
+  let k=i*12u;return mat4x4f(vec4f(matrices[k],matrices[k+1u],matrices[k+2u],0.0),vec4f(matrices[k+3u],matrices[k+4u],matrices[k+5u],0.0),vec4f(matrices[k+6u],matrices[k+7u],matrices[k+8u],0.0),vec4f(matrices[k+9u],matrices[k+10u],matrices[k+11u],1.0));
+}
+fn record(i:u32)->Record {return Record(matrix(i),vec4f(b.base.rgb*bitcast<vec3f>(rows[i].xyz),1.0),b.factors);}
 @compute @workgroup_size(256) fn cull(@builtin(global_invocation_id) g:vec3u,@builtin(local_invocation_index) l:u32,@builtin(workgroup_id) w:vec3u) {
   let i=g.x;var v=0u;
   if(i<b.count){
-    var r:Record;let row=rows[i];
-    if(row.w==1u){
-      let k=i*12u;var ok=true;for(var j=0u;j<12u;j++){ok=ok&&finite(matrices[k+j]);}
-      if(ok){
-        let m=mat4x4f(vec4f(matrices[k],matrices[k+1u],matrices[k+2u],0.0),vec4f(matrices[k+3u],matrices[k+4u],matrices[k+5u],0.0),vec4f(matrices[k+6u],matrices[k+7u],matrices[k+8u],0.0),vec4f(matrices[k+9u],matrices[k+10u],matrices[k+11u],1.0));
-        r=Record(m,vec4f(b.base.rgb*bitcast<vec3f>(row.xyz),1.0),b.factors);
-        if(keep(m)){v=1u;}
-      }
-    }
-    world[i]=r;
+    if(shown(i)&&keep(matrix(i))){v=1u;}
   }
   scratch[l]=v;workgroupBarrier();
   for(var o=1u;o<256u;o=o<<1u){var t=0u;if(l>=o){t=scratch[l-o];}workgroupBarrier();scratch[l]+=t;workgroupBarrier();}
@@ -107,8 +107,12 @@ fn finite(x:f32)->bool {return (bitcast<u32>(x)&0x7f800000u)!=0x7f800000u;}
   if(i==0u&&b.count==0u){args[0]=b.indices;args[1]=0u;args[2]=0u;args[3]=0u;args[4]=0u;}
   if(i>=b.count){return;}
   let e=local[i];let v=e>>31u;let p=groups[i>>8u]+(e&0x7fffffffu);
-  if(v==1u){drawn[p]=world[i];}
+  if(v==1u){drawn[p]=record(i);}
   if(i==b.count-1u){args[0]=b.indices;args[1]=p+v;args[2]=0u;args[3]=0u;args[4]=0u;}
+}
+@compute @workgroup_size(256) fn fill(@builtin(global_invocation_id) g:vec3u) {
+  let i=g.x;
+  if(i<b.count){var r:Record;if(shown(i)){r=record(i);}world[i]=r;}
 }
 `;
 // Depth-only caster drawing for @margoengine/shadows (its cascade passes: depth32float, less-equal, no face culling).
@@ -194,6 +198,7 @@ export class DynamicInstances implements EnginePlugin {
   private readonly dirtyMatrices: Uint8Array;
   private readonly dirtyRows: Uint8Array;
   private dirty = false;
+  private filled = false;
   private engine?: Engine;
   private device?: GPUDevice;
   private buffers?: Buffers;
@@ -201,6 +206,7 @@ export class DynamicInstances implements EnginePlugin {
     cull: GPUComputePipeline;
     scan: GPUComputePipeline;
     scatter: GPUComputePipeline;
+    fill: GPUComputePipeline;
     group: GPUBindGroup;
   };
   private shadow?: { pipeline: GPURenderPipeline; uniforms: GPUBuffer[]; groups: GPUBindGroup[] };
@@ -484,6 +490,7 @@ export class DynamicInstances implements EnginePlugin {
       pass.setPipeline(p.scatter);
       pass.dispatchWorkgroups(groups);
       pass.end();
+      this.filled = false;
     }
     // The batch core keeps for the own geometry: the same object while this plugin retains the geometry.
     let batch = this.batch;
@@ -583,7 +590,23 @@ export class DynamicInstances implements EnginePlugin {
         (buffer, binding) => ({ binding, resource: { buffer } }),
       ),
     });
-    return { cull: pipeline('cull'), scan: pipeline('scan'), scatter: pipeline('scatter'), group };
+    return { cull: pipeline('cull'), scan: pipeline('scan'), scatter: pipeline('scatter'), fill: pipeline('fill'), group };
+  }
+
+  /** Records `world` on `encoder`, once per cull. The compatibility route writes it on the CPU. */
+  private fill(encoder: GPUCommandEncoder): void {
+    const p = this.pipelines;
+    if (this.filled || !p || this.route) return;
+    this.filled = true;
+    const pass = encoder.beginComputePass();
+    pass.setBindGroup(0, p.group);
+    pass.setPipeline(p.fill);
+    pass.dispatchWorkgroups(Math.max(1, Math.ceil(this.high / BLOCK)));
+    pass.end();
+  }
+  /** The `ShadowSource` contract of @margoengine/shadows: builds the rows `drawShadow` reads. */
+  prepareShadow({ context }: { context: { encoder: GPUCommandEncoder } }): void {
+    this.fill(context.encoder);
   }
 
   /**
@@ -716,8 +739,9 @@ export class DynamicInstances implements EnginePlugin {
     d.queue.writeBuffer(t.uniform, 0, matrix);
     const read = d.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     try {
-      const encoder = d.createCommandEncoder(),
-        pass = encoder.beginRenderPass(t.descriptor);
+      const encoder = d.createCommandEncoder();
+      this.fill(encoder);
+      const pass = encoder.beginRenderPass(t.descriptor);
       pass.setPipeline(t.pipeline);
       pass.setBindGroup(0, t.group);
       pass.setVertexBuffer(0, core.vertex);

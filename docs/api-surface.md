@@ -28,7 +28,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/controls | `.` 50, `./orbit` 7, `./arcball` 5, `./transform` 5, `./drag` 3, `./profiles` 13, `./walk` 6 | 63 |  | 23,268 |
 | @margoengine/core | `.` 17, `./extension` 26 | 16 |  | 21,431 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,171 |
-| @margoengine/culling | `.` 6, `./dynamic` 2, `./parts` 3 | 4 |  | 10,855 |
+| @margoengine/culling | `.` 6, `./dynamic` 2, `./parts` 3 | 4 |  | 10,868 |
 | @margoengine/cutscene | `.` 43 |  |  | 6,589 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3, `./tga` 3, `./dds` 5, `./ktx` 5, `./tiff` 3 | 5 |  | 478,227 |
 | @margoengine/dof | `.` 2, `./lens` 3, `./autofocus` 2 | 8 |  | 7,805 |
@@ -54,7 +54,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/lod | `.` 18, `./auto` 6 | 11 |  | 10,980 |
 | margoengine | `.` 23, `./game` 43, `./viz` 33, `./web` 15 |  |  | 52 |
 | @margoengine/materials | `.` 112, `./atlas` 8, `./transmission` 8, `./batched` 4 | 48 |  | 60,668 |
-| @margoengine/math | `.` 67, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 3, `./matrix3` 1, `./matrix4` 1, `./color` 15, `./box3` 1, `./obb` 1, `./line3` 1, `./triangle` 1, `./capsule` 3, `./sphere` 1, `./plane` 1, `./ray` 2, `./frustum` 1, `./project` 5, `./spherical` 1, `./cylindrical` 1, `./sh` 2, `./mathutils` 21, `./mat4` 11, `./validate` 3, `./quat` 10, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 127 |  | 16,373 |
+| @margoengine/math | `.` 67, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 3, `./matrix3` 1, `./matrix4` 1, `./color` 15, `./box3` 1, `./obb` 1, `./line3` 1, `./triangle` 1, `./capsule` 3, `./sphere` 1, `./plane` 1, `./ray` 2, `./frustum` 1, `./project` 5, `./spherical` 1, `./cylindrical` 1, `./sh` 2, `./mathutils` 21, `./mat4` 11, `./validate` 3, `./quat` 10, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 127 |  | 19,519 |
 | @margoengine/mcp | `.` 38 | 1 |  | 8,408 |
 | @margoengine/mesh-edit | `.` 88, `./modeling` 48 | 2 |  | 29,560 |
 | @margoengine/mixer | `.` 41 |  |  | 6,711 |
