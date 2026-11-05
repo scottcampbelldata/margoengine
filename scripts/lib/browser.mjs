@@ -31,6 +31,8 @@ const ALIASES = {
 /** The WebGPU switch a Chromium-family browser needs where WebGPU is not already on. */
 const WEBGPU_ARGS = ['--enable-unsafe-webgpu'];
 const LINUX_ARGS = ['--enable-features=Vulkan', '--use-angle=vulkan'];
+/** macOS: Playwright's headless shell otherwise gets SwiftShader (software); ANGLE on Metal gives the real GPU. */
+const DARWIN_ARGS = ['--use-angle=metal'];
 /** SwiftShader as the WebGPU adapter (the switches scripts/screenshot-example.mjs already used). */
 const SOFTWARE_ARGS = [
   '--enable-unsafe-webgpu',
@@ -84,12 +86,25 @@ export function launchArgs(browser, extra = [], { webgpu = true, gpu = gpuAdapte
   else if (browser.platform !== 'win32' || browser.name !== 'edge') {
     args.push(...WEBGPU_ARGS);
     if (browser.platform === 'linux') args.push(...LINUX_ARGS);
+    if (browser.platform === 'darwin') args.push(...DARWIN_ARGS);
   }
   if (browser.chooseGpu && !browser.software) {
     const arg = gpu({ env: browser.env });
     if (arg) args.push(arg);
   }
   return [...new Set([...args, ...extra])];
+}
+
+/**
+ * The reason a GPU check must not run on the adapter the browser gave it, or null. A software or fallback adapter
+ * (SwiftShader) is refused unless software was asked for (MARGO_SOFTWARE_GPU=1). `adapter` is the probe's `hardware.webgpu`.
+ */
+export function softwareAdapterReason(browser, adapter) {
+  if (browser.software || !adapter) return null;
+  const soft =
+    adapter.fallback === true || /swiftshader/i.test(`${adapter.architecture ?? ''} ${adapter.description ?? ''}`);
+  if (!soft) return null;
+  return `WebGPU adapter is a software one (${JSON.stringify(adapter)}) on ${browser.platform}; this check needs a real GPU. Fix the browser launch, or set MARGO_SOFTWARE_GPU=1 to run on SwiftShader on purpose`;
 }
 
 /**

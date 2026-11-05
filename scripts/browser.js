@@ -1,5 +1,5 @@
 import { firefox, webkit } from '@playwright/test';
-import { launchBrowser, resolveBrowser } from './lib/browser.mjs';
+import { launchBrowser, resolveBrowser, softwareAdapterReason } from './lib/browser.mjs';
 import { createServer } from 'vite';
 import { realpathSync } from 'node:fs';
 import { createServer as createNetServer } from 'node:net';
@@ -559,6 +559,11 @@ export async function openBrowser({
         await page.waitForLoadState('load');
         await server.waitForRequestsIdle();
       }
+    }
+    if (browserName === 'chromium') {
+      // A real-GPU check never runs on SwiftShader by accident (MARGO_SOFTWARE_GPU=1 asks for it).
+      const refusal = softwareAdapterReason(resolveBrowser({ name: channel }), hardware.webgpu);
+      if (refusal) throw new Error(refusal);
     }
     hardware.browserName = browserName;
     hardware.browserVersion = browser.version();

@@ -9,6 +9,7 @@ import {
   launchArgs,
   resolveBrowser,
   skipSuite,
+  softwareAdapterReason,
   unsupportedReason,
 } from '../scripts/lib/browser.mjs';
 
@@ -32,6 +33,35 @@ test('Linux and macOS default to Playwright chromium, never the msedge channel (
   }
   for (const flag of ['--enable-features=Vulkan', '--use-angle=vulkan'])
     assert.ok(launchArgs(pick({}, 'linux')).includes(flag), flag);
+});
+
+test('macOS asks ANGLE for Metal (regression: the headless shell got SwiftShader); Windows and Linux are unchanged', () => {
+  assert.deepEqual(launchArgs(pick({}, 'darwin'), ['--x']), ['--enable-unsafe-webgpu', '--use-angle=metal', '--x']);
+  assert.deepEqual(launchArgs(pick({ MARGO_BROWSER: 'chrome' }, 'darwin')), [
+    '--enable-unsafe-webgpu',
+    '--use-angle=metal',
+  ]);
+  assert.ok(!launchArgs(pick({ MARGO_SOFTWARE_GPU: '1' }, 'darwin')).includes('--use-angle=metal'));
+  assert.deepEqual(launchArgs(pick({}, 'darwin'), [], { webgpu: false }), []);
+  assert.ok(!launchArgs(pick({}, 'linux')).includes('--use-angle=metal'));
+  assert.deepEqual(launchArgs(pick({}, 'linux')), [
+    '--enable-unsafe-webgpu',
+    '--enable-features=Vulkan',
+    '--use-angle=vulkan',
+  ]);
+  assert.ok(!launchArgs(pick({ MARGO_BROWSER: 'chrome' }), [], { gpu: () => undefined }).includes('--use-angle=metal'));
+});
+
+test('a software or fallback WebGPU adapter is refused unless software was asked for', () => {
+  const swift = { vendor: 'google', architecture: 'swiftshader', device: '', description: '', fallback: true };
+  const metal = { vendor: 'apple', architecture: 'metal-3', device: '', description: '', fallback: false };
+  const reason = softwareAdapterReason(pick({}, 'darwin'), swift);
+  assert.match(reason, /software one .*swiftshader.* on darwin/);
+  assert.match(softwareAdapterReason(pick({}, 'linux'), { ...swift, fallback: null }), /software/);
+  assert.match(softwareAdapterReason(pick({}, 'linux'), { ...metal, fallback: true }), /software/);
+  assert.equal(softwareAdapterReason(pick({}, 'darwin'), metal), null);
+  assert.equal(softwareAdapterReason(pick({ MARGO_SOFTWARE_GPU: '1' }, 'linux'), swift), null);
+  assert.equal(softwareAdapterReason(pick({}, 'linux'), null), null);
 });
 
 test('MARGO_BROWSER, --browser and the older BROWSER_CHANNEL pick the browser, in that order', () => {
