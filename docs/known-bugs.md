@@ -223,7 +223,13 @@ does not own. Each entry says exactly what is needed to close it.
   none of them (audit E-02, bug 67); it now has the same kind of defaults: own-host `origins` (`'*'` opts out),
   `maxConnections` (1,024) and `firstMessageTimeout` (10 s), with tests in `packages/netcode/tests/transports.test.js`.
   Authentication and network-level denial of service (a flood below the TCP layer) are still the application's.
-- **Needed to close:** F20 fixed with a regression test that fails without it.
+- **Recheck of F20 (2026-11-05):** not reproduced, and not identified. The repository, the private notes and the commit
+  history name no decoder, input or time for it, and the audit report is not on this PC. Every fuzz target ran 10 s (seed
+  1, 0 findings on the 26 named targets), and `decoders/ktx2` and `environment/exr` 60 s (seed 7, 0 findings), on the
+  RTX A6000 PC. The audit ran on a slower laptop, and one fuzz target it had left the engine with its package on
+  2026-10-29, so F20 may have gone with it.
+- **Needed to close:** the audit's F20 text (its input, or at least the target and the time). Then a regression test that
+  fails without the fix.
 
 ### text: the colour emoji check needs a colour emoji font on the machine
 
