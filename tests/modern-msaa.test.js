@@ -301,3 +301,114 @@ test('standalone 4x HDR captures resolve depth and discard samples without an ou
   color.destroy();
   depth.destroy();
 });
+
+const joining = (begin) => ({
+  name: 'package',
+  order: 1,
+  joins: true,
+  execute(c) {
+    begin?.(c);
+  },
+});
+const openPass = (c, last) => {
+  const color = { view: c.color, loadOp: 'load', storeOp: 'store' },
+    depth = { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store' };
+  c.attach(color, depth, last);
+  c.encoder.beginRenderPass({ colorAttachments: [color], depthStencilAttachment: depth }).end();
+};
+
+test('a scene pass that stores for a later pass does not resolve as well', async () => {
+  await harness(async ({ passes, frame }) => {
+    const graph = new FrameGraph();
+    graph.add({
+      name: 'package',
+      order: 1,
+      execute: (c) => c.encoder.beginRenderPass({ colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }] }).end(),
+    });
+    frame(graph);
+    assert.equal(passes.length, 3);
+    assert.equal(passes[0].colorAttachments[0].resolveTarget, undefined);
+    assert.equal(passes[0].colorAttachments[0].storeOp, 'store');
+    assert.ok(passes[2].colorAttachments[0].resolveTarget);
+  });
+});
+
+test('a joining last pass takes the clear and the resolve: one render pass a frame', async () => {
+  await harness(async ({ passes, frame }) => {
+    const graph = new FrameGraph();
+    graph.add(joining((c) => openPass(c, true)));
+    for (let i = 0; i < 2; i++) {
+      passes.length = 0;
+      frame(graph);
+      assert.equal(passes.length, 1);
+      const [color] = passes[0].colorAttachments;
+      assert.equal(color.loadOp, 'clear');
+      assert.ok(color.clearValue);
+      assert.equal(passes[0].depthStencilAttachment.depthLoadOp, 'clear');
+      assert.equal(passes[0].depthStencilAttachment.depthClearValue, 0);
+      assert.ok(color.resolveTarget);
+      assert.equal(color.storeOp, 'discard');
+      assert.equal(passes[0].depthStencilAttachment.depthStoreOp, 'discard');
+    }
+  });
+});
+
+test('a joining pass with two render passes clears in the first and resolves in the one marked last', async () => {
+  await harness(async ({ passes, frame }) => {
+    const graph = new FrameGraph();
+    graph.add(
+      joining((c) => {
+        openPass(c, false);
+        openPass(c, true);
+      }),
+    );
+    frame(graph);
+    assert.equal(passes.length, 2);
+    assert.equal(passes[0].colorAttachments[0].loadOp, 'clear');
+    assert.equal(passes[0].colorAttachments[0].storeOp, 'store');
+    assert.equal(passes[0].colorAttachments[0].resolveTarget, undefined);
+    assert.equal(passes[1].colorAttachments[0].loadOp, 'load');
+    assert.ok(passes[1].colorAttachments[0].resolveTarget);
+  });
+});
+
+test('a joining pass that draws nothing leaves core to clear before the next pass, and to resolve', async () => {
+  await harness(async ({ passes, frame }) => {
+    const graph = new FrameGraph(),
+      seen = [];
+    graph.add(joining());
+    graph.add({ name: 'after', order: 2, execute: () => seen.push(passes.length) });
+    frame(graph);
+    assert.deepEqual(seen, [1]);
+    assert.equal(passes[0].colorAttachments[0].loadOp, 'clear');
+    assert.equal(passes.length, 2);
+    assert.ok(passes[1].colorAttachments[0].resolveTarget);
+  });
+});
+
+test('a joining pass that is not the last clears but leaves the resolve to core', async () => {
+  await harness(async ({ passes, frame }) => {
+    const graph = new FrameGraph();
+    graph.add(joining((c) => openPass(c, true)));
+    graph.add({ name: 'after', order: 2, execute() {} });
+    frame(graph);
+    assert.equal(passes.length, 2);
+    assert.equal(passes[0].colorAttachments[0].loadOp, 'clear');
+    assert.equal(passes[0].colorAttachments[0].storeOp, 'store');
+    assert.equal(passes[0].colorAttachments[0].resolveTarget, undefined);
+    assert.ok(passes[1].colorAttachments[0].resolveTarget);
+  });
+});
+
+test('a pass between the main pass and a joining one keeps the clear in the main pass', async () => {
+  await harness(async ({ passes, frame }) => {
+    const graph = new FrameGraph();
+    graph.add({ name: 'between', order: 0.5, execute() {} });
+    graph.add(joining((c) => openPass(c, true)));
+    frame(graph);
+    assert.equal(passes.length, 2);
+    assert.equal(passes[0].colorAttachments[0].loadOp, 'clear');
+    assert.equal(passes[1].colorAttachments[0].loadOp, 'load');
+    assert.ok(passes[1].colorAttachments[0].resolveTarget);
+  });
+});

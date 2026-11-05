@@ -12,7 +12,7 @@ export interface VertexInputs {
 
 const ALL: readonly number[] = [0, 1, 2, 3, 4];
 // The tangent frame of `surface`, then the mapped normal it exists for.
-const frame = /\n {2}var t=i\.tangent\.xyz-n\*dot\(n,i\.tangent\.xyz\);[^]*?\n {2}s\.n=normalize\(t\*sampledNormal\.x\*f\.factors\.z\+b\*sampledNormal\.y\*f\.factors\.z\+n\*sampledNormal\.z\);/;
+const frame = /\n {2}var t=i\.tangent[^]*?\n {2}s\.n=normalize\(t\*sampledNormal[^;]*;/;
 const flatNormal = 'let sampledNormal=vec4f(0.5,0.5,1,1).xyz*2-1;';
 const coordinates = /\nfn uv\(i:Out, ?\w+:f32\)->vec2f \{[^\n]*\}(?=\n)/;
 

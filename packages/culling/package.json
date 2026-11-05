@@ -53,6 +53,6 @@
     "build": "node ../../scripts/build-optional.js culling",
     "test": "npm run build && node --test tests/*.test.js test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/culling/test/gpu/dynamic-check.mjs && node packages/culling/test/gpu/parts-check.mjs"
+    "test:gpu": "cd ../.. && node packages/culling/test/gpu/dynamic-check.mjs && node packages/culling/test/gpu/parts-check.mjs && node packages/culling/test/gpu/last-pass-check.mjs"
   }
 }

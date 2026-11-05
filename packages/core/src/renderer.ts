@@ -22,7 +22,8 @@ declare const GPUBufferUsage: {
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number };
 declare const GPUMapMode: { READ: number };
 
-const defaultDraw: DrawOptions = {};
+const defaultDraw: DrawOptions = {},
+  drawable = (batch: Batch) => (batch.count || batch.redirect) && !batch.claimed;
 
 /** @internal How a view clears. A partial rectangle cannot use the attachment load operation: that clears the whole target. */
 export function rectangleClear(
@@ -213,6 +214,8 @@ export class GPURenderer implements Renderer {
   private msaa?: GPUTextureView;
   private resolveTarget?: GPUTextureView;
   private preserveMSAA = false;
+  private cleared = false;
+  private depthView?: GPUTextureView;
   /** A caller's view target depth: every pass stores it, since the caller reads it after the frame. */
   private keepDepth = false;
   private passDescriptor?: GPURenderPassDescriptor;
@@ -453,6 +456,8 @@ export class GPURenderer implements Renderer {
     this.frame.fill(1, 28, 31);
     if (lighting.ambient) this.frame.set(lighting.ambient, 28);
     this.device.queue.writeBuffer(this.uniform, 0, this.frame);
+    // A frame drawn inside a package's draw comes before the render pass that clear was left for.
+    this.passContext?.settle!();
     const stacked = !!view && view.index + 1 !== view.count;
     // A canvas view before the last keeps its multisample colour for the next one instead of resolving it.
     this.holdColor = stacked;
@@ -468,6 +473,7 @@ export class GPURenderer implements Renderer {
       depth = caller ? caller.createView() : views.at(-1)!;
     this.preserveMSAA = (graph.revision > 0 || stacked) && !!this.msaa;
     this.keepDepth = !!caller;
+    this.depthView = depth;
     const context = (this.passContext ??= {
       backend: 'webgpu',
       draw: (options: DrawOptions = defaultDraw) => {
@@ -557,9 +563,9 @@ export class GPURenderer implements Renderer {
         if (mode === 'attachment' && clearColor) attachment.clearValue = tint as GPUColor;
         depth.view = context.depth;
         depth.depthLoadOp = mode === 'attachment' && clearDepth ? 'clear' : 'load';
-        attachment.resolveTarget = context.color === this.msaa && !this.holdColor ? this.resolveTarget : undefined;
-        // Later scene passes load MSAA color and depth until the final resolve.
-        attachment.storeOp = attachment.resolveTarget && !this.preserveMSAA ? 'discard' : 'store';
+        // Later scene passes load MSAA color and depth until the final resolve, the only one such a frame needs.
+        attachment.resolveTarget = context.color === this.msaa && !this.preserveMSAA ? this.resolveTarget : undefined;
+        attachment.storeOp = attachment.resolveTarget ? 'discard' : 'store';
         depth.depthStoreOp = this.keepDepth ? 'store' : attachment.storeOp;
         attachments.length = 1;
         if (options.colorAttachments) attachments.push(...options.colorAttachments);
@@ -573,6 +579,16 @@ export class GPURenderer implements Renderer {
               : 'load'
           : undefined;
         depth.stencilStoreOp = stencil ? depth.depthStoreOp : undefined;
+        // A plugin's wrapper around draw may draw again, so only core's own draw is the pass's last.
+        if (context.only && context.draw === this.draw) {
+          // Nothing of core's to draw and a pass next that opens its own: one render pass instead of two, each of
+          // which would store or reload the multisampled colour and depth (1,000 boxes: 0.034 -> 0.024 ms of GPU).
+          if (context.joins && mode === 'attachment' && !drawBatches.some(drawable)) {
+            this.cleared = true;
+            return;
+          }
+          context.attach!(attachment, depth, true);
+        }
         const pass = context.encoder.beginRenderPass(descriptor);
         if (viewport) pass.setViewport(...viewport, 0, 1);
         if (scissor) pass.setScissorRect(...scissor);
@@ -589,7 +605,7 @@ export class GPURenderer implements Renderer {
         // By index: an array iterator would be garbage every draw.
         for (let i = 0; i < drawBatches.length; i++) {
           const batch = drawBatches[i];
-          if ((batch.count || batch.redirect) && !batch.claimed) {
+          if (drawable(batch)) {
             const p = pipeline === this.pipeline && !bindings.length && !batch.mask ? this.culled : pipeline;
             if (p !== current) {
               current = p;
@@ -618,6 +634,35 @@ export class GPURenderer implements Renderer {
           }
         }
         pass.end();
+      },
+      attach: (color: GPURenderPassColorAttachment, depth: GPURenderPassDepthStencilAttachment, last: boolean) => {
+        if (this.cleared) {
+          const source = (this.passDescriptor!.colorAttachments as GPURenderPassColorAttachment[])[0],
+            target = this.passDescriptor!.depthStencilAttachment!;
+          this.cleared = false;
+          color.loadOp = source.loadOp;
+          color.clearValue = source.clearValue;
+          depth.depthLoadOp = target.depthLoadOp;
+          depth.depthClearValue = target.depthClearValue;
+          if (target.stencilLoadOp) {
+            depth.stencilReadOnly = undefined;
+            depth.stencilLoadOp = target.stencilLoadOp;
+            depth.stencilClearValue = target.stencilClearValue;
+            depth.stencilStoreOp = 'store';
+          }
+        }
+        if (!last || !this.passContext!.last || !this.preserveMSAA || this.holdColor || color.view !== this.msaa || depth.view !== this.depthView)
+          return;
+        color.resolveTarget = this.resolveTarget;
+        color.storeOp = 'discard';
+        depth.depthStoreOp = this.keepDepth ? 'store' : 'discard';
+        if (depth.stencilStoreOp) depth.stencilStoreOp = depth.depthStoreOp;
+        this.preserveMSAA = false;
+      },
+      settle: () => {
+        if (!this.cleared) return;
+        this.cleared = false;
+        this.passContext!.encoder.beginRenderPass(this.passDescriptor!).end();
       },
     } as Extract<PassContext, { backend: 'webgpu' }>);
     // Field by field: an object literal to Object.assign from would be garbage every frame.

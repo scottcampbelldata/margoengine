@@ -18,7 +18,7 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 [Start here: guides by goal](docs/start-here.md) · [Live demos](https://margoengine.com) ·
 [Coming from three.js](docs/from-threejs.md)
 
-The core and the stage together are 22,522 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
+The core and the stage together are 22,815 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
 ## Install
@@ -270,7 +270,7 @@ which stays for v1.0.
 
 | Bundle | gzip | raw |
 | --- | --- | --- |
-| core + stage (`import { createStage } from 'margoengine'`) | 22,522 B | 55,595 B |
+| core + stage (`import { createStage } from 'margoengine'`) | 22,815 B | 56,578 B |
 
 Recorded in [entry-sizes.json](examples/package-benchmarks/results/entry-sizes.json), along with
 the size of every other package entry. `npm run measure:size` bundles the entry with Vite, minified the same way as
@@ -676,6 +676,11 @@ Core is untouched. The exception covers this one change; the freeze applies agai
 two-GPU PC. Unset keeps the old request (`'high-performance'`, nothing on Windows). Cost: core 21,077 -> 21,106 B gzip, core + stage 22,494 -> 22,524 B. The exception
 covers this one option; the freeze applies again after it.
 
+**Exception, one render pass for a package's frame (Scott, 2026-11-05: core may change if justified, documented and under the
+size limit):** `FramePass.joins` and the context's `attach` let a package's pass take core's clear and resolve (perf-history
+entry 51). No package can hold this: core owns the clear, the resolve target and the graph's order. Cost: core + stage
+22,522 -> 22,815 B gzip. The exception covers this one change; the freeze applies again after it.
+
 ## Names exported by more than one package
 
 A name declared and exported by two packages must mean the same thing, or be renamed. Decisions:
@@ -1068,7 +1073,7 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 156,772 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 22,522 B). Wasm decoders, workers and lazily loaded parts
+part of a kit pays for that part; core + stage alone is 22,815 B). Wasm decoders, workers and lazily loaded parts
 are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
 moves more than 3%.
 
@@ -2543,7 +2548,7 @@ features add no core or stage functionality.
 
 # Design envelope
 
-Margo is a small WebGPU engine: core plus the stage facade is 22,522 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,134 B of its 21,504 B cap; the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,522 B; storing a caller's 4x view target depth then added 23 B to each), and every
+Margo is a small WebGPU engine: core plus the stage facade is 22,815 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,134 B of its 21,504 B cap; the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,815 B; storing a caller's 4x view target depth then added 23 B to each), and every
 other capability is an optional package. That size is a decision, and so are the boundaries below. Each one exists
 for one of two reasons: it keeps core small and frozen, or it follows the limits WebGPU guarantees on every adapter
 (Margo's device requests none above them, so an app that runs on a laptop also runs on a phone). This page lists every
@@ -2598,6 +2603,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | VFX repeatable particle order (accepted difference in work, Scott 2026-10-30) | Measured (RTX A6000, Edge 156, 2026-10-30, 8 alternating rounds of `examples/package-benchmarks/vfx-gpu.mjs` against the atomic build): simulate compute 0.094 to 0.184 ms at 1,000,000 particles and 0.010 to 0.031 ms at 100,000; draw unchanged. On the WebGL2 layer's CPU tier, simulate wall time 290 to 58 ms at 20,000 and 370 to 250 ms at 100,000 (the package-route row under Platform was measured before this change). | Births take the lowest dead slots and the draw list is in slot order, instead of atomic counters whose order changed from run to run (two runs of one still frame differed on up to 5,965 of 65,536 pixels). The extra work is four small compute passes (workgroup prefix sums) around the simulation; the output is the same particles in a repeatable order. | The same frames draw the same pixels on every run (`packages/vfx/test/browser-check.mjs`, order case). Size: `@margoengine/vfx/base` 7,339 to 7,978 B gzip, the root 12,376 to 12,999 B; the growth of their limits in `scripts/quality/baselines/sizes.json` was approved by Scott on 2026-10-30. | None needed below about 1,000,000 particles; fewer particles (`capacity`) cost proportionally less. |
 | Scatter cull in candidate order (accepted difference in work, 2026-11-05) | Measured (8 alternating rounds of [scatter-cull-gpu.mjs](../examples/package-benchmarks/scatter-cull-gpu.mjs) against the atomic build, 1432 x 768 at 4x MSAA, [A6000 result](../examples/package-benchmarks/results/scatter-cull-gpu-a6000.json), [M6 result](../examples/package-benchmarks/results/scatter-cull-gpu-m6.json)): the distribute pass at 10,000 / 110,000 / 1,000,000 candidates takes 0.012 / 0.044 / 0.049 ms atomic and 0.046 / 0.091 / 0.222 ms ordered on the RTX A6000 (Edge 156, D3D12), 0.011 / 0.111 / 0.485 ms and 0.043 / 0.231 / 1.050 ms on an Apple M6 Mac mini (Chrome for Testing 156, Metal); the LOD draw is unchanged (ratio 0.94 to 1.03). | The atomic cull put each frame's instances in the rings in whichever order the GPU's threads ran, and an Apple M6 at 4x MSAA draws an instance's edge pixels by that order: a still biome view changed about 420 of 76,800 pixels every frame. The extra work: each candidate stores its ring flags (and, when kept, its instance) at its own index, a prefix count over the three rings (`packages/shared/prefix.js`, the WebGL2 route's) gives each its slot, and each ring is compacted (`packages/scatter/src/order.ts`). The output is the same instances in every ring (the benchmark compares them), in candidate order every frame. | Still frames draw the same bits at 4x MSAA (`packages/scatter/test/repeat.browser.mjs`: exact on the A6000 and the M6). GPU memory: about 58 B more per candidate (`ScatterTiles`: per record slot; `gpuBytes` counts it), 32 B of it the culled instance: the zero-config biome world's stored objects went from 5.9 to 12.0 MB; `ScatterTiles` holds at most `maxStorageBufferBindingSize / 32` record slots (4,194,304 at the WebGPU default of 128 MiB, 16,777,216 before). Shadow lists keep their atomic append: a depth-only pass gives the same depth in any order. | Fewer candidates (`count`) cost proportionally less; a candidate past every ring costs its flags and its share of the prefix count only. |
 | Precise maths against the WGSL builtins (accepted difference in work, 2026-11-05) | Measured ([precise-math-gpu.mjs](../examples/package-benchmarks/precise-math-gpu.mjs), RTX A6000, [result](../examples/package-benchmarks/results/precise-math-gpu.json)): on 16,777,216 values `createCompute()` takes 1.0 to 1.8 times `createCompute({ fastMath: true })` for one call per element, `tan` 2.3 times and `pow` 3.0 times (2.19 against 0.72 ms). The path tracer's panorama and fisheye rays cost 1% to 7% of a traced sample. What Margo does extra: the same answer on every GPU within the bounds in the compute README. Trade-off: `fastMath` is faster and as accurate as the GPU happens to be; the tracer has no such option. |
+| Render passes of a package's frame | One colour pass when only packages that `join` draw (`createInstancedMesh`, `CulledInstances`, runs of glTF models): 0.024 ms at 1,000 boxes against 0.039 before (RTX A6000, 2026-11-05, perf-history entry 51). A core mesh in the same scene keeps core's clear pass; a pass after the package keeps core's resolve pass; a glTF model alone in its segment takes core's clear but keeps core's resolve pass, which measured no slower than resolving in the package's pass. |
 
 ## Assets
 
@@ -2639,7 +2645,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
-| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 22,522 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) downloads the WebGL2 compatibility layer and runs every live demo on it (see the next row); only a browser without WebGL2 at the layer's full tier as well gets "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no demo code; the landing page draws no scene. No demo runs on the small WebGL2 preview: each needs effects, particles, skinning or compute, and all of them run on the layer. | `@margoengine/webgl` (3,154 B gzip, stays for v1.0 as the small preview, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo installs the layer without WebGPU, shows the message without WebGL2 too, downloads none of the layer with WebGPU, throws no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). The WebGL2 compatibility layer (`@margoengine/webgl2-compat`) is what the site runs without WebGPU, and the fuller fallback: it runs the WebGPU code of core and the packages as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
+| WebGPU first | Enforced: `Engine.create` uses WebGPU unless the app passes a fallback ([engine.ts](../packages/core/src/engine.ts), [webgl.test.js](../packages/webgl/test/webgl.test.js), [webgl-preview.test.js](../tests/webgl-preview.test.js)). | One backend keeps core + stage at 22,815 B gzip; culling, particles, sections and most effects are compute or WebGPU-only work. | `Error: WebGPU unavailable` (no fallback) or `Error: adapter unavailable` (`backend: 'webgpu'`); on the WebGL2 path, `engine.pick` and `engine.rebootDevice` throw `WebGPU required` (core is frozen, so a plain `Error`), and packages that need WebGPU throw `MargoError` code `unsupported` naming themselves when attached (`PostProcessing requires WebGPU; ...`, `VFX ...`, `Sky ...`, `Shadows ...`). On margoengine.com, a browser without WebGPU (no `navigator.gpu`, or no adapter) downloads the WebGL2 compatibility layer and runs every live demo on it (see the next row); only a browser without WebGL2 at the layer's full tier as well gets "This demo needs a browser with WebGPU: Chrome, Edge or Safari." in the canvas area with a link to [webgpu.html](../site/webgpu.html) on what to update, and downloads no demo code; the landing page draws no scene. No demo runs on the small WebGL2 preview: each needs effects, particles, skinning or compute, and all of them run on the layer. | `@margoengine/webgl` (3,154 B gzip, stays for v1.0 as the small preview, `Engine.create(canvas, {backend: 'auto', fallback: webglRenderer})`): a basic preview of core meshes, shaded per pixel with one directional light plus ambient, no textures, effects or picking. Checked in a real browser with WebGPU removed (`npm run check:no-webgpu`, part of `check:merge`: every site demo installs the layer without WebGPU, shows the message without WebGL2 too, downloads none of the layer with WebGPU, throws no uncaught error, and the preview draws two coloured boxes, read back as pixels) and in [gates-browser-tests.json](../examples/package-benchmarks/results/gates-browser-tests.json). The WebGL2 compatibility layer (`@margoengine/webgl2-compat`) is what the site runs without WebGPU, and the fuller fallback: it runs the WebGPU code of core and the packages as an optional download that WebGPU users never load ([webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)). In React, `loadFallback` fetches the basic fallback only without WebGPU and `fallbackContent` replaces the plain message. |
 | WebGPU pages alive at once | Measured on an Intel Arc 140V laptop (Edge and Chrome 156, headless, 2026-10-30): with 3 WebGPU pages alive in one browser process a new page's `requestDevice` took 10.6 s, and the 4th page never got a device or finished its pipeline compile (4 of 7 runs); 2 pages at once, one page at a time, or 4 separate browsers always started. The NVIDIA RTX A6000 desktop starts 4 at once. Enforced since then: each `Engine.create` startup step (`requestAdapter`, `requestDevice`, each pipeline compile) has a limit ([renderer.ts](../packages/core/src/renderer.ts), [core-startup-watchdog.test.js](../tests/core-startup-watchdog.test.js)). | The stall is in the driver or the browser's GPU process, not the page: the pages already drawing keep drawing every frame while the new one waits. | One `console.warn` (`Margo: still waiting for requestDevice after 8 s; see https://margoengine.com/errors#timeout`) after `startupWarning` ms (default 8,000), then a rejection with `MargoError` code `timeout` naming the step after `startupTimeout` ms (default 30,000); `backend: 'auto'` with a `fallback` draws on WebGL2 instead. Before, `Engine.create` never settled and the canvas stayed blank at 300 x 150. | Start several engines one at a time (each after the previous has drawn) and dispose those that leave the screen; the demo gallery must not start many engines at once. `signal` cancels creation; raise `startupTimeout` for a slow first compile. |
 | Compute on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-28, [compute.html](../packages/webgl2-compat/test/compute.html) cases and a timing page). Compute entry points that store only their own texel run as fragment draws and those with a bounded number of stores as point draws, on the GPU. The rest (atomics, workgroup memory, barriers, stores in loops of unknown length) run on the CPU in JavaScript: a clustered-binning kernel over 3,456 clusters takes 1.5 ms with 16 lights, 2.8 ms with 64 and 9.4 ms with 256 (37 to 94 million loop iterations a second); a 64-wide workgroup reduction with 7 barriers runs 4.4 million invocations a second (65,536 in 14.9 ms). | WebGL2 has no compute shaders, storage buffers or atomics. | The same results as WebGPU (the layer's compute check compares both on one GPU), slower: GPU-written inputs of a CPU kernel are read back synchronously (counted in the device's `stalls`). Multisampled and external textures cannot be read by CPU-tier kernels (MargoError `unsupported`); cube textures are sampled there as on WebGPU, seamless; CPU kernels need a page that allows JavaScript compiled at run time (CSP `unsafe-eval`; nothing else in the layer does). A CPU-tier dispatch stops at its work budget, 100,000,000 invocations plus loop iterations by default (`cpuWorkBudget`), and is reported as a `GPUInternalError` coded `failed` with nothing stored. | Keep per-frame CPU-tier work under the numbers measured here; [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md) lists the tiers. A transform-feedback tier for own-index stores is parked (speed only: those stores already run on the scatter tier with the same pixels, about 0.09 ms more per stored word, measured in the roadmap). |
 | Package routes on the WebGL2 compatibility layer | Measured (Edge 156, ANGLE Direct3D 11, NVIDIA RTX A6000, 2026-10-29, frame wall time, native WebGPU then the layer; [routes-browser.mjs](../packages/webgl2-compat/test/routes-browser.mjs) checks the pixels). DOF at 1280 x 720: 0.72 ms, 10.1 ms on its route (913 ms on the generic CPU tier before). Splats: 10,000 in 1.2 ms, 17.9 ms (44 ms before); 100,000 in 2.1 ms, 39 ms (308 ms before). `CulledInstances`, 10,000 parts: 0.98 ms, 1.14 ms (11.7 ms before). VFX on the CPU tier, its plan's route: 5,000 particles 0.61 ms, 6.5 ms; 50,000 in 0.67 ms, 48 ms. Scatter on the CPU tier: 10,000 instances 0.56 ms, 5.4 ms; 100,000 in 0.85 ms, 40 ms. | WebGL2 has no workgroup memory, atomics or compute; each route does the same work another way. | The same pixels as native WebGPU. Splats read their projected keys back once a frame (a counted stall); `'occlusion'` culling culls against the frustum only (the same image, more parts drawn). The voxel path tracer and XR refuse the layer (MargoError `unsupported`). | Budget VFX particles and scatter instances by the per-frame times measured here (about 1 µs per particle and 0.4 µs per instance on this PC). |
@@ -2656,7 +2662,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ### React page
 
-What a minimal React page downloads, and why it is larger than core + stage (22,522 B gzip). The cube page of the
+What a minimal React page downloads, and why it is larger than core + stage (22,815 B gzip). The cube page of the
 bundler matrix (`Canvas`, `Mesh`, `BoxGeometry`, `PbrMaterial`, `useFrame`, and `OrbitControls` from
 `@margoengine/react/controls`), built by Vite 8.3.4, React 19.3 and `@margoengine/react` installed alone with
 `@margoengine/controls` (2026-10-27), measured from the build's source maps (minified bytes per package; gzip is each
@@ -3188,9 +3194,9 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
 
 ### createInstancedMesh draws 50,000 boxes slower than three.js
 
-- **What:** `@margoengine/materials` `createInstancedMesh` boxes at 50,000: GPU 0.546 ms against three's WebGL2
-  `InstancedMesh` 0.469 ms and WebGPU 0.351 ms (10,000: 0.146 against 0.127 and 0.135 ms; run of 2026-11-05, diagnostic).
-  `CulledInstances` draws the same scene in 0.298 ms.
+- **What:** `@margoengine/materials` `createInstancedMesh` boxes at 50,000: GPU 0.539 ms against three's WebGL2
+  `InstancedMesh` 0.467 ms and WebGPU 0.361 ms (run of 2026-11-05, diagnostic). `CulledInstances` draws the same scene in
+  0.284 ms. At 10,000 Margo now leads (0.111 against 0.127 and 0.141 ms, perf-history entry 51).
 - **Fixed part:** gltf-pro now fetches and passes only what the finished shader reads (0.615 to 0.546 ms, perf-history
   entry 50).
 - **Cause of the rest: not found.** Ruled out by measurement on the same page: the fragment stage (a shader returning the
@@ -3198,18 +3204,6 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
   measurement of this entry, texture reads and the node x instance matrix product. The time is in the vertex stage or
   before it. **Next to test:** the 80-byte vertex stride and the 96-byte instance stride, against a compact position and
   normal stream.
-
-### A package's own render pass costs a fixed MSAA store and reload
-
-- **What:** at 1,000 boxes both Margo instancing paths take 0.037-0.039 ms of GPU per frame against three's WebGL2
-  0.030 ms (three's WebGPU renderer 0.050 ms).
-- **Cause (measured):** core draws a frame in one render pass when no package adds one. A package pass (gltf-pro for
-  `createInstancedMesh`, `CulledInstances`) makes core store its multisampled colour and depth, the package reload
-  and store them, and core resolve them in a final pass: three passes against one. The resolve pass's depth
-  attachment is not the cost (removing it: 0.037 -> 0.037 ms).
-- **Plan:** let a package draw inside core's main pass (for example a frame-graph pass that core encodes in its own
-  render pass when it needs only core's targets). That is a new core capability, so it waits for the core freeze to
-  lift; until then the cost is about 0.01 ms per frame and matters only for very small scenes.
 
 ### Moving instances spend twice three's CPU per frame
 
@@ -3582,7 +3576,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 22,522 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 22,815 B gzip.
 
 Use either name; they are interchangeable. Each package is still published on its own (`@margoengine/shadows`) for
 apps that want a smaller install.

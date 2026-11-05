@@ -426,7 +426,7 @@ test('capture lists exactly the recorded commands, pass by pass, with pipelines,
   assert.deepEqual(
     main.attachments.map((item) => [item.target, item.view?.format, item.view?.sampleCount, item.resolveTarget?.label]),
     [
-      ['color', 'bgra8unorm', 4, 'canvas'],
+      ['color', 'bgra8unorm', 4, undefined],
       ['depth', 'depth32float', 4, undefined],
     ],
   );

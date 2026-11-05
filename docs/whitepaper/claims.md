@@ -27,7 +27,7 @@ or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 
 | Claim | Where | Evidence | Command | Status |
 | --- | --- | --- | --- | --- |
-| Core + stage is 22,522 B gzip (55,595 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` at the core cleanup landing (2026-10-30) | `npm run build:packages && npm run measure:size` | PROVEN |
+| Core + stage is 22,815 B gzip (56,578 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `examples/package-benchmarks/results/entry-sizes.json` at the core cleanup landing (2026-10-30) | `npm run build:packages && npm run measure:size` | PROVEN |
 | The build fails at 25,000 B gzip for core + stage | README, site | `scripts/core-budget.js`, run by `build:packages` and `measure:size` | `npm run build:packages` | PROVEN |
 | Every other package is optional and has its own size | README | `entry-sizes.json` (every exports entry and worker) | `npm run build:site` | PROVEN |
 | An engine starts with 1,024 entity slots and doubles up to 8,388,608 | site | `packages/core/src/kernel.ts`; `tests/core-dirty-transforms.test.js` (1,000,000 entities) | `npm test` | PROVEN |
@@ -41,7 +41,7 @@ and commit.
 
 | Page | Figures | Evidence | Status |
 | --- | --- | --- | --- |
-| engine | Core 21,134 B (51,774 raw), core + stage 22,522 B (55,595 raw), 2,478 B under the gate | `entry-sizes.json` at the item 53.2 dynamic instances landing (2026-10-29, dirty: false) | PROVEN |
+| engine | Core 21,431 B (52,756 raw), core + stage 22,815 B (56,578 raw), 2,185 B under the gate | `entry-sizes.json` at the item 53.2 dynamic instances landing (2026-10-29, dirty: false) | PROVEN |
 | engine | 98 packages (none published to npm yet); `npm i margoengine`; kit sizes (game 307,012, viz 277,396, web 155,058 B) | `docs/catalog.json`; `docs/guides/kits.md`, re-measured by `tests/umbrella.test.js` (fails on a 3% move) | PROVEN |
 | engine | Starter first frames: web 788, react 835, viz 968, game 1,308 ms (vite dev, packages linked, one run each, RTX A6000 PC) | `examples/package-benchmarks/results/starters-first-frame.json` (`tools/create-margo/test/browser-check.mjs`) | PROVEN (dated, one run) |
 | engine | 6,498 tests, 6,496 pass, 2 skipped (Node 26.12, `01836c27`) | `examples/package-benchmarks/results/test-count.json` | PROVEN |
@@ -101,7 +101,7 @@ backs them yet:
 
 | ID | Claim | Evidence | Command | Status | Note |
 | --- | --- | --- | --- | --- | --- |
-| LIM-001 | "core plus the stage facade is 22,522 B gzip"; the build fails at 25,000 bytes (docs/limits.md, intro) | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage.gzip` 22522, at the commit the record names); `scripts/core-budget.js` (`CORE_STAGE_GZIP_LIMIT`) | `npm run build:packages && npm run measure:size` | PROVEN | The figure moves a little with most changes to core; the record names its commit. |
+| LIM-001 | "core plus the stage facade is 22,815 B gzip"; the build fails at 25,000 bytes (docs/limits.md, intro) | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage.gzip` 22522, at the commit the record names); `scripts/core-budget.js` (`CORE_STAGE_GZIP_LIMIT`) | `npm run build:packages && npm run measure:size` | PROVEN | The figure moves a little with most changes to core; the record names its commit. |
 | LIM-002 | Entities: "8,388,608 slots (2^23)", starts at `capacity` (default 1,024) and doubles; `RangeError: Capacity` / `Capacity: 1..8388608`; a failed growth leaves the store as it was (docs/limits.md, Scale) | `packages/core/src/kernel.ts` (`create`, `grow`), `engine.ts` `createMesh` and `Engine.create` (`capacity ?? 1024`); `tests/core-dirty-transforms.test.js` asserts `/Capacity/` at 2^23 + 1 and growth from 1,024 (in verify) | `node --test tests/core-dirty-transforms.test.js` | PROVEN | See also S-04. |
 | LIM-003 | "352.1 B of kernel memory per slot at 1,048,576 slots (351 B by layout)" (docs/limits.md, Scale) | `examples/package-benchmarks/parts/results-scale-node.json` (`kernelBytesPerSlot` 352.1 at 1,000,012 entities; Node 24, AC, quiet-gated at 8% CPU, not diagnostic); layout in `packages/kernel/src/lib.rs` (86 float columns + 7 flag bytes) | `node --expose-gc examples/package-benchmarks/parts/scale-node.mjs` | PROVEN | - |
 | LIM-004 | "a static kernel tick costs 3.3 ms at 100,006 entities, 20.2 ms at 499,992 and 41.5 ms at 1,000,012"; "about 41 ns per entity per frame even when nothing moves"; above 1,048,576 slots "not measured" (docs/limits.md, Scale) | Same JSON (`tickStaticMs` 3.328 / 20.153 / 41.461); 41.461 ms / 1,000,012 = 41 ns | same | PROVEN | Node CPU timings, same Wasm as the browser, fake renderer. |
@@ -153,6 +153,7 @@ backs them yet:
 | LIM-050 | Capsule: box, OBB, triangle and capsule tests match the exact point distance minimised along the axis on 6,500 seeded pairs; pushOutOfTriangle always resolves the overlap on 2,000 pairs; ray entries match sphere tracing on 2,000 rays within 1e-6 (docs/limits.md, Geometry) | `packages/math/test/capsule.test.js` | `npm test --workspace packages/math` | PROVEN | |
 | LIM-051 | Tessellation: no edge stays over the limit, the surface does not change, and meshes stay closed across seams and after displacement (docs/limits.md, Geometry) | `packages/geometry/tests/tessellate.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 | LIM-052 | GPU geometry: generated vertices match closed forms and the curve through their points on a real GPU, with triangles facing their normals, and survive a replaced vertex buffer and a lost device (docs/limits.md, Geometry) | `packages/geometry/tests/gpu.test.js`, `packages/geometry/tests/gpu-check.mjs` | `npm test --workspace packages/geometry` | PROVEN | |
+| LIM-053 | A package's frame is one colour render pass, unchanged bit for bit in opaque scenes (docs/limits.md, Rendering) | `packages/culling/test/gpu/last-pass-check.mjs`, `tests/modern-msaa.test.js` | `npm run test:gpu --workspace packages/culling` | PROVEN | RTX A6000 only |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 
@@ -295,7 +296,7 @@ as one value (`canonicalNaN`); every other bit, -0 included, still counts.
 | materials-atlas (measurement, no baseline) | geometry + materials at `700838e` | - |
 | binding-limit | `e017d50` -> `f8a36ca`: 3,812 calls without IBL, 4,556 with (384 mapped) | - |
 | gltf-pro-lighting-hooks | `15c87f1` -> `cf2953e`: 4,556 calls; texture transform: `114130c` -> `7072190` | `6a958e532` |
-| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `fa2a70f3`: 1,085 calls |
+| materials-uv-transform | `1970fda` -> `700838e`: 1,277 calls; texture transform: `114130c` -> `7072190` | `20a5e259`: 1,085 calls |
 | lines-perspective | `96edc75` -> `6da7f7e`: 946 calls | `2d192a71` (per-line clipping planes at `86063c47`: the style uniform grew from 128 to 224 bytes and the shader gained a world-position varying and a zero-count plane loop; then `clipIntersection` at `2d192a71` changed that loop to count the planes a point is behind. Unclipped lines' calls and writes changed on purpose both times) |
 | math-consolidation | `2484971` -> `4eed254` (math built at the pin) | `2484971` |
 | post-stack | `5b1fe66^` -> `5b1fe66`: 12,378 calls (creative `5b1fe66^` -> `3319317`) | `6a958e532` |
@@ -430,7 +431,7 @@ chain (`writeTexture`, views, the mip bind groups, passes and draws) now come be
 `beginRenderPass` instead of after it. Both orders upload before the frame's commands run. The full trace matches
 `e2cb3815`.
 
-**materials-uv-transform, advanced to `fa2a70f3` on 2026-11-05 (perf-history entry 50):** gltf-pro trims a pipeline to the vertex inputs its finished shader reads. The story's one material with no maps changes: of 1,085 calls, one shader module and one render pipeline differ, and every other call, binding and upload is as before. `packages/materials/test/vertex-inputs-browser.mjs` shows the pixels do not change.
+**materials-uv-transform, advanced to `20a5e259` on 2026-11-05 (perf-history entry 50):** gltf-pro trims a pipeline to the vertex inputs its finished shader reads. The story's one material with no maps changes: of 1,085 calls, one shader module and one render pipeline differ, and every other call, binding and upload is as before. `packages/materials/test/vertex-inputs-browser.mjs` shows the pixels do not change.
 
 **gltf-pro-lighting-hooks, oit-detached and materials-uv-transform, advanced to `641246d3` on 2026-10-26 (speed matrix
 row 12.7, perf-history entry 32):** gltf-pro makes one default view per texture and one sampler per device and sampler

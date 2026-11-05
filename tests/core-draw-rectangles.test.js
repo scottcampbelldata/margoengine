@@ -83,7 +83,8 @@ test('WebGPU rectangles preserve whole-attachment clears, later loads and MSAA s
       ['load', 'load', 'store', 'store'],
     ],
   );
-  assert.ok(draws.every(({ descriptor: d }) => d.colorAttachments[0].resolveTarget?.canvas));
+  assert.ok(draws.every(({ descriptor: d }) => !d.colorAttachments[0].resolveTarget), 'only the last pass resolves');
+  assert.ok(h.passes.at(-1).descriptor.colorAttachments[0].resolveTarget?.canvas);
   const final = h.passes.at(-1);
   assert.deepEqual(final.commands, [['end']], 'the last pass only resolves the preserved samples');
   assert.equal(final.descriptor.colorAttachments[0].loadOp, 'load');

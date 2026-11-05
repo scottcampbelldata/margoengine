@@ -122,8 +122,8 @@ page, `diag` scripts of this change's session):
      takes 50k from 0.642 to 0.47 ms, level with three. Not fixed yet (known-bugs).
 3. *CulledInstances' compute culling pays for itself.* At 10k and 50k it is the fastest of the four on the GPU. At 1k
    both Margo paths lose about 0.01 ms to a fixed cost: a package's own render pass makes core store and reload its
-   multisampled targets and resolve in an extra pass (three passes against one). Not fixable inside the core freeze
-   (known-bugs).
+   multisampled targets and resolve in an extra pass (three passes against one). Fixed 2026-11-05 (perf-history entry
+   51): one pass, 0.024 ms against three's 0.031 ms.
 4. *Moving instances.* `CulledInstances.setTransform` wrote two buffers per part (20,000 GPU calls a frame) and
    computed each part's bounding sphere on the CPU: now one upload per frame for the changed range, and the cull pass
    derives the sphere from the matrix. Both paths also gained from a closed-form `Quaternion.setFromEuler` (the
@@ -148,8 +148,8 @@ Reading (diagnostic only):
 - `CulledInstances` now has the highest frame rate of the four at 1k, 10k and 50k static boxes and the lowest GPU
   time at 10k and 50k (0.300 against 0.472 ms at 50k). Its moving case went from 69 to 618 FPS.
 - Still open, each with its cause and plan in [known-bugs.md](../known-bugs.md#performance-losses-still-open):
-  `createInstancedMesh` GPU at 10k-50k (vertex fetch), the 1k GPU time of both paths (a package pass's fixed MSAA
-  cost; 0.038-0.039 against 0.030 ms), and CPU for moving instances (1.2-1.3 against 0.62 ms; three's WebGPU
+  `createInstancedMesh` GPU at 50k (the 1k cost of a package pass closed in perf-history entry 51), and CPU for moving
+  instances (1.2-1.3 against 0.62 ms; three's WebGPU
   renderer 0.91 ms).
 
 

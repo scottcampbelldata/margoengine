@@ -3603,6 +3603,7 @@ function queue(runtime: Engine): MaterialDraws {
       graph.add({
         name,
         order: 1,
+        joins: true,
         execute: (c) => {
           if (c.backend !== 'webgpu') return;
           if (!arranged) arrange();

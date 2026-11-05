@@ -245,6 +245,7 @@ interface FramePass {
     order: number;
     execute(context: PassContext): void;
     prepare?(context: PassContext): void;
+    joins?: boolean;
 }
 
 interface GeometryBuffers {
@@ -281,6 +282,9 @@ type PassContext = {
             depth?: GPUTexture;
         };
     };
+    last?: boolean;
+    joins?: boolean;
+    only?: boolean;
     draw(options?: DrawOptions): void;
 } & ({
     backend: 'webgpu';
@@ -294,6 +298,8 @@ type PassContext = {
     bindings: GPUBindGroupEntry[];
     indirect: boolean;
     descriptor: GPURenderPipelineDescriptor;
+    attach?(color: GPURenderPassColorAttachment, depth: GPURenderPassDepthStencilAttachment, last: boolean): void;
+    settle?(): void;
 } | {
     backend: 'webgl2';
     gl: WebGL2RenderingContext;

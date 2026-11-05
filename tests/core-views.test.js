@@ -435,6 +435,6 @@ test('a 4x target depth in the scene format keeps what the scene drew: every pas
       passes.map(() => 'store'),
       `${draws ? 'with' : 'without'} a package pass, no pass discards the caller depth`,
     );
-    assert.equal(h.draws().at(-1).descriptor.colorAttachments[0].resolveTarget.caller, 'bgra8unorm');
+    assert.equal(h.passes.at(-1).descriptor.colorAttachments[0].resolveTarget.caller, 'bgra8unorm');
   }
 });

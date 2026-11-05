@@ -1415,6 +1415,22 @@ interface DrawScratch {
   liveBatches: Map<StaticBatch, boolean>;
   blendDistance: Map<DrawResource, number>;
 }
+/** Begins the render pass of `draw`, which stays open for the draws after it. */
+function openPass(c: Context, scratch: DrawScratch, color: GPUTextureView, depth: GPUTextureView, closing: unknown) {
+  const stencil = c.descriptor.depthStencil!.format.includes('stencil'),
+    target = scratch.depth,
+    attachment = scratch.color;
+  attachment.view = color;
+  target.view = depth;
+  if (attachment.resolveTarget) attachment.resolveTarget = undefined;
+  attachment.loadOp = target.depthLoadOp = 'load';
+  attachment.storeOp = target.depthStoreOp = 'store';
+  target.stencilLoadOp = stencil ? 'load' : undefined;
+  target.stencilStoreOp = stencil ? 'store' : undefined;
+  // A run in the graph's last pass is one render pass and resolves the frame; a queue draws its blends in a later one.
+  c.attach?.(attachment, target, !!closing && !opaquePasses.get(c));
+  return c.encoder.beginRenderPass(scratch.descriptor);
+}
 function createDrawScratch(color: GPUTextureView, depth: GPUTextureView): DrawScratch {
   const attachment: GPURenderPassColorAttachment = { view: color, loadOp: 'load', storeOp: 'store' };
   const depthAttachment: GPURenderPassDepthStencilAttachment = {
@@ -2662,6 +2678,7 @@ export class PBRModel implements EnginePlugin {
     graph.add({
       name: this.name,
       order: 1,
+      joins: true,
       execute: (c) => {
         if (c.backend === 'webgpu') this.drawSegment(c, own);
       },
@@ -3060,7 +3077,8 @@ export class PBRModel implements EnginePlugin {
       if (phase === 'blend') return;
       phase = 'opaque';
     }
-    const scratch = (scratchStack[scratchDepth] ??= createDrawScratch(color, depth)),
+    const closing = mode === 'beauty' && carry,
+      scratch = (scratchStack[scratchDepth] ??= createDrawScratch(color, depth)),
       camera = c.camera,
       lighting = this.engine.lighting;
     scratch.eye.set(camera.position);
@@ -3219,12 +3237,7 @@ export class PBRModel implements EnginePlugin {
         // A run draws meshes that differ only in their node matrix as one instanced draw (draw-batch.ts).
         if (batching && batchable(d, r, det)) {
           if (!pass) {
-            scratch.color.view = color;
-            scratch.depth.view = depth;
-            const stencil = c.descriptor.depthStencil!.format.includes('stencil');
-            scratch.depth.stencilLoadOp = stencil ? 'load' : undefined;
-            scratch.depth.stencilStoreOp = stencil ? 'store' : undefined;
-            run.pass = pass = c.encoder.beginRenderPass(scratch.descriptor);
+            run.pass = pass = openPass(c, scratch, color, depth, closing);
             applyView(pass, c);
           }
           if (!viewAt) {
@@ -3291,12 +3304,7 @@ export class PBRModel implements EnginePlugin {
             pass = undefined;
           }
           if (!pass) {
-            scratch.color.view = color;
-            scratch.depth.view = depth;
-            const stencil = c.descriptor.depthStencil!.format.includes('stencil');
-            scratch.depth.stencilLoadOp = stencil ? 'load' : undefined;
-            scratch.depth.stencilStoreOp = stencil ? 'store' : undefined;
-            pass = c.encoder.beginRenderPass(scratch.descriptor);
+            pass = openPass(c, scratch, color, depth, closing);
             applyView(pass, c);
           }
           target = pass;

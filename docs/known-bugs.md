@@ -490,9 +490,9 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
 
 ### createInstancedMesh draws 50,000 boxes slower than three.js
 
-- **What:** `@margoengine/materials` `createInstancedMesh` boxes at 50,000: GPU 0.546 ms against three's WebGL2
-  `InstancedMesh` 0.469 ms and WebGPU 0.351 ms (10,000: 0.146 against 0.127 and 0.135 ms; run of 2026-11-05, diagnostic).
-  `CulledInstances` draws the same scene in 0.298 ms.
+- **What:** `@margoengine/materials` `createInstancedMesh` boxes at 50,000: GPU 0.539 ms against three's WebGL2
+  `InstancedMesh` 0.467 ms and WebGPU 0.361 ms (run of 2026-11-05, diagnostic). `CulledInstances` draws the same scene in
+  0.284 ms. At 10,000 Margo now leads (0.111 against 0.127 and 0.141 ms, perf-history entry 51).
 - **Fixed part:** gltf-pro now fetches and passes only what the finished shader reads (0.615 to 0.546 ms, perf-history
   entry 50).
 - **Cause of the rest: not found.** Ruled out by measurement on the same page: the fragment stage (a shader returning the
@@ -500,18 +500,6 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
   measurement of this entry, texture reads and the node x instance matrix product. The time is in the vertex stage or
   before it. **Next to test:** the 80-byte vertex stride and the 96-byte instance stride, against a compact position and
   normal stream.
-
-### A package's own render pass costs a fixed MSAA store and reload
-
-- **What:** at 1,000 boxes both Margo instancing paths take 0.037-0.039 ms of GPU per frame against three's WebGL2
-  0.030 ms (three's WebGPU renderer 0.050 ms).
-- **Cause (measured):** core draws a frame in one render pass when no package adds one. A package pass (gltf-pro for
-  `createInstancedMesh`, `CulledInstances`) makes core store its multisampled colour and depth, the package reload
-  and store them, and core resolve them in a final pass: three passes against one. The resolve pass's depth
-  attachment is not the cost (removing it: 0.037 -> 0.037 ms).
-- **Plan:** let a package draw inside core's main pass (for example a frame-graph pass that core encodes in its own
-  render pass when it needs only core's targets). That is a new core capability, so it waits for the core freeze to
-  lift; until then the cost is about 0.01 ms per frame and matters only for very small scenes.
 
 ### Moving instances spend twice three's CPU per frame
 

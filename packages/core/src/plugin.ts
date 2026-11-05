@@ -58,6 +58,12 @@ export type PassContext = {
     layers?: number;
     target?: { color: GPUTexture; depth?: GPUTexture };
   };
+  /** True while the graph's last pass runs, if it `joins`. */
+  last?: boolean;
+  /** True while the pass before one that `joins` runs. */
+  joins?: boolean;
+  /** @internal True during the main pass's draw, its only one: with nothing to draw it may leave its clear to a pass that joins, and as the graph's last pass it resolves the frame. */
+  only?: boolean;
   draw(options?: DrawOptions): void;
 } & (
   | {
@@ -73,6 +79,15 @@ export type PassContext = {
       bindings: GPUBindGroupEntry[];
       indirect: boolean;
       descriptor: GPURenderPipelineDescriptor;
+      /**
+       * For a {@link FramePass} that `joins`: call it just before each `beginRenderPass` on `color` and `depth`, on
+       * attachments set to `load` and `store`. The first call takes the clear core left for this pass. With `last` true,
+       * meaning no render pass on them follows in this pass, the attachments resolve the multisampled colour, if this is
+       * the graph's last pass, and core adds no resolve pass.
+       */
+      attach?(color: GPURenderPassColorAttachment, depth: GPURenderPassDepthStencilAttachment, last: boolean): void;
+      /** @internal Runs a clear left for a pass that took none. */
+      settle?(): void;
     }
   | { backend: 'webgl2'; gl: WebGL2RenderingContext }
 );
@@ -86,6 +101,12 @@ export interface FramePass {
   order: number;
   execute(context: PassContext): void;
   prepare?(context: PassContext): void;
+  /**
+   * The pass opens its render passes on the context's `color` and `depth` through `attach`, and before its first one
+   * reads neither. When the pass before it has nothing to draw, its clear then happens in this pass's first render pass;
+   * as the graph's last pass, the render pass it marks `last` resolves the frame.
+   */
+  joins?: boolean;
 }
 /**
  * Runtime plugin attached with `engine.use(plugin)` or `scene.use(plugin)`. `name` must be non-empty and unique per scene. `setup` and
@@ -114,7 +135,16 @@ export interface EnginePlugin {
 export class FrameGraph {
   revision = 0;
   private passes: Array<FramePass & { owner?: string }> = [
-    { name: 'main', order: 0, execute: (context) => context.draw() },
+    {
+      name: 'main',
+      order: 0,
+      joins: true,
+      execute: (context) => {
+        context.only = true;
+        context.draw();
+        context.only = false;
+      },
+    },
   ];
   private owner?: string;
   private executing = false;
@@ -160,7 +190,12 @@ export class FrameGraph {
     this.executing = true;
     try {
       // By index: an array iterator would be garbage every frame.
-      for (let i = 0; i < this.passes.length; i++) this.passes[i].execute(context);
+      for (let i = 0; i < this.passes.length; i++) {
+        context.last = i + 1 === this.passes.length && this.passes[i].joins;
+        context.joins = this.passes[i + 1]?.joins;
+        this.passes[i].execute(context);
+        if (context.backend === 'webgpu' && !context.joins) context.settle?.();
+      }
     } finally {
       this.executing = false;
     }

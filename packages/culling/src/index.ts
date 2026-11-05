@@ -322,6 +322,7 @@ export class CulledInstances implements EnginePlugin {
     graph.add({
       name: this.name,
       order: 1,
+      joins: true,
       execute: (c) => {
         if (c.backend === 'webgpu') this.draw(c);
       },
@@ -651,6 +652,11 @@ export class CulledInstances implements EnginePlugin {
     this.color.view = c.color;
     this.target.view = c.depth;
     this.target.stencilReadOnly = c.descriptor.depthStencil!.format.includes('stencil') || undefined;
+    this.target.stencilLoadOp = this.target.stencilStoreOp = undefined;
+    this.color.resolveTarget = undefined;
+    this.color.loadOp = this.target.depthLoadOp = 'load';
+    this.color.storeOp = this.target.depthStoreOp = 'store';
+    c.attach?.(this.color, this.target, true);
     const main = c.encoder.beginRenderPass(this.main);
     let current: GPURenderPipeline | undefined;
     this.batches.forEach((batch, i) => {

@@ -1399,7 +1399,37 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   pipelines' attribute counts.
 - **Still open:** the rest of the gap ([known-bugs.md](../known-bugs.md#createinstancedmesh-draws-50000-boxes-slower-than-threejs)).
 
-### 50. Polygon offsets: 59 s to 1.9 s by changing the method, same result
+### 51. A package's boxes draw in one render pass
+
+- **Loss:** 1,000 boxes took 0.039 ms (`createInstancedMesh`) and 0.037 ms (`CulledInstances`) of GPU against three's
+  WebGL2 0.032 ms, because a package's pass made a frame three render passes: core's clear, the package's, and core's
+  resolve, each storing or reloading the 4x colour and depth. The clear pass also resolved, for nothing: the final
+  pass overwrote it.
+- **Fix:** core (approved by Scott for this job, 2026-11-05; 293 bytes of core + stage gzip). The main pass resolves only
+  when no pass follows. A `FramePass` can declare `joins`: when the main pass has nothing to draw, it leaves its clear to
+  that pass, whose first render pass takes it through `context.attach`, and the graph's last render pass resolves the
+  frame. No package could hold this: core owns the clear, the resolve target and the order of the graph. The main pass
+  also resolves by itself as the graph's last pass, so a frame with only earlier passes (shadows) is one colour pass too.
+- **Measured step by step:** dropping the wasted resolve 0.039 -> 0.034; moving the resolve into the package's pass as well
+  0.034 -> 0.034 (no gain alone); taking the clear as well 0.034 -> 0.024.
+- **After:** RTX A6000, Chromium 156, 2026-11-05, three runs, diagnostic (the machine was shared). GPU ms a frame:
+
+  | Boxes | Path | Before | After | three WebGL2 | three WebGPU |
+  | --- | --- | --- | --- | --- | --- |
+  | 1,000 | `createInstancedMesh` | 0.039 | 0.024 | 0.031 | 0.048 |
+  | 1,000 | `CulledInstances` | 0.037 | 0.030 | 0.031 | 0.048 |
+  | 10,000 | `createInstancedMesh` | 0.146 | 0.111 | 0.127 | 0.141 |
+  | 50,000 | `createInstancedMesh` | 0.546 | 0.539 | 0.467 | 0.361 |
+
+  The 10,000 figure is run `20261105-194051`; the full comparison run read 0.139 there, marked noisy, and 0.110 on the
+  same scene moving. A scene with core meshes of its own keeps the clear in the main pass and gains only the first step.
+- **Same output:** `packages/culling/test/gpu/last-pass-check.mjs` draws each path with the new passes and with core's own,
+  bit for bit for opaque scenes. Blended scenes may differ on under 1% of their pixels, the GPU's own 4x blending noise
+  ([known-bugs.md](../known-bugs.md#4x-msaa-blending-is-not-repeatable-rtx-a6000-under-cpu-load-and-intel-arc-140v)).
+- **Rerun:** `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3`.
+- **Guard:** the browser test above, which also asserts the number of colour passes, and `tests/modern-msaa.test.js`.
+
+### 52. Polygon offsets: 59 s to 1.9 s by changing the method, same result
 
 - **Loss:** the first `polygonOffset` took 59 s on a 20,000-point wavy outline (distance 0.5). It added one band per
   edge to the polygon. On a finely sampled outline each band overlaps hundreds of neighbours, and every overlap is a
@@ -1432,8 +1462,8 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   - Rerun: `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3`.
   - Guard: `packages/culling/test/culling.test.js`, `packages/materials/test/materials.test.js`,
     `packages/math/test/euler-quaternion.test.js`, `packages/gltf-pro/tests/instancing.test.js`.
-  - Still open: `createInstancedMesh` vertex fetch at 10k-50k, the 1k GPU cost of a package pass, and CPU for moving
-    instances. Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
+  - Still open: `createInstancedMesh` at 50k and CPU for moving instances (the 1k cost of a package pass closed in
+    entry 51). Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
 - **STL import and USDZ export against three.js: partly closed (entries 26 and 31).** `p-stl` (the plain `parseSTL`)
   4.7 ms against 2.7 (accepted difference in work, see entry 31; with three's `computeVertexNormals()` on both sides,

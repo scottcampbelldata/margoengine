@@ -351,6 +351,8 @@ Calls outside that optional phase retain their existing order and bindings.
 An extension with `afterOpaque: true` (materials transmission sets it) also flushes with the blended draws, after the
 opaque capture, but keeps its authored alpha mode, blending and depth writes; such primitives cast no opaque shadows.
 
+A package whose frame-graph pass draws one run and nothing else can declare `joins` on its pass: the run's render pass then takes core's clear and resolves the frame ([core README](../core/README.md#viewport-and-scissor-per-core-draw)), one render pass for the whole frame.
+
 A package that draws many models itself passes a `PBRDrawRun` as the last argument of `draw()`. Every `draw()` of the
 run continues one render pass instead of beginning its own, which saves a store and a reload of the multisampled colour
 and depth per model (10,000 meshes of `@margoengine/materials` cost 168 ms of CPU a frame with a pass each). Blended

@@ -702,8 +702,8 @@ test('Reusable frame context resets plugin overrides and cap passes load beauty 
       { color: 'hdr-color', load: 'clear', depth: 'hdr-depth', depthLoad: 'clear', stencilLoad: 'clear' },
       { color: 'hdr-color', load: 'load', depth: 'hdr-depth', depthLoad: 'load', stencilLoad: 'clear' },
       { color: 'core-color', load: 'load', depth: 'core-depth', depthLoad: 'load', stencilLoad: undefined },
+      // The main pass is the graph's last now: it resolves the frame itself, with no resolve pass after it.
       { color: 'core-color', load: 'clear', depth: 'core-depth', depthLoad: 'clear', stencilLoad: 'clear' },
-      { color: 'core-color', load: 'load', depth: 'core-depth', depthLoad: 'load', stencilLoad: undefined },
     ]);
     assert.equal(passContext.bindings.length, 0);
   } finally {

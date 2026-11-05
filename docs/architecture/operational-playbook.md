@@ -248,6 +248,12 @@ Unmeasured: that cost on other GPUs, one kernel rotation-sync call, and cross-ma
 gltf-pro trims each pipeline to the vertex inputs its finished shader reads (`packages/gltf-pro/src/vertex-inputs.ts`), after
 every shader patch. Evidence: `packages/materials/test/vertex-inputs-browser.mjs` (no pixel differs, RTX A6000 only).
 
+A frame is one colour render pass when only a package draws. The main pass with nothing to draw leaves its clear to a next
+pass that declares `joins`; that pass opens its render passes through `context.attach`, and the last one resolves. A clear
+nobody took runs before the following pass. Core resolves in a pass of its own only when the graph's last pass did not.
+Evidence: `packages/culling/test/gpu/last-pass-check.mjs` (pass counts, frames unchanged) and `tests/modern-msaa.test.js`, RTX
+A6000 only; the gain on tile-based GPUs is unmeasured.
+
 ### 3.1 Fallback ladder
 
 | Tier | Behavior | Loading and cost |

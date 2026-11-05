@@ -192,6 +192,33 @@ const leftView: FramePass = {
 
 Both tuples use top-left drawing-buffer pixels, with nonnegative integer origins and positive integer sizes. Invalid or out-of-bounds rectangles throw before drawing. Custom target owners must set the context dimensions to match their active attachments. Omitted rectangles use the full target and do not retain the preceding draw's state.
 
+A pass that opens its own render passes on `color` and `depth` can declare `joins`, and the frame then needs no render pass of core's. Set the attachments to `load` and `store` each frame and call `attach` just before each `beginRenderPass`; `true` means no render pass on them follows in this pass. The first call takes core's clear when core has nothing to draw, and in the graph's last pass the attachments resolve the frame. A pass that draws nothing need do nothing: core clears and resolves as usual.
+
+```ts
+import type { FramePass } from 'margoengine/core/extension';
+
+const color: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
+const depth: GPURenderPassDepthStencilAttachment = { view: undefined!, depthLoadOp: 'load', depthStoreOp: 'store' };
+const ownPass: FramePass = {
+  name: 'own-pass',
+  order: 1,
+  joins: true,
+  execute(context) {
+    if (context.backend !== 'webgpu') return;
+    color.view = context.color;
+    depth.view = context.depth;
+    color.resolveTarget = undefined;
+    color.loadOp = depth.depthLoadOp = 'load';
+    color.storeOp = depth.depthStoreOp = 'store';
+    const stencil = context.descriptor.depthStencil!.format.includes('stencil');
+    depth.stencilLoadOp = stencil ? 'load' : undefined;
+    depth.stencilStoreOp = stencil ? 'store' : undefined;
+    context.attach?.(color, depth, true);
+    context.encoder.beginRenderPass({ colorAttachments: [color], depthStencilAttachment: depth }).end();
+  },
+};
+```
+
 Clearing still clears the whole attachment, regardless of either rectangle. Use `clear:false` for later subviews that must retain color and depth. Rectangles do not change camera aspect or culling, the coordinates used by `engine.pick`, or optional packages that open their own native render passes. WebGL's core-mesh preview supports the same rectangles and clear/load behavior.
 
 Call `engine.dispose()` when the canvas is removed, or let `using engine = await Engine.create(canvas)` (and `using mesh = engine.createMesh()`, `using scene = engine.createScene()`) dispose at the end of the block: `[Symbol.dispose]` is `dispose()` where the runtime has the symbol. Disposing twice is harmless.

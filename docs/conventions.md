@@ -106,6 +106,11 @@ Core is untouched. The exception covers this one change; the freeze applies agai
 two-GPU PC. Unset keeps the old request (`'high-performance'`, nothing on Windows). Cost: core 21,077 -> 21,106 B gzip, core + stage 22,494 -> 22,524 B. The exception
 covers this one option; the freeze applies again after it.
 
+**Exception, one render pass for a package's frame (Scott, 2026-11-05: core may change if justified, documented and under the
+size limit):** `FramePass.joins` and the context's `attach` let a package's pass take core's clear and resolve (perf-history
+entry 51). No package can hold this: core owns the clear, the resolve target and the graph's order. Cost: core + stage
+22,522 -> 22,815 B gzip. The exception covers this one change; the freeze applies again after it.
+
 ## Names exported by more than one package
 
 A name declared and exported by two packages must mean the same thing, or be renamed. Decisions:
