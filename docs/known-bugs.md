@@ -314,12 +314,32 @@ does not own. Each entry says exactly what is needed to close it.
   GPU lock (it failed at +2.6 ms worst frame in a shared slot beside other suites). A failed check exits at once with
   its own error (`runSuite`, `scripts/support/shutdown.mjs`), its teardown bounded and printed beside it: the laptop's
   3 kills at 8bd1fb40 came after 'packing:', which fits an assertion that failed there and then the unbounded WGSL wait
-  in close() (cause 1). Open: the laptop's line-49 check (one frame with 2 ms sends: 5.8 ms seen once standalone, limit
-  3.5 ms, 2.3 to 2.4 ms before); not loosened.
+  in close() (cause 1). Open then: the laptop's slow sends check (one frame with 2 ms sends: 5.8 ms seen once
+  standalone, limit 3.5 ms, 2.3 to 2.4 ms before); not loosened. See the slow sends bullet below.
 - **Since 2026-10-30 (Scott's ruling):** the flythrough step has a 750 s (12.5 min) limit, set per script in
   `packages/biomes/package.json` (`"margo": { "gpuTestTimeoutMinutes": { "test:gpu:flythrough": 12.5 } }`, read by
   `packageMinutes` in `scripts/support/run-limited.mjs`); the view and objects steps keep 600 s. Test:
   `tests/gpu-timing-lock.test.js`.
+- **The slow sends frame (cause found for one frame, the rest not proven):** the laptop's 4.0, 5.6 and 5.8 ms frames
+  (limit 3.5 ms: a 2 ms send plus 1.5 ms) came from the check before 2bb1ab52f, which timed the view's frame on the wall
+  clock with the check's own busy waits inside it. The laptop's trace of the 4.0 ms frame (flight 6, frame 77) shows
+  the page thread stopped 2.9 ms inside the wait that stands for a 16 kB r32float write's cost, with no garbage
+  collection, compile or task on the thread; the real write took 0.1 ms or less. Since 2bb1ab52f the waits run on
+  `tests/flythrough-clock.mjs`, which leaves out time the thread did not run inside them and still counts a stop in the
+  view's code or a slow real call (`tests/flythrough-clock.test.js` fails against the old wait); the limit is
+  unchanged. The 5.6 and 5.8 ms frames had no trace. Read at 72de6c42, the view cannot spend more than one send or one
+  copy step begun inside its 0.25 ms budget in a frame, plus the plan: each send step posts once (the overview job per
+  worker starts all 4 workers at attach, so no send in a flight starts a worker, which would post twice), a send starts
+  only on budget that covers the last send's cost, and terrain goes in 16 kB bands, never a whole 200 kB tile. That
+  fits the 2.3 to 2.4 ms of the other runs, so the 5.8 ms frame was most likely the same kind of stop. Not proven: the
+  A6000 PC has never shown it.
+- **Needed to close:** on the laptop, at a commit that has the worst-frame report (the commit after 72de6c42 that adds
+  this bullet), run `npm run test:gpu:flythrough --workspace @margoengine/biomes` (it takes the exclusive GPU lock) 3
+  times. The `slow sends worst frame:` line takes the slowest frame apart: view time, clock time, time not run inside
+  the waits, sends, texture writes and kB, and the time in the real postMessage and writeTexture calls. 3 passes:
+  remove this entry. A failure names its owner: 2 or more sends, or about 200 kB of writes, in that frame is the view's
+  scheduling (`#apply` in `src/view.ts`); most of it in the real calls is the browser or the Arc driver (still counted,
+  hunt it there); neither is the view's own code.
 
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 

@@ -65,10 +65,17 @@ await runSuite(
         .map(([format, ms]) => `${format} ${ms.toFixed(1)} ms`)
         .join(', ')}`,
     );
+    // The worst frame taken apart, so a frame over the limit names its cause: two sends or a whole tile (about 200 kB)
+    // in one frame is the view's scheduling, a slow real call is the browser or driver, neither is the view's own code.
+    const w = slow.worst,
+      worst = !w
+        ? 'no frames'
+        : `${w.own.toFixed(1)} ms of view time (${w.total.toFixed(1)} ms on the clock, ${w.stalled.toFixed(1)} ms not run inside the waits): ${w.sends} sends, ${w.writes} texture writes of ${w.kB.toFixed(0)} kB, ${w.calls.toFixed(1)} ms in the real postMessage and writeTexture calls`;
+    console.log(`slow sends worst frame: ${worst}`);
     assert.ok(slow.sends >= 8, `the flight sent ${slow.sends} jobs`);
     assert.ok(
       slow.max <= SEND + 1.5,
-      `the view spent ${slow.max.toFixed(1)} ms in one frame with ${SEND} ms sends: jobs or a whole tile went in beyond the frame budget`,
+      `the view spent ${slow.max.toFixed(1)} ms in one frame with ${SEND} ms sends: jobs or a whole tile went in beyond the frame budget (worst frame ${worst})`,
     );
     // Regression: a frame that planned also sent its new jobs and copied tiles in; plans come every few frames, and on a
     // laptop APU those frames were the slowest 1 percent (p99 +0.3 ms, at the limit). A frame that plans must send and

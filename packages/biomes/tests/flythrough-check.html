@@ -52,12 +52,15 @@ window.check={
   * set, the workers' replies are held back for STALL ms out of every 2 x STALL ms, as busy workers on a laptop are:
   * jobs the view sends meanwhile only wait in the pool's queues. The busy waits run on a clock that keeps apart the time
   * the thread did not run inside them (flythrough-clock.mjs): the view's time in a frame (max) leaves it out, rawMax and
-  * stalled report it. calls holds the slowest real writeTexture call per texture format, after its wait.
+  * stalled report it. calls holds the slowest real writeTexture call per texture format, after its wait. worst is the
+  * frame with the most view time, taken apart: its sends and texture writes, the time of the real postMessage and
+  * writeTexture calls in it, and the time the thread did not run inside the waits, so a frame over the limit names its
+  * cause (two sends or a whole tile in one frame, a slow real call, or the view's own code).
   */
  async slowSends(SEND,COPY,STALL=0){
-  let sends=0,late=0,inView=false,stepped=false,known=false,calls={};const queue=device.queue,writeTexture=queue.writeTexture,clock=stallClock(()=>performance.now());
-  queue.writeTexture=function(dst,data,layout,size){if(inView)stepped=true;clock.wait(COPY*(layout.bytesPerRow??0)*(size[1]??size.height??1)/1024);const t0=performance.now(),r=writeTexture.call(this,dst,data,layout,size),d=performance.now()-t0,f=dst.texture.format;if(inView&&!(calls[f]>=d))calls[f]=d;return r;};
-  const createWorker=()=>{const w=new Worker('/packages/biomes/dist/workers/biomes.js',{name:'margoengine-biomes'}),post=w.postMessage.bind(w);if(STALL){let on=null;Object.defineProperty(w,'onmessage',{get:()=>on,set:(f)=>{on=f;}});w.addEventListener('message',(e)=>held?held.push(()=>on?.(e)):on?.(e));}w.postMessage=(m,t)=>{sends++;if(inView){if(stepped&&known)late++;known=true;}clock.wait(SEND);post(m,t);};return w;};
+  let sends=0,late=0,inView=false,stepped=false,known=false,calls={},fs=0,fw=0,fkb=0,freal=0,worst=null;const queue=device.queue,writeTexture=queue.writeTexture,clock=stallClock(()=>performance.now());
+  queue.writeTexture=function(dst,data,layout,size){const kb=(layout.bytesPerRow??0)*(size[1]??size.height??1)/1024;if(inView){stepped=true;fw++;fkb+=kb;}clock.wait(COPY*kb);const t0=performance.now(),r=writeTexture.call(this,dst,data,layout,size),d=performance.now()-t0,f=dst.texture.format;if(inView){freal+=d;if(!(calls[f]>=d))calls[f]=d;}return r;};
+  const createWorker=()=>{const w=new Worker('/packages/biomes/dist/workers/biomes.js',{name:'margoengine-biomes'}),post=w.postMessage.bind(w);if(STALL){let on=null;Object.defineProperty(w,'onmessage',{get:()=>on,set:(f)=>{on=f;}});w.addEventListener('message',(e)=>held?held.push(()=>on?.(e)):on?.(e));}w.postMessage=(m,t)=>{sends++;if(inView){if(stepped&&known)late++;known=true;fs++;}clock.wait(SEND);const t0=performance.now();post(m,t);if(inView)freal+=performance.now()-t0;};return w;};
   let held=null;const world=await BiomeWorld.create({workers:4,createWorker});place(0);
   const view=await BiomeView.attach(engine,world);await view.ready;
   // Every step the view takes marks the frame: a texture write, an objects step, a job handed to the pool (sent or queued).
@@ -65,13 +68,13 @@ window.check={
   const proto=Object.getPrototypeOf(view.objects),steps=proto.steps;proto.steps=function(...a){return steps.apply(this,a).map((f)=>()=>{f();if(inView)stepped=true;});};
   const stall=STALL&&setInterval(()=>{if(held){const go=held;held=null;for(const f of go)setTimeout(f,0);}else held=[];},STALL);
   const plugin=[...engine.plugins.values()].find((p)=>p.name.startsWith('biomes-view:')),own=plugin.onPreUpdate,times=[],raw=[],lost=[];
-  plugin.onPreUpdate=(delta)=>{const t=clock.time(()=>{inView=true;stepped=false;own(delta);inView=false;});times.push(t.own);raw.push(t.total);lost.push(t.stalled);};
+  plugin.onPreUpdate=(delta)=>{fs=fw=fkb=freal=0;const t=clock.time(()=>{inView=true;stepped=false;own(delta);inView=false;});times.push(t.own);raw.push(t.total);lost.push(t.stalled);if(!(worst?.own>=t.own))worst={own:t.own,total:t.total,stalled:t.stalled,sends:fs,writes:fw,kB:fkb,calls:freal};};
   for(let i=0;i<10;i++){await frame();engine.render({delta:1/60});}
-  await view.whenIdle();times.length=0;raw.length=0;lost.length=0;calls={};sends=0;late=0;known=false;
+  await view.whenIdle();times.length=0;raw.length=0;lost.length=0;calls={};sends=0;late=0;known=false;worst=null;
   let s=0,last=await frame();
   while(s<LENGTH/3){const now=await frame(),dt=Math.min(0.1,(now-last)/1000);last=now;s+=SPEED*dt;place(s);engine.render({delta:dt});}
   delete queue.writeTexture;proto.steps=steps;clearInterval(stall);if(held){for(const f of held)f();held=null;}
-  const out={frames:times.length,max:Math.max(...times),rawMax:Math.max(...raw),stalled:lost.reduce((a,b)=>a+b,0),stalls:lost.filter((x)=>x>0).length,stalledMax:Math.max(0,...lost),calls,sends,late};view.dispose();world.dispose();
+  const out={frames:times.length,max:Math.max(...times),rawMax:Math.max(...raw),stalled:lost.reduce((a,b)=>a+b,0),stalls:lost.filter((x)=>x>0).length,stalledMax:Math.max(0,...lost),calls,worst,sends,late};view.dispose();world.dispose();
   return out;
  }
 };
