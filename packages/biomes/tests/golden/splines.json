@@ -1,0 +1,11 @@
+{
+  "$comment": "SHA-256 of carved world tiles and painted path rasters (splines.test.js). A change here changes every world with paths; advance it only with a reason in the commit.",
+  "carved": [
+    "be46cf8bdfb1eccef26c662859c350f152239e9354c3b088f0868576305c678c",
+    "39d10e44a5f48b62e0a0a3906b62d3f3126cf0a3137d50435da78bc475e12f1f",
+    "004d1e9dbc76329f84b831c360fcee24ee585a0a94dcaf1d118f3793e5dfdf90",
+    "daece70a4da5e7b0cf2ca92f6e562dfcb4d0e3f9bfd55b03ba8fb7b0c8ec1734"
+  ],
+  "painted": "56dd520823147aeed0cf0402c69bd05edd6059fc5de3670784b1090ece6dd99a",
+  "exclusion": "a369ff601b0b22d3f952f4e0c3691530140fa43e096475716d29f6e9cc5f5e3d"
+}

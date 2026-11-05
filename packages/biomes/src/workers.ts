@@ -160,8 +160,8 @@ export class BiomeWorkers implements Disposable {
 
   /** A world update; false when it cannot reach a worker (a `field` height is a function). */
   change(changes: { classifier?: unknown; height?: object }): boolean {
-    const h = changes.height as { samples?: Int32Array | Float32Array; field?: unknown } | undefined;
-    if (h && 'field' in h) return false;
+    const h = changes.height as { samples?: Int32Array | Float32Array; field?: unknown; base?: object } | undefined;
+    if (h && ('field' in h || (h.base && 'field' in h.base))) return false;
     this.broadcast({
       op: 'update',
       changes: {

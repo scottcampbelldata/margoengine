@@ -7,6 +7,8 @@
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { clampInt, divFloor, fade, isqrt, ONE } from '@margoengine/biomes/toolkit';
 import { paintReach, placementReach } from './reach.js';
+import { splinesHook } from './splines-hook.js';
+import type { PathOptions } from './splines.js';
 import type { BiomeWorld, LayerWrite } from './world.js';
 
 type Rect = readonly [number, number, number, number];
@@ -41,9 +43,13 @@ export type BrushMode = 'add' | 'subtract' | 'set' | 'max' | 'min';
 /** Brush edge: smooth (quintic), linear or hard. */
 export type BrushFalloff = 'smooth' | 'linear' | 'constant';
 
-/** One edit as plain data; `apply` replays it exactly. Lengths in metres, strength and value 0..1. */
+/**
+ * One edit as plain data; `apply` replays it exactly. Lengths in metres, strength and value 0..1. A `'path'` edit
+ * (made by `pathEdits` or `paintPaths` of `@margoengine/biomes/splines`, which must be loaded to apply one) paints
+ * along a road or path: `strength` under its width, fading across its edge with `falloff`.
+ */
 export interface BiomeEdit {
-  readonly kind: 'paint' | 'fill';
+  readonly kind: 'paint' | 'fill' | 'path';
   /** `paint/<biome>` or `mask/<name>`. */
   readonly layer: string;
   /** Dab centre [x, z] and radius (paint). */
@@ -56,6 +62,8 @@ export interface BiomeEdit {
   readonly falloff: BrushFalloff;
   /** Fill only where this mask layer is set (scaled by it). */
   readonly mask?: string;
+  /** The road or path (path). */
+  readonly path?: PathOptions;
 }
 
 /** Brush settings of {@link BiomeEditor.paint}. */
@@ -327,8 +335,9 @@ const grow = (r: Rect, m: number, [x0, z0, x1, z1]: Rect): Rect[] =>
 function check(edit: BiomeEdit, world: BiomeWorld): BiomeEdit {
   if (!edit || typeof edit !== 'object')
     throw typeError('A biome edit is an object such as editor.edits holds', 'biomes');
-  const e = { ...edit };
-  if (e.kind !== 'paint' && e.kind !== 'fill') throw rangeError("A biome edit kind is 'paint' or 'fill'", 'biomes');
+  const e = { ...edit } as { -readonly [K in keyof BiomeEdit]: BiomeEdit[K] };
+  if (e.kind !== 'paint' && e.kind !== 'fill' && e.kind !== 'path')
+    throw rangeError("A biome edit kind is 'paint', 'fill' or 'path'", 'biomes');
   if (typeof e.layer !== 'string' || !/^(paint\/[a-z0-9][a-z0-9-]*|mask\/[\w-]+)$/.test(e.layer))
     throw rangeError('A biome edit layer is a biome id, paint/<biome> or mask/<name>', 'biomes');
   if (e.layer.startsWith('paint/') && !world.biomes.some((b) => `paint/${b.id}` === e.layer))
@@ -347,6 +356,14 @@ function check(edit: BiomeEdit, world: BiomeWorld): BiomeEdit {
       !(e.radius! > 0 && e.radius! <= 65536)
     )
       throw rangeError('A brush needs a finite [x, z] centre and a radius in 0..65,536 m (above 0)', 'biomes');
+  } else if (e.kind === 'path') {
+    if (!splinesHook.check)
+      throw fault(
+        'state',
+        "A path edit needs the splines entry; await import('@margoengine/biomes/splines') first",
+        'biomes',
+      );
+    e.path = splinesHook.check(e.path!);
   } else if (!Array.isArray(e.rect) || e.rect.length !== 4 || !e.rect.every(Number.isFinite))
     throw rangeError('A fill rectangle is [minX, minZ, maxX, maxZ] in metres', 'biomes');
   if (e.mask !== undefined && !/^mask\/[\w-]+$/.test(e.mask)) throw rangeError('A fill mask is mask/<name>', 'biomes');
@@ -375,6 +392,12 @@ function brush(world: BiomeWorld, e: BiomeEdit, before: Map<string, Uint8Array |
     g0z = divFloor(cz - r, cell);
     g1x = divFloor(cx + r, cell) + 1;
     g1z = divFloor(cz + r, cell) + 1;
+  } else if (e.kind === 'path') {
+    const [x0, z0, x1, z1] = splinesHook.box!(e.path!);
+    g0x = divFloor(x0 - ox, cell);
+    g0z = divFloor(z0 - oz, cell);
+    g1x = divFloor(x1 - ox, cell) + 1;
+    g1z = divFloor(z1 - oz, cell) + 1;
   } else {
     const [x0, z0, x1, z1] = e.rect!;
     g0x = divFloor(Math.round(x0 * 1000) - ox + cell - 1, cell);
@@ -399,7 +422,20 @@ function brush(world: BiomeWorld, e: BiomeEdit, before: Map<string, Uint8Array |
     for (let tx = divFloor(g0x, cells); tx <= divFloor(g1x, cells); tx++) {
       const key = `${e.layer}|${tx},${tz}`,
         old = world.readLayer(e.layer, tx, tz),
-        mask = e.mask ? world.readLayer(e.mask, tx, tz) : undefined;
+        mask = e.mask ? world.readLayer(e.mask, tx, tz) : undefined,
+        // A path's weights over the tile's cells, from the cell corners as a dab reads them.
+        along =
+          e.kind === 'path'
+            ? splinesHook.raster!(
+                e.path!,
+                e.falloff,
+                ox + tx * cells * cell,
+                oz + tz * cells * cell,
+                cell,
+                cells,
+                cells,
+              )
+            : undefined;
       if (!before.has(key)) before.set(key, old);
       const data = old ? old.slice() : new Uint8Array(cells * cells).fill(neutral);
       let changed = false;
@@ -414,6 +450,9 @@ function brush(world: BiomeWorld, e: BiomeEdit, before: Map<string, Uint8Array |
             if (d2 > r * r) continue;
             const t = Math.min(ONE, divFloor(isqrt(d2) * ONE, r));
             amount = e.falloff === 'constant' ? ONE : e.falloff === 'linear' ? ONE - t : ONE - fade(t);
+          } else if (along) {
+            amount = along[k];
+            if (!amount) continue;
           } else if (e.mask) amount = mask ? divFloor(mask[k] * ONE, 255) : 0;
           const v = data[k],
             push = Math.floor((target * amount) / ONE),

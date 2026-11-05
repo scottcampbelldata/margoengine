@@ -5,6 +5,8 @@ import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { divFloor, ONE } from './fixed.js';
 import type { createRelief, Relief, ReliefOptions } from './relief.js';
 import type { Scratch } from './scratch.js';
+import { splinesHook } from './splines-hook.js';
+import type { PathOptions } from './splines.js';
 
 /**
  * Where a world's heights come from.
@@ -13,6 +15,7 @@ import type { Scratch } from './scratch.js';
  * - `field`: a function of world (x, z) in metres returning metres, sampled once per tile and region cell.
  * - `relief`: {@link createRelief} settings (the default: a 4 km seeded landscape), evaluated every 4 m and
  *   interpolated with Catmull-Rom.
+ * - `carve`: paths of `@margoengine/biomes/splines` (`carvePaths`) flattened or cut into `base` (default the relief).
  */
 export type HeightSource =
   | {
@@ -22,7 +25,8 @@ export type HeightSource =
       readonly unit?: 'm' | 'mm';
     }
   | { readonly field: (x: number, z: number) => number }
-  | { readonly relief: ReliefOptions };
+  | { readonly relief: ReliefOptions }
+  | { readonly carve: readonly PathOptions[]; readonly base?: HeightSource };
 
 /** Spacing of the procedural relief lattice, mm. */
 const LATTICE = 4000;
@@ -177,6 +181,15 @@ export function heightsOf(
   seed: number,
   relief?: typeof createRelief,
 ): Heights {
+  if (typeof source === 'object' && source !== null && 'carve' in source) {
+    if (!splinesHook.carve)
+      throw fault(
+        'state',
+        "A carved height needs the splines entry; await import('@margoengine/biomes/splines') first (BiomeWorld.create loads it)",
+        'biomes',
+      );
+    return splinesHook.carve(heightsOf(source.base, origin, size, seed, relief), source.carve, origin);
+  }
   if (source === undefined || 'relief' in source) {
     if (!relief)
       throw fault(

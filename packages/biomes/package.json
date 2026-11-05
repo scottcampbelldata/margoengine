@@ -121,6 +121,10 @@
     "./gpu": {
       "types": "./dist/gpu.d.ts",
       "import": "./dist/gpu.js"
+    },
+    "./splines": {
+      "types": "./dist/splines.d.ts",
+      "import": "./dist/splines.js"
     }
   },
   "files": [

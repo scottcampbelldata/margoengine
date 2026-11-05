@@ -111,6 +111,9 @@ async function run(m: Message): Promise<unknown> {
     case 'update': {
       const changes = { ...(m.changes as Record<string, unknown>) };
       if ('classifier' in changes) changes.classifier = await classifier(changes.classifier);
+      // Carved heights need the splines entry, which the page loaded before it sent them.
+      if (changes.height && typeof changes.height === 'object' && 'carve' in changes.height)
+        await import('@margoengine/biomes/splines');
       world!.update(changes);
       return null;
     }

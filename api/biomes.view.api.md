@@ -267,6 +267,8 @@ interface BiomeWorldOptions {
     readonly cache?: number;
 }
 
+type BrushFalloff = 'smooth' | 'linear' | 'constant';
+
 interface Climate {
     readonly latitude: number;
     readonly sea: number;
@@ -372,6 +374,9 @@ type HeightSource = {
     readonly field: (x: number, z: number) => number;
 } | {
     readonly relief: ReliefOptions;
+} | {
+    readonly carve: readonly PathOptions[];
+    readonly base?: HeightSource;
 };
 
 interface IslandOptions {
@@ -397,6 +402,28 @@ interface PaintLayer {
 }
 
 type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
+
+interface PathCarve {
+    readonly mode?: 'flatten' | 'cut';
+    readonly depth?: number;
+    readonly grade?: number;
+}
+
+type PathCurve = 'polyline' | 'catmull-rom' | 'b-spline';
+
+interface PathOptions {
+    readonly points: readonly (readonly [number, number])[];
+    readonly curve?: PathCurve;
+    readonly closed?: boolean;
+    readonly step?: number;
+    readonly width?: number;
+    readonly edge?: number;
+    readonly falloff?: BrushFalloff;
+    readonly biome?: string;
+    readonly mask?: string;
+    readonly strength?: number;
+    readonly carve?: PathCarve;
+}
 
 type Range = readonly [min: number | null, max: number | null];
 

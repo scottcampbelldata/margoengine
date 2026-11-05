@@ -64,6 +64,7 @@ with the terrain.
 | [Procedural relief, hydrology and erosion](docs/relief-and-hydrology.md) | `createRelief` (coasts, islands, river valleys), `/hydrology` (flow, wetness, lakes, channels, on the CPU or a GPU world's device) and `/erosion` (integer thermal and hydraulic erosion) |
 | [Seasons](docs/seasons.md) | `/seasons`: green-up, autumn, snow and wet ground for any day of the year |
 | [Disturbance](docs/disturbance.md) | `/disturbance`: fire history, flood return periods and succession stages |
+| [Roads and paths](docs/roads-and-paths.md) | `/splines`: polylines and smooth curves that keep objects off, paint a road surface and flatten or cut the ground |
 
 ## Entries
 
@@ -72,7 +73,8 @@ and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld
 height, the default), `/digest` (canonical bytes and SHA-256, loaded by `world.digest`), `/zones` (Whittaker and
 Holdridge classifiers), `/multinoise` (nearest-point classifier over axes you choose), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/placement` (stored
 objects), `/stats` (point-pattern statistics), `/erosion` (thermal and hydraulic erosion; `BiomeWorld.create` loads it only for a relief
-with `erosion`), `/disturbance` (fire, flood and succession), `/gpu` (the device kernels; loaded only for a world that
+with `erosion`), `/disturbance` (fire, flood and succession), `/splines` (roads and paths; `BiomeWorld.create` loads it only for a carved
+height), `/gpu` (the device kernels; loaded only for a world that
 may compute on a device), `/io` (heightmap, weight and mask files, layer dumps), `/view`,
 `/objects` (stored objects and detail drawn through scatter) and `/editor`. The lazily loaded ones come through the
 package name, so an app holds one copy of each module.

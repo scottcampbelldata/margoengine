@@ -215,6 +215,9 @@ export type HeightSource = {
     readonly field: (x: number, z: number) => number;
 } | {
     readonly relief: ReliefOptions;
+} | {
+    readonly carve: readonly PathOptions[];
+    readonly base?: HeightSource;
 };
 
 export interface IslandOptions {
@@ -388,6 +391,8 @@ export function treelineMargin(seasonTemperature: number, days: number): number;
 
 // Not exported from this entry, but used by the exports above:
 
+type BrushFalloff = 'smooth' | 'linear' | 'constant';
+
 interface Erosion extends HeightGrid {
     readonly height: Int32Array;
     readonly flow: Int32Array;
@@ -412,6 +417,28 @@ interface HeightGrid {
     readonly nx: number;
     readonly nz: number;
     readonly step: number;
+}
+
+interface PathCarve {
+    readonly mode?: 'flatten' | 'cut';
+    readonly depth?: number;
+    readonly grade?: number;
+}
+
+type PathCurve = 'polyline' | 'catmull-rom' | 'b-spline';
+
+interface PathOptions {
+    readonly points: readonly (readonly [number, number])[];
+    readonly curve?: PathCurve;
+    readonly closed?: boolean;
+    readonly step?: number;
+    readonly width?: number;
+    readonly edge?: number;
+    readonly falloff?: BrushFalloff;
+    readonly biome?: string;
+    readonly mask?: string;
+    readonly strength?: number;
+    readonly carve?: PathCarve;
 }
 
 type Rect = readonly [number, number, number, number];

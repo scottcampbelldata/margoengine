@@ -7,6 +7,7 @@ import { divFloor } from './fixed.js';
 import { LAYERS } from './layers.js';
 import type { RasterLayer } from './layers.js';
 import { BiomeWorld } from '@margoengine/biomes';
+import type { HeightSource } from './height.js';
 import type { BiomeWorldOptions, LayerWrite } from './world.js';
 
 /** A rectangle of tiles `[x0, z0, x1, z1]` (inclusive tile indices); the default is the whole world. */
@@ -335,17 +336,21 @@ async function worldOptions(
   if (typeof saved !== 'object' || saved === null) throw typeError('loadWorld takes the JSON text or object that saveWorld(world) returns', 'biomes');
   if (saved.format !== 'margo-biomes-world' || saved.version !== 1 || !saved.options || !Array.isArray(saved.edits))
     throw rangeError('Not a saved biome world (format margo-biomes-world, version 1)', 'biomes');
-  const options: Record<string, any> = { ...saved.options },
-    height = options.height;
+  const options: Record<string, any> = { ...saved.options };
   for (const key of Object.keys(options)) if (options[key] === null || options[key] === undefined) delete options[key];
-  if (height && typeof height === 'object' && 'samples' in height) {
+  // Samples are base64, also under carved paths (`{ carve, base }`).
+  const decode = (height: any): any => {
+    if (height && typeof height === 'object' && 'carve' in height)
+      return height.base == null ? { carve: height.carve } : { carve: height.carve, base: decode(height.base) };
+    if (!(height && typeof height === 'object' && 'samples' in height)) return height;
     const bytes = unbase64(height.samples),
       Type = height.type === 'Float32Array' ? Float32Array : height.type === 'Int32Array' ? Int32Array : undefined;
     if (!Type) throw rangeError('Saved height samples are Int32Array or Float32Array', 'biomes');
     const copy = new Uint8Array(bytes.length);
     copy.set(bytes);
-    options.height = { ...height, type: undefined, samples: new Type(copy.buffer) };
-  }
+    return { ...height, type: undefined, samples: new Type(copy.buffer) };
+  };
+  if (options.height !== undefined) options.height = decode(options.height);
   if (options.classifier?.kind === 'multinoise')
     options.classifier = (await import('@margoengine/biomes/multinoise')).multiNoise(options.classifier.spec);
   else if (options.classifier === 'whittaker' || options.classifier === 'holdridge')
@@ -374,7 +379,13 @@ function base64(a: ArrayBufferView): string {
 export function saveWorld(world: BiomeWorld): unknown {
   const { options, classifier, paint, user } = world.state(),
     { seed, size, origin, tileSize, resolution, regionResolution, climate, ecotone, biomes, height: h } = options;
-  if (h && 'field' in h) throw fault('unsupported', 'saveWorld cannot save a height function', 'biomes');
+  const encode = (height: HeightSource | undefined): unknown => {
+    if (height && 'field' in height) throw fault('unsupported', 'saveWorld cannot save a height function', 'biomes');
+    if (height && 'carve' in height) return { carve: height.carve, base: encode(height.base) };
+    return height && 'samples' in height
+      ? { ...height, samples: base64(height.samples), type: height.samples.constructor.name }
+      : height;
+  };
   return {
     format: 'margo-biomes-world',
     version: 1,
@@ -391,7 +402,7 @@ export function saveWorld(world: BiomeWorld): unknown {
       classifier:
         classifier === 'envelopes' ? classifier : classifier.spec ? { kind: classifier.kind, spec: classifier.spec } : classifier.kind,
       paint,
-      height: h && 'samples' in h ? { ...h, samples: base64(h.samples), type: h.samples.constructor.name } : h,
+      height: encode(h),
     },
     edits: [...user].flatMap(([name, tiles]) =>
       [...tiles].map(([at, data]) => {

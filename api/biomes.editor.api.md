@@ -4,7 +4,7 @@
 
 ```ts
 export interface BiomeEdit {
-    readonly kind: 'paint' | 'fill';
+    readonly kind: 'paint' | 'fill' | 'path';
     readonly layer: string;
     readonly center?: readonly [number, number];
     readonly radius?: number;
@@ -13,6 +13,7 @@ export interface BiomeEdit {
     readonly mode: BrushMode;
     readonly falloff: BrushFalloff;
     readonly mask?: string;
+    readonly path?: PathOptions;
 }
 
 export class BiomeEditor implements Disposable {
@@ -280,6 +281,9 @@ type HeightSource = {
     readonly field: (x: number, z: number) => number;
 } | {
     readonly relief: ReliefOptions;
+} | {
+    readonly carve: readonly PathOptions[];
+    readonly base?: HeightSource;
 };
 
 interface IslandOptions {
@@ -305,6 +309,28 @@ interface PaintLayer {
 }
 
 type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
+
+interface PathCarve {
+    readonly mode?: 'flatten' | 'cut';
+    readonly depth?: number;
+    readonly grade?: number;
+}
+
+type PathCurve = 'polyline' | 'catmull-rom' | 'b-spline';
+
+interface PathOptions {
+    readonly points: readonly (readonly [number, number])[];
+    readonly curve?: PathCurve;
+    readonly closed?: boolean;
+    readonly step?: number;
+    readonly width?: number;
+    readonly edge?: number;
+    readonly falloff?: BrushFalloff;
+    readonly biome?: string;
+    readonly mask?: string;
+    readonly strength?: number;
+    readonly carve?: PathCarve;
+}
 
 type Range = readonly [min: number | null, max: number | null];
 

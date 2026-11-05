@@ -548,7 +548,12 @@ class Missing {
 interface Shapes {
   readonly lines: Float64Array; // ax, az, bx, bz, half, verge per segment
   readonly polys: readonly { pts: Float64Array; verge: number; box: Rect }[];
+  /** Line offsets by 64 m square of their reach box, so a point reads only nearby segments; `wide` reach over 8 x 8. */
+  readonly near: Map<number, Int32Array>;
+  readonly wide: Int32Array;
 }
+/** Side of the exclusion squares, ticks (64 m). */
+const NEAR = 64 * TICK;
 
 function shapesOf(exclusions: readonly Exclusion[] | undefined, origin: readonly [number, number]): Shapes {
   const lines: number[] = [],
@@ -587,7 +592,30 @@ function shapesOf(exclusions: readonly Exclusion[] | undefined, origin: readonly
       polys.push({ pts, verge, box: [x0 - verge, z0 - verge, x1 + verge, z1 + verge] });
     } else throw typeError("An exclusion kind is 'line' or 'polygon'", 'biomes');
   }
-  return { lines: Float64Array.from(lines), polys };
+  const near = new Map<number, number[]>(),
+    wide: number[] = [];
+  for (let i = 0; i < lines.length; i += 6) {
+    const reach = lines[i + 4] + lines[i + 5],
+      x0 = divFloor(Math.min(lines[i], lines[i + 2]) - reach, NEAR),
+      x1 = divFloor(Math.max(lines[i], lines[i + 2]) + reach, NEAR),
+      z0 = divFloor(Math.min(lines[i + 1], lines[i + 3]) - reach, NEAR),
+      z1 = divFloor(Math.max(lines[i + 1], lines[i + 3]) + reach, NEAR);
+    if ((x1 - x0 + 1) * (z1 - z0 + 1) > 64 || Math.max(-x0, x1, -z0, z1) >= 32768) wide.push(i);
+    else
+      for (let z = z0; z <= z1; z++)
+        for (let x = x0; x <= x1; x++) {
+          const key = (x + 32768) * 65536 + z + 32768,
+            list = near.get(key);
+          if (list) list.push(i);
+          else near.set(key, [i]);
+        }
+  }
+  return {
+    lines: Float64Array.from(lines),
+    polys,
+    near: new Map([...near].map(([key, list]) => [key, Int32Array.from(list)])),
+    wide: Int32Array.from(wide),
+  };
 }
 
 /** Squared distance (ticks^2) from (px, pz) to segment a-b, exact in integers below 2^53. */
@@ -606,9 +634,17 @@ function segment2(px: number, pz: number, ax: number, az: number, bx: number, bz
 /** Inside an exclusion: 2; inside a verge: 1 plus the verge share in `out[0]` (Q16, 1 at the edge); else 0. */
 function excluded(s: Shapes, x: number, z: number, out: Int32Array): number {
   let edge = 0;
-  const l = s.lines;
-  for (let i = 0; i < l.length; i += 6) {
-    const half = l[i + 4],
+  const l = s.lines,
+    bx = divFloor(x, NEAR),
+    bz = divFloor(z, NEAR),
+    near =
+      bx >= -32768 && bx < 32768 && bz >= -32768 && bz < 32768
+        ? s.near.get((bx + 32768) * 65536 + bz + 32768)
+        : undefined,
+    count = near ? near.length : 0;
+  for (let n = 0; n < count + s.wide.length; n++) {
+    const i = n < count ? near![n] : s.wide[n - count],
+      half = l[i + 4],
       verge = l[i + 5],
       reach = half + verge;
     if (x < Math.min(l[i], l[i + 2]) - reach || x > Math.max(l[i], l[i + 2]) + reach) continue;

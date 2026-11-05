@@ -306,7 +306,11 @@ export class BiomeWorld implements Disposable {
       throw typeError('BiomeWorld options must be an object; pass {} for the defaults', 'biomes');
     aborted(options.signal);
     const biomes = options.biomes ?? (await defaultBiomes()),
-      h = options.height;
+      given = options.height,
+      // Paths carved into heights load the splines entry; the rest of the checks read the source under them.
+      carved = typeof given === 'object' && given !== null && 'carve' in given,
+      h = carved ? given.base : given;
+    if (carved) await import('@margoengine/biomes/splines');
     // The procedural relief is its own entry, loaded only for worlds that use it (the default height).
     if (h === undefined || (typeof h === 'object' && h !== null && 'relief' in h)) {
       relief ??= (await import('@margoengine/biomes/relief')).createRelief;
