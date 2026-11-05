@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-044). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-045). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -76,6 +76,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Split tangents (`splitTangents`, `computeTangents` with `split`) | Enforced by method: checked against Blender's MikkTSpace on two meshes, to a dot product above 0.9995 per corner with matching signs. It follows the published grouping and is not a port of the reference library, so a mesh with unusual degenerate triangles may group differently. `w` assumes v up. | Clean room: written from the paper. | A rare corner could differ from a bake on degenerate geometry. | Remove zero-area triangles first; flip v on glTF UVs. |
 | Baked poses (`bakeMorphTargets`, `bakeSkin`) | Enforced by method: four joints per vertex, linear blend skinning, Float32 output. | One pose on the CPU for picking, physics or export; the same mix glTF defines. | Linear blending collapses at sharp twists, as it does on the GPU. | Bake several poses, or split the joint. |
 | Delaunay triangulation (`@margoengine/geometry/delaunay`) | Enforced by method: adds no points of its own, so thin outlines keep thin triangles; crossing constraints and self-crossing rings are refused. Exact tests fall back to whole-number arithmetic, which is slower on grids and other exactly cocircular input. | Keeping the input points is what stops T-junctions; refinement would add vertices. | Cocircular input costs more time. | Add inner points with `points`; split crossing edges. |
+| Segments and triangles (`@margoengine/math/line3`, `/triangle`) | Enforced by method: two directions count as parallel, and a triangle as degenerate, when the sine squared of their angle is below 1e-14 (float64 rounding). `Triangle.containsPoint` tests the point's projection on the plane, not its height above it. | Below that angle the closed forms lose all their digits, so the parallel and collapsed cases take their own paths. | A sliver thinner than about 1e-7 radians gets null barycentric weights. | Use `closestPointToPoint`, which still answers for a degenerate triangle; check `distanceToPoint` when height off the plane matters. |
 
 ## Copies of a model
 

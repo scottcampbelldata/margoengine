@@ -20,12 +20,15 @@ export {
 export type { ColorGrade, ColorLike, HSL } from './color.js';
 export { Box3 } from './box3.js';
 export { OBB } from './obb.js';
+export { Line3 } from './line3.js';
+export { Triangle } from './triangle.js';
 export { Sphere } from './sphere.js';
 export { Plane } from './plane.js';
 export { Ray } from './ray.js';
 export type { RayLike } from './ray.js';
 export { Frustum } from './frustum.js';
 export { Spherical } from './spherical.js';
+export { Cylindrical } from './cylindrical.js';
 export * as MathUtils from './mathutils.js';
 export { MargoError, type MargoErrorCode } from './errors.js';
 export type {

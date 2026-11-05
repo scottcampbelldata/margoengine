@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4433531,
+  "total": 4441486,
   "history": [
     {
       "date": "2026-10-24",
@@ -1556,6 +1556,12 @@
       "commit": "9afedda37",
       "reason": "geometry: new optional entry geometry/delaunay and extrude triangulate option",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "3730d4921",
+      "reason": "New math entries ./line3, ./triangle and ./cylindrical: Line3 segment queries, Triangle with box test, Cylindrical; also exported from the math root. Core and core + stage unchanged.",
+      "grew": 4
     }
   ],
   "items": {
@@ -1765,14 +1771,16 @@
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,
     "@margoengine/materials/transmission": 7416,
-    "@margoengine/math": 14882,
+    "@margoengine/math": 16865,
     "@margoengine/math/affine": 3936,
     "@margoengine/math/billboard": 2672,
     "@margoengine/math/box3": 2581,
     "@margoengine/math/color": 2858,
+    "@margoengine/math/cylindrical": 560,
     "@margoengine/math/errors": 412,
     "@margoengine/math/euler": 1301,
     "@margoengine/math/frustum": 2512,
+    "@margoengine/math/line3": 2278,
     "@margoengine/math/mat4": 1934,
     "@margoengine/math/mathutils": 1138,
     "@margoengine/math/matrix3": 1128,
@@ -1785,6 +1793,7 @@
     "@margoengine/math/ray": 2468,
     "@margoengine/math/sphere": 2260,
     "@margoengine/math/spherical": 559,
+    "@margoengine/math/triangle": 3134,
     "@margoengine/math/validate": 602,
     "@margoengine/math/vec3": 490,
     "@margoengine/math/vector2": 947,

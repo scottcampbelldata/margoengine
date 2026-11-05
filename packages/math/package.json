@@ -68,6 +68,14 @@
       "types": "./dist/obb.d.ts",
       "import": "./dist/obb.js"
     },
+    "./line3": {
+      "types": "./dist/line3.d.ts",
+      "import": "./dist/line3.js"
+    },
+    "./triangle": {
+      "types": "./dist/triangle.d.ts",
+      "import": "./dist/triangle.js"
+    },
     "./sphere": {
       "types": "./dist/sphere.d.ts",
       "import": "./dist/sphere.js"
@@ -87,6 +95,10 @@
     "./spherical": {
       "types": "./dist/spherical.d.ts",
       "import": "./dist/spherical.js"
+    },
+    "./cylindrical": {
+      "types": "./dist/cylindrical.d.ts",
+      "import": "./dist/cylindrical.js"
     },
     "./mathutils": {
       "types": "./dist/mathutils.d.ts",

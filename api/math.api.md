@@ -98,6 +98,20 @@ export interface ColorLike {
 
 export type ColorSpace = 'srgb' | 'srgb-linear' | 'display-p3' | 'display-p3-linear';
 
+export class Cylindrical {
+    radius: number;
+    theta: number;
+    y: number;
+    constructor(radius?: number, theta?: number, y?: number);
+    set(radius: number, theta: number, y: number): this;
+    copy(c: Cylindrical): this;
+    clone(): Cylindrical;
+    setFromVector3(v: Vec3Like): this;
+    setFromCartesianCoords(x: number, y: number, z: number): this;
+    toVector3<T extends Vec3Like>(out: T): T;
+    equals(c: Cylindrical, epsilon?: number): boolean;
+}
+
 export class Euler {
     x: number;
     y: number;
@@ -150,6 +164,28 @@ export interface HSL {
 }
 
 export type HeightField = (x: number, z: number) => number;
+
+export class Line3 {
+    start: Vector3;
+    end: Vector3;
+    constructor(start?: Vector3, end?: Vector3);
+    set(start: Vec3Like, end: Vec3Like): this;
+    copy(line: Line3): this;
+    clone(): Line3;
+    getCenter<T extends Vec3Like>(out: T): T;
+    delta<T extends Vec3Like>(out: T): T;
+    distance(): number;
+    distanceSq(): number;
+    at<T extends Vec3Like>(t: number, out: T): T;
+    closestPointToPointParameter(p: Vec3Like, clampToLine?: boolean): number;
+    closestPointToPoint<T extends Vec3Like>(p: Vec3Like, clampToLine: boolean, out: T): T;
+    distanceSqToPoint(p: Vec3Like): number;
+    distanceToPoint(p: Vec3Like): number;
+    distanceSqToLine3(line: Line3, outThis?: Vec3Like, outOther?: Vec3Like): number;
+    distanceToLine3(line: Line3): number;
+    applyMatrix4(m: MatrixLike): this;
+    equals(line: Line3, epsilon?: number): boolean;
+}
 
 export const LinearToSRGB: (c: number) => number;
 
@@ -458,6 +494,30 @@ export class Spherical {
     makeSafe(epsilon?: number): this;
     setFromVector3(v: Vec3Like): this;
     setFromCartesianCoords(x: number, y: number, z: number): this;
+}
+
+export class Triangle {
+    a: Vector3;
+    b: Vector3;
+    c: Vector3;
+    constructor(a?: Vector3, b?: Vector3, c?: Vector3);
+    set(a: Vec3Like, b: Vec3Like, c: Vec3Like): this;
+    setFromPositions(positions: ArrayLike<number>, ia: number, ib: number, ic: number): this;
+    copy(triangle: Triangle): this;
+    clone(): Triangle;
+    getArea(): number;
+    getMidpoint<T extends Vec3Like>(out: T): T;
+    getNormal<T extends Vec3Like>(out: T): T;
+    getPlane<T extends PlaneLike>(out: T): T;
+    getBarycoord<T extends Vec3Like>(p: Vec3Like, out: T): T | null;
+    containsPoint(p: Vec3Like, epsilon?: number): boolean;
+    getInterpolation<T extends Vec3Like>(p: Vec3Like, va: Vec3Like, vb: Vec3Like, vc: Vec3Like, out: T): T | null;
+    isFrontFacing(direction: Vec3Like): boolean;
+    closestPointToPoint<T extends Vec3Like>(p: Vec3Like, out: T): T;
+    distanceToPoint(p: Vec3Like): number;
+    intersectsBox(box: BoxLike): boolean;
+    applyMatrix4(m: MatrixLike): this;
+    equals(triangle: Triangle, epsilon?: number): boolean;
 }
 
 export type Vec2 = readonly [x: number, y: number];

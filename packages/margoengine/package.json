@@ -882,6 +882,14 @@
       "types": "./dist/math/obb.d.ts",
       "import": "./dist/math/obb.js"
     },
+    "./math/line3": {
+      "types": "./dist/math/line3.d.ts",
+      "import": "./dist/math/line3.js"
+    },
+    "./math/triangle": {
+      "types": "./dist/math/triangle.d.ts",
+      "import": "./dist/math/triangle.js"
+    },
     "./math/sphere": {
       "types": "./dist/math/sphere.d.ts",
       "import": "./dist/math/sphere.js"
@@ -901,6 +909,10 @@
     "./math/spherical": {
       "types": "./dist/math/spherical.d.ts",
       "import": "./dist/math/spherical.js"
+    },
+    "./math/cylindrical": {
+      "types": "./dist/math/cylindrical.d.ts",
+      "import": "./dist/math/cylindrical.js"
     },
     "./math/mathutils": {
       "types": "./dist/math/mathutils.d.ts",

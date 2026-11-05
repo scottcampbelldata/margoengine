@@ -2,7 +2,7 @@
 
 Import `margoengine/math` from the `margoengine` package, or `@margoengine/math` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Sphere, Plane, Ray, Frustum, Spherical and MathUtils. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
+Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Line3, Triangle, Sphere, Plane, Ray, Frustum, Spherical, Cylindrical and MathUtils. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
 
 ```ts
 import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
@@ -37,6 +37,32 @@ const crate = new OBB()
 const door = new OBB(new Vector3(6.2, 1, 0), new Vector3(0.1, 1, 0.5));
 console.log(crate.intersectsOBB(door)); // true
 console.log(crate.intersectRay(new Ray(new Vector3(0, 1, 0), new Vector3(1, 0, 0)), new Vector3())); // entry near x = 3.59
+```
+
+Segments and triangles (`Line3`, also `@margoengine/math/line3`; `Triangle`, also `@margoengine/math/triangle`). `Line3`
+holds `start` and `end`: `at(t, out)`, `getCenter`, `delta`, `distance`, `closestPointToPointParameter(p, clampToLine)`,
+`closestPointToPoint(p, clampToLine, out)`, `distanceToPoint` and `distanceSqToLine3(other, outThis?, outOther?)`, which also
+writes the nearest point of each segment. A zero-length segment acts as a point. `Triangle` holds `a`, `b`, `c`
+(counter-clockwise faces the viewer): `getNormal`, `getArea`, `getMidpoint`, `getPlane`, `getBarycoord(p, out)` (weights for
+a, b, c in x, y, z), `getInterpolation(p, va, vb, vc, out)`, `containsPoint(p, epsilon = 0)`, `closestPointToPoint(p, out)`,
+`distanceToPoint`, `isFrontFacing(direction)`, `intersectsBox(box)` (separating axes, touching counts) and
+`setFromPositions(positions, ia, ib, ic)` to read a mesh. A degenerate triangle (corners in a line) has area 0, a zero normal
+and null weights; its closest-point queries still answer for the segment it collapses to. For a ray, call
+`ray.intersectTriangle(t.a, t.b, t.c, false, out)`.
+
+`Cylindrical` (also `@margoengine/math/cylindrical`) holds `radius`, `theta` (azimuth around +y from +z, as in `Spherical`) and
+height `y`: `setFromVector3(v)`, `setFromCartesianCoords(x, y, z)` and `toVector3(out)`.
+
+```ts
+import {Box3, Cylindrical, Line3, Triangle, Vector3} from 'margoengine/math';
+const rail = new Line3(new Vector3(0, 0, 0), new Vector3(10, 0, 0));
+const ramp = new Triangle(new Vector3(0, 0, 0), new Vector3(4, 0, 0), new Vector3(0, 0, -4));
+console.log(rail.distanceToPoint(new Vector3(5, 3, 0))); // 3
+console.log(ramp.getNormal(new Vector3()).toArray()); // [0, 1, 0]
+console.log(ramp.closestPointToPoint(new Vector3(9, 2, 0), new Vector3()).toArray()); // [4, 0, 0]
+console.log(ramp.intersectsBox(new Box3(new Vector3(-1, -1, -1), new Vector3(1, 1, 1)))); // true
+const seat = new Cylindrical(3, Math.PI / 2, 1).toVector3(new Vector3()); // (3, 1, ~0): a quarter turn round the column
+console.log(seat.toArray());
 ```
 
 Core interop: `toArray()` with no target returns a tuple that `setPosition`, `setScale`, `setRotation`, `setQuaternion`, `camera.position` and `fitToBoundingBox` accept. `copy()` reads any `{x, y, z}`, including `mesh.position`; `Euler.setFromVector3(mesh.rotation)` reads core's XYZ angles. `Matrix4.fromArray` reads `camera.matrix` and world matrices from `@margoengine/core/extension`. `Frustum.fromArray(camera.planes)` and `setFromProjectionMatrix` use core's plane order and WebGPU depth range ([0, 1], reversed-Z included); pass `false` for WebGL [-1, 1]. `Color` stores linear sRGB; hex, CSS and HSL inputs are decoded from sRGB.
@@ -75,7 +101,7 @@ for (const mesh of billboards) {
 }
 ```
 
-Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation outside `OBB`, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Line3, Triangle, Cylindrical, Matrix2, `Vector3.project`/`unproject` (no camera object), `Euler.reorder`, ColorManagement and Display-P3, `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
+Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation outside `OBB`, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Matrix2, `Vector3.project`/`unproject` (no camera object), `Euler.reorder`, ColorManagement and Display-P3, `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

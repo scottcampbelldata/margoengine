@@ -100,7 +100,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `Points`, `Sprite` | `@margoengine/points` |
 | troika-three-text | `@margoengine/text` |
 | `CSS2DRenderer`, `CSS3DRenderer` | `@margoengine/labels` (`@margoengine/html` adds depth occlusion) |
-| `Vector3`, `Matrix4`, `Quaternion`, `Color`, `Box3`, `OBB` (addons `math/OBB.js`) | `@margoengine/math` (`OBB` also as `@margoengine/math/obb`) |
+| `Vector3`, `Matrix4`, `Quaternion`, `Color`, `Box3`, `Line3`, `Triangle`, `Cylindrical`, `OBB` (addons `math/OBB.js`) | `@margoengine/math` (each also as its own entry, such as `@margoengine/math/obb`; `Cylindrical` turns into a point with `toVector3(out)`, there is no `Vector3.setFromCylindrical`) |
 | stats.js | `@margoengine/stats` |
 | `renderer.info`, Spector.js, lil-gui scene inspectors | `@margoengine/inspector` (`@margoengine/inspector/frame`: frame debugger) |
 | `ViewHelper` | `@margoengine/viewcube` |
