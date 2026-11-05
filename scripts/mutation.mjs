@@ -24,7 +24,13 @@ export const TARGETS = {
   biomes: {
     classify: {
       file: 'src/classify.ts',
-      tests: ['classify.test.js', 'climate.test.js'],
+      tests: [
+        'classify-mutants.test.js',
+        'classify.test.js',
+        'climate.test.js',
+        'gpu-classify-inputs.test.js',
+        'gpu-classify-warp.test.js',
+      ],
     },
     fixed: {
       file: 'src/fixed.ts',
@@ -32,7 +38,7 @@ export const TARGETS = {
     },
     placement: {
       file: 'src/placement.ts',
-      tests: ['placement-output.test.js', 'placement-band.test.js', 'placement.test.js'],
+      tests: ['placement-mutants.test.js', 'placement-output.test.js', 'placement-band.test.js', 'placement.test.js'],
     },
   },
 };
@@ -234,14 +240,15 @@ async function buildInto(name, work, target, mutated) {
 export async function runTarget(
   name,
   targetName,
-  { cap = 0, seed = 1, jobs = 4, listOnly = false, log = console.log } = {},
+  { cap = 0, seed = 1, jobs = 4, listOnly = false, lines = null, log = console.log } = {},
 ) {
   const target = TARGETS[name]?.[targetName];
   if (!target) throw new Error(`unknown target ${name}/${targetName}`);
   const root = resolve(repository, 'packages', name);
   const source = await readFile(resolve(root, target.file), 'utf8');
   const all = mutantsOf(source, target.file);
-  const chosen = pickMutants(all, cap, seed);
+  const inRange = lines ? all.filter((m) => m.line >= lines[0] && m.line <= lines[1]) : all;
+  const chosen = pickMutants(inRange, cap, seed);
   log(`${name}/${targetName}: ${all.length} mutants, running ${chosen.length}`);
   if (listOnly) return { results: [], all: all.length };
   const slots = [];
@@ -253,6 +260,11 @@ export async function runTarget(
     await mkdir(work, { recursive: true });
     await cp(resolve(root, 'tests'), resolve(work, 'tests'), { recursive: true });
     await cp(resolve(root, 'bench'), resolve(work, 'bench'), { recursive: true }).catch(() => {});
+    // Tests that import ../src/*.ts (through a resolve hook) see the mutant too: the slot holds its own copy of src.
+    await cp(resolve(root, 'src'), resolve(work, 'src'), { recursive: true });
+    await cp(resolve(repository, 'packages/shared'), resolve(top, 'packages/shared'), { recursive: true }).catch(
+      () => {},
+    );
     await cp(resolve(root, 'package.json'), resolve(work, 'package.json'));
     await cp(resolve(repository, 'scripts/support'), resolve(top, 'scripts/support'), { recursive: true });
     slots.push(work);
@@ -260,6 +272,7 @@ export async function runTarget(
   const results = new Array(chosen.length);
   let next = 0;
   // Sanity: the unmutated build must pass, or every "kill" would be a broken build.
+  await writeFile(resolve(slots[0], target.file), source);
   await buildInto(name, slots[0], target.file, source);
   const base = await runTests(resolve(slots[0], 'tests'), target.tests);
   if (!base.passed) throw new Error(`unmutated ${name}/${targetName} fails ${base.file}: ${base.reason}`);
@@ -270,7 +283,9 @@ export async function runTarget(
       const mutant = chosen[index];
       const record = { ...mutant, file: target.file };
       try {
-        await buildInto(name, slot, target.file, applyMutant(source, mutant));
+        const mutated = applyMutant(source, mutant);
+        await writeFile(resolve(slot, target.file), mutated);
+        await buildInto(name, slot, target.file, mutated);
         const run = await runTests(resolve(slot, 'tests'), target.tests);
         record.status = run.passed ? 'survived' : 'killed';
         if (!run.passed) record.killedBy = `${run.file} (${run.reason})`;
@@ -305,6 +320,7 @@ async function main(argv) {
       jobs: Number(flag('jobs', 4)),
       seed: Number(flag('seed', 1)),
       listOnly: argv.includes('--list'),
+      lines: flag('lines', '') ? flag('lines', '').split('-').map(Number) : null,
     });
     const s = scoreOf(results);
     report[targetName] = { generated: all, ...s, survivors: results.filter((r) => r.status === 'survived') };
