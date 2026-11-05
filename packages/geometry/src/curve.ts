@@ -185,14 +185,14 @@ export abstract class Curve<V extends Vec> {
 }
 
 // `v` with its component along unit `t` removed, normalized.
-function perpendicular(v: MutableVec3, t: MutableVec3): MutableVec3 {
+export function perpendicular(v: MutableVec3, t: MutableVec3): MutableVec3 {
   const along = dot(v, t);
   return normalize([v[0] - t[0] * along, v[1] - t[1] * along, v[2] - t[2] * along]);
 }
 
 // Parallel transport of `normal` from unit tangent `from` to unit tangent `to`: rotate about `from x to` by the angle
 // between them (Bishop 1975; Hanson and Ma 1995). Re-orthogonalized against `to` so rounding cannot accumulate.
-function transport(normal: MutableVec3, from: MutableVec3, to: MutableVec3): MutableVec3 {
+export function transport(normal: MutableVec3, from: MutableVec3, to: MutableVec3): MutableVec3 {
   const axis = cross(from, to),
     sine = Math.sqrt(dot(axis, axis));
   if (sine <= parallelLimit) return perpendicular(normal, to);

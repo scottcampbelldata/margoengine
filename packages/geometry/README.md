@@ -54,11 +54,12 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry` from `@margoengine/geometry/extras` |
 | `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` from `@margoengine/geometry/nurbs` |
 | `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
+| `CurveFlow`, `flowGeometry` from `@margoengine/geometry/flow` |
 | `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs, sample, optimize), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -231,6 +232,45 @@ const indices = optimizeVertexCache(mesh.indices, mesh.positions.length / 3);
 - `analyzeVertexCache(indices, vertexCount?, cacheSize = 16)`: `{misses, acmr, atvr}` on a first-in first-out cache.
   `acmr` is misses per triangle (3 is the worst), `atvr` misses per vertex used (1 is the best).
 
+## Bending along a curve
+
+`@margoengine/geometry/flow` deforms a mesh to follow a curve, or places rigid copies along it: trains on tracks, text
+along a path, pipes and snakes.
+
+```ts
+import {boxGeometry, CatmullRomCurve3} from 'margoengine/geometry';
+import {CurveFlow, flowGeometry} from 'margoengine/geometry/flow';
+
+const track = new CatmullRomCurve3([[0, 0, 0], [10, 2, 5], [20, 0, 0], [30, 1, -5]]);
+
+// A snake: a long box with plenty of segments, stretched over the whole curve.
+const body = boxGeometry(1, 0.4, 0.4, 128, 2, 2);
+const snake = flowGeometry(body, track, {fit: true});
+
+// Build a CurveFlow to reuse the frames. lockUp keeps a train level on hills.
+const flow = new CurveFlow(track, {lockUp: true});
+const wagon = flow.deform(boxGeometry(0.8, 1, 3, 2, 2, 32), {axis: 'z', offset: 12});
+
+// Rigid copies: sleepers every metre as instance matrices, or one moving train car.
+const sleepers = flow.matrices(Math.floor(flow.length), {spacing: 1});
+const car = flow.matrixAt(12.5, 'z');
+const {position, tangent, up, side} = flow.getFrame(12.5);
+```
+
+- `new CurveFlow(curve, {closed = false, segments = 256, up = [0, 1, 0], lockUp = false})`: samples frames at equal
+  distances. Without `lockUp`, frames turn with the curve by the smallest rotation from a first up leaning towards `up`,
+  so a coaster goes through a loop without flipping; with it, every frame holds `up`, and a section running straight up
+  keeps the last good frame. `closed` wraps distances and spreads the twist of one lap so the frames meet.
+- `flow.deform(data, {axis = 'x', offset = 0, scale = 1, fit = false})`: `axis` runs along the curve, and local +y stays up
+  (+z when `axis` is `'y'`). `offset` places local 0 along the curve, `scale` stretches along it, and `fit` maps the
+  mesh's extent onto the whole curve. Animate `offset` to slide a mesh along. Past the ends of an open curve the mesh
+  carries on straight along the end tangent.
+- Normals use the inverse transpose of the bend's Jacobian, so they stay perpendicular to the bent surface even with
+  `scale`; tangents use the Jacobian. Only vertices move, so a mesh needs enough segments along `axis`.
+- `flow.matrices(count, {axis = 'x', offset = 0, spacing})` gives column-major 4x4 matrices, 16 values each; `spacing`
+  defaults to even over the curve. `flow.matrixAt(distance, axis = 'x', target?)` is one matrix, and `target` skips the
+  allocation.
+
 ## How it works
 
 - **Tested from first principles.** Primitive parameters, defaults, segment clamping, UV conventions and groups are pinned by `tests/primitives.test.js`: closed solids have no boundary edges and face outward, normals are unit length, areas and volumes match the analytic shapes, and recorded counts, areas and volumes hold to 1e-5. Vertex order inside a primitive is not part of the API.
@@ -305,6 +345,8 @@ radial normals, closed after welding, area and volume), and creases at repeated 
 share of points per triangle, a chi-squared test over a square, the moments of a linear density on a single quad,
 zero-weight triangles, interpolated attributes, seeds and the ends of the random range. The optimiser tests check that
 every triangle survives with its winding and group, a hand-counted cache model, miss ratios under 0.8 from shuffled
-grids, spheres and knots, and overdraw on nested shells with a software depth buffer.
+grids, spheres and knots, and overdraw on nested shells with a software depth buffer. The flow tests check that a
+straight line changes nothing, a band and a tube bent round a circle land on the closed forms with the right normals,
+normals under stretch, closed frames meeting, level frames with `lockUp`, and instance matrices.
 
 Apache-2.0 licensed.

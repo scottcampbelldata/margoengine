@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4419695,
+  "total": 4422443,
   "history": [
     {
       "date": "2026-10-24",
@@ -1526,6 +1526,12 @@
       "commit": "61bab5d9b",
       "reason": "geometry: new optional entry geometry/optimize (vertex cache, overdraw and vertex fetch order)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "d99592c7b",
+      "reason": "geometry: new optional entry geometry/flow (bend geometry along a curve)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1677,6 +1683,7 @@
     "@margoengine/geometry": 20731,
     "@margoengine/geometry/extras": 5843,
     "@margoengine/geometry/extrude": 8562,
+    "@margoengine/geometry/flow": 2748,
     "@margoengine/geometry/nurbs": 5307,
     "@margoengine/geometry/optimize": 2409,
     "@margoengine/geometry/primitives": 4058,

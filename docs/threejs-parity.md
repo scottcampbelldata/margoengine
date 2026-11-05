@@ -4,11 +4,11 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 ## Summary
 
-190 three.js features in 19 areas (recounted from the rows 2026-10-31; 51 of the COVERED rows are marked †):
+191 three.js features in 19 areas (recounted from the rows 2026-10-31; 51 of the COVERED rows are marked †):
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 156 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 157 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 4 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 17 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 13 | Out of scope by decision. The note says why and what to use instead. |
@@ -82,6 +82,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Shape, Path, curves, Extrude, Lathe, Tube | COVERED † | geometry `Shape`, `Path`, `CatmullRomCurve3` …, `extrudeGeometry`, `latheGeometry`, `tubeGeometry` | | No custom `UVGenerator`. |
 | NURBSCurve, NURBSSurface, NURBSUtils | COVERED | geometry `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` (`@margoengine/geometry/nurbs`; `packages/geometry/src/nurbs.ts`) | | Written from the NURBS Book definitions. Rational curves and surfaces, exact derivatives, meshing with creases at repeated knots. No trimming. |
 | MeshSurfaceSampler | COVERED | geometry `MeshSurfaceSampler` (`@margoengine/geometry/sample`; `packages/geometry/src/sample.ts`) | | Area or per-vertex weights, with density linear across each triangle; position, normal, UV, colour; seeded by default. |
+| CurveModifier, Flow, InstancedFlow | COVERED | geometry `CurveFlow`, `flowGeometry` (`@margoengine/geometry/flow`; `packages/geometry/src/flow.ts`) | | Done on the CPU at build time or per call, not in a vertex shader. Exact normals under the bend; rigid instance matrices. |
 | EdgesGeometry, WireframeGeometry | COVERED † | geometry `edgesGeometry`, `wireframe` | | Draw the result with the lines package. |
 | BufferGeometry custom attributes (uv, uv1, color, tangent) on drawable meshes | COVERED | materials `createMesh`, `createInstancedMesh`, `packGeometry` (`packages/materials/src/built-material.ts`); shader `RawMesh` (`packages/shader/src/raw.ts`); core `Geometry` (`packages/core/src/geometry.ts`) | | Materials meshes take `uvs`, independent `uvs1`, `tangents` and `colors` (RGB or RGBA) into gltf-pro's 80-byte vertex; `mesh.setGeometry(geometry, range?)` repacks; `groups` with a material array become separate primitives sharing vertices and instances; glTF export keeps UV1 and group materials. Arbitrary named attributes (f32 to vec4f and i32/u32, per vertex or per instance, up to 16, live `setAttribute(name, data, range?)`) reach your own WGSL through `RawMesh`; the PBR vertex layout stays fixed, so a NodeMaterial cannot read them. Core geometry stays position, normal and index only, up to 1,000,000 vertices. |
 | BufferGeometryUtils (merge, mergeVertices, toNonIndexed, computeTangents, computeVertexNormals) | COVERED † | geometry `mergeGeometries`, `mergeVertices`, `toNonIndexed`, `computeTangents`, `computeVertexNormals` (`packages/geometry/src/utils.ts`) | | Also `creasedNormals` (three.js `toCreasedNormals`), `applyMatrix4`, `computeBoundingBox`, `computeBoundingSphere` and `center`. |

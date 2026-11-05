@@ -650,6 +650,10 @@
       "types": "./dist/geometry/optimize.d.ts",
       "import": "./dist/geometry/optimize.js"
     },
+    "./geometry/flow": {
+      "types": "./dist/geometry/flow.d.ts",
+      "import": "./dist/geometry/flow.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"
