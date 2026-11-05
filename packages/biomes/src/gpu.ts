@@ -151,7 +151,7 @@ export class GpuTiles {
       (kind !== 'envelopes' && !kind.perCell && depth < cells)
     )
       throw rangeError(
-        "BiomeWorld backend 'gpu' tile row and margins exceed device limits (non-perCell zone scorers need a full tile); use fewer biomes or classifier inputs, smaller tileSize, larger resolution, or backend 'cpu'",
+        "BiomeWorld backend 'gpu' tile row and margins exceed device limits, where a non-perCell zone scorer needs a full tile; use fewer biomes or classifier inputs, smaller tileSize, larger resolution, or backend 'cpu'",
         'biomes',
       );
     return depth;
