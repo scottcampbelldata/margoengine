@@ -1,4 +1,6 @@
 import { opacityCode, solidVertexDepth } from '../../shared/caster.js';
+import { displacementCode } from '../../shared/displacement.js';
+import { sectionShader } from '../../shared/section.js';
 
 const frame = `struct Temporal {current:mat4x4f,previous:mat4x4f,inverse:mat4x4f,settings:vec4f}
 @group(0) @binding(0) var<uniform> temporal:Temporal;`;
@@ -16,8 +18,15 @@ export const cameraVelocity =
 @fragment fn fragment(i:Fullscreen)->Motion {let size=vec2f(textureDimensions(depth));let uv=i.clip.xy/size;let d=textureLoad(depth,vec2i(i.clip.xy),0);
   let world=temporal.inverse*vec4f(uv*vec2f(2,-2)+vec2f(-1,1),d,1);var o=motion(uv,temporal.previous*world);
   if(d==0){o.depth=-1;}return o;}`;
-export function objectVelocity(pbr: boolean, transformed = false, opacity = false, solid = false): string {
-  const code = `${opacity ? opacityCode(0, 5) : ''}
+export function objectVelocity(
+  pbr: boolean,
+  transformed = false,
+  opacity = false,
+  solid = false,
+  displaced = false,
+  clipped = false,
+): string {
+  let code = `${opacity ? opacityCode(0, 5) : ''}
 struct ObjectCamera {current:mat4x4f,previous:mat4x4f,settings:vec4f}
 struct ObjectFrame {model:mat4x4f,previousModel:mat4x4f,settings:vec4f,alpha:vec4f${transformed ? ',alphaUV0:vec4f,alphaUV1:vec4f' : ''}}
 @group(0) @binding(0) var<uniform> f:ObjectFrame;
@@ -32,7 +41,28 @@ struct Out {@builtin(position) clip:vec4f,@location(0) previous:vec4f${pbr ? ',@
 ${motion}
 @fragment fn fragment(i:Out)->Motion {${pbr ? 'var uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);' + (transformed ? 'uv=vec2f(dot(f.alphaUV0.xy,uv)+f.alphaUV0.z,dot(f.alphaUV1.xy,uv)+f.alphaUV1.z);' : '') + `let alpha=textureSample(alphaMap,alphaSampler,uv).a*${opacity ? 'margoOpacityAt(i.uv)*' : ''}i.alpha*f.alpha.x;if(alpha<f.alpha.y){discard;}` : ''}
   return motion(i.clip.xy/camera.settings.xy,i.previous);}`;
-  return solid ? solidVertexDepth(code) : code;
+  if (solid) code = solidVertexDepth(code);
+  // The previous frame's vertex moves by the same amount: a map or scale changing moves a surface without any velocity.
+  if (displaced)
+    code =
+      displacementCode(1) +
+      code
+        .replace(',@location(1) uv:vec4f,', ',@location(3) normal:vec4f,@location(1) uv:vec4f,')
+        .replace(
+          'let p=vec4f(i.position.xyz,1);',
+          'let shift=i.normal.xyz*margoDisplacement(i.uv);let p=vec4f(i.position.xyz+shift,1);',
+        )
+        .replace('vec4f(previousVertices[index*5].xyz,1)', 'vec4f(previousVertices[index*5].xyz+shift,1)');
+  if (clipped)
+    code = sectionShader(
+      code
+        .replace('struct Out {', 'struct Out {@location(3) position:vec3f,')
+        .replace('o.uv=i.uv;', 'o.position=world.xyz;o.uv=i.uv;'),
+      0,
+      8,
+      'materialClip',
+    );
+  return code;
 }
 export const snapshot = `@group(0) @binding(0) var<storage,read> source:array<vec4f>;
 @group(0) @binding(1) var<storage,read_write> destination:array<vec4f>;

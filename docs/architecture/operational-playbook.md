@@ -576,7 +576,7 @@ slower baseline is invalid; compare the run's baseline against the recorded base
 | Wall-time assertion failed only under CPU contention | CPU-time budget helper plus wall-budget gate. |
 | GPU driver reset produced a misleading code failure | One evidence-backed retry with explicit result annotation. |
 | Public generated records or prose drifted | Revision-stamped generation, public-truth checks, and whitepaper evidence. |
-| A pass other than the colour pass drew a material's whole surface | `packages/materials/test/cutout-passes-browser.mjs` (picking, contact shadows, TAA velocity) and `packages/shadows/test/cutout-casters-browser.mjs` (every shadow map pass, virtual included) read pixels and velocities through a cut-out. |
+| A pass other than the colour pass drew a material's whole surface | `packages/materials/test/cutout-passes-browser.mjs` (picking, contact shadows, TAA velocity) and `packages/shadows/test/cutout-casters-browser.mjs` (every shadow map pass, virtual included) read pixels and velocities through a cut-out, a displaced surface and a clipping plane. |
 
 ## 5. Current evidence gaps
 

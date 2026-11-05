@@ -100,7 +100,8 @@ draws are not rejected by their bind-pose bounds.
 
 The returned mesh is the primitive's node. Picking and outlines honor hidden
 ancestors, mirrored winding, front/back/double-sided materials, alpha masks, opacity maps
-(materials `alphaMap`, `PickingPrimitive.opacity`), vertex alpha (left out with `vertexAlpha: false`),
+(materials `alphaMap`, `PickingPrimitive.opacity`), displaced surfaces (`displacement`), clipping planes (`clip`, whatever
+`clipShadows` says), vertex alpha (left out with `vertexAlpha: false`),
 UV1, texture transforms and implicit mip filtering. Blended PBR surfaces are
 pickable when their sampled alpha is at least 0.001, materials meshes included. GPU picking chooses the
 nearest visible surface; CPU BVH queries remain geometric triangle queries.

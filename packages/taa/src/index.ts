@@ -13,7 +13,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { halton, jitterProjection } from './jitter.js';
 import { fullscreen, cameraVelocity, objectVelocity, snapshot, resolve, present } from './shader.js';
-import { opacityEntries, type CasterCutout } from '../../shared/caster.js';
+import { displacementGroup, opacityEntries, type CasterCutout } from '../../shared/caster.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 import { hiddenInTree } from '../../shared/visibility.js';
@@ -105,6 +105,9 @@ interface Draw {
   alpha?: GPUTextureView;
   sampler?: GPUSampler;
   opacity?: VelocityPrimitive['opacity'];
+  displacement?: VelocityPrimitive['displacement'];
+  displaced?: GPUBindGroup;
+  clip?: GPUBuffer;
   frame: number;
 }
 /**
@@ -574,7 +577,12 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         format: 'rgba8unorm',
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
       });
-      device.queue.writeTexture({ texture: this.whiteTexture }, new Uint8Array(4).fill(255), { bytesPerRow: 4 }, [1, 1]);
+      device.queue.writeTexture(
+        { texture: this.whiteTexture },
+        new Uint8Array(4).fill(255),
+        { bytesPerRow: 4 },
+        [1, 1],
+      );
       this.whiteView = this.whiteTexture.createView();
       this.whiteSampler = device.createSampler();
     }
@@ -598,9 +606,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       throw new TypeError(
         'Invalid TAA alpha transform; set it to a Float32Array of 8 finite numbers on a primitive with stride 80.',
       );
-    const opacity = p.opacity;
-    if (opacity && p.stride !== 80)
-      throw new TypeError('Invalid TAA opacity map; use it on a primitive with stride 80.');
+    const { opacity, displacement, surfaceClip: clip } = p;
+    if ((opacity || displacement || clip) && p.stride !== 80)
+      throw new TypeError('Invalid TAA opacity map, displacement or clip; use it on a primitive with stride 80.');
     const pbr = p.stride === 80,
       solid = pbr && p.vertexAlpha === false,
       key =
@@ -612,12 +620,18 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         ':' +
         solid +
         ':' +
+        !!displacement +
+        ':' +
+        !!clip +
+        ':' +
         c.descriptor.depthStencil!.format +
         ':' +
         c.descriptor.multisample?.count;
     let pipeline = this.objectPipelines.get(key);
     if (!pipeline) {
-      const module = c.device.createShaderModule({ code: objectVelocity(pbr, !!transform, !!opacity, solid) });
+      const module = c.device.createShaderModule({
+        code: objectVelocity(pbr, !!transform, !!opacity, solid, !!displacement, !!clip),
+      });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: {
@@ -631,6 +645,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
                     { shaderLocation: 0, offset: 0, format: 'float32x4' },
                     { shaderLocation: 1, offset: 48, format: 'float32x4' },
                     { shaderLocation: 2, offset: 64, format: 'float32x4' },
+                    ...(displacement ? [{ shaderLocation: 3, offset: 16, format: 'float32x4' as const }] : []),
                   ]
                 : [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
             },
@@ -662,11 +677,15 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       r.vertexSize !== size ||
       r.alpha !== p.alphaTexture ||
       r.sampler !== p.alphaSampler ||
-      r.opacity !== opacity
+      r.opacity !== opacity ||
+      r.displacement !== displacement ||
+      r.clip !== clip?.buffer
     ) {
       r?.uniform.destroy();
       r?.vertices?.destroy();
       r?.source?.destroy();
+      // A block's const: a closure over the function's variable would cost a context on every draw (see shadows).
+      const made = pipeline;
       const uniform = c.device.createBuffer({
         size: transform ? 192 : 160,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -684,6 +703,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         alpha: p.alphaTexture,
         sampler: p.alphaSampler,
         opacity,
+        displacement,
+        displaced: displacementGroup(c.device, () => made.getBindGroupLayout(1), displacement),
+        clip: clip?.buffer,
         frame: -2,
       };
       records.set(identity, r);
@@ -732,6 +754,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
                 { binding: 2, resource: p.alphaTexture ?? white! },
                 { binding: 3, resource: p.alphaSampler ?? this.whiteSampler! },
                 ...(opacity ? opacityEntries(opacity, 5) : []),
+                ...(clip ? [{ binding: 8, resource: clip }] : []),
               ]
             : []),
         ],
@@ -786,6 +809,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     for (const { r, p } of draws) {
       pass.setPipeline(r.pipeline);
       pass.setBindGroup(0, r.group);
+      if (r.displaced) pass.setBindGroup(1, r.displaced);
       pass.setVertexBuffer(0, p.vertex, r.vertexOffset || undefined);
       pass.setIndexBuffer(p.index, 'uint32');
       pass.drawIndexed(p.count);

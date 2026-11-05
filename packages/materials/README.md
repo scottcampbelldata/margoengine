@@ -332,7 +332,9 @@ Groups become primitives of one `PBRModel`, share packed vertices and GPU vertex
 object across every primitive. Opaque groups draw before blended groups across the materials queue; transparent
 ordering still uses the model's node distance, not individual triangles. Group bounds conservatively include all vertices.
 Picking either group returns the shared mesh node. The existing shadows, lighting, SSAO and exporter adapters accept
-the model; shadows follow `map` and `alphaMap` cut-outs under `alphaTest`. Export preserves group materials and UV1.
+the model; shadows follow `map` and `alphaMap` cut-outs under `alphaTest`. Picking, contact shadows and TAA velocity follow
+`displacementMap` and `clippingPlanes` too: a click through a clipped part misses. `clipShadows: false` leaves shadows whole
+and still clips picking and TAA, which follow the surface. Export preserves group materials and UV1.
 
 Packing is cached by geometry identity: finish editing attributes before the first call to `packGeometry` or mesh
 creation, and use a new geometry object for changed attributes, or edit a live mesh with `setGeometry`.

@@ -1,5 +1,5 @@
-// Real-GPU regression test: a materials cut-out holds in the passes that do not run its colour shader. A click through
-// a hole misses, a contact shadow keeps the map's UV transform and alphaMap, TAA writes no velocity through a hole, and
+// Real-GPU regression test: a materials cut-out, displacement or clipping plane holds in the passes that do not run
+// its colour shader. A click through a hole misses, a contact shadow keeps the map's UV transform and alphaMap, TAA writes no velocity through a hole, and
 // `vertexColors: false` keeps vertex alpha out of all of them. Shadow maps are cutout-casters-browser.mjs.
 // Run from the repository root after `npm run build:packages`: node packages/materials/test/cutout-passes-browser.mjs
 import assert from 'node:assert/strict';
@@ -25,7 +25,12 @@ const surface = {
   alphaOnly: { left: true, right: false },
   vertexOff: { left: true, right: true },
   vertexOn: { left: false, right: false },
+  displaced: { left: false, right: true },
+  clipped: { left: false, right: true },
+  clipFree: { left: false, right: true },
 };
+// `clipShadows: false` leaves the shadow whole.
+const shadow = { ...surface, clipFree: { left: true, right: true } };
 const luminance = (image, [x, y]) => {
   let sum = 0;
   for (let j = y - 2; j <= y + 2; j++)
@@ -54,7 +59,7 @@ try {
   }
   await page.evaluate(() => window.check.contact());
   const bare = await shot();
-  for (const [name, want] of Object.entries(surface)) {
+  for (const [name, want] of Object.entries(shadow)) {
     const { points, errors } = await page.evaluate((n) => window.check.contact(n), name);
     assert.deepEqual(errors, []);
     measure(`contact ${name}`, await shot(), bare, points, want);

@@ -8,6 +8,12 @@ export interface CasterCutout {
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
+  /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices). */
+  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /** Planes that clip the shadow (materials `clippingPlanes` with `clipShadows`, 80-byte vertices). */
+  clip?: GPUBufferBinding;
+  /** Planes that clip the surface, whatever `clipShadows` says (80-byte vertices). */
+  surfaceClip?: GPUBufferBinding;
 }
 /** A depth-only caster pipeline (less-equal depth into depth32float, line lists for `lines`). */
 export function casterPipeline(
@@ -43,6 +49,8 @@ export function opacityEntries(
 ): GPUBindGroupEntry[];
 /** A caster shader that leaves vertex alpha out of its cut-out (a primitive with `vertexAlpha: false`). */
 export function solidVertexDepth(code: string): string;
+/** A caster shader that discards what uniform `name`'s planes cut away, bound at `binding` of group 0. */
+export function clippedDepth(code: string, binding: number, name: string): string;
 /** A cleared depth-only pass descriptor; set `depthStencilAttachment.view` before each use. */
 export function depthPassDescriptor(): GPURenderPassDescriptor & {
   depthStencilAttachment: GPURenderPassDepthStencilAttachment;

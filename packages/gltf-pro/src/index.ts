@@ -948,6 +948,8 @@ export interface PBRMaterial extends GLTFMaterial {
    * to clip too: a uniform of up to 6 world planes in the scene `section` binding's layout (plane count in settings.x).
    */
   clip?: GPUBufferBinding;
+  /** The same planes for passes that follow the surface and not its shadow: picking and TAA velocity. */
+  surfaceClip?: GPUBufferBinding;
   /**
    * The cut-out a material draws from its own maps (`@margoengine/materials` map and alphaMap with alphaTest), for shadow
    * casters to cut alike in place of `maps[0]`: the map's view and sampler, its UV set and affine rows, and an opacity map
@@ -1124,6 +1126,7 @@ interface ShadowCasterRecord {
   /** False keeps vertex alpha out of the cut-out, as the colour pass does. Set only on a primitive that cuts. */
   vertexAlpha?: boolean;
   clip?: GPUBufferBinding;
+  surfaceClip?: GPUBufferBinding;
   dynamic: boolean;
 }
 // Keep the original triangle buffer for queries and exports. Duplicate shared
@@ -1228,6 +1231,9 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   else delete value.displacement;
   if (clip) value.clip = clip;
   else delete value.clip;
+  const surfaceClip = m.surfaceClip;
+  if (surfaceClip) value.surfaceClip = surfaceClip;
+  else delete value.surfaceClip;
   // ponytail: edited geometry stays a dynamic caster after its first write; add a geometry revision to the shadow
   // still-hash if edited static levels need the cached atlas back. Displaced casters redraw too (live scale and bias).
   value.dynamic =
@@ -2829,6 +2835,8 @@ export class PBRModel implements EnginePlugin {
               : {}),
           ...(mask?.opacity ? { opacity: mask.opacity } : {}),
           ...(m.vertexAlpha === false && cutoff > 0 ? { vertexAlpha: false } : {}),
+          ...(m.displacement ? { displacement: m.displacement } : {}),
+          ...(m.surfaceClip ? { clip: m.surfaceClip } : {}),
         };
       });
   }

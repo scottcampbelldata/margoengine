@@ -18,11 +18,14 @@ import {
 import {
   casterBuffers,
   drawCaster,
+  clippedDepth,
+  displacementGroup,
   opacityDepth,
   opacityEntries,
   solidVertexDepth,
   type CasterCutout,
 } from '../../shared/caster.js';
+import { displacedDepth } from '../../shared/displacement.js';
 import { instancedDepth } from '../../shared/instances.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
@@ -127,6 +130,9 @@ interface Slot {
   mask?: GPUTextureView;
   sampler?: GPUSampler;
   opacity?: ContactPrimitive['opacity'];
+  displacement?: ContactPrimitive['displacement'];
+  displaced?: GPUBindGroup;
+  clip?: GPUBuffer;
 }
 
 // Blur: Gaussian with sigma = radius / 2, cut at 3 sigma (the truncated tail is 0.3% of the weight, below r16float
@@ -143,7 +149,8 @@ struct Draw {camera:mat4x4f,model:mat4x4f,alpha:vec4f${transformed ? ',alphaUV0:
 @group(0) @binding(0) var<uniform> f:Draw;`;
 
 // 80-byte casters: alpha cutout from TEXCOORD_0 or _1. The text keeps the shape the shared caster edits rewrite:
-// instancedDepth (shared/instances.js), opacityDepth and solidVertexDepth (shared/caster.js).
+// displacedDepth (shared/displacement.js), instancedDepth (shared/instances.js), opacityDepth, solidVertexDepth and
+// clippedDepth (shared/caster.js).
 const pbrOccluder = (transformed: boolean) => `${occluderBody(transformed)}
 @group(0) @binding(1) var mask:texture_2d<f32>;
 @group(0) @binding(2) var maskSampler:sampler;
@@ -507,8 +514,10 @@ export class ContactShadows implements EnginePlugin {
           throw new RangeError('Contact shadow primitive stride must be 24 or 80; pass core or gltf-pro vertices');
         if (p.instances && p.stride !== 80)
           throw new RangeError('Instanced contact shadow primitives need 80-byte vertices; pass gltf-pro instances');
-        if (p.opacity && p.stride !== 80)
-          throw new RangeError('Opacity-mapped contact shadow primitives need 80-byte vertices; pass gltf-pro vertices');
+        if ((p.opacity || p.displacement || p.clip) && p.stride !== 80)
+          throw new RangeError(
+            'Opacity-mapped, displaced and clipped contact shadow primitives need 80-byte vertices; pass gltf-pro vertices',
+          );
         const transform = p.alphaTransform;
         if (
           transform !== undefined &&
@@ -544,14 +553,27 @@ export class ContactShadows implements EnginePlugin {
         p.topology ?? 'triangle-list',
         p.instances?.count ?? -1,
       );
-      next.push(p.alpha, p.cutoff, p.texCoord, p.alphaTexture, p.alphaSampler, p.vertexAlpha, p.opacity);
+      next.push(
+        p.alpha,
+        p.cutoff,
+        p.texCoord,
+        p.alphaTexture,
+        p.alphaSampler,
+        p.vertexAlpha,
+        p.opacity,
+        p.displacement,
+        p.clip,
+      );
       if (p.alphaTransform) next.push(...p.alphaTransform);
       for (let i = 0; i < 16; i++) next.push(p.node.matrix[i]);
     }
-    // An opacity map's UV rows change on the GPU alone, so nothing here can see them.
+    // An opacity map's UV rows, a displacement's scale and a material's planes change on the GPU alone, so nothing here can
+    // see them.
     const old = this.signature,
       differs =
-        old.length !== next.length || next.some((v, i) => !Object.is(v, old[i])) || draws.some((p) => p.opacity);
+        old.length !== next.length ||
+        next.some((v, i) => !Object.is(v, old[i])) ||
+        draws.some((p) => p.opacity || p.displacement || p.clip);
     this.nextSignature = old;
     this.signature = next;
     return differs;
@@ -564,18 +586,22 @@ export class ContactShadows implements EnginePlugin {
       transformed = !!p.alphaTransform,
       opacity = !!p.opacity,
       solid = stride === 80 && p.vertexAlpha === false,
-      key = `${stride}|${instanced}|${lines}|${transformed}|${opacity}|${solid}`;
+      displaced = !!p.displacement,
+      clipped = !!p.clip,
+      key = `${stride}|${instanced}|${lines}|${transformed}|${opacity}|${solid}|${displaced}|${clipped}`;
     let pipeline = this.occluders.get(key);
     if (!pipeline) {
       let code = stride === 24 ? coreOccluder : pbrOccluder(transformed);
+      if (displaced) code = displacedDepth(code, 1);
       if (instanced) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
+      if (clipped) code = clippedDepth(code, 3, 'materialClip');
       const module = device.createShaderModule({ code }),
         keepNearest = { operation: 'max', srcFactor: 'one', dstFactor: 'one' } as const;
       pipeline = device.createRenderPipeline({
         layout: 'auto',
-        vertex: { module, entryPoint: 'vertex', buffers: casterBuffers(stride, false, instanced) },
+        vertex: { module, entryPoint: 'vertex', buffers: casterBuffers(stride, displaced, instanced) },
         fragment: {
           module,
           entryPoint: 'fragment',
@@ -630,23 +656,30 @@ export class ContactShadows implements EnginePlugin {
           slot.pipeline !== pipeline ||
           slot.mask !== mask ||
           slot.sampler !== sampler ||
-          slot.opacity !== p.opacity
+          slot.opacity !== p.opacity ||
+          slot.displacement !== p.displacement ||
+          slot.clip !== p.clip?.buffer
         ) {
-          slot.group = p.opacity
-            ? device.createBindGroup({
-                layout: pipeline.getBindGroupLayout(0),
-                entries: [
-                  { binding: 0, resource: { buffer: slot.uniform } },
-                  { binding: 1, resource: mask! },
-                  { binding: 2, resource: sampler! },
-                  ...opacityEntries(p.opacity),
-                ],
-              })
-            : group(device, pipeline, mask ? [{ buffer: slot.uniform }, mask, sampler!] : [{ buffer: slot.uniform }]);
+          slot.group =
+            p.opacity || p.clip
+              ? device.createBindGroup({
+                  layout: pipeline.getBindGroupLayout(0),
+                  entries: [
+                    { binding: 0, resource: { buffer: slot.uniform } },
+                    { binding: 1, resource: mask! },
+                    { binding: 2, resource: sampler! },
+                    ...(p.clip ? [{ binding: 3, resource: p.clip }] : []),
+                    ...(p.opacity ? opacityEntries(p.opacity) : []),
+                  ],
+                })
+              : group(device, pipeline, mask ? [{ buffer: slot.uniform }, mask, sampler!] : [{ buffer: slot.uniform }]);
           slot.pipeline = pipeline;
           slot.mask = mask;
           slot.sampler = sampler;
           slot.opacity = p.opacity;
+          slot.displacement = p.displacement;
+          slot.displaced = displacementGroup(device, () => pipeline.getBindGroupLayout(1), p.displacement);
+          slot.clip = p.clip?.buffer;
         }
         drawCaster(
           pass,
@@ -658,7 +691,7 @@ export class ContactShadows implements EnginePlugin {
           projection,
           p,
           p.alphaTransform,
-          undefined,
+          slot.displaced,
           p.instances,
         );
       });

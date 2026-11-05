@@ -72,5 +72,8 @@ interface CasterCutout {
   alphaTransform?: Float32Array;
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   vertexAlpha?: boolean;
+  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  clip?: GPUBufferBinding;
+  surfaceClip?: GPUBufferBinding;
 }
 ```

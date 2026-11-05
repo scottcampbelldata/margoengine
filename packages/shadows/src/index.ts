@@ -17,7 +17,7 @@ import { displacedDepth } from '../../shared/displacement.js';
 import { shadowPrimitivesInto, coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
 import { viewMatrix } from '../../shared/view.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
-import { sectionState, sectionShader } from '../../shared/section.js';
+import { sectionState } from '../../shared/section.js';
 import { finiteVector } from '@margoengine/math/validate';
 import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
@@ -31,6 +31,7 @@ import {
   casterRuntime,
   nodeRecords,
   depthPassDescriptor,
+  clippedDepth,
   displacementGroup,
   drawCaster,
   opacityDepth,
@@ -1568,12 +1569,7 @@ export class Shadows implements EnginePlugin {
       if (inst) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
-      if (section) {
-        code = code
-          .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
-          .replace(/o.clip=f.camera\*([^;]+);/, 'let world=$1;o.clip=f.camera*world;o.position=world.xyz;');
-        code = sectionShader(code, 0, 3, material ? 'materialClip' : 'section');
-      }
+      if (section) code = clippedDepth(code, 3, material ? 'materialClip' : 'section');
       const module = this.device!.createShaderModule({ code });
       pipeline = tinted
         ? tintPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines)

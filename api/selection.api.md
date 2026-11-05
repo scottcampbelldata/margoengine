@@ -117,6 +117,12 @@ export interface PickingPrimitive {
         readonly sampler: GPUSampler;
     };
     vertexAlpha?: boolean;
+    displacement?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
+    clip?: GPUBufferBinding;
     doubleSided?: boolean;
     side?: 'front' | 'back' | 'double';
 }

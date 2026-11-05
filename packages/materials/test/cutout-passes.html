@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"/><title>Materials cut-outs in every pass</title><style>body{margin:0;background:#000}canvas{width:256px;height:256px;display:block}</style></head><body>
+<!doctype html><html><head><meta charset="utf-8"/><title>Materials surfaces in every pass</title><style>body{margin:0;background:#000}canvas{width:256px;height:256px;display:block}</style></head><body>
 <script type="module">
 // A quad whose left half is solid and right half cut out, through the passes that do not draw the material's colour
 // shader: picking, contact shadows and TAA velocity. cutout-passes-browser.mjs reads the answers.
@@ -25,6 +25,11 @@ const variants={
   // Vertex alpha 0.2 under alphaTest 0.5: the colour pass ignores it with vertexColors false and cuts all without.
   vertexOff:()=>({material:new PbrMaterial({alphaTest:0.5,vertexColors:false}),colors:faint}),
   vertexOn:()=>({material:new PbrMaterial({alphaTest:0.5}),colors:faint}),
+  // Normals along +x and a displacement of 1.2 slide the quad off its left half, which holds no vertex to move.
+  displaced:()=>({material:new PbrMaterial({displacementMap:split(white.concat(255),white.concat(255)),displacementScale:1.2}),along:[1,0,0]}),
+  // A plane keeps x >= 0. Picking and TAA follow the surface; a contact shadow follows clipShadows.
+  clipped:()=>({material:new PbrMaterial({clippingPlanes:[[1,0,0,0]]})}),
+  clipFree:()=>({material:new PbrMaterial({clippingPlanes:[[1,0,0,0]],clipShadows:false})}),
 };
 const scene=async(camera)=>{
   document.querySelector('canvas')?.remove();
@@ -36,16 +41,17 @@ const scene=async(camera)=>{
   const pixel=p=>{engine.camera.update(1,true);const m=engine.camera.matrix,c=[0,1,2,3].map(r=>m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r]);return [Math.round((c[0]/c[3]+1)/2*256),Math.round((1-c[1]/c[3])/2*256)];};
   return {engine,errors,render,pixel};
 };
-const facing=(colors,x0=-1,x1=1)=>({positions:[x0,-1,0,x1,-1,0,x1,1,0,x0,1,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3],...(colors?{colors}:{})});
+const four=n=>[...n,...n,...n,...n];
+const facing=(colors,along=[0,0,1],x0=-1,x1=1)=>({positions:[x0,-1,0,x1,-1,0,x1,1,0,x0,1,0],normals:four(along),uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3],...(colors?{colors}:{})});
 // A strip above the floor, thin in z so the camera sees the floor under it.
-const flat=(colors,y=0.6,x0=-1,x1=1,z0=-0.2,z1=0.2)=>({positions:[x0,y,z1,x1,y,z1,x1,y,z0,x0,y,z0],normals:[0,1,0,0,1,0,0,1,0,0,1,0],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3],...(colors?{colors}:{})});
+const flat=(colors,along=[0,1,0],y=0.6,x0=-1,x1=1,z0=-0.2,z1=0.2)=>({positions:[x0,y,z1,x1,y,z1,x1,y,z0,x0,y,z0],normals:four(along),uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3],...(colors?{colors}:{})});
 let open;
 window.check={
   // Whether a click on each half hits the quad.
   async pick(name){
-    const {engine,errors,render,pixel}=await scene({position:[0,0,5],target:[0,0,0],fov:60}),{material,colors}=variants[name]();
+    const {engine,errors,render,pixel}=await scene({position:[0,0,5],target:[0,0,0],fov:60}),{material,colors,along}=variants[name]();
     Picking.attach(engine);
-    createMesh(engine,facing(colors),material);
+    createMesh(engine,facing(colors,along),material);
     await render();
     const [lx,ly]=pixel([-0.5,0,0]),[rx,ry]=pixel([0.5,0,0]),left=await engine.pick(lx,ly)!==null,right=await engine.pick(rx,ry)!==null;
     engine.dispose();
@@ -57,7 +63,7 @@ window.check={
     const made=await scene({position:[0,5,6],target:[0,0,0],fov:60}),{engine,errors,render,pixel}=made;
     engine.createMesh().setGeometry(box(16,0.1,16)).setPosition([0,-0.05,0]);
     const contact=ContactShadows.attach(engine,{size:6,height:1.5,blur:0,opacity:1,resolution:512,static:!!cached});
-    if(name){const {material,colors}=variants[name]();made.material=material;contact.add(createMesh(engine,flat(colors),material));}
+    if(name){const {material,colors,along}=variants[name]();made.material=material;contact.add(createMesh(engine,flat(colors,along),material));}
     open=made;
     await render();
     return {points:{left:pixel([-0.5,0,0]),right:pixel([0.5,0,0])},errors:errors.splice(0)};
@@ -71,9 +77,9 @@ window.check={
   // Slides a cut-out across a still coplanar quad; the velocity of each half, in uv, jitter taken out.
   async taa(name){
     open?.engine.dispose();open=undefined;
-    const {engine,errors,render,pixel}=await scene({position:[0,0,5],target:[0,0,0],fov:60}),{material,colors}=variants[name]();
+    const {engine,errors,render,pixel}=await scene({position:[0,0,5],target:[0,0,0],fov:60}),{material,colors,along}=variants[name]();
     engine.createMesh().setGeometry(box(8,8,0.5)).setPosition([0,0,-0.25]);
-    const mesh=createMesh(engine,facing(colors),material),taa=TAA.attach(engine),step=0.2;
+    const mesh=createMesh(engine,facing(colors,along),material),taa=TAA.attach(engine),step=0.2;
     taa.add(mesh);
     // fixed-wait: each frame moves the quad one step, so the count is the motion and not time to settle.
     for(let f=0;f<4;f++){mesh.root.setPosition([f*step-0.3,0,0]);await render(1);}

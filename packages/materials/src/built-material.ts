@@ -1877,6 +1877,10 @@ function clipUniform(m: Material, device: GPUDevice, owner: object): GPUBufferBi
 function clipOf(m: Material, device: GPUDevice | null | undefined, owner: object) {
   return device && m['clipping'].length && m.clipShadows ? clipUniform(m, device, owner) : undefined;
 }
+/** What passes that follow the surface bind to clip `m`, whether or not its shadows are clipped (gltf-pro `surfaceClip`). */
+function surfaceClipOf(m: Material, device: GPUDevice | null | undefined, owner: object) {
+  return device && m['clipping'].length ? clipUniform(m, device, owner) : undefined;
+}
 const surfaceAnchor = 'if(!facing&&f.settings.z<0.5){discard;}';
 /**
  * `code` discarding what the material's planes cut away: in every fragment entry, and in gltf-pro's `surface()` so
@@ -3884,6 +3888,7 @@ const surfaceFields: PropertyDescriptorMap = {
   renderState: live(renderStateOf),
   displacement: live((m, g) => displacementOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   clip: live((m, g) => clipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
+  surfaceClip: live((m, g) => surfaceClipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   castMask: live((m, g) => castMaskOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   pickMask: live((m, g) => pickMaskOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   vertexAlpha: live((m) => m.vertexColors),

@@ -4,7 +4,15 @@ import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
-import { casterBuffers, opacityDepth, opacityEntries, solidVertexDepth } from '../../shared/caster.js';
+import {
+  casterBuffers,
+  clippedDepth,
+  displacementGroup,
+  opacityDepth,
+  opacityEntries,
+  solidVertexDepth,
+} from '../../shared/caster.js';
+import { displacedDepth } from '../../shared/displacement.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -28,6 +36,10 @@ export interface PickingPrimitive {
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the test, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
+  /** Vertex displacement of the surface (materials `displacementMap`): the shape a click lands on. */
+  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /** Planes that clip the surface (materials `clippingPlanes`): a click through them misses. */
+  clip?: GPUBufferBinding;
   doubleSided?: boolean;
   side?: 'front' | 'back' | 'double';
 }
@@ -57,6 +69,9 @@ interface Draw {
   texture?: GPUTextureView;
   sampler?: GPUSampler;
   opacity?: PickingPrimitive['opacity'];
+  displacement?: PickingPrimitive['displacement'];
+  displaced?: GPUBindGroup;
+  clip?: GPUBuffer;
 }
 const identityUV = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]);
 const budget = 65536;
@@ -294,15 +309,20 @@ export class PickingPrimitives {
     // Each primitive owns its uniform; another view of the same frame writes a frame-arena slice.
     for (let index = 0; index < primitives.length; index++) {
       const p = primitives[index],
-        opacity = p.opacity,
-        variant = opacity || p.vertexAlpha === false ? this.pipeline(options, !!opacity, p.vertexAlpha === false) : pipeline;
+        { opacity, displacement, clip } = p,
+        variant =
+          opacity || displacement || clip || p.vertexAlpha === false
+            ? this.pipeline(options, !!opacity, p.vertexAlpha === false, !!displacement, !!clip)
+            : pipeline;
       let record = draws[index];
       if (
         !record ||
         record.pipeline !== variant ||
         record.texture !== p.alphaTexture ||
         record.sampler !== p.alphaSampler ||
-        record.opacity !== opacity
+        record.opacity !== opacity ||
+        record.displacement !== displacement ||
+        record.clip !== clip?.buffer
       ) {
         retire(this.device!, record?.uniform);
         const uniform = this.device.createBuffer({
@@ -319,6 +339,9 @@ export class PickingPrimitives {
             texture: p.alphaTexture,
             sampler: p.alphaSampler,
             opacity,
+            displacement,
+            displaced: displacementGroup(this.device!, () => variant.getBindGroupLayout(1), displacement),
+            clip: clip?.buffer,
             groups: uniformGroups(uniform, (binding) =>
               this.device!.createBindGroup({
                 layout: variant.getBindGroupLayout(0),
@@ -326,6 +349,7 @@ export class PickingPrimitives {
                   { binding: 0, resource: binding },
                   { binding: 1, resource: texture },
                   { binding: 2, resource: sampler },
+                  ...(clip ? [{ binding: 3, resource: clip }] : []),
                   ...(opacity ? opacityEntries(opacity) : []),
                 ],
               }),
@@ -369,6 +393,7 @@ export class PickingPrimitives {
         const p = primitives[index];
         if (draws[index].pipeline !== bound) pass.setPipeline((bound = draws[index].pipeline));
         pass.setBindGroup(0, draws[index].groups.get(draws[index].slice));
+        if (draws[index].displaced) pass.setBindGroup(1, draws[index].displaced!);
         pass.setVertexBuffer(0, p.vertex, p.vertexOffset || undefined);
         pass.setIndexBuffer(p.index, 'uint32');
         pass.drawIndexed(p.count);
@@ -378,8 +403,14 @@ export class PickingPrimitives {
     }
     return candidates;
   }
-  /** The pipeline of `options`; a primitive with an opacity map or without vertex alpha takes its own shader. */
-  private pipeline(options: DrawOptions, opacity = false, solid = false): GPURenderPipeline {
+  /** The pipeline of `options`; a primitive with an opacity map, no vertex alpha, displacement or planes takes its own shader. */
+  private pipeline(
+    options: DrawOptions,
+    opacity = false,
+    solid = false,
+    displaced = false,
+    clipped = false,
+  ): GPURenderPipeline {
     const mask = !!options.mask,
       key = [
         options.format,
@@ -389,6 +420,8 @@ export class PickingPrimitives {
         mask,
         opacity,
         solid,
+        displaced,
+        clipped,
       ].join(':');
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
@@ -396,15 +429,18 @@ export class PickingPrimitives {
         throw new RangeError(
           'Too many picking primitive variants; reduce distinct formats, sample counts and mask modes to 64 or fewer.',
         );
-      const plain = shader(mask),
-        code = solid ? solidVertexDepth(plain) : plain,
-        module = this.device!.createShaderModule({ code: opacity ? opacityDepth(code, 0) : code });
+      let code = shader(mask);
+      if (displaced) code = displacedDepth(code, 1);
+      if (solid) code = solidVertexDepth(code);
+      if (opacity) code = opacityDepth(code, 0);
+      if (clipped) code = clippedDepth(code, 3, 'materialClip');
+      const module = this.device!.createShaderModule({ code });
       pipeline = this.device!.createRenderPipeline({
         layout: 'auto',
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: casterBuffers(80),
+          buffers: casterBuffers(80, displaced),
         },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: options.format }] },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
@@ -449,9 +485,9 @@ struct PickFrame {camera:mat4x4f,model:mat4x4f,settings:vec4f,uv0:vec4f,uv1:vec4
 @group(0) @binding(1) var alphaMap:texture_2d<f32>;
 @group(0) @binding(2) var alphaSampler:sampler;
 struct PickInput {@location(0) position:vec4f,@location(3) uv:vec4f,@location(4) color:vec4f}
-struct PickOut {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
-@vertex fn vertex(i:PickInput)->PickOut {var o:PickOut;let p=f.model*vec4f(i.position.xyz,1);o.position=f.camera*p;o.uv=select(i.uv.xy,i.uv.zw,f.settings.z>0.5);o.alpha=i.color.a;return o;}
-@fragment fn fragment(i:PickOut,@builtin(front_facing) front:bool)->@location(0) ${mask ? 'vec4f' : 'u32'} {
+struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+@vertex fn vertex(i:PickInput)->Out {var o:Out;let p=f.model*vec4f(i.position.xyz,1);o.clip=f.camera*p;o.uv=select(i.uv.xy,i.uv.zw,f.settings.z>0.5);o.alpha=i.color.a;return o;}
+@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) ${mask ? 'vec4f' : 'u32'} {
  let uv=vec2f(dot(f.uv0.xy,i.uv)+f.uv0.z,dot(f.uv1.xy,i.uv)+f.uv1.z);let alpha=textureSample(alphaMap,alphaSampler,uv).a*f.settings.x*i.alpha;
  let facing=front==(f.settings.w>0.0);if((!facing&&f.info.y<0.5)||(facing&&f.info.y>1.5)||alpha<f.settings.y){discard;}return ${mask ? 'vec4f(1,0,0,1)' : 'u32(f.info.x)'};
 }`;

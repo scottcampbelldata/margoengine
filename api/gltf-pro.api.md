@@ -264,6 +264,7 @@ export interface PBRMaterial extends GLTFMaterial {
         readonly sampler: GPUSampler;
     };
     clip?: GPUBufferBinding;
+    surfaceClip?: GPUBufferBinding;
     castMask?: {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
@@ -329,6 +330,12 @@ export class PBRModel implements EnginePlugin {
             readonly sampler: GPUSampler;
         } | undefined;
         vertexAlpha?: boolean | undefined;
+        displacement?: {
+            readonly buffer: GPUBuffer;
+            readonly view: GPUTextureView;
+            readonly sampler: GPUSampler;
+        } | undefined;
+        clip?: GPUBufferBinding | undefined;
     }[];
     setup(engine: Engine, device?: GPUDevice | null): void;
     shareBuffers(target: PBRPrimitive, source: PBRPrimitive): boolean;
@@ -370,6 +377,12 @@ export class PBRModel implements EnginePlugin {
             readonly sampler: GPUSampler;
         } | undefined;
         vertexAlpha?: boolean | undefined;
+        displacement?: {
+            readonly buffer: GPUBuffer;
+            readonly view: GPUTextureView;
+            readonly sampler: GPUSampler;
+        } | undefined;
+        clip?: GPUBufferBinding | undefined;
     }[];
     readPickingGeometry(): Promise<readonly PBRPickingGeometry[]>;
     draw(c: Context, mode: 'beauty' | 'gbuffer' | 'ambient' | 'transparent' | 'transmission' | 'capture' | 'occlusion', color: GPUTextureView, depth: GPUTextureView, phase?: 'all' | 'opaque' | 'blend', external?: {
@@ -1074,6 +1087,7 @@ interface ShadowCasterRecord {
     opacity?: NonNullable<PBRMaterial['castMask']>['opacity'];
     vertexAlpha?: boolean;
     clip?: GPUBufferBinding;
+    surfaceClip?: GPUBufferBinding;
     dynamic: boolean;
 }
 

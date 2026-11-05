@@ -472,14 +472,6 @@ does not own. Each entry says exactly what is needed to close it.
   blend, or drawing a full-screen layer first to change the GPU's tile state, changes or adds work to hide the
   symptom.
 
-### Displacement and clipping planes on materials meshes: passes that do not follow them
-
-Found while fixing the cut-outs (2026-11-05), from reading the code; not yet run as a repro. Shadow maps follow a
-materials mesh's `displacementMap` and `clippingPlanes` (`displacement` and `clip` on its caster), but
-`@margoengine/staging`, `@margoengine/taa` and picking draw the undisplaced, unclipped geometry: their shaders have no
-such binding. **Repro:** a mesh with `displacementMap` over a floor, or `clippingPlanes` with `clipShadows`, with
-`ContactShadows`, `TAA` or `Picking`; a click on a clipped part still hits it.
-
 
 ## Performance losses still open
 

@@ -241,7 +241,7 @@ test('Distinct PBR primitives retain distinct uniforms, UV1 affine alpha, mirror
   const code = h.pipelines.find((p) => p.vertex.module.code.includes('struct PickFrame')).vertex.module.code;
   assert.ok(code.includes('textureSample(alphaMap,alphaSampler,uv).a*f.settings.x*i.alpha'));
   assert.ok(code.indexOf('textureSample(') < code.indexOf('discard;'));
-  assert.ok(code.includes('let p=f.model*vec4f(i.position.xyz,1);o.position=f.camera*p;'));
+  assert.ok(code.includes('let p=f.model*vec4f(i.position.xyz,1);o.clip=f.camera*p;'));
   const buffers = h.counts.buffers,
     textures = h.counts.textures;
   await h.picking.onPick(64, 48);
