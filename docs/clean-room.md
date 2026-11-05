@@ -843,6 +843,7 @@ Gaea, World Machine, Houdini and the like) was read; facts about them come only 
 | Trigonometry | Volder, "The CORDIC trigonometric computing technique", IRE Transactions on Electronic Computers, 1959 (vectoring and rotation modes, gain constant) |
 | Hashes | Jarzynski and Olano, "Hash functions for GPU rendering", Journal of Computer Graphics Techniques, 2020 (PCG output hash, nested hashing for several inputs) |
 | Value noise | Lattice values from those hashes, blended with the quintic fade of Perlin, "Improving Noise", SIGGRAPH 2002; fractal sums and ridged noise in our own integer layout |
+| Multi-noise classifier (`/multinoise`) | Our own design: nearest prototype by weighted squared Euclidean distance to a point or box (textbook nearest-prototype rule) on axes normalised to Q16, blended with the Wendland kernel above; the technique name is generic and no other tool's source or data was read |
 | Blend kernel | Wendland, "Piecewise polynomial, positive definite and compactly supported radial functions of minimal degree", Advances in Computational Mathematics, 1995 (C2 kernel `(1 - r)^4 (4r + 1)`) |
 | Procedural relief and R16 | Our own design: fractal lowlands, ridged mountains under a mask, a smoothstep coast shelf, river valleys carved around polylines |
 | Height interpolation | Keys, "Cubic convolution interpolation for digital image processing", IEEE Transactions on Acoustics, Speech and Signal Processing, 1981 (Catmull-Rom weights, a = -0.5) in Q16; linear extension past the edges |

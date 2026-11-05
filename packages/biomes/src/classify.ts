@@ -3,7 +3,7 @@
 // noise so borders wander like real ecotones, a 3x3 box blur removes salt-and-pepper, paint layers (read at the warped
 // cell through a box the width of the world's ecotone, so painted edges blend and wander too) compose in a fixed order, a cell outside every envelope falls back to the nearest one (ties by priority, then id), and the top 4
 // biomes are stored with weights that sum to exactly 255 (largest remainder, ties by priority, then id). The
-// Whittaker and Holdridge classifiers live in the zones entry and plug in through `ZoneClassifier`.
+// Whittaker and Holdridge classifiers live in the zones entry and the multi-noise one in its own, all plugging in through `ZoneClassifier`.
 import { type BiomeDefinition, type Dimension, envelopeOf } from './define.js';
 import { clampInt, divFloor, ONE, wendland } from './fixed.js';
 import { warpLattice, warpPlanes } from './classify-warp.js';
@@ -21,10 +21,15 @@ export interface PaintLayer {
 
 /**
  * A classifier that weights biomes by named zones instead of their envelopes: `whittaker` and `holdridge` from
- * `@margoengine/biomes/zones`, passed as `BiomeWorld.create({ classifier })`.
+ * `@margoengine/biomes/zones`, or `multiNoise(spec)` from `@margoengine/biomes/multinoise`, passed as
+ * `BiomeWorld.create({ classifier })`.
  */
 export interface ZoneClassifier {
-  readonly kind: 'whittaker' | 'holdridge';
+  readonly kind: 'whittaker' | 'holdridge' | 'multinoise';
+  /** Layers the scorer reads beyond the base set and the biomes' envelopes (`multiNoise` names its axes here). */
+  readonly inputs?: readonly string[];
+  /** Plain JSON that rebuilds this classifier on a worker or from a saved world (`multiNoise` keeps its spec). */
+  readonly spec?: object;
   /**
    * Set when the scorer gives cell k weights from cell k of `warped` alone (never from `cells` or other cells), as
    * `whittaker` and `holdridge` do. `BiomeWorld.tilePart` then classifies only the cells asked for; unset (the
@@ -113,7 +118,9 @@ export function classifier(
     rank[b] = place;
   });
   const dims = biomes.map(envelopeOf),
-    inputs = [...new Set([...BASE, ...dims.flat().map((d) => d.layer)])],
+    inputs = [
+      ...new Set([...BASE, ...dims.flat().map((d) => d.layer), ...(kind === 'envelopes' ? [] : (kind.inputs ?? []))]),
+    ],
     slotOf = (layer: string) => inputs.indexOf(layer);
   return {
     kind: kind === 'envelopes' ? kind : kind.kind,

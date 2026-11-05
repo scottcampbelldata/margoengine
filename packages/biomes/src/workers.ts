@@ -52,8 +52,13 @@ const spawn = (): Worker =>
     name: 'margoengine-biomes',
   });
 
-/** A classifier as a worker gets it: its name (the worker imports the zones entry for a zone classifier). */
-const classifierName = (c: unknown) => (c === undefined || c === 'envelopes' ? c : (c as { kind: string }).kind);
+/** A classifier as a worker gets it: its name (the worker imports the zones entry for a zone classifier), or `{ kind, spec }` for one built from a spec. */
+const classifierName = (c: unknown) =>
+  c === undefined || c === 'envelopes'
+    ? c
+    : (c as { spec?: object }).spec
+      ? { kind: (c as { kind: string }).kind, spec: (c as { spec: object }).spec }
+      : (c as { kind: string }).kind;
 
 /**
  * The workers of one world (`world.workers`), made by `BiomeWorld.create`. A worker started later (or restarted after

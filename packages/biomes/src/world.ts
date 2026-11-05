@@ -364,7 +364,7 @@ export class BiomeWorld implements Disposable {
     if (new Set(ids).size !== ids.length) throw rangeError('BiomeWorld biome ids must be unique', 'biomes');
     if (kind !== 'envelopes' && typeof (kind as ZoneClassifier)?.scorer !== 'function')
       throw rangeError(
-        "BiomeWorld classifier is 'envelopes' or whittaker or holdridge from '@margoengine/biomes/zones'",
+        "BiomeWorld classifier is 'envelopes', whittaker or holdridge from '@margoengine/biomes/zones', or multiNoise(spec) from '@margoengine/biomes/multinoise'",
         'biomes',
       );
     if (!checkPaint(paint, ids))

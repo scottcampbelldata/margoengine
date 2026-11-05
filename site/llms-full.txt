@@ -6433,7 +6433,7 @@ with the terrain.
 | Guide | What it covers |
 | --- | --- |
 | [Worlds, tiles and climate](docs/worlds-and-climate.md) | `BiomeWorld.create` options, tiles and tile parts, every layer, how the climate is made, the G1 speed numbers, region fields, the reference world R16 |
-| [Biomes, presets, painting and editing](docs/biomes-and-painting.md) | `defineBiome`, envelopes, Whittaker and Holdridge, the presets, painting, clearings, Koppen labels, `BiomeEditor` with undo |
+| [Biomes, presets, painting and editing](docs/biomes-and-painting.md) | `defineBiome`, envelopes, Whittaker and Holdridge, multi-noise maps, the presets, painting, clearings, Koppen labels, `BiomeEditor` with undo |
 | [Drawing a world as terrain](docs/terrain-view.md) | `BiomeView` options, materials, the sea and river water, trees and grass, shadows, the forest floor and far trees |
 | [Trees, shrubs, rocks and props](docs/placement.md) | `BiomePlacement`: clusters, stands, the hard core, shade, sizes, exclusions, the record layout, `/stats` |
 | [Workers](docs/workers.md) | tiles and objects on Web Workers, caching, what a placement reads from its neighbours |

@@ -28,7 +28,7 @@ dirty rectangle. `tile`, `tiles`, `create` and `digest` take an `AbortSignal`.
 `world.tilePart(x, z, [i0, j0, i1, j1])` makes only some cells of a tile (`i1` and `j1` exclusive), with the same bytes
 as those cells of the whole tile. Placement uses it to make only the edge of each neighbour it reads. A part is never
 cached and is made on the calling thread, also on a world with workers; when the world already holds the whole tile,
-it answers with that (`window` is then `[0, 0, cells, cells]`). The envelopes, `whittaker` and `holdridge` classify
+it answers with that (`window` is then `[0, 0, cells, cells]`). The envelopes, `whittaker`, `holdridge` and `multiNoise` classify
 only the cells asked for. A `ZoneClassifier` of your own does too when it sets `perCell: true`; without it, `tilePart`
 makes the whole tile and answers with that, so a part always has the whole tile's bytes.
 

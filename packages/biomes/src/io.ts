@@ -346,10 +346,12 @@ async function worldOptions(
     copy.set(bytes);
     options.height = { ...height, type: undefined, samples: new Type(copy.buffer) };
   }
-  if (options.classifier === 'whittaker' || options.classifier === 'holdridge')
+  if (options.classifier?.kind === 'multinoise')
+    options.classifier = (await import('@margoengine/biomes/multinoise')).multiNoise(options.classifier.spec);
+  else if (options.classifier === 'whittaker' || options.classifier === 'holdridge')
     options.classifier = (await import('@margoengine/biomes/zones'))[options.classifier as 'whittaker' | 'holdridge'];
   else if (options.classifier !== undefined && options.classifier !== 'envelopes')
-    throw rangeError('Saved classifier is envelopes, whittaker or holdridge', 'biomes');
+    throw rangeError('Saved classifier is envelopes, whittaker, holdridge or a multinoise spec', 'biomes');
   return {
     options: options as BiomeWorldOptions,
     edits: saved.edits.map((e) => ({ name: e.name, x: e.x, z: e.z, data: unbase64(e.data) })),
@@ -386,7 +388,8 @@ export function saveWorld(world: BiomeWorld): unknown {
       climate,
       ecotone,
       biomes,
-      classifier: classifier === 'envelopes' ? classifier : classifier.kind,
+      classifier:
+        classifier === 'envelopes' ? classifier : classifier.spec ? { kind: classifier.kind, spec: classifier.spec } : classifier.kind,
       paint,
       height: h && 'samples' in h ? { ...h, samples: base64(h.samples), type: h.samples.constructor.name } : h,
     },

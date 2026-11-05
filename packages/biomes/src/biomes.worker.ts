@@ -15,9 +15,10 @@ const placements = new Map<number, BiomePlacement>();
 
 type Message = { id: number; op: string } & Record<string, unknown>;
 
-/** The classifier object for a name sent by the page ('envelopes', 'whittaker' or 'holdridge'). */
+/** The classifier object for a name sent by the page ('envelopes', 'whittaker', 'holdridge' or { kind: 'multinoise', spec }). */
 async function classifier(name: unknown): Promise<BiomeWorldOptions['classifier']> {
   if (name === undefined || name === 'envelopes') return name as undefined;
+  if (typeof name === 'object') return (await import('./multinoise.js')).multiNoise((name as { spec: never }).spec);
   const zones = await import('./zones.js');
   return name === 'whittaker' ? zones.whittaker : zones.holdridge;
 }

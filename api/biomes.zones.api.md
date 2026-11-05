@@ -13,7 +13,9 @@ export const WHITTAKER: Readonly<Record<string, {
 }>>;
 
 export interface ZoneClassifier {
-    readonly kind: 'whittaker' | 'holdridge';
+    readonly kind: 'whittaker' | 'holdridge' | 'multinoise';
+    readonly inputs?: readonly string[];
+    readonly spec?: object;
     readonly perCell?: true;
     scorer(biomes: readonly BiomeDefinition[], slotOf: (layer: string) => number): (warped: Int32Array, cells: number, member: Int32Array) => void;
 }

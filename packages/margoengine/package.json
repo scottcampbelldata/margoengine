@@ -126,6 +126,10 @@
       "types": "./dist/biomes/zones.d.ts",
       "import": "./dist/biomes/zones.js"
     },
+    "./biomes/multinoise": {
+      "types": "./dist/biomes/multinoise.d.ts",
+      "import": "./dist/biomes/multinoise.js"
+    },
     "./biomes/view": {
       "types": "./dist/biomes/view.d.ts",
       "import": "./dist/biomes/view.js"

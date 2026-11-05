@@ -46,6 +46,8 @@ console.log(world.biomes[first].id, tile.layer('biomeWeight')!.data[0] / 255, wo
   `BiomeWorld.create({ classifier: whittaker })`. A classifier of your own implements `ZoneClassifier`. Set
   `perCell: true` when its scorer weights cell k from cell k of the warped inputs alone (not from the grid size or
   other cells), so `tilePart` can classify just the cells it makes; unset by default, `tilePart` makes whole tiles.
+- **Multi-noise** (entry `/multinoise`): for stylised maps, place biomes in a space whose axes are fields you choose
+  and give each cell to the nearest. See Multi-noise maps below.
 
 `presets` holds `temperate`, `boreal`, `alpine`, `wetland`, `tundra`, `desert`, `savanna` and `tropical`, written as
 plant functional type limits over the coldest month, growing degree days and the moisture index, with Korner's
@@ -99,6 +101,46 @@ BiomeEditor.attach(world).paint('clearing', { center: [100, 80], radius: 40, fal
 const tile = await placement.tile(2, 2); // objects stay out of the painted yard; undo brings them back
 console.log(tile.count, world.heightAt(100, 80)); // where to stand the cabin, in metres
 ```
+
+### Multi-noise maps
+
+```ts
+import { BiomeWorld } from '@margoengine/biomes';
+import { presets } from '@margoengine/biomes/presets';
+import { multiNoise, multiNoisePresets } from '@margoengine/biomes/multinoise';
+
+// The ready climate spec: the eight preset biomes placed on mean temperature and rainfall.
+const world = await BiomeWorld.create({ biomes: Object.values(presets), classifier: multiNoise(multiNoisePresets.climate) });
+
+// Your own axes: a painted noise raster is an axis too (write it with world.writeLayer or the editor).
+const stylised = multiNoise({
+  axes: [
+    { field: 'temperature', range: [-10, 35] },
+    { field: 'mask/continentalness', range: [0, 1], weight: 2 }, // counts twice as much in a distance
+  ],
+  points: [
+    { biome: 'tundra', at: { temperature: -8, 'mask/continentalness': [0.3, 1] } }, // a box: any value from 0.3 up
+    { biome: 'temperate', at: { temperature: 12, 'mask/continentalness': 0.6 } },
+    { biome: 'wetland', at: { temperature: 12, 'mask/continentalness': 0.1 } },
+  ],
+  blend: 0.15,
+});
+```
+
+An axis is a field name (any `ClimateEnvelope` field, `LAYERS` name or `mask/<name>`) with the `[min, max]` that one
+unit of distance covers, and an integer `weight` of 1 to 16 (default 1). A point sets a biome at one position per axis:
+a number, a `[min, max]` box side (no distance while the cell is inside it), or nothing, which leaves that axis out of
+the distance. A biome may have several points; its distance is that of the nearest. Values and points are
+normalised to Q16 on their axis, an input beyond the range counts as the edge, and the cell takes the biome with the
+smallest weighted squared distance, ties by `priority`, then id. Everything is integer, so the bytes are the same on
+every platform, with any number of workers, and a saved world keeps the spec.
+
+`blend` (0..1, default 0.1) is the width of the smooth border, as a distance in axis spans: a biome that is farther than
+the nearest by less than `blend` takes a share that falls to nothing at `blend` (the Wendland kernel envelopes use),
+and the world's ecotone warp and 3x3 blur still apply. `blend: 0` gives the plain nearest point. Cost grows with
+cells x points x axes; the limits are 8 axes and 1,024 points. A biome with no point never appears except by paint, and
+a point naming a biome the world does not have throws. It lives in its own entry because `/zones` carries the
+Whittaker table and Holdridge lattice, none of which this needs.
 
 ### Koppen labels
 

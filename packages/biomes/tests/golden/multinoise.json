@@ -1,0 +1,8 @@
+{
+  "$comment": "SHA-256 of BiomeWorld.digest(2, 1) for the multi-noise worlds of tests/multinoise-cases.mjs. A change changes every multi-noise map; advance it only with a reason in the commit.",
+  "climate:1": "a61ef02ed76b3a3a29c53a03dcf56416e8b7e77eefc02ffc8ccff6e67d1df7ad",
+  "climate:4294967295": "ca05b99888ebf7dfc7c6cfff202293d2bc753d8aaa3da51c850e76773504d95f",
+  "climate-hard:2": "3d3eb18720cb14f5c8b2f5b389131b26325e8cfef19033c77fa3b6a1330cb513",
+  "relief:1": "d0c2dc6ee0872562bb2bfcf0e6730a9c4de43e0b1caa13ecdbcff67913edd6e9",
+  "relief-wide:3": "13be6bad163cf59af3d2938e6cc787e389b62c403ff0ada7ef5b98d192cbe3c6"
+}
