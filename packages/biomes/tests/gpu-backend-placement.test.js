@@ -427,7 +427,7 @@ test('concurrent GPU placements capture independent loading contexts and cached 
 
 test('hardware hydrology fixtures construct valid worlds and retain sampled flats', async () => {
   const cases = backendHydrologyCases();
-  assert.equal(BACKEND_PLACEMENT_CASE_COUNT, 8 + cases.length * 2);
+  assert.equal(BACKEND_PLACEMENT_CASE_COUNT, 10 + cases.length * 2);
   assert.deepEqual(
     cases.map(({ name }) => name),
     ['coast-south', 'island', 'samples-flats'],
@@ -456,6 +456,7 @@ test('the hardware runner bundles the full public placement/hydrology matrix', a
     'runBackendPlacementCases',
     'R16-mountain',
     'island-clearing-exclusions',
+    'carved-path-exclusion',
     'coast-south',
     'samples-flats',
   ])
@@ -491,6 +492,51 @@ test('the hardware runner bundle sends backend gpu placement and hydrology to th
     cpu.dispose();
   });
   assert.deepEqual(b.tileBytes(await placed.tile(1, 1)), b.tileBytes(await reference.tile(1, 1)));
+  const flow = { multiple: true, channelCells: 3, lakeDepth: 20 };
+  assert.deepEqual(await proof.hydrologyOfAsync(world, flow), proof.hydrologyOf(cpu, flow));
+  for (const stage of ['counts', 'emit', 'accept', 'kill', 'd8', 'accumulate'])
+    assert.ok(stages.has(stage), "backend 'gpu' ran on the CPU: no " + stage + ' pipeline');
+  fake.assertFreed();
+});
+
+// A world carved by /splines on backend 'gpu': placement (with the paths as exclusions) and hydrology go through the
+// device pipelines and give the CPU bytes. Runs the hardware bundle, so /splines is the src copy the check runs.
+test('the hardware runner bundle sends a carved world with path exclusions to the device with the CPU bytes', {
+  timeout: 120000,
+}, async (t) => {
+  installGPUConstants(t);
+  const { backendPlacementModuleCode } = await import('./gpu-backend-placement-entry.mjs');
+  const proof = new Function(`${await backendPlacementModuleCode()}
+return __margoBackendPlacementProof;`)();
+  const b = proof.flow,
+    spec = b.placementCases(b)[0],
+    options = { ...spec.options, size: [512, 512], height: proof.carvePaths(proof.CARVED_PATHS), workers: 0 },
+    placement = { ...spec.placement, exclusions: proof.pathExclusions(proof.CARVED_PATHS) };
+  const cpu = await b.BiomeWorld.create({ ...options, backend: 'cpu' });
+  const plain = await b.BiomeWorld.create({ ...options, height: undefined, backend: 'cpu' });
+  const fake = fakeDevice(),
+    stages = proof.watchStages(fake.device);
+  const world = await b.BiomeWorld.create({ ...options, backend: 'gpu', device: fake.device });
+  // The fake runs no field shaders: the GPU world reads the CPU world's fields, as in the test above.
+  t.mock.method(world, 'tile', (x, z, o) => cpu.tile(x, z, o));
+  t.mock.method(world, 'tilePart', (x, z, window, o) => cpu.tilePart(x, z, window, o));
+  const placed = b.BiomePlacement.attach(world, placement),
+    reference = b.BiomePlacement.attach(cpu, placement);
+  t.after(() => {
+    placed.dispose();
+    reference.dispose();
+    world.dispose();
+    plain.dispose();
+    cpu.dispose();
+  });
+  assert.notEqual(await cpu.digest(1, 1), await plain.digest(1, 1), 'the paths carve tile 1,1');
+  const actual = await placed.tile(1, 1, { ahead: [[2, 1]] });
+  assert.ok(
+    actual.exclusion.data.some((v) => v > 0),
+    'the path exclusions reach tile 1,1',
+  );
+  assert.deepEqual(b.tileBytes(actual), b.tileBytes(await reference.tile(1, 1)));
+  assert.equal(await placed.digest(1, 1), await reference.digest(1, 1));
   const flow = { multiple: true, channelCells: 3, lakeDepth: 20 };
   assert.deepEqual(await proof.hydrologyOfAsync(world, flow), proof.hydrologyOf(cpu, flow));
   for (const stage of ['counts', 'emit', 'accept', 'kill', 'd8', 'accumulate'])

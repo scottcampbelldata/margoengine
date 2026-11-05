@@ -1,11 +1,13 @@
 import * as m from './gpu-placement-flow-source.mjs';
 import { presetWorlds, R16 } from '../src/presets.ts';
 import { hydrologyOf, hydrologyOfAsync } from '../src/hydrology.ts';
+import { carvePaths, pathExclusions } from '../src/splines.ts';
+import { CARVED_PATHS } from './gpu-backend-source.mjs';
 
-export const BACKEND_PLACEMENT_CASE_COUNT = 14;
+export const BACKEND_PLACEMENT_CASE_COUNT = 16;
 // The bundle's own modules, so the CPU test drives the very copy the hardware check runs.
 export * as flow from './gpu-placement-flow-source.mjs';
-export { hydrologyOf, hydrologyOfAsync };
+export { hydrologyOf, hydrologyOfAsync, carvePaths, pathExclusions, CARVED_PATHS };
 
 /** Records the entry point of every compute pipeline `device` makes; the hardware check and its CPU test read it. */
 export function watchStages(device) {
@@ -109,6 +111,17 @@ export async function runBackendPlacementCases(device) {
         [9, 8],
       ],
     },
+    {
+      // A carved road, track and loop that placement keeps clear (the paths cross the border of these tiles).
+      name: 'carved-path-exclusion',
+      options: { seed: 5, size: [1024, 1024], height: carvePaths(CARVED_PATHS) },
+      placement: { exclusions: pathExclusions(CARVED_PATHS) },
+      carved: true,
+      tiles: [
+        [1, 1],
+        [2, 1],
+      ],
+    },
   ];
   let gpuCases = 0,
     coldBands = 0;
@@ -160,6 +173,8 @@ export async function runBackendPlacementCases(device) {
           if (!ids.includes(cpu.biomes.length - 1)) throw Error('Painted clearing missing from island fixture');
           if (i === 0 && !actual.exclusion.data.some((v) => v > 0)) throw Error('Island exclusion is not exercised');
         }
+        if (spec.carved && !actual.exclusion.data.some((v) => v > 0))
+          throw Error('Path exclusion is not exercised on carved tile ' + x + ',' + z);
         console.log('placement parity: ' + spec.name + ' ' + x + ',' + z + (i ? ' ahead' : ' cold'));
         gpuCases++;
       }

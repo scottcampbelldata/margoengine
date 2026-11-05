@@ -2,8 +2,52 @@ import { BiomeWorld } from '../src/world.ts';
 import { LAYERS } from '../src/layers.ts';
 import { presetWorlds, R16 } from '../src/presets.ts';
 import { defineBiome } from '../src/define.ts';
+import { carvePaths } from '../src/splines.ts';
 
-export const BACKEND_CASE_COUNT = 10;
+export const BACKEND_CASE_COUNT = 17;
+
+/**
+ * Paths carved into a 1024 m world (tiles of 256 m, minimum corner -512): a flatten road and a cut track that cross the
+ * tile borders at x = 0 and z = 0, and a closed Catmull-Rom loop that reaches all four centre tiles.
+ */
+export const CARVED_PATHS = Object.freeze([
+  {
+    points: [
+      [-240, -150],
+      [-60, -20],
+      [40, 30],
+      [230, -90],
+    ],
+    curve: 'catmull-rom',
+    width: 8,
+    edge: 6,
+    carve: { mode: 'flatten', grade: 40 },
+  },
+  {
+    points: [
+      [-30, -230],
+      [20, 0],
+      [-10, 230],
+    ],
+    width: 3,
+    edge: 2,
+    falloff: 'linear',
+    carve: { mode: 'cut', depth: 1.5 },
+  },
+  {
+    points: [
+      [120, 0],
+      [0, 120],
+      [-120, 0],
+      [0, -120],
+    ],
+    curve: 'catmull-rom',
+    closed: true,
+    width: 5,
+    edge: 3,
+    carve: { mode: 'flatten', depth: 0.5 },
+  },
+]);
 
 function equalTile(cpu, gpu, label) {
   for (const name of Object.keys(LAYERS)) {
@@ -36,6 +80,7 @@ export async function runBackendCases(device) {
     climate: R16.climate,
   };
   const island = presetWorlds.island;
+  const eroded = { relief: { coast: 'west', rivers: 1, erosion: { iterations: 8 } } };
   const cases = [
     {
       name: 'default',
@@ -80,7 +125,36 @@ export async function runBackendCases(device) {
       paint: true,
       ...(ecotone === 24 ? { part: [8, 8, [0, 9, 39, 31]] } : {}),
     })),
+    {
+      name: 'carved-paths',
+      options: { seed: 5, size: [1024, 1024], height: carvePaths(CARVED_PATHS) },
+      uncarved: { seed: 5, size: [1024, 1024] },
+      tiles: [
+        [1, 1],
+        [2, 1],
+        [1, 2],
+        [2, 2],
+      ],
+      part: [2, 1, [0, 192, 96, 256]],
+    },
+    {
+      name: 'carved-erosion',
+      options: { seed: 3, size: [1024, 1024], height: carvePaths(CARVED_PATHS, eroded) },
+      uncarved: { seed: 3, size: [1024, 1024], height: eroded },
+      tiles: [
+        [1, 1],
+        [2, 2],
+      ],
+    },
   ];
+  // Every case must reach the device: a backend 'gpu' world whose tiles came from the CPU would match trivially.
+  let submits = 0;
+  const queue = device.queue,
+    submit = queue.submit.bind(queue);
+  queue.submit = (buffers) => {
+    submits++;
+    return submit(buffers);
+  };
   let gpuCases = 0;
   for (const spec of cases) {
     if (
@@ -91,8 +165,10 @@ export async function runBackendCases(device) {
         'Banded case requires a default-limits device so full classification planes exceed its buffer limits',
       );
     const cpu = await BiomeWorld.create({ ...spec.options, backend: 'cpu', workers: 0 });
-    let gpu;
+    let gpu, plain;
+    const before = submits;
     try {
+      if (spec.uncarved) plain = await BiomeWorld.create({ ...spec.uncarved, backend: 'cpu', workers: 0 });
       gpu = await BiomeWorld.create({ ...spec.options, backend: 'gpu', device, workers: 0 });
       let unpainted;
       if (spec.paint) {
@@ -130,6 +206,8 @@ export async function runBackendCases(device) {
         const expected = await cpu.digest(x, z),
           actual = await gpu.digest(x, z);
         if (expected !== actual) throw Error(`${spec.name}: world.digest differs`);
+        if (plain && (await plain.digest(x, z)) === expected)
+          throw Error(`${spec.name}: tile ${x},${z} is not carved (same digest as the uncarved world)`);
         if (spec.paint) {
           if (expected === unpainted) throw Error(`${spec.name}: paint did not change the digest`);
           const ids = new Set(b.layer('biome').data.filter((id) => id !== 255));
@@ -137,8 +215,11 @@ export async function runBackendCases(device) {
         }
         gpuCases++;
       }
+      if (submits === before)
+        throw Error(`${spec.name}: backend 'gpu' submitted no device work (tiles ran on the CPU)`);
     } finally {
       gpu?.dispose();
+      plain?.dispose();
       cpu.dispose();
     }
   }

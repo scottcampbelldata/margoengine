@@ -70,7 +70,7 @@ async function check() {
           });
           try {
             const module = globalThis.__margoBackendProof;
-            if (module.BACKEND_CASE_COUNT !== 10) throw Error('Backend case matrix changed');
+            if (module.BACKEND_CASE_COUNT !== 17) throw Error('Backend case matrix changed');
             const gpuCases = await module.runBackendCases(device);
             await device.queue.onSubmittedWorkDone();
             return { gpuCases, errors };
@@ -80,7 +80,7 @@ async function check() {
           }
         });
         assert.deepEqual(proof.errors, [], 'WebGPU compilation, validation or uncaptured errors');
-        assert.equal(proof.gpuCases, 10, 'GPU cases were skipped');
+        assert.equal(proof.gpuCases, 17, 'GPU cases were skipped');
         return { status: 'pass', backend: 'webgpu', adapter, gpuCases: proof.gpuCases, skipped: 0 };
       },
       async () => context?.close(),

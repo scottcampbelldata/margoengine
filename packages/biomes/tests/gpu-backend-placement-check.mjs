@@ -83,7 +83,7 @@ async function check() {
             if (!destroying) errors.push(`device lost: ${loss.message}`);
           });
           try {
-            if (module.BACKEND_PLACEMENT_CASE_COUNT !== 14) throw Error('Backend case matrix changed');
+            if (module.BACKEND_PLACEMENT_CASE_COUNT !== 16) throw Error('Backend case matrix changed');
             const gpuCases = await module.runBackendPlacementCases(device);
             for (const stage of ['counts', 'emit', 'accept', 'kill', 'd8', 'accumulate'])
               if (!stages.has(stage))
@@ -96,7 +96,7 @@ async function check() {
           }
         });
         assert.deepEqual(proof.errors, [], 'WebGPU compilation, validation or uncaptured errors');
-        assert.equal(proof.gpuCases, 14, 'GPU cases were skipped');
+        assert.equal(proof.gpuCases, 16, 'GPU cases were skipped');
         return { status: 'pass', backend: 'webgpu', adapter, gpuCases: proof.gpuCases, skipped: 0 };
       },
       async () => context?.close(),
