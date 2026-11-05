@@ -71,6 +71,25 @@ test('the worker file holds no GPU code: its worlds never get a device, so the b
     assert.ok(!worker.includes(gpuOnly), gpuOnly);
 });
 
+test('placement and hydrology load their GPU kernels through the gpu entry by name, never as their own chunks', () => {
+  // A relative import() of a kernel counted in the entry's size and was inlined into the worker file.
+  for (const entry of ['placement', 'hydrology']) {
+    const seen = new Set(),
+      walk = (file) => {
+        if (seen.has(file)) return;
+        seen.add(file);
+        const text = readFileSync(new URL(file, import.meta.url), 'utf8');
+        assert.ok(!text.includes('createShaderModule'), `${entry} reaches GPU code in ${file}`);
+        for (const [, name] of text.matchAll(/(?:from\s*|import\(\s*)"\.\/([^"]+)"/g)) walk('../dist/' + name);
+      };
+    walk(`../dist/${entry}.js`);
+    assert.ok(
+      readFileSync(new URL(`../dist/${entry}.js`, import.meta.url), 'utf8').includes('"@margoengine/biomes/gpu"'),
+      entry,
+    );
+  }
+});
+
 test('relief entry is loaded only by worlds that use it; update to a relief height without it names the fix', () => {
   // A fresh process: nothing has loaded the relief entry yet.
   const index = new URL('../dist/index.js', import.meta.url).href,

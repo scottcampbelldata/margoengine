@@ -1581,7 +1581,8 @@ export class BiomePlacement implements Disposable {
       whole = new Set<string>(),
       plan = this.#plan;
     combined.throwIfAborted();
-    const { placeTileGPU } = await import('./gpu-placement.js');
+    // The kernel is in the GPU entry (by package name), so this entry and the worker file hold none of it.
+    const { placeTileGPU } = await import('@margoengine/biomes/gpu');
     for (;;) {
       combined.throwIfAborted();
       this.#live();

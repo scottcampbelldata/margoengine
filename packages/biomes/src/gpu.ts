@@ -9,7 +9,13 @@ import type { TileFrame } from './fields.js';
 import { divFloor } from './fixed.js';
 import { classifyGPU } from './gpu-classify-inputs.js';
 import { rectFieldsGPU } from './gpu-fields.js';
+import { worldGPU } from './gpu-placement-flow-internal.js';
 import type { RasterLayer } from './layers.js';
+
+// The flow and placement kernels of a backend 'gpu' world: /hydrology and /placement load them through this entry by
+// package name, so neither entry nor the worker file (which swaps this entry for an empty stub) holds GPU code.
+export { hydrologyGPU } from './gpu-flow.js';
+export { placeTileGPU } from './gpu-placement.js';
 
 /** One request's revision of the world: every band of the request reads it, whatever updates come meanwhile. */
 export interface GpuRequest {
@@ -97,9 +103,13 @@ export class GpuTiles {
     return new GpuTiles(device, cells, corners, !gpu);
   }
 
-  /** Aborted once the device is lost (after {@link GpuTiles.watch}) or these tiles are disposed. */
-  get signal(): AbortSignal {
-    return this.#abort.signal;
+  /**
+   * Sends `world`'s object placement and `hydrologyOfAsync` to this device too, for backend 'gpu' only: 'auto' keeps
+   * them on the CPU, since neither has a per-tile CPU fallback. They reject once the device is lost or the world is
+   * disposed.
+   */
+  route(world: object): void {
+    if (!this.#fallback) worldGPU.set(world, { device: this.device, signal: this.#abort.signal });
   }
 
   /** Starts watching for device loss (one reaction per device, shared by its worlds). */

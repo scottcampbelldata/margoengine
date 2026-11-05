@@ -246,7 +246,7 @@ function graphOf(p: GPUPool, factor: Int32Array, species: number, g: number, rea
   return new Uint32Array([...starts, ...edges]);
 }
 
-/** Opt-in GPU placement on the supplied device; all default/auto/CPU entry points remain unchanged. */
+/** Places tile (x, z) of `placement` on `device`, byte-identical to the CPU: what `BiomePlacement` runs for a backend 'gpu' world. */
 export async function placeTileGPU(
   device: GPUDevice,
   placement: BiomePlacement,

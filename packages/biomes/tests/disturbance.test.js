@@ -321,8 +321,9 @@ test('entry is isolated and emits its public types', () => {
   assert.match(source, /import type \{ HeightGrid, Hydrology \} from '.\/hydrology.js'/);
 });
 
-test('README disturbance example runs verbatim with literal public imports', { timeout: 30000 }, () => {
-  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+test('disturbance guide example runs verbatim with literal public imports', { timeout: 30000 }, () => {
+  // The section moved from the README into its guide (packages/biomes/docs/disturbance.md) with the README split.
+  const readme = readFileSync(new URL('../docs/disturbance.md', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
   const section = readme.split('## Disturbance\n')[1]?.split('\n## ')[0];
   assert.ok(section);
   const example = /```ts\n([\s\S]*?)```/.exec(section)[1];

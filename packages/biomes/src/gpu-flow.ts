@@ -82,7 +82,7 @@ fn accumulate(@builtin(global_invocation_id) id: vec3<u32>, @builtin(num_workgro
 }
 `;
 
-/** Internal opt-in exact D8 and flow; no change to the synchronous or world backend. */
+/** Exact D8 and flow on `device`, byte-identical to `hydrology`: what `hydrologyOfAsync` runs for a backend 'gpu' world. */
 export async function hydrologyGPU(
   device: GPUDevice,
   grid: HeightGrid,

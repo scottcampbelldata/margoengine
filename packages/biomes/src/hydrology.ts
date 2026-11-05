@@ -446,7 +446,8 @@ export async function hydrologyOfAsync(
     (settings.channelCells === undefined || Number.isFinite(settings.channelCells)) &&
     (settings.lakeDepth === undefined || Number.isFinite(settings.lakeDepth))
   ) {
-    const { hydrologyGPU } = await import('./gpu-flow.js');
+    // The kernel is in the GPU entry (by package name), so this entry and the worker file hold none of it.
+    const { hydrologyGPU } = await import('@margoengine/biomes/gpu');
     return hydrologyGPU(gpu.device, grid, { ...settings, multiple: !!settings.multiple }, { signal: combined });
   }
   await Promise.resolve();
