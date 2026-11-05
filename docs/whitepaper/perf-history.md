@@ -1540,6 +1540,25 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node bench/cli.mjs parity --cases=p-stl,p-stl-normals --engines=margo,three-webgl-parity --runs=3`.
 - **Guard:** `packages/loaders/tests/stl.test.js`, "binary and ASCII compute the same flat normals, bit for bit".
 
+### 58. Plain glTF materials keep their shader and pipeline between frames
+
+- **Loss:** `p-morph` CPU 0.49 ms a frame against three's WebGL 0.26 (run `20261105-234620`). About half of the frame was
+  gltf-pro deriving each of the 200 draws again.
+- **Cause:** only materials-package records could keep a shader across frames, because that check needs a shading hook's
+  revision. A plain record composed its shader text and pipeline key on every draw, and a draw that first asked to join
+  a batch derived twice.
+- **Fix:** a compact record with no hook, extension, render state, tint or instances keeps its shader and pipeline
+  while its `structureFlags` and `plainShape` (normal map on UV1, wireframe, no texture transform) stay equal. The rows
+  are still read every frame, so a direct edit of the material's arrays shows on the next one, and the same pipeline
+  objects draw. `PBRMaterial` got no version: its arrays are public and report no edit.
+- **After:** 0.35 ms against 0.26 (run `20261105-235113`, `--no-gate`, busy machine, diagnostic). GPU time unchanged at
+  0.175 ms.
+- **Left:** see [known-bugs.md](../known-bugs.md#morph-targets-cpu-per-animation-per-frame).
+- **Rerun:** `node bench/cli.mjs parity --cases=p-morph --engines=margo,three-webgl-parity --runs=3`.
+- **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, "a plain material keeps its shader and pipeline between
+  frames, and every edit still shows" (fails with the kept path disabled); `tests/replica.test.js` caught mirrored
+  instances, which is why instances stay out.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

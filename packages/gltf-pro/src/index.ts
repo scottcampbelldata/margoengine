@@ -914,6 +914,16 @@ const sideOf = (m: PBRMaterial): MaterialSide =>
   m.side ?? (m.settings[2] === 2 ? 'back' : m.settings[2] >= 0.5 ? 'double' : 'front');
 const sideFlag = (side: MaterialSide): number => (side === 'double' ? 1 : side === 'back' ? 2 : 0);
 /**
+ * What composes a compact material's shader and pipeline beyond `structureFlags`, for a record with no shading hook or
+ * extension: a normal map on UV1 and a wireframe draw. -1 when a map has a KHR_texture_transform, whose coordinate
+ * extension is per resource and composes each frame.
+ */
+function plainShape(m: PBRMaterial, v: Float32Array, wireframe: unknown): number {
+  const { maps } = m;
+  for (let i = 0; i < maps.length; i++) if (maps[i]?.extensions?.KHR_texture_transform !== undefined) return -1;
+  return +(!!maps[2] && v[94] === 1) + +!!wireframe * 2;
+}
+/**
  * A glTF PBR material as the model draws it: base colour, factors, emission, settings, side and optional extension.
  */
 export interface PBRMaterial extends GLTFMaterial {
@@ -4162,20 +4172,21 @@ export class PBRModel implements EnginePlugin {
         !!shading?.texturedTint,
         !!shading?.replacesTextures,
       ),
-      revision = shading?.shaderRevision;
+      revision = shading?.shaderRevision,
+      // A compact record with no hook has no revision: `plainShape` names all that composes its shader instead. Instances
+      // stay out: their mirrored state and layout change the pipeline with no change to the record.
+      plain = compact && !inst && !shading && !source && !m.renderState && !m.attenuation ? plainShape(m, v, wireframe) : -1;
     // The same shader and pipeline as `d` from an earlier frame (draw-memo.ts): the shading hook reports the same
-    // revision, nothing else that composes the shader changed, and no lighting effect or transparency hook patches it.
-    // Only the rows (above) and group 2's bindings are read again.
+    // revision or a plain record the same shape, nothing else that composes the shader changed, and no lighting effect
+    // or transparency hook patches it. Only the rows (above) and group 2's bindings are read again.
     if (
       d &&
-      revision !== undefined &&
-      d.revision === revision &&
+      (compact ? plain >= 0 && d.plain === plain : revision !== undefined && d.revision === revision) &&
       d.shading === shading &&
       d.renderState === m.renderState &&
       d.structure === structure &&
       d.floatCount === floatCount &&
       d.compact === compact &&
-      !compact &&
       !source &&
       !m.extended &&
       !frame.lighting.length &&
@@ -4183,6 +4194,7 @@ export class PBRModel implements EnginePlugin {
       !capture &&
       (!build || d.pipeline !== undefined)
     ) {
+      if (compact) r.coordinates = undefined;
       if (r.extension) {
         retire(r.device, r.extension.uniform);
         r.extension = undefined;
@@ -4268,6 +4280,7 @@ export class PBRModel implements EnginePlugin {
       out.complete = false;
       // Derived without composing the shader: a later frame cannot keep the pipeline on what this derivation saw.
       out.structure = undefined;
+      out.plain = -1;
       out.version = Number.NaN;
       out.group = undefined;
       out.blend = m.settings[0] === 2 || transmit;
@@ -4533,6 +4546,7 @@ export class PBRModel implements EnginePlugin {
       build && !inst ? (d?.group && d.pipeline === pipeline && d.effect === effect ? d.group : undefined) : undefined;
     const out: DrawDerivation = d ?? ({} as DrawDerivation);
     out.revision = revision;
+    out.plain = plain;
     // The same conditions as keeping the pipeline (above): group 2 then holds only the shading hook's bindings. Read
     // again after `bindings()` ran, as in the kept path.
     out.version =

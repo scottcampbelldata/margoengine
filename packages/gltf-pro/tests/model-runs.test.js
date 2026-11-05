@@ -339,3 +339,50 @@ test('compile() builds first-frame pipelines off the frame, and a draw it did no
   a.dispose();
   await assert.rejects(a.compile(), (error) => error.code === 'disposed');
 });
+
+test('a plain material keeps its shader and pipeline between frames, and every edit still shows', async (t) => {
+  // p-morph: 200 draws of plain glTF materials composed their shader and pipeline key again every frame.
+  const f = await fixture(t),
+    device = f.engine.gpu,
+    doc = structuredClone(f.doc);
+  doc.materials = [{}];
+  const model = parseGLTF(f.engine, doc, f.buffers);
+  if (f.engine.plugins.get(model.name) !== model) f.engine.use(model);
+  const [resource] = model['resources'],
+    material = model.primitives[0].material,
+    made = [],
+    create = device.createRenderPipeline,
+    get = Map.prototype.get;
+  device.createRenderPipeline = (d) => {
+    made.push(d);
+    return create.call(device, d);
+  };
+  t.after(() => {
+    device.createRenderPipeline = create;
+    Map.prototype.get = get;
+  });
+  f.frame();
+  f.frame();
+  let composed = 0;
+  Map.prototype.get = function (key) {
+    if (typeof key === 'string' && key.length > 1000) composed++;
+    return get.call(this, key);
+  };
+  f.frame();
+  Map.prototype.get = get;
+  assert.equal(composed, 0, 'a steady plain material looks up no shader text');
+
+  material.base[0] = 0.25; // the arrays are public and report no edit, so the rows are read every frame
+  f.frame();
+  assert.equal(resource.values[76], 0.25, 'a direct edit of the material rows shows on the next frame');
+
+  made.length = 0;
+  material.side = 'double';
+  f.frame();
+  assert.equal(made.at(-1)?.primitive.cullMode, 'none', 'a side change takes its own pipeline');
+
+  made.length = 0;
+  material.settings[0] = 2;
+  f.frame();
+  assert.ok(made.at(-1)?.fragment.targets[0].blend, 'an alpha mode change takes a blended pipeline');
+});

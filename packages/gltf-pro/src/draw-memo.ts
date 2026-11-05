@@ -7,7 +7,9 @@
 // every frame, so every live value and texture edit shows on the next one. The shader and pipeline are kept only when
 // the record's shading hook reports an unchanged `shaderRevision`, its structure (`structureFlags`), shading object and
 // render state are the same and no lighting effect or transparency hook patches the shader (4,096 materials meshes,
-// one material each, composed 4,096 shaders a frame); everything else composes them again each frame, as before.
+// one material each, composed 4,096 shaders a frame). A compact record with no hook keeps them on `plainShape` the same
+// way (p-morph's plain glTF materials composed 200 shaders and pipeline keys a frame); its rows stay live, since nothing
+// reports an edit of its arrays. Everything else composes them again each frame, as before.
 // A record whose shading hook reports a `version` goes further: while that number and the draw context stay the same,
 // the derivation is reused whole from an earlier frame (its rows, pipeline and group 2), without reading the record or
 // calling `bindings()` (`steadyDerivation` in index.ts); 4,096 such materials read about 1.5 us each per frame before.
@@ -96,6 +98,8 @@ export interface DrawDerivation {
   shading?: object;
   renderState?: object;
   structure?: number;
+  /** `plainShape` of a compact record with no hook (index.ts), -1 otherwise: its stand-in for `revision`. */
+  plain?: number;
   /**
    * @internal The record's `shading.version` when this derivation was last made complete under the conditions that
    * keep its pipeline (no lighting effects, a beauty-like pass); NaN otherwise. A later frame whose record reports the

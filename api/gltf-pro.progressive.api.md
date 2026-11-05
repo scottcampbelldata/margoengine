@@ -171,6 +171,7 @@ interface DrawDerivation {
     shading?: object;
     renderState?: object;
     structure?: number;
+    plain?: number;
     version?: number;
 }
 

@@ -570,21 +570,19 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 
 ### Morph targets: CPU per Animation per frame
 
-- **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.52 ms CPU a frame
-  against three's WebGL 0.27 (run `20261027-032923`; 0.52 against 0.29 in run `20261027-103915`). The GPU half of this entry is fixed (perf-history entry 34:
-  1.33 -> 0.19 ms, one dispatch per buffer page and pipeline instead of 200); what is left on the GPU is the 0.05 ms
-  deform pass, an accepted difference in work recorded in the matrix row 12.5.
-- **Cause (measured, browser CPU profile of 5,000 `p-morph` frames, 2026-10-27):** most of it is not the animation.
-  About 55% of the busy frame time is gltf-pro deriving each of the 200 draws again every frame (`derive`,
-  `derivation`, `draw`, `drawSegment`, `nodeRows`): MorphStressTest has two primitives, so its models never take the
-  run's one-primitive short path (`joinRun`), and a plain glTF material has no steady path (the steady check in
-  `derive` needs a `shading` record's version, which only materials-package materials carry), so every draw rebuilds
-  its uniform rows and its pipeline key strings. The 100 Animations' own work (`setMorph`, validation, weight writes,
-  `upload`, `deformAll`) is about a fifth. The one-upload-per-device plan below would only move that fifth.
-- **Plan:** give `PBRMaterial` a version that its setters and `markDirty()` bump, so a plain glTF material takes the
-  steady path when nothing changed (rows rewritten only for the node matrix, as for materials-package materials),
-  and let a multi-primitive model join a run when each primitive could; then write the weights of every Animation of
-  a device in one upload. Both are gltf-pro and animation changes, no core.
+- **What:** `p-morph`, 100 MorphStressTest copies with 8 weights each changing every frame: 0.35 ms CPU a frame
+  against three's WebGL 0.26 (run `20261105-235113`, busy machine, diagnostic; 0.49 before perf-history entry 58). The GPU
+  half is fixed (perf-history entry 34: 1.33 -> 0.19 ms); what is left on the GPU is the 0.05 ms deform pass, an accepted
+  difference in work recorded in the matrix row 12.5.
+- **Fixed (entry 58):** plain glTF materials composed their shader and pipeline key again on each of the 200 draws of
+  every frame, twice when the draw asked to join a batch first. They now keep both while nothing that shapes them
+  changed. The planned `PBRMaterial` version was not built: `base`, `factors`, `emission` and `settings` are public arrays
+  read live each draw, so a version would miss a direct write. The rows are still read every frame.
+- **Cause of what is left:** the 200 draws' rows, uniform writes and bindings, and the 100 Animations' own work
+  (`setMorph`, validation, weight writes, `upload`, `deformAll`). A multi-primitive model joining a run would not help this
+  scene: deformed primitives cannot join an instanced batch (`batchable`).
+- **Plan:** write the weights of every Animation of a device in one upload (`packages/animation/src/index.ts`, `upload`),
+  then profile again. No core change.
 
 ### cloneModel: two engine-wide ticks per copy
 
