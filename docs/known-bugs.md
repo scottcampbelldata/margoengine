@@ -488,15 +488,6 @@ The entries below were measured with `npm run bench -- instanced --engines=margo
 machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md),
 "Instanced: fixes and what is left"). Each cause was measured, not guessed.
 
-### Precise maths: cost against the WGSL builtins not measured
-
-- **What:** compute's element-wise functions and the path tracer's panorama and fisheye rays use the precise f32
-  functions (`packages/shared/precise-math.js`), and since `b6bea3e9` every step whose rounding matters takes its
-  operands through `pmHide` (four hides in the precise divide where the old code had one, more work in `pow`). Their
-  GPU cost against the builtins (`createCompute({ fastMath: true })`) has never been measured.
-- **Needed to close:** a measured GPU time for both, recorded as an accepted difference in work with a like-for-like
-  `fastMath` row, in [whitepaper/perf-history.md](whitepaper/perf-history.md).
-
 ### createInstancedMesh reads vertex attributes its material does not use
 
 - **What:** `@margoengine/materials` `createInstancedMesh` boxes at 50,000: GPU 0.63 ms against three's WebGL2

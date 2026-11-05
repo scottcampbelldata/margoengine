@@ -1,0 +1,276 @@
+{
+  "benchmark": "precise-math-gpu",
+  "recordedAt": "2026-11-05T18:21:03.797Z",
+  "commit": "214a946ba",
+  "rounds": 5,
+  "count": 16777216,
+  "trace": {
+    "width": 1920,
+    "height": 1080,
+    "samples": 8,
+    "trials": 6
+  },
+  "quietGate": {
+    "ac": true,
+    "cpuLoadPercent": 9,
+    "waitedSeconds": 57,
+    "checkedAt": "2026-11-05T18:22:01.039Z",
+    "topProcesses": [
+      {
+        "Name": "claude",
+        "Id": 30692,
+        "cpuSeconds": 21211
+      },
+      {
+        "Name": "claude",
+        "Id": 16448,
+        "cpuSeconds": 1400
+      },
+      {
+        "Name": "Grok Bot",
+        "Id": 18568,
+        "cpuSeconds": 1204
+      },
+      {
+        "Name": "msedgewebview2",
+        "Id": 36476,
+        "cpuSeconds": 1154
+      },
+      {
+        "Name": "blender",
+        "Id": 42428,
+        "cpuSeconds": 945
+      },
+      {
+        "Name": "Grok Bot",
+        "Id": 37592,
+        "cpuSeconds": 927
+      },
+      {
+        "Name": "claude",
+        "Id": 45988,
+        "cpuSeconds": 851
+      },
+      {
+        "Name": "Fusion360",
+        "Id": 40676,
+        "cpuSeconds": 713
+      }
+    ]
+  },
+  "cpuLoadAtStart": 0,
+  "hardware": {
+    "vendor": "nvidia",
+    "architecture": "ampere",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 156.0.4314.58",
+  "compute": {
+    "sin": {
+      "preciseMs": 0.655,
+      "fastMs": 0.36,
+      "ratio": 1.82,
+      "differ": 0.9826
+    },
+    "sin (huge)": {
+      "preciseMs": 0.655,
+      "fastMs": 0.371,
+      "ratio": 1.76,
+      "differ": 1
+    },
+    "cos": {
+      "preciseMs": 0.808,
+      "fastMs": 0.59,
+      "ratio": 1.37,
+      "differ": 0.9837
+    },
+    "tan": {
+      "preciseMs": 1.365,
+      "fastMs": 0.59,
+      "ratio": 2.31,
+      "differ": 0.8979
+    },
+    "asin": {
+      "preciseMs": 0.71,
+      "fastMs": 0.59,
+      "ratio": 1.2,
+      "differ": 0.2677
+    },
+    "acos": {
+      "preciseMs": 0.601,
+      "fastMs": 0.382,
+      "ratio": 1.57,
+      "differ": 0.1378
+    },
+    "atan": {
+      "preciseMs": 0.601,
+      "fastMs": 0.382,
+      "ratio": 1.57,
+      "differ": 0.0357
+    },
+    "atan2": {
+      "preciseMs": 0.983,
+      "fastMs": 0.721,
+      "ratio": 1.36,
+      "differ": 0.4964
+    },
+    "exp": {
+      "preciseMs": 0.59,
+      "fastMs": 0.59,
+      "ratio": 1,
+      "differ": 0.8216
+    },
+    "exp2": {
+      "preciseMs": 0.59,
+      "fastMs": 0.59,
+      "ratio": 1,
+      "differ": 0.4979
+    },
+    "expm1": {
+      "preciseMs": 0.59,
+      "fastMs": 0.59,
+      "ratio": 1,
+      "differ": 0.6877
+    },
+    "log": {
+      "preciseMs": 0.655,
+      "fastMs": 0.59,
+      "ratio": 1.11,
+      "differ": 0.4898
+    },
+    "log2": {
+      "preciseMs": 0.786,
+      "fastMs": 0.59,
+      "ratio": 1.33,
+      "differ": 0.4303
+    },
+    "log1p": {
+      "preciseMs": 1.005,
+      "fastMs": 0.59,
+      "ratio": 1.7,
+      "differ": 0.5243
+    },
+    "sinh": {
+      "preciseMs": 0.786,
+      "fastMs": 0.448,
+      "ratio": 1.76,
+      "differ": 0.2811
+    },
+    "cosh": {
+      "preciseMs": 0.721,
+      "fastMs": 0.415,
+      "ratio": 1.74,
+      "differ": 0.2905
+    },
+    "tanh": {
+      "preciseMs": 0.568,
+      "fastMs": 0.393,
+      "ratio": 1.44,
+      "differ": 0.8519
+    },
+    "pow": {
+      "preciseMs": 2.185,
+      "fastMs": 0.721,
+      "ratio": 3.03,
+      "differ": 0.7006
+    }
+  },
+  "tracer": {
+    "1 bounces": {
+      "camera": {
+        "preciseMsPerSample": 3.755,
+        "builtinMsPerSample": 3.733,
+        "extraPercent": 0.6,
+        "meanLevels": [
+          0.1,
+          0.1
+        ]
+      },
+      "panorama": {
+        "preciseMsPerSample": 3.629,
+        "builtinMsPerSample": 3.397,
+        "extraPercent": 6.8,
+        "meanLevels": [
+          0.226,
+          0.226
+        ]
+      },
+      "fisheye equidistant": {
+        "preciseMsPerSample": 1.955,
+        "builtinMsPerSample": 1.906,
+        "extraPercent": 2.6,
+        "meanLevels": [
+          0.064,
+          0.064
+        ]
+      },
+      "fisheye equisolid": {
+        "preciseMsPerSample": 1.988,
+        "builtinMsPerSample": 1.914,
+        "extraPercent": 3.9,
+        "meanLevels": [
+          0.063,
+          0.063
+        ]
+      },
+      "fisheye stereographic": {
+        "preciseMsPerSample": 3.787,
+        "builtinMsPerSample": 3.591,
+        "extraPercent": 5.5,
+        "meanLevels": [
+          0.127,
+          0.127
+        ]
+      }
+    },
+    "4 bounces": {
+      "camera": {
+        "preciseMsPerSample": 8.64,
+        "builtinMsPerSample": 8.711,
+        "extraPercent": -0.8,
+        "meanLevels": [
+          0.159,
+          0.159
+        ]
+      },
+      "panorama": {
+        "preciseMsPerSample": 8.096,
+        "builtinMsPerSample": 7.933,
+        "extraPercent": 2.1,
+        "meanLevels": [
+          0.277,
+          0.277
+        ]
+      },
+      "fisheye equidistant": {
+        "preciseMsPerSample": 4.32,
+        "builtinMsPerSample": 4.295,
+        "extraPercent": 0.6,
+        "meanLevels": [
+          0.091,
+          0.091
+        ]
+      },
+      "fisheye equisolid": {
+        "preciseMsPerSample": 4.347,
+        "builtinMsPerSample": 4.301,
+        "extraPercent": 1.1,
+        "meanLevels": [
+          0.089,
+          0.089
+        ]
+      },
+      "fisheye stereographic": {
+        "preciseMsPerSample": 8.782,
+        "builtinMsPerSample": 8.645,
+        "extraPercent": 1.6,
+        "meanLevels": [
+          0.185,
+          0.185
+        ]
+      }
+    }
+  }
+}

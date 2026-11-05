@@ -423,7 +423,8 @@ their bits, where the compiler cannot rearrange them. `sin`, `cos` and `tan` red
 and an integer exponent works as in NumPy (`(-2) ** 3` is -8). Division is the builtin (WGSL allows 2.5 ulp).
 
 `createCompute({ fastMath: true })` uses the builtins instead: faster for arithmetic-bound kernels, with the bounds
-above only as good as the GPU's. The CPU backend computes every function in double precision and rounds to f32 either
+above only as good as the GPU's. Measured on an RTX A6000, one call per element over 16,777,216 values: the precise
+functions take 1.0 to 1.8 times the builtins, `tan` 2.3 times and `pow` 3 times. The CPU backend computes every function in double precision and rounds to f32 either
 way.
 
 ```ts

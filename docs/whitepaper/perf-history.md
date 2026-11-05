@@ -1034,8 +1034,7 @@ log kept on the machine that ran it. Open items stay in [known-bugs.md](../known
   so the old code fails on any GPU; `test:browser:sweep` (0.5 s) runs in `check:merge` and the nightly run.
 - **Rerun:** `npm run test:browser:sweep --workspace @margoengine/compute` and
   `npm run test:browser:reassociate --workspace @margoengine/compute`.
-- **Still open:** what the extra work costs in the precise divide and `pow` is not measured
-  ([known-bugs.md](../known-bugs.md#precise-maths-cost-against-the-wgsl-builtins-not-measured)).
+- **Cost of the extra work:** measured in entry 48.
 
 ### 38. A pinned proof failed on two machines because Node 22 and Node 26 compute `pow` differently
 
@@ -1301,6 +1300,57 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   the high end.
 - **No rival row:** this prices one Margo draw against itself. The `Transmission` pass is the other route and was not
   timed here.
+
+### 48. Precise maths against the WGSL builtins: measured, kept (accepted difference in work)
+
+- **Measured:** `examples/package-benchmarks/precise-math-gpu.mjs`, RTX A6000, Chromium 156, 2026-11-05, commit
+  `214a946ba`, quiet gate passed at the start, five rounds. Compute rows are one element-wise function on 16,777,216 f32
+  values through the package, `createCompute()` against the like-for-like `createCompute({ fastMath: true })`, GPU ms
+  for the pass:
+
+  | Function | Precise | `fastMath` | Ratio |
+  | --- | --- | --- | --- |
+  | `sin` | 0.66 | 0.36 | 1.82 |
+  | `sin`, inputs 1e6 to 1e9 | 0.66 | 0.37 | 1.76 |
+  | `cos` | 0.81 | 0.59 | 1.37 |
+  | `tan` | 1.36 | 0.59 | 2.31 |
+  | `asin` | 0.71 | 0.59 | 1.20 |
+  | `acos` | 0.60 | 0.38 | 1.57 |
+  | `atan` | 0.60 | 0.38 | 1.57 |
+  | `atan2` | 0.98 | 0.72 | 1.36 |
+  | `exp`, `exp2`, `expm1` | 0.59 | 0.59 | 1.00 |
+  | `log` | 0.66 | 0.59 | 1.11 |
+  | `log2` | 0.79 | 0.59 | 1.33 |
+  | `log1p` | 1.00 | 0.59 | 1.70 |
+  | `sinh` | 0.79 | 0.45 | 1.76 |
+  | `cosh` | 0.72 | 0.41 | 1.74 |
+  | `tanh` | 0.57 | 0.39 | 1.44 |
+  | `pow` | 2.19 | 0.72 | 3.03 |
+
+  The path tracer's rows are GPU ms per traced sample at 1920 x 1080, the shipped shader against the same shader with
+  the ray generation's precise calls swapped for the builtins:
+
+  | Lens | 1 bounce, precise | builtin | Extra | 4 bounces, precise | builtin | Extra |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Camera (no precise call: the control) | 3.76 | 3.73 | 0.6% | 8.64 | 8.71 | -0.8% |
+  | Panorama | 3.63 | 3.40 | 6.8% | 8.10 | 7.93 | 2.1% |
+  | Fisheye, equidistant | 1.96 | 1.91 | 2.6% | 4.32 | 4.30 | 0.6% |
+  | Fisheye, equisolid | 1.99 | 1.91 | 3.9% | 4.35 | 4.30 | 1.1% |
+  | Fisheye, stereographic | 3.79 | 3.59 | 5.5% | 8.78 | 8.65 | 1.6% |
+
+- **What it means:** the cost is the work, so it stays. The builtins are the part of WGSL that may be far off (entry 37;
+  in these runs 14% to 100% of the values differ from the precise result, except `atan` at 4%), and the precise
+  functions spend their time on the exact reduction and the corrected steps that keep the same answer on every GPU.
+  A single call per element is close to memory bound: the 16M-value pass moves 128 MB, and the floor seen here is
+  0.36 to 0.59 ms. `pow` is the one function that clearly leaves that floor. A kernel that chains many of these calls
+  will see a larger ratio than these rows, and it is the case `fastMath` exists for.
+- **Reading the numbers:** the GPU timer ticks every 0.066 ms and the memory clock moved between functions on this
+  machine, so the builtin column's 0.36 and 0.59 are two states of the same floor, and ratios under about 1.6 are not
+  firm. Each row is the median of the rounds, each round the mean of its faster half of twelve trials. The tracer's
+  control row shows its noise: under 1%.
+- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/precise-math-gpu.mjs`.
+  Result: `examples/package-benchmarks/results/precise-math-gpu.json`.
+- **Not measured:** other GPUs. The AMD and Mesa compilers named in entry 37 may price `pmHide` differently.
 
 ## Open losses
 

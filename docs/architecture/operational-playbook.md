@@ -239,8 +239,9 @@ proof inputs now use exact operations, approximated host math is replaced by det
 proof, and the suite runs under both pow modes. NaN payloads are canonicalized only where a proof explicitly defines
 that comparison; signed zero otherwise remains significant.
 
-Unmeasured: precise-function GPU cost versus native builtins, one kernel rotation-sync call, and cross-machine kernel
-bit equality.
+Measured on the RTX A6000 only (`docs/whitepaper/perf-history.md` entry 48): one precise call per element costs 1.0 to
+1.8 times the builtin, `tan` 2.3, `pow` 3.0, and the path tracer's panorama and fisheye rays 1% to 7% of a traced sample.
+Unmeasured: that cost on other GPUs, one kernel rotation-sync call, and cross-machine kernel bit equality.
 
 ## 3. Rendering backends and hardware tiers
 
@@ -586,7 +587,7 @@ The following remain technical gaps, not permission to weaken a check:
 2. Native and Wasm turn reduction differ at an exact half-way case that lacks a regression test.
 3. The kernel optimization experiment uses obsolete layout and compression assumptions.
 4. Cross-machine bit equality of kernel output is not measured.
-5. Precise-math GPU cost versus builtins is not measured.
+5. Precise-math GPU cost versus builtins is measured on the RTX A6000 only.
 6. Intel Arc 140V precise-math bounds need a post-fix run.
 7. Compatibility CPU compute requires `unsafe-eval`; broad CSP prose must remain scoped to the native engine.
 8. Compatibility path-tracer kernels remain outside the practical shader-compilation budget.
