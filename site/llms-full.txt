@@ -2873,7 +2873,12 @@ does not own. Each entry says exactly what is needed to close it.
   font is present.
 
 
-### biomes test:gpu on the Intel Arc laptop: every check OK, then killed at 600 s (not reproduced)
+### biomes flythrough on laptops: the slow sends frame runs past 3.5 ms while the page thread is off the CPU
+
+- **Now (2026-11-05):** the 600 s kill below is no longer seen: 3 runs of `test:gpu:flythrough` on the Intel Arc 140V
+  laptop at b4d10441 each ended in 40 to 48 s on the slow sends assertion with its own error and a bounded teardown,
+  no `SHUTDOWN_TIMEOUT` and no hang. What is open is that assertion; see **The slow sends frame on the Arc laptop**
+  below for the measured cause. Earlier history follows.
 
 - **Repro:** on the Intel laptop (Arc 140V) at 6a8607de, `biomes test:gpu` in the GPU package tests printed all three
   checks OK (view; objects 172569; flythrough p99 +0.00 ms) and then "HUNG: no result after 600 s, process tree
@@ -2928,6 +2933,26 @@ does not own. Each entry says exactly what is needed to close it.
   remove this entry. A failure names its owner: 2 or more sends, or about 200 kB of writes, in that frame is the view's
   scheduling (`#apply` in `src/view.ts`); most of it in the real calls is the browser or the Arc driver (still counted,
   hunt it there); neither is the view's own code.
+- **The slow sends frame on the Arc laptop (measured 2026-11-05, b4d10441, Core Ultra 7 258V, 8 cores, Arc 140V,
+  Chrome 156, on mains, Balanced power plan, Zoom, Snagit and Grok Bot open):** the 3 runs failed at 3.7, 3.6 and
+  4.0 ms of view time. Their worst frames: 1 send and 0.0 ms in real calls (3.7 ms); 1 send and 0.6 ms in real calls
+  (3.6 ms); one terrain band, 4 writes of 16 kB, 0.6 ms in real calls, 2.2 ms more lost inside the waits (4.0 ms).
+  None is 2 sends or a whole tile. A diagnostic copy of the flight (3 flights, a per-frame log of every step, send
+  and texture write, and a Chrome trace with the page thread's CPU time between marks at each frame's start and end)
+  puts the rest on the operating system: the frames over the limit had the page thread on a CPU for 0.9 to 2.4 ms of
+  3.6 to 5.3 ms. One objects step (scatter `setTile`, plain JavaScript with no GPU call) took 3.8 ms on the clock in
+  a frame of 0.9 ms CPU time; a frame that only planned took 2.3 ms with 0.8 ms CPU time; one real `postMessage` took
+  1.4 ms (a worker wake, as on the N100 below) and one 16 kB `writeTexture` 2.5 ms, each with the thread mostly off
+  the CPU. The view's own code is as fast as on the A6000 (time outside waits and real calls: median 0.2 ms on the
+  laptop, 0.1 ms on the A6000, which ran the same diagnostic at 2.5 ms worst, 0 frames over). The flights failed 1
+  in 3 under the diagnostic (4 frames over, worst 4.8 ms; the others 3.1 and 2.8 ms). Same cause as the N100 entry
+  below: the page thread loses its core to the 4 busy workers, the GPU process and other programs.
+- **Needed to close (Scott's call):** nothing in the view spends the time, so no view change is a fix, and the limit
+  and the check stay as they are. Two things are left to decide: (1) a quiet rerun on the laptop with the other
+  programs closed, which says whether the laptop can pass as it is; (2) whether the check should time the view's
+  frame by the page thread's CPU time from a trace (the diagnostic's method), which leaves out every stop the
+  operating system makes, not only those inside the check's waits; it would also leave out a worker wake that blocks
+  the thread, which the check counts now.
 - **Since 2026-11-05 (bounded without a GPU run, Scott: no GPU checks now):** `packages/biomes/tests/gpu-chain-bound.test.js`
   pins the structure that keeps a stuck check from hiding: every biomes GPU step has a limit above its A6000 time with a
   1.4x margin, none chains more than two check files (the timing test runs alone), and every check file ends through
