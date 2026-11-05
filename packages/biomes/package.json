@@ -106,6 +106,10 @@
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"
     },
+    "./io": {
+      "types": "./dist/io.d.ts",
+      "import": "./dist/io.js"
+    },
     "./workers": {
       "types": "./dist/workers.d.ts",
       "import": "./dist/workers.js"

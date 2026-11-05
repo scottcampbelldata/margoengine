@@ -328,15 +328,15 @@ export class BiomeWorld implements Disposable {
     if (!world.#gpu && (auto || (workers && workers > 0)) && !(h && typeof h === 'object' && 'field' in h)) {
       const { BiomeWorkers, defaultWorkers } = await import('@margoengine/biomes/workers'),
         count = workers || defaultWorkers();
-      if (count) world.#remote = new BiomeWorkers(count, world, () => world.#state(), options.createWorker);
+      if (count) world.#remote = new BiomeWorkers(count, world, () => world.state(), options.createWorker);
     }
     aborted(options.signal);
     world.#gpu?.watch();
     return world;
   }
 
-  /** The state a worker replica is made from (the workers entry builds its message). */
-  #state(): WorldState {
+  /** The state a worker replica is made from, and the data `saveWorld` of the `/io` entry writes. */
+  state(): WorldState {
     return {
       options: this.#given,
       biomes: this.#biomes,
