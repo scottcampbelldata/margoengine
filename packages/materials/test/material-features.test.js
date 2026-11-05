@@ -543,7 +543,8 @@ test('vertexColors false passes white from the vertex stage; instance tints stil
     meshes = [createMesh(s.engine, quad, material), createInstancedMesh(s.engine, quad, material, 1)];
   meshes[1].instances.count = 1;
   const all = codes(s.frame());
-  assert.ok(all.some((c) => c.includes('o.uv=i.uv; o.color=vec4f(1); return o;')));
+  // No map reads the UVs here, so gltf-pro's trimmed vertex stage writes only the white.
+  assert.ok(all.some((c) => c.includes('o.color=vec4f(1); return o;')));
   assert.ok(
     all.some((c) => c.includes('o.color=vec4f(1)*k.tint;')),
     'instanced',

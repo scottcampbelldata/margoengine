@@ -18,13 +18,15 @@ const coordinates = /\nfn uv\(i:Out, ?\w+:f32\)->vec2f \{[^\n]*\}(?=\n)/;
 
 /** With a flat normal the frame's two terms are exact zeros, so the normal is `n`; the frame goes unless later text uses it. */
 function dropFlatFrame(code: string): string {
-  if (!code.includes(flatNormal)) return code;
-  const found = frame.exec(code);
-  if (!found) return code;
-  const after = code.slice(found.index + found[0].length),
+  // From `surface` on: a helper above it may open with the same line (materials' normal map node does).
+  const start = code.indexOf('fn surface('),
+    body = code.slice(start),
+    found = frame.exec(body);
+  if (start < 0 || !found || !code.includes(flatNormal)) return code;
+  const after = body.slice(found.index + found[0].length),
     end = after.indexOf('\n  return s;');
   if (end < 0 || /\b(t|b|dp1|dp2|duv1|duv2)\b/.test(after.slice(0, end))) return code;
-  return code.replace(frame, '\n  s.n=normalize(n);');
+  return code.slice(0, start) + body.replace(frame, '\n  s.n=normalize(n);');
 }
 
 /** The vertex stage's text range: its opening to the `return o;` of its end. */
@@ -48,7 +50,7 @@ function dropOutput(code: string, field: string): string {
 export function vertexInputs(source: string): VertexInputs {
   const unchanged = { code: source, locations: ALL };
   if (!/\bstruct Input \{/.test(source) || source.split(':Input').length !== 2) return unchanged;
-  if (stage(source)[1] < 0) return unchanged;
+  if (Math.min(...stage(source)) < 0) return unchanged;
   let code = dropOutput(dropOutput(dropFlatFrame(source), 'tangent'), 'uv');
   const [start, end] = stage(code),
     body = code.slice(code.indexOf(')->Out {', start), end);

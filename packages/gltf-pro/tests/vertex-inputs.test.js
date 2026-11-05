@@ -50,6 +50,20 @@ test('code that still needs the frame or the UVs keeps them', () => {
   assert.deepEqual(vertexInputs(used).locations, [0, 1, 2, 4]);
 });
 
+test('a shader whose vertex entry has another name is left alone', () => {
+  const renamed = bare(pbrShader).replace('@vertex fn vertex(', '@vertex fn margoVertex(');
+  assert.deepEqual(vertexInputs(renamed), { code: renamed, locations: [0, 1, 2, 3, 4] });
+});
+
+test('a helper above the structs that opens like the tangent frame does not take them with it', () => {
+  const helper = '\nfn margoNode(i:Out,n:vec3f)->vec3f {\n  var t=i.tangent.xyz-n*dot(n,i.tangent.xyz);var b=cross(n,t);\n  return b;\n}\n',
+    { code, locations } = vertexInputs(helper + bare(pbrShader));
+  assert.match(code, /struct Input \{/);
+  assert.match(code, /fn margoNode/);
+  assert.match(code, /s\.n=normalize\(n\);/);
+  assert.deepEqual(locations, [0, 1, 2, 4]);
+});
+
 test('a vertex stage that reads an input keeps it, and one that passes the input on keeps all', () => {
   const displaced = bare(pbrShader).replace('let p=f.model*vec4f(i.position.xyz,1);', 'let p=f.model*vec4f(i.position.xyz+i.uv.xyz,1);');
   assert.deepEqual(vertexInputs(displaced).locations, [0, 1, 3, 4]);
