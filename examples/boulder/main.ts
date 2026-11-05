@@ -18,7 +18,7 @@ import { Climber } from './climber.ts';
 import { buildGym, EGG, PLAQUE, ROOM, SUN } from './gym.ts';
 import { CHARACTER } from './rig.ts';
 import { TIERS } from './tiers.ts';
-import { buildWall, LEFT_FOOT, MAT_TOP, RIGHT_FOOT, pickHold, type Point, type Route, type RouteName } from './wall.ts';
+import { buildWall, LEFT_FOOT, MAT_TOP, RIGHT_FOOT, pickHold, type Point, type Route, type RouteName, type Vec } from './wall.ts';
 import type { GymSound, SoundName } from './sound.ts';
 
 const tier = applyQualityTier() as keyof typeof TIERS,
@@ -132,7 +132,7 @@ try {
     color: [1, 0.98, 0.93, 0.5],
   });
 
-  const puff = (point: readonly number[], count: number) => {
+  const puff = (point: ArrayLike<number>, count: number) => {
     chalk.options.position = [point[0], point[1], point[2]];
     chalk.burst(count);
   };
@@ -155,7 +155,7 @@ try {
   };
 
   let sound: GymSound | undefined;
-  const play = (name: SoundName, point: readonly number[]) => sound?.play(name, [point[0], point[1], point[2]]);
+  const play = (name: SoundName, point: ArrayLike<number>) => sound?.play(name, [point[0], point[1], point[2]]);
 
   // Stances.
   const positions = (route: Route, moves: number): { on: number[]; at: Point[] } => {
@@ -270,7 +270,7 @@ try {
     }
   };
 
-  climb.onEvent = (event: ClimbEvent, limb: number, point: Point) => {
+  climb.onEvent = (event: ClimbEvent, limb: number, point: Vec) => {
     if (event === 'contact') {
       if (limb < 2) {
         puff(point, 60);

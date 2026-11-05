@@ -6,6 +6,9 @@ checked as its own convex hull, not as a capsule.
 
 Run it with `npm run build:boulder`, then serve `test-results/boulder-site`. On the site it lives at `/demos/boulder/`.
 
+A frame allocates nothing: every vector `Climb` writes each frame is a `Float64Array`, made with `vec()` in `climb.ts`. A plain
+array can be widened by V8 so that each number written to it is boxed.
+
 ## Where things are
 
 | File | What it owns |

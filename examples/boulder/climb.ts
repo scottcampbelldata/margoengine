@@ -2,7 +2,7 @@
 // the pelvis and the moving limb's path, and writes plain numbers that climber.ts hands to the IK solvers.
 import { smoothDamp } from '@margoengine/tween';
 import { CHARACTER, RIG } from './rig.ts';
-import { LEFT_FOOT, RIGHT_FOOT, wallAt, wallNormalAbove, type Hold, type Point } from './wall.ts';
+import { LEFT_FOOT, RIGHT_FOOT, wallAt, wallNormalAbove, type Hold, type Vec } from './wall.ts';
 
 // Past about 110 degrees of flexion the thigh and calf armour touch. This hip to
 // ankle distance is about 102 degrees, so a stance never asks for the touching range.
@@ -17,7 +17,12 @@ const PELVIS_MIN = 0.22;
 const CHEST_MIN = 0.22;
 const HEAD_MIN = 0.28;
 
-function normalize(v: Point): Point {
+/**
+ * A vector a frame writes to. A typed array always holds raw doubles. A plain `[0, 0, 0]` can be widened by V8 to hold
+ * tagged values, sometimes, depending on when code is optimized, and from then on every number written to it is boxed.
+ */
+export const vec = (x = 0, y = 0, z = 0): Float64Array => Float64Array.of(x, y, z);
+function normalize(v: Vec): Vec {
   // Math.sqrt: Math.hypot boxes its result, once per call, every frame.
   const l = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1;
   v[0] /= l;
@@ -25,7 +30,7 @@ function normalize(v: Point): Point {
   v[2] /= l;
   return v;
 }
-function cross(a: ArrayLike<number>, b: ArrayLike<number>, out: Point): Point {
+function cross(a: ArrayLike<number>, b: ArrayLike<number>, out: Vec): Vec {
   const x = a[1] * b[2] - a[2] * b[1],
     y = a[2] * b[0] - a[0] * b[2],
     z = a[0] * b[1] - a[1] * b[0];
@@ -37,11 +42,11 @@ function cross(a: ArrayLike<number>, b: ArrayLike<number>, out: Point): Point {
 
 /** The torso's frame: right, up and back (out of the wall) as unit vectors. */
 export interface Frame {
-  right: Point;
-  up: Point;
-  back: Point;
+  right: Vec;
+  up: Vec;
+  back: Vec;
 }
-export const newFrame = (): Frame => ({ right: [1, 0, 0], up: [0, 1, 0], back: [0, 0, 1] });
+export const newFrame = (): Frame => ({ right: vec(1, 0, 0), up: vec(0, 1, 0), back: vec(0, 0, 1) });
 
 /** Writes a frame from the up direction and the wall normal it should face. */
 export function frameFrom(up: ArrayLike<number>, normal: ArrayLike<number>, out: Frame): Frame {
@@ -56,7 +61,7 @@ export function frameFrom(up: ArrayLike<number>, normal: ArrayLike<number>, out:
 }
 
 /** origin + frame * local. Torso local +X is right, +Y up, +Z back: the rig's rest frame, facing -Z. */
-export function place(frame: Frame, local: readonly number[], origin: readonly number[], out: Point): Point {
+export function place(frame: Frame, local: ArrayLike<number>, origin: ArrayLike<number>, out: Vec): Vec {
   out[0] = origin[0] + frame.right[0] * local[0] + frame.up[0] * local[1] + frame.back[0] * local[2];
   out[1] = origin[1] + frame.right[1] * local[0] + frame.up[1] * local[1] + frame.back[1] * local[2];
   out[2] = origin[2] + frame.right[2] * local[0] + frame.up[2] * local[1] + frame.back[2] * local[2];
@@ -64,20 +69,19 @@ export function place(frame: Frame, local: readonly number[], origin: readonly n
 }
 
 export interface PelvisResult {
-  position: Point;
+  position: Vec;
   frame: Frame;
   /** Largest amount, metres, by which a limb misses its reach range or the body misses the wall limit. 0 is feasible. */
   error: number;
 }
-export const newPelvis = (): PelvisResult => ({ position: [0, 0, 0], frame: newFrame(), error: 0 });
+export const newPelvis = (): PelvisResult => ({ position: vec(), frame: newFrame(), error: 0 });
 
-const scratch: Point = [0, 0, 0],
-  scratchNormal: Point = [0, 0, 0],
-  scratchUp: Point = [0, 0, 0],
-  joint: Point = [0, 0, 0],
-  faceLocal: Point = [0, 0, 0];
+const scratch: Vec = vec(),
+  scratchNormal: Vec = vec(),
+  scratchUp: Vec = vec(),
+  joint: Vec = vec();
 
-function torsoFrame(contacts: readonly Point[], bound: readonly boolean[], pelvis: Point, frame: Frame): void {
+function torsoFrame(contacts: readonly Vec[], bound: readonly boolean[], pelvis: Vec, frame: Frame): void {
   // A free hand has no say: its contact is wherever it last held on.
   const both = bound[0] && bound[1],
     hx = both ? (contacts[0][0] + contacts[1][0]) / 2 : 0,
@@ -113,7 +117,7 @@ function pushOffWall(out: PelvisResult, localY: number, min: number, target: num
  * Finds a pelvis that reaches every bound contact and stays clear of the wall: repeated projection onto each limb's
  * reach shell and the wall limit. `error` reports what is still missed; under a few millimetres counts as feasible.
  */
-export function solvePelvis(contacts: readonly Point[], bound: readonly boolean[], out: PelvisResult): PelvisResult {
+export function solvePelvis(contacts: readonly Vec[], bound: readonly boolean[], out: PelvisResult): PelvisResult {
   const p = out.position;
   let total = 0;
   p[0] = p[1] = p[2] = 0;
@@ -162,7 +166,7 @@ export function solvePelvis(contacts: readonly Point[], bound: readonly boolean[
 }
 
 /** Where the wrist sits for a hand on a hold, and where the ankle sits for a foot on it. */
-export function contactPoint(limb: number, hold: Hold, out: Point): Point {
+export function contactPoint(limb: number, hold: Hold, out: Vec): Vec {
   const [x, y, z] = hold.position,
     n = hold.normal;
   if (limb === LEFT_FOOT || limb === RIGHT_FOOT) {
@@ -181,7 +185,7 @@ export function contactPoint(limb: number, hold: Hold, out: Point): Point {
 }
 
 /** A foot standing on the mat: the stance a route starts from and a fall ends in. */
-export function matFoot(limb: number, x: number, matTop: number, out: Point): Point {
+export function matFoot(limb: number, x: number, matTop: number, out: Vec): Vec {
   out[0] = x + (limb === LEFT_FOOT ? -0.14 : 0.14);
   out[1] = matTop + CHARACTER.ankleHeight;
   out[2] = 0.42;
@@ -195,31 +199,31 @@ export type ClimbEvent = 'contact' | 'short' | 'landed';
  * Call `update` every frame. A frame allocates nothing; a move's planning does, a little, on the click that starts it.
  */
 export class Climb {
-  readonly contacts: Point[] = [
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
+  readonly contacts: Vec[] = [
+    vec(),
+    vec(),
+    vec(),
+    vec(),
   ];
-  readonly targets: Point[] = [
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
+  readonly targets: Vec[] = [
+    vec(),
+    vec(),
+    vec(),
+    vec(),
   ];
   /** Which hold each limb is on; -1 for a free limb or a foot on the mat. */
   readonly on: number[] = [-1, -1, -1, -1];
   /** The wall's outward normal under the hold each hand is on or on its way to. */
-  readonly handNormals: Point[] = [
-    [0, 0, 1],
-    [0, 0, 1],
+  readonly handNormals: Vec[] = [
+    vec(0, 0, 1),
+    vec(0, 0, 1),
   ];
   /** False for an arm that hangs free (after a fall). */
   readonly bound = [true, true, true, true];
-  readonly pelvis: Point = [0, 0, 0];
+  readonly pelvis = vec();
   readonly frame = newFrame();
   /** The point the head looks at, always a metre from the face: see `update`. */
-  readonly look: Point = [0, 1, 1.5];
+  readonly look: Vec = vec(0, 1, 1.5);
   /** The limb on its way to a hold, or -1. */
   moving = -1;
   /** How far the moving limb has come, 0 to 1 and eased. A typed slot, so a frame allocates nothing. */
@@ -227,7 +231,7 @@ export class Climb {
   /** True while a fall plays. */
   falling = false;
   /** Called when a hold is taken, a reach comes up short, or a fall lands. */
-  onEvent: ((event: ClimbEvent, limb: number, point: Point) => void) | null = null;
+  onEvent: ((event: ClimbEvent, limb: number, point: Vec) => void) | null = null;
   private readonly plan = newPelvis();
   private readonly velocity = new Float64Array(3);
   private readonly upVelocity = new Float64Array(3);
@@ -239,10 +243,10 @@ export class Climb {
   private readonly lookGoal = new Float64Array(3);
   private readonly lookNow = new Float64Array([0, 0, -1]);
   private readonly lookWanted = new Float64Array(3);
-  private readonly from: Point = [0, 0, 0];
-  private readonly to: Point = [0, 0, 0];
-  private readonly lift: Point = [0, 0, 1];
-  private readonly normal: Point = [0, 0, 1];
+  private readonly from: Vec = vec();
+  private readonly to: Vec = vec();
+  private readonly lift: Vec = vec(0, 0, 1);
+  private readonly normal: Vec = vec(0, 0, 1);
   private liftHeight = 0;
   // A typed slot: a double field would box on every write once V8 has seen it hold an integer.
   private readonly clock = new Float64Array(1);
@@ -252,7 +256,7 @@ export class Climb {
   private fallTime = 0;
   private fallDuration = 0;
   private fallDrop = 0;
-  private readonly fallFrom: Point = [0, 0, 0];
+  private readonly fallFrom: Vec = vec();
 
   readonly holds: readonly Hold[];
 
@@ -261,7 +265,7 @@ export class Climb {
   }
 
   /** Places the climber at once, with no motion: every limb on its contact, the pelvis on its solved place. */
-  teleport(holdsOn: readonly number[], positions: readonly Point[]): void {
+  teleport(holdsOn: readonly number[], positions: readonly Vec[]): void {
     for (let i = 0; i < 4; i++) {
       this.on[i] = holdsOn[i];
       this.bound[i] = true;
@@ -286,7 +290,7 @@ export class Climb {
    * Walks the feet to their places on the mat with the arms still free, ready for `move` to send each hand to its first
    * hold. Used to start a route.
    */
-  settle(feet: readonly Point[]): void {
+  settle(feet: readonly Vec[]): void {
     for (let i = 0; i < 4; i++) {
       this.on[i] = -1;
       this.bound[i] = i >= 2;
@@ -463,15 +467,17 @@ export class Climb {
   }
 
   /** The middle of the face, into `scratch`. */
-  private faceAt(frame: Frame, pelvis: ArrayLike<number>): void {
-    faceLocal[0] = RIG.head[0];
-    faceLocal[1] = RIG.head[1] + CHARACTER.faceAbove;
-    faceLocal[2] = RIG.head[2];
-    place(frame, faceLocal, pelvis as unknown as Point, scratch);
+  private faceAt(frame: Frame, pelvis: Float64Array): void {
+    // Written out: `place` takes plain arrays too, and a load there that has seen too many kinds of array boxes its number.
+    const x = RIG.head[0],
+      y = RIG.head[1] + CHARACTER.faceAbove,
+      z = RIG.head[2],
+      { right, up, back } = frame;
+    for (let a = 0; a < 3; a++) scratch[a] = pelvis[a] + right[a] * x + up[a] * y + back[a] * z;
   }
 
   /** Writes the unit direction from the face to the look goal. */
-  private lookDirection(frame: Frame, pelvis: ArrayLike<number>, out: Float64Array): void {
+  private lookDirection(frame: Frame, pelvis: Float64Array, out: Float64Array): void {
     this.faceAt(frame, pelvis);
     const x = this.lookGoal[0] - scratch[0],
       y = this.lookGoal[1] - scratch[1],
@@ -500,7 +506,7 @@ export class Climb {
 }
 
 /** The distance from a hip joint to its ankle, for the knee limit check. */
-export function legReach(frame: Frame, pelvis: Point, limb: number, ankle: Point): number {
+export function legReach(frame: Frame, pelvis: Vec, limb: number, ankle: Vec): number {
   place(frame, RIG.roots[limb], pelvis, scratch);
   return Math.hypot(ankle[0] - scratch[0], ankle[1] - scratch[1], ankle[2] - scratch[2]);
 }

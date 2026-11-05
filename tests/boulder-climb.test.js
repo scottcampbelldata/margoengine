@@ -3,7 +3,9 @@
 // real GPU with the solver and the bones.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { GLTFAsset } from '@margoengine/gltf-pro';
 import {
   Climb,
@@ -173,7 +175,7 @@ test('a hold out of reach comes back short and leaves the stance as it was', () 
   settleMove(climb);
   assert.deepEqual(events, ['short']);
   assert.equal(climb.on.join(), before);
-  assert.deepEqual(climb.contacts[0], contact);
+  assert.deepEqual([...climb.contacts[0]], contact);
 });
 
 test('a fall lands on the mat with free arms, then a route starts from the feet', () => {
@@ -257,7 +259,7 @@ test('the torso frame stays square, and the wall normal is unit', () => {
   }
   const f = newFrame();
   assert.deepEqual(
-    [f.right, f.up, f.back],
+    [[...f.right], [...f.up], [...f.back]],
     [
       [1, 0, 0],
       [0, 1, 0],
@@ -265,6 +267,25 @@ test('the torso frame stays square, and the wall normal is unit', () => {
     ],
   );
   assert.ok(MIN_ARM_REACH < RIG.upper[0] + RIG.lower[0]);
+});
+
+// V8 can widen a plain array to hold tagged values, and then each number written to it is boxed: 15 a frame, when the
+// torso frame's arrays went that way. Whether it happens depends on when code is optimized, so this holds both ends.
+test('what a frame of Climb writes lives in typed arrays', () => {
+  const climb = climbAt('blue', 4),
+    { right, up, back } = climb.frame,
+    written = [climb.pelvis, climb.look, right, up, back, ...climb.targets, ...climb.contacts, ...climb.handNormals];
+  written.push(newPelvis().position);
+  for (const v of written) assert.ok(v instanceof Float64Array);
+});
+
+test('a frame of Climb allocates nothing when V8 optimizes on the main thread', { skip: !!process.env.CLIMB_NESTED }, () => {
+  const run = spawnSync(
+    process.execPath,
+    ['--no-concurrent-recompilation', '--experimental-test-module-mocks', fileURLToPath(import.meta.url)],
+    { encoding: 'utf8', timeout: 60_000, env: { ...process.env, CLIMB_NESTED: '1' } },
+  );
+  assert.equal(run.status, 0, run.stdout.slice(-2000));
 });
 
 test('the plaque carries the dedication', () => {

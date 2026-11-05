@@ -9,6 +9,7 @@ import {
   type LookAt,
 } from '@margoengine/animator';
 import { Animation } from '@margoengine/animation';
+import type { Vec3 } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import type { PBRModel } from '@margoengine/gltf-pro';
 import {
@@ -18,9 +19,9 @@ import {
   type ElbowEvaluator,
 } from '@margoengine/kinematics-constraints';
 import { jointHulls } from '@margoengine/rigging/hulls';
-import { MIN_ARM_REACH, MIN_LEG_REACH, place, type Climb } from './climb.ts';
+import { MIN_ARM_REACH, MIN_LEG_REACH, place, vec, type Climb } from './climb.ts';
 import { CHARACTER, measureRig, restPosition, RIG } from './rig.ts';
-import { VOLUMES, wallAt, wallSlabs, type Point } from './wall.ts';
+import { VOLUMES, wallAt, wallSlabs, type Point, type Vec } from './wall.ts';
 
 type Model = PBRModel;
 type Node = PBRModel['nodes'][number];
@@ -61,7 +62,7 @@ export function skinData(model: Model): {
 }
 
 // A rotation (x, y, z, w) from the columns of an orthonormal basis.
-function basisQuaternion(x: readonly number[], y: readonly number[], z: readonly number[], out: Float64Array): void {
+function basisQuaternion(x: ArrayLike<number>, y: ArrayLike<number>, z: ArrayLike<number>, out: Float64Array): void {
   const trace = x[0] + y[1] + z[2];
   if (trace > 0) {
     const s = Math.sqrt(trace + 1) * 2;
@@ -108,7 +109,7 @@ interface Limb {
   /** The swivel angle of the last pose the solver cleared. */
   swivel: number;
   /** The direction the limb prefers to bend: see `PREFER`. */
-  prefer: Point;
+  prefer: Vec;
   /** Added to every swivel angle the solver tries: see `solveLimb`. */
   swivelOrigin: Float64Array;
   clamped: Float32Array;
@@ -148,7 +149,7 @@ export class Climber {
   private readonly root: Model['root'];
   private readonly runtime: ReturnType<typeof engineRuntime>;
   private readonly quaternion = new Float64Array(4);
-  private readonly rootPosition: Point = [0, 0, 0];
+  private readonly rootPosition: Vec = vec();
   private readonly rootJoint: Float32Array = new Float32Array(3);
   private readonly climb: Climb;
   private readonly model: Model;
@@ -203,7 +204,7 @@ export class Climber {
 
     const look: LookAt = {
       joints: [node(body), node(head)],
-      target: climb.look,
+      target: climb.look as unknown as Vec3,
       shares: CHARACTER.lookShares,
       axis: CHARACTER.lookAxis,
       origin: CHARACTER.lens,
@@ -223,7 +224,7 @@ export class Climber {
         upperHull = arm ? trimmed(hull(upper), CHARACTER.shoulderTrim) : hull(upper),
         colliders = arm ? [...this.wallVolumes, this.bodyHull, this.headHull] : this.wallVolumes,
         swivelOrigin = new Float64Array(1),
-        prefer: Point = [PREFER[index][0], PREFER[index][1], PREFER[index][2]],
+        prefer = vec(PREFER[index][0], PREFER[index][1], PREFER[index][2]),
         solver = new AvoidanceSolver(colliders, {
           // The chain chooses each bone's twist and the solver assumes one; this covers the difference between the two hulls.
           minClearance: 0.014,
@@ -308,7 +309,7 @@ export class Climber {
       breath = this.breathing ? Math.sin(this.time * 1.7) * 0.004 : 0;
     place(frame, [-RIG.hips[0], -RIG.hips[1], -RIG.hips[2] + breath], pelvis, this.rootPosition);
     basisQuaternion(frame.right, frame.up, frame.back, this.quaternion);
-    this.root.setPosition(this.rootPosition);
+    this.root.setPosition(this.rootPosition as unknown as Vec3);
     this.root.setQuaternion(this.quaternion as unknown as number[]);
   }
 
@@ -319,8 +320,8 @@ export class Climber {
       limb.rotationGoal.set(climb.footOnHold(i) ? this.footPointed[i - 2] : this.footFlat[i - 2]);
       return;
     }
-    const f: Point = scratchFingers,
-      p: Point = scratchPalm;
+    const f = scratchFingers,
+      p = scratchPalm;
     if (climb.bound[i]) {
       // Palm on the hold and fingers up the wall and over it.
       const n = climb.handNormals[i],
@@ -740,15 +741,15 @@ export class Climber {
 }
 
 const scratchElbow = new Float32Array(3),
-  scratchFingers: Point = [0, 1, 0],
-  scratchPalm: Point = [0, 0, 1],
-  scratchX: Point = [1, 0, 0],
-  scratchY: Point = [0, 1, 0],
-  scratchZ: Point = [0, 0, 1],
-  scratchThird: Point = [1, 0, 0];
+  scratchFingers = vec(0, 1, 0),
+  scratchPalm = vec(0, 0, 1),
+  scratchX = vec(1, 0, 0),
+  scratchY = vec(0, 1, 0),
+  scratchZ = vec(0, 0, 1),
+  scratchThird = vec(1, 0, 0);
 
 /** The hand bone's world rotation that sends its fingers and palm axes (CHARACTER.hand) to the unit directions `f` and `p`. */
-function handRotation(f: Point, p: Point, out: Float64Array): void {
+function handRotation(f: Vec, p: Vec, out: Float64Array): void {
   const a = CHARACTER.hand.fingers,
     b = CHARACTER.hand.palm,
     // Third axis of each basis: fingers cross palm.
@@ -825,7 +826,7 @@ function trimmed(points: Float32Array, start: number): Float32Array {
 }
 
 /** Two-bone elbow position for a swivel angle, measured from the direction the limb prefers to bend. */
-function elbowEvaluator(a: number, b: number, prefer: Point, origin: Float64Array): ElbowEvaluator {
+function elbowEvaluator(a: number, b: number, prefer: Vec, origin: Float64Array): ElbowEvaluator {
   return (root, target, angle, out) => {
     const dx = target[0] - root[0],
       dy = target[1] - root[1],

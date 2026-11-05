@@ -2,6 +2,8 @@
 // the page builds meshes from it. Units are metres, +Y up, +Z out of the wall toward the room. The climber faces -Z.
 
 export type Point = [number, number, number];
+/** A point or direction that is written every frame: see `vec` in climb.ts. */
+export type Vec = Point | Float64Array;
 
 /** The wall profile, walked from the floor up: height y, then distance z out of the wall. */
 const PROFILE: readonly (readonly [number, number])[] = [
@@ -37,7 +39,7 @@ export function surface(x: number, s: number, outPoint: Point = [0, 0, 0], outNo
 }
 
 /** The wall's surface z at height `y`; writes the outward normal at that height. */
-export function wallAt(y: number, outNormal: Point): number {
+export function wallAt(y: number, outNormal: Vec): number {
   let i = 0;
   while (i < PROFILE.length - 2 && y > PROFILE[i + 1][0]) i++;
   const a = PROFILE[i],
@@ -54,7 +56,7 @@ export function wallAt(y: number, outNormal: Point): number {
  * The wall's outward normal `above` metres over a point. For per-frame callers: a height computed by the caller and passed
  * to `wallAt` is a double crossing a call, and V8 boxes those, once per frame.
  */
-export function wallNormalAbove(point: ArrayLike<number>, above: number, outNormal: Point): void {
+export function wallNormalAbove(point: ArrayLike<number>, above: number, outNormal: Vec): void {
   let i = 0;
   while (i < PROFILE.length - 2 && point[1] + above > PROFILE[i + 1][0]) i++;
   outNormal[0] = 0;

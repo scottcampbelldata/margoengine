@@ -480,16 +480,6 @@ materials mesh's `displacementMap` and `clippingPlanes` (`displacement` and `cli
 such binding. **Repro:** a mesh with `displacementMap` over a floor, or `clippingPlanes` with `clipShadows`, with
 `ContactShadows`, `TAA` or `Picking`; a click on a clipped part still hits it.
 
-### Boulder: `Climb.update` can box a number every frame, and its allocation test then fails
-
-Found 2026-11-05, when `tests/boulder-climb.test.js` ("a frame of Climb allocates nothing") failed once in `verify`. About
-16 bytes a frame, one boxed number. It shows only after the file's earlier tests have run; the test passes alone.
-**Repro:** `tests/boulder-climb.test.js` whole, 24 copies at once: 13 of 96 runs fail. With
-`node --no-concurrent-recompilation` 93 of 96 fail.
-**Known so far:** removing the `upNow` `smoothDamp` call in `update` stops it, but that also leaves `upNow` still, so the
-cause may follow the values and not the call. That call alone, `commit`, `stepMove`, `faceAt` and `lookDirection` each
-measure about 0. **Ruled out:** a short warm-up (300,000 frames first changes nothing), inlining, Maglev, escape
-analysis, and the call's `smoothTime` and `maxSpeed` constants. No test limit was changed.
 
 ## Performance losses still open
 
