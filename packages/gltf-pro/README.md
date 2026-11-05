@@ -165,7 +165,7 @@ the loader also validates returned data before constructing GPU resources.
 
 `model.writeGeometry(geometry)` takes one `PreparedGeometry` per entry of `model.primitives` and swaps them in place: GPU buffers are rewritten while the new data fits and reallocated at twice their size otherwise. With `range` (`{start, count}` in vertices) only those vertices changed: vertex and index counts stay and only that range uploads (pass new array objects when positions moved, so BVH and selection caches keyed on them refresh). Nodes, materials and plugin registrations stay; static batches are retired and edited primitives cast dynamic shadows. Skinned, morphed and `shareBuffers` primitives are refused, and `createRenderer` replicas keep their original geometry. `@margoengine/materials` meshes wrap it as `mesh.setGeometry`.
 
-Transmissive materials honour their maps on the default path too: a black half of a `transmissionTexture` hides the light behind it, and `metallicRoughnessTexture`, base colour, sheen, clearcoat and iridescence all change how much passes.
+Transmissive materials honour their maps on the default path too: a black half of a `transmissionTexture` hides the light behind it, and `metallicRoughnessTexture`, base colour, sheen, clearcoat and iridescence all change how much passes. That takes a second textured draw per glass surface; [docs/limits.md](../../docs/limits.md) has the measured cost.
 
 `KHR_materials_specular` and `KHR_materials_ior` reach every light: direct, `Clustered` local lights, `EnvironmentLighting`, `LightProbes` and sky ambient. A lighting hook reads them as `s.f0` and `s.sw`; on shaders without those fields `lightPBR` writes 0.04 and 1 in their place.
 

@@ -1,0 +1,732 @@
+{
+  "benchmark": "tint-pass-gpu",
+  "recordedAt": "2026-11-05T17:00:50.779Z",
+  "rounds": 5,
+  "frames": 240,
+  "quietGate": {
+    "ac": true,
+    "cpuLoadPercent": 9,
+    "waitedSeconds": 129,
+    "checkedAt": "2026-11-05T17:03:02.165Z",
+    "topProcesses": [
+      {
+        "Name": "claude",
+        "Id": 13112,
+        "cpuSeconds": 18140
+      },
+      {
+        "Name": "claude",
+        "Id": 30692,
+        "cpuSeconds": 16644
+      },
+      {
+        "Name": "claude",
+        "Id": 16448,
+        "cpuSeconds": 1179
+      },
+      {
+        "Name": "Grok Bot",
+        "Id": 18568,
+        "cpuSeconds": 1151
+      },
+      {
+        "Name": "msedgewebview2",
+        "Id": 36476,
+        "cpuSeconds": 1069
+      },
+      {
+        "Name": "Grok Bot",
+        "Id": 37592,
+        "cpuSeconds": 886
+      },
+      {
+        "Name": "blender",
+        "Id": 42428,
+        "cpuSeconds": 835
+      },
+      {
+        "Name": "claude",
+        "Id": 45988,
+        "cpuSeconds": 755
+      }
+    ]
+  },
+  "cpuLoadAtStart": 9,
+  "hardware": {
+    "vendor": "nvidia",
+    "architecture": "ampere",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 156.0.4314.58",
+  "rows": [
+    {
+      "width": 1280,
+      "height": 720,
+      "material": "factors",
+      "layers": 1,
+      "surface": {
+        "gpuMs": 0.197,
+        "gpuMsRange": [
+          0.197,
+          0.197
+        ],
+        "frameMs": 0.353,
+        "meanLevel": 153.83
+      },
+      "constant": {
+        "gpuMs": 0.197,
+        "gpuMsRange": [
+          0.131,
+          0.197
+        ],
+        "frameMs": 0.34,
+        "meanLevel": 153.84
+      },
+      "off": {
+        "gpuMs": 0.131,
+        "gpuMsRange": [
+          0.131,
+          0.131
+        ],
+        "frameMs": 0.34,
+        "meanLevel": 170.15
+      },
+      "tintDrawMs": 0.066,
+      "tintDrawMsPerMegapixelLayer": 0.072,
+      "tintDrawShareOfFrame": 0.335,
+      "mapsOverConstantMs": 0
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "material": "factors",
+      "layers": 4,
+      "surface": {
+        "gpuMs": 0.393,
+        "gpuMsRange": [
+          0.393,
+          0.393
+        ],
+        "frameMs": 0.593,
+        "meanLevel": 144.47
+      },
+      "constant": {
+        "gpuMs": 0.328,
+        "gpuMsRange": [
+          0.328,
+          0.393
+        ],
+        "frameMs": 0.533,
+        "meanLevel": 144.47
+      },
+      "off": {
+        "gpuMs": 0.262,
+        "gpuMsRange": [
+          0.262,
+          0.328
+        ],
+        "frameMs": 0.493,
+        "meanLevel": 198.78
+      },
+      "tintDrawMs": 0.131,
+      "tintDrawMsPerMegapixelLayer": 0.036,
+      "tintDrawShareOfFrame": 0.333,
+      "mapsOverConstantMs": 0.065
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "material": "factors",
+      "layers": 16,
+      "surface": {
+        "gpuMs": 1.376,
+        "gpuMsRange": [
+          1.376,
+          1.376
+        ],
+        "frameMs": 1.6,
+        "meanLevel": 136.72
+      },
+      "constant": {
+        "gpuMs": 1.114,
+        "gpuMsRange": [
+          1.049,
+          1.114
+        ],
+        "frameMs": 1.327,
+        "meanLevel": 136.72
+      },
+      "off": {
+        "gpuMs": 0.852,
+        "gpuMsRange": [
+          0.852,
+          0.918
+        ],
+        "frameMs": 1.107,
+        "meanLevel": 235.04
+      },
+      "tintDrawMs": 0.524,
+      "tintDrawMsPerMegapixelLayer": 0.036,
+      "tintDrawShareOfFrame": 0.381,
+      "mapsOverConstantMs": 0.262
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "material": "four",
+      "layers": 1,
+      "surface": {
+        "gpuMs": 0.197,
+        "gpuMsRange": [
+          0.197,
+          0.197
+        ],
+        "frameMs": 0.38,
+        "meanLevel": 138.64
+      },
+      "constant": {
+        "gpuMs": 0.197,
+        "gpuMsRange": [
+          0.131,
+          0.197
+        ],
+        "frameMs": 0.373,
+        "meanLevel": 181.71
+      },
+      "off": {
+        "gpuMs": 0.131,
+        "gpuMsRange": [
+          0.131,
+          0.197
+        ],
+        "frameMs": 0.353,
+        "meanLevel": 185.27
+      },
+      "tintDrawMs": 0.066,
+      "tintDrawMsPerMegapixelLayer": 0.072,
+      "tintDrawShareOfFrame": 0.335,
+      "mapsOverConstantMs": 0
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "material": "four",
+      "layers": 4,
+      "surface": {
+        "gpuMs": 0.459,
+        "gpuMsRange": [
+          0.459,
+          0.524
+        ],
+        "frameMs": 0.7,
+        "meanLevel": 128.11
+      },
+      "constant": {
+        "gpuMs": 0.393,
+        "gpuMsRange": [
+          0.393,
+          0.393
+        ],
+        "frameMs": 0.573,
+        "meanLevel": 222.75
+      },
+      "off": {
+        "gpuMs": 0.328,
+        "gpuMsRange": [
+          0.328,
+          0.328
+        ],
+        "frameMs": 0.507,
+        "meanLevel": 230.9
+      },
+      "tintDrawMs": 0.131,
+      "tintDrawMsPerMegapixelLayer": 0.036,
+      "tintDrawShareOfFrame": 0.285,
+      "mapsOverConstantMs": 0.066
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "material": "four",
+      "layers": 16,
+      "surface": {
+        "gpuMs": 1.769,
+        "gpuMsRange": [
+          1.769,
+          1.769
+        ],
+        "frameMs": 2.033,
+        "meanLevel": 127.64
+      },
+      "constant": {
+        "gpuMs": 1.245,
+        "gpuMsRange": [
+          1.245,
+          1.311
+        ],
+        "frameMs": 1.52,
+        "meanLevel": 233.1
+      },
+      "off": {
+        "gpuMs": 0.983,
+        "gpuMsRange": [
+          0.983,
+          0.983
+        ],
+        "frameMs": 1.213,
+        "meanLevel": 243.67
+      },
+      "tintDrawMs": 0.786,
+      "tintDrawMsPerMegapixelLayer": 0.053,
+      "tintDrawShareOfFrame": 0.444,
+      "mapsOverConstantMs": 0.524
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "material": "eight",
+      "layers": 1,
+      "surface": {
+        "gpuMs": 0.262,
+        "gpuMsRange": [
+          0.197,
+          0.262
+        ],
+        "frameMs": 0.44,
+        "meanLevel": 140.65
+      },
+      "constant": {
+        "gpuMs": 0.197,
+        "gpuMsRange": [
+          0.197,
+          0.197
+        ],
+        "frameMs": 0.373,
+        "meanLevel": 179.84
+      },
+      "off": {
+        "gpuMs": 0.197,
+        "gpuMsRange": [
+          0.131,
+          0.197
+        ],
+        "frameMs": 0.367,
+        "meanLevel": 189.09
+      },
+      "tintDrawMs": 0.065,
+      "tintDrawMsPerMegapixelLayer": 0.071,
+      "tintDrawShareOfFrame": 0.248,
+      "mapsOverConstantMs": 0.065
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "material": "eight",
+      "layers": 4,
+      "surface": {
+        "gpuMs": 0.655,
+        "gpuMsRange": [
+          0.655,
+          0.721
+        ],
+        "frameMs": 0.88,
+        "meanLevel": 133.23
+      },
+      "constant": {
+        "gpuMs": 0.459,
+        "gpuMsRange": [
+          0.393,
+          0.459
+        ],
+        "frameMs": 0.647,
+        "meanLevel": 214.76
+      },
+      "off": {
+        "gpuMs": 0.393,
+        "gpuMsRange": [
+          0.393,
+          0.393
+        ],
+        "frameMs": 0.62,
+        "meanLevel": 233.34
+      },
+      "tintDrawMs": 0.262,
+      "tintDrawMsPerMegapixelLayer": 0.071,
+      "tintDrawShareOfFrame": 0.4,
+      "mapsOverConstantMs": 0.196
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "material": "eight",
+      "layers": 16,
+      "surface": {
+        "gpuMs": 2.687,
+        "gpuMsRange": [
+          2.687,
+          2.753
+        ],
+        "frameMs": 2.98,
+        "meanLevel": 133.05
+      },
+      "constant": {
+        "gpuMs": 1.901,
+        "gpuMsRange": [
+          1.704,
+          1.901
+        ],
+        "frameMs": 2.16,
+        "meanLevel": 230.15
+      },
+      "off": {
+        "gpuMs": 1.311,
+        "gpuMsRange": [
+          1.311,
+          1.376
+        ],
+        "frameMs": 1.587,
+        "meanLevel": 243.79
+      },
+      "tintDrawMs": 1.376,
+      "tintDrawMsPerMegapixelLayer": 0.093,
+      "tintDrawShareOfFrame": 0.512,
+      "mapsOverConstantMs": 0.786
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "material": "factors",
+      "layers": 1,
+      "surface": {
+        "gpuMs": 0.393,
+        "gpuMsRange": [
+          0.393,
+          0.393
+        ],
+        "frameMs": 0.653,
+        "meanLevel": 156.25
+      },
+      "constant": {
+        "gpuMs": 0.328,
+        "gpuMsRange": [
+          0.328,
+          0.328
+        ],
+        "frameMs": 0.667,
+        "meanLevel": 156.25
+      },
+      "off": {
+        "gpuMs": 0.328,
+        "gpuMsRange": [
+          0.328,
+          0.328
+        ],
+        "frameMs": 0.607,
+        "meanLevel": 172.91
+      },
+      "tintDrawMs": 0.065,
+      "tintDrawMsPerMegapixelLayer": 0.031,
+      "tintDrawShareOfFrame": 0.165,
+      "mapsOverConstantMs": 0.065
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "material": "factors",
+      "layers": 4,
+      "surface": {
+        "gpuMs": 0.918,
+        "gpuMsRange": [
+          0.918,
+          0.918
+        ],
+        "frameMs": 1.187,
+        "meanLevel": 146.68
+      },
+      "constant": {
+        "gpuMs": 0.786,
+        "gpuMsRange": [
+          0.786,
+          0.786
+        ],
+        "frameMs": 1.087,
+        "meanLevel": 146.68
+      },
+      "off": {
+        "gpuMs": 0.655,
+        "gpuMsRange": [
+          0.655,
+          0.655
+        ],
+        "frameMs": 0.92,
+        "meanLevel": 202.16
+      },
+      "tintDrawMs": 0.263,
+      "tintDrawMsPerMegapixelLayer": 0.032,
+      "tintDrawShareOfFrame": 0.286,
+      "mapsOverConstantMs": 0.132
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "material": "factors",
+      "layers": 16,
+      "surface": {
+        "gpuMs": 3.408,
+        "gpuMsRange": [
+          3.342,
+          3.408
+        ],
+        "frameMs": 3.627,
+        "meanLevel": 138.75
+      },
+      "constant": {
+        "gpuMs": 2.687,
+        "gpuMsRange": [
+          2.687,
+          2.687
+        ],
+        "frameMs": 2.96,
+        "meanLevel": 138.75
+      },
+      "off": {
+        "gpuMs": 2.097,
+        "gpuMsRange": [
+          2.097,
+          2.163
+        ],
+        "frameMs": 2.427,
+        "meanLevel": 239.18
+      },
+      "tintDrawMs": 1.311,
+      "tintDrawMsPerMegapixelLayer": 0.04,
+      "tintDrawShareOfFrame": 0.385,
+      "mapsOverConstantMs": 0.721
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "material": "four",
+      "layers": 1,
+      "surface": {
+        "gpuMs": 0.524,
+        "gpuMsRange": [
+          0.524,
+          0.59
+        ],
+        "frameMs": 0.84,
+        "meanLevel": 139.96
+      },
+      "constant": {
+        "gpuMs": 0.393,
+        "gpuMsRange": [
+          0.393,
+          0.393
+        ],
+        "frameMs": 0.693,
+        "meanLevel": 184.02
+      },
+      "off": {
+        "gpuMs": 0.328,
+        "gpuMsRange": [
+          0.328,
+          0.328
+        ],
+        "frameMs": 0.64,
+        "meanLevel": 187.68
+      },
+      "tintDrawMs": 0.196,
+      "tintDrawMsPerMegapixelLayer": 0.095,
+      "tintDrawShareOfFrame": 0.374,
+      "mapsOverConstantMs": 0.131
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "material": "four",
+      "layers": 4,
+      "surface": {
+        "gpuMs": 1.507,
+        "gpuMsRange": [
+          1.507,
+          1.507
+        ],
+        "frameMs": 1.84,
+        "meanLevel": 128.41
+      },
+      "constant": {
+        "gpuMs": 1.049,
+        "gpuMsRange": [
+          0.983,
+          1.049
+        ],
+        "frameMs": 1.347,
+        "meanLevel": 225.68
+      },
+      "off": {
+        "gpuMs": 0.786,
+        "gpuMsRange": [
+          0.786,
+          0.786
+        ],
+        "frameMs": 1.113,
+        "meanLevel": 234.09
+      },
+      "tintDrawMs": 0.721,
+      "tintDrawMsPerMegapixelLayer": 0.087,
+      "tintDrawShareOfFrame": 0.478,
+      "mapsOverConstantMs": 0.458
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "material": "four",
+      "layers": 16,
+      "surface": {
+        "gpuMs": 4.456,
+        "gpuMsRange": [
+          4.456,
+          4.522
+        ],
+        "frameMs": 4.76,
+        "meanLevel": 128.04
+      },
+      "constant": {
+        "gpuMs": 3.473,
+        "gpuMsRange": [
+          3.473,
+          3.473
+        ],
+        "frameMs": 3.76,
+        "meanLevel": 237.22
+      },
+      "off": {
+        "gpuMs": 2.556,
+        "gpuMsRange": [
+          2.49,
+          2.621
+        ],
+        "frameMs": 2.82,
+        "meanLevel": 247.63
+      },
+      "tintDrawMs": 1.9,
+      "tintDrawMsPerMegapixelLayer": 0.057,
+      "tintDrawShareOfFrame": 0.426,
+      "mapsOverConstantMs": 0.983
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "material": "eight",
+      "layers": 1,
+      "surface": {
+        "gpuMs": 0.786,
+        "gpuMsRange": [
+          0.721,
+          0.786
+        ],
+        "frameMs": 1.053,
+        "meanLevel": 142.58
+      },
+      "constant": {
+        "gpuMs": 0.524,
+        "gpuMsRange": [
+          0.524,
+          0.59
+        ],
+        "frameMs": 0.793,
+        "meanLevel": 182.61
+      },
+      "off": {
+        "gpuMs": 0.524,
+        "gpuMsRange": [
+          0.459,
+          0.524
+        ],
+        "frameMs": 0.773,
+        "meanLevel": 192.14
+      },
+      "tintDrawMs": 0.262,
+      "tintDrawMsPerMegapixelLayer": 0.126,
+      "tintDrawShareOfFrame": 0.333,
+      "mapsOverConstantMs": 0.262
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "material": "eight",
+      "layers": 4,
+      "surface": {
+        "gpuMs": 2.884,
+        "gpuMsRange": [
+          2.753,
+          2.949
+        ],
+        "frameMs": 3.153,
+        "meanLevel": 134.81
+      },
+      "constant": {
+        "gpuMs": 1.442,
+        "gpuMsRange": [
+          1.442,
+          1.507
+        ],
+        "frameMs": 1.807,
+        "meanLevel": 218.13
+      },
+      "off": {
+        "gpuMs": 1.245,
+        "gpuMsRange": [
+          1.245,
+          1.311
+        ],
+        "frameMs": 1.567,
+        "meanLevel": 236.51
+      },
+      "tintDrawMs": 1.639,
+      "tintDrawMsPerMegapixelLayer": 0.198,
+      "tintDrawShareOfFrame": 0.568,
+      "mapsOverConstantMs": 1.442
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "material": "eight",
+      "layers": 16,
+      "surface": {
+        "gpuMs": 6.881,
+        "gpuMsRange": [
+          6.75,
+          7.012
+        ],
+        "frameMs": 7.26,
+        "meanLevel": 134.72
+      },
+      "constant": {
+        "gpuMs": 4.653,
+        "gpuMsRange": [
+          4.456,
+          4.719
+        ],
+        "frameMs": 4.773,
+        "meanLevel": 234.12
+      },
+      "off": {
+        "gpuMs": 3.408,
+        "gpuMsRange": [
+          3.342,
+          3.932
+        ],
+        "frameMs": 3.647,
+        "meanLevel": 247.56
+      },
+      "tintDrawMs": 3.473,
+      "tintDrawMsPerMegapixelLayer": 0.105,
+      "tintDrawShareOfFrame": 0.505,
+      "mapsOverConstantMs": 2.228
+    }
+  ],
+  "powerOnlineAfter": true
+}

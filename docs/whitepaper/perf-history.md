@@ -1279,6 +1279,29 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Guard:** `packages/scatter/test/order.test.js` (rings equal with GPU threads run forward and in reverse) and
   `packages/scatter/test/repeat.browser.mjs` (still 4x MSAA frames bit-identical; exact on the A6000 and the M6).
 
+### 47. Native glass tint draw: what reading the maps costs
+
+- **Measured:** `examples/package-benchmarks/tint-pass-gpu.mjs`, RTX A6000, Chromium 156, 2026-11-05, quiet gate passed,
+  five interleaved rounds, 1920 × 1080 4x, screen-filling glass over an opaque wall, sun light only. GPU ms a frame:
+
+  | Glass | Layers | Ships (reads maps) | Factors-only tint | No tint draw |
+  | --- | --- | --- | --- | --- |
+  | No maps | 1 | 0.39 | 0.33 | 0.33 |
+  | No maps | 16 | 3.41 | 2.69 | 2.10 |
+  | Four maps | 1 | 0.52 | 0.39 | 0.33 |
+  | Four maps | 16 | 4.46 | 3.47 | 2.56 |
+  | Eight maps | 1 | 0.79 | 0.52 | 0.52 |
+  | Eight maps | 16 | 6.88 | 4.65 | 3.41 |
+
+- **What it means:** the fix in a1f778bdc added 0.13 ms to one screen of four-map glass. The two comparison columns are
+  wrong images on purpose: without the maps the mapped frames come out far too bright (mean level 237 against 128 at
+  four maps, 16 layers), and without the draw the light behind is not filtered at all. They exist only to price the draw.
+- **Reading the numbers:** the GPU timer ticks every 0.066 ms, so the one-layer rows are good to about one tick. An
+  image-based light would make the lit draw dearer and the tint's share smaller; this scene has none, so the share is
+  the high end.
+- **No rival row:** this prices one Margo draw against itself. The `Transmission` pass is the other route and was not
+  timed here.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

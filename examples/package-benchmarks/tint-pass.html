@@ -1,0 +1,77 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Glass tint pass cost</title><style>body{margin:0}#host{width:1280px;height:720px}</style></head><body><div id="host"></div>
+<script type="module">
+// Driven by tint-pass-gpu.mjs. An opaque grey wall behind `layers` screen-filling glass quads loaded through gltf-pro, so
+// every pixel of the frame runs the native glass draws `layers` times. The runner chooses what the tint draw does by
+// patching the served gltf-pro build, so this page is the same for all three arms.
+// ?width=&height= set the frame. Maps are 1024 x 1024 noise with mipmaps, sampled at about one texel a pixel.
+const query=new URLSearchParams(location.search),width=+query.get('width'),height=+query.get('height');
+const host=document.querySelector('#host');host.style.width=width+'px';host.style.height=height+'px';
+const {createStage}=await import('/packages/stage/dist/index.js');
+const {box,PbrMaterial}=await import('/packages/core/dist/index.js');
+const {parseGLTF}=await import('/packages/gltf-pro/dist/index.js');
+const {extendedMaterials}=await import('/packages/gltf-pro/dist/extended.js');
+const {Tonemap}=await import('/packages/tonemap/dist/index.js');
+const {Stats}=await import('/packages/stats/dist/index.js');
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,features:['timestamp-query'],camera:{position:[0,0,4],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+Tonemap.attach(engine,{curve:'neutral'});
+const wall=engine.createMesh().setGeometry(box(40,40,0.2));wall.setMaterial(new PbrMaterial({color:[0.6,0.6,0.6],roughness:1,metalness:0}));wall.position.set(0,0,-3);
+
+// A repeatable noise map; `floor` keeps a channel high, as a transmission map on real glass is.
+function noise(seed,floor){
+  const size=1024,data=new Uint8ClampedArray(size*size*4);let x=seed>>>0||1;
+  for(let i=0;i<size*size;i++){for(let k=0;k<3;k++){x^=x<<13;x^=x>>>17;x^=x<<5;data[i*4+k]=floor+((x>>>0)%(256-floor));}data[i*4+3]=255;}
+  return new ImageData(data,size,size);
+}
+const maps=[noise(1,180),noise(2,0),noise(3,96),noise(4,160),noise(5,0),noise(6,0),noise(7,0),noise(8,0)];
+const volume={KHR_materials_ior:{ior:1.5},KHR_materials_volume:{thicknessFactor:0.1,attenuationColor:[0.7,0.9,1],attenuationDistance:1}};
+// factors: no maps. four: the usual glass set. eight: the coat and sheen maps as well, the most the tint draw reads here.
+const materials={
+  factors:{count:0,gltf:{pbrMetallicRoughness:{baseColorFactor:[0.9,1,0.9,1],roughnessFactor:0.2,metallicFactor:0},extensions:{KHR_materials_transmission:{transmissionFactor:0.9},...volume}}},
+  four:{count:4,gltf:{pbrMetallicRoughness:{baseColorTexture:{index:0},metallicRoughnessTexture:{index:1},roughnessFactor:0.5,metallicFactor:0.2},normalTexture:{index:2},
+    extensions:{KHR_materials_transmission:{transmissionFactor:1,transmissionTexture:{index:3}},...volume}}},
+  eight:{count:8,gltf:{pbrMetallicRoughness:{baseColorTexture:{index:0},metallicRoughnessTexture:{index:1},roughnessFactor:0.5,metallicFactor:0.2},normalTexture:{index:2},
+    extensions:{KHR_materials_transmission:{transmissionFactor:1,transmissionTexture:{index:3}},...volume,
+      KHR_materials_clearcoat:{clearcoatFactor:0.5,clearcoatTexture:{index:4},clearcoatRoughnessFactor:0.5,clearcoatRoughnessTexture:{index:5}},
+      KHR_materials_sheen:{sheenColorFactor:[1,1,1],sheenColorTexture:{index:6},sheenRoughnessFactor:0.5,sheenRoughnessTexture:{index:7}}}}},
+};
+// Quads 20 m across, nearest at z = 0, each 0.1 m behind the last, with UVs repeating 8 times.
+function document_(name,layers){
+  const material=materials[name];
+  const positions=new Float32Array([-10,-10,0,10,-10,0,10,10,0,-10,10,0]),normals=new Float32Array([0,0,1,0,0,1,0,0,1,0,0,1]),
+    uvs=new Float32Array([0,8,8,8,8,0,0,0]),indices=new Uint16Array([0,1,2,0,2,3]);
+  const parts=[positions,normals,uvs,indices],offsets=[];let size=0;for(const p of parts){offsets.push(size);size+=p.byteLength;}
+  const bytes=new Uint8Array(size);parts.forEach((p,i)=>bytes.set(new Uint8Array(p.buffer),offsets[i]));
+  const count=material.count,nodes=Array.from({length:layers},(_,i)=>({mesh:0,translation:[0,0,-0.1*i]}));
+  return {doc:{asset:{version:'2.0'},scene:0,scenes:[{nodes:nodes.map((_,i)=>i)}],nodes,materials:[material.gltf],extensionsUsed:Object.keys(material.gltf.extensions),
+    meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1,TEXCOORD_0:2},indices:3,material:0}]}],buffers:[{byteLength:size}],
+    bufferViews:parts.map((p,i)=>({buffer:0,byteOffset:offsets[i],byteLength:p.byteLength,target:i<3?34962:34963})),
+    accessors:[{bufferView:0,componentType:5126,count:4,type:'VEC3',min:[-10,-10,0],max:[10,10,0]},{bufferView:1,componentType:5126,count:4,type:'VEC3'},{bufferView:2,componentType:5126,count:4,type:'VEC2'},{bufferView:3,componentType:5123,count:6,type:'SCALAR'}],
+    ...(count?{images:maps.slice(0,count).map(()=>({mimeType:'image/png'})),samplers:[{magFilter:9729,minFilter:9987,wrapS:10497,wrapT:10497}],textures:maps.slice(0,count).map((_,i)=>({source:i,sampler:0}))}:{})},bytes};
+}
+let model=null,stats=null;
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+const median=a=>{const b=[...a].sort((x,y)=>x-y);return +b[b.length>>1].toFixed(3);};
+window.check={
+  async show({material,layers}){
+    model?.dispose();
+    const {doc,bytes}=document_(material,layers);
+    model=parseGLTF(engine,doc,[bytes],await Promise.all(maps.slice(0,materials[material].count).map(m=>createImageBitmap(m))),{materials:extendedMaterials});
+    if(!model.primitives.every(p=>p.material.tint))throw new Error('the glass did not load as transmissive');
+    stats??=Stats.attach(engine,{profiling:true});
+    for(let i=0;i<30;i++)await frame();
+    return errors.splice(0);
+  },
+  // Batches of 15 frames in flight, so the GPU stays busy and at its working clock. Median GPU pass time of the last frame
+  // of each batch, and the median time a frame took across a batch.
+  async measure(frames){
+    const gpu=[],times=[];
+    for(let i=0;i<frames;i+=15){
+      const t=performance.now();for(let k=0;k<15;k++)engine.render();await device.queue.onSubmittedWorkDone();times.push((performance.now()-t)/15);
+      await new Promise(r=>setTimeout(r,5));let sum=0;const ms=stats.gpuPassMilliseconds;for(let k=0;k<stats.gpuPassCount;k++)sum+=ms[k];if(stats.gpuPassCount)gpu.push(sum);
+    }
+    return {gpuMs:gpu.length?median(gpu):null,gpuSamples:gpu.length,frameMs:median(times),errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>
