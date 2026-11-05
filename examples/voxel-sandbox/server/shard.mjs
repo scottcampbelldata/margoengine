@@ -539,8 +539,9 @@ export class PlazaShard {
   }
   // The counts sit beside the world, not in it: `this.world` also goes to the router, and identities need not.
   async #writeState() {
+    const revision = this.#counts?.revision;
     await writeWhole(this.#stateFile, JSON.stringify({ ...this.world, counts: this.#counts?.toJSON() }));
-    this.#counts?.saved();
+    this.#counts?.saved(revision);
   }
   async #loadWorld() {
     const text = await readFile(this.#stateFile, 'utf8').catch((error) => {

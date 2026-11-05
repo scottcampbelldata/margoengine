@@ -157,6 +157,17 @@ test('what state.json keeps brings everything back, and holds no address', () =>
   assert.equal(back.dirty, false);
 });
 
+test('a change that lands while the counts are being written stays to be written', () => {
+  const counts = make();
+  edit(counts, 'a', GEM, 0, OPAL);
+  const writing = counts.revision;
+  edit(counts, 'a', [1, 2, 3], 0, TIN);
+  counts.saved(writing);
+  assert.equal(counts.dirty, true, 'the write held only the first change');
+  counts.saved(counts.revision);
+  assert.equal(counts.dirty, false);
+});
+
 test('200 identities and 50,000 cells go through state.json', () => {
   const counts = make();
   for (let i = 0; i < 50_000; i++) edit(counts, `id${i % 200}`, [i, 5, 5], 0, TIN);

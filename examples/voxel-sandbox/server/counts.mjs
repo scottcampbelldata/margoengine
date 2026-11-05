@@ -21,6 +21,7 @@ export class PlazaCounts {
   #changed = new Set();
   #foundMoved = false;
   #dirty = false; // anything to write to state.json
+  #revision = 0; // goes up with every change, so a write can say which changes it holds
   #found = 0;
   /** @type {Map<string, Uint16Array>} */
   #inventory = new Map();
@@ -61,9 +62,13 @@ export class PlazaCounts {
   get dirty() {
     return this.#dirty;
   }
-  /** Says that what {@link PlazaCounts.toJSON} gave is on disk. */
-  saved() {
-    this.#dirty = false;
+  /** Names the changes {@link PlazaCounts.toJSON} gives now, for {@link PlazaCounts.saved}. */
+  get revision() {
+    return this.#revision;
+  }
+  /** Says that `revision` is on disk. A change that landed while it was being written stays to be written. */
+  saved(revision) {
+    if (revision === this.#revision) this.#dirty = false;
   }
   /** What `identity` holds, in the order of `COUNTED_BLOCKS`: a copy. */
   countsOf(identity) {
@@ -173,5 +178,6 @@ export class PlazaCounts {
     counts[slot] = Math.min(MAX_COUNT, counts[slot] + by);
     this.#changed.add(identity);
     this.#dirty = true;
+    this.#revision++;
   }
 }
