@@ -472,6 +472,8 @@ does not own. Each entry says exactly what is needed to close it.
   translucent panes in the other order differ by up to 132 of 255 (`swapped layer order` step), and the mesh arrival
   order step stays a pixel comparison with that tolerance only. The check's output prints the exact count next to the
   tolerant one, and `--repeat` reports both (it still fails on any exact difference: it is the repro).
+- **Recheck (2026-11-05, RTX A6000, driver 32.0.16.1742, Edge 156.0.4314.58):** `scripts/msaa-blend-repeat-check.mjs`
+  still has 29 of 30 frames differing with no Margo code, and 0 of 30 with `--mask=7`. Nothing new to fix in Margo.
 - **Needed to close:** the plain-WebGPU page sent to NVIDIA (it repeats on no other GPU tested) and the recorded voxel
   frame with its replay page sent to Intel (Scott decides both), and their fixes or explanations recorded here; then
   the voxel tolerance can go (the Arc's 9 of 255 is over it, so the voxel checks can fail now and then on that laptop,
