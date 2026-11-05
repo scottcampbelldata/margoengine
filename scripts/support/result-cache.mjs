@@ -10,11 +10,11 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import {
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
-  renameSync,
   rmSync,
   statSync,
   utimesSync,
@@ -480,7 +480,11 @@ function lockHolds(text, repository) {
   return Boolean(entry) && (entry.version ?? '') === head.slice(at + 1) && (entry.integrity ?? '') === integrity;
 }
 
-/** The on-disk store. Writes go through a temp name and a rename, so a concurrent reader never sees half an entry. */
+/**
+ * The on-disk store. Writes go through a temp name and a hard link, so a concurrent reader never sees half an entry. A
+ * key names exact inputs, so two runs writing one key hold the same answer: the first stays. Replacing it instead fails
+ * on Windows (EPERM) while another run touches the file, and ended verify when two ran at once.
+ */
 export class ResultStore {
   constructor(dir = defaultStoreDir(), { capBytes = CAP_BYTES } = {}) {
     this.dir = dir;
@@ -493,7 +497,15 @@ export class ResultStore {
   #atomicWrite(file, bytes) {
     const temporary = `${file}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
     writeFileSync(temporary, bytes);
-    renameSync(temporary, file);
+    try {
+      linkSync(temporary, file);
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      const now = new Date();
+      utimesSync(file, now, now);
+    } finally {
+      rmSync(temporary, { force: true });
+    }
   }
   /** A stored pass for this exact key, or undefined. A poisoned key is never returned. */
   get(step, key) {

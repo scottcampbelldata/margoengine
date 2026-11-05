@@ -266,6 +266,15 @@ test('a failure is never stored', (t) => {
   assert.throws(() => store.put({ step: 'step', key: 'k', passed: false }), /only a first-try pass/);
 });
 
+test('a second write of one key keeps the first entry and leaves no temp file', (t) => {
+  const store = new ResultStore(join(temp(t), 'store'));
+  assert.equal(store.put({ step: 'step', key: 'k', passed: true, run: 'first' }), true);
+  assert.equal(store.put({ step: 'step', key: 'k', passed: true, run: 'second' }), true);
+  assert.equal(store.get('step', 'k').run, 'first');
+  const folders = readdirSync(join(store.dir, 'steps'));
+  assert.deepEqual(readdirSync(join(store.dir, 'steps', folders[0])), ['k.json']);
+});
+
 test('a pass is stored, the next run would hit it, and the step still ran', (t) => {
   const { root, repository } = fixture(t);
   repository.tracked.add('step.mjs');
