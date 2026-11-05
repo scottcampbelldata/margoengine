@@ -305,9 +305,16 @@ type PassContext = {
     gl: WebGL2RenderingContext;
 });
 
+interface RenderTarget {
+    format: GPUTextureFormat;
+    depthFormat: GPUTextureFormat;
+    samples: number;
+}
+
 interface Renderer {
     readonly backend: 'webgpu' | 'webgl2';
     readonly gpu?: GPUDevice;
+    readonly target?: RenderTarget;
     onLost?: (error: Error) => void;
     add(geometry: Geometry, capacity: number): void;
     remove(geometry: Geometry): void;

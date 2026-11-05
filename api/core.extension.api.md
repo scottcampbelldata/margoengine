@@ -86,6 +86,7 @@ export class Engine {
     private constructor();
     rebootDevice(): Promise<void>;
     get backend(): 'webgpu' | 'webgl2';
+    get renderTarget(): RenderTarget | null;
     get gpu(): GPUDevice | null;
     geometryBuffers(geometry: Geometry): GeometryBuffers | null;
     hasPlugin(name: string): boolean;
@@ -279,6 +280,7 @@ export interface RenderView {
 export interface Renderer {
     readonly backend: 'webgpu' | 'webgl2';
     readonly gpu?: GPUDevice;
+    readonly target?: RenderTarget;
     onLost?: (error: Error) => void;
     add(geometry: Geometry, capacity: number): void;
     remove(geometry: Geometry): void;
@@ -447,6 +449,12 @@ interface PbrMaterialOptions {
     roughness?: number;
     metalness?: number;
     doubleSided?: boolean;
+}
+
+interface RenderTarget {
+    format: GPUTextureFormat;
+    depthFormat: GPUTextureFormat;
+    samples: number;
 }
 
 interface Scene {

@@ -1385,6 +1385,8 @@ function textureGroup(
 }
 interface DrawScratch {
   context?: Context;
+  /** Set by `PBRModel.compile`: derivations stop at the pipeline and compile it here, by key, off the frame. */
+  compiling?: Map<string, Promise<unknown>>;
   /** A batch's member matrices, tints (folded batches) and uniform values (draw-batch.ts). */
   matrices: ArrayLike<number>[];
   tints: ArrayLike<number>[];
@@ -2723,6 +2725,69 @@ export class PBRModel implements EnginePlugin {
     this.gpuCache.delete(key);
     this.textures.splice(this.textures.indexOf(texture), 1);
     dropTexture(device, texture);
+  }
+  /**
+   * Compiles the render pipelines of this model's beauty draws without blocking, so its first frame finds them ready.
+   * Call it once the scene's lights and effects are set: a change that alters a shader afterwards compiles on the draw
+   * as before, so calling this is never needed for correctness. Off WebGPU it does nothing. Pipelines of batched
+   * textureless meshes compile on their first draw. Rejects with the GPU's error if a pipeline fails.
+   */
+  async compile(): Promise<void> {
+    if (this.disposed) throw margoError('disposed', 'PBRModel is disposed; load the model again');
+    const target = this.engine.renderTarget,
+      device = this.engine.gpu;
+    if (!target || !device) return;
+    const c = {
+        device,
+        format: target.format,
+        descriptor: { multisample: { count: target.samples }, depthStencil: { format: target.depthFormat } },
+      } as unknown as Context,
+      compiling = new Map<string, Promise<unknown>>(),
+      scratch = createDrawScratch(undefined!, undefined!),
+      draws = deviceDraws(device),
+      frame = drawFrame(
+        undefined,
+        'beauty',
+        undefined,
+        c,
+        undefined,
+        this.transparency,
+        this.capture,
+        this.asset.hooks.materials,
+        this.lightingList,
+      );
+    scratch.compiling = compiling;
+    scratch.context = c;
+    for (const r of this.resources) {
+      const p = r.primitive,
+        m = p.material;
+      if (p.topology || r.batch || r.mergedInto) continue;
+      if ((this.transparency && separable(m)) || (this.transmission && transmits(m))) continue;
+      if (!p.instances && !p.deformed && !m.shading?.replacesTextures && !m.maps.some(Boolean)) continue;
+      p.node.check();
+      const a = p.node.matrix,
+        det =
+          a[0] * (a[5] * a[10] - a[6] * a[9]) -
+          a[4] * (a[1] * a[10] - a[2] * a[9]) +
+          a[8] * (a[1] * a[6] - a[2] * a[5]);
+      if (det === 0 || !Number.isFinite(det)) continue;
+      const wireframe = wireframeIndices(r);
+      this.derive(
+        undefined,
+        frame,
+        draws,
+        c,
+        'beauty',
+        scratch,
+        r,
+        wireframe ? 'line-list' : undefined,
+        wireframe,
+        Math.sign(det),
+        undefined,
+        p.instances,
+      );
+    }
+    await Promise.all(compiling.values());
   }
   /** Borrow a decoded image for optional material packages; the model owns its lifetime. */
   image(index: number): Exclude<GLTFImage, undefined> {
@@ -4404,14 +4469,28 @@ export class PBRModel implements EnginePlugin {
             (mode === 'beauty' || through || capture ? 'greater-equal' : 'equal'),
         },
       };
-      pipeline = c.device.createRenderPipeline(descriptor);
-      if (draws.pipelines.size >= 4096) draws.pipelines.clear();
-      draws.pipelines.set(key, pipeline);
-      const view = code.includes('margoView.');
-      if (view) viewPipelines.add(pipeline);
+      const view = code.includes('margoView.'),
+        hold = (name: string, made: GPURenderPipeline) => {
+          if (draws.pipelines.size >= 4096) draws.pipelines.clear();
+          draws.pipelines.set(name, made);
+          if (view) viewPipelines.add(made);
+          return made;
+        },
+        // Off the frame (`compile`): a draw that reached this key first keeps its own pipeline.
+        later = (name: string, wanted: GPURenderPipelineDescriptor) => {
+          if (!scratch.compiling!.has(name))
+            scratch.compiling!.set(
+              name,
+              c.device.createRenderPipelineAsync(wanted).then((made) => {
+                if (!draws.pipelines.has(name)) hold(name, made);
+              }),
+            );
+        };
+      if (scratch.compiling) later(key, descriptor);
+      else pipeline = hold(key, c.device.createRenderPipeline(descriptor));
       // Transmission's first draw: what is behind times the tint (no blend constant, see below).
       if (tinted) {
-        const tint = c.device.createRenderPipeline({
+        const wanted: GPURenderPipelineDescriptor = {
           ...descriptor,
           // The tint only reads depth and stencil; the lit draw performs each requested write once.
           depthStencil: {
@@ -4435,11 +4514,12 @@ export class PBRModel implements EnginePlugin {
               },
             ],
           },
-        });
-        draws.pipelines.set(key + ':tint', tint);
-        if (view) viewPipelines.add(tint);
+        };
+        if (scratch.compiling) later(key + ':tint', wanted);
+        else hold(key + ':tint', c.device.createRenderPipeline(wanted));
       }
     }
+    if (scratch.compiling) return undefined!;
     const effectBindings = !!shading || (lit && ((lighting && this.lighting.size > 0) || through));
     const effect =
       effectBindings && build

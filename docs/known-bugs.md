@@ -663,19 +663,17 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 - **Plan:** the LUT depends only on its size and sample count: share one per device (counted, freed with the last
   environment). Then time the passes to state the rest as an accepted difference with its parts.
 
-### First frame of 100 morphed copies is still slower than three's WebGL backend
+### Build plus first frame of 100 morphed copies is still slower than three's WebGL backend
 
-- **What:** `p-morph`'s first frame is 133 to 187 ms (build 61 to 76) against three's WebGL 25 to 48 (build 21 to 32); it
-  is now faster than three's WebGPU backend (189 to 379). Busy-machine diagnostic runs `20261105-183112` and
-  `20261105-183306`, RTX A6000, not gated: entry 49 of perf-history.md.
-- **Cause (measured by waiting on the queue after each build stage):** one-off WebGPU work that does not grow with the
-  copies: 58 ms for the first load (mip pipelines and the 1024 x 1024 mip chain), 31 ms for the deformation buffers
-  (25 MB written, the bind-pose vertices once per copy, and the compute pipeline), 60 ms for the frame itself, 10 of it
-  on the CPU and the rest the render pipeline's compile.
-- **Plan:** (1) share the bind-pose block between copies in `DeformArena`, as the morph deltas are. (2) Compile the
-  render pipeline while the model loads: its key needs the target format, depth format and sample count, which only the
-  pass context carries, so this needs core to expose them. That is a core change with no engine failure behind it:
-  Scott's call. If neither closes the gap, record what is left as an accepted difference.
+- **What:** with `PBRModel.compile()` (`p-morph-compiled`) the first frame is 17 ms, ahead of three's WebGL 30 and WebGPU
+  194, but only because the compile moved into the build. Build plus first frame is 125 to 143 ms, against 154 for
+  `p-morph` without it, three's WebGL 54 and WebGPU 217. Busy-machine diagnostic runs, RTX A6000, not gated: entry 56 of
+  perf-history.md.
+- **Cause:** one-off WebGPU work that does not grow with the copies: 58 ms for the first load (mip pipelines and the
+  1024 x 1024 mip chain), 31 ms for the deformation buffers (25 MB written, the bind-pose vertices once per copy, and the
+  compute pipeline), and the render pipeline's compile, which overlaps the build by only 11 to 29 ms.
+- **Plan:** share the bind-pose block between copies in `DeformArena`, as the morph deltas are. If that does not close the
+  gap, record what is left as an accepted difference.
 
 ## Fixed 2026-11-05
 

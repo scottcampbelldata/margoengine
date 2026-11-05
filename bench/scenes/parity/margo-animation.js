@@ -118,38 +118,10 @@ export const builders = {
     );
   },
 
-  async 'p-morph'(canvas, data, marks) {
-    const engine = await engineFor(canvas, data.camera, 4096, marks),
-      s = performance.now(),
-      [{ loadGLTF }, { Animation }, { cloneModel }] = await Promise.all([
-        import('@margoengine/gltf-pro'),
-        import('@margoengine/animation'),
-        import('@margoengine/animation/skeleton-utils'),
-      ]);
-    const first = await loadGLTF(engine, data.url),
-      models = [first];
-    for (let i = 1; i < data.n; i++) models.push(await cloneModel(first));
-    const node = first.primitives[0].nodeIndex,
-      targets = first.primitives[0].weights.length;
-    const animations = models.map((m, i) => {
-      m.root.setPosition(morphAt(i));
-      const a = Animation.attach(m);
-      a.playing = false; // weights are set by hand
-      return a;
-    });
-    marks.buildMs = +(performance.now() - s).toFixed(1);
-    return timedApp(
-      engine,
-      data.camera,
-      (t) => {
-        for (let i = 0; i < animations.length; i++)
-          for (let k = 0; k < targets; k++) animations[i].setMorph(node, k, Math.sin(t + i + k) * 0.5 + 0.5);
-      },
-      {
-        note: '100 MorphStressTest (1 load + cloneModel), 5 x 20 grid 4.5 x 1.2 m (spec gives no layout); compute morphs',
-      },
-    );
-  },
+  'p-morph': (canvas, data, marks) => morphCopies(canvas, data, marks, false),
+  // The same scene and work, with the render pipeline compiled during the build (PBRModel.compile), so the build grows
+  // by what the first frame loses: read the two together.
+  'p-morph-compiled': (canvas, data, marks) => morphCopies(canvas, data, marks, true),
 
   async 'p-keyframes'(canvas, data, marks) {
     // One track per node: kind i % 3 (position vec3 linear, rotation quaternion slerp, scale step), 120 keys each.
@@ -245,6 +217,41 @@ export const builders = {
     };
   },
 };
+
+async function morphCopies(canvas, data, marks, compile) {
+  const engine = await engineFor(canvas, data.camera, 4096, marks),
+    s = performance.now(),
+    [{ loadGLTF }, { Animation }, { cloneModel }] = await Promise.all([
+      import('@margoengine/gltf-pro'),
+      import('@margoengine/animation'),
+      import('@margoengine/animation/skeleton-utils'),
+    ]);
+  const first = await loadGLTF(engine, data.url),
+    models = [first],
+    compiled = compile ? first.compile() : undefined;
+  for (let i = 1; i < data.n; i++) models.push(await cloneModel(first));
+  const node = first.primitives[0].nodeIndex,
+    targets = first.primitives[0].weights.length;
+  const animations = models.map((m, i) => {
+    m.root.setPosition(morphAt(i));
+    const a = Animation.attach(m);
+    a.playing = false; // weights are set by hand
+    return a;
+  });
+  await compiled;
+  marks.buildMs = +(performance.now() - s).toFixed(1);
+  return timedApp(
+    engine,
+    data.camera,
+    (t) => {
+      for (let i = 0; i < animations.length; i++)
+        for (let k = 0; k < targets; k++) animations[i].setMorph(node, k, Math.sin(t + i + k) * 0.5 + 0.5);
+    },
+    {
+      note: '100 MorphStressTest (1 load + cloneModel), 5 x 20 grid 4.5 x 1.2 m (spec gives no layout); compute morphs',
+    },
+  );
+}
 
 /** MorphStressTest instance i: 5 columns 4.5 m apart, 20 rows 1.2 m apart (the model is 4 x 1 m). */
 export const morphAt = (i) => [((i % 5) - 2) * 4.5, 0, (Math.floor(i / 5) - 9.5) * 1.2];

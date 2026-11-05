@@ -66,7 +66,7 @@ async function fixture(t) {
     engine.frameGraph.execute(context);
     return passes.filter((p) => p.draws).map((p) => p.draws);
   };
-  return { engine, doc, buffers, frame };
+  return { engine, doc, buffers, frame, context };
 }
 
 test('consecutive model passes draw as one run; a pass added between them keeps them apart', async (t) => {
@@ -274,4 +274,68 @@ test('copies of one image share its GPU texture, freed with the last holder', as
   d.dispose();
   e.dispose();
   assert.equal(made[1].gone, true);
+});
+
+test('compile() builds first-frame pipelines off the frame, and a draw it did not foresee still compiles', async (t) => {
+  // p-morph: the first frame blocked about 80 ms on its render pipeline, with nothing else to overlap it.
+  const f = await fixture(t),
+    device = f.engine.gpu,
+    sync = [],
+    later = [],
+    create = device.createRenderPipeline;
+  device.createRenderPipeline = (d) => {
+    if (d.vertex.buffers?.[0]?.arrayStride === 80) sync.push(d);
+    return create.call(device, d);
+  };
+  device.createRenderPipelineAsync = async (d) => {
+    later.push(d);
+    return create.call(device, d);
+  };
+  device.queue.copyExternalImageToTexture ??= () => {};
+  const encoder = device.createCommandEncoder;
+  device.createCommandEncoder = (d) => {
+    const e = encoder.call(device, d);
+    e.beginRenderPass ??= () => ({ setPipeline() {}, setBindGroup() {}, draw() {}, end() {} });
+    return e;
+  };
+  const doc = structuredClone(f.doc),
+    buffers = [...f.buffers, new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])];
+  doc.buffers.push({ byteLength: 32 });
+  doc.bufferViews.push({ buffer: 3, byteLength: 32 });
+  doc.accessors.push({ bufferView: 3, componentType: 5126, count: 4, type: 'VEC2' });
+  doc.meshes[0].primitives[0].attributes.TEXCOORD_0 = 3;
+  doc.images = [{ uri: 'unused.png' }];
+  doc.textures = [{ source: 0 }];
+  doc.materials = [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }];
+  const a = parseGLTF(f.engine, doc, buffers, [{ width: 4, height: 4, close() {} }]);
+  if (f.engine.plugins.get(a.name) !== a) f.engine.use(a);
+
+  // No target to compile for (off WebGPU): nothing happens and the draw compiles as ever.
+  await a.compile();
+  assert.equal(later.length, 0);
+
+  const renderer = f.engine['renderer'];
+  renderer.target = {
+    format: f.context.format,
+    depthFormat: f.context.descriptor.depthStencil.format,
+    samples: f.context.descriptor.multisample.count,
+  };
+  await Promise.all([a.compile(), new PBRModel(f.engine, a.asset, a.shareImages()).compile()]);
+  assert.ok(later.length >= 1, 'compiled off the frame');
+  const compiled = later.length;
+  f.frame();
+  assert.equal(sync.length, 0, 'the first frame found its pipeline ready');
+  await a.compile();
+  assert.equal(later.length, compiled, 'a ready pipeline is not compiled again');
+
+  // A pipeline compile() did not foresee (here another target) is compiled by the draw, as it always was.
+  renderer.target = { ...renderer.target, samples: renderer.target.samples === 1 ? 4 : 1 };
+  doc.materials[0].doubleSided = true;
+  const unforeseen = parseGLTF(f.engine, doc, buffers, [{ width: 4, height: 4, close() {} }]);
+  if (f.engine.plugins.get(unforeseen.name) !== unforeseen) f.engine.use(unforeseen);
+  await unforeseen.compile();
+  f.frame();
+  assert.equal(sync.length, 1, 'the draw compiled what it needed');
+  a.dispose();
+  await assert.rejects(a.compile(), (error) => error.code === 'disposed');
 });

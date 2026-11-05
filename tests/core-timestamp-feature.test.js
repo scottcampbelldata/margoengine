@@ -168,6 +168,23 @@ test('EngineOptions.powerPreference reaches requestAdapter on every OS and again
     }
 });
 
+test('Engine.renderTarget names what a pipeline must match, after a device restore too', async (t) => {
+  const dom = new JSDOM('<body></body>');
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  t.after(() => dom.window.close());
+  const h = harness(t, []),
+    engine = await EngineKernel.create(h.canvas, { capacity: 1, backend: 'webgpu' });
+  try {
+    const expected = { format: 'bgra8unorm', depthFormat: 'depth32float', samples: 4 };
+    assert.deepEqual(engine.renderTarget, expected);
+    await engine.rebootDevice();
+    assert.deepEqual(engine.renderTarget, expected);
+  } finally {
+    engine.dispose();
+    h.restore();
+  }
+});
+
 test('renderer preserves the adapter texture-array capability for optional packages', async (t) => {
   for (const maxTextureArrayLayers of [256, 2048]) {
     const h = harness(t, []);

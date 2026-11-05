@@ -303,6 +303,23 @@ engine.use(second);
 `shareImages()` counts the new holder at once: pass the images to `closeImages(images)` if no model ends up holding
 them.
 
+`model.compile()` compiles the model's render pipelines without blocking, so its first frame does not wait for them.
+Call it once the scene's lights and effects are set: anything that changes a shader afterwards compiles on the draw as
+before, so it is never needed for correctness. Start it early and await it late, so the compile overlaps other work. The
+wait moves rather than disappears: `p-morph`'s first frame fell by 83 ms and its build grew by 54 to 72.
+
+```ts
+import {loadGLTF} from 'margoengine/gltf-pro';
+
+const model = await loadGLTF(engine, 'robot.glb');
+const compiled = model.compile();
+// ...build the rest of the scene...
+await compiled;
+```
+
+It does nothing off WebGPU, leaves batched textureless meshes to their first draw, and rejects with the GPU's error if
+a pipeline fails. Copies of a model share pipelines, so one call serves them all.
+
 Optional material packages can borrow decoded images with `model.image(index)`;
 the model retains ownership and closes them when disposed.
 

@@ -2,7 +2,14 @@ import { TransformStore, syncStoredRotation } from './kernel.js';
 import { Camera, type CameraOptions, type Vec3 } from './camera.js';
 import { F32_OVERFLOW, Geometry, PbrMaterial, finite } from './geometry.js';
 import { hypot } from '../../shared/hypot.js';
-import { GPURenderer, type Renderer, type Batch, type GeometryBuffers, type RenderView } from './renderer.js';
+import {
+  GPURenderer,
+  type Renderer,
+  type RenderTarget,
+  type Batch,
+  type GeometryBuffers,
+  type RenderView,
+} from './renderer.js';
 import { FrameGraph, type EnginePlugin } from './plugin.js';
 import { sceneSamples } from './quality.js';
 import { checkLayers, layerRegistry, meshLayers, validateRectangle } from '../../shared/view-rect.js';
@@ -514,6 +521,10 @@ export class Engine {
   }
   get backend(): 'webgpu' | 'webgl2' {
     return this.renderer.backend;
+  }
+  /** The canvas pass's colour format, depth format and sample count, so a package can compile pipelines before the first frame; null off WebGPU. */
+  get renderTarget(): RenderTarget | null {
+    return this.renderer.target ?? null;
   }
   get gpu(): GPUDevice | null {
     return this.renderer.gpu ?? null;

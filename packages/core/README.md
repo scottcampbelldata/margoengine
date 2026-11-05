@@ -150,6 +150,20 @@ const engine = await Engine.create(canvas, { powerPreference: 'low-power' });
 - Chrome and Edge on Windows ignore a set value and log a console warning; choose the GPU per browser in Windows
   Settings > System > Display > Graphics there.
 
+## Compiling pipelines early
+
+`engine.renderTarget` names what a render pipeline must match to draw in the canvas pass: the colour format, the depth
+format and the sample count. An optional package reads it to compile its pipelines before the first frame, as
+`PBRModel.compile()` in `@margoengine/gltf-pro` does. It is `null` off WebGPU, and it follows a restored device.
+
+```ts
+import { Engine } from '@margoengine/core';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const target = engine.renderTarget; // { format, depthFormat, samples }, or null on the WebGL2 preview
+```
+
 ## Ambient RGB
 
 Extension users can tint core's diffuse ambient independently of the directional light:

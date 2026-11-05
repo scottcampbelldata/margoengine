@@ -133,6 +133,12 @@ export interface ViewDraw {
   clear?: { color?: string | false; depth?: boolean };
   target?: { color: GPUTexture; depth?: GPUTexture };
 }
+/** What a render pipeline must match to draw in the canvas pass (`Engine.renderTarget`). */
+export interface RenderTarget {
+  format: GPUTextureFormat;
+  depthFormat: GPUTextureFormat;
+  samples: number;
+}
 /**
  * Backend contract the engine draws through: core's WebGPU renderer, or an `EngineOptions.fallback` such as WebGL2.
  * `add` sizes a geometry's instance storage (`capacity` instances), `render` draws one frame (`delta` in seconds), and
@@ -141,6 +147,8 @@ export interface ViewDraw {
 export interface Renderer {
   readonly backend: 'webgpu' | 'webgl2';
   readonly gpu?: GPUDevice;
+  /** The canvas pass's formats and sample count; absent off WebGPU. */
+  readonly target?: RenderTarget;
   onLost?: (error: Error) => void;
   add(geometry: Geometry, capacity: number): void;
   remove(geometry: Geometry): void;
@@ -197,6 +205,13 @@ const settle = <T>(
 
 export class GPURenderer implements Renderer {
   onLost?: (error: Error) => void;
+  get target(): RenderTarget {
+    return {
+      format: this.format,
+      depthFormat: this.descriptor.depthStencil!.format,
+      samples: this.descriptor.multisample!.count!,
+    };
+  }
   get gpu(): GPUDevice {
     return this.device;
   }

@@ -1144,6 +1144,18 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
         camera: orbit(20, 8, 200),
       }),
     },
+    'p-morph-compiled': {
+      area: 'animation',
+      rows: ['12.5'],
+      title: 'Morph targets, pipeline compiled during the build',
+      draws: 'p-morph with PBRModel.compile() called during the build. Margo only: read build and first frame together.',
+      params: {},
+      data: (p, { assets }) => ({
+        url: `${assets}khronos/MorphStressTest/MorphStressTest.glb`,
+        n: 100,
+        camera: orbit(20, 8, 200),
+      }),
+    },
     'p-keyframes': {
       area: 'animation',
       kind: 'task',
@@ -1683,7 +1695,7 @@ export const ROWS = {
   '12.2': { scenes: ['p-crossfade'] },
   '12.3': { scenes: ['p-mixer'] },
   '12.4': { none: 'no three.js equivalent (three.js has no built-in vertex animation textures)', noEquivalent: true },
-  '12.5': { scenes: ['p-morph'] },
+  '12.5': { scenes: ['p-morph', 'p-morph-compiled'] },
   '12.6': { scenes: ['p-keyframes'] },
   '12.7': { scenes: ['p-skeleton-clone'] },
   '12.8': { scenes: ['p-ik'] },

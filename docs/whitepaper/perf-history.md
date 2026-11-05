@@ -1371,7 +1371,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   | Textures made | 700 | 7 | | |
 
   Margo is now faster than three's WebGPU backend on the first frame and still slower than its WebGL backend; what is
-  left, and its plan, is in [known-bugs.md](../known-bugs.md#first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend).
+  left, and its plan, is in [known-bugs.md](../known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend).
 - **Rerun:** `node bench/cli.mjs parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5
   --warmup=1 --no-compare --no-fail`.
 - **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, `packages/animation/tests/clone.test.js`.
@@ -1501,6 +1501,29 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Limit:** `#private` fields must be declared, so a bare one still starts as `undefined`. None was measured.
 - **Guard:** `tests/class-fields.test.js`.
 
+### 56. `p-morph`'s render pipeline, compiled during the build
+
+- **Loss:** after entry 49 the first frame still blocked on its render pipeline, and its key needs the target formats and
+  sample count, which only the pass context carried.
+- **Fix:** core gained one read-only getter, `Engine.renderTarget` (Scott's exception to the core rule, 2026-11-05; 44 B
+  gzip), and gltf-pro gained `PBRModel.compile()`, which runs the draw's own derivation and compiles with
+  `createRenderPipelineAsync`. The draw then finds the same pipeline under the same key, so nothing it draws changes.
+  It is opt-in: compiling at every load would compile twice in any scene that adds lights or effects after loading.
+- **Result (RTX A6000, Edge, other sessions running, so diagnostic and not gated):**
+
+  | | `p-morph` | `p-morph-compiled` | three WebGPU | three WebGL |
+  | --- | --- | --- | --- | --- |
+  | First frame ms | 100 | 17 | 194 | 30 |
+  | Build ms | 54 | 108 to 126 | 23 | 24 |
+  | Build plus first frame ms | 154 | 125 to 143 | 217 | 54 |
+
+  The first frame now beats both three backends, but most of that is the wait moving into the build: the real saving is
+  11 to 29 ms of overlap. Margo still trails three's WebGL on the two together. `p-morph` is unchanged and
+  `p-morph-compiled` sits beside it, Margo only: three's matching call, `compileAsync`, is not in its scene.
+- **Rerun:** `node bench/cli.mjs parity --cases=p-morph --engines=margo --runs=5 --warmup=1 --no-compare --no-fail`
+  (the case name also selects `p-morph-compiled`).
+- **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, `tests/core-timestamp-feature.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1546,6 +1569,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 5. Kernel snapshot compare (entry 8): before and after with the machine and a committed result.
 6. three.js `InstancedMesh` against Margo instanced (open loss): a quiet run once the fix lands.
 7. Galaxy S23 Ultra island (open loss): an after number, which needs the device.
-8. `p-morph` first frame (entry 49): a quiet run.
+8. `p-morph` first frame (entries 49 and 56): a quiet run.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

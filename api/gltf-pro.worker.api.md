@@ -219,6 +219,7 @@ interface DrawResource {
 
 interface DrawScratch {
     context?: Context;
+    compiling?: Map<string, Promise<unknown>>;
     matrices: ArrayLike<number>[];
     tints: ArrayLike<number>[];
     blocks: Float32Array[];
@@ -869,6 +870,7 @@ class PBRModel implements EnginePlugin {
     }): void;
     registerPasses(graph: FrameGraph): void;
     shareImages(): GLTFImage[];
+    compile(): Promise<void>;
     image(index: number): Exclude<GLTFImage, undefined>;
     uploadImage(index: number, device: GPUDevice, srgb?: boolean): GPUTexture;
     addLighting(effect: LightingEffect): () => void;
