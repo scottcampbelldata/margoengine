@@ -270,6 +270,9 @@ export class BiomeWorld implements Disposable {
     )
       throw rangeError('BiomeWorld workers must be an integer 0..16 or false', 'biomes');
     this.#gpu = gpu?.GpuTiles.of(options, size, regionResolution, tileSize / resolution); // float division: exact
+    // Backend 'gpu' also places objects and routes hydrology on the device; 'auto' keeps those on the CPU, since
+    // neither has a per-tile CPU fallback.
+    if (this.#gpu && backend === 'gpu') worldGPU.set(this, { device: this.#gpu.device, signal: this.#gpu.signal });
     if (typeof ecotone !== 'number' || !(ecotone >= 0 && ecotone <= 128))
       throw rangeError('BiomeWorld ecotone must be a number of metres, 0..128 (0 keeps painted edges hard)', 'biomes');
     if (!Number.isInteger(cache) || cache < 1 || cache > 4096)

@@ -97,6 +97,11 @@ export class GpuTiles {
     return new GpuTiles(device, cells, corners, !gpu);
   }
 
+  /** Aborted once the device is lost (after {@link GpuTiles.watch}) or these tiles are disposed. */
+  get signal(): AbortSignal {
+    return this.#abort.signal;
+  }
+
   /** Starts watching for device loss (one reaction per device, shared by its worlds). */
   watch(): void {
     let state = deviceLoss.get(this.device);
