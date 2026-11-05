@@ -177,16 +177,6 @@ does not own. Each entry says exactly what is needed to close it.
   `--msaa` passes there. Two views still stream tiles into different pages, so a fixed cull order makes each view
   steady, and two views can still differ at 4x MSAA.
 
-### gltf-pro's native coat and sheen lobes ignore shadows
-
-- **What:** `layers()` adds the coat's and the sheen's sun lobes after the shadow hook has wrapped `direct`, so a coated
-  physical surface in full shadow keeps a sun highlight. `install(model)` shadows its coat (`margoDirectVisible`).
-- **Repro:** a physical `KHR_materials_clearcoat` material through `loadGLTF`, in the shadow of another mesh, with
-  `Shadows` attached: the highlight stays.
-- **Cause:** `layers` in `packages/gltf-pro/src/shader.ts` reads `f.light` and `f.radiance` with no visibility. The fix is
-  `margoDirectVisible` there too; it makes every physical shader evaluate the shadow where `shadowLit` now skips unlit
-  fragments, so its cost has to be measured first. Found by code reading (2026-11-05), not yet measured.
-
 ### Native glass on a display-encoded target adds its lit draw in encoded values
 
 - **What:** without an HDR scene target (`f.settings.w` below 0.5), the lit draw of gltf-pro's native glass blends over

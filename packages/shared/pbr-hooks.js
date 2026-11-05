@@ -43,10 +43,17 @@ function composeLightPBR(code, hooks, cache) {
   const layered = code.includes('fn margoAmbientLayers(');
   if (hooks.direct) {
     // A coat lights its lobe through the same visibility, evaluated once. `direct` hooks scale the light they wrap.
-    if (code.includes(directVisibility)) {
-      edit('var color=', () => `margoDirectVisible=${hooks.direct('vec3f(1)')};\n  var color=`);
+    const wrapped = hooks.direct('direct');
+    if (code.includes(directVisibility) && wrapped !== 'direct') {
+      const light = code.includes('fn margoLit(') ? 'margoLit(s,l,direct)' : 'vec3f(1)';
+      // A block's own `direct` is what the hook wrote about. In front of the ambient hook's statement as well, so the
+      // text is the same in either order.
+      edit(
+        /(?:let margoAmbient=[^;]*;)?var color=/,
+        (sum) => `{let direct=${light};margoDirectVisible=${wrapped};}\n  ${sum}`,
+      );
       edit('direct+ambient(s)', 'direct*margoDirectVisible+ambient(s)');
-    } else edit('direct+ambient(s)', hooks.direct('direct') + '+ambient(s)');
+    } else edit('direct+ambient(s)', wrapped + '+ambient(s)');
   }
   if (hooks.light) {
     if (layered) {

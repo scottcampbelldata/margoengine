@@ -326,6 +326,44 @@ export async function clearcoatBrowserChecks(page) {
         near(centre(glowCoat.linear), 0.5 * 0.96, 'Emission under the coat');
         near(centre(glowOblique.linear), 0.5 * grazing, 'Emission under the coat at n.v 0.25');
         glow.destroy();
+        // Native coat and sheen lobes are sunlight too: with no ambient light a `direct` hook scales the whole pixel, so
+        // full shadow leaves nothing and half shadow half. The light faces the quad, so the lobes are at their brightest.
+        const sheened = structuredClone(doc);
+        sheened.extensionsUsed = ['KHR_materials_clearcoat', 'KHR_materials_sheen'];
+        sheened.materials[0].extensions = {
+          KHR_materials_clearcoat: { clearcoatFactor: 1, clearcoatRoughnessFactor: 0.05 },
+          KHR_materials_sheen: { sheenColorFactor: [1, 1, 1], sheenRoughnessFactor: 0.5 },
+        };
+        const { extendedMaterials } = await import('/packages/gltf-pro/dist/extended.js');
+        const native = parseGLTF(
+          engine,
+          sheened,
+          buffers.map((buffer) => new Uint8Array(buffer)),
+          [],
+          { materials: extendedMaterials },
+        );
+        assert(native.primitives[0].material.physical, 'The native check must draw the physical shader');
+        const hooked = async (scale, extension) => {
+          const remove = native.addLighting({
+            pbr: () => ({ declarations: '', direct: (light) => `${light}*${scale}` }),
+            bindings() {
+              return [];
+            },
+          });
+          const result = await render(extension, native);
+          remove();
+          return centre(result.linear);
+        };
+        const open = centre((await render(undefined, native)).linear);
+        assert(open > 0.01, `No sunlight to shadow: ${open}`);
+        assert((await hooked('0.0')) === 0, 'Native coat and sheen lobes stayed lit in full shadow');
+        near(await hooked('0.5'), open * 0.5, 'Native coat and sheen lobes in half shadow');
+        // The install coat on a physical shader shares the native one's visibility, in one declaration.
+        assert(
+          (await hooked('0.0', materials.clearcoat({ factor: 1, roughnessFactor: 0.05 }))) === 0,
+          'The install coat on a physical material stayed lit in full shadow',
+        );
+        native.destroy();
         engine.lighting.radiance.set([1, 1, 1, 0.03]);
         removeLighting();
 

@@ -219,7 +219,10 @@ function coatLayer(code: string): string {
   // Ambient 0.5 and the hemisphere are the native layers' own, written so that lightPBR can replace them.
   if (!code.includes('fn margoCoatAmbient('))
     code += `\nfn margoCoatAmbient(s:Surface,v:vec3f)->vec3f {return 0.5*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.cn.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}\n`;
-  return `${directVisibility}\n${code}`;
+  // A physical shader declares it already, and its margoLit knows only the native coat: this one has light of its own.
+  return code.includes(directVisibility)
+    ? code.replace(/fn margoLit\([^}]*\}/, 'fn margoLit(s:Surface,l:vec3f,direct:vec3f)->vec3f {return vec3f(1);}')
+    : `${directVisibility}\n${code}`;
 }
 
 /** `under`, an expression of ambient light, as the coat layer of `extension` leaves it. */

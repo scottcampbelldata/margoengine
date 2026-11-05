@@ -1,4 +1,5 @@
 import { margoError } from '../../shared/errors.js';
+import { directVisibility } from '../../shared/pbr-hooks.js';
 import { neutralShader } from '../../shared/display.js';
 import { transmittedDiffuse } from '../../shared/pbr-transmission.js';
 import { cotangentFrameShader } from '../../shared/tangent-frame.js';
@@ -469,7 +470,7 @@ const physicalEdits = (sample: (name: string) => string, bindings: string): [str
   ['return ((1-fresnel)*(1-s.metal)', 'return ((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)'],
   [
     '@fragment fn fragment(',
-    `${dielectricFresnelWGSL}fn ggx(n:vec3f,v:vec3f,l:vec3f,r:f32)->f32 {
+    `${directVisibility}\n${dielectricFresnelWGSL}fn ggx(n:vec3f,v:vec3f,l:vec3f,r:f32)->f32 {
   let h=normalize(v+l); let nl=clamp(dot(n,l),0.0,1.0); let nv=clamp(dot(n,v),0.0001,1.0); let nh=clamp(dot(n,h),0.0,1.0);
   let a2=pow(r,4.0); let d=${ggxD}; let g=${smithG};
   return d*g/max(4*nl*nv,0.0001)*nl;
@@ -479,8 +480,12 @@ fn margoLayerSky(s:Surface)->vec3f {return mix(vec3f(0.35,0.3,0.25),vec3f(1),cla
 // environment replace them (PBRHooks coat and sheen), the defaults are the hemisphere.
 fn margoCoatAmbient(s:Surface,v:vec3f)->vec3f {return 0.5*margoLayerSky(s);}
 ${sheenBrdfWGSL('margoSheenBRDF')}${sheenAlbedoWGSL('margoSheenAlbedo')}fn margoSheenAmbient(s:Surface,v:vec3f)->vec3f {return margoSheenAlbedo(clamp(dot(s.n,v),0.0001,1.0),s.sh.w)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}
+// What the direct hook is asked about: the base's light, or a coat or sheen lobe with light of its own. Fragments with
+// none of these stay zero, so a shadow hook skips them as it does on any other shader.
+fn margoLit(s:Surface,l:vec3f,direct:vec3f)->vec3f {return vec3f(select(0.0,1.0,any(direct!=vec3f(0))||(f.light.w>0.0&&((s.cc>0.0&&dot(s.cn,l)>0.0)||(any(s.sh.rgb>vec3f(0))&&dot(s.n,l)>0.0)))));}
 fn layers(s:Surface,v:vec3f,l:vec3f,under:vec3f)->vec3f {
-  let light=f.radiance.rgb*f.light.w;
+  // Both lobes are sunlight, so a shadow takes them with the base's direct light.
+  let light=f.radiance.rgb*f.light.w*margoDirectVisible;
   // Sheen (KHR_materials_sheen) lies on the base surface, so it uses s.n. \`under\` holds direct and ambient light
   // together, so it is scaled once by the view albedo, 1 - max(sheen colour) E(n.v) (the spec's ambient form); black
   // sheen leaves it exactly as it was and adds zero.

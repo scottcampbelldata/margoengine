@@ -691,11 +691,9 @@ export async function lobeBrowserChecks(page) {
         );
         const shadowedExtension = materials.materialLobes(all, coat),
           unshadowed = await render(shadowedExtension, { ...black, direction: [0.4, 0.3, 1, 1] });
+        // A `direct` hook, as Shadows uses: the coat adds its light after the sum, so text edits of the sum miss it.
         const removeLighting = model.addLighting({
-          shader(code) {
-            assert(code.includes('direct+ambient(s)'), 'The standard lighting hook changed');
-            return code.replace('direct+ambient(s)', 'direct*0.0+ambient(s)');
-          },
+          pbr: () => ({ declarations: '', direct: (light) => `${light}*0.0` }),
           bindings() {
             return [];
           },

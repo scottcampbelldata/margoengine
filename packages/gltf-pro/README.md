@@ -304,7 +304,12 @@ the share `keep`, the layer's `direct` light adds on top with the same shadow
 visibility, and `(1 - keep) * margoCoatAmbient(s, v)` adds its ambient light. `normal`
 and `roughness` land in `s.cn` and `s.cr`, which an environment's `coat` hook reads.
 `direct` hooks of lighting effects must scale the light they wrap, since a coated
-shader evaluates them once on `vec3f(1)`. All four fields are WGSL expressions
+shader evaluates them once on `vec3f(1)` and multiplies every sun lobe by the result.
+Native physical materials do the same for their clearcoat and sheen lobes, so a
+shadow removes those highlights with the base's; fragments where nothing is lit
+stay zero, so `Shadows` still skips them. An effect with only a raw `shader` edit of
+`direct+ambient(s)` reaches the base's light and misses these lobes, so a shadowing
+effect uses the `direct` hook. All four fields are WGSL expressions
 evaluated after `wgsl`:
 
 ```ts

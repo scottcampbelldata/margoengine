@@ -291,7 +291,7 @@ test('extended shaders: hook points once, only used features compiled, worst cas
   assert.match(lit, /fn margoAmbientTerm\(i:Out,s:Surface,v:vec3f\)->vec3f \{return iblShade\(/);
   assert.match(
     lit,
-    /let margoAmbient=margoAmbientLayers\(i,s,v\);var color=margoLocal0\(i,margoFront\(s\),v\)\+shadowLit\(direct,i\.position,s\.n\)\+ambient\(s\)\+s\.emissive\+margoAmbient;/,
+    /let margoAmbient=margoAmbientLayers\(i,s,v\);var color=margoLocal0\(i,margoFront\(s\),v\)\+direct\*margoDirectVisible\+ambient\(s\)\+s\.emissive\+margoAmbient;/,
   );
   assert.match(lit, /\nfn margoLocal0\(i:Out,s:Surface,v:vec3f\)->vec3f \{return clusterLighting\(/);
   // The physical variant without transmission keeps the inline hooks (unchanged text, GPU-call proofs).

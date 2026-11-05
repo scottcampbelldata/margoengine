@@ -639,8 +639,13 @@ test('lighting hooks (contract v1): every hook point occurs once in both variant
     assert.equal(compose(order), body, order.join());
   assert.match(
     body,
-    /let margoAmbient=vec3f\(0\.5\)\*s\.occlusion;var color=clusterLighting\([^;]+\)\+shadowLit\(direct,i\.position,s\.n\)\+ambient\(s\)\+s\.emissive\+margoAmbient;\n  color=layers\(s,v,l,color\);/,
+    /let margoAmbient=vec3f\(0\.5\)\*s\.occlusion;var color=clusterLighting\([^;]+\)\+direct\*margoDirectVisible\+ambient\(s\)\+s\.emissive\+margoAmbient;\n  color=layers\(s,v,l,color\);/,
   );
+  // Shadows reach the coat and sheen lobes in layers, and are asked about a fragment only if something there is lit.
+  assert.match(body, /\{let direct=margoLit\(s,l,direct\);margoDirectVisible=shadowLit\(direct,i\.position,s\.n\);\}/);
+  assert.match(body, /fn layers\([^{]*\{[^}]*let light=f\.radiance\.rgb\*f\.light\.w\*margoDirectVisible;/);
+  assert.equal(body.split('shadowLit(').length - 1, 1, 'One shadow lookup in the shader body');
+  assert.match(lightPBR(pbrShader, effects[0]), /shadowLit\(direct,i\.position,s\.n\)\+ambient\(s\)/);
   assert.match(body, /fn ambient\(s:Surface\)->vec3f \{return vec3f\(0\);\}/);
   assert.match(
     body,

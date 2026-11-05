@@ -17,7 +17,10 @@ const code = physicalShader(),
     'layers',
   ],
   frame = { radiance: [1.2, 1, 0.8, 0.6], light: [0, 1, 0, 2.5] },
-  shader = wgslModule(names.map((n) => wgslFunction(code, n)).join('\n'), { f: frame });
+  shader = wgslModule(names.map((n) => wgslFunction(code, n)).join('\n'), {
+    f: frame,
+    margoDirectVisible: [1, 1, 1],
+  });
 const unit = (v) => {
   const l = Math.hypot(...v);
   return v.map((x) => x / l);
