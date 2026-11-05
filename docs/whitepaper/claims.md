@@ -146,6 +146,7 @@ backs them yet:
 | LIM-043 | Baked skin: four joints per vertex, linear blending, Float32 output (docs/limits.md, Geometry) | `packages/geometry/tests/mesh-utils.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 | LIM-044 | Delaunay triangulation: exact predicates, no added points, crossing constraints refused; smallest angle never worse than triangulateShape on the same points (docs/limits.md, Geometry) | `packages/geometry/tests/delaunay.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 | LIM-045 | Line3 and Triangle: segment distance matches a sampled reference on 1,000 seeded pairs (a quarter nearly parallel), closest point never beaten by a grid search on 500 seeded triangles, `intersectsBox` equals polygon clipping on 5,000 seeded pairs, degenerate input gives no NaN (docs/limits.md, Geometry) | `packages/math/test/line3-triangle.test.js` | `npm test --workspace packages/math` | PROVEN | |
+| LIM-046 | Polygon booleans and offsets: every sampled point matches the operation and true distance; no result edges cross, at scales from 2^-500 to 2^500 (docs/limits.md, Geometry) | `packages/geometry/tests/polygon.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 

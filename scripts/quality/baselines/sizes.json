@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4441486,
+  "total": 4448298,
   "history": [
     {
       "date": "2026-10-24",
@@ -1562,6 +1562,12 @@
       "commit": "3730d4921",
       "reason": "New math entries ./line3, ./triangle and ./cylindrical: Line3 segment queries, Triangle with box test, Cylindrical; also exported from the math root. Core and core + stage unchanged.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "3730d4921",
+      "reason": "geometry: new optional entry geometry/polygon",
+      "grew": 1
     }
   ],
   "items": {
@@ -1717,6 +1723,7 @@
     "@margoengine/geometry/flow": 2748,
     "@margoengine/geometry/nurbs": 5307,
     "@margoengine/geometry/optimize": 2409,
+    "@margoengine/geometry/polygon": 6812,
     "@margoengine/geometry/primitives": 4058,
     "@margoengine/geometry/sample": 1980,
     "@margoengine/geometry/shapes": 3840,

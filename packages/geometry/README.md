@@ -56,11 +56,12 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
 | `CurveFlow`, `flowGeometry` from `@margoengine/geometry/flow` |
 | `delaunayTriangulate`, `triangulateConstrained` from `@margoengine/geometry/delaunay` |
+| `polygonUnion`, `polygonDifference`, `polygonIntersection`, `polygonXor`, `polygonOffset`, `polygonStroke`, `polygonArea`, `polygonShapes` from `@margoengine/geometry/polygon` |
 | `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -369,6 +370,56 @@ const solid = extrudeGeometry(new Shape(outline), {depth: 1, triangulate: triang
 - Neither adds points. The smallest angle is the best those points allow, never worse than `triangulateShape` on the same
   points. Many outlines tie: the default triangulator already gives good shapes, so the main gain is keeping every point.
 
+## Polygon booleans and offsets
+
+`@margoengine/geometry/polygon` combines 2D shapes and grows or shrinks them, for floor plans, text outlines, road edges
+and bevels before extrusion.
+
+```ts
+import {Shape, extrudeGeometry} from 'margoengine/geometry';
+import {polygonArea, polygonDifference, polygonOffset, polygonShapes, polygonStroke, polygonUnion} from 'margoengine/geometry/polygon';
+
+const room = [[0, 0], [6, 0], [6, 4], [0, 4]];
+const annexe = [[5, 1], [9, 1], [9, 3], [5, 3]];
+const column = [[2, 1.5], [2.5, 1.5], [2.5, 2], [2, 2]];
+
+// A floor plan: two rooms, less a column. Each result is {contour, holes}.
+const floor = polygonDifference(polygonUnion(room, annexe), column);
+console.log(polygonArea(floor)); // 29.75
+
+// Walls 0.2 thick inside the plan, as a solid.
+const walls = polygonDifference(floor, polygonOffset(floor, -0.2));
+const solid = extrudeGeometry(polygonShapes(walls), {depth: 3, bevelEnabled: false});
+
+// A path around the building with round corners, and a road from a centre line.
+const path = polygonOffset(floor, 1, {join: 'round'});
+const road = polygonStroke([[0, -5], [10, -5], [14, 0]], 3, {join: 'round', cap: 'round'});
+
+// Inputs can be rings, {contour, holes}, Shapes or lists of them.
+const disc = new Shape();
+disc.absarc(0, 0, 2, 0, Math.PI * 2, false);
+const notched = polygonDifference(disc, [[0, -0.5], [3, -0.5], [3, 0.5], [0, 0.5]], {curveSegments: 32});
+```
+
+- `polygonUnion(a, b?, options)`, `polygonDifference(a, b, options)`, `polygonIntersection(a, b, options)` and
+  `polygonXor(a, b, options)` return `Polygon[]`, largest first. Outlines run counter-clockwise and holes clockwise, no
+  two edges cross, regions that meet only at a point are separate polygons, and points on a straight run are dropped.
+  Vertices that did not move come back bit for bit. `polygonUnion(a)` alone cleans one input.
+- Options: `fillRule` and `curveSegments` (points per curve of a `Shape`, default 12). The default fill rule
+  `'positive'` turns outlines and holes the right way first, so ring direction does not matter, and a hole cuts only
+  its own outline. `'nonzero'` and `'evenodd'` keep each ring's direction, for outlines that cross themselves.
+- `polygonOffset(input, distance, options)`: positive grows, negative shrinks. `join` is `'miter'` (default),
+  `'round'` or `'bevel'`. `miterLimit` (default 4) is the longest miter as a multiple of the distance, as in SVG, and
+  longer ones become bevels. `arcTolerance` (default 1/500 of the distance) is the largest gap between a round join and
+  its chords. Corners only need a join on the side that opens up, so an outset keeps inner corners sharp and an inset
+  keeps outer corners sharp. Thin parts vanish, narrow gaps close and holes move the opposite way.
+- `polygonStroke(points, width, options)`: a band around a line of points, which may cross itself. It takes `join`,
+  `miterLimit` and `arcTolerance`, plus `cap` (`'butt'` by default, `'round'`, `'square'`) and `closed`.
+- `polygonArea(polygons)` is the filled area. `polygonShapes(polygons)` gives `Shape`s for `extrudeGeometry` and
+  `shapeGeometry`; `triangulateConstrained(contour, holes)` takes a polygon's rings as they are.
+- All points go onto one grid of about 2^26 steps across the input, so results are exact on that grid at any scale, and
+  edges closer than one step (1.5e-8 of the width) count as touching. Parts thinner than two steps are dropped.
+
 ## Bending along a curve
 
 `@margoengine/geometry/flow` deforms a mesh to follow a curve, or places rigid copies along it: trains on tracks, text
@@ -413,6 +464,7 @@ const {position, tangent, up, side} = flow.getFrame(12.5);
 - **Tested from first principles.** Primitive parameters, defaults, segment clamping, UV conventions and groups are pinned by `tests/primitives.test.js`: closed solids have no boundary edges and face outward, normals are unit length, areas and volumes match the analytic shapes, and recorded counts, areas and volumes hold to 1e-5. Vertex order inside a primitive is not part of the API.
 - **Indices everywhere.** Polyhedra and extrusions are built non-indexed and get sequential indices, so every result has the same shape.
 - **Curves.** `getPoint(t)`, arc-length `getPointAt(u)`, `getPoints`, `getSpacedPoints`, `getLength`, `getLengths`, `getUtoTmapping`, `getTangent(At)` and `computeFrenetFrames(segments, closed)` (parallel transport, with the closing twist spread evenly). Arc length uses 200 chord samples (`arcLengthDivisions`); call `updateArcLengths()` after editing control points. Catmull-Rom accepts `'uniform'` as an alias of `'catmullrom'`.
+- **Polygon booleans.** Every point goes onto an integer grid sized to fit a double's exact products, so no test can round the wrong way. Segments are cut by snap rounding (J. Hobby, 1999): a segment passing through the grid cell of a vertex or crossing bends to its centre, repeated until segments meet only at ends. A plane sweep gives every edge the winding numbers on its two sides, the edges with the result on one side only are walked into rings keeping the result on the left, and rings are cut where they touch themselves. An offset runs the same sweep over the raw offset curve and keeps what it winds around (Chen and McMains, 2005), so short edges and self-overlap need no special cases.
 - **Triangulation.** Ear clipping after D. Eberly, "Triangulation by Ear Clipping" (2002): rings that share sides are merged first, each hole is joined to the outer ring at a shared corner or by a bridge to a mutually visible vertex, and the best-shaped ears are cut first with a grid keeping each ear test local (a 20,000-vertex ring takes tens of milliseconds). A one-point hole becomes an interior vertex. Stuck passes (rounding, self-touching or self-intersecting rings) fall back to splitting along a valid diagonal, so every input terminates. Ring orientation in the input does not matter, and output triangles are always counter-clockwise.
 - **Utilities.** `computeVertexNormals` weights face normals by corner angle. `computeTangents` follows the MikkTSpace recipe (per-triangle UV derivatives projected onto each vertex normal's plane, angle weighted, Gram-Schmidt, `w` from the bitangent). `applyMatrix4` transforms normals by the inverse-transpose; a mirroring matrix also flips the winding and the tangent sign so solids stay outward. `mergeVertices` uses a spatial hash with neighbor-cell lookup. `loopSubdivide` welds positions to find topology, applies Loop's weights with boundary rules, keeps UV seams and recomputes normals.
 - **Pure and SSR safe.** No globals, no GPU, no DOM; every function returns new arrays and leaves its input untouched. `"sideEffects": false` with one module-level export per feature, so bundlers keep only what you import: `boxGeometry` plus `toGeometry` stays under 1.5 kB gzip and under an eighth of the whole package (both enforced by `npm test`).
@@ -464,6 +516,7 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
 - `latheGeometry` makes every normal unit length, including the last profile normal, which the reference fixture leaves unnormalized. Otherwise output matches the reference fixtures.
 - `computeTangents` follows UVs with v up, as the primitives have them. UVs stored v down, as in glTF files, give the opposite `w`; flip v first or negate `w`.
 - By default a shape with collinear points on its outline can leave T-junctions between the extruded caps and walls, because `triangulateShape` drops those points. Pass `triangulate: triangulateConstrained` to keep them.
+- Polygon results are exact on a grid of 2^26 steps across the input, not in doubles: a vertex at a crossing moves by up to half a step, and features under two steps wide are dropped. A round join is a chain of chords, so a rounded outset is up to `arcTolerance` smaller than the true curve.
 - `edgesGeometry` and `wireframe` return index pairs, not a line geometry; core has no line primitive.
 - Core's `Geometry` accepts up to 1,000,000 vertices, so `toGeometry` throws above that.
 
@@ -490,6 +543,9 @@ results. The split tangent tests compare every triangle corner with tangents Ble
 housekeeping tests check baked poses against hand-worked results, stretched and mirrored normals, an identity pose,
 group order, buffer round trips and strip winding. The Delaunay tests check empty circles by brute force, Euler's
 triangle count, grids, circles, collinear runs, coordinates scaled by 2^500 and 2^-1060 giving the same answer, kept
-constraints, holes in any winding or touching the outline, and watertight extrusions.
+constraints, holes in any winding or touching the outline, and watertight extrusions. The polygon tests check every
+operation on random concave outlines point by point and through area identities, that no two result edges cross,
+shared edges, touching corners, gaps from 1e-3 to -1e-7, coordinates scaled by 2^500 and 2^-500, 1,000 overlapping
+triangles, fill rules, offsets and strokes point by point against true distances, and extruded results being closed.
 
 Apache-2.0 licensed.

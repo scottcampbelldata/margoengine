@@ -658,6 +658,10 @@
       "types": "./dist/geometry/delaunay.d.ts",
       "import": "./dist/geometry/delaunay.js"
     },
+    "./geometry/polygon": {
+      "types": "./dist/geometry/polygon.d.ts",
+      "import": "./dist/geometry/polygon.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"

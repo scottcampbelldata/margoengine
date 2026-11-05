@@ -77,6 +77,10 @@
     "./delaunay": {
       "types": "./dist/delaunay.d.ts",
       "import": "./dist/delaunay.js"
+    },
+    "./polygon": {
+      "types": "./dist/polygon.d.ts",
+      "import": "./dist/polygon.js"
     }
   },
   "files": [

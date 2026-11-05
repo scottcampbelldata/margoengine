@@ -1399,6 +1399,19 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   pipelines' attribute counts.
 - **Still open:** the rest of the gap ([known-bugs.md](../known-bugs.md#createinstancedmesh-draws-50000-boxes-slower-than-threejs)).
 
+### 50. Polygon offsets: 59 s to 1.9 s by changing the method, same result
+
+- **Loss:** the first `polygonOffset` took 59 s on a 20,000-point wavy outline (distance 0.5). It added one band per
+  edge to the polygon. On a finely sampled outline each band overlaps hundreds of neighbours, and every overlap is a
+  crossing to resolve.
+- **Fix:** one raw offset curve per ring, filled by winding number (Chen and McMains, 2005). The same sweep runs over
+  far fewer crossings. Nothing is skipped: the area matches the first method to all printed digits, 390.8455 outset and
+  282.9276 inset.
+- **Result (dev PC, node, other sessions running, so diagnostic and not gated):** 59.0 s to 1.9 s for the round outset,
+  16.5 s to 1.8 s for the miter inset. Intersecting two 100,000-point outlines takes 0.9 to 1.7 s.
+- **Rerun:** `node packages/geometry/scripts/polygon-bench.mjs` after `npm run build` in `packages/geometry`.
+- **Guard:** `packages/geometry/tests/polygon.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
