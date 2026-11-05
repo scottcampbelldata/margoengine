@@ -1262,6 +1262,23 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Still slow:** the frame interval on the layer is 66.6 ms (15 frames a second) against 16.7 natively, GPU time the
   budget does not measure. Details: [the roadmap](../webgl2-compat-roadmap.md#package-routes-m6-2026-10-29).
 
+### 46. Scatter's cull in candidate order: a slower cull pass, kept (accepted difference in work)
+
+- **Loss:** on an Apple M6 (Metal) a still biome view at 4x MSAA drew about 420 of 76,800 pixels differently every
+  frame, and `node packages/biomes/tests/shadows-check.mjs --msaa` failed its control (1,149 values differ).
+- **Cause:** scatter's WebGPU cull appended instances at `atomicAdd` slots, so the rings' order changed every frame,
+  and the M6 draws an instance's MSAA edges by that order.
+- **Fix:** the commit "fix(scatter): cull in candidate order on WebGPU". Each candidate stores its flags at its own
+  index, a prefix count gives each its slot, and each ring is compacted. The same instances, in candidate order.
+- **After:** the distribute pass at 10,000 / 110,000 / 1,000,000 candidates went from 0.012 / 0.044 / 0.049 ms to
+  0.046 / 0.091 / 0.222 ms on the RTX A6000, and from 0.011 / 0.111 / 0.485 ms to 0.043 / 0.231 / 1.050 ms on the M6.
+  The LOD draw did not change. Source: `examples/package-benchmarks/results/scatter-cull-gpu-a6000.json` and
+  `scatter-cull-gpu-m6.json`. Recorded in [limits.md](../limits.md) as an accepted difference in work, with about 58 B
+  more GPU memory per candidate.
+- **Rerun:** `node examples/package-benchmarks/scatter-cull-gpu.mjs --a=test-results/scatter-base --b=packages/scatter/dist`.
+- **Guard:** `packages/scatter/test/order.test.js` (rings equal with GPU threads run forward and in reverse) and
+  `packages/scatter/test/repeat.browser.mjs` (still 4x MSAA frames bit-identical; exact on the A6000 and the M6).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

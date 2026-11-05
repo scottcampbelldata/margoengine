@@ -362,7 +362,7 @@ test('Scatter: the route kernels are point draws for every option, and a stale c
   }
   assert.throws(() => scatter.candidateShader(scatterCullShader({}).replace('emit(ring,instance);', '')), {
     code: 'unsupported',
-    message: /Scatter on WebGL2 needs the shader/,
+    message: /Scatter culls in order only with the distribute shader/,
   });
   assert.throws(() => scatter.countedVertex('@vertex fn v()', 'let data=instances[index];', 0, 3, ''), {
     code: 'unsupported',
@@ -391,7 +391,8 @@ test('Scatter: slots and fade bands follow the flags, ring by ring', async () =>
     slots = prefixOf(marks),
     candidates = new Float32Array(n * 8);
   for (let i = 0; i < n; i++) candidates.set([i, 0, 0, 1, 0, 0, 0, i === 1 ? 1 : i === 4 ? 2 : 0], i * 8);
-  const size = Uint32Array.of(n, 0, 0, 0),
+  // Candidates, then each ring's capacity: room for every candidate.
+  const size = Uint32Array.of(n, n, n, n),
     lists = [0, 1, 2].map((ring) => {
       const out = new Float32Array(n * 8);
       run(compactShader(ring), { 0: size, 1: candidates, 2: marks, 3: slots, 4: out }, 1);

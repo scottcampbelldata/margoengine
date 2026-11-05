@@ -156,9 +156,10 @@ of the presets, from `@margoengine/procedural`. Pass `objects: false` for terrai
 total and the device's largest texture caps each side, checked before anything is allocated:
 `BiomeObjects.attach` rejects with MargoError `'unsupported'` past either (`detailFits` tells ahead), and `BiomeView`
 coarsens its detail maps until they fit. GPU memory follows what is held: the zero-config
-world's 172,640 streamed objects take 6.6 MB (records 8 bytes each, LOD rings 32 bytes per instance they can draw, both
-sized from the held tiles with headroom, and a tree's canopy sharing its trunk's), down from 117.6 MB when every tile
-slot and ring was sized for the densest case (`packages/biomes/tests/objects-check.mjs`, RTX A6000).
+world's 162,776 streamed objects take 12.0 MB (records 8 bytes each, LOD rings 32 bytes per instance they can draw, both
+sized from the held tiles with headroom, a tree's canopy sharing its trunk's, and about 58 bytes per record slot for
+scatter's cull in candidate order), down from 117.6 MB when every tile slot and ring was sized for the densest case.
+Before the ordered cull (2026-11-05) the same world took 5.9 MB (`packages/biomes/tests/objects-check.mjs`, RTX A6000).
 
 | `BiomeView.attach` option | Default | Meaning |
 | --- | --- | --- |

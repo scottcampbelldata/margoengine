@@ -5,11 +5,12 @@
 // view adds the terrain and every stored-object mesh, and removes them all on dispose. Before scatter could cast and
 // the view could hand over its objects, trees cast nothing and were lit from a fixed direction without the sun.
 // The control comes first: two views without shadows, each built and streamed from scratch, must draw the same bits, so
-// a pixel that changes with shadows changes because of them. The frames are single-sampled: on an Apple M6 a 4x MSAA
-// frame's edge pixels follow the order scatter's GPU cull appends instances in, which changes every frame, and the old
-// check, at 4x MSAA with no control, put 52 to 60 such pixels down to the shadows ("shadows brighten nothing"). With
-// `--msaa` the scene keeps 4x MSAA: the repro of "Apple GPUs: 4x MSAA edges of scatter instances" in
-// docs/known-bugs.md, which fails at the control on that GPU.
+// a pixel that changes with shadows changes because of them. The frames are single-sampled by default: on an Apple M6
+// a 4x MSAA frame's edge pixels followed the order scatter's GPU cull appended instances in, which changed every
+// frame, and the old check, at 4x MSAA with no control, put 52 to 60 such pixels down to the shadows ("shadows brighten
+// nothing"). With `--msaa` the scene keeps 4x MSAA: the repro of "Apple GPUs: 4x MSAA edges of scatter instances" in
+// the fixed tables of docs/known-bugs.md. It failed at the control on the M6 (1,149 values differ) until the cull
+// kept candidate order (2026-11-05); it passes there and on the RTX A6000 now.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';

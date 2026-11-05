@@ -12,6 +12,8 @@ import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 // SHA-256 of the distribute shader before the world-rectangle options existed (main at 0765a2c1).
 const ORIGINAL = '63b49bcd65f7277d9606496ea67532a1b80a1d72d23baf3f5f46211560f3976d';
+// SHA-256 of the kernel WebGPU compiles from it: the candidate kernel of the ordered cull (src/order.ts), no atomics.
+const ORDERED = '5df19e53e3cae3ef32e5740b504efa0ef30e46fb86b3eff20653b0c28326b9d7';
 
 test('off path: without bounds, densityMap and follow the distribute shader and frame are as before', () => {
   assert.equal(sha(scatterCullShader({})), ORIGINAL);
@@ -19,7 +21,9 @@ test('off path: without bounds, densityMap and follow the distribute shader and 
     effect = new Scatter(box(), { count: 16, wind: [1, 0, 0.5] });
   h.engine.use(effect);
   h.frame();
-  assert.equal(sha(h.pipelines.find((p) => p.compute).compute.module.code), ORIGINAL);
+  const code = h.pipelines.find((p) => p.compute).compute.module.code;
+  assert.equal(sha(code), ORDERED);
+  assert.doesNotMatch(code, /atomic/);
   assert.equal(h.resources.filter((r) => r.size === 320).length >= 1, true, 'an 80-float frame');
   effect.dispose();
 });
@@ -105,9 +109,11 @@ test('ScatterTiles packs held records, filters a palette index, frees tiles and 
   );
   h.frame();
   const code = h.pipelines.find((p) => p.compute).compute.module.code;
-  assert.equal(code, tilesCullShader());
+  // The candidate kernel of the tiles shader: the rings' capacities bound the compaction, not an atomic slot.
+  assert.equal(sha(code), 'aaa7d495a2e7b3788e6ec5f9cdfe2c14ef15935038999916cf51426f5f775296');
   assert.match(code, /var<storage,read> records:array<vec2u>/);
-  assert.match(code, /if\(slot>=pages\[0\]\[ring\+1u\]\)\{atomicSub/);
+  assert.doesNotMatch(code, /atomic/);
+  assert.doesNotMatch(tilesCullShader(), /atomicSub/);
   assert.ok(tiles.removeTile('0,0'));
   assert.ok(!tiles.removeTile('0,0'));
   tiles.setTile('0,1', [0, 256], 256, Uint8Array.from(record(3, 4, 1)));
@@ -162,7 +168,10 @@ test('ScatterTiles memory follows what is held: records in pages, rings sized fr
   assert.deepEqual(t.rings, [room(100), room(164), room(194)]);
   // Bytes: 16 pages of records, the three rings and the page table; the sharing mesh holds none of its own, and both
   // draw one set of rings.
-  assert.equal(trunks.gpuBytes, 16 * 64 * 8 + (room(100) + room(164) + room(194)) * 32 + 16 * 17);
+  // The ordered cull of 1,024 record slots: 32 bytes each for the instances, 12 for the ring flags, then the slots and
+  // the prefix count's levels (192 + 12 sums, 3,073 + 193 + 13 counts) and six 16-byte uniforms (five steps, the lanes).
+  const cull = 1024 * 32 + 1024 * 12 + (192 + 12) * 4 + (3073 + 193 + 13) * 4 + 6 * 16;
+  assert.equal(trunks.gpuBytes, 16 * 64 * 8 + (room(100) + room(164) + room(194)) * 32 + 16 * 17 + cull);
   assert.equal(crowns.gpuBytes, 0);
   assert.equal(
     h.resources.filter((r) => !r.destroyed && r.size === room(100) * 32).length,

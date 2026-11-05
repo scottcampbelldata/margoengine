@@ -50,11 +50,7 @@ export function tilesCullShader(): string {
       '@group(0) @binding(6) var<storage,read> exclusions:array<vec4f>;',
       '@group(0) @binding(6) var<storage,read> exclusions:array<vec4f>;\n@group(0) @binding(7) var<storage,read> records:array<vec2u>;\n@group(0) @binding(8) var<storage,read> pages:array<vec4u>;',
     )
-    .replace(
-      ' let slot=atomicAdd(&commands[ring].count,1u);',
-      // pages[0] = (0, ring capacities): a ring never writes past its buffer.
-      ' let slot=atomicAdd(&commands[ring].count,1u);if(slot>=pages[0][ring+1u]){atomicSub(&commands[ring].count,1u);return;}',
-    )
+    // A ring keeps at most its buffer's instances: the ordered cull's compaction stops there (./order.ts).
     .replace(
       /let i=id\.x;if\(i>=frame\.ids\.x\|\|hash\(i\*7u\+1u\)>frame\.rules\.w\)\{return;\}[\s\S]*?let uv=[^\n]*\n/,
       // Page p (records 64 p .. 64 p + 63) is pages[1 + p] = (its tile's origin x and z and side as f32 bits, records used).
@@ -208,12 +204,14 @@ export class ScatterTiles extends Scatter {
   }
 
   /**
-   * GPU bytes this mesh holds for its objects: its records (8 per record slot) and its LOD rings (32 per instance), both
+   * GPU bytes this mesh holds for its objects: its records (8 per record slot), its LOD rings (32 per instance) and,
+   * from its first frame, its ordered cull (about 58 per record slot: the culled instance, ring flags and slots); all
    * 0 for a mesh that shares another's.
    */
   get gpuBytes(): number {
     if (this.#leader) return 0;
-    return this.#capacity * 8 + (this.#rings[0] + this.#rings[1] + this.#rings[2]) * 32 + this.#table.byteLength;
+    const rings = this.#rings[0] + this.#rings[1] + this.#rings[2];
+    return this.#capacity * 8 + rings * 32 + this.#table.byteLength + (this.ordered?.bytes ?? 0);
   }
 
   /**
@@ -358,7 +356,7 @@ export class ScatterTiles extends Scatter {
     if (size !== this.#capacity) {
       if (
         Math.ceil(size / 64) > d.limits.maxComputeWorkgroupsPerDimension ||
-        size * 8 > d.limits.maxStorageBufferBindingSize
+        size * 32 > d.limits.maxStorageBufferBindingSize
       )
         throw new RangeError('ScatterTiles holds more records than the GPU can cull; hold fewer or smaller tiles');
       this.#recordBuffer?.destroy();

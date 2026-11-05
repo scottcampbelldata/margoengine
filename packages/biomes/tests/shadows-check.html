@@ -3,11 +3,12 @@
 // Real-GPU proof for BiomeView's `shadows` option: a temperate forest at noon drawn without shadows (twice, by two
 // views), then with a Shadows that the view fills (terrain and every stored-object mesh). shadows-check.mjs compares
 // the frames pixel by pixel.
-// Single-sampled (exactSize): the comparison needs a frame that depends on the scene alone. Scatter culls on the GPU and
-// appends instances with atomics, so their order changes every frame; on an Apple M6 (Metal) a 4x MSAA frame's edge
-// pixels follow that order: two frames of one still view differed in about 400 pixels, some by a third of their
-// brightness ("Apple GPUs: 4x MSAA edges of scatter instances" in docs/known-bugs.md). Single-sampled, depth-tested
-// opaque drawing does not depend on draw order. `?msaa` keeps the 4x MSAA scene: the repro of that entry.
+// Single-sampled (exactSize) by default: the comparison needs a frame that depends on the scene alone, and
+// single-sampled, depth-tested opaque drawing does not depend on draw order. Scatter's GPU cull used to append
+// instances with atomics, so their order changed every frame, and on an Apple M6 (Metal) a 4x MSAA frame's edge pixels
+// followed that order: two frames of one still view differed in about 400 pixels ("Apple GPUs: 4x MSAA edges of
+// scatter instances" in the fixed tables of docs/known-bugs.md). The cull keeps candidate order since 2026-11-05.
+// `?msaa` keeps the 4x MSAA scene: the repro of that entry, which passes on the M6 now.
 import {Engine} from '/packages/core/dist/index.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
 import {Shadows} from '/packages/shadows/dist/index.js';

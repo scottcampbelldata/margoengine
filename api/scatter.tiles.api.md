@@ -45,6 +45,16 @@ export function tilesCullShader(): string;
 
 type GroundBounds = readonly [minX: number, minZ: number, maxX: number, maxZ: number];
 
+class OrderedCull {
+    readonly n: number;
+    readonly candidates: GPUBuffer;
+    readonly flags: GPUBuffer;
+    constructor(device: GPUDevice, n: number);
+    encode(pass: GPUComputePassEncoder, rings: GPUBuffer[], commands: GPUBuffer): void;
+    get bytes(): number;
+    destroy(): void;
+}
+
 class Scatter implements EnginePlugin {
     readonly name: string;
     protected engine?: Engine;
@@ -67,6 +77,7 @@ class Scatter implements EnginePlugin {
     onPreUpdate(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     protected cull(c: ScatterPassContext, terrain: GPUTexture): void;
+    protected ordered?: OrderedCull;
     protected instancesChanged(): void;
     protected cullCode(): string;
     protected extraEntries(): ({

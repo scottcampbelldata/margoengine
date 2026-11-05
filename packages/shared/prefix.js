@@ -2,7 +2,8 @@
 // WebGL2 compatibility layer (the WebGL2 roadmap, "Package routes"), where every kernel here runs as a point
 // draw: each invocation stores one word at its own index. Sums of 16 go up the levels until a level has at most 16
 // words; then each index takes its parent's count plus at most 15 neighbours on the way down. Integers, so the result
-// is exact and independent of draw order. Only the routes import this file, so WebGPU pages never download it.
+// is exact and independent of draw order. The routes import this file, and so does scatter's WebGPU cull
+// (scatter/src/order.ts), which uses it to keep its instances in candidate order on every GPU.
 //
 // Several lists share one count as lanes: lane l, index i at word l * n + i. A lane's exclusive prefix is then
 // prefix[l * n + i] - prefix[l * n], and its total is the next lane's start minus its own.

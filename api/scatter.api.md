@@ -42,6 +42,7 @@ export class Scatter implements EnginePlugin {
     onPreUpdate(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     protected cull(c: ScatterPassContext, terrain: GPUTexture): void;
+    protected ordered?: OrderedCull;
     protected instancesChanged(): void;
     protected cullCode(): string;
     protected extraEntries(): ({
@@ -165,6 +166,16 @@ export function scatterCullShader(o: ScatterOptions): string;
 export function spacePlacements(candidates: readonly GroundPlacement[], radius: number, gap?: number): GroundPlacement[];
 
 // Not exported from this entry, but used by the exports above:
+
+class OrderedCull {
+    readonly n: number;
+    readonly candidates: GPUBuffer;
+    readonly flags: GPUBuffer;
+    constructor(device: GPUDevice, n: number);
+    encode(pass: GPUComputePassEncoder, rings: GPUBuffer[], commands: GPUBuffer): void;
+    get bytes(): number;
+    destroy(): void;
+}
 
 type ScatterPassContext = Extract<PassContext, {
     backend: 'webgpu';

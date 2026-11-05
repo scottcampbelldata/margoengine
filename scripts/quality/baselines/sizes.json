@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4404671,
+  "total": 4405362,
   "history": [
     {
       "date": "2026-10-24",
@@ -1490,6 +1490,12 @@
       "commit": "3b1850b1e",
       "reason": "Shadows reach native coat and sheen lobes: margoLit and margoDirectVisible in the physical shader text",
       "grew": 2
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "b4d104412",
+      "reason": "scatter: the WebGPU cull keeps candidate order (src/order.ts and shared/prefix.js now load with the root, no longer only in the WebGL2 route chunk), so still 4x MSAA frames repeat bit for bit on Apple GPUs (known bug fixed 2026-11-05); +150 B gzip",
+      "grew": 1
     }
   ],
   "items": {
@@ -1804,9 +1810,9 @@
     "@margoengine/road": 1171,
     "@margoengine/save": 6955,
     "@margoengine/save/node": 939,
-    "@margoengine/scatter": 18744,
+    "@margoengine/scatter": 19461,
     "@margoengine/scatter/paint": 1532,
-    "@margoengine/scatter/tiles": 3448,
+    "@margoengine/scatter/tiles": 3422,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
     "@margoengine/sciviz": 36802,

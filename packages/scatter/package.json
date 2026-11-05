@@ -54,6 +54,7 @@
     "test": "npm run build && node --test test/*.test.js",
     "test:browser": "npm run build && node test/lod.browser.mjs",
     "test:browser:edges": "cd ../.. && node packages/scatter/test/edges.browser.mjs",
+    "test:browser:repeat": "cd ../.. && node packages/scatter/test/repeat.browser.mjs",
     "test:browser:inner": "cd ../.. && node packages/scatter/test/inner.browser.mjs",
     "test:browser:shadow": "cd ../.. && node packages/scatter/test/shadow.browser.mjs",
     "test:browser:shadow-cull": "cd ../.. && node packages/scatter/test/shadow-cull.browser.mjs",

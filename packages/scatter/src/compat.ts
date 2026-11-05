@@ -3,14 +3,16 @@
 // tier: JavaScript, a read-back of the heightmap per dispatch, 50 to 90 ms a frame for 110,000 blades. Here the same
 // tests run as point draws on the GPU, each kernel storing at its own index or at an exact slot:
 // - each candidate stores its Instance and one flag per LOD ring (a fade band flags two rings);
-// - one prefix count over the three rings (shared/prefix.js) gives every instance its slot, then each ring is compacted;
+// - one prefix count over the three rings (shared/prefix.js) gives every instance its slot, then each ring is compacted
+//   (./order.js, the same kernels as the WebGPU route's);
 // - the shadow lists do the same with one flag per cascade and ring.
-// So the rings and lists hold the instances the WebGPU route's hold, in candidate order (WebGPU's order is whichever
-// thread came first, and depth makes it not matter). A GPU-written indirect draw would stall the main thread on a
-// read-back of its arguments (WebGL2 has no indirect draws), so a draw asks for every slot of its ring or list and its
-// vertex shader drops those at or past the count, read from a small buffer of counts.
+// So the rings and lists hold the instances the WebGPU route's hold, in candidate order. A GPU-written indirect draw
+// would stall the main thread on a read-back of its arguments (WebGL2 has no indirect draws), so a draw asks for every
+// slot of its ring or list and its vertex shader drops those at or past the count, read from a small buffer of counts.
 import { MargoError } from '@margoengine/math/errors';
 import { PrefixCount } from '../../shared/prefix.js';
+import { candidateShader, compactShader } from './order.js';
+export { candidateShader, compactShader };
 
 declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number };
 
@@ -26,63 +28,7 @@ const once = (code: string, from: string, to: string): string => {
 const RINGS = 3;
 /** Words between two counts in the counts buffer: each count is bound alone, at a 256-byte aligned offset. */
 const COUNT_STRIDE = 64;
-const cullEntry = '@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){';
 const lanes = (n: string) => `@group(0) @binding(0) var<uniform> ${n}:vec4u;\n`;
-const instance = 'struct Instance {position:vec4f,rotation:vec4f}\n';
-
-/**
- * The candidate kernel from a cull text (`scatterCullShader`, any options): every test as written, then the Instance and
- * one flag per ring at the candidate's own index; a fade band's rotation.w holds its first ring plus 1 until compaction.
- * @throws MargoError `'unsupported'` when the text is not the one these edits were written for.
- */
-export function candidateShader(cull: string): string {
-  let code = cull;
-  for (const [from, to] of [
-    ['@group(0) @binding(2) var<storage,read_write> near:array<Instance>;\n', '@group(0) @binding(2) var<storage,read_write> candidates:array<Instance>;\n'],
-    ['@group(0) @binding(3) var<storage,read_write> middle:array<Instance>;\n', '@group(0) @binding(3) var<storage,read_write> marks:array<u32>;\n'],
-    ['@group(0) @binding(4) var<storage,read_write> far:array<Instance>;\n', ''],
-    ['struct Command {indices:u32,count:atomic<u32>,first:u32,base:u32,instance:u32}\n', ''],
-    ['@group(0) @binding(5) var<storage,read_write> commands:array<Command,3>;\n', ''],
-    [
-      `fn emit(ring:u32,instance:Instance){
- let slot=atomicAdd(&commands[ring].count,1u);
- if(ring==0u){near[slot]=instance;}else if(ring==1u){middle[slot]=instance;}else{far[slot]=instance;}
-}
-`,
-      'var<private> placed:Instance;\n',
-    ],
-    [cullEntry, 'fn place(id:vec3u)->u32{'],
-    [
-      'instance.rotation.w=1.0;emit(ring,instance);\n   instance.rotation.w=2.0;emit(ring+1u,instance);return;',
-      'instance.rotation.w=f32(ring)+1.0;placed=instance;return 3u<<ring;',
-    ],
-    [
-      'emit(select(select(2u,1u,d<frame.lod.y),0u,d<frame.lod.x),instance);',
-      'placed=instance;return 1u<<select(select(2u,1u,d<frame.lod.y),0u,d<frame.lod.x);',
-    ],
-  ])
-    code = once(code, from, to);
-  return `${code.replaceAll('return;', 'return 0u;')}
-${cullEntry}
- if(id.x>=frame.ids.x){return;}
- let mask=place(id);
- candidates[id.x]=placed;
- let n=frame.ids.x;marks[id.x]=mask&1u;marks[n+id.x]=(mask>>1u)&1u;marks[2u*n+id.x]=mask>>2u;
-}`;
-}
-/** One LOD ring's compaction; a fade band's copy takes the rotation.w the WebGPU route gives that ring (1 or 2). */
-export const compactShader = (ring: number): string =>
-  `${instance}${lanes('n')}@group(0) @binding(1) var<storage,read> candidates:array<Instance>;
-@group(0) @binding(2) var<storage,read> marks:array<u32>;
-@group(0) @binding(3) var<storage,read> slots:array<u32>;
-@group(0) @binding(4) var<storage,read_write> rings:array<Instance>;
-@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){
- let at=${ring}u*n.x+id.x;
- if(id.x>=n.x||marks[at]!=1u){return;}
- var c=candidates[id.x];
- if(c.rotation.w>0.0){c.rotation.w=select(2.0,1.0,u32(c.rotation.w)==${ring + 1}u);}
- rings[slots[at]-slots[${ring}u*n.x]]=c;
-}`;
 /** One invocation: each list's count, into the draw arguments (as WebGPU leaves them) and the counts the draws read. */
 export const totalsShader = (first: number, lists: number): string =>
   `${lanes('n')}@group(0) @binding(1) var<storage,read> slots:array<u32>;
@@ -134,14 +80,12 @@ export const shadowCompactShader = `struct Cull {light:array<mat4x4f,4>,lists:ve
 const counted = (group: number, binding: number) =>
   `@group(${group}) @binding(${binding}) var<storage,read> drawnCount:array<u32>;\n`;
 /** A vertex stage that draws nothing for the slots at or past its list's count (the binding `counted` declares). */
-export function countedVertex(
-  code: string,
-  list: string,
-  group: number,
-  binding: number,
-  none: string,
-): string {
-  return once(once(code, '@vertex', counted(group, binding) + '@vertex'), list, `if(index>=drawnCount[0]){${none}}${list}`);
+export function countedVertex(code: string, list: string, group: number, binding: number, none: string): string {
+  return once(
+    once(code, '@vertex', counted(group, binding) + '@vertex'),
+    list,
+    `if(index>=drawnCount[0]){${none}}${list}`,
+  );
 }
 const noOutput = 'var none:Output;none.clip=vec4f(2,2,2,1);return none;';
 const noPosition = 'return vec4f(2,2,2,1);';
@@ -213,15 +157,12 @@ export class ScatterRoute {
     this.slots = new PrefixCount(d, n * RINGS, this.owned);
     this.counts = storage((RINGS + 4 * RINGS) * COUNT_STRIDE * 4);
     this.lanes = this.make(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-    d.queue.writeBuffer(this.lanes, 0, new Uint32Array([n, 0, 0, 0]));
+    // Candidates, then each ring's capacity (every candidate: the root Scatter's rings hold the whole grid).
+    d.queue.writeBuffer(this.lanes, 0, new Uint32Array([n, host.capacity, host.capacity, host.capacity]));
     this.placing = pipeline(d, candidateShader(host.cull));
     const groups = Math.ceil(n / 64);
     this.finish = host.rings.map((ring, r) =>
-      this.kernel(
-        compactShader(r),
-        [this.lanes, this.candidates, this.slots.flags, this.slots.prefix, ring],
-        groups,
-      ),
+      this.kernel(compactShader(r), [this.lanes, this.candidates, this.slots.flags, this.slots.prefix, ring], groups),
     );
     this.finish.push(
       this.kernel(totalsShader(0, RINGS), [this.lanes, this.slots.prefix, host.commands, this.counts], 1),

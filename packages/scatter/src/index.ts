@@ -34,6 +34,7 @@ import { displayShader } from '../../shared/display.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
+import { OrderedCull, candidateShader } from './order.js';
 declare const GPUBufferUsage: {
   VERTEX: number;
   INDEX: number;
@@ -708,7 +709,7 @@ export class Scatter implements EnginePlugin {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     d.queue.writeTexture({ texture: this.fallback }, new Float32Array(1), { bytesPerRow: 4 }, [1, 1]);
-    this.compute = compute(d, this.cullCode());
+    this.compute = compute(d, candidateShader(this.cullCode()));
     // ScatterTiles keeps the layer's generic tiers: its rings grow and its records are its own.
     const uniform = this.uniform;
     if (this.constructor === Scatter)
@@ -780,27 +781,49 @@ export class Scatter implements EnginePlugin {
       },
     });
   }
-  /** Records the distribute (cull) dispatch: clears the ring counts, then fills the rings (the tiles entry shares it). */
+  /**
+   * Records the distribute (cull) pass, in candidate order (./order.js): each candidate's Instance and ring flags at
+   * its own index, then the rings compacted and their draw counts set (the tiles entry shares it).
+   */
   protected cull(c: ScatterPassContext, terrain: GPUTexture): void {
     const density = this.options.densityMap ? (this.options.densityMap() ?? this.fallback!) : undefined;
     if (this.route) return this.route.cull(c.encoder, terrain, density);
-    for (let i = 0; i < 3; i++) c.encoder.clearBuffer(this.commands!, i * 20 + 4, 4);
+    const n = this.dispatched();
+    if (this.ordered?.n !== n) {
+      this.ordered?.destroy();
+      this.ordered = new OrderedCull(c.device, n);
+      this.computeGroup = undefined;
+    }
+    const o = this.ordered;
     if (this.terrain !== terrain || this.densityTexture !== density || this.extraChanged || !this.computeGroup) {
-      this.computeGroup = group(c.device, this.compute!, [
-        { buffer: this.uniform! },
-        terrain.createView(),
-        ...this.instances.map((buffer) => ({ buffer })),
-        { buffer: this.commands! },
+      const resources: (GPUBufferBinding | GPUTextureView)[] = [
         { buffer: this.exclusionBuffer! },
         ...(density ? [density.createView()] : []),
         ...this.extraEntries(),
-      ]);
+      ];
+      this.computeGroup = c.device.createBindGroup({
+        layout: this.compute!.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.uniform! } },
+          { binding: 1, resource: terrain.createView() },
+          { binding: 2, resource: { buffer: o.candidates } },
+          { binding: 3, resource: { buffer: o.flags } },
+          ...resources.map((resource, k) => ({ binding: 6 + k, resource })),
+        ],
+      });
       this.terrain = terrain;
       this.densityTexture = density;
       this.extraChanged = false;
     }
-    dispatch(c, this.compute!, this.computeGroup, Math.ceil(this.dispatched() / 64));
+    const pass = c.encoder.beginComputePass();
+    pass.setPipeline(this.compute!);
+    pass.setBindGroup(0, this.computeGroup);
+    pass.dispatchWorkgroups(Math.ceil(n / 64));
+    o.encode(pass, this.instances, this.commands!);
+    pass.end();
   }
+  /** The ordered cull's candidates, flags and slots (made for the threads of the distribute pass). */
+  protected ordered?: OrderedCull;
 
   /** Call after replacing `instances`: the bind groups that read them are made again. */
   protected instancesChanged(): void {
@@ -1147,6 +1170,8 @@ export class Scatter implements EnginePlugin {
     this.uniform = this.commands = undefined;
     this.fallback = undefined;
     this.compute = undefined;
+    this.ordered?.destroy();
+    this.ordered = undefined;
     this.pipelines.clear();
     this.terrain = undefined;
     this.computeGroup = undefined;

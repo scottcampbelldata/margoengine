@@ -74,7 +74,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10, `./hulls` 4 | 2 |  | 7,650 |
 | @margoengine/road | `.` 3 |  |  | 1,027 |
 | @margoengine/save | `.` 42, `./node` 1 | 2 |  | 6,699 |
-| @margoengine/scatter | `.` 20, `./tiles` 3, `./paint` 3 | 10 |  | 14,942 |
+| @margoengine/scatter | `.` 20, `./tiles` 3, `./paint` 3 | 12 |  | 14,942 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 218 |
 | @margoengine/sciviz | `.` 71, `./bricks` 21, `./colormaps` 11, `./maths` 37 | 62 |  | 35,936 |
 | @margoengine/selection | `.` 25 | 2 |  | 17,915 |

@@ -19,6 +19,12 @@ height samples, scales and exclusion data.
 
 WebGPU seeded, stratified placement with density, world-height and slope rules. Compute culling packs instances into three distance LOD rings, followed by indexed indirect draws.
 
+The rings keep candidate order: each frame they hold the same instances in the same order on every GPU, so a still
+view draws the same pixels frame after frame, 4x MSAA edges included (an Apple M6 drew other edge pixels every frame
+when the rings were filled with atomics). The cost is a slower cull pass and about 58 bytes of GPU memory per
+candidate; [docs/limits.md](../../docs/limits.md) ("Scatter cull in candidate order") has the measured numbers.
+`node packages/scatter/test/repeat.browser.mjs` checks repeated frames bit for bit.
+
 ```ts
 import {Scatter} from 'margoengine/scatter';
 const scatter = Scatter.attach(engine, [nearGeometry, midGeometry, farGeometry], {
@@ -287,7 +293,8 @@ maxZ]` the `heightmap` and `densityMap` cover, instead of `area` around `center`
 texture over `bounds` that multiplies `density` per instance, such as a biome detail map) and `follow` (the grid moves
 with the camera in whole cells and every instance takes its random numbers from its world cell, so grass stays put as
 the camera moves). Without them the distribute shader is the same text as before, byte for byte
-(`scatterCullShader(options)` returns it, and the package test pins it).
+(`scatterCullShader(options)` returns it, and the package test pins it; WebGPU runs it as the candidate kernel of the
+ordered cull, also pinned).
 
 ```ts
 import { Scatter } from '@margoengine/scatter';
@@ -360,7 +367,10 @@ oaks.removeTile('3,4');
 | `species` | all | the record palette index this mesh draws |
 
 Memory: 8 bytes per record slot (pages of 64) on the CPU and the GPU, 32 bytes per instance a ring can draw, plus half
-again as headroom; `tiles.gpuBytes` reports it (0 for a mesh that shares another's).
+again as headroom, and about 58 bytes per record slot on the GPU for the ordered cull (the culled instance, ring flags
+and slots); `tiles.gpuBytes` reports it from the first frame (0 for a mesh that shares another's). A ring at its
+capacity keeps the first instances in record order. The GPU's `maxStorageBufferBindingSize` holds 32 bytes per record
+slot: 4,194,304 slots at the WebGPU default of 128 MiB.
 
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).

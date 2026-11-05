@@ -1,8 +1,8 @@
 // The biomes shadows check without a GPU. On an Apple M6 (2026-11-05) it failed with "shadows brighten nothing" on 52
 // to 60 pixels, yet two views without shadows already differed in 428 pixels there: a 4x MSAA frame's edge pixels
-// follow the order scatter's GPU cull appends instances in ("Apple GPUs: 4x MSAA edges of scatter instances" in
-// docs/known-bugs.md). The check now compares two views without shadows first and fails there, and draws
-// single-sampled frames unless asked for 4x MSAA.
+// followed the order scatter's GPU cull appended instances in (fixed 2026-11-05: the cull keeps candidate order; see
+// "Apple GPUs: 4x MSAA edges of scatter instances" in the fixed tables of docs/known-bugs.md). The check compares two
+// views without shadows first and fails there, and draws single-sampled frames unless asked for 4x MSAA.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

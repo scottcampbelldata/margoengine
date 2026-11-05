@@ -151,32 +151,6 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
-### Apple GPUs: 4x MSAA edges of scatter instances change from frame to frame
-
-- **What:** on an Apple M6 Mac mini (Metal 3, Chrome for Testing 156), a still biome view at 4x MSAA draws different
-  pixels each frame: in the biomes shadows-check scene, about 420 of 76,800 pixels differed across four frames with no
-  time step, by up to 0.075 in luminance (a third of some pixels' brightness), as speckle inside the hazel shrubs and on
-  tree edges. The terrain alone draws the same bits every frame. The RTX A6000 (D3D12) draws the same bits. It made
-  `npm run test:gpu:shadows -w @margoengine/biomes` report "shadows brighten nothing" on 52 to 60 pixels (2026-11-05):
-  two views without shadows already differed in 428 pixels there, so the shadows were not the cause.
-- **Repro:** `node packages/biomes/tests/shadows-check.mjs --msaa` on the Mac fails at the control step ("two views
-  without shadows draw the same bits: 1169 values differ"); without `--msaa` (single-sampled, the check's default) it
-  passes there and on the A6000.
-- **Cause, measured:** scatter's GPU cull appends each visible instance at `atomicAdd` slots, so the ring buffers hold
-  the same instances in a new order every frame (buffer captures: the same 32-byte entries, sorted, no duplicates). On
-  the M6, at 4x MSAA, edge pixels inside an instance follow that order, even on an isolated shrub. Each of these makes
-  the frames identical there: single-sampled drawing (`exactSize`), or the cull rewritten to write instance `i` at slot
-  `i` (a diagnostic only: it draws culled instances as empty ones). None of these removes it: `greater` in place of
-  `greater-equal` (so not depth ties), colour interpolated at the pixel centre in place of `centroid`, back faces drawn,
-  or the shaded colour replaced by the interpolated world position (so the winning fragment changes, not its lighting).
-  The GPU's own mechanism is not traced.
-- **Needed to close:** an order-stable cull on scatter's WebGPU route in place of the atomic append. Its WebGL2 route
-  (`packages/scatter/src/compat.ts`) already compacts in candidate order with `PrefixCount` (`packages/shared/prefix.js`);
-  its note that depth makes WebGPU's order not matter does not hold on the M6 at 4x MSAA. The new cull's cost is
-  measured against the atomic one, and a frame-repeat check of a scatter scene at 4x MSAA is exact on the Mac; then
-  `--msaa` passes there. Two views still stream tiles into different pages, so a fixed cull order makes each view
-  steady, and two views can still differ at 4x MSAA.
-
 ### Native glass on a display-encoded target adds its lit draw in encoded values
 
 - **What:** without an HDR scene target (`f.settings.w` below 0.5), the lit draw of gltf-pro's native glass blends over
@@ -705,6 +679,12 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   is fixed (entry 36).
 - **Plan (gltf-pro and animation):** create the pipelines a loaded model will draw with
   (`createRenderPipelineAsync` / `createComputePipelineAsync`) while it loads, so the first frame finds them ready.
+
+## Fixed 2026-11-05
+
+| Bug | Cause | Fix | Regression test |
+| --- | --- | --- | --- |
+| Apple GPUs: 4x MSAA edges of scatter instances changed from frame to frame (Apple M6, Metal: a still biome view drew about 420 of 76,800 pixels differently every frame; `node packages/biomes/tests/shadows-check.mjs --msaa` failed its control, 1,149 values differ) | scatter's WebGPU cull appended each visible instance at an `atomicAdd` slot, so the LOD rings held the frame's instances in whichever order the GPU's threads ran, and the M6 draws an instance's MSAA edge pixels by that order | the commit "fix(scatter): cull in candidate order on WebGPU": each candidate stores its ring flags (and its instance) at its own index, the prefix count of `packages/shared/prefix.js` gives each its slot and each ring is compacted (`packages/scatter/src/order.ts`, shared with the WebGL2 route). On the M6 the frame-repeat check is exact and `shadows-check.mjs --msaa` passes (control 0); its cost is in [limits.md](limits.md) (Rendering, "Scatter cull in candidate order") | `packages/scatter/test/order.test.js` (fails with the atomic cull: its rings come out reversed when the threads run in reverse); `packages/scatter/test/repeat.browser.mjs` (6 still 4x MSAA frames bit-identical) |
 
 ## Fixed 2026-10-31 (flaky root tests under load)
 
