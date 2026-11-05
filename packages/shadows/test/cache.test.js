@@ -489,3 +489,39 @@ test('prepareShadow runs once per frame before any depth pass, with every cascad
   assert.deepEqual(frame().slice(0, 3), ['prepare moving', 'prepare still', 'pass']);
   shadows.dispose();
 });
+
+test('under cadence a static caster is prepared on the frames a moved cascade redraws it', () => {
+  const h = optionalGPU(),
+    engine = h.engine,
+    log = [];
+  engine.gpu.limits.maxTextureDimension2D = 8192;
+  engine.gpu.limits.maxTextureArrayLayers = 256;
+  engine.lighting = { direction: new Float32Array([1, 2, 3, 3]) };
+  const shadows = new Shadows({ resolution: 64, cascades: 2, cadence: [1, 1] });
+  shadows.add(
+    {
+      shadowVersion: 0,
+      prepareShadow() {
+        log.push('prepare');
+      },
+      drawShadow() {
+        log.push('draw');
+      },
+    },
+    { static: true },
+  );
+  engine.use(shadows);
+  const frame = () => {
+    log.length = 0;
+    h.context.shader = 'let linear=direct*vec3f(1);';
+    h.context.bindings.length = 0;
+    engine.frameGraph.execute(h.context);
+    return [...log];
+  };
+  assert.deepEqual(frame(), ['prepare', 'draw', 'draw'], 'the first frame draws both cascades');
+  assert.deepEqual(frame(), [], 'a still camera reuses the map');
+  h.context.camera.position = [40, 30, 20];
+  assert.deepEqual(frame(), ['prepare', 'draw', 'draw'], 'a moved camera prepares before it redraws');
+  shadows.dispose();
+  h.cleanup();
+});

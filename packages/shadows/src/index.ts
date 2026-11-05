@@ -1028,9 +1028,11 @@ export class Shadows implements EnginePlugin {
     const prepare = this.prepareContext;
     prepare.context = c;
     prepare.cascades = this.cascadeCount;
+    let redraw = this.dirty;
+    if (cadence) for (let i = 0; i < this.cascadeCount; i++) redraw ||= this.moved(cadence, i);
     for (let i = 0; i < this.sources.length; i++) {
       const r = this.sources[i];
-      if (r.cast && 'prepareShadow' in r.source && r.source.prepareShadow && (this.dirty || !r.static))
+      if (r.cast && 'prepareShadow' in r.source && r.source.prepareShadow && (redraw || !r.static))
         r.source.prepareShadow(prepare);
     }
     if (cadence) return this.renderCadence(c, cadence, moving);
@@ -1099,15 +1101,20 @@ export class Shadows implements EnginePlugin {
       pass.end();
     }
   }
+  /** Whether a cascade is due under `cadence` and its matrix changed since it last drew. */
+  private moved(cadence: readonly number[], cascade: number): boolean {
+    if (this.frameSerial % (cadence[cascade] ?? 1)) return false;
+    for (let k = cascade * 16; k < cascade * 16 + 16; k++) if (this.matrices[k] !== this.previous[k]) return true;
+    return false;
+  }
   /** The depth passes under `cadence`: each cascade redraws, recopies and draws its moving casters only on its own frames. */
   private renderCadence(c: ShadowPassContext, cadence: readonly number[], moving: boolean): void {
     let changed = false;
     const size = { width: this.width, height: this.height, depthOrArrayLayers: 1 };
     for (let i = 0; i < this.cascadeCount; i++) {
       const due = this.frameSerial % (cadence[i] ?? 1) === 0,
-        from = i * 16;
-      let stale = this.dirty;
-      if (due) for (let k = from; k < from + 16; k++) stale ||= this.matrices[k] !== this.previous[k];
+        from = i * 16,
+        stale = this.dirty || this.moved(cadence, i);
       if (stale) {
         this.depth(c, i, true);
         this.previous.set(this.matrices.subarray(from, from + 16), from);

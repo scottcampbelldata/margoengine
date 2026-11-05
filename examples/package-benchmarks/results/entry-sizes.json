@@ -1,5 +1,5 @@
 {
-  "commit": "eff7e778d",
+  "commit": "8fc9f4bb3",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1518,8 +1518,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 51968,
-        "gzip": 17206
+        "raw": 52122,
+        "gzip": 17250
       },
       "./virtual": {
         "raw": 42419,
@@ -2036,9 +2036,9 @@
       "brotli": 26302
     },
     "packages/shadows/dist/index.js": {
-      "raw": 51968,
-      "gzip": 17206,
-      "brotli": 15260
+      "raw": 52122,
+      "gzip": 17250,
+      "brotli": 15296
     },
     "packages/decoders/dist/decoder.worker.js": {
       "raw": 10691,
