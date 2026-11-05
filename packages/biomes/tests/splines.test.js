@@ -468,7 +468,7 @@ test('edge cases: self-crossing, huge widths, paths outside the world, thousands
   ]);
   assert.ok(rasters(world, 'mask/wide').every((r) => r.every((v) => v === 255)));
   let ms = cpu();
-  assert.ok(ms < 5000, `${ms} ms of CPU`);
+  assert.ok(ms < 200, `${ms} ms of CPU`);
   // A path outside the world writes nothing and carves nothing.
   const outside = {
     points: [
@@ -493,7 +493,7 @@ test('edge cases: self-crossing, huge widths, paths outside the world, thousands
   await digests(carved);
   paintPaths(editor, [wander]);
   ms = cpu();
-  assert.ok(ms < 20000, `${ms} ms of CPU`);
+  assert.ok(ms < 800, `${ms} ms of CPU`);
   const whole = rasters(world, 'mask/wander');
   editor.undo();
   // The same line drawn as one two-point path per piece, painted with 'max': the same bytes.

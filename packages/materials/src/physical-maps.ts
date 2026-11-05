@@ -96,7 +96,7 @@ fn margoPhysicalFrame(i:Out,n:vec3f,k:u32)->mat3x3f {
     );
   code = code.replace(
     /@fragment fn margoTint\(i:Out\)->@location\(0\) vec4f \{[^}]*\}/,
-    '@fragment fn margoTint(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {let s=surface(i,front);return margoTintShare(i,s.base.rgb*s.tr*pow(margoPhysicalMaps.volume.yzw,vec3f(margoPhysicalMaps.volume.x*s.th)));}',
+    '@fragment fn margoTint(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {let s=surface(i,front);return margoTintSurface(i,s,s.base.rgb*s.tr*pow(margoPhysicalMaps.volume.yzw,vec3f(margoPhysicalMaps.volume.x*s.th)));}',
   );
   return declarations + code;
 }

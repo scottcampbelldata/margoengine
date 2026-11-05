@@ -113,7 +113,7 @@ test('native PBR uploads live dispersion without overwriting the blue transmissi
   model.draw(view.c, 'beauty', view.c.color, view.c.depth);
   const values = model.resources[0].values;
   assert.equal(values[103], 2.5);
-  assert.ok(Math.abs(values[102] - 0.05) < 1e-6, 'blue transmission tint remains in ext.z');
+  assert.equal(values[102], 1, 'the blue tint lane (volume attenuation, none here) remains in ext.z');
   material.dispersion = 0;
   view.begin(1);
   model.draw(view.c, 'beauty', view.c.color, view.c.depth);

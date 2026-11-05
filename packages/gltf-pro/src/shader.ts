@@ -375,15 +375,23 @@ const transmissive = new Map<string, string>();
 // Transmission's first draw (gltf-pro blends it as dst x src): what is left of the light behind, from spare Frame lanes
 // and the material's factors. The transmitted light is in the base layer (KHR_materials_transmission), so it is scaled
 // by 1 - specular x max(F) (KHR_materials_specular), by the sheen's 1 - max(colour) E(n.v) (KHR_materials_sheen) and by
-// the coat's 1 - clearcoat x F (KHR_materials_clearcoat). This draw binds no maps, so it reads factors only and leaves
-// metal out: glTF's default metallicFactor is 1 with the real value in a map (docs/known-bugs.md). A display-encoded
-// target holds encoded light, so the share is encoded as well.
+// the coat's 1 - clearcoat x F (KHR_materials_clearcoat). margoTintShare is the frame-only draw of a material with no
+// maps to read, which leaves metal to the material's tint; margoTintSurface (surfaceTintPBR) reads all of it from the
+// surface, maps included, with 1 - metal and the thin film. A display-encoded target holds encoded light, so the share
+// is encoded as well.
 const tintEntry = `
 fn margoTintShare(i:Out,tint:vec3f)->vec4f {
   let nv=clamp(abs(dot(normalize(i.normal),normalize(f.eye.xyz-i.position))),0.0001,1.0); let w=pow(1-nv,5.0);
   let ior=(f.ext.y-1)/(f.ext.y+1); let f0=min(ior*ior*f.specular.rgb,vec3f(1)); let fr=f0+(1-f0)*w;
   let share=tint*(1-f.specular.w*max(fr.r,max(fr.g,fr.b)))*(1-max(f.sheen.r,max(f.sheen.g,f.sheen.b))*margoSheenAlbedo(nv,clamp(f.sheen.w,0.03,1.0)))*(1-f.coat.x*(0.04+0.96*w));
+  return margoTintEncode(share);
+}
+fn margoTintEncode(share:vec3f)->vec4f {
   return vec4f(select(share,select(share*12.92,1.055*pow(share,vec3f(1.0/2.4))-0.055,share>=vec3f(0.0031308)),f.settings.w<0.5),1);
+}
+fn margoTintSurface(i:Out,s:Surface,tint:vec3f)->vec4f {
+  let nv=clamp(abs(dot(s.n,normalize(f.eye.xyz-i.position))),0.0001,1.0); let fr=margoTintFresnel(s,nv);
+  return margoTintEncode(tint*(1-s.metal)*(1-margoFresnelPeak(fr))*(1-max(s.sh.r,max(s.sh.g,s.sh.b))*margoSheenAlbedo(nv,s.sh.w))*(1-s.cc*(0.04+0.96*pow(1-nv,5.0))));
 }
 @fragment fn margoTint(i:Out)->@location(0) vec4f {return margoTintShare(i,vec3f(f.coordsB.zw,f.ext.z));}
 `;
@@ -397,6 +405,13 @@ export function texturedTintPBR(code: string): string {
   return code.replace(
     /@fragment fn margoTint\(i:Out(?:,@builtin\(front_facing\) front:bool)?\)->@location\(0\) vec4f \{/,
     `@fragment fn margoTint(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {${resources}`,
+  );
+}
+/** `code` with a tint draw that reads the whole surface: the same bindings as the lit draw, the base colour and transmission maps included. The tint lanes then hold the volume attenuation alone. */
+export function surfaceTintPBR(code: string): string {
+  return texturedTintPBR(code).replace(
+    'return margoTintShare(i,vec3f(f.coordsB.zw,f.ext.z));',
+    'let s=surface(i,front);return margoTintSurface(i,s,s.base.rgb*s.tr*vec3f(f.coordsB.zw,f.ext.z));',
   );
 }
 /**
@@ -418,7 +433,13 @@ fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return vec3f(0);}
 fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {return margoAmbientTerm(i,margoFront(s),v);}
 @fragment fn fragment(`,
       ],
-    ]) + tintEntry;
+    ]) +
+    `fn margoTintFresnel(s:Surface,nv:f32)->vec3f {return ${
+      code.includes(' ir:vec4f')
+        ? 'mix(margoDielectricFresnel(s.f0,s.sw,nv),s.ir.rgb,s.ir.w)'
+        : 'margoDielectricFresnel(s.f0,s.sw,nv)'
+    };}` +
+    tintEntry;
   transmissive.set(code, out);
   return out;
 }
@@ -702,7 +723,13 @@ export function extendedShader(plan: ExtendedPlan): string {
           ambientWgsl(plan) +
           '@fragment fn fragment(',
       ],
-    ]) + tintEntry;
+    ]) +
+    `fn margoTintFresnel(s:Surface,nv:f32)->vec3f {return ${
+      plan.iridescence
+        ? 'mix(margoDielectricFresnel(s.f0,s.sw,nv),s.ir.rgb,s.ir.w)'
+        : 'margoDielectricFresnel(s.f0,s.sw,nv)'
+    };}` +
+    tintEntry;
   if (extended.size >= 64) extended.clear();
   extended.set(key, out);
   return out;

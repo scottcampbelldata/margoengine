@@ -30,6 +30,7 @@ import {
   factorPhysicalShader,
   physicalShader,
   transmissiveShader,
+  surfaceTintPBR,
   viewShader,
 } from '../src/shader.ts';
 import { lightPBR } from '../../shared/pbr-hooks.js';
@@ -456,7 +457,7 @@ test('transmission: tint multiply then lit add (no blend constant); ambient hook
   let log = draw();
   const pipelines = log.filter((e) => e[0] === 'renderPipeline'),
     passes = log.filter((e) => e[0].startsWith('pass.')).map((e) => (e[0] === 'pass.setPipeline' ? e[1] : e[0]));
-  assert.equal(log.find((e) => e[0] === 'module')[2].code, viewShader(transmissiveShader()));
+  assert.equal(log.find((e) => e[0] === 'module')[2].code, viewShader(surfaceTintPBR(transmissiveShader())));
   assert.deepEqual(
     pipelines.map((e) => [e[2].fragment.entryPoint, e[2].fragment.targets[0].blend.color]),
     [
@@ -471,7 +472,7 @@ test('transmission: tint multiply then lit add (no blend constant); ambient hook
   const write = log.find((e) => e[0] === 'writeBuffer'),
     values = new Float32Array(write[2] / 4 + floatsOf(write[3]).length);
   values.set(floatsOf(write[3]), write[2] / 4);
-  near([values[98], values[99], values[102]], [0.4, 0.8, 0.2], 1e-6, 'tint lanes');
+  near([values[98], values[99], values[102]], [1, 1, 1], 1e-6, 'tint lanes: volume attenuation alone, the rest comes from the surface');
   ibl.applyTo(model);
   log = draw();
   const code = log.find((e) => e[0] === 'module')[2].code;

@@ -177,19 +177,6 @@ does not own. Each entry says exactly what is needed to close it.
   `--msaa` passes there. Two views still stream tiles into different pages, so a fixed cull order makes each view
   steady, and two views can still differ at 4x MSAA.
 
-### gltf-pro's native tint draw reads factors, never maps
-
-- **What:** transmitted light on the default path (no `install`, no `Transmission`) is a multiply draw that binds no
-  textures. It reads the sheen, specular and clearcoat factors, not their maps, and has never read the base colour or
-  transmission maps. `metallicFactor` is left out altogether: the default is 1 with the real value in a map, and reading
-  it turned FlightHelmet's lenses black. So a metal factor below 1 does not dim the light behind on this path (spec:
-  `1 - metal`), and a sheen factor of 1 with a dark map dims as if the map were white. Iridescence does not reach it.
-- **Repro:** a glass material with `KHR_materials_transmission.transmissionTexture` black on half its area through
-  `loadGLTF`: the whole surface passes the light behind. The two other paths honour it.
-- **Cause:** `tintEntry` in `packages/gltf-pro/src/shader.ts`, drawn with group 0 only (`frameGroup`). The fix is a tint
-  read from the full surface (`createDrawGroups`, as `texturedTint` does), with the volume attenuation apart from the base
-  colour in the uniform; it costs a second textured fragment pass on every native glass surface.
-
 ### Clearcoat does not dim the opaque base under it through materials `install`
 
 - **What:** the spec's coated material is `mix(material, clearcoat_brdf, clearcoat * F)`, so the base keeps

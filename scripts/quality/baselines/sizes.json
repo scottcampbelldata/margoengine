@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4389086,
+  "total": 4390816,
   "history": [
     {
       "date": "2026-10-24",
@@ -1466,6 +1466,12 @@
       "commit": "d9d5adae6",
       "reason": "post/ssr: margoSSRFresnel takes the dielectric Fresnel ends so reflections match KHR_materials_specular ambient light; margoSSR stays for terrain and water",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "bbb4a609b",
+      "reason": "gltf-pro worker: margoTintSurface, the transmissive tint read from the surface with its maps",
+      "grew": 1
     }
   ],
   "items": {
@@ -1632,7 +1638,7 @@
     "@margoengine/gltf-pro/prepare": 17572,
     "@margoengine/gltf-pro/progressive": 63493,
     "@margoengine/gltf-pro/scene": 1471,
-    "@margoengine/gltf-pro/worker": 57046,
+    "@margoengine/gltf-pro/worker": 58776,
     "@margoengine/headless": 2867,
     "@margoengine/html": 5013,
     "@margoengine/ifc": 2819,

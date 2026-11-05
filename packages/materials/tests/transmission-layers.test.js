@@ -7,7 +7,7 @@
 // on the GPU.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pbrShader, transmissiveShader } from '../../gltf-pro/src/shader.ts';
+import { extendedShader, pbrShader, surfaceTintPBR, transmissiveShader } from '../../gltf-pro/src/shader.ts';
 import { materialExtensionShader } from '../../gltf-pro/src/material-extension.ts';
 import { sheenAlbedoWGSL } from '../../shared/sheen.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
@@ -239,6 +239,36 @@ test('KHR_materials_specular on the native paths: the weight scales F90 and the 
   const code = transmissiveShader();
   assert.ok(code.includes('let fresnel=f0+(mix(vec3f(s.sw),vec3f(1),s.metal)-f0)*pow(1-vh,5.0);'), 'direct light F90');
   assert.ok(code.includes('((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)'), 'direct light base');
+});
+
+/** gltf-pro's surface tint (loaded materials): what is left of the light behind, read from the sampled surface. */
+function surfaceTint({ nv = 1, metal = 0, sheen = [0, 0, 0], coat = 0, ir, code = transmissiveShader() }) {
+  const start = code.indexOf('fn margoTintFresnel('),
+    end = code.indexOf('@fragment fn margoTint(');
+  assert.ok(start >= 0 && end > start, 'the surface tint is in the transmissive shader');
+  const shader = wgslModule(dielectricFresnelWGSL + sheenAlbedoWGSL('margoSheenAlbedo') + code.slice(start, end), {
+    exp: (x) => f32(Math.exp(x)),
+    f: { eye: [Math.sqrt(1 - nv * nv) * 3, 0, nv * 3, 1], ext: [0, 1.5, 0, 0], settings: [0, 0, 0, 1] },
+  });
+  const s = { n: [0, 0, 1], metal, f0: [0.04, 0.04, 0.04], sw: 1, sh: [...sheen, 0.5], cc: coat, ir };
+  return shader.call('margoTintSurface', { position: [0, 0, 0] }, s, [1, 1, 1]);
+}
+
+test('the surface tint reads metal, sheen and coat from the surface, maps included', () => {
+  const clear = surfaceTint({});
+  assert.ok(Math.abs(clear[0] - 0.96) < 1e-5, 'only the dielectric Fresnel');
+  assert.deepEqual(surfaceTint({ metal: 1 }).slice(0, 3), [0, 0, 0], 'metal passes nothing behind');
+  assert.ok(Math.abs(surfaceTint({ metal: 0.5 })[0] - 0.48) < 1e-5, 'a metal factor below 1 dims by 1 - metal');
+  assert.ok(surfaceTint({ sheen: [1, 1, 1] })[0] < clear[0], 'a bright sheen texel dims');
+  assert.equal(surfaceTint({ sheen: [0, 0, 0] })[0], clear[0], 'a dark sheen texel does not');
+  assert.ok(surfaceTint({ coat: 1 })[0] < clear[0], 'the coat dims');
+});
+
+test('the surface tint draw multiplies by the sampled base colour and transmission, and thin film reaches it', () => {
+  const code = surfaceTintPBR(transmissiveShader());
+  assert.ok(code.includes('let s=surface(i,front);return margoTintSurface(i,s,s.base.rgb*s.tr*vec3f(f.coordsB.zw,f.ext.z));'));
+  const film = extendedShader({ slots: Array(18).fill(-1), iridescence: true, anisotropy: false, diffuseTransmission: false });
+  assert.ok(film.includes('mix(margoDielectricFresnel(s.f0,s.sw,nv),s.ir.rgb,s.ir.w)'));
 });
 
 test('native tint on a display-encoded target multiplies encoded light by the encoded share', () => {

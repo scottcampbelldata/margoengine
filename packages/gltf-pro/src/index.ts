@@ -74,6 +74,7 @@ import {
   capturePBR,
   transmissionPBR,
   texturedTintPBR,
+  surfaceTintPBR,
   compactTests,
   viewShader,
   type ExtendedPlan,
@@ -238,7 +239,9 @@ const ownSlot = (m: PBRMaterial, i: number, x?: GLTFExtendedMaterials) => {
 };
 // What a transparency hook takes over: plain alpha blending (transmission tints and custom render state keep the sorted path).
 const separable = (m: PBRMaterial) => m.settings[0] === 2 && !m.tint && !m.renderState,
-  transmits = (m: PBRMaterial) => !!m.tint && !m.renderState && !m.extension?.replacesPhysical;
+  transmits = (m: PBRMaterial) => !!m.tint && !m.renderState && !m.extension?.replacesPhysical,
+  /** A loaded material's tint draw reads the surface; a shading hook's material has its own tint. */
+  surfaceTint = (m: PBRMaterial) => !!m.attenuation && !m.shading;
 // Names the material + effects combination instead of an invalid pipeline when the shader declares more sampled textures or
 // samplers than the device allows per stage (WebGPU's default and guaranteed minimum is 16 of each; README "Texture bindings").
 // ponytail: counts declarations, not per-stage use, so a texture read only in the vertex stage still counts.
@@ -927,6 +930,8 @@ export interface PBRMaterial extends GLTFMaterial {
   physical?: number[];
   extended?: Omit<ExtendedPlan, 'slots'>;
   tint?: number[];
+  /** Volume attenuation at the thickness factor, for a tint draw that reads the rest from the surface (surfaceTintPBR). */
+  attenuation?: number[];
   volume?: number[];
   renderState?: PBRRenderState;
   extension?: MaterialExtension;
@@ -1650,6 +1655,7 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
     tint: transmission
       ? base.slice(0, 3).map((v, i) => v * transmission * attenuationPower(attenuation[i], depth))
       : undefined,
+    attenuation: transmission ? attenuation.map((c) => attenuationPower(c, depth)) : undefined,
     // Transmission hook only: thickness (mesh space) and transmittance per world unit, attenuationColor^(1/attenuationDistance).
     volume: transmission ? [thickness, ...attenuation.map((c) => attenuationPower(c, 1 / distance))] : undefined,
   };
@@ -3973,9 +3979,10 @@ export class PBRModel implements EnginePlugin {
     // Physical rows follow 26 UV rows (36 for extended materials); factor-only materials (five maps) use the same layout.
     // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
     if (!compact && m.tint) {
-      v[98] = m.tint[0];
-      v[99] = m.tint[1];
-      v[102] = m.tint[2];
+      const lanes = surfaceTint(m) ? m.attenuation! : m.tint;
+      v[98] = lanes[0];
+      v[99] = lanes[1];
+      v[102] = lanes[2];
     }
     const source = p.extension ?? m.extension,
       // A normal map on UV1 or with a UV transform (glTF maps), or constructed material maps whose normal-slot affine
@@ -4158,6 +4165,7 @@ export class PBRModel implements EnginePlugin {
     if (inst) code = inst.shader(code);
     if (side === 'back' && !topology) code = backSideShader(code);
     if (m.shading?.texturedTint) code = texturedTintPBR(code);
+    else if (surfaceTint(m)) code = surfaceTintPBR(code);
     if (mode === 'occlusion') {
       const rewritten = occlusionShader(code);
       // An appended occlusion fragment builds the plain surface: give it the extension's edits and bindings too.
@@ -4226,7 +4234,7 @@ export class PBRModel implements EnginePlugin {
       (inst ? ':i' + face + ':' + objectId(inst.layout) : '') +
       (topology ? ':' + topology : '') +
       (through || capture ? ':o' + objectId((through ? oit! : hook!).targets) : '') +
-      (tinted && shading?.texturedTint ? ':t' : '');
+      (tinted && (shading?.texturedTint || surfaceTint(m)) ? ':t' : '');
     let pipeline = draws.pipelines.get(key);
     // A draw that may join an instanced batch derives without building its own pipeline or calling the lighting
     // bindings: the batch draws with its instanced variant (see `build`).
@@ -4325,7 +4333,8 @@ export class PBRModel implements EnginePlugin {
           fragment: {
             module,
             entryPoint: 'margoTint',
-            constants: m.shading?.texturedTint ? { margoFaceTest: face, margoAlphaTest: mask } : undefined,
+            constants:
+              m.shading?.texturedTint || surfaceTint(m) ? { margoFaceTest: face, margoAlphaTest: mask } : undefined,
             targets: [
               {
                 format,
@@ -4348,7 +4357,7 @@ export class PBRModel implements EnginePlugin {
         ? this.effectGroup(d, pipeline!, c, scratch, shading, lit && lighting, through ? oit : undefined)
         : undefined;
     const tint = tinted && build ? draws.pipelines.get(key + ':tint')! : undefined,
-      mappedTint = !!shading?.texturedTint,
+      mappedTint = !!shading?.texturedTint || surfaceTint(m),
       tintEffect = tintGroup(d, tint, mappedTint, effect, c.device);
     // The draw group is kept while the pipeline and group 2 are (`effectGroup` keeps the group object while its entries stay).
     const group =
