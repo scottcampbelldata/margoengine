@@ -340,6 +340,10 @@ does not own. Each entry says exactly what is needed to close it.
   remove this entry. A failure names its owner: 2 or more sends, or about 200 kB of writes, in that frame is the view's
   scheduling (`#apply` in `src/view.ts`); most of it in the real calls is the browser or the Arc driver (still counted,
   hunt it there); neither is the view's own code.
+- **Since 2026-11-05 (bounded without a GPU run, Scott: no GPU checks now):** `packages/biomes/tests/gpu-chain-bound.test.js`
+  pins the structure that keeps a stuck check from hiding: every biomes GPU step has a limit above its A6000 time with a
+  1.4x margin, none chains more than two check files (the timing test runs alone), and every check file ends through
+  `runSuite` and `watchExit`. The kill itself is still not reproduced; the laptop reruns of the first **Needed to close** above still close the entry.
 
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 

@@ -1,0 +1,43 @@
+# The biomes package promises the same bytes on every platform. This job rebuilds the package on Linux, macOS and
+# Windows and runs every test that compares against a recorded golden digest (tests/golden/*.json), so a platform
+# that computes one cell differently fails here. CPU only; no GPU, no timing tests.
+name: Biomes digests
+on:
+  push:
+    paths:
+      - 'packages/biomes/**'
+      - 'packages/math/**'
+      - '.github/workflows/biomes-digests.yml'
+  pull_request:
+    paths:
+      - 'packages/biomes/**'
+      - 'packages/math/**'
+      - '.github/workflows/biomes-digests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  digests:
+    name: Golden digests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.18.0'
+          cache: npm
+      - run: npm ci
+      - name: Build the packages biomes imports
+        run: npm run build:packages
+      - name: Build biomes
+        run: node scripts/build-optional.js biomes
+      - name: Golden-digest tests
+        working-directory: packages/biomes
+        run: node --test --test-timeout=600000 tests/classify.test.js tests/climate.test.js tests/fixed.test.js tests/placement-output.test.js tests/placement.test.js tests/seasons.test.js tests/gpu-classify-inputs.test.js

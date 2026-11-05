@@ -9,6 +9,11 @@ trigonometry, table logarithms and PCG hashes. No `Math.sin`, `Math.exp` or floa
 gives byte-identical layers in every browser, in Node, on the main thread or in a worker. The helpers are public, so
 your own rules can follow the same contract (entry `/toolkit`).
 
+The golden digests run on Linux, macOS and Windows in `.github/workflows/biomes-digests.yml`. The tests are also
+mutation-tested with a small runner in the repository (`node scripts/mutation.mjs biomes`): 82.3 % of the `fixed.ts`
+mutants are killed (all 487), 80.8 % of `classify.ts` (all 501) and 62.0 % of a `placement.ts` sample, measured before
+its new tests. The surviving mutants are listed with their lines and reasons in `docs/mutation.md`.
+
 ```ts
 import { ONE, atan2, hash3, qexp2, qlog2, qmul, sincos } from '@margoengine/biomes/toolkit';
 

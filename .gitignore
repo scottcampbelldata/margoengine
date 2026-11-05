@@ -30,3 +30,6 @@ benchmarks/runs/
 python/margoengine/labextension/
 python/margoengine/static/
 python/margoengine/nbextension/
+
+# Mutation runner work builds (scripts/mutation.mjs)
+.mutation/
