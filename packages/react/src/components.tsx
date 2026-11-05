@@ -48,8 +48,9 @@ export type { MargoPointerEvent, PointerHandlers } from './internal.js';
 import { warnLowercaseTags, warnPickingWithoutWebGPU } from './dev-warnings.js';
 import { ownerHook } from './dev-names.js';
 import { capPixelRatio } from './pixel-ratio.js';
-// Bundlers replace process.env.NODE_ENV; without one `process` is absent and the development hints stay off.
-declare const process: { env: { NODE_ENV?: string } } | undefined;
+import { envReadable } from './dev-mode.js';
+// Bundlers replace process.env.NODE_ENV, usually with no global `process` on the page: see dev-mode.ts.
+declare const process: { env: { NODE_ENV?: string } };
 
 /** What {@link useMargo} returns: the stage, canvas, camera, size and engine, plus `invalidate()`. */
 export interface MargoContextValue {
@@ -189,7 +190,7 @@ export function MargoCanvas({
   const cameraOverrides = useMemo(() => new Set<() => void>(), [engine]);
   const pointerHandlers = useMemo(() => {
     const handlers = new Map<number, PointerHandlers>();
-    if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production' && engine?.backend === 'webgl2') {
+    if (envReadable && process.env.NODE_ENV !== 'production' && engine?.backend === 'webgl2') {
       const set = handlers.set.bind(handlers);
       handlers.set = (id, value) => {
         if (value.onClick || value.onPointerOver || value.onPointerOut) warnPickingWithoutWebGPU();
@@ -200,7 +201,7 @@ export function MargoCanvas({
   }, [engine]);
   useEffect(() => {
     const parent = canvas.current?.parentElement;
-    if (!engine || !parent || typeof process === 'undefined' || process.env.NODE_ENV === 'production') return;
+    if (!engine || !parent || !envReadable || process.env.NODE_ENV === 'production') return;
     if (warnLowercaseTags(parent) || typeof MutationObserver === 'undefined') return;
     const watch = new MutationObserver(() => warnLowercaseTags(parent) && watch.disconnect());
     watch.observe(parent, { childList: true, subtree: true });

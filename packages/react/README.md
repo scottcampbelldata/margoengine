@@ -508,8 +508,20 @@ Windows where the browser chooses), and core takes no option for it, so a prop h
 
 ## Development hints
 
-In development (any build where `process.env.NODE_ENV` is not `'production'`) the Canvas prints each of these once as a
-`MargoError`. A production bundle contains none of them.
+In development the Canvas prints each of these once as a `MargoError`. Development means your bundler or Node gives
+`process.env.NODE_ENV` a value other than `'production'`; the page needs no global `process`, so the Vite dev server
+counts. A production bundle contains none of them. Plain ES modules with no bundler print none either.
+
+```tsx
+import {Canvas} from '@margoengine/react';
+
+// Under `vite dev` the console names the component to use instead of <mesh>.
+export const App = () => (
+  <Canvas>
+    <mesh />
+  </Canvas>
+);
+```
 
 - **A lowercase R3F tag** such as `<mesh>`, `<group>` or `<boxGeometry>` inside the Canvas. React renders it as an unknown
   DOM element, so nothing draws. The message names the Margo component to use (`<Mesh>`, `<Group>`, `<BoxGeometry>`,
@@ -619,5 +631,5 @@ export function App() {
   with `frameloop="demand"` until something asks for a frame.
 - `Grid` needs `@margoengine/lines`, and lets go of its plugin on unmount.
 - `DevTools` needs `@margoengine/inspector` and `@margoengine/stats`, loaded only when it opens, and is off in a production
-  build unless you pass `enabled`. In React 19 development builds a mesh without a `name` shows the components that made it,
+  build unless you pass `enabled`, including one with no global `process`, which is every browser build. In React 19 development builds a mesh without a `name` shows the components that made it,
   such as "Box in Part".

@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 
-// Development-only hints. Every call site is wrapped in `process.env.NODE_ENV !== 'production'`, so a production
+// Development-only hints. Every call site is wrapped in the guard of dev-mode.ts, so a production
 // bundle drops the call and, with `sideEffects: false`, this module with it. Each hint prints once per page load.
 const printed = new Set<string>();
 function hint(code: 'state' | 'unsupported', key: string, message: string): void {

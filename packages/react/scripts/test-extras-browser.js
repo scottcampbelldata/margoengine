@@ -14,8 +14,11 @@ const browser = await openBrowser({ port: 5198, startPath: '/packages/react/test
   { page, hardware } = browser;
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
+const warnings = [];
 page.on('console', (message) => {
-  if (message.type() === 'error') errors.push(message.text());
+  if (message.type() === 'warning') warnings.push(message.text());
+  // React's own complaint about the <mesh> the hints check renders on purpose.
+  if (message.type() === 'error' && !/is unrecognized in this browser.* mesh$/.test(message.text())) errors.push(message.text());
 });
 // Mean colour of a square of the screenshot around (x, y), in fractions of its size.
 const sample = (image, x, y, half = 6) => {
@@ -116,6 +119,20 @@ try {
     `the fallback environment lights the metal, ${unlit} -> ${metal}`,
   );
   result.checks.push({ name: 'Sky: a metal sphere lit only by the sky is not black', unlit, metal });
+
+  // The hints' guard needs no global `process`: Vite replaces the expression and defines none (the page proves it).
+  assert.equal(await page.evaluate(() => typeof process), 'undefined');
+  await shot('hints');
+  assert.ok(
+    warnings.some((text) => /<mesh> is a DOM element/.test(text)),
+    `the lowercase tag hint prints, got ${warnings}`,
+  );
+  await shot('hints-webgl2');
+  assert.ok(
+    warnings.some((text) => /never fire on the WebGL2 fallback/.test(text)),
+    `the picking hint prints, got ${warnings}`,
+  );
+  result.checks.push({ name: 'Development hints print on a page served by Vite' });
 
   await page.evaluate(() => window.extras.unmount());
   assert.deepEqual(await page.evaluate(() => window.extras.state.errors), []);

@@ -21,7 +21,7 @@ import { Grid } from '@margoengine/react/lines';
 import { BatchedMesh, BatchedItem } from '@margoengine/react/materials';
 import { Voxels } from '@margoengine/react/voxel';
 
-type Mode = 'views' | 'batched' | 'voxels' | 'sky-metal' | 'sky-metal-off' | 'helpers';
+type Mode = 'views' | 'batched' | 'voxels' | 'sky-metal' | 'sky-metal-off' | 'helpers' | 'hints' | 'hints-webgl2';
 // A 4 x 4 x 4 block of one red stone type, textured from raw pixels (no image files).
 const blocks = new BlockTypes(),
   stone = blocks.define('stone'),
@@ -49,7 +49,8 @@ function App({ mode }: { mode: Mode }) {
   return (
     <StrictMode>
       <Canvas
-        backend="webgpu"
+        backend={mode === 'hints-webgl2' ? 'webgl2' : 'webgpu'}
+        loadFallback={mode === 'hints-webgl2' ? () => import('@margoengine/webgl') : undefined}
         camera={
           mode === 'voxels' ? { position: [6, 70, 9], target: [0, 64, 0] } : { position: [0, 0, 7], target: [0, 0, 0] }
         }
@@ -91,6 +92,14 @@ function App({ mode }: { mode: Mode }) {
           </>
         )}
         {mode === 'voxels' && <Voxels world={world} textures={textures} />}
+        {/* The two development hints: Vite serves this page and it has no global `process`. */}
+        {mode === 'hints' && <mesh />}
+        {mode === 'hints-webgl2' && (
+          <Mesh onClick={() => {}}>
+            <BoxGeometry args={[1, 1, 1]} />
+            <PbrMaterial color="#ff2020" />
+          </Mesh>
+        )}
         {/* A metal sphere whose only light is the Sky; the fallback environment is what lights it. */}
         {(mode === 'sky-metal' || mode === 'sky-metal-off') && (
           <>

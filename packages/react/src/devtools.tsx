@@ -2,11 +2,10 @@ import React, { useEffect, useRef } from 'react';
 import type { InspectorOptions } from '@margoengine/inspector';
 import type { StatsOptions } from '@margoengine/stats';
 import type { EngineKernel } from '@margoengine/core';
+import { panelsByDefault } from './dev-mode.js';
 import { ownerHook } from './dev-names.js';
 import { report, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
-
-declare const process: { env: { NODE_ENV?: string } } | undefined;
 
 /** Props of `<DevTools>`; every prop is optional. Options are read when the panels open. */
 export interface DevToolsProps {
@@ -45,7 +44,7 @@ const options = <T,>(value: boolean | T): T | undefined => (typeof value === 'ob
  * "Box in Car" (React 19 in development; other meshes keep "Entity 12").
  */
 export function DevTools({
-  enabled = typeof process === 'undefined' || process.env.NODE_ENV !== 'production',
+  enabled = panelsByDefault,
   inspector = true,
   stats = true,
   onError,

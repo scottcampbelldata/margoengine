@@ -4,18 +4,6 @@ What is known to be wrong or not yet proven, and what it would take to close eac
 boundary is a decision, with its escape hatch) live in [limits.md](limits.md); this page lists defects and checks that
 are still open.
 
-## React
-
-### The development hints of @margoengine/react stay off under the Vite dev server
-
-- **What:** the hints for lowercase React Three Fiber tags and for pointer handlers on WebGL2 never print on a page served by Vite.
-- **Cause:** their guard, `typeof process !== 'undefined' && process.env.NODE_ENV !== 'production'` in
-  `packages/react/src/components.tsx`, needs a global `process`. Vite replaces only the member expression and the page has no
-  `process`, so the guard is false. Found when `<DevTools>` used the same guard in `scripts/test-extras-browser.js`: no name arrived.
-- **Repro:** `npm run test:browser:extras -w @margoengine/react` serves through Vite; render `<mesh />` in
-  `tests/extras-browser.tsx` and no hint prints. `tests/dev-hints.test.js` passes because Node has `process`.
-- **To close:** a guard that also holds under Vite and still lets a production bundle drop the hints, with a browser test.
-
 ## Boulder demo
 
 ### The robot's arm shows a copper piston through its shell at close range
