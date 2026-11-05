@@ -187,17 +187,23 @@ does not own. Each entry says exactly what is needed to close it.
   `margoDirectVisible` there too; it makes every physical shader evaluate the shadow where `shadowLit` now skips unlit
   fragments, so its cost has to be measured first. Found by code reading (2026-11-05), not yet measured.
 
-### Display-encoded targets add transmitted and lit light in encoded values
+### Native glass on a display-encoded target adds its lit draw in encoded values
 
-- **What:** without an HDR scene target (`f.settings.w` below 0.5), the lit colour and the transmitted light are both
-  display-encoded when they are added: `color+...` in `materialTransmission`, and the lit draw's blend over the tint on
-  the native path. Light adds in linear values, so bright highlights over bright backgrounds come out too bright.
-- **Size:** encoded 0.5 + 0.5 reads 1.0; adding in linear light reads 0.69. The share itself is linear since 2026-10-31.
-- **Repro:** glass with a strong highlight over a bright background, on a target with no PostStack, against the same
-  scene with `Tonemap`.
-- **Cause:** the tone map and encoding run before the `output` hook; the extension path could decode and re-encode, the
-  native path's second draw cannot without a scene copy. Also, the native tint encodes the share and multiplies, which
-  is exact only for a power curve: within 1 step above about 40 of 255, up to 2 steps below it.
+- **What:** without an HDR scene target (`f.settings.w` below 0.5), the lit draw of gltf-pro's native glass blends over
+  the tint draw in display-encoded values. Light adds in linear values, so bright highlights over bright backgrounds
+  come out too bright. `materials` `install` and `Transmission` add in linear light since 2026-11-05; only the native
+  two-draw path is left.
+- **Size:** encoded 0.5 + 0.5 reads 1.0; adding in linear light reads 0.69. Also, the native tint encodes the share and
+  multiplies, which is exact only for a power curve: within 1 step above about 40 of 255, up to 2 steps below it.
+- **Repro:** glass with a strong highlight over a bright background through `loadGLTF`, on a target with no PostStack,
+  against the same scene with `Tonemap`.
+- **Cause:** the blend unit reads the target as it is stored, and core's colour targets are plain `bgra8unorm` or
+  `rgba8unorm`, so no blend state can decode the destination.
+- **Needed to close:** one of two changes, each with a cost that is Scott's to weigh. A scene copy before every native
+  glass draw (the light behind read in the shader, as `install` does) adds a copy and a pass per glass surface to the
+  default path. An `-srgb` view of the target for the glass pass (blending then runs in linear light in hardware) needs
+  core to create its targets with `viewFormats`, a core change for looks, which the freeze rules out. Until then
+  `Tonemap` or any PostStack gives the exact result, and `install(model)` does on any target.
 
 ### Findings of the outside audit (2026-10-28)
 

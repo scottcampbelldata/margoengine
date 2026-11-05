@@ -83,6 +83,13 @@ export function transmissionShader(
   const declarations = /* wgsl */ `${helpers}// IEC 61966-2-1 transfer, to tint display-encoded snapshots in linear light.
 fn materialTransmissionLinear(c:vec3f)->vec3f {let x=max(c,vec3f(0)); return select(x/12.92,pow((x+0.055)/1.055,vec3f(2.4)),x>vec3f(0.04045));}
 fn materialTransmissionEncode(c:vec3f)->vec3f {let x=max(c,vec3f(0)); return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>vec3f(0.0031308));}
+// Lit colour plus light behind. On a display-encoded target both are encoded, and light adds in linear values; where
+// either is zero the other keeps the value as it was, so light seen through unlit glass passes unchanged.
+fn materialTransmissionAdd(color:vec3f,light:vec3f)->vec3f {
+  if(f.settings.w>=0.5){return color+light;}
+  let sum=materialTransmissionEncode(materialTransmissionLinear(color)+materialTransmissionLinear(light));
+  return select(select(sum,color,light==vec3f(0.0)),light,color==vec3f(0.0));
+}
 // The snapshot texel under a framebuffer position, clamped to the texture.
 fn materialTransmissionRead(p:vec2f)->vec3f {
   let size=vec2f(textureDimensions(${snapshot},0));
@@ -156,7 +163,7 @@ fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,factor:f32,ior:f3
   }
   let r0=(ior-1.0)/(ior+1.0);
   materialTransmissionF0=r0*r0;
-  return color+materialTransmissionFilter(transmitted,materialTransmissionWeight(s,v,n,factor));
+  return materialTransmissionAdd(color,materialTransmissionFilter(transmitted,materialTransmissionWeight(s,v,n,factor)));
 }
 `;
   return {

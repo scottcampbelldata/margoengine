@@ -188,7 +188,7 @@ test('a node material with a clearcoat and transmission composes the coat share 
 test('the transmitted share is applied in linear light on a display-encoded target', () => {
   assert.ok(
     transmission({ opaqueColor: {}, factor: 1 }).declarations.includes(
-      'return color+materialTransmissionFilter(transmitted,materialTransmissionWeight(s,v,n,factor));',
+      'return materialTransmissionAdd(color,materialTransmissionFilter(transmitted,materialTransmissionWeight(s,v,n,factor)));',
     ),
   );
 });

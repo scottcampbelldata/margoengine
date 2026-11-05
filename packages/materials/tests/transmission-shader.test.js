@@ -98,7 +98,7 @@ test('output assigns color only behind a positive factor and the weight expressi
   assert.doesNotMatch(value.output, /return/);
   assert.ok(
     value.declarations.includes(
-      'return color+materialTransmissionFilter(transmitted,materialTransmissionWeight(s,v,n,factor));',
+      'return materialTransmissionAdd(color,materialTransmissionFilter(transmitted,materialTransmissionWeight(s,v,n,factor)));',
     ),
   );
   assert.ok(value.declarations.includes('fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,'));
@@ -379,6 +379,28 @@ test('display-encoded captures tint and attenuate in linear light (IEC 61966-2-1
       .slice(0, 3)
       .map((c, k) => (1 - f0) * (base[k] === 1 ? c : toDisplay(toLinear(c) * base[k])));
   close(out, expected, 2e-6, 'linear tint');
+});
+
+test('display-encoded lit and transmitted light add in linear light, and either alone stays exactly as it was', () => {
+  const toLinear = (c) => (c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92),
+    toDisplay = (c) => (c > 0.0031308 ? 1.055 * c ** (1 / 2.4) - 0.055 : c * 12.92);
+  const { shade } = extension({ factor: 1, ior: 1 }, 0),
+    lit = [0.5, 0.25, 0],
+    { out, pixel } = shade([0.2, 0.2, 0], [0, 0, 1], { color: lit }),
+    light = texel(pixel).slice(0, 3);
+  close(
+    out,
+    lit.map((c, k) => (c === 0 ? light[k] : toDisplay(toLinear(c) + toLinear(light[k])))),
+    2e-6,
+    'linear sum',
+  );
+  // Encoded 0.5 over encoded 0.5 reads 0.69, where adding the encoded values read 1.
+  assert.ok(Math.abs(toDisplay(toLinear(0.5) * 2) - 0.6858) < 0.001);
+  assert.deepEqual(
+    shade([0.2, 0.2, 0], [0, 0, 1], { color: [0, 0, 0] }).out.map(Math.fround),
+    light.map(Math.fround),
+    'Nothing lit keeps the light behind bit for bit',
+  );
 });
 
 const pass = new Transmission().declarations(2);
