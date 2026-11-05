@@ -55,11 +55,12 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` from `@margoengine/geometry/nurbs` |
 | `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
 | `CurveFlow`, `flowGeometry` from `@margoengine/geometry/flow` |
+| `delaunayTriangulate`, `triangulateConstrained` from `@margoengine/geometry/delaunay` |
 | `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -335,6 +336,39 @@ const fromFan = triangleFanToTriangles(6);
 - `mergeGroups` keeps the order materials first appear in, and triangles in no group stay at the end.
 - Strip conversion keeps one winding, drops the repeats used to stitch strips, and treats `0xffffffff` as a restart.
 
+## Delaunay triangulation
+
+`@margoengine/geometry/delaunay` triangulates point sets and polygons so that triangles are as well shaped as the points
+allow. It keeps every point it is given, and exact arithmetic decides every test, so grids, points on one circle and
+near-collinear runs are safe.
+
+```ts
+import {extrudeGeometry, Shape} from 'margoengine/geometry';
+import {delaunayTriangulate, triangulateConstrained} from 'margoengine/geometry/delaunay';
+
+// Terrain from scattered samples, keeping a ridge line as an edge.
+const samples = [[0, 0], [10, 0], [10, 10], [0, 10], [4, 5], [6, 5]];
+const terrain = delaunayTriangulate(samples, {edges: [[4, 5]]});
+
+// A polygon with a hole, plus inner points and edges to hold.
+const outline = [[0, 0], [5, 0], [10, 0], [10, 10], [0, 10]];
+const hole = [[4, 4], [6, 4], [6, 6], [4, 6]];
+const fill = triangulateConstrained(outline, [hole], {points: [[2, 2], [8, 8]]});
+// fill.indices address outline, then hole, then points.
+
+// Extruded caps that keep every outline point, so they meet the walls with no T-junctions.
+const solid = extrudeGeometry(new Shape(outline), {depth: 1, triangulate: triangulateConstrained});
+```
+
+- `delaunayTriangulate(points, {edges})` covers the convex hull and returns counter-clockwise triangles as a
+  `Uint32Array`. A repeated point becomes its first copy, and points all on one line give no triangles.
+- `triangulateConstrained(contour, holes, {points, edges})` has the same result shape as `triangulateShape`, plus `points`.
+  Rings fill by the even-odd rule in any winding. A hole may touch the outline at a point or along a side.
+- A constraint through a point on its line passes through that point. Edges that cross are refused: split them where they
+  meet.
+- Neither adds points. The smallest angle is the best those points allow, never worse than `triangulateShape` on the same
+  points. Many outlines tie: the default triangulator already gives good shapes, so the main gain is keeping every point.
+
 ## Bending along a curve
 
 `@margoengine/geometry/flow` deforms a mesh to follow a curve, or places rigid copies along it: trains on tracks, text
@@ -429,7 +463,7 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
   triangles; run `mergeVertices` when a caller needs an indexed, welded mesh.
 - `latheGeometry` makes every normal unit length, including the last profile normal, which the reference fixture leaves unnormalized. Otherwise output matches the reference fixtures.
 - `computeTangents` follows UVs with v up, as the primitives have them. UVs stored v down, as in glTF files, give the opposite `w`; flip v first or negate `w`.
-- A shape with collinear points on its outline can leave T-junctions between the extruded caps and walls, because the triangulator drops those points.
+- By default a shape with collinear points on its outline can leave T-junctions between the extruded caps and walls, because `triangulateShape` drops those points. Pass `triangulate: triangulateConstrained` to keep them.
 - `edgesGeometry` and `wireframe` return index pairs, not a line geometry; core has no line primitive.
 - Core's `Geometry` accepts up to 1,000,000 vertices, so `toGeometry` throws above that.
 
@@ -454,6 +488,8 @@ check default UVs staying as they were, every corner being offered once, world s
 results. The split tangent tests compare every triangle corner with tangents Blender made: a mirrored sheet in
 `tests/fixtures/mikktspace-mirror.json`, which must split exactly its six mirror vertices, and an exported glTF. The
 housekeeping tests check baked poses against hand-worked results, stretched and mirrored normals, an identity pose,
-group order, buffer round trips and strip winding.
+group order, buffer round trips and strip winding. The Delaunay tests check empty circles by brute force, Euler's
+triangle count, grids, circles, collinear runs, coordinates scaled by 2^500 and 2^-1060 giving the same answer, kept
+constraints, holes in any winding or touching the outline, and watertight extrusions.
 
 Apache-2.0 licensed.

@@ -654,6 +654,10 @@
       "types": "./dist/geometry/flow.d.ts",
       "import": "./dist/geometry/flow.js"
     },
+    "./geometry/delaunay": {
+      "types": "./dist/geometry/delaunay.d.ts",
+      "import": "./dist/geometry/delaunay.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"

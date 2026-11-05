@@ -106,6 +106,14 @@ export interface ExtrudeOptions {
   bevelSegments?: number;
   /** Sweep along this 3D curve instead of +z: shape x follows the frame normal, y the binormal. */
   extrudePath?: Curve<MutableVec3>;
+  /**
+   * Fills the caps in place of `triangulateShape`. Pass `triangulateConstrained` from `@margoengine/geometry/delaunay`
+   * to keep every outline point, so caps meet walls with no T-junctions. Default `triangulateShape`.
+   */
+  triangulate?: (
+    contour: MutableVec2[],
+    holes: MutableVec2[][],
+  ) => { contour: MutableVec2[]; holes: MutableVec2[][]; indices: number[] };
   /** Replaces the default UVs, for example with {@link worldUVs}. Default: the UVs described on {@link extrudeGeometry}. */
   uvGenerator?: ExtrudeUVGenerator;
 }
@@ -227,7 +235,7 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
   const fills = list.map((shape) => {
     const extracted = shape.extractPoints(curveSegments);
     orientRings(extracted.shape, extracted.holes);
-    return triangulateShape(
+    return (options.triangulate ?? triangulateShape)(
       mergeOverlappingPoints(extracted.shape),
       extracted.holes.map((h) => mergeOverlappingPoints(h)),
     );

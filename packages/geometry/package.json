@@ -73,6 +73,10 @@
     "./flow": {
       "types": "./dist/flow.d.ts",
       "import": "./dist/flow.js"
+    },
+    "./delaunay": {
+      "types": "./dist/delaunay.d.ts",
+      "import": "./dist/delaunay.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4430113,
+  "total": 4433531,
   "history": [
     {
       "date": "2026-10-24",
@@ -1550,13 +1550,19 @@
       "commit": "e4e5653da",
       "reason": "geometry: mesh utilities (bake morph and skin, merge groups, interleave, memory, strip and fan)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "9afedda37",
+      "reason": "geometry: new optional entry geometry/delaunay and extrude triangulate option",
+      "grew": 1
     }
   ],
   "items": {
     "@margoengine/animation": 22595,
     "@margoengine/animation/pointer": 7149,
     "@margoengine/animation/sampling": 2803,
-    "@margoengine/animation/skeleton-utils": 8966,
+    "@margoengine/animation/skeleton-utils": 8965,
     "@margoengine/animation/vat": 8130,
     "@margoengine/animator": 18656,
     "@margoengine/animator/graph": 8290,
@@ -1699,6 +1705,7 @@
     "@margoengine/fbx/worker": 19547,
     "@margoengine/fsm": 1131,
     "@margoengine/geometry": 24762,
+    "@margoengine/geometry/delaunay": 3419,
     "@margoengine/geometry/extras": 5843,
     "@margoengine/geometry/extrude": 8942,
     "@margoengine/geometry/flow": 2748,

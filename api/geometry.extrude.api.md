@@ -15,6 +15,11 @@ export interface ExtrudeOptions {
     bevelOffset?: number;
     bevelSegments?: number;
     extrudePath?: Curve<MutableVec3>;
+    triangulate?: (contour: MutableVec2[], holes: MutableVec2[][]) => {
+        contour: MutableVec2[];
+        holes: MutableVec2[][];
+        indices: number[];
+    };
     uvGenerator?: ExtrudeUVGenerator;
 }
 
