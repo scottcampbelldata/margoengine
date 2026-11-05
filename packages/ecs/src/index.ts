@@ -208,3 +208,5 @@ export class World {
     return count;
   }
 }
+export { Schedule } from './schedule.js';
+export type { ScheduleOptions, ScheduleTime, SystemOptions, SystemRun } from './schedule.js';

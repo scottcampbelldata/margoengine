@@ -24,7 +24,41 @@ export type Entity = number;
 
 export type NumericArray = Float32Array | Float64Array | Int32Array | Uint32Array | Uint8Array;
 
+export class Schedule {
+    readonly step: number;
+    readonly maxSteps: number;
+    dropped: number;
+    constructor({ step, maxSteps }?: ScheduleOptions);
+    add(name: string, run: SystemRun, options?: SystemOptions): this;
+    remove(name: string): boolean;
+    has(name: string): boolean;
+    order(): string[];
+    update(delta: number): number;
+}
+
+export interface ScheduleOptions {
+    step?: number;
+    maxSteps?: number;
+}
+
+export interface ScheduleTime {
+    delta: number;
+    elapsed: number;
+    tick: number;
+    alpha: number;
+    fixed: boolean;
+}
+
 export type Schema = Record<string, ArrayConstructor>;
+
+export interface SystemOptions {
+    before?: readonly string[];
+    after?: readonly string[];
+    when?: (time: Readonly<ScheduleTime>) => boolean;
+    fixed?: boolean;
+}
+
+export type SystemRun = (time: Readonly<ScheduleTime>) => void;
 
 export class World {
     readonly capacity: number;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4467300,
+  "total": 4470384,
   "history": [
     {
       "date": "2026-10-24",
@@ -1616,6 +1616,12 @@
       "commit": "5dfee9ef5",
       "reason": "New math entry ./color-space: named colour spaces and convertColor between sRGB, linear and Display P3; also exported from the math root",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "72eb4f5f5",
+      "reason": "New ecs entry ./schedule: Schedule with ordering, run conditions and fixed time steps; also exported from the ecs root",
+      "grew": 2
     }
   ],
   "items": {
@@ -1717,7 +1723,8 @@
     "@margoengine/dof": 7880,
     "@margoengine/dof/autofocus": 2154,
     "@margoengine/dof/lens": 1506,
-    "@margoengine/ecs": 1606,
+    "@margoengine/ecs": 2947,
+    "@margoengine/ecs/schedule": 1743,
     "@margoengine/environment": 29930,
     "@margoengine/environment/cube-camera": 5691,
     "@margoengine/environment/exr-write": 2084,

@@ -2300,6 +2300,7 @@
     "imports": "import { Component } from '@margoengine/ecs';",
     "exports": [
       "Component",
+      "Schedule",
       "World"
     ],
     "category": "Simulation and games"

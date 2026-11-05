@@ -156,6 +156,7 @@ backs them yet:
 | LIM-053 | A package's frame is one colour render pass, unchanged bit for bit in opaque scenes (docs/limits.md, Rendering) | `packages/culling/test/gpu/last-pass-check.mjs`, `tests/modern-msaa.test.js` | `npm run test:gpu --workspace packages/culling` | PROVEN | RTX A6000 only |
 | LIM-054 | OBB: intersectsOBB touches and separates on each of its 15 axes alone and matches polygon clipping on 1,000 seeded pairs; intersectRay finds the nearest entry within 1e-9 relative (docs/limits.md, Geometry) | `packages/math/test/obb.test.js` | `npm test --workspace packages/math` | PROVEN | |
 | LIM-055 | Colour conversion: sRGB red gives the published Display P3 value within 1e-4, all 16 pairs of the four named spaces round trip within 1e-12 and match `Color`, and P3 green keeps its negative sRGB channels (docs/limits.md, Geometry) | `packages/math/test/color-space.test.js` | `npm test --workspace packages/math` | PROVEN | |
+| LIM-056 | Scheduler: stable order from before and after, cycles and missing names refused by name, one run per paid fixed step with the remainder carried, at most maxSteps with the rest reported as dropped (docs/limits.md, Entities) | `packages/ecs/test/schedule.test.js` | `npm test --workspace packages/ecs` | PROVEN | |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 
