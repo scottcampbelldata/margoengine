@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4386117,
+  "total": 4388695,
   "history": [
     {
       "date": "2026-10-24",
@@ -1454,6 +1454,12 @@
       "commit": "42f4d3f7f",
       "reason": "biomes /multinoise entry (new, 3,492 B gzip) and job I roads and paths: new lazy /splines entry 2614 B (polyline, Catmull-Rom and B-spline paths in integers, carved heights, path edits, placement exclusions; loaded by BiomeWorld.create only for a carved height); /editor 3644 to 3754 B for the path edit kind through a small hook; worker 45092 to 49261 B measured: it bundles /multinoise and /splines so multi-noise and carved worlds give identical bytes on 1 and 4 workers; core, stage and the biomes root budget unchanged",
       "grew": 4
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "911528d46",
+      "reason": "KHR_materials_specular weight in the physical shader text: F90 weight and one base weight, 9 B in gltf-pro worker and materials/transmission, 123 B in the fbx worker that bundles the shader",
+      "grew": 3
     }
   ],
   "items": {
@@ -1598,7 +1604,7 @@
     "@margoengine/exporters/usdz": 11341,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 18653,
-    "@margoengine/fbx dist/workers/fbx.js": 51819,
+    "@margoengine/fbx dist/workers/fbx.js": 53501,
     "@margoengine/fbx/export": 7920,
     "@margoengine/fbx/worker": 19547,
     "@margoengine/fsm": 1131,
@@ -1611,7 +1617,7 @@
     "@margoengine/geometry/utils": 5406,
     "@margoengine/gltf": 6285,
     "@margoengine/gltf-pro": 56912,
-    "@margoengine/gltf-pro dist/workers/gltf.js": 20707,
+    "@margoengine/gltf-pro dist/workers/gltf.js": 21338,
     "@margoengine/gltf-pro dist/workers/progressive.js": 15420,
     "@margoengine/gltf-pro/asset": 5501,
     "@margoengine/gltf-pro/coordinates": 755,
@@ -1657,7 +1663,7 @@
     "@margoengine/materials": 61113,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,
-    "@margoengine/materials/transmission": 7151,
+    "@margoengine/materials/transmission": 7416,
     "@margoengine/math": 12483,
     "@margoengine/math/affine": 3936,
     "@margoengine/math/billboard": 2672,
