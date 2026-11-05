@@ -154,6 +154,7 @@ backs them yet:
 | LIM-051 | Tessellation: no edge stays over the limit, the surface does not change, and meshes stay closed across seams and after displacement (docs/limits.md, Geometry) | `packages/geometry/tests/tessellate.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 | LIM-052 | GPU geometry: generated vertices match closed forms and the curve through their points on a real GPU, with triangles facing their normals, and survive a replaced vertex buffer and a lost device (docs/limits.md, Geometry) | `packages/geometry/tests/gpu.test.js`, `packages/geometry/tests/gpu-check.mjs` | `npm test --workspace packages/geometry` | PROVEN | |
 | LIM-053 | A package's frame is one colour render pass, unchanged bit for bit in opaque scenes (docs/limits.md, Rendering) | `packages/culling/test/gpu/last-pass-check.mjs`, `tests/modern-msaa.test.js` | `npm run test:gpu --workspace packages/culling` | PROVEN | RTX A6000 only |
+| LIM-054 | OBB: intersectsOBB touches and separates on each of its 15 axes alone and matches polygon clipping on 1,000 seeded pairs; intersectRay finds the nearest entry within 1e-9 relative (docs/limits.md, Geometry) | `packages/math/test/obb.test.js` | `npm test --workspace packages/math` | PROVEN | |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 
