@@ -2811,21 +2811,16 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
-### `KHR_materials_specular` weight does not scale Fresnel at grazing angles on gltf-pro's native paths
+### `KHR_materials_specular` weight does not reach ambient light on gltf-pro's native paths
 
-- **What:** the spec's Fresnel is `specular * (f0 + (1 - f0) * (1 - v.h)^5)`, so `specularFactor` 0 reflects nothing at any
-  angle, and the base is weighted by `1 - specular * max(F)`, one number for all channels. gltf-pro's native physical
-  shader and the `Transmission` pass multiply only F0 by the weight (`s.f0`), keep F90 at 1, and subtract F per channel.
-- **Measured (`Transmission` pass, white glass, unlit, n.v 0.25, 2026-10-31):** specular 0 passes 0.76 of the light
-  behind, the spec gives 1.0; specular 0.5 passes 0.75, the spec 0.87. Colour [2,1,1] at normal incidence passes
-  (0.92, 0.96, 0.96), the spec 0.92 in all channels. Normal incidence with white specular is right.
-- **Repro:** a material with `KHR_materials_specular: {specularFactor: 0}` through `Transmission.add(model)`; for the
-  reflection, the same material lit at a grazing view through `loadGLTF`.
-- **Cause:** `s.f0=min(ior*ior*color,1)*weight` in `physicalEdits` (`packages/gltf-pro/src/shader.ts`), used by
-  `direct_light` and `margoTransmission` (`packages/materials/src/transmission-pass.ts`), and the split-sum ambient in
-  `environment`, `sky` and `clustered`, which all take F90 = 1. The fix needs a surface F90 through those packages.
-  The materials `install` lobes and the native tint draw already follow the spec, so on the native tint path a surface with
-  specular 0 passes all the light behind and still reflects at grazing angles until this is fixed.
+- **What:** direct light and the `Transmission` pass follow the spec since 2026-11-05 (`specular * (f0 + (1 - f0) * (1 - v.h)^5)`,
+  base weighted by one number). Ambient light from an ambient hook does not: `environment`, `sky` and `clustered` take base
+  and metal only, so they use F0 0.04 and F90 1 whatever the specular or IOR. A surface with specular 0 under an IBL still
+  reflects. The built-in hemisphere ambient does read the weighted F0.
+- **Repro:** a material with `KHR_materials_specular: {specularFactor: 0}` through `loadGLTF`, lit by an `Environment`.
+- **Cause:** the hook calls in `packages/environment/src/lighting.ts`, `packages/sky/src/lighting.ts` and `clustered`.
+- **Needed to close:** either hooks that take F0 and F90, or gltf-pro evaluating each hook on modified surfaces as it does for
+  thin film (`margoAmbientLayers`), with a shader variant so only these materials pay for the extra hook calls.
 
 ### gltf-pro's native tint draw reads factors, never maps
 

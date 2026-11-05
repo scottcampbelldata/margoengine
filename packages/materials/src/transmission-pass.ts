@@ -80,9 +80,8 @@ fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
     transmittance=select(select(pow(max(t,vec3f(0.000001)),vec3f(path)),vec3f(0.0),t<=vec3f(0.0)),vec3f(1.0),t>=vec3f(1.0));
   }
   // The dielectric's Fresnel: glTF 2.0 Appendix B mixes the metal part in beside this one, not over it.
-  let q=1.0-clamp(dot(s.n,v),0.0,1.0); let q2=q*q;
-  let fresnel=s.f0+(1.0-s.f0)*q2*q2*q;
-  return (1.0-s.metal)*s.tr*(1.0-fresnel)*s.base.rgb*transmittance*behind;
+  let keep=1.0-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,clamp(dot(s.n,v),0.0,1.0)));
+  return (1.0-s.metal)*s.tr*keep*s.base.rgb*transmittance*behind;
 }
 `;
 // Mip chain of the scene copy: level0 copies the resolved scene texel for texel; reduce writes each next level as

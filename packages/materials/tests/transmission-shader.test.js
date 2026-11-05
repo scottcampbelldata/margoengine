@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { transmission, Transmission } from '../dist/transmission.js';
+import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 import { wgslModule } from './support/wgsl-subset.js';
 
 const W = 200,
@@ -383,7 +384,7 @@ test('display-encoded captures tint and attenuate in linear light (IEC 61966-2-1
 const pass = new Transmission().declarations(2);
 function hook(frame, volume) {
   const samples = [];
-  const shader = wgslModule(pass, {
+  const shader = wgslModule(dielectricFresnelWGSL + pass, {
     f: { eye: [...eye, 1], camera, model: identity, ...frame },
     margoVolume: volume,
     margoScene: 'scene',
@@ -405,6 +406,8 @@ const surface = (overrides = {}) => ({
   tr: 1,
   th: 1,
   f0: [0, 0, 0],
+
+  sw: 1,
   ...overrides,
 });
 

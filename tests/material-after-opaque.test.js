@@ -291,7 +291,7 @@ test('extension transmission dims diffuse and ambient light only, and adds the l
     const code = s.draws[0].pipeline.fragment.module.code;
     assert.match(code, /s\.tr=clamp\(materialFactors\[0\]\.x,0\.0,1\.0\);/, 'the transmitted share is the factor');
     assert.ok(code.includes('s.base.rgb*(1-s.metal)*(1-s.tr)+'), 'ambient diffuse scaled by 1 - tr');
-    assert.ok(code.includes('(1-fresnel)*(1-s.metal)*(1-s.tr)*s.base.rgb/'), 'direct diffuse scaled by 1 - tr');
+    assert.ok(code.includes('(1-s.metal)*(1-s.tr)*s.base.rgb/'), 'direct diffuse scaled by 1 - tr');
     assert.ok(code.includes('d*g*fresnel/max(4*nl*nv,0.0001)'), 'the specular lobe is untouched');
     assert.ok(code.includes('return color+materialTransmissionFilter(transmitted,materialTransmissionWeight(s,v,n,factor));'));
     assert.ok(!code.includes('mix(color,transmitted'), 'reflections are no longer faded out');

@@ -4,6 +4,7 @@ import { transmittedDiffuse } from '../../shared/pbr-transmission.js';
 import { cotangentFrameShader } from '../../shared/tangent-frame.js';
 import { ggxD, smithG } from '../../shared/light-terms.js';
 import { sheenAlbedoWGSL, sheenBrdfWGSL } from '../../shared/sheen.js';
+import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 // Hemisphere ambient and GGX direct light, shared by the compact and extended shaders.
 // Direct light: glTF 2.0 specification Appendix B (GGX D: Walter et al. 2007, eq. 33; Smith G: eq. 34; Fresnel:
 // Schlick 1994; dielectric F0 0.04 = IOR 1.5). Hemisphere ambient (ground (0.35, 0.3, 0.25) to sky 1 by n.y / 2 + 1/2,
@@ -427,12 +428,12 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {return margoAmbientTerm(i
 // technique"; coat roughness floor 0.045: Filament design document; sheen roughness floor 0.03 and coat ambient 0.5:
 // Margo design choices.
 const physicalEdits = (sample: (name: string) => string, bindings: string): [string, string][] => [
-  ['emissive:vec3f}', 'emissive:vec3f, f0:vec3f, tr:f32, th:f32, cn:vec3f, cc:f32, cr:f32, sh:vec4f}'],
+  ['emissive:vec3f}', 'emissive:vec3f, f0:vec3f, sw:f32, tr:f32, th:f32, cn:vec3f, cc:f32, cr:f32, sh:vec4f}'],
   ['var emissiveSampler:sampler;', 'var emissiveSampler:sampler;\n' + bindings],
   // Dielectric F0 from IOR and KHR_materials_specular, transmission weight, clearcoat normal and layer factors.
   [
     '  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}',
-    `  let ior=(f.ext.y-1)/(f.ext.y+1); s.f0=min(ior*ior*f.specular.rgb*${sample('specularColor')}.rgb,vec3f(1))*f.specular.w*${sample('specular')}.a;
+    `  let ior=(f.ext.y-1)/(f.ext.y+1); s.sw=f.specular.w*${sample('specular')}.a; s.f0=min(ior*ior*f.specular.rgb*${sample('specularColor')}.rgb,vec3f(1))*s.sw;
   s.tr=f.coat.w*${sample('transmission')}.r; s.th=1; let cm=${sample('clearcoatNormal')}.xyz*2-1; s.cn=normalize(t*cm.x*f.coat.z+b*cm.y*f.coat.z+n*cm.z);
   s.cc=f.coat.x*${sample('clearcoat')}.r; s.cr=clamp(f.coat.y*${sample('clearcoatRoughness')}.g,0.045,1.0);
   // Sheen: linear colour (factor x map rgb) and roughness (factor x map alpha), raised to 0.03 so the Charlie lobe's
@@ -442,9 +443,12 @@ const physicalEdits = (sample: (name: string) => string, bindings: string): [str
   ],
   ['mix(vec3f(0.04),s.base.rgb,s.metal)', 'mix(s.f0,s.base.rgb,s.metal)'],
   ...transmittedDiffuse,
+  // KHR_materials_specular: the weight scales F90 too, and the base keeps one number for all channels.
+  ['let fresnel=f0+(1-f0)*pow(1-vh,5.0);', 'let fresnel=f0+(mix(vec3f(s.sw),vec3f(1),s.metal)-f0)*pow(1-vh,5.0);'],
+  ['return ((1-fresnel)*(1-s.metal)', 'return ((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)'],
   [
     '@fragment fn fragment(',
-    `fn ggx(n:vec3f,v:vec3f,l:vec3f,r:f32)->f32 {
+    `${dielectricFresnelWGSL}fn ggx(n:vec3f,v:vec3f,l:vec3f,r:f32)->f32 {
   let h=normalize(v+l); let nl=clamp(dot(n,l),0.0,1.0); let nv=clamp(dot(n,v),0.0001,1.0); let nh=clamp(dot(n,h),0.0,1.0);
   let a2=pow(r,4.0); let d=${ggxD}; let g=${smithG};
   return d*g/max(4*nl*nv,0.0001)*nl;
@@ -596,8 +600,8 @@ fn margoBent(s:Surface,v:vec3f)->vec3f {
  */
 export const directWgsl = (anisotropic: boolean): string => `fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {
   let h=normalize(v+l); let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
-  let f0=mix(s.f0,s.base.rgb,s.metal); let schlick=f0+(1-f0)*pow(1-vh,5.0);
-  let fr=mix(schlick,s.ir.rgb,s.ir.w); let kd=mix(1-schlick,vec3f(1-max(s.ir.r,max(s.ir.g,s.ir.b))),s.ir.w); let a=s.roughness*s.roughness;
+  let f0=mix(s.f0,s.base.rgb,s.metal); let schlick=f0+(mix(vec3f(s.sw),vec3f(1),s.metal)-f0)*pow(1-vh,5.0);
+  let fr=mix(schlick,s.ir.rgb,s.ir.w); let kd=mix(vec3f(1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh))),vec3f(1-max(s.ir.r,max(s.ir.g,s.ir.b))),s.ir.w); let a=s.roughness*s.roughness;
   ${
     anisotropic
       ? `let t=s.at.xyz; let b=cross(s.n,t); let alt=mix(a,1.0,s.at.w*s.at.w); let a2=alt*a;
@@ -687,7 +691,7 @@ export function extendedShader(plan: ExtendedPlan): string {
       ],
       [/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/, 'fn ambient(s:Surface)->vec3f {return margoHemisphere(s);}'],
       [
-        'return ((1-fresnel)*(1-s.metal)*(1-s.tr)*s.base.rgb/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*',
+        'return ((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)*(1-s.tr)*s.base.rgb/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl*',
         'return margoDirect(s,v,l)*',
       ],
       [

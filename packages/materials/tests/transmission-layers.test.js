@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { pbrShader, transmissiveShader } from '../../gltf-pro/src/shader.ts';
 import { materialExtensionShader } from '../../gltf-pro/src/material-extension.ts';
 import { sheenAlbedoWGSL } from '../../shared/sheen.js';
+import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 import { clearcoat, materialLobes, nodeMaterial } from '../dist/index.js';
 import { createTransmission, transmission } from '../dist/transmission.js';
 import { wgslModule } from './support/wgsl-subset.js';
@@ -222,6 +223,23 @@ for (const [name, c] of [...CASES.filter(([, c]) => !c.metal), ['clearcoat 1, gr
       assert.ok(Math.abs(channel - expected) < 2e-5, `${name}: ${actual} vs the spec's ${expected}`);
     assert.equal(actual[3], 1);
   });
+
+test('KHR_materials_specular on the native paths: the weight scales F90 and the base keeps one number', () => {
+  const fresnel = wgslModule(dielectricFresnelWGSL),
+    share = ({ nv = 1, factor = 1, color = [1, 1, 1] }) => {
+      const f0 = color.map((c) => Math.min(0.04 * c, 1) * factor);
+      return 1 - fresnel.call('margoFresnelPeak', fresnel.call('margoDielectricFresnel', f0, factor, nv));
+    };
+  // The numbers of docs/known-bugs.md: specular 0 and 0.5 at n.v 0.25, colour [2,1,1] at normal incidence.
+  assert.ok(Math.abs(share({ factor: 0, nv: 0.25 }) - 1) < 1e-6);
+  assert.ok(Math.abs(share({ factor: 0.5, nv: 0.25 }) - 0.866) < 1e-3);
+  assert.ok(Math.abs(share({ color: [2, 1, 1] }) - 0.92) < 1e-6);
+  for (const [name, c] of CASES.filter(([, c]) => !c.metal && !c.sheen && c.ior === undefined))
+    assert.ok(Math.abs(share(c) - spec(c)) < 2e-5, name);
+  const code = transmissiveShader();
+  assert.ok(code.includes('let fresnel=f0+(mix(vec3f(s.sw),vec3f(1),s.metal)-f0)*pow(1-vh,5.0);'), 'direct light F90');
+  assert.ok(code.includes('((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)'), 'direct light base');
+});
 
 test('native tint on a display-encoded target multiplies encoded light by the encoded share', () => {
   const linear = tint({ factor: 0.5, nv: 0.25 }),
