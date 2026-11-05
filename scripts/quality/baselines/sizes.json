@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4373486,
+  "total": 4386117,
   "history": [
     {
       "date": "2026-10-24",
@@ -1448,6 +1448,12 @@
       "commit": "f8e5860fe",
       "reason": "WebGL2 routes for vfx, scatter and sky (gameplay sandbox 3,748 -> 2.9 ms of frame work on the layer). The growth is the lazy compat chunks, which this gate counts with the entry; native WebGPU pages never fetch them. vfx/base passes the 10,000 B heavy line only through that chunk, so creative's two static imports of it read as leaks.",
       "grew": 7
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "42f4d3f7f",
+      "reason": "biomes /multinoise entry (new, 3,492 B gzip) and job I roads and paths: new lazy /splines entry 2614 B (polyline, Catmull-Rom and B-spline paths in integers, carved heights, path edits, placement exclusions; loaded by BiomeWorld.create only for a carved height); /editor 3644 to 3754 B for the path edit kind through a small hook; worker 45092 to 49261 B measured: it bundles /multinoise and /splines so multi-noise and carved worlds give identical bytes on 1 and 4 workers; core, stage and the biomes root budget unchanged",
+      "grew": 4
     }
   ],
   "items": {
@@ -1462,17 +1468,18 @@
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
     "@margoengine/biomes": 16819,
-    "@margoengine/biomes dist/workers/biomes.js": 45092,
+    "@margoengine/biomes dist/workers/biomes.js": 50739,
     "@margoengine/biomes/cover": 3341,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 5771,
-    "@margoengine/biomes/editor": 3644,
+    "@margoengine/biomes/editor": 4010,
     "@margoengine/biomes/erosion": 3202,
     "@margoengine/biomes/far": 3745,
     "@margoengine/biomes/gpu": 22366,
     "@margoengine/biomes/hydrology": 5138,
     "@margoengine/biomes/io": 4137,
     "@margoengine/biomes/koppen": 1231,
+    "@margoengine/biomes/multinoise": 3748,
     "@margoengine/biomes/objects": 4246,
     "@margoengine/biomes/placement": 13208,
     "@margoengine/biomes/presets": 2024,
@@ -1480,6 +1487,7 @@
     "@margoengine/biomes/relief": 4553,
     "@margoengine/biomes/rivers": 2264,
     "@margoengine/biomes/seasons": 3517,
+    "@margoengine/biomes/splines": 2870,
     "@margoengine/biomes/stats": 2755,
     "@margoengine/biomes/toolkit": 3176,
     "@margoengine/biomes/view": 10454,
