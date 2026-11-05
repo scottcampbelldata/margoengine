@@ -2,7 +2,7 @@
 
 Import `margoengine/math` from the `margoengine` package, or `@margoengine/math` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Line3, Triangle, Sphere, Plane, Ray, Frustum, Spherical, Cylindrical and MathUtils. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
+Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Line3, Triangle, Sphere, Plane, Ray, Frustum, Spherical, Cylindrical, MathUtils and the project functions. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
 
 ```ts
 import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
@@ -65,6 +65,23 @@ const seat = new Cylindrical(3, Math.PI / 2, 1).toVector3(new Vector3()); // (3,
 console.log(seat.toArray());
 ```
 
+Project and unproject (also `@margoengine/math/project`), against anything with a view-projection `matrix`, such as
+`engine.camera` once it has drawn a frame: `projectPoint(point, camera, out)` writes normalized device coordinates (x and y run
+-1..1, +y up), `unprojectPoint(ndc, camera, out)` goes back, `worldToScreen(point, camera, width, height, out)` writes pixels
+from the top-left corner, and `screenToWorld(x, y, depth, camera, width, height, out)` goes back. z is the camera's own depth:
+on WebGPU near = 1 and far = 0, on WebGL near = -1 and far = 1, so a depth from `projectPoint` always round-trips. A point on or
+behind the camera plane has no place on screen: the project functions return null instead of a mirrored position, and leave
+`out` alone. `out` may be the input. `unprojectPoint` and `screenToWorld` throw `RangeError` for a matrix with no inverse, as in
+a camera that has not drawn yet. Orthographic views from `@margoengine/cameras` work the same.
+
+```ts
+import {Vector3, screenToWorld, worldToScreen} from 'margoengine/math';
+const {clientWidth: width, clientHeight: height} = canvas;
+const spot = worldToScreen(new Vector3(0, 2, 0), engine.camera, width, height, new Vector3());
+if (spot) label.style.transform = `translate(${spot.x}px, ${spot.y}px)`; // null: behind the camera, hide the label
+const atSameDepth = spot && screenToWorld(spot.x + 10, spot.y, spot.z, engine.camera, width, height, new Vector3());
+```
+
 Core interop: `toArray()` with no target returns a tuple that `setPosition`, `setScale`, `setRotation`, `setQuaternion`, `camera.position` and `fitToBoundingBox` accept. `copy()` reads any `{x, y, z}`, including `mesh.position`; `Euler.setFromVector3(mesh.rotation)` reads core's XYZ angles. `Matrix4.fromArray` reads `camera.matrix` and world matrices from `@margoengine/core/extension`. `Frustum.fromArray(camera.planes)` and `setFromProjectionMatrix` use core's plane order and WebGPU depth range ([0, 1], reversed-Z included); pass `false` for WebGL [-1, 1]. `Color` stores linear sRGB; hex, CSS and HSL inputs are decoded from sRGB.
 
 `Euler.setFromQuaternion` and `setFromRotationMatrix` keep the exact orientation in all six orders, also at and next to ±90° (the middle angle is in [-π/2, π/2]). At a pole many angle triples give the same rotation, so compare orientations, not angles.
@@ -101,7 +118,7 @@ for (const mesh of billboards) {
 }
 ```
 
-Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation outside `OBB`, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Matrix2, `Vector3.project`/`unproject` (no camera object), `Euler.reorder`, ColorManagement and Display-P3, `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
+Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation outside `OBB`, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Matrix2, `Vector3.project` and `unproject` as methods (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, so Vector3 stays small), `Euler.reorder`, ColorManagement and Display-P3, `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

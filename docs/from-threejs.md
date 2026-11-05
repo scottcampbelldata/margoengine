@@ -97,6 +97,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | TSL, node materials | `@margoengine/shader` |
 | `OrthographicCamera` | `@margoengine/cameras` |
 | `Line2`, `LineMaterial`, `GridHelper`, `AxesHelper` | `@margoengine/lines` |
+| `vector.project(camera)`, `vector.unproject(camera)` | `projectPoint(v, engine.camera, v)`, `unprojectPoint(v, engine.camera, v)` from `@margoengine/math`, plus `worldToScreen` and `screenToWorld` for pixels. A point behind the camera returns null, and on WebGPU depth runs near = 1 to far = 0 |
 | `Points`, `Sprite` | `@margoengine/points` |
 | troika-three-text | `@margoengine/text` |
 | `CSS2DRenderer`, `CSS3DRenderer` | `@margoengine/labels` (`@margoengine/html` adds depth occlusion) |

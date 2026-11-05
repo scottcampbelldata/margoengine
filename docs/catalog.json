@@ -117,7 +117,11 @@
       "hexColor",
       "linearP3ToLinearSRGB",
       "linearSRGBToLinearP3",
-      "quaternionToDegrees"
+      "projectPoint",
+      "quaternionToDegrees",
+      "screenToWorld",
+      "unprojectPoint",
+      "worldToScreen"
     ]
   },
   {

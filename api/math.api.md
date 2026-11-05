@@ -372,6 +372,10 @@ export interface PlaneLike {
     constant: number;
 }
 
+export interface ProjectionCamera {
+    readonly matrix: ArrayLike<number>;
+}
+
 export type Quat = readonly [x: number, y: number, z: number, w: number];
 
 export class Quaternion {
@@ -682,7 +686,15 @@ export function linearP3ToLinearSRGB<T extends NumberArray = number[]>(rgb: Arra
 
 export function linearSRGBToLinearP3<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
 
+export function projectPoint<T extends Vec3Like>(point: Vec3Like, camera: ProjectionCamera, out: T): T | null;
+
 export function quaternionToDegrees(quaternion: ArrayLike<number>, order?: EulerOrder): [number, number, number];
+
+export function screenToWorld<T extends Vec3Like>(x: number, y: number, depth: number, camera: ProjectionCamera, width: number, height: number, out: T): T | null;
+
+export function unprojectPoint<T extends Vec3Like>(ndc: Vec3Like, camera: ProjectionCamera, out: T): T | null;
+
+export function worldToScreen<T extends Vec3Like>(point: Vec3Like, camera: ProjectionCamera, width: number, height: number, out: T): T | null;
 
 // Not exported from this entry, but used by the exports above:
 

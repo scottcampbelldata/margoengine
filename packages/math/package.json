@@ -92,6 +92,10 @@
       "types": "./dist/frustum.d.ts",
       "import": "./dist/frustum.js"
     },
+    "./project": {
+      "types": "./dist/project.d.ts",
+      "import": "./dist/project.js"
+    },
     "./spherical": {
       "types": "./dist/spherical.d.ts",
       "import": "./dist/spherical.js"

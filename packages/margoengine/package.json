@@ -910,6 +910,10 @@
       "types": "./dist/math/frustum.d.ts",
       "import": "./dist/math/frustum.js"
     },
+    "./math/project": {
+      "types": "./dist/math/project.d.ts",
+      "import": "./dist/math/project.js"
+    },
     "./math/spherical": {
       "types": "./dist/math/spherical.d.ts",
       "import": "./dist/math/spherical.js"

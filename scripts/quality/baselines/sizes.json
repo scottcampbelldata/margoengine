@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4448298,
+  "total": 4450335,
   "history": [
     {
       "date": "2026-10-24",
@@ -1568,6 +1568,12 @@
       "commit": "3730d4921",
       "reason": "geometry: new optional entry geometry/polygon",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "f47864ae7",
+      "reason": "New math entry ./project: projectPoint, unprojectPoint, worldToScreen and screenToWorld against any view-projection matrix; also exported from the math root. Core and core + stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -1778,7 +1784,7 @@
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,
     "@margoengine/materials/transmission": 7416,
-    "@margoengine/math": 16865,
+    "@margoengine/math": 17625,
     "@margoengine/math/affine": 3936,
     "@margoengine/math/billboard": 2672,
     "@margoengine/math/box3": 2581,
@@ -1795,6 +1801,7 @@
     "@margoengine/math/mesh": 515,
     "@margoengine/math/obb": 4477,
     "@margoengine/math/plane": 2101,
+    "@margoengine/math/project": 1277,
     "@margoengine/math/quat": 1317,
     "@margoengine/math/quaternion": 1617,
     "@margoengine/math/ray": 2468,

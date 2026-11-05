@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-046). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-047). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -78,6 +78,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Delaunay triangulation (`@margoengine/geometry/delaunay`) | Enforced by method: adds no points of its own, so thin outlines keep thin triangles; crossing constraints and self-crossing rings are refused. Exact tests fall back to whole-number arithmetic, which is slower on grids and other exactly cocircular input. | Keeping the input points is what stops T-junctions; refinement would add vertices. | Cocircular input costs more time. | Add inner points with `points`; split crossing edges. |
 | Segments and triangles (`@margoengine/math/line3`, `/triangle`) | Enforced by method: two directions count as parallel, and a triangle as degenerate, when the sine squared of their angle is below 1e-14 (float64 rounding). `Triangle.containsPoint` tests the point's projection on the plane, not its height above it. | Below that angle the closed forms lose all their digits, so the parallel and collapsed cases take their own paths. | A sliver thinner than about 1e-7 radians gets null barycentric weights. | Use `closestPointToPoint`, which still answers for a degenerate triangle; check `distanceToPoint` when height off the plane matters. |
 | Polygon booleans and offsets (`@margoengine/geometry/polygon`) | Enforced by method: all points go onto one grid of about 2^26 steps across the input. A vertex at a crossing moves up to half a step, edges closer than a step touch, and parts under two steps wide are dropped. | One exact grid is what makes every test safe: no epsilon to tune, and no failed or crossing output at any scale. | Two features 1e-8 of the input's width apart merge. Very large plans with very fine detail lose the detail. | Run distant parts separately, or scale up the part that needs the detail. |
+| Project and unproject (`@margoengine/math/project`) | Enforced by method: core's `camera.matrix` is Float32 and holds zeros until the first frame; a point at or behind the camera plane returns null; a matrix with no inverse throws `RangeError`. | One matrix serves every camera, orthographic included; null keeps a point behind the camera from showing up mirrored on screen. | Results carry float32 precision, not float64, and depth z follows the camera (WebGPU near = 1, far = 0; WebGL near = -1, far = 1). | Pass your own `{matrix}` as a Float64Array for float64 results. Take depth from `projectPoint` instead of hard-coding it. |
 
 ## Copies of a model
 
