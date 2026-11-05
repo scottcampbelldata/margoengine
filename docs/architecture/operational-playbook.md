@@ -311,6 +311,11 @@ Mapping details:
 | CPU | Atomics, workgroup memory, barriers, unbounded store loops, hazards, unsupported formats, or f16 uniform cases | Typed IR emitted as JavaScript; one invocation at a time, generators across barriers, f32 rounded with `Math.fround` | Requires CSP `unsafe-eval`; cannot read cube, multisampled, or external textures; GPU-written inputs can cause synchronous stalls. |
 | Package alternate path | Planned for large atomic, sorting, or GPU-driven workloads | Feature-specific implementation | No recorded shader required it at the snapshot. |
 
+Package routes now cover VFX, scatter (not `ScatterTiles`) and the sky's light projection as well as DOF, splats,
+culling and shadows. A CPU-tier kernel that reads a GPU-written resource waits for all GPU work before it, so one small
+kernel can cost a whole frame: the sky projection cost 57 ms that way. Evidence: `routes.test.js` and the frame budget of
+`visual:compat:budget`; the integrated-GPU budget run is still missing.
+
 The CPU tier's CSP requirement applies only to this opt-in compatibility path. General claims that the shipped native
 engine needs no `unsafe-eval` must be scoped accordingly. Recorded A6000/Edge measurements for CPU clustered binning
 over 3,456 clusters were 1.5 ms with 16 lights, 2.8 ms with 64, and 9.4 ms with 256; a 64-wide reduction with seven

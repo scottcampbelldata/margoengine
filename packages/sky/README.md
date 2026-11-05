@@ -355,7 +355,8 @@ does not stop the others. `weather.flash` (0 to 1) is the same flash as a number
 The state reads as plain numbers: `amount`, `flash`, `wetness` (rises under rain in about 20 s, dries in 90 s; drive
 roughness with it) and `snowCover` (builds in 2 minutes, melts in 5; drive a snow layer). `weather.listener` is the
 position strikes are placed around; the render pass follows the camera, and without a GPU engine you may set it yourself
-and call `onPreUpdate(delta)` for audio or game logic. `Weather` needs WebGPU (`MargoError` `'unsupported'` on WebGL2).
+and call `onPreUpdate(delta)` for audio or game logic. `Weather` needs WebGPU (`MargoError` `'unsupported'` on WebGL2). Sky lighting runs on the WebGL2 compatibility layer with
+no change to your code: the package loads a small route there that computes the same light on the GPU.
 This is a screen-space-free particle overlay: no splashes on the ground, no rain running down the lens, no rain
 occlusion under roofs (it respects the scene depth, not covered areas).
 

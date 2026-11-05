@@ -1,8 +1,10 @@
 import { finiteVector } from '@margoengine/math/validate';
 import { compute, group } from '../../shared/gpu.js';
+import { loadCompatRoute } from '../../shared/compat.js';
 import type { SkyFeatures } from './base.js';
 import { MargoError } from '@margoengine/math/errors';
 import { environment } from './environment.js';
+import { project } from './project.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { STORAGE_BINDING: number; TEXTURE_BINDING: number };
 // The sky's light as the scene receives it: a 64 x 32 environment rendered each frame, three box-filtered mips for
@@ -19,28 +21,6 @@ const downsample = `
 @compute @workgroup_size(8,4) fn main(@builtin(global_invocation_id) id:vec3u){
  if(any(id.xy>=textureDimensions(coarser))){return;}let p=vec2i(id.xy)*2;
  textureStore(coarser,vec2i(id.xy),(textureLoad(finer,p,0)+textureLoad(finer,p+vec2i(1,0),0)+textureLoad(finer,p+vec2i(0,1),0)+textureLoad(finer,p+vec2i(1),0))*0.25);
-}`;
-// Projection onto nine spherical harmonics (Ramamoorthi and Hanrahan 2001) from the 32 x 16 mip, one workgroup.
-// Each coefficient is pre-scaled by its basis constant squared and the clamped-cosine factor over pi (1, 2/3, 1/4), so
-// a shader gets irradiance over pi as a plain polynomial in the normal: 1, y, z, x, xy, yz, 3z^2-1, xz, x^2-y^2.
-const project = `
-@group(0) @binding(0) var level:texture_2d<f32>;
-@group(0) @binding(1) var<storage,read_write> light:array<vec4f,10>;
-var<workgroup> sums:array<array<vec3f,9>,64>;
-@compute @workgroup_size(64) fn main(@builtin(local_invocation_index) t:u32){
- var c=array<vec3f,9>();
- for(var k=t;k<512u;k+=64u){
-  let x=k%32u;let y=k/32u;let phi=((f32(x)+0.5)/32.0-0.5)*6.2831853;let theta=(f32(y)+0.5)/16.0*3.14159265;
-  let w=vec3f(sin(theta)*cos(phi),cos(theta),sin(theta)*sin(phi));
-  // Radiance times the texel's solid angle, (2 pi / 32)(pi / 16) sin(theta).
-  let l=textureLoad(level,vec2i(i32(x),i32(y)),0).rgb*sin(theta)*0.0385531;
-  c[0]+=l;c[1]+=l*w.y;c[2]+=l*w.z;c[3]+=l*w.x;c[4]+=l*(w.x*w.y);c[5]+=l*(w.y*w.z);c[6]+=l*(3.0*w.z*w.z-1.0);c[7]+=l*(w.x*w.z);c[8]+=l*(w.x*w.x-w.y*w.y);
- }
- sums[t]=c;
- for(var s=32u;s>0u;s=s>>1u){workgroupBarrier();if(t<s){for(var i=0u;i<9u;i++){sums[t][i]+=sums[t+s][i];}}}
- workgroupBarrier();
- var scale=array<f32,9>(0.0795775,0.1591549,0.1591549,0.1591549,0.2984155,0.2984155,0.0248680,0.2984155,0.0746039);
- if(t<9u){light[t]=vec4f(sums[0][t]*scale[t],0);}
 }`;
 // Analytic environment BRDF in skyLighting: Karis 2014, "Physically Based Shading on Mobile" (after Lazarov 2013), a
 // published engine standard. Reflection mip = roughness x 3 is Margo's.
@@ -122,10 +102,8 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
         render = compute(d, code + environment + renderLight, 'renderLight'),
         down = compute(d, downsample),
         reduce = compute(d, project);
-      return {
-        buffer,
-        pipelines: [render, down, down, down, reduce],
-        groups: [
+      const pipelines = [render, down, down, down, reduce],
+        groups = [
           d.createBindGroup({
             layout: render.getBindGroupLayout(0),
             entries: [...entries, { binding: 3, resource: level(0) }],
@@ -134,7 +112,17 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
           group(d, down, [level(1), level(2)]),
           group(d, down, [level(2), level(3)]),
           group(d, reduce, [level(1), { buffer }]),
-        ],
+        ];
+      // On the WebGL2 layer the projection moves off the CPU tier once its route has loaded.
+      loadCompatRoute(d, () => import('./compat.js'))?.then(({ projectRoute }) => {
+        const route = compute(d, projectRoute);
+        pipelines[4] = route;
+        groups[4] = group(d, route, [level(1), { buffer }]);
+      });
+      return {
+        buffer,
+        pipelines,
+        groups,
         bindings: [
           { binding: 8, resource: { buffer, offset: 0, size: 160 } },
           { binding: 10, resource: map.createView() },

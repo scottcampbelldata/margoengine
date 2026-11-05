@@ -41,7 +41,7 @@ Last recorded 2026-10-30 at 38445c65 on nvidia ampere (msedge 156.0.4314.50); a 
 | `dof` | high | runs with differences: d > 2 on 0.66% of pixels, mean d 0.0728, max d 113 | exact | 0.3 ms / 0.5 ms; 16.7 ms / 16.7 ms |
 | `earth` | high | runs, same pixels | exact | 0.3 ms / 0.5 ms; 16.7 ms / 16.7 ms |
 | `flight-helmet` | high | runs, same pixels | exact | 0.6 ms / 0.9 ms; 16.7 ms / 16.7 ms |
-| `gameplay-sandbox` | high | runs with differences: d > 2 on 1.16% of pixels, mean d 0.132, max d 73 | 0.00%, mean 0.0000488, max d 1 | - / -; - / - |
+| `gameplay-sandbox` | high | runs with differences: d > 2 on 1.16% of pixels, mean d 0.132, max d 73 | 0.00%, mean 0.0000488, max d 1 | 0.7 ms / 2.9 ms; 16.7 ms / 66.6 ms |
 | `khronos-ABeautifulGame` | model | runs, same pixels | exact | 0.6 ms / 0.8 ms; 16.7 ms / 16.7 ms |
 | `khronos-AlphaBlendModeTest` | model | runs, same pixels | exact | 0.4 ms / 0.6 ms; 16.7 ms / 16.7 ms |
 | `khronos-AnisotropyBarnLamp` | model | runs, same pixels | exact | 0.3 ms / 0.5 ms; 16.7 ms / 16.7 ms |

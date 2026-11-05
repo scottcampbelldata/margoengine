@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4364782,
+  "total": 4373486,
   "history": [
     {
       "date": "2026-10-24",
@@ -1442,6 +1442,12 @@
       "commit": "54c1a937e",
       "reason": "biomes integration (route step, jobs B and C), Scott's 2026-11-05 ruling that justified size growth is fine (core and the 25,000 B core+stage gate unchanged): new /erosion 2946 B (integer thermal and hydraulic erosion) and /io 3881 B (heightmap, weight and mask exports, saveWorld and loadWorld); /gpu 14425 to 21714 B, it now also holds the flow and placement kernels a backend 'gpu' world runs hydrologyOfAsync and BiomePlacement on (loaded by package name, so /hydrology, /placement and the worker hold none of it); /hydrology 4882 B and /placement 12823 B for that routing (+203 B and +147 B over their budgets); worker 41312 to 43778 B: it bundles /erosion so a relief world with erosion gives identical bytes on 1 and 4 workers (about 2 kB), plus the routing",
       "grew": 6
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "f8e5860fe",
+      "reason": "WebGL2 routes for vfx, scatter and sky (gameplay sandbox 3,748 -> 2.9 ms of frame work on the layer). The growth is the lazy compat chunks, which this gate counts with the entry; native WebGPU pages never fetch them. vfx/base passes the 10,000 B heavy line only through that chunk, so creative's two static imports of it read as leaks.",
+      "grew": 7
     }
   ],
   "items": {
@@ -1753,7 +1759,7 @@
     "@margoengine/road": 1171,
     "@margoengine/save": 6955,
     "@margoengine/save/node": 939,
-    "@margoengine/scatter": 15271,
+    "@margoengine/scatter": 18744,
     "@margoengine/scatter/paint": 1532,
     "@margoengine/scatter/tiles": 3448,
     "@margoengine/scenery": 474,
@@ -1772,12 +1778,12 @@
     "@margoengine/shader/readback": 7620,
     "@margoengine/shadows": 17321,
     "@margoengine/shadows/virtual": 14601,
-    "@margoengine/sky": 16485,
+    "@margoengine/sky": 17003,
     "@margoengine/sky/base": 7066,
     "@margoengine/sky/bruneton": 2557,
     "@margoengine/sky/clouds": 2338,
     "@margoengine/sky/fog": 2295,
-    "@margoengine/sky/lighting": 3617,
+    "@margoengine/sky/lighting": 4064,
     "@margoengine/sky/night": 2523,
     "@margoengine/sky/preetham": 953,
     "@margoengine/sky/reflection": 1325,
@@ -1820,8 +1826,8 @@
     "@margoengine/usdz": 8792,
     "@margoengine/usdz dist/workers/usdz.js": 65883,
     "@margoengine/usdz/worker": 9856,
-    "@margoengine/vfx": 14548,
-    "@margoengine/vfx/base": 8535,
+    "@margoengine/vfx": 16742,
+    "@margoengine/vfx/base": 10605,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/emitter": 2656,
     "@margoengine/vfx/obstacles": 1364,
@@ -1886,6 +1892,8 @@
     "leak @margoengine/controls -> @margoengine/bvh": 1,
     "leak @margoengine/controls/drag -> @margoengine/bvh": 1,
     "leak @margoengine/controls/walk -> @margoengine/bvh": 1,
+    "leak @margoengine/creative -> @margoengine/vfx/base": 1,
+    "leak @margoengine/creative/particles -> @margoengine/vfx/base": 1,
     "leak @margoengine/fbx -> @margoengine/exporters": 1,
     "leak @margoengine/fbx -> @margoengine/gltf-pro": 1,
     "leak @margoengine/fbx/worker -> @margoengine/gltf-pro/worker": 1,

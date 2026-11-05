@@ -1250,6 +1250,18 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
     `VoxelEditStore`. Guard: `packages/voxel-net/tests/limits.test.js`.
 - **What we got wrong:** our own security review and fuzzers had not found these.
 
+### 45. Gameplay sandbox on the WebGL2 layer: 3,748 ms to 2.9 ms of main-thread work a frame
+
+- **Measured:** `npm run visual:compat:budget -- --only=gameplay-sandbox`, RTX A6000, Edge 156, ANGLE Direct3D 11,
+  2026-11-05. Median main-thread work per frame on the layer: 3,748.2 ms before, 56.6 ms with the VFX and scatter routes,
+  2.9 ms with the sky route too. Natively 0.7 ms.
+- **Cause:** kernels on the layer's CPU tier. The last one cost little itself: its read of the light map waited for
+  the whole frame's GPU work.
+- **Same work:** each route does the same tests and sums, in the same order where order changes the bits. Same pixel
+  status against native. The budget was not changed.
+- **Still slow:** the frame interval on the layer is 66.6 ms (15 frames a second) against 16.7 natively, GPU time the
+  budget does not measure. Details: [the roadmap](../webgl2-compat-roadmap.md#package-routes-m6-2026-10-29).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

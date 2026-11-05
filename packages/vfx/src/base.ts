@@ -16,6 +16,7 @@ import { simulationShader, billboardShader, multisampled, foggedBillboard } from
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 export type { FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
+import { loadCompatRoute } from '../../shared/compat.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
   STORAGE: number;
@@ -273,6 +274,8 @@ export class VFX implements EnginePlugin {
   private emitterRuntime?: ReturnType<NonNullable<VFXFeatures['emitter']>['create']>;
   private emitterShape?: string;
   private sorter?: ReturnType<NonNullable<VFXFeatures['sort']>['create']>;
+  /** On the WebGL2 layer, once loaded: the simulation as point draws on the GPU and the draw without a read-back (./compat.js). */
+  private route?: { kernels: import('./compat.js').SimulationRoute; billboard(code: string): string; binding: number };
   private owned: OwnedResources = [];
   private softRuntime?: ReturnType<NonNullable<VFXFeatures['soft']>['create']>;
   private fogSource: FogLike | null = null;
@@ -511,6 +514,33 @@ export class VFX implements EnginePlugin {
       );
     if (this.sprite) this.spriteEntries = f.texture!.create(this.device, this.sprite, this.owned);
     this.burst(this.options.initialCount ?? 0);
+    const particles = this.particles;
+    loadCompatRoute(this.device, () => import('./compat.js'))?.then((compat) => {
+      if (this.particles !== particles) return;
+      this.route = {
+        kernels: new compat.SimulationRoute(
+          this.device!,
+          simulation,
+          this.capacity,
+          {
+            uniform: u,
+            particles,
+            alive: this.alive!,
+            indirect: this.indirect!,
+            visible: this.visible!,
+          },
+          [
+            ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
+            ...(this.emitterRuntime?.entries ?? []),
+          ],
+          this.owned,
+        ),
+        billboard: compat.countedBillboard,
+        binding: compat.COUNT_BINDING,
+      };
+      this.renders.clear();
+      this.renderGroups.clear();
+    });
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -578,7 +608,7 @@ export class VFX implements EnginePlugin {
     }
     if (o.curves) this.curveRuntime!.write(c.device.queue, o.curves);
     if (o.emitter) this.emitterRuntime!.write(c.device.queue, o.emitter);
-    c.encoder.clearBuffer(this.indirect!, 4, 4);
+    if (!this.route) c.encoder.clearBuffer(this.indirect!, 4, 4);
     const pass = c.encoder.beginComputePass(),
       groups = Math.ceil(this.capacity / 256),
       step = ([pipeline, group]: Step, count: number) => {
@@ -588,13 +618,16 @@ export class VFX implements EnginePlugin {
       },
       [deaths, births] = this.births!,
       [scan, compact] = this.listing!;
-    if (budget) {
-      step(deaths, groups);
-      step(births, 1);
+    if (this.route) this.route.kernels.encode(pass, budget > 0);
+    else {
+      if (budget) {
+        step(deaths, groups);
+        step(births, 1);
+      }
+      step([this.simulation!, this.computeGroup!], groups);
+      step(scan, 1);
+      step(compact, groups);
     }
-    step([this.simulation!, this.computeGroup!], groups);
-    step(scan, 1);
-    step(compact, groups);
     this.sorter?.run(pass);
     pass.end();
   }
@@ -627,7 +660,8 @@ export class VFX implements EnginePlugin {
     let pipeline = this.renders.get(key);
     if (!pipeline) {
       const lit = samples ? this.features.soft!.patch(this.billboard, samples) : this.billboard,
-        billboard = fog ? foggedBillboard(lit) : lit;
+        fogged = fog ? foggedBillboard(lit) : lit,
+        billboard = this.route ? this.route.billboard(fogged) : fogged;
       const module = c.device.createShaderModule({
         code: (c.descriptor.multisample?.count ?? 1) > 1 ? multisampled(billboard) : billboard,
       });
@@ -670,6 +704,7 @@ export class VFX implements EnginePlugin {
           ...(this.curveRuntime?.entries ?? []),
           ...(fog ? [{ binding: 5, resource: { buffer: this.fogBuffer! } }] : []),
           ...(samples ? this.softRuntime!.entries : []),
+          ...(this.route ? [{ binding: this.route.binding, resource: { buffer: this.visible! } }] : []),
         ],
       });
       this.renderGroups.set(pipeline, group);
@@ -681,7 +716,8 @@ export class VFX implements EnginePlugin {
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
     applyView(pass, c);
-    pass.drawIndirect(this.visible!, 0);
+    if (this.route) pass.draw(3, this.capacity);
+    else pass.drawIndirect(this.visible!, 0);
     pass.end();
     this.engine!.stats.drawCalls++;
   }
@@ -708,7 +744,7 @@ export class VFX implements EnginePlugin {
     this.owned = [];
     this.spriteEntries = [];
     this.curveRuntime = this.emitterRuntime = undefined;
-    this.extra = this.sorter = undefined;
+    this.extra = this.sorter = this.route = undefined;
     this.uniform = this.particles = this.alive = this.indirect = this.visible = this.respawn = undefined;
     this.computeGroup = this.births = this.listing = undefined;
     this.renderGroups.clear();

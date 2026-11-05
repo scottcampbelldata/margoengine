@@ -33,6 +33,7 @@ import { preset } from '../../shared/preset.js';
 import { displayShader } from '../../shared/display.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
+import { loadCompatRoute } from '../../shared/compat.js';
 declare const GPUBufferUsage: {
   VERTEX: number;
   INDEX: number;
@@ -491,6 +492,8 @@ export class Scatter implements EnginePlugin {
   /** Four light matrices, then each ring's list offset and the cascade stride (u32), then cascades and radius. */
   private readonly cullValues = new Float32Array(72);
   private readonly listOffsets = new Uint32Array(this.cullValues.buffer, 256, 4);
+  /** On the WebGL2 layer, once loaded: the kernels as point draws on the GPU and draws without a read-back (./compat.js). */
+  private route?: import('./compat.js').ScatterRoute;
   /** Whether any instance can fade between LOD meshes: shaders keep the dither `discard` only then. */
   private readonly fade: boolean;
   /** `variation` hue and value; both 0 (and no `clusters`) keep the original lit vertex stage. */
@@ -706,6 +709,32 @@ export class Scatter implements EnginePlugin {
     });
     d.queue.writeTexture({ texture: this.fallback }, new Float32Array(1), { bytesPerRow: 4 }, [1, 1]);
     this.compute = compute(d, this.cullCode());
+    // ScatterTiles keeps the layer's generic tiers: its rings grow and its records are its own.
+    const uniform = this.uniform;
+    if (this.constructor === Scatter)
+      loadCompatRoute(d, () => import('./compat.js'))?.then(({ ScatterRoute }) => {
+        if (this.uniform !== uniform) return;
+        this.route = new ScatterRoute({
+          device: d,
+          cull: this.cullCode(),
+          count: this.count,
+          capacity: this.ringCapacity(),
+          uniform,
+          rings: this.instances,
+          commands: this.commands!,
+          exclusions: this.exclusionBuffer!,
+          vertices: this.vertices,
+          indices: this.indices,
+          indexCounts: this.geometries.map((g) => g.indices.length),
+          values: this.values,
+          shadowCode,
+          shadowListCode,
+          shadowDepth,
+        });
+        this.pipelines.clear();
+        this.renderGroups.clear();
+        this.pbrGroups.clear();
+      });
   }
   onPreUpdate(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0)
@@ -753,8 +782,9 @@ export class Scatter implements EnginePlugin {
   }
   /** Records the distribute (cull) dispatch: clears the ring counts, then fills the rings (the tiles entry shares it). */
   protected cull(c: ScatterPassContext, terrain: GPUTexture): void {
-    for (let i = 0; i < 3; i++) c.encoder.clearBuffer(this.commands!, i * 20 + 4, 4);
     const density = this.options.densityMap ? (this.options.densityMap() ?? this.fallback!) : undefined;
+    if (this.route) return this.route.cull(c.encoder, terrain, density);
+    for (let i = 0; i < 3; i++) c.encoder.clearBuffer(this.commands!, i * 20 + 4, 4);
     if (this.terrain !== terrain || this.densityTexture !== density || this.extraChanged || !this.computeGroup) {
       this.computeGroup = group(c.device, this.compute!, [
         { buffer: this.uniform! },
@@ -890,7 +920,7 @@ export class Scatter implements EnginePlugin {
             'let n=normalize(mix(normalize(i.normal)*select(-1.0,1.0,facing),i.ground.xyz,i.ground.w));',
           );
       }
-      const module = c.device.createShaderModule({ code });
+      const module = c.device.createShaderModule({ code: this.route ? this.route.vertex(code, lit) : code });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: {
@@ -924,17 +954,18 @@ export class Scatter implements EnginePlugin {
     }
     let groups = this.renderGroups.get(pipeline);
     if (!groups) {
-      groups = this.instances.map((buffer) =>
-        lit
+      groups = this.instances.map((buffer, ring) => {
+        const count = this.route ? [this.route.ringCount(ring)] : [];
+        return lit
           ? c.device.createBindGroup({
               layout: pipeline!.getBindGroupLayout(1),
-              entries: [
-                { binding: 0, resource: { buffer } },
-                { binding: 1, resource: { buffer: this.materialUniform! } },
-              ],
+              entries: [{ buffer }, { buffer: this.materialUniform! }, ...count].map((resource, binding) => ({
+                binding,
+                resource,
+              })),
             })
-          : group(c.device, pipeline!, [{ buffer: this.uniform! }, { buffer }]),
-      );
+          : group(c.device, pipeline!, [{ buffer: this.uniform! }, { buffer }, ...count]);
+      });
       this.renderGroups.set(pipeline, groups);
     }
     let lighting = this.pbrGroups.get(pipeline);
@@ -955,7 +986,8 @@ export class Scatter implements EnginePlugin {
       pass.setBindGroup(lit ? 1 : 0, groups[i]);
       pass.setVertexBuffer(0, this.vertices[i]);
       pass.setIndexBuffer(this.indices[i], 'uint32');
-      pass.drawIndexedIndirect(this.commands!, i * 20);
+      if (this.route) pass.drawIndexed(this.geometries[i].indices.length, this.ringCapacity());
+      else pass.drawIndexedIndirect(this.commands!, i * 20);
     }
     pass.end();
   }
@@ -975,6 +1007,7 @@ export class Scatter implements EnginePlugin {
     cascades: number;
   }): void {
     if (this.disposed || !this.commands) return;
+    if (this.route) return this.route.prepareShadow(context.encoder, matrices, cascades, this.values[35]);
     const d = context.device,
       rings = this.instances,
       o = this.listOffsets;
@@ -1046,6 +1079,7 @@ export class Scatter implements EnginePlugin {
     cascade: number;
   }): void {
     if (this.disposed || !this.commands) return;
+    if (this.route) return this.route.drawShadow(context.encoder, pass, matrix, cascade);
     const d = context.device,
       cull = this.cascadeCull,
       culled = !!cull && context.encoder === cull.encoder && cascade < cull.cascades,
@@ -1093,6 +1127,8 @@ export class Scatter implements EnginePlugin {
   }
 
   protected release(): void {
+    this.route?.destroy();
+    this.route = undefined;
     for (const b of [...this.instances, ...this.vertices, ...this.indices]) b.destroy();
     this.instances = [];
     this.vertices = [];

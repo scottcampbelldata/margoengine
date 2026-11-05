@@ -2811,16 +2811,6 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
-### The frame-budget step fails on the gameplay sandbox (WebGL2 layer, CPU tier)
-
-- **What:** `npm run visual:compat:budget` fails since 974a2a48c, which times gameplay-sandbox while it runs (it stops
-  drawing under reduced motion; before, a missing median passed without a check): 2,403 ms a frame on the layer against
-  0.8 ms native, budget 50 ms (RTX A6000, Edge 156). windy-meadow, timed the same way, passes at 22.3 ms.
-- **Repro:** `npm run visual:compat:budget -- --only=gameplay-sandbox`.
-- **Cause:** the VFX and scatter kernels of the sandbox use atomics, which the layer runs on the CPU tier.
-- **Needed to close:** layer routes for the VFX and scatter prefix counts (a branch with an unchecked start exists,
-  `sandbox-compat-routes`, 27aa6aff5). Parked by Scott with the sandbox's speed; no budget was raised and no step skipped.
-
 ### `KHR_materials_specular` weight does not scale Fresnel at grazing angles on gltf-pro's native paths
 
 - **What:** the spec's Fresnel is `specular * (f0 + (1 - f0) * (1 - v.h)^5)`, so `specularFactor` 0 reflects nothing at any

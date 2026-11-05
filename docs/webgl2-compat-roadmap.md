@@ -641,9 +641,18 @@ wall time per frame, native then the layer.
   from the transforms the plugin keeps and uploads the kept records and the indirect arguments: 1.14 ms, no compute,
   no stall. `CulledMeshes` does the same from core's batch records. A padded bounding sphere is conservative, so the
   image is the same.
-- **Generic tiers as the route.** VFX and creative particles (a VFX preset) and scatter use atomics; the plan's
-  route for them is simulation and placement on the CPU, which is what the CPU tier does with their own kernels. Their checks pass on the layer (`--compat`). Budgets: VFX 6.5 ms for 5,000 particles and
+- **Generic tiers as the route (until 2026-11-05, see VFX, scatter and sky below).** VFX and creative particles (a VFX preset) and scatter use atomics; the plan's
+  route for them was simulation and placement on the CPU, which is what the CPU tier does with their own kernels. Their checks pass on the layer (`--compat`). Budgets: VFX 6.5 ms for 5,000 particles and
   48 ms for 50,000 (0.61 and 0.67 natively); scatter 5.4 ms for 10,000 instances and 40 ms for 100,000 (0.56 and 0.85).
+- **VFX, scatter and sky (2026-11-05).** The gameplay sandbox spent 3,748 ms of main-thread work a frame on the layer
+  against 0.6 natively. VFX and scatter handed out slots with atomics and workgroup scans; their routes
+  (`vfx/src/compat.ts`, `scatter/src/compat.ts`, with `shared/prefix.js`, an exact prefix count from own-index stores)
+  run the same tests as point draws and draw every slot, the vertex stage dropping those past the count, since an indirect draw would
+  read its arguments back. That left 56.6 ms, nearly all one `readPixels`: the sky's spherical-harmonics kernel, on the
+  CPU tier for its workgroup memory, read the light map every frame and so waited for the frame's GPU work. Its route
+  (`sky/src/compat.ts`) is nine point-draw invocations adding the same terms in the same order: 2.9 ms. The VFX and sky
+  routes equal the WebGPU kernels word for word on the CPU runner (`routes.test.js`); the sandbox's pixels against native
+  did not change (d > 2 on 1.15% of pixels, 1.16% before). `ScatterTiles` keeps the generic tiers.
 - **Refusals.** The voxel path tracer (out of scope: ANGLE's Direct3D compiler takes 20 s to minutes per kernel) and XR
   (WebXR on WebGL2 needs `XRWebGLLayer`) refuse the layer with MargoError code `unsupported` naming what they need;
   each message has a unit test.
@@ -783,8 +792,8 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   of 8 demos) fails a demo whose median frame on the layer costs more than 50 ms of main-thread work and more than
   twice its native frame (`--budget=<ms>`). It was part of `visual:compat`, in a shared GPU slot, until a landing
   failed on khronos-NodePerformanceTest at 86 ms beside other GPU suites (2026-10-30). The run on an integrated GPU
-  (AMD Radeon 680M) is still to be recorded. On the RTX A6000 the step currently fails on gameplay-sandbox
-  (see `docs/known-bugs.md`).
+  (AMD Radeon 680M) is still to be recorded. On the RTX A6000 gameplay-sandbox passes at 2.9 ms of main-thread work a
+  frame on the layer (3,748 ms before its routes); the frame interval there is 66.6 ms, GPU time, which this budget does not cover.
 - **Dual viewport** ([examples/dual-viewport.html](../examples/dual-viewport.html), the launch showcase item): one
   scene with PBR materials and soft shadows, native WebGPU on the left and the layer on the right, with the live pixel
   difference and both frame times. In exact-pixel mode and with 4x MSAA on this PC no pixel of the 274,176 differs by more than one level.
@@ -810,5 +819,5 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   73,000 B, not the 60,000 B target, which no gate ever enforced. The base carries the full WGSL to GLSL translator and
   the WGSL checker, both needed on the first frame; native WebGPU always validates shaders, so a build without the
   checker would behave differently from it. The lazy compute runtime is measured and gated on its own.
-- **Left from M8.** The integrated-GPU budget run. The transform-feedback tier for own-index stores is parked with the
-  sandbox's speed (speed only, see the scatter tier above); nothing is built for it.
+- **Left from M8.** The integrated-GPU budget run. The transform-feedback tier for own-index stores is parked (speed
+  only, see the scatter tier above); nothing is built for it.
