@@ -331,6 +331,30 @@ does not own. Each entry says exactly what is needed to close it.
   pins the structure that keeps a stuck check from hiding: every biomes GPU step has a limit above its A6000 time with a
   1.4x margin, none chains more than two check files (the timing test runs alone), and every check file ends through
   `runSuite` and `watchExit`. The kill itself is still not reproduced; the laptop reruns of the first **Needed to close** above still close the entry.
+- **Since 2026-11-05, the Ubuntu box (Intel N100, 4 cores and 4 threads, Linux 7.0, Chromium 156) fails the slow sends
+  check every run** (view frame max 9.0, 5.4, 5.5, 5.3, 7.6 ms against 3.5; each worst frame 1 send, no texture write,
+  3 to 6.8 ms inside the real postMessage). Measured, at 35673dfa1 with no source change:
+  1. **Not the message.** A job message is a few fields (`view`: op, x, z, the material names, step, canopy; `place`:
+     op, pid, x, z, split, detail, ahead) and results come back as transferred buffers (`collect` in
+     `src/biomes.worker.ts`). A trace of one slow sends flight (38 posts over 1 ms) puts every slow post inside a task
+     whose thread time is 2.1 to 2.5 ms, which is the check's 2 ms wait plus at most 0.5 ms; the rest of the task, 1.3
+     to 7.6 ms, is time the page thread was not on a CPU. No garbage collection or other event inside those posts.
+  2. **It is the scheduler waking a worker.** Every post in the pool goes to an idle worker (`#pump` posts only then),
+     so every post wakes a sleeping thread. Posts are cheap (at most 0.1 ms over 74 posts) while at most one other
+     worker runs, and dear (mean 0.3 to 0.6 ms, up to 5.9 ms) while two or three others run. A page with no engine code
+     (4 or 5 workers: some spinning, one asleep) shows the same: waking the sleeping one with 3 spinning took over 1 ms
+     in 51 to 63 of 200 posts (about 3 ms each, one Linux time slice), whatever the page thread ran before the post
+     (0 to 3 ms); posting to a worker that is running took over 1 ms in 0 of 600 posts. Waking a small relay worker
+     that forwards the job made it worse (over 1 ms in 167 to 184 of 200).
+  3. **Fewer workers do not clear it.** With the check's world forced to 3 workers: 5.5 and 5.1 ms; with 2 workers:
+     4.6 and 2.7 ms. On 4 threads the page thread, the GPU process and two or more busy workers fill the CPU, and the
+     operating system takes a slice from the page thread at a wake (and elsewhere: the check already sees up to 2.9 ms
+     lost inside its own waits on this box).
+  The view sends at most one job per frame, first in its frame, as the check requires; what costs is a wake the job
+  needs. No limit is changed and nothing is skipped. The one lever left in the pool is to run fewer workers at once
+  than the hardware threads, a throughput loss, and even 2 of 4 failed one run in 2 here; Scott's call. The
+  diagnostics (per-post timing by busy workers, the trace reader, the wake page) are kept on the box in
+  `~/margo-test/repo` (`diag-flythrough.mjs`, `wake-check.html`, `wake-check.mjs`).
 
 ### GPU resets during busy check:merge runs on the RTX A6000 PC (nvlddmkm event 153)
 
