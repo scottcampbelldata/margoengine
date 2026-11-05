@@ -28,7 +28,7 @@ export class GpuTiles {
     watch(): void;
     live(): void;
     fits(c?: Classifier, kind?: 'envelopes' | ZoneClassifier, height?: ArrayLike<number>): boolean;
-    layers(r: GpuRequest, caller?: AbortSignal, live?: () => void): Promise<Map<string, RasterLayer>>;
+    layers(r: GpuRequest, caller?: AbortSignal, live?: () => void, cpu?: () => Map<string, RasterLayer>): Promise<Map<string, RasterLayer>>;
     dispose(reason?: unknown): void;
 }
 

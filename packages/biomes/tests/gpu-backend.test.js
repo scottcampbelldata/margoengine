@@ -401,7 +401,8 @@ test('GPU bands keep the request state across updates and raster writes', { time
 
 test('CPU callback failures preserve identity on GPU tiles and parts', async (t) => {
   constants(t);
-  for (const backend of ['cpu', 'gpu'])
+  // Backend 'auto' with a device runs the same GPU path: a CPU callback error is not a device failure to fall back on.
+  for (const backend of ['cpu', 'gpu', 'auto'])
     for (const kind of ['height', 'score', 'user']) {
       const reason = kind === 'height' ? new TypeError('height callback failed') : Error(`${kind} callback failed`);
       let throwing = false;
@@ -630,7 +631,98 @@ test('loss and disposal during readback reject and release all buffers', { timeo
   }
 });
 
-test('auto and cpu ignore device and retain existing default world digests', async () => {
+/** Asserts two tiles (or tile parts) hold the same layers with the same bytes. */
+function sameTile(actual, expected, message) {
+  assert.deepEqual(actual.layers, expected.layers, message);
+  for (const name of expected.layers) assert.deepEqual(actual.layer(name).data, expected.layer(name).data, message);
+}
+
+test('auto uses a given device and makes a tile on the CPU, with the CPU bytes, when the device fails on it', {
+  timeout: 20000,
+}, async (t) => {
+  constants(t);
+  const cpu = await BiomeWorld.create({ ...options, backend: 'cpu' });
+  const expected = [await cpu.tile(0, 0), await cpu.tile(0, 0, { layers: ['rainfall'] })];
+  const part = await cpu.tilePart(0, 0, [0, 0, 4, 3]);
+  cpu.dispose();
+  for (const mode of ['pipeline', 'compile', 'validation', 'allocation', 'map', 'uncaptured', 'lost']) {
+    const fake = fakeDevice(mode);
+    if (mode === 'lost') fake.lose();
+    const world = await BiomeWorld.create({ ...options, device: fake.device });
+    try {
+      sameTile(await world.tile(0, 0), expected[0], mode);
+      sameTile(await world.tile(0, 0, { layers: ['rainfall'] }), expected[1], mode);
+      sameTile(await world.tilePart(0, 0, [0, 0, 4, 3]), part, mode);
+      // The device was tried first: backend 'auto' (the default) no longer ignores a given device.
+      if (mode === 'map' || mode === 'allocation') assert.ok(fake.buffers.length > 0, mode);
+      assert.ok(
+        fake.buffers.every((b) => b.destroyed),
+        mode,
+      );
+      const reason = { cancelled: true };
+      await assert.rejects(
+        world.tilePart(0, 1, [0, 0, 4, 3], { signal: AbortSignal.abort(reason) }),
+        (e) => e === reason,
+      );
+    } finally {
+      world.dispose();
+    }
+  }
+});
+
+test('auto: a device lost during readback finishes the tile on the CPU; disposal still rejects', {
+  timeout: 10000,
+}, async (t) => {
+  constants(t);
+  const cpu = await BiomeWorld.create({ ...options, backend: 'cpu' });
+  const expected = await cpu.tilePart(0, 0, [0, 0, 4, 3]);
+  cpu.dispose();
+  for (const dispose of [false, true]) {
+    const fake = fakeDevice('wait');
+    const world = await BiomeWorld.create({ ...options, backend: 'auto', device: fake.device });
+    const pending = world.tilePart(0, 0, [0, 0, 4, 3]);
+    await fake.mappingStarted;
+    if (dispose) {
+      world.dispose();
+      await assert.rejects(pending, (e) => e.name === 'MargoError' && e.code === 'disposed');
+    } else {
+      fake.lose();
+      sameTile(await pending, expected);
+      const made = fake.buffers.length;
+      sameTile(await world.tilePart(0, 0, [0, 0, 4, 3]), expected);
+      assert.equal(fake.buffers.length, made, 'after the loss, tiles go straight to the CPU');
+    }
+    world.dispose();
+    assert.ok(fake.buffers.length > 0 && fake.buffers.every((b) => b.destroyed));
+  }
+});
+
+test('auto makes a world its device cannot hold on the CPU instead of rejecting', async (t) => {
+  constants(t);
+  const high = {
+    ...options,
+    height: { field: () => 1_500_000 },
+    biomes: [defineBiome({ id: 'high', climate: { height: [1_400_000, 1_600_000] }, ground: [{ material: 'rock' }] })],
+  };
+  const small = fakeDevice();
+  small.device.limits.maxStorageBufferBindingSize = 1;
+  for (const [world, fake] of [
+    [high, fakeDevice()],
+    [options, small],
+  ]) {
+    const cpu = await BiomeWorld.create({ ...world, backend: 'cpu' }),
+      auto = await BiomeWorld.create({ ...world, backend: 'auto', device: fake.device });
+    try {
+      sameTile(await auto.tile(0, 0), await cpu.tile(0, 0));
+      assert.equal(fake.buffers.length, 0);
+    } finally {
+      cpu.dispose();
+      auto.dispose();
+    }
+  }
+});
+
+test('cpu ignores a device, auto ignores what is not a GPUDevice; both keep the default world digests', async () => {
   const golden = JSON.parse(readFileSync(new URL('./golden/fields.json', import.meta.url), 'utf8'));
   for (const backend of ['auto', 'cpu']) {
     const world = await BiomeWorld.create({ backend, device: {}, workers: 0 });

@@ -56,14 +56,16 @@ export interface BiomeWorldOptions {
   readonly resolution?: 0.5 | 1 | 2 | 4;
   /** Region cell size in metres, a power of two from 4 x `resolution` up to `tileSize`. Default 16. */
   readonly regionResolution?: number;
-  /** `'auto'` and `'cpu'` compute on the CPU; `'gpu'` needs `device` and no workers.
+  /** `'cpu'` computes on the CPU; `'gpu'` computes on `device` and needs no workers. `'auto'` computes on `device`
+   * when one is given (with no workers) and the world fits it, makes a tile on the CPU when the device fails on it or
+   * is lost, and uses the CPU everywhere else; the bytes are the same either way.
    * GPU region axes allow at most 32768 corners and the packed region must fit device buffer limits.
    * Tile rows are banded to fit; at least one row plus margins must fit (a non-perCell zone scorer needs a full tile).
    * Heights and classification sources must be within +/-1073741824
    * (heights in mm). Tile output is byte-identical within this domain; use `'cpu'` for larger domains.
    * Default `'auto'`. */
   readonly backend?: 'auto' | 'gpu' | 'cpu';
-  /** Used only with backend `'gpu'`. The caller owns this device; the world never destroys it. */
+  /** The WebGPU device of backends `'gpu'` and `'auto'`. The caller owns it; the world never destroys it. */
   readonly device?: GPUDevice;
   /** Biomes to classify into, at most 254. Default: the temperate preset and its neighbours (alpine, wetland, boreal). */
   readonly biomes?: readonly BiomeDefinition[];
@@ -289,7 +291,7 @@ export class BiomeWorld implements Disposable {
     this.#kind = options.classifier ?? 'envelopes';
     this.#paint = options.paint ?? [];
     [this.#biomes, this.#classifier] = this.#buildClassifier();
-    this.#gpu?.fits(this.#classifier, this.#kind);
+    this.#fit(this.#classifier, this.#kind);
     this.#heights = regionEntry!.heightsOf(options.height, this.#origin, this.#size, this.seed, relief);
     this.#region = this.#buildRegion();
   }
@@ -310,7 +312,8 @@ export class BiomeWorld implements Disposable {
     // Heights and region fields are their own entry, so a program that only defines biomes never loads them.
     regionEntry ??= await import('@margoengine/biomes/region');
     // The GPU checks, bands and kernels are their own entry, loaded only for a world that may compute on a device.
-    if (options.backend === 'gpu') gpu ??= await import('@margoengine/biomes/gpu');
+    if (options.backend === 'gpu' || (options.device && options.backend !== 'cpu'))
+      gpu ??= await import('@margoengine/biomes/gpu');
     aborted(options.signal);
     const world = new BiomeWorld(options, biomes),
       { workers } = options;
@@ -394,13 +397,21 @@ export class BiomeWorld implements Disposable {
       nz = divFloor(this.#size[1], step) + 1,
       height = heights.grid(0, 0, nx, nz, step),
       water = heights.relief?.waterCells(this.#origin, step, nx, nz);
-    this.#gpu?.fits(undefined, undefined, height);
+    this.#fit(undefined, undefined, height);
     return regionEntry!.buildRegion(height, nx, nz, step, climate, water);
   }
 
   #live(): void {
     if (this.#disposed)
       throw fault('disposed', 'BiomeWorld is disposed; create a new one with BiomeWorld.create()', 'biomes');
+  }
+
+  /** Backend `'gpu'` throws for a state its device cannot hold; `'auto'` drops the device and goes on with the CPU. */
+  #fit(c?: Classifier, kind?: 'envelopes' | ZoneClassifier, height?: ArrayLike<number>): void {
+    if (this.#gpu?.fits(c, kind, height) === false) {
+      this.#gpu.dispose();
+      this.#gpu = undefined;
+    }
   }
 
   #gpuLive(): void {
@@ -593,11 +604,12 @@ export class BiomeWorld implements Disposable {
     }
     // Updates replace frames and rasters; keep this revision for every awaited band and CPU tail.
     const user = new Map([...this.#user].map(([name, tiles]) => [name, new Map(tiles)])),
-      ecotone = featherCells(this.ecotone, this.resolution);
+      ecotone = featherCells(this.ecotone, this.resolution),
+      c = this.#classifier;
     return g.layers(
       {
         frame: Object.freeze(frame),
-        classifier: this.#classifier,
+        classifier: c,
         kind: this.#kind,
         gx,
         gz,
@@ -608,10 +620,12 @@ export class BiomeWorld implements Disposable {
       },
       signal,
       () => this.#live(),
+      // Backend 'auto' makes a tile the device failed on here, from the same revision.
+      () => this.#cpuLayers(frame, gx, gz, width, depth, names, c, user),
     );
   }
 
-  /** The layers of a cell rectangle, made on this thread. */
+  /** The layers of a cell rectangle, made on this thread (from classifier `c` and user rasters `user`). */
   #cpuLayers(
     frame: TileFrame,
     gx: number,
@@ -619,15 +633,16 @@ export class BiomeWorld implements Disposable {
     width: number,
     depth: number,
     names: readonly string[],
+    c = this.#classifier,
+    user?: ReadonlyMap<string, ReadonlyMap<string, Uint8Array>>,
   ): Map<string, RasterLayer> {
     if (!classified(names)) return rectFields(frame, gx, gz, width, depth, names);
     // Classification blurs over a 1-cell margin: compute the fields one cell wider, classify, then crop.
-    const c = this.#classifier,
-      // The wide fields are working arrays: the result keeps cropped copies.
-      wide = rectFields(frame, gx - 1, gz - 1, width + 2, depth + 2, wideNames(names, c), true),
+    // The wide fields are working arrays: the result keeps cropped copies.
+    const wide = rectFields(frame, gx - 1, gz - 1, width + 2, depth + 2, wideNames(names, c), true),
       ids = new Uint8Array(width * depth * 4),
       weights = new Uint8Array(width * depth * 4);
-    classify(c, this.#input(wide, gx, gz, width, depth), ids, weights);
+    classify(c, this.#input(wide, gx, gz, width, depth, user), ids, weights);
     return assemble(names, wide, ids, weights, width, depth);
   }
 
@@ -900,7 +915,7 @@ export class BiomeWorld implements Disposable {
       paint = changes.paint ?? this.#paint,
       [biomes, classifier] = this.#buildClassifier(changes.biomes ?? this.#biomes, kind, paint),
       climate = changes.climate ? quantizeClimate(changes.climate) : this.#climate;
-    this.#gpu?.fits(classifier, kind);
+    this.#fit(classifier, kind);
     const heights = changes.height
         ? regionEntry!.heightsOf(changes.height, this.#origin, this.#size, this.seed, relief)
         : this.#heights,

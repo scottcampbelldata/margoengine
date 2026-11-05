@@ -1,7 +1,7 @@
-// The WebGPU side of BiomeWorld backend 'gpu': option and domain checks, row bands that fit the device, device loss,
-// and the kernels (exact region upsampling feeding the shared field loop, classification planes feeding the shared
-// selection rules). A world loads this entry with import() only
-// when it may compute on a device, so the root entry and the worker file hold none of it.
+// The WebGPU side of BiomeWorld backends 'gpu' and 'auto' with a device: option and domain checks, row bands that fit
+// the device, device loss, the per-tile CPU fallback of 'auto', and the kernels (exact region upsampling feeding the
+// shared field loop, classification planes feeding the shared selection rules). A world loads this entry with import()
+// only when it may compute on a device, so the root entry and the worker file hold none of it.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { assemble, classified, wideNames } from './assemble.js';
 import type { Classifier, ClassifyInput, ZoneClassifier } from './classify.js';
@@ -46,16 +46,20 @@ export class GpuTiles {
   readonly #abort = new AbortController();
   readonly #cells: number;
   readonly #corners: readonly [number, number];
+  /** Backend 'auto': what the device cannot do is made on the CPU, with the same bytes, instead of rejecting. */
+  readonly #fallback: boolean;
 
-  private constructor(device: GPUDevice, cells: number, corners: readonly [number, number]) {
+  private constructor(device: GPUDevice, cells: number, corners: readonly [number, number], fallback: boolean) {
     this.device = device;
     this.#cells = cells;
     this.#corners = corners;
+    this.#fallback = fallback;
   }
 
   /**
-   * The device tiles of a world with these options, or undefined for the CPU (backends 'auto' and 'cpu'). Backend
-   * 'gpu' needs a device and no workers. `size` is in metres, `cells` the tile cells per side.
+   * The device tiles of a world with these options, or undefined for the CPU. Backend 'gpu' needs a device and no
+   * workers; backend 'auto' uses a GPUDevice when one is given and the world fits it, and the CPU otherwise. `size` is
+   * in metres, `cells` the tile cells per side.
    * @throws TypeError for backend 'gpu' without a GPUDevice; RangeError for its workers or region axes.
    */
   static of(
@@ -64,9 +68,14 @@ export class GpuTiles {
     regionResolution: number,
     cells: number,
   ): GpuTiles | undefined {
-    const { backend, device, workers } = options,
-      corners = size.map((v) => divFloor(v, regionResolution) + 1) as [number, number];
-    if (backend !== 'gpu') return undefined;
+    const { backend = 'auto', device, workers } = options,
+      gpu = backend === 'gpu',
+      corners = size.map((v) => divFloor(v, regionResolution) + 1) as [number, number],
+      miss = (error: Error): undefined => {
+        if (gpu) throw error;
+        return undefined;
+      };
+    if (backend === 'cpu') return undefined;
     if (
       !device ||
       typeof device !== 'object' ||
@@ -75,15 +84,17 @@ export class GpuTiles {
       !device.queue ||
       typeof device.lost?.then !== 'function'
     )
-      throw typeError("BiomeWorld backend 'gpu' requires the device option (a GPUDevice)", 'biomes');
+      return miss(typeError("BiomeWorld backend 'gpu' requires the device option (a GPUDevice)", 'biomes'));
     if (workers && workers > 0)
-      throw rangeError("BiomeWorld backend 'gpu' runs on this thread; pass workers: 0", 'biomes');
+      return miss(rangeError("BiomeWorld backend 'gpu' runs on this thread; pass workers: 0", 'biomes'));
     if (corners.some((v) => v > 32768))
-      throw rangeError(
-        "BiomeWorld backend 'gpu' allows at most 32768 region corners per axis; use a larger regionResolution or smaller size",
-        'biomes',
+      return miss(
+        rangeError(
+          "BiomeWorld backend 'gpu' allows at most 32768 region corners per axis; use a larger regionResolution or smaller size",
+          'biomes',
+        ),
       );
-    return new GpuTiles(device, cells, corners);
+    return new GpuTiles(device, cells, corners, !gpu);
   }
 
   /** Starts watching for device loss (one reaction per device, shared by its worlds). */
@@ -102,24 +113,30 @@ export class GpuTiles {
     else state.controllers.add(this.#abort);
   }
 
-  /** Throws the loss (or the disposal) once the device is lost. */
+  /** Throws the loss (or the disposal) once the device is lost; backend 'auto' goes on with the CPU instead. */
   live(): void {
-    this.#abort.signal.throwIfAborted();
+    if (!this.#fallback) this.#abort.signal.throwIfAborted();
   }
 
   /**
    * Checks that tiles of this state fit the device: the bands of classifier `c`, and the region corner `height` (mm).
+   * Backend 'auto' returns false instead of throwing (the world then makes its tiles on the CPU).
    * @throws RangeError that names the bound and the fix.
    */
   fits(c?: Classifier, kind: 'envelopes' | ZoneClassifier = 'envelopes', height?: ArrayLike<number>): boolean {
-    if (c) this.#bandDepth(c, kind);
-    for (let i = 0; height && i < height.length; i++)
-      if (Math.abs(height[i]) > 1073741824)
-        throw rangeError(
-          "BiomeWorld backend 'gpu' heights must be within +/-1073741824 mm; rescale the height source or use backend 'cpu'",
-          'biomes',
-        );
-    return true;
+    try {
+      if (c) this.#bandDepth(c, kind);
+      for (let i = 0; height && i < height.length; i++)
+        if (Math.abs(height[i]) > 1073741824)
+          throw rangeError(
+            "BiomeWorld backend 'gpu' heights must be within +/-1073741824 mm; rescale the height source or use backend 'cpu'",
+            'biomes',
+          );
+      return true;
+    } catch (error) {
+      if (this.#fallback) return false;
+      throw error;
+    }
   }
 
   /** Largest tile band whose wide fields and classification planes fit the device. */
@@ -160,9 +177,22 @@ export class GpuTiles {
   /**
    * The layers of a request, in device bands joined row by row: fields and classification on the device, the shared
    * CPU tails in between. Disposal, device loss, the caller's cancellation and GPU failures reject; errors of shared
-   * CPU callbacks keep their identity. `live` throws when the world is disposed.
+   * CPU callbacks keep their identity. `live` throws when the world is disposed. Backend 'auto' makes the request with
+   * `cpu` (the same bytes) when the device fails on it or is lost; cancellation and disposal still reject.
    */
-  async layers(r: GpuRequest, caller?: AbortSignal, live?: () => void): Promise<Map<string, RasterLayer>> {
+  async layers(
+    r: GpuRequest,
+    caller?: AbortSignal,
+    live?: () => void,
+    cpu?: () => Map<string, RasterLayer>,
+  ): Promise<Map<string, RasterLayer>> {
+    const fallback = this.#fallback && cpu,
+      onCpu = () => {
+        caller?.throwIfAborted();
+        live?.();
+        return cpu!();
+      };
+    if (fallback && this.#abort.signal.aborted) return onCpu();
     const signal = caller ? AbortSignal.any([caller, this.#abort.signal]) : this.#abort.signal,
       { frame, classifier: c, gx, width, depth, names } = r,
       device = this.device,
@@ -208,8 +238,10 @@ export class GpuTiles {
       check();
       return layers;
     } catch (error) {
-      // Kernels wrap device errors; shared CPU callbacks keep their original exceptions.
-      throw signal.aborted ? signal.reason : error;
+      // Kernels wrap device errors (and the loss) as MargoError 'failed'; shared CPU callbacks keep their exceptions.
+      const reason = signal.aborted ? signal.reason : error;
+      if (fallback && reason?.name === 'MargoError' && reason.code === 'failed') return onCpu();
+      throw reason;
     }
   }
 
