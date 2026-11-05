@@ -1,8 +1,8 @@
 {
  "proof": "quality-presets",
- "ref": "33c403984",
- "revision": "33c403984c02ecce6e8e9746865532a263b2703a",
- "capturedAt": "33c403984c02ecce6e8e9746865532a263b2703a",
+ "ref": "6a958e532",
+ "revision": "6a958e532393160001d1d71deafeb27cef40f808",
+ "capturedAt": "6a958e532393160001d1d71deafeb27cef40f808",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
@@ -14,8 +14,8 @@
   "ssr 4x": "3ab2e9ea82d8c2c3cfe7b74e6b30a9f8b589d4418af6795fe2f14be0c42ad67b",
   "volumetric 1x": "8f93b22a414825e1cbb8718dbe78b1f86b1431821801f6ac7006a26d6497806d",
   "volumetric 4x": "576e6697a31875ef4b15df9610cb0f17c7cf736e3832e0e20f7b5dedd0ff6f59",
-  "localShadows 1x": "597e00718bac8cf4385cd53efac4f25706a15fba7807a42fe63561e92bd4bdaa",
-  "localShadows 4x": "d5fc973a2da9dc36c0c779b3642ac3276c91e7b3d55a0ab09923a1ada81f3f95",
+  "localShadows 1x": "d6875d262efc44b2070f3c49fd6cf0fe21d89a2036cd529346974bfc10ac963c",
+  "localShadows 4x": "21286ac7792e3649ee2ab55a89fce7073df70998e2148dea8699bc940f96e0d3",
   "vfx 1x": "4866e1f4d0f0deb4540e266d1d3de6de1bec1f464928375bf21ebe1b2e6468b2",
   "vfx 4x": "d15ee245f731f624bc89b5a0ef86394a3906a436491296f9d2c057b7c9269ed8"
  }

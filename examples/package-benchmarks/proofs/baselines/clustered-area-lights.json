@@ -1,11 +1,12 @@
 {
  "proof": "clustered-area-lights",
- "ref": "57250a49",
- "revision": "57250a49e64ab686b6dd992751d092e19433fcb3",
- "capturedAt": "a5e86aef36575fcf75d4e4a65cda51ac321f1655",
+ "ref": "6a958e532",
+ "revision": "6a958e532393160001d1d71deafeb27cef40f808",
+ "capturedAt": "6a958e532393160001d1d71deafeb27cef40f808",
+ "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "1x": "4f62597813dd55fc7312aa91f63c0862af5abfabcdbc1f78cbebb98493818ed8",
-  "4x": "710f3ab1ec39d7fec4eaa80a947228202bce9385047ba706f7aa89900baf831a"
+  "1x": "ab64780a918bab3b053f2ac37a1b70d82a51ee0018e50512b06c9c3e015b74b3",
+  "4x": "5fc922b8d0cfb5d4f4d1c679bf2667fc45a96f2f1ae7edac745e17e8d879e233"
  }
 }
