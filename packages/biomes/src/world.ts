@@ -297,7 +297,7 @@ export class BiomeWorld implements Disposable {
         throw typeError("BiomeWorld backend 'gpu' requires the device option (a GPUDevice)", 'biomes');
       if (options.workers && options.workers > 0)
         throw rangeError("BiomeWorld backend 'gpu' runs on this thread; pass workers: 0", 'biomes');
-      if (size.some((v) => v / regionResolution + 1 > 32768))
+      if (size.some((v) => divFloor(v, regionResolution) >= 32768))
         throw rangeError(
           "BiomeWorld backend 'gpu' allows at most 32768 region corners per axis; use a larger regionResolution or smaller size",
           'biomes',
@@ -407,12 +407,12 @@ export class BiomeWorld implements Disposable {
 
   /** Largest tile band whose wide fields and classification planes fit the device. */
   #gpuBandDepth(c: Classifier, kind = this.#kind): number {
-    const cells = this.tileSize / this.resolution;
+    const cells = (this.tileSize * 2) / (this.resolution * 2); // float division: 128..1024, exact
     if (!this.#device) return cells;
     const limits = this.#device.limits,
       limit = Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize),
-      nx = this.#size[0] / (this.regionResolution * 1000) + 1,
-      nz = this.#size[1] / (this.regionResolution * 1000) + 1;
+      nx = divFloor(this.#size[0], this.regionResolution * 1000) + 1,
+      nz = divFloor(this.#size[1], this.regionResolution * 1000) + 1;
     if (5 * nx * nz * 4 > limit)
       throw rangeError(
         "BiomeWorld backend 'gpu' packed region exceeds device buffer limits; use a smaller size or larger regionResolution",
@@ -421,12 +421,11 @@ export class BiomeWorld implements Disposable {
     const n = cells + 2,
       slots = c.inputs.length,
       planes = slots + (c.score ? 0 : c.ids.length),
-      rows = Math.floor(
-        Math.min(
-          limit / (n * Math.max(24, 8 * planes)),
-          0x7fffffff / (planes * n),
-          limits.maxComputeWorkgroupsPerDimension * 8,
-        ),
+      // divFloor(x, 0) is x: a classifier with no planes is not bounded by them.
+      rows = Math.min(
+        divFloor(limit, n * Math.max(24, 8 * planes)),
+        divFloor(0x7fffffff, planes * n),
+        limits.maxComputeWorkgroupsPerDimension * 8,
       ),
       depth = Math.min(cells, rows - 2),
       table = 4 * (2 * slots + c.ids.length + 1 + 4 * c.envelopes.slot.length);
@@ -699,10 +698,10 @@ export class BiomeWorld implements Disposable {
             let out = layers.get(name);
             if (!out) {
               const Type = layer.data.constructor as new (length: number) => RasterLayer['data'];
-              out = { ...layer, depth, data: new Type((layer.data.length / layer.depth) * depth) };
+              out = { ...layer, depth, data: new Type(divFloor(layer.data.length, layer.depth) * depth) };
               layers.set(name, out);
             }
-            out.data.set(layer.data, (row * layer.data.length) / layer.depth);
+            out.data.set(layer.data, divFloor(row * layer.data.length, layer.depth));
           }
         }
       }
