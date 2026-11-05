@@ -103,6 +103,7 @@
       "Plane",
       "Quaternion",
       "Ray",
+      "SH3",
       "SRGBToLinear",
       "SRGB_TO_P3",
       "Sphere",
@@ -120,6 +121,7 @@
       "projectPoint",
       "quaternionToDegrees",
       "screenToWorld",
+      "shBasis",
       "unprojectPoint",
       "worldToScreen"
     ]

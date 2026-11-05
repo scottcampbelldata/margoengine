@@ -2,7 +2,7 @@
 
 Import `margoengine/math` from the `margoengine` package, or `@margoengine/math` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Line3, Triangle, Sphere, Plane, Ray, Frustum, Spherical, Cylindrical, MathUtils and the project functions. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
+Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Line3, Triangle, Sphere, Plane, Ray, Frustum, Spherical, Cylindrical, SH3, MathUtils and the project functions. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
 
 ```ts
 import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
@@ -80,6 +80,26 @@ const {clientWidth: width, clientHeight: height} = canvas;
 const spot = worldToScreen(new Vector3(0, 2, 0), engine.camera, width, height, new Vector3());
 if (spot) label.style.transform = `translate(${spot.x}px, ${spot.y}px)`; // null: behind the camera, hide the label
 const atSameDepth = spot && screenToWorld(spot.x + 10, spot.y, spot.z, engine.camera, width, height, new Vector3());
+```
+
+Spherical harmonics (`SH3`, also `@margoengine/math/sh`): three bands of RGB radiance, for light probes and irradiance on the CPU.
+`coefficients` is a Float64Array of 27 numbers, `k * 3 + channel`, in the order and with the signs of
+`@margoengine/environment` radiance coefficients. Build one with `addAmbient(color)` and `addSample(direction, color, weight = 1)`,
+where `weight` is the solid angle the sample stands for (`4 * Math.PI / count` for uniform samples, 1 for a distant light of that
+irradiance). Read it with `getAt(direction, out)` (radiance) and `getIrradianceAt(normal, out)` (the clamped cosine applied;
+multiply by albedo / PI for reflected light). Blend with `add`, `addScaledSH`, `scale` and `lerp`; `fromArray` and `toArray` move
+the numbers. `shBasis(direction, out?)` gives the nine basis values. Directions need not be unit length; a zero or non-finite one
+throws `RangeError`. Colours are any `{r, g, b}`. Three bands ring around a bright point of light, so a result can be a little
+above the truth or below 0; results are not clamped.
+
+```ts
+import {Color, SH3, Vector3} from 'margoengine/math';
+const sky = new SH3().addAmbient({r: 0.2, g: 0.3, b: 0.5}).addSample(new Vector3(1, 2, 0), {r: 3, g: 2.8, b: 2.4});
+const room = new SH3().addAmbient({r: 0.4, g: 0.35, b: 0.3});
+const probe = sky.clone().lerp(room, 0.25); // blend two probes as the player walks between them
+const light = probe.getIrradianceAt(new Vector3(0, 1, 0), new Color());
+console.log(light.r, light.g, light.b);
+const upload = probe.toArray(new Float32Array(27));
 ```
 
 Core interop: `toArray()` with no target returns a tuple that `setPosition`, `setScale`, `setRotation`, `setQuaternion`, `camera.position` and `fitToBoundingBox` accept. `copy()` reads any `{x, y, z}`, including `mesh.position`; `Euler.setFromVector3(mesh.rotation)` reads core's XYZ angles. `Matrix4.fromArray` reads `camera.matrix` and world matrices from `@margoengine/core/extension`. `Frustum.fromArray(camera.planes)` and `setFromProjectionMatrix` use core's plane order and WebGPU depth range ([0, 1], reversed-Z included); pass `false` for WebGL [-1, 1]. `Color` stores linear sRGB; hex, CSS and HSL inputs are decoded from sRGB.

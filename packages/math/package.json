@@ -104,6 +104,10 @@
       "types": "./dist/cylindrical.d.ts",
       "import": "./dist/cylindrical.js"
     },
+    "./sh": {
+      "types": "./dist/sh.d.ts",
+      "import": "./dist/sh.js"
+    },
     "./mathutils": {
       "types": "./dist/mathutils.d.ts",
       "import": "./dist/mathutils.js"

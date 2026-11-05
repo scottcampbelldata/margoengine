@@ -454,6 +454,25 @@ export interface RectAreaLight {
     shadow?: AreaLightShadow;
 }
 
+export class SH3 {
+    readonly coefficients: Float64Array<ArrayBuffer>;
+    constructor(coefficients?: ArrayLike<number>);
+    zero(): this;
+    copy(sh: SH3): this;
+    clone(): SH3;
+    fromArray(array: ArrayLike<number>, offset?: number): this;
+    toArray<T extends NumberArray = number[]>(out?: T, offset?: number): T;
+    add(sh: SH3): this;
+    addScaledSH(sh: SH3, scale: number): this;
+    scale(s: number): this;
+    lerp(sh: SH3, t: number): this;
+    equals(sh: SH3, epsilon?: number): boolean;
+    addAmbient(color: ColorLike): this;
+    addSample(direction: Vec3Like, color: ColorLike, weight?: number): this;
+    getAt<T extends ColorLike>(direction: Vec3Like, out: T): T;
+    getIrradianceAt<T extends ColorLike>(normal: Vec3Like, out: T): T;
+}
+
 export const SRGBToLinear: (c: number) => number;
 
 export const SRGB_TO_P3: readonly number[];
@@ -691,6 +710,8 @@ export function projectPoint<T extends Vec3Like>(point: Vec3Like, camera: Projec
 export function quaternionToDegrees(quaternion: ArrayLike<number>, order?: EulerOrder): [number, number, number];
 
 export function screenToWorld<T extends Vec3Like>(x: number, y: number, depth: number, camera: ProjectionCamera, width: number, height: number, out: T): T | null;
+
+export function shBasis<T extends NumberArray = Float64Array>(direction: Vec3Like, out?: T): T;
 
 export function unprojectPoint<T extends Vec3Like>(ndc: Vec3Like, camera: ProjectionCamera, out: T): T | null;
 

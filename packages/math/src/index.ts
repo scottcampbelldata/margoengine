@@ -31,6 +31,7 @@ export { Spherical } from './spherical.js';
 export { projectPoint, unprojectPoint, worldToScreen, screenToWorld } from './project.js';
 export type { ProjectionCamera } from './project.js';
 export { Cylindrical } from './cylindrical.js';
+export { SH3, shBasis } from './sh.js';
 export * as MathUtils from './mathutils.js';
 export { MargoError, type MargoErrorCode } from './errors.js';
 export type {

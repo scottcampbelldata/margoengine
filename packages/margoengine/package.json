@@ -922,6 +922,10 @@
       "types": "./dist/math/cylindrical.d.ts",
       "import": "./dist/math/cylindrical.js"
     },
+    "./math/sh": {
+      "types": "./dist/math/sh.d.ts",
+      "import": "./dist/math/sh.js"
+    },
     "./math/mathutils": {
       "types": "./dist/math/mathutils.d.ts",
       "import": "./dist/math/mathutils.js"
