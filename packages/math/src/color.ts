@@ -110,22 +110,17 @@ function toLinear(r: number, g: number, b: number, colorSpace: ColorSpace, out: 
     out[offset + 2] = v[2];
   }
 }
-const spaces: Readonly<Record<string, ColorSpace>> = {
-  srgb: 'srgb',
-  'srgb-linear': 'srgb-linear',
-  'display-p3': 'display-p3',
-  'display-p3-linear': 'display-p3-linear',
-};
+const spaces: readonly string[] = ['srgb', 'srgb-linear', 'display-p3', 'display-p3-linear'];
 /** CSS `color(<space> r g b [/ alpha])` with a space Margo knows: its components (numbers or %) and space; else null. */
 function cssColor(text: string): { rgb: number[]; space: ColorSpace } | null {
   const match = /^color\(\s*([a-z0-9-]+)\s+([^)]*)\)$/i.exec(text.trim());
   if (!match) return null;
-  const space = spaces[match[1].toLowerCase()],
+  const space = match[1].toLowerCase() as ColorSpace,
     parts = match[2]
       .split('/')[0]
       .trim()
       .split(/[\s,]+/);
-  if (!space)
+  if (!spaces.includes(space))
     throw new TypeError(`Color space '${match[1]}' is unknown; use srgb, srgb-linear, display-p3 or display-p3-linear`);
   const rgb = parts.map((part) => (part.endsWith('%') ? parseFloat(part) / 100 : Number(part)));
   if (rgb.length !== 3 || !rgb.every(Number.isFinite))

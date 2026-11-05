@@ -76,3 +76,9 @@ test('clipToSRGB desaturates toward luminance just enough; in-gamut and HDR colo
   clipToSRGB([-0.1, 1, 0], out, 1);
   assert.equal(out[0], 0);
 });
+
+test('a CSS color() names only real spaces: inherited object keys such as constructor are refused', () => {
+  assert.throws(() => parseColor('color(constructor 1 0 0)'), /Color space 'constructor' is unknown/);
+  assert.throws(() => new Color().setStyle('color(constructor 1 0 0)'), /unknown/);
+  close(parseColor('color(SRGB-LINEAR 1 0 0)'), [1, 0, 0], 0, 'case does not matter');
+});
