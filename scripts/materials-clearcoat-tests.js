@@ -194,7 +194,7 @@ export async function clearcoatBrowserChecks(page) {
           difference(baseline.gbuffer, coat.gbuffer).changed === 0,
           'Clearcoat changed the base g-buffer normal/depth',
         );
-        assert(difference(baseline.ambient, coat.ambient).changed === 0, 'Clearcoat changed base ambient lighting');
+        assert(difference(baseline.ambient, zero.ambient).changed === 0, 'Factor zero changed the ambient replay');
 
         const redZero = texture([0, 255, 255, 255]),
           redOne = texture([255, 0, 0, 255]);
@@ -235,7 +235,6 @@ export async function clearcoatBrowserChecks(page) {
         );
         assert(difference(normal.beauty, coat.beauty).changed > 0, 'Coat normal texture has no effect on the coat');
         assert(difference(normal.gbuffer, baseline.gbuffer).changed === 0, 'Coat normal leaked into the base g-buffer');
-        assert(difference(normal.ambient, baseline.ambient).changed === 0, 'Coat normal leaked into ambient lighting');
         const scaleZero = await render(
           materials.clearcoat({ factor: 1, roughnessFactor: 0.05, clearcoatNormalTexture: { ...tilted, scale: 0 } }),
         );
@@ -265,21 +264,70 @@ export async function clearcoatBrowserChecks(page) {
           difference(normalZero.beauty, baseline.beauty).max <= 1,
           'Factor zero with a normal texture changed the base lobe',
         );
+        // KHR_materials_clearcoat: everything under the coat keeps 1 - clearcoat x F(n.v), and the coat's own light adds
+        // on top. A `direct` hook of zero stands for full shadow, so the coat's lobe must go with the base's.
         const removeLighting = model.addLighting({
-          shader(code) {
-            return code.replace('direct+ambient(s)', 'direct*0.0+ambient(s)');
-          },
+          pbr: () => ({ declarations: '', direct: (light) => `${light}*0.0` }),
           bindings() {
             return [];
           },
         });
+        const float16 = (bytes, offset) => {
+          const value = new DataView(bytes.buffer).getUint16(offset, true),
+            exponent = (value >> 10) & 31,
+            fraction = value & 1023;
+          return exponent ? 2 ** (exponent - 15) * (1 + fraction / 1024) : 2 ** -14 * (fraction / 1024);
+        };
+        // The two pixels either side of the centre: their views lean opposite ways, so a tilted coat normal reads n.v.
+        const centre = (bytes) =>
+          (float16(bytes, ((height / 2) * width + width / 2) * 8) +
+            float16(bytes, ((height / 2) * width + width / 2 - 1) * 8)) /
+          2;
+        const near = (actual, expected, label) =>
+          assert(Math.abs(actual - expected) <= expected * 0.01, `${label}: ${actual}, expected ${expected}`);
+        // Hemisphere ambient at n.y = 0 in red: 0.675 x strength; the coat's default ambient is half of that.
+        const strength = 1,
+          sky = 0.675 * strength,
+          oblique = texture([251, 128, 159, 255]),
+          // The texel below is n.v 0.25, to its 8 bits.
+          grazing = 1 - 0.04 - 0.96 * (1 - ((159 / 255) * 2 - 1)) ** 5;
+        engine.lighting.radiance.set([1, 1, 1, strength]);
         const shadowZero = await render(materials.clearcoat({ factor: 0, roughnessFactor: 0.05 }));
         const shadowCoat = await render(materials.clearcoat({ factor: 1, roughnessFactor: 0.05 }));
-        removeLighting();
-        assert(
-          difference(shadowZero.beauty, shadowCoat.beauty).max <= 1,
-          'The coat must receive the existing direct-light shadow visibility',
+        const shadowOblique = await render(
+          materials.clearcoat({ factor: 1, roughnessFactor: 0.05, clearcoatNormalTexture: oblique }),
         );
+        const under = centre(shadowZero.linear);
+        near(centre(shadowCoat.linear), under * 0.96 + 0.04 * 0.5 * sky, 'Coat at normal incidence');
+        near(centre(shadowCoat.ambient), under * 0.96 + 0.04 * 0.5 * sky, 'Ambient replay under the coat');
+        near(centre(shadowOblique.linear), under * grazing + (1 - grazing) * 0.5 * sky, 'Coat at n.v 0.25');
+        // Emission lies under the coat as well: with no ambient light it keeps exactly the coat's share.
+        engine.lighting.radiance.set([1, 1, 1, 0]);
+        const glowing = structuredClone(doc);
+        glowing.materials[0].emissiveFactor = [0.5, 0.5, 0.5];
+        const glow = parseGLTF(
+          engine,
+          glowing,
+          buffers.map((buffer) => new Uint8Array(buffer)),
+        );
+        glow.addLighting({
+          pbr: () => ({ declarations: '', direct: (light) => `${light}*0.0` }),
+          bindings() {
+            return [];
+          },
+        });
+        const glowZero = await render(materials.clearcoat({ factor: 0, roughnessFactor: 0.05 }), glow);
+        const glowCoat = await render(materials.clearcoat({ factor: 1, roughnessFactor: 0.05 }), glow);
+        const glowOblique = await render(
+          materials.clearcoat({ factor: 1, roughnessFactor: 0.05, clearcoatNormalTexture: oblique }),
+          glow,
+        );
+        near(centre(glowZero.linear), 0.5, 'Uncoated emission');
+        near(centre(glowCoat.linear), 0.5 * 0.96, 'Emission under the coat');
+        near(centre(glowOblique.linear), 0.5 * grazing, 'Emission under the coat at n.v 0.25');
+        glow.destroy();
+        engine.lighting.radiance.set([1, 1, 1, 0.03]);
+        removeLighting();
 
         const halves = texture([0, 255, 255, 255, 255, 0, 0, 255], [2, 1]);
         const uv0 = await render(

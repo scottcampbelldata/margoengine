@@ -278,9 +278,9 @@ function compile(
   const factors: number[] = [],
     textures: MaterialExtensionTexture[] = [],
     uvSets = new Set<0 | 1>();
-  let statements = '',
+  let coatLayer: MaterialExtension['coat'],
+    statements = '',
     declarations = '',
-    direct = '',
     output = '',
     needsNormal = false;
   const uniform = (values: readonly number[]) => {
@@ -352,7 +352,7 @@ function compile(
     );
     statements += shader.wgsl + '\n';
     declarations += shader.declarations;
-    direct = shader.direct ?? '';
+    coatLayer = shader.coat;
   }
   let transmits = false,
     opaqueIndex: number | undefined,
@@ -391,7 +391,7 @@ function compile(
   const extension: MaterialExtension = {
     wgsl: statements,
     ...(declarations ? { declarations } : {}),
-    ...(direct ? { direct } : {}),
+    ...(coatLayer ? { coat: coatLayer } : {}),
     ...(output ? { output, lighting: false, afterOpaque: true, transmission: transmitted, ior: transmittedIor } : {}),
     ...(factors.length ? { factors: Float32Array.from(factors) } : {}),
     ...(textures.length ? { textures } : {}),

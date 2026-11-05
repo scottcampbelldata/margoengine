@@ -93,6 +93,7 @@ import {
   materialExtensionShader,
   materialExtensionSurface,
   materialExtensionAmbientShader,
+  coatedAmbient,
   bindMaterialExtension,
   type MaterialExtension,
   type MaterialExtensionResource,
@@ -4147,8 +4148,8 @@ export class PBRModel implements EnginePlugin {
             (replay = patched.replace(
               'return vec4f(color,',
               compact
-                ? '_=color;return vec4f(margoAmbient,'
-                : '_=color;return vec4f(select(margoAmbient,vec3f(0),f.ext.x>0.5),',
+                ? `_=color;return vec4f(${coatedAmbient(extension, 'margoAmbient')},`
+                : `_=color;return vec4f(select(${coatedAmbient(extension, 'margoAmbient')},vec3f(0),f.ext.x>0.5),`,
             )),
           );
         }
@@ -4157,7 +4158,7 @@ export class PBRModel implements EnginePlugin {
         lit = true;
       } else code = surface;
     }
-    if (extension?.ambient) code = materialExtensionAmbientShader(code, extension);
+    if (extension?.ambient || extension?.coat) code = materialExtensionAmbientShader(code, extension);
     if (transmission) code = transmissionPBR(code, oit!.declarations(2));
     else if (through) code = transparentPBR(code, oit!.declarations(2));
     else if (capture) code = capturePBR(code, hook!.declarations(code));

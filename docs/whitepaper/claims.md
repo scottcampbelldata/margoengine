@@ -77,6 +77,8 @@ The only runs so far were diagnostics on a busy machine (`results/vs-threejs-*.j
 
 The quiet-machine run, with an A/A run to show the noise floor, decides what gets published.
 
+**Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
+
 ## Not yet backed by a committed result
 
 These statements describe what the code does, and the docs word them that way, but no committed result file

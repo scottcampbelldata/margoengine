@@ -39,7 +39,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/fsm | `.` 3 |  |  | 971 |
 | @margoengine/geometry | `.` 64, `./shapes` 20, `./triangulate` 5, `./extrude` 3, `./primitives` 17, `./utils` 21, `./extras` 6 | 15 |  | 20,606 |
 | @margoengine/gltf | `.` 4 |  |  | 6,039 |
-| @margoengine/gltf-pro | `.` 44, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 335 |  | 56,276 |
+| @margoengine/gltf-pro | `.` 44, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 338 |  | 56,276 |
 | @margoengine/headless | `.` 10 |  |  | 2,611 |
 | @margoengine/html | `.` 7 |  |  | 4,853 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,568 |

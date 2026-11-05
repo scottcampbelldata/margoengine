@@ -475,6 +475,25 @@ test('the direct-light slot keys its shader and executes before lighting transfo
   }
 });
 
+test('the coat layer scales every light under it, once, and adds its own light on top', async () => {
+  const s = await scene({ clearcoatFactor: 1 });
+  try {
+    install(s.model);
+    s.draw();
+    const code = s.draws.at(-1).pipeline.vertex.module.code,
+      fragment = code.slice(code.indexOf('@fragment fn fragment('), code.indexOf('@fragment fn gbuffer'));
+    assert.match(fragment, /var color=direct\+ambient\(s\)\+s\.emissive;\s*color=\(color\)\*\(materialCoatKeep\)/);
+    assert.equal(fragment.split('materialClearcoat)*margoDirectVisible').length - 1, 1, 'One coat lobe, after the sum');
+    assert.doesNotMatch(fragment, /direct\+=materialClearcoat/, 'The lobe must not be scaled by its own Fresnel');
+    assert.match(
+      code.slice(code.indexOf('@fragment fn ambientFragment(')),
+      /return vec4f\(\(ambient\(s\)\)\*\(materialCoatKeep\)\+\(1\.0-\(materialCoatKeep\)\)\*margoCoatAmbient\(s,v\),/,
+    );
+  } finally {
+    s.engine.dispose();
+  }
+});
+
 test('materials remains optional, tree shakable and absent from frozen and glTF module imports', () => {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(manifest.name, '@margoengine/materials');

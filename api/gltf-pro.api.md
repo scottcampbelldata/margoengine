@@ -176,6 +176,7 @@ export interface MaterialExtension {
     wgsl?: string;
     direct?: string;
     ambient?: string;
+    coat?: MaterialCoatLayer;
     output?: string;
     lighting?: boolean;
     declarations?: string;
@@ -942,6 +943,13 @@ interface GLTFTextureTransform {
   rotation?: number;
   scale?: readonly [number, number];
   texCoord?: number;
+}
+
+interface MaterialCoatLayer {
+    keep: string;
+    direct: string;
+    normal: string;
+    roughness: string;
 }
 
 interface MaterialExtensionResource {

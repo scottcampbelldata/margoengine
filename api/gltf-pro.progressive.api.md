@@ -657,6 +657,13 @@ interface LightingEffect {
     bindings(): GPUBindGroupEntry[];
 }
 
+interface MaterialCoatLayer {
+    keep: string;
+    direct: string;
+    normal: string;
+    roughness: string;
+}
+
 interface MaterialExtension {
     afterOpaque?: boolean;
     replacesPhysical?: boolean;
@@ -665,6 +672,7 @@ interface MaterialExtension {
     wgsl?: string;
     direct?: string;
     ambient?: string;
+    coat?: MaterialCoatLayer;
     output?: string;
     lighting?: boolean;
     declarations?: string;

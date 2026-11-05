@@ -1,6 +1,7 @@
 import { retire } from '../../shared/frame-resources.js';
 import { margoError } from '../../shared/errors.js';
 import { transmissionWeight } from '../../shared/pbr-transmission.js';
+import { directVisibility } from '../../shared/pbr-hooks.js';
 
 /** Caller-owned, filterable 2D texture and optional filtering sampler. */
 export interface MaterialExtensionTexture {
@@ -35,6 +36,13 @@ export interface MaterialExtension {
   direct?: string;
   /** Statements after hemispherical ambient lighting; may mutate materialAmbient. */
   ambient?: string;
+  /**
+   * A layer over all the surface's light, as KHR_materials_clearcoat defines it: direct, local, ambient and emissive
+   * light keep the share `keep`, then the layer's own directional and ambient light add on top. The ambient light is
+   * `(1 - keep) x margoCoatAmbient(s, v)`, the same function native physical materials use, so lighting effects light it
+   * (PBRHooks `coat`). SSAO's ambient replay returns the same sum for its ambient part.
+   */
+  coat?: MaterialCoatLayer;
   /** Beauty-only statements after output encoding, before the final return. */
   output?: string;
   /** Disable optional lighting bindings for a caller-managed surface. */
@@ -45,6 +53,18 @@ export interface MaterialExtension {
   factors?: Float32Array;
   /** materialTextureN / materialSamplerN, at bindings 1+2*N / 2+2*N. */
   textures?: readonly MaterialExtensionTexture[];
+}
+
+/** WGSL expressions, evaluated after `wgsl`, of a `MaterialExtension.coat` layer. */
+export interface MaterialCoatLayer {
+  /** f32: the share of the light under the layer that it leaves, 1 - factor x Fresnel(v.n). */
+  keep: string;
+  /** vec3f: the layer's own directional light, before shadows. Shadow visibility applies to it as to the base. */
+  direct: string;
+  /** vec3f: the layer's unit normal, in `s.cn`. */
+  normal: string;
+  /** f32: the layer's roughness, in `s.cr`. */
+  roughness: string;
 }
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -76,6 +96,8 @@ export function prepareMaterialExtension(
     typeof extension !== 'object' ||
     (extension.wgsl !== undefined && typeof extension.wgsl !== 'string') ||
     (extension.direct !== undefined && typeof extension.direct !== 'string') ||
+    (extension.coat !== undefined &&
+      !['keep', 'direct', 'normal', 'roughness'].every((key) => typeof extension.coat?.[key as 'keep'] === 'string')) ||
     (extension.ambient !== undefined && typeof extension.ambient !== 'string') ||
     (extension.output !== undefined && typeof extension.output !== 'string') ||
     (extension.transmission !== undefined && typeof extension.transmission !== 'string') ||
@@ -158,6 +180,7 @@ export function materialExtensionSurface(code: string, extension: MaterialExtens
     () =>
       `var s=surface(i,front);\n${extensionAccess(extension)}${extension.wgsl ?? ''}\n` +
       (extension.transmission ? `s.tr=clamp(${extension.transmission},0.0,1.0);\n` : '') +
+      (extension.coat ? `s.cn=${extension.coat.normal};s.cr=${extension.coat.roughness};\n` : '') +
       (extension.ior
         ? `{let materialIorRatio=(max(${extension.ior},1.0)-1.0)/(max(${extension.ior},1.0)+1.0);s.f0=vec3f(materialIorRatio*materialIorRatio);}\n`
         : ''),
@@ -181,6 +204,30 @@ function dielectricIor(code: string): string {
   return code.replace(struct, 'struct Surface {$1, f0:vec3f}').replaceAll(fixed, 'mix(s.f0,s.base.rgb,s.metal)');
 }
 
+/**
+ * `code` with what a coat layer reads: the Surface's coat normal and roughness and the default coat ambient light, which
+ * native physical shaders already have, and the shadow visibility `lightPBR` fills in for the coat's directional light.
+ */
+function coatLayer(code: string): string {
+  const struct = /struct Surface \{([^}]*)\}/;
+  if (!struct.test(code))
+    throw margoError(
+      'unsupported',
+      'PBR shader coat target missing: the Surface struct; use matching @margoengine/gltf-pro and materials versions',
+    );
+  if (!code.includes(' cn:vec3f')) code = code.replace(struct, 'struct Surface {$1, cn:vec3f, cr:f32}');
+  // Ambient 0.5 and the hemisphere are the native layers' own, written so that lightPBR can replace them.
+  if (!code.includes('fn margoCoatAmbient('))
+    code += `\nfn margoCoatAmbient(s:Surface,v:vec3f)->vec3f {return 0.5*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.cn.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}\n`;
+  return `${directVisibility}\n${code}`;
+}
+
+/** `under`, an expression of ambient light, as the coat layer of `extension` leaves it. */
+export function coatedAmbient(extension: MaterialExtension | undefined, under: string): string {
+  const keep = extension?.coat?.keep;
+  return keep ? `(${under})*(${keep})+(1.0-(${keep}))*margoCoatAmbient(s,v)` : under;
+}
+
 export function materialExtensionShader(source: string, extension: MaterialExtension): string {
   validateDeclarations(extension.declarations);
   // Even an empty extension has a distinct pipeline signature.
@@ -195,6 +242,7 @@ export function materialExtensionShader(source: string, extension: MaterialExten
   // without texture samples or changes to the surface (WGSL 9.2.3).
   let code = extension.transmission ? transmissionWeight(source) : source;
   if (extension.ior) code = dielectricIor(code);
+  if (extension.coat) code = coatLayer(code);
   if (extension.direct)
     code = code.replace('let direct=', 'var direct=').replace('var color=', () => `${extension.direct}\n  var color=`);
   if (extension.output)
@@ -208,7 +256,8 @@ export function materialExtensionShader(source: string, extension: MaterialExten
 
 /** Apply after optional lighting effects have matched their standard lighting call sites. */
 export function materialExtensionAmbientShader(source: string, extension: MaterialExtension): string {
-  if (!extension.ambient) return source;
+  const { ambient, coat } = extension;
+  if (!ambient && !coat) return source;
   const entry = (name: string, rewrite: (code: string) => string) => {
     const start = source.indexOf('@fragment fn ' + name + '(');
     if (start < 0) return;
@@ -216,17 +265,34 @@ export function materialExtensionAmbientShader(source: string, extension: Materi
       end = next < 0 ? source.length : next;
     source = source.slice(0, start) + rewrite(source.slice(start, end)) + source.slice(end);
   };
-  entry('fragment', (code) =>
-    code
-      .replace('var color=', () => `var materialAmbient=ambient(s);\n${extension.ambient}\n  var color=`)
-      .replace('ambient(s)+s.emissive', 'materialAmbient+s.emissive'),
-  );
-  entry('ambientFragment', (code) =>
-    code.replace(
-      'return vec4f(ambient(s),',
-      () => `var materialAmbient=ambient(s);\n${extension.ambient}\n  return vec4f(materialAmbient,`,
-    ),
-  );
+  if (ambient) {
+    entry('fragment', (code) =>
+      code
+        .replace('var color=', () => `var materialAmbient=ambient(s);\n${ambient}\n  var color=`)
+        .replace('ambient(s)+s.emissive', 'materialAmbient+s.emissive'),
+    );
+    entry('ambientFragment', (code) =>
+      code.replace(
+        'return vec4f(ambient(s),',
+        () => `var materialAmbient=ambient(s);\n${ambient}\n  return vec4f(materialAmbient,`,
+      ),
+    );
+  }
+  if (coat) {
+    // Every light is in `color` once this statement ends: what runs after it (native layers, transmission) is on top.
+    entry('fragment', (code) =>
+      code.replace(
+        /var color=[^;]*\+s\.emissive[^;]*;/,
+        (sum) => `${sum}\n  color=${coatedAmbient(extension, 'color')}+(${coat.direct})*margoDirectVisible;`,
+      ),
+    );
+    entry('ambientFragment', (code) =>
+      code.replace(
+        /return vec4f\((materialAmbient|ambient\(s\)),/,
+        (_, under) => `let v=normalize(f.eye.xyz-i.position);\n  return vec4f(${coatedAmbient(extension, under)},`,
+      ),
+    );
+  }
   return source;
 }
 

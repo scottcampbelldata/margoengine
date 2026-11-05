@@ -298,6 +298,24 @@ uses these hooks for transmission while retaining the baseline factor-zero path.
 1 minus it, and `ior` (a WGSL index of refraction, kept as `s.f0`) sets the
 dielectric F0 of direct and ambient light to ((ior - 1) / (ior + 1))^2 in place of
 0.04, as the native physical path does; without `ior` the F0 stays 0.04.
+The optional `coat` layer goes over all the surface's light, as
+`KHR_materials_clearcoat` defines it: direct, local, ambient and emitted light keep
+the share `keep`, the layer's `direct` light adds on top with the same shadow
+visibility, and `(1 - keep) * margoCoatAmbient(s, v)` adds its ambient light. `normal`
+and `roughness` land in `s.cn` and `s.cr`, which an environment's `coat` hook reads.
+`direct` hooks of lighting effects must scale the light they wrap, since a coated
+shader evaluates them once on `vec3f(1)`. All four fields are WGSL expressions
+evaluated after `wgsl`:
+
+```ts
+import {type MaterialExtension} from 'margoengine/gltf-pro';
+
+const varnish: MaterialExtension = {
+  wgsl: 'let varnishKeep=0.9;',
+  coat: {keep: 'varnishKeep', direct: 'vec3f(0)', normal: 's.n', roughness: '0.1'},
+};
+```
+
 The optional `ambient` statements can mutate `materialAmbient` after hemisphere
 lighting in beauty and ambient-only passes. They are applied after lighting
 effects have matched the standard PBR source. Materials uses this hook for sheen,

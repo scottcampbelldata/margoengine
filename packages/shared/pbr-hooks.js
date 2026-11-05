@@ -2,6 +2,8 @@
 // same hook points: `direct+ambient(s)`, `var color=`, `fn ambient(s:Surface)`, `+s.emissive;` and the tone-map line.
 import { margoError } from './errors.js';
 const lit = new WeakMap();
+/** Declared by a shader whose coat layer adds directional light after the sum: what the `direct` hook lets through. */
+export const directVisibility = 'var<private> margoDirectVisible:vec3f=vec3f(1);';
 /** `code` (a PBR fragment with gltf-pro's hook points, possibly already lit) with one effect's hooks composed in. */
 export function lightPBR(code, hooks) {
   const cache = lit.get(hooks),
@@ -39,7 +41,13 @@ function composeLightPBR(code, hooks, cache) {
   // functions of the surface: local lights see the diffuse left after transmission (margoFront), the ambient hook is
   // layered by margoAmbientLayers (thin film, diffuse transmission, bent normal).
   const layered = code.includes('fn margoAmbientLayers(');
-  if (hooks.direct) edit('direct+ambient(s)', hooks.direct('direct') + '+ambient(s)');
+  if (hooks.direct) {
+    // A coat lights its lobe through the same visibility, evaluated once. `direct` hooks scale the light they wrap.
+    if (code.includes(directVisibility)) {
+      edit('var color=', () => `margoDirectVisible=${hooks.direct('vec3f(1)')};\n  var color=`);
+      edit('direct+ambient(s)', 'direct*margoDirectVisible+ambient(s)');
+    } else edit('direct+ambient(s)', hooks.direct('direct') + '+ambient(s)');
+  }
   if (hooks.light) {
     if (layered) {
       const n = out.split('fn margoLocal').length - 1;

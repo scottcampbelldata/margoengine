@@ -2839,16 +2839,15 @@ does not own. Each entry says exactly what is needed to close it.
   `--msaa` passes there. Two views still stream tiles into different pages, so a fixed cull order makes each view
   steady, and two views can still differ at 4x MSAA.
 
-### Clearcoat does not dim the opaque base under it through materials `install`
+### gltf-pro's native coat and sheen lobes ignore shadows
 
-- **What:** the spec's coated material is `mix(material, clearcoat_brdf, clearcoat * F)`, so the base keeps
-  `1 - clearcoat * F`. `clearcoatShader`'s `direct` hook only adds the coat (`direct+=materialClearcoat`), and no ambient
-  term exists. Transmitted light under the coat is right since `materialCoatKeep` (2026-10-31); opaque lit light is not.
-- **Size:** with clearcoat 1 the base should read 0.96 of itself at normal incidence and 0.73 at n.v 0.25.
-- **Repro:** `install(model)` on an opaque `KHR_materials_clearcoat` material, against the same model through gltf-pro's
-  native `layers()`, which does scale it.
-- **Cause:** `packages/materials/src/shader.ts`. The fix is `direct=direct*materialCoatKeep+materialClearcoat` plus a coat
-  ambient term; it moves the clearcoat baselines, so it was left for its own change.
+- **What:** `layers()` adds the coat's and the sheen's sun lobes after the shadow hook has wrapped `direct`, so a coated
+  physical surface in full shadow keeps a sun highlight. `install(model)` shadows its coat (`margoDirectVisible`).
+- **Repro:** a physical `KHR_materials_clearcoat` material through `loadGLTF`, in the shadow of another mesh, with
+  `Shadows` attached: the highlight stays.
+- **Cause:** `layers` in `packages/gltf-pro/src/shader.ts` reads `f.light` and `f.radiance` with no visibility. The fix is
+  `margoDirectVisible` there too; it makes every physical shader evaluate the shadow where `shadowLit` now skips unlit
+  fragments, so its cost has to be measured first. Found by code reading (2026-11-05), not yet measured.
 
 ### Display-encoded targets add transmitted and lit light in encoded values
 
@@ -2880,7 +2879,13 @@ does not own. Each entry says exactly what is needed to close it.
   none of them (audit E-02, bug 67); it now has the same kind of defaults: own-host `origins` (`'*'` opts out),
   `maxConnections` (1,024) and `firstMessageTimeout` (10 s), with tests in `packages/netcode/tests/transports.test.js`.
   Authentication and network-level denial of service (a flood below the TCP layer) are still the application's.
-- **Needed to close:** F20 fixed with a regression test that fails without it.
+- **Recheck of F20 (2026-11-05):** not reproduced, and not identified. The repository, the private notes and the commit
+  history name no decoder, input or time for it, and the audit report is not on this PC. Every fuzz target ran 10 s (seed
+  1, 0 findings on the 26 named targets), and `decoders/ktx2` and `environment/exr` 60 s (seed 7, 0 findings), on the
+  RTX A6000 PC. The audit ran on a slower laptop with 36 targets; `machinery/surface` left with the CAD code on
+  2026-10-29, so F20 may have gone with it.
+- **Needed to close:** the audit's F20 text (its input, or at least the target and the time). Then a regression test that
+  fails without the fix.
 
 ### The exporters USDZ timing test can still fail when every core is busy allocating
 
@@ -3138,6 +3143,8 @@ does not own. Each entry says exactly what is needed to close it.
   translucent panes in the other order differ by up to 132 of 255 (`swapped layer order` step), and the mesh arrival
   order step stays a pixel comparison with that tolerance only. The check's output prints the exact count next to the
   tolerant one, and `--repeat` reports both (it still fails on any exact difference: it is the repro).
+- **Recheck (2026-11-05, RTX A6000, driver 32.0.16.1742, Edge 156.0.4314.58):** `scripts/msaa-blend-repeat-check.mjs`
+  still has 29 of 30 frames differing with no Margo code, and 0 of 30 with `--mask=7`. Nothing new to fix in Margo.
 - **Needed to close:** the plain-WebGPU page sent to NVIDIA (it repeats on no other GPU tested) and the recorded voxel
   frame with its replay page sent to Intel (Scott decides both), and their fixes or explanations recorded here; then
   the voxel tolerance can go (the Arc's 9 of 255 is over it, so the voxel checks can fail now and then on that laptop,
@@ -4713,7 +4720,7 @@ const extension = clearcoat({factor: 1, roughnessFactor: 0.05});
 
 `ClearcoatOptions` supports the two factors and three optional textures. Each `ClearcoatTexture` contains a `view`, an optional `sampler`, and an optional `texCoord` (`0` or `1`); the normal texture also accepts `scale`. A `transform` accepts glTF-style `offset`, `rotation`, `scale`, and overriding `texCoord`. A view without a sampler uses nearest sampling with clamped UVs at mip level `0`. Views and samplers supplied to `clearcoat()` stay caller-owned.
 
-Clearcoat adds a second GGX specular lobe with dielectric F0 `0.04`. Its normal affects only that lobe; the base shading and g-buffer normal are unchanged, so SSAO and shadows continue to use the base normal. Clearcoat factor `0` preserves the baseline material.
+Clearcoat adds a second GGX specular lobe with dielectric F0 `0.04`. As KHR_materials_clearcoat defines it, everything under the coat (direct, local, ambient and emitted light) keeps `1 - clearcoat * F(n.v)`, 0.96 of itself at normal incidence and 0.73 at n.v 0.25 with clearcoat 1, and the coat adds its own directional and ambient light on top, the ambient from the same `margoCoatAmbient` as gltf-pro's native materials, so an environment lights it. Its normal affects only the coat; the base shading and g-buffer normal are unchanged, so SSAO and shadows continue to use the base normal. Clearcoat factor `0` preserves the baseline material.
 
 The package supports clearcoat factor, roughness, and the optional clearcoat factor, roughness, and normal textures. Missing factor and roughness default to `0`; missing textures do not allocate samplers. Lighting retains bind group 2, while clearcoat resources use the optional material bind group 3.
 
@@ -4731,13 +4738,6 @@ metadata creates an installation plan on an ordinary PBR primitive.
 
 ```ts
 import {materialLobes, clearcoat} from 'margoengine/materials';
-
-primitive.extension = materialLobes({
-  sheen: {colorFactor: [0.4, 0.1, 0.05], roughnessFactor: 0.5},
-  specular: {factor: 0.8, colorFactor: [1, 0.8, 0.5]},
-  anisotropy: {strength: 0.5, rotation: Math.PI / 4},
-  iridescence: {factor: 0.6, ior: 1.3, thicknessMinimum: 100, thicknessMaximum: 400},
-}, clearcoat({factor: 0.2}));
 ```
 
 [README continues: https://margoengine.com/llms/packages/materials.md]

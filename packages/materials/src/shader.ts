@@ -26,7 +26,7 @@ export interface ClearcoatShaderValues {
 export function clearcoatShader(
   textures: ClearcoatShaderTextures = {},
   values?: ClearcoatShaderValues,
-): Pick<MaterialExtension, 'wgsl' | 'declarations' | 'direct'> {
+): Pick<MaterialExtension, 'wgsl' | 'declarations' | 'coat'> {
   const sample = (slot: ClearcoatTextureSlot) => {
     const texture = `materialTexture${slot.index}`,
       coords = coordinateExpression(slot);
@@ -58,13 +58,20 @@ export function clearcoatShader(
   // minimum perceptual roughness of the Filament design document (published engine standard).
   return {
     wgsl: `let materialClearcoat=materialClearcoatLighting(i,front${values ? ',' + values.factor + ',' + values.roughness + (values.normal ? ',' + values.normal : '') : ''});`,
-    // Skip even the addition when factor is zero, preserving the base operation order.
-    direct: `if(${values ? values.factor : 'materialFactors[0].x'}>0.0){direct+=materialClearcoat;}`,
+    // Factor zero keeps 1 and adds exact zeros, so the base light stays bit for bit.
+    coat: {
+      keep: 'materialCoatKeep',
+      direct: 'materialClearcoat',
+      normal: 'materialCoatSurfaceNormal',
+      roughness: 'materialCoatSurfaceRoughness',
+    },
     declarations:
       (Object.values(textures).some((slot) => slot?.transformIndex !== undefined) ? coordinateWGSL : '') +
       /* wgsl */ `
-// What the coat leaves of the light transmitted under it, 1 - clearcoat * Fresnel(v.Nc) (KHR_materials_clearcoat).
+// What the coat leaves of the light under it, 1 - clearcoat * Fresnel(v.Nc) (KHR_materials_clearcoat).
 var<private> materialCoatKeep:f32=1.0;
+var<private> materialCoatSurfaceNormal:vec3f=vec3f(0,0,1);
+var<private> materialCoatSurfaceRoughness:f32=1.0;
 // Clearcoat has an independent normal. Never change Surface.n: SSAO and shadows use the base normal.
 fn materialClearcoatLighting(i:Out,front:bool${values ? ',materialCoatFactor:f32,materialCoatRoughness:f32' + (values.normal ? ',materialCoatNormal:vec3f' : '') : ''})->vec3f {
 ${values ? '' : '  let factors=materialFactors[0];\n'}  let factor=clamp(${values ? 'materialCoatFactor' : 'factors.x'}${textures.factor ? '*' + sample(textures.factor) + '.r' : ''},0.0,1.0);
@@ -74,6 +81,7 @@ ${values ? '' : '  let factors=materialFactors[0];\n'}  let factor=clamp(${value
   let n=select(vec3f(0,0,1),i.normal/max(normalLength,0.000001),normalLength>0.000001)*select(-1.0,1.0,facing);
   var coatNormal=${values?.normal ? 'materialCoatNormal' : 'n'};
 ${normalShader}
+  materialCoatSurfaceNormal=coatNormal; materialCoatSurfaceRoughness=roughness;
   // Texture samples and derivative frames above must precede this varying branch.
   if(factor<=0.0){return vec3f(0);}
   let view=f.eye.xyz-i.position; let v=view/max(length(view),0.0001);

@@ -33,7 +33,7 @@ const extension = clearcoat({factor: 1, roughnessFactor: 0.05});
 
 `ClearcoatOptions` supports the two factors and three optional textures. Each `ClearcoatTexture` contains a `view`, an optional `sampler`, and an optional `texCoord` (`0` or `1`); the normal texture also accepts `scale`. A `transform` accepts glTF-style `offset`, `rotation`, `scale`, and overriding `texCoord`. A view without a sampler uses nearest sampling with clamped UVs at mip level `0`. Views and samplers supplied to `clearcoat()` stay caller-owned.
 
-Clearcoat adds a second GGX specular lobe with dielectric F0 `0.04`. Its normal affects only that lobe; the base shading and g-buffer normal are unchanged, so SSAO and shadows continue to use the base normal. Clearcoat factor `0` preserves the baseline material.
+Clearcoat adds a second GGX specular lobe with dielectric F0 `0.04`. As KHR_materials_clearcoat defines it, everything under the coat (direct, local, ambient and emitted light) keeps `1 - clearcoat * F(n.v)`, 0.96 of itself at normal incidence and 0.73 at n.v 0.25 with clearcoat 1, and the coat adds its own directional and ambient light on top, the ambient from the same `margoCoatAmbient` as gltf-pro's native materials, so an environment lights it. Its normal affects only the coat; the base shading and g-buffer normal are unchanged, so SSAO and shadows continue to use the base normal. Clearcoat factor `0` preserves the baseline material.
 
 The package supports clearcoat factor, roughness, and the optional clearcoat factor, roughness, and normal textures. Missing factor and roughness default to `0`; missing textures do not allocate samplers. Lighting retains bind group 2, while clearcoat resources use the optional material bind group 3.
 

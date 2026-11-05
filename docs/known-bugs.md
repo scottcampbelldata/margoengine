@@ -177,16 +177,15 @@ does not own. Each entry says exactly what is needed to close it.
   `--msaa` passes there. Two views still stream tiles into different pages, so a fixed cull order makes each view
   steady, and two views can still differ at 4x MSAA.
 
-### Clearcoat does not dim the opaque base under it through materials `install`
+### gltf-pro's native coat and sheen lobes ignore shadows
 
-- **What:** the spec's coated material is `mix(material, clearcoat_brdf, clearcoat * F)`, so the base keeps
-  `1 - clearcoat * F`. `clearcoatShader`'s `direct` hook only adds the coat (`direct+=materialClearcoat`), and no ambient
-  term exists. Transmitted light under the coat is right since `materialCoatKeep` (2026-10-31); opaque lit light is not.
-- **Size:** with clearcoat 1 the base should read 0.96 of itself at normal incidence and 0.73 at n.v 0.25.
-- **Repro:** `install(model)` on an opaque `KHR_materials_clearcoat` material, against the same model through gltf-pro's
-  native `layers()`, which does scale it.
-- **Cause:** `packages/materials/src/shader.ts`. The fix is `direct=direct*materialCoatKeep+materialClearcoat` plus a coat
-  ambient term; it moves the clearcoat baselines, so it was left for its own change.
+- **What:** `layers()` adds the coat's and the sheen's sun lobes after the shadow hook has wrapped `direct`, so a coated
+  physical surface in full shadow keeps a sun highlight. `install(model)` shadows its coat (`margoDirectVisible`).
+- **Repro:** a physical `KHR_materials_clearcoat` material through `loadGLTF`, in the shadow of another mesh, with
+  `Shadows` attached: the highlight stays.
+- **Cause:** `layers` in `packages/gltf-pro/src/shader.ts` reads `f.light` and `f.radiance` with no visibility. The fix is
+  `margoDirectVisible` there too; it makes every physical shader evaluate the shadow where `shadowLit` now skips unlit
+  fragments, so its cost has to be measured first. Found by code reading (2026-11-05), not yet measured.
 
 ### Display-encoded targets add transmitted and lit light in encoded values
 

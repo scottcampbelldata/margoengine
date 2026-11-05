@@ -214,7 +214,8 @@ test('clearcoat nodes compile the shared dielectric GGX lobe and retain factor-z
   const shared = source(clearcoat({ factor: 1, roughnessFactor: 0.05 }));
   for (const term of ['3.14159265', 'pow(1-vh,5.0)', '4*nl*nv', '0.04'])
     assert.ok(source(extension).includes(term) && shared.includes(term));
-  assert.match(extension.direct, /if\(/);
+  assert.equal(extension.coat.keep, 'materialCoatKeep');
+  assert.match(extension.declarations, /if\(factor<=0\.0\)\{return vec3f\(0\);\}/);
   assert.ok(extension.factors.includes(Math.fround(0.05)));
   assert.doesNotThrow(() => nodeMaterial(graph(emit(color(), { clearcoat: { ...node, factor: scalar(0) } }))));
 });

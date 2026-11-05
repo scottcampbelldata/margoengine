@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4397692,
+  "total": 4403573,
   "history": [
     {
       "date": "2026-10-24",
@@ -1478,6 +1478,12 @@
       "commit": "0db3bb422",
       "reason": "New math entry ./obb: OBB (oriented bounding box) with SAT intersectsOBB, ray, plane, sphere and Box3 tests, input checks with fix messages; also exported from the math root (+1.97 kB gzip). Core and core + stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "a0e103074",
+      "reason": "gltf-pro entries and the usdz worker grow: MaterialExtension.coat, the clearcoat layer install needed to dim the light under it",
+      "grew": 3
     }
   ],
   "items": {
@@ -1591,7 +1597,7 @@
     "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/atlas": 2403,
     "@margoengine/exporters/capture": 7241,
-    "@margoengine/exporters/collect": 7934,
+    "@margoengine/exporters/collect": 7908,
     "@margoengine/exporters/dae": 10560,
     "@margoengine/exporters/godot": 10258,
     "@margoengine/exporters/godot-2d": 3416,
@@ -1634,7 +1640,7 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 5406,
     "@margoengine/gltf": 6285,
-    "@margoengine/gltf-pro": 56912,
+    "@margoengine/gltf-pro": 58819,
     "@margoengine/gltf-pro dist/workers/gltf.js": 21337,
     "@margoengine/gltf-pro dist/workers/progressive.js": 15420,
     "@margoengine/gltf-pro/asset": 5501,
@@ -1642,7 +1648,7 @@
     "@margoengine/gltf-pro/extended": 6783,
     "@margoengine/gltf-pro/instancing": 3380,
     "@margoengine/gltf-pro/prepare": 17572,
-    "@margoengine/gltf-pro/progressive": 63493,
+    "@margoengine/gltf-pro/progressive": 65481,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/worker": 58776,
     "@margoengine/headless": 2867,
@@ -1857,7 +1863,7 @@
     "@margoengine/ui": 28622,
     "@margoengine/ui/react": 28708,
     "@margoengine/usdz": 8792,
-    "@margoengine/usdz dist/workers/usdz.js": 65883,
+    "@margoengine/usdz dist/workers/usdz.js": 67895,
     "@margoengine/usdz/worker": 9856,
     "@margoengine/vfx": 16742,
     "@margoengine/vfx/base": 10605,
