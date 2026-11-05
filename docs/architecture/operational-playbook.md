@@ -585,3 +585,7 @@ The following remain technical gaps, not permission to weaken a check:
 14. Remote workflow configuration is not proof that a workflow actually ran.
 15. The quality classifier must keep a conservative full-mode fallback for genuinely unclassifiable or shared
     changes, while ordinary package changes remain affected-only.
+16. Scatter's GPU cull appends instances in an order that changes every frame. On an Apple M6 (Metal) at 4x MSAA the
+    edge pixels follow it, so a still frame is not repeatable there ("Apple GPUs: 4x MSAA edges of scatter instances" in
+    `docs/known-bugs.md`). The biomes shadows check compares single-sampled frames and first proves that two views
+    without shadows draw the same bits; no exact 4x MSAA repeat check of a scatter scene exists yet.
