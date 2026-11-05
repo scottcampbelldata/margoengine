@@ -2615,6 +2615,13 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Extrusion UVs (`uvGenerator` of `@margoengine/geometry/extrude`) | Enforced by method: the generator runs once per triangle corner on the CPU, and wall `u` comes from the outline before the bevel widens it. | Walls and caps are separate triangles, so a corner can differ per surface. | A texture on a wide bevel stretches a little across `u`. | Use `distance` and your own `u` from `shape`. |
 | Split tangents (`splitTangents`, `computeTangents` with `split`) | Enforced by method: checked against Blender's MikkTSpace on two meshes, to a dot product above 0.9995 per corner with matching signs. It follows the published grouping and is not a port of the reference library, so a mesh with unusual degenerate triangles may group differently. `w` assumes v up. | Clean room: written from the paper. | A rare corner could differ from a bake on degenerate geometry. | Remove zero-area triangles first; flip v on glTF UVs. |
 
+## Copies of a model
+
+| Limit | Value |
+| --- | --- |
+| Textures of `cloneModel` copies | Shared: one GPU texture per device, image and format, freed with its last holder (`p-morph`: 7 textures for 100 copies, not 700). A second model loaded from the same file holds its own images, so it uploads its own textures. |
+| `p-morph` first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 133 to 187 ms against three's WebGPU 189 to 379 and WebGL 25 to 48, busy-machine diagnostic. |
+
 ## Platform
 
 | Limit | Starts at | Why | What you see | Escape hatch |
@@ -3352,20 +3359,25 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 - **Plan:** the LUT depends only on its size and sample count: share one per device (counted, freed with the last
   environment). Then time the passes to state the rest as an accepted difference with its parts.
 
-### First frame of 100 morphed copies
+### First frame of 100 morphed copies is still slower than three's WebGL backend
 
-- **What:** `p-morph`'s first frame is 304 ms (three's WebGPU backend 294, WebGL 37; run `20261027-103915`); its build
-  is 206 ms. Before perf-history entry 34 the build was 490 ms and the first frame 47.
-- **Cause:** the per-device deformation setup and gltf-pro's render pipelines are created on the first frame, and
-  WebGPU compiles pipelines there. A second cause, every copy compiling its own mip pipelines (200 shader modules),
-  is fixed (entry 36).
-- **Plan (gltf-pro and animation):** create the pipelines a loaded model will draw with
-  (`createRenderPipelineAsync` / `createComputePipelineAsync`) while it loads, so the first frame finds them ready.
+- **What:** `p-morph`'s first frame is 133 to 187 ms (build 61 to 76) against three's WebGL 25 to 48 (build 21 to 32); it
+  is now faster than three's WebGPU backend (189 to 379). Busy-machine diagnostic runs `20261105-183112` and
+  `20261105-183306`, RTX A6000, not gated: entry 49 of perf-history.md.
+- **Cause (measured by waiting on the queue after each build stage):** one-off WebGPU work that does not grow with the
+  copies: 58 ms for the first load (mip pipelines and the 1024 x 1024 mip chain), 31 ms for the deformation buffers
+  (25 MB written, the bind-pose vertices once per copy, and the compute pipeline), 60 ms for the frame itself, 10 of it
+  on the CPU and the rest the render pipeline's compile.
+- **Plan:** (1) share the bind-pose block between copies in `DeformArena`, as the morph deltas are. (2) Compile the
+  render pipeline while the model loads: its key needs the target format, depth format and sample count, which only the
+  pass context carries, so this needs core to expose them. That is a core change with no engine failure behind it:
+  Scott's call. If neither closes the gap, record what is left as an accepted difference.
 
 ## Fixed 2026-11-05
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| `cloneModel`: every copy uploaded and mipped its own textures (`p-morph`: 700 textures, 300 bitmap copies, 300 submits, about 560 MB of texture memory for 100 copies; the first frame waited 200 ms for it) | the copies held separate `createImageBitmap` copies, so nothing could tell they were one image, and gltf-pro's texture cache was per model | copies hold the source's images (`PBRModel.shareImages`, counted) and gltf-pro shares textures per device, image and format, each freed with its last holder | `packages/gltf-pro/tests/model-runs.test.js` ("copies of one image share its GPU texture"), `packages/animation/tests/clone.test.js` ("cloneModel holds the source image") |
 | Apple GPUs: 4x MSAA edges of scatter instances changed from frame to frame (Apple M6, Metal: a still biome view drew about 420 of 76,800 pixels differently every frame; `node packages/biomes/tests/shadows-check.mjs --msaa` failed its control, 1,149 values differ) | scatter's WebGPU cull appended each visible instance at an `atomicAdd` slot, so the LOD rings held the frame's instances in whichever order the GPU's threads ran, and the M6 draws an instance's MSAA edge pixels by that order | the commit "fix(scatter): cull in candidate order on WebGPU": each candidate stores its ring flags (and its instance) at its own index, the prefix count of `packages/shared/prefix.js` gives each its slot and each ring is compacted (`packages/scatter/src/order.ts`, shared with the WebGL2 route). On the M6 the frame-repeat check is exact and `shadows-check.mjs --msaa` passes (control 0); its cost is in [limits.md](limits.md) (Rendering, "Scatter cull in candidate order") | `packages/scatter/test/order.test.js` (fails with the atomic cull: its rings come out reversed when the threads run in reverse); `packages/scatter/test/repeat.browser.mjs` (6 still 4x MSAA frames bit-identical) |
 
 ## Fixed 2026-10-31 (flaky root tests under load)

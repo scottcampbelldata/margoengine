@@ -201,3 +201,77 @@ test('copies of one textured asset compile the mip pipelines once per device', a
   const mips = created.filter(([kind, what]) => kind === 'module' && what === 'mip');
   assert.equal(mips.length, 1, 'one mip shader for the device, not one per copy');
 });
+
+test('copies of one image share its GPU texture, freed with the last holder', async (t) => {
+  // p-morph: every cloneModel copy uploaded and mipped its own textures (700 textures, 300 image copies and 300 submits
+  // for 100 copies), all queued during the build, so the first frame waited 260 ms for them.
+  const f = await fixture(t),
+    device = f.engine.gpu,
+    made = [],
+    create = device.createTexture,
+    copied = [];
+  device.createTexture = (d) => {
+    const texture = create.call(device, d),
+      destroy = texture.destroy;
+    texture.destroy = () => {
+      texture.gone = true;
+      destroy?.call(texture);
+    };
+    if (d.size[0] === 4) made.push(texture);
+    return texture;
+  };
+  device.queue.copyExternalImageToTexture = ({ source }) => copied.push(source);
+  const encoder = device.createCommandEncoder;
+  device.createCommandEncoder = (d) => {
+    const e = encoder.call(device, d);
+    e.beginRenderPass ??= () => ({ setPipeline() {}, setBindGroup() {}, draw() {}, end() {} });
+    return e;
+  };
+  const doc = structuredClone(f.doc),
+    buffers = [...f.buffers, new Float32Array([0, 0, 1, 0, 1, 1, 0, 1])];
+  doc.buffers.push({ byteLength: 32 });
+  doc.bufferViews.push({ buffer: 3, byteLength: 32 });
+  doc.accessors.push({ bufferView: 3, componentType: 5126, count: 4, type: 'VEC2' });
+  doc.meshes[0].primitives[0].attributes.TEXCOORD_0 = 3;
+  doc.images = [{ uri: 'unused.png' }];
+  doc.textures = [{ source: 0 }];
+  doc.materials = [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }];
+  const image = {
+      width: 4,
+      height: 4,
+      closed: 0,
+      close() {
+        this.closed++;
+      },
+    },
+    a = parseGLTF(f.engine, doc, buffers, [image]);
+  if (f.engine.plugins.get(a.name) !== a) f.engine.use(a);
+  const b = new PBRModel(f.engine, a.asset, a.shareImages()),
+    c = new PBRModel(f.engine, a.asset, a.shareImages());
+  f.engine.use(b);
+  f.engine.use(c);
+  assert.equal(made.length, 1, 'the copies made no texture of their own');
+  assert.deepEqual(copied, [image], 'the image was uploaded once');
+  assert.equal(b['resources'][0].views[0], a['resources'][0].views[0], 'one view for the copies');
+  // Another image on the same asset is another texture.
+  const other = { width: 4, height: 4, close() {} },
+    d = new PBRModel(f.engine, a.asset, [other]);
+  f.engine.use(d);
+  assert.equal(made.length, 2, 'a different image uploads its own texture');
+  // In any disposal order: the source first, as a copy that outlives it keeps drawing.
+  a.dispose();
+  b.dispose();
+  assert.equal(made[0].gone, undefined, 'a copy still draws from the texture');
+  assert.equal(image.closed, 0, 'a copy still holds the image');
+  c.dispose();
+  assert.equal(made[0].gone, true, 'the last holder frees the texture');
+  assert.equal(image.closed, 1, 'the last holder closes the image');
+  // Freed for good: a later model of that image uploads it again rather than drawing from a destroyed texture.
+  const again = { width: 4, height: 4, close() {} },
+    e = new PBRModel(f.engine, d.asset, [again]);
+  f.engine.use(e);
+  assert.equal(made.length, 3);
+  d.dispose();
+  e.dispose();
+  assert.equal(made[1].gone, true);
+});

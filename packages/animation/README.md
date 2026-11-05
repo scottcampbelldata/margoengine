@@ -378,11 +378,11 @@ applyKeyframeClip(walk, Animation.attach(hero), t); // or new AnimationGroup(wal
 
 `cloneModel(model)` resolves to a new `PBRModel` with its own root and nodes, starting in the source's current local
 transforms, visibility and morph weights, and registered with the engine when the source is. It shares the source's
-parsed asset (document, buffers, accessors), compressed textures, and packed vertex arrays where gltf-pro cached them
-(worker and progressive loads, prepared static scenes; otherwise it packs its own from the shared accessors). Decoded
-bitmaps are copied with `createImageBitmap`, because disposing a model closes its own. Disposing either model leaves
-the other working. gltf-pro uploads vertex buffers and textures per model, so each clone costs its own GPU
-memory; materials are rebuilt from the document, so runtime material edits on the source are not copied.
+parsed asset (document, buffers, accessors), decoded images, and packed vertex arrays where gltf-pro cached them
+(worker and progressive loads, prepared static scenes; otherwise it packs its own from the shared accessors). Copies
+share the GPU textures of those images and the GPU buffers of those arrays, so a clone uploads no texture and costs no
+texture memory. Disposing any model, source included, leaves the others working: each image, texture and buffer goes
+with its last holder. Materials are rebuilt from the document, so runtime material edits on the source are not copied.
 
 `retargetRig(skeletonOrModel)` reads a bone hierarchy and its current local pose, which becomes the rig's rest pose; a
 model's rig is every node, so armature and mesh nodes count toward bone orientations. `new Retarget(source, target,

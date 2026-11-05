@@ -75,6 +75,13 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Extrusion UVs (`uvGenerator` of `@margoengine/geometry/extrude`) | Enforced by method: the generator runs once per triangle corner on the CPU, and wall `u` comes from the outline before the bevel widens it. | Walls and caps are separate triangles, so a corner can differ per surface. | A texture on a wide bevel stretches a little across `u`. | Use `distance` and your own `u` from `shape`. |
 | Split tangents (`splitTangents`, `computeTangents` with `split`) | Enforced by method: checked against Blender's MikkTSpace on two meshes, to a dot product above 0.9995 per corner with matching signs. It follows the published grouping and is not a port of the reference library, so a mesh with unusual degenerate triangles may group differently. `w` assumes v up. | Clean room: written from the paper. | A rare corner could differ from a bake on degenerate geometry. | Remove zero-area triangles first; flip v on glTF UVs. |
 
+## Copies of a model
+
+| Limit | Value |
+| --- | --- |
+| Textures of `cloneModel` copies | Shared: one GPU texture per device, image and format, freed with its last holder (`p-morph`: 7 textures for 100 copies, not 700). A second model loaded from the same file holds its own images, so it uploads its own textures. |
+| `p-morph` first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 133 to 187 ms against three's WebGPU 189 to 379 and WebGL 25 to 48, busy-machine diagnostic. |
+
 ## Platform
 
 | Limit | Starts at | Why | What you see | Escape hatch |

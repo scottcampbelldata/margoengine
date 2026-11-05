@@ -1352,6 +1352,30 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   Result: `examples/package-benchmarks/results/precise-math-gpu.json`.
 - **Not measured:** other GPUs. The AMD and Mesa compilers named in entry 37 may price `pmHide` differently.
 
+### 49. `p-morph`'s first frame: the copies' textures, not the pipelines
+
+- **Loss:** first frame 249 ms (build 177) against three's WebGPU 192 and WebGL 25 (run `20261105-181853`). The known-bugs
+  entry blamed pipeline compiles on the first frame.
+- **Measured cause:** the frame's CPU side took 8 ms, and 264 of its 320 ms were GPU work already queued by the build:
+  waiting on the queue before the first frame left a 55 ms frame. Every `cloneModel` copy uploaded and mipped its own
+  textures: 700 textures, 100 of them 1024 x 1024 with 11 levels, 300 bitmap copies and 300 submits.
+- **Fix:** copies hold the source's decoded images and gltf-pro shares one texture per device, image and format, counted
+  like the vertex buffers. The same work reaches the same pixels: the run's screenshot is byte for byte the one before
+  (SHA-256 `67648a86...` both ways). Nothing is skipped: each image is still uploaded and mipped, once.
+- **Result (RTX A6000, Edge, other sessions running, so diagnostic and not gated):**
+
+  | | Before | After | three WebGPU | three WebGL |
+  | --- | --- | --- | --- | --- |
+  | Build ms | 177 | 61 to 76 | 22 to 33 | 21 to 32 |
+  | First frame ms | 249 | 133 to 187 | 189 to 379 | 25 to 48 |
+  | Textures made | 700 | 7 | | |
+
+  Margo is now faster than three's WebGPU backend on the first frame and still slower than its WebGL backend; what is
+  left, and its plan, is in [known-bugs.md](../known-bugs.md#first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend).
+- **Rerun:** `node bench/cli.mjs parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5
+  --warmup=1 --no-compare --no-fail`.
+- **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, `packages/animation/tests/clone.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1397,5 +1421,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 5. Kernel snapshot compare (entry 8): before and after with the machine and a committed result.
 6. three.js `InstancedMesh` against Margo instanced (open loss): a quiet run once the fix lands.
 7. Galaxy S23 Ultra island (open loss): an after number, which needs the device.
+8. `p-morph` first frame (entry 49): a quiet run.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

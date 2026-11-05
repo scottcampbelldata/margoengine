@@ -364,17 +364,13 @@ export function loadGLTFProgressive(
       }
     }
     // Default 1x1 maps that only stood in for textures are freed, so the model holds what loadGLTF's holds.
-    const cache = model!['gpuCache'],
-      textures: GPUTexture[] = model!['textures'];
+    const cache = model!['gpuCache'];
     const used = new Set(
       model!.primitives.flatMap((p) => p.material.maps.map((m: unknown, i: number) => (m ? -1 : i))),
     );
     for (const [key, t] of cache)
-      if (typeof key === 'string' && key.startsWith('default:') && !used.has(+key.slice(8))) {
-        (t as GPUTexture).destroy();
-        cache.delete(key);
-        textures.splice(textures.indexOf(t as GPUTexture), 1);
-      }
+      if (typeof key === 'string' && key.startsWith('default:') && !used.has(+key.slice(8)))
+        model!['dropTexture'](device(), key, t as GPUTexture);
     // Instances and final vertices are in place, so the baked batches match a direct loadGLTF.
     (asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral })[deferStaticBatches]?.commit?.();
     finished = true;

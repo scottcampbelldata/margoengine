@@ -259,6 +259,7 @@
       "PBRDrawRun",
       "PBRModel",
       "applyGLTFLights",
+      "closeImages",
       "loadGLTF",
       "parseGLTF",
       "parseGLTFAsync",

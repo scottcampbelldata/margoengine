@@ -872,6 +872,7 @@ class PBRModel implements EnginePlugin {
         readonly count: number;
     }): void;
     registerPasses(graph: FrameGraph): void;
+    shareImages(): GLTFImage[];
     image(index: number): Exclude<GLTFImage, undefined>;
     uploadImage(index: number, device: GPUDevice, srgb?: boolean): GPUTexture;
     addLighting(effect: LightingEffect): () => void;

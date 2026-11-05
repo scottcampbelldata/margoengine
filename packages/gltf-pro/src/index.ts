@@ -53,6 +53,7 @@ import {
   container,
   loadAsset,
   closeImages,
+  retainImages,
   entry,
   integer,
   overBudget,
@@ -127,7 +128,7 @@ interface StaticBatchDeferral {
 }
 import { occlusionShader } from './occlusion.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
-export { GLTFAsset } from './asset.js';
+export { GLTFAsset, closeImages } from './asset.js';
 export type { GLTFDocument } from './asset.js';
 export type { GLTFImage, KTX2Image } from './asset.js';
 export { textureCoordinates } from './texture-coordinates.js';
@@ -1690,7 +1691,17 @@ interface SharedBuffer {
   users: number;
   map: WeakMap<object, SharedBuffer>;
 }
+interface SharedTexture {
+  texture: GPUTexture;
+  key: string;
+  users: number;
+  map: Map<string, SharedTexture>;
+}
 const sharedBuffers = new WeakMap<GPUDevice, WeakMap<GLTFAsset, WeakMap<object, SharedBuffer>>>(),
+  // Textures per device, decoded image and format: models holding one image (cloneModel copies) upload and mip it
+  // once. The 1 x 1 stand-in maps are held by the asset instead, per slot.
+  sharedTextures = new WeakMap<GPUDevice, WeakMap<object, Map<string, SharedTexture>>>(),
+  textureShares = new WeakMap<GPUTexture, SharedTexture>(),
   bufferShares = new WeakMap<GPUBuffer, SharedBuffer>(),
   // A material map's default view per texture and its sampler per device and state: both immutable, so every slot,
   // primitive and model shares them (each was a native call per map slot of every primitive of every model).
@@ -1717,6 +1728,24 @@ function dropBuffer(device: GPUDevice, buffer: GPUBuffer): void {
   if (share && --share.users > 0) return;
   if (share) forget(share);
   retire(device, buffer);
+}
+/** The map of textures made from `holder` on `device`. */
+function texturesOf(device: GPUDevice, holder: object): Map<string, SharedTexture> {
+  let holders = sharedTextures.get(device);
+  if (!holders) sharedTextures.set(device, (holders = new WeakMap()));
+  let map = holders.get(holder);
+  if (!map) holders.set(holder, (map = new Map()));
+  return map;
+}
+/** Lets go of a material texture: retires it unless another model still counts on it. */
+function dropTexture(device: GPUDevice, texture: GPUTexture): void {
+  const share = textureShares.get(texture);
+  if (share && --share.users > 0) return;
+  if (share) {
+    textureShares.delete(texture);
+    share.map.delete(share.key);
+  }
+  retire(device, texture);
 }
 function primitive(
   asset: GLTFAsset,
@@ -2544,10 +2573,26 @@ export class PBRModel implements EnginePlugin {
         throw new RangeError('Image exceeds device limit; load a smaller model, or reduce its textures and meshes');
       const key = image ? source + ':' + format : 'default:' + i;
       let texture = cache.get(key) as GPUTexture | undefined;
-      if (!texture && compressed) {
-        texture = uploadCompressedImage(device, compressed, srgbMaps.includes(i));
+      const shares = texture ? undefined : texturesOf(device, image ?? this.asset),
+        shareKey = image ? format : key,
+        share = shares?.get(shareKey);
+      if (share) {
+        // Another model on this device holds the same image: count this one in (cloneModel copies upload nothing).
+        share.users++;
+        texture = share.texture;
         this.textures.push(texture);
         cache.set(key, texture);
+      }
+      const hold = (made: GPUTexture) => {
+        const held = { texture: made, key: shareKey, users: 1, map: shares! };
+        shares!.set(shareKey, held);
+        textureShares.set(made, held);
+        this.textures.push(made);
+        cache.set(key, made);
+      };
+      if (!texture && compressed) {
+        texture = uploadCompressedImage(device, compressed, srgbMaps.includes(i));
+        hold(texture);
       }
       if (!texture) {
         const levels = compressed
@@ -2564,8 +2609,7 @@ export class PBRModel implements EnginePlugin {
             GPUTextureUsage.COPY_DST |
             (compressed ? 0 : GPUTextureUsage.RENDER_ATTACHMENT),
         });
-        this.textures.push(texture);
-        cache.set(key, texture);
+        hold(texture);
         // Transcoded mips upload as-is: rgba8 rows, or 16-byte 4x4 blocks (BC7, ASTC 4x4, ETC2 RGBA8).
         if (image) device.queue.copyExternalImageToTexture({ source: image as ImageBitmap }, { texture }, size);
         else
@@ -2645,6 +2689,22 @@ export class PBRModel implements EnginePlugin {
     } finally {
       run.end();
     }
+  }
+  /**
+   * This model's decoded images for another model of the same asset (`new PBRModel(engine, asset, images)`), which then
+   * holds them too: each closes with its last holder, and the two share the GPU textures made from them. Pass them to
+   * `closeImages` if no model ends up holding them.
+   */
+  shareImages(): GLTFImage[] {
+    if (this.disposed) throw margoError('disposed', 'PBRModel is disposed; load the model again');
+    retainImages(this.images);
+    return [...this.images];
+  }
+  /** Lets go of one of this model's material textures and forgets its cache key. */
+  private dropTexture(device: GPUDevice, key: string, texture: GPUTexture): void {
+    this.gpuCache.delete(key);
+    this.textures.splice(this.textures.indexOf(texture), 1);
+    dropTexture(device, texture);
   }
   /** Borrow a decoded image for optional material packages; the model owns its lifetime. */
   image(index: number): Exclude<GLTFImage, undefined> {
@@ -4728,7 +4788,7 @@ export class PBRModel implements EnginePlugin {
     for (const [b, owner] of buffers) cleanup.run(() => retire(owner, b));
     // Each of this model's vertex and index buffers once, however many of its primitives draw from it.
     for (const [b, owner] of counted) cleanup.run(() => dropBuffer(owner, b));
-    if (device) for (const t of this.textures) cleanup.run(() => retire(device, t));
+    if (device) for (const t of this.textures) cleanup.run(() => dropTexture(device, t));
     for (const p of [...this.primitives, ...this.pointsAndLines]) {
       p.buffers = undefined;
       cleanup.run(() => p.instances?.dispose());

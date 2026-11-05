@@ -982,6 +982,18 @@ export async function decodeImage(data: Uint8Array, type: string | undefined, in
     );
   }
 }
+/** Models beyond the first that hold each decoded image (`retainImages`). */
+const imageHolders = new WeakMap<object, number>();
+/** Counts one more model in on `images`: each closes only when its last holder calls `closeImages`. */
+export function retainImages(images: readonly GLTFImage[]): void {
+  for (const image of images) if (image) imageHolders.set(image, (imageHolders.get(image) ?? 0) + 1);
+}
+/** Lets go of `images` for one holder: each closes unless `retainImages` or `PBRModel.shareImages` counted another. */
 export function closeImages(images: readonly GLTFImage[]): void {
-  for (const image of images) if (image && 'close' in image) image.close();
+  for (const image of images) {
+    if (!image) continue;
+    const others = imageHolders.get(image);
+    if (others) imageHolders.set(image, others - 1);
+    else if ('close' in image) image.close();
+  }
 }

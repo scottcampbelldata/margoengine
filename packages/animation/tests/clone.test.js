@@ -99,3 +99,39 @@ test('cloneModel rejects anything but a live model', async () => {
   source.dispose();
   await assert.rejects(cloneModel(source), (error) => error.code === 'disposed');
 });
+
+test('cloneModel holds the source image instead of copying it, closing it with the last model', async () => {
+  const e = await engine(),
+    image = {
+      width: 1,
+      height: 1,
+      closed: 0,
+      close() {
+        this.closed++;
+      },
+    },
+    vertices = new Float32Array(3 * 20),
+    doc = {
+      asset: { version: '2.0' },
+      images: [{ uri: 'unused.png' }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+      nodes: [{ mesh: 0, name: 'tile' }],
+    };
+  vertices.set([0, 0, 0, 1, 0, 0, 1, 0], 0);
+  vertices.set([1, 0, 0, 1, 0, 0, 1, 0], 20);
+  vertices.set([0, 1, 0, 1, 0, 0, 1, 0], 40);
+  const source = new PBRModel(e, new GLTFAsset(doc, []), [image], [[{ vertices, indices: new Uint32Array([0, 1, 2]) }]]),
+    created = globalThis.createImageBitmap;
+  globalThis.createImageBitmap = () => assert.fail('a clone copied the bitmap');
+  try {
+    const clone = await cloneModel(source);
+    assert.equal(clone.image(0), image);
+    source.dispose();
+    assert.equal(image.closed, 0, 'the clone still holds it');
+    clone.dispose();
+    assert.equal(image.closed, 1);
+  } finally {
+    if (created === undefined) delete globalThis.createImageBitmap;
+    else globalThis.createImageBitmap = created;
+  }
+});

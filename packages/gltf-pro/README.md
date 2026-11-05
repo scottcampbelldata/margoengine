@@ -287,6 +287,21 @@ without lighting also binds the empty group 2 required by the pipeline layout.
 lighting calculation. It may update `direct` before the existing lighting effects
 apply, so additional lobes share directional shadow visibility. It does not run
 in g-buffer or ambient entry points. Unextended shader strings stay unchanged.
+A second model of the same asset can hold this model's decoded images, and then shares the GPU textures made from
+them instead of uploading and mipping its own. Each image and texture goes with its last holder, in any disposal order
+(`cloneModel` from `@margoengine/animation/skeleton-utils` does this for you):
+
+```ts
+import {PBRModel, loadGLTF} from 'margoengine/gltf-pro';
+
+const first = await loadGLTF(engine, 'robot.glb');
+const second = new PBRModel(engine, first.asset, first.shareImages());
+engine.use(second);
+```
+
+`shareImages()` counts the new holder at once: pass the images to `closeImages(images)` if no model ends up holding
+them.
+
 Optional material packages can borrow decoded images with `model.image(index)`;
 the model retains ownership and closes them when disposed.
 
