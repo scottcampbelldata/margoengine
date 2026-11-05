@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4409999,
+  "total": 4415306,
   "history": [
     {
       "date": "2026-10-24",
@@ -1508,6 +1508,12 @@
       "commit": "4d388a0ca",
       "reason": "Displacement and clipping planes in picking, contact shadows and TAA velocity: shader variants in selection, staging and taa",
       "grew": 3
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "214a946ba",
+      "reason": "geometry: new optional entry geometry/nurbs (NURBS curves and surfaces)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1659,6 +1665,7 @@
     "@margoengine/geometry": 20731,
     "@margoengine/geometry/extras": 5843,
     "@margoengine/geometry/extrude": 8562,
+    "@margoengine/geometry/nurbs": 5307,
     "@margoengine/geometry/primitives": 4058,
     "@margoengine/geometry/shapes": 3840,
     "@margoengine/geometry/triangulate": 6805,

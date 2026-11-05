@@ -2553,7 +2553,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-034). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-036). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2602,6 +2602,12 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | glTF download budget | Enforced: gltf-pro reads at most `maxDownloadBytes` (default 64 MiB, 67,108,864 B: `assetLimit`) of JSON, buffers and images per load, and decoded accessors, packed geometry and decoded images may each use 4x that (256 MiB by default); `@margoengine/gltf` reads at most 64 MiB ([asset.ts](../packages/gltf-pro/src/asset.ts), [loading.js](../packages/shared/loading.js); [accessors.test.js](../packages/gltf-pro/tests/accessors.test.js)). Khronos ABeautifulGame (a 43 MB GLB whose 33 2048x2048 textures decode to 528 MiB) is over the default image budget. | Bounds memory for any URL an app is handed. | gltf-pro names the option for the download and packed-geometry budgets, e.g. `RangeError: glTF exceeds download budget (67108864 bytes; raise the maxDownloadBytes option)`; decoded accessors and images over 4x throw `RangeError: Decoded glTF exceeds byte budget` or `RangeError: glTF images exceed decoded size limit`; the light loader throws `glTF download byte budget exceeded` or `glTF buffers exceed 64 MiB`. | gltf-pro's `maxDownloadBytes` option (ABeautifulGame loads with 160 MiB, [khronos-gallery.js](../examples/khronos-gallery.js)); for the light loader, use gltf-pro. |
 | Malformed and hostile files | Enforced at each parser's trust boundary (glTF, gltf-pro with its parse worker and progressive stream, `.margo`, Draco, KTX2, meshopt, HDR, EXR, UltraHDR, FBX), checked by seeded fuzzers (`npm run fuzz`, [targets-formats.js](../scripts/fuzz/targets-formats.js); regressions in [fuzz-formats-regressions.test.js](../tests/fuzz-formats-regressions.test.js)): every input ends in a result or the package's own error. Limits added with them: a gltf-pro document nested deeper than 256 levels ([asset.ts](../packages/gltf-pro/src/asset.ts)); an EXR chunk that decodes to more than 256 MiB, or chunks too small to hold the image ([exr.ts](../packages/environment/src/exr.ts)); a Draco or KTX2 decode running longer than 10 s plus 4 s per MiB of input ([pool.ts](../packages/decoders/src/pool.ts)). How long large valid Draco and KTX2 files take to decode: not measured. | Files from a URL are untrusted: a malformed one must fail with an error the app can show, not crash, hang, read outside its bytes or claim memory its size cannot justify. | `TypeError: Invalid glTF JSON: nested deeper than 256 levels`, `RangeError: Unsupported EXR: a chunk decodes to more than 256 MiB`, `RangeError: Invalid EXR: chunks are too small for the image size`, `MargoError: Draco decode timed out after <limit> ms (corrupt data?); the decoder worker was restarted`. | The decoders' `timeout` option (`Infinity` turns the limit off). No real glTF comes near 256 levels; EXR: fewer channels per file. |
 | Vertices per primitive | Enforced: gltf-pro takes up to 1,000,000 vertices per primitive (index accessors are bounded only by the decoded budget); the light `@margoengine/gltf` loader up to 1,000,000 vertices in total ([accessors.test.js](../packages/gltf-pro/tests/accessors.test.js): 1,000,002 indices decode, 1,000,002 vertices are refused). | Vertex buffers are also bound as storage buffers, and indices pass through float32, exact up to 2^24. | gltf-pro names the location: `glTF mesh 0 "part" primitive 0: Expected bounded triangle geometry`; the light loader: `RangeError: glTF exceeds one million vertices`. | gltf-pro instead of the light loader lifts the total; a primitive over 1,000,000 vertices must be split at export (for CAD, a coarser `margo-convert --linear-deflection`). |
+
+## Geometry
+
+| Limit | Starts at | Why | What you see | Escape hatch |
+| --- | --- | --- | --- | --- |
+| NURBS surfaces (`@margoengine/geometry/nurbs`) | Enforced by method: no trimming curves, knot insertion or degree elevation; `NurbsCurve.tessellate` halves a span at most 12 times. | Trimming needs a boundary representation, which this engine does not carry; revolves, control nets and whole patches do not. | A trimmed patch meshes untrimmed. | Cut the mesh with `@margoengine/mesh-edit`. |
 
 ## Platform
 
@@ -8919,10 +8925,11 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `edgesGeometry`, `wireframe` (line index pairs) |
 | `loopSubdivide` |
 | `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry` from `@margoengine/geometry/extras` |
+| `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` from `@margoengine/geometry/nurbs` |
 
 ## Smaller entries
 
-The root exports everything. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -8941,9 +8948,6 @@ const button = roundedBoxGeometry(2, 1, 0.4, 4, 0.15);
 
 // The convex hull of any points ([x, y, z] arrays or flat numbers): only the corners become vertices.
 const rock = convexGeometry(points);
-
-// Any surface (u, v) in [0, 1]: normals come from the surface, UVs are (u, v).
-const wave = parametricGeometry((u, v) => [u * 4 - 2, Math.sin(u * 6) * 0.2, v * 4 - 2], 64, 64);
 ```
 
 [README continues: https://margoengine.com/llms/packages/geometry.md]

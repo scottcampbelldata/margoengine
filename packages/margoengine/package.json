@@ -638,6 +638,10 @@
       "types": "./dist/geometry/extras.d.ts",
       "import": "./dist/geometry/extras.js"
     },
+    "./geometry/nurbs": {
+      "types": "./dist/geometry/nurbs.d.ts",
+      "import": "./dist/geometry/nurbs.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"

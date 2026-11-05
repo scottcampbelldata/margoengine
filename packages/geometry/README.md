@@ -52,10 +52,11 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `edgesGeometry`, `wireframe` (line index pairs) |
 | `loopSubdivide` |
 | `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry` from `@margoengine/geometry/extras` |
+| `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` from `@margoengine/geometry/nurbs` |
 
 ## Smaller entries
 
-The root exports everything. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -99,6 +100,62 @@ const sticker = decalGeometry(wallGeometry, wallMesh.matrix, hit, [0, 0, 0, 1], 
   fanned back, keeping the target's winding (also under a mirroring matrix). UVs are `x / size.x + 0.5` and
   `y / size.y + 0.5`, so 0 to 1 across the box. Vertices lift `offset` along their normal (default 1/1000 of the
   smaller side) to avoid depth fighting; `backfaces: true` keeps triangles facing away from the projector.
+
+## NURBS
+
+`@margoengine/geometry/nurbs` holds rational B-spline curves and surfaces with knots and weights, for exact circles and smooth industrial shapes.
+
+```ts
+import {tubeGeometry} from 'margoengine/geometry';
+import {NurbsCurve, NurbsSurface, nurbsCircle, nurbsRevolve, nurbsSurfaceGeometry} from 'margoengine/geometry/nurbs';
+
+// A cubic curve. Weights pull it towards a point; knots default to clamped and uniform.
+const curve = new NurbsCurve({
+  degree: 3,
+  points: [[0, 0, 0], [1, 2, 0], [3, 2, 1], [4, 0, 1]],
+  weights: [1, 2, 1, 1],
+});
+const pipe = tubeGeometry(curve, 64, 0.1, 12); // It is a Curve, so everything that takes a Curve takes it.
+const outline = curve.tessellate(0.001); // Points within 0.001 of the curve.
+
+// Exact shapes: every point of this circle is at radius 2 to rounding, and the sphere's normals are radial.
+const ring = nurbsCircle(2);
+const sphere = nurbsSurfaceGeometry(nurbsRevolve(nurbsCircle(1, -Math.PI / 2, Math.PI / 2)), 32, 48);
+
+// Any control net: points[i][j] with i along u, j along v.
+const patch = new NurbsSurface({
+  degreeU: 2,
+  degreeV: 2,
+  points: [
+    [[0, 0, 0], [0, 0, 1], [0, 0, 2]],
+    [[1, 1, 0], [1, 2, 1], [1, 1, 2]],
+    [[2, 0, 0], [2, 0, 1], [2, 0, 2]],
+  ],
+});
+const mesh = nurbsSurfaceGeometry(patch, 24, 24);
+```
+
+- `new NurbsCurve({points, degree, knots, weights})`: 2D or 3D. `degree` defaults to 3, or the most the point count
+  allows; `knots` to clamped and uniform on [0, 1]; `weights` to 1. Unclamped knots work: the curve runs from
+  `knots[degree]` to `knots[points.length]`. As a `Curve`, `t` in [0, 1] maps linearly to that range, and
+  `getPointAt`, `getLength` and `computeFrenetFrames` use its arc-length table.
+- `curve.evaluate(u)` and `curve.derivatives(u, order = 1, left = false)` take the knot parameter. Derivatives of any
+  order are exact for the rational curve; `left` picks the left-hand ones at a repeated knot.
+- `curve.tessellate(tolerance = 1e-3)`: points within `tolerance` of the curve, in its units. Every distinct knot is
+  kept, so corners stay exact, and each span is halved at most 12 times.
+- `new NurbsSurface({points, degreeU, degreeV, knotsU, knotsV, weights})`: `getPoint(u, v)` and `getNormal(u, v)` take
+  [0, 1]; `evaluate(u, v)` and `derivatives(u, v)` take knot parameters.
+- `nurbsSurfaceGeometry(surface, slices = 32, stacks = 32)`: the even grid plus a line at every inner knot. Positions
+  and normals are evaluated, not differenced, and the normal is `dS/du x dS/dv`, matching the winding. UVs are (u, v)
+  in [0, 1]. A knot repeated `degree` times gets a doubled line with one-sided normals, so creases stay sharp.
+  Triangles that collapse at a pole are left out.
+- `nurbsCircle(radius = 1, startAngle = 0, endAngle = 2 pi)`: rational quadratic spans of at most 90 degrees in the
+  z = 0 plane; an end below the start runs clockwise.
+- `nurbsRevolve(profile, angle = 2 pi)`: turns a profile around +y, from +x towards +z. `u` runs along the profile and
+  `v` around the axis. A profile rising along +y on the +x side faces out.
+
+Curves and surfaces are fixed once built; to change one, build a new one. Invalid degrees, knots, weights or
+coordinates throw `RangeError` or `TypeError` naming the fix.
 
 ## How it works
 
@@ -148,6 +205,9 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
 
 ## Limits
 
+- NURBS surfaces are not trimmed: a surface is meshed over its whole knot range, seams of closed surfaces are not
+  welded (run `mergeVertices`), and there is no knot insertion, degree elevation or file import. A pole's normal is
+  taken 1/10,000 of the parameter range inside the surface.
 - `parametricGeometry` does not weld seams or poles and `decalGeometry` does not share vertices between clipped
   triangles; run `mergeVertices` when a caller needs an indexed, welded mesh.
 - `latheGeometry` makes every normal unit length, including the last profile normal, which the reference fixture leaves unnormalized. Otherwise output matches the reference fixtures.
@@ -165,6 +225,8 @@ the sphere limit), convex hulls (cube lattices with duplicates, edge and face po
 keep only the end circles; 2,000 sphere points all become vertices with F = 2V - 4; random clouds contain every input
 point), parametric spheres and tori (area, volume, Euler characteristic 2 and 0, radial normals) and decals (every
 vertex inside the box, UVs 0 to 1 matching the box coordinates, footprint area x * y on planes, turned and mirrored
-world matrices).
+world matrices). The NURBS tests check circles and arcs at radius to 1e-12 at every parameter, the Bezier special
+case, rational derivatives to third order against differences, spheres and tori against their closed forms (radius,
+radial normals, closed after welding, area and volume), and creases at repeated knots.
 
 Apache-2.0 licensed.

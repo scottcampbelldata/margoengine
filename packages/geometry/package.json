@@ -57,6 +57,10 @@
     "./extras": {
       "types": "./dist/extras.d.ts",
       "import": "./dist/extras.js"
+    },
+    "./nurbs": {
+      "types": "./dist/nurbs.d.ts",
+      "import": "./dist/nurbs.js"
     }
   },
   "files": [
