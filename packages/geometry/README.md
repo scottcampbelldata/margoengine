@@ -259,6 +259,30 @@ included), the default `u` and `v`, and `distance`: the true length walked from 
 in full. Default UVs do not change when the option is absent. On walls `u` comes from the outline before the bevel widens
 it.
 
+## Tangents that split at seams
+
+`computeTangents(data)` keeps the vertices it is given, which matches MikkTSpace on meshes already split at UV seams and
+mirror lines. A mesh that shares vertices across a mirror line needs two frames there, so pass `split: true`. Normal maps
+baked against MikkTSpace, as Blender and Substance bake them, then shade without seams.
+
+```ts
+import {sphereGeometry} from 'margoengine/geometry';
+import {computeTangents, splitTangents} from 'margoengine/geometry/utils';
+
+const mesh = sphereGeometry(1, 32, 16);
+
+// May add vertices: the indices and vertex count can change.
+const mapped = computeTangents(mesh, {split: true});
+
+// splitTangents also says where each vertex came from, so your own attributes can follow.
+const {data, source} = splitTangents(mesh);
+const colors = new Float32Array(source.length * 3); // Copy from your colors at source[v].
+```
+
+Corners at one vertex share a frame only when they sit in the same fan of connected triangles with the same UV
+orientation, which is the grouping MikkTSpace defines. Triangles keep their order and winding, and the first frame at a
+vertex keeps its index. `w` follows UVs with v up; UVs stored v down, as in glTF files, give the opposite `w`.
+
 ## Bending along a curve
 
 `@margoengine/geometry/flow` deforms a mesh to follow a curve, or places rigid copies along it: trains on tracks, text
@@ -352,7 +376,7 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
 - `parametricGeometry` does not weld seams or poles and `decalGeometry` does not share vertices between clipped
   triangles; run `mergeVertices` when a caller needs an indexed, welded mesh.
 - `latheGeometry` makes every normal unit length, including the last profile normal, which the reference fixture leaves unnormalized. Otherwise output matches the reference fixtures.
-- `computeTangents` does not split vertices where the tangent frame is discontinuous. It matches MikkTSpace on meshes already split at UV seams and mirror lines (glTF assets and all primitives here), not bit for bit on arbitrary meshes.
+- `computeTangents` follows UVs with v up, as the primitives have them. UVs stored v down, as in glTF files, give the opposite `w`; flip v first or negate `w`.
 - A shape with collinear points on its outline can leave T-junctions between the extruded caps and walls, because the triangulator drops those points.
 - `edgesGeometry` and `wireframe` return index pairs, not a line geometry; core has no line primitive.
 - Core's `Geometry` accepts up to 1,000,000 vertices, so `toGeometry` throws above that.
@@ -375,6 +399,7 @@ grids, spheres and knots, and overdraw on nested shells with a software depth bu
 straight line changes nothing, a band and a tube bent round a circle land on the closed forms with the right normals,
 normals under stretch, closed frames meeting, level frames with `lockUp`, and instance matrices. The extrusion UV tests
 check default UVs staying as they were, every corner being offered once, world scale on bevels and paths, and refused
-results.
+results. The split tangent tests compare every triangle corner with tangents Blender made: a mirrored sheet in
+`tests/fixtures/mikktspace-mirror.json`, which must split exactly its six mirror vertices, and an exported glTF.
 
 Apache-2.0 licensed.

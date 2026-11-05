@@ -1,5 +1,6 @@
 import type { GeometryData, GeometryGroup } from './data.js';
 import type { MutableVec3 } from './math.js';
+import { splitTangents } from './tangent-split.js';
 
 const clone = (data: GeometryData, changes: Partial<GeometryData>): GeometryData => {
   const out: GeometryData = {
@@ -419,13 +420,21 @@ export function creasedNormals(positions: ArrayLike<number>, options: CreasedNor
   return normals;
 }
 
+export { splitTangents, type SplitTangents } from './tangent-split.js';
+
 /**
  * Per-vertex tangents (xyzw, w = bitangent sign) following the MikkTSpace recipe: per-triangle UV derivatives,
  * projected onto each vertex normal's plane, normalized and weighted by the corner angle, then Gram-Schmidt
  * orthogonalized. Matches MikkTSpace on meshes already split at UV seams and mirror lines (as glTF and all
- * primitives here are); it does not split vertices itself.
+ * primitives here are). With `split` it splits vertices where the tangent frame breaks, through {@link splitTangents},
+ * so any mesh matches MikkTSpace; the result may then hold more vertices. `w` follows UVs with v up, as the primitives
+ * have them; UVs stored v down, as in glTF files, give the opposite `w`.
+ *
+ * @param data - The mesh, with normals and UVs.
+ * @param options - `split`: add vertices where the frame breaks. Default false.
  */
-export function computeTangents(data: GeometryData): GeometryData {
+export function computeTangents(data: GeometryData, options: { split?: boolean } = {}): GeometryData {
+  if (options.split) return splitTangents(data).data;
   const P = data.positions,
     N = data.normals,
     UV = data.uvs,

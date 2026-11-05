@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-041). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-042). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -73,6 +73,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Mesh optimisation (`@margoengine/geometry/optimize`) | Enforced by test ([optimize.test.js](../packages/geometry/tests/optimize.test.js)): shuffled grids, spheres and knots end under 0.8 cache misses per triangle on a 16-vertex first-in first-out cache (3 before); nested shells lose over 40 percent of their overdraw while the miss ratio stays within 6 percent. Frame time on a GPU: not measured. | The cache model is a simulation; real GPUs differ in cache size and batching. | Triangle order changes, so a transparent mesh that relied on it can look different. | `overdraw: false` keeps the sort off; leave the mesh out to keep its order. |
 | Bending along a curve (`@margoengine/geometry/flow`) | Enforced by method: frames are sampled `segments` times (default 256) and interpolated, and only vertices move. A shape wider than the radius of a bend folds over itself. | Sampling once makes each vertex a table lookup. | A coarse mesh cuts corners; a tight bend pinches the inner side. | Add segments along the axis; raise `segments`. |
 | Extrusion UVs (`uvGenerator` of `@margoengine/geometry/extrude`) | Enforced by method: the generator runs once per triangle corner on the CPU, and wall `u` comes from the outline before the bevel widens it. | Walls and caps are separate triangles, so a corner can differ per surface. | A texture on a wide bevel stretches a little across `u`. | Use `distance` and your own `u` from `shape`. |
+| Split tangents (`splitTangents`, `computeTangents` with `split`) | Enforced by method: checked against Blender's MikkTSpace on two meshes, to a dot product above 0.9995 per corner with matching signs. It follows the published grouping and is not a port of the reference library, so a mesh with unusual degenerate triangles may group differently. `w` assumes v up. | Clean room: written from the paper. | A rare corner could differ from a bake on degenerate geometry. | Remove zero-area triangles first; flip v on glTF UVs. |
 
 ## Platform
 

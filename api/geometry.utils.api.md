@@ -34,6 +34,11 @@ export interface MergeVerticesOptions {
     removeDegenerate?: boolean;
 }
 
+export interface SplitTangents {
+    data: GeometryData;
+    source: Uint32Array;
+}
+
 export function applyMatrix4(data: GeometryData, m: ArrayLike<number>): GeometryData;
 
 export function center(data: GeometryData): GeometryData;
@@ -48,7 +53,9 @@ export function computeBoundingSphere(data: GeometryData): {
     radius: number;
 };
 
-export function computeTangents(data: GeometryData): GeometryData;
+export function computeTangents(data: GeometryData, options?: {
+    split?: boolean;
+}): GeometryData;
 
 export function computeVertexNormals(data: GeometryData): GeometryData;
 
@@ -65,6 +72,8 @@ export function mergeGeometries(list: readonly GeometryData[], useGroups?: boole
 export function mergeVertices(data: GeometryData, options?: MergeVerticesOptions): GeometryData;
 
 export function pbrVertexStream(data: GeometryData, occlusion?: (x: number, y: number, z: number) => number): Float32Array;
+
+export function splitTangents(data: GeometryData): SplitTangents;
 
 export function toGeometry(data: GeometryData): Geometry;
 

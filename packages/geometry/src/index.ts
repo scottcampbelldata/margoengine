@@ -49,6 +49,7 @@ export {
   computeBoundingBox,
   computeBoundingSphere,
   computeTangents,
+  splitTangents,
   computeVertexNormals,
   creasedNormals,
   edgesGeometry,

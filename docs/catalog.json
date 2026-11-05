@@ -2573,6 +2573,7 @@
       "shapeArea",
       "shapeGeometry",
       "sphereGeometry",
+      "splitTangents",
       "tetrahedronGeometry",
       "toGeometry",
       "toNonIndexed",

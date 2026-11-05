@@ -211,7 +211,9 @@ export function computeBoundingSphere(data: GeometryData): {
     radius: number;
 };
 
-export function computeTangents(data: GeometryData): GeometryData;
+export function computeTangents(data: GeometryData, options?: {
+    split?: boolean;
+}): GeometryData;
 
 export function computeVertexNormals(data: GeometryData): GeometryData;
 
@@ -261,6 +263,8 @@ export function shapeGeometry(shapes: Shape | readonly Shape[], curveSegments?: 
 
 export function sphereGeometry(radius?: number, widthSegments?: number, heightSegments?: number, phiStart?: number, phiLength?: number, thetaStart?: number, thetaLength?: number): GeometryData;
 
+export function splitTangents(data: GeometryData): SplitTangents;
+
 export function tetrahedronGeometry(radius?: number, detail?: number, smooth?: boolean): GeometryData;
 
 export function toGeometry(data: GeometryData): Geometry;
@@ -286,4 +290,11 @@ export function wireframe(data: GeometryData): Uint32Array;
 export function wireframePositions(data: GeometryData, offsetY?: number): Float32Array;
 
 export function worldUVs(tile?: number): ExtrudeUVGenerator;
+
+// Not exported from this entry, but used by the exports above:
+
+interface SplitTangents {
+    data: GeometryData;
+    source: Uint32Array;
+}
 ```
