@@ -75,15 +75,53 @@ function parseBinary(bytes: Uint8Array, count: number, options: STLOptions): Loa
   for (let t = 0, offset = 84; t < count; t++, offset += 50) {
     if ((t & (ABORT_STEP - 1)) === 0) throwIfAborted(options.signal, F);
     const at = t * 9;
-    for (let i = 0; i < 9; i++) positions[at + i] = view.getFloat32(offset + 12 + i * 4, true);
-    setNormal(
-      positions,
-      normals,
-      at,
-      view.getFloat32(offset, true),
-      view.getFloat32(offset + 4, true),
-      view.getFloat32(offset + 8, true),
-    );
+    const ax = view.getFloat32(offset + 12, true),
+      ay = view.getFloat32(offset + 16, true),
+      az = view.getFloat32(offset + 20, true),
+      bx = view.getFloat32(offset + 24, true),
+      by = view.getFloat32(offset + 28, true),
+      bz = view.getFloat32(offset + 32, true),
+      cx = view.getFloat32(offset + 36, true),
+      cy = view.getFloat32(offset + 40, true),
+      cz = view.getFloat32(offset + 44, true);
+    positions[at] = ax;
+    positions[at + 1] = ay;
+    positions[at + 2] = az;
+    positions[at + 3] = bx;
+    positions[at + 4] = by;
+    positions[at + 5] = bz;
+    positions[at + 6] = cx;
+    positions[at + 7] = cy;
+    positions[at + 8] = cz;
+    let nx = view.getFloat32(offset, true),
+      ny = view.getFloat32(offset + 4, true),
+      nz = view.getFloat32(offset + 8, true);
+    if (!usable(nx, ny, nz)) {
+      // The same sums as flatNormal, on the corners already in hand.
+      const ux = bx - ax,
+        uy = by - ay,
+        uz = bz - az,
+        vx = cx - ax,
+        vy = cy - ay,
+        vz = cz - az;
+      nx = uy * vz - uz * vy;
+      ny = uz * vx - ux * vz;
+      nz = ux * vy - uy * vx;
+      const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (length > 0 && length < Infinity) {
+        const scale = 1 / length;
+        nx *= scale;
+        ny *= scale;
+        nz *= scale;
+      } else {
+        nx = 0;
+        ny = 0;
+        nz = 1;
+      }
+    }
+    normals[at] = normals[at + 3] = normals[at + 6] = nx;
+    normals[at + 1] = normals[at + 4] = normals[at + 7] = ny;
+    normals[at + 2] = normals[at + 5] = normals[at + 8] = nz;
     // VisCAM / SolidView color extension: bit 15 set means a color follows; red bits 10-14, green 5-9, blue 0-4.
     const attribute = view.getUint16(offset + 48, true);
     if (attribute & 0x8000) {

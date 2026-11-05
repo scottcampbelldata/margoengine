@@ -3257,7 +3257,11 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   mesh is render-ready; three's `STLLoader` copies the file's zero normals, which light wrongly until the user calls
   `computeVertexNormals()`. The full job is measured as `p-stl-normals` (run `20261026-211213`, diagnostic): three
   `STLLoader.parse` + `computeVertexNormals()` 8.7 ms, `parseSTL` 4.7 ms, so Margo is faster when both produce a
-  lit mesh. The plain-copy `p-stl` gap (4.7 against 2.7 ms, 1.7x) stays listed.
+  lit mesh. The plain-copy `p-stl` gap stays listed.
+- **Rechecked (2026-11-05, perf-history entry 57):** the binary loop now reads each corner once and computes the normal
+  from what it holds, with byte-identical output: in Node 5.5 ms became 4.6, a plain copy being 3.1. Run
+  `20261105-233654` (busy machine, diagnostic): `p-stl` 4.5 ms against three's 3.5, `p-stl-normals` 5.2 against 10.7.
+  What is left is the work itself: the identity index array (0.4 ms) and about 1.1 ms of normal maths.
 - **Plan:** for `parseSTL`, the remaining gap is the computed normals, which are
   the behavior a user needs; an opt-out only to win a benchmark would measure less work, so it is not planned.
 

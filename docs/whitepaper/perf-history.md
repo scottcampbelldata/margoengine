@@ -1524,6 +1524,22 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   (the case name also selects `p-morph-compiled`).
 - **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, `tests/core-timestamp-feature.test.js`.
 
+### 57. Binary STL reads each corner once
+
+- **Loss:** `p-stl` (204,800-triangle binary STL with zero stored normals): 5.5 ms in Node against 3.1 for a loop that
+  only copies the file's floats.
+- **Cause:** `parseBinary` wrote the corners to `positions`, then `flatNormal` read them back from that array, and each
+  triangle went through two extra calls.
+- **Fix:** the loop keeps the nine corner values in locals and does the same sums on them. Same work, same order of
+  operations. `flatNormal` stays for ASCII.
+- **After:** Node, 5.5 to 4.6 ms. Old and new output compared byte for byte on 200,000 random triangles holding zero,
+  NaN, infinite, huge and degenerate values, plain and welded. Run `20261105-233654` (`--no-gate`, busy machine,
+  diagnostic): `p-stl` 4.5 ms against three's 3.5, `p-stl-normals` 5.2 against 10.7.
+- **Left:** the identity index array (0.4 ms) and the normal maths (about 1.1 ms). Both are output, so the accepted
+  difference of entry 31 stands.
+- **Rerun:** `node bench/cli.mjs parity --cases=p-stl,p-stl-normals --engines=margo,three-webgl-parity --runs=3`.
+- **Guard:** `packages/loaders/tests/stl.test.js`, "binary and ASCII compute the same flat normals, bit for bit".
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1547,9 +1563,10 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   - Still open: `createInstancedMesh` at 50k and the upload of moving instances (the 1k cost of a package pass closed in
     entry 51). Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
-- **STL import and USDZ export against three.js: partly closed (entries 26 and 31).** `p-stl` (the plain `parseSTL`)
-  4.7 ms against 2.7 (accepted difference in work, see entry 31; with three's `computeVertexNormals()` on both sides,
-  `p-stl-normals`, Margo is 4.7 against 8.7 ms, faster): it computes the flat normals the file leaves zero, where three copies the zeros.
+- **STL import and USDZ export against three.js: partly closed (entries 26, 31 and 57).** `p-stl` (the plain `parseSTL`)
+  4.5 ms against 3.5 (entry 57, busy machine; accepted difference in work, see entry 31; with three's
+  `computeVertexNormals()` on both sides, `p-stl-normals`, Margo is 5.2 against 10.7 ms, faster): it computes the flat
+  normals the file leaves zero, where three copies the zeros.
   `p-export-usdz` 16.0 ms against 2.5 (run `20261026-165034`, diagnostic): `exportUSDZ` writes every mesh in world
   space (2.46 MB) where three's archive is 444 KB. Causes and plans:
   [known-bugs.md](../known-bugs.md#stl-import-still-computes-normals-threes-stlloader-leaves-zero) and

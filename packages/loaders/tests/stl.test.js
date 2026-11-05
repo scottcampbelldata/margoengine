@@ -130,6 +130,21 @@ test('ASCII STL gives the same geometry as binary', () => {
   assert.equal(a.colors, undefined);
 });
 
+test('binary and ASCII compute the same flat normals, bit for bit', () => {
+  // The binary loop computes a zero-normal facet from corners it holds in locals; ASCII goes through flatNormal. Exact
+  // float32 values in the text keep the corners equal, so any drift between the two sums shows here.
+  const round = (v) => Math.fround(v);
+  const triangles = Array.from({ length: 64 }, (_, i) =>
+    Array.from({ length: 9 }, (_, k) => round(Math.sin(i * 12.9898 + k * 78.233) * 1000)),
+  );
+  triangles.push([1, 2, 3, 1, 2, 3, 4, 5, 6]); // degenerate: two equal corners
+  triangles.push([3e38, 0, 0, -3e38, 0, 0, 0, 3e38, 3e38]); // the cross product overflows to the +z fallback
+  const fromBinary = parseSTL(binary(triangles)),
+    fromText = parseSTL(ascii(triangles));
+  assert.deepEqual(fromBinary.positions, fromText.positions);
+  assert.deepEqual(fromBinary.normals, fromText.normals);
+});
+
 test('ASCII STL: zero normals are computed, upper case keywords, exponents, CRLF and several solids', () => {
   const text = new TextDecoder().decode(ascii(SQUARE, { upper: true })).replaceAll('\n', '\r\n');
   const mesh = parseSTL(new TextEncoder().encode(text.replace(/0 0 0/g, '0 0 0')));
