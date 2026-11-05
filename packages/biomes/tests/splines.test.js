@@ -17,6 +17,7 @@ import { heightsOf } from '../dist/region.js';
 import { createRelief } from '../dist/relief.js';
 import { carvePaths, definePath, paintPaths, pathEdits, pathExclusions } from '../dist/splines.js';
 import { ThreadWebWorker } from './thread-worker.js';
+import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 
 const golden = JSON.parse(readFileSync(new URL('./golden/splines.json', import.meta.url), 'utf8'));
 const sha = (...arrays) => {
@@ -452,7 +453,8 @@ test('edge cases: self-crossing, huge widths, paths outside the world, thousands
   assert.deepEqual(rasters(world, 'mask/eight'), poly);
   editor.undo();
   // A 2 km wide road covers the world at full strength, quickly.
-  let t0 = performance.now();
+  // CPU time of this thread (the worlds here run with `workers: false`), so a busy machine cannot fail the budgets.
+  let cpu = cpuTimer();
   paintPaths(editor, [
     {
       points: [
@@ -465,7 +467,8 @@ test('edge cases: self-crossing, huge widths, paths outside the world, thousands
     },
   ]);
   assert.ok(rasters(world, 'mask/wide').every((r) => r.every((v) => v === 255)));
-  assert.ok(performance.now() - t0 < 5000);
+  let ms = cpu();
+  assert.ok(ms < 5000, `${ms} ms of CPU`);
   // A path outside the world writes nothing and carves nothing.
   const outside = {
     points: [
@@ -485,11 +488,12 @@ test('edge cases: self-crossing, huge widths, paths outside the world, thousands
     points.push([-240 + (i % 400) * 1.2, -240 + Math.floor(i / 400) * 48 + Math.sin(i) * 3]);
   const wander = { points, width: 2, edge: 1, mask: 'wander' };
   assert.ok(definePath(wander).line.length / 2 >= 4000);
-  t0 = performance.now();
+  cpu = cpuTimer();
   const carved = await BiomeWorld.create({ ...base, height: carvePaths([wander]) });
   await digests(carved);
   paintPaths(editor, [wander]);
-  assert.ok(performance.now() - t0 < 20000, `${performance.now() - t0} ms`);
+  ms = cpu();
+  assert.ok(ms < 20000, `${ms} ms of CPU`);
   const whole = rasters(world, 'mask/wander');
   editor.undo();
   // The same line drawn as one two-point path per piece, painted with 'max': the same bytes.
