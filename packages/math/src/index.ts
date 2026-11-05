@@ -22,6 +22,8 @@ export { Box3 } from './box3.js';
 export { OBB } from './obb.js';
 export { Line3 } from './line3.js';
 export { Triangle } from './triangle.js';
+export { Capsule } from './capsule.js';
+export type { CapsuleRay, OBBLike } from './capsule.js';
 export { Sphere } from './sphere.js';
 export { Plane } from './plane.js';
 export { Ray } from './ray.js';

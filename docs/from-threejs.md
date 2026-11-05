@@ -99,6 +99,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | `Line2`, `LineMaterial`, `GridHelper`, `AxesHelper` | `@margoengine/lines` |
 | `vector.project(camera)`, `vector.unproject(camera)` | `projectPoint(v, engine.camera, v)`, `unprojectPoint(v, engine.camera, v)` from `@margoengine/math`, plus `worldToScreen` and `screenToWorld` for pixels. A point behind the camera returns null, and on WebGPU depth runs near = 1 to far = 0 |
 | `SphericalHarmonics3` | `SH3` from `@margoengine/math` (also `@margoengine/math/sh`); `getAt`, `getIrradianceAt` and `addScaledSH` keep their names, colours are `{r, g, b}` |
+| `Capsule` (addons `math/Capsule.js`) | `Capsule` from `@margoengine/math` (also `@margoengine/math/capsule`); `pushOutOfTriangle` gives the move a character needs |
 | `Points`, `Sprite` | `@margoengine/points` |
 | troika-three-text | `@margoengine/text` |
 | `CSS2DRenderer`, `CSS3DRenderer` | `@margoengine/labels` (`@margoengine/html` adds depth occlusion) |

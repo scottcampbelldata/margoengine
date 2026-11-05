@@ -898,6 +898,10 @@
       "types": "./dist/math/triangle.d.ts",
       "import": "./dist/math/triangle.js"
     },
+    "./math/capsule": {
+      "types": "./dist/math/capsule.d.ts",
+      "import": "./dist/math/capsule.js"
+    },
     "./math/sphere": {
       "types": "./dist/math/sphere.d.ts",
       "import": "./dist/math/sphere.js"

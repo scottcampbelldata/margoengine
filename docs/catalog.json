@@ -88,6 +88,7 @@
     "imports": "import { Box3 } from '@margoengine/math';",
     "exports": [
       "Box3",
+      "Capsule",
       "Color",
       "Cylindrical",
       "Euler",

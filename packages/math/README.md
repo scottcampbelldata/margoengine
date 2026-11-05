@@ -2,7 +2,7 @@
 
 Import `margoengine/math` from the `margoengine` package, or `@margoengine/math` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Line3, Triangle, Sphere, Plane, Ray, Frustum, Spherical, Cylindrical, SH3, MathUtils and the project functions. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
+Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Line3, Triangle, Capsule, Sphere, Plane, Ray, Frustum, Spherical, Cylindrical, SH3, MathUtils and the project functions. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
 
 ```ts
 import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
@@ -102,6 +102,25 @@ console.log(light.r, light.g, light.b);
 const upload = probe.toArray(new Float32Array(27));
 ```
 
+Capsules (`Capsule`, also `@margoengine/math/capsule`): every point within `radius` of the segment `start` to `end`, the usual
+collider of a character. `new Capsule()` stands 2 tall on the origin with radius 0.5; `axis` is the `Line3` between the ends.
+Queries: `containsPoint`, `distanceToPoint` (0 inside), `clampPoint`, `getBoundingBox`, `getBoundingSphere`, `intersectsSphere`,
+`intersectsCapsule`, `intersectsPlane`, `intersectsBox`, `intersectsOBB`, `intersectsTriangle`, `intersectRay(ray, out)` and
+`intersectsRay(ray)`, all exact, touching counts. `pushOutOfTriangle(triangle, out)` writes the move that takes the capsule off a
+triangle, or returns null when they do not overlap; its direction is the contact normal. `translate` moves the capsule and
+`applyMatrix4` takes rotation, translation and uniform scale (the radius scales too); any other matrix throws `RangeError`, as
+does a negative or non-finite radius in the constructor or `set`.
+
+```ts
+import {Capsule, Triangle, Vector3} from 'margoengine/math';
+const hero = new Capsule(); // 2 tall, radius 0.5, feet on the origin
+const push = new Vector3();
+const ground = new Triangle(new Vector3(-9, 0, 9), new Vector3(9, 0, 9), new Vector3(0, 0, -9));
+hero.translate(new Vector3(0, -0.2, 0)); // gravity for this step
+if (hero.pushOutOfTriangle(ground, push)) hero.translate(push); // back up by 0.2
+console.log(hero.start.y); // 0.5
+```
+
 Core interop: `toArray()` with no target returns a tuple that `setPosition`, `setScale`, `setRotation`, `setQuaternion`, `camera.position` and `fitToBoundingBox` accept. `copy()` reads any `{x, y, z}`, including `mesh.position`; `Euler.setFromVector3(mesh.rotation)` reads core's XYZ angles. `Matrix4.fromArray` reads `camera.matrix` and world matrices from `@margoengine/core/extension`. `Frustum.fromArray(camera.planes)` and `setFromProjectionMatrix` use core's plane order and WebGPU depth range ([0, 1], reversed-Z included); pass `false` for WebGL [-1, 1]. `Color` stores linear sRGB; hex, CSS and HSL inputs are decoded from sRGB.
 
 `Euler.setFromQuaternion` and `setFromRotationMatrix` keep the exact orientation in all six orders, also at and next to ±90° (the middle angle is in [-π/2, π/2]). At a pole many angle triples give the same rotation, so compare orientations, not angles.
@@ -138,7 +157,7 @@ for (const mesh of billboards) {
 }
 ```
 
-Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation outside `OBB`, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Matrix2, `Vector3.project` and `unproject` as methods (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, so Vector3 stays small), `Euler.reorder`, ColorManagement and Display-P3, `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
+Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation outside `OBB`, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Matrix2, `Vector3.project` and `unproject` as methods (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, so Vector3 stays small), `Euler.reorder`, a global `ColorManagement` switch (spaces are named per call, as in `color.setRGB(r, g, b, 'display-p3')` and `color.getRGB(out, 'display-p3')`), `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

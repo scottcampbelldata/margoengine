@@ -46,6 +46,40 @@ export interface BoxLike {
     max: Vec3Like;
 }
 
+export class Capsule {
+    readonly axis: Line3;
+    readonly start: Vector3;
+    readonly end: Vector3;
+    radius: number;
+    constructor(start?: Vec3Like, end?: Vec3Like, radius?: number);
+    set(start: Vec3Like, end: Vec3Like, radius: number): this;
+    copy(capsule: Capsule): this;
+    clone(): Capsule;
+    getCenter<T extends Vec3Like>(out: T): T;
+    translate(offset: Vec3Like): this;
+    applyMatrix4(m: MatrixLike): this;
+    getBoundingBox<T extends BoxLike>(out: T): T;
+    getBoundingSphere<T extends SphereLike>(out: T): T;
+    containsPoint(p: Vec3Like): boolean;
+    distanceToPoint(p: Vec3Like): number;
+    clampPoint<T extends Vec3Like>(p: Vec3Like, out: T): T;
+    intersectsSphere(sphere: SphereLike): boolean;
+    intersectsCapsule(capsule: Capsule): boolean;
+    intersectsPlane(plane: PlaneLike): boolean;
+    intersectsBox(box: BoxLike): boolean;
+    intersectsOBB(obb: OBBLike): boolean;
+    intersectsTriangle(triangle: Triangle): boolean;
+    pushOutOfTriangle<T extends Vec3Like>(triangle: Triangle, out: T): T | null;
+    intersectRay<T extends Vec3Like>(ray: CapsuleRay, out: T): T | null;
+    intersectsRay(ray: CapsuleRay): boolean;
+    equals(capsule: Capsule, epsilon?: number): boolean;
+}
+
+export interface CapsuleRay {
+    origin: Vec3Like;
+    direction: Vec3Like;
+}
+
 export class Color {
     r: number;
     g: number;
@@ -340,6 +374,12 @@ export class OBB {
         direction: Vec3Like;
     }): boolean;
     equals(obb: OBB, epsilon?: number): boolean;
+}
+
+export interface OBBLike {
+    center: Vec3Like;
+    halfSize: Vec3Like;
+    rotation: MatrixLike;
 }
 
 export const P3_TO_SRGB: readonly number[];

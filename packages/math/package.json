@@ -76,6 +76,10 @@
       "types": "./dist/triangle.d.ts",
       "import": "./dist/triangle.js"
     },
+    "./capsule": {
+      "types": "./dist/capsule.d.ts",
+      "import": "./dist/capsule.js"
+    },
     "./sphere": {
       "types": "./dist/sphere.d.ts",
       "import": "./dist/sphere.js"

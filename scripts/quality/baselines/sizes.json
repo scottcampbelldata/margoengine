@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4458997,
+  "total": 4465291,
   "history": [
     {
       "date": "2026-10-24",
@@ -1586,6 +1586,12 @@
       "commit": "b8548b4b1",
       "reason": "geometry: new optional entry geometry/sweep",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "e958a3b04",
+      "reason": "New math entry ./capsule: Capsule with exact box, OBB, triangle, capsule, plane and ray tests and pushOutOfTriangle; also exported from the math root. Core and core + stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -1797,10 +1803,11 @@
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,
     "@margoengine/materials/transmission": 7416,
-    "@margoengine/math": 18311,
+    "@margoengine/math": 20201,
     "@margoengine/math/affine": 3936,
     "@margoengine/math/billboard": 2672,
     "@margoengine/math/box3": 2581,
+    "@margoengine/math/capsule": 4404,
     "@margoengine/math/color": 2858,
     "@margoengine/math/cylindrical": 560,
     "@margoengine/math/errors": 412,

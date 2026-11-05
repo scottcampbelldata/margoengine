@@ -150,6 +150,7 @@ backs them yet:
 | LIM-047 | Project and unproject: core cameras on both depth conventions, an orthographic hook, 2,000 seeded round trips within 1e-6 relative, null behind the camera (docs/limits.md, Geometry) | `packages/math/test/project.test.js` | `npm test --workspace packages/math` | PROVEN | |
 | LIM-048 | SH3: basis orthonormal over the sphere within 1e-3, irradiance matches a numerically integrated clamped cosine within 2e-3, a distant light gives exactly 17/16 and 1/16 (docs/limits.md, Geometry) | `packages/math/test/sh.test.js` | `npm test --workspace packages/math` | PROVEN | |
 | LIM-049 | Sweep and loft: volumes match closed forms, solids are closed and face out, smooth lofts pass through every section (docs/limits.md, Geometry) | `packages/geometry/tests/sweep.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
+| LIM-050 | Capsule: box, OBB, triangle and capsule tests match the exact point distance minimised along the axis on 6,500 seeded pairs; pushOutOfTriangle always resolves the overlap on 2,000 pairs; ray entries match sphere tracing on 2,000 rays within 1e-6 (docs/limits.md, Geometry) | `packages/math/test/capsule.test.js` | `npm test --workspace packages/math` | PROVEN | |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 

@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-049). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-050). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -81,6 +81,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Project and unproject (`@margoengine/math/project`) | Enforced by method: core's `camera.matrix` is Float32 and holds zeros until the first frame; a point at or behind the camera plane returns null; a matrix with no inverse throws `RangeError`. | One matrix serves every camera, orthographic included; null keeps a point behind the camera from showing up mirrored on screen. | Results carry float32 precision, not float64, and depth z follows the camera (WebGPU near = 1, far = 0; WebGL near = -1, far = 1). | Pass your own `{matrix}` as a Float64Array for float64 results. Take depth from `projectPoint` instead of hard-coding it. |
 | Spherical harmonics (`@margoengine/math/sh`) | Enforced by method: three bands, 9 RGB coefficients, CPU only. No rotation of a coefficient set. | Three bands hold diffuse light to within a few percent, and match the layout `@margoengine/environment` reads. | A single point of light overshoots: a distant light reads 17/16 of its irradiance facing it and 1/16 facing away, where the truth is 1 and 0. Results are not clamped. | For sharp light use a real light and keep SH for the soft part. To turn a probe, project it again from rotated samples. |
 | Sweep and loft (`@margoengine/geometry/sweep`) | Enforced by method: sections stay flat and are matched by their share of the way round, with no point-to-point control. A loft has no holes in its sections. | One rule fits any pair of outlines and keeps every corner. | A twisted quad is two flat triangles, so a twisted solid loses volume in proportion to the step (0.4 percent at 128 steps for a quarter turn). A sharp bend in a path pinches the profile. | Raise `steps`, round the path, or pass 3D rings with matching points and `align: false`. |
+| Capsules (`@margoengine/math/capsule`) | Enforced: a negative or non-finite radius and any matrix beyond rotation, translation and uniform scale throw `RangeError`. `pushOutOfTriangle` resolves one triangle at a time, and returns null for an axis lying in a degenerate triangle. | Under other matrices the shape stops being a capsule. One triangle at a time keeps the type a shape, not a physics solver. | Several triangles at once (a corner) need repeated passes in the caller, and a push out of one triangle can move into the next. | For a full character controller with sliding and stepping use `@margoengine/physics`. |
 
 ## Copies of a model
 
