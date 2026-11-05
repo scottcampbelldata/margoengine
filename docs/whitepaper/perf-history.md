@@ -1442,6 +1442,29 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node packages/geometry/scripts/polygon-bench.mjs` after `npm run build` in `packages/geometry`.
 - **Guard:** `packages/geometry/tests/polygon.test.js`.
 
+### 53. Number fields that stay numbers
+
+- **Loss:** 10,000 moving instances took 1.14 ms (`createInstancedMesh`) and 1.47 ms (`CulledInstances`) of CPU a frame
+  against three's WebGL2 0.63 ms and WebGPU 0.90 ms.
+- **Cause:** matrix maths, not validation as first thought. `Euler`, `Quaternion` and `Vector3` were built with `x;` before
+  the constructor, so each field began as `undefined`, V8 stored it as a tagged value, and every fraction written to it
+  allocated. 10,000 `setFromEuler` calls took 0.48 ms where the same arithmetic on a plain object took 0.28 ms. Each
+  variant ran in its own process; changing the method body made no difference.
+- **Fix:** `useDefineForClassFields: false` in `packages/math/tsconfig.json`, which drops the declarations. Same arithmetic,
+  same results. `CulledInstances` copies a row by index: `TypedArray.set` cost more in its call than in 16 values.
+- **After:** RTX A6000, Chromium 156, 2026-11-05, three runs, diagnostic (the machine was shared). CPU ms a frame, 10,000
+  boxes:
+
+  | Path | Before | After | three WebGL2 | three WebGPU |
+  | --- | --- | --- | --- | --- |
+  | `createInstancedMesh` | 1.14 | 0.92 | 0.63 | 0.90 |
+  | `CulledInstances` | 1.47 | 1.10 | 0.63 | 0.90 |
+
+  In Node, compose alone went 0.51 -> 0.32 ms; three's took 0.36 ms.
+- **Rerun:** `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3 --cases=moving`.
+- **Guard:** `packages/math/test/field-types.test.js`.
+- **Still open:** the upload ([known-bugs.md](../known-bugs.md#moving-instances-spend-more-cpu-than-threes-webgl2-renderer)).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1462,7 +1485,7 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   - Rerun: `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3`.
   - Guard: `packages/culling/test/culling.test.js`, `packages/materials/test/materials.test.js`,
     `packages/math/test/euler-quaternion.test.js`, `packages/gltf-pro/tests/instancing.test.js`.
-  - Still open: `createInstancedMesh` at 50k and CPU for moving instances (the 1k cost of a package pass closed in
+  - Still open: `createInstancedMesh` at 50k and the upload of moving instances (the 1k cost of a package pass closed in
     entry 51). Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
 - **STL import and USDZ export against three.js: partly closed (entries 26 and 31).** `p-stl` (the plain `parseSTL`)

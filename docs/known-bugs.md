@@ -501,23 +501,33 @@ machine, diagnostic; numbers and method in [whitepaper/boxes-vs-threejs.md](whit
   before it. **Next to test:** the 80-byte vertex stride and the 96-byte instance stride, against a compact position and
   normal stream.
 
-### Moving instances spend twice three's CPU per frame
+### Moving instances spend more CPU than three's WebGL2 renderer
 
-- **What:** 10,000 instances moving every frame: CPU 1.23 ms (`createInstancedMesh`) and 1.33 ms (`CulledInstances`)
-  per frame against three's WebGL2 0.63 ms and WebGPU 0.89 ms.
-- **Cause (measured by CPU profile):** the matrix maths is now the same cost in both (Euler to quaternion, about
-  0.3 ms, mostly sine and cosine). The rest is Margo's per-row validation (finite values, affine last row, nonsingular
-  for `CulledInstances`; about 0.2 ms), which three's `setMatrixAt` does not do, and the upload of 96-byte rows
-  (960 KB a frame) where three uploads 64-byte matrices.
-- **Plan:** a bulk `setMatrices(start, Float32Array)` on PBRInstances and CulledInstances that validates and copies
-  a whole range in one call, and a separate matrix stream so moving instances upload 64 bytes each. Both are package
-  changes; the validation itself stays (it is what keeps a bad matrix from reaching the GPU).
+- **What:** 10,000 instances moving every frame: CPU 0.92 ms (`createInstancedMesh`) and 1.10 ms (`CulledInstances`) per
+  frame against three's WebGL2 0.63 ms and WebGPU 0.90 ms (2026-11-05, diagnostic; perf-history entry 53).
+- **Fixed part:** the matrix maths was 40% slower than three's for a build reason, now faster (perf-history entry 53).
+- **Cause of the rest (measured):** `queue.writeBuffer` of the 960 KB of rows takes about 0.2 ms: the upload with it
+  stubbed out drops by that, and three's WebGPU renderer, which uploads the same way, lands level with Margo. Validation
+  and the row copy take 0.11 ms, and stay (they keep a bad matrix from reaching the GPU).
+- **Ruled out:** a bulk `setMatrices` is no faster than `setMatrixAt` (0.78 against 0.59 ms with the matrix maths, Node),
+  so `CulledInstances` did not get one.
+- **Plan:** a separate matrix stream, so moving instances upload 64 bytes each (640 KB). That changes the vertex layout of
+  every instanced path; at the measured rate it saves about 0.07 ms.
 - **Since item 53.2 (2026-10-29):** `DynamicInstances` (@margoengine/culling/dynamic) takes 48-byte rows and a bulk
   path (write `matrices`, then `update(from, to)`; a non-finite row draws nothing instead of throwing). Like for like
   with three's `setMatrixAt` (same CPU matrix maths per box, rows copied unchecked): 0.90 against 0.91 ms at 10,000,
   6.67 against 6.11 ms at 100,000 and 16.2 against 15.7 ms at 250,000 (three.js WebGPU; numbers in
   [whitepaper/boxes-vs-threejs.md](whitepaper/boxes-vs-threejs.md), "Moving instances on the GPU"). The checked
   `setMatrixAt` stays about 15% over three at 100,000, the validation cost.
+
+### Bare class fields in other packages may cost the same as they did in math
+
+- **What:** `@margoengine/math` lost 40% of its `setFromEuler` time to class fields declared before the constructor
+  (perf-history entry 53). TypeScript's `useDefineForClassFields` emits them for every package, so a class of number
+  fields written every frame elsewhere pays the same. Not measured outside math.
+- **Repro:** look for bare `x;` lines before `constructor(` in `packages/*/dist/*.js`; `packages/math/test/field-types.test.js` is the check.
+- **Plan:** set the option in the shared tsconfig once a run of every package's tests and proofs shows no class relied on
+  the define behaviour.
 
 ### DynamicInstances: about 25-35% more GPU time than InstancedMesh at 100,000 and 250,000 moving boxes
 

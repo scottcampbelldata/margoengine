@@ -1,5 +1,5 @@
 {
-  "commit": "6293e8336",
+  "commit": "ba3a63639",
   "dirty": true,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -372,16 +372,16 @@
     },
     "@margoengine/culling": {
       ".": {
-        "raw": 32450,
-        "gzip": 10855
+        "raw": 32480,
+        "gzip": 10868
       },
       "./dynamic": {
         "raw": 19985,
         "gzip": 7205
       },
       "./parts": {
-        "raw": 34006,
-        "gzip": 11632
+        "raw": 34036,
+        "gzip": 11634
       }
     },
     "@margoengine/cutscene": {
@@ -684,6 +684,22 @@
       "./delaunay": {
         "raw": 7027,
         "gzip": 3163
+      },
+      "./polygon": {
+        "raw": 17761,
+        "gzip": 6597
+      },
+      "./sweep": {
+        "raw": 15341,
+        "gzip": 6549
+      },
+      "./tessellate": {
+        "raw": 2837,
+        "gzip": 1241
+      },
+      "./gpu": {
+        "raw": 14986,
+        "gzip": 5096
       }
     },
     "@margoengine/gltf": {
@@ -920,80 +936,92 @@
     },
     "@margoengine/math": {
       ".": {
-        "raw": 51973,
-        "gzip": 16373
+        "raw": 61351,
+        "gzip": 19519
       },
       "./vector2": {
-        "raw": 2094,
-        "gzip": 723
+        "raw": 2090,
+        "gzip": 720
       },
       "./vector3": {
-        "raw": 3941,
-        "gzip": 1342
+        "raw": 3935,
+        "gzip": 1337
       },
       "./vector4": {
-        "raw": 1869,
-        "gzip": 669
+        "raw": 1861,
+        "gzip": 663
       },
       "./quaternion": {
-        "raw": 3755,
-        "gzip": 1550
+        "raw": 3747,
+        "gzip": 1543
       },
       "./euler": {
-        "raw": 2167,
-        "gzip": 1055
+        "raw": 2155,
+        "gzip": 1047
       },
       "./matrix3": {
-        "raw": 1939,
-        "gzip": 872
+        "raw": 1958,
+        "gzip": 881
       },
       "./matrix4": {
-        "raw": 4469,
-        "gzip": 1976
+        "raw": 4488,
+        "gzip": 1987
       },
       "./color": {
-        "raw": 6617,
-        "gzip": 2851
+        "raw": 6632,
+        "gzip": 2849
       },
       "./box3": {
-        "raw": 7395,
-        "gzip": 2377
+        "raw": 7381,
+        "gzip": 2366
       },
       "./obb": {
-        "raw": 11653,
-        "gzip": 4221
+        "raw": 11641,
+        "gzip": 4208
       },
       "./line3": {
-        "raw": 5740,
-        "gzip": 2022
+        "raw": 5724,
+        "gzip": 2011
       },
       "./triangle": {
-        "raw": 7502,
-        "gzip": 2878
+        "raw": 7490,
+        "gzip": 2867
+      },
+      "./capsule": {
+        "raw": 11092,
+        "gzip": 4130
       },
       "./sphere": {
-        "raw": 6448,
-        "gzip": 2045
+        "raw": 6428,
+        "gzip": 2035
       },
       "./plane": {
-        "raw": 5864,
-        "gzip": 1903
+        "raw": 5842,
+        "gzip": 1892
       },
       "./ray": {
-        "raw": 6604,
-        "gzip": 2263
+        "raw": 6581,
+        "gzip": 2253
       },
       "./frustum": {
-        "raw": 7039,
-        "gzip": 2309
+        "raw": 7010,
+        "gzip": 2294
+      },
+      "./project": {
+        "raw": 2051,
+        "gzip": 1021
       },
       "./spherical": {
-        "raw": 612,
-        "gzip": 303
+        "raw": 595,
+        "gzip": 296
       },
       "./cylindrical": {
-        "raw": 666,
-        "gzip": 304
+        "raw": 651,
+        "gzip": 298
+      },
+      "./sh": {
+        "raw": 2011,
+        "gzip": 915
       },
       "./mathutils": {
         "raw": 1761,
@@ -1024,12 +1052,12 @@
         "gzip": 259
       },
       "./billboard": {
-        "raw": 6014,
-        "gzip": 2597
+        "raw": 6006,
+        "gzip": 2591
       },
       "./affine": {
-        "raw": 9320,
-        "gzip": 3871
+        "raw": 9331,
+        "gzip": 3867
       }
     },
     "@margoengine/mcp": {

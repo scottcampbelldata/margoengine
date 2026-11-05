@@ -390,8 +390,11 @@ export class CulledInstances implements EnginePlugin {
     return det;
   }
   protected write(i: number, m: ArrayLike<number>): void {
-    const det = this.determinant(m);
-    this.records.set(m, i * 24);
+    const det = this.determinant(m),
+      records = this.records,
+      o = i * 24;
+    // By index: `set` costs more in its call than in its 16 values.
+    for (let k = 0; k < 16; k++) records[o + k] = m[k];
     const flip = +(det < 0);
     this.flips[this.batchOf[i]] += flip - this.flipped[i];
     this.flipped[i] = flip;
