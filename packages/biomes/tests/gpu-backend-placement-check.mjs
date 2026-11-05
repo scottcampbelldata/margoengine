@@ -74,12 +74,8 @@ async function check() {
               maxBufferSize: selected.limits.maxBufferSize,
             },
           });
-          const stages = new Set(),
-            createPipeline = device.createComputePipelineAsync.bind(device);
-          device.createComputePipelineAsync = (descriptor) => {
-            stages.add(descriptor.compute.entryPoint);
-            return createPipeline(descriptor);
-          };
+          const module = globalThis.__margoBackendPlacementProof,
+            stages = module.watchStages(device);
           const errors = [];
           let destroying = false;
           device.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
@@ -87,11 +83,11 @@ async function check() {
             if (!destroying) errors.push(`device lost: ${loss.message}`);
           });
           try {
-            const module = globalThis.__margoBackendPlacementProof;
             if (module.BACKEND_PLACEMENT_CASE_COUNT !== 14) throw Error('Backend case matrix changed');
             const gpuCases = await module.runBackendPlacementCases(device);
             for (const stage of ['counts', 'emit', 'accept', 'kill', 'd8', 'accumulate'])
-              if (!stages.has(stage)) throw Error('GPU stage was not exercised: ' + stage);
+              if (!stages.has(stage))
+                throw Error('GPU stage was not exercised: ' + stage + " (backend 'gpu' work ran on the CPU)");
             await device.queue.onSubmittedWorkDone();
             return { gpuCases, errors };
           } finally {

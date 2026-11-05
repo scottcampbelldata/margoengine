@@ -461,3 +461,57 @@ test('the hardware runner bundles the full public placement/hydrology matrix', a
   ])
     assert.ok(code.includes(name), name);
 });
+
+// Regression (2026-11-05, every hardware box): the runner's bundle took @margoengine/biomes/gpu from dist, whose own GPU
+// world registry got the backend 'gpu' worlds, so src placement and hydrology ran on the CPU with the same bytes and
+// the check failed with "GPU stage was not exercised: counts". Runs that bundle with the fake device and reads the
+// same stage spy the check reads.
+test('the hardware runner bundle sends backend gpu placement and hydrology to the device', {
+  timeout: 120000,
+}, async (t) => {
+  installGPUConstants(t);
+  const { backendPlacementModuleCode } = await import('./gpu-backend-placement-entry.mjs');
+  const proof = new Function(`${await backendPlacementModuleCode()}\nreturn __margoBackendPlacementProof;`)();
+  const b = proof.flow,
+    spec = b.placementCases(b)[0],
+    options = { ...spec.options, size: [384, 384], workers: 0 };
+  const cpu = await b.BiomeWorld.create({ ...options, backend: 'cpu' });
+  const fake = fakeDevice(),
+    stages = proof.watchStages(fake.device);
+  const world = await b.BiomeWorld.create({ ...options, backend: 'gpu', device: fake.device });
+  // The fake runs no field shaders: the GPU world reads the CPU world's fields, as in the fixture above.
+  t.mock.method(world, 'tile', (x, z, o) => cpu.tile(x, z, o));
+  t.mock.method(world, 'tilePart', (x, z, window, o) => cpu.tilePart(x, z, window, o));
+  const placed = b.BiomePlacement.attach(world, spec.placement),
+    reference = b.BiomePlacement.attach(cpu, spec.placement);
+  t.after(() => {
+    placed.dispose();
+    reference.dispose();
+    world.dispose();
+    cpu.dispose();
+  });
+  assert.deepEqual(b.tileBytes(await placed.tile(1, 1)), b.tileBytes(await reference.tile(1, 1)));
+  const flow = { multiple: true, channelCells: 3, lakeDepth: 20 };
+  assert.deepEqual(await proof.hydrologyOfAsync(world, flow), proof.hydrologyOf(cpu, flow));
+  for (const stage of ['counts', 'emit', 'accept', 'kill', 'd8', 'accumulate'])
+    assert.ok(stages.has(stage), "backend 'gpu' ran on the CPU: no " + stage + ' pipeline');
+  fake.assertFreed();
+});
+
+test('hardware bundles alias every package entry to src and refuse a dist module', async () => {
+  const { existsSync } = await import('node:fs');
+  const { assertSourceBundle, sourceAliases } = await import('./source-bundle.mjs');
+  const { default: manifest } = await import('../package.json', { with: { type: 'json' } });
+  const aliases = sourceAliases();
+  assert.equal(aliases.length, Object.keys(manifest.exports).length);
+  for (const { find, replacement } of aliases) assert.ok(existsSync(replacement), String(find));
+  const gpu = aliases.find(({ find }) => find.test('@margoengine/biomes/gpu'));
+  assert.match(gpu.replacement, /[\\/]src[\\/]gpu\.ts$/);
+  assert.equal(aliases.filter(({ find }) => find.test('@margoengine/biomes/gpu')).length, 1, 'exact matches only');
+  assert.throws(
+    () => assertSourceBundle({ moduleIds: ['/r/packages/biomes/src/world.ts', '/r/packages/biomes/dist/gpu.js'] }),
+    /built package instead of src: \/r\/packages\/biomes\/dist\/gpu\.js/,
+  );
+  assert.throws(() => assertSourceBundle({ moduleIds: [] }), /no modules/);
+  assertSourceBundle({ moduleIds: ['/r/packages/biomes/src/world.ts'] });
+});

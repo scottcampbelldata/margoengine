@@ -3,6 +3,20 @@ import { presetWorlds, R16 } from '../src/presets.ts';
 import { hydrologyOf, hydrologyOfAsync } from '../src/hydrology.ts';
 
 export const BACKEND_PLACEMENT_CASE_COUNT = 14;
+// The bundle's own modules, so the CPU test drives the very copy the hardware check runs.
+export * as flow from './gpu-placement-flow-source.mjs';
+export { hydrologyOf, hydrologyOfAsync };
+
+/** Records the entry point of every compute pipeline `device` makes; the hardware check and its CPU test read it. */
+export function watchStages(device) {
+  const stages = new Set(),
+    create = device.createComputePipelineAsync.bind(device);
+  device.createComputePipelineAsync = (descriptor) => {
+    stages.add(descriptor.compute.entryPoint);
+    return create(descriptor);
+  };
+  return stages;
+}
 
 export function backendHydrologyCases() {
   const island = presetWorlds.island;

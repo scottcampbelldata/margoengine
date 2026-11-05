@@ -1,22 +1,14 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
+import { assertSourceBundle, sourceAliases } from './source-bundle.mjs';
 export async function placementFlowModuleCode() {
   const result = await build({
     configFile: false,
     publicDir: false,
     logLevel: 'silent',
-    resolve: {
-      alias: {
-        '@margoengine/biomes/toolkit': fileURLToPath(new URL('../src/toolkit.ts', import.meta.url)),
-        '@margoengine/biomes/region': fileURLToPath(new URL('../src/region.ts', import.meta.url)),
-        '@margoengine/biomes/relief': fileURLToPath(new URL('../src/relief.ts', import.meta.url)),
-        '@margoengine/biomes/presets': fileURLToPath(new URL('../src/presets.ts', import.meta.url)),
-        '@margoengine/biomes/workers': fileURLToPath(new URL('../src/workers.ts', import.meta.url)),
-        '@margoengine/biomes/digest': fileURLToPath(new URL('../src/digest.ts', import.meta.url)),
-        '@margoengine/biomes/gpu': fileURLToPath(new URL('../src/gpu.ts', import.meta.url)),
-      },
-    },
+    // Every package entry from src, so no dist copy brings its own module state (see source-bundle.mjs).
+    resolve: { alias: sourceAliases() },
     build: {
       write: false,
       minify: false,
@@ -32,5 +24,6 @@ export async function placementFlowModuleCode() {
     !Array.isArray(result) && result.output.length === 1 && result.output[0].type === 'chunk',
     'J6 proof must be one browser bundle',
   );
+  assertSourceBundle(result.output[0]);
   return result.output[0].code;
 }
