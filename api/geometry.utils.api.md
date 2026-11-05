@@ -28,10 +28,42 @@ export interface GeometryGroup {
     materialIndex: number;
 }
 
+export interface InterleaveInput {
+    array: ArrayLike<number>;
+    size: number;
+}
+
+export interface InterleavedBuffer {
+    buffer: Float32Array;
+    stride: number;
+    offsets: number[];
+}
+
+export interface MemoryEstimate {
+    positions: number;
+    normals: number;
+    uvs: number;
+    tangents: number;
+    indices: number;
+    total: number;
+}
+
 export interface MergeVerticesOptions {
     tolerance?: number;
     positionOnly?: boolean;
     removeDegenerate?: boolean;
+}
+
+export interface MorphTargetData {
+    positions?: ArrayLike<number>;
+    normals?: ArrayLike<number>;
+    tangents?: ArrayLike<number>;
+}
+
+export interface SkinData {
+    joints: ArrayLike<number>;
+    weights: ArrayLike<number>;
+    matrices: ArrayLike<number>;
 }
 
 export interface SplitTangents {
@@ -40,6 +72,10 @@ export interface SplitTangents {
 }
 
 export function applyMatrix4(data: GeometryData, m: ArrayLike<number>): GeometryData;
+
+export function bakeMorphTargets(data: GeometryData, targets: readonly MorphTargetData[], weights: ArrayLike<number>): GeometryData;
+
+export function bakeSkin(data: GeometryData, skin: SkinData): GeometryData;
 
 export function center(data: GeometryData): GeometryData;
 
@@ -61,13 +97,21 @@ export function computeVertexNormals(data: GeometryData): GeometryData;
 
 export function creasedNormals(positions: ArrayLike<number>, options?: CreasedNormalsOptions): Float32Array;
 
+export function deinterleaveAttributes(buffer: ArrayLike<number>, sizes: readonly number[]): Float32Array[];
+
 export function edgesGeometry(data: GeometryData, thresholdAngle?: number): Uint32Array;
+
+export function estimateMemory(data: GeometryData): MemoryEstimate;
 
 export function footprintRadius(data: GeometryData): number;
 
 export function geometryData(positions: ArrayLike<number>, normals: ArrayLike<number>, uvs: ArrayLike<number>, indices: ArrayLike<number>, groups?: GeometryGroup[]): GeometryData;
 
+export function interleaveAttributes(attributes: readonly InterleaveInput[]): InterleavedBuffer;
+
 export function mergeGeometries(list: readonly GeometryData[], useGroups?: boolean): GeometryData;
+
+export function mergeGroups(data: GeometryData): GeometryData;
 
 export function mergeVertices(data: GeometryData, options?: MergeVerticesOptions): GeometryData;
 
@@ -78,6 +122,10 @@ export function splitTangents(data: GeometryData): SplitTangents;
 export function toGeometry(data: GeometryData): Geometry;
 
 export function toNonIndexed(data: GeometryData): GeometryData;
+
+export function triangleFanToTriangles(source: ArrayLike<number> | number): Uint32Array;
+
+export function triangleStripToTriangles(source: ArrayLike<number> | number): Uint32Array;
 
 export function wireframe(data: GeometryData): Uint32Array;
 

@@ -283,6 +283,58 @@ Corners at one vertex share a frame only when they sit in the same fan of connec
 orientation, which is the grouping MikkTSpace defines. Triangles keep their order and winding, and the first frame at a
 vertex keeps its index. `w` follows UVs with v up; UVs stored v down, as in glTF files, give the opposite `w`.
 
+## Mesh housekeeping
+
+`@margoengine/geometry/utils` also bakes poses into plain positions, tidies draws, and packs buffers.
+
+```ts
+import {boxGeometry} from 'margoengine/geometry';
+import {
+  bakeMorphTargets,
+  bakeSkin,
+  deinterleaveAttributes,
+  estimateMemory,
+  interleaveAttributes,
+  mergeGroups,
+  triangleFanToTriangles,
+  triangleStripToTriangles,
+} from 'margoengine/geometry/utils';
+
+const mesh = boxGeometry();
+const count = mesh.positions.length / 3;
+
+// One morph pose, for picking or export. Targets are differences from the base, as in glTF.
+const smile = {positions: new Float32Array(count * 3)};
+const posed = bakeMorphTargets(mesh, [smile], [0.75]);
+
+// One skinned pose. matrices: joint world matrix times inverse bind matrix, 16 values per joint.
+const joints = new Uint8Array(count * 4);
+const weights = new Float32Array(count * 4).fill(0.25);
+const matrices = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 1];
+const baked = bakeSkin(mesh, {joints, weights, matrices});
+
+// One draw per material, then one vertex buffer.
+const tidy = mergeGroups(mesh);
+const {buffer, stride, offsets} = interleaveAttributes([
+  {array: mesh.positions, size: 3},
+  {array: mesh.normals, size: 3},
+  {array: mesh.uvs, size: 2},
+]);
+const [positions, normals, uvs] = deinterleaveAttributes(buffer, [3, 3, 2]);
+
+console.log(estimateMemory(mesh).total, 'bytes');
+
+// Strip and fan index lists from older formats. A number means a non-indexed draw of that many vertices.
+const fromStrip = triangleStripToTriangles([0, 1, 2, 3]);
+const fromFan = triangleFanToTriangles(6);
+```
+
+- `bakeMorphTargets` and `bakeSkin` return a new mesh, with normals and tangents unit length again. Skin normals use the
+  inverse transpose of the blended matrix, and stay facing out through a mirroring pose.
+- `bakeSkin` normalizes weights; a vertex with no weight stays where it is.
+- `mergeGroups` keeps the order materials first appear in, and triangles in no group stay at the end.
+- Strip conversion keeps one winding, drops the repeats used to stitch strips, and treats `0xffffffff` as a restart.
+
 ## Bending along a curve
 
 `@margoengine/geometry/flow` deforms a mesh to follow a curve, or places rigid copies along it: trains on tracks, text
@@ -400,6 +452,8 @@ straight line changes nothing, a band and a tube bent round a circle land on the
 normals under stretch, closed frames meeting, level frames with `lockUp`, and instance matrices. The extrusion UV tests
 check default UVs staying as they were, every corner being offered once, world scale on bevels and paths, and refused
 results. The split tangent tests compare every triangle corner with tangents Blender made: a mirrored sheet in
-`tests/fixtures/mikktspace-mirror.json`, which must split exactly its six mirror vertices, and an exported glTF.
+`tests/fixtures/mikktspace-mirror.json`, which must split exactly its six mirror vertices, and an exported glTF. The
+housekeeping tests check baked poses against hand-worked results, stretched and mirrored normals, an identity pose,
+group order, buffer round trips and strip winding.
 
 Apache-2.0 licensed.

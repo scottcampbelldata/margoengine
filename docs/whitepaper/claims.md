@@ -143,6 +143,7 @@ backs them yet:
 | LIM-040 | Curve bending: frames sampled `segments` times, default 256; only vertices move; a shape wider than a bend radius folds (docs/limits.md, Geometry) | `packages/geometry/tests/flow.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 | LIM-041 | Extrusion UV generators: called once per triangle corner; wall `u` measured on the outline before the bevel (docs/limits.md, Geometry) | `packages/geometry/tests/extrude-uv.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 | LIM-042 | Split tangents match Blender's MikkTSpace at every triangle corner, above 0.9995 by dot product with equal signs, on a mirrored sheet and an exported glTF (docs/limits.md, Geometry) | `packages/geometry/tests/tangent-split.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
+| LIM-043 | Baked skin: four joints per vertex, linear blending, Float32 output (docs/limits.md, Geometry) | `packages/geometry/tests/mesh-utils.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 

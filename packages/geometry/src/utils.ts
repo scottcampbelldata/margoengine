@@ -421,6 +421,21 @@ export function creasedNormals(positions: ArrayLike<number>, options: CreasedNor
 }
 
 export { splitTangents, type SplitTangents } from './tangent-split.js';
+export {
+  bakeMorphTargets,
+  bakeSkin,
+  deinterleaveAttributes,
+  estimateMemory,
+  interleaveAttributes,
+  mergeGroups,
+  triangleFanToTriangles,
+  triangleStripToTriangles,
+  type InterleavedBuffer,
+  type InterleaveInput,
+  type MemoryEstimate,
+  type MorphTargetData,
+  type SkinData,
+} from './mesh-utils.js';
 
 /**
  * Per-vertex tangents (xyzw, w = bitangent sign) following the MikkTSpace recipe: per-triangle UV derivatives,

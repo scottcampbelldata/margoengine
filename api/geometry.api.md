@@ -193,6 +193,10 @@ export type Vec = MutableVec2 | MutableVec3;
 
 export function applyMatrix4(data: GeometryData, m: ArrayLike<number>): GeometryData;
 
+export function bakeMorphTargets(data: GeometryData, targets: readonly MorphTargetData[], weights: ArrayLike<number>): GeometryData;
+
+export function bakeSkin(data: GeometryData, skin: SkinData): GeometryData;
+
 export function boxGeometry(width?: number, height?: number, depth?: number, widthSegments?: number, heightSegments?: number, depthSegments?: number): GeometryData;
 
 export function capsuleGeometry(radius?: number, height?: number, capSegments?: number, radialSegments?: number, heightSegments?: number): GeometryData;
@@ -223,9 +227,13 @@ export function creasedNormals(positions: ArrayLike<number>, options?: CreasedNo
 
 export function cylinderGeometry(radiusTop?: number, radiusBottom?: number, height?: number, radialSegments?: number, heightSegments?: number, openEnded?: boolean, thetaStart?: number, thetaLength?: number): GeometryData;
 
+export function deinterleaveAttributes(buffer: ArrayLike<number>, sizes: readonly number[]): Float32Array[];
+
 export function dodecahedronGeometry(radius?: number, detail?: number, smooth?: boolean): GeometryData;
 
 export function edgesGeometry(data: GeometryData, thresholdAngle?: number): Uint32Array;
+
+export function estimateMemory(data: GeometryData): MemoryEstimate;
 
 export function extrudeGeometry(shapes: Shape | readonly Shape[], options?: ExtrudeOptions): GeometryData;
 
@@ -235,6 +243,8 @@ export function geometryData(positions: ArrayLike<number>, normals: ArrayLike<nu
 
 export function icosahedronGeometry(radius?: number, detail?: number, smooth?: boolean): GeometryData;
 
+export function interleaveAttributes(attributes: readonly InterleaveInput[]): InterleavedBuffer;
+
 export function isClockWise(points: readonly MutableVec2[]): boolean;
 
 export function latheGeometry(points?: readonly MutableVec2[], segmentCount?: number, phiStart?: number, phiLength?: number): GeometryData;
@@ -242,6 +252,8 @@ export function latheGeometry(points?: readonly MutableVec2[], segmentCount?: nu
 export function loopSubdivide(data: GeometryData, iterations?: number, tolerance?: number): GeometryData;
 
 export function mergeGeometries(list: readonly GeometryData[], useGroups?: boolean): GeometryData;
+
+export function mergeGroups(data: GeometryData): GeometryData;
 
 export function mergeOverlappingPoints(points: readonly MutableVec2[]): MutableVec2[];
 
@@ -275,6 +287,10 @@ export function torusGeometry(radius?: number, tube?: number, radialSegments?: n
 
 export function torusKnotGeometry(radius?: number, tube?: number, tubularSegments?: number, radialSegments?: number, p?: number, q?: number): GeometryData;
 
+export function triangleFanToTriangles(source: ArrayLike<number> | number): Uint32Array;
+
+export function triangleStripToTriangles(source: ArrayLike<number> | number): Uint32Array;
+
 export function triangulate(data: ArrayLike<number>, holeIndices?: ArrayLike<number>, dim?: number): number[];
 
 export function triangulateShape(contour: readonly MutableVec2[], holes?: readonly (readonly MutableVec2[])[]): {
@@ -292,6 +308,38 @@ export function wireframePositions(data: GeometryData, offsetY?: number): Float3
 export function worldUVs(tile?: number): ExtrudeUVGenerator;
 
 // Not exported from this entry, but used by the exports above:
+
+interface InterleaveInput {
+    array: ArrayLike<number>;
+    size: number;
+}
+
+interface InterleavedBuffer {
+    buffer: Float32Array;
+    stride: number;
+    offsets: number[];
+}
+
+interface MemoryEstimate {
+    positions: number;
+    normals: number;
+    uvs: number;
+    tangents: number;
+    indices: number;
+    total: number;
+}
+
+interface MorphTargetData {
+    positions?: ArrayLike<number>;
+    normals?: ArrayLike<number>;
+    tangents?: ArrayLike<number>;
+}
+
+interface SkinData {
+    joints: ArrayLike<number>;
+    weights: ArrayLike<number>;
+    matrices: ArrayLike<number>;
+}
 
 interface SplitTangents {
     data: GeometryData;
