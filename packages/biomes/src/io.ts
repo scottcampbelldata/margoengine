@@ -1,5 +1,5 @@
 // Files in and out of a biome world: heightmaps (16-bit PNG, RAW16, float32), per-biome weight maps and masks as PNG,
-// layer dumps as JSON or CSV, and the decoder of `BiomeWorld.toJSON()` that `BiomeWorld.from()` loads on first use.
+// layer dumps as JSON or CSV, and `saveWorld` and `loadWorld`, which save a world's options and edits and make it again.
 // An entry of its own: the root entry does not import it. The PNG writer is ours (stored or CompressionStream deflate,
 // CRC-32 and Adler-32 written out below); nothing here reads a file format library or sends bytes anywhere.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
@@ -332,7 +332,7 @@ async function worldOptions(
     options?: Record<string, any>;
     edits?: { name: string; x: number; z: number; data: string }[];
   };
-  if (typeof saved !== 'object' || saved === null) throw typeError('BiomeWorld.from takes the JSON of world.toJSON()', 'biomes');
+  if (typeof saved !== 'object' || saved === null) throw typeError('loadWorld takes the JSON text or object that saveWorld(world) returns', 'biomes');
   if (saved.format !== 'margo-biomes-world' || saved.version !== 1 || !saved.options || !Array.isArray(saved.edits))
     throw rangeError('Not a saved biome world (format margo-biomes-world, version 1)', 'biomes');
   const options: Record<string, any> = { ...saved.options },

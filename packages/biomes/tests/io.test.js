@@ -186,7 +186,8 @@ test('saveWorld refuses what JSON cannot hold, and loadWorld refuses other data'
   const world = await BiomeWorld.create({ ...options, height: { field: () => 5 } });
   assert.throws(() => saveWorld(world), { code: 'unsupported' });
   await assert.rejects(loadWorld({ format: 'other' }), RangeError);
-  await assert.rejects(loadWorld('null'), TypeError);
+  // The message names the functions that exist (it once named BiomeWorld.from and world.toJSON, which do not).
+  await assert.rejects(loadWorld('null'), (e) => e instanceof TypeError && /saveWorld/.test(e.message) && !/toJSON|BiomeWorld.from/.test(e.message));
 });
 
 test('the io entry is lazy: no static import of the root reaches it', async () => {
