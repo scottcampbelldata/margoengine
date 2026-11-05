@@ -94,6 +94,7 @@ class BiomeWorld implements Disposable {
     readonly tilesZ: number;
     private constructor();
     static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
+    state(): WorldState;
     get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
     get rivers(): readonly Int32Array[];

@@ -158,6 +158,10 @@
       "types": "./dist/biomes/stats.d.ts",
       "import": "./dist/biomes/stats.js"
     },
+    "./biomes/io": {
+      "types": "./dist/biomes/io.d.ts",
+      "import": "./dist/biomes/io.js"
+    },
     "./biomes/workers": {
       "types": "./dist/biomes/workers.d.ts",
       "import": "./dist/biomes/workers.js"

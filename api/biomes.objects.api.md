@@ -174,6 +174,7 @@ class BiomeWorld implements Disposable {
     readonly tilesZ: number;
     private constructor();
     static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
+    state(): WorldState;
     get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
     get biomes(): readonly BiomeDefinition[];
     get rivers(): readonly Int32Array[];
@@ -530,6 +531,14 @@ interface ValleyOptions {
     readonly width?: number;
     readonly floor?: number;
     readonly mouth?: number;
+}
+
+interface WorldState {
+    readonly options: BiomeWorldOptions;
+    readonly biomes: readonly BiomeDefinition[];
+    readonly classifier: 'envelopes' | ZoneClassifier;
+    readonly paint: readonly PaintLayer[];
+    readonly user: ReadonlyMap<string, ReadonlyMap<string, Uint8Array>>;
 }
 
 interface ZoneClassifier {

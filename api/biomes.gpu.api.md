@@ -25,12 +25,21 @@ export class GpuTiles {
     readonly device: GPUDevice;
     private constructor();
     static of(options: GpuOptions, size: readonly [number, number], regionResolution: number, cells: number): GpuTiles | undefined;
+    route(world: object): void;
     watch(): void;
     live(): void;
     fits(c?: Classifier, kind?: 'envelopes' | ZoneClassifier, height?: ArrayLike<number>): boolean;
     layers(r: GpuRequest, caller?: AbortSignal, live?: () => void, cpu?: () => Map<string, RasterLayer>): Promise<Map<string, RasterLayer>>;
     dispose(reason?: unknown): void;
 }
+
+export function hydrologyGPU(device: GPUDevice, grid: HeightGrid, options?: HydrologyOptions, { signal }?: {
+    readonly signal?: AbortSignal;
+}): Promise<Hydrology>;
+
+export function placeTileGPU(device: GPUDevice, placement: BiomePlacement, x: number, z: number, { signal }?: {
+    readonly signal?: AbortSignal;
+}): Promise<PlacedTile>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -50,6 +59,147 @@ interface BiomeDefinition {
     readonly priority?: number;
     readonly weight?: number;
     readonly zones?: readonly string[];
+}
+
+class BiomePlacement implements Disposable {
+    private constructor();
+    static attach(world: BiomeWorld, options?: PlacementOptions): BiomePlacement;
+    get world(): BiomeWorld;
+    get species(): readonly PlacedSpecies[];
+    get tileSize(): number;
+    get details(): readonly {
+        readonly id: string;
+        readonly mesh: string;
+        readonly density: number;
+    }[];
+    get reach(): number;
+    update(changes: Pick<PlacementOptions, 'exclusions' | 'conflicts'>): void;
+    onChange(listener: (rect: Rect) => void): () => void;
+    tile(x: number, z: number, options?: {
+        readonly signal?: AbortSignal;
+        readonly priority?: number;
+        readonly detail?: number;
+        readonly ahead?: readonly (readonly [number, number])[];
+    }): Promise<PlacedTile>;
+    tiles(rect: Rect, options?: {
+        readonly focus?: readonly [number, number];
+        readonly signal?: AbortSignal;
+    }): AsyncIterableIterator<PlacedTile>;
+    digest(x: number, z: number, options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<string>;
+    inspect(rect: Rect, options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<{
+        key: string;
+        layer: number;
+        x: number;
+        z: number;
+        spacing: number;
+        size: number;
+        priority: number;
+        fate: 'accepted' | 'rejected' | 'unresolved';
+        round: number;
+    }[]>;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+interface BiomeSample {
+    height: number;
+    slope: number;
+    aspect: number;
+    temperature: number;
+    coldest: number;
+    warmest: number;
+    gdd5: number;
+    season: number;
+    treeline: number;
+    rainfall: number;
+    alpha: number;
+    moisture: number;
+    exposure: number;
+    waterDistance: number;
+    soil: number;
+    biomes: string[];
+    weights: number[];
+}
+
+interface BiomeTile {
+    readonly x: number;
+    readonly z: number;
+    readonly origin: readonly [number, number];
+    readonly cells: number;
+    readonly resolution: number;
+    readonly layers: readonly string[];
+    layer(name: string): RasterLayer | undefined;
+}
+
+class BiomeWorld implements Disposable {
+    readonly seed: number;
+    readonly tileSize: number;
+    readonly ecotone: number;
+    readonly resolution: number;
+    readonly regionResolution: number;
+    readonly bounds: Rect;
+    readonly tilesX: number;
+    readonly tilesZ: number;
+    private constructor();
+    static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
+    state(): WorldState;
+    get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
+    get biomes(): readonly BiomeDefinition[];
+    get rivers(): readonly Int32Array[];
+    get region(): Region;
+    get paint(): readonly PaintLayer[];
+    overview(): {
+        readonly width: number;
+        readonly depth: number;
+        readonly resolution: number;
+        readonly height: Float32Array;
+    };
+    get climate(): Climate;
+    tile(x: number, z: number, options?: TileRequest): Promise<BiomeTile>;
+    tilePart(x: number, z: number, window: Rect, options?: TileRequest): Promise<BiomeTile & {
+        readonly window: Rect;
+    }>;
+    readLayer(name: string, x: number, z: number): Uint8Array | undefined;
+    writeLayer(name: string, x: number, z: number, data: Uint8Array | undefined): void;
+    writeLayers(writes: readonly LayerWrite[]): void;
+    tiles(rect: Rect, options?: TileRequest & {
+        readonly focus?: readonly [number, number];
+    }): AsyncIterableIterator<BiomeTile>;
+    sample(x: number, z: number, out?: BiomeSample): BiomeSample;
+    sampleRegion(x: number, z: number, out?: BiomeSample): BiomeSample;
+    heightAt(x: number, z: number): number;
+    update(changes: Partial<Pick<BiomeWorldOptions, 'biomes' | 'climate' | 'classifier' | 'paint' | 'height'>>): void;
+    onChange(listener: (rect: Rect) => void): () => void;
+    digest(x: number, z: number, options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<string>;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+interface BiomeWorldOptions {
+    readonly seed?: number;
+    readonly height?: HeightSource;
+    readonly origin?: readonly [number, number];
+    readonly size?: readonly [number, number];
+    readonly climate?: ClimateOptions;
+    readonly tileSize?: 128 | 256 | 512;
+    readonly resolution?: 0.5 | 1 | 2 | 4;
+    readonly regionResolution?: number;
+    readonly backend?: 'auto' | 'gpu' | 'cpu';
+    readonly device?: GPUDevice;
+    readonly biomes?: readonly BiomeDefinition[];
+    readonly classifier?: 'envelopes' | ZoneClassifier;
+    readonly paint?: readonly PaintLayer[];
+    readonly ecotone?: number;
+    readonly signal?: AbortSignal;
+    readonly workers?: number | false;
+    readonly createWorker?: () => Worker;
+    readonly cache?: number;
 }
 
 interface Classifier {
@@ -117,6 +267,21 @@ interface ClimateEnvelope {
     readonly blend?: number;
 }
 
+interface ClimateOptions {
+    readonly latitude?: number;
+    readonly seaLevel?: number;
+    readonly lapseRate?: number;
+    readonly lapseSplit?: number;
+    readonly equatorTemperature?: number;
+    readonly poleTemperature?: number;
+    readonly rainfall?: number;
+    readonly wind?: readonly [x: number, z: number];
+    readonly rainShadow?: number;
+    readonly inland?: number;
+    readonly coldAir?: number;
+    readonly rainSeason?: 'auto' | 'uniform' | 'summer' | 'winter';
+}
+
 interface ClusterRule {
     readonly kind: 'thomas' | 'matern' | '2dt';
     readonly parents: number;
@@ -129,6 +294,17 @@ interface ColorVariation {
     readonly hue?: number;
     readonly value?: number;
     readonly seasonal?: boolean;
+}
+
+interface DensityMap {
+    readonly id: string;
+    readonly mesh: string;
+    readonly density: number;
+    readonly data: Uint8Array;
+    readonly sampled?: {
+        readonly every: number;
+        readonly data: Uint8Array;
+    };
 }
 
 interface DetailRule {
@@ -148,6 +324,36 @@ interface Dims {
     readonly width: Int32Array;
 }
 
+interface Erosion extends HeightGrid {
+    readonly height: Int32Array;
+    readonly flow: Int32Array;
+    readonly direction: Int8Array;
+    readonly wear: Int32Array;
+    readonly deposit: Int32Array;
+    readonly outflow: number;
+}
+
+interface ErosionOptions {
+    readonly iterations?: number;
+    readonly talus?: number;
+    readonly thermal?: number;
+    readonly capacity?: number;
+    readonly incision?: number;
+    readonly deposition?: number;
+    readonly sea?: number;
+}
+
+type Exclusion = {
+    readonly kind: 'line';
+    readonly points: readonly (readonly [number, number])[];
+    readonly width: number;
+    readonly verge?: number;
+} | {
+    readonly kind: 'polygon';
+    readonly points: readonly (readonly [number, number])[];
+    readonly verge?: number;
+};
+
 interface GroundLayer {
     readonly material: string;
     readonly slope?: Range;
@@ -160,9 +366,57 @@ interface GroundLayer {
     readonly weight?: number;
 }
 
+interface HeightGrid {
+    readonly height: Int32Array;
+    readonly nx: number;
+    readonly nz: number;
+    readonly step: number;
+}
+
+type HeightSource = {
+    readonly samples: Int32Array | Float32Array;
+    readonly width: number;
+    readonly depth: number;
+    readonly unit?: 'm' | 'mm';
+} | {
+    readonly field: (x: number, z: number) => number;
+} | {
+    readonly relief: ReliefOptions;
+};
+
 interface Heights {
     grid(gx: number, gz: number, count: number, rows: number, step: number, scratch?: Scratch): Int32Array;
     readonly relief?: Relief;
+}
+
+interface Hydrology extends HeightGrid {
+    readonly filled: Int32Array;
+    readonly direction: Int8Array;
+    readonly flow: Int32Array;
+    readonly shares?: Float64Array;
+    readonly twi: Int16Array;
+    readonly hand: Int32Array;
+    readonly lake: Uint8Array;
+    readonly channel: Uint8Array;
+    readonly water: Int32Array;
+}
+
+interface HydrologyOptions {
+    readonly sea?: number;
+    readonly channelCells?: number;
+    readonly lakeDepth?: number;
+    readonly multiple?: boolean;
+}
+
+interface InstanceView {
+    x: number;
+    z: number;
+    species: number;
+    key: string;
+    scale: number;
+    yaw: number;
+    variant: number;
+    age: number;
 }
 
 interface IslandOptions {
@@ -172,6 +426,66 @@ interface IslandOptions {
 }
 
 type LayerFormat = 'i32' | 'i16' | 'u16' | 'u8' | 'rgba8';
+
+interface LayerWrite {
+    readonly name: string;
+    readonly x: number;
+    readonly z: number;
+    readonly data: Uint8Array | undefined;
+    readonly changed?: readonly [number, number, number, number];
+}
+
+interface PaintLayer {
+    readonly biome: string;
+    readonly mode?: PaintMode;
+    readonly mask?: string;
+}
+
+type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
+
+interface PlacedSpecies {
+    readonly key: string;
+    readonly id: string;
+    readonly biome: string;
+    readonly kind: 'plant' | 'rock' | 'prop';
+    readonly layer: number;
+    readonly mesh: string;
+    readonly radius: number;
+    readonly tags: readonly string[];
+    readonly density: number;
+    readonly clustered: boolean;
+}
+
+interface PlacedTile {
+    readonly x: number;
+    readonly z: number;
+    readonly origin: readonly [number, number];
+    readonly size: number;
+    readonly instances: Uint8Array;
+    readonly count: number;
+    readonly species: readonly string[];
+    readonly canopy: RasterLayer;
+    readonly exclusion: RasterLayer;
+    readonly density: readonly DensityMap[];
+    readonly stats: {
+        readonly candidates: number;
+        readonly accepted: number;
+        readonly unresolved: number;
+        readonly rounds: Uint32Array;
+    };
+    readonly groups?: readonly {
+        readonly species: number;
+        readonly dead: boolean;
+        readonly records: Uint8Array;
+    }[];
+    forEachInstance(visit: (instance: InstanceView) => void): void;
+}
+
+interface PlacementOptions {
+    readonly rounds?: number;
+    readonly conflicts?: Readonly<Record<string, number>>;
+    readonly exclusions?: readonly Exclusion[];
+}
 
 type Range = readonly [min: number | null, max: number | null];
 
@@ -184,6 +498,10 @@ interface RasterLayer {
     readonly scale: number;
     readonly unit: string;
 }
+
+type Rect = readonly [number, number, number, number];
+
+type Rect = readonly [number, number, number, number];
 
 interface Region {
     readonly nx: number;
@@ -202,6 +520,7 @@ interface Relief {
     readonly rivers: readonly RiverLine[];
     readonly valleyWidth: number;
     readonly islands: readonly ReliefIsland[];
+    readonly erosion?: Erosion;
     waterCells(origin: readonly [number, number], step: number, nx: number, nz: number): Uint8Array;
     readonly settings: Readonly<{
         seed: number;
@@ -225,6 +544,10 @@ interface Relief {
     }>;
 }
 
+interface ReliefErosionOptions extends Omit<ErosionOptions, 'sea'> {
+    readonly step?: number;
+}
+
 interface ReliefIsland {
     readonly x: number;
     readonly z: number;
@@ -243,6 +566,7 @@ interface ReliefOptions {
     readonly shelf?: number;
     readonly valley?: ValleyOptions;
     readonly islands?: IslandOptions;
+    readonly erosion?: ReliefErosionOptions;
 }
 
 type RiverLine = Int32Array;
@@ -291,12 +615,25 @@ interface TileFrame {
     readonly scratch?: Scratch;
 }
 
+interface TileRequest {
+    readonly layers?: readonly string[];
+    readonly signal?: AbortSignal;
+}
+
 type Typed = Int32Array | Int16Array | Uint16Array | Uint8Array | Uint32Array | Float64Array;
 
 interface ValleyOptions {
     readonly width?: number;
     readonly floor?: number;
     readonly mouth?: number;
+}
+
+interface WorldState {
+    readonly options: BiomeWorldOptions;
+    readonly biomes: readonly BiomeDefinition[];
+    readonly classifier: 'envelopes' | ZoneClassifier;
+    readonly paint: readonly PaintLayer[];
+    readonly user: ReadonlyMap<string, ReadonlyMap<string, Uint8Array>>;
 }
 
 interface ZoneClassifier {
