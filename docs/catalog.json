@@ -2299,6 +2299,7 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/ecs@1.0.0",
     "imports": "import { Component } from '@margoengine/ecs';",
     "exports": [
+      "ChangeTracker",
       "Component",
       "Schedule",
       "World"

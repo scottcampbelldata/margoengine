@@ -55,6 +55,32 @@ schedule.update(1 / 30); // two fixed steps of move, then report once
 
 Systems receive `{delta, elapsed, tick, alpha, fixed}`: `delta` is the step in a fixed system and the frame time otherwise, `alpha` is the share of a step left in the accumulator, for blending the last two fixed states when drawing. The object is reused, so read it during the call. Order is `before` and `after`, then the order of `add`. `schedule.order()` lists the result. A missing name, a cycle, or a frame system ordered before a fixed one throws MargoError `'state'` from `order` or the next `update`. Systems are synchronous and run on the calling thread; a `Schedule` holds one step size, so use a second `Schedule` for a second rate.
 
+## Change detection
+
+`ChangeTracker` (from `margoengine/ecs`, or `margoengine/ecs/changes` alone) answers which entities gained, changed or lost one component since its last `clear()`.
+
+```ts
+import {ChangeTracker, World} from 'margoengine/ecs';
+const world = new World(1024);
+const health = world.component({value: Float32Array});
+const tracker = new ChangeTracker(health);
+const entity = world.create();
+health.add(entity, {value: 100});
+const results = new Uint32Array(world.capacity);
+console.log(tracker.added(results)); // 1, results[0] is the entity
+tracker.clear();
+health.add(entity, {value: 90}); // seen
+health.fields.value[health.index(entity)] = 80; // not seen by itself...
+health.touch(entity); // ...until reported
+console.log(tracker.changed(results)); // 1
+tracker.clear();
+world.destroy(entity);
+console.log(tracker.removed(results)); // 1, results[0] is now a stale id
+tracker.stop();
+```
+
+`fields` are plain typed arrays, so a direct write cannot be seen: call `component.touch(entity)` after one, or write through `component.add`. Results are net over the window: added then removed reports nothing, removed then added back is `changed`, added then written stays `added`. Each tracker keeps its own window, so systems can read at their own pace; call `clear()` when one is done, for example in a last system of a `Schedule`. `stop()`, or `using`, detaches a tracker. A tracker costs 24 bytes per world slot. To react at once instead of reading a window, push your own `{onAdd, onChange, onRemove}` onto `component.observers`; do not add or remove rows of that component from inside one.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/ecs

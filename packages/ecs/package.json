@@ -26,6 +26,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./changes": {
+      "types": "./dist/changes.d.ts",
+      "import": "./dist/changes.js"
+    },
     "./schedule": {
       "types": "./dist/schedule.d.ts",
       "import": "./dist/schedule.js"

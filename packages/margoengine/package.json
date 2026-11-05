@@ -430,6 +430,10 @@
       "types": "./dist/ecs.d.ts",
       "import": "./dist/ecs.js"
     },
+    "./ecs/changes": {
+      "types": "./dist/ecs/changes.d.ts",
+      "import": "./dist/ecs/changes.js"
+    },
     "./ecs/schedule": {
       "types": "./dist/ecs/schedule.d.ts",
       "import": "./dist/ecs/schedule.js"

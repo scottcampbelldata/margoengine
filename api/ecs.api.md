@@ -7,6 +7,17 @@ export type ArrayConstructor = {
     new (length: number): NumericArray;
 };
 
+export class ChangeTracker {
+    readonly component: Component;
+    constructor(component: Component);
+    added(output: Uint32Array): number;
+    changed(output: Uint32Array): number;
+    removed(output: Uint32Array): number;
+    clear(): void;
+    stop(): void;
+    [Symbol.dispose]: () => void;
+}
+
 export class Component<S extends Schema = Schema> {
     readonly world: World;
     readonly fields: {
@@ -14,10 +25,18 @@ export class Component<S extends Schema = Schema> {
     };
     readonly entities: Uint32Array;
     size: number;
+    readonly observers: ComponentObserver[];
     constructor(world: World, schema: S);
     index(entity: Entity): number;
     add(entity: Entity, values?: Partial<Record<keyof S, number>>): number;
+    touch(entity: Entity): boolean;
     remove(entity: Entity): boolean;
+}
+
+export interface ComponentObserver {
+    onAdd(entity: Entity): void;
+    onChange(entity: Entity): void;
+    onRemove(entity: Entity): void;
 }
 
 export type Entity = number;

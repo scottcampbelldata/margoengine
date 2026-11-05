@@ -8,6 +8,15 @@ export type Schema = Record<string, ArrayConstructor>;
 /** Entity id: `generation * capacity + slot`, a non-negative integer up to `0xffffffff`. Stale ids fail `World.alive`. */
 export type Entity = number;
 const capacityLimit = 1_000_000;
+/** Told about every row change of a component, after it happened. Push one onto {@link Component.observers}. */
+export interface ComponentObserver {
+  /** `entity` gained a row. */
+  onAdd(entity: Entity): void;
+  /** `add` wrote values into the row `entity` already had, or `touch` reported a direct write. */
+  onChange(entity: Entity): void;
+  /** `entity` lost its row; a destroyed entity is reported here before its id goes stale. */
+  onRemove(entity: Entity): void;
+}
 
 /** Packed sparse-set component store. Data rows move when entities are removed. */
 export class Component<S extends Schema = Schema> {
@@ -17,6 +26,8 @@ export class Component<S extends Schema = Schema> {
   /** Field arrays in schema order, so row moves need no per-call Object.values. */
   private readonly columns: NumericArray[];
   size = 0;
+  /** Called on every row change; `ChangeTracker` from `@margoengine/ecs/changes` is the usual user. */
+  readonly observers: ComponentObserver[] = [];
   /**
    * Prefer {@link World.component}, which also registers the store for cleanup on `destroy`.
    * @throws TypeError for an empty schema or an unsupported storage constructor.
@@ -70,14 +81,25 @@ export class Component<S extends Schema = Schema> {
         throw new RangeError('Invalid component data; pass finite numbers that fit the field type');
     }
     let row = this.index(entity);
-    if (row < 0) {
+    const inserted = row < 0;
+    if (inserted) {
       row = this.size++;
       this.sparse[entity % this.world.capacity] = row;
       this.entities[row] = entity;
       for (let i = 0; i < columns.length; i++) columns[i][row] = 0;
     }
     for (const key of keys) this.fields[key][row] = values[key as keyof S]!;
+    const observers = this.observers;
+    if (inserted) for (let i = 0; i < observers.length; i++) observers[i].onAdd(entity);
+    else if (keys.length) for (let i = 0; i < observers.length; i++) observers[i].onChange(entity);
     return row;
+  }
+  /** Report a write made straight into `fields`, which observers cannot see; false when `entity` has no row. */
+  touch(entity: Entity): boolean {
+    if (this.index(entity) < 0) return false;
+    const observers = this.observers;
+    for (let i = 0; i < observers.length; i++) observers[i].onChange(entity);
+    return true;
   }
   /** Remove the component from `entity`, moving the last row into its place; false when it had none. */
   remove(entity: Entity): boolean {
@@ -92,6 +114,8 @@ export class Component<S extends Schema = Schema> {
       const columns = this.columns;
       for (let i = 0; i < columns.length; i++) columns[i][row] = columns[i][last];
     }
+    const observers = this.observers;
+    for (let i = 0; i < observers.length; i++) observers[i].onRemove(entity);
     return true;
   }
 }
@@ -210,3 +234,4 @@ export class World {
 }
 export { Schedule } from './schedule.js';
 export type { ScheduleOptions, ScheduleTime, SystemOptions, SystemRun } from './schedule.js';
+export { ChangeTracker } from './changes.js';

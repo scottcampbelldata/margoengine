@@ -2562,7 +2562,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-056). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-057). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2642,6 +2642,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
 | Scheduler (`@margoengine/ecs/schedule`) | Enforced: one fixed step size per `Schedule`, at most `maxSteps` (default 8) steps an update; time past that is dropped. Systems are synchronous and single threaded; the fixed phase always runs before the frame phase. | A cap stops a long stall from costing more steps than the next frame can pay for, which would snowball. | `update` returns the steps run and `schedule.dropped` holds the seconds lost. A frame system ordered before a fixed one throws MargoError `'state'`. | Raise `maxSteps`, or run a second `Schedule` for a second rate. |
+| Change detection (`@margoengine/ecs/changes`) | Enforced by method: only `component.add`, `remove`, `touch` and `world.destroy` are seen. A write straight into `fields` is invisible until `touch` reports it, and a row counts as changed even when the value written is the same. 24 bytes per world slot per tracker. | `fields` are plain typed arrays, so loops over them stay at full speed; intercepting each write would cost that speed. | The entity is missing from `changed`. | Call `component.touch(entity)` after direct writes. |
 
 ## Copies of a model
 
@@ -8511,9 +8512,31 @@ schedule.update(1 / 30); // two fixed steps of move, then report once
 
 Systems receive `{delta, elapsed, tick, alpha, fixed}`: `delta` is the step in a fixed system and the frame time otherwise, `alpha` is the share of a step left in the accumulator, for blending the last two fixed states when drawing. The object is reused, so read it during the call. Order is `before` and `after`, then the order of `add`. `schedule.order()` lists the result. A missing name, a cycle, or a frame system ordered before a fixed one throws MargoError `'state'` from `order` or the next `update`. Systems are synchronous and run on the calling thread; a `Schedule` holds one step size, so use a second `Schedule` for a second rate.
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+## Change detection
 
-Build and unit tests: npm test --workspace @margoengine/ecs
+`ChangeTracker` (from `margoengine/ecs`, or `margoengine/ecs/changes` alone) answers which entities gained, changed or lost one component since its last `clear()`.
+
+```ts
+import {ChangeTracker, World} from 'margoengine/ecs';
+const world = new World(1024);
+const health = world.component({value: Float32Array});
+const tracker = new ChangeTracker(health);
+const entity = world.create();
+health.add(entity, {value: 100});
+const results = new Uint32Array(world.capacity);
+console.log(tracker.added(results)); // 1, results[0] is the entity
+tracker.clear();
+health.add(entity, {value: 90}); // seen
+health.fields.value[health.index(entity)] = 80; // not seen by itself...
+health.touch(entity); // ...until reported
+console.log(tracker.changed(results)); // 1
+tracker.clear();
+world.destroy(entity);
+console.log(tracker.removed(results)); // 1, results[0] is now a stale id
+tracker.stop();
+```
+
+[README continues: https://margoengine.com/llms/packages/ecs.md]
 
 === @margoengine/fsm (packages/fsm/README.md) ===
 
