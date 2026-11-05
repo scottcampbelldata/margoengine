@@ -2582,7 +2582,8 @@
       "triangulateShape",
       "tubeGeometry",
       "wireframe",
-      "wireframePositions"
+      "wireframePositions",
+      "worldUVs"
     ],
     "category": "Geometry and spatial"
   },

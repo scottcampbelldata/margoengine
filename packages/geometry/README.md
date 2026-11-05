@@ -232,6 +232,33 @@ const indices = optimizeVertexCache(mesh.indices, mesh.positions.length / 3);
 - `analyzeVertexCache(indices, vertexCount?, cacheSize = 16)`: `{misses, acmr, atvr}` on a first-in first-out cache.
   `acmr` is misses per triangle (3 is the worst), `atvr` misses per vertex used (1 is the best).
 
+## Extrusion UVs
+
+By default extrusions use raw shape coordinates as UVs. Pass `uvGenerator` to change that: `worldUVs(tile)` keeps a texture
+at one real-world scale, including round bevels and along paths, and your own function gets every triangle corner.
+
+```ts
+import {extrudeGeometry, Shape, worldUVs} from 'margoengine/geometry';
+
+const wall = new Shape([[0, 0], [4, 0], [4, 3], [0, 3]]);
+
+// One texture repeat every 2 world units on caps, walls and bevels.
+const brick = extrudeGeometry(wall, {depth: 0.5, uvGenerator: worldUVs(2)});
+
+// Your own mapping: caps fill 0 to 1 over the shape, walls wrap once round the ring.
+const custom = extrudeGeometry(wall, {
+  depth: 0.5,
+  bevelEnabled: false,
+  uvGenerator: ({surface, shape, u, distance}) =>
+    surface === 'cap' ? [shape[0] / 4, shape[1] / 3] : [u / 14, distance / 0.5],
+});
+```
+
+Each corner has `surface` (`'cap'` or `'wall'`), `position`, `shape` (the point in the shape's plane, bevel widening
+included), the default `u` and `v`, and `distance`: the true length walked from the first layer, so a bevel's curve counts
+in full. Default UVs do not change when the option is absent. On walls `u` comes from the outline before the bevel widens
+it.
+
 ## Bending along a curve
 
 `@margoengine/geometry/flow` deforms a mesh to follow a curve, or places rigid copies along it: trains on tracks, text
@@ -329,7 +356,6 @@ tiles.normals = creasedNormals(tiles.positions, {angle: 45, groups: tileGroups})
 - A shape with collinear points on its outline can leave T-junctions between the extruded caps and walls, because the triangulator drops those points.
 - `edgesGeometry` and `wireframe` return index pairs, not a line geometry; core has no line primitive.
 - Core's `Geometry` accepts up to 1,000,000 vertices, so `toGeometry` throws above that.
-- No custom UV generator for extrusions; UVs are the raw shape coordinates.
 
 ## Tests
 
@@ -347,6 +373,8 @@ zero-weight triangles, interpolated attributes, seeds and the ends of the random
 every triangle survives with its winding and group, a hand-counted cache model, miss ratios under 0.8 from shuffled
 grids, spheres and knots, and overdraw on nested shells with a software depth buffer. The flow tests check that a
 straight line changes nothing, a band and a tube bent round a circle land on the closed forms with the right normals,
-normals under stretch, closed frames meeting, level frames with `lockUp`, and instance matrices.
+normals under stretch, closed frames meeting, level frames with `lockUp`, and instance matrices. The extrusion UV tests
+check default UVs staying as they were, every corner being offered once, world scale on bevels and paths, and refused
+results.
 
 Apache-2.0 licensed.

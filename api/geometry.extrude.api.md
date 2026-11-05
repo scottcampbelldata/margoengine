@@ -15,11 +15,25 @@ export interface ExtrudeOptions {
     bevelOffset?: number;
     bevelSegments?: number;
     extrudePath?: Curve<MutableVec3>;
+    uvGenerator?: ExtrudeUVGenerator;
 }
+
+export interface ExtrudeUVCorner {
+    surface: 'cap' | 'wall';
+    position: readonly [number, number, number];
+    shape: readonly [number, number];
+    u: number;
+    v: number;
+    distance: number;
+}
+
+export type ExtrudeUVGenerator = (corner: ExtrudeUVCorner) => readonly [number, number];
 
 export function extrudeGeometry(shapes: Shape | readonly Shape[], options?: ExtrudeOptions): GeometryData;
 
 export function shapeGeometry(shapes: Shape | readonly Shape[], curveSegments?: number): GeometryData;
+
+export function worldUVs(tile?: number): ExtrudeUVGenerator;
 
 // Not exported from this entry, but used by the exports above:
 

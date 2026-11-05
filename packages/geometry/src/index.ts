@@ -35,7 +35,14 @@ export {
   polyhedronGeometry,
   tetrahedronGeometry,
 } from './primitives.js';
-export { extrudeGeometry, shapeGeometry, type ExtrudeOptions } from './extrude.js';
+export {
+  extrudeGeometry,
+  shapeGeometry,
+  worldUVs,
+  type ExtrudeOptions,
+  type ExtrudeUVCorner,
+  type ExtrudeUVGenerator,
+} from './extrude.js';
 export {
   applyMatrix4,
   center,

@@ -94,7 +94,19 @@ export interface ExtrudeOptions {
     bevelOffset?: number;
     bevelSegments?: number;
     extrudePath?: Curve<MutableVec3>;
+    uvGenerator?: ExtrudeUVGenerator;
 }
+
+export interface ExtrudeUVCorner {
+    surface: 'cap' | 'wall';
+    position: readonly [number, number, number];
+    shape: readonly [number, number];
+    u: number;
+    v: number;
+    distance: number;
+}
+
+export type ExtrudeUVGenerator = (corner: ExtrudeUVCorner) => readonly [number, number];
 
 export interface FrenetFrames {
     tangents: MutableVec3[];
@@ -272,4 +284,6 @@ export function tubeGeometry(path: Curve<Vec>, tubularSegments?: number, radius?
 export function wireframe(data: GeometryData): Uint32Array;
 
 export function wireframePositions(data: GeometryData, offsetY?: number): Float32Array;
+
+export function worldUVs(tile?: number): ExtrudeUVGenerator;
 ```

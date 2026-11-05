@@ -50,6 +50,42 @@ export function shapeGeometry(shapes: Shape | readonly Shape[], curveSegments = 
   return geometryData(positions, normals, uvs, indices, Array.isArray(shapes) ? groups : undefined);
 }
 
+/** One triangle corner handed to an {@link ExtrudeOptions.uvGenerator}. */
+export interface ExtrudeUVCorner {
+  /** `'cap'` for the two end faces, `'wall'` for the sides and bevels. */
+  surface: 'cap' | 'wall';
+  /** The finished 3D position. */
+  position: readonly [number, number, number];
+  /** The position in the shape's own plane, with the bevel's widening applied. */
+  shape: readonly [number, number];
+  /** Default u: shape x on caps, distance round the ring on walls. */
+  u: number;
+  /** Default v: shape y on caps; the layer's z, or distance along the path, on walls. */
+  v: number;
+  /** True distance from the first layer to this corner, along the wall and round the bevels. */
+  distance: number;
+}
+
+/**
+ * Generates the UV of one triangle corner of an extrusion. Called once per corner, so a corner on an edge shared by
+ * two surfaces can differ between them.
+ */
+export type ExtrudeUVGenerator = (corner: ExtrudeUVCorner) => readonly [number, number];
+
+/**
+ * A {@link ExtrudeUVGenerator} that keeps a texture at one real-world scale: caps use the shape plane, and walls use
+ * the distance round the ring and the true distance along the wall, so bevels and paths do not squash the texture.
+ *
+ * @param tile - World units per texture repeat. Default 1.
+ * @throws RangeError when `tile` is not a finite number above 0.
+ */
+export function worldUVs(tile = 1): ExtrudeUVGenerator {
+  if (!(tile > 0 && Number.isFinite(tile)))
+    throw new RangeError(`worldUVs tile ${tile} is invalid; pass a size above 0`);
+  return ({ surface, shape, u, distance }) =>
+    surface === 'cap' ? [shape[0] / tile, shape[1] / tile] : [u / tile, distance / tile];
+}
+
 /** Options of {@link extrudeGeometry}. */
 export interface ExtrudeOptions {
   /** Divisions per curve passed to `Shape.extractPoints`. Default 12. */
@@ -70,6 +106,8 @@ export interface ExtrudeOptions {
   bevelSegments?: number;
   /** Sweep along this 3D curve instead of +z: shape x follows the frame normal, y the binormal. */
   extrudePath?: Curve<MutableVec3>;
+  /** Replaces the default UVs, for example with {@link worldUVs}. Default: the UVs described on {@link extrudeGeometry}. */
+  uvGenerator?: ExtrudeUVGenerator;
 }
 
 /**
@@ -128,10 +166,12 @@ function bevelDirections(ring: readonly MutableVec2[]): MutableVec2[] {
  * walls (group material 1), with an optional quarter-round bevel adding `bevelThickness` beyond both ends and
  * widening the outline by `bevelSize`. Output is non-indexed with flat normals (zero for zero-area triangles). Cap
  * UVs are the cap vertex (x, y); wall UVs run along the ring perimeter (u) and the extrusion (v), in shape units.
+ * `uvGenerator` replaces them.
  *
  * @param shapes - One shape or an array of shapes (independent solids, concatenated).
  * @param options - See {@link ExtrudeOptions}.
- * @throws RangeError when `steps`, `curveSegments` or (with the bevel on) `bevelSegments` is not finite.
+ * @throws RangeError when `steps`, `curveSegments` or (with the bevel on) `bevelSegments` is not finite, or
+ *   `uvGenerator` returns anything but two finite numbers.
  */
 export function extrudeGeometry(shapes: Shape | readonly Shape[], options: ExtrudeOptions = {}): GeometryData {
   const curveSegments = finiteNumber(options.curveSegments ?? 12),
@@ -142,7 +182,8 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
     thickness = options.bevelThickness ?? 0.2,
     size = options.bevelSize ?? thickness - 0.1,
     offset = options.bevelOffset ?? 0,
-    segments = bevel ? Math.max(0, Math.floor(finiteNumber(options.bevelSegments ?? 3))) : 0;
+    segments = bevel ? Math.max(0, Math.floor(finiteNumber(options.bevelSegments ?? 3))) : 0,
+    uvGenerator = options.uvGenerator;
 
   // Layers as (z, outline offset) for a straight extrusion: front bevel, body, back bevel (mirrored).
   const layers: [number, number][] = [];
@@ -278,6 +319,36 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
       grid.push(row);
     }
 
+    /** Replaces the default UVs of the triangle just written; corners are layer and vertex pairs. */
+    const remap = (surface: 'cap' | 'wall', ...corners: number[]): void => {
+      if (!uvGenerator) return;
+      for (let c = 0; c < 3; c++) {
+        const l = corners[c * 2],
+          k = corners[c * 2 + 1],
+          t = (vertex - 3 + c) * 2,
+          position = grid[l][k];
+        let distance = 0;
+        for (let i = 1; i <= l; i++)
+          distance += Math.hypot(
+            grid[i][k][0] - grid[i - 1][k][0],
+            grid[i][k][1] - grid[i - 1][k][1],
+            grid[i][k][2] - grid[i - 1][k][2],
+          );
+        const uv = uvGenerator({
+          surface,
+          position: [position[0], position[1], position[2]],
+          shape: path ? [flat[k][0], flat[k][1]] : [position[0], position[1]],
+          u: uvs[t],
+          v: uvs[t + 1],
+          distance,
+        });
+        if (!Number.isFinite(uv?.[0]) || !Number.isFinite(uv?.[1]))
+          throw new RangeError(`extrudeGeometry uvGenerator returned ${uv}; return [u, v] with finite numbers`);
+        uvs[t] = uv[0];
+        uvs[t + 1] = uv[1];
+      }
+    };
+
     // Caps: front (first layer) reversed to face -z, back (last layer) as triangulated, facing +z.
     const capStart = vertex,
       front = grid[0],
@@ -287,12 +358,15 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
         b = front[fill.indices[t + 1]],
         c = front[fill.indices[t + 2]];
       triangle(a, c, b, a[0], a[1], c[0], c[1], b[0], b[1]);
+      remap('cap', 0, fill.indices[t], 0, fill.indices[t + 2], 0, fill.indices[t + 1]);
     }
     for (let t = 0; t < fill.indices.length; t += 3) {
       const a = back[fill.indices[t]],
         b = back[fill.indices[t + 1]],
         c = back[fill.indices[t + 2]];
       triangle(a, b, c, a[0], a[1], b[0], b[1], c[0], c[1]);
+      const end = layerCount - 1;
+      remap('cap', end, fill.indices[t], end, fill.indices[t + 1], end, fill.indices[t + 2]);
     }
     const wallStart = vertex;
     groups.push({ start: capStart, count: wallStart - capStart, materialIndex: 0 });
@@ -313,7 +387,9 @@ export function extrudeGeometry(shapes: Shape | readonly Shape[], options: Extru
             C = grid[l + 1][j],
             D = grid[l + 1][i];
           triangle(A, D, B, u, v0, u, v1, u1, v0);
+          remap('wall', l, i, l + 1, i, l, j);
           triangle(B, D, C, u1, v0, u, v1, u1, v1);
+          remap('wall', l, j, l + 1, i, l + 1, j);
         }
         u = u1;
       }
