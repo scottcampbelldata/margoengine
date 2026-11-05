@@ -530,6 +530,8 @@ interface GPUCall {
   readonly need: readonly (readonly [number, number, Rect?])[];
   readonly whole: ReadonlySet<string>;
   readonly missed: Set<string>;
+  /** Banded tiles the dependency windows reach past the band of: made whole together after the first miss. */
+  readonly beyond: Set<string>;
   error?: { readonly reason: unknown };
 }
 
@@ -1311,8 +1313,32 @@ export class BiomePlacement implements Disposable {
             const [tx, tz] = key.split(',').map(Number);
             need.push([tx, tz]);
           }
-          const seen = new Set<string>();
-          for (const [x0, z0, x1, z1] of context ? [] : windows)
+          // Every tile the dependency windows cross is read whole, except the 3 x 3 the call context names (bands
+          // there grow whole on a miss). Finding the far tiles one miss at a time reran every kernel once per tile:
+          // 48 runs for a default world tile, whose windows cross 7 x 7 tiles.
+          const seen = new Set<string>(need.map(([tx, tz]) => tileKey(tx, tz))),
+            cellTicks = tileTicks / (world.tileSize / world.resolution); // float division: exact
+          // Likewise each band a window reaches past is made whole with the first miss, not one rerun per band.
+          for (const [tx, tz, band] of context?.need ?? [])
+            if (
+              band &&
+              windows.some(([x0, z0, x1, z1]) => {
+                const ax = Math.max(x0, tx * tileTicks),
+                  az = Math.max(z0, tz * tileTicks),
+                  bx = Math.min(x1, (tx + 1) * tileTicks),
+                  bz = Math.min(z1, (tz + 1) * tileTicks);
+                return (
+                  ax < bx &&
+                  az < bz &&
+                  (ax < tx * tileTicks + band[0] * cellTicks ||
+                    az < tz * tileTicks + band[1] * cellTicks ||
+                    bx > tx * tileTicks + band[2] * cellTicks ||
+                    bz > tz * tileTicks + band[3] * cellTicks)
+                );
+              })
+            )
+              context!.beyond.add(tileKey(tx, tz));
+          for (const [x0, z0, x1, z1] of windows)
             for (
               let tz = Math.max(0, divFloor(z0, tileTicks));
               tz < Math.min(world.tilesZ, -divFloor(-z1, tileTicks));
@@ -1624,7 +1650,7 @@ export class BiomePlacement implements Disposable {
       this.#live();
       if (plan !== this.#plan)
         throw fault('failed', 'World changed during GPU placement; request the tile again', 'biomes');
-      const context: GPUCall = { need, whole, missed: new Set() };
+      const context: GPUCall = { need, whole, missed: new Set(), beyond: new Set() };
       try {
         let pending: Promise<PlacedTile>;
         // The kernel captures this context in its bridge before its first await.
@@ -1639,7 +1665,7 @@ export class BiomePlacement implements Disposable {
         combined.throwIfAborted();
         if (context.error) throw context.error.reason;
         if (![...context.missed].some((key) => !whole.has(key))) throw error;
-        for (const key of context.missed) whole.add(key);
+        for (const key of [...context.missed, ...context.beyond]) whole.add(key);
       }
     }
   }

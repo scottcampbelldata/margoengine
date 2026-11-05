@@ -107,6 +107,50 @@ test('direct bridge calls keep whole dependency windows without a public call co
   fake.assertFreed();
 });
 
+test('public GPU tiles read far window tiles whole in the first run, not one rerun per tile', {
+  timeout: 60000,
+}, async (t) => {
+  // Regression: the dependency windows of a default world tile cross 7 x 7 tiles; each tile past the 3 x 3 was
+  // found by a miss and reran every kernel (48 runs, 45 s on an RTX A6000 for one tile).
+  installGPUConstants(t);
+  const spec = m.placementCases(m)[0];
+  const options = { ...spec.options, size: [1024, 1024], workers: 0 };
+  const cpu = await m.BiomeWorld.create({ ...options, backend: 'cpu' });
+  const fake = fakeDevice();
+  const world = await m.BiomeWorld.create({ ...options, backend: 'gpu', device: fake.device });
+  const counts = () => fake.dispatch.filter(([name]) => name === 'counts').length;
+  const far = new Map();
+  const [x, z] = [4, 4];
+  // The run in which each tile past the 3 x 3 was first read (later runs read it again from the world's cache).
+  const record = (tx, tz) => {
+    const key = tx + ',' + tz;
+    if ((Math.abs(tx - x) > 1 || Math.abs(tz - z) > 1) && !far.has(key)) far.set(key, counts());
+  };
+  t.mock.method(world, 'tile', (tx, tz, o) => {
+    record(tx, tz);
+    return cpu.tile(tx, tz, o);
+  });
+  t.mock.method(world, 'tilePart', (tx, tz, window, o) => {
+    record(tx, tz);
+    return cpu.tilePart(tx, tz, window, o);
+  });
+  const p = m.BiomePlacement.attach(world, spec.placement),
+    reference = m.BiomePlacement.attach(cpu, spec.placement);
+  t.after(() => {
+    p.dispose();
+    reference.dispose();
+    world.dispose();
+    cpu.dispose();
+  });
+  const actual = await p.tile(x, z);
+  assert.deepEqual(m.tileBytes(actual), m.tileBytes(await reference.tile(x, z)));
+  assert.ok(far.size >= 16, 'the windows reach past the 3 x 3, so this fixture exercises far tiles');
+  assert.deepEqual(new Set(far.values()), new Set([1]), 'every far tile is read in the first GPU run');
+  // The first band miss makes every band the windows reach past whole at once: one rerun, not one per band.
+  assert.equal(counts(), 2, 'a cold tile runs with bands, then once more with the bands it reaches past made whole');
+  fake.assertFreed();
+});
+
 test('CPU and GPU validate tile options and pre-aborted requests in the same order', async (t) => {
   for (const gpu of [false, true]) {
     const { world, placement: p, fake } = await fixture(t, {}, gpu);

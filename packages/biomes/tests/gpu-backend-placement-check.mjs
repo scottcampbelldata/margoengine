@@ -1,4 +1,4 @@
-// Functional hardware proof only. No timing measurements or benchmark claims.
+// Functional hardware proof only. It prints each case's wall time for diagnosis; no benchmark claims.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -35,6 +35,8 @@ async function check() {
         page.on('pageerror', (error) => pageErrors.push(error.message));
         page.on('console', (message) => {
           if (message.type() === 'error') pageErrors.push(message.text());
+          // The per-case lines name each case and its milliseconds, so a deadline names the slow case.
+          else if (/^(?:placement|hydrology) parity: /.test(message.text())) console.log(message.text());
         });
         await page.addScriptTag({ content: moduleCode });
         const identity = await page.evaluate(async () => {

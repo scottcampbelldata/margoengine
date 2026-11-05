@@ -125,7 +125,10 @@ export async function runBackendPlacementCases(device) {
   ];
   let gpuCases = 0,
     coldBands = 0;
+  // Case wall time for diagnosis on slow adapters (worlds are built inside the first tile's time); not a benchmark.
+  const ms = (start) => Math.round(performance.now() - start);
   for (const spec of cases) {
+    let start = performance.now();
     const cpu = await m.BiomeWorld.create({ ...spec.options, backend: 'cpu', workers: 0 });
     let gpu, cp, gp;
     try {
@@ -175,7 +178,8 @@ export async function runBackendPlacementCases(device) {
         }
         if (spec.carved && !actual.exclusion.data.some((v) => v > 0))
           throw Error('Path exclusion is not exercised on carved tile ' + x + ',' + z);
-        console.log('placement parity: ' + spec.name + ' ' + x + ',' + z + (i ? ' ahead' : ' cold'));
+        console.log(`placement parity: ${spec.name} ${x},${z} ${i ? 'ahead' : 'cold'} ${ms(start)} ms`);
+        start = performance.now();
         gpuCases++;
       }
     } finally {
@@ -192,9 +196,10 @@ export async function runBackendPlacementCases(device) {
     try {
       gpu = await m.BiomeWorld.create({ ...spec.options, backend: 'gpu', workers: 0, device });
       for (const options of [{}, { multiple: true, channelCells: 4, lakeDepth: 500 }]) {
-        const label = spec.name + (options.multiple ? ' multiple' : ' default');
+        const label = spec.name + (options.multiple ? ' multiple' : ' default'),
+          start = performance.now();
         equalRecord(hydrologyOf(cpu, options), await hydrologyOfAsync(gpu, options), label);
-        console.log('hydrology parity: ' + label);
+        console.log(`hydrology parity: ${label} ${ms(start)} ms`);
         gpuCases++;
       }
     } finally {
