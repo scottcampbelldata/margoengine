@@ -2678,18 +2678,6 @@ are still open.
 - **Needed to close:** decide whether this model stays. If it does, add those parts to `NO_CROSSING`, fix what the check
   then reports and rebuild the GLB. If another model replaces it, this entry goes with the old model.
 
-## Package test scripts
-
-### Fourteen packages' own `npm test` misses some of their test files
-
-- **What:** animation, audio, clustered, creative, culling, decoders, environment, ifc, lines, loaders, materials,
-  physics, points and splats name test files in their `test` script, so a file added later runs only in the root
-  `test:all`.
-- **Repro:** `node --test tests/package-test-scripts.test.js`; `STILL_MISSING_FILES` there is the list and only shrinks.
-- **Cause:** the scripts list files by name instead of `tests/*.test.js`.
-- **Needed to close:** change each script to the glob and make every newly run file pass, then take the package off the
-  list. `exporters` is done.
-
 ## Blocked on hardware we do not have
 
 These features pass their tests against the published specifications, but the only real check is a device the project

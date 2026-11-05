@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/planet.test.js tests/particles.test.js tests/hash.test.js ../../tests/modern-grass.test.js ../../tests/deep-render-creative.test.js ../../tests/audit-rendering-composition.test.js",
+    "test": "npm run build && node --test tests/*.test.js ../../tests/modern-grass.test.js ../../tests/deep-render-creative.test.js ../../tests/audit-rendering-composition.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "dev": "vite --config vite.config.js",
     "prepack": "npm run build"

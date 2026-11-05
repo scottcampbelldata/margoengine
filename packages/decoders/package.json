@@ -28,7 +28,7 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test tests/decoders.test.js tests/meshopt.test.js tests/meshopt-encode.test.js tests/tga.test.js tests/dds.test.js tests/ktx.test.js tests/tiff.test.js",
+    "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   },

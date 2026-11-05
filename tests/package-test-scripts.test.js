@@ -7,24 +7,6 @@ import test from 'node:test';
 
 const packagesDir = join(import.meta.dirname, '..', 'packages');
 
-/** The packages still naming some files and missing others (docs/known-bugs.md). This list only shrinks. */
-const STILL_MISSING_FILES = new Set([
-  'animation',
-  'audio',
-  'clustered',
-  'creative',
-  'culling',
-  'decoders',
-  'environment',
-  'ifc',
-  'lines',
-  'loaders',
-  'materials',
-  'physics',
-  'points',
-  'splats',
-]);
-
 function globToRegExp(glob) {
   const escaped = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replaceAll('*', '[^/]*');
   return new RegExp(`^${escaped}$`);
@@ -52,14 +34,6 @@ function filesNotRun(name) {
 const packages = readdirSync(packagesDir).filter((name) => existsSync(join(packagesDir, name, 'package.json')));
 
 test('every package test script runs all of its test files', () => {
-  const missing = packages
-    .filter((name) => !STILL_MISSING_FILES.has(name))
-    .map((name) => [name, filesNotRun(name)])
-    .filter(([, files]) => files.length);
+  const missing = packages.map((name) => [name, filesNotRun(name)]).filter(([, files]) => files.length);
   assert.deepEqual(missing, [], 'use tests/*.test.js in the package test script so new files run');
-});
-
-test('a package fixed on the still-missing list leaves the list', () => {
-  const fixed = [...STILL_MISSING_FILES].filter((name) => !filesNotRun(name).length);
-  assert.deepEqual(fixed, [], 'take these names off STILL_MISSING_FILES');
 });
