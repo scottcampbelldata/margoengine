@@ -666,6 +666,10 @@
       "types": "./dist/geometry/sweep.d.ts",
       "import": "./dist/geometry/sweep.js"
     },
+    "./geometry/tessellate": {
+      "types": "./dist/geometry/tessellate.d.ts",
+      "import": "./dist/geometry/tessellate.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"

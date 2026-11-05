@@ -85,6 +85,10 @@
     "./sweep": {
       "types": "./dist/sweep.d.ts",
       "import": "./dist/sweep.js"
+    },
+    "./tessellate": {
+      "types": "./dist/tessellate.d.ts",
+      "import": "./dist/tessellate.js"
     }
   },
   "files": [

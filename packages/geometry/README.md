@@ -57,12 +57,13 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `CurveFlow`, `flowGeometry` from `@margoengine/geometry/flow` |
 | `delaunayTriangulate`, `triangulateConstrained` from `@margoengine/geometry/delaunay` |
 | `sweepGeometry`, `loftGeometry` from `@margoengine/geometry/sweep` |
+| `tessellateGeometry`, `tessellateWithParents` from `@margoengine/geometry/tessellate` |
 | `polygonUnion`, `polygonDifference`, `polygonIntersection`, `polygonXor`, `polygonOffset`, `polygonStroke`, `polygonArea`, `polygonShapes` from `@margoengine/geometry/polygon` |
 | `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon, sweep), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon, sweep, tessellate), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -475,6 +476,47 @@ const duct = loftGeometry([
   sharper corners. Caps are group 0 and walls group 1, as in `extrudeGeometry`, and UVs run round the profile in u and
   along the length in v. A scale of 0 ends in a point with no cap.
 
+## Tessellating by edge length
+
+`@margoengine/geometry/tessellate` splits triangles until no edge is longer than a limit, so vertex displacement, morphing
+and curved deformations have enough vertices to work with.
+
+```ts
+import {boxGeometry} from 'margoengine/geometry';
+import {tessellateGeometry, tessellateWithParents} from 'margoengine/geometry/tessellate';
+
+// A box with 12 triangles becomes one fine enough to bend, with the same shape.
+const fine = tessellateGeometry(boxGeometry(2, 2, 2), 0.1);
+
+// Bulge it into a sphere: no cracks open, even where faces have their own vertices.
+for (let i = 0; i < fine.positions.length; i += 3) {
+  const length = Math.hypot(fine.positions[i], fine.positions[i + 1], fine.positions[i + 2]);
+  for (let k = 0; k < 3; k++) fine.positions[i + k] /= length;
+}
+
+// Attributes of your own follow through the parents of each added vertex.
+const box = boxGeometry(1, 1, 1);
+const heat = new Float32Array(box.positions.length / 3).fill(1);
+const {data, parents} = tessellateWithParents(box, 0.25);
+const all = new Float32Array(data.positions.length / 3);
+all.set(heat);
+for (let v = heat.length; v < all.length; v++) {
+  const at = (v - heat.length) * 2;
+  all[v] = (all[parents[at]] + all[parents[at + 1]]) / 2;
+}
+```
+
+- `tessellateGeometry(data, maxEdge, {maxTriangles})` always splits the longest edge at its middle (Rivara 1984), which
+  keeps angles bounded: no sliver gets thinner as it splits. An edge is split exactly when it is over the limit, so
+  triangles that share an edge agree without looking at each other, and meshes stay closed across UV seams and hard
+  edges, where vertices are duplicated.
+- Normals and tangents are interpolated and made unit length again, UVs are interpolated and groups follow their
+  triangles. The surface does not change: new vertices lie on existing edges, so smooth shapes stay faceted until you
+  move the vertices.
+- `maxTriangles` (default 5,000,000) throws before a tiny limit runs out of memory.
+- `tessellateWithParents` also returns `parents`: two entries per added vertex, the vertices it is halfway between, always
+  earlier ones. Use it for morph targets and attributes of your own.
+
 ## Bending along a curve
 
 `@margoengine/geometry/flow` deforms a mesh to follow a curve, or places rigid copies along it: trains on tracks, text
@@ -606,6 +648,8 @@ triangles, fill rules, offsets and strokes point by point against true distances
 The sweep tests check boxes, cylinders, frustums, pyramids and tori against closed forms, radial normals with no seam,
 hard edges, twist landing on the right corners, a match with `tubeGeometry`, level rails and holes. The loft tests check
 square to circle, sections of different counts and starts, smooth lofts passing through every section, closed rings and
-3D rings in either direction.
+3D rings in either direction. The tessellation tests check that no edge stays over the limit, that area and volume do not
+change, closed solids across hard edges and seams, the same points on both sides of a shared edge, displaced meshes
+staying closed, interpolated attributes, groups, the smallest angle on a split square, and parents.
 
 Apache-2.0 licensed.
