@@ -906,6 +906,10 @@
       "types": "./dist/math/triangle.d.ts",
       "import": "./dist/math/triangle.js"
     },
+    "./math/color-space": {
+      "types": "./dist/math/color-space.d.ts",
+      "import": "./dist/math/color-space.js"
+    },
     "./math/capsule": {
       "types": "./dist/math/capsule.d.ts",
       "import": "./dist/math/capsule.js"

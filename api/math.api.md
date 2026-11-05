@@ -146,6 +146,8 @@ export class Cylindrical {
     equals(c: Cylindrical, epsilon?: number): boolean;
 }
 
+export const DisplayP3ColorSpace = "display-p3";
+
 export class Euler {
     x: number;
     y: number;
@@ -220,6 +222,10 @@ export class Line3 {
     applyMatrix4(m: MatrixLike): this;
     equals(line: Line3, epsilon?: number): boolean;
 }
+
+export const LinearDisplayP3ColorSpace = "display-p3-linear";
+
+export const LinearSRGBColorSpace = "srgb-linear";
 
 export const LinearToSRGB: (c: number) => number;
 
@@ -513,6 +519,8 @@ export class SH3 {
     getIrradianceAt<T extends ColorLike>(normal: Vec3Like, out: T): T;
 }
 
+export const SRGBColorSpace = "srgb";
+
 export const SRGBToLinear: (c: number) => number;
 
 export const SRGB_TO_P3: readonly number[];
@@ -734,6 +742,8 @@ export class Vector4 {
 }
 
 export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
+
+export function convertColor<T extends NumberArray = number[]>(rgb: ArrayLike<number>, from: ColorSpace, to: ColorSpace, out?: T, offset?: number): T;
 
 export function degreesToQuaternion(degrees: ArrayLike<number>, order?: EulerOrder): [number, number, number, number];
 

@@ -76,6 +76,10 @@
       "types": "./dist/triangle.d.ts",
       "import": "./dist/triangle.js"
     },
+    "./color-space": {
+      "types": "./dist/color-space.d.ts",
+      "import": "./dist/color-space.js"
+    },
     "./capsule": {
       "types": "./dist/capsule.d.ts",
       "import": "./dist/capsule.js"

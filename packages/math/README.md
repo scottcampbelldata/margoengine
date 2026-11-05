@@ -157,6 +157,15 @@ for (const mesh of billboards) {
 }
 ```
 
+`@margoengine/math/color-space` names the colour spaces and converts between them. `convertColor(rgb, from, to, out?, offset?)` takes components from one space to another; `from` and `to` are `SRGBColorSpace`, `LinearSRGBColorSpace`, `DisplayP3ColorSpace`, `LinearDisplayP3ColorSpace` or the same strings (`'srgb'`, `'srgb-linear'`, `'display-p3'`, `'display-p3-linear'`). The result is not clamped, so a colour outside the target space keeps channels below 0 or above 1 and converts back unchanged; `clipToSRGB` brings one inside sRGB. An unknown name throws `TypeError`.
+
+```ts
+import { DisplayP3ColorSpace, SRGBColorSpace, convertColor } from '@margoengine/math/color-space';
+
+const p3 = convertColor([1, 0, 0], SRGBColorSpace, DisplayP3ColorSpace); // about [0.9175, 0.2003, 0.1386]
+const back = convertColor(p3, DisplayP3ColorSpace, SRGBColorSpace); // about [1, 0, 0]
+```
+
 Limits: matrices are Float64Array (copy into a Float32Array for GPU upload). No input validation outside `OBB`, so NaN propagates. `Color.setStyle` reads `#rgb`, `#rrggbb`, `rgb()` and `hsl()` but not named colors. Not included: Matrix2, `Vector3.project` and `unproject` as methods (use `projectPoint(v, camera, v)` and `unprojectPoint(v, camera, v)`, so Vector3 stays small), `Euler.reorder`, a global `ColorManagement` switch (spaces are named per call, as in `color.setRGB(r, g, b, 'display-p3')` and `color.getRGB(out, 'display-p3')`), `generateUUID`. `Sphere.setFromPoints` is a bounding-box-centered sphere, not the minimal one.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.

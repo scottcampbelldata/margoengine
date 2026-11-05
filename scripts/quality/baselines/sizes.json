@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4466316,
+  "total": 4467300,
   "history": [
     {
       "date": "2026-10-24",
@@ -1610,6 +1610,12 @@
       "commit": "87cdbf396",
       "reason": "gltf-pro: PBRModel.compile, render pipelines compiled during the build (p-morph first frame, perf-history entry 56); the worker bundles the model class",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "5dfee9ef5",
+      "reason": "New math entry ./color-space: named colour spaces and convertColor between sRGB, linear and Display P3; also exported from the math root",
+      "grew": 1
     }
   ],
   "items": {
@@ -1716,8 +1722,8 @@
     "@margoengine/environment/cube-camera": 5691,
     "@margoengine/environment/exr-write": 2084,
     "@margoengine/environment/probes": 15099,
-    "@margoengine/environment/reflector": 10886,
-    "@margoengine/environment/refractor": 10843,
+    "@margoengine/environment/reflector": 10874,
+    "@margoengine/environment/refractor": 10833,
     "@margoengine/environment/volumetric": 8443,
     "@margoengine/exporters": 34664,
     "@margoengine/exporters/apng": 2322,
@@ -1803,8 +1809,8 @@
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/refracted": 7846,
-    "@margoengine/lines": 18441,
-    "@margoengine/lines/edges": 4829,
+    "@margoengine/lines": 18423,
+    "@margoengine/lines/edges": 4811,
     "@margoengine/loaders": 52602,
     "@margoengine/loaders dist/workers/usd.js": 8435,
     "@margoengine/loaders/common": 3417,
@@ -1829,6 +1835,7 @@
     "@margoengine/math/box3": 2581,
     "@margoengine/math/capsule": 4386,
     "@margoengine/math/color": 2858,
+    "@margoengine/math/color-space": 1099,
     "@margoengine/math/cylindrical": 554,
     "@margoengine/math/errors": 412,
     "@margoengine/math/euler": 1301,
@@ -1875,12 +1882,12 @@
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/palette": 4341,
     "@margoengine/pixel/render3d": 3866,
-    "@margoengine/points": 21511,
+    "@margoengine/points": 21492,
     "@margoengine/points/copc": 11717,
     "@margoengine/points/e57": 6537,
     "@margoengine/points/las": 5116,
     "@margoengine/points/laz": 8046,
-    "@margoengine/points/octree": 7919,
+    "@margoengine/points/octree": 7906,
     "@margoengine/post": 40110,
     "@margoengine/post/afterimage": 5619,
     "@margoengine/post/bloom": 6716,
@@ -1989,9 +1996,9 @@
     "@margoengine/taa": 11747,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12359,
-    "@margoengine/text": 16420,
+    "@margoengine/text": 16406,
     "@margoengine/text/msdf": 4516,
-    "@margoengine/text/rich": 11414,
+    "@margoengine/text/rich": 11403,
     "@margoengine/tilemap": 7435,
     "@margoengine/tilemap/autotile": 1605,
     "@margoengine/tilemap/ldtk": 3070,
