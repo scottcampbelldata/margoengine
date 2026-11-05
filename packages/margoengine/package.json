@@ -98,6 +98,10 @@
       "types": "./dist/biomes/hydrology.d.ts",
       "import": "./dist/biomes/hydrology.js"
     },
+    "./biomes/disturbance": {
+      "types": "./dist/biomes/disturbance.d.ts",
+      "import": "./dist/biomes/disturbance.js"
+    },
     "./biomes/seasons": {
       "types": "./dist/biomes/seasons.d.ts",
       "import": "./dist/biomes/seasons.js"
@@ -153,6 +157,10 @@
     "./biomes/workers": {
       "types": "./dist/biomes/workers.d.ts",
       "import": "./dist/biomes/workers.js"
+    },
+    "./biomes/gpu": {
+      "types": "./dist/biomes/gpu.d.ts",
+      "import": "./dist/biomes/gpu.js"
     },
     "./blender": {
       "types": "./dist/blender.d.ts",

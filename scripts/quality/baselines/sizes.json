@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4322755,
+  "total": 4347094,
   "history": [
     {
       "date": "2026-10-24",
@@ -1430,6 +1430,12 @@
       "commit": "aa77fca57",
       "reason": "biomes job E, water that shows: water: { lakes: 'auto', rivers: 'hydrology' }; lakeLevels and viewWater in biomes/rivers (2008 B gzip, the hydrology entry stays behind import()); biomes/view 10399 B stays inside its budget",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "e83d27e66",
+      "reason": "biomes GPU backend wiring (job A, fix 2): the kernels moved to the new lazy @margoengine/biomes/gpu entry (14425 B gzip, loaded only by backend 'gpu' worlds), and the worker build leaves it out with an empty stub; root 24637 -> 16329 B (budget 15776 -> 16819), worker 49060 -> 41256 B (budget 40524 -> 42494). What stays in the root buys: backend 'gpu' and the device option through a small GpuTiles hook, per-caller tile cancellation (one caller's abort no longer rejects a cached tile other callers share), an update() that leaves the world unchanged when a change throws, request snapshots so awaited bands read one revision, and the crop and pack step both paths share. About 214 B of the root and 356 B of the worker were over before the wiring (J5 classify split and field validation). New record /disturbance 5515 B (J5, not recorded before). Accepted under Scott's 2026-11-05 ruling on optional package entries; core and core + stage unchanged",
+      "grew": 4
     }
   ],
   "items": {
@@ -1443,12 +1449,14 @@
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 9000,
     "@margoengine/behavior/steering": 3830,
-    "@margoengine/biomes": 15776,
-    "@margoengine/biomes dist/workers/biomes.js": 40524,
+    "@margoengine/biomes": 16819,
+    "@margoengine/biomes dist/workers/biomes.js": 42494,
     "@margoengine/biomes/cover": 3608,
     "@margoengine/biomes/digest": 894,
+    "@margoengine/biomes/disturbance": 5771,
     "@margoengine/biomes/editor": 3644,
     "@margoengine/biomes/far": 3996,
+    "@margoengine/biomes/gpu": 14858,
     "@margoengine/biomes/hydrology": 4679,
     "@margoengine/biomes/koppen": 1231,
     "@margoengine/biomes/objects": 4246,
