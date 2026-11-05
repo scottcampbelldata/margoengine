@@ -3,10 +3,20 @@
 import { worldGPU } from './gpu-placement-flow-internal.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { type Climate, type ClimateOptions, quantizeClimate } from './climate.js';
-import { checkPaint, type Classifier, classifier, classify, type PaintLayer, type ZoneClassifier } from './classify.js';
+import { assemble, classified, wideNames } from './assemble.js';
+import {
+  type ClassifyInput,
+  checkPaint,
+  type Classifier,
+  classifier,
+  classify,
+  type PaintLayer,
+  type ZoneClassifier,
+} from './classify.js';
 import { type BiomeDefinition, defineBiome } from './define.js';
 import { rectFields, type TileFrame } from './fields.js';
 import { divFloor, imod } from './fixed.js';
+import type { GpuTiles } from './gpu.js';
 import type { Heights, HeightSource } from './height.js';
 import { DEFAULT_LAYERS, LAYERS, type RasterLayer } from './layers.js';
 import type { createRelief } from './relief.js';
@@ -14,13 +24,6 @@ import { featherCells, paintReach } from './reach.js';
 import type { Region } from './region.js';
 import { Scratch } from './scratch.js';
 import { type BiomeSample, readCell, samplePoint } from './sample.js';
-
-interface LayerState {
-  readonly frame: TileFrame;
-  readonly classifier: Classifier;
-  readonly user: ReadonlyMap<string, ReadonlyMap<string, Uint8Array>>;
-  readonly ecotone: number;
-}
 
 /** One user layer raster write of {@link BiomeWorld.writeLayers}. */
 export interface LayerWrite {
@@ -143,32 +146,12 @@ type Rect = readonly [number, number, number, number];
 
 /** createRelief from the relief entry, once a world has loaded it. */
 let relief: typeof createRelief | undefined, regionEntry: typeof import('@margoengine/biomes/region') | undefined;
-let gpuFields: typeof import('./gpu-fields.js') | undefined,
-  gpuClassify: typeof import('./gpu-classify-inputs.js') | undefined;
+/** The GPU entry (checks, bands, loss and kernels), loaded by the first world that may compute on a device. */
+let gpu: typeof import('@margoengine/biomes/gpu') | undefined;
 
 const aborted = (signal?: AbortSignal) => {
   if (signal?.aborted) throw signal.reason;
 };
-
-const deviceLoss = new WeakMap<GPUDevice, { controllers: Set<AbortController>; lost: boolean }>();
-
-// Share one reaction across worlds because device.lost retains reactions until the device is lost.
-function abortOnDeviceLoss(device: GPUDevice, controller: AbortController): void {
-  let state = deviceLoss.get(device);
-  if (!state) {
-    state = { controllers: new Set(), lost: false };
-    deviceLoss.set(device, state);
-    const loss = state;
-    void device.lost.then(() => {
-      loss.lost = true;
-      for (const active of loss.controllers)
-        active.abort(fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes'));
-      loss.controllers.clear();
-    });
-  }
-  if (state.lost) controller.abort(fault('failed', 'BiomeWorld GPU device lost; recreate the WebGPU device', 'biomes'));
-  else state.controllers.add(controller);
-}
 
 /** Cancellation belongs to the caller, not to a cached tile shared by other callers. */
 async function withSignal<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
@@ -239,8 +222,8 @@ export class BiomeWorld implements Disposable {
   /** The options as given (climate and heights unquantised), for worker replicas. */
   #given: BiomeWorldOptions;
   #remote?: Remote;
-  readonly #device?: GPUDevice;
-  readonly #gpuAbort?: AbortController;
+  /** Device tiles of a GPU world (`@margoengine/biomes/gpu`). */
+  #gpu?: GpuTiles;
 
   private constructor(options: BiomeWorldOptions, biomes: readonly BiomeDefinition[]) {
     const seed = options.seed ?? 1,
@@ -284,28 +267,7 @@ export class BiomeWorld implements Disposable {
       !(Number.isInteger(options.workers) && options.workers >= 0 && options.workers <= 16)
     )
       throw rangeError('BiomeWorld workers must be an integer 0..16 or false', 'biomes');
-    if (backend === 'gpu') {
-      const device = options.device;
-      if (
-        !device ||
-        typeof device !== 'object' ||
-        typeof device.createBuffer !== 'function' ||
-        typeof device.createShaderModule !== 'function' ||
-        !device.queue ||
-        typeof device.lost?.then !== 'function'
-      )
-        throw typeError("BiomeWorld backend 'gpu' requires the device option (a GPUDevice)", 'biomes');
-      if (options.workers && options.workers > 0)
-        throw rangeError("BiomeWorld backend 'gpu' runs on this thread; pass workers: 0", 'biomes');
-      if (size.some((v) => divFloor(v, regionResolution) >= 32768))
-        throw rangeError(
-          "BiomeWorld backend 'gpu' allows at most 32768 region corners per axis; use a larger regionResolution or smaller size",
-          'biomes',
-        );
-      this.#device = device;
-      this.#gpuAbort = new AbortController();
-      worldGPU.set(this, { device, signal: this.#gpuAbort.signal });
-    }
+    this.#gpu = gpu?.GpuTiles.of(options, size, regionResolution, tileSize / resolution); // float division: exact
     if (typeof ecotone !== 'number' || !(ecotone >= 0 && ecotone <= 128))
       throw rangeError('BiomeWorld ecotone must be a number of metres, 0..128 (0 keeps painted edges hard)', 'biomes');
     if (!Number.isInteger(cache) || cache < 1 || cache > 4096)
@@ -327,7 +289,7 @@ export class BiomeWorld implements Disposable {
     this.#kind = options.classifier ?? 'envelopes';
     this.#paint = options.paint ?? [];
     [this.#biomes, this.#classifier] = this.#buildClassifier();
-    this.#gpuBandDepth(this.#classifier);
+    this.#gpu?.fits(this.#classifier, this.#kind);
     this.#heights = regionEntry!.heightsOf(options.height, this.#origin, this.#size, this.seed, relief);
     this.#region = this.#buildRegion();
   }
@@ -347,22 +309,20 @@ export class BiomeWorld implements Disposable {
       relief ??= (await import('@margoengine/biomes/relief')).createRelief;
     // Heights and region fields are their own entry, so a program that only defines biomes never loads them.
     regionEntry ??= await import('@margoengine/biomes/region');
+    // The GPU checks, bands and kernels are their own entry, loaded only for a world that may compute on a device.
+    if (options.backend === 'gpu') gpu ??= await import('@margoengine/biomes/gpu');
     aborted(options.signal);
     const world = new BiomeWorld(options, biomes),
       { workers } = options;
-    if (world.#device) {
-      gpuFields ??= await import('./gpu-fields.js');
-      gpuClassify ??= await import('./gpu-classify-inputs.js');
-    }
     // Workers are their own entry, loaded only for a world that uses them (by default where Web Workers exist).
     const auto = workers === undefined && typeof Worker === 'function' && typeof globalThis.location !== 'undefined';
-    if (!world.#device && (auto || (workers && workers > 0)) && !(h && typeof h === 'object' && 'field' in h)) {
+    if (!world.#gpu && (auto || (workers && workers > 0)) && !(h && typeof h === 'object' && 'field' in h)) {
       const { BiomeWorkers, defaultWorkers } = await import('@margoengine/biomes/workers'),
         count = workers || defaultWorkers();
       if (count) world.#remote = new BiomeWorkers(count, world, () => world.#state(), options.createWorker);
     }
     aborted(options.signal);
-    if (world.#device) abortOnDeviceLoss(world.#device, world.#gpuAbort!);
+    world.#gpu?.watch();
     return world;
   }
 
@@ -405,44 +365,6 @@ export class BiomeWorld implements Disposable {
     return [checked, classifier(checked, kind, paint)];
   }
 
-  /** Largest tile band whose wide fields and classification planes fit the device. */
-  #gpuBandDepth(c: Classifier, kind = this.#kind): number {
-    const cells = (this.tileSize * 2) / (this.resolution * 2); // float division: 128..1024, exact
-    if (!this.#device) return cells;
-    const limits = this.#device.limits,
-      limit = Math.min(limits.maxStorageBufferBindingSize, limits.maxBufferSize),
-      nx = divFloor(this.#size[0], this.regionResolution * 1000) + 1,
-      nz = divFloor(this.#size[1], this.regionResolution * 1000) + 1;
-    if (5 * nx * nz * 4 > limit)
-      throw rangeError(
-        "BiomeWorld backend 'gpu' packed region exceeds device buffer limits; use a smaller size or larger regionResolution",
-        'biomes',
-      );
-    const n = cells + 2,
-      slots = c.inputs.length,
-      planes = slots + (c.score ? 0 : c.ids.length),
-      // divFloor(x, 0) is x: a classifier with no planes is not bounded by them.
-      rows = Math.min(
-        divFloor(limit, n * Math.max(24, 8 * planes)),
-        divFloor(0x7fffffff, planes * n),
-        limits.maxComputeWorkgroupsPerDimension * 8,
-      ),
-      depth = Math.min(cells, rows - 2),
-      table = 4 * (2 * slots + c.ids.length + 1 + 4 * c.envelopes.slot.length);
-    if (
-      depth < 1 ||
-      table > limit ||
-      limits.maxBufferSize < 32 ||
-      [Math.ceil(n / 8), slots, c.score ? 1 : c.ids.length].some((v) => v > limits.maxComputeWorkgroupsPerDimension) ||
-      (kind !== 'envelopes' && !kind.perCell && depth < cells)
-    )
-      throw rangeError(
-        "BiomeWorld backend 'gpu' tile row and margins exceed device limits (non-perCell zone scorers need a full tile); use fewer biomes or classifier inputs, smaller tileSize, larger resolution, or backend 'cpu'",
-        'biomes',
-      );
-    return depth;
-  }
-
   /** The biome definitions in force (the indices in the `biome` layer point into this list). */
   get biomes(): readonly BiomeDefinition[] {
     return this.#biomes;
@@ -472,11 +394,7 @@ export class BiomeWorld implements Disposable {
       nz = divFloor(this.#size[1], step) + 1,
       height = heights.grid(0, 0, nx, nz, step),
       water = heights.relief?.waterCells(this.#origin, step, nx, nz);
-    if (this.#device && height.some((v) => Math.abs(v) > 1073741824))
-      throw rangeError(
-        "BiomeWorld backend 'gpu' heights must be within +/-1073741824 mm; rescale the height source or use backend 'cpu'",
-        'biomes',
-      );
+    this.#gpu?.fits(undefined, undefined, height);
     return regionEntry!.buildRegion(height, nx, nz, step, climate, water);
   }
 
@@ -487,7 +405,7 @@ export class BiomeWorld implements Disposable {
 
   #gpuLive(): void {
     this.#live();
-    this.#gpuAbort?.signal.throwIfAborted();
+    this.#gpu?.live();
   }
 
   /**
@@ -614,7 +532,7 @@ export class BiomeWorld implements Disposable {
           : this.#ready.get(`${x},${z}`);
     if (whole && names.every((name) => whole.layers.includes(name)))
       return Object.freeze({ ...whole, window: Object.freeze([0, 0, cells, cells] as const) });
-    if (!this.#device) await Promise.resolve();
+    if (!this.#gpu) await Promise.resolve();
     this.#live();
     aborted(options.signal);
     const [i0, j0, i1, j1] = window,
@@ -632,7 +550,7 @@ export class BiomeWorld implements Disposable {
   }
 
   async #make(x: number, z: number, names: readonly string[]): Promise<BiomeTile> {
-    if (!this.#device) await Promise.resolve();
+    if (!this.#gpu) await Promise.resolve();
     this.#live();
     const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
       layers = await this.#layers(x * cells, z * cells, cells, cells, names);
@@ -660,120 +578,87 @@ export class BiomeWorld implements Disposable {
     names: readonly string[],
     signal?: AbortSignal,
   ): Promise<Map<string, RasterLayer>> {
-    if (this.#gpuAbort) signal = signal ? AbortSignal.any([signal, this.#gpuAbort.signal]) : this.#gpuAbort.signal;
-    try {
-      // Updates replace frames and rasters; keep this revision for every awaited band and CPU tail.
-      const state: LayerState | undefined = this.#device
-        ? {
-            frame: Object.freeze({
-              climate: this.#climate,
-              region: this.#region,
-              heights: this.#heights,
-              cell: this.resolution * 1000,
-              scratch: this.#scratch,
-            }),
-            classifier: this.#classifier,
-            user: new Map([...this.#user].map(([name, tiles]) => [name, new Map(tiles)])),
-            ecotone: featherCells(this.ecotone, this.resolution),
-          }
-        : undefined;
-      const bandDepth = this.#gpuBandDepth(state?.classifier ?? this.#classifier);
-      let layers: Map<string, RasterLayer>;
-      if (depth <= bandDepth) layers = await this.#computeLayers(gx, gz, width, depth, names, signal, state);
-      else {
-        layers = new Map();
-        for (let row = 0; row < depth; row += bandDepth) {
-          const band = await this.#computeLayers(
-            gx,
-            gz + row,
-            width,
-            Math.min(bandDepth, depth - row),
-            names,
-            signal,
-            state,
-          );
-          aborted(signal);
-          this.#gpuLive();
-          for (const [name, layer] of band) {
-            let out = layers.get(name);
-            if (!out) {
-              const Type = layer.data.constructor as new (length: number) => RasterLayer['data'];
-              out = { ...layer, depth, data: new Type(divFloor(layer.data.length, layer.depth) * depth) };
-              layers.set(name, out);
-            }
-            out.data.set(layer.data, divFloor(row * layer.data.length, layer.depth));
-          }
-        }
-      }
+    const g = this.#gpu,
+      frame = {
+        climate: this.#climate,
+        region: this.#region,
+        heights: this.#heights,
+        cell: this.resolution * 1000,
+        scratch: this.#scratch,
+      };
+    if (!g) {
+      this.#live();
       aborted(signal);
-      this.#gpuLive();
-      return layers;
-    } catch (error) {
-      aborted(signal);
-      this.#gpuLive();
-      // Kernels wrap device errors; shared CPU callbacks keep their original exceptions.
-      throw error;
+      return this.#cpuLayers(frame, gx, gz, width, depth, names);
     }
+    // Updates replace frames and rasters; keep this revision for every awaited band and CPU tail.
+    const user = new Map([...this.#user].map(([name, tiles]) => [name, new Map(tiles)])),
+      ecotone = featherCells(this.ecotone, this.resolution);
+    return g.layers(
+      {
+        frame: Object.freeze(frame),
+        classifier: this.#classifier,
+        kind: this.#kind,
+        gx,
+        gz,
+        width,
+        depth,
+        names,
+        input: (wide, z, rows) => this.#input(wide, gx, z, width, rows, user, ecotone),
+      },
+      signal,
+      () => this.#live(),
+    );
   }
 
-  async #computeLayers(
+  /** The layers of a cell rectangle, made on this thread. */
+  #cpuLayers(
+    frame: TileFrame,
     gx: number,
     gz: number,
     width: number,
     depth: number,
     names: readonly string[],
-    signal?: AbortSignal,
-    state?: LayerState,
-  ): Promise<Map<string, RasterLayer>> {
-    this.#gpuLive();
-    const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
-      cell = this.resolution * 1000,
-      frame = state?.frame ?? {
-        climate: this.#climate,
-        region: this.#region,
-        heights: this.#heights,
-        cell,
-        scratch: this.#scratch,
-      };
-    const fields = (x: number, z: number, w: number, d: number, wanted: readonly string[], temporary = false) =>
-      this.#device
-        ? gpuFields!.rectFieldsGPU(this.#device, frame, x, z, w, d, wanted, { temporary: false, signal })
-        : rectFields(frame, x, z, w, d, wanted, temporary);
-    if (!names.includes('biome') && !names.includes('biomeWeight')) return fields(gx, gz, width, depth, names);
+  ): Map<string, RasterLayer> {
+    if (!classified(names)) return rectFields(frame, gx, gz, width, depth, names);
     // Classification blurs over a 1-cell margin: compute the fields one cell wider, classify, then crop.
-    const c = state?.classifier ?? this.#classifier,
+    const c = this.#classifier,
       // The wide fields are working arrays: the result keeps cropped copies.
-      wideResult = fields(
-        gx - 1,
-        gz - 1,
-        width + 2,
-        depth + 2,
-        [...new Set([...names, ...c.inputs.filter((n) => !n.startsWith('mask/'))])],
-        true,
-      ),
-      // CPU scratch is consumed synchronously; GPU layers own their arrays across awaits.
-      wide = wideResult instanceof Promise ? await wideResult : wideResult,
+      wide = rectFields(frame, gx - 1, gz - 1, width + 2, depth + 2, wideNames(names, c), true),
+      ids = new Uint8Array(width * depth * 4),
+      weights = new Uint8Array(width * depth * 4);
+    classify(c, this.#input(wide, gx, gz, width, depth), ids, weights);
+    return assemble(names, wide, ids, weights, width, depth);
+  }
+
+  /** The classification grid over the wide (1-cell margin) fields of a rectangle, with a request's user rasters. */
+  #input(
+    wide: ReadonlyMap<string, RasterLayer>,
+    gx: number,
+    gz: number,
+    width: number,
+    depth: number,
+    user: ReadonlyMap<string, ReadonlyMap<string, Uint8Array>> = this.#user,
+    ecotone = featherCells(this.ecotone, this.resolution),
+  ): ClassifyInput {
+    const cells = (this.tileSize * 2) / (this.resolution * 2), // float division: 128..1024, exact
       n = width + 2,
       rows = depth + 2,
       ox = gx - 1,
-      oz = gz - 1,
-      ids = new Uint8Array(width * depth * 4),
-      weights = new Uint8Array(width * depth * 4);
-    aborted(signal);
-    this.#gpuLive();
-    const input = {
+      oz = gz - 1;
+    return {
       n,
       depth: rows,
       gx: ox,
       gz: oz,
       seed: this.seed,
-      cell,
-      layer: (name: string) => wide.get(name)!.data,
+      cell: this.resolution * 1000,
+      layer: (name) => wide.get(name)!.data,
       // The feather's wide read stays inside the world (edge cells repeat), so paint keeps full strength up to
       // the world's edge instead of fading into cells that do not exist.
-      user: (name: string, margin = 0) =>
+      user: (name, margin = 0) =>
         userGrid(
-          state?.user ?? this.#user,
+          user,
           this.tilesX,
           this.tilesZ,
           name,
@@ -784,29 +669,8 @@ export class BiomeWorld implements Disposable {
           !!margin,
           rows + 2 * margin,
         ),
-      ecotone: state?.ecotone ?? featherCells(this.ecotone, this.resolution),
+      ecotone,
     };
-    if (this.#device) await gpuClassify!.classifyGPU(this.#device, c, input, ids, weights, { signal });
-    else classify(c, input, ids, weights);
-    aborted(signal);
-    this.#gpuLive();
-    const layers = new Map<string, RasterLayer>();
-    for (const name of names) {
-      if (name === 'biome' || name === 'biomeWeight') continue;
-      layers.set(name, crop(wide.get(name)!, width, depth));
-    }
-    const info = (name: 'biome' | 'biomeWeight', data: Uint8Array): RasterLayer => ({
-      name,
-      format: 'rgba8',
-      width,
-      depth,
-      data,
-      scale: LAYERS[name].scale,
-      unit: LAYERS[name].unit,
-    });
-    if (names.includes('biome')) layers.set('biome', info('biome', ids));
-    if (names.includes('biomeWeight')) layers.set('biomeWeight', info('biomeWeight', weights));
-    return layers;
   }
 
   /**
@@ -1036,7 +900,7 @@ export class BiomeWorld implements Disposable {
       paint = changes.paint ?? this.#paint,
       [biomes, classifier] = this.#buildClassifier(changes.biomes ?? this.#biomes, kind, paint),
       climate = changes.climate ? quantizeClimate(changes.climate) : this.#climate;
-    this.#gpuBandDepth(classifier, kind);
+    this.#gpu?.fits(classifier, kind);
     const heights = changes.height
         ? regionEntry!.heightsOf(changes.height, this.#origin, this.#size, this.seed, relief)
         : this.#heights,
@@ -1087,8 +951,7 @@ export class BiomeWorld implements Disposable {
   /** Frees the cache and listeners; later calls throw MargoError `'disposed'`. */
   dispose(): void {
     this.#disposed = true;
-    if (this.#device) deviceLoss.get(this.#device)?.controllers.delete(this.#gpuAbort!);
-    this.#gpuAbort?.abort(
+    this.#gpu?.dispose(
       fault('disposed', 'BiomeWorld is disposed; create a new one with BiomeWorld.create()', 'biomes'),
     );
     this.#remote?.dispose();
@@ -1102,14 +965,6 @@ export class BiomeWorld implements Disposable {
   [Symbol.dispose](): void {
     this.dispose();
   }
-}
-
-/** The interior `width` x `depth` of a layer computed with a 1-cell margin. */
-function crop(layer: RasterLayer, width: number, depth: number): RasterLayer {
-  const n = width + 2,
-    data = new (layer.data.constructor as Int32ArrayConstructor)(width * depth);
-  for (let j = 0; j < depth; j++) data.set(layer.data.subarray((j + 1) * n + 1, (j + 1) * n + 1 + width), j * width);
-  return { ...layer, width, depth, data };
 }
 
 /** The default biomes: the temperate preset and its neighbours, loaded from the presets entry on first use. */

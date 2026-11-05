@@ -105,6 +105,10 @@
     "./workers": {
       "types": "./dist/workers.d.ts",
       "import": "./dist/workers.js"
+    },
+    "./gpu": {
+      "types": "./dist/gpu.d.ts",
+      "import": "./dist/gpu.js"
     }
   },
   "files": [

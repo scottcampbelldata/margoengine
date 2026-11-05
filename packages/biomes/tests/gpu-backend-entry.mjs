@@ -12,6 +12,7 @@ export async function backendModuleCode() {
       '@margoengine/biomes/presets': fileURLToPath(new URL('../src/presets.ts', import.meta.url)),
       '@margoengine/biomes/workers': fileURLToPath(new URL('../src/workers.ts', import.meta.url)),
       '@margoengine/biomes/digest': fileURLToPath(new URL('../src/digest.ts', import.meta.url)),
+      '@margoengine/biomes/gpu': fileURLToPath(new URL('../src/gpu.ts', import.meta.url)),
     } },
     build: { write: false, minify: false, target: 'es2022', rollupOptions: {
       input: fileURLToPath(new URL('./gpu-backend-source.mjs', import.meta.url)),

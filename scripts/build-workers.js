@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 
 const decoderStub = fileURLToPath(new URL('./worker-decoder-stub.js', import.meta.url)),
-  poolStub = fileURLToPath(new URL('./worker-pool-stub.js', import.meta.url));
+  poolStub = fileURLToPath(new URL('./worker-pool-stub.js', import.meta.url)),
+  emptyStub = fileURLToPath(new URL('./worker-empty-stub.js', import.meta.url));
 
 // Parser workers: each src/<name>.worker.ts becomes a self-contained classic worker, dist/workers/<name>.js. A package
 // starts it with new URL('./workers/<name>.js?no-inline', import.meta.url), which the app's bundler copies as an asset,
@@ -25,6 +26,8 @@ export async function buildWorkers(root) {
           { find: /^@margoengine\/decoders$/, replacement: decoderStub },
           // A biome world worker never starts workers itself (its world has workers: false).
           { find: /^@margoengine\/biomes\/workers$/, replacement: poolStub },
+          // Nor does it get a GPU device (its options name none), so it never loads the GPU kernels.
+          { find: /^@margoengine\/biomes\/gpu$/, replacement: emptyStub },
         ],
       },
       build: {

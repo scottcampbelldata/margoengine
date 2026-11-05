@@ -55,12 +55,20 @@ test('the root entry loads heights and region fields only for a world: no static
   walk('../dist/index.js');
   const names = [...seen].join(' ');
   assert.ok(!/region|height/.test(names), names);
+  // Nor the GPU entry and its kernels: only a backend 'gpu' world imports them.
+  assert.ok(!/gpu/.test(names), names);
   const { distanceTransform, heightsOf } = await import('../dist/region.js');
   assert.equal(typeof distanceTransform, 'function');
   assert.equal(
     heightsOf(undefined, [0, 0], [256000, 256000], 1, () => ({ height: () => 5 })).grid(0, 0, 1, 1, 4000)[0],
     5,
   );
+});
+
+test('the worker file holds no GPU code: its worlds never get a device, so the build leaves the GPU entry out', () => {
+  const worker = readFileSync(new URL('../dist/workers/biomes.js', import.meta.url), 'utf8');
+  for (const gpuOnly of ['createShaderModule', '@compute', 'requires the device option'])
+    assert.ok(!worker.includes(gpuOnly), gpuOnly);
 });
 
 test('relief entry is loaded only by worlds that use it; update to a relief height without it names the fix', () => {

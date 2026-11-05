@@ -16,6 +16,8 @@ registerHooks({
       return nextResolve(new URL('../src/presets.ts', import.meta.url).href, context);
     if (specifier === '@margoengine/biomes/digest')
       return nextResolve(new URL('../src/digest.ts', import.meta.url).href, context);
+    if (specifier === '@margoengine/biomes/gpu')
+      return nextResolve(new URL('../src/gpu.ts', import.meta.url).href, context);
     if (/^\.{1,2}\//.test(specifier) && specifier.endsWith('.js') && context.parentURL?.startsWith('file:')) {
       const js = new URL(specifier, context.parentURL),
         ts = new URL(specifier.slice(0, -3) + '.ts', context.parentURL);
