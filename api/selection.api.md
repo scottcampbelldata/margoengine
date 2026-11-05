@@ -111,6 +111,12 @@ export interface PickingPrimitive {
     cutoff?: number;
     texCoord?: 0 | 1;
     alphaTransform?: Float32Array;
+    opacity?: {
+        readonly buffer: GPUBuffer;
+        readonly view: GPUTextureView;
+        readonly sampler: GPUSampler;
+    };
+    vertexAlpha?: boolean;
     doubleSided?: boolean;
     side?: 'front' | 'back' | 'double';
 }

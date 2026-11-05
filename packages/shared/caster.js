@@ -74,32 +74,43 @@ export const displacementGroup = (device, layout, displacement) =>
     : undefined;
 
 /**
- * A caster depth shader (80-byte PBR vertices, the fragment reading its alpha map at `i.uv`) whose cut-out also
- * multiplies by a material's opacity map (materials `alphaMap`, green channel, its own UV rows 0 and 1 of the feature
- * uniform): the uniform, view and sampler at bindings 4-6 of `group`. Apply it after `instancedDepth`.
+ * WGSL of a material's opacity map (materials `alphaMap`, green channel, its own UV rows 0 and 1 of the feature uniform):
+ * the uniform, view and sampler at bindings `first` to `first` + 2 of `group`, and `margoOpacityAt` of both UV sets.
+ */
+export const opacityCode = (group, first = 4) => `struct MargoOpacity {values:vec4f,uvt:array<vec4f,8>}
+@group(${group}) @binding(${first}) var<uniform> margoOpacity:MargoOpacity;
+@group(${group}) @binding(${first + 1}) var margoOpacityMap:texture_2d<f32>;
+@group(${group}) @binding(${first + 2}) var margoOpacitySampler:sampler;
+fn margoOpacityAt(uv:vec4f)->f32 {let a=margoOpacity.uvt[0]; let p=vec3f(select(uv.xy,uv.zw,a.w>0.5),1); return textureSampleLevel(margoOpacityMap,margoOpacitySampler,vec2f(dot(a.xyz,p),dot(margoOpacity.uvt[1].xyz,p)),0.0).g;}
+`;
+
+/**
+ * A caster shader (80-byte PBR vertices, the fragment reading its alpha map at `i.uv` or a local `uv`) whose cut-out also
+ * multiplies by a material's opacity map, bound at 4-6 of `group`. Apply it after `instancedDepth`.
  */
 export function opacityDepth(code, group) {
   const out = code
     .replace(/struct (\w*Out) \{/, 'struct $1 {@location(3) margoUV:vec4f,')
     .replace('o.uv=select(', 'o.margoUV=i.uv;o.uv=select(')
     .replace('o.uv=o.uv*i.uvt.xy+i.uvt.zw;', '$&o.margoUV=o.margoUV*i.uvt.xyxy+i.uvt.zwzw;')
-    .replace(/textureSampleLevel\(\w+,\w+,i\.uv,0\)\.a\*/, '$&margoOpacityAt(i.margoUV)*');
+    .replace(/textureSample(?:Level)?\(\w+,\w+,(?:i\.)?uv(?:,0)?\)\.a\*/, '$&margoOpacityAt(i.margoUV)*');
   if (!out.includes('o.margoUV=i.uv;') || !out.includes('margoOpacityAt(i.margoUV)*'))
     throw new TypeError('Opacity-mapped shadow casters need 80-byte vertices; draw them with a PBR depth shader');
-  return `struct MargoOpacity {values:vec4f,uvt:array<vec4f,8>}
-@group(${group}) @binding(4) var<uniform> margoOpacity:MargoOpacity;
-@group(${group}) @binding(5) var margoOpacityMap:texture_2d<f32>;
-@group(${group}) @binding(6) var margoOpacitySampler:sampler;
-fn margoOpacityAt(uv:vec4f)->f32 {let a=margoOpacity.uvt[0]; let p=vec3f(select(uv.xy,uv.zw,a.w>0.5),1); return textureSampleLevel(margoOpacityMap,margoOpacitySampler,vec2f(dot(a.xyz,p),dot(margoOpacity.uvt[1].xyz,p)),0.0).g;}
-${out}`;
+  return opacityCode(group) + out;
 }
 
-/** The bind group entries of a caster's `opacity` (see `opacityDepth`). */
-export const opacityEntries = (opacity) => [
-  { binding: 4, resource: { buffer: opacity.buffer } },
-  { binding: 5, resource: opacity.view },
-  { binding: 6, resource: opacity.sampler },
+/** The bind group entries of a caster's `opacity`, from binding `first` (see `opacityCode`). */
+export const opacityEntries = (opacity, first = 4) => [
+  { binding: first, resource: { buffer: opacity.buffer } },
+  { binding: first + 1, resource: opacity.view },
+  { binding: first + 2, resource: opacity.sampler },
 ];
+
+/**
+ * A caster shader that leaves vertex alpha out of its cut-out, for a primitive with `vertexAlpha: false` (materials
+ * `vertexColors: false`, whose colour pass reads white). An instance's tint still counts. Apply it after `instancedDepth`.
+ */
+export const solidVertexDepth = (code) => code.replace('o.alpha=i.color.a', 'o.alpha=1.0');
 
 /** A cleared depth-only pass descriptor; set `depthStencilAttachment.view` before each use. */
 export const depthPassDescriptor = () => ({

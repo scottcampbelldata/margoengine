@@ -5,6 +5,7 @@
 import {Engine,box} from '/packages/core/dist/index.js';
 import {PbrMaterial,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
 import {Clustered} from '/packages/clustered/dist/index.js';
 import {LocalShadows} from '/packages/clustered/dist/shadows.js';
 const canvas=document.querySelector('canvas'),errors=[];
@@ -15,7 +16,7 @@ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 engine.createMesh().setGeometry(box(14,0.1,14)).setPosition([0,-0.05,0]);
 const radiance=Float32Array.from(engine.lighting.radiance);
 engine.lighting.direction.set([-1,1,0].map(v=>v*Math.SQRT1_2));
-const quad=(x0=-3,x1=-1,y=2,z0=-1,z1=1)=>({positions:[x0,y,z1,x1,y,z1,x1,y,z0,x0,y,z0],normals:[0,1,0,0,1,0,0,1,0,0,1,0],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]});
+const quad=(x0=-3,x1=-1,y=2,z0=-1,z1=1,colors)=>({positions:[x0,y,z1,x1,y,z1,x1,y,z0,x0,y,z0],normals:[0,1,0,0,1,0,0,1,0,0,1,0],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3],...(colors?{colors}:{})});
 // Texels left, right; nearest, so the edge sits at u = 0.5.
 const split=(left,right,options)=>new Texture({data:new Uint8Array([...left,...right,...left,...right]),width:2,height:2},{magFilter:'nearest',minFilter:'nearest',mipmaps:false,...options});
 const white=[255,255,255];
@@ -35,7 +36,11 @@ const casters={
   alphaMap:()=>new PbrMaterial({map:split([...white,255],[...white,255]),alphaMap:split([0,255,0,255],[0,0,0,255]),alphaTest:0.5}),
   // alphaMap with no base map.
   alphaOnly:()=>new PbrMaterial({alphaMap:split([0,255,0,255],[0,0,0,255]),alphaTest:0.5}),
+  // Vertex alpha 0.2 under alphaTest 0.5: vertexColors false draws the whole quad, so it casts whole; on, nothing draws.
+  vertexOff:()=>new PbrMaterial({alphaTest:0.5,vertexColors:false}),
+  vertexOn:()=>new PbrMaterial({alphaTest:0.5}),
 };
+const faint=[1,1,1,0.2,1,1,1,0.2,1,1,1,0.2,1,1,1,0.2],geometries={vertexOff:()=>quad(-3,-1,2,-1,1,faint),vertexOn:()=>quad(-3,-1,2,-1,1,faint)};
 let plugins=[],removers=[],mesh,current;
 const clear=()=>{removers.forEach(r=>r());removers=[];plugins.forEach(p=>p.dispose());plugins=[];mesh?.dispose?.();mesh=undefined;};
 const render=async(n=3)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
@@ -48,6 +53,7 @@ const separate=(light,add)=>{sunOff();const l=Clustered.attach(engine,{grid:[4,4
 const integrated=(light,add)=>{sunOff();const l=Clustered.attach(engine,{grid:[4,4,4],shadows:{resolution:512,maxLights:2}});plugins.push(l);if(add)removers.push(l.add(add),l.addShadowCaster(add));l.setLights([{...light,shadow:true}]);};
 const passes={
   directional(add){engine.lighting.radiance.set(radiance.subarray(0,3));const s=Shadows.attach(engine,{resolution:1024,bounds:{min:[-7,-1,-7],max:[7,3,7]}});plugins.push(s);if(add)removers.push(s.add(add));},
+  virtual(add){engine.lighting.radiance.set(radiance.subarray(0,3));const s=VirtualShadows.attach(engine);plugins.push(s);if(add)removers.push(s.add(add));},
   spot:add=>separate(spot,add),
   point:add=>separate(point,add),
   integratedSpot:add=>integrated(spot,add),
@@ -59,8 +65,9 @@ window.check={
     clear();
     if(caster){
       const material=current=casters[caster]();
-      if(instanced){mesh=createInstancedMesh(engine,quad(),material,1);mesh.instances.setMatrices(0,new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]));}
-      else mesh=createMesh(engine,quad(),material);
+      const shape=geometries[caster]?.()??quad();
+      if(instanced){mesh=createInstancedMesh(engine,shape,material,1);mesh.instances.setMatrices(0,new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]));}
+      else mesh=createMesh(engine,shape,material);
     }
     passes[pass](mesh);
     await render();

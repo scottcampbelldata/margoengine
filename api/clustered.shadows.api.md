@@ -44,6 +44,7 @@ export interface LocalShadowPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    vertexAlpha?: boolean;
     bounds?: ArrayLike<number>;
 }
 
@@ -235,6 +236,7 @@ interface LocalShadowPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    vertexAlpha?: boolean;
 }
 
 interface LocalShadowSource {

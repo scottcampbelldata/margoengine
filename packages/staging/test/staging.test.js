@@ -113,6 +113,57 @@ test('instanced shadow primitives (gltf-pro PBRInstances) draw every instance in
     contact.dispose();
   }
 });
+test('a cut-out caster draws with its UV transform, opacity map and vertex alpha setting', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    modules = [],
+    create = s.engine.gpu.createShaderModule.bind(s.engine.gpu);
+  s.engine.gpu.createShaderModule = (descriptor) => {
+    modules.push(descriptor.code);
+    return create(descriptor);
+  };
+  try {
+    contact.add(s.model);
+    primitive.alphaTransform = new Float32Array([1, 0, 0.5, 0, 0, 1, 0, 0]);
+    primitive.opacity = { buffer: s.vertex, view: {}, sampler: {} };
+    primitive.vertexAlpha = false;
+    s.frame();
+    const code = modules.find((c) => c.includes('margoOpacityAt'));
+    assert.match(code, /alphaUV0:vec4f,alphaUV1:vec4f/);
+    assert.match(code, /o\.alpha=1\.0;/);
+    assert.match(code, /\.a\*margoOpacityAt\(i\.margoUV\)\*f\.alpha\.x/);
+    primitive.alphaTransform = new Float32Array(4);
+    assert.throws(() => s.frame(), /alpha transform/);
+  } finally {
+    contact.dispose();
+  }
+});
+test('static redraws an opacity-mapped caster, whose UV rows change on the GPU alone, and follows a changed cut-out', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    full = 4;
+  try {
+    contact.add(s.model);
+    primitive.alphaTransform = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]);
+    assert.equal(s.frame().length, full);
+    assert.deepEqual(s.frame(), ['plane']);
+    primitive.alphaTransform[2] = 0.5;
+    assert.equal(s.frame().length, full, 'moved UV rows');
+    assert.deepEqual(s.frame(), ['plane']);
+    primitive.vertexAlpha = false;
+    assert.equal(s.frame().length, full, 'vertex alpha off');
+    primitive.opacity = { buffer: s.vertex, view: {}, sampler: {} };
+    assert.equal(s.frame().length, full);
+    assert.equal(s.frame().length, full, 'every frame while it has an opacity map');
+    delete primitive.opacity;
+    s.frame();
+    assert.deepEqual(s.frame(), ['plane']);
+  } finally {
+    contact.dispose();
+  }
+});
 test('static re-renders only on transform, source, visibility or option changes', () => {
   const s = scene(),
     contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),

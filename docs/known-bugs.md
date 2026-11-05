@@ -472,18 +472,24 @@ does not own. Each entry says exactly what is needed to close it.
   blend, or drawing a full-screen layer first to change the GPU's tile state, changes or adds work to hide the
   symptom.
 
-### Cut-outs on materials meshes: passes the shadow fix did not reach
+### Displacement and clipping planes on materials meshes: passes that do not follow them
 
-Found while fixing shadow cut-outs (2026-10-31). Each comes from reading the code; none has been run as a repro yet.
+Found while fixing the cut-outs (2026-11-05), from reading the code; not yet run as a repro. Shadow maps follow a
+materials mesh's `displacementMap` and `clippingPlanes` (`displacement` and `clip` on its caster), but
+`@margoengine/staging`, `@margoengine/taa` and picking draw the undisplaced, unclipped geometry: their shaders have no
+such binding. **Repro:** a mesh with `displacementMap` over a floor, or `clippingPlanes` with `clipShadows`, with
+`ContactShadows`, `TAA` or `Picking`; a click on a clipped part still hits it.
 
-- **Picking:** `PBRModel.pickingPrimitives` (gltf-pro) binds `r.views[0]`, the default white, so a click on a materials
-  mesh's cut-out hole still hits it. Repro: `new PbrMaterial({map, alphaTest: 0.5})`, pick through a transparent texel.
-  Fix: use `castMask` there too.
-- **Contact shadows:** `@margoengine/staging` samples `alphaTexture` at the raw UVs (no `alphaTransform`, glTF
-  `KHR_texture_transform` included) and ignores `opacity`. Repro: a cut-out with `uvTransform` or an `alphaMap`.
-- **TAA velocity:** `@margoengine/taa` ignores a caster's `opacity`, so an `alphaMap` hole writes the quad's velocity.
-- **`vertexColors: false`:** the colour pass reads vertex alpha as 1, but the caster depth shaders still multiply it in.
-  Repro: geometry with RGBA colours below `alphaTest`, `vertexColors: false`: drawn, yet casts nothing.
+### Boulder: `Climb.update` can box a number every frame, and its allocation test then fails
+
+Found 2026-11-05, when `tests/boulder-climb.test.js` ("a frame of Climb allocates nothing") failed once in `verify`. About
+16 bytes a frame, one boxed number. It shows only after the file's earlier tests have run; the test passes alone.
+**Repro:** `tests/boulder-climb.test.js` whole, 24 copies at once: 13 of 96 runs fail. With
+`node --no-concurrent-recompilation` 93 of 96 fail.
+**Known so far:** removing the `upNow` `smoothDamp` call in `update` stops it, but that also leaves `upNow` still, so the
+cause may follow the values and not the call. That call alone, `commit`, `stepMove`, `faceAt` and `lookDirection` each
+measure about 0. **Ruled out:** a short warm-up (300,000 frames first changes nothing), inlining, Maglev, escape
+analysis, and the call's `smoothTime` and `maxSpeed` constants. No test limit was changed.
 
 ## Performance losses still open
 

@@ -35,6 +35,7 @@ import {
   drawCaster,
   opacityDepth,
   opacityEntries,
+  solidVertexDepth,
   staleCaster,
 } from '../../shared/caster.js';
 export { cascadeSplits, fitCascades } from './cascades.js';
@@ -175,6 +176,8 @@ export interface ShadowPrimitive {
    * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Such a caster redraws every frame.
    */
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
+  vertexAlpha?: boolean;
   /** Skinned, morphed, instanced, or deformed casters redraw every frame. Unset casters are cached while they stay put. */
   dynamic?: boolean;
 }
@@ -1291,6 +1294,7 @@ export class Shadows implements EnginePlugin {
     hash = this.mixFloat(hash, primitive.alpha ?? 1);
     hash = this.mixFloat(hash, primitive.cutoff ?? 0);
     hash = this.mixFloat(hash, primitive.texCoord ?? 0);
+    hash = Math.imul(hash, 16777619) ^ (primitive.vertexAlpha === false ? 1 : 0);
     const transform = primitive.alphaTransform;
     hash = Math.imul(hash, 16777619) ^ (transform?.length ?? 0);
     if (transform) for (let i = 0; i < transform.length; i++) hash = this.mixFloat(hash, transform[i]);
@@ -1541,6 +1545,7 @@ export class Shadows implements EnginePlugin {
     const opacity = p.opacity;
     if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
     const lines = p.topology === 'line-list',
+      solid = p.stride === 80 && p.vertexAlpha === false,
       key =
         p.stride +
         (transform ? 1 : 0) +
@@ -1550,7 +1555,8 @@ export class Shadows implements EnginePlugin {
         (displacement ? 16 : 0) +
         (material ? 32 : 0) +
         (opacity ? 64 : 0) +
-        (tinted ? 128 : 0);
+        (tinted ? 128 : 0) +
+        (solid ? 256 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
@@ -1560,6 +1566,7 @@ export class Shadows implements EnginePlugin {
           .replace('{discard;}}', '{discard;}return vec4f(1);}');
       if (displacement) code = displacedDepth(code, 1);
       if (inst) code = instancedDepth(code);
+      if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
       if (section) {
         code = code

@@ -14,6 +14,7 @@ import {
   displacementGroup,
   opacityDepth,
   opacityEntries,
+  solidVertexDepth,
   drawCaster,
   staleCaster,
 } from '../../shared/caster.js';
@@ -100,6 +101,8 @@ export interface LocalShadowPrimitive {
    * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Requires 80-byte vertices.
    */
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
+  vertexAlpha?: boolean;
 }
 /**
  * A caster `Clustered.addShadowCaster` takes besides a core mesh: an object with `shadowPrimitives` (gltf-pro models,
@@ -562,8 +565,15 @@ export class LocalShadowMaps {
         'Invalid local shadow primitive; set texCoord to 0 or 1 and alpha and cutoff to finite numbers',
       );
     const lines = p.topology === 'line-list',
+      solid = p.stride === 80 && p.vertexAlpha === false,
       key =
-        p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (displacement ? 8 : 0) + (opacity ? 16 : 0);
+        p.stride +
+        (transform ? 1 : 0) +
+        (inst ? 2 : 0) +
+        (lines ? 4 : 0) +
+        (displacement ? 8 : 0) +
+        (opacity ? 16 : 0) +
+        (solid ? 32 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const depth = depthShader(p.stride === 80, !!transform),
@@ -574,7 +584,8 @@ export class LocalShadowMaps {
               'localDepth.model*mat4x4f(i.m0,i.m1,i.m2,i.m3)*vec4f(',
             )
           : code,
-        module = this.device!.createShaderModule({ code: opacity ? opacityDepth(placed, 0) : placed });
+        cut = solid ? solidVertexDepth(placed) : placed,
+        module = this.device!.createShaderModule({ code: opacity ? opacityDepth(cut, 0) : cut });
       pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
       this.pipelines.set(key, pipeline);
     }

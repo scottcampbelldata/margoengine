@@ -15,7 +15,14 @@ import {
   type PassContext,
   type Vec3,
 } from '@margoengine/core/extension';
-import { casterBuffers, drawCaster } from '../../shared/caster.js';
+import {
+  casterBuffers,
+  drawCaster,
+  opacityDepth,
+  opacityEntries,
+  solidVertexDepth,
+  type CasterCutout,
+} from '../../shared/caster.js';
 import { instancedDepth } from '../../shared/instances.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
@@ -57,7 +64,7 @@ export interface ContactShadowOptions {
  * One drawable caster, the same shape as `@margoengine/shadows`' shadow primitives. gltf-pro models and materials
  * meshes expose arrays of them as `shadowPrimitives`.
  */
-export interface ContactPrimitive {
+export interface ContactPrimitive extends CasterCutout {
   /** Node whose world matrix places the primitive. */
   node: Mesh;
   /** Vertex buffer: 24-byte core vertices (position) or 80-byte gltf-pro vertices. */
@@ -119,6 +126,7 @@ interface Slot {
   pipeline?: GPURenderPipeline;
   mask?: GPUTextureView;
   sampler?: GPUSampler;
+  opacity?: ContactPrimitive['opacity'];
 }
 
 // Blur: Gaussian with sigma = radius / 2, cut at 3 sigma (the truncated tail is 0.3% of the weight, below r16float
@@ -130,32 +138,33 @@ const PLANE_LIFT = 1e-4; // share of the larger plane side the plane floats abov
 const DEFAULT_RESOLUTION = 256; // 64 texels per world unit on the default 4-unit plane; the blur hides the texel grid
 const STRIDES = new Set([24, 80]);
 
-const occluderBody = `
-struct Draw {camera:mat4x4f,model:mat4x4f,alpha:vec4f}
+const occluderBody = (transformed = false) => `
+struct Draw {camera:mat4x4f,model:mat4x4f,alpha:vec4f${transformed ? ',alphaUV0:vec4f,alphaUV1:vec4f' : ''}}
 @group(0) @binding(0) var<uniform> f:Draw;`;
 
-// 80-byte casters: alpha cutout from TEXCOORD_0 or _1. The input struct and vertex expression keep the shape
-// instancedDepth (shared/instances.js) rewrites into the per-instance program.
-const pbrOccluder = `${occluderBody}
+// 80-byte casters: alpha cutout from TEXCOORD_0 or _1. The text keeps the shape the shared caster edits rewrite:
+// instancedDepth (shared/instances.js), opacityDepth and solidVertexDepth (shared/caster.js).
+const pbrOccluder = (transformed: boolean) => `${occluderBody(transformed)}
 @group(0) @binding(1) var mask:texture_2d<f32>;
 @group(0) @binding(2) var maskSampler:sampler;
-struct Input {@location(0) position:vec4f,@location(3) uvs:vec4f,@location(4) color:vec4f}
-struct Varyings {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
-@vertex fn vertex(i:Input)->Varyings {
- var o:Varyings;
+struct In {@location(0) position:vec4f,@location(3) uv:vec4f,@location(4) color:vec4f}
+struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+@vertex fn vertex(i:In)->Out {
+ var o:Out;
  o.clip=f.camera*f.model*vec4f(i.position.xyz,1);
- o.uv=select(i.uvs.xy,i.uvs.zw,f.alpha.z==1);
+ o.uv=select(i.uv.xy,i.uv.zw,f.alpha.z==1);
  o.alpha=i.color.a;
+ ${transformed ? 'let sourceUV=o.uv;o.uv=vec2f(dot(f.alphaUV0.xy,sourceUV)+f.alphaUV0.z,dot(f.alphaUV1.xy,sourceUV)+f.alphaUV1.z);' : ''}
  return o;
 }
-@fragment fn fragment(v:Varyings)->@location(0) vec4f {
- let coverage=textureSample(mask,maskSampler,v.uv).a*f.alpha.x*v.alpha;
+@fragment fn fragment(i:Out)->@location(0) vec4f {
+ let coverage=textureSample(mask,maskSampler,i.uv).a*f.alpha.x*i.alpha;
  if (coverage<f.alpha.y) {discard;}
- return vec4f(1-v.clip.z,0,0,1);
+ return vec4f(1-i.clip.z,0,0,1);
 }`;
 
 // 24-byte core casters: position only.
-const coreOccluder = `${occluderBody}
+const coreOccluder = `${occluderBody()}
 @vertex fn vertex(@location(0) position:vec3f)->@builtin(position) vec4f {
  return f.camera*f.model*vec4f(position,1);
 }
@@ -498,6 +507,19 @@ export class ContactShadows implements EnginePlugin {
           throw new RangeError('Contact shadow primitive stride must be 24 or 80; pass core or gltf-pro vertices');
         if (p.instances && p.stride !== 80)
           throw new RangeError('Instanced contact shadow primitives need 80-byte vertices; pass gltf-pro instances');
+        if (p.opacity && p.stride !== 80)
+          throw new RangeError('Opacity-mapped contact shadow primitives need 80-byte vertices; pass gltf-pro vertices');
+        const transform = p.alphaTransform;
+        if (
+          transform !== undefined &&
+          (!(transform instanceof Float32Array) ||
+            transform.length !== 8 ||
+            transform.some((value) => !Number.isFinite(value)) ||
+            p.stride !== 80)
+        )
+          throw new TypeError(
+            'Invalid contact shadow alpha transform; pass a Float32Array of 8 finite numbers on 80-byte vertices',
+          );
         p.node.check();
         this.owned(p.node, engine);
         if (hiddenInTree(engine.store, p.node.id) || p.instances?.count === 0) continue;
@@ -522,22 +544,34 @@ export class ContactShadows implements EnginePlugin {
         p.topology ?? 'triangle-list',
         p.instances?.count ?? -1,
       );
-      next.push(p.alpha, p.cutoff, p.texCoord, p.alphaTexture, p.alphaSampler);
+      next.push(p.alpha, p.cutoff, p.texCoord, p.alphaTexture, p.alphaSampler, p.vertexAlpha, p.opacity);
+      if (p.alphaTransform) next.push(...p.alphaTransform);
       for (let i = 0; i < 16; i++) next.push(p.node.matrix[i]);
     }
+    // An opacity map's UV rows change on the GPU alone, so nothing here can see them.
     const old = this.signature,
-      differs = old.length !== next.length || next.some((v, i) => !Object.is(v, old[i]));
+      differs =
+        old.length !== next.length || next.some((v, i) => !Object.is(v, old[i])) || draws.some((p) => p.opacity);
     this.nextSignature = old;
     this.signature = next;
     return differs;
   }
 
-  private occluder(device: GPUDevice, stride: number, instanced: boolean, lines: boolean): GPURenderPipeline {
-    const key = `${stride}|${instanced}|${lines}`;
+  private occluder(device: GPUDevice, p: ContactPrimitive): GPURenderPipeline {
+    const stride = p.stride,
+      instanced = !!p.instances,
+      lines = p.topology === 'line-list',
+      transformed = !!p.alphaTransform,
+      opacity = !!p.opacity,
+      solid = stride === 80 && p.vertexAlpha === false,
+      key = `${stride}|${instanced}|${lines}|${transformed}|${opacity}|${solid}`;
     let pipeline = this.occluders.get(key);
     if (!pipeline) {
-      const code = stride === 24 ? coreOccluder : instanced ? instancedDepth(pbrOccluder) : pbrOccluder,
-        module = device.createShaderModule({ code }),
+      let code = stride === 24 ? coreOccluder : pbrOccluder(transformed);
+      if (instanced) code = instancedDepth(code);
+      if (solid) code = solidVertexDepth(code);
+      if (opacity) code = opacityDepth(code, 0);
+      const module = device.createShaderModule({ code }),
         keepNearest = { operation: 'max', srcFactor: 'one', dstFactor: 'one' } as const;
       pipeline = device.createRenderPipeline({
         layout: 'auto',
@@ -578,22 +612,41 @@ export class ContactShadows implements EnginePlugin {
     });
     try {
       draws.forEach((p, i) => {
-        const pipeline = this.occluder(device, p.stride, !!p.instances, p.topology === 'line-list'),
-          slot = (this.slots[i] ??= {
-            uniform: device.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
-            values: new Float32Array(36),
-          });
+        // A slot serves whichever caster is at i, so it is replaced when the alpha transform's rows come or go.
+        const pipeline = this.occluder(device, p),
+          floats = p.alphaTransform ? 44 : 36;
+        let slot = this.slots[i];
+        if (slot?.values.length !== floats) {
+          slot?.uniform.destroy();
+          slot = this.slots[i] = {
+            uniform: device.createBuffer({ size: floats * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+            values: new Float32Array(floats),
+          };
+        }
         const mask = p.stride === 80 ? (p.alphaTexture ?? this.whiteView) : undefined,
           sampler = p.stride === 80 ? (p.alphaSampler ?? this.sampler) : undefined;
-        if (!slot.group || slot.pipeline !== pipeline || slot.mask !== mask || slot.sampler !== sampler) {
-          slot.group = group(
-            device,
-            pipeline,
-            mask ? [{ buffer: slot.uniform }, mask, sampler!] : [{ buffer: slot.uniform }],
-          );
+        if (
+          !slot.group ||
+          slot.pipeline !== pipeline ||
+          slot.mask !== mask ||
+          slot.sampler !== sampler ||
+          slot.opacity !== p.opacity
+        ) {
+          slot.group = p.opacity
+            ? device.createBindGroup({
+                layout: pipeline.getBindGroupLayout(0),
+                entries: [
+                  { binding: 0, resource: { buffer: slot.uniform } },
+                  { binding: 1, resource: mask! },
+                  { binding: 2, resource: sampler! },
+                  ...opacityEntries(p.opacity),
+                ],
+              })
+            : group(device, pipeline, mask ? [{ buffer: slot.uniform }, mask, sampler!] : [{ buffer: slot.uniform }]);
           slot.pipeline = pipeline;
           slot.mask = mask;
           slot.sampler = sampler;
+          slot.opacity = p.opacity;
         }
         drawCaster(
           pass,
@@ -604,7 +657,7 @@ export class ContactShadows implements EnginePlugin {
           slot.values,
           projection,
           p,
-          undefined,
+          p.alphaTransform,
           undefined,
           p.instances,
         );

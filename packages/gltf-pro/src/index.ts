@@ -960,6 +960,10 @@ export interface PBRMaterial extends GLTFMaterial {
     readonly transform: Float32Array;
     readonly opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   };
+  /** The same mask for picking, which a blended material's holes also pass through. Absent draws as ever. */
+  pickMask?: PBRMaterial['castMask'];
+  /** False when the material's colour pass reads white for vertex colours (`@margoengine/materials` `vertexColors`). */
+  vertexAlpha?: boolean;
   /** Use the retained UV-transform frame layout for constructed optional materials. */
   extendedFrame?: boolean;
 }
@@ -1117,6 +1121,8 @@ interface ShadowCasterRecord {
   instances?: PBRInstances;
   displacement?: PBRMaterial['displacement'];
   opacity?: NonNullable<PBRMaterial['castMask']>['opacity'];
+  /** False keeps vertex alpha out of the cut-out, as the colour pass does. Set only on a primitive that cuts. */
+  vertexAlpha?: boolean;
   clip?: GPUBufferBinding;
   dynamic: boolean;
 }
@@ -1213,6 +1219,8 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   const opacity = mask?.opacity;
   if (opacity) value.opacity = opacity;
   else delete value.opacity;
+  if (m.vertexAlpha === false && value.cutoff > 0) value.vertexAlpha = false;
+  else delete value.vertexAlpha;
   value.instances = p.instances;
   const displacement = m.displacement,
     clip = m.clip;
@@ -2795,32 +2803,34 @@ export class PBRModel implements EnginePlugin {
     if (this.disposed) return [];
     return this.resources
       .filter((r) => !r.batch)
-      .map((r) => ({
-        primitive: r.primitive,
-        node: r.primitive.node,
-        vertex: r.primitive.deformed ?? r.vertex,
-        vertexOffset: r.primitive.deformed ? (r.primitive.deformedOffset ?? 0) : 0,
-        index: r.index,
-        count: r.primitive.indices.length,
-        stride: 80 as const,
-        alphaTexture: r.views[0],
-        alphaSampler: r.samplers[0],
-        alpha: r.primitive.material.base[3],
-        cutoff:
-          r.primitive.material.settings[0] === 1
-            ? r.primitive.material.settings[1]
-            : r.primitive.material.settings[0] === 2
-              ? 0.001
-              : 0,
-        side: sideOf(r.primitive.material),
-        doubleSided: sideOf(r.primitive.material) === 'double',
-        texCoord: (r.primitive.material.maps[0] ? textureCoordinates(r.primitive.material.maps[0]).texCoord : 0) as
-          | 0
-          | 1,
-        ...(r.primitive.material.maps[0]?.extensions?.KHR_texture_transform
-          ? { alphaTransform: textureCoordinates(r.primitive.material.maps[0]).transform }
-          : {}),
-      }));
+      .map((r) => {
+        const m = r.primitive.material,
+          mask = m.pickMask,
+          cutoff = m.settings[0] === 1 ? m.settings[1] : m.settings[0] === 2 ? 0.001 : 0;
+        return {
+          primitive: r.primitive,
+          node: r.primitive.node,
+          vertex: r.primitive.deformed ?? r.vertex,
+          vertexOffset: r.primitive.deformed ? (r.primitive.deformedOffset ?? 0) : 0,
+          index: r.index,
+          count: r.primitive.indices.length,
+          stride: 80 as const,
+          alphaTexture: mask ? mask.view : r.views[0],
+          alphaSampler: mask ? mask.sampler : r.samplers[0],
+          alpha: m.base[3],
+          cutoff,
+          side: sideOf(m),
+          doubleSided: sideOf(m) === 'double',
+          texCoord: (mask ? mask.texCoord : m.maps[0] ? textureCoordinates(m.maps[0]).texCoord : 0) as 0 | 1,
+          ...(mask
+            ? { alphaTransform: mask.transform }
+            : m.maps[0]?.extensions?.KHR_texture_transform
+              ? { alphaTransform: textureCoordinates(m.maps[0]).transform }
+              : {}),
+          ...(mask?.opacity ? { opacity: mask.opacity } : {}),
+          ...(m.vertexAlpha === false && cutoff > 0 ? { vertexAlpha: false } : {}),
+        };
+      });
   }
   /** Explicit CPU-query snapshot. Only deformed geometry incurs GPU readback. */
   async readPickingGeometry(): Promise<readonly PBRPickingGeometry[]> {

@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { Material, Texture, createMesh } from '../../materials/dist/index.js';
-import { opacityDepth, opacityEntries } from '../../shared/caster.js';
+import { opacityCode, opacityDepth, opacityEntries, solidVertexDepth } from '../../shared/caster.js';
 import { instancedDepth } from '../../shared/instances.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
@@ -100,6 +100,66 @@ test('editing a mesh material keeps one mask object, so caster reads allocate no
   } finally {
     s.close();
   }
+});
+
+test('vertexColors false keeps vertex alpha out of a cutting caster, and only a cutting one', async () => {
+  const s = await scene();
+  try {
+    const material = new Material({ alphaTest: 0.5, vertexColors: false }),
+      mesh = createMesh(s.engine, quad, material);
+    assert.equal(mesh.shadowPrimitives[0].vertexAlpha, false);
+    material.vertexColors = true;
+    assert.equal(mesh.shadowPrimitives[0].vertexAlpha, undefined);
+    assert.equal(s.caster({ vertexColors: false }).shadowPrimitives[0].vertexAlpha, undefined, 'nothing to cut');
+  } finally {
+    s.close();
+  }
+});
+
+test('a mesh picks through what its colour pass leaves out', async () => {
+  const s = await scene();
+  try {
+    const material = { map: texture(), alphaTest: 0.4, uvTransform: { offset: [0.25, 0], texCoord: 1 } },
+      mesh = s.caster(material),
+      [p] = mesh.pickingPrimitives,
+      [cast] = mesh.shadowPrimitives;
+    assert.equal(p.alphaTexture, cast.alphaTexture, 'the map, not the default white');
+    assert.equal(p.alphaSampler, cast.alphaSampler);
+    assert.equal(p.texCoord, 1);
+    assert.equal(p.alphaTransform[2], 0.25);
+    assert.ok(s.caster({ alphaMap: texture(), alphaTest: 0.5 }).pickingPrimitives[0].opacity.view);
+    // Blended holes pick through and cast nothing, as before.
+    const blended = s.caster({ map: texture(), transparent: true });
+    assert.equal(blended.pickingPrimitives[0].alphaTransform?.length, 8);
+    assert.equal(blended.pickingPrimitives[0].cutoff, 0.001);
+    assert.equal(s.caster({ alphaTest: 0.5, vertexColors: false }).pickingPrimitives[0].vertexAlpha, false);
+    const plain = s.caster({}).pickingPrimitives[0];
+    assert.equal(plain.alphaTransform, undefined);
+    assert.equal(plain.opacity, undefined);
+    assert.equal(plain.vertexAlpha, undefined);
+  } finally {
+    s.close();
+  }
+});
+
+test('solidVertexDepth takes vertex alpha out, whatever else the caster does', () => {
+  const plain = '@location(4) color:vec4f @vertex fn vertex(i:In)->Out {o.alpha=i.color.a;return o;}';
+  assert.match(solidVertexDepth(plain), /o\.alpha=1\.0;/);
+  // An instance's tint still multiplies in.
+  assert.match(solidVertexDepth(instancedDepth(plain)), /o\.alpha=1\.0\*i\.tint\.a;/);
+});
+
+test('opacityDepth reads every sampling form the caster passes use', () => {
+  const shape = (sample) =>
+    `struct PickOut {a:f32}struct Out {b:f32}o.uv=select(i.uv.xy,i.uv.zw,f.x);let alpha=${sample}.a*f.alpha.x;`;
+  for (const sample of ['textureSampleLevel(m,s,i.uv,0)', 'textureSample(m,s,i.uv)', 'textureSample(m,s,uv)'])
+    assert.match(opacityDepth(shape(sample), 0), /\.a\*margoOpacityAt\(i\.margoUV\)\*f\.alpha\.x/);
+  // A pass whose binding 4 is taken moves the map.
+  assert.match(opacityCode(0, 5), /@binding\(5\) var<uniform> margoOpacity/);
+  assert.deepEqual(
+    opacityEntries({ buffer: {}, view: {}, sampler: {} }, 5).map((e) => e.binding),
+    [5, 6, 7],
+  );
 });
 
 test('opacityDepth adds the opacity map to a caster depth shader', () => {

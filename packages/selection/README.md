@@ -99,9 +99,10 @@ require a beauty render. Animation time is not advanced by the query. Deformed
 draws are not rejected by their bind-pose bounds.
 
 The returned mesh is the primitive's node. Picking and outlines honor hidden
-ancestors, mirrored winding, front/back/double-sided materials, alpha masks, vertex alpha,
+ancestors, mirrored winding, front/back/double-sided materials, alpha masks, opacity maps
+(materials `alphaMap`, `PickingPrimitive.opacity`), vertex alpha (left out with `vertexAlpha: false`),
 UV1, texture transforms and implicit mip filtering. Blended PBR surfaces are
-pickable when their sampled alpha is at least 0.001. GPU picking chooses the
+pickable when their sampled alpha is at least 0.001, materials meshes included. GPU picking chooses the
 nearest visible surface; CPU BVH queries remain geometric triangle queries.
 
 Outlines replay the same current PBR buffers against scene depth, with both

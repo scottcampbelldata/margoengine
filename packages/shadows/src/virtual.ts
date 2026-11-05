@@ -19,7 +19,16 @@ import { meshTriangles } from '../../shared/mesh-source.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { invert } from '../../shared/math.js';
-import { casterPipeline, casterRuntime, displacementGroup, drawCaster, staleCaster } from '../../shared/caster.js';
+import {
+  casterPipeline,
+  casterRuntime,
+  displacementGroup,
+  drawCaster,
+  opacityDepth,
+  opacityEntries,
+  solidVertexDepth,
+  staleCaster,
+} from '../../shared/caster.js';
 import { PAGES_PER_SIDE, PAGE_TEXELS, PagePool, basePageSize, pageIndex, pageMatrix, pageSize } from './pages.js';
 import { shadowDepth, type ShadowFilter } from './shader.js';
 import { pageClear, pageCopy, pageFeedback, pageNearest, virtualSampling } from './virtual-shader.js';
@@ -88,6 +97,7 @@ interface Draw {
   section?: GPUBuffer;
   displacement?: ShadowPrimitive['displacement'];
   displaced?: GPUBindGroup;
+  opacity?: ShadowPrimitive['opacity'];
   /** Stays cached while it stays put: not a `static` registration, whose changes only `shadowVersion` reports. */
   watched: boolean;
   /** What the cached pages hold of it (world matrix, alpha, cutoff, UV set, count, then the alpha transform). */
@@ -642,6 +652,7 @@ export class VirtualShadows implements EnginePlugin {
         section: section?.buffer,
         displacement: p.displacement,
         displaced: displacementGroup(this.device!, () => pipeline.getBindGroupLayout(1), p.displacement),
+        opacity: p.opacity,
         watched: false,
         seen: new Float32Array(28),
         castSerial: -1,
@@ -665,17 +676,29 @@ export class VirtualShadows implements EnginePlugin {
       throw new RangeError('Unsupported shadow vertex stride; use 24-byte or 80-byte vertices.');
     const inst = p.instances,
       displacement = p.displacement,
-      transform = p.alphaTransform;
+      transform = p.alphaTransform,
+      opacity = p.opacity;
     if (inst && p.stride !== 80) throw new RangeError('Instanced shadow casters need 80-byte vertices');
     if (displacement && p.stride !== 80) throw new RangeError('Displaced shadow casters need 80-byte vertices');
+    if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
     const lines = p.topology === 'line-list',
+      solid = p.stride === 80 && p.vertexAlpha === false,
       key =
-        p.stride + (transform ? 1 : 0) + (inst ? 2 : 0) + (lines ? 4 : 0) + (section ? 8 : 0) + (displacement ? 16 : 0);
+        p.stride +
+        (transform ? 1 : 0) +
+        (inst ? 2 : 0) +
+        (lines ? 4 : 0) +
+        (section ? 8 : 0) +
+        (displacement ? 16 : 0) +
+        (opacity ? 32 : 0) +
+        (solid ? 64 : 0);
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
       if (displacement) code = displacedDepth(code, 1);
       if (inst) code = instancedDepth(code);
+      if (solid) code = solidVertexDepth(code);
+      if (opacity) code = opacityDepth(code, 0);
       if (section) {
         code = code
           .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
@@ -705,6 +728,7 @@ export class VirtualShadows implements EnginePlugin {
           { binding: 1, resource: p.alphaTexture ?? this.whiteView! },
           { binding: 2, resource: p.alphaSampler ?? this.alphaSampler! },
           ...(section ? [{ binding: 3, resource: section }] : []),
+          ...(p.opacity ? opacityEntries(p.opacity) : []),
         ],
       });
     }

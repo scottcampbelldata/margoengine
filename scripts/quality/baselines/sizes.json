@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4405362,
+  "total": 4407354,
   "history": [
     {
       "date": "2026-10-24",
@@ -1496,6 +1496,12 @@
       "commit": "b4d104412",
       "reason": "scatter: the WebGPU cull keeps candidate order (src/order.ts and shared/prefix.js now load with the root, no longer only in the WebGL2 route chunk), so still 4x MSAA frames repeat bit for bit on Apple GPUs (known bug fixed 2026-11-05); +150 B gzip",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "f9d1f17be",
+      "reason": "Cut-outs on materials meshes: opacity and solid shader variants in selection, staging and taa",
+      "grew": 3
     }
   ],
   "items": {
@@ -1819,7 +1825,7 @@
     "@margoengine/sciviz/bricks": 14279,
     "@margoengine/sciviz/colormaps": 4433,
     "@margoengine/sciviz/maths": 5638,
-    "@margoengine/selection": 18404,
+    "@margoengine/selection": 19018,
     "@margoengine/shader": 12517,
     "@margoengine/shader/editor": 21990,
     "@margoengine/shader/effects": 8386,
@@ -1854,10 +1860,10 @@
     "@margoengine/stage/particles": 724,
     "@margoengine/stage/shadows": 750,
     "@margoengine/stage/sky": 719,
-    "@margoengine/staging": 6296,
+    "@margoengine/staging": 7041,
     "@margoengine/stats": 4934,
     "@margoengine/stats/report": 1389,
-    "@margoengine/taa": 10390,
+    "@margoengine/taa": 11023,
     "@margoengine/taa/upscale": 7124,
     "@margoengine/terrain": 12449,
     "@margoengine/text": 16532,

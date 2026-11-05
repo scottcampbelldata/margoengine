@@ -137,6 +137,8 @@ backs them yet:
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 
+**Cut-outs hold in every pass (2026-11-05).** A materials cut-out (`map` alpha, `alphaMap`, UV transform, `alphaTest`, `vertexColors: false`) now holds in picking, contact shadows, TAA velocity and virtual shadows as well as the other shadow maps; proof by GPU pixel and velocity reads in `packages/materials/test/cutout-passes-browser.mjs` and `packages/shadows/test/cutout-casters-browser.mjs`. `triplanar` is the exception, and displacement and clipping planes are still open (`docs/known-bugs.md`).
+
 **Transmission adds in linear light (2026-11-05).** Through `install` and `Transmission`, on display-encoded targets too; proof in `packages/materials/tests/transmission-shader.test.js`. gltf-pro's native two-draw glass still adds encoded values on a target with no PostStack ([known-bugs.md](../known-bugs.md)).
 
 ## Optimization proofs

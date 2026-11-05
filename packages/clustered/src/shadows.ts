@@ -27,7 +27,14 @@ import {
 } from './light-shadow-math.js';
 import { MargoError } from '@margoengine/math/errors';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { casterBuffers, casterRuntime, displacementGroup, opacityDepth, opacityEntries } from '../../shared/caster.js';
+import {
+  casterBuffers,
+  casterRuntime,
+  displacementGroup,
+  opacityDepth,
+  opacityEntries,
+  solidVertexDepth,
+} from '../../shared/caster.js';
 import { worldRadius } from '../../shared/sphere.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
@@ -81,6 +88,8 @@ export interface LocalShadowPrimitive {
    * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Such a caster redraws every frame.
    */
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
+  vertexAlpha?: boolean;
   /**
    * Bounding sphere of the vertices in the node's local space: centre x, y, z and radius (core `Geometry.bounds`).
    * With it, each shadow map draws the caster only when the sphere reaches its light's frustum; without it (and for
@@ -975,7 +984,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     const identity = p.primitive ?? p.index,
       displacement = p.displacement,
       opacity = p.opacity,
-      key = `${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}${displacement ? 'd' : ''}${opacity ? 'o' : ''}`;
+      key = `${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}${displacement ? 'd' : ''}${opacity ? 'o' : ''}${p.stride === 80 && p.vertexAlpha === false ? 'a' : ''}`;
     if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
     if (displacement && p.stride !== 80) throw new RangeError('Displaced shadow casters need 80-byte vertices');
     let records = this.draws.get(p.node);
@@ -1069,7 +1078,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       plain = depth(pbr, key.includes('t')),
       opacity = key.includes('o'),
       code = displaced ? displacedDepth(plain, 2) : plain,
-      placed = key.includes('i') ? instancedDepth(code) : code,
+      instanced = key.includes('i') ? instancedDepth(code) : code,
+      placed = key.includes('a') ? solidVertexDepth(instanced) : instanced,
       module = this.device!.createShaderModule({ code: opacity ? opacityDepth(placed, 1) : placed });
     pipeline = this.device!.createRenderPipeline({
       layout: this.device!.createPipelineLayout({

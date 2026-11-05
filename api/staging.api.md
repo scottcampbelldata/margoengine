@@ -6,7 +6,7 @@
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
 
-export interface ContactPrimitive {
+export interface ContactPrimitive extends CasterCutout {
     node: Mesh;
     vertex: GPUBuffer;
     vertexOffset?: number;
@@ -58,5 +58,13 @@ export class ContactShadows implements EnginePlugin {
 export interface ContactSource {
     shadowPrimitives?: readonly ContactPrimitive[];
     disposed?: boolean;
+}
+
+// Not exported from this entry, but used by the exports above:
+
+interface CasterCutout {
+  alphaTransform?: Float32Array;
+  opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  vertexAlpha?: boolean;
 }
 ```

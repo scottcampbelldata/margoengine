@@ -40,7 +40,7 @@ export interface TAAVelocity {
     readonly resolved: GPUTexture;
 }
 
-export interface VelocityPrimitive {
+export interface VelocityPrimitive extends CasterCutout {
     primitive?: object;
     node: Mesh;
     vertex: GPUBuffer;
@@ -54,7 +54,6 @@ export interface VelocityPrimitive {
     alpha?: number;
     cutoff?: number;
     texCoord?: number;
-    alphaTransform?: Float32Array;
     instances?: unknown;
 }
 
@@ -66,4 +65,12 @@ export interface VelocitySource {
 export function halton(index: number, base: number): number;
 
 export function jitterProjection(out: Float32Array, matrix: ArrayLike<number>, frame: number, width: number, height: number): Float32Array;
+
+// Not exported from this entry, but used by the exports above:
+
+interface CasterCutout {
+  alphaTransform?: Float32Array;
+  opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  vertexAlpha?: boolean;
+}
 ```

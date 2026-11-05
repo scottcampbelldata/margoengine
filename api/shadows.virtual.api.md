@@ -130,6 +130,7 @@ interface ShadowPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    vertexAlpha?: boolean;
     dynamic?: boolean;
 }
 

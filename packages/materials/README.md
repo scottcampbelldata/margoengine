@@ -646,7 +646,19 @@ const leaves = new LambertMaterial({map: leafColour, alphaMap: leafCutout, alpha
 leaves.alphaMap = null; // live: the next frame draws without it
 ```
 
-Directional, spot and point shadows cut along the same `map` alpha, `alphaMap`, UV transforms and `alphaTest` as the colour pass. `triplanar` is the exception: its projection follows world space, so the mesh casts its whole surface.
+Directional (cascaded and virtual), spot and point shadows, contact shadows, TAA velocity and picking cut along the same `map` alpha, `alphaMap`, UV transforms and `alphaTest` as the colour pass, and `vertexColors: false` keeps vertex alpha out of all of them. Picking also passes through the holes of a blended material. `triplanar` is the exception: its projection follows world space, so the mesh keeps its whole surface in those passes.
+
+```js
+import { Picking } from '@margoengine/selection';
+import { ContactShadows } from '@margoengine/staging';
+import { PbrMaterial, createMesh } from '@margoengine/materials';
+
+Picking.attach(engine);
+const contact = ContactShadows.attach(engine);
+const fence = createMesh(engine, geometry, new PbrMaterial({ map, alphaMap, alphaTest: 0.5 }));
+contact.add(fence);
+await engine.pick(x, y); // null through a hole, and no contact shadow under one
+```
 
 ## Parallax, triplanar and subsurface
 

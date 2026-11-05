@@ -40,7 +40,9 @@ casts, fading linearly to nothing at it, default 1), `blur` (world units, defaul
   write, lifted 0.01% of the plane size above the ground so it does not z-fight with a floor mesh there. A model in front
   of the plane covers it; a transparent glTF primitive blends over it. Not drawn when the camera is below the ground.
 - **Sources**: anything with `shadowPrimitives` (gltf-pro `PBRModel`, `@margoengine/materials` meshes), same shape as
-  `@margoengine/shadows`; alpha-masked materials honour their cutout, blended ones are skipped. Instanced primitives (gltf-pro `PBRInstances`) draw every instance in one occluder draw. Hidden meshes and
+  `@margoengine/shadows`; alpha-masked materials honour their cutout (`alphaTransform`, including glTF
+  `KHR_texture_transform`, the materials `alphaMap` as `opacity`, and `vertexAlpha: false`), blended ones are skipped. An
+  `opacity` caster's UV rows change on the GPU alone, so a `static` shadow redraws every frame while one is added. Instanced primitives (gltf-pro `PBRInstances`) draw every instance in one occluder draw. Hidden meshes and
   disposed sources drop out.
 
 Limits: Y-up ground only; the blur is uniform, so the shadow does not get softer with height

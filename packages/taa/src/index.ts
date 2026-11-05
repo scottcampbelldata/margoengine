@@ -13,6 +13,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { halton, jitterProjection } from './jitter.js';
 import { fullscreen, cameraVelocity, objectVelocity, snapshot, resolve, present } from './shader.js';
+import { opacityEntries, type CasterCutout } from '../../shared/caster.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
 import { hiddenInTree } from '../../shared/visibility.js';
@@ -23,6 +24,7 @@ declare const GPUTextureUsage: {
   TEXTURE_BINDING: number;
   STORAGE_BINDING: number;
   COPY_SRC: number;
+  COPY_DST: number;
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** TAA settings, read every frame from `taa.options`; out of range throws RangeError before any GPU command. */
@@ -35,7 +37,7 @@ export interface TAAOptions {
   depth?: () => GPUTexture | undefined;
 }
 /** A drawable whose per-vertex motion TAA tracks: the `shadowPrimitives` contract of core and gltf-pro meshes. */
-export interface VelocityPrimitive {
+export interface VelocityPrimitive extends CasterCutout {
   /** The source primitive: keys TAA's per-draw record; static PBR sources keep their CPU `vertices` on it. */
   primitive?: object;
   /** The mesh whose world matrix (current and previous) moves the primitive. */
@@ -62,8 +64,6 @@ export interface VelocityPrimitive {
   cutoff?: number;
   /** UV set of `alphaTexture`, 0 or 1. */
   texCoord?: number;
-  /** UV transform of `alphaTexture` (PBR only): 8 finite floats, rows (a, b, offset, unused) for u and then v. */
-  alphaTransform?: Float32Array;
   /** Instanced (gltf-pro PBRInstances) primitives get no object motion: camera reprojection covers static instances. */
   instances?: unknown;
 }
@@ -104,6 +104,7 @@ interface Draw {
   vertexSize: number;
   alpha?: GPUTextureView;
   sampler?: GPUSampler;
+  opacity?: VelocityPrimitive['opacity'];
   frame: number;
 }
 /**
@@ -172,6 +173,9 @@ export class TAA implements EnginePlugin {
   private objectCamera?: GPUBuffer;
   private readonly cameraRows = new Float32Array(36);
   private sources = new Set<VelocitySource>();
+  private whiteTexture?: GPUTexture;
+  private whiteView?: GPUTextureView;
+  private whiteSampler?: GPUSampler;
   private readonly values = new Float32Array(52);
   private readonly jittered = new Float32Array(16);
   private readonly previous = new Float32Array(16);
@@ -562,6 +566,20 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           if (!records.size) this.draws.delete(mesh);
         }
   }
+  /** The mask of a primitive without one (a materials mesh with no map): opaque, as the shadow passes read it. */
+  private white(device: GPUDevice): GPUTextureView {
+    if (!this.whiteView) {
+      this.whiteTexture = device.createTexture({
+        size: [1, 1],
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      device.queue.writeTexture({ texture: this.whiteTexture }, new Uint8Array(4).fill(255), { bytesPerRow: 4 }, [1, 1]);
+      this.whiteView = this.whiteTexture.createView();
+      this.whiteSampler = device.createSampler();
+    }
+    return this.whiteView;
+  }
   private drawMotion(c: Context, p: VelocityPrimitive, out: { r: Draw; p: VelocityPrimitive }[]): void {
     // Per-instance previous transforms are unavailable; retain camera reprojection for these casters.
     if (p.instances) return;
@@ -580,12 +598,26 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       throw new TypeError(
         'Invalid TAA alpha transform; set it to a Float32Array of 8 finite numbers on a primitive with stride 80.',
       );
+    const opacity = p.opacity;
+    if (opacity && p.stride !== 80)
+      throw new TypeError('Invalid TAA opacity map; use it on a primitive with stride 80.');
     const pbr = p.stride === 80,
+      solid = pbr && p.vertexAlpha === false,
       key =
-        p.stride + ':' + !!transform + ':' + c.descriptor.depthStencil!.format + ':' + c.descriptor.multisample?.count;
+        p.stride +
+        ':' +
+        !!transform +
+        ':' +
+        !!opacity +
+        ':' +
+        solid +
+        ':' +
+        c.descriptor.depthStencil!.format +
+        ':' +
+        c.descriptor.multisample?.count;
     let pipeline = this.objectPipelines.get(key);
     if (!pipeline) {
-      const module = c.device.createShaderModule({ code: objectVelocity(pbr, !!transform) });
+      const module = c.device.createShaderModule({ code: objectVelocity(pbr, !!transform, !!opacity, solid) });
       pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: {
@@ -629,7 +661,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       r.vertexOffset !== offset ||
       r.vertexSize !== size ||
       r.alpha !== p.alphaTexture ||
-      r.sampler !== p.alphaSampler
+      r.sampler !== p.alphaSampler ||
+      r.opacity !== opacity
     ) {
       r?.uniform.destroy();
       r?.vertices?.destroy();
@@ -650,12 +683,13 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         vertexSize: size,
         alpha: p.alphaTexture,
         sampler: p.alphaSampler,
+        opacity,
         frame: -2,
       };
       records.set(identity, r);
       if (pbr) {
-        if (!p.alphaTexture || !p.alphaSampler || size > c.device.limits.maxStorageBufferBindingSize)
-          throw new TypeError('TAA PBR source needs alpha bindings and a storage-sized vertex buffer');
+        if (size > c.device.limits.maxStorageBufferBindingSize)
+          throw new TypeError('TAA PBR source needs a storage-sized vertex buffer');
         // A whole buffer binds as before; a deformer's shared buffer binds the primitive's range.
         let source: GPUBufferBinding =
           offset || size !== p.vertex.size ? { buffer: p.vertex, offset, size } : { buffer: p.vertex };
@@ -686,6 +720,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           ],
         });
       }
+      const white = pbr && !(p.alphaTexture && p.alphaSampler) ? this.white(c.device) : undefined;
       r.group = c.device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
         entries: [
@@ -694,8 +729,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           ...(pbr
             ? [
                 { binding: 1, resource: { buffer: r.vertices! } },
-                { binding: 2, resource: p.alphaTexture! },
-                { binding: 3, resource: p.alphaSampler! },
+                { binding: 2, resource: p.alphaTexture ?? white! },
+                { binding: 3, resource: p.alphaSampler ?? this.whiteSampler! },
+                ...(opacity ? opacityEntries(opacity, 5) : []),
               ]
             : []),
         ],
@@ -824,6 +860,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     this.motionDepth = undefined;
     this.captureTarget?.dispose();
     this.captureTarget = undefined;
+    this.whiteTexture?.destroy();
+    this.whiteTexture = this.whiteView = this.whiteSampler = undefined;
     for (const t of this.textures) t.destroy();
     for (const records of this.draws.values())
       for (const r of records.values()) {

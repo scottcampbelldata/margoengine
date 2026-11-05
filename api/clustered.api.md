@@ -169,6 +169,7 @@ export interface LocalShadowPrimitive {
         readonly view: GPUTextureView;
         readonly sampler: GPUSampler;
     };
+    vertexAlpha?: boolean;
 }
 
 export interface LocalShadowSource {

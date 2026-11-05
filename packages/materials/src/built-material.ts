@@ -1831,12 +1831,11 @@ function displacementOf(m: Material, device: GPUDevice | null | undefined, owner
     : (state.displacement = { buffer, view, sampler });
 }
 /**
- * What shadow casters bind to cut `m` out like its colour pass: the map and alphaMap under the same `alphaTest`. A
- * blended or untested material has no mask, so an opaque caster's draw does not change. Triplanar projects the map from
- * world space, which a caster's UVs cannot follow: it casts its whole surface (README).
+ * The map and alphaMap of `m` as a pass other than its colour pass binds them. Triplanar projects the map from world
+ * space, which such a pass's UVs cannot follow: it keeps its whole surface (README).
  */
-function castMaskOf(m: Material, device: GPUDevice | null | undefined, owner: object): CastMask | undefined {
-  if (!device || m.settings[0] !== 1 || m.triplanar || (!m.map && !m.alphaMap)) return undefined;
+function surfaceMask(m: Material, device: GPUDevice | null | undefined, owner: object): CastMask | undefined {
+  if (!device || m.triplanar || (!m.map && !m.alphaMap)) return undefined;
   const state = mapState(m, owner),
     [view, sampler] = m.map?.sampled(device, true, 'map') ?? fallback(device, 0),
     mask = (state.castMask ??= { view, sampler, texCoord: 0, transform: new Float32Array(8) }),
@@ -1854,6 +1853,12 @@ function castMaskOf(m: Material, device: GPUDevice | null | undefined, owner: ob
   } else delete mask.opacity;
   return mask;
 }
+/** What shadow casters cut `m` out with: only `alphaTest` cuts, so an opaque or blended caster's draw does not change. */
+const castMaskOf = (m: Material, device: GPUDevice | null | undefined, owner: object): CastMask | undefined =>
+  m.settings[0] === 1 ? surfaceMask(m, device, owner) : undefined;
+/** What picking tests `m` with: a blended material has holes too, where its coverage is 0. */
+const pickMaskOf = (m: Material, device: GPUDevice | null | undefined, owner: object): CastMask | undefined =>
+  m.settings[0] !== 0 ? surfaceMask(m, device, owner) : undefined;
 /** The clipping-plane uniform of `m` for `owner` (section layout: 6 planes, count in settings.x), written now. */
 function clipUniform(m: Material, device: GPUDevice, owner: object): GPUBufferBinding {
   const buffer = materialBuffer(m, device, owner, 112, 'clip'),
@@ -3880,6 +3885,8 @@ const surfaceFields: PropertyDescriptorMap = {
   displacement: live((m, g) => displacementOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   clip: live((m, g) => clipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   castMask: live((m, g) => castMaskOf(m, g[recordRuntime].gpu, g[recordRuntime])),
+  pickMask: live((m, g) => pickMaskOf(m, g[recordRuntime].gpu, g[recordRuntime])),
+  vertexAlpha: live((m) => m.vertexColors),
   wireframe: {
     ...live((m) => m.wireframe),
     set(this: MaterialRecord, v: boolean) {

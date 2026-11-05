@@ -85,9 +85,9 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/splines | `.` 3 |  |  | 1,382 |
 | @margoengine/sprites | `.` 14, `./animation` 6, `./aseprite` 13, `./atlas` 3 | 6 |  | 4,894 |
 | @margoengine/stage | `.` 23, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1 | 15 |  | 1,984 |
-| @margoengine/staging | `.` 4 |  |  | 6,056 |
+| @margoengine/staging | `.` 4 | 1 |  | 6,056 |
 | @margoengine/stats | `.` 3, `./report` 6 | 2 |  | 4,897 |
-| @margoengine/taa | `.` 7, `./upscale` 2 |  |  | 10,203 |
+| @margoengine/taa | `.` 7, `./upscale` 2 | 1 |  | 10,203 |
 | @margoengine/terrain | `.` 13 | 2 |  | 11,867 |
 | @margoengine/text | `.` 35, `./rich` 8, `./msdf` 4 | 22 |  | 16,050 |
 | @margoengine/tilemap | `.` 41, `./autotile` 13, `./ldtk` 8, `./tiled` 6 | 28 |  | 7,253 |

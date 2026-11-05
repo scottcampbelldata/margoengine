@@ -43,7 +43,7 @@ const patch = async (image, p) => {
 // Where each half of the quad (x -3 to -2 solid, -2 to -1 cut) lands on the floor, through its middle.
 const directional = { solid: [-0.5, 0, 0], cut: [0.5, 0, 0] },
   local = { solid: [-0.75, 0, 0], cut: [0.75, 0, 0] },
-  passes = { directional, spot: local, point: local, integratedSpot: local, integratedPoint: local };
+  passes = { directional, virtual: directional, spot: local, point: local, integratedSpot: local, integratedPoint: local };
 // Whether each half's floor point is in shadow, per caster.
 const expected = {
   map: { solid: true, cut: false },
@@ -54,6 +54,8 @@ const expected = {
   transform: { solid: false, cut: true },
   alphaMap: { solid: true, cut: false },
   alphaOnly: { solid: true, cut: false },
+  vertexOff: { solid: true, cut: true },
+  vertexOn: { solid: false, cut: false },
 };
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
@@ -88,6 +90,7 @@ try {
     for (const pass of Object.keys(passes)) for (const caster of Object.keys(expected)) await run(pass, caster);
     await run('directional', 'map', true);
     await run('directional', 'alphaMap', true);
+    await run('directional', 'vertexOff', true);
     await run('spot', 'alphaMap', true);
     await run('integratedPoint', 'alphaMap', true);
     // Live edits redraw the cached map: no test casts the whole quad, the test again cuts it, a new map moves the cut.

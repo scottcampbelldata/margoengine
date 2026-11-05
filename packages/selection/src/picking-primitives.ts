@@ -4,7 +4,7 @@ import type { Mesh as MeshHandle } from '@margoengine/core';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
-import { casterBuffers } from '../../shared/caster.js';
+import { casterBuffers, opacityDepth, opacityEntries, solidVertexDepth } from '../../shared/caster.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -24,6 +24,10 @@ export interface PickingPrimitive {
   cutoff?: number;
   texCoord?: 0 | 1;
   alphaTransform?: Float32Array;
+  /** Opacity map of the surface (materials `alphaMap`): its green channel multiplies the alpha `cutoff` tests. */
+  opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  /** False keeps vertex alpha out of the test, as the colour pass does (materials `vertexColors: false`). Default true. */
+  vertexAlpha?: boolean;
   doubleSided?: boolean;
   side?: 'front' | 'back' | 'double';
 }
@@ -52,6 +56,7 @@ interface Draw {
   pipeline: GPURenderPipeline;
   texture?: GPUTextureView;
   sampler?: GPUSampler;
+  opacity?: PickingPrimitive['opacity'];
 }
 const identityUV = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]);
 const budget = 65536;
@@ -264,39 +269,7 @@ export class PickingPrimitives {
       this.clearDraws();
       return candidates;
     }
-    const mask = !!options.mask,
-      key = [
-        options.format,
-        options.depthFormat,
-        options.sampleCount ?? 1,
-        options.depthCompare ?? 'greater-equal',
-        mask,
-      ].join(':');
-    let pipeline = this.pipelines.get(key);
-    if (!pipeline) {
-      if (this.pipelines.size >= 64)
-        throw new RangeError(
-          'Too many picking primitive variants; reduce distinct formats, sample counts and mask modes to 64 or fewer.',
-        );
-      const module = this.device.createShaderModule({ code: shader(mask) });
-      pipeline = this.device.createRenderPipeline({
-        layout: 'auto',
-        vertex: {
-          module,
-          entryPoint: 'vertex',
-          buffers: casterBuffers(80),
-        },
-        fragment: { module, entryPoint: 'fragment', targets: [{ format: options.format }] },
-        primitive: { topology: 'triangle-list', cullMode: 'none' },
-        multisample: { count: options.sampleCount ?? 1 },
-        depthStencil: {
-          format: options.depthFormat,
-          depthWriteEnabled: !mask,
-          depthCompare: options.depthCompare ?? 'greater-equal',
-        },
-      });
-      this.pipelines.set(key, pipeline);
-    }
+    const pipeline = this.pipeline(options);
     if (!this.white) {
       this.white = this.device.createTexture({
         size: [1, 1],
@@ -312,6 +285,7 @@ export class PickingPrimitives {
       this.whiteView = this.white.createView();
       this.sampler = this.device.createSampler();
     }
+    // Records live under the plain pipeline of these options; each holds its own variant.
     let draws = this.drawsByPipeline.get(pipeline);
     if (!draws) {
       draws = [];
@@ -319,13 +293,16 @@ export class PickingPrimitives {
     }
     // Each primitive owns its uniform; another view of the same frame writes a frame-arena slice.
     for (let index = 0; index < primitives.length; index++) {
-      const p = primitives[index];
+      const p = primitives[index],
+        opacity = p.opacity,
+        variant = opacity || p.vertexAlpha === false ? this.pipeline(options, !!opacity, p.vertexAlpha === false) : pipeline;
       let record = draws[index];
       if (
         !record ||
-        record.pipeline !== pipeline ||
+        record.pipeline !== variant ||
         record.texture !== p.alphaTexture ||
-        record.sampler !== p.alphaSampler
+        record.sampler !== p.alphaSampler ||
+        record.opacity !== opacity
       ) {
         retire(this.device!, record?.uniform);
         const uniform = this.device.createBuffer({
@@ -338,16 +315,18 @@ export class PickingPrimitives {
           record = {
             uniform,
             values: new Float32Array(48),
-            pipeline,
+            pipeline: variant,
             texture: p.alphaTexture,
             sampler: p.alphaSampler,
+            opacity,
             groups: uniformGroups(uniform, (binding) =>
               this.device!.createBindGroup({
-                layout: pipeline.getBindGroupLayout(0),
+                layout: variant.getBindGroupLayout(0),
                 entries: [
                   { binding: 0, resource: binding },
                   { binding: 1, resource: texture },
                   { binding: 2, resource: sampler },
+                  ...(opacity ? opacityEntries(opacity) : []),
                 ],
               }),
             ),
@@ -385,9 +364,10 @@ export class PickingPrimitives {
       },
     });
     try {
-      pass.setPipeline(pipeline);
+      let bound: GPURenderPipeline | undefined;
       for (let index = 0; index < primitives.length; index++) {
         const p = primitives[index];
+        if (draws[index].pipeline !== bound) pass.setPipeline((bound = draws[index].pipeline));
         pass.setBindGroup(0, draws[index].groups.get(draws[index].slice));
         pass.setVertexBuffer(0, p.vertex, p.vertexOffset || undefined);
         pass.setIndexBuffer(p.index, 'uint32');
@@ -397,6 +377,47 @@ export class PickingPrimitives {
       pass.end();
     }
     return candidates;
+  }
+  /** The pipeline of `options`; a primitive with an opacity map or without vertex alpha takes its own shader. */
+  private pipeline(options: DrawOptions, opacity = false, solid = false): GPURenderPipeline {
+    const mask = !!options.mask,
+      key = [
+        options.format,
+        options.depthFormat,
+        options.sampleCount ?? 1,
+        options.depthCompare ?? 'greater-equal',
+        mask,
+        opacity,
+        solid,
+      ].join(':');
+    let pipeline = this.pipelines.get(key);
+    if (!pipeline) {
+      if (this.pipelines.size >= 64)
+        throw new RangeError(
+          'Too many picking primitive variants; reduce distinct formats, sample counts and mask modes to 64 or fewer.',
+        );
+      const plain = shader(mask),
+        code = solid ? solidVertexDepth(plain) : plain,
+        module = this.device!.createShaderModule({ code: opacity ? opacityDepth(code, 0) : code });
+      pipeline = this.device!.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+          module,
+          entryPoint: 'vertex',
+          buffers: casterBuffers(80),
+        },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: options.format }] },
+        primitive: { topology: 'triangle-list', cullMode: 'none' },
+        multisample: { count: options.sampleCount ?? 1 },
+        depthStencil: {
+          format: options.depthFormat,
+          depthWriteEnabled: !mask,
+          depthCompare: options.depthCompare ?? 'greater-equal',
+        },
+      });
+      this.pipelines.set(key, pipeline);
+    }
+    return pipeline;
   }
   private clearDraws(): void {
     for (const draws of this.drawsByPipeline.values()) for (const record of draws) retire(this.device!, record.uniform);
@@ -428,9 +449,9 @@ struct PickFrame {camera:mat4x4f,model:mat4x4f,settings:vec4f,uv0:vec4f,uv1:vec4
 @group(0) @binding(1) var alphaMap:texture_2d<f32>;
 @group(0) @binding(2) var alphaSampler:sampler;
 struct PickInput {@location(0) position:vec4f,@location(3) uv:vec4f,@location(4) color:vec4f}
-struct PickOutput {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
-@vertex fn vertex(i:PickInput)->PickOutput {var o:PickOutput;let p=f.model*vec4f(i.position.xyz,1);o.position=f.camera*p;o.uv=select(i.uv.xy,i.uv.zw,f.settings.z>0.5);o.alpha=i.color.a;return o;}
-@fragment fn fragment(i:PickOutput,@builtin(front_facing) front:bool)->@location(0) ${mask ? 'vec4f' : 'u32'} {
+struct PickOut {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+@vertex fn vertex(i:PickInput)->PickOut {var o:PickOut;let p=f.model*vec4f(i.position.xyz,1);o.position=f.camera*p;o.uv=select(i.uv.xy,i.uv.zw,f.settings.z>0.5);o.alpha=i.color.a;return o;}
+@fragment fn fragment(i:PickOut,@builtin(front_facing) front:bool)->@location(0) ${mask ? 'vec4f' : 'u32'} {
  let uv=vec2f(dot(f.uv0.xy,i.uv)+f.uv0.z,dot(f.uv1.xy,i.uv)+f.uv1.z);let alpha=textureSample(alphaMap,alphaSampler,uv).a*f.settings.x*i.alpha;
  let facing=front==(f.settings.w>0.0);if((!facing&&f.info.y<0.5)||(facing&&f.info.y>1.5)||alpha<f.settings.y){discard;}return ${mask ? 'vec4f(1,0,0,1)' : 'u32(f.info.x)'};
 }`;

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { TAA, halton } from '../dist/index.js';
 import { mockGPU, passes, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { wgsl } from '../../core/src/shaders.ts';
+import { objectVelocity } from '../src/shader.ts';
 
 /** One TAA on the recording mock, a frame driver, and every pass context it saw. */
 function rig() {
@@ -32,6 +33,16 @@ function rig() {
 }
 // jitterProjection's NDC offset of frame f, in uv.
 const offset = (f, w, h) => [(halton((f % 8) + 1, 2) - 0.5) / w, (halton((f % 8) + 1, 3) - 0.5) / h];
+
+test('object velocity cuts with the opacity map and leaves vertex alpha out on request', () => {
+  const plain = objectVelocity(true, true);
+  assert.doesNotMatch(plain, /margoOpacity/);
+  assert.match(plain, /o\.alpha=i\.color\.a;/);
+  const cut = objectVelocity(true, true, true, true);
+  assert.match(cut, /@binding\(5\) var<uniform> margoOpacity/, 'binding 4 is the camera');
+  assert.match(cut, /\.a\*margoOpacityAt\(i\.uv\)\*i\.alpha\*f\.alpha\.x/);
+  assert.match(cut, /o\.alpha=1\.0;/);
+});
 
 test('taa.velocity: the velocity texture, the jitter part of every vector, and the resolved frame', () => {
   const r = rig();
