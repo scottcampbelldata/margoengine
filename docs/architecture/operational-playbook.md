@@ -325,6 +325,10 @@ engine needs no `unsafe-eval` must be scoped accordingly. Recorded A6000/Edge me
 over 3,456 clusters were 1.5 ms with 16 lights, 2.8 ms with 64, and 9.4 ms with 256; a 64-wide reduction with seven
 barriers reached 4.4 million invocations per second.
 
+`@margoengine/geometry/gpu` has no route through these tiers: `GeometryGenerator` writes core's vertex buffers from a
+frame pass at order -1000 and refuses the WebGL2 backend with `unsupported`. Evidence: `npm run test:gpu` in
+`packages/geometry` on the RTX A6000, reading vertices back and rebuilding after `rebootDevice`.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback
@@ -598,6 +602,7 @@ The following remain technical gaps, not permission to weaken a check:
 10. The WebGL preview size was inconsistent across older public sources; current generated evidence should replace
     every stale statement.
 11. One duplicate-window comment says eight lines while implementation and conventions use six.
+12. GPU geometry generation has no speed measurement and no run on a GPU other than the RTX A6000.
 12. Only the upper core-stage bound is enforced; there is intentionally no lower bound.
 13. Public-truth checks cover license and package count, not every size or performance number.
 14. Remote workflow configuration is not proof that a workflow actually ran.

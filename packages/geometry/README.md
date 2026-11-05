@@ -58,12 +58,13 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `delaunayTriangulate`, `triangulateConstrained` from `@margoengine/geometry/delaunay` |
 | `sweepGeometry`, `loftGeometry` from `@margoengine/geometry/sweep` |
 | `tessellateGeometry`, `tessellateWithParents` from `@margoengine/geometry/tessellate` |
+| `GeometryGenerator`, `GpuGeometry`, `GpuPath`, `gridIndices` from `@margoengine/geometry/gpu` |
 | `polygonUnion`, `polygonDifference`, `polygonIntersection`, `polygonXor`, `polygonOffset`, `polygonStroke`, `polygonArea`, `polygonShapes` from `@margoengine/geometry/polygon` |
 | `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon, sweep, tessellate), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample, optimize, flow, delaunay, polygon, sweep, tessellate, gpu), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -517,6 +518,55 @@ for (let v = heat.length; v < all.length; v++) {
 - `tessellateWithParents` also returns `parents`: two entries per added vertex, the vertices it is halfway between, always
   earlier ones. Use it for morph targets and attributes of your own.
 
+## Geometry built on the GPU
+
+`@margoengine/geometry/gpu` writes positions and normals straight into the vertex buffer the engine draws from, in a
+compute pass before the scene, for geometry that changes every frame: ropes, cables, animated ribbons and rippling
+sheets. No vertices are uploaded; each item sends 64 bytes of settings a frame. WebGPU only.
+
+```ts
+import {Engine, PbrMaterial} from 'margoengine';
+import {GeometryGenerator} from 'margoengine/geometry/gpu';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 2, 8], target: [0, 0, 0]}});
+const generator = GeometryGenerator.attach(engine);
+const material = new PbrMaterial({color: '#d08030'});
+
+// A rippling sheet: the height is a WGSL function of u, v and time, and normals follow by themselves.
+const sheet = generator.grid({
+  width: 6,
+  depth: 6,
+  columns: 128,
+  rows: 128,
+  bounds: 5,
+  code: `fn height(u: f32, v: f32, time: f32, p: vec4f) -> f32 { return 0.2 * sin(u * 12.0 + time * 3.0); }`,
+});
+engine.createMesh().setGeometry(sheet.geometry).setMaterial(material);
+
+// A rope through 16 points. Points can come from the CPU like this, or from your own compute pass through rope.points.
+const rope = generator.tube({points: 16, radius: 0.05, bounds: 10});
+engine.createMesh().setGeometry(rope.geometry).setMaterial(material);
+engine.onFrame(() => {
+  rope.setPoints(Array.from({length: 16}, (_, i) => [i / 3 - 2.5, 1 + Math.sin(i / 2 + rope.time) / 2, 0]));
+});
+```
+
+- `surface({code})` takes `fn surface(u: f32, v: f32, time: f32, p: vec4f) -> vec3f`; `grid`, `sphere`, `torus` and
+  `cylinder` (an open side wall, or a cone with one radius 0) are the same thing with the function written for you.
+  Normals are `dP/du x dP/dv` by differences, carried on from inside at the first and last rows so poles come out right.
+- `tube` and `ribbon` follow a Catmull-Rom curve through their control points, which are `vec4f`: `xyz`, and `w`
+  multiplying the radius or width. Frames do not twist on their own (double reflection, Wang et al. 2008), and `closed`
+  spreads what is left of the turn over the loop so the ends meet. `up` sets where the frames start.
+- `rope.points` is the GPU buffer of control points. Bind it in a compute pass of your own, such as a rope simulation, and
+  nothing passes through the CPU. After a lost device the points are those of the last `setPoints`.
+- `params` is four numbers the shader reads; for the built-in shapes they are the sizes. Change them at any time. `time`
+  advances with the engine and can be set. `active = false` holds the last result.
+- Only geometry on a mesh in the frame is generated, once a frame, whichever view draws it first.
+- `bounds` is where the geometry can reach, for culling. The default of radius 1,000,000 is never culled.
+- The CPU copy of the geometry stays zero, so CPU raycasts and exports do not see the shape. `await item.read({signal})`
+  copies the vertices back; it waits for the GPU, so use it for a pick or an export, not every frame.
+- `GeometryGenerator.attach` throws `unsupported` on the WebGL2 backend.
+
 ## Bending along a curve
 
 `@margoengine/geometry/flow` deforms a mesh to follow a curve, or places rigid copies along it: trains on tracks, text
@@ -650,6 +700,10 @@ hard edges, twist landing on the right corners, a match with `tubeGeometry`, lev
 square to circle, sections of different counts and starts, smooth lofts passing through every section, closed rings and
 3D rings in either direction. The tessellation tests check that no edge stays over the limit, that area and volume do not
 change, closed solids across hard edges and seams, the same points on both sides of a shared edge, displaced meshes
-staying closed, interpolated attributes, groups, the smallest angle on a split square, and parents.
+staying closed, interpolated attributes, groups, the smallest angle on a split square, and parents. The GPU geometry
+tests check grid topology, sizes, bounds, validation and when work is sent against a stand-in device; `npm run test:gpu`
+reads vertices back from a real GPU and checks spheres, tori, cones, sheets and surfaces against closed forms, tubes
+against the curve through their points, triangles facing their normals, points written by a compute pass, a vertex
+buffer core replaced, closed loops meeting, a drawn picture and a lost device.
 
 Apache-2.0 licensed.

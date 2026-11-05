@@ -670,6 +670,10 @@
       "types": "./dist/geometry/tessellate.d.ts",
       "import": "./dist/geometry/tessellate.js"
     },
+    "./geometry/gpu": {
+      "types": "./dist/geometry/gpu.d.ts",
+      "import": "./dist/geometry/gpu.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"

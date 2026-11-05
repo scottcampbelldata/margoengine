@@ -1,0 +1,343 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Geometry GPU check</title>
+<style>body{margin:0}canvas{width:400px;height:400px;display:block}</style>
+</head>
+<body>
+<canvas width="400" height="400"></canvas>
+<script type="module">
+import { Engine, PbrMaterial } from '/packages/core/dist/index.js';
+import { GeometryGenerator } from '/packages/geometry/dist/gpu.js';
+
+const canvas = document.querySelector('canvas'),
+  engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 6], target: [0, 0, 0] } }),
+  device = engine.gpu,
+  errors = [],
+  generator = GeometryGenerator.attach(engine),
+  material = new PbrMaterial({ color: '#ff3010' });
+device.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+
+const frame = async (delta = 1 / 60) => {
+  engine.render({ delta });
+  await engine.gpu.queue.onSubmittedWorkDone();
+};
+const place = (item) => {
+  const mesh = engine.createMesh().setGeometry(item.geometry).setMaterial(material);
+  return mesh;
+};
+const lengthOf = (a, i) => Math.hypot(a[i * 3], a[i * 3 + 1], a[i * 3 + 2]);
+const spline = (p0, p1, p2, p3, t) =>
+  p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
+
+/** Triangles that face away from their own vertex normals. */
+function backwards({ positions: P, normals: N }, indices) {
+  let wrong = 0;
+  for (let t = 0; t < indices.length; t += 3) {
+    const [a, b, c] = [indices[t] * 3, indices[t + 1] * 3, indices[t + 2] * 3],
+      e = [0, 1, 2].map((k) => P[b + k] - P[a + k]),
+      f = [0, 1, 2].map((k) => P[c + k] - P[a + k]),
+      face = [e[1] * f[2] - e[2] * f[1], e[2] * f[0] - e[0] * f[2], e[0] * f[1] - e[1] * f[0]];
+    if (Math.hypot(...face) < 1e-9) continue;
+    if ([0, 1, 2].reduce((sum, k) => sum + face[k] * (N[a + k] + N[b + k] + N[c + k]), 0) <= 0) wrong++;
+  }
+  return wrong;
+}
+
+function signedVolume({ positions: P }, indices) {
+  let sum = 0;
+  for (let t = 0; t < indices.length; t += 3) {
+    const a = indices[t] * 3,
+      b = indices[t + 1] * 3,
+      c = indices[t + 2] * 3;
+    sum +=
+      (P[a] * (P[b + 1] * P[c + 2] - P[b + 2] * P[c + 1]) -
+        P[a + 1] * (P[b] * P[c + 2] - P[b + 2] * P[c]) +
+        P[a + 2] * (P[b] * P[c + 1] - P[b + 1] * P[c])) /
+      6;
+  }
+  return sum;
+}
+
+window.check = {
+  errors: () => errors,
+
+  /** A sphere lies on its radius with radial normals, and fills the screen's middle. */
+  async sphere() {
+    const item = generator.sphere({ radius: 1.5, columns: 48, rows: 24 }),
+      mesh = place(item);
+    await frame();
+    const data = await item.read();
+    let worstRadius = 0,
+      worstNormal = 0,
+      worstUnit = 0;
+    for (let i = 0; i < item.vertexCount; i++) {
+      const r = lengthOf(data.positions, i);
+      worstRadius = Math.max(worstRadius, Math.abs(r - 1.5));
+      worstUnit = Math.max(worstUnit, Math.abs(lengthOf(data.normals, i) - 1));
+      for (let k = 0; k < 3; k++)
+        worstNormal = Math.max(worstNormal, Math.abs(data.normals[i * 3 + k] - data.positions[i * 3 + k] / r));
+    }
+    const volume = signedVolume(data, item.geometry.indices);
+    window.keep = { item, mesh };
+    return { worstRadius, worstNormal, worstUnit, volume, wrong: backwards(data, item.geometry.indices) };
+  },
+
+  async clear() {
+    window.keep.mesh.dispose();
+    window.keep.item.dispose();
+    await frame();
+  },
+
+  /** Params change the result with nothing re-uploaded but the settings. */
+  async params() {
+    const item = generator.torus({ radius: 2, tube: 0.5, columns: 96, rows: 48 });
+    const mesh = place(item);
+    await frame();
+    const data = await item.read(),
+      first = signedVolume(data, item.geometry.indices),
+      wrong = backwards(data, item.geometry.indices);
+    item.params[1] = 0.25;
+    await frame();
+    const second = signedVolume(await item.read(), item.geometry.indices);
+    mesh.dispose();
+    item.dispose();
+    return { first, second, wrong };
+  },
+
+  async cylinder() {
+    const item = generator.cylinder({ radiusTop: 0, radiusBottom: 1, height: 2, columns: 64 }),
+      mesh = place(item);
+    await frame();
+    const data = await item.read(),
+      { positions: P, normals: N } = data,
+      wrong = backwards(data, item.geometry.indices);
+    let worstSlope = 0;
+    for (let i = 0; i < item.vertexCount; i++) {
+      const r = Math.hypot(P[i * 3], P[i * 3 + 2]);
+      worstSlope = Math.max(worstSlope, Math.abs(r - (1 - (P[i * 3 + 1] + 1) / 2)));
+      if (r > 0.001) {
+        const outward = (N[i * 3] * P[i * 3] + N[i * 3 + 2] * P[i * 3 + 2]) / r;
+        if (outward <= 0) worstSlope = Infinity;
+      }
+    }
+    mesh.dispose();
+    item.dispose();
+    return { worstSlope, wrong };
+  },
+
+  /** A sheet animated by time: every vertex at the height the formula gives for that time. */
+  async grid() {
+    const item = generator.grid({
+        width: 4,
+        depth: 2,
+        columns: 32,
+        rows: 16,
+        code: `fn height(u: f32, v: f32, time: f32, p: vec4f) -> f32 { return sin(u * 6.0 + time) * v; }`,
+      }),
+      mesh = place(item);
+    item.time = 1;
+    await frame(0.5);
+    const data = await item.read(),
+      { positions: P, normals: N } = data,
+      wrong = backwards(data, item.geometry.indices);
+    let worst = 0,
+      up = 1;
+    for (let row = 0; row <= 16; row++)
+      for (let column = 0; column <= 32; column++) {
+        const i = row * 33 + column,
+          u = column / 32,
+          v = row / 16;
+        worst = Math.max(
+          worst,
+          Math.abs(P[i * 3] - (u - 0.5) * 4),
+          Math.abs(P[i * 3 + 1] - Math.sin(u * 6 + 1.5) * v),
+          Math.abs(P[i * 3 + 2] - (0.5 - v) * 2),
+        );
+        up = Math.min(up, N[i * 3 + 1]);
+      }
+    mesh.dispose();
+    item.dispose();
+    return { worst, up, wrong, time: item.time };
+  },
+
+  /** A custom surface, with hand-worked normals. */
+  async surface() {
+    const item = generator.surface({
+        columns: 8,
+        rows: 8,
+        params: [3, 0, 0, 0],
+        code: `fn surface(u: f32, v: f32, time: f32, p: vec4f) -> vec3f { return vec3f(u * p.x, v * p.x, u + v); }`,
+      }),
+      mesh = place(item);
+    await frame();
+    const { positions: P, normals: N } = await item.read();
+    mesh.dispose();
+    item.dispose();
+    // P = (3u, 3v, u + v): dP/du x dP/dv = (3, 0, 1) x (0, 3, 1) = (-3, -3, 9).
+    const s = Math.hypot(3, 3, 9);
+    return { last: [...P.slice(-3)], normal: [...N.slice(0, 3)], expected: [-3 / s, -3 / s, 9 / s] };
+  },
+
+  /** A tube on the curve through its control points, ring by ring. */
+  async tube() {
+    const points = [
+        [0, 0, 0],
+        [1, 1, 0],
+        [2, 0, 1],
+        [3, 1, 1],
+      ],
+      item = generator.tube({ points: 4, radius: 0.2, sides: 12, segments: 48 }),
+      mesh = place(item);
+    item.setPoints(points);
+    await frame();
+    const data = await item.read(),
+      { positions: P, normals: N } = data,
+      wrong = backwards(data, item.geometry.indices);
+    let worstCentre = 0,
+      worstRadius = 0,
+      worstCross = 0,
+      worstTwist = 0;
+    let previous;
+    for (let row = 0; row <= 48; row++) {
+      const x = (row / 48) * 3,
+        span = Math.min(Math.floor(x), 2),
+        t = x - span,
+        at = (i, k) =>
+          i < 0 ? 2 * points[0][k] - points[1][k] : i > 3 ? 2 * points[3][k] - points[2][k] : points[i][k],
+        centre = [0, 1, 2].map((k) => spline(at(span - 1, k), at(span, k), at(span + 1, k), at(span + 2, k), t));
+      const base = row * 13,
+        mean = [0, 0, 0];
+      for (let j = 0; j < 12; j++) for (let k = 0; k < 3; k++) mean[k] += P[(base + j) * 3 + k] / 12;
+      worstCentre = Math.max(worstCentre, ...[0, 1, 2].map((k) => Math.abs(mean[k] - centre[k])));
+      for (let j = 0; j <= 12; j++) {
+        const v = (base + j) * 3,
+          d = [0, 1, 2].map((k) => P[v + k] - centre[k]);
+        worstRadius = Math.max(worstRadius, Math.abs(Math.hypot(...d) - 0.2));
+        worstCross = Math.max(worstCross, ...[0, 1, 2].map((k) => Math.abs(d[k] / 0.2 - N[v + k])));
+      }
+      const first = [N[base * 3], N[base * 3 + 1], N[base * 3 + 2]];
+      if (previous) {
+        const dot = first[0] * previous[0] + first[1] * previous[1] + first[2] * previous[2];
+        worstTwist = Math.max(worstTwist, Math.acos(Math.min(1, dot)));
+      }
+      previous = first;
+    }
+    window.keep = { item, mesh };
+    return { worstCentre, worstRadius, worstCross, worstTwist, wrong };
+  },
+
+  /** A compute shader of the page's own writes the points: nothing crosses from the CPU. */
+  async simulated() {
+    const { item } = window.keep,
+      module = device.createShaderModule({
+        code: `@group(0) @binding(0) var<storage, read_write> points: array<vec4f>;
+          @compute @workgroup_size(4) fn main(@builtin(local_invocation_id) id: vec3u) {
+            points[id.x] = vec4f(f32(id.x), 5.0, 0.0, 2.0);
+          }`,
+      }),
+      pipeline = device.createComputePipeline({ layout: 'auto', compute: { module, entryPoint: 'main' } }),
+      group = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: item.points } }],
+      }),
+      encoder = device.createCommandEncoder(),
+      pass = encoder.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, group);
+    pass.dispatchWorkgroups(1);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+    await frame();
+    const { positions: P } = await item.read();
+    let worst = 0;
+    // A straight line at y = 5 with w = 2: every point 0.4 from it.
+    for (let i = 0; i < item.vertexCount; i++)
+      worst = Math.max(worst, Math.abs(Math.hypot(P[i * 3 + 1] - 5, P[i * 3 + 2]) - 0.4));
+    return worst;
+  },
+
+  /** More meshes make core replace the vertex buffer; generation must follow it. */
+  async grow() {
+    const { item } = window.keep,
+      extra = [];
+    for (let i = 0; i < 9; i++) extra.push(place(item));
+    await frame();
+    const { positions: P } = await item.read();
+    for (const mesh of extra) mesh.dispose();
+    await frame();
+    window.keep.mesh.dispose();
+    item.dispose();
+    await frame();
+    return Math.max(...P.slice(0, 300).map(Math.abs));
+  },
+
+  /** A closed tube meets itself: last row on first, with no turn left over. */
+  async closed() {
+    const ring = [];
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      ring.push([Math.cos(a) * 2, Math.sin(a) * 2, Math.sin(a * 3) * 0.5]);
+    }
+    const item = generator.tube({ points: 12, closed: true, sides: 8, segments: 96, radius: 0.1 }),
+      mesh = place(item);
+    item.setPoints(ring);
+    await frame();
+    const { positions: P } = await item.read(),
+      last = 96 * 9;
+    let worst = 0;
+    for (let j = 0; j < 9 * 3; j++) worst = Math.max(worst, Math.abs(P[j] - P[last * 3 + j]));
+    mesh.dispose();
+    item.dispose();
+    return worst;
+  },
+
+  /** A ribbon: width across, normal square to it, and up holds the start of the frames. */
+  async ribbon() {
+    const item = generator.ribbon({ points: 3, width: 1, segments: 8, up: [0, 1, 0] }),
+      mesh = place(item);
+    item.setPoints([
+      [0, 0, 0],
+      [2, 0, 0],
+      [4, 0, 0],
+    ]);
+    await frame();
+    const data = await item.read(),
+      { positions: P, normals: N } = data,
+      wrong = backwards(data, item.geometry.indices);
+    mesh.dispose();
+    item.dispose();
+    return { first: [...P.slice(0, 6)], normal: [...N.slice(0, 3)], wrong };
+  },
+
+  /** A generated sphere shows up in the picture. */
+  async picture() {
+    const item = generator.sphere({ radius: 1.5 }),
+      mesh = place(item);
+    await frame();
+    window.keep = { item, mesh };
+  },
+
+  /** After a lost device everything is made again and generation carries on. */
+  async restore() {
+    const item = generator.tube({ points: 2, radius: 0.5, sides: 4, segments: 4 }),
+      mesh = place(item);
+    item.setPoints([
+      [0, 7, 0],
+      [1, 7, 0],
+    ]);
+    await frame();
+    await engine.rebootDevice();
+    engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+    await frame();
+    const { positions: P } = await item.read();
+    mesh.dispose();
+    item.dispose();
+    return { same: engine.gpu === device, y: P[1], x: P[0] };
+  },
+};
+window.ready = true;
+</script>
+</body>
+</html>

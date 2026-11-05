@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4466788,
+  "total": 4472140,
   "history": [
     {
       "date": "2026-10-24",
@@ -1598,6 +1598,12 @@
       "commit": "2efa3cca1",
       "reason": "geometry: new optional entry geometry/tessellate",
       "grew": 1
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "6d2178556",
+      "reason": "new optional entry @margoengine/geometry/gpu",
+      "grew": 1
     }
   ],
   "items": {
@@ -1751,6 +1757,7 @@
     "@margoengine/geometry/extras": 5843,
     "@margoengine/geometry/extrude": 8942,
     "@margoengine/geometry/flow": 2748,
+    "@margoengine/geometry/gpu": 5352,
     "@margoengine/geometry/nurbs": 5307,
     "@margoengine/geometry/optimize": 2409,
     "@margoengine/geometry/polygon": 6812,
