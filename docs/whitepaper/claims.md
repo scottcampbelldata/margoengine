@@ -429,6 +429,8 @@ the nearest depth, takes its first search read at the receiver's texel and compa
 `'pcf'` and `'hard'` receivers change only by the appended struct member. Against the old references the first
 difference in each story is the uniform's size and the new buffer.
 
+**environment-hemisphere, advanced to `39c3bfe36` on 2026-11-05:** the physical and transmissive shaders' sun lobes take `margoDirectVisible` and gain `margoLit`, so their text differs; the standard and extended shaders, the hooks and the GPU calls are as before.
+
 **environment-hemisphere, advanced to `a1f778bdc` on 2026-11-05:** the transmissive shader gains the surface tint functions, so its text differs; the lit draw is as before.
 
 **clustered-area-lights, clustered-light-hooks, clustered-local-shadows, environment-hemisphere, gltf-pro-lighting-hooks, post-ssr-models and quality-presets, advanced to `6a958e532` on 2026-11-05:** the IBL, sky, probe, clustered and SSR shaders take the dielectric Fresnel ends as arguments, so their text differs. Plain materials pass 0.04 and 1, which give the old numbers; the calls, bindings and uploads are as before.

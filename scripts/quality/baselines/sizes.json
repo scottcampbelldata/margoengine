@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4403573,
+  "total": 4404671,
   "history": [
     {
       "date": "2026-10-24",
@@ -1484,6 +1484,12 @@
       "commit": "a0e103074",
       "reason": "gltf-pro entries and the usdz worker grow: MaterialExtension.coat, the clearcoat layer install needed to dim the light under it",
       "grew": 3
+    },
+    {
+      "date": "2026-11-05",
+      "commit": "3b1850b1e",
+      "reason": "Shadows reach native coat and sheen lobes: margoLit and margoDirectVisible in the physical shader text",
+      "grew": 2
     }
   ],
   "items": {
@@ -1645,9 +1651,9 @@
     "@margoengine/gltf-pro dist/workers/progressive.js": 15420,
     "@margoengine/gltf-pro/asset": 5501,
     "@margoengine/gltf-pro/coordinates": 755,
-    "@margoengine/gltf-pro/extended": 6783,
+    "@margoengine/gltf-pro/extended": 7245,
     "@margoengine/gltf-pro/instancing": 3380,
-    "@margoengine/gltf-pro/prepare": 17572,
+    "@margoengine/gltf-pro/prepare": 18208,
     "@margoengine/gltf-pro/progressive": 65481,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/worker": 58776,
