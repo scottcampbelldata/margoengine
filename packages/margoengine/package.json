@@ -646,6 +646,10 @@
       "types": "./dist/geometry/sample.d.ts",
       "import": "./dist/geometry/sample.js"
     },
+    "./geometry/optimize": {
+      "types": "./dist/geometry/optimize.d.ts",
+      "import": "./dist/geometry/optimize.js"
+    },
     "./gltf": {
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"

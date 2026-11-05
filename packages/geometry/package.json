@@ -65,6 +65,10 @@
     "./sample": {
       "types": "./dist/sample.d.ts",
       "import": "./dist/sample.js"
+    },
+    "./optimize": {
+      "types": "./dist/optimize.d.ts",
+      "import": "./dist/optimize.js"
     }
   },
   "files": [

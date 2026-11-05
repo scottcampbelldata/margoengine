@@ -54,10 +54,11 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry` from `@margoengine/geometry/extras` |
 | `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` from `@margoengine/geometry/nurbs` |
 | `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
+| `optimizeMesh`, `optimizeVertexCache`, `optimizeOverdraw`, `optimizeVertexFetch`, `vertexFetchRemap`, `analyzeVertexCache` from `@margoengine/geometry/optimize` |
 
 ## Smaller entries
 
-The root exports everything except the optional entries below it (extras, nurbs, sample), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
+The root exports everything except the optional entries below it (extras, nurbs, sample, optimize), which load only when imported. Code that needs one part imports it alone: `@margoengine/geometry/shapes` (curves, paths,
 shapes), `@margoengine/geometry/triangulate` (`triangulate`, `triangulateShape`), `@margoengine/geometry/extrude`
 (`extrudeGeometry`, `shapeGeometry`), `@margoengine/geometry/primitives` (the solids and
 polyhedra) and `@margoengine/geometry/utils` (`geometryData`, `toGeometry`, merging, normals, tangents, edges and
@@ -194,6 +195,42 @@ console.log(point.position, point.normal, point.uv, point.color, point.triangle,
 - A sample costs one binary search over the triangles; building the sampler reads the mesh once. It keeps a reference
   to `data`, so changing the arrays afterwards changes what samples read but not the triangle weights.
 
+## Mesh optimisation
+
+`@margoengine/geometry/optimize` is the step engines run at import: the same triangles and vertices, in an order the GPU
+reads faster. An opaque mesh draws the same picture.
+
+```ts
+import {mergeVertices, sphereGeometry} from 'margoengine/geometry';
+import {analyzeVertexCache, optimizeMesh, optimizeVertexCache} from 'margoengine/geometry/optimize';
+
+const mesh = mergeVertices(sphereGeometry(1, 64, 48));
+
+// All three steps, group by group.
+const fast = optimizeMesh(mesh);
+console.log(analyzeVertexCache(mesh.indices).acmr, analyzeVertexCache(fast.indices).acmr);
+
+// A transparent mesh whose triangle order matters to you: keep the cache step, skip the overdraw sort.
+const glass = optimizeMesh(mesh, {overdraw: false});
+
+// Or one step on a bare index list.
+const indices = optimizeVertexCache(mesh.indices, mesh.positions.length / 3);
+```
+
+- `optimizeVertexCache(indices, vertexCount?)`: Forsyth's linear-speed greedy order. Triangles keep their corners and
+  winding; only their order changes.
+- `optimizeOverdraw(indices, positions, {threshold = 1.05, cacheSize = 16})`: Sander, Nehab and Barczak's method. Run it
+  after the cache step. It cuts the list into clusters and draws the ones facing furthest out of the mesh first, so the
+  depth test can skip what they hide. `threshold` caps how much worse the cache miss ratio may get.
+- `optimizeVertexFetch(data)`: rewrites the vertex arrays in order of first use and drops unused vertices. Attributes
+  outside `GeometryData` (skin weights, say) follow with `vertexFetchRemap(indices, vertexCount?)`, which gives each old
+  vertex its new index, or `0xffffffff` if unused.
+- `optimizeMesh(data, {overdraw = true, threshold, cacheSize})`: the three in order. Each stretch between group boundaries
+  is handled alone, so groups keep exactly their triangles. A mesh with one vertex per corner (extrusions, polyhedra) has
+  nothing to reuse, so run `mergeVertices` first.
+- `analyzeVertexCache(indices, vertexCount?, cacheSize = 16)`: `{misses, acmr, atvr}` on a first-in first-out cache.
+  `acmr` is misses per triangle (3 is the worst), `atvr` misses per vertex used (1 is the best).
+
 ## How it works
 
 - **Tested from first principles.** Primitive parameters, defaults, segment clamping, UV conventions and groups are pinned by `tests/primitives.test.js`: closed solids have no boundary edges and face outward, normals are unit length, areas and volumes match the analytic shapes, and recorded counts, areas and volumes hold to 1e-5. Vertex order inside a primitive is not part of the API.
@@ -266,6 +303,8 @@ world matrices). The NURBS tests check circles and arcs at radius to 1e-12 at ev
 case, rational derivatives to third order against differences, spheres and tori against their closed forms (radius,
 radial normals, closed after welding, area and volume), and creases at repeated knots. The sampler tests check the
 share of points per triangle, a chi-squared test over a square, the moments of a linear density on a single quad,
-zero-weight triangles, interpolated attributes, seeds and the ends of the random range.
+zero-weight triangles, interpolated attributes, seeds and the ends of the random range. The optimiser tests check that
+every triangle survives with its winding and group, a hand-counted cache model, miss ratios under 0.8 from shuffled
+grids, spheres and knots, and overdraw on nested shells with a software depth buffer.
 
 Apache-2.0 licensed.

@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-037). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-038). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -69,6 +69,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | --- | --- | --- | --- | --- |
 | NURBS surfaces (`@margoengine/geometry/nurbs`) | Enforced by method: no trimming curves, knot insertion or degree elevation; `NurbsCurve.tessellate` halves a span at most 12 times. | Trimming needs a boundary representation, which this engine does not carry; revolves, control nets and whole patches do not. | A trimmed patch meshes untrimmed. | Cut the mesh with `@margoengine/mesh-edit`. |
 | Mesh surface sampler (`@margoengine/geometry/sample`) | Enforced by method: points are independent random draws, so they can clump; there is no minimum spacing. Vertex weights are linear across each triangle. | Independent draws cost one search each and need no neighbour lookups. | Two points can land close together. | `@margoengine/scatter` for spaced placement on terrain. |
+| Mesh optimisation (`@margoengine/geometry/optimize`) | Enforced by test ([optimize.test.js](../packages/geometry/tests/optimize.test.js)): shuffled grids, spheres and knots end under 0.8 cache misses per triangle on a 16-vertex first-in first-out cache (3 before); nested shells lose over 40 percent of their overdraw while the miss ratio stays within 6 percent. Frame time on a GPU: not measured. | The cache model is a simulation; real GPUs differ in cache size and batching. | Triangle order changes, so a transparent mesh that relied on it can look different. | `overdraw: false` keeps the sort off; leave the mesh out to keep its order. |
 
 ## Platform
 

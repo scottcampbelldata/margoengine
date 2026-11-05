@@ -92,6 +92,8 @@ backs them yet:
   test.
 - Texture slot counts per material kind in the gltf-pro README, counted from shader source.
 - The sky package's recorded traces, which must be re-recorded after the night sky and fog changes.
+- Frame time gained by `optimizeMesh`. Its tests measure cache misses on a simulated cache and overdraw on a software
+  depth buffer; no GPU run is recorded.
 - glTF export timing for the test model: measured once on a busy machine (`results/exporters-model.json`), so it is
   not quoted.
 
@@ -136,6 +138,7 @@ backs them yet:
 | LIM-035 | Native glass tint draw: "0.52 ms", "0.33 ms", "0.39 ms" (four maps, one layer), 4.46 / 2.56 / 3.47 ms (16 layers), 6.88 / 3.41 / 4.65 ms (eight maps), 3.41 against 2.69 ms (no maps), 17 to 57 percent, 0.03 to 0.2 ms per million glass pixels at 1920 × 1080 4x (docs/limits.md, Rendering) | `results/tint-pass-gpu.json` (`rows`; quiet gate passed); `examples/package-benchmarks/tint-pass.html` | `node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/tint-pass-gpu.mjs` | PROVEN | One machine, sun light only; perf-history entry 47. |
 | LIM-036 | NURBS: `tessellate` halves a span at most 12 times; no trimming, knot insertion or degree elevation; a full `nurbsCircle` stays at its radius to 1e-12 at every parameter (docs/limits.md, Geometry) | `packages/geometry/tests/nurbs.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 | LIM-037 | Mesh sampler: independent draws, no minimum spacing; vertex weights linear across each triangle (docs/limits.md, Geometry) | `packages/geometry/tests/sample.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
+| LIM-038 | Mesh optimisation: under 0.8 cache misses per triangle from shuffled grids, spheres and knots on a 16-vertex first-in first-out cache; over 40 percent less overdraw on nested shells with the miss ratio within 6 percent (docs/limits.md, Geometry) | `packages/geometry/tests/optimize.test.js` | `npm test --workspace packages/geometry` | PROVEN | |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 
