@@ -219,21 +219,6 @@ does not own. Each entry says exactly what is needed to close it.
   Authentication and network-level denial of service (a flood below the TCP layer) are still the application's.
 - **Needed to close:** F20 fixed with a regression test that fails without it.
 
-### The exporters USDZ timing test can still fail when every core is busy allocating
-
-- **What:** `packages/exporters/tests/exporters.test.js` "numbers are written as the shortest text ... (and fast:
-  p-export-usdz)" asserts that a whole `exportUSDZ` of 1,000 boxes is faster than the old digit-by-digit number search
-  alone. Alone it is about 20 against 48 ms. It failed once in a `check:merge` verify on 2026-10-28 (66.9 against
-  64.4 ms) while other checks ran on the machine.
-- **Done:** the two jobs now take turns for nine rounds and each keeps its best round, so a burst of load falls on
-  both. With 32 processes allocating memory on all 32 hardware threads, the old timing failed 4 of 6 runs and the new
-  one 1 of 6; with 8 such processes (the verify's own concurrency) both passed 8 of 8.
-- **Cause of what is left:** the export allocates strings and buffers and the old search barely does, so when memory
-  bandwidth is saturated the export slows more than the search, and the comparison flips.
-- **Fix needed:** compare work with the same allocation profile (the new number writer against the old search, both
-  producing the same strings, with the whole-export time kept as a separate check against a recorded budget), and
-  show it holds with all cores allocating.
-
 ### text: the colour emoji check needs a colour emoji font on the machine
 
 - **Repro:** `npm run test:browser --workspace @margoengine/text` on a Linux machine with no colour emoji font
@@ -781,6 +766,7 @@ Each is described with its cause and guard in
 | A GPU reset left a page waiting 30 to 120 s with no cause named (the reset itself is still open, above) | `49dca9dd`, `51d8786a` | `tests/device-loss-guard.test.js`, `tests/driver-resets.test.js` |
 | netcode `openWebSocket` hung on a refused connection on Node 22 | `7f0dd465` | `packages/netcode/tests/transports.test.js` |
 | Data after a compressed stream accepted on Node 22 (fbx, loaders ZIP, splats SOG, voxel codec) | `0687e6ec` | `tests/trailing-data.test.js` |
+| The exporters USDZ timing test flipped with every core allocating: the whole export against the old search | 2026-11-05 | `packages/exporters/tests/exporters.test.js` |
 | Audit F01, F02, F05: margo-convert read, deleted or overwrote files outside their folder | `4bc89574` | `tests/margo-convert-paths.test.js` |
 | Audit F06, F07: `allowedURLs` matched by prefix; redirects were not rechecked | `c6e7623c` | `tests/security.test.js`, `packages/gltf-pro/tests/progressive.test.js` |
 | Audit F04, F17: OBJ material libraries fetched from any host with the caller's options, no total budget | `b96f5f40` | `packages/loaders/tests/mtl.test.js` |

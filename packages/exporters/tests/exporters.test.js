@@ -6,6 +6,7 @@ import { Geometry, PbrMaterial, box } from '@margoengine/core/extension';
 import { parseGLTF } from '@margoengine/gltf';
 import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
 import { Animation } from '@margoengine/animation';
+import { num } from '../../shared/float-text.js';
 import * as exporters from '../dist/index.js';
 import { exportGLB, exportGLTF, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';
 import {
@@ -1069,10 +1070,11 @@ test('numbers are written as the shortest text that reads back as the same Float
       geometry,
       material: { color: [0.2, 0.4, 0.6, 1] },
     }));
-  // Timed against the old digit-by-digit search over the numbers the mesh lines hold, on the same machine and load: the
-  // old export ran that search and more. The two jobs take turns, nine rounds each, and each keeps its best round: timed
-  // one after the other (three of one, then three of the other), a burst of load from the rest of an eight-way verify
-  // fell on the export alone and it failed at 66.9 against 64.4 ms (2026-10-28); alone it is about 20 against 48 ms.
+  // Two separate checks (2026-11-05). The writer against the old digit-by-digit search: both turn the numbers the mesh
+  // lines hold into the same array of strings, so they allocate alike, and saturated memory bandwidth slows both. It used
+  // to be the whole export against the search, which flipped with every core allocating: the export allocates strings and
+  // buffers, and the search barely does (66.9 against 64.4 ms in a verify on 2026-10-28, alone about 20 against 48 ms).
+  // Each keeps its best of nine alternating rounds, so a burst of load falls on both.
   const text = new TextDecoder().decode(exportUSDZ({ nodes })),
     numbers = text
       .split('\n')
@@ -1083,21 +1085,43 @@ test('numbers are written as the shortest text that reads back as the same Float
       job();
       return performance.now() - start;
     };
-  let usdz = Infinity,
+  assert.ok(numbers.length > 140_000, `${numbers.length} numbers`);
+  assert.deepEqual(numbers.slice(0, 5000).map(num), numbers.slice(0, 5000).map(reference));
+  let writer = Infinity,
     search = Infinity;
   for (let round = 0; round < 9; round++) {
+    writer = Math.min(
+      writer,
+      time(() => numbers.map(num)),
+    );
+    search = Math.min(
+      search,
+      time(() => numbers.map(reference)),
+    );
+  }
+  assert.ok(
+    writer < search,
+    `The number writer ${writer.toFixed(1)} ms is not below the old search ${search.toFixed(1)} ms`,
+  );
+  // The whole export against a recorded budget, in units of a control job that allocates alike: strings joined into one
+  // text, encoded to bytes and copied. A budget in milliseconds cannot hold on a loaded machine: with every core
+  // allocating the export's best round reads 90 to 144 ms against 18 alone, and the control slows with it.
+  const control = () => {
+    const parts = [];
+    for (let i = 0; i < numbers.length; i++) parts.push(`${i}.5`);
+    const bytes = new TextEncoder().encode(parts.join(' '));
+    return new Uint8Array(bytes.length * 2).set(bytes);
+  };
+  let usdz = Infinity,
+    unit = Infinity;
+  for (let round = 0; round < 15; round++) {
     usdz = Math.min(
       usdz,
       time(() => exportUSDZ({ nodes })),
     );
-    search = Math.min(
-      search,
-      time(() => numbers.forEach(reference)),
-    );
+    unit = Math.min(unit, time(control));
   }
-  assert.ok(numbers.length > 140_000, `${numbers.length} numbers`);
-  assert.ok(
-    usdz < search,
-    `USDZ export ${usdz.toFixed(1)} ms is not below the old search alone ${search.toFixed(1)} ms`,
-  );
+  // The ratio read 4.9 to 5.1 alone and 2.6 to 4.9 with 32 processes allocating on 32 threads; the export before its number
+  // writer was fast reads about 16.
+  assert.ok(usdz < unit * 10, `exportUSDZ of 1,000 boxes took ${usdz.toFixed(1)} ms, the control ${unit.toFixed(1)} ms`);
 });

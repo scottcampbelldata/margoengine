@@ -564,6 +564,7 @@ slower baseline is invalid; compare the run's baseline against the recorded base
 | Current proofs depended on private local history | Committed golden outputs and fresh-checkout validation. |
 | Historical proof used today's core on both sides | Claim-revision core pinning and dedicated tests. |
 | Stand-in overhead erased a measured speedup | Shared recorder methods and focused regression test. |
+| A timing comparison flipped under load because its two sides allocate differently | Compare work with the same allocation profile; a whole-job budget is a ratio to a control job that allocates alike (`packages/exporters/tests/exporters.test.js`: 10 of 10 with 32 processes allocating). |
 | Proof digest differed by Node/V8 math | Exact proof inputs, deterministic stand-ins, and multiple pow modes. |
 | Packed declarations referenced source outside the package | Every build creates declarations; consumer package check. |
 | Visual profile mismatched browser or adapter | Exact profile key and explicit adapter selection. |

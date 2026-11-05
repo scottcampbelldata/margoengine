@@ -1,5 +1,6 @@
 // Shared scene collection for every exporter: walks a Margo Engine engine (or a plain data scene), validates and
 // normalizes geometry and materials, and computes local and world transforms in double precision.
+import { num } from '../../shared/float-text.js';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, Mesh, Geometry, PbrMaterial } from '@margoengine/core';
@@ -1384,46 +1385,7 @@ export function toWorld({ geometry, world }: Drawable): {
   return { positions, normals, indices };
 }
 
-// Recently written values: meshes repeat most of theirs (shared corners, axis normals, UVs). Cleared when full.
-const numCache = new Map<number, string>(),
-  numBits = new Uint32Array(new Float32Array(1).buffer),
-  numFloat = new Float32Array(numBits.buffer);
-/** The fewest significant digits (1 to 9) whose toPrecision text reads back as `f`, and that text as a number. */
-function shortest(f: number): string {
-  // Integers below 2^24 are exact and distinct in Float32, so their shortest text is the integer itself.
-  if (Number.isInteger(f) && Math.abs(f) < 16_777_216) return String(f);
-  const fits = (digits: number): boolean => Math.fround(Number(f.toPrecision(digits))) === f;
-  numFloat[0] = f;
-  const exponent = (numBits[0] >>> 23) & 255;
-  // Away from a power of two, f's rounding interval is symmetric, so a correctly rounded text with more digits is never
-  // farther from f: once some digit count reads back, every larger one does, and a binary search finds the fewest (3 or
-  // 4 toPrecision calls instead of up to 9). A power of two (zero mantissa), the top binade, NaN and infinity have a
-  // lopsided or open interval: they scan every count.
-  if (numBits[0] & 0x7fffff && exponent > 0 && exponent < 254) {
-    let low = 1,
-      high = 9; // nine significant digits always identify a Float32
-    while (low < high) {
-      const mid = (low + high) >> 1;
-      if (fits(mid)) high = mid;
-      else low = mid + 1;
-    }
-    return String(Number(f.toPrecision(low)));
-  }
-  for (let digits = 1; digits < 10; digits++) if (fits(digits)) return String(Number(f.toPrecision(digits)));
-  return String(f);
-}
-/** @internal Shortest decimal that reads back as the same Float32 value. */
-export function num(value: number): string {
-  const f = Math.fround(value);
-  if (f === 0) return '0';
-  let text = numCache.get(f);
-  if (text === undefined) {
-    text = shortest(f);
-    if (numCache.size >= 8192) numCache.clear();
-    numCache.set(f, text);
-  }
-  return text;
-}
+export { num };
 
 export const toSrgb = (v: number): number => (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
 export const byte = (v: number): number => Math.max(0, Math.min(255, Math.round(v * 255)));
