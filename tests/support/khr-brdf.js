@@ -111,11 +111,15 @@ export function direct(s, v, l) {
     NdotV = Math.max(dot(s.n, v), 1e-4),
     NdotH = Math.max(dot(s.n, h), 0),
     VdotH = Math.max(dot(v, h), 0);
-  const f0 = s.f0.map((f, i) => mix(f, s.base[i], s.metal)),
-    F = f0.map((f) => schlick(f, VdotH)),
+  // KHR_materials_specular: `specular` scales F90, and the base keeps one number, 1 - max of the dielectric Fresnel.
+  const weight = s.specular ?? 1,
+    edge = (1 - VdotH) ** 5,
+    f0 = s.f0.map((f, i) => mix(f, s.base[i], s.metal)),
+    F = f0.map((f) => f + (mix(weight, 1, s.metal) - f) * edge),
+    dielectric = Math.max(...s.f0.map((f) => f + (weight - f) * edge)),
     irid = s.iridescence ?? { factor: 0, fresnel: [0, 0, 0] };
   const fr = F.map((f, i) => mix(f, irid.fresnel[i], irid.factor)),
-    kd = F.map((f) => mix(1 - f, 1 - Math.max(...irid.fresnel), irid.factor));
+    kd = F.map(() => mix(1 - dielectric, 1 - Math.max(...irid.fresnel), irid.factor));
   const alpha = s.roughness * s.roughness;
   let spec;
   if (s.anisotropy > 0) {

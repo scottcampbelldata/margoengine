@@ -6,6 +6,7 @@
 // normal incidence and the native tint path drew 1.0. scripts/materials-transmission-tests.js measures the same numbers
 // on the GPU.
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { extendedShader, pbrShader, surfaceTintPBR, transmissiveShader } from '../../gltf-pro/src/shader.ts';
 import { materialExtensionShader } from '../../gltf-pro/src/material-extension.ts';
@@ -269,6 +270,13 @@ test('the surface tint draw multiplies by the sampled base colour and transmissi
   assert.ok(code.includes('let s=surface(i,front);return margoTintSurface(i,s,s.base.rgb*s.tr*vec3f(f.coordsB.zw,f.ext.z));'));
   const film = extendedShader({ slots: Array(18).fill(-1), iridescence: true, anisotropy: false, diffuseTransmission: false });
   assert.ok(film.includes('mix(margoDielectricFresnel(s.f0,s.sw,nv),s.ir.rgb,s.ir.w)'));
+});
+
+test('each dispersed ray reads its own blur level', () => {
+  const pass = readFileSync(new URL('../src/transmission-pass.ts', import.meta.url), 'utf8');
+  assert.ok(pass.includes('margoTransmissionLevel(s.roughness,red,path)'));
+  assert.ok(pass.includes('margoTransmissionLevel(s.roughness,blue,path)'));
+  assert.ok(pass.includes('margoTransmissionLevel(s.roughness,ior,path)'));
 });
 
 test('native tint on a display-encoded target multiplies encoded light by the encoded share', () => {

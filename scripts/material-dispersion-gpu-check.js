@@ -69,9 +69,11 @@ try {
   // Each reference renders an ordinary nondispersive material; there is no copied dispersion shader.
   // https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_dispersion#implementation
   function channelIors(options) {
-    const ior = options.ior ?? 1.5,
-      halfSpread = (ior - 1) * 0.025 * options.dispersion;
-    return [Math.max(1, ior - halfSpread), ior, ior + halfSpread];
+    // In f32, as the shader computes them: a double's last bits move a ray across a texel edge.
+    const f = Math.fround,
+      ior = f(options.ior ?? 1.5),
+      halfSpread = f(f(f(ior - 1) * f(0.025)) * f(options.dispersion));
+    return [Math.max(1, f(ior - halfSpread)), ior, f(ior + halfSpread)];
   }
   async function spectralCase(name, options, variant = {}) {
     const actual = await render(name + '-dispersive', options, variant),

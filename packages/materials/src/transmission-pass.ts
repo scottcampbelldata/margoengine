@@ -50,14 +50,10 @@ fn margoTransmissionBehind(i:Out,n:vec3f,v:vec3f,ior:f32,path:f32,level:f32)->ve
   let uv=clamp(c.xy/max(c.w,0.000001)*vec2f(0.5,-0.5)+0.5,vec2f(0),vec2f(1));
   return textureSampleLevel(margoScene,margoSceneSampler,uv,level).rgb;
 }
-fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
-  let ior=max(f.ext.y,1.0);
-  // Node transforms scale the thickness (KHR_materials_volume): the mean of the model axis lengths.
-  let scale=(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3.0;
-  let path=max(margoVolume.x*s.th*scale,0.0);
+// Blur level from the transmitted lobe width (derivation above declarations) at one IOR: dispersed rays each have their own.
+fn margoTransmissionLevel(roughness:f32,ior:f32,path:f32)->f32 {
   let size=vec2f(textureDimensions(margoScene,0));
-  // Blur level from the transmitted lobe width (derivation above declarations).
-  let alpha=s.roughness*s.roughness;
+  let alpha=roughness*roughness;
   let sinTilt=alpha*inverseSqrt(1.0+alpha*alpha);
   let sinOut=sinTilt/ior;
   let tanOut=sinOut*inverseSqrt(1.0-sinOut*sinOut);
@@ -66,12 +62,19 @@ fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
   let yRow=vec3f(f.camera[0].y,f.camera[1].y,f.camera[2].y);
   let reach=select(path,1.0,dot(wRow,wRow)>0.0);
   let texels=deviation*reach*length(yRow)*size.y;
-  let level=clamp(log2(max(texels,1.0)),0.0,f32(textureNumLevels(margoScene)-1u));
-  var behind=margoTransmissionBehind(i,s.n,v,ior,path,level);
+  return clamp(log2(max(texels,1.0)),0.0,f32(textureNumLevels(margoScene)-1u));
+}
+fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
+  let ior=max(f.ext.y,1.0);
+  // Node transforms scale the thickness (KHR_materials_volume): the mean of the model axis lengths.
+  let scale=(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3.0;
+  let path=max(margoVolume.x*s.th*scale,0.0);
+  var behind=margoTransmissionBehind(i,s.n,v,ior,path,margoTransmissionLevel(s.roughness,ior,path));
   if(f.ext.w>0.0&&path>0.0){
     // KHR_materials_dispersion: IOR spread (IOR-1)*0.025*dispersion; red and blue each read on their own ray.
     let spread=(ior-1.0)*0.025*f.ext.w;
-    behind=vec3f(margoTransmissionBehind(i,s.n,v,max(1.0,ior-spread),path,level).r,behind.g,margoTransmissionBehind(i,s.n,v,ior+spread,path,level).b);
+    let red=max(1.0,ior-spread); let blue=ior+spread;
+    behind=vec3f(margoTransmissionBehind(i,s.n,v,red,path,margoTransmissionLevel(s.roughness,red,path)).r,behind.g,margoTransmissionBehind(i,s.n,v,blue,path,margoTransmissionLevel(s.roughness,blue,path)).b);
   }
   // Beer-Lambert through the volume: margoVolume.yzw is the transmittance per world unit.
   var transmittance=vec3f(1.0);

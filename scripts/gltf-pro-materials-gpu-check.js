@@ -30,13 +30,15 @@ const directCases = Array.from({ length: 96 }, (_, k) => {
   const n = [0, 0, 1],
     t = vec.normalize([1, random() - 0.5, 0]),
     v = unitAbove(n),
-    back = k % 4 === 3;
+    back = k % 4 === 3,
+    specular = k % 3 === 1 ? random() : 1;
   const l = back ? vec.scale(unitAbove(n), -1) : unitAbove(n);
   return {
     base: [random(), random(), random()],
     metal: k % 3 === 0 ? 1 : random() * 0.3,
     roughness: 0.1 + random() * 0.85,
-    f0: [0.04, 0.04, 0.04],
+    f0: [0.04 * specular, 0.04 * specular, 0.04 * specular],
+    specular,
     transmission: k % 5 === 0 ? random() : 0,
     n,
     t: vec.normalize([t[0], t[1], 0]),
@@ -57,7 +59,8 @@ try {
   const result = await page.evaluate(
     async ({ iridescenceCases, directCases }) => {
       const shader = await import('/packages/gltf-pro/src/shader.ts'),
-        { lightPBR } = await import('/packages/shared/pbr-hooks.js');
+        { lightPBR } = await import('/packages/shared/pbr-hooks.js'),
+        { dielectricFresnelWGSL } = await import('/packages/shared/pbr-fresnel.js');
       const { Shadows } = await import('/packages/shadows/dist/index.js'),
         { Clustered } = await import('/packages/clustered/dist/index.js');
       const { LocalShadows } = await import('/packages/clustered/dist/shadows.js'),
@@ -204,13 +207,13 @@ try {
         ...c.diffuseTransmission.color,
         ...c.v,
         ...c.l,
-        0,
+        c.specular,
         0,
       ];
       const directOn = (anisotropic) =>
         run(
-          `${io}${surface}\n${shader.directWgsl(anisotropic)}@compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id:vec3u) {
-  let k=id.x*32; var s:Surface; s.base=vec4f(input[k],input[k+1],input[k+2],1); s.metal=input[k+3]; s.roughness=input[k+4]; s.f0=vec3f(input[k+5],input[k+6],input[k+7]); s.tr=input[k+8];
+          `${io}${surface}\n${dielectricFresnelWGSL}${shader.directWgsl(anisotropic)}@compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id:vec3u) {
+  let k=id.x*32; var s:Surface; s.base=vec4f(input[k],input[k+1],input[k+2],1); s.metal=input[k+3]; s.roughness=input[k+4]; s.f0=vec3f(input[k+5],input[k+6],input[k+7]); s.tr=input[k+8]; s.sw=input[k+30];
   s.n=vec3f(input[k+9],input[k+10],input[k+11]); s.at=vec4f(input[k+12],input[k+13],input[k+14],input[k+15]); s.ir=vec4f(input[k+17],input[k+18],input[k+19],input[k+16]);
   s.dt=vec4f(input[k+21],input[k+22],input[k+23],input[k+20]);
   output[id.x]=vec4f(margoDirect(s,vec3f(input[k+24],input[k+25],input[k+26]),vec3f(input[k+27],input[k+28],input[k+29])),0);

@@ -339,8 +339,9 @@ const dispersionFixture = {
       encoder.copyTextureToTexture({ texture: stack.sceneTexture! }, { texture: callerSnapshot }, [320, 240]);
       device.queue.submit([encoder.finish()]);
       const o = mappedOptions(options, variant);
-      model.primitives[0].material.extension = {
-        ...callerTransmission({
+      // KHR_materials_dispersion moves refraction only, and the scalar references change the IOR: this fixture fixes the
+      // Fresnel so that both sides differ in refraction alone. transmission-layers.test.js covers the Fresnel.
+      const extension = callerTransmission({
           factor: o.transmission,
           ior: o.ior,
           dispersion: o.dispersion,
@@ -351,8 +352,14 @@ const dispersionFixture = {
             attenuationDistance: o.attenuationDistance,
           },
         }),
-        replacesPhysical: true,
-      };
+        fixed = Object.fromEntries(
+          Object.entries(extension).map(([key, value]) => [
+            key,
+            typeof value === 'string' ? value.replace('materialTransmissionF0=r0*r0;', 'materialTransmissionF0=0.0;') : value,
+          ]),
+        );
+      if (JSON.stringify(fixed) === JSON.stringify(extension)) throw new Error('the caller Fresnel moved; update this fixture');
+      model.primitives[0].material.extension = { ...fixed, replacesPhysical: true };
       model.primitives[0].material.settings[0] = 2;
       model.root.visible = true;
     } else if (variant.path !== 'fallback') {

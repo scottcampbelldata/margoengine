@@ -1,8 +1,8 @@
 {
- "date": "2026-10-15T20:45:04.726Z",
+ "date": "2026-11-05T14:05:18.684Z",
  "hardware": {
-  "vendor": "intel",
-  "architecture": "xe-2lpg",
+  "vendor": "nvidia",
+  "architecture": "ampere",
   "device": "",
   "description": "",
   "fallback": false
@@ -130,9 +130,9 @@
   }
  ],
  "worstRelativeError": {
-  "iridescence": 0.000016318600368769864,
-  "directIsotropic": 0.000001381570849492134,
-  "directAnisotropic": 3.5663701968018443e-7
+  "iridescence": 0.000004744944911254003,
+  "directIsotropic": 0.000005687977881128357,
+  "directAnisotropic": 5.787469621502877e-7
  },
  "cases": {
   "iridescence": 64,
