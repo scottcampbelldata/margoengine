@@ -217,7 +217,11 @@ Important primitives:
 
 `pmHide` was required because real compilers legally rewrote error-free transforms: AMD D3D12 folded
 `(1 + x) - 1`, and Mesa also regrouped and factored sums. Before the fix a Radeon 680M produced a `preciseLog1p`
-result 8,383,741 ulp outside the bound; Mesa had 14 of 17 functions outside bounds. The fixes are guarded by:
+result 8,383,741 ulp outside the bound; Mesa had 14 of 17 functions outside bounds. Apple's compiler (M6, Chrome and
+Playwright WebKit) lost the last product of `pmProductError` while it was unhidden, so the result was the sum without
+it: `precisePow` went 97 ulp out, and `preciseTan` over its bound through `preciseDiv`. Every product there is hidden now.
+The same compiler spread an unhidden tail over the large part of `preciseLog2`, regrouped `(0.5 t) t` as `0.5 (t t)` in sinh
+and cosh, and lost `f - sd` in pow's log pair. Hides there are named in `tests/precise-math.test.js`. The fixes are guarded by:
 
 - A browser shader rewriter that simulates cancellation and factoring on any GPU.
 - A spec-error rewriter that perturbs builtin results by WGSL's allowed error.
@@ -234,6 +238,12 @@ UHD/Mesa Vulkan. The Intel Arc 140V had not been rerun after the fix. The commit
 and 298,646 pow inputs with zero over bound on A6000 and Intel UHD. Bit equality across vendors is not claimed; the
 per-function ulp bound is.
 
+`pmLog2Pair` carries `s R` as a pair since 2026-11-05. In one float it left `precisePow` over its bound near the top of the
+range on every GPU tried (5.66 ulp on the A6000), and the sweep never drew those inputs. The sweep now has that class,
+which fails on the old maths: 318,575 pow inputs, 0 over bound on the A6000 and on an Apple M6 in Chrome 157 and
+Playwright WebKit. Worst in a 262,144 input scan of that class: 1.23 ulp on the A6000, 1.03 on the M6. The AMD, Intel UHD
+and Arc results above predate this change.
+
 Node 22 and Node 26 once produced different pinned proof digests because V8 implementations of `pow` differed. The
 proof inputs now use exact operations, approximated host math is replaced by deterministic stand-ins during the
 proof, and the suite runs under both pow modes. NaN payloads are canonicalized only where a proof explicitly defines
@@ -241,6 +251,7 @@ that comparison; signed zero otherwise remains significant.
 
 Measured on the RTX A6000 only (`docs/whitepaper/perf-history.md` entry 48): one precise call per element costs 1.0 to
 1.8 times the builtin, `tan` 2.3, `pow` 3.0, and the path tracer's panorama and fisheye rays 1% to 7% of a traced sample.
+The `pow` figure predates the pair for `s R`, which adds work, and has not been measured again.
 Unmeasured: that cost on other GPUs, one kernel rotation-sync call, and cross-machine kernel bit equality.
 
 `@margoengine/compute/subgroups` is opt-in for the same reason: its float sums follow the GPU's subgroup size, so they
@@ -635,7 +646,8 @@ The following remain technical gaps, not permission to weaken a check:
 3. The kernel optimization experiment uses obsolete layout and compression assumptions.
 4. Cross-machine bit equality of kernel output is not measured.
 5. Precise-math GPU cost versus builtins is measured on the RTX A6000 only.
-6. Intel Arc 140V precise-math bounds need a post-fix run.
+6. Intel Arc 140V precise-math bounds need a post-fix run; AMD and Intel UHD need one since the `pmLog2Pair` change of
+   2026-11-05, and `precisePow`'s cost needs measuring again.
 7. Compatibility CPU compute requires `unsafe-eval`; broad CSP prose must remain scoped to the native engine.
 8. Compatibility path-tracer kernels remain outside the practical shader-compilation budget.
 9. Visual baselines do not cover every supported GPU/browser/OS combination.
