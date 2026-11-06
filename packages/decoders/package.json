@@ -89,6 +89,10 @@
     "./jxl": {
       "types": "./dist/jxl.d.ts",
       "import": "./dist/jxl.js"
+    },
+    "./pvr": {
+      "types": "./dist/pvr.d.ts",
+      "import": "./dist/pvr.js"
     }
   },
   "files": [

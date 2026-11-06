@@ -73,6 +73,24 @@ const texture = uploadTexture(device, jxlTextureFile(image));
 folder for `jxl_oxide_wasm_bg.wasm`. `image.decoder` says which ran. Bit depths above 8 come out as 8, an animation gives its first
 frame, a file with an ICC profile and no XYB comes out as stored, and CMYK files are refused (`docs/limits.md`).
 
+## PVR (`@margoengine/decoders/pvr`)
+
+`parsePVR(bytes)` reads PVR files of PVRTC 1 data, 2 or 4 bits a texel, version 3 or the older 52 byte header, and decodes every level,
+surface and cube face to RGBA8 on the CPU, because WebGPU has no PVRTC format. Old iOS asset packs keep working this way. It costs 4
+bytes a texel on the GPU and a pass on the calling thread, so ship KTX2 for anything new.
+
+```ts
+import {parsePVR, uploadTexture} from 'margoengine/decoders/pvr';
+
+declare const device: GPUDevice;
+declare const bytes: Uint8Array;
+
+const texture = uploadTexture(device, parsePVR(bytes));
+```
+
+The result is a `TextureFile` with `target: 'pvr'`, sRGB when the file says so. `decodePVRTC(data, width, height, twoBit)` decodes one
+level of bare PVRTC data. PVRTC 2, 3D textures, big-endian files and sizes that are not powers of two are refused.
+
 ## Texture upload (`@margoengine/decoders/texture`)
 
 `getSupportedTranscodeFormat`, `getBytesPerRow` and `createKTX2Texture` (also on the root) without the transcoder or the

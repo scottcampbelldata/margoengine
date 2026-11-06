@@ -1,5 +1,5 @@
 {
-  "commit": "0cd600605",
+  "commit": "289b05a6e",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -586,6 +586,10 @@
       "./jxl": {
         "raw": 2274888,
         "gzip": 875878
+      },
+      "./pvr": {
+        "raw": 6490,
+        "gzip": 3003
       }
     },
     "@margoengine/dof": {

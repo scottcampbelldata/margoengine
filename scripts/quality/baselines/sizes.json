@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7402913,
+  "total": 7406172,
   "history": [
     {
       "date": "2026-10-24",
@@ -2564,6 +2564,12 @@
       "commit": "0cd600605",
       "reason": "materials/stochastic entry; built-material exports mapSlots",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "4950621e6",
+      "reason": "new entry pvr",
+      "grew": 1
     }
   ],
   "items": {
@@ -2700,6 +2706,7 @@
     "@margoengine/decoders/meshopt": 3309,
     "@margoengine/decoders/meshopt-simd": 19391,
     "@margoengine/decoders/png": 3813,
+    "@margoengine/decoders/pvr": 3259,
     "@margoengine/decoders/texture": 914,
     "@margoengine/decoders/tga": 1614,
     "@margoengine/decoders/tiff": 4129,

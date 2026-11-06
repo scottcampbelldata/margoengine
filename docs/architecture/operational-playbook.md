@@ -890,8 +890,6 @@ The following remain technical gaps, not permission to weaken a check:
     A6000 alone, as are occluders, oriented boxes and occlusion for core meshes.
 21. Every timing since 2026-11-05 is diagnostic. The parity ledger's last run is 2026-10-27: after numbers sit in the row's cause text,
     and `p-morph-compiled`, `p-motion-blur-velocity` and `p-pmrem-refresh` have no ledger row yet.
-29. GPU Basis transcoding (`@margoengine/decoders/ktx2-gpu`) equals the Wasm transcoder byte for byte on the RTX A6000 only, and
-    its load time against a cold Wasm transcoder is not measured.
 22. The WebGL2 CPU tier's interpreter and the path tracer on the layer have no committed timing script.
 23. `@margoengine/shader` compute passes have no check on the WebGL2 layer, and `@margoengine/compute/nn` and `/graph` no speed measurement.
 24. The headless stage has not run in Node: no WebGPU binding is in the repository.
@@ -899,3 +897,5 @@ The following remain technical gaps, not permission to weaken a check:
 26. `ScenePass` (`@margoengine/shader/pass`) has no check in a multi-view frame, and its `velocity()` follows one camera.
 27. Dual quaternion skinning has no frame-time measurement and no run on a GPU other than the RTX A6000.
 28. Bone-texture crowds have no frame-time measurement and no run on a GPU other than the RTX A6000.
+29. GPU Basis transcoding (`@margoengine/decoders/ktx2-gpu`) equals the Wasm transcoder byte for byte on the RTX A6000 only, and
+    its load time against a cold Wasm transcoder is not measured.

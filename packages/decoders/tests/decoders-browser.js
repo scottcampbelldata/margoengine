@@ -6,6 +6,7 @@ import { KTX2Streamer } from '../dist/ktx2-stream.js';
 import { JXLDecoder, jxlTextureFile, uploadTexture } from '../dist/jxl.js';
 import { decodePNG } from '../dist/png.js';
 import jxlRecords from './fixtures/jxl/records.json';
+import { parsePVR } from '../dist/pvr.js';
 
 const fixture = async (name) =>
   new Uint8Array(await (await fetch(new URL(`./fixtures/${name}`, import.meta.url))).arrayBuffer());
@@ -435,6 +436,18 @@ window.runDecoderTests = async () => {
   check((await jxlNative.decode(jxlBytes)).decoder === report.jxlBrowser, 'the second decode took another path');
   jxlNative.dispose();
   checks.push(`JPEG XL with no option: this browser went through ${report.jxlBrowser}; the canvas read back passed on a stand-in`);
+  // PVR: every level of a real file, decoded on the CPU, reads back from the GPU as it was written.
+  const pvr = parsePVR(new Uint8Array(await (await fetch('/tests/fixtures/pvr/fern.pvr')).arrayBuffer())),
+    pvrTexture = uploadTexture(device, pvr, {
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
+    }),
+    pvrLevels = await readLevels(device, pvrTexture);
+  check(pvrLevels.length === pvr.mipmaps.length, `PVR uploaded ${pvrLevels.length} of ${pvr.mipmaps.length} levels`);
+  pvrLevels.forEach((level, i) => {
+    check(level.every((value, at) => value === pvr.mipmaps[i].data[at]), `PVR level ${i} reads back differently`);
+  });
+  pvrTexture.destroy();
+  checks.push(`A real PVRTC file uploads as ${pvr.format}, ${pvr.mipmaps.length} levels, and reads back as decoded`);
   rgba.dispose();
   negotiated.dispose();
   device.destroy();

@@ -36,7 +36,7 @@ export interface TextureFile {
   /** The device feature `format` needs (`texture-compression-bc`, `-etc2` or `-astc`), or undefined for none. */
   feature?: GPUFeatureName;
   /** The file type read. */
-  target: 'dds' | 'ktx' | 'ktx2' | 'jxl';
+  target: 'dds' | 'ktx' | 'ktx2' | 'jxl' | 'pvr';
   /** For a KTX2 file: the transcode target used, or 'native' when the file already stored `format`. */
   transcoded?: string;
   srgb: boolean;

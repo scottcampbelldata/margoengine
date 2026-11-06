@@ -1,0 +1,61 @@
+{
+  "bigMushroom_texture.pvr": {
+    "width": 256,
+    "height": 256,
+    "levels": 1,
+    "sha256": {
+      "0": "f08da112c5b79ce1e7cc29394ae0f03aee98da00c41a8f16a7e150682ef8a8fc"
+    }
+  },
+  "fern.pvr": {
+    "width": 256,
+    "height": 512,
+    "levels": 10,
+    "sha256": {
+      "0": "cf811ecba75644c0e193d84b90e8b726ec99077c4cf3862585edf43750bafe07",
+      "1": "16b53eada4eed4671ef4d43935642a9f1474919b27889049261ee9918b9027b1",
+      "2": "8bef847d090a84d02b8f641f02af9f726d0b52410690dce3a3f8cb4d273846b9",
+      "3": "90b2deceddaa8100e0e622ba88f06d5f4b562e0fcb1e22d8ece69bf26362cb07",
+      "4": "e59aec3bf98baea925a14765b718512e51cd267f2de6c8a2d4eb20ad710b34d3",
+      "5": "0beb66ea0f2413849c1304dc3b5f48a19e62b8272dabeba059b93b8209ebf976"
+    }
+  },
+  "Ground_Western_Village_roughness.pvr": {
+    "width": 2,
+    "height": 2,
+    "levels": 1,
+    "sha256": {}
+  },
+  "test_image_pvrtc2bpp.pvr": {
+    "width": 128,
+    "height": 128,
+    "levels": 1,
+    "sha256": {
+      "0": "cdf04ee48bda239f3d63ecdd7c443ada06feba1f35e5c92fd46bdfca2f736d75"
+    }
+  },
+  "test_image_pvrtc2bpp_v3.pvr": {
+    "width": 128,
+    "height": 128,
+    "levels": 1,
+    "sha256": {
+      "0": "6abb27716e89bd4311e568e335925364d84c3e447dc927c66becfb11651e68d1"
+    }
+  },
+  "test_image_pvrtc4bpp.pvr": {
+    "width": 128,
+    "height": 128,
+    "levels": 1,
+    "sha256": {
+      "0": "2e33a2c08cb4961c9eec4f4f99e1c5d9ed3096230e74a1cd84dd2f77df39380b"
+    }
+  },
+  "test_image_pvrtc4bpp_v3.pvr": {
+    "width": 128,
+    "height": 128,
+    "levels": 1,
+    "sha256": {
+      "0": "7f7cf893e05ac0af43cfc35f9ebcf4eba4887ca65cb8c663bfa899083629a692"
+    }
+  }
+}
