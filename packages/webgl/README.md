@@ -17,7 +17,7 @@ const engine = await Engine.create(canvas, {backend: 'auto', fallback: webglRend
 
 Without a `fallback`, `backend: 'auto'` requires WebGPU and `Engine.create` rejects with
 "WebGPU unavailable"; `backend: 'webgl2'` always uses the fallback. The renderer lives outside
-core, so apps that target WebGPU only do not load its 3,021 B min+gzip
+core, so apps that target WebGPU only do not load its 3,407 B min+gzip
 ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)).
 
 Without React, load it only when WebGPU is missing (needs no core change; WebGPU users download nothing of
