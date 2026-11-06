@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9034407,
+  "total": 9043685,
   "history": [
     {
       "date": "2026-10-24",
@@ -2774,6 +2774,12 @@
       "commit": "b687c84b3",
       "reason": "feat(kinematics-constraints): batched GPU clearance (new entry @margoengine/kinematics-constraints/gpu)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "bbb2459dd",
+      "reason": "gltf-pro and materials gain KHR_materials_volume_scatter",
+      "grew": 7
     }
   ],
   "items": {
@@ -2993,18 +2999,18 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 6831,
-    "@margoengine/gltf-pro": 63626,
-    "@margoengine/gltf-pro dist/workers/gltf.js": 23501,
+    "@margoengine/gltf-pro": 65573,
+    "@margoengine/gltf-pro dist/workers/gltf.js": 24791,
     "@margoengine/gltf-pro dist/workers/progressive.js": 15374,
     "@margoengine/gltf-pro/asset": 5490,
     "@margoengine/gltf-pro/coordinates": 755,
-    "@margoengine/gltf-pro/extended": 7640,
+    "@margoengine/gltf-pro/extended": 8224,
     "@margoengine/gltf-pro/instancing": 3350,
-    "@margoengine/gltf-pro/prepare": 20459,
+    "@margoengine/gltf-pro/prepare": 21088,
     "@margoengine/gltf-pro/progressive": 70098,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/splats": 2100,
-    "@margoengine/gltf-pro/worker": 64090,
+    "@margoengine/gltf-pro/worker": 66055,
     "@margoengine/gltf/auto": 14068,
     "@margoengine/gltf/instancing": 1985,
     "@margoengine/gltf/meshopt": 1205,
@@ -3085,7 +3091,7 @@
     "@margoengine/lod/auto": 7888,
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/stream": 1778,
-    "@margoengine/materials": 63050,
+    "@margoengine/materials": 64979,
     "@margoengine/materials/alpha-hash": 1309,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 37624,
@@ -3097,7 +3103,7 @@
     "@margoengine/materials/prefilter": 1933,
     "@margoengine/materials/skin": 11181,
     "@margoengine/materials/stochastic": 2402,
-    "@margoengine/materials/transmission": 7416,
+    "@margoengine/materials/transmission": 8350,
     "@margoengine/math": 20105,
     "@margoengine/math/affine": 3936,
     "@margoengine/math/billboard": 2672,

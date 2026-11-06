@@ -6,6 +6,7 @@ import { coordinateSlot, coordinateWGSL } from './coordinates.js';
 import type { ClearcoatTexture } from './index.js';
 import { transmissionShader } from './transmission-shader.js';
 import { MargoError } from '@margoengine/math/errors';
+import { scatterExtinction } from '../../shared/volume-scatter.js';
 
 /** KHR_materials_volume: `thicknessFactor` in mesh units (default 0), `attenuationColor` linear RGB (default [1, 1, 1]) and `attenuationDistance` in world units (default Infinity). Needs a transmission factor above 0. */
 export interface VolumeOptions {
@@ -13,6 +14,12 @@ export interface VolumeOptions {
   thicknessTexture?: ClearcoatTexture;
   attenuationColor?: readonly [number, number, number];
   attenuationDistance?: number;
+  /** KHR_materials_volume_scatter (draft): the multi-scatter albedo, linear RGB from 0 to 1 (default [0, 0, 0], no scattering). */
+  multiscatterColorFactor?: readonly [number, number, number];
+  /** Multiplies `multiscatterColorFactor`; an sRGB texture, RGB channels. */
+  multiscatterColorTexture?: ClearcoatTexture;
+  /** Henyey-Greenstein anisotropy from -1 to 1 (default 0): positive scatters forward, so less of it comes back. */
+  scatterAnisotropy?: number;
 }
 /** Options for `transmission()`: `factor` from 0 to 1 (default 0), `ior` (default 1.5), `dispersion` (default 0), an `opaqueColor` view and optional `transmissionTexture` and `volume`. */
 export interface TransmissionOptions extends TransmissionPassOptions {
@@ -41,6 +48,7 @@ export function validateTransmission(options: TransmissionOptions): {
   thickness: number;
   inverseDistance: number;
   color: readonly number[];
+  scatter?: { color: readonly number[]; anisotropy: number; extinction: readonly number[] };
 } {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw new TypeError('Invalid transmission options; pass an options object such as { factor: 1 }.');
@@ -66,7 +74,21 @@ export function validateTransmission(options: TransmissionOptions): {
   const inverseDistance = distance === Infinity ? 0 : 1 / distance;
   if (!Number.isFinite(Math.fround(inverseDistance)))
     throw new RangeError('Volume attenuation distance is too small for float32; pass a larger distance.');
-  return { factor, ior, dispersion, thickness, inverseDistance, color };
+  const multiscatter = volume?.multiscatterColorFactor ?? [0, 0, 0];
+  if (
+    !Array.isArray(multiscatter) ||
+    multiscatter.length !== 3 ||
+    multiscatter.some((c) => typeof c !== 'number' || !Number.isFinite(c) || c < 0 || c > 1)
+  )
+    throw new RangeError('Invalid volume multi-scatter color; pass [r, g, b] with each component from 0 to 1.');
+  const anisotropy = transmissionScalar(volume?.scatterAnisotropy, 0, 'scatter anisotropy', -1, 1),
+    extinction = color.map((c) => scatterExtinction(c, distance));
+  // No colour, depth or medium: nothing scatters, so the shader stays the one without it.
+  const scatter =
+    multiscatter.some((c) => c > 0) && thickness > 0 && extinction.some((c) => c > 0)
+      ? { color: multiscatter, anisotropy, extinction }
+      : undefined;
+  return { factor, ior, dispersion, thickness, inverseDistance, color, ...(scatter ? { scatter } : {}) };
 }
 function validateMap(map: ClearcoatTexture): void {
   if (
@@ -84,6 +106,7 @@ export function createTransmission(options: TransmissionOptions = {}, base?: Mat
   const values = validateTransmission(options);
   if (options.transmissionTexture !== undefined) validateMap(options.transmissionTexture);
   if (options.volume?.thicknessTexture !== undefined) validateMap(options.volume.thicknessTexture);
+  if (options.volume?.multiscatterColorTexture !== undefined) validateMap(options.volume.multiscatterColorTexture);
   if (values.factor === 0) return base ?? {};
   if (!options.opaqueColor)
     throw new TypeError('Transmission requires an opaqueColor view or materials.install(model)');
@@ -99,6 +122,9 @@ export function createTransmission(options: TransmissionOptions = {}, base?: Mat
     ...values.color,
     values.dispersion,
   ];
+  const scatterIndex = factors.length / 4;
+  if (values.scatter)
+    factors.push(...values.scatter.color, values.scatter.anisotropy, ...values.scatter.extinction, 0);
   textures.push({ view: options.opaqueColor });
   const slot = (map?: ClearcoatTexture) => {
     if (!map) return undefined;
@@ -107,16 +133,20 @@ export function createTransmission(options: TransmissionOptions = {}, base?: Mat
     return { index, ...coordinateSlot(map, factors), sampler: !!map.sampler };
   };
   const factor = slot(options.transmissionTexture),
-    thickness = slot(options.volume?.thicknessTexture);
+    thickness = slot(options.volume?.thicknessTexture),
+    scatterColor = values.scatter ? slot(options.volume?.multiscatterColorTexture) : undefined;
   const shader = transmissionShader({
     opaque,
     factor,
     thickness,
     factorsIndex,
     coated: !!base?.declarations?.includes('materialCoatKeep'),
+    ...(values.scatter ? { scatter: { factorsIndex: scatterIndex, color: scatterColor } } : {}),
   });
   const helper =
-    (factor?.transformIndex !== undefined || thickness?.transformIndex !== undefined) &&
+    (factor?.transformIndex !== undefined ||
+      thickness?.transformIndex !== undefined ||
+      scatterColor?.transformIndex !== undefined) &&
     !base?.declarations?.includes('fn materialUV(')
       ? coordinateWGSL
       : '';
@@ -124,6 +154,8 @@ export function createTransmission(options: TransmissionOptions = {}, base?: Mat
     ...base,
     ...shader,
     declarations: (base?.declarations ?? '') + '\n' + helper + shader.declarations,
+    ...(shader.direct ? { direct: [base?.direct, shader.direct].filter(Boolean).join('\n') } : {}),
+    ...(shader.ambient ? { ambient: [base?.ambient, shader.ambient].filter(Boolean).join('\n') } : {}),
     factors: Float32Array.from(factors),
     textures,
     lighting: false,

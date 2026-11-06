@@ -211,7 +211,172 @@ function firstTwoSets({ json, bin }) {
   return { json: edited, bin };
 }
 
+/**
+ * A 2 x 2 quad facing +z, seen from +z, whose one material has these `extensions` on a metal-free surface of `base`.
+ * Everything is through `parseGLTFAsync`; with `installed`, `install(model)` from @margoengine/materials runs on it.
+ */
+async function scatterQuad(extensions, { base = [1, 1, 1], installed = false } = {}) {
+  await open();
+  await page.evaluate(
+    async ({ extensions, base, installed }) => {
+      const { parseGLTFAsync } = await import('/packages/gltf-pro/dist/index.js'),
+        { engine } = window.check,
+        floats = new Float32Array([
+          ...[-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0],
+          ...[0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+          ...[0, 1, 1, 1, 1, 0, 0, 0],
+        ]),
+        indices = new Uint16Array([0, 1, 2, 0, 2, 3]),
+        bytes = new Uint8Array(floats.byteLength + indices.byteLength);
+      bytes.set(new Uint8Array(floats.buffer));
+      bytes.set(new Uint8Array(indices.buffer), floats.byteLength);
+      const view = (byteOffset, byteLength) => ({ buffer: 0, byteOffset, byteLength }),
+        accessor = (bufferView, type, count, componentType = 5126) => ({ bufferView, componentType, count, type }),
+        doc = {
+          asset: { version: '2.0' },
+          scene: 0,
+          scenes: [{ nodes: [0] }],
+          nodes: [{ mesh: 0 }],
+          meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, indices: 3, material: 0 }] }],
+          materials: [
+            { pbrMetallicRoughness: { baseColorFactor: [...base, 1], metallicFactor: 0, roughnessFactor: 0.6 }, extensions },
+          ],
+          buffers: [{ byteLength: bytes.byteLength }],
+          bufferViews: [view(0, 48), view(48, 48), view(96, 32), view(128, 12)],
+          accessors: [
+            { ...accessor(0, 'VEC3', 4), min: [-1, -1, 0], max: [1, 1, 0] },
+            accessor(1, 'VEC3', 4),
+            accessor(2, 'VEC2', 4),
+            accessor(3, 'SCALAR', 6, 5123),
+          ],
+        };
+      const model = await parseGLTFAsync(engine, doc, [bytes], []);
+      if (installed) (await import('/packages/materials/dist/index.js')).install(model);
+      engine.camera.position = [0, 0, 4];
+      engine.camera.target = [0, 0, 0];
+    },
+    { extensions, base, installed },
+  );
+  const image = await pixels(),
+    middle = image.at(size / 2, size / 2);
+  await close();
+  return middle;
+}
+/** The scene light behind a pixel: sRGB decoded, then the Khronos PBR Neutral offset put back (the peak stays under its 0.76 knee). */
+const sceneLight = (pixel) => {
+  const c = pixel.map((v) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4)),
+    low = Math.min(...c),
+    x = low + 0.04 < 0.08 ? Math.sqrt(low / 6.25) : low + 0.04,
+    offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  return c.map((v) => v + offset);
+};
+
 const checks = {
+  // The spec compares a dense medium to a plain diffuse surface of the multi-scatter colour, and a thin one has no medium.
+  // Black diffuse transmission colour leaves the back lobe out, so only the scattered lobe differs between these.
+  async 'scatter: dense is the diffuse surface of its colour, thin is none, between is the share of the formula'() {
+    const color = [0.6, 0.3, 0.15],
+      diffuse = {
+        KHR_materials_diffuse_transmission: { diffuseTransmissionFactor: 1, diffuseTransmissionColorFactor: [0, 0, 0] },
+      },
+      medium = (attenuationDistance) => ({
+        ...diffuse,
+        KHR_materials_volume: { attenuationColor: [0.5, 0.5, 0.5], attenuationDistance, thicknessFactor: 1 },
+        KHR_materials_volume_scatter: { multiscatterColorFactor: color },
+      });
+    // sigma_t x = ln 2 / d: exp(-69 rho_ss) leaves under 1e-3 of a level at distance 0.01; 1e-5 of a level at 1000.
+    const dense = await scatterQuad(medium(0.01)),
+      thin = await scatterQuad(medium(1000)),
+      between = await scatterQuad(medium(1)),
+      none = await scatterQuad(diffuse),
+      solid = await scatterQuad({}, { base: color });
+    for (let k = 0; k < 3; k++) {
+      // One rounding of each picture.
+      assert.ok(Math.abs(dense[k] - solid[k]) <= 2, `dense ${dense} against the diffuse surface ${solid}`);
+      assert.ok(Math.abs(thin[k] - none[k]) <= 2, `thin ${thin} against none ${none}`);
+    }
+    assert.ok(solid[0] > none[0] + 40, `the lobe shows: ${solid} against ${none}`);
+    // Light adds: the scene light between lies at the formula's share of the way, up to half a level in each of three
+    // pictures, a level being what one more of it in every channel means in scene light there.
+    const { scatterExtinction, scatterShares } = await import('../../shared/volume-scatter.js');
+    const [low, high, seen, next] = [none, solid, between, between.map((v) => v + 1)].map(sceneLight);
+    for (let k = 0; k < 3; k++) {
+      const [w] = scatterShares(scatterExtinction(0.5, 1), color[k], 0, 1),
+        expected = low[k] + w * (high[k] - low[k]);
+      assert.ok(Math.abs(seen[k] - expected) <= 1.5 * Math.abs(next[k] - seen[k]), `channel ${k}: ${seen} against ${expected}`);
+    }
+  },
+  // Milky glass through install: dense, nothing of the black page comes through and the lobe is all there is. IOR 1
+  // takes the specular away, so only the lobe is left to light it, and a plain surface of that colour matches it.
+  async 'scatter: install(model) lights the scattered share of transmission'() {
+    const color = [0.6, 0.3, 0.15],
+      ior = { KHR_materials_ior: { ior: 1 } },
+      glass = (scatter) => ({
+        ...ior,
+        KHR_materials_transmission: { transmissionFactor: 1 },
+        KHR_materials_volume: { attenuationColor: [0.5, 0.5, 0.5], attenuationDistance: 0.01, thicknessFactor: 1 },
+        ...(scatter ? { KHR_materials_volume_scatter: { multiscatterColorFactor: color } } : {}),
+      }),
+      milky = await scatterQuad(glass(true), { installed: true }),
+      clear = await scatterQuad(glass(false), { installed: true }),
+      solid = await scatterQuad(ior, { base: color, installed: true });
+    assert.ok(Math.max(...clear) <= 2, `dense clear glass is dark: ${clear}`);
+    for (let k = 0; k < 3; k++) assert.ok(Math.abs(milky[k] - solid[k]) <= 2, `${milky} against ${solid}`);
+  },
+  // Its material as the file states it, and with the extension taken out: the skull's lit pixels leave the colour of the
+  // diffuse transmission's back lobe for the file's multi-scatter colour, which has more blue than red.
+  async 'scatter: the real Khronos ScatteringSkull draws'() {
+    const folder = process.env.MARGO_SPLAT_SAMPLES;
+    if (!folder || !existsSync(join(folder, 'skull/ScatteringSkull.gltf'))) {
+      console.log('ScatteringSkull absent: set MARGO_SPLAT_SAMPLES (tests/fixtures/scatter/NOTICE.md)');
+      return;
+    }
+    const read = (name) => readFileSync(join(folder, 'skull', name)).toString('base64'),
+      png = read('ScatteringSkull_images/aoThickness.png'),
+      bin = read('ScatteringSkull_binary.bin'),
+      json = JSON.parse(readFileSync(join(folder, 'skull/ScatteringSkull.gltf'), 'utf8')),
+      draw = async (doc) => {
+        await open();
+        await page.evaluate(
+          async ({ doc, bin, png }) => {
+            const { parseGLTFAsync } = await import('/packages/gltf-pro/dist/index.js'),
+              { extendedMaterials } = await import('/packages/gltf-pro/dist/extended.js'),
+              { engine } = window.check,
+              bytes = (text) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0)),
+              image = await createImageBitmap(new Blob([bytes(png)], { type: 'image/png' }), {
+                colorSpaceConversion: 'none',
+                premultiplyAlpha: 'none',
+              }),
+              model = await parseGLTFAsync(engine, doc, [bytes(bin)], [image], { materials: extendedMaterials }),
+              b = model.bounds;
+            engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]]);
+          },
+          { doc, bin, png },
+        );
+        const image = await pixels();
+        await close();
+        return image;
+      },
+      mean = (image) => {
+        const sum = [0, 0, 0];
+        let count = 0;
+        for (let i = 0; i < image.data.length; i += 4)
+          if (image.data[i] + image.data[i + 1] + image.data[i + 2] > 24) {
+            count++;
+            for (let k = 0; k < 3; k++) sum[k] += image.data[i + k];
+          }
+        return { count, mean: sum.map((v) => v / count) };
+      },
+      without = structuredClone(json);
+    delete without.materials[0].extensions.KHR_materials_volume_scatter;
+    const scattered = mean(await draw(json)),
+      plain = mean(await draw(without));
+    console.log(`skull: ${scattered.count} pixels lit, mean ${scattered.mean.map((v) => v.toFixed(1))}; no scatter ${plain.mean.map((v) => v.toFixed(1))}`);
+    assert.ok(scattered.count > 5000, 'the skull draws');
+    // The file's colour is 0.17, 0.53, 0.59.
+    assert.ok(scattered.mean[2] > scattered.mean[0] + 10, `blue over red: ${scattered.mean}`);
+    assert.ok(plain.mean[2] < plain.mean[0] + 10, `not without the extension: ${plain.mean}`);
+  },
   // The parse worker and the progressive stream each carry the second vertex buffer's array across a worker.
   async 'uv: the worker and progressive loaders keep later sets'() {
     const url = '/packages/gltf-pro/tests/fixtures/uv/FourUV.glb',

@@ -95,7 +95,12 @@ export function clearcoat(options: ClearcoatOptions = {}): MaterialExtension {
 }
 
 type CoatMap = 'clearcoatTexture' | 'clearcoatRoughnessTexture' | 'clearcoatNormalTexture';
-type MapField = CoatMap | 'transmissionTexture' | 'thicknessTexture' | (typeof lobeMaps)[keyof typeof lobeMaps][number];
+type MapField =
+  | CoatMap
+  | 'transmissionTexture'
+  | 'thicknessTexture'
+  | 'multiscatterColorTexture'
+  | (typeof lobeMaps)[keyof typeof lobeMaps][number];
 /** Fields read from normalized material options or their glTF extension counterparts, validated below. */
 type MaterialDefinition = Partial<Record<MapField, TextureInfo | ClearcoatTexture>> & {
   factor?: number;
@@ -109,6 +114,8 @@ type MaterialDefinition = Partial<Record<MapField, TextureInfo | ClearcoatTextur
   thicknessFactor?: number;
   attenuationColor?: readonly [number, number, number];
   attenuationDistance?: number;
+  multiscatterColorFactor?: readonly [number, number, number];
+  scatterAnisotropy?: number;
   colorFactor?: readonly [number, number, number];
   sheenColorFactor?: readonly [number, number, number];
   sheenRoughnessFactor?: number;
@@ -185,6 +192,12 @@ export class MaterialInstallation implements EnginePlugin {
             : material.extensions?.KHR_materials_volume,
         'KHR_materials_volume',
       );
+      const scatter = definition(
+        volume?.multiscatterColorFactor !== undefined
+          ? volume
+          : material.extensions?.KHR_materials_volume_scatter,
+        'KHR_materials_volume_scatter',
+      );
       const lobeOptions: MaterialLobeOptions = {},
         lobeTextures: Partial<Record<MapField, TextureInfo | ClearcoatTexture>> = {};
       for (const key of Object.keys(lobeMaps) as (keyof typeof lobeMaps)[]) {
@@ -244,6 +257,8 @@ export class MaterialInstallation implements EnginePlugin {
                 thicknessFactor: volume.thicknessFactor,
                 attenuationColor: volume.attenuationColor,
                 attenuationDistance: volume.attenuationDistance,
+                multiscatterColorFactor: scatter?.multiscatterColorFactor,
+                scatterAnisotropy: scatter?.scatterAnisotropy,
               },
             }
           : {}),
@@ -272,6 +287,7 @@ export class MaterialInstallation implements EnginePlugin {
       if (plan.transmission) {
         maps.transmissionTexture = transmit?.transmissionTexture;
         maps.thicknessTexture = volume?.thicknessTexture;
+        maps.multiscatterColorTexture = scatter?.multiscatterColorTexture;
       }
       for (const field of Object.keys(maps) as MapField[])
         if (maps[field] !== undefined) {
@@ -327,7 +343,12 @@ export class MaterialInstallation implements EnginePlugin {
               resolved[field] =
                 'view' in map
                   ? map
-                  : textures.resolve(map, field === 'sheenColorTexture' || field === 'specularColorTexture');
+                  : textures.resolve(
+                      map,
+                      field === 'sheenColorTexture' ||
+                        field === 'specularColorTexture' ||
+                        field === 'multiscatterColorTexture',
+                    );
           }
           for (const field of mapFields) options[field] = resolved[field];
           const coat = plan.coat ? clearcoat(options) : undefined;
@@ -340,7 +361,13 @@ export class MaterialInstallation implements EnginePlugin {
                   opaqueColor: this.capture!.view,
                   transmissionTexture: resolved.transmissionTexture,
                   ...(plan.transmission.volume
-                    ? { volume: { ...plan.transmission.volume, thicknessTexture: resolved.thicknessTexture } }
+                    ? {
+                        volume: {
+                          ...plan.transmission.volume,
+                          thicknessTexture: resolved.thicknessTexture,
+                          multiscatterColorTexture: resolved.multiscatterColorTexture,
+                        },
+                      }
                     : {}),
                 },
                 coat,

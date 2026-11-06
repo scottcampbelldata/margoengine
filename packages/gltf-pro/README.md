@@ -137,7 +137,7 @@ viewGLTFCamera(model, 0); // the animated yfov
 applyGLTFLights(model); // the animated sun; pass {clustered} for point and spot lights
 ```
 
-`loadGLTF` and `parseGLTFAsync` shade a file that uses clearcoat, transmission, IOR, volume, dispersion, sheen, specular, iridescence, anisotropy, diffuse transmission or a bump map with the physical renderer by default: they import `extendedMaterials` from `@margoengine/gltf-pro/extended` on first need, so an app whose files never use those extensions ships none of its WGSL. Pass `{decoders: {materials: false}}` to keep the base shader (the extensions are then ignored, as glTF allows), or your own `extendedMaterials`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. The imported metadata also stays available for explicit `@margoengine/materials` installation, whose lobes replace the physical renderer for the materials they cover. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
+`loadGLTF` and `parseGLTFAsync` shade a file that uses clearcoat, transmission, IOR, volume, dispersion, sheen, specular, iridescence, anisotropy, diffuse transmission, volume scatter or a bump map with the physical renderer by default: they import `extendedMaterials` from `@margoengine/gltf-pro/extended` on first need, so an app whose files never use those extensions ships none of its WGSL. Pass `{decoders: {materials: false}}` to keep the base shader (the extensions are then ignored, as glTF allows), or your own `extendedMaterials`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. The imported metadata also stays available for explicit `@margoengine/materials` installation, whose lobes replace the physical renderer for the materials they cover. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
 
 `KHR_materials_dispersion` is accepted when required. Its factor is validated and
 retained as `primitive.material.dispersion` even without a materials decoder;
@@ -257,6 +257,25 @@ console.log(model.primitives[0].uvs);
 ```
 
 `loadGLTFInWorker`, `loadGLTFProgressive`, Draco, `EXT_mesh_gpu_instancing`, `@margoengine/lod` levels and far meshes, and `@margoengine/exporters` all keep the later sets. `writeGeometry` keeps them too: a write that changes the vertex count passes its own `uvs`. Such primitives stay out of static batches. A `MASK` or `BLEND` base map on set 2 or 3 casts and picks uncut, as the depth passes read the first two sets only, and a `.margo` file holds two sets. A fifth set is refused by name.
+
+### Scattering in glTF volumes (`KHR_materials_volume_scatter`, draft)
+
+`loadGLTF` and `parseGLTFAsync` read `KHR_materials_volume_scatter` by themselves through `@margoengine/gltf-pro/extended`, so milky glass, jade and wax look solid where the light has far to go and clear where it has not. It needs `KHR_materials_volume` with a thickness and an `attenuationDistance`, and light that enters: `KHR_materials_transmission` or `KHR_materials_diffuse_transmission`. Otherwise it does nothing, as the spec has it. `multiscatterColorFactor` (default `[0, 0, 0]`) times `multiscatterColorTexture` (sRGB) is the multi-scatter colour; `scatterAnisotropy` (default `0`, from -1 to 1) moves scattering forward or back.
+
+```ts
+import {parseGLTF} from 'margoengine/gltf-pro';
+import {extendedMaterials} from 'margoengine/gltf-pro/extended';
+import type {Engine} from 'margoengine';
+declare const engine: Engine;
+declare const doc: object;
+// The default loaders need none of this; the synchronous parser takes the decoder by hand.
+const model = parseGLTF(engine, doc, [], [], {materials: extendedMaterials});
+console.log(model.primitives[0].material.extended?.scatter);
+```
+
+This is a rasterizer's reading, with no light walked through the medium. Over the depth x, which is `thicknessFactor` times the green channel of `thicknessTexture` along the surface normal, a share 1 - exp(-sigma_s (1 - g) x) of the entering light scatters and comes back as a diffuse lobe of the multi-scatter colour, with sigma_s from the spec's albedo mapping. A dense medium therefore matches a diffuse surface of that colour, the comparison the spec itself draws. Light does not spread sideways under the surface, so edges stay sharp. Specular transmission keeps its Beer-Lambert term, which already counts what scattered out of the straight path. Diffuse transmission had none, so it is scaled by what crosses the depth. For the view through the glass to refract, and for `KHR_materials_volume` thickness maps on that view, use `install(model)` from `@margoengine/materials`, which reads this extension too.
+
+The text read is the draft of Khronos glTF pull request 2453 (Status "Draft") as of 2026-11-06: it can still change, and pull request 2579 proposes `KHR_materials_scatter` in its place. The multi-scatter colour and thickness maps count toward the eight extension textures of an extended material. Phase function detail beyond the 1 - g scale is not drawn.
 
 ### Bump maps in glTF (`EXT_materials_bump`, draft)
 

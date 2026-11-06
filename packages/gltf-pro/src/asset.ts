@@ -140,7 +140,7 @@ export interface GLTFExtendedMaterials {
   parse(
     extensions: GLTFExtensions,
   ): { features: Omit<ExtendedPlan, 'slots'>; maps: (GLTFTextureInfo | undefined)[]; rows: number[] } | undefined;
-  /** The binding plan for a material's 19 map slots (`extendedPlan`). */
+  /** The binding plan for a material's 21 map slots (`extendedPlan`). */
   plan(maps: readonly ({ index: number } | undefined)[], features: Omit<ExtendedPlan, 'slots'>): ExtendedPlan;
   /** The extended physical shader for a plan (`extendedShader`). */
   shader(plan: ExtendedPlan): string;
@@ -176,6 +176,7 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   KHR_materials_anisotropy: 'materials',
   KHR_materials_diffuse_transmission: 'materials',
   EXT_materials_bump: 'materials',
+  KHR_materials_volume_scatter: 'materials',
   KHR_gaussian_splatting: 'splats',
   KHR_gaussian_splatting_compression_spz_2: 'splats',
 };

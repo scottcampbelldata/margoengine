@@ -42,6 +42,9 @@ export interface VolumeOptions {
     thicknessTexture?: ClearcoatTexture;
     attenuationColor?: readonly [number, number, number];
     attenuationDistance?: number;
+    multiscatterColorFactor?: readonly [number, number, number];
+    multiscatterColorTexture?: ClearcoatTexture;
+    scatterAnisotropy?: number;
 }
 
 export function createTransmission(options?: TransmissionOptions, base?: MaterialExtension): MaterialExtension;
@@ -57,6 +60,11 @@ export function validateTransmission(options: TransmissionOptions): {
     thickness: number;
     inverseDistance: number;
     color: readonly number[];
+    scatter?: {
+        color: readonly number[];
+        anisotropy: number;
+        extinction: readonly number[];
+    };
 };
 
 // Not exported from this entry, but used by the exports above:

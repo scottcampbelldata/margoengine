@@ -19,9 +19,9 @@ model.destroy();
 stage.dispose();
 ```
 
-`install(model)` is synchronous and registers its engine plugin automatically. It reads optional `KHR_materials_clearcoat`, `KHR_materials_sheen`, `KHR_materials_specular`, `KHR_materials_anisotropy`, `KHR_materials_iridescence`, `KHR_materials_transmission`, `KHR_materials_ior`, and `KHR_materials_volume` data from each primitive's material and uses the model's already loaded images. The baseline `loadGLTF` and `parseGLTF` APIs remain unchanged. Their existing validation rejects these extensions in `extensionsRequired`; use optional metadata for this explicit installation path.
+`install(model)` is synchronous and registers its engine plugin automatically. It reads optional `KHR_materials_clearcoat`, `KHR_materials_sheen`, `KHR_materials_specular`, `KHR_materials_anisotropy`, `KHR_materials_iridescence`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, and the draft `KHR_materials_volume_scatter` data from each primitive's material and uses the model's already loaded images. The baseline `loadGLTF` and `parseGLTF` APIs remain unchanged. Their existing validation rejects these extensions in `extensionsRequired`; use optional metadata for this explicit installation path.
 
-Normalized author configuration is also supported: `material.clearcoat` uses `factor`, `roughnessFactor`, `clearcoatTexture`, `clearcoatRoughnessTexture`, and `clearcoatNormalTexture`. Normal texture metadata honors `clearcoatNormalTexture.scale`. `material.transmission` uses `factor`, `ior`, and `transmissionTexture`; `material.volume` uses `thicknessFactor`, `thicknessTexture`, `attenuationColor`, and `attenuationDistance`. Volume can also be nested in `material.transmission.volume`. Installation composes clearcoat and transmission into the same extension slot.
+Normalized author configuration is also supported: `material.clearcoat` uses `factor`, `roughnessFactor`, `clearcoatTexture`, `clearcoatRoughnessTexture`, and `clearcoatNormalTexture`. Normal texture metadata honors `clearcoatNormalTexture.scale`. `material.transmission` uses `factor`, `ior`, and `transmissionTexture`; `material.volume` uses `thicknessFactor`, `thicknessTexture`, `attenuationColor`, `attenuationDistance`, `multiscatterColorFactor`, `multiscatterColorTexture`, and `scatterAnisotropy`. Volume can also be nested in `material.transmission.volume`. Installation composes clearcoat and transmission into the same extension slot.
 
 For caller-provided resources, `clearcoat(options)` returns a `MaterialExtension` that can be assigned to `model.primitives[i].extension`:
 
@@ -112,7 +112,28 @@ Transmission defaults to factor `0` and IOR `1.5`. Its optional texture multipli
 
 Thin glass (no or zero volume thickness) keeps its sightline: it samples the pixel behind it, as glTF specifies. Only positive thickness bends the view along a refraction path. Off-screen coordinates clamp to the image edge, and transparent layers are absent from the opaque snapshot.
 
-Volume requires positive transmission; otherwise installation throws `KHR_materials_volume requires transmission`. Thickness defaults to `0`, and its optional texture uses the green channel. Beer's law attenuates the transmitted color using `attenuationColor` (default `[1, 1, 1]`) and `attenuationDistance`. A missing distance or `Infinity` leaves the transmitted color unattenuated. There is no participating-media scattering. Transmission and thickness maps accept UV0 or UV1 and use linear data.
+Volume requires positive transmission; otherwise installation throws `KHR_materials_volume requires transmission`. Thickness defaults to `0`, and its optional texture uses the green channel. Beer's law attenuates the transmitted color using `attenuationColor` (default `[1, 1, 1]`) and `attenuationDistance`. A missing distance or `Infinity` leaves the transmitted color unattenuated. Transmission and thickness maps accept UV0 or UV1 and use linear data.
+
+Milky glass and jade come from `KHR_materials_volume_scatter` (draft, Khronos pull request 2453 as of 2026-11-06; it can still change). With a `multiscatterColorFactor` above zero (default `[0, 0, 0]`, times the sRGB `multiscatterColorTexture`), a thickness and an attenuation distance, the share of the transmitted light that scatters over the depth, 1 - exp(-sigma_s (1 - g) x), comes back as a diffuse lobe of that colour, lit by the sun and the hemisphere; `scatterAnisotropy` is g, from -1 to 1, default `0`. A dense medium looks like a diffuse surface of the colour and hides what is behind it. This is one lobe at the surface, with no light walked through the medium and none spreading sideways. The view through keeps its Beer-Lambert term. Node materials and `Material` do not have it.
+
+```ts
+import {transmission} from 'margoengine/materials';
+import type {PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
+declare const opaqueColor: GPUTextureView;
+for (const primitive of model.primitives)
+  primitive.extension = transmission({
+    opaqueColor,
+    factor: 1,
+    volume: {
+      thicknessFactor: 0.2,
+      attenuationColor: [0.8, 0.9, 0.8],
+      attenuationDistance: 0.05,
+      multiscatterColorFactor: [0.7, 0.8, 0.7],
+      scatterAnisotropy: 0.2,
+    },
+  });
+```
 
 Transmissive primitives draw after the opaque capture (`afterOpaque: true`) and keep their authored alpha mode: OPAQUE
 and MASK surfaces keep their coverage and depth writes, BLEND surfaces blend. They do not cast shadows or receive the

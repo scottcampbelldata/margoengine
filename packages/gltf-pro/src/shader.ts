@@ -7,6 +7,7 @@ import { ggxD, smithG } from '../../shared/light-terms.js';
 import { sheenAlbedoWGSL, sheenBrdfWGSL } from '../../shared/sheen.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 import { bumpGradientWgsl } from '../../shared/bump.js';
+import { volumeScatterWgsl } from '../../shared/volume-scatter.js';
 // Hemisphere ambient and GGX direct light, shared by the compact and extended shaders.
 // Direct light: glTF 2.0 specification Appendix B (GGX D: Walter et al. 2007, eq. 33; Smith G: eq. 34; Fresnel:
 // Schlick 1994; dielectric F0 0.04 = IOR 1.5). Hemisphere ambient (ground (0.35, 0.3, 0.25) to sky 1 by n.y / 2 + 1/2,
@@ -338,8 +339,8 @@ export const physicalMaps = [
   'specular',
   'specularColor',
 ];
-// Slots 13-18, extended materials only: iridescence (R), its thickness (G), anisotropy (RG direction, B strength), diffuse
-// transmission (A) and its colour (RGB, sRGB), bump height (R, linear).
+// Slots 13-20, extended materials only: iridescence (R), its thickness (G), anisotropy (RG direction, B strength), diffuse
+// transmission (A) and its colour (RGB, sRGB), bump height (R, linear), multi-scatter colour (RGB, sRGB), volume thickness (G).
 export const extendedMaps = [
   'iridescence',
   'iridescenceThickness',
@@ -347,6 +348,8 @@ export const extendedMaps = [
   'diffuseTransmission',
   'diffuseTransmissionColor',
   'bump',
+  'multiscatter',
+  'thickness',
 ];
 const sample = (name: string) => `textureSample(${name}Map,${name}Sampler,uv(i,${physicalMaps.indexOf(name) + 5}))`;
 function patch(source: string, edits: [string | RegExp, string][]): string {
@@ -556,7 +559,8 @@ export function transmissionPBR(code: string, declarations: string): string {
 
 /**
  * What an extended material shades (KHR_materials_iridescence, anisotropy, diffuse_transmission and EXT_materials_bump
- * in use) and which group-1 texture each map slot 5-18 samples: `slots[k]` is a binding index j (`margoMap{j}` at binding 10 + 2j) or
+ * and KHR_materials_volume_scatter
+ * in use) and which group-1 texture each map slot 5-20 samples: `slots[k]` is a binding index j (`margoMap{j}` at binding 10 + 2j) or
  * -1 for the slot's default value. Base slots 0-4 always keep their own bindings 0-9 (text patches use them).
  */
 export interface ExtendedPlan {
@@ -565,11 +569,12 @@ export interface ExtendedPlan {
   readonly anisotropy: boolean;
   readonly diffuseTransmission: boolean;
   readonly bump?: boolean;
+  readonly scatter?: boolean;
 }
 /** Extension textures an extended material may bind: 5 base + 8 = 13, so shadows, IBL and LocalShadows (3) still fit WebGPU's 16. */
 export const extendedTextureLimit = 8;
 /**
- * Binding plan for an extended material's 19 map slots: slots sharing a glTF texture share one binding (their UV rows
+ * Binding plan for an extended material's 21 map slots: slots sharing a glTF texture share one binding (their UV rows
  * stay per slot); at most `extendedTextureLimit` distinct textures, later slots beyond that fall back to their defaults.
  */
 export function extendedPlan(
@@ -577,7 +582,7 @@ export function extendedPlan(
   features: Omit<ExtendedPlan, 'slots'>,
 ): ExtendedPlan {
   const textures: number[] = [],
-    slots = Array.from({ length: 19 }, (_, k) => {
+    slots = Array.from({ length: 21 }, (_, k) => {
       const map = k < 5 ? undefined : maps[k];
       if (!map) return -1;
       const j = textures.indexOf(map.index);
@@ -628,7 +633,7 @@ fn margoBent(s:Surface,v:vec3f)->vec3f {
  * Sources: anisotropic D and V: KHR_materials_anisotropy "Implementation" (Burley 2012; Heitz 2014); isotropic
  * separable Smith V: glTF 2.0 Appendix B.
  */
-export const directWgsl = (anisotropic: boolean): string => `fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {
+export const directWgsl = (anisotropic: boolean, scatter = false): string => `fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {
   let h=normalize(v+l); let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0); let nh=clamp(dot(s.n,h),0.0,1.0); let vh=clamp(dot(v,h),0.0,1.0);
   let f0=mix(s.f0,s.base.rgb,s.metal); let schlick=f0+(mix(vec3f(s.sw),vec3f(1),s.metal)-f0)*pow(1-vh,5.0);
   let fr=mix(schlick,s.ir.rgb,s.ir.w); let kd=mix(vec3f(1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh))),vec3f(1-max(s.ir.r,max(s.ir.g,s.ir.b))),s.ir.w); let a=s.roughness*s.roughness;
@@ -639,7 +644,7 @@ export const directWgsl = (anisotropic: boolean): string => `fn margoDirect(s:Su
   let spec=a2*w2*w2/3.14159265*clamp(0.5/max(nl*length(vec3f(alt*dot(t,v),a*dot(b,v),nv))+nv*length(vec3f(alt*dot(t,l),a*dot(b,l),nl)),1e-6),0.0,1.0);`
       : `let a2=a*a; let spec=${ggxD}/max((nv+sqrt(a2+(1-a2)*nv*nv))*(nl+sqrt(a2+(1-a2)*nl*nl)),0.0001);`
   }
-  let diffuse=kd*(1-s.metal)*(1-s.tr)*(s.base.rgb*(1-s.dt.w)*nl+s.dt.rgb*s.dt.w*clamp(-dot(s.n,l),0.0,1.0))/3.14159265;
+  let diffuse=kd*(1-s.metal)*((1-s.tr)*(s.base.rgb*(1-s.dt.w)*nl+s.dt.rgb*s.dt.w*clamp(-dot(s.n,l),0.0,1.0))${scatter ? '+s.sc*nl' : ''})/3.14159265;
   return diffuse+spec*fr*nl;
 }
 `;
@@ -654,10 +659,10 @@ export const directWgsl = (anisotropic: boolean): string => `fn margoDirect(s:Su
 const ambientWgsl = (
   plan: ExtendedPlan,
 ) => `fn margoSky(n:vec3f)->vec3f {return mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(n.y*0.5+0.5,0.0,1.0));}
-fn margoFront(s:Surface)->Surface {var o=s; o.base=vec4f(s.base.rgb*(1-s.tr)*(1-s.dt.w),s.base.a); return o;}
+fn margoFront(s:Surface)->Surface {var o=s; o.base=vec4f(s.base.rgb*(1-s.tr)*(1-s.dt.w)${plan.scatter ? '+s.sc' : ''},s.base.a); return o;}
 fn margoHemisphere(s:Surface)->vec3f {
   let f0=mix(mix(s.f0,s.base.rgb,s.metal),s.ir.rgb,s.ir.w); let k=(1-s.metal)*(1-s.tr);
-  return (s.base.rgb*k*(1-s.dt.w)*margoSky(s.n)+s.dt.rgb*k*s.dt.w*margoSky(-s.n)+f0*0.5*margoSky(s.n))*f.radiance.w*s.occlusion;
+  return (s.base.rgb*k*(1-s.dt.w)*margoSky(s.n)+s.dt.rgb*k*s.dt.w*margoSky(-s.n)${plan.scatter ? '+s.sc*(1-s.metal)*margoSky(s.n)' : ''}+f0*0.5*margoSky(s.n))*f.radiance.w*s.occlusion;
 }
 fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return vec3f(0);}
 fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {
@@ -687,15 +692,28 @@ const bumpEdit = (sampleOf: (name: string, at?: string) => string) => `  {
     s.n=margoBumpGradient(s.n,i.position,(${sampleOf('bump', 'bumpUV+dpdx(bumpUV)')}.r-bumpBase)*bumpScale,(${sampleOf('bump', 'bumpUV+dpdy(bumpUV)')}.r-bumpBase)*bumpScale,facing);
   }
 `;
+// KHR_materials_volume_scatter (shared/volume-scatter.js): of the light entering the volume, by transmission or diffuse
+// transmission, the scattered share leaves as a diffuse lobe of the multi-scatter colour, `s.sc`. Specular transmission
+// keeps its own Beer-Lambert term, whose attenuation already counts scattering (the spec's T); the diffuse transmission
+// lobe had none, so it takes what crosses the depth. Depth is the thickness along the mesh normal, in world units.
+const scatterEdit = (sampleOf: (name: string, at?: string) => string) => `  {
+    let scatterColor=f.scatter.rgb*${sampleOf('multiscatter')}.rgb;
+    let scatterDepth=f.extinction.w*${sampleOf('thickness')}.g*length(n*mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz));
+    let scatterShares=margoScatterShares(f.extinction.rgb,scatterColor,f.scatter.w,scatterDepth);
+    s.sc=(s.tr+(1-s.tr)*s.dt.w)*scatterShares[0]*clamp(scatterColor,vec3f(0),vec3f(1));
+    s.dt=vec4f(s.dt.rgb*scatterShares[1],s.dt.w);
+  }
+`;
 const extended = new Map<string, string>();
 /**
  * Physical variant for an extended material (`ExtendedPlan`), cached per plan: only the extension maps the material uses
  * are bound (shared textures once), the thin-film, anisotropic, diffuse-transmission and bump terms only when used, and
- * a Frame with 19 UV rows and four more factor rows (iri: factor, film IOR, thickness min, max; aniso: strength, cos, sin;
- * dtr: factor, colour; bump: factor, 1 for object space). Hook points and text-patch anchors are those of `physicalShader`.
+ * a Frame with 21 slots of UV rows and six more factor rows (iri: factor, film IOR, thickness min, max; aniso: strength, cos, sin;
+ * dtr: factor, colour; bump: factor, 1 for object space; scatter: multi-scatter colour, anisotropy; extinction: per unit
+ * length, thickness). Hook points and text-patch anchors are those of `physicalShader`.
  */
 export function extendedShader(plan: ExtendedPlan): string {
-  const key = plan.slots.join() + +plan.iridescence + +plan.anisotropy + +plan.diffuseTransmission + +!!plan.bump;
+  const key = plan.slots.join() + +plan.iridescence + +plan.anisotropy + +plan.diffuseTransmission + +!!plan.bump + +!!plan.scatter;
   let out = extended.get(key);
   if (out !== undefined) return out;
   const names = [...physicalMaps, ...extendedMaps],
@@ -719,15 +737,15 @@ export function extendedShader(plan: ExtendedPlan): string {
   out =
     patch(extendedPBRShader, [
       ...physicalEdits(sampleOf, bindings),
-      ['uvt:array<vec4f,26>', 'uvt:array<vec4f,38>'],
-      ['sheen:vec4f\n}', 'sheen:vec4f, iri:vec4f, aniso:vec4f, dtr:vec4f, bump:vec4f\n}'],
-      ['sh:vec4f}', 'sh:vec4f, ir:vec4f, at:vec4f, dt:vec4f}'],
+      ['uvt:array<vec4f,26>', 'uvt:array<vec4f,42>'],
+      ['sheen:vec4f\n}', 'sheen:vec4f, iri:vec4f, aniso:vec4f, dtr:vec4f, bump:vec4f, scatter:vec4f, extinction:vec4f\n}'],
+      ['sh:vec4f}', `sh:vec4f, ir:vec4f, at:vec4f, dt:vec4f${plan.scatter ? ', sc:vec3f' : ''}}`],
       [
         '  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}',
         `${plan.bump ? bumpEdit(sampleOf) : ''}  s.ir=${plan.iridescence ? `vec4f(margoIridescence(mix(s.f0,s.base.rgb,s.metal),clamp(dot(s.n,normalize(f.eye.xyz-i.position)),0.0,1.0),mix(f.iri.z,f.iri.w,${sampleOf('iridescenceThickness')}.g),f.iri.y),f.iri.x*${sampleOf('iridescence')}.r)` : 'vec4f(0)'};
   s.at=${plan.anisotropy ? `margoAnisotropy(s.n,t,b,${sampleOf('anisotropy')}.xyz)` : 'vec4f(0)'};
   s.dt=${plan.diffuseTransmission ? `vec4f(f.dtr.yzw*${sampleOf('diffuseTransmissionColor')}.rgb,f.dtr.x*${sampleOf('diffuseTransmission')}.a)` : 'vec4f(0)'};
-  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}`,
+${plan.scatter ? scatterEdit(sampleOf) : ''}  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}`,
       ],
       [/fn ambient\(s:Surface\)->vec3f \{[^}]*\}/, 'fn ambient(s:Surface)->vec3f {return margoHemisphere(s);}'],
       [
@@ -739,7 +757,8 @@ export function extendedShader(plan: ExtendedPlan): string {
         (plan.bump ? bumpGradientWgsl : '') +
           (plan.iridescence ? iridescenceWgsl : '') +
           (plan.anisotropy ? anisotropyWgsl : '') +
-          directWgsl(plan.anisotropy) +
+          (plan.scatter ? volumeScatterWgsl : '') +
+          directWgsl(plan.anisotropy, plan.scatter) +
           ambientWgsl(plan) +
           '@fragment fn fragment(',
       ],

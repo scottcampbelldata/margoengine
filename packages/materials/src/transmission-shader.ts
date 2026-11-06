@@ -1,6 +1,7 @@
 import type { MaterialExtension } from '@margoengine/gltf-pro';
 import { coordinateExpression } from './coordinates.js';
 import type { ClearcoatTextureSlot } from './shader.js';
+import { volumeScatterWgsl } from '../../shared/volume-scatter.js';
 
 export interface TransmissionShaderTextures {
   /** Snapshot of the opaque scene, in the render attachment's original format. */
@@ -11,6 +12,8 @@ export interface TransmissionShaderTextures {
   factorsIndex?: number;
   /** A clearcoat is composed under this extension: its `materialCoatKeep` also scales the transmitted light. */
   coated?: boolean;
+  /** KHR_materials_volume_scatter: rows [multi-scatter colour, anisotropy], then [extinction per unit length, 0], and the colour map. */
+  scatter?: { factorsIndex: number; color?: ClearcoatTextureSlot };
 }
 /** Compiler-owned expressions evaluated in the extension's surface hook. */
 export interface TransmissionShaderValues {
@@ -43,6 +46,10 @@ function readMap(slot: ClearcoatTextureSlot, explicitLevel: boolean): string {
  * transmitted light in the base layer, under fresnel_mix (KHR_materials_transmission, KHR_materials_specular), sheen
  * and clearcoat. The host already dims diffuse and ambient light by the factor.
  *
+ * With `scatter` (KHR_materials_volume_scatter, shared/volume-scatter.js), the share of the transmitted light that
+ * scatters on its way through the thickness leaves the surface as a diffuse lobe of the multi-scatter colour. The view
+ * through keeps its Beer-Lambert term, whose attenuation already counts what scattered out of it.
+ *
  * @param textures - Slot of the opaque snapshot, optional transmission (R) and thickness (G) maps, and the factor row.
  * @param values - Compiler-owned WGSL expressions used in place of the factor rows (node materials).
  * @returns The extension's module declarations, beauty `output` statement and `transmission` weight expression.
@@ -50,7 +57,7 @@ function readMap(slot: ClearcoatTextureSlot, explicitLevel: boolean): string {
 export function transmissionShader(
   textures: TransmissionShaderTextures,
   values?: TransmissionShaderValues,
-): Pick<MaterialExtension, 'declarations' | 'output' | 'transmission' | 'ior'> {
+): Pick<MaterialExtension, 'declarations' | 'output' | 'transmission' | 'ior' | 'direct' | 'ambient'> {
   const row = textures.factorsIndex ?? 0,
     first = `materialFactors[${row}]`,
     second = `materialFactors[${row + 1}]`,
@@ -79,7 +86,19 @@ export function transmissionShader(
     attenuation = values ? values.attenuation : `${second}.xyz`,
     inverseDistance = values ? values.inverseDistance : `${first}.w`,
     dispersion = values ? (values.dispersion ?? '0.0') : `${second}.w`,
-    coat = textures.coated ? '*materialCoatKeep' : '';
+    coat = textures.coated ? '*materialCoatKeep' : '',
+    scatter = textures.scatter;
+  if (scatter) {
+    const rows = `materialFactors[${scatter.factorsIndex}]`,
+      extinction = `materialFactors[${scatter.factorsIndex + 1}]`;
+    // Read from the direct and ambient hooks (non-uniform control flow), so at an explicit level.
+    helpers += `${volumeScatterWgsl}fn materialScatterLobe(i:Out,s:Surface)->vec3f {
+  let color=clamp(${rows}.rgb${scatter.color ? `*${readMap(scatter.color, true)}.rgb` : ''},vec3f(0),vec3f(1));
+  let depth=${thickness}*length(s.n*mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz));
+  return s.tr*(1-s.metal)*margoScatterShares(${extinction}.rgb,color,${rows}.a,depth)[0]*color;
+}
+`;
+  }
   const declarations = /* wgsl */ `${helpers}// IEC 61966-2-1 transfer, to tint display-encoded snapshots in linear light.
 fn materialTransmissionLinear(c:vec3f)->vec3f {let x=max(c,vec3f(0)); return select(x/12.92,pow((x+0.055)/1.055,vec3f(2.4)),x>vec3f(0.04045));}
 fn materialTransmissionEncode(c:vec3f)->vec3f {let x=max(c,vec3f(0)); return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>vec3f(0.0031308));}
@@ -172,5 +191,13 @@ fn materialTransmission(i:Out,s:Surface,color:vec3f,front:bool,factor:f32,ior:f3
     ior,
     output: `if(s.tr>0.0){color=materialTransmission(i,s,color,front,s.tr,${ior},${thickness},${attenuation},${inverseDistance},${dispersion});}`,
     declarations,
+    ...(scatter
+      ? {
+          direct:
+            'direct+=materialScatterLobe(i,s)*clamp(dot(s.n,l),0.0,1.0)/3.14159265*f.radiance.rgb*f.light.w;',
+          ambient:
+            'materialAmbient+=materialScatterLobe(i,s)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;',
+        }
+      : {}),
   };
 }

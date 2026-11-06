@@ -904,6 +904,9 @@ export interface VolumeOptions {
     thicknessTexture?: ClearcoatTexture;
     attenuationColor?: readonly [number, number, number];
     attenuationDistance?: number;
+    multiscatterColorFactor?: readonly [number, number, number];
+    multiscatterColorTexture?: ClearcoatTexture;
+    scatterAnisotropy?: number;
 }
 
 export class WgslMaterial extends Material {

@@ -222,7 +222,7 @@ export interface GLTFLightReceiver {
  * Options of loadGLTF: asset limits and fetch options, plus the Draco, meshopt and KTX2 decoders and an AbortSignal.
  */
 export type GLTFLoadOptions = Omit<AssetOptions, 'buffers'> & CompressionOptions;
-const srgbMaps = [0, 4, 9, 12, 17],
+const srgbMaps = [0, 4, 9, 12, 17, 19],
   normalMaps = [2, 7],
   blended = (m: PBRMaterial) => m.settings[0] === 2 || (!!m.tint && !m.extension?.replacesPhysical),
   // Drawn after the opaque phase: blended, or its extension asks for the opaque capture (`afterOpaque`). A static
@@ -1678,7 +1678,7 @@ function material(def: GLTFMaterial = {}, extended?: GLTFExtendedMaterials): PBR
         ? Infinity
         : scalar(vo.attenuationDistance, Number.MIN_VALUE, Infinity, 'attenuation distance'),
     depth = thickness / distance;
-  // Extended materials: thin film, anisotropy, diffuse transmission or bump in use (factor > 0); maps 13-18 and four more uniform rows.
+  // Extended materials: thin film, anisotropy, diffuse transmission, bump or volume scatter in use; maps 13-20 and six more uniform rows.
   const x = extended?.parse(e),
     physical = !!(x || cc || tr || sh || sp || vo || e.KHR_materials_ior || e.KHR_materials_dispersion);
   const maps = [
@@ -2704,13 +2704,13 @@ export class PBRModel implements EnginePlugin {
     }
     return out;
   }
-  // The material's uniform buffer (880 bytes, 1136 for extended materials), textures and samplers; again after a variant switch.
+  // The material's uniform buffer (880 bytes, 1232 for extended materials), textures and samplers; again after a variant switch.
   private bindMaterial(r: DrawResource, device: GPUDevice, mipSampler: GPUSampler): void {
     const m = r.primitive.material,
       floats =
         !(r.primitive.extension ?? m.extension)?.replacesPhysical && (m.extendedFrame || m.physical || m.ext?.[0])
           ? m.extended
-            ? 284
+            ? 308
             : 220
           : 100,
       cache = this.gpuCache;
@@ -4279,7 +4279,7 @@ export class PBRModel implements EnginePlugin {
     }
     const compact =
       !!(p.extension ?? m.extension)?.replacesPhysical || (!m.extendedFrame && !m.physical && !m.ext?.[0]);
-    const floatCount = compact ? 100 : m.extended ? 284 : 220,
+    const floatCount = compact ? 100 : m.extended ? 308 : 220,
       // A third or fourth UV set, which a material of the primitive reads; loading progressively, a placeholder has none.
       laterUV = !!p.uvs;
     if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
@@ -4303,11 +4303,11 @@ export class PBRModel implements EnginePlugin {
       v.set(m.uvt!, 104);
     }
     if (!compact && m.physical) {
-      const offset = m.extended ? 256 : 208;
+      const offset = m.extended ? 272 : 208;
       v.set(m.physical, offset);
       if (!m.maps[7] && !m.shading?.replacesTextures) v[offset + 2] = 0;
     }
-    // Physical rows follow 26 UV rows (38 for extended materials); factor-only materials (five maps) use the same layout.
+    // Physical rows follow 26 UV rows (42 for extended materials); factor-only materials (five maps) use the same layout.
     // The transmission tint (margoTint) in spare Frame lanes coordsB.zw and ext.z; zero for every other material.
     if (!compact && m.tint) {
       const lanes = surfaceTint(m) ? m.attenuation! : m.tint;

@@ -69,6 +69,11 @@ export interface GLTFExtensions {
     diffuseTransmissionTexture?: GLTFTextureInfo;
     diffuseTransmissionColorTexture?: GLTFTextureInfo;
   };
+  KHR_materials_volume_scatter?: {
+    multiscatterColorFactor?: number[];
+    multiscatterColorTexture?: GLTFTextureInfo;
+    scatterAnisotropy?: number;
+  };
   EXT_materials_bump?: {
     bumpFactor?: number;
     bumpTexture?: GLTFTextureInfo;
