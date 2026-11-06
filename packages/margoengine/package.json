@@ -1050,6 +1050,10 @@
       "types": "./dist/kinematics-constraints/sdf.d.ts",
       "import": "./dist/kinematics-constraints/sdf.js"
     },
+    "./kinematics-constraints/plan": {
+      "types": "./dist/kinematics-constraints/plan.d.ts",
+      "import": "./dist/kinematics-constraints/plan.js"
+    },
     "./labels": {
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"

@@ -460,8 +460,78 @@ for (const obstacle of [exact, baked]) {
 
 `MeshVolume` is exact and pays for it per query. `SDFVolume` costs the same whatever the mesh, and is only as fine as its grid: a wall thinner than a cell may not be there at all, which is why the margin matters, and a coarse field reads obstacles fatter than they are. A grid field must hold the whole obstacle: past the grid's edge a reading is the distance to the grid. Segment and hull queries on both answer no more than the true gap, so the swept checks keep their promise. A segment that crosses a mesh reads minus its radius, and an overlapping hull reads zero or less: the value ranks poses, it is not a depth. This entry needs `@margoengine/bvh`, an optional peer of this package, and only this entry does.
 
+## Motion planning (`margoengine/kinematics-constraints/plan`)
+
+A solver only ever steps toward the target, so an obstacle it would have to back away from stops it. When `JointLimitSolver` reports `blocked`, plan the way round. `planPath` searches the robot's joint space with random samples and returns a list of configurations, and every straight step between two of them has passed `sweepRobot`, so the gap holds along the whole path, not only at the points on it.
+
+```ts
+import { CapsuleVolume } from 'margoengine/kinematics-constraints';
+import { planPath } from 'margoengine/kinematics-constraints/plan';
+import { Robot } from 'margoengine/kinematics-constraints/robot';
+
+const along = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1]; // one unit along x
+const arm = new Robot({
+  joints: [{ lower: -3.1, upper: 3.1 }, { lower: -3.1, upper: 3.1, origin: along }],
+  shapes: [
+    { joint: 0, end: [1, 0, 0], radius: 0.05 },
+    { joint: 1, end: [1, 0, 0], radius: 0.05 },
+  ],
+});
+const post = new CapsuleVolume({ start: [1.3, 0, -1], end: [1.3, 0, 1], radius: 0.1 });
+const plan = await planPath(arm, [0.9, -1.2], [-0.9, 1.2], { colliders: [post], seed: 7 });
+if (plan.status === 'found') console.log(plan.path.length, 'poses, joint-space length', plan.length);
+```
+
+`plan.status` is `'found'`, `'start-blocked'` or `'goal-blocked'` when an end is out of range or inside an obstacle, or `'no-path'` when the budget ran out, which does not prove there is no path. The same seed and scene give the same path. `planPath` runs in slices of about 8 ms so a page stays alive, and an `AbortSignal` rejects it with the signal's reason. `planPathSync` does the same work in one call.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `algorithm` | `'rrt-connect'` | `'rrt-connect'` grows a tree from each end, `'rrt'` one tree from the start, `'prm'` a roadmap. |
+| `colliders` | none | Any volume: spheres, capsules, hulls, `MeshVolume`, `SDFVolume`. |
+| `minClearance` | `0.01` | Gap the whole path keeps, in scene units. |
+| `selfCollision` | `false` | Also keep the robot's shapes off each other. |
+| `seed` | `1` | Seed of the random numbers. |
+| `stepSize` | `0.3` | Largest move of a tree edge in joint space. |
+| `maxSamples` | `20000` | Random samples before `'no-path'`. |
+| `goalBias` | `0.1` | Share of samples aimed at the goal, on `'rrt'`. |
+| `neighbors` | `10` | Nodes each roadmap node tries to join, on `'prm'`. |
+| `shortcuts` | `100` | Rounds of random shortcutting on the path found; 0 keeps the raw path. |
+| `tolerance`, `maxSteps` | `1e-4`, `4096` | Passed to the swept check of every edge. An edge that runs out of steps counts as blocked. |
+| `signal` | none | Stops the search. |
+
+`planToPose` takes a tip target instead of a goal configuration. The joint-limit solver looks for a clear pose at the target, ignoring obstacles on the way there, from the start and then from `goalAttempts` (default 32) random restarts, and the planner finds the way to it.
+
+```ts
+import { SphereVolume } from 'margoengine/kinematics-constraints';
+import { armRobot } from 'margoengine/kinematics-constraints/limits';
+import { planToPose } from 'margoengine/kinematics-constraints/plan';
+
+const arm = armRobot({ upperLength: 1, forearmLength: 1, radius: 0.05, elbow: [0.05, 2.8] });
+const ball = new SphereVolume({ center: [0, 1.22, 0], radius: 0.1 });
+const reach = await planToPose(arm, [0, 0, 0, 2], { position: [0, 1.6, 0] }, { tip: 'hand', colliders: [ball], seed: 2 });
+console.log(reach.status);
+```
+
+A scene that holds still can pay for its search once. A `Roadmap` is a graph of clear poses joined by proved edges: grow it, then ask it as many times as you like.
+
+```ts
+import { CapsuleVolume } from 'margoengine/kinematics-constraints';
+import { Roadmap } from 'margoengine/kinematics-constraints/plan';
+import { Robot } from 'margoengine/kinematics-constraints/robot';
+
+const arm = new Robot({
+  joints: [{ lower: -3, upper: 3 }],
+  shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.05 }],
+});
+const post = new CapsuleVolume({ start: [-0.7, -0.7, -1], end: [-0.7, -0.7, 1], radius: 0.05 });
+const roadmap = new Roadmap(arm, { colliders: [post], seed: 3 }).grow(200);
+console.log(roadmap.size, roadmap.query([-1], [2]).status, roadmap.query([0], [-1.5]).status);
+```
+
+`roadmap.samplePoses(count)` and `roadmap.addPoses(poses, gaps)` split the sampling from the check, so a batch check of your own can sit between them. A continuous joint has no range, so samples stay one turn each way of the start, or of the `around` option on a `Roadmap`. It plans on the line of its value, not on a circle: passing an obstacle the other way round means writing the goal one turn lower, as `goal - 2 * Math.PI`.
+
 ## Scope
 
 `Success` describes static analytical proxy clearance at one evaluated instant, within numerical tolerance. It covers neither unsupplied mesh/skinning geometry nor unchecked link portions. Set proxies to enclose the full deformation envelope and any desired padding in your application.
 
-Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. Concave obstacles are in `/sdf`. This package does not implement dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or use a higher-level planner.
+Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. Concave obstacles are in `/sdf`. Planning round them is `/plan`. This package does not implement dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or call `/plan`.

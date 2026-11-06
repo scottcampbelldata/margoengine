@@ -42,6 +42,10 @@
     "./sdf": {
       "types": "./dist/sdf.d.ts",
       "import": "./dist/sdf.js"
+    },
+    "./plan": {
+      "types": "./dist/plan.d.ts",
+      "import": "./dist/plan.js"
     }
   },
   "files": [
