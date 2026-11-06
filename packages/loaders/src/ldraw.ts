@@ -22,7 +22,7 @@ export interface LDrawColor {
 
 /** Options of {@link parseLDraw}. */
 export interface LDrawOptions extends ParseLimits {
-  /** Reads a part, by its path below the library folder. Without it, only the file's own contents load. */
+  /** Reads a part, by its path below the library folder; {@link resolveFromURL} makes one for a hosted library. Without it, only the file's own contents load. */
   resolve?: AssetResolver;
   /** Folders tried in order for each reference, ending in `/`. Default `''`, `parts/`, `p/`, `models/` and the `unofficial/` two. */
   searchPaths?: readonly string[];
@@ -272,6 +272,41 @@ function multiply(parent: Matrix, child: Matrix): Matrix {
       parent[r * 3] * child[9] + parent[r * 3 + 1] * child[10] + parent[r * 3 + 2] * child[11] + parent[9 + r];
   }
   return out;
+}
+
+/** Options of {@link resolveFromURL}. */
+export interface LDrawURLOptions {
+  /** Fetch used for each part. Default `globalThis.fetch`. */
+  fetch?: typeof fetch;
+  /** Cancels the reads in flight. Pass the one you give `parseLDraw`. */
+  signal?: AbortSignal;
+}
+
+/**
+ * A `resolve` for {@link parseLDraw} that reads parts over HTTP from an LDraw library folder you host. The library is
+ * the "Complete" download of ldraw.org, unzipped: `LDConfig.ldr`, `parts/` and `p/` directly below `base`.
+ * A status other than 2xx rejects, so `parseLDraw` tries the next search path and lists a part found nowhere in `missing`.
+ *
+ * @param base The library folder, absolute or relative to the page.
+ * @example
+ * ```ts
+ * import { parseLDraw, resolveFromURL } from '@margoengine/loaders/ldraw';
+ *
+ * const text = await (await fetch('/models/car.ldr')).text();
+ * const model = await parseLDraw(text, { resolve: resolveFromURL('/ldraw/') });
+ * console.log(model.missing);
+ * ```
+ */
+export function resolveFromURL(
+  base: string | URL,
+  { fetch: get = globalThis.fetch, signal }: LDrawURLOptions = {},
+): AssetResolver {
+  const folder = new URL(String(base).replace(/\/*$/, '/'), globalThis.location?.href);
+  return async (path) => {
+    const response = await get(new URL(path, folder), { signal });
+    if (!response.ok) throw new LoaderError(F, 'unsupported', `${path}: HTTP ${response.status}`);
+    return new Uint8Array(await response.arrayBuffer());
+  };
 }
 
 /**

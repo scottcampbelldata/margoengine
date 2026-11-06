@@ -1,7 +1,7 @@
 // parseLDraw: line types, colour inheritance, sub-files, MPD packs, BFC winding, units, limits and refusals.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLDraw } from '../dist/ldraw.js';
+import { parseLDraw, resolveFromURL } from '../dist/ldraw.js';
 import { LoaderError } from '../dist/common.js';
 
 const file = { units: 'file' };
@@ -116,6 +116,47 @@ test('a missing part is listed, the rest of the model still loads, and no resolv
   const alone = await parseLDraw(text, file);
   assert.deepEqual(alone.missing, ['gone.dat']);
   assert.equal(alone.indices.length, 6);
+});
+
+test('resolveFromURL reads a hosted library: search paths, a 404, the base with or without its slash, and the signal', async () => {
+  const library = {
+      'https://cdn.example.test/ldraw/LDConfig.ldr': '0 !COLOUR Red CODE 4 VALUE #C91A09 EDGE #333333\n',
+      'https://cdn.example.test/ldraw/parts/plate.dat': '3 16 0 0 0 10 0 0 0 0 10\n',
+    },
+    asked = [],
+    signal = new AbortController().signal,
+    fetch = async (url, init) => {
+      asked.push(String(url));
+      assert.equal(init.signal, signal);
+      const body = library[String(url)];
+      return new Response(body ?? 'gone', { status: body === undefined ? 404 : 200 });
+    };
+  for (const base of ['https://cdn.example.test/ldraw', 'https://cdn.example.test/ldraw/', new URL('https://cdn.example.test/ldraw/')]) {
+    asked.length = 0;
+    const model = await parseLDraw('1 4 0 0 0 1 0 0 0 1 0 0 0 1 plate.dat\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 absent.dat\n', {
+      resolve: resolveFromURL(base, { fetch, signal }),
+    });
+    assert.equal(model.groups.length, 1);
+    assert.equal(model.groups[0].name, 'Red');
+    assert.deepEqual(model.missing, ['absent.dat']);
+    assert.ok(asked.includes('https://cdn.example.test/ldraw/parts/plate.dat'));
+    assert.equal(asked.filter((url) => url.endsWith('plate.dat')).length, 2, 'the folder before it, then parts/');
+  }
+});
+
+test('an abort during a hosted read stops the parse', async () => {
+  const controller = new AbortController(),
+    fetch = async () => {
+      controller.abort();
+      throw new DOMException('Aborted', 'AbortError');
+    };
+  await assert.rejects(
+    parseLDraw('1 4 0 0 0 1 0 0 0 1 0 0 0 1 plate.dat\n', {
+      resolve: resolveFromURL('https://cdn.example.test/ldraw/', { fetch, signal: controller.signal }),
+      signal: controller.signal,
+    }),
+    { code: 'aborted' },
+  );
 });
 
 test('an MPD pack finds its own files first and draws the first one', async () => {

@@ -450,10 +450,20 @@ const parts: Record<string, string> = { 'parts/plate.dat': '0 BFC CERTIFY CCW\n4
 const model = await parseLDraw('1 4 0 0 0 1 0 0 0 1 0 0 0 1 plate.dat\n', {
   resolve: async (path) => {
     if (path in parts) return parts[path];
-    throw new Error(`no ${path}`); // in a browser: fetch(`/ldraw/${path}`), and throw on a 404
+    throw new Error(`no ${path}`);
   },
 });
 console.log(model.groups[0].name, model.lines.length, model.missing);
+```
+
+A normal `.ldr` is mostly references, so without a library it draws almost nothing and lists its parts in `missing`. Download the "Complete" library from [ldraw.org](https://www.ldraw.org), unzip it where your site serves files, and pass `resolveFromURL`, which takes `fetch` and `signal`. The library is not part of this package.
+
+```ts
+import { parseLDraw, resolveFromURL } from '@margoengine/loaders/ldraw';
+
+const text = '1 4 0 0 0 1 0 0 0 1 0 0 0 1 3024.dat\n';
+const model = await parseLDraw(text, { resolve: resolveFromURL('/ldraw/') });
+console.log(model.missing);
 ```
 
 - **Colours.** 16 takes the colour of the reference above it and 24 that colour's edge. `0x2RRGGBB` is a direct colour. `0 !COLOUR` lines and `LDConfig.ldr` fill the palette, read through `resolve` or passed as `config`; without one, the 16 classic colours apply and an unknown code draws light grey with a warning.

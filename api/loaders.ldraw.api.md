@@ -34,7 +34,14 @@ export interface LDrawOptions extends ParseLimits {
     signal?: AbortSignal;
 }
 
+export interface LDrawURLOptions {
+    fetch?: typeof fetch;
+    signal?: AbortSignal;
+}
+
 export function parseLDraw(input: BinaryInput | string, options?: LDrawOptions): Promise<LDrawModel>;
+
+export function resolveFromURL(base: string | URL, { fetch: get, signal }?: LDrawURLOptions): AssetResolver;
 
 // Not exported from this entry, but used by the exports above:
 
