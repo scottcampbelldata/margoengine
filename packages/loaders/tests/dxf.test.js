@@ -257,3 +257,30 @@ test('DXF: drawing units kept, binary files, and errors that name the problem', 
     (e) => e.code === 'range',
   );
 });
+
+test('regression: binary DXF before R13 has one-byte group codes, and the version of a binary file is read', () => {
+  const encoder = new TextEncoder(),
+    bytes = [...encoder.encode('AutoCAD Binary DXF\r\n\x1a\0')],
+    string = (code, value) => bytes.push(code, ...encoder.encode(value), 0),
+    double = (code, value) => {
+      bytes.push(code);
+      bytes.push(...new Uint8Array(new Float64Array([value]).buffer));
+    };
+  string(0, 'SECTION');
+  string(2, 'HEADER');
+  string(9, '$ACADVER');
+  string(1, 'AC1009');
+  string(0, 'ENDSEC');
+  string(0, 'SECTION');
+  string(2, 'ENTITIES');
+  string(0, 'LINE');
+  string(8, '0');
+  for (const [code, value] of [[10, 0], [20, 0], [30, 0], [11, 3], [21, 4], [31, 0]]) double(code, value);
+  // 255 announces a two-byte code: 1000 is a string of extended data.
+  bytes.push(255, 1000 & 255, 1000 >> 8, ...encoder.encode('note'), 0);
+  string(0, 'ENDSEC');
+  string(0, 'EOF');
+  const drawing = parseDXF(new Uint8Array(bytes));
+  assert.equal(drawing.version, 'AC1009');
+  assert.equal(drawing.lines.positions.length, 6);
+});

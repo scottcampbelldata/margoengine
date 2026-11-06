@@ -168,13 +168,20 @@ function readPairs(bytes: Uint8Array, decode: (b: Uint8Array) => string): { code
   if (bytes.length >= 22 && latin1(bytes, 0, 22) === sentinel) {
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let at = 22;
+    // Before R13 a group code is one byte, 255 announcing a two-byte code; the first group, 0 SECTION, tells which.
+    const wide = bytes[at + 1] === 0;
     const need = (n: number) => {
       if (at + n > bytes.length) throw new LoaderError(F, 'truncated', `binary DXF ends inside a group at byte ${at}`);
     };
     while (at < bytes.length) {
-      need(2);
-      const code = view.getUint16(at, true);
-      at += 2;
+      need(wide ? 2 : 1);
+      let code = wide ? view.getUint16(at, true) : bytes[at];
+      at += wide ? 2 : 1;
+      if (!wide && code === 255) {
+        need(2);
+        code = view.getUint16(at, true);
+        at += 2;
+      }
       let value: Value;
       switch (binaryKind(code)) {
         case 'double':
@@ -317,7 +324,7 @@ function ocs(n: [number, number, number]): M4 {
 }
 
 /**
- * Reads a DXF drawing (ASCII, or binary from R13 on) into faces, line segments, points, texts and ACIS solids, in
+ * Reads a DXF drawing (ASCII or binary) into faces, line segments, points, texts and ACIS solids, in
  * meters by default. Throws a {@link LoaderError}: `'syntax'` or `'truncated'` for a malformed file, `'limit'` past a
  * limit, `'range'` for a bad option.
  */
@@ -340,7 +347,8 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
 
   // Text: UTF-8 from AutoCAD 2007 (AC1021) on, the drawing's code page (Windows-1252 assumed) before.
   const head = latin1(bytes, 0, Math.min(bytes.length, 1 << 16)),
-    version = /\$ACADVER\s*\r?\n\s*1\s*\r?\n([^\r\n]*)/.exec(head)?.[1]?.trim() ?? '',
+    // Text writes the name and value on lines; binary as a zero-ended string, group code 1 (one byte before R13), string.
+    version = /\$ACADVER(?:\s*\r?\n\s*1\s*\r?\n|\0\x01\0?)([^\r\n\0]*)/.exec(head)?.[1]?.trim() ?? '',
     utf8 = version >= 'AC1021',
     decoder = (() => {
       try {
