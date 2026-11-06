@@ -81,6 +81,12 @@ export const LEAF = 1;
 export const OP = 2;
 /** Writes statements and returns a variable name, once per scope. */
 export const STMT = 4;
+/** Its value is settled when it is emitted, whatever it read: an assignment later does not change it. */
+export const FIXED = 8;
+/** Runs where it was made and never again: using it outside that scope is an error, not a second run. */
+export const ONCE = 16;
+/** Reads a mutable variable, so its value can change from one statement to the next. */
+export const MUTABLE = 32;
 /** Writes the WGSL for node `n` with builder `b` and returns its expression (or a variable name for statement nodes). */
 export type Emit = (b: Builder, n: Node) => string;
 let uid = 0;
@@ -359,7 +365,7 @@ export const negate = <T extends Type>(x: Node<T>): Node<T> => unary('-', x);
  */
 export const not = <T extends Type>(x: Node<T>): Node<T> =>
   scalarOf(x.type) === 'bool' ? unary('!', x) : fail('not() needs bool');
-/** `cond ? ifTrue : ifFalse` per component (both sides are evaluated). */
+/** `cond ? ifTrue : ifFalse` per component (both sides are evaluated; `If` runs only one). */
 export function select<T extends Type>(
   cond: Node<'bool' | `vec${N}<bool>`> | boolean,
   ifTrue: NodeInput<T>,
@@ -643,6 +649,7 @@ export function loop<T extends Type>(
       b.line(`var ${a} = ${first};`);
       b.bind(i, k);
       b.bind(acc, a);
+      b.epoch++;
       b.push();
       const value = b.expr(x.args[2]),
         lines = b.pop();
@@ -834,6 +841,7 @@ export class Program {
   private readonly canonOf = new Map<Node, Node>();
   private readonly ids = new Map<Node, number>();
   private readonly refs = new Map<Node, number>();
+  private readonly mutable = new Map<Node, boolean>();
   private size = 16;
   private counter = 0;
   private next: number;
@@ -936,6 +944,15 @@ export class Program {
   /** @internal */ shared(c: Node): boolean {
     return (this.refs.get(c) ?? 0) > 1;
   }
+  /** @internal True when `c` reads a mutable variable and is not settled, so an assignment makes it stale. */
+  volatile(c: Node): boolean {
+    let v = this.mutable.get(c);
+    if (v === undefined) {
+      v = !(c.flags & FIXED) && (!!(c.flags & MUTABLE) || c.args.some((a) => this.volatile(this.canon(a))));
+      this.mutable.set(c, v);
+    }
+    return v;
+  }
   /** @internal */ declareOnce(key: string, code: () => string): void {
     if (!this.declarations.has(key)) {
       this.declarations.set(key, '');
@@ -990,8 +1007,10 @@ export const sameEntries = (a: readonly GPUBindGroupEntry[], b: readonly GPUBind
 /** Emits one stage. Expressions referenced more than once become `let ndN`; everything else is inlined. */
 export class Builder {
   inFn = false;
+  /** Counts assignments and loop entries: a mutable value kept from an earlier epoch is stale. */
+  epoch = 0;
   private scopes: string[][] = [[]];
-  private readonly memo = new Map<Node, { name: string; scope: string[] }>();
+  private readonly memo = new Map<Node, { name: string; scope: string[]; epoch: number }>();
   private readonly params = new Map<Node, string>();
   constructor(
     readonly program: Program,
@@ -1000,17 +1019,20 @@ export class Builder {
   expr(n: Node): string {
     const c = this.program.canon(n),
       m = this.memo.get(c);
-    if (m && this.scopes.includes(m.scope)) return m.name;
+    if (m && this.scopes.includes(m.scope) && (m.epoch === this.epoch || !this.program.volatile(c))) return m.name;
+    if (m && c.flags & ONCE)
+      fail('A value made inside an If, Loop or Switch body cannot be used outside it; assign it to a Var');
     const code = c.emit(this, c),
-      scope = this.scopes.at(-1)!;
+      scope = this.scopes.at(-1)!,
+      epoch = this.epoch;
     if (c.flags & STMT) {
-      this.memo.set(c, { name: code, scope });
+      this.memo.set(c, { name: code, scope, epoch });
       return code;
     }
     if (c.flags & LEAF || !this.program.shared(c)) return code;
     const name = this.program.name();
     this.line(`let ${name} = ${code};`);
-    this.memo.set(c, { name, scope });
+    this.memo.set(c, { name, scope, epoch });
     return name;
   }
   /** The expression, parenthesised when it is an inlined operator. */
@@ -1033,8 +1055,11 @@ export class Builder {
   bind(param: Node, name: string): void {
     this.params.set(this.program.canon(param), name);
   }
+  unbind(param: Node): void {
+    this.params.delete(this.program.canon(param));
+  }
   param(n: Node): string {
-    return this.params.get(n) ?? fail('A loop or Fn parameter was used outside its body');
+    return this.params.get(n) ?? fail('A loop or Fn parameter or a Var was used outside its body');
   }
   /** A stage-local expression (reads entry-point inputs), refused inside Fn bodies. */
   local(code: string): string {

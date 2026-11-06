@@ -47,6 +47,8 @@ try {
     'discard',
     'postDiscard',
     'atomics',
+    'statements',
+    'branch',
     'post',
     'compute',
   ]) {
@@ -55,6 +57,30 @@ try {
     assert.equal(result.error, null, name);
     assert.deepEqual(result.errors, [], name);
     if (expected[name]) near(center, expected[name], name);
+    if (name === 'statements') {
+      const flow = await page.evaluate(() => window.check.readFlow());
+      for (let i = 0; i < 64; i++) {
+        let root = 0,
+          even = 0;
+        for (let k = 0; k < 100; k++) {
+          if (k * k > i) {
+            root = k;
+            break;
+          }
+          if (k % 2 === 0) even += k;
+        }
+        const halves = i > 1 ? Math.floor(Math.log2(i)) : 0;
+        assert.deepEqual(
+          [...flow.slice(i * 6, i * 6 + 3), ...flow.slice(i * 6 + 4, i * 6 + 6)],
+          [even, halves, [10, 20, 20, 30][i % 4], i % 2 ? 2 : 1, root],
+          `statements at ${i}`,
+        );
+      }
+    }
+    if (name === 'branch') {
+      near(await pixel(0.5, 0.25), [255, 0, 0], 'branch left');
+      near(await pixel(0.5, 0.75), [0, 255, 0], 'branch right');
+    }
     if (name === 'uniform') {
       const step = await page.evaluate(() => window.check.setTint('#00ff00'));
       assert.deepEqual(step.errors, []);

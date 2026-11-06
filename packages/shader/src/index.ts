@@ -1,6 +1,21 @@
 export * from './node.js';
 export { texture, type BindableTexture } from './texture.js';
 export {
+  block,
+  If,
+  Loop,
+  While,
+  Break,
+  Continue,
+  Switch,
+  Var,
+  Let,
+  VarNode,
+  type Branch,
+  type Cases,
+  type LoopRange,
+} from './control.js';
+export {
   NodeMaterial,
   materialColor,
   materialNormal,

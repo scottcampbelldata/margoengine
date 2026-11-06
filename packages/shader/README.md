@@ -54,6 +54,43 @@ ComputePass.attach(stage.engine, n, i => {
 // counter.update() before a frame resets it to its CPU data (zeros).
 ```
 
+Statements: variables that change, branches that run one side only, loops that leave early:
+
+```ts
+import {block, If, Loop, Break, Var, NodeMaterial, ComputePass, storage, texture, uv, vec3, uint} from 'margoengine/shader';
+const march = block(() => {
+  const light = Var(vec3(0)), depth = Var(0);                          // Var(0, 'u32') for other types
+  Loop(64, () => {
+    const density = texture(fog, uv().add(depth), 0).r;                 // an explicit level: see Limits
+    If(density.greaterThan(0.95), () => Break());                       // stops this pixel's loop here
+    light.addAssign(vec3(density).mul(0.02));
+    depth.addAssign(0.01);
+  });
+  return light;
+});
+new NodeMaterial({colorNode: march});
+
+const hits = storage(1, 'u32', {atomic: true}), out = storage(n, 'u32');
+ComputePass.attach(stage.engine, n, i => {                              // a ComputePass body is a statement body already
+  If(i.mod(2).equal(0), () => {
+    out.store(hits.atomicAdd(0, 1), i);                                 // runs here, for the even invocations only
+  });
+});
+```
+
+## Statements
+
+`block(() => value)` is a node worked out by statements; NodeMaterial slots, NodePass nodes and Fn bodies all take one. A ComputePass body and every body below are statement bodies too, so they need no `block`.
+
+- `Var(init, type?)` declares a variable; `.assign(v)`, `.addAssign`, `.subAssign`, `.mulAssign`, `.divAssign` and `.assignElement(i, v)` change it. It is a node, so `x.add(1)`, `x.xy` and `x.lessThan(0)` read it.
+- `If(cond, body).ElseIf(cond, body).Else(body)` runs one body. Only that body's nodes run, which is the reason to use it over `select`; a condition after the first is worked out only when the ones before it failed. Conditions are single `bool`s.
+- `Loop(count, i => ...)` or `Loop({from, to, step}, i => ...)` counts with an `i32` `i`; the bounds are read once, on entry. `While(cond, body)` tests `cond` before each pass and hangs the GPU if it never fails, so bound it. `Break()` and `Continue()` work in both; `loop()` stays the plain fold.
+- `Switch(i32 or u32 node).Case(1, body).Case([2, 3], body).Default(body)` picks one body. There is no fall-through, `Default` is optional, and `Break()` inside a Case ends the Switch rather than a loop around it, as in C and WGSL.
+- `Let(node)` keeps a value as it is now. A node that reads a `Var` is worked out where it is used: after `const next = x.add(1); x.assign(0);`, `next` is `1`, while `Let(x.add(1))` taken before the assignment keeps the old sum.
+- Storage `store` and atomics inside these bodies happen right there, in order. At the top level of a ComputePass body atomics run where they are made and writes run after them, returned or not.
+
+Mistakes fail when the material or pass is built, with a message that says what to do: a statement outside a body, `Break()` with nothing to leave (a `block` is a value, so a Break in it cannot reach a loop outside it), a `Var` or `Let` used outside the body it was made in, repeated cases. An atomic made in a branch and used outside it is refused too, because the only way to emit it would be to run it twice.
+
 ## Nodes
 
 - Types: `f32`, `i32`, `u32`, `bool`, `vec2/3/4` of each, `mat2x2f`, `mat3x3f`, `mat4x4f`. `Node<'vec3f'>` is checked by TypeScript, and every operation checks again at run time with a message such as `vec3f + vec2f: operand types do not combine`. Numbers lift to the other operand's type; scalars splat (`mix(a, b, 0.5)`, `clamp(v, 0, 1)` on vectors).
@@ -62,7 +99,7 @@ ComputePass.attach(stage.engine, n, i => {
 - Built-ins, as functions and methods: `abs sign floor ceil round trunc fract sin cos tan asin acos atan atan2 tanh exp exp2 log log2 sqrt inverseSqrt saturate normalize radians degrees dpdx dpdy fwidth min max pow clamp step smoothstep mix reflect refract cross length distance dot oneMinus`.
 - Inputs: `uv()`, `vertexColor()`, `positionLocal`, `positionWorld`, `normalLocal`, `normalWorld`, `viewDirection`, `cameraPosition`, `screenUV`, `screenCoordinate`, `varying(node)`; frame uniforms `time`, `deltaTime`, `resolution`; `uniform(value, {type, name})` with `.value` live; `texture(materialsTexture, uv?, level?)`.
 - Material inputs (fragment): `materialColor`, `materialNormal`, `materialRoughness`, `materialMetalness`, `materialEmissive` (what the Material computed before nodes ran), `frontFacing`. Post inputs: `inputColor(uv?)`, `inputDepth(uv?)`. Compute input: `instanceIndex`.
-- Control: `select(cond, ifTrue, ifFalse)`, `loop(count, init, (i, acc) => next)` (a bounded fold), `Fn(body, name)` (one WGSL function per argument-type signature) and `wgslFn(code)` for hand-written WGSL. `discard(cond, value)` drops the fragment where `cond` holds and is `value` elsewhere (NodeMaterial fragment nodes and NodePass nodes; a vertex or compute use throws).
+- Control: `select(cond, ifTrue, ifFalse)`, `loop(count, init, (i, acc) => next)` (a bounded fold), `Fn(body, name)` (one WGSL function per argument-type signature) and `wgslFn(code)` for hand-written WGSL. `discard(cond, value)` drops the fragment where `cond` holds and is `value` elsewhere (NodeMaterial fragment nodes and NodePass nodes; a vertex or compute use throws). Statement-level `If`, `Loop` and the rest are under [Statements](#statements).
 - Atomics: `storage(data, 'u32' | 'i32', {atomic: true})` gives `atomicAdd(i, v)`, `atomicMax`, `atomicMin` (each returns the previous value), `atomicLoad(i)` and `atomicStore(i, v)` (a write like `store`), in ComputePass nodes only; TypeScript refuses them on other storage types. They run in the order they are made, before the body's writes, even when their result is unused (inside `loop` or `Fn` bodies only where the result is used); equal calls are never merged. `element(i)` on an atomic buffer is an `atomicLoad` in compute and a plain read in materials and post.
 
 The compiler hash-conses the graph, so equal subexpressions built separately (three calls to `uv().y`) become one `let`; nodes not reachable from an output, unused uniforms and unused textures are never emitted. Output text depends only on the graph, so equal graphs give equal shaders and pipelines cache; uniform values live in a buffer, so changing them never recompiles. `material.fragmentCode`, `material.vertexCode`, `pass.code()` and `computePass.code` show the generated WGSL; `test/snapshots` holds examples.
@@ -300,13 +337,13 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 
 - Nodes are fixed when a NodeMaterial, NodePass or ComputePass is constructed; build a new one to change the graph. Only uniform values, textures' pixels and storage contents change live.
 - NodeMaterial patches gltf-pro's beauty shader (standard and KHR physical variants): shadows, SSAO's G-buffer and depth-equal passes see neither `positionNode` nor `normalNode`; normals are not re-derived after a vertex offset; at most 8 varyings. Its bindings start at group 2, binding 48, and node textures count against WebGPU's 16 sampled textures per stage: a `NodeMaterial` on a materials mesh fits 6 texture nodes alone, 5 with directional shadows and 3 with shadows, IBL and LocalShadows; past that, gltf-pro throws a `RangeError` naming the combination.
-- `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; there is no statement-level `If`, `Break`, assignment to variables or `switch`. `discard` in a NodeMaterial affects the beauty pass only: shadows still see the whole surface, and a NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `textureSample` inside a loop with a non-uniform bound is a WGSL uniformity error.
+- `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; `If` runs one. `discard` in a NodeMaterial affects the beauty pass only: shadows still see the whole surface, and a NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `texture(map, uv)`, `dpdx`, `dpdy` and `fwidth` inside an `If`, `Switch` or `While` on a per-pixel value, or a loop with a non-uniform bound or a `Break` on one, are a WGSL uniformity error, reported when the pipeline compiles; pass `texture` an explicit level there or sample before the branch.
 - Raw meshes are not picked by `engine.pick`, are not culled, and draw only into the main colour and depth: shadows, SSAO and SSR G-buffers and depth prepasses do not see them. Raw uniforms are scalars, vectors, mat3x3f and mat4x4f (no arrays or structs); no storage buffers or extra bind groups; one colour target; 32-bit attribute formats only.
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
 - ComputePass is one-dimensional (up to 65535 workgroups), runs every frame while attached (`computeReadback` runs once) (an atomic counter keeps counting unless `update()` resets it), and has no workgroup memory, barriers or atomics on workgroup variables, and no `atomicSub`/`And`/`Or`/`Xor`/`Exchange`/`CompareExchange` yet. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
 - No GLSL/WebGL2 output, no node editor, no built-in noise library (write it with `Fn` or `wgslFn`), no light, shadow or environment nodes, no skinning or morph nodes, no MRT outputs.
 
-Size (min + gzip, Rolldown, peers external): whole package 11.8 kB (11.2 kB before `discard` and atomics); `NodeMaterial` with colour nodes only, 5.8 kB, unchanged (post, compute and texture code tree-shake away; the test enforces this).
+Size (min + gzip, Rolldown, peers external): whole package 13.9 kB (11.8 kB before statements); `NodeMaterial` with colour nodes only, 6.0 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
 
 Apache-2.0. Optional, tree-shakable package; peers `@margoengine/core`, `@margoengine/materials` and `@margoengine/gltf-pro` (^0.1.0 || ^1.0.0).
 

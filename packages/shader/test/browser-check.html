@@ -4,7 +4,7 @@ import {createStage} from '/packages/stage/dist/index.js';
 import {planeGeometry} from '/packages/geometry/dist/index.js';
 import {Texture,createMesh} from '/packages/materials/dist/index.js';
 import {PostStack} from '/packages/post/dist/index.js';
-import {NodeMaterial,NodePass,ComputePass,storage,uniform,texture,uv,vec3,vec4,color,mix,step,select,positionLocal,normalLocal,inputColor,inputDepth,float,instanceIndex,loop,Fn,time,sin,discard,uint,screenUV} from '/packages/shader/dist/index.js';
+import {NodeMaterial,NodePass,ComputePass,storage,uniform,texture,uv,vec3,vec4,color,mix,step,select,positionLocal,normalLocal,inputColor,inputDepth,float,instanceIndex,loop,Fn,time,sin,discard,uint,screenUV,block,If,Loop,While,Break,Continue,Switch,Var,Let} from '/packages/shader/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];let pipelines=0;
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -15,6 +15,17 @@ const field=storage(4,'vec4f'),fill=new ComputePass(4,i=>field.store(i,vec4(i.to
 // 1000 invocations: count, max and min of the index, and compaction of the even indices through an atomic slot counter.
 const counter=storage(new Uint32Array([0,0,0xffffffff,0]),'u32',{atomic:true}),kept=storage(1024,'u32');
 const tally=new ComputePass(1000,i=>{counter.atomicAdd(0,1);counter.atomicMax(1,i);counter.atomicMin(2,i);const even=i.mod(2).equal(0),slot=counter.atomicAdd(3,select(even,uint(1),uint(0)));return kept.store(select(even,slot,uint(1023)),i);});
+// Statements: for each i, the first k with k*k > i (Break), the sum of even k up to it (Continue), halvings of i (While), a
+// Switch over i%4, a branch that only even i take, and a value kept with Let across an assignment.
+const flow=storage(64*6,'u32'),statements=new ComputePass(64,i=>{
+  const root=Var(0,'u32'),even=Var(0,'u32'),halves=Var(0,'u32'),n=Var(i),pick=Var(0,'u32'),base=i.mul(6);
+  Loop(100,k=>{const u=k.toUint();If(u.mul(u).greaterThan(i),()=>{root.assign(u);Break();});If(k.mod(2).equal(1),()=>Continue());even.addAssign(u);});
+  While(n.greaterThan(uint(1)),()=>{n.assign(n.div(uint(2)));halves.addAssign(uint(1));});
+  Switch(i.mod(4)).Case(0,()=>pick.assign(uint(10))).Case([1,2],()=>pick.assign(uint(20))).Default(()=>pick.assign(uint(30)));
+  If(i.mod(2).equal(0),()=>flow.store(base.add(4),uint(1))).Else(()=>flow.store(base.add(4),uint(2)));
+  const old=Let(root);root.assign(uint(0));flow.store(base.add(5),old.add(root));
+  flow.store(base,even);flow.store(base.add(1),halves);flow.store(base.add(2),pick);
+});
 // Two raw meshes of equal bytes share a vertex buffer; rawWrite() changes one, which must leave the other alone.
 const rawShared=async()=>{
   const {RawShaders,RawShaderMaterial,RawMesh}=await import('/packages/shader/dist/raw.js');
@@ -42,6 +53,9 @@ const scenarios={
   discard:()=>plane(new NodeMaterial({shading:'basic',colorNode:discard(uv().x.lessThan(0.5),vec3(1))})),
   postDiscard:()=>{const mesh=plane(new NodeMaterial({shading:'basic',colorNode:vec3(1)})),stack=PostStack.attach(engine,[new NodePass(discard(screenUV.x.lessThan(0.5),inputColor()))]);return {destroy(){stack.dispose();mesh.destroy();}};},
   atomics:()=>{engine.use(tally);return {destroy(){engine.removePlugin(tally.name);}};},
+  statements:()=>{engine.use(statements);return {destroy(){engine.removePlugin(statements.name);}};},
+  // Left of centre takes the first branch, right of it the loop, which leaves after two of its 64 passes.
+  branch:()=>plane(new NodeMaterial({shading:'basic',colorNode:block(()=>{const c=Var(vec3(0));If(uv().x.lessThan(0.5),()=>c.assign(vec3(1,0,0))).Else(()=>{Loop(64,k=>{If(k.equal(2),()=>Break());c.addAssign(vec3(0,0.5,0));});});return c;})})),
   post:()=>{
     const mesh=plane(new NodeMaterial({shading:'basic',colorNode:color('#ff8000')}));mesh.root.setScale([0.5,0.5,0.5]);
     // Inverts the scene where there is geometry, magenta where depth is the cleared far plane.
@@ -60,6 +74,7 @@ window.check={
   async setTint(hex){const before=pipelines;tint.value=hex;engine.render();await device.queue.onSubmittedWorkDone();return {errors:errors.splice(0),newPipelines:pipelines-before};},
   async rawWrite(){const {left,right,shared}=window.current;right.setAttribute('color',[0,1,0,0,1,0,0,1,0,0,1,0]);engine.render();await device.queue.onSubmittedWorkDone();return {shared,split:left.gpu.vertex.buffer!==right.gpu.vertex.buffer,errors:errors.splice(0)};},
   readField:()=>readBack(field,Float32Array),
+  readFlow:()=>readBack(flow,Uint32Array),
   async readAtomics(){const first=(await readBack(kept,Uint32Array)).slice(0,500).sort((a,b)=>a-b);return {counter:await readBack(counter,Uint32Array),evens:first.every((v,k)=>v===k*2)};},
   // Both gltf-pro variants (standard and KHR physical) with node overrides, including a vertex offset and a varying, must compile.
   async variants(){

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5001057,
+  "total": 5002943,
   "history": [
     {
       "date": "2026-10-24",
@@ -2156,6 +2156,12 @@
       "commit": "04eac421b",
       "reason": "New gltf entry ./textured and the root's load, read and finish hooks: base colour maps and MASK on the light path. Core and core + stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d2a381758",
+      "reason": "shader root: statements in node graphs (If, Loop, While, Switch, Var, block), tree-shaken when unused",
+      "grew": 1
     }
   ],
   "items": {
@@ -2554,7 +2560,7 @@
     "@margoengine/sciviz/colormaps": 4427,
     "@margoengine/sciviz/maths": 5638,
     "@margoengine/selection": 20446,
-    "@margoengine/shader": 12502,
+    "@margoengine/shader": 14388,
     "@margoengine/shader/editor": 21836,
     "@margoengine/shader/effects": 8306,
     "@margoengine/shader/graph": 11088,

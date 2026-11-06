@@ -10,7 +10,9 @@ import {
 } from '@margoengine/core/extension';
 import { compute } from '../../shared/gpu.js';
 import {
+  FIXED,
   Node,
+  ONCE,
   Program,
   STMT,
   builtin,
@@ -139,10 +141,16 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
       return this.atomic && b.stage.kind === 'compute' ? `atomicLoad(&${at})` : at;
     });
   }
-  /** A write made at the end of the ComputePass body (`atomicStore` on an atomic buffer). */
+  /** A write made at the end of the ComputePass body (`atomicStore` on an atomic buffer); inside `If`, `Loop` and other statement bodies it happens right where it is called. */
   store(i: Index, value: NodeInput<T>): Store {
     // StorageBuffer<T> is invariant in T (element reads and value writes), so widening to Store's buffer needs the cast.
-    return { buffer: this as unknown as StorageBuffer, index: index(i), value: cast(value, this.type, 'stored value') };
+    const write = {
+      buffer: this as unknown as StorageBuffer,
+      index: index(i),
+      value: cast(value, this.type, 'stored value'),
+    };
+    effects.store?.(write);
+    return write;
   }
   /** Atomically adds `value` to element `i` and returns the previous value (compaction: `out.store(counter.atomicAdd(0, 1), i)`).
    * Runs where it is made, in order with other atomics, even when its result is unused; inside `loop` or `Fn` only when the result is used. */
@@ -176,7 +184,7 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
         b.line(`let ${name} = ${op}(&${b.resource(this)}[${at}]${v ? ', ' + v : ''});`);
         return name;
       },
-      STMT,
+      STMT | FIXED | ONCE,
     );
     effects.list?.push(n);
     return n;
@@ -225,7 +233,7 @@ export interface ComputeOptions {
   /** Plugin and debug name. Default `'shader:compute:<n>'` (n counts passes). */
   name?: string;
 }
-/** Runs `body` for `count` invocations every frame: atomic operations first, in the order they were made, then the writes it returns (their reads happen before any write). */
+/** Runs `body` for `count` invocations every frame: atomic operations and statements first, in the order they were made, then its writes, returned ones first (their reads happen before any write). */
 export class ComputePass implements EnginePlugin {
   readonly name: string;
   readonly program = new Program(0, true);
@@ -253,20 +261,28 @@ export class ComputePass implements EnginePlugin {
       throw new RangeError(
         'ComputePass needs an integer count of at least 1, a workgroup size from 1 to 256 that dispatches at most 65535 groups, and a finite order; adjust count or workgroupSize.',
       );
-    const outer = effects.list,
-      made: Node[] = (effects.list = []);
+    const { list, store } = effects,
+      made: Node[] = (effects.list = []),
+      kept: Store[] = [];
+    effects.store = (write) => kept.push(write as Store);
     let result: ComputeBody;
     try {
       result = body(instanceIndex);
     } finally {
-      effects.list = outer;
+      effects.list = list;
+      effects.store = store;
     }
     const out = [result ?? []].flat(),
-      stores = out.filter((s) => !(s instanceof Node)) as Store[];
-    if ((!out.length && !made.length) || stores.some((s) => !(s?.buffer instanceof StorageBuffer)))
+      returned = out.filter((s) => !(s instanceof Node)) as Store[];
+    if (
+      (!out.length && !made.length && !kept.length) ||
+      returned.some((s) => !(s?.buffer instanceof StorageBuffer))
+    )
       throw new TypeError(
-        'A ComputePass body must return storage.store(...) writes or make atomic operations; return the writes or call an atomic method.',
+        'A ComputePass body must make storage.store(...) writes, statements or atomic operations; add one to the body.',
       );
+    // A write the body made and did not return still happens: losing it silently would be worse than any order.
+    const stores = [...new Set([...returned, ...kept])];
     const first = [...made, ...out.filter((n) => n instanceof Node)],
       p = this.program;
     const s = this.program.stage(stage, [...first, ...stores.flatMap((w) => [w.index, w.value])]),

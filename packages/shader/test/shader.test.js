@@ -579,5 +579,6 @@ test('importing a colour node and NodeMaterial leaves post, compute and textures
   for (const marker of ['@compute', 'texture_depth_2d', 'textureSampleLevel', 'read_write', 'aces('])
     assert.ok(!minimal.text.includes(marker), marker + ' (compute, post or texture code) was not shaken out');
   assert.ok(minimal.gzip < all.gzip * 0.6, `minimal ${minimal.gzip} vs all ${all.gzip}`);
-  assert.ok(minimal.gzip < 6500 && all.gzip < 12500, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
+  // The whole-package budget follows what the root holds: 12,500 B, then 14,500 B with statements (control.ts, 2.1 kB).
+  assert.ok(minimal.gzip < 6500 && all.gzip < 14500, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
 });

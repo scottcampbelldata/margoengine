@@ -1,5 +1,5 @@
 {
-  "commit": "093528f60",
+  "commit": "d2a381758",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -812,12 +812,16 @@
     },
     "@margoengine/gltf": {
       ".": {
-        "raw": 16271,
-        "gzip": 6278
+        "raw": 17066,
+        "gzip": 6575
       },
       "./quantized": {
         "raw": 2223,
         "gzip": 1129
+      },
+      "./textured": {
+        "raw": 13939,
+        "gzip": 5583
       }
     },
     "@margoengine/gltf-pro": {
@@ -1522,6 +1526,10 @@
       "./warm": {
         "raw": 2705,
         "gzip": 1308
+      },
+      "./ssaa": {
+        "raw": 4111,
+        "gzip": 1985
       }
     },
     "@margoengine/ragdoll": {
@@ -1718,32 +1726,32 @@
     },
     "@margoengine/shader": {
       ".": {
-        "raw": 31842,
-        "gzip": 12137
+        "raw": 37345,
+        "gzip": 13968
       },
       "./noise": {
         "raw": 11276,
         "gzip": 4731
       },
       "./graph": {
-        "raw": 28134,
-        "gzip": 10765
+        "raw": 28676,
+        "gzip": 10974
       },
       "./readback": {
-        "raw": 18317,
-        "gzip": 7401
+        "raw": 18892,
+        "gzip": 7619
       },
       "./raw": {
         "raw": 27308,
         "gzip": 10125
       },
       "./effects": {
-        "raw": 19361,
-        "gzip": 8050
+        "raw": 19827,
+        "gzip": 8208
       },
       "./editor": {
-        "raw": 62422,
-        "gzip": 21200
+        "raw": 62964,
+        "gzip": 21408
       }
     },
     "@margoengine/shadows": {
@@ -2323,9 +2331,9 @@
   },
   "lazyFiles": {
     "packages/gltf/dist/index.js": {
-      "raw": 16271,
-      "gzip": 6278,
-      "brotli": 5635
+      "raw": 17066,
+      "gzip": 6575,
+      "brotli": 5904
     },
     "packages/scenery/dist/sky.js": {
       "raw": 22771,

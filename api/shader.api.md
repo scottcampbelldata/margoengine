@@ -15,10 +15,18 @@ export interface BindableTexture {
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }
 
+export interface Branch {
+    ElseIf(condition: NodeInput<'bool'> | boolean, body: Body): Branch;
+    Else(body: Body): void;
+}
+
+export function Break(): void;
+
 export class Builder {
     readonly program: Program;
     readonly stage: ShaderStage;
     inFn: boolean;
+    epoch: number;
     constructor(program: Program, stage: ShaderStage);
     expr(n: Node): string;
     wrap(n: Node): string;
@@ -27,6 +35,7 @@ export class Builder {
     pop(): string[];
     name(): string;
     bind(param: Node, name: string): void;
+    unbind(param: Node): void;
     param(n: Node): string;
     local(code: string): string;
     builtin(name: string): string;
@@ -35,6 +44,11 @@ export class Builder {
     frame(name: string, type: Type): string;
     declare(key: string, code: string): void;
     fn(spec: Spec): string;
+}
+
+export interface Cases {
+    Case(values: number | readonly number[], body: Body): Cases;
+    Default(body: Body): void;
 }
 
 export type ColorValue = string | number | readonly number[];
@@ -62,7 +76,11 @@ export class ComputePass implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
+export function Continue(): void;
+
 export type Emit = (b: Builder, n: Node) => string;
+
+export const FIXED = 8;
 
 export function Fn<P extends Type[], R extends Type>(body: (...args: {
     [K in keyof P]: Node<P[K]>;
@@ -77,7 +95,21 @@ export interface Host {
     [key: string]: unknown;
 }
 
+export function If(condition: NodeInput<'bool'> | boolean, body: Body): Branch;
+
 export const LEAF = 1;
+
+export function Let<T extends Type>(value: Node<T>): Node<T>;
+
+export function Loop(range: NodeInput<'i32' | 'u32'> | LoopRange, body: (i: Node<'i32'>) => unknown): void;
+
+export interface LoopRange {
+    from?: NodeInput<'i32' | 'u32'>;
+    to: NodeInput<'i32' | 'u32'>;
+    step?: number;
+}
+
+export const MUTABLE = 32;
 
 export type Matrix = 'mat2x2f' | 'mat3x3f' | 'mat4x4f';
 
@@ -198,6 +230,8 @@ export interface NodePassOptions {
     name?: string;
 }
 
+export const ONCE = 16;
+
 export const OP = 2;
 
 export class Program {
@@ -229,6 +263,7 @@ export class Program {
     canon(n: Node): Node;
     count(n: Node): void;
     shared(c: Node): boolean;
+    volatile(c: Node): boolean;
     declareOnce(key: string, code: () => string): void;
     resource(resource: Resource): string;
     member(type: Type, name: string, node?: UniformNode, frame?: string): string;
@@ -286,6 +321,8 @@ export interface Store {
     readonly value: Node;
 }
 
+export function Switch(selector: Node<'i32' | 'u32'>): Cases;
+
 export type Swizzles<T extends Type> = {
     readonly [K in Sw<C> | Sw<R>]: Node<VecOf<ScalarOf<T>, Count<K>>>;
 };
@@ -300,9 +337,25 @@ export class UniformNode<T extends Type = Type> extends Node<T> {
     write(out: DataView, offset: number): void;
 }
 
+export function Var<T extends Type>(init: Node<T>): VarNode<T>;
+export function Var(init: number): VarNode<'f32'>;
+export function Var<T extends Type>(init: NodeInput<T> | boolean, type: T): VarNode<T>;
+
+export class VarNode<T extends Type = Type> extends Node<T> {
+    constructor(type: T);
+    assign(value: NodeInput<T>): void;
+    addAssign(value: NodeInput): void;
+    subAssign(value: NodeInput): void;
+    mulAssign(value: NodeInput): void;
+    divAssign(value: NodeInput): void;
+    assignElement(index: NodeInput<'i32' | 'u32'>, value: NodeInput): void;
+}
+
 export type VecOf<S extends Scalar, K extends number> = K extends 1 ? S : S extends 'bool' ? `vec${K & N}<bool>` : `vec${K & N}${S extends 'f32' ? 'f' : S extends 'i32' ? 'i' : 'u'}`;
 
 export type Vector = `vec${N}${'f' | 'i' | 'u'}` | `vec${N}<bool>`;
+
+export function While(condition: Node<'bool'>, body: Body): void;
 
 export type Widest<A extends readonly unknown[]> = [TypeOf<A[number]>] extends [never] ? 'f32' : [Exclude<TypeOf<A[number]>, Scalar>] extends [never] ? TypeOf<A[number]> : Exclude<TypeOf<A[number]>, Scalar>;
 
@@ -317,6 +370,8 @@ export const asin: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 export const atan: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const atan2: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
+
+export function block<T extends Type>(body: () => Node<T>): Node<T>;
 
 export const bool: (x: Part) => Node<'bool'>;
 
@@ -545,6 +600,8 @@ export function wgslFn<R extends Type = Type>(code: string): (...args: NodeInput
 // Not exported from this entry, but used by the exports above:
 
 type Atomic = 'u32' | 'i32';
+
+type Body = () => unknown;
 
 type Bools<T extends Type> = Node<VecOf<'bool', Size<T>>>;
 

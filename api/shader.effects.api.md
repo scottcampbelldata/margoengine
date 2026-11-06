@@ -105,6 +105,7 @@ class Builder {
     readonly program: Program;
     readonly stage: ShaderStage;
     inFn: boolean;
+    epoch: number;
     constructor(program: Program, stage: ShaderStage);
     expr(n: Node): string;
     wrap(n: Node): string;
@@ -113,6 +114,7 @@ class Builder {
     pop(): string[];
     name(): string;
     bind(param: Node, name: string): void;
+    unbind(param: Node): void;
     param(n: Node): string;
     local(code: string): string;
     builtin(name: string): string;
@@ -269,6 +271,7 @@ class Program {
     canon(n: Node): Node;
     count(n: Node): void;
     shared(c: Node): boolean;
+    volatile(c: Node): boolean;
     declareOnce(key: string, code: () => string): void;
     resource(resource: Resource): string;
     member(type: Type, name: string, node?: UniformNode, frame?: string): string;
