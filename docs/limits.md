@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-116). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-117). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -148,6 +148,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Third-person camera (`ThirdPersonControls` in `@margoengine/controls/third-person`, 2026-11-05) | By method: the arm is swept with nine rays a frame, not a true sphere, so an object thinner than the gaps between the rays can slip through the sweep. Skinned models collide in their bind pose, as for the bvh Raycaster. Not checked: the camera has no collider of its own, so it does not stop for something that moves into it from the side beyond the rim rays. | Nine rays against cached trees is cheap on the CPU and needs no physics package. | A pole near the camera may graze the view for a frame. | Raise `probeRadius`, or drive the camera from `@margoengine/physics` shape casts. |
 | `DragControls` rotate mode, groups and children (2026-11-05) | By method: a turn goes about the grabbed object's origin, not the grab point or the group's centre. `recursive` and `transformGroup` follow core mesh children; a model is always dragged whole. | A model's nodes are not meshes the control can list. | A group with a far-off grabbed member swings wide. | Grab a member near the middle, or use `TransformControls`. |
 | Orbit target radius and `orthoZoom` (2026-11-05) | By method: `minTargetRadius` and `maxTargetRadius` act on the target and move the camera by the same step, after `targetBounds`, so the sphere wins when the two disagree. A target exactly on `cursor` leaves along +X. `orthoZoom` needs a `CameraProjection` or a `projection` with a numeric `zoom`. | The shell has no way to slide past its centre, and a plain camera has no zoom. | With `minTargetRadius` above 0, the target cannot pass through `cursor`. | Set `minTargetRadius` to 0, or keep the shell thick. |
+| Several objects on `TransformControls` (`attachMany`, `pivot`, 2026-11-05) | By method: an object's size has only its own axes, so a non-uniform stretch along another frame gives each axis its share instead of a shear, exact when the axes line up or the factors match. A mesh with an attached ancestor follows that ancestor. | Meshes store position, rotation and scale, with no shear. | A turned object scaled unevenly in `world` space keeps its shape family, not the sheared shape a matrix would give. | Scale evenly, or scale in the object's own axes with `individual` and `local`. |
 
 ## Copies of a model
 

@@ -29,6 +29,11 @@ import { viewSize } from '../../shared/view-rect.js';
 
 /** The frame the gizmo axes follow: `world` (the default) or the attached object's `local` axes. */
 export type TransformSpace = 'world' | 'local';
+/**
+ * What several attached objects turn and scale about: their `median` point (the default), the `active` object's origin,
+ * or `individual`ly, each about its own origin.
+ */
+export type TransformPivot = 'median' | 'active' | 'individual';
 export type { TransformMode, HandleName };
 
 /** Options of `TransformControls`; every field is optional. */
@@ -37,6 +42,8 @@ export interface TransformControlsOptions {
   mode?: TransformMode;
   /** Default `world`. */
   space?: TransformSpace;
+  /** What several attached objects turn and scale about. Default `median`. */
+  pivot?: TransformPivot;
   /** Gizmo size multiplier. Default 1. */
   size?: number;
   /** Snap step for moving, in world units. Default null: no snapping. */
@@ -68,6 +75,18 @@ export interface TransformControlsOptions {
   order?: number;
 }
 
+/** One object of a multi-object drag, as it was when the drag began. */
+interface Member {
+  mesh: Mesh;
+  position: V3;
+  quaternion: Q4;
+  scale: V3;
+  parentInverse: number[];
+  parentQuaternion: Q4;
+  world: V3;
+  worldQuaternion: Q4;
+}
+
 interface DragStart {
   axis: HandleName;
   origin: V3;
@@ -95,6 +114,8 @@ interface DragStart {
   spoke: V3 | null;
   /** Where an axis or plane scale's pointer is now, relative to the origin. */
   pointNow: V3 | null;
+  /** The objects a multi-object drag moves, or null for one attached object. */
+  members: Member[] | null;
 }
 
 let counter = 0;
@@ -111,10 +132,11 @@ const FLIP_MARGIN = 0.05;
  *
  * The gizmo is drawn by a frame graph pass on top of the scene (WebGPU, with a WebGL2 fallback) and is hit-tested
  * in screen space with ray math. Drags are applied in the parent's space using the world matrices in
- * `engineRuntime(engine).store.matrices`, so parented meshes move, rotate and scale correctly.
+ * `engineRuntime(engine).store.matrices`, so parented meshes move, rotate and scale correctly. `attachMany` edits several
+ * meshes at once about the `pivot`.
  *
  * Events: `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`),
- * `mode-changed` and `space-changed`.
+ * `mode-changed`, `space-changed` and `pivot-changed`.
  */
 export class TransformControls extends EventDispatcher {
   readonly engine: EngineKernel;
@@ -126,6 +148,8 @@ export class TransformControls extends EventDispatcher {
   visible = true;
   mode: TransformMode;
   space: TransformSpace;
+  /** What several attached objects turn and scale about. Default `median`. */
+  pivot: TransformPivot;
   size: number;
   translationSnap: number | null;
   rotationSnap: number | null;
@@ -142,7 +166,7 @@ export class TransformControls extends EventDispatcher {
    * changes: picking is on the CPU and has no scene depth, so a hidden handle can still be grabbed.
    */
   occlude: boolean;
-  /** Attached mesh, or null. */
+  /** Attached mesh, or null. With several attached, the active one: its axes are the `local` frame. */
   object: Mesh | null = null;
   /** Hovered or dragged handle. */
   axis: HandleName | null = null;
@@ -151,6 +175,9 @@ export class TransformControls extends EventDispatcher {
   private drag: DragStart | null = null;
   private pointerId: number | null = null;
   private resetState: { position: V3; quaternion: Q4; scale: V3 } | null = null;
+  /** Everything `attachMany` attached, the active object included; empty with one object. */
+  private selection: Mesh[] = [];
+  private savedSelection: Array<{ mesh: Mesh; position: V3; quaternion: Q4; scale: V3 }> = [];
   private readonly flip: [number, number, number] = [1, 1, 1];
   /** Name of the engine plugin that owns the overlay pass. */
   readonly pluginName: string;
@@ -165,6 +192,7 @@ export class TransformControls extends EventDispatcher {
     this.engine = engine;
     this.mode = options.mode ?? 'translate';
     this.space = options.space ?? 'world';
+    this.pivot = options.pivot ?? 'median';
     this.size = options.size ?? 1;
     this.translationSnap = options.translationSnap ?? null;
     this.rotationSnap = options.rotationSnap ?? null;
@@ -222,19 +250,50 @@ export class TransformControls extends EventDispatcher {
     this.element = null;
   }
 
-  attach(object: Mesh): this {
+  private owned(object: Mesh): void {
     meshRuntime(object).check();
     if ((meshRuntime(object) as unknown as { engine: unknown }).engine !== engineRuntime(this.engine))
       throw new TypeError('Mesh belongs to another engine; attach a mesh created by this engine');
+  }
+  attach(object: Mesh): this {
+    this.owned(object);
     if (this.dragging) this.endDrag();
     this.object = object;
+    this.selection = [];
+    this.savedSelection = [];
     this.resetState = this.local();
     this.dispatchEvent({ type: 'change' });
     return this;
   }
+  /**
+   * Attaches several meshes to edit together; repeats count once and an empty list detaches. `active` (default the last
+   * one) gives the `local` axes and the `active` pivot. A mesh whose ancestor is also attached follows that ancestor.
+   */
+  attachMany(objects: Iterable<Mesh>, active?: Mesh): this {
+    const list = [...new Set(objects)];
+    for (const object of list) this.owned(object);
+    const chosen = active ?? list[list.length - 1];
+    if (!chosen) return this.detach();
+    if (!list.includes(chosen)) throw new TypeError('The active mesh is not one of the attached meshes');
+    if (list.length === 1) return this.attach(chosen);
+    if (this.dragging) this.endDrag();
+    this.object = chosen;
+    this.selection = list;
+    this.resetState = this.local();
+    this.savedSelection = list.map((mesh) => ({ mesh, ...this.local(mesh) }));
+    this.dispatchEvent({ type: 'change' });
+    return this;
+  }
+  /** Every attached mesh that still exists, the active one included. */
+  get objects(): readonly Mesh[] {
+    const object = this.attached();
+    return this.selection.length ? this.selection.filter((mesh) => this.live(mesh)) : object ? [object] : [];
+  }
   detach(): this {
     if (this.dragging) this.endDrag();
     this.object = null;
+    this.selection = [];
+    this.savedSelection = [];
     this.setAxis(null);
     this.dispatchEvent({ type: 'change' });
     return this;
@@ -253,6 +312,13 @@ export class TransformControls extends EventDispatcher {
     if (space !== this.space) {
       this.space = space;
       this.dispatchEvent({ type: 'space-changed', value: space });
+      this.dispatchEvent({ type: 'change' });
+    }
+  }
+  setPivot(pivot: TransformPivot): void {
+    if (pivot !== this.pivot) {
+      this.pivot = pivot;
+      this.dispatchEvent({ type: 'pivot-changed', value: pivot });
       this.dispatchEvent({ type: 'change' });
     }
   }
@@ -310,9 +376,8 @@ export class TransformControls extends EventDispatcher {
   /** Ends the current drag and puts the mesh back to where the drag began. Returns false when nothing is being dragged. */
   cancelDrag(): boolean {
     if (!this.dragging || !this.object || !this.resetState) return false;
-    const s = this.resetState,
-      pointerId = this.pointerId;
-    this.object.setPosition(s.position).setQuaternion(s.quaternion).setScale(s.scale);
+    const pointerId = this.pointerId;
+    this.restore();
     if (pointerId !== null) {
       try {
         this.element?.releasePointerCapture?.(pointerId);
@@ -363,10 +428,16 @@ export class TransformControls extends EventDispatcher {
   /** Restores the attached mesh to its transform at attach time or at the start of the last drag. */
   reset(): void {
     if (!this.object || !this.resetState || this.dragging) return;
-    const s = this.resetState;
-    this.object.setPosition(s.position).setQuaternion(s.quaternion).setScale(s.scale);
+    this.restore();
     this.dispatchEvent({ type: 'objectChange' });
     this.dispatchEvent({ type: 'change' });
+  }
+  /** Puts every attached mesh back to its saved transform. */
+  private restore(): void {
+    const s = this.resetState!;
+    this.object!.setPosition(s.position).setQuaternion(s.quaternion).setScale(s.scale);
+    for (const m of this.savedSelection)
+      if (this.live(m.mesh)) m.mesh.setPosition(m.position).setQuaternion(m.quaternion).setScale(m.scale);
   }
 
   /** The gizmo frame for a viewport size in CSS pixels, or null when nothing is attached. */
@@ -376,10 +447,11 @@ export class TransformControls extends EventDispatcher {
     const store = engineRuntime(this.engine).store,
       id = meshRuntime(object).id,
       m = store.matrices.subarray(id * 16, id * 16 + 16);
-    const origin: V3 = [m[12], m[13], m[14]],
+    const origin: V3 = this.pivotPoint() ?? [m[12], m[13], m[14]],
       camera = this.view?.camera ?? this.engine.camera,
       b = basis(camera);
-    const space = this.mode === 'scale' ? 'local' : this.space,
+    // One object scales along its own axes, the only ones it has; a group can also spread along the world's.
+    const space = this.mode === 'scale' && !this.selection.length ? 'local' : this.space,
       q = this.worldQuaternion(object);
     const axes: [V3, V3, V3] =
       space === 'local'
@@ -470,6 +542,8 @@ export class TransformControls extends EventDispatcher {
     this.stopListenToKeyEvents();
     this.disconnect();
     this.object = null;
+    this.selection = [];
+    this.savedSelection = [];
     this.overlay.release();
     if (!this.engine.disposed && this.engine.hasPlugin(this.pluginName)) this.engine.removePlugin(this.pluginName);
   }
@@ -588,6 +662,7 @@ export class TransformControls extends EventDispatcher {
       tangent: { x: 0, y: 0 },
       spoke: null,
       pointNow: null,
+      members: this.selection.length ? this.movers().map((mesh) => this.member(mesh)) : null,
     };
     if (this.mode === 'rotate' && 'XYZ'.includes(axis) && axis.length === 1) {
       const a = f.axes['XYZ'.indexOf(axis)],
@@ -617,6 +692,7 @@ export class TransformControls extends EventDispatcher {
     }
     this.drag = drag;
     this.resetState = local;
+    if (this.selection.length) this.savedSelection = this.selection.map((mesh) => ({ mesh, ...this.local(mesh) }));
     this.dragging = true;
     this.dispatchEvent({ type: 'dragging-changed', value: true });
     this.dispatchEvent({ type: 'mouseDown', mode: this.mode });
@@ -660,7 +736,8 @@ export class TransformControls extends EventDispatcher {
     const world = add(d.origin, offset);
     if (snap && (!local || d.axis === 'XYZ'))
       for (let i = 0; i < 3; i++) if (active[i] || d.axis === 'XYZ') world[i] = Math.round(world[i] / snap) * snap;
-    object.setPosition(transformPoint(d.parentInverse, world));
+    if (d.members) this.moveMembers(d, sub(world, d.origin));
+    else object.setPosition(transformPoint(d.parentInverse, world));
   }
 
   private rotate(d: DragStart, object: Mesh, b: Basis, x: number, y: number, width: number, height: number): void {
@@ -724,6 +801,10 @@ export class TransformControls extends EventDispatcher {
   }
   /** Applies a world-space rotation R: local' = P^-1 R P local, P being the parent's world rotation. */
   private applyRotation(d: DragStart, object: Mesh, rotation: Q4): void {
+    if (d.members) {
+      this.turnMembers(d, rotation);
+      return;
+    }
     const P = d.parentQuaternion,
       next = multiplyQuaternions(
         multiplyQuaternions(multiplyQuaternions(conjugateQuaternion(P), rotation), P),
@@ -757,7 +838,129 @@ export class TransformControls extends EventDispatcher {
       if (snap) next[i] = Math.round(next[i] / snap) * snap || snap;
       if (Math.abs(next[i]) < 1e-4) next[i] = Math.sign(next[i] || d.scale[i]) * 1e-4;
     }
-    object.setScale(next);
+    if (d.members)
+      this.scaleMembers(d, [0, 1, 2].map((i) => (d.scale[i] ? next[i] / d.scale[i] : 1)) as unknown as V3);
+    else object.setScale(next);
+  }
+
+  // ---- several objects ----
+  /** True when each object follows its own axes: `individual` pivot, `local` space and an axis handle. */
+  private ownAxes(d: DragStart): boolean {
+    return this.pivot === 'individual' && this.space === 'local' && d.axis !== 'XYZ' && !d.axis.includes('E');
+  }
+  /** Each object moves by `offset`; on its own axes it moves that much along each of them instead. */
+  private moveMembers(d: DragStart, offset: V3): void {
+    const own = this.ownAxes(d),
+      along = d.axes.map((a) => dot(offset, a));
+    for (const m of d.members!) {
+      if (!this.live(m.mesh)) continue;
+      let step = offset;
+      if (own) {
+        step = [0, 0, 0];
+        for (let i = 0; i < 3; i++) {
+          const unit: V3 = [0, 0, 0];
+          unit[i] = 1;
+          step = madd(step, rotateByQuaternion(unit, m.worldQuaternion), along[i]);
+        }
+      }
+      m.mesh.setPosition(transformPoint(m.parentInverse, add(m.world, step)));
+    }
+  }
+  /** Each object turns by the world rotation R, about the pivot or in place; on its own axes, the same turn in its frame. */
+  private turnMembers(d: DragStart, rotation: Q4): void {
+    const own = this.ownAxes(d),
+      inPlace = this.pivot === 'individual',
+      inFrame = multiplyQuaternions(
+        multiplyQuaternions(conjugateQuaternion(d.worldQuaternion), rotation),
+        d.worldQuaternion,
+      );
+    for (const m of d.members!) {
+      if (!this.live(m.mesh)) continue;
+      const R = own
+          ? multiplyQuaternions(
+              multiplyQuaternions(m.worldQuaternion, inFrame),
+              conjugateQuaternion(m.worldQuaternion),
+            )
+          : rotation,
+        P = m.parentQuaternion;
+      if (!inPlace)
+        m.mesh.setPosition(
+          transformPoint(m.parentInverse, add(d.origin, rotateByQuaternion(sub(m.world, d.origin), rotation))),
+        );
+      m.mesh.setQuaternion(
+        normalizeQuaternion(
+          multiplyQuaternions(multiplyQuaternions(multiplyQuaternions(conjugateQuaternion(P), R), P), m.quaternion),
+        ),
+      );
+    }
+  }
+  /**
+   * Scales by `factors` along the gizmo axes: positions spread about the pivot, unless in place. An object's size has only
+   * its own axes, so each takes the stretch the factors give that axis, exact when the axes line up or the factors match.
+   */
+  private scaleMembers(d: DragStart, factors: V3): void {
+    const own = this.ownAxes(d),
+      inPlace = this.pivot === 'individual';
+    for (const m of d.members!) {
+      if (!this.live(m.mesh)) continue;
+      if (!inPlace) {
+        const from = sub(m.world, d.origin);
+        let to: V3 = [0, 0, 0];
+        for (let i = 0; i < 3; i++) to = madd(to, d.axes[i], dot(from, d.axes[i]) * factors[i]);
+        m.mesh.setPosition(transformPoint(m.parentInverse, add(d.origin, to)));
+      }
+      const size: V3 = [...m.scale] as V3;
+      for (let j = 0; j < 3; j++) {
+        let stretch = factors[j];
+        if (!own) {
+          const unit: V3 = [0, 0, 0];
+          unit[j] = 1;
+          const axis = rotateByQuaternion(unit, m.worldQuaternion),
+            parts = d.axes.map((a, i) => dot(axis, a) * factors[i]),
+            shares = d.axes.map((a) => Math.abs(dot(axis, a))),
+            main = shares.indexOf(Math.max(...shares));
+          stretch = Math.sign(factors[main]) * Math.hypot(...parts);
+        }
+        size[j] *= stretch;
+        if (Math.abs(size[j]) < 1e-4) size[j] = Math.sign(size[j] || m.scale[j]) * 1e-4;
+      }
+      m.mesh.setScale(size);
+    }
+  }
+  private member(mesh: Mesh): Member {
+    const m = engineRuntime(this.engine).store.matrices,
+      id = meshRuntime(mesh).id,
+      parent = this.parentMatrix(mesh);
+    return {
+      mesh,
+      ...this.local(mesh),
+      parentInverse: invertAffine(parent),
+      parentQuaternion: quatFromMatrix(parent),
+      world: [m[id * 16 + 12], m[id * 16 + 13], m[id * 16 + 14]],
+      worldQuaternion: this.worldQuaternion(mesh),
+    };
+  }
+  /** The live attached meshes with no attached ancestor: moving those carries the rest. */
+  private movers(): Mesh[] {
+    const store = engineRuntime(this.engine).store,
+      list = this.selection.filter((mesh) => this.live(mesh)),
+      ids = new Set(list.map((mesh) => meshRuntime(mesh).id));
+    return list.filter((mesh) => {
+      for (let id = store.parents[meshRuntime(mesh).id]; id >= 0; id = store.parents[id]) if (ids.has(id)) return false;
+      return true;
+    });
+  }
+  /** Where the gizmo sits with several attached: the active origin under the `active` pivot, else the median. */
+  private pivotPoint(): V3 | null {
+    if (!this.selection.length || this.pivot === 'active') return null;
+    const m = engineRuntime(this.engine).store.matrices,
+      list = this.movers();
+    const sum: V3 = [0, 0, 0];
+    for (const mesh of list) {
+      const at = meshRuntime(mesh).id * 16;
+      for (let i = 0; i < 3; i++) sum[i] += m[at + 12 + i];
+    }
+    return list.length ? (scale(sum, 1 / list.length) as V3) : null;
   }
 
   // ---- helpers ----
@@ -794,21 +997,29 @@ export class TransformControls extends EventDispatcher {
     }
     return best;
   }
+  private live(mesh: Mesh): boolean {
+    const runtime = engineRuntime(this.engine);
+    return !runtime.disposed && runtime.meshes.get(meshRuntime(mesh).id) === (mesh as unknown);
+  }
   private attached(): Mesh | null {
     const object = this.object;
     if (!object) return null;
-    const runtime = engineRuntime(this.engine);
-    if (runtime.disposed || runtime.meshes.get(meshRuntime(object).id) !== (object as unknown)) {
-      this.object = null;
+    if (!this.live(object)) {
+      // The last of what is left takes over as active, and its reset point with it.
+      const left = this.selection.filter((mesh) => this.live(mesh));
+      this.selection = left.length > 1 ? left : [];
+      this.object = left[left.length - 1] ?? null;
+      this.savedSelection = this.savedSelection.filter((m) => this.live(m.mesh));
+      this.resetState = this.savedSelection.find((m) => m.mesh === this.object) ?? null;
       this.dragging = false;
       this.drag = null;
-      return null;
+      return this.object;
     }
     return object;
   }
-  private local(): { position: V3; quaternion: Q4; scale: V3 } {
+  private local(mesh: Mesh = this.object!): { position: V3; quaternion: Q4; scale: V3 } {
     const t = engineRuntime(this.engine).store.transforms,
-      id = meshRuntime(this.object!).id;
+      id = meshRuntime(mesh).id;
     return {
       position: [t.x[id], t.y[id], t.z[id]],
       quaternion: [t.qx[id], t.qy[id], t.qz[id], t.qw[id]],

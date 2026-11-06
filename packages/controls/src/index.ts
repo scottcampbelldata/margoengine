@@ -24,7 +24,13 @@ export { PointerLockControls } from './pointer-lock.js';
 export { TransformControls } from './transform.js';
 export { DragControls } from './drag.js';
 export type { DragControlsOptions, DragMode, DragObject } from './drag.js';
-export type { TransformControlsOptions, TransformSpace, TransformMode, HandleName } from './transform.js';
+export type {
+  TransformControlsOptions,
+  TransformSpace,
+  TransformPivot,
+  TransformMode,
+  HandleName,
+} from './transform.js';
 export { buildDelta, buildGizmo, pickHandle } from './gizmo.js';
 export type { GizmoDelta, GizmoFrame, Handle, Prim } from './gizmo.js';
 export { tessellate } from './overlay.js';
