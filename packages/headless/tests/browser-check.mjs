@@ -1,8 +1,10 @@
 // Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
 //   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/headless/tests/browser-check.mjs
 // Renders one cube on a page canvas and through the stand-in canvas, then compares the page's screenshot with the PNG
-// bytes at the visual check's limits. Proves the padding, swizzle, row order and encoder on a real device.
+// bytes at the visual check's limits. Proves the padding, swizzle, row order and encoder on a real device. Then encodes a
+// turning cube to WebM and MP4 and plays both back. MARGO_KEEP_VIDEO=<path> keeps the files, to open them in other tools.
 import assert from 'node:assert/strict';
+import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { compare } from '../../../scripts/support/visual-image.js';
 import { decodePNG } from '../../../tests/support/png.js';
@@ -35,6 +37,21 @@ try {
   assert.ok(drawn > 1000, `the cube drew (${drawn} pixels differ from the corner)`);
   assert.deepEqual(pageErrors, []);
   console.log(`ok headless: ${format}, changed ${metrics.changed}, hot ${metrics.hot}, mean ${metrics.mean}`);
+  // Video: the browser's encoder, Margo's container, the browser's demuxer and decoder. MOST_DIFFERENCE is the mean
+  // channel error a 4 Mbit/s encode of a 256 x 192 cube may show; the wrong frame must show more than any right one.
+  const MOST_DIFFERENCE = 2;
+  for (const name of ['webm', 'mp4']) {
+    const { file, ...result } = await page.evaluate((container) => window.check.video(container), name);
+    if (process.env.MARGO_KEEP_VIDEO) await writeFile(`${process.env.MARGO_KEEP_VIDEO}.${name}`, Uint8Array.from(file));
+    assert.deepEqual(result.errors, [], 'no validation errors');
+    assert.equal(result.frames, 60);
+    assert.deepEqual([result.width, result.height], [256, 192]);
+    assert.ok(Math.abs(result.duration - result.expected) < 1 / 30, `duration ${result.duration}`);
+    for (const value of result.same) assert.ok(value < MOST_DIFFERENCE, `${name} shows its frames: ${result.same}`);
+    assert.ok(result.other > Math.max(...result.same), `${name} frames differ: ${result.other}`);
+    const errors = result.same.map((value) => value.toFixed(2)).join(' ');
+    console.log(`ok video ${name}: ${result.codec}, ${result.bytes} B, frame error ${errors}, wrong ${result.other.toFixed(2)}`);
+  }
 } finally {
   await context.close();
 }

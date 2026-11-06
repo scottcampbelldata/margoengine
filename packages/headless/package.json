@@ -27,6 +27,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./video": {
+      "types": "./dist/video.d.ts",
+      "import": "./dist/video.js"
+    },
+    "./ffmpeg": {
+      "types": "./dist/ffmpeg.d.ts",
+      "import": "./dist/ffmpeg.js"
     }
   },
   "files": [

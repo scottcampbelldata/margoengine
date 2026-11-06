@@ -1,3 +1,4 @@
+| Video output (`@margoengine/headless/video`, `/ffmpeg`, 2026-11-05) | `encodeVideo` builds the whole file in memory and needs WebCodecs: browsers and workers have it, Node does not. WebM takes VP8, VP9 and AV1; MP4 takes H.264, VP9 and AV1. WebM times are whole milliseconds, as its default timestamp scale gives. Alpha is dropped. Frames are 8-bit RGBA, so no HDR video. No audio track. | A file built whole has every size known up front, so nothing is patched afterwards and the MP4 index can sit first for playback before the download ends. WebCodecs is the only encoder a page has; shipping one would be a large download. | A very long capture must fit in memory, as compressed bytes only. In Node, `encodeWithFFmpeg` streams to a file instead, and needs ffmpeg installed. Its rawvideo input has only been run against a stand-in program: the only real ffmpeg on the test machine lacks the rawvideo reader and libx264, so the VP9 output arguments were run on a real ffmpeg, and the H.264 ones were not. | Render in a browser or worker for `encodeVideo`, or use `/ffmpeg` in Node. Pass `args` to choose other ffmpeg settings. |
 # Design envelope
 
 Margo is a small WebGPU engine: core plus the stage facade is 22,859 B gzip (`npm run measure:size` prints the exact figure; the build fails at 25,000 bytes; core alone is 21,134 B of its 21,504 B cap; the 2026-10-30 core cleanup, which removed the view target depth copy pass, `mesh.euler` and four small duplicates, took core from 21,176 B to 20,790 B and core + stage from 22,580 B to 22,859 B; storing a caller's 4x view target depth then added 23 B to each, and `Engine.renderTarget` 44 B to core + stage), and every
@@ -13,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-086). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-087). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -71,7 +72,6 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Hidden lines (`HiddenLine` in `@margoengine/lines/hidden`, `behind` and `depthBias` on `LineMaterial`) | By method: the test is against scene depth, so surfaces that write no depth hide nothing; `depthBias` (default 0.001 of the distance) decides what counts as on a surface, so an edge closer behind a surface than that shows as seen. Dashes run in world units. Hidden lines do not pick. | A depth test is one draw with no mesh analysis, on any scene; exact CAD hidden-line removal would need the geometry on the CPU. | A very thin wall can show an edge behind it as seen. | Lower `depthBias`, or raise it if a far model flickers. |
 | Alpha to coverage on lines (`alphaToCoverage` on `LineMaterial`) | By method: works with MSAA only and falls back to blending without it; opacity comes in steps of one sample, four at 4x MSAA; lines of equal opacity use the same samples, so the later replaces the earlier at a crossing. | MSAA hardware turns alpha into a sample mask, which is what makes it independent of draw order. | Fine opacity changes band at low sample counts. | Leave it off and blend, or raise the sample count. |
 
-## Assets
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |

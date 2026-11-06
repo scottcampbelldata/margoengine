@@ -39,6 +39,8 @@ export interface InstalledGPU {
 
 export function createHeadlessCanvas({ width, height }: HeadlessCanvasOptions): HTMLCanvasElement;
 
+export function encodePNG({ width, height, data }: HeadlessPixels): Promise<Uint8Array>;
+
 export function installGPU({ gpu, globals }: InstallGPUOptions): InstalledGPU;
 
 export function readPixels(engine: Engine, { signal }?: HeadlessReadOptions): Promise<HeadlessPixels>;

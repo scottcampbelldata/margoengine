@@ -758,6 +758,14 @@
       "types": "./dist/headless.d.ts",
       "import": "./dist/headless.js"
     },
+    "./headless/video": {
+      "types": "./dist/headless/video.d.ts",
+      "import": "./dist/headless/video.js"
+    },
+    "./headless/ffmpeg": {
+      "types": "./dist/headless/ffmpeg.d.ts",
+      "import": "./dist/headless/ffmpeg.js"
+    },
     "./html": {
       "types": "./dist/html.d.ts",
       "import": "./dist/html.js"

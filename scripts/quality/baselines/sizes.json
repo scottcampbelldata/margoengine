@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4591909,
+  "total": 4598984,
   "history": [
     {
       "date": "2026-10-24",
@@ -1754,6 +1754,12 @@
       "commit": "d480e69fe",
       "reason": "alphaToCoverage on LineMaterial",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "72aced94b",
+      "reason": "New optional entries @margoengine/headless/video and /ffmpeg: image sequences and video output",
+      "grew": 2
     }
   ],
   "items": {
@@ -1941,6 +1947,8 @@
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/worker": 60700,
     "@margoengine/headless": 2864,
+    "@margoengine/headless/ffmpeg": 1434,
+    "@margoengine/headless/video": 5641,
     "@margoengine/html": 5013,
     "@margoengine/ifc": 2819,
     "@margoengine/ifc dist/workers/ifc.js": 3443,

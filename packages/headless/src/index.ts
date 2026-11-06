@@ -252,7 +252,7 @@ function finishPixels(data: Uint8Array, swap: boolean, premultiplied: boolean): 
 }
 
 /** Encodes RGBA pixels as an 8-bit PNG file (each row filtered against the one above). */
-async function encodePNG({ width, height, data }: HeadlessPixels): Promise<Uint8Array> {
+export async function encodePNG({ width, height, data }: HeadlessPixels): Promise<Uint8Array> {
   const stride = width * 4;
   const rows = new Uint8Array((stride + 1) * height);
   for (let y = 0; y < height; y++) {

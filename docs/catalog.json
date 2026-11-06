@@ -1274,6 +1274,7 @@
     "imports": "import { createHeadlessCanvas } from '@margoengine/headless';",
     "exports": [
       "createHeadlessCanvas",
+      "encodePNG",
       "installGPU",
       "readPixels",
       "toPNG"
