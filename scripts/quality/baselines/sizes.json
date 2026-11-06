@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5237761,
+  "total": 5243379,
   "history": [
     {
       "date": "2026-10-24",
@@ -2396,6 +2396,12 @@
       "commit": "a8b7df724",
       "reason": "feat(animator): stride, orientation and distance warping (new entry @margoengine/animator/warping)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "cdf0c53db",
+      "reason": "full-body IK entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2411,6 +2417,7 @@
     "@margoengine/animation/skeleton-utils": 8891,
     "@margoengine/animation/vat": 8512,
     "@margoengine/animator": 18654,
+    "@margoengine/animator/fbik": 5618,
     "@margoengine/animator/graph": 8542,
     "@margoengine/animator/inertialize": 2150,
     "@margoengine/animator/sync": 2070,

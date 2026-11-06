@@ -48,6 +48,10 @@
     "./warping": {
       "types": "./dist/warping.d.ts",
       "import": "./dist/warping.js"
+    },
+    "./fbik": {
+      "types": "./dist/fbik.d.ts",
+      "import": "./dist/fbik.js"
     }
   },
   "files": [

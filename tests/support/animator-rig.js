@@ -10,6 +10,9 @@ import { Animator } from '../../packages/animator/dist/index.js';
 /** Fox.glb, a real file with real Walk, Run and Survey clips. */
 export const FOX = new URL('../../examples/assets/khronos/Fox/Fox.glb', import.meta.url);
 
+/** RiggedFigure.glb, a real humanoid file with one walking clip. */
+export const RIGGED_FIGURE = new URL('../../examples/assets/khronos/RiggedFigure/RiggedFigure.glb', import.meta.url);
+
 /** A biped: names to [parent, x, y, z] in metres, facing +Z, its left side at +X, 1 m hips. */
 export const BIPED = {
   Root: [null, 0, 0, 0],

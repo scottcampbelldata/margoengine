@@ -102,6 +102,10 @@
       "types": "./dist/animator/warping.d.ts",
       "import": "./dist/animator/warping.js"
     },
+    "./animator/fbik": {
+      "types": "./dist/animator/fbik.d.ts",
+      "import": "./dist/animator/fbik.js"
+    },
     "./audio": {
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"

@@ -381,6 +381,40 @@ stop.distance = 1.5;                        // what is left to the mark, written
 - **Pelvis.** It drops by what the longest stride needs, at most `maxPelvisDrop` (default 0.2).
 - **Distance.** `addDistanceWarp` stands a clip where the travel of `joint` matches `distance`: `mode: 'stop'` reads what is left, `'start'` what has been covered. Time only runs forward, and a distance longer than the clip holds its first frame. The state must play one clip.
 
+## Full-body IK (`margoengine/animator/fbik`)
+
+`addFullBodyIK(animator, rig)` reaches hands, feet and head together, for reaching, climbing and interactions. One solve moves and turns the pelvis and bends the spine only as far as the targets need: a hand in reach moves the arm alone, a far one bends the body, and a pinned foot stops the pelvis going further than the leg allows. The centre of mass stays over what bears weight, so a long reach pushes the hips back. Each limb is finished by the two-bone solver, so bones keep their lengths.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {Animator} from 'margoengine/animator';
+import {addFullBodyIK, type FullBodyLimb} from 'margoengine/animator/fbik';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/hero.glb'); // a clip named Idle
+const animator = Animator.attach(Animation.attach(model), {initial:'idle', states:{idle:'Idle'}});
+const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
+const limb = (side: string, a: string, b: string, c: string): FullBodyLimb => ({
+  upper: joint(side + a), lower: joint(side + b), end: joint(side + c)
+});
+const leftHand = limb('Left', 'Arm', 'ForeArm', 'Hand');
+const ik = addFullBodyIK(animator, {
+  pelvis: joint('Hips'),
+  spine: [joint('Spine'), joint('Chest')],
+  legs: [limb('Left', 'UpLeg', 'Leg', 'Foot'), limb('Right', 'UpLeg', 'Leg', 'Foot')],
+  arms: [leftHand, limb('Right', 'Arm', 'ForeArm', 'Hand')],
+  head: {joint: joint('Head')}
+});
+leftHand.target = [0.3, 1.15, 0.85]; // world space; write into it every frame
+engine.start();
+console.log(ik.result.reached, ik.result.distance, ik.result.balanced);
+```
+
+Each limb takes `target`, `rotation`, `pole`, `weight` (default 1), `pinned` (holds its animated place with no target: default true for legs, false for arms) and `support` (counts for balance: default true for legs; set it on a hand that grips, for climbing). `head` takes `joint`, `target`, `rotation` and `weight`. The rig takes `balance` (default true), `supportRadius` (how far the centre of mass may stand outside the supports, default a tenth of the first leg's length), `maxBend` (radians a spine joint turns from the animated pose, default 0.8), `reach` (share of a limb's length the torso plans for, default 0.98), `iterations` (default 12), `tolerance` (default 0.001), `weight` (default 1) and `onSolve`. `ik.result` reports `reached`, `distance`, `balanced`, `imbalance` and `iterations`. The solve runs after foot IK and the solvers added before it.
+
+The torso is a damped Gauss-Newton solve (Levenberg 1944, Marquardt 1963); the centre of mass uses Winter's segment shares. A target past what the pinned feet allow leaves the arm straight toward it and `reached` false, with the feet still down. Balance is about world +Y, and a limb must be a direct chain of three joints.
+
 ## Explicit rotation writer
 
 `AnimatorOptions.writeRotation?: (node: Mesh, rotation: readonly number[]) => void` is an optional, explicit commit hook for applications that own their transform writer. It is captured and validated once during construction. Omit it to keep the current dynamic `Mesh.setQuaternion` call, including method overrides. This is an additive public API option; it does not change core/stage.
