@@ -35,6 +35,9 @@ lamp.x += 1; // read each frame
 
 `addLight(options)` returns a `Light2D`, `removeLight(light)` takes it away, and `lights` lists them.
 
+Lights add up in four half-float layers, 32 B per pixel of the target, so a sum of many lights reads the same on GPUs that
+round blends differently. `docs/limits.md` has the numbers.
+
 ## Light2D
 
 Every field is read each frame. Distances are world units, angles radians, and y runs down the screen.

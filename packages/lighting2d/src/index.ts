@@ -205,7 +205,7 @@ const shader = /* wgsl */ `
 struct L{view:vec4f,size:vec4f,at:vec4f,way:vec4f,color:vec4f}
 @group(0) @binding(0) var<uniform> u:L;
 @group(0) @binding(1) var bumps:texture_2d<f32>;
-@group(0) @binding(2) var sum:texture_2d<f32>;
+@group(0) @binding(2) var sum:texture_2d_array<f32>;
 @vertex fn wide(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{
 return vec4f(f32(i&1u)*4-1,f32(i>>1u)*4-1,0,1);
 }
@@ -217,7 +217,7 @@ if(i<2u){return vec4f(clip(p-u.view.xy)+vec2f(-1,1),0,1);}
 return vec4f(clip(p*u.at.w-u.at.xy),0,0);
 }
 @fragment fn none()->@location(0) vec4f{return vec4f(0);}
-@fragment fn show(@builtin(position) f:vec4f)->@location(0) vec4f{return vec4f(textureLoad(sum,vec2i(f.xy),0).rgb,1);}
+@fragment fn show(@builtin(position) f:vec4f)->@location(0) vec4f{let p=vec2i(f.xy);return vec4f(textureLoad(sum,p,0,0).rgb+textureLoad(sum,p,1,0).rgb+textureLoad(sum,p,2,0).rgb+textureLoad(sum,p,3,0).rgb,1);}
 @fragment fn lit(@builtin(position) f:vec4f)->@location(0) vec4f{
 let world=u.view.xy+f.xy/u.view.z;
 var n=vec3f(0,0,1);
@@ -247,6 +247,13 @@ return vec4f(u.color.rgb*a*max(0,dot(n,l)),0);
 /** Bytes per light in the uniform buffer: the largest `minUniformBufferOffsetAlignment` WebGPU allows. */
 const STRIDE = 256;
 const SUM_FORMAT = 'rgba16float';
+/**
+ * Layers the lights are shared out over, added up once in the show pass. Each additive blend into half floats rounds,
+ * and an Apple M6 always rounds toward zero (99% of 65,536 sums of 43 fit that exactly, none fit round to nearest; an
+ * RTX A6000 rounds to nearest): 1.66 levels too dark on average after 43 lights. The rounding step scales with the
+ * sum, so four sums of a quarter of the light lose a quarter as much.
+ */
+const SUM_LAYERS = 4;
 const FLOATS = STRIDE / 4;
 
 /** Settings of {@link Lighting2D}. */
@@ -302,6 +309,7 @@ export class Lighting2D implements EnginePlugin {
   #showGroup?: GPUBindGroup;
   #sum?: GPUTexture;
   #sumView?: GPUTextureView;
+  #sumLayers: GPUTextureView[] = [];
   #uniform?: GPUBuffer;
   #values: Float32Array<ArrayBuffer> = new Float32Array(0);
   #edgeBuffer?: GPUBuffer;
@@ -382,6 +390,7 @@ export class Lighting2D implements EnginePlugin {
     this.#uniform = this.#edgeBuffer = this.#stencil = this.#stencilView = this.#flat = undefined;
     this.#module = this.#layout = this.#pipelines = this.#format = this.#light = this.#shadow = undefined;
     this.#show = this.#showGroup = this.#sum = this.#sumView = undefined;
+    this.#sumLayers = [];
     this.#group = this.#groupBump = this.#device = undefined;
     this.#edgesWritten = false;
   }
@@ -515,11 +524,14 @@ export class Lighting2D implements EnginePlugin {
       this.#stencilView = this.#stencil.createView();
       this.#sum = device.createTexture({
         label: 'lighting2d sum',
-        size,
+        size: [size[0], size[1], SUM_LAYERS],
         format: SUM_FORMAT,
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       });
-      this.#sumView = this.#sum.createView();
+      this.#sumView = this.#sum.createView({ dimension: '2d-array' });
+      this.#sumLayers = Array.from({ length: SUM_LAYERS }, (_, baseArrayLayer) =>
+        this.#sum!.createView({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
+      );
       this.#showGroup = undefined;
     }
     this.#showGroup ??= device.createBindGroup({
@@ -572,17 +584,23 @@ export class Lighting2D implements EnginePlugin {
       );
     });
     device.queue.writeBuffer(this.#uniform, 0, values);
-    const view = this.#sumView!;
-    c.encoder
-      .beginRenderPass({
-        colorAttachments: [
-          { view, loadOp: 'clear', clearValue: [ambient[0], ambient[1], ambient[2], 1], storeOp: 'store' },
-        ],
-      })
-      .end();
+    this.#sumLayers.forEach((view, layer) =>
+      c.encoder
+        .beginRenderPass({
+          colorAttachments: [
+            {
+              view,
+              loadOp: 'clear',
+              clearValue: layer ? [0, 0, 0, 1] : [ambient[0], ambient[1], ambient[2], 1],
+              storeOp: 'store',
+            },
+          ],
+        })
+        .end(),
+    );
     lights.forEach((l, i) => {
       const pass = c.encoder.beginRenderPass({
-        colorAttachments: [{ view, loadOp: 'load', storeOp: 'store' }],
+        colorAttachments: [{ view: this.#sumLayers[i % SUM_LAYERS]!, loadOp: 'load', storeOp: 'store' }],
         depthStencilAttachment: {
           view: this.#stencilView!,
           stencilLoadOp: 'clear',
