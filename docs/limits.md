@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-059). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-060). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -88,6 +88,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Capsules (`@margoengine/math/capsule`) | Enforced: a negative or non-finite radius and any matrix beyond rotation, translation and uniform scale throw `RangeError`. `pushOutOfTriangle` resolves one triangle at a time, and returns null for an axis lying in a degenerate triangle. | Under other matrices the shape stops being a capsule. One triangle at a time keeps the type a shape, not a physics solver. | Several triangles at once (a corner) need repeated passes in the caller, and a push out of one triangle can move into the next. | For a full character controller with sliding and stepping use `@margoengine/physics`. |
 | Tessellation (`@margoengine/geometry/tessellate`) | Enforced by method: `maxTriangles`, 5,000,000 by default, stops a tiny limit. Edges are measured in the mesh's own units, not on screen. | Plain edge length needs no camera and keeps neighbours in agreement. | Long thin triangles add many vertices along their length. Flat areas are split as finely as curved ones. | Pick the limit for the deformation, or tessellate only the part that bends. |
 | GPU geometry (`@margoengine/geometry/gpu`) | Enforced by method: WebGPU only, `attach` throws `unsupported` on WebGL2; 1,000,000 vertices per item, as core. Tube and ribbon frames are walked by one GPU invocation, so that step grows with `segments`. Speed is not measured. | Each frame depends on the one before it. | CPU raycasts and exports see zeros until `read()`. Control points written by your own compute pass are lost with the device. Default bounds are never culled. | Pass `bounds`; keep `segments` to what the curve needs; call `setPoints` again after a restore if you drive points on the GPU. |
+| Exact booleans (`@margoengine/mesh-edit/boolean-exact`) | Enforced by method: every side test and all topology are exact, then corners round to float64. Faces thinner than about 4e-9 of their length, or a few float64 steps, fold away; `collapsedFaces` counts them. Inputs must not intersect themselves. Measured 0.8 s for one operation on 1,728 faces and 40 to 75 s on 10,368 (work grows with faces squared). | `PolygonMesh` stores float64 corners and every face must pass the validity check, so a true result thinner than that has no valid float64 face. | A closed valid mesh that can differ from the exact solid by about 4e-9 of a face length; `MargoError` `failed` for a self-intersecting input. | `booleanMeshes` in `/modeling` is faster on clean inputs; scale thin features up, or split large meshes. |
 
 ## Entities
 

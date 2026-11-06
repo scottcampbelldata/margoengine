@@ -30,6 +30,10 @@
     "./modeling": {
       "types": "./dist/modeling.d.ts",
       "import": "./dist/modeling.js"
+    },
+    "./boolean-exact": {
+      "types": "./dist/boolean-exact.d.ts",
+      "import": "./dist/boolean-exact.js"
     }
   },
   "files": [

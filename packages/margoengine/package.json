@@ -1010,6 +1010,10 @@
       "types": "./dist/mesh-edit/modeling.d.ts",
       "import": "./dist/mesh-edit/modeling.js"
     },
+    "./mesh-edit/boolean-exact": {
+      "types": "./dist/mesh-edit/boolean-exact.d.ts",
+      "import": "./dist/mesh-edit/boolean-exact.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"

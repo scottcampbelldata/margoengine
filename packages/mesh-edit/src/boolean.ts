@@ -252,7 +252,7 @@ function flip(poly: Poly): void {
 }
 
 /** Check one input: closed, two oppositely wound faces per edge, positive volume. */
-function assertSolid(mesh: PolygonMesh, label: string): void {
+export function assertSolid(mesh: PolygonMesh, label: string): void {
   assertPolygonMesh(mesh);
   if (!mesh.faces.length) throw new TypeError(`Boolean input ${label} has no faces; supply a closed mesh.`);
   for (const edge of collectPolygonEdges(mesh)) {
@@ -262,22 +262,27 @@ function assertSolid(mesh: PolygonMesh, label: string): void {
         `Boolean input ${label} must be closed and consistently wound (edge ${edge.id}); close holes and fix winding.`,
       );
   }
-  let volume = 0;
+  let volume = 0,
+    extent = 0;
   const o = mesh.vertices[0];
+  for (const p of mesh.vertices)
+    for (let axis = 0; axis < 3; axis++) extent = Math.max(extent, Math.abs(p[axis] - o[axis]));
+  // Unit size first: the cube of a very small or very large solid's size leaves float64.
+  const unit = 1 / extent;
   for (const face of mesh.faces) {
     const a = mesh.vertices[face.vertices[0]];
     for (let i = 1; i < face.vertices.length - 1; i++) {
       const b = mesh.vertices[face.vertices[i]],
         c = mesh.vertices[face.vertices[i + 1]],
-        ax = a[0] - o[0],
-        ay = a[1] - o[1],
-        az = a[2] - o[2],
-        bx = b[0] - o[0],
-        by = b[1] - o[1],
-        bz = b[2] - o[2],
-        cx = c[0] - o[0],
-        cy = c[1] - o[1],
-        cz = c[2] - o[2];
+        ax = (a[0] - o[0]) * unit,
+        ay = (a[1] - o[1]) * unit,
+        az = (a[2] - o[2]) * unit,
+        bx = (b[0] - o[0]) * unit,
+        by = (b[1] - o[1]) * unit,
+        bz = (b[2] - o[2]) * unit,
+        cx = (c[0] - o[0]) * unit,
+        cy = (c[1] - o[1]) * unit,
+        cz = (c[2] - o[2]) * unit;
       volume += ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx);
     }
   }
@@ -521,6 +526,26 @@ function assemble(
     else groups.set(k, [loop]);
   }
   for (const group of groups.values()) merged.push(...mergeGroup(group, vertices, tick));
+  return finishBoolean(a, b, merged, vertices, nonManifold, createIdOption);
+}
+
+/** One closed loop of a boolean result, tagged with the input face it came from. */
+export interface BooleanLoop {
+  vertices: number[];
+  uv: MutableVec2[];
+  input: 0 | 1;
+  face: string;
+}
+
+/** Name the merged loops, compact the vertices and build the result. */
+export function finishBoolean(
+  a: PolygonMesh,
+  b: PolygonMesh,
+  merged: readonly BooleanLoop[],
+  vertices: MutableVec3[],
+  nonManifold: number,
+  createIdOption: (() => string) | undefined,
+): MeshBooleanResult {
   // Name faces: the first piece of each source face keeps its ID (b's only when a does not use it).
   const usedIds = new Set<string>(),
     taken = new Set([...a.faces.map((f) => f.id), ...b.faces.map((f) => f.id)]),
@@ -584,12 +609,8 @@ function assemble(
 }
 
 /** Greedy merge of one source face's pieces across shared edges while the union stays a valid convex face. */
-function mergeGroup(
-  group: { vertices: number[]; uv: MutableVec2[]; input: 0 | 1; face: string; plane: Plane }[],
-  vertices: MutableVec3[],
-  tick: () => void,
-): typeof group {
-  const pieces: ((typeof group)[number] | null)[] = [...group];
+export function mergeGroup<L extends BooleanLoop>(group: L[], vertices: MutableVec3[], tick: () => void): L[] {
+  const pieces: (L | null)[] = [...group];
   let changed = pieces.length > 1;
   while (changed) {
     changed = false;
@@ -622,5 +643,5 @@ function mergeGroup(
       }
     }
   }
-  return pieces.filter((piece): piece is (typeof group)[number] => piece !== null);
+  return pieces.filter((piece): piece is L => piece !== null);
 }

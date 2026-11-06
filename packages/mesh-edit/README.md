@@ -190,6 +190,28 @@ Shapes that only touch along an edge or at a vertex give a closed result whose t
 count is `nonManifoldEdges`. Features thinner than the tolerance are merged away. Work grows with the number of faces
 times the BSP depth (typically n log n, n squared at worst); pass `signal` to stop a long run.
 
+### Exact booleans
+
+`booleanMeshes` above fails on geometry finer than its tolerance and asks you to nudge an input. The optional `boolean-exact` entry never does: two boxes one float64 step apart, or a face turned by 1e-15 radians, work as they are.
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { booleanMeshesExact } from 'margoengine/mesh-edit/boolean-exact';
+
+const box = createPrimitiveMesh('cube', 'box');
+const other = createPrimitiveMesh('cube', 'other');
+// Almost the same box: every face lies 1e-13 from the first box's face.
+other.vertices = other.vertices.map(([x, y, z]): [number, number, number] => [x + 1e-13, y + 1e-13, z]);
+const result = booleanMeshesExact(box, other, 'union');
+console.log(result.mesh.faces.length, result.collapsedFaces, result.nonManifoldEdges);
+```
+
+- `booleanMeshesExact(a, b, operation, {createId, signal})` takes the same `operation` values and returns the same `mesh`, `sources`, `faceMap`, `nonManifoldEdges` and `diagnostics` as `booleanMeshes`, plus `collapsedFaces`. There is no `tolerance`.
+- Every float64 coordinate is an exact integer in one shared power-of-two scale. Polygons are stored as planes, so a cut adds a plane and never a rounded point (Sugihara and Iri, 1989; Bernstein and Fussell, 2009). Side tests run in float64 with an error bound and use BigInt only when the bound cannot decide. T-junctions are closed exactly, line by line.
+- Only at the end are corners rounded to float64. A face of the exact result too thin to be a valid face (about 4e-9 of its length, or a few float64 steps) is folded away, keeping every edge matched by its reverse; `collapsedFaces` counts these. The returned mesh is always closed and passes the mesh-edit checks, so it can feed the next boolean.
+- Inputs must be closed, outward facing and free of self-intersection: one that crosses itself throws `MargoError` code `failed` when the crossing breaks the result. Faces that are not quite planar count as the triangles an exact ear clip gives them.
+- Speed: about 0.8 s for one operation on 1,728 faces, 40 to 75 s on 10,368. Work grows with faces squared. Use `booleanMeshes` for large clean inputs and pass `signal` to stop a long run.
+
 ## Simplification and levels of detail
 
 Quadric error edge collapse that keeps UV seams and open borders:
