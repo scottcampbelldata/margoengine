@@ -186,6 +186,8 @@ test('the probes leave out a window in which V8 collected garbage', { timeout: 6
         [
           '--expose-gc',
           '--single-threaded-gc',
+          // As the probes (HEAP above): a compiler thread's work lands in a window at a time the machine's load decides.
+          '--no-concurrent-recompilation',
           `--max-semi-space-size=${young}`,
           '--input-type=module',
           '-e',
