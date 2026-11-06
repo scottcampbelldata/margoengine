@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4541241,
+  "total": 4560378,
   "history": [
     {
       "date": "2026-10-24",
@@ -1706,6 +1706,12 @@
       "commit": "6afa9d0df",
       "reason": "shader/raw: meshes with equal bytes share GPU buffers, counted per device with copy on write, and a run binds them once (p-custom-shader, perf-history entry 63): 22.5 -> 3.4 ms CPU, diagnostic; 9,684 to 10,125 B gzip, +441 B",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "ce45393d0",
+      "reason": "New optional entry @margoengine/compute/nn: neural networks",
+      "grew": 1
     }
   ],
   "items": {
@@ -1771,6 +1777,7 @@
     "@margoengine/compute/fft": 6037,
     "@margoengine/compute/frame": 31457,
     "@margoengine/compute/linalg": 5745,
+    "@margoengine/compute/nn": 19137,
     "@margoengine/compute/random": 8328,
     "@margoengine/compute/signal": 7496,
     "@margoengine/compute/sparse": 7283,

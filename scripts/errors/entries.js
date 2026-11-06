@@ -407,6 +407,10 @@ export const entries = [
     title: '@margoengine/compute: GPU arrays, kernels and primitives',
     kind: 'family',
     messages: [
+      'backward needs a tensor that depends on a parameter; none of its inputs requires a gradient',
+      'Tensor operands are Tensors, GpuArrays or numbers',
+      'tensor takes a GpuArray; use gpu.array(data) first',
+      'An optimizer needs at least one parameter',
       'GpuArray disposed; create a new array with gpu.array()',
       'GpuArray belongs to another compute context; create it with this context',
       'reshape takes at most one -1 dimension',

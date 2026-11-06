@@ -7,8 +7,8 @@ typed arrays with views and broadcasting, element-wise expressions that fuse int
 statistics along axes, scans, sorting, selection and histograms. It also runs your own WGSL kernels, with bindings
 read from the source. Optional entries add matrix products (`/linalg`), Fourier transforms (`/fft`), convolution
 (`/signal`), reproducible random numbers (`/random`), sparse matrices and solvers (`/sparse`), gradients
-(`/autodiff`), data larger than GPU memory (`/stream`), kernels inside an engine's frame (`/frame`) and subgroup
-kernels for reductions, scans and sorts (`/subgroups`).
+(`/autodiff`), data larger than GPU memory (`/stream`), kernels inside an engine's frame (`/frame`), subgroup
+kernels for reductions, scans and sorts (`/subgroups`) and neural networks (`/nn`).
 
 The package is optional and tree-shakable, adds nothing to core, and needs no engine: without one it opens a
 headless device of its own. Without WebGPU (Node, an older browser, a blocklisted GPU) the same code runs on the CPU.
@@ -278,6 +278,68 @@ for (let step = 0; step < 200; step++) {
 }
 console.log(await w.item(), await b.item()); // close to 2 and 1
 ```
+
+## Neural networks
+
+`@margoengine/compute/nn` trains and runs neural networks, with names and shapes that follow PyTorch. It is built from the
+package's own arrays, so a network runs unchanged on WebGPU and on the CPU backend.
+
+- **Layers:** `Linear`, `Conv1d`, `Conv2d` (stride, padding, dilation), `MaxPool2d`, `AvgPool2d`, `Flatten`, `Dropout`,
+  `LayerNorm`, `Embedding`, `MultiHeadAttention` (`causal`; self or cross attention), `Sequential`. Subclass `Module` for your
+  own: parameters and layers kept as plain properties are found by `parameters()`.
+- **Activations**, as layers and as `Tensor` methods: `ReLU`, `LeakyReLU`, `GELU` (the tanh form), `SiLU`, `Sigmoid`, `Tanh`,
+  `Softmax`. `Tensor` also has `logSoftmax`, `exp`, `log` and `rsqrt`.
+- **Losses:** `crossEntropy(logits, labels)` (it takes logits, not probabilities) and `mseLoss(prediction, target)`.
+- **Optimizers:** `SGD` (`momentum`, `weightDecay`), `Adam` and `AdamW`. Change `opt.lr` between steps to schedule it.
+- **Functions:** `scaledDotProductAttention(q, k, v, { causal })`, `dropout`, `noGrad(work)`.
+
+A `Tensor` holds a GpuArray and how it was made. `tensor(array)` wraps your input, `parameter(array)` makes one to train, and
+`loss.backward()` fills `grad` on the parameters. Disposing a result (`using` does it for you) frees everything its forward and
+backward passes made; parameters, their gradients and your input arrays stay. `model.predict(array)` runs inference and keeps
+only the result. `await model.stateDict()` and `model.loadStateDict(state)` save and restore weights. Pass one
+`rng: new Random(gpu, { seed })` to the layers to make starting weights repeat.
+
+```ts
+import { createCompute } from '@margoengine/compute';
+import { Random } from '@margoengine/compute/random';
+import { AdamW, Conv2d, Flatten, Linear, MaxPool2d, ReLU, Sequential, crossEntropy, tensor } from '@margoengine/compute/nn';
+
+using gpu = await createCompute();
+const rng = new Random(gpu, { seed: 1 });
+using model = new Sequential(
+  new Conv2d(gpu, 1, 8, 3, { padding: 1, rng }),
+  new ReLU(),
+  new MaxPool2d(2),
+  new Flatten(),
+  new Linear(gpu, 8 * 14 * 14, 10, { rng }),
+);
+using opt = new AdamW(model.parameters(), { lr: 1e-3 });
+const images = rng.uniform([32, 1, 28, 28]);
+const labels = rng.integers(0, 10, 32);
+for (let step = 0; step < 10; step++) {
+  opt.zeroGrad();
+  using loss = crossEntropy(model.forward(tensor(images)), labels);
+  loss.backward();
+  opt.step();
+  if (step === 9) console.log(await loss.item());
+}
+console.log((await model.predict(images).read()).length); // 320: 10 logits per image
+```
+
+```ts
+import { createCompute } from '@margoengine/compute';
+import { LayerNorm, MultiHeadAttention, tensor } from '@margoengine/compute/nn';
+
+using gpu = await createCompute();
+using attention = new MultiHeadAttention(gpu, 64, 8, { causal: true });
+using norm = new LayerNorm(gpu, 64);
+const x = tensor(gpu.zeros([2, 16, 64])); // batch, length, features
+using y = norm.forward(attention.forward(x));
+console.log(y.shape); // [2, 16, 64]
+```
+
+Gradients of convolutions and pooling repeat exactly from run to run. `Embedding` gradients add repeated ids atomically, so
+their rounding may vary on a GPU. [docs/limits.md](../../docs/limits.md#rendering) has what is left out and what memory it takes.
 
 ## Streams and frames
 

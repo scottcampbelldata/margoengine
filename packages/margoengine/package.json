@@ -302,6 +302,10 @@
       "types": "./dist/compute/subgroups.d.ts",
       "import": "./dist/compute/subgroups.js"
     },
+    "./compute/nn": {
+      "types": "./dist/compute/nn.d.ts",
+      "import": "./dist/compute/nn.js"
+    },
     "./controls": {
       "types": "./dist/controls.d.ts",
       "import": "./dist/controls.js"

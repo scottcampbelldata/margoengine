@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/compute",
   "version": "1.0.0",
-  "description": "GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection, histograms, matmul, FFT, convolution, random numbers, streaming, and WGSL kernels bound by name.",
+  "description": "GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection, histograms, matmul, FFT, convolution, random numbers, streaming, neural networks, and WGSL kernels bound by name.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -63,6 +63,10 @@
     "./subgroups": {
       "types": "./dist/subgroups.d.ts",
       "import": "./dist/subgroups.js"
+    },
+    "./nn": {
+      "types": "./dist/nn.d.ts",
+      "import": "./dist/nn.js"
     }
   },
   "files": [
