@@ -416,6 +416,42 @@ tier whose `distance` it has reached, and copies on one interval take turns, so 
 counts node levels from the scene roots, so what level 4 means depends on the rig: pick it per character. Weight tracks
 always play. Distance and visibility use the root's position from the previous frame.
 
+## Clip editing (`@margoengine/animation/clip-utils`)
+
+`subclip` cuts a time range into a new clip, and `makeAdditive` turns a clip into differences from a reference pose.
+
+```ts
+import {Skeleton, applyKeyframeClip, createKeyframeClip} from 'margoengine/animation';
+import {applyAdditiveClip, makeAdditive, subclip, subclipFrames} from 'margoengine/animation/clip-utils';
+const skeleton = new Skeleton([{name: 'hips', parent: -1}, {name: 'head', parent: 0, translation: [0, 1, 0]}]);
+const walk = createKeyframeClip({
+  name: 'Walk',
+  tracks: [{target: 'hips', path: 'translation', keys: [
+    {time: 0, value: [0, 0, 0]}, {time: 1, value: [0, 0.1, 1]}, {time: 2, value: [0, 0, 2]},
+  ]}],
+  markers: [{time: 0.75, name: 'footstep'}],
+});
+const nod = createKeyframeClip({
+  name: 'Nod',
+  tracks: [{target: 'head', path: 'rotation', keys: [
+    {time: 0, value: [0, 0, 0, 1]}, {time: 0.5, value: [0.2588, 0, 0, 0.9659]}, {time: 1, value: [0, 0, 0, 1]},
+  ]}],
+});
+const stride = subclip(walk, 0.5, 1.5, {name: 'Stride'}); // seconds; starts at 0, markers come along
+const opening = subclipFrames(walk, 0, 15); // frames, both included, at 30 per second unless you pass a rate
+const additive = makeAdditive(nod); // against the first frame; or {clip: idle, time: 0.5}
+const t = 0.25;
+applyKeyframeClip(stride, skeleton, t); // pose the base first, every frame
+applyAdditiveClip(additive, skeleton, t, 0.5); // then add half of the nod
+```
+
+A cut plays exactly as the source did: both ends are sampled, keys inside keep their interpolation, and only an eased or
+cubic segment the cut passes through becomes short straight keys, 60 per second unless you pass `fps`. Property tracks
+stay bound to their targets, and `blend` carries over. `makeAdditive` uses the sums `@margoengine/animator` additive
+layers use: translation and weights subtract, scale divides (a zero reference axis gives 1) and rotation is
+`inverse(reference) * rotation`. Every key keeps its time and interpolation, so the result is exact between keys too.
+`applyAdditiveClip` adds to whatever pose the skeleton holds, so applying it twice adds twice.
+
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:

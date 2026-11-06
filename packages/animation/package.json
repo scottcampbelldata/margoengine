@@ -58,6 +58,10 @@
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
+    },
+    "./clip-utils": {
+      "types": "./dist/clip-utils.d.ts",
+      "import": "./dist/clip-utils.js"
     }
   },
   "files": [

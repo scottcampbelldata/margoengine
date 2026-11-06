@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5101723,
+  "total": 5106883,
   "history": [
     {
       "date": "2026-10-24",
@@ -2282,10 +2282,17 @@
       "commit": "69505e4e9",
       "reason": "loaders/3dm, new optional entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d3ea9e3d3",
+      "reason": "feat(animation): subclips and additive clips (new entry @margoengine/animation/clip-utils)",
+      "grew": 1
     }
   ],
   "items": {
     "@margoengine/animation": 22595,
+    "@margoengine/animation/clip-utils": 5160,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/morph-gpu": 3265,
     "@margoengine/animation/pointer": 7146,
