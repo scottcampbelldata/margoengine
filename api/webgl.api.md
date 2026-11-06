@@ -8,10 +8,13 @@ import { Batch, FrameGraph, Lighting, Renderer, ViewDraw } from "@margoengine/co
 
 export class GLRenderer implements Renderer {
     readonly backend = "webgl2";
+    readonly gl: WebGL2RenderingContext;
+    intercept?: (camera: Camera, batches: Iterable<Batch>, view?: ViewDraw) => void;
     constructor(canvas: HTMLCanvasElement, { transparent }?: WebGLRendererOptions);
     add(geometry: Geometry, capacity: number): void;
     remove(geometry: Geometry): void;
     render(camera: Camera, lighting: Lighting, batches: Iterable<Batch>, graph: FrameGraph, delta: number, view?: ViewDraw): void;
+    drawBatches(batches: Iterable<Batch>): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
@@ -19,6 +22,10 @@ export class GLRenderer implements Renderer {
 export interface WebGLRendererOptions {
     transparent?: boolean;
 }
+
+export const glProgram: (gl: WebGL2RenderingContext, vertex: string, fragment: string) => WebGLProgram;
+
+export const glRenderer: (canvas: object) => GLRenderer | undefined;
 
 export const webglRenderer: (canvas: HTMLCanvasElement, options?: WebGLRendererOptions) => Renderer;
 ```

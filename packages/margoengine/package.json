@@ -2002,6 +2002,10 @@
       "types": "./dist/webgl.d.ts",
       "import": "./dist/webgl.js"
     },
+    "./webgl/pick": {
+      "types": "./dist/webgl/pick.d.ts",
+      "import": "./dist/webgl/pick.js"
+    },
     "./webgl2-compat": {
       "types": "./dist/webgl2-compat.d.ts",
       "import": "./dist/webgl2-compat.js"

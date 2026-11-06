@@ -27,8 +27,9 @@ that.
   How each demo looks on the layer is [webgl2-compat-demos.md](webgl2-compat-demos.md).
 - **Apps on the engine.** `Engine.create` (and `createStage`) reject with `WebGPU unavailable` unless the app passes
   `fallback: webglRenderer` from `@margoengine/webgl`. With it, core meshes draw on WebGL2 (per-pixel PBR from each
-  mesh's constant colour, one directional light plus ambient, no textures, effects or picking). Packages that need
-  WebGPU throw `MargoError` code `unsupported` naming themselves; core's `engine.pick` throws `WebGPU required`.
+  mesh's constant colour, one directional light plus ambient, no textures or effects). Packages that need
+  WebGPU throw `MargoError` code `unsupported` naming themselves; core's `engine.pick` throws `WebGPU required` unless
+  the app adds `webglPicking` from `@margoengine/webgl/pick`.
   Covered by [webgl-preview.test.js](../tests/webgl-preview.test.js) in `npm run verify` and by the pixel readback in
   `check:no-webgpu`.
 

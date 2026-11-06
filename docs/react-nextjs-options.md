@@ -164,7 +164,7 @@ type-checked from packed tarballs), `modern:test:bundlers`. Guides: `docs/react-
 ## 11. Honest gaps to know about
 
 - Not on npm yet (tarballs only).
-- WebGPU only for picking/click events, PBR, IBL, shadows, post; WebGL2 is a basic preview.
+- WebGPU only for React click events, PBR, IBL, shadows, post; WebGL2 is a basic preview (`engine.pick` needs its `/pick` entry there).
 - `Box`, `Sphere`, `Plane` take colour only (no textures); use a glTF `Model`.
 - No lowercase JSX tags, no `extend()`, no event bubbling: R3F code needs a rename pass, not a drop-in swap.
 - Next.js example builds with `--webpack`; Turbopack is covered by the bundler matrix, not the example script.

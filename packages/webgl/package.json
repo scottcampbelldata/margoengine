@@ -27,6 +27,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./pick": {
+      "types": "./dist/pick.d.ts",
+      "import": "./dist/pick.js"
     }
   },
   "files": [
@@ -46,6 +50,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js webgl",
     "test": "npm run build && node --test test/*.test.js",
+    "test:gpu": "npm run build && cd ../.. && node packages/webgl/test/browser-check.mjs",
     "prepack": "npm run build"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "commit": "54c2c46bb",
+  "commit": "cdb3f0eac",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -440,20 +440,24 @@
     },
     "@margoengine/culling": {
       ".": {
-        "raw": 41899,
-        "gzip": 13203
+        "raw": 43693,
+        "gzip": 13693
       },
       "./dynamic": {
         "raw": 20393,
         "gzip": 7250
       },
       "./parts": {
-        "raw": 44464,
-        "gzip": 14113
+        "raw": 46258,
+        "gzip": 14598
       },
       "./models": {
         "raw": 8050,
         "gzip": 3368
+      },
+      "./shadows": {
+        "raw": 70673,
+        "gzip": 20361
       }
     },
     "@margoengine/cutscene": {
@@ -2200,14 +2204,18 @@
     },
     "@margoengine/webgl": {
       ".": {
-        "raw": 7049,
-        "gzip": 3134
+        "raw": 7271,
+        "gzip": 3215
+      },
+      "./pick": {
+        "raw": 4775,
+        "gzip": 2129
       }
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 310944,
-        "gzip": 93661
+        "raw": 311437,
+        "gzip": 93814
       },
       "./adapter": {
         "raw": 1123,
@@ -2218,8 +2226,8 @@
         "gzip": 42136
       },
       "./device": {
-        "raw": 309873,
-        "gzip": 93376
+        "raw": 310366,
+        "gzip": 93522
       },
       "./glsl": {
         "raw": 145692,
@@ -2418,14 +2426,14 @@
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {
-        "raw": 241609,
-        "gzip": 72163,
+        "raw": 242102,
+        "gzip": 72312,
         "target": 73000
       },
       "lazy": {
         "name": "compute runtime",
         "raw": 69334,
-        "gzip": 22040,
+        "gzip": 22041,
         "loadedBy": "the first compute pipeline on the layer (import() of compute/runtime.js in device/device.ts)"
       }
     }

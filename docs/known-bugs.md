@@ -184,6 +184,17 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   2 ms and the GPU 24% busy. Cause not found. Ruled out: GPU load, CPU load, the back-forward cache as the only cause, and the old page's device (destroying it on `pagehide`
   still gave 3 of 25). A plain WebGPU page that only clears held 60 in 20 of 20 loads at the same size, so a frame's real work plays a part. Safari not run.
 
+### React pointer handlers stay off on the WebGL2 preview
+
+- **What:** `@margoengine/webgl/pick` gives the preview a working `engine.pick`, but the React `Canvas` still ignores
+  `onClick`, `onPointerOver` and `onPointerOut` on the preview and warns that picking needs WebGPU. Apps that call
+  `engine.pick` themselves work.
+- **Repro:** a `Canvas` with `backend="webgl2"` and `loadFallback`, a mesh with `onClick`, and
+  `engine.use(webglPicking())`: the handler never runs.
+- **Cause:** `canPick` in `packages/react/src/components.tsx` returns false for every `webgl2` engine, and the dev warning
+  in the same file fires on the same test.
+- **Needed to close:** both tests also ask `engine.plugins.has('webgl-pick')`, with a test in the React package.
+
 ### Three packages fail on a WebGPU compatibility-level device
 
 - **What:** with `allowCompatibilityAdapters` from `@margoengine/webgl2-compat/adapter`, core and `@margoengine/materials`

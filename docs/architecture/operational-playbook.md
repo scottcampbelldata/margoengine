@@ -283,7 +283,7 @@ guard. `@margoengine/worker` gives the canvas `clientWidth` and `clientHeight` a
 | Tier | Behavior | Loading and cost |
 | --- | --- | --- |
 | Native WebGPU | Core `GPURenderer` and all packages | Always attempted first for `backend: 'auto'` or `'webgpu'`. |
-| `@margoengine/webgl` preview | Core meshes, constant-color PBR, one directional plus ambient light; no textures, effects, or picking | App-provided fallback, normally dynamically imported. Separate chunk; 3,127 bytes gzip in the audited size record. |
+| `@margoengine/webgl` preview | Core meshes, constant-color PBR, one directional plus ambient light; no textures or effects. `/pick` adds a read-pixels `engine.pick` (R32UI 1x1 target, same projection narrowing as core's pick); core's refusal stands without it. Evidence: real-browser `packages/webgl/test/browser-check.mjs` on Chromium; Firefox and Safari not run. | App-provided fallback, normally dynamically imported. Separate chunk; 3,127 bytes gzip in the audited size record. |
 | `@margoengine/webgl2-compat` | WebGPU-shaped API over WebGL2 so core and feature packages run unchanged | App installs only when native WebGPU is unavailable. Device, translator, and compute entries are lazy. |
 | Unsupported message | Page explains that WebGPU is required and does not download demo code | Used below the supported fallback floor. |
 

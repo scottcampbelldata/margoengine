@@ -185,7 +185,7 @@ The scene is about 60 lines. Three things to know about it:
 **WebGPU and the fallback.** This scene needs WebGPU. Chrome and Edge on desktop are the browsers the engine is tested
 in. Without WebGPU the page shows a message and stops. The site's demos run on WebGL2 without WebGPU through the optional
 [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) layer. The small [`@margoengine/webgl`](packages/webgl/README.md)
-preview renders plain meshes with flat shading on WebGL2, with no textures, shadows, effects or picking, so it cannot run this
+preview renders plain meshes with flat shading on WebGL2, with no textures, shadows or effects, so it cannot run this
 quickstart. Details are under [Browser support](#browser-support).
 
 Next: [Start here](docs/start-here.md) lists a guide for each goal: [textures and materials](docs/guides/textures-and-materials.md),
@@ -248,7 +248,7 @@ More examples are in [examples/](examples/README.md).
 
 Margo Engine needs WebGPU. Without it, the optional `@margoengine/webgl2-compat` layer runs the WebGPU code of core and the
 packages on WebGL2 (every site demo loads it; [docs/webgl2-compat-demos.md](docs/webgl2-compat-demos.md) lists how each one compares with native).
-Or pass the `@margoengine/webgl` fallback to get a basic WebGL2 preview of plain meshes (no textures, effects or picking),
+Or pass the `@margoengine/webgl` fallback to get a basic WebGL2 preview of plain meshes (no textures or effects; picking is its optional `/pick` entry),
 which stays for v1.0.
 
 | Browser | Status |

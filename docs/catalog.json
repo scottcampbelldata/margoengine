@@ -175,6 +175,8 @@
     "imports": "import { GLRenderer } from '@margoengine/webgl';",
     "exports": [
       "GLRenderer",
+      "glProgram",
+      "glRenderer",
       "webglRenderer"
     ]
   },

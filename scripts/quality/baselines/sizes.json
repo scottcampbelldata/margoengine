@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4808202,
+  "total": 4810587,
   "history": [
     {
       "date": "2026-10-24",
@@ -2012,6 +2012,12 @@
       "commit": "794c8fa6c",
       "reason": "culling: new shadows entry; dynamic members opened to subclasses",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "cdb3f0eac",
+      "reason": "New webgl entry ./pick: read-pixels engine.pick on the WebGL2 preview; the root entry gains the shared program builder and the renderer lookup the optional entries need",
+      "grew": 1
     }
   ],
   "items": {
@@ -2516,6 +2522,7 @@
     "@margoengine/weather": 5230,
     "@margoengine/weather/hail": 4278,
     "@margoengine/webgl": 3277,
+    "@margoengine/webgl/pick": 2385,
     "@margoengine/webgl2-compat": 96428,
     "@margoengine/webgl2-compat base (without compute runtime)": 73000,
     "@margoengine/webgl2-compat lazy compute runtime": 22701,
