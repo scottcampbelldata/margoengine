@@ -31,12 +31,14 @@ export class Component<S extends Schema = Schema> {
   /**
    * Prefer {@link World.component}, which also registers the store for cleanup on `destroy`.
    * @throws TypeError for an empty schema or an unsupported storage constructor.
+   * @param tag True only from {@link World.tag}, the one place a component may have no fields.
    */
   constructor(
     readonly world: World,
     schema: S,
+    tag = false,
   ) {
-    if (!Object.keys(schema).length)
+    if (!tag && !Object.keys(schema).length)
       throw new TypeError('Empty component schema; give at least one field, e.g. {x: Float32Array}');
     this.sparse = new Int32Array(world.capacity).fill(-1);
     this.entities = new Uint32Array(world.capacity);
@@ -56,6 +58,10 @@ export class Component<S extends Schema = Schema> {
     if (!this.world.alive(entity)) return -1;
     const row = this.sparse[entity % this.world.capacity];
     return row >= 0 && this.entities[row] === entity ? row : -1;
+  }
+  /** True when `entity` is alive and has this component. */
+  has(entity: Entity): boolean {
+    return this.index(entity) >= 0;
   }
   /**
    * Add the component to `entity` (new rows start zeroed) or overwrite fields of an existing row; returns the row.
@@ -190,6 +196,12 @@ export class World {
     this.components.add(component);
     return component;
   }
+  /** Create a tag: a component with no fields, for marks like `frozen`. Use it like any component: add, remove, has, query. */
+  tag(): Component<Record<never, never>> {
+    const tag = new Component<Record<never, never>>(this, {}, true);
+    this.components.add(tag);
+    return tag;
+  }
   /**
    * Query output is caller-owned; returns the number of matching entity IDs.
    * @throws TypeError when `components` is empty or holds a component of another world.
@@ -235,3 +247,5 @@ export class World {
 export { Schedule } from './schedule.js';
 export type { ScheduleOptions, ScheduleTime, SystemOptions, SystemRun } from './schedule.js';
 export { ChangeTracker } from './changes.js';
+export { Query } from './query.js';
+export type { QueryTerms } from './query.js';

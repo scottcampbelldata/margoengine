@@ -30,6 +30,10 @@
       "types": "./dist/changes.d.ts",
       "import": "./dist/changes.js"
     },
+    "./query": {
+      "types": "./dist/query.d.ts",
+      "import": "./dist/query.js"
+    },
     "./schedule": {
       "types": "./dist/schedule.d.ts",
       "import": "./dist/schedule.js"

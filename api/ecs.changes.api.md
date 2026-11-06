@@ -28,8 +28,9 @@ class Component<S extends Schema = Schema> {
     readonly entities: Uint32Array;
     size: number;
     readonly observers: ComponentObserver[];
-    constructor(world: World, schema: S);
+    constructor(world: World, schema: S, tag?: boolean);
     index(entity: Entity): number;
+    has(entity: Entity): boolean;
     add(entity: Entity, values?: Partial<Record<keyof S, number>>): number;
     touch(entity: Entity): boolean;
     remove(entity: Entity): boolean;
@@ -55,6 +56,7 @@ class World {
     create(): Entity;
     destroy(entity: Entity): void;
     component<S extends Schema>(schema: S): Component<S>;
+    tag(): Component<Record<never, never>>;
     query(components: readonly Component[], output: Uint32Array): number;
 }
 ```

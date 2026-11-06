@@ -26,8 +26,9 @@ export class Component<S extends Schema = Schema> {
     readonly entities: Uint32Array;
     size: number;
     readonly observers: ComponentObserver[];
-    constructor(world: World, schema: S);
+    constructor(world: World, schema: S, tag?: boolean);
     index(entity: Entity): number;
+    has(entity: Entity): boolean;
     add(entity: Entity, values?: Partial<Record<keyof S, number>>): number;
     touch(entity: Entity): boolean;
     remove(entity: Entity): boolean;
@@ -42,6 +43,19 @@ export interface ComponentObserver {
 export type Entity = number;
 
 export type NumericArray = Float32Array | Float64Array | Int32Array | Uint32Array | Uint8Array;
+
+export class Query {
+    readonly world: World;
+    constructor(world: World, terms: QueryTerms);
+    run(output: Uint32Array): number;
+    forEach(visit: (entity: Entity, rows: Int32Array) => void): number;
+}
+
+export interface QueryTerms {
+    with: readonly Component[];
+    without?: readonly Component[];
+    optional?: readonly Component[];
+}
 
 export class Schedule {
     readonly step: number;
@@ -87,6 +101,7 @@ export class World {
     create(): Entity;
     destroy(entity: Entity): void;
     component<S extends Schema>(schema: S): Component<S>;
+    tag(): Component<Record<never, never>>;
     query(components: readonly Component[], output: Uint32Array): number;
 }
 ```

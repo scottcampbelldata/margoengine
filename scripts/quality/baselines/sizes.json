@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4471758,
+  "total": 4473247,
   "history": [
     {
       "date": "2026-10-24",
@@ -1628,6 +1628,12 @@
       "commit": "0b8bfae69",
       "reason": "New ecs entry ./changes: ChangeTracker with net added, changed and removed lists, Component observers and touch; also exported from the ecs root",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d462f554a",
+      "reason": "New ecs entry ./query: Query with without and optional terms; world.tag and Component.has in the root",
+      "grew": 2
     }
   ],
   "items": {
@@ -1729,8 +1735,9 @@
     "@margoengine/dof": 7880,
     "@margoengine/dof/autofocus": 2154,
     "@margoengine/dof/lens": 1506,
-    "@margoengine/ecs": 3435,
+    "@margoengine/ecs": 3903,
     "@margoengine/ecs/changes": 886,
+    "@margoengine/ecs/query": 1021,
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/environment": 29930,
     "@margoengine/environment/cube-camera": 5691,

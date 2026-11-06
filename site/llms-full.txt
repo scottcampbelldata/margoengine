@@ -2562,7 +2562,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-057). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-058). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2643,6 +2643,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | --- | --- | --- | --- | --- |
 | Scheduler (`@margoengine/ecs/schedule`) | Enforced: one fixed step size per `Schedule`, at most `maxSteps` (default 8) steps an update; time past that is dropped. Systems are synchronous and single threaded; the fixed phase always runs before the frame phase. | A cap stops a long stall from costing more steps than the next frame can pay for, which would snowball. | `update` returns the steps run and `schedule.dropped` holds the seconds lost. A frame system ordered before a fixed one throws MargoError `'state'`. | Raise `maxSteps`, or run a second `Schedule` for a second rate. |
 | Change detection (`@margoengine/ecs/changes`) | Enforced by method: only `component.add`, `remove`, `touch` and `world.destroy` are seen. A write straight into `fields` is invisible until `touch` reports it, and a row counts as changed even when the value written is the same. 24 bytes per world slot per tracker. | `fields` are plain typed arrays, so loops over them stay at full speed; intercepting each write would cost that speed. | The entity is missing from `changed`. | Call `component.touch(entity)` after direct writes. |
+| Query filters and tags (`@margoengine/ecs/query`, `world.tag`) | Enforced: `with` needs at least one term, and a `Query` cannot run inside its own `forEach`. Entities that start matching during `forEach` wait for the next call. A tag stores no fields but keeps the 8 bytes per world slot of its entity index. | The smallest `with` store is the list to walk, so there must be one. The match list is one buffer per query. | MargoError `'state'` or `TypeError`. | Use a second `Query` to nest. |
 
 ## Copies of a model
 
@@ -8473,6 +8474,38 @@ const count = world.query([position], results);
 
 Numeric entity IDs include a generation, so destroyed/reused slots reject stale handles. Removal swaps the last dense row into the removed row: call component.index(entity) before using a row index. Queries write into caller-owned storage and reject undersized output. Integer writes reject truncation and overflow. Capacity is fixed; this is a sparse-set implementation, not a second archetype storage engine.
 
+## Query filters and tags
+
+`world.query` intersects components. `Query` (from `margoengine/ecs`, or `margoengine/ecs/query` alone) adds `without` and `optional` terms, and `world.tag()` makes a component with no fields.
+
+```ts
+import {Query, World} from 'margoengine/ecs';
+const world = new World(1024);
+const position = world.component({x: Float32Array});
+const health = world.component({value: Float32Array});
+const frozen = world.tag();
+const entity = world.create();
+position.add(entity, {x: 1});
+const stuck = world.create();
+position.add(stuck, {x: 2});
+frozen.add(stuck);
+const moving = new Query(world, {with: [position], without: [frozen], optional: [health]});
+moving.forEach((id, rows) => {
+  position.fields.x[rows[0]] += 1;
+  if (rows[1] >= 0) health.fields.value[rows[1]] -= 1; // -1: this entity has no health
+});
+const results = new Uint32Array(world.capacity);
+console.log(moving.run(results), frozen.has(stuck)); // 1 true
+```
+
+| `new Query` term | Default | Meaning |
+| --- | --- | --- |
+| `with` | required | An entity must have all of these; at least one |
+| `without` | none | An entity must have none of these |
+| `optional` | none | Never changes the match; `forEach` gives its row, or -1 |
+
+`run(output)` writes the ids into your array. `forEach(visit)` passes the `with` rows, then the `optional` rows, in one reused `Int32Array`. It takes the match list first and looks rows up just before each call, so `visit` can add, remove and destroy; entities that stop matching are passed over, and new matches wait for the next call. A `Query` cannot run inside its own `forEach`; use a second one to nest. Tags store no field data, only the 8 bytes per world slot every component uses for its entity index.
+
 ## Systems and scheduler
 
 `Schedule` (from `margoengine/ecs`, or `margoengine/ecs/schedule` alone) runs named systems in a dependable order. Each `update(delta)` runs the fixed phase, then the frame phase. A `fixed: true` system runs once per step the elapsed time pays for, so physics stays deterministic at any frame rate. Everything else runs once per update.
@@ -8509,32 +8542,6 @@ schedule.update(1 / 30); // two fixed steps of move, then report once
 | `before`, `after` | none | Names of systems this one runs before or after, in the same phase; a frame system may also run `after` a fixed one |
 | `when` | always | Run condition, asked before every run |
 | `fixed` | `false` | Run in the fixed phase |
-
-Systems receive `{delta, elapsed, tick, alpha, fixed}`: `delta` is the step in a fixed system and the frame time otherwise, `alpha` is the share of a step left in the accumulator, for blending the last two fixed states when drawing. The object is reused, so read it during the call. Order is `before` and `after`, then the order of `add`. `schedule.order()` lists the result. A missing name, a cycle, or a frame system ordered before a fixed one throws MargoError `'state'` from `order` or the next `update`. Systems are synchronous and run on the calling thread; a `Schedule` holds one step size, so use a second `Schedule` for a second rate.
-
-## Change detection
-
-`ChangeTracker` (from `margoengine/ecs`, or `margoengine/ecs/changes` alone) answers which entities gained, changed or lost one component since its last `clear()`.
-
-```ts
-import {ChangeTracker, World} from 'margoengine/ecs';
-const world = new World(1024);
-const health = world.component({value: Float32Array});
-const tracker = new ChangeTracker(health);
-const entity = world.create();
-health.add(entity, {value: 100});
-const results = new Uint32Array(world.capacity);
-console.log(tracker.added(results)); // 1, results[0] is the entity
-tracker.clear();
-health.add(entity, {value: 90}); // seen
-health.fields.value[health.index(entity)] = 80; // not seen by itself...
-health.touch(entity); // ...until reported
-console.log(tracker.changed(results)); // 1
-tracker.clear();
-world.destroy(entity);
-console.log(tracker.removed(results)); // 1, results[0] is now a stale id
-tracker.stop();
-```
 
 [README continues: https://margoengine.com/llms/packages/ecs.md]
 

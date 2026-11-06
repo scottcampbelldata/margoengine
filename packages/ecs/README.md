@@ -16,6 +16,38 @@ const count = world.query([position], results);
 
 Numeric entity IDs include a generation, so destroyed/reused slots reject stale handles. Removal swaps the last dense row into the removed row: call component.index(entity) before using a row index. Queries write into caller-owned storage and reject undersized output. Integer writes reject truncation and overflow. Capacity is fixed; this is a sparse-set implementation, not a second archetype storage engine.
 
+## Query filters and tags
+
+`world.query` intersects components. `Query` (from `margoengine/ecs`, or `margoengine/ecs/query` alone) adds `without` and `optional` terms, and `world.tag()` makes a component with no fields.
+
+```ts
+import {Query, World} from 'margoengine/ecs';
+const world = new World(1024);
+const position = world.component({x: Float32Array});
+const health = world.component({value: Float32Array});
+const frozen = world.tag();
+const entity = world.create();
+position.add(entity, {x: 1});
+const stuck = world.create();
+position.add(stuck, {x: 2});
+frozen.add(stuck);
+const moving = new Query(world, {with: [position], without: [frozen], optional: [health]});
+moving.forEach((id, rows) => {
+  position.fields.x[rows[0]] += 1;
+  if (rows[1] >= 0) health.fields.value[rows[1]] -= 1; // -1: this entity has no health
+});
+const results = new Uint32Array(world.capacity);
+console.log(moving.run(results), frozen.has(stuck)); // 1 true
+```
+
+| `new Query` term | Default | Meaning |
+| --- | --- | --- |
+| `with` | required | An entity must have all of these; at least one |
+| `without` | none | An entity must have none of these |
+| `optional` | none | Never changes the match; `forEach` gives its row, or -1 |
+
+`run(output)` writes the ids into your array. `forEach(visit)` passes the `with` rows, then the `optional` rows, in one reused `Int32Array`. It takes the match list first and looks rows up just before each call, so `visit` can add, remove and destroy; entities that stop matching are passed over, and new matches wait for the next call. A `Query` cannot run inside its own `forEach`; use a second one to nest. Tags store no field data, only the 8 bytes per world slot every component uses for its entity index.
+
 ## Systems and scheduler
 
 `Schedule` (from `margoengine/ecs`, or `margoengine/ecs/schedule` alone) runs named systems in a dependable order. Each `update(delta)` runs the fixed phase, then the frame phase. A `fixed: true` system runs once per step the elapsed time pays for, so physics stays deterministic at any frame rate. Everything else runs once per update.
