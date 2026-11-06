@@ -40,7 +40,8 @@ test('a hanging test is killed with its child process, within the limit, and nam
     // (a real 1.5 s limit fired first: "the fake test never started its child").
     let fire, limitAsked;
     const running = runLimited(`${node} ${JSON.stringify(parentFile)}`, {
-      cwd: dir,
+      // Not in `dir`: Windows refuses to remove a folder for a moment after the process that sat in it dies.
+      cwd: tmpdir(),
       limitMs: 1500,
       label: 'fake-package test:browser',
       startLimit: (run, ms) => {

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4631203,
+  "total": 4634873,
   "history": [
     {
       "date": "2026-10-24",
@@ -1814,6 +1814,12 @@
       "commit": "9850d0f39",
       "reason": "cameras gains focal length and film gauge (lensToFov, fovToLens, focalLength)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "1083eacb2",
+      "reason": "points: potree entry (batch 27 job 3)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2111,6 +2117,7 @@
     "@margoengine/points/las": 5116,
     "@margoengine/points/laz": 8046,
     "@margoengine/points/octree": 8486,
+    "@margoengine/points/potree": 3670,
     "@margoengine/points/surfels": 14337,
     "@margoengine/post": 40110,
     "@margoengine/post/afterimage": 5619,
