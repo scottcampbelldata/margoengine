@@ -1,4 +1,5 @@
-// One call for any glTF file: the light loader with just the entries the file needs, or gltf-pro when it refuses.
+// One call for any glTF file: the light loader with just the entries the file needs, or gltf-pro when it refuses or
+// passes one of its own limits.
 import type { EngineKernel } from '@margoengine/core';
 import type { PBRModel } from '@margoengine/gltf-pro';
 import { MargoError } from '@margoengine/math/errors';
@@ -78,9 +79,10 @@ function remembering(get: typeof fetch): typeof fetch {
 
 /**
  * Loads a .gltf or .glb without having to know what it holds. The light loader runs with only the `@margoengine/gltf/*`
- * entries the file calls for; if it refuses the file as unsupported, `@margoengine/gltf-pro` is imported and loads it from
- * the bytes already downloaded. A malformed file throws either way. gltf-pro is an optional peer: a file that needs it
- * rejects with `Install @margoengine/gltf-pro` when it is missing.
+ * entries the file calls for; if it refuses the file as unsupported, which includes passing a limit only the light loader
+ * has (one million vertices, instances past `maxNodes`), `@margoengine/gltf-pro` is imported and loads it from the bytes
+ * already downloaded, instances included. A malformed file throws either way. gltf-pro is an optional peer: a file that
+ * needs it rejects with `Install @margoengine/gltf-pro` when it is missing.
  * @example
  * const { model, loader } = await loadAuto(engine, '/any.glb');
  * // On teardown: model.dispose();
@@ -96,13 +98,22 @@ export async function loadAuto(
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
   const data = await readResponse(await cached(target, { signal }), { maxBytes: 64 * 1024 * 1024, signal, label: 'glTF download' }),
     options = { signal, fetch: cached, maxNodes, allowedURLs };
+  const doc = documentOf(data);
   try {
-    const extensions = await entriesFor(documentOf(data));
+    const extensions = await entriesFor(doc);
     return { loader: 'gltf', model: await loadGLTF(engine, target, { ...options, extensions }) };
   } catch (error) {
     if (!(error instanceof MargoError) || error.code !== 'unsupported') throw error;
-    const pro = await gltfPro();
-    return { loader: 'gltf-pro', model: await pro.loadGLTF(engine, target, options), reason: error.message };
+    const pro = await gltfPro(),
+      // gltf-pro imports its other readers itself; without this one it would draw each instanced node once.
+      decoders = uses(doc, 'EXT_mesh_gpu_instancing')
+        ? { instancing: (await import('@margoengine/gltf-pro/instancing')).instancing }
+        : undefined;
+    return {
+      loader: 'gltf-pro',
+      model: await pro.loadGLTF(engine, target, decoders ? { ...options, decoders } : options),
+      reason: error.message,
+    };
   }
 }
 async function gltfPro(): Promise<typeof import('@margoengine/gltf-pro')> {

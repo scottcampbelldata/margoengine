@@ -114,8 +114,10 @@ any node, and counts toward `maxNodes` (default 100,000).
 ### Any file, without choosing a loader
 
 `loadAuto` from `@margoengine/gltf/auto` reads the file, runs the light loader with only the entries that file calls for,
-and imports `@margoengine/gltf-pro` only if the light loader refuses it as unsupported. Each URL is downloaded once,
-whichever loader runs. A malformed file is an error either way. Install `@margoengine/gltf-pro` beside this package for
+and imports `@margoengine/gltf-pro` only if the light loader refuses it as unsupported, or the file passes a limit only
+the light loader has: one million vertices in total, one million values in an accessor, or instances past `maxNodes`.
+Each URL is downloaded once, whichever loader runs. A malformed file is an error either way, and so is a file over a limit
+both loaders share: 64 MiB, or more real nodes than `maxNodes`. Install `@margoengine/gltf-pro` beside this package for
 files that need it; without it such a file rejects with a message that says so. It also takes `signal`, `fetch`,
 `maxNodes` and `allowedURLs`.
 

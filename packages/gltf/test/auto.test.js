@@ -12,6 +12,8 @@ import { documentOf, headlessEngine, vertexData, withBitmaps } from './helpers.j
 let installed = false;
 registerHooks({
   resolve(specifier, context, next) {
+    if (specifier === '@margoengine/gltf-pro/instancing')
+      return { url: 'data:text/javascript,export const instancing = { read() {} };', shortCircuit: true };
     if (specifier !== '@margoengine/gltf-pro') return next(specifier, context);
     if (!installed)
       throw Object.assign(new Error(`Cannot find package '${specifier}'`), { code: 'ERR_MODULE_NOT_FOUND' });
@@ -215,6 +217,93 @@ test('an unsupported file moves to gltf-pro from the bytes already downloaded', 
   }
 });
 
+const moved = async (t, input, options) => {
+  const calls = [],
+    model = { dispose() {} };
+  globalThis.loadPro = async (...args) => {
+    calls.push(args[2]);
+    return model;
+  };
+  t.after(() => delete globalThis.loadPro);
+  const { engine } = await headlessEngine();
+  try {
+    const { fetch, asked } = server(fileOf(input)),
+      result = await loadAuto(engine, url, { fetch, ...options });
+    assert.equal(result.loader, 'gltf-pro');
+    assert.equal(result.model, model);
+    assert.deepEqual(asked, ['/m.glb']);
+    assert.equal(engine.meshes.size, 0);
+    return { result, options: calls[0] };
+  } finally {
+    engine.dispose();
+  }
+};
+
+test('a file over a light limit gltf-pro does not share moves on: total vertices', async (t) => {
+  const count = 600_000,
+    file = documentOf([new Float32Array(count * 3), new Float32Array(count * 3).fill(1)], {
+      accessors: accessors.map((a) => ({ ...a, count })),
+      meshes: [{ primitives: [primitive, primitive] }],
+      nodes: [{ mesh: 0 }],
+    }),
+    { result } = await moved(t, file);
+  assert.match(result.reason, /one million vertices/);
+});
+
+test('a file over a light limit gltf-pro does not share moves on: one accessor', async (t) => {
+  const count = 1_000_001,
+    file = documentOf([new Float32Array(count * 3), new Float32Array(count * 3).fill(1)], {
+      accessors: accessors.map((a) => ({ ...a, count })),
+      meshes: [{ primitives: [primitive] }],
+      nodes: [{ mesh: 0 }],
+    }),
+    { result } = await moved(t, file);
+  assert.match(result.reason, /one million values/);
+});
+
+const forest = (rest) =>
+  documentOf([positions, normals, new Float32Array([0, 0, 0, 1, 0, 0, 2, 0, 0])], {
+    accessors: [...accessors, { bufferView: 2, componentType: 5126, count: 3, type: 'VEC3' }],
+    meshes: [{ primitives: [primitive] }],
+    nodes: [{ mesh: 0, extensions: { EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: 2 } } } }],
+    ...rest,
+  });
+
+test('instances past maxNodes move on, and gltf-pro gets the reader that keeps them', async (t) => {
+  const { result, options } = await moved(t, forest({ extensionsRequired: ['EXT_mesh_gpu_instancing'] }), { maxNodes: 2 });
+  assert.match(result.reason, /maxNodes/);
+  assert.equal(options.maxNodes, 2);
+  assert.equal(typeof options.decoders.instancing.read, 'function');
+});
+
+test('an instanced file refused for another reason keeps its instances on gltf-pro', async (t) => {
+  const { options } = await moved(t, forest({
+    extensionsUsed: ['EXT_mesh_gpu_instancing'],
+    animations: [{ channels: [], samplers: [] }],
+  }));
+  assert.equal(typeof options.decoders.instancing.read, 'function');
+});
+
+test('a file with no instances passes gltf-pro no decoders', async (t) => {
+  const { options } = await moved(t, animated());
+  assert.equal(options.decoders, undefined);
+});
+
+test('a limit both loaders share is the error, with no trip to gltf-pro', async (t) => {
+  globalThis.loadPro = () => assert.fail('gltf-pro must not run');
+  t.after(() => delete globalThis.loadPro);
+  const { engine } = await headlessEngine();
+  try {
+    const file = plain({ nodes: [{ mesh: 0 }, { mesh: 0 }, { mesh: 0 }] });
+    await assert.rejects(loadAuto(engine, url, { ...server(fileOf(file)), maxNodes: 2 }), {
+      name: 'RangeError',
+      message: /raise the maxNodes option/,
+    });
+  } finally {
+    engine.dispose();
+  }
+});
+
 test('a material the light entries refuse moves on; a texture on WebGL does too', async (t) => {
   const model = { dispose() {} };
   let calls = 0;
@@ -280,6 +369,7 @@ test('gltf-pro and the other entries stay out of what the entry imports at load'
   const code = await readFile(new URL('../dist/auto.js', import.meta.url), 'utf8');
   assert.match(code, /import\(["`]@margoengine\/gltf-pro["`]\)/);
   assert.doesNotMatch(code, /from\s*["`]@margoengine\/gltf-pro/);
+  assert.match(code, /import\(["`]@margoengine\/gltf-pro\/instancing["`]\)/, 'the reader is gltf-pro\'s own, not a copy');
   for (const name of ['meshopt', 'quantized', 'textured', 'instancing', 'scene-data'])
     assert.doesNotMatch(code, new RegExp(`from\\s*["\`]\\./${name}`));
 });

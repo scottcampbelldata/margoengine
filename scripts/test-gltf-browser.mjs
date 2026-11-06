@@ -213,6 +213,28 @@ try {
     result.auto = { light: light.loader, pro: pro.loader, reason: pro.reason, glow };
     pro.model.dispose();
 
+    // Instances past maxNodes: the real gltf-pro takes the file, and the reader loadAuto hands it keeps every instance.
+    const grown = {
+        ...forest,
+        buffers: [
+          { byteLength: length, uri: 'quad.bin' },
+          { byteLength: offsets.byteLength, uri: 'offsets.bin' },
+        ],
+      },
+      many = await loadAuto(instance, url, {
+        maxNodes: 2,
+        fetch: async (target) =>
+          new Response(
+            String(target).endsWith('quad.bin') ? bytes : String(target).endsWith('offsets.bin') ? offsets : JSON.stringify(grown),
+          ),
+      });
+    ensure(many.loader === 'gltf-pro', `Instances past maxNodes move to gltf-pro: ${many.loader}`);
+    const [manyWest, manyMiddle, manyEast] = pixels(left, [32, 32], right);
+    ensure(!near(manyWest, boxOnly, 8) && !near(manyEast, boxOnly, 8), `gltf-pro draws both instances: ${manyWest}, ${manyEast}`);
+    ensure(near(manyMiddle, boxOnly, 8), `Nothing draws between them: ${manyMiddle}`);
+    result.autoInstances = { reason: many.reason, west: manyWest, east: manyEast };
+    many.model.dispose();
+
     // Two views: each camera sees the quad from its own side of the frame.
     const views = await load(file({ alphaMode: 'MASK', pbrMetallicRoughness: pbr({ baseColorTexture: map }) }));
     const camera = new Camera({ position: [0, 0, 3], target: [0, 0, 0], near: 0.1, far: 100 });

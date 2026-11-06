@@ -286,7 +286,10 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       const expanded = normals ? undefined : indices;
       vertices += normals ? positions.length / 3 : indices.length;
       if (vertices > 1_000_000)
-        throw new RangeError('glTF exceeds one million vertices; load a smaller file or split it');
+        throw new MargoError(
+          'unsupported',
+          'glTF exceeds one million vertices, the limit of the light loader; load it with @margoengine/gltf-pro, or split it',
+        );
       if (!normals) {
         const expanded = new Float32Array(indices.length * 3);
         normals = new Float32Array(expanded.length);

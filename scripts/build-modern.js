@@ -155,6 +155,7 @@ async function buildPackage(name) {
           '@margoengine/animation',
           '@margoengine/animation/sampling',
           '@margoengine/gltf-pro',
+          '@margoengine/gltf-pro/instancing',
           '@margoengine/loaders',
           '@margoengine/lines',
           '@margoengine/decoders',

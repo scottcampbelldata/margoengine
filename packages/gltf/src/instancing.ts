@@ -1,6 +1,7 @@
 // EXT_mesh_gpu_instancing for the light loader. Core already draws every mesh of one geometry as one instanced draw, so
 // each instance becomes a node on the shared mesh and the file needs no draw path of its own.
-import { checkCount, countLimit } from '../../shared/limits.js';
+import { MargoError } from '@margoengine/math/errors';
+import { countLimit } from '../../shared/limits.js';
 import type { GLTFAccessor, GLTFNode } from '../../shared/gltf.js';
 import { readAccessor } from './accessor.js';
 import type { GLTFExtension, GLTFFile } from './index.js';
@@ -39,7 +40,11 @@ function expand(file: GLTFFile, node: GLTFNode, first: number, limit: number): {
     (scale && scale.length !== count * 3)
   )
     throw invalid('instance attributes');
-  checkCount('Too many glTF nodes', first + count, limit, 'maxNodes');
+  if (first + count > limit)
+    throw new MargoError(
+      'unsupported',
+      `Too many glTF nodes (${first + count} > ${limit}; raise the maxNodes option, or load it with @margoengine/gltf-pro, which draws instances without nodes)`,
+    );
   const instances: GLTFNode[] = [];
   for (let i = 0; i < count; i++) {
     const instance: GLTFNode = { mesh: node.mesh };

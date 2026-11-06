@@ -52,8 +52,12 @@ export function readAccessor(
     start = integer(v.byteOffset ?? 0, 'view offset'),
     length = integer(v.byteLength, 'view length', 1),
     stride = integer(v.byteStride ?? size * components, 'stride', size * components);
+  if (count > 1_000_000)
+    throw new MargoError(
+      'unsupported',
+      'glTF accessor holds over one million values, the limit of the light loader; load it with @margoengine/gltf-pro',
+    );
   if (
-    count > 1_000_000 ||
     start + length > buffer.length ||
     offset + (count - 1) * stride + components * size > length ||
     start % size ||

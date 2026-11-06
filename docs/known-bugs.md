@@ -697,6 +697,8 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| The light glTF loader called a valid accessor over one million values not valid glTF | The count limit shared one error with the bounds checks | Its own `unsupported` error naming gltf-pro, so `loadAuto` moves on | `packages/gltf/test/auto.test.js` |
+| `loadAuto` drew each instanced node once on gltf-pro, or refused the file | It passed gltf-pro no `decoders.instancing`, which gltf-pro does not import itself | `loadAuto` imports the reader when the file uses `EXT_mesh_gpu_instancing` | `packages/gltf/test/auto.test.js` |
 | LAZ formats 1 and 3: wrong GPS times on PDAL `autzen_trim.laz` | GPSTIME11 stored the new difference after a multiplier 1 point, and the test encoder made the same mistake, so round trips passed | The previous difference stays, as in point14; the encoder follows the file | `packages/points/tests/laz-encoder.js` round trips |
 | LAZ point14: X and Y past the header bounds for points with four or more returns | Rows 4 and up of the return group map were wrong | First return group 3, last 5, those between 4, checked on real files up to six returns | `packages/points/tests/laz-encoder.js` round trips |
 | `parse3DM` threw on every file with the real rhino3dm | `File3dmLayerTable.delete(id)` hides the handle's `delete`, and the stand-in had no such table | The free comes from the base that owns `isDeleted` | `packages/loaders/tests/3dm.test.js` |
