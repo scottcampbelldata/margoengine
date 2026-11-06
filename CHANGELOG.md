@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Light tier on displays that are no multiple of 60
+
+- `capFrameRate` and `paceEngine` no longer fall below their rate: a 100 Hz display renders 100 FPS on the light tier, not 50, and 90 Hz renders 90, not 45. 60, 120, 144 and 240 Hz are unchanged.
+- The light tier's GPU reading counts the time a frame's passes cover, so a GPU that runs passes side by side (Apple M6) reads what it spends: 8.8 ms, not 31.4 ms.
+
 ### voxel-net resumes a dropped connection (protocol 4, unreleased)
 
 - **Breaking:** `PROTOCOL_VERSION` is 4. A server and its clients must be built from the same version; the server closes

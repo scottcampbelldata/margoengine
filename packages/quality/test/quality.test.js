@@ -184,13 +184,14 @@ test('on the full tier, sustained slow frames store low and reload once; fast or
 
 // A fake WebGPU for the light-tier reading. `passMs`: each frame's passes by timestamps. `doneMs`: what submit to done would
 // read (the old rule's number): the presenting floor and other work on the machine, which the reading must ignore.
-function fakeGpu({ passMs = 2, doneMs = passMs, passes = 3, encoders = 1, feature = true, zero = false } = {}) {
+function fakeGpu({ passMs = 2, doneMs = passMs, passes = 3, encoders = 1, feature = true, zero = false, overlap = false } = {}) {
   const live = new Set(),
     make = (object) => (live.add(object), object);
   let clock = 0;
   const gpu = {
     live,
     wrote: 0,
+    stamp: 1000n,
     pending: [],
     clock: () => clock,
     queue: {
@@ -237,8 +238,11 @@ function fakeGpu({ passMs = 2, doneMs = passMs, passes = 3, encoders = 1, featur
             if (writes?.querySet) {
               gpu.wrote++;
               const each = BigInt(Math.round((passMs * 1e6) / (passes * encoders)));
-              writes.querySet.stamps[writes.beginningOfPassWriteIndex] = 1000n;
-              writes.querySet.stamps[writes.endOfPassWriteIndex] = 1000n + each;
+              // Passes run one after another unless `overlap`: then every pass of a frame runs at once, as on a tiled GPU.
+              const start = overlap ? 1000n : gpu.stamp;
+              writes.querySet.stamps[writes.beginningOfPassWriteIndex] = start;
+              writes.querySet.stamps[writes.endOfPassWriteIndex] = start + each;
+              gpu.stamp = start + each;
             }
             return { end() {} };
           };
@@ -340,6 +344,14 @@ test('a frame is the sum of all its encoders, not one submission', async () => {
   const split = await visit({ passMs: 12, encoders: 4 });
   assert.equal(split.stored, null, '3 ms a submission is still a 12 ms frame');
   assert.ok(Math.abs(split.readings[0] - 12) < 0.01, `read ${split.readings[0]} ms`);
+});
+
+// An Apple M6 runs a frame's passes side by side: at 60 FPS, 11 passes added up to 31 ms a frame in Chrome and 19 ms in
+// WebKit, though the GPU was busy for 8 ms of each frame. Adding them up counts the same time several times over.
+test('passes that run at the same time count once', async () => {
+  const side = await visit({ passMs: 12, passes: 4, overlap: true });
+  assert.ok(Math.abs(side.readings[0] - 3) < 0.01, `read ${side.readings[0]} ms`);
+  assert.equal(side.stored, 'high', 'four 3 ms passes side by side are a 3 ms frame');
 });
 
 test('without timestamp-query the page stays light, stores nothing and stops at once', async () => {
@@ -507,6 +519,75 @@ test('the light-tier cap runs every other refresh of a 120 Hz display and every 
     for (let frame = 1; frame <= hz; frame++) runs += engine.pace((frame * 1000) / hz);
     assert.equal(runs, expected, `${hz} Hz`);
   }
+});
+
+// A Dell S2725HS on an Apple M6 runs at 100 Hz by default: the old cap dropped every other refresh there, 50 FPS on a
+// page asked for 60. Any display that is not close to a multiple of the rate fell short the same way (90 Hz gave 45).
+test('the cap never renders below its rate, at any refresh rate', () => {
+  for (const [hz, expected] of [
+    [75, 75],
+    [90, 90],
+    [100, 100],
+    [165, 83],
+    [200, 67],
+  ]) {
+    const engine = {};
+    capFrameRate(engine);
+    let runs = 0;
+    for (let frame = 1; frame <= hz; frame++) runs += engine.pace((frame * 1000) / hz);
+    assert.ok(Math.abs(runs - expected) <= 1, `${hz} Hz ran ${runs}, expected about ${expected}`);
+  }
+});
+
+test('the cap holds its rate through callback jitter and whole-millisecond timestamps', () => {
+  for (const hz of [60, 75, 90, 100, 120, 144, 165, 200, 240])
+    for (const [jitter, whole] of [
+      [1, false],
+      [1, true],
+      [2, false],
+    ]) {
+      const engine = {};
+      capFrameRate(engine);
+      let seed = 12345,
+        runs = 0;
+      for (let frame = 1; frame <= hz * 10; frame++) {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        const time = (frame * 1000) / hz + (seed / 2 ** 31 - 1) * jitter;
+        runs += engine.pace(whole ? Math.round(time) : time);
+      }
+      assert.ok(runs / 10 >= 59, `${hz} Hz, jitter ${jitter}, whole ${whole}: ${runs / 10} FPS`);
+    }
+});
+
+test('slow frames on a fast display do not lift the cap', () => {
+  // A GPU that misses refreshes on a 120 Hz panel: 8.33 ms, then two refreshes late. The display is still 120 Hz.
+  const engine = {};
+  capFrameRate(engine);
+  let time = 0,
+    runs = 0,
+    quick = 0,
+    last = -Infinity;
+  for (let frame = 0; frame < 600; frame++) {
+    time += ((frame % 2 ? 3 : 1) * 1000) / 120;
+    if (engine.pace(time)) {
+      runs++;
+      if (time - last < 12) quick++;
+      last = time;
+    }
+  }
+  assert.ok(runs > 0);
+  assert.ok(quick <= 2, `${quick} frames ran on a refresh the cap should skip`);
+});
+
+test('a page moved to a slower display reaches that display rate within seconds', () => {
+  const engine = {};
+  capFrameRate(engine);
+  let time = 0;
+  for (let frame = 0; frame < 240 * 5; frame++) engine.pace((time += 1000 / 240));
+  for (let frame = 0; frame < 100 * 10; frame++) engine.pace((time += 10));
+  let runs = 0;
+  for (let frame = 0; frame < 100; frame++) runs += engine.pace((time += 10));
+  assert.equal(runs, 100);
 });
 
 test('paceEngine caps a light-tier engine through engine.pace without touching requestAnimationFrame', async () => {

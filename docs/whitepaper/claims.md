@@ -20,7 +20,7 @@ Unless a row says otherwise, real-GPU numbers come from one machine:
 - AC power checked before and after, with a GPU lock held so no other benchmark runs at the same time.
 
 Some newer results (the voxel sandbox and multiplayer, the create-margo starters) come from a desktop with an AMD
-Ryzen 9 9950X and an NVIDIA RTX A6000, and say so. Nothing has been measured on Apple silicon, on Android, in Firefox
+Ryzen 9 9950X and an NVIDIA RTX A6000, and say so. On Apple silicon, only the results that name an Apple M6 Mac mini. Nothing has been measured on Android, in Firefox
 or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 
 ## Headline numbers
@@ -177,6 +177,7 @@ backs them yet:
 | LIM-074 | Subgroup kernels: integer results, orders and stable sorts equal the default kernels at every boundary size on subgroup sizes 32 and 4, and sort takes 7.0 against 11.9 ms on 16,777,216 values on an RTX A6000 (docs/limits.md, Rendering) | `packages/compute/tests/compute-subgroups-browser.js`, `results/compute-subgroups.json` | `node scripts/gpu-lock.mjs run --owner=<id> -- node packages/compute/tests/compute-browser.mjs`; `node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/compute-subgroups.mjs` | PROVEN | Timings are diagnostic until a quiet run; one GPU plus SwiftShader; perf-history entry 62. |
 | LIM-075 | Raw mesh buffers: meshes with equal bytes hold one buffer and a run binds it once; a write copies it for that mesh only, the other meshes keep drawing the old bytes, and it is freed with its last mesh (docs/limits.md, Rendering) | `packages/shader/test/raw.test.js`, `packages/shader/test/browser-check.mjs` | `npm run test:gpu --workspace packages/shader` | PROVEN | RTX A6000 only |
 | LIM-076 | Depth-writing lines: the nearer of two crossing lines wins in either draw order, dash gaps and clipped parts write nothing, a later pass respects the depth and the edge keeps its ramp (docs/limits.md, Rendering) | `packages/lines/tests/depth-write.test.js`, `packages/lines/tests/features-browser.js` | `npm test --workspace @margoengine/lines`, `npm run test:browser --workspace @margoengine/lines` | PROVEN | |
+| LIM-077 | Light-tier pace: an even rate of at least 60 FPS on every display from 60 to 240 Hz, through jitter and whole-millisecond timestamps (docs/limits.md, Platform) | `packages/quality/test/quality.test.js` | `npm test --workspace @margoengine/quality` | PROVEN | A physical 100 Hz panel is not yet measured |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 

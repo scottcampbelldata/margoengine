@@ -1,4 +1,4 @@
-// The light tier's GPU reading: real GPU time per frame, the sum of its render and compute passes by timestamp queries.
+// The light tier's GPU reading: real GPU time per frame, the time its render and compute passes cover by timestamp queries.
 // Loaded only by a page still being measured (phones, measured and forced pages never download it), and fully removed
 // when the reading ends.
 const FEATURE = 'timestamp-query',
@@ -28,11 +28,25 @@ interface Slot {
   used: number;
 }
 interface Frame {
-  sum: number;
+  /** Each counted pass's start and end, in nanoseconds. */
+  spans: [number, number][];
   open: number;
   counted: boolean;
   sealed: boolean;
   bad: boolean;
+}
+
+/** The milliseconds at least one of `spans` covers. A GPU may run passes side by side (an Apple M6 runs a frame's 11 passes
+ * in 8 ms that add up to 31), so adding them up would count the same time more than once. */
+function covered(spans: [number, number][]): number {
+  let nanoseconds = 0,
+    end = -Infinity;
+  for (const [from, to] of spans.sort((a, b) => a[0] - b[0])) {
+    if (to <= end) continue;
+    nanoseconds += to - Math.max(from, end);
+    end = to;
+  }
+  return nanoseconds / 1e6;
 }
 
 /** Skip two seconds of startup (shader compiles, uploads), then read 120 frames, giving up ten seconds in. Reports the
@@ -51,7 +65,7 @@ export function readGpuTime(
     free: Slot[] = [],
     sent = new WeakMap<object, Slot>(),
     times: number[] = [],
-    next = (): Frame => ({ sum: 0, open: 0, counted: false, sealed: false, bad: false });
+    next = (): Frame => ({ spans: [], open: 0, counted: false, sealed: false, bad: false });
   let frame = next(),
     first = -1,
     elapsed = 0,
@@ -76,7 +90,7 @@ export function readGpuTime(
   };
   const settle = (ended: Frame) => {
     if (done || !ended.sealed || ended.open || ended.bad || !ended.counted) return;
-    if (times.push(ended.sum) === 120) close();
+    if (times.push(covered(ended.spans)) === 120) close();
   };
   const take = (owner: DeviceLike): Slot | undefined => {
     let slot = free.pop();
@@ -144,14 +158,12 @@ export function readGpuTime(
       slot.read.mapAsync(MAP_READ, 0, size).then(
         () => {
           const stamps = new BigInt64Array(slot.read.getMappedRange(0, size));
-          let nanoseconds = 0;
           // Timestamps may go backwards across a GPU clock change; such a pass counts as nothing rather than negative.
           for (let i = 0; i < slot.used; i += 2)
-            if (stamps[i + 1] > stamps[i]) nanoseconds += Number(stamps[i + 1] - stamps[i]);
+            if (stamps[i + 1]! > stamps[i]!) owner.spans.push([Number(stamps[i]), Number(stamps[i + 1])]);
           slot.read.unmap();
           slot.used = 0;
           free.push(slot);
-          owner.sum += nanoseconds / 1e6;
           owner.counted = true;
           owner.open--;
           settle(owner);

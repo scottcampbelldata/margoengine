@@ -380,11 +380,17 @@ the quality package.
 Promotion and demotion rules:
 
 - Phone or URL-forced tiers are not auto-changed.
-- A light-tier page with timestamp-query support samples GPU passes after startup for 120 frames. A sufficiently low
+- A light-tier page with timestamp-query support samples GPU passes after startup for 120 frames, reading the time a
+  frame's passes cover, so passes that run side by side count once (2026-11-05: an Apple M6 ran 31.9 ms of passes in 8.5 ms
+  of GPU time; an RTX A6000 reads the same either way, 4.33 ms, so limits set on such GPUs keep their meaning). A sufficiently low
   p90 stores high for the next page load; it never reloads immediately into a heavier tier.
 - A high-tier page stores a held state and reloads once only after five consecutive one-second windows under 55 FPS;
   frame gaps above 250 ms restart a window.
 - The measurement restores wrapped queue/encoder methods and destroys temporary GPU resources.
+- The light tier's pace (`capFrameRate`) gives each frame the most whole refreshes that still reach 60 FPS, from a median of
+  the last 16 callback gaps, so a 100 Hz display renders 100 FPS rather than 50. Evidence: unit tests from 50 to 240 Hz with
+  jitter, and a real page on a simulated 100 Hz clock on an Apple M6. Missing: a run on a physical 100 Hz panel, Safari
+  itself, and whether an M6 stays on the full tier at 100 Hz (it costs 13.4 ms a frame there, over the 10 ms refresh).
 
 The source comments contain both an old 5 ms threshold and a later documented 8 ms threshold. Current code is the
 authority; the discrepancy should be removed when that area changes.

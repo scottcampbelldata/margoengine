@@ -1631,6 +1631,16 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node bench/cli.mjs parity --cases=p-custom-shader --engines=margo,three-webgl-parity --runs=3`.
 - **Guard:** `packages/shader/test/raw.test.js`, `packages/shader/test/browser-check.mjs` (`rawShared`).
 
+### 64. Light tier: 50 FPS on a 100 Hz display
+
+- **Loss:** the voxel sandbox ran at 50 FPS on an Apple M6 Mac mini in Safari and Chrome, on a monitor that gives 60 on Windows. macOS runs that monitor (Dell S2725HS) at 100 Hz by default: all 18 mode changes in a week of WindowServer logs set 1920 x 1080 at 100 Hz.
+- **Cause:** `capFrameRate` skipped every refresh sooner than 12.67 ms after the last frame, so at 100 Hz it dropped every other one. The light tier is the only paced desktop tier, and the Mac stayed on it because the GPU reading added up passes that run side by side (31.9 ms of passes in 8.5 ms of GPU time).
+- **Fix:** each frame spans the most whole refreshes that still reach the rate, and the reading counts the time passes cover. Same work per frame, same quality. No `FAST_GPU_MS` change.
+- **After:** real page, simulated 100 Hz clock, Apple M6, 1920 x 1000: 50.0 to 100.1 FPS in Chrome 157, 50.0 to 100.0 in Playwright WebKit 27.2. Reading at 60 Hz: 31.4 to 8.8 ms in Chrome, 18.8 to 8.7 ms in WebKit. Not yet measured on a physical 100 Hz panel or in Safari itself.
+- **Difference:** a 100 Hz display now renders twice the frames it did on the light tier.
+- **Rerun:** `npm test --workspace @margoengine/quality`; on a 100 Hz display, the sandbox's HUD with `?seed=1`.
+- **Guard:** `packages/quality/test/quality.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

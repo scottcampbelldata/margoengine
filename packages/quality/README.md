@@ -2,8 +2,8 @@
 
 Import `margoengine/quality` from the `margoengine` package, or `@margoengine/quality` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Measured quality tiers. Desktops start on a light tier (single-sampled, pixel ratio capped, paced to at most about
-60 FPS) and read the real GPU time of each frame by timestamp queries; a page under the limit gets the full 4× MSAA tier
+Measured quality tiers. Desktops start on a light tier (single-sampled, pixel ratio capped, paced to an even rate of at
+least 60 FPS) and read the real GPU time of each frame by timestamp queries; a page under the limit gets the full 4× MSAA tier
 from its next load. No PC is first shown the 4× tier or reloaded by the probe (the light tier's own frame rate depends on
 the GPU), and no rule based on device names is involved.
 
@@ -13,7 +13,7 @@ import {Engine} from 'margoengine/core';
 
 applyQualityTier();                       // before creating the engine
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
-paceEngine(engine);                       // light tier: about 60 FPS
+paceEngine(engine);                       // light tier: an even rate of at least 60 FPS
 // ...build the scene and start rendering, then:
 watchQuality();
 ```
@@ -21,7 +21,7 @@ watchQuality();
 - `applyQualityTier()` returns `'light'`, `'high'` or `'phone'`. Phones are single-sampled with the pixel ratio capped
   at 1 (`globalThis.margoLow = 1`), even with `?quality=high` or `?scale=2`. It sets core's `globalThis.margoLow`, which
   core reads when it builds pipelines and sizes the canvas, so it must run before the engine is created.
-- `watchQuality()` reads 120 frames on the light tier and, when the 90th percentile of a frame's GPU passes is under
+- `watchQuality()` reads 120 frames on the light tier and, when the 90th percentile of the time a frame's GPU passes cover (passes that run side by side count once) is under
   `FAST_GPU_MS` (8 ms), remembers `'high'` for this page in `localStorage['margoQuality:' + location.pathname]`. One key
   per page, because the result says what this page's scene costs: a light scene must not mark a weak PC high for a heavy
   one. A slow reading remembers nothing, so one bad session cannot hold a browser on the light tier: the next load
@@ -36,11 +36,18 @@ watchQuality();
 - `onReading(milliseconds)` on `watchQuality` reports the reading when it ends, undefined when there is none.
 - For testing: `?quality=high` or `?quality=low` forces a tier without remembering it; `?scale=1.5` sets the light
   tier's pixel ratio (1 to 2). `localStorage.removeItem('margoQuality:' + location.pathname)` measures again.
-- `paceEngine(engine)` sets core's `engine.pace` hook on the light tier so `engine.start()` renders about 60 FPS
-  (every other refresh at 120 Hz, 72 FPS at 144 Hz) instead of swinging between 120 and 40 FPS on a slow GPU. Other
-  tiers stay uncapped. Nothing global is patched: other `requestAnimationFrame` loops on the page run at the display
+- `paceEngine(engine)` sets core's `engine.pace` hook on the light tier so `engine.start()` renders at an even rate of
+  at least 60 FPS instead of swinging between 120 and 40 FPS on a slow GPU. Each frame spans the most whole refreshes that
+  still reach 60, so the rate depends on the display:
+
+  | Display | 60 Hz | 75 Hz | 90 Hz | 100 Hz | 120 Hz | 144 Hz | 165 Hz | 200 Hz | 240 Hz |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Frames per second | 60 | 75 | 90 | 100 | 60 | 72 | 83 | 67 | 60 |
+
+  Other tiers stay uncapped. Nothing global is patched: other `requestAnimationFrame` loops on the page run at the display
   rate. An app that renders from its own loop (calling `engine.render` itself) can gate it with `frameDue`.
-- `capFrameRate(engine, rate = 60)` sets the same pacing on any engine regardless of tier.
+- `capFrameRate(engine, rate = 60)` sets the same pacing on any engine regardless of tier. It reads the display's refresh
+  from the last 16 callback gaps, so it follows a page moved to another display within 16 frames.
 - The light-tier reading skips the first two seconds and gives up after ten, at any refresh rate.
 
 ## Dynamic resolution

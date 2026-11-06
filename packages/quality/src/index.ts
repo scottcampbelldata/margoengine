@@ -78,7 +78,7 @@ export interface QualityOptions {
 
 /** Below this many frames per second, a one-second window on the full tier counts as slow. */
 export const SLOW_FPS = 55;
-/** Light-tier GPU milliseconds per frame (90th percentile, timestamp queries: the sum of a frame's passes) below which
+/** Light-tier GPU milliseconds per frame (90th percentile, timestamp queries: the time a frame's passes cover) below which
  * this page's next load gets the full tier. Chosen from Plaza in real play at spawn, with the sun moving and shadows
  * redrawing: an RTX A6000 on a busy machine read 3.2 to 7.25 ms from 720p to 4K, an Intel UHD (Alder Lake-N) 60 ms at 720p,
  * and an Arc 140V 9 to 16.4 ms by the same queries, copies included, in `measure.mjs`. A limit for that scene, on those
@@ -156,12 +156,34 @@ export function applyQualityTier({
 /** An engine from `Engine.create` / `createStage` (EngineKernel) or the runtime `Engine` from core's extension API. */
 export type Paced = EngineKernel | { pace?: (time: number) => boolean };
 
-/** Set `engine.pace` so the engine renders about `rate` frames per second (60 on 60/120/240 Hz, 72 on 144 Hz): it skips
- * a display refresh that comes sooner than 4 ms before the next frame is due. */
+/** Set `engine.pace` so the engine renders at an even rate no lower than `rate`, as near to it as the display allows: 60
+ * on 60/120/240 Hz, 72 on 144 Hz, 83 on 165 Hz, and every refresh of a 75, 90 or 100 Hz display. Each frame spans the most
+ * whole refreshes that still keep up with `rate`, so a display that is no multiple of it never falls below (every other
+ * refresh of 100 Hz would be 50 FPS). It counts refreshes rather than comparing times, so timestamp jitter cannot move it. */
 export function capFrameRate(engine: Paced, rate = 60): void {
-  const gap = 1000 / rate - 4;
-  let last = -Infinity;
-  (engine as { pace?: (time: number) => boolean }).pace = (time) => (time - last < gap ? false : ((last = time), true));
+  // 1 ms of slack: at exactly twice the rate, two refreshes are exactly one frame.
+  const gap = 1000 / rate + 1,
+    recent = new Float64Array(16).fill(Infinity),
+    sorted = new Float64Array(16);
+  let last = -Infinity,
+    before = -Infinity,
+    seen = 0,
+    waited = 0;
+  (engine as { pace?: (time: number) => boolean }).pace = (time) => {
+    const delta = time - before;
+    before = time;
+    // A stall or a hidden tab says nothing about the display.
+    if (delta < gap * 4) recent[seen++ % 16] = delta;
+    sorted.set(recent);
+    sorted.sort();
+    // The display's refresh: the lower median of the last 16 callback gaps. Jitter is even on both sides of it, and a slow
+    // frame's missed refreshes land above it, so neither moves it; a page moved to another display has it within 16 frames.
+    const refresh = sorted[(Math.min(seen, 16) - 1) >> 1]!;
+    if (++waited < Math.floor(gap / refresh) && time - last < gap) return false;
+    last = time;
+    waited = 0;
+    return true;
+  };
 }
 
 /** Apply the chosen tier's frame cap to an engine; call right after creating it. On the light tier a slow GPU on a
