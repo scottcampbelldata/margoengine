@@ -802,6 +802,10 @@
       "types": "./dist/exporters/ktx2.d.ts",
       "import": "./dist/exporters/ktx2.js"
     },
+    "./exporters/meshopt": {
+      "types": "./dist/exporters/meshopt.d.ts",
+      "import": "./dist/exporters/meshopt.js"
+    },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
       "import": "./dist/fbx.js"

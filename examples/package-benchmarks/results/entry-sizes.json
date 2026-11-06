@@ -1,5 +1,5 @@
 {
-  "commit": "ea67e75ab",
+  "commit": "64ab0faee",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -496,32 +496,32 @@
     },
     "@margoengine/culling": {
       ".": {
-        "raw": 43776,
-        "gzip": 13693
+        "raw": 43792,
+        "gzip": 13696
       },
       "./dynamic": {
         "raw": 20393,
         "gzip": 7250
       },
       "./parts": {
-        "raw": 46337,
-        "gzip": 14598
+        "raw": 46357,
+        "gzip": 14604
       },
       "./models": {
         "raw": 28457,
         "gzip": 9375
       },
       "./shadows": {
-        "raw": 70758,
-        "gzip": 20407
+        "raw": 70778,
+        "gzip": 20419
       },
       "./lod": {
         "raw": 9076,
         "gzip": 3754
       },
       "./meshlets": {
-        "raw": 52105,
-        "gzip": 16542
+        "raw": 55783,
+        "gzip": 17522
       }
     },
     "@margoengine/cutscene": {
@@ -812,12 +812,16 @@
         "gzip": 3401
       },
       "./draco": {
-        "raw": 575441,
-        "gzip": 180639
+        "raw": 575448,
+        "gzip": 180650
       },
       "./ktx2": {
-        "raw": 2487226,
-        "gzip": 983913
+        "raw": 2487233,
+        "gzip": 983923
+      },
+      "./meshopt": {
+        "raw": 21008,
+        "gzip": 8146
       }
     },
     "@margoengine/fbx": {
@@ -1104,6 +1108,10 @@
       "./sdf": {
         "raw": 18839,
         "gzip": 6974
+      },
+      "./plan": {
+        "raw": 44942,
+        "gzip": 15775
       }
     },
     "@margoengine/labels": {

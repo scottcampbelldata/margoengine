@@ -41,7 +41,7 @@ What happens to a model (`.glb` or `.gltf` with its external files):
   the mesh), normals and tangents to 8 bits, texture coordinates in 0..1 to 16 bits, colours and skin weights to 8
   bits. Meshes with morph targets are left alone; skinned meshes keep float positions.
 - **Compress** (web presets, EXT_meshopt_compression). Vertex attributes and triangle indices are written with the
-  meshopt codecs by an encoder written for Margo from the extension specification (`pipeline/meshopt-encode.js`);
+  meshopt codecs by an encoder written for Margo from the extension specification (`@margoengine/exporters/meshopt`);
   Margo's decoder (`@margoengine/decoders/meshopt`) reads them, and so do other glTF loaders that support the
   extension. The output lists the extension as required.
 - A model is never written larger than it came in, and a model that uses an extension the optimiser does not rewrite

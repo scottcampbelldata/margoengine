@@ -1,5 +1,4 @@
-// @ts-check
-// glTF meshopt bufferView encoding for margo-convert, written clean room from the EXT_meshopt_compression and
+// glTF meshopt bufferView encoding, written clean room from the EXT_meshopt_compression and
 // KHR_meshopt_compression specifications (Appendix A "Bitstream"): the version 0 attribute codec and the version 0
 // triangle codec. Margo's decoder (@margoengine/decoders/meshopt) is the reader these streams are tested against.
 // Nothing here was derived from another encoder's source.
@@ -8,26 +7,24 @@ const GROUP = 16;
 /** Bits per delta for each 2-bit group header of the version 0 attribute codec. */
 const WIDTHS = [0, 2, 4, 8];
 
-/** @param {number} d signed 8-bit delta @returns {number} */
-const zigzag8 = (d) => ((d << 1) ^ (d >> 7)) & 0xff;
+/** Zigzag of a signed 8-bit delta. */
+const zigzag8 = (d: number): number => ((d << 1) ^ (d >> 7)) & 0xff;
 
 /**
  * Encodes `count` elements of `size` bytes (a multiple of 4, at most 256) with the version 0 attribute codec.
  * Every byte lane is delta coded against the previous element, zigzagged, and packed per group of 16 elements with
  * the narrowest of 0, 2, 4 or 8 bits that is cheapest (the all-ones value of a narrow width escapes to a full byte).
- * @param {Uint8Array} data count * size bytes, elements interleaved
- * @param {number} count elements
- * @param {number} size bytes per element
- * @returns {Uint8Array}
+ * @param data count * size bytes, elements interleaved
+ * @param count elements
+ * @param size bytes per element
  */
-export function encodeVertexBuffer(data, count, size) {
+export function encodeVertexBuffer(data: Uint8Array, count: number, size: number): Uint8Array {
   if (!Number.isInteger(size) || size < 4 || size > 256 || size % 4 !== 0)
-    throw new RangeError(`meshopt attribute stride must be a multiple of 4 from 4 to 256, got ${size}`);
+    throw new RangeError(`meshopt attribute stride is ${size}; pass a multiple of 4 from 4 to 256`);
   if (!Number.isInteger(count) || count < 1 || data.length < count * size)
-    throw new RangeError('meshopt attribute data does not hold count * stride bytes');
+    throw new RangeError('meshopt attribute data is too short; pass count * stride bytes');
   const blockMax = Math.min(Math.floor(8192 / size) & ~15, 256);
-  /** @type {number[]} */
-  const out = [0xa0];
+  const out: number[] = [0xa0];
   const prev = Uint8Array.from(data.subarray(0, size));
   const baseline = Uint8Array.from(prev);
   const lane = new Uint8Array(256);
@@ -110,14 +107,16 @@ const AUX = [0x00, 0x01, 0x10, 0x12, 0x21, 0x02, 0x20, 0x13, 0x31, 0x23, 0x32, 0
 /**
  * Encodes a triangle list with the version 0 triangle codec. Vertices are renumbered in order of first use, which the
  * codec requires; the result carries the renumbering so the caller can reorder its vertex data to match.
- * @param {ArrayLike<number>} indices a multiple of 3 indices into `vertexCount` vertices
- * @param {number} vertexCount
- * @returns {{bytes: Uint8Array, remap: Uint32Array, indices: Uint32Array}} `remap[old]` is the new index of vertex
- *   `old` (vertices no triangle uses follow the used ones); `indices` are the triangles in the new numbering
+ * @param indices a multiple of 3 indices into `vertexCount` vertices
+ * @returns `remap[old]` is the new index of vertex `old` (vertices no triangle uses follow the used ones); `indices` are
+ * the triangles in the new numbering
  */
-export function encodeTriangles(indices, vertexCount) {
+export function encodeTriangles(
+  indices: ArrayLike<number>,
+  vertexCount: number,
+): { bytes: Uint8Array; remap: Uint32Array; indices: Uint32Array } {
   const triangles = indices.length / 3;
-  if (!Number.isInteger(triangles) || triangles < 1) throw new RangeError('meshopt triangles need whole triangles');
+  if (!Number.isInteger(triangles) || triangles < 1) throw new RangeError('meshopt triangles are not whole; pass three indices for each triangle, at least one');
   const map = new Int32Array(vertexCount).fill(-1);
   const edgeA = new Int32Array(16).fill(-1),
     edgeB = new Int32Array(16).fill(-1),
@@ -126,30 +125,29 @@ export function encodeTriangles(indices, vertexCount) {
     vertHead = 0,
     next = 0,
     last = 0;
-  const pushEdge = (/** @type {number} */ a, /** @type {number} */ b) => {
+  const pushEdge = (a: number, b: number) => {
     edgeA[edgeHead] = a;
     edgeB[edgeHead] = b;
     edgeHead = (edgeHead + 1) & 15;
   };
-  const pushVertex = (/** @type {number} */ v) => {
+  const pushVertex = (v: number) => {
     verts[vertHead] = v;
     vertHead = (vertHead + 1) & 15;
   };
-  const vertexAt = (/** @type {number} */ i) => verts[(vertHead - 1 - i) & 15];
-  const fifoIndex = (/** @type {number} */ v, /** @type {number} */ from, /** @type {number} */ to) => {
+  const vertexAt = (i: number) => verts[(vertHead - 1 - i) & 15];
+  const fifoIndex = (v: number, from: number, to: number) => {
     for (let i = from; i <= to; i++) if (vertexAt(i) === v) return i;
     return -1;
   };
   const codes = new Uint8Array(triangles),
     result = new Uint32Array(indices.length);
-  /** @type {number[]} */
-  const data = [];
-  const varintSize = (/** @type {number} */ id, /** @type {number} */ from) => {
+  const data: number[] = [];
+  const varintSize = (id: number, from: number) => {
     const d = (id - from) | 0,
       z = ((d << 1) ^ (d >> 31)) >>> 0;
     return z < 128 ? 1 : z < 16384 ? 2 : z < 2097152 ? 3 : z < 268435456 ? 4 : 5;
   };
-  const putVarint = (/** @type {number} */ id) => {
+  const putVarint = (id: number) => {
     const d = (id - last) | 0;
     let z = ((d << 1) ^ (d >> 31)) >>> 0;
     while (z >= 128) {
@@ -163,7 +161,7 @@ export function encodeTriangles(indices, vertexCount) {
   for (let t = 0; t < triangles; t++) {
     const o = [indices[t * 3], indices[t * 3 + 1], indices[t * 3 + 2]];
     for (const v of o)
-      if (!(v >= 0 && v < vertexCount)) throw new RangeError(`meshopt index ${v} is outside the vertices`);
+      if (!(v >= 0 && v < vertexCount)) throw new RangeError(`meshopt index ${v} is outside the vertices; pass indices below vertexCount`);
     // Best edge-fifo candidate over the three rotations of the triangle.
     let best = null;
     for (let r = 0; r < 3; r++) {
@@ -222,8 +220,6 @@ export function encodeTriangles(indices, vertexCount) {
       let n = next,
         l = last,
         extra = 0;
-      /** @type {number[]} */
-      const refs = [];
       const seen = new Map();
       const plan = ids.map((old, k) => {
         const known = seen.get(old);
@@ -245,8 +241,7 @@ export function encodeTriangles(indices, vertexCount) {
         l = m;
         return { id: m, code: 15 };
       });
-      void refs;
-      if (plan.some((p) => p.code === -1)) throw new RangeError('meshopt triangle repeats a vertex');
+      if (plan.some((p) => p.code === -1)) throw new RangeError('meshopt triangle repeats a vertex; drop triangles with no area first');
       const z = plan[1].code,
         w = plan[2].code;
       const aux = (z << 4) | w;
@@ -257,7 +252,7 @@ export function encodeTriangles(indices, vertexCount) {
       if (!aNew && aux === 0) cost = Infinity;
       if (!pick || cost < pick.cost) pick = { r, ids, plan, z, w, aux, table, aNew, cost };
     }
-    if (!pick || pick.cost === Infinity) throw new RangeError('meshopt triangle cannot be coded');
+    if (!pick || pick.cost === Infinity) throw new RangeError('meshopt triangle cannot be coded; drop triangles with no area first');
     const { ids, plan, z, w, aux, table, aNew } = pick;
     const lo = table >= 0 ? table : aNew ? 14 : 15;
     codes[t] = 0xf0 | lo;

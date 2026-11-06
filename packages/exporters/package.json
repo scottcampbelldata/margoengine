@@ -176,6 +176,10 @@
     "./ktx2": {
       "types": "./dist/ktx2.d.ts",
       "import": "./dist/ktx2.js"
+    },
+    "./meshopt": {
+      "types": "./dist/meshopt.d.ts",
+      "import": "./dist/meshopt.js"
     }
   },
   "files": [

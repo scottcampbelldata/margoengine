@@ -6,7 +6,7 @@
 import { createHash } from 'node:crypto';
 import { joinGLB, readAccessor, splitGLB } from '@margoengine/exporters';
 import { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
-import { encodeTriangles, encodeVertexBuffer } from './meshopt-encode.js';
+import { encodeTriangles, encodeVertexBuffer } from '@margoengine/exporters/meshopt';
 
 /**
  * One accessor's data: tightly packed components in the accessor's component type.

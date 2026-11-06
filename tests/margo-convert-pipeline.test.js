@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
 import { parseGLTFAsync } from '@margoengine/gltf-pro';
-import { encodeTriangles, encodeVertexBuffer } from '../tools/margo-convert/pipeline/meshopt-encode.js';
+import { encodeTriangles, encodeVertexBuffer } from '@margoengine/exporters/meshopt';
 import { optimizeModel } from '../tools/margo-convert/pipeline/optimize.js';
 import { build, sha256 } from '../tools/margo-convert/pipeline/build.js';
 import { PRESET_NAMES, PRESETS, preset } from '../tools/margo-convert/pipeline/presets.js';

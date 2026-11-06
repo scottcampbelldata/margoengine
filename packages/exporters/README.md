@@ -737,6 +737,32 @@ ETC1S is the smallest and the most lossy; UASTC keeps more detail in more bytes.
 
 `skipped` names each texture left as it was: one no material reads, one already in KTX2, one held by WebP, AVIF or DDS, an image in an outside file, an image that is neither PNG nor JPEG. A file with nothing to compress comes back as the same bytes. Images keep their stored samples: EXIF orientation and colour profiles are ignored, as glTF says, and 16-bit PNG samples keep their high byte.
 
+### Meshopt (`@margoengine/exporters/meshopt`)
+
+`compressMeshopt(glb, options)` stores geometry, skins and animation as `EXT_meshopt_compression`, and by default stores vertices as small integers with `KHR_mesh_quantization`. The codecs are plain code written from the extension's text, so there is no Wasm to load and no worker, and the work runs on the calling thread with a pause between primitives. A reader needs both extensions; `@margoengine/gltf-pro` and `@margoengine/gltf/meshopt` read the file with the decoder in `@margoengine/decoders`.
+
+```ts
+import { exportGLB } from 'margoengine/exporters';
+import { compressMeshopt } from 'margoengine/exporters/meshopt';
+
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
+const source = exportGLB({ nodes: [{ geometry: { positions, normals, indices: [0, 1, 2, 0, 2, 3] } }] });
+
+const { glb, compressed, quantized, skipped } = await compressMeshopt(source);
+console.log(`${source.length} -> ${glb.length} bytes, ${compressed} streams, ${quantized} attributes as integers`);
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `quantize` | true | Positions in 16 bits on one grid for the whole mesh, normals and tangents in `normalBits`, texture coordinates in 16, colours and skin weights in 8. `false` keeps every value exact |
+| `normalBits` | 8 | NORMAL and TANGENT: 8 or 16 |
+| `signal` | none | Stops between primitives |
+
+A position lands within half a step of a grid of 65,534 steps across the mesh's widest axis, and the grid goes into the node's transform, so the file stays where it was. A node that something else depends on (an animation target, a joint, a parent, a camera) keeps its transform, and a new child node holds the mesh and the grid. Skinned meshes, instanced meshes and meshes with morph targets keep float positions: a skin ignores its node's transform, and morph targets add to positions as stored. Texture coordinates outside 0 to 1 stay floats. Skin weights still add up to 1 after rounding.
+
+Triangles that repeat a vertex and vertices no triangle uses go, and each primitive's vertices are renumbered, which the triangle codec requires. Primitives that keep Draco are listed in `skipped`. A very small file can grow, because each stream adds JSON and a fixed tail: compare the lengths when that matters. `encodeVertexBuffer` and `encodeTriangles` are the two codecs on their own.
+
 ## Limits
 
 The engine/data-scene `exportGLTF` and `exportGLB` entrypoints write cameras, lights, extras and

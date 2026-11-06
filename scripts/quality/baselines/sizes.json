@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8970630,
+  "total": 8979032,
   "history": [
     {
       "date": "2026-10-24",
@@ -2720,6 +2720,12 @@
       "commit": "8e64347df",
       "reason": "feat(kinematics-constraints): motion planner (new entry @margoengine/kinematics-constraints/plan)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "64ab0faee",
+      "reason": "new meshopt entry in exporters",
+      "grew": 1
     }
   ],
   "items": {
@@ -2896,6 +2902,7 @@
     "@margoengine/exporters/hash": 1717,
     "@margoengine/exporters/import-names": 1038,
     "@margoengine/exporters/ktx2": 1013431,
+    "@margoengine/exporters/meshopt": 8402,
     "@margoengine/exporters/model": 9536,
     "@margoengine/exporters/roblox": 18377,
     "@margoengine/exporters/roblox-chunks": 9679,

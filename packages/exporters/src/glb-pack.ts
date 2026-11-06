@@ -49,7 +49,8 @@ function withoutViews(json: JSONObject): JSONObject {
 
 /**
  * Writes the BIN chunk again: every buffer view something still reads, in order, with the data in `views` in place.
- * Views of other buffers stay as they are. A view's meshopt stream, when it lies in buffer 0, moves with it.
+ * Views of other buffers stay as they are. A view's meshopt stream, when it lies in buffer 0, moves with it, and `views`
+ * holds the stream itself for a view that has one.
  */
 export function packGLB(parts: GLBParts, views: NewViews = new Map()): GLBParts {
   const json = parts.json as JSONObject,
@@ -72,9 +73,9 @@ export function packGLB(parts: GLBParts, views: NewViews = new Map()): GLBParts 
     const view = old[index],
       fresh = views.get(index),
       meshopt = view.extensions?.EXT_meshopt_compression;
-    if (meshopt?.buffer === 0) ranges.push({ source: from(meshopt), holder: meshopt });
-    if (fresh) ranges.push({ source: fresh, holder: view });
-    else if (view.buffer === 0) ranges.push({ source: from(view), holder: view });
+    if (meshopt?.buffer === 0) ranges.push({ source: fresh ?? from(meshopt), holder: meshopt });
+    else if (fresh) ranges.push({ source: fresh, holder: view });
+    if (!fresh && view.buffer === 0) ranges.push({ source: from(view), holder: view });
   }
   let length = 0;
   for (const { source } of ranges) length = aligned(length) + source.length;
