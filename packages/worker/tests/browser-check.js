@@ -65,7 +65,13 @@ window.check = {
   },
   async close() {
     gpu.view.dispose();
-    return ask(gpu.worker, 'closed');
+    // The close travels on the canvas's port and this question on the worker's own channel, and nothing orders the two:
+    // WebKit answers the question first. Two seconds at most.
+    for (let i = 0; i < 100; i++) {
+      if (await ask(gpu.worker, 'closed')) return true;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    return false;
   },
 };
 window.ready = true;
