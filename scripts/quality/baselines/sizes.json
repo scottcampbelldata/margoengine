@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7406172,
+  "total": 6500708,
   "history": [
     {
       "date": "2026-10-24",
@@ -2570,6 +2570,12 @@
       "commit": "4950621e6",
       "reason": "new entry pvr",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "45c5adf57",
+      "reason": "CulledModels gains plain primitive records and the Hi-Z pyramid and occluder list; gltf-pro gains the culled hook",
+      "grew": 1
     }
   ],
   "items": {
@@ -2691,7 +2697,7 @@
     "@margoengine/culling/dynamic": 7461,
     "@margoengine/culling/lod": 4010,
     "@margoengine/culling/meshlets": 16974,
-    "@margoengine/culling/models": 3624,
+    "@margoengine/culling/models": 9657,
     "@margoengine/culling/parts": 15027,
     "@margoengine/culling/shadows": 20972,
     "@margoengine/cutscene": 6822,

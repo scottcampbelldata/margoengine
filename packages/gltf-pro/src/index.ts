@@ -1013,6 +1013,12 @@ export interface PBRPrimitive {
    * `Batch.redirect`. Depth casters, picking and export keep reading every row. A wireframe draw ignores it.
    */
   redirect?: { instances: GPUBuffer; args: GPUBuffer };
+  /**
+   * Set by a GPU-culling package (`CulledModels` in @margoengine/culling/models) on a primitive without `instances`: its
+   * own draw reads drawIndexedIndirect arguments from `args` at `offset`, so a culled primitive draws nothing. Depth
+   * casters, picking and export ignore it, and so do a wireframe draw and a draw joined into an instanced batch.
+   */
+  culled?: { args: GPUBuffer; offset: number };
   /** The 80-byte-stride vertex and uint32 index buffers while the model is set up on a device (for picking and outlines). */
   buffers?: { vertex: GPUBuffer; index: GPUBuffer };
   /** Set for glTF POINTS (`point-list`) and LINES, LINE_LOOP, LINE_STRIP (`line-list`, as index pairs); absent for triangles. */
@@ -3334,6 +3340,7 @@ export class PBRModel implements EnginePlugin {
           count = wireframe?.count ?? p.indices.length;
         const uploaded = inst?.upload(c.device),
           redirect = inst && !wireframe ? p.redirect : undefined,
+          culled = inst || wireframe ? undefined : p.culled,
           instances = redirect?.instances ?? uploaded;
         const a = node.matrix,
           det =
@@ -3502,6 +3509,7 @@ export class PBRModel implements EnginePlugin {
           applyStencilReference(target, state);
           if (redirect) target.drawIndexedIndirect(redirect.args, 0);
           else if (inst) target.drawIndexed(count, inst.count);
+          else if (culled) target.drawIndexedIndirect(culled.args, culled.offset);
           else target.drawIndexed(count);
         }
         setPipeline(bound, pipeline);
@@ -3517,6 +3525,7 @@ export class PBRModel implements EnginePlugin {
         applyStencilReference(target, state);
         if (redirect) target.drawIndexedIndirect(redirect.args, 0);
         else if (inst) target.drawIndexed(count, inst.count);
+        else if (culled) target.drawIndexedIndirect(culled.args, culled.offset);
         else target.drawIndexed(count);
         if (!external && !carry && blend && mode !== 'gbuffer' && !through && !capture) {
           pass!.end();
@@ -4121,7 +4130,8 @@ export class PBRModel implements EnginePlugin {
     if (d.effect) setGroup(bound, 2, d.effect.group);
     setBuffers(bound, r.vertex, undefined, wireframe?.index ?? r.index);
     applyStencilReference(pass, d.state);
-    pass.drawIndexed(wireframe?.count ?? p.indices.length);
+    if (p.culled && !wireframe) pass.drawIndexedIndirect(p.culled.args, p.culled.offset);
+    else pass.drawIndexed(wireframe?.count ?? p.indices.length);
     this.engine.stats.drawCalls++;
   }
   /**
@@ -4757,6 +4767,7 @@ export class PBRModel implements EnginePlugin {
         instances: undefined,
         deformed: undefined,
         deformedOffset: undefined,
+        culled: undefined,
       })),
       asset: this.asset,
       images: this.images,
@@ -4777,6 +4788,7 @@ export class PBRModel implements EnginePlugin {
         ...primitive,
         instances: undefined,
         deformed: undefined,
+        culled: undefined,
       })),
       lights: this.lights,
       cameras: this.cameras,

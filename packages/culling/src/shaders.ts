@@ -124,6 +124,41 @@ fn reaches(lo:vec2f,hi:vec2f,near:f32)->bool {
 }
 `;
 
+/**
+ * With occlusion: `early` lists last frame's kept instances that are large enough to occlude, and `cull` replaces the plain
+ * kernel of {@link instanceCull}, adding the Hi-Z test; the plain scan and scatter follow it. Separate bindings: the plain
+ * kernels' six storage buffers plus these would pass WebGPU's eight per stage. `part` and `matrix` as in `instanceCull`.
+ */
+export const occludedCull = (part: string, matrix: string): string =>
+  common +
+  cullInputs(part) +
+  `
+@group(0) @binding(1) var<uniform> f:Frame;
+@group(0) @binding(2) var<uniform> b:Part;
+@group(0) @binding(3) var<storage,read> records:array<Record>;
+@group(0) @binding(4) var<storage,read_write> visible:array<u32>;
+@group(0) @binding(5) var<storage,read> hiz:array<f32>;
+@group(0) @binding(6) var<storage,read_write> local:array<u32>;
+@group(0) @binding(7) var<storage,read_write> groups:array<u32>;
+@group(0) @binding(8) var<storage,read_write> earlyArgs:array<atomic<u32>>;
+@group(0) @binding(9) var<storage,read_write> earlyList:array<u32>;
+var<workgroup> scratch:array<u32,256>;
+${sphereCode}${occlusionCode}
+@compute @workgroup_size(256) fn early(@builtin(global_invocation_id) g:vec3u) {
+  let i=g.x;if(i>=b.count||visible[i]==0u){return;}
+  let s=bound(${matrix});if(!keep(s)||!occluder(s)){return;}
+  earlyList[atomicAdd(&earlyArgs[1],1u)]=i;
+}
+@compute @workgroup_size(256) fn cull(@builtin(global_invocation_id) g:vec3u,@builtin(local_invocation_index) l:u32,@builtin(workgroup_id) w:vec3u) {
+  let i=g.x;var v=0u;
+  if(i<b.count){let s=bound(${matrix});if(keep(s)&&unoccluded(s)){v=1u;}visible[i]=v;}
+  scratch[l]=v;workgroupBarrier();
+  for(var o=1u;o<256u;o=o<<1u){var t=0u;if(l>=o){t=scratch[l-o];}workgroupBarrier();scratch[l]+=t;workgroupBarrier();}
+  if(i<b.count){local[i]=scratch[l]-v;}
+  if(l==255u){groups[w.x]=scratch[255];}
+}
+`;
+
 // The tests of bounds: 'box': part i's local box under its matrix, an oriented box in world space, padded for float32.
 // Its radius along a plane normal is exact, and the nearest depth of a convex shape is at one of its corners.
 const boxCode = `

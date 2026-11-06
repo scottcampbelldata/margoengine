@@ -159,14 +159,14 @@ core's (`test/gpu/meshes-occlusion-check.mjs`).
 
 ## Loaded models and materials meshes: `CulledModels`
 
-`CulledModels` from `margoengine/culling/models` runs the same compute cull on the instanced primitives of gltf-pro
-models and materials meshes, whatever they were loaded or built from, so a forest of a million trees costs the CPU the
-same as ten.
+`CulledModels` from `margoengine/culling/models` runs the same compute cull on gltf-pro models and materials meshes,
+whatever they were loaded or built from. Instanced primitives compact their rows, so a forest of a million trees costs
+the CPU the same as ten. Every other primitive gets one indirect draw record, so an ordinary glTF scene is culled too.
 
 ```ts
 import {Engine} from 'margoengine/core';
 import {boxGeometry} from 'margoengine/geometry';
-import {Material, createInstancedMesh} from 'margoengine/materials';
+import {Material, createInstancedMesh, createMesh} from 'margoengine/materials';
 import {CulledModels} from 'margoengine/culling/models';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -174,12 +174,15 @@ const trees = createInstancedMesh(engine, boxGeometry(1, 4, 1), new Material({co
 for (let i = 0; i < 50_000; i++)
   trees.instances.setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 250) * 3, 0, Math.floor(i / 250) * 3, 1]);
 
-const culled = CulledModels.attach(engine, [trees], {minRadius: 1});   // drops rows under 1 CSS px in radius too
+const culled = CulledModels.attach(engine, [trees], {minRadius: 1, occlusion: true});   // drops rows under 1 CSS px in radius too
+const wall = createMesh(engine, boxGeometry(200, 20, 1), new Material({color: '#808080'}));
+culled.add(wall).addOccluder(wall);   // and rows behind the wall
 engine.start();
 setTimeout(async () => console.log(await culled.readCounts()), 1000);   // rows drawn per primitive
 ```
 
-Each frame, before any draw, every primitive of an added model that has `instances` tests its rows against the frustum,
+Each frame, before any draw, every primitive of an added model that has `instances` tests its rows against the frustum
+(and the pyramid of the occluders, with `occlusion`),
 compacts the kept rows in order, and sets `primitive.redirect`, gltf-pro's hook for this, which core's `Batch.redirect`
 matches; every draw of the primitive in that frame (main pass, SSAO, outline) reads the kept rows with one indirect draw.
 A glTF with EXT_mesh_gpu_instancing, a `PBRInstances` you assign and `createInstancedMesh` all go the same way. With no
@@ -188,9 +191,15 @@ A glTF with EXT_mesh_gpu_instancing, a `PBRInstances` you assign and `createInst
 - `culled.add(model, {padding})` and `culled.remove(model)` work at any time. A shader that moves vertices past the
   geometry, such as a displacement map, needs `padding` of at least the farthest it moves them, in the primitive's units.
 - Shadows, picking and export read every row, so casters outside the view still cast.
-- Skinned and morphed primitives are not culled: their bounds are only known on the GPU. Primitives without `instances`
-  draw as before, one draw each, so their CPU cost still grows with their number.
-- Frustum and screen size only: no occlusion here.
+- A primitive without `instances` gets a record in one shared list, written by one dispatch for all of them, and sets
+  `primitive.culled`, gltf-pro's hook for this. A culled primitive draws nothing, so it costs no vertex or fragment work,
+  but it still costs its draw call on the CPU: WebGPU has no multi-draw, so CPU cost still grows with the number of
+  primitives. Give repeated objects `instances`. A primitive gltf-pro has joined into an instanced batch stays in that draw.
+- Skinned and morphed primitives are not culled: their bounds are only known on the GPU.
+- `{occlusion: true}` also drops rows and primitives hidden behind the surfaces you give `culled.addOccluder(wall)`: a
+  core mesh, a model, a materials mesh or a Terrain. Give it the large things: an occluder draws depth-only every frame,
+  so it hides at once, in the frame it moves. Cut-out, blended, displaced and clipped primitives and back faces do not
+  occlude. With no occluder nothing is built and nothing is paid. `culled.removeOccluder(wall)` stops it.
 - WebGL2 compatibility layer: nothing is culled and every row draws, the same image. The `@margoengine/webgl` renderer
   is not supported (`MargoError` `'unsupported'`).
 

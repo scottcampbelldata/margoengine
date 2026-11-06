@@ -952,6 +952,10 @@ interface PBRPrimitive {
         instances: GPUBuffer;
         args: GPUBuffer;
     };
+    culled?: {
+        args: GPUBuffer;
+        offset: number;
+    };
     buffers?: {
         vertex: GPUBuffer;
         index: GPUBuffer;

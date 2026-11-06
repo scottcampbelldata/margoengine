@@ -472,7 +472,12 @@ core through camera and occluder changes, 9 of 1,509 instances drawn behind a wa
 `CulledModels` (`@margoengine/culling/models`) runs the same cull on `PBRInstances` rows, world = node matrix x row. gltf-pro
 reads `primitive.redirect` as core reads `Batch.redirect`, so its colour and depth replays draw the kept rows; casters and
 picking keep every row. Evidence: `packages/culling/test/gpu/models-cull-check.mjs`, 0 differing pixels with and without
-shadows, RTX A6000. Still missing: a timed run, and any cull for non-instanced primitives.
+shadows, RTX A6000. A primitive without instances gets one 20-byte indirect record from one dispatch and gltf-pro draws it
+through `primitive.culled`, so a culled one still costs its draw call on the CPU (WebGPU has no multi-draw). With
+`occlusion` both tests also read the shared pyramid, built each frame from `addOccluder` surfaces drawn with this frame's
+camera, as for `CulledInstances`. Evidence: `packages/culling/test/gpu/models-plain-check.mjs`, 0 differing pixels on the
+real NodePerformanceTest.glb (2,066 of 10,000 primitives drawn close up) and through a wall that moves in, 1 of 146 drawn
+behind it, RTX A6000. Still missing: a timed run, skinned and morphed primitives, and members of an instanced batch.
 
 `addOccluder` puts core meshes, models and Terrain into the occluder pass of `CulledInstances`, each with the maths of its
 own draw (core's `camera*(model*p)`; Terrain's rings on its own uniforms). An occluder must be a surface the frame shows,
