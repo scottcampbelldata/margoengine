@@ -5,7 +5,7 @@ export type NumericArray = Float32Array | Float64Array | Int32Array | Uint32Arra
 export type ArrayConstructor = { new (length: number): NumericArray };
 /** Component layout: field name to storage constructor. Must have at least one field. */
 export type Schema = Record<string, ArrayConstructor>;
-/** Entity id: `generation * capacity + slot`, a non-negative integer up to `0xffffffff`. Stale ids fail `World.alive`. */
+/** Entity id: `generation * stride + slot`, a non-negative integer up to `0xffffffff`. Stale ids fail `World.alive`. */
 export type Entity = number;
 const capacityLimit = 1_000_000;
 /** Told about every row change of a component, after it happened. Push one onto {@link Component.observers}. */
@@ -40,15 +40,15 @@ export class Component<S extends Schema = Schema> {
   ) {
     if (!tag && !Object.keys(schema).length)
       throw new TypeError('Empty component schema; give at least one field, e.g. {x: Float32Array}');
-    this.sparse = new Int32Array(world.capacity).fill(-1);
-    this.entities = new Uint32Array(world.capacity);
+    this.sparse = world.allocate(Int32Array, -1);
+    this.entities = world.allocate(Uint32Array);
     this.fields = Object.fromEntries(
       Object.entries(schema).map(([key, Type]) => {
         if (![Float32Array, Float64Array, Int32Array, Uint32Array, Uint8Array].includes(Type as typeof Float32Array))
           throw new TypeError(
             'Unsupported component storage; use Float32Array, Float64Array, Int32Array, Uint32Array or Uint8Array',
           );
-        return [key, new Type(world.capacity)];
+        return [key, world.allocate(Type)];
       }),
     ) as typeof this.fields;
     this.columns = Object.values(this.fields) as NumericArray[];
@@ -56,7 +56,7 @@ export class Component<S extends Schema = Schema> {
   /** Row of `entity` in the field arrays, or -1 when it is dead or has no such component. */
   index(entity: Entity): number {
     if (!this.world.alive(entity)) return -1;
-    const row = this.sparse[entity % this.world.capacity];
+    const row = this.sparse[entity % this.world.stride];
     return row >= 0 && this.entities[row] === entity ? row : -1;
   }
   /** True when `entity` is alive and has this component. */
@@ -90,7 +90,7 @@ export class Component<S extends Schema = Schema> {
     const inserted = row < 0;
     if (inserted) {
       row = this.size++;
-      this.sparse[entity % this.world.capacity] = row;
+      this.sparse[entity % this.world.stride] = row;
       this.entities[row] = entity;
       for (let i = 0; i < columns.length; i++) columns[i][row] = 0;
     }
@@ -112,11 +112,11 @@ export class Component<S extends Schema = Schema> {
     const row = this.index(entity);
     if (row < 0) return false;
     const last = --this.size;
-    this.sparse[entity % this.world.capacity] = -1;
+    this.sparse[entity % this.world.stride] = -1;
     if (row !== last) {
       const moved = this.entities[last];
       this.entities[row] = moved;
-      this.sparse[moved % this.world.capacity] = row;
+      this.sparse[moved % this.world.stride] = row;
       const columns = this.columns;
       for (let i = 0; i < columns.length; i++) columns[i][row] = columns[i][last];
     }
@@ -135,22 +135,49 @@ export class World {
   private readonly components = new Set<{ remove(entity: Entity): unknown }>();
   /**
    * @param capacity Maximum live entities, an integer in [1, 1_000_000]. Default 4096.
-   * @throws RangeError for an invalid capacity.
+   * @param stride Spacing of entity ids, at least `capacity`; slots can never pass it. Default `capacity`.
+   * `GrowableWorld` sets it to its limit, so ids survive growth.
+   * @throws RangeError for an invalid capacity or stride.
    */
-  constructor(readonly capacity = 4096) {
-    if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > capacityLimit)
-      throw new RangeError('Invalid ECS capacity; use an integer from 1 to 1000000');
-    this.live = new Uint8Array(capacity);
-    this.generations = new Uint32Array(capacity);
-    this.free = new Uint32Array(capacity);
-    this.freeCount = capacity;
-    for (let i = 0; i < capacity; i++) this.free[i] = capacity - 1 - i;
+  constructor(
+    readonly capacity = 4096,
+    readonly stride = capacity,
+  ) {
+    if (!Number.isSafeInteger(stride) || stride < 1 || stride > capacityLimit)
+      throw new RangeError('Invalid ECS limit; use an integer from 1 to 1000000');
+    if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > stride)
+      throw new RangeError(`Invalid ECS capacity; use an integer from 1 to ${stride}`);
+    this.live = this.allocate(Uint8Array);
+    this.generations = this.allocate(Uint32Array);
+    this.free = this.allocate(Uint32Array);
+    this.freeCount = 0;
+    this.release(0, capacity);
+  }
+  /**
+   * A zeroed array with one element per slot, filled with `fill` when given. Component stores come from here; in a
+   * `GrowableWorld` it keeps its length in step with `capacity`, which makes it the right query output there.
+   */
+  allocate<T extends NumericArray>(Type: new (length: number) => T, fill = 0): T {
+    const array = new Type(this.capacity);
+    if (fill) array.fill(fill);
+    return array;
+  }
+  /** Make slots `from` up to `to` free, lowest first out. */
+  protected release(from: number, to: number): void {
+    for (let slot = to - 1; slot >= from; slot--) this.free[this.freeCount++] = slot;
+  }
+  /**
+   * Called by `create` with no free slot; must free at least one or throw.
+   * @throws RangeError in a fixed world.
+   */
+  protected grow(): void {
+    throw new RangeError('Entity capacity exhausted; destroy entities or create the World with a larger capacity');
   }
   /** True when `entity` is a current id of this world (created and not destroyed since). */
   alive(entity: Entity): boolean {
     if (!Number.isSafeInteger(entity) || entity < 0 || entity > 0xffffffff) return false;
-    const slot = entity % this.capacity;
-    return !!this.live[slot] && Math.floor(entity / this.capacity) === this.generations[slot];
+    const slot = entity % this.stride;
+    return !!this.live[slot] && Math.floor(entity / this.stride) === this.generations[slot];
   }
   /**
    * Assert that `entity` is alive.
@@ -162,14 +189,13 @@ export class World {
   }
   /**
    * Allocate a new entity id.
-   * @throws RangeError when all `capacity` slots are in use.
+   * @throws RangeError when all `capacity` slots are in use and the world cannot grow.
    */
   create(): Entity {
-    if (!this.freeCount)
-      throw new RangeError('Entity capacity exhausted; destroy entities or create the World with a larger capacity');
+    if (!this.freeCount) this.grow();
     const slot = this.free[--this.freeCount];
     this.live[slot] = 1;
-    return this.generations[slot] * this.capacity + slot;
+    return this.generations[slot] * this.stride + slot;
   }
   /**
    * Remove `entity` from every component of this world and free its slot (retired instead once
@@ -179,14 +205,14 @@ export class World {
    */
   destroy(entity: Entity): void {
     this.check(entity);
-    const slot = entity % this.capacity;
+    const slot = entity % this.stride;
     // A cascade can lead back here while this entity is on its way out; the outer call finishes the job.
     if (this.live[slot] === 2) return;
     this.live[slot] = 2;
     for (const component of this.components) component.remove(entity);
     this.live[slot] = 0;
     // Retire slots before generation IDs would exceed packed Uint32 storage.
-    if ((this.generations[slot] + 1) * this.capacity + slot <= 0xffffffff) {
+    if ((this.generations[slot] + 1) * this.stride + slot <= 0xffffffff) {
       this.generations[slot]++;
       this.free[this.freeCount++] = slot;
     }
@@ -226,7 +252,7 @@ export class World {
     for (let i = 1; i < components.length; i++) if (components[i].size < source.size) source = components[i];
     // index() repeats the liveness test for every component; it depends only on the entity, so test it once per row.
     let count = 0;
-    const capacity = this.capacity,
+    const stride = this.stride,
       live = this.live,
       generations = this.generations,
       entities = source.entities,
@@ -234,8 +260,8 @@ export class World {
       width = components.length;
     for (let i = 0; i < size; i++) {
       const entity = entities[i],
-        slot = entity % capacity;
-      if (!live[slot] || Math.floor(entity / capacity) !== generations[slot]) continue;
+        slot = entity % stride;
+      if (!live[slot] || Math.floor(entity / stride) !== generations[slot]) continue;
       let match = true;
       for (let j = 0; j < width; j++) {
         const component = components[j],

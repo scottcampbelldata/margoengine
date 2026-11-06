@@ -1587,6 +1587,14 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   selects `p-gpu-pick-batch`).
 - **Guard:** `packages/selection/test/pick-many.browser.mjs`.
 
+### 61. `GrowableWorld`: resizable arrays cost a loop about twice its time (accepted difference)
+
+- **Measured:** one system's loop over 100,000 rows, 500 passes, 8 alternating rounds, median: 0.12 to 0.15 ms on a fixed `World`, 0.25 to 0.31 ms on a `GrowableWorld`; ratio 2.02 to 2.09 over three runs (Node 26, Windows 11, other jobs running, diagnostic).
+- **Cause:** a `GrowableWorld`'s arrays sit on resizable buffers, so V8 rereads their length instead of treating it as fixed.
+- **Why it stays:** growing replaces nothing, so a cached `position.fields.x` stays valid. With plain arrays it would silently write to the old copy. The fixed `World` keeps plain arrays and pays nothing.
+- **Rerun:** `node examples/package-benchmarks/ecs-growable.mjs` after a build.
+- **Guard:** `packages/ecs/test/growable.test.js`, "growing keeps ids, rows and every array reference, including ones taken before it".
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1634,5 +1642,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 6. three.js `InstancedMesh` against Margo instanced (open loss): a quiet run once the fix lands.
 7. Galaxy S23 Ultra island (open loss): an after number, which needs the device.
 8. `p-morph` first frame (entries 49 and 56): a quiet run.
+9. `GrowableWorld` loop cost (entry 61): a quiet run.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

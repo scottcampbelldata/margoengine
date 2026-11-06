@@ -1,17 +1,16 @@
 /// <reference lib="esnext.disposable" />
-import type { Component, ComponentObserver, Entity } from './index.js';
+import type { Component, ComponentObserver, Entity, World } from './index.js';
 
 /** Packed entities with an index by slot: a slot holds at most one entity per set, however often it is reused. */
 class EntitySet {
   private readonly dense: Uint32Array;
   private readonly sparse: Int32Array;
   size = 0;
-  constructor(
-    capacity: number,
-    private readonly stride: number,
-  ) {
-    this.dense = new Uint32Array(capacity);
-    this.sparse = new Int32Array(capacity).fill(-1);
+  private readonly stride: number;
+  constructor(world: World) {
+    this.dense = world.allocate(Uint32Array);
+    this.sparse = world.allocate(Int32Array, -1);
+    this.stride = world.stride;
   }
   has(entity: Entity): boolean {
     const at = this.sparse[entity % this.stride];
@@ -62,10 +61,10 @@ export class ChangeTracker {
   private readonly observer: ComponentObserver;
   /** Start tracking `component`; changes before this call are not reported. */
   constructor(readonly component: Component) {
-    const { capacity } = component.world;
-    const added = (this.addedSet = new EntitySet(capacity, capacity)),
-      changed = (this.changedSet = new EntitySet(capacity, capacity)),
-      removed = (this.removedSet = new EntitySet(capacity, capacity));
+    const { world } = component;
+    const added = (this.addedSet = new EntitySet(world)),
+      changed = (this.changedSet = new EntitySet(world)),
+      removed = (this.removedSet = new EntitySet(world));
     this.observer = {
       onAdd(entity) {
         if (removed.has(entity)) {

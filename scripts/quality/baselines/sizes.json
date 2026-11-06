@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4522687,
+  "total": 4524920,
   "history": [
     {
       "date": "2026-10-24",
@@ -1682,6 +1682,12 @@
       "commit": "c27e461ce",
       "reason": "mesh-edit entries ./bake and ./weights",
       "grew": 3
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "4ddb214ea",
+      "reason": "New ecs entry ./growable: GrowableWorld; World gains stride, allocate, release and grow",
+      "grew": 1
     }
   ],
   "items": {
@@ -1784,8 +1790,9 @@
     "@margoengine/dof/autofocus": 2154,
     "@margoengine/dof/lens": 1506,
     "@margoengine/ecs": 4554,
-    "@margoengine/ecs/changes": 886,
+    "@margoengine/ecs/changes": 882,
     "@margoengine/ecs/engine": 1436,
+    "@margoengine/ecs/growable": 2237,
     "@margoengine/ecs/query": 1021,
     "@margoengine/ecs/relations": 1209,
     "@margoengine/ecs/schedule": 1743,

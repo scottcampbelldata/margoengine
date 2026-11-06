@@ -438,6 +438,10 @@
       "types": "./dist/ecs/engine.d.ts",
       "import": "./dist/ecs/engine.js"
     },
+    "./ecs/growable": {
+      "types": "./dist/ecs/growable.d.ts",
+      "import": "./dist/ecs/growable.js"
+    },
     "./ecs/query": {
       "types": "./dist/ecs/query.d.ts",
       "import": "./dist/ecs/query.js"

@@ -50,7 +50,11 @@ type Schema = Record<string, ArrayConstructor>;
 
 class World {
     readonly capacity: number;
-    constructor(capacity?: number);
+    readonly stride: number;
+    constructor(capacity?: number, stride?: number);
+    allocate<T extends NumericArray>(Type: new (length: number) => T, fill?: number): T;
+    protected release(from: number, to: number): void;
+    protected grow(): void;
     alive(entity: Entity): boolean;
     check(entity: Entity): void;
     create(): Entity;

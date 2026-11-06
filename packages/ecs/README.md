@@ -2,7 +2,7 @@
 
 Import `margoengine/ecs` from the `margoengine` package, or `@margoengine/ecs` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-A bounded sparse-set ECS with packed Float32, Float64, Int32, Uint32 and Uint8 component fields.
+A sparse-set ECS with packed Float32, Float64, Int32, Uint32 and Uint8 component fields.
 
 ```ts
 import {World} from 'margoengine/ecs';
@@ -14,7 +14,29 @@ const results = new Uint32Array(world.capacity);
 const count = world.query([position], results);
 ```
 
-Numeric entity IDs include a generation, so destroyed/reused slots reject stale handles. Removal swaps the last dense row into the removed row: call component.index(entity) before using a row index. Queries write into caller-owned storage and reject undersized output. Integer writes reject truncation and overflow. Capacity is fixed; this is a sparse-set implementation, not a second archetype storage engine.
+Numeric entity IDs include a generation, so destroyed/reused slots reject stale handles. Removal swaps the last dense row into the removed row: call component.index(entity) before using a row index. Queries write into caller-owned storage and reject undersized output. Integer writes reject truncation and overflow. A `World` has a fixed capacity; a `GrowableWorld` grows. This is a sparse-set implementation, not a second archetype storage engine.
+
+## Growable worlds
+
+`GrowableWorld` (from `margoengine/ecs/growable`) doubles its slots when `create` runs out, so you do not have to guess a capacity. Everything else works as in a `World`.
+
+```ts
+import {GrowableWorld} from 'margoengine/ecs/growable';
+const world = new GrowableWorld({capacity: 1024});
+const position = world.component({x: Float32Array});
+const {x} = position.fields;
+const results = world.allocate(Uint32Array); // keeps up with the capacity
+for (let i = 0; i < 5000; i++) position.add(world.create(), {x: i});
+console.log(world.capacity, x.length); // 8192 8192
+console.log(world.query([position], results)); // 5000
+```
+
+| `new GrowableWorld` option | Default | Meaning |
+| --- | --- | --- |
+| `capacity` | `1024` | Slots at the start |
+| `limit` | `1000000` | Most slots it may grow to, at most 1,000,000; past it `create` throws `RangeError` |
+
+Growing moves nothing: arrays sit on resizable buffers, so `component.fields`, arrays taken from them and ids all stay valid, and arrays only get longer. A `Uint32Array` you made yourself stays its size, so make query outputs with `world.allocate(Uint32Array)`. Ids are spaced by `limit`, and an id must fit 32 bits, so a slot retires after about 4,294,967,295 / `limit` reuses (4,294 at the default) and the world grows past it; lower `limit` for a world that churns entities hard. Resizable arrays cost speed: a loop over 100,000 rows took about twice as long as on a plain `World` (0.25 to 0.31 ms against 0.12 to 0.15, Node 26, busy machine, [ecs-growable.mjs](../../examples/package-benchmarks/ecs-growable.mjs)). When a bound is known, use a `World`.
 
 ## Query filters and tags
 

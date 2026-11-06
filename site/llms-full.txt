@@ -2562,7 +2562,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-068). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-069). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2655,6 +2655,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Query filters and tags (`@margoengine/ecs/query`, `world.tag`) | Enforced: `with` needs at least one term, and a `Query` cannot run inside its own `forEach`. Entities that start matching during `forEach` wait for the next call. A tag stores no fields but keeps the 8 bytes per world slot of its entity index. | The smallest `with` store is the list to walk, so there must be one. The match list is one buffer per query. | MargoError `'state'` or `TypeError`. | Use a second `Query` to nest. |
 | Engine bridge (`@margoengine/ecs/engine`) | Enforced: one way, component to mesh, and one mesh per entity. Each group is whole or absent. Values pass the mesh's own setters; `sync` costs one lookup per link even when nothing moved. Parents are not copied. | The setters' checks and the Euler view of `mesh.rotation` must hold, so the bridge cannot write the store columns blindly. | `TypeError`, `RangeError` or MargoError `'disposed'` from `link`, `sync` or the constructor. | Read a mesh back by hand when something else moves it. |
 | Relationships (`@margoengine/ecs/relations`) | Enforced by method: pairs carry no data of their own and live in Maps and Sets, not typed arrays. `acyclic` pays a walk up from the target on every `add`. | Pairs change rarely next to component rows, and Sets keep both directions direct to read. | A loop on an `acyclic` relation throws `TypeError`. | Keep per-pair numbers in a component on the source. |
+| Growable worlds (`@margoengine/ecs/growable`, accepted difference in speed, 2026-11-05) | Enforced: at most `limit` slots, 1,000,000 at most, and a slot retires after about 4,294,967,295 / `limit` reuses. Measured ([ecs-growable.mjs](../examples/package-benchmarks/ecs-growable.mjs), Node 26, three runs on a busy machine, diagnostic): a loop over 100,000 rows takes about twice as long as on a fixed `World`, ratio 2.02 to 2.09. | Ids are 32 bits and spaced by `limit`, so they survive growth. Resizable buffers keep every array reference valid while growing; plain arrays would be replaced, and a cached `fields.x` would silently write to the old copy. A fixed `World` pays nothing. | `create` throws `RangeError` at the limit. | Use a fixed `World` when a bound is known; lower `limit` for more reuses per slot. |
 
 ## Copies of a model
 
@@ -8477,7 +8478,7 @@ console.log(nav.route([1,0,1], [8,0,1])?.offMesh, removeCrate);
 
 Import `margoengine/ecs` from the `margoengine` package, or `@margoengine/ecs` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-A bounded sparse-set ECS with packed Float32, Float64, Int32, Uint32 and Uint8 component fields.
+A sparse-set ECS with packed Float32, Float64, Int32, Uint32 and Uint8 component fields.
 
 ```ts
 import {World} from 'margoengine/ecs';
@@ -8489,7 +8490,29 @@ const results = new Uint32Array(world.capacity);
 const count = world.query([position], results);
 ```
 
-Numeric entity IDs include a generation, so destroyed/reused slots reject stale handles. Removal swaps the last dense row into the removed row: call component.index(entity) before using a row index. Queries write into caller-owned storage and reject undersized output. Integer writes reject truncation and overflow. Capacity is fixed; this is a sparse-set implementation, not a second archetype storage engine.
+Numeric entity IDs include a generation, so destroyed/reused slots reject stale handles. Removal swaps the last dense row into the removed row: call component.index(entity) before using a row index. Queries write into caller-owned storage and reject undersized output. Integer writes reject truncation and overflow. A `World` has a fixed capacity; a `GrowableWorld` grows. This is a sparse-set implementation, not a second archetype storage engine.
+
+## Growable worlds
+
+`GrowableWorld` (from `margoengine/ecs/growable`) doubles its slots when `create` runs out, so you do not have to guess a capacity. Everything else works as in a `World`.
+
+```ts
+import {GrowableWorld} from 'margoengine/ecs/growable';
+const world = new GrowableWorld({capacity: 1024});
+const position = world.component({x: Float32Array});
+const {x} = position.fields;
+const results = world.allocate(Uint32Array); // keeps up with the capacity
+for (let i = 0; i < 5000; i++) position.add(world.create(), {x: i});
+console.log(world.capacity, x.length); // 8192 8192
+console.log(world.query([position], results)); // 5000
+```
+
+| `new GrowableWorld` option | Default | Meaning |
+| --- | --- | --- |
+| `capacity` | `1024` | Slots at the start |
+| `limit` | `1000000` | Most slots it may grow to, at most 1,000,000; past it `create` throws `RangeError` |
+
+Growing moves nothing: arrays sit on resizable buffers, so `component.fields`, arrays taken from them and ids all stay valid, and arrays only get longer. A `Uint32Array` you made yourself stays its size, so make query outputs with `world.allocate(Uint32Array)`. Ids are spaced by `limit`, and an id must fit 32 bits, so a slot retires after about 4,294,967,295 / `limit` reuses (4,294 at the default) and the world grows past it; lower `limit` for a world that churns entities hard. Resizable arrays cost speed: a loop over 100,000 rows took about twice as long as on a plain `World` (0.25 to 0.31 ms against 0.12 to 0.15, Node 26, busy machine, [ecs-growable.mjs](../../examples/package-benchmarks/ecs-growable.mjs)). When a bound is known, use a `World`.
 
 ## Query filters and tags
 
@@ -8526,39 +8549,6 @@ console.log(moving.run(results), frozen.has(stuck)); // 1 true
 ## Systems and scheduler
 
 `Schedule` (from `margoengine/ecs`, or `margoengine/ecs/schedule` alone) runs named systems in a dependable order. Each `update(delta)` runs the fixed phase, then the frame phase. A `fixed: true` system runs once per step the elapsed time pays for, so physics stays deterministic at any frame rate. Everything else runs once per update.
-
-```ts
-import {Schedule, World} from 'margoengine/ecs';
-const world = new World(1024);
-const position = world.component({x: Float32Array});
-const velocity = world.component({x: Float32Array});
-const entity = world.create();
-position.add(entity, {x: 0});
-velocity.add(entity, {x: 2});
-const moving = new Uint32Array(world.capacity);
-let paused = false;
-const schedule = new Schedule({step: 1 / 60});
-schedule.add('move', (time) => {
-  const count = world.query([position, velocity], moving);
-  for (let i = 0; i < count; i++) {
-    const id = moving[i];
-    position.fields.x[position.index(id)] += velocity.fields.x[velocity.index(id)] * time.delta;
-  }
-}, {fixed: true, when: () => !paused});
-schedule.add('report', () => console.log(position.fields.x[position.index(entity)]), {after: ['move']});
-schedule.update(1 / 30); // two fixed steps of move, then report once
-```
-
-| `new Schedule` option | Default | Meaning |
-| --- | --- | --- |
-| `step` | `1 / 60` | Seconds per fixed step |
-| `maxSteps` | `8` | Most fixed steps in one update; the rest of a long stall is dropped and reported in `schedule.dropped` |
-
-| `schedule.add` option | Default | Meaning |
-| --- | --- | --- |
-| `before`, `after` | none | Names of systems this one runs before or after, in the same phase; a frame system may also run `after` a fixed one |
-| `when` | always | Run condition, asked before every run |
-| `fixed` | `false` | Run in the fixed phase |
 
 [README continues: https://margoengine.com/llms/packages/ecs.md]
 

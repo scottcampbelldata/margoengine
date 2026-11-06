@@ -34,6 +34,10 @@
       "types": "./dist/engine.d.ts",
       "import": "./dist/engine.js"
     },
+    "./growable": {
+      "types": "./dist/growable.d.ts",
+      "import": "./dist/growable.js"
+    },
     "./query": {
       "types": "./dist/query.d.ts",
       "import": "./dist/query.js"
