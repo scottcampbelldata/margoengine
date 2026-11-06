@@ -1,4 +1,4 @@
-// The banned-terms check catches CAD import and CAD tooling names in public text and in the text of tracked PDFs, and
+// The banned-terms check catches the private kernel's names in public text and in the text of tracked PDFs, and
 // its list never holds them. The words are written here in base64 or character codes, because this file is scanned too.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

@@ -63,9 +63,9 @@ Scott's rule (2026-10-24): every API and tool should feel modern and familiar, s
   type-checks them).
 - When you see a place where Margo is harder to use than the tools people come from, fix it or list it in `docs/known-bugs.md`.
 
-## No CAD in this repository
+## No boundary-representation kernel or paid packages in this repository
 
-Scott's decision (2026-10-29): CAD import and CAD tooling are not part of this repository and must not be added back. `npm run check:banned-terms` (in verify) enforces it; its encoded list is `scripts/banned-terms.json`.
+Scott's decision (2026-11-06, replacing the 2026-10-29 no-CAD rule): CAD file import and CAD formats are fine here. Scott's boundary-representation kernel, and any package worth selling rather than open-sourcing, stay out and must not be added. `npm run check:banned-terms` (in verify) enforces the kernel's names; its encoded list is `scripts/banned-terms.json`.
 
 ## How work lands
 

@@ -1,7 +1,7 @@
 // Fails when a tracked file's path, a tracked text file, or the text a tracked PDF shows, contains a term from
-// scripts/banned-terms.json: CAD
-// import and CAD tooling are not part of this repository, so their package, file, function and format names
-// must not come back. The list holds hashes, never the words. To fix a hit: remove the text from the public file (for a
+// scripts/banned-terms.json: Scott's private boundary-representation kernel stays out of this repository, so its
+// package, file and function names must not come in (AGENTS.md). CAD file import and CAD formats are fine here. The list
+// holds hashes, never the words. To fix a hit: remove the text from the public file (for a
 // PDF, from the page it is printed from, then print it again). A new allow entry needs a reason and a review.
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
