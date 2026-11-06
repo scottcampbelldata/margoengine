@@ -1113,6 +1113,13 @@ test('numbers are written as the shortest text that reads back as the same Float
     const bytes = new TextEncoder().encode(parts.join(' '));
     return new Uint8Array(bytes.length * 2).set(bytes);
   };
+  // Six controls per timing, so both jobs last about as long. A control of 3 ms alone finds a quiet gap between bursts of
+  // load that a 20 ms export cannot, which read 41.6 against 4.0 ms (10.3) in 1 of 10 runs with 40 processes in bursts;
+  // the long control read 4.8 to 6.8 in those runs.
+  const repeats = 6,
+    controls = () => {
+      for (let i = 0; i < repeats; i++) control();
+    };
   let usdz = Infinity,
     unit = Infinity;
   for (let round = 0; round < 15; round++) {
@@ -1120,7 +1127,7 @@ test('numbers are written as the shortest text that reads back as the same Float
       usdz,
       time(() => exportUSDZ({ nodes })),
     );
-    unit = Math.min(unit, time(control));
+    unit = Math.min(unit, time(controls) / repeats);
   }
   // The ratio read 4.9 to 5.1 alone and 2.6 to 4.9 with 32 processes allocating on 32 threads; the export before its number
   // writer was fast reads about 16.
