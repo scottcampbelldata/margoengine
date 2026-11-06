@@ -2067,7 +2067,7 @@
     "package": "@margoengine/input",
     "version": "1.0.0",
     "published": false,
-    "description": "Semantic keyboard, pointer, gamepad and touch actions with haptics, and tap, hold, slow tap and double press rules.",
+    "description": "Semantic keyboard, pointer, gamepad and touch actions with haptics, tap, hold, slow tap and double press rules, and local multiplayer.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "input",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/input@1.0.0",

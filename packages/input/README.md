@@ -81,6 +81,58 @@ tick();
 
 A press and release between two updates counts for one update on keys, mouse buttons and touch buttons, so a short tap is not lost on a slow frame. Gamepads are polled, so a gamepad press shorter than one update can still pass unseen.
 
+## Local multiplayer
+
+`@margoengine/input/players` gives each player devices of their own and a full `Input`, all made from one action map:
+
+```ts
+import {LocalPlayers} from 'margoengine/input/players';
+
+const party = new LocalPlayers(
+  {
+    move: [
+      {type: 'key', code: 'KeyD'},
+      {type: 'key', code: 'KeyA', scale: -1},
+      {type: 'gamepad-axis', index: 0},
+    ],
+    jump: [{type: 'key', code: 'Space'}, {type: 'gamepad-button', index: 0}],
+    start: [{type: 'key', code: 'Enter'}, {type: 'gamepad-button', index: 9}],
+  },
+  {
+    joinAction: 'start', // a press on a device nobody owns adds a player
+    schemes: {
+      arrows: {
+        move: [
+          {type: 'key', code: 'ArrowRight'},
+          {type: 'key', code: 'ArrowLeft', scale: -1},
+        ],
+        jump: [{type: 'key', code: 'ArrowUp'}],
+        start: [{type: 'key', code: 'ShiftRight'}],
+      },
+    },
+  },
+);
+party.on('join', ({player, device}) => console.log('player', player.index, 'joined on', device));
+party.on('lost', ({player}) => console.log('pause: player', player.index, 'lost a gamepad'));
+function tick() {
+  party.update(); // in place of input.update()
+  for (const player of party.players) {
+    if (player.input.state('jump').pressed) void player.rumble(100);
+    console.log(player.index, player.input.state('move').value);
+  }
+}
+tick();
+```
+
+A device is `'keyboard'` (the key, mouse and pointer bindings), `'keyboard:<scheme>'` (that entry of `schemes`, for two players on one keyboard), `'gamepad:<n>'` (the gamepad bindings, pointed at gamepad `n`) or `'touch'`. A device has one owner; a player can own several.
+
+- `party.add(device?)`, `party.remove(player)`: add in the lowest free slot, or remove. `player.index` stays put while others come and go.
+- `party.assign(player, device)`, `party.unassign(device)`, `party.owner(device)`: move devices at any time. `assign` rebuilds that player's bindings from the shared map, so apply saved bindings after it.
+- `player.input` is a real `Input`: contexts, rebinding, touch controls, `Interactions` and recording are per player. An action with no binding on the player's devices reads 0.
+- `party.on(type, handler)` hears `join`, `leave`, `lost` and `regained`, and returns the function that stops listening. An unplugged gamepad keeps its owner and comes back to them on the same index.
+- The press that joins does not read as `pressed`, so Start does not also pause.
+- Options: `maxPlayers` (default 4), `schemes` (default none), `joinAction` (default none: only `add` adds), `gamepadSlots` (gamepad indices `joinAction` watches, default 4), and `target`, `gamepads`, `deadzone` and `contexts`, which go to every player's `Input`.
+
 ## Gestures
 
 ```ts

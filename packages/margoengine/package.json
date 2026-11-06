@@ -850,6 +850,10 @@
       "types": "./dist/input/interactions.d.ts",
       "import": "./dist/input/interactions.js"
     },
+    "./input/players": {
+      "types": "./dist/input/players.d.ts",
+      "import": "./dist/input/players.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"
