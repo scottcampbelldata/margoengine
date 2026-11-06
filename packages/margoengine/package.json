@@ -310,6 +310,10 @@
       "types": "./dist/compute/graph.d.ts",
       "import": "./dist/compute/graph.js"
     },
+    "./compute/autotune": {
+      "types": "./dist/compute/autotune.d.ts",
+      "import": "./dist/compute/autotune.js"
+    },
     "./controls": {
       "types": "./dist/controls.d.ts",
       "import": "./dist/controls.js"

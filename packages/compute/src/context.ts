@@ -1017,7 +1017,7 @@ async function ready(context: ComputeContext): Promise<ComputeContext> {
 
 /**
  * Opens a compute context. With `engine` (WebGPU backend) or `device` it shares that device; otherwise it opens a
- * headless device of its own with the adapter's largest buffer limits (so big arrays fit) and, where available, the
+ * headless device of its own with the adapter's largest buffer and workgroup limits and, where available, the
  * `shader-f16`, `timestamp-query` and `subgroups` features. Without WebGPU it falls back to the CPU (`backend`, default
  * `'auto'`; check `gpu.backend`); with `backend: 'webgpu'` it rejects with a MargoError (`unsupported`) instead.
  * @example
@@ -1070,6 +1070,10 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
       maxBufferSize: adapter.limits.maxBufferSize,
       maxStorageBuffersPerShaderStage: adapter.limits.maxStorageBuffersPerShaderStage,
       maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+      maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
+      maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
+      maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
+      maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ,
     },
   });
   if (options.signal?.aborted) {

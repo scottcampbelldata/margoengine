@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4573568,
+  "total": 4575440,
   "history": [
     {
       "date": "2026-10-24",
@@ -1724,6 +1724,12 @@
       "commit": "1d561e76c",
       "reason": "New lines entry ./pick: LinePicking; selection gains Picking.addOverlay; lines root gains depthWrite variants",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "c50f4be0d",
+      "reason": "New optional entry @margoengine/compute/autotune: workgroup autotuning",
+      "grew": 1
     }
   ],
   "items": {
@@ -1786,6 +1792,7 @@
     "@margoengine/clustered/units": 1089,
     "@margoengine/compute": 38960,
     "@margoengine/compute/autodiff": 5845,
+    "@margoengine/compute/autotune": 1872,
     "@margoengine/compute/fft": 6037,
     "@margoengine/compute/frame": 31457,
     "@margoengine/compute/graph": 7525,

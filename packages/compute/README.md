@@ -8,7 +8,7 @@ statistics along axes, scans, sorting, selection and histograms. It also runs yo
 read from the source. Optional entries add matrix products (`/linalg`), Fourier transforms (`/fft`), convolution
 (`/signal`), reproducible random numbers (`/random`), sparse matrices and solvers (`/sparse`), gradients
 (`/autodiff`), data larger than GPU memory (`/stream`), kernels inside an engine's frame (`/frame`), subgroup
-kernels for reductions, scans and sorts (`/subgroups`), neural networks (`/nn`) and graph algorithms (`/graph`).
+kernels for reductions, scans and sorts (`/subgroups`), neural networks (`/nn`), graph algorithms (`/graph`) and workgroup sizes measured per adapter (`/autotune`).
 
 The package is optional and tree-shakable, adds nothing to core, and needs no engine: without one it opens a
 headless device of its own. Without WebGPU (Node, an older browser, a blocklisted GPU) the same code runs on the CPU.
@@ -466,6 +466,56 @@ const active = useSubgroups(gpu); // false on the CPU backend, and everything be
 const keys = gpu.array(new Uint32Array([5, 3, 9, 1]));
 console.log(active, await gpu.sort(keys).read(), await keys.sum().item()); // [1, 3, 5, 9] 18
 ```
+
+## Workgroup autotuning
+
+`@margoengine/compute/autotune` picks your kernel's workgroup size by timing it on this adapter, because the fastest size
+depends on the GPU and the kernel. Write the kernel as a function of the size. `autotune` runs it at each candidate, resolves
+the fastest `kernel` and `workgroupSize`, and remembers the answer, so later calls run nothing. It needs a GPU: the CPU backend
+rejects with `unsupported`, as any WGSL kernel does.
+
+```ts
+import { createCompute } from '@margoengine/compute';
+import { autotune } from '@margoengine/compute/autotune';
+
+using gpu = await createCompute();
+const n = 1 << 20;
+const x = gpu.arange(0, n, 1, 'f32');
+const y = gpu.zeros(n);
+const { kernel, workgroupSize, timings, cached } = await autotune(gpu, {
+  name: 'saxpy',
+  signature: String(n),
+  source: (size) => /* wgsl */ `
+    @group(0) @binding(0) var<storage, read> x: array<f32>;
+    @group(0) @binding(1) var<storage, read_write> y: array<f32>;
+    @compute @workgroup_size(${size}) fn main(@builtin(global_invocation_id) id: vec3u) {
+      if (id.x < ${n}u) { y[id.x] = 2.0 * x[id.x] + y[id.x]; }
+    }`,
+  run: (kernel) => kernel.run({ x, y }, { count: n }),
+});
+console.log(workgroupSize, cached, timings); // for example [256, 1, 1] false [{ workgroupSize: [256, 1, 1], ms: 0.2 }, ...]
+y.write(new Float32Array(n)); // the runs above changed y
+kernel.run({ x, y }, { count: n });
+console.log(await y.read({ length: 3 })); // [0, 2, 4]
+```
+
+`run` must do what the real work does, at the real size: a size that wins on a small input can lose on a large one. Say what
+it depends on in `signature` (default `''`). `run` runs many times, so write it to be repeatable. Options:
+
+- `candidates`: sizes to try, numbers or `[x, y, z]`. Default 256, 128, 64, 32, 512, 1024. Those over the device's limits are
+  dropped, and on a tie the earlier wins.
+- `trials`: timed runs of each size, of which the median counts. Default 7. Sizes take turns within each round.
+- `warmup`: untimed runs of each size first. Default 2.
+- `store`: keeps results across sessions; `localStorage` fits, or any object with `getItem` and `setItem`, async or not. An
+  error from it reaches you. Default none: results last as long as the context.
+- `refresh`: measures again even if a result is known. Default false.
+- `entryPoint` and `signal`.
+
+Times are GPU time from timestamp queries, or wall clock up to `gpu.done()` on a device without them. Browsers round GPU
+timestamps (steps of 0.066 ms in the Chrome tested), so sizes of a short kernel can tie: have `run` dispatch it several times.
+Equal medians go to the better mean, then to the earlier candidate. A result is kept per
+adapter, `name`, `signature`, WGSL source and candidate list, so changing any of them measures again. The package's own
+kernels keep their fixed sizes; this is for yours.
 
 ## CPU fallback
 

@@ -71,6 +71,10 @@
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"
+    },
+    "./autotune": {
+      "types": "./dist/autotune.d.ts",
+      "import": "./dist/autotune.js"
     }
   },
   "files": [
