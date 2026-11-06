@@ -38,12 +38,15 @@ function Count() {
   return null;
 }
 function Red() {
-  return (
+  // Not a plain `return <Mesh>`: that is a tail call, and WebKit (which has proper tail calls) drops Red from the owner
+  // stack, so the mesh names the next component up. README, "DevTools".
+  const mesh = (
     <Mesh>
       <BoxGeometry args={[2.4, 2.4, 2.4]} />
       <PbrMaterial color="#ff2020" roughness={0.6} />
     </Mesh>
   );
+  return mesh;
 }
 function App({ mode }: { mode: Mode }) {
   return (

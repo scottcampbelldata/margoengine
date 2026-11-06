@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { launchBrowser, resolveBrowser } from '../../../scripts/lib/browser.mjs';
 import { build, createServer } from 'vite';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
@@ -264,22 +264,48 @@ try {
       still.every((value, i) => Math.abs(value - original[i]) < 1e-6),
       'Reduced motion changed the globe',
     );
-    const pinch = await mobileContext.newCDPSession(mobile);
-    await pinch.send('Input.dispatchTouchEvent', {
-      type: 'touchStart',
-      touchPoints: [
-        { x: 120, y: 250 },
-        { x: 270, y: 250 },
-      ],
-    });
-    await pinch.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [
-        { x: 90, y: 250 },
-        { x: 300, y: 250 },
-      ],
-    });
-    await pinch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    if (resolveBrowser().engine === 'chromium') {
+      const pinch = await mobileContext.newCDPSession(mobile);
+      await pinch.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [
+          { x: 120, y: 250 },
+          { x: 270, y: 250 },
+        ],
+      });
+      await pinch.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [
+          { x: 90, y: 250 },
+          { x: 300, y: 250 },
+        ],
+      });
+      await pinch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else
+      // Only Chromium takes real multi-touch from a script; elsewhere the same two fingers go in as the pointer events
+      // a touch screen makes, which is what OrbitControls reads.
+      await mobile.evaluate(() => {
+        const canvas = document.querySelector('canvas'),
+          finger = (type, pointerId, clientX) =>
+            canvas.dispatchEvent(
+              new PointerEvent(type, {
+                pointerId,
+                pointerType: 'touch',
+                clientX,
+                clientY: 250,
+                button: type === 'pointermove' ? -1 : 0,
+                buttons: type === 'pointerup' ? 0 : 1,
+                bubbles: true,
+                cancelable: true,
+              }),
+            );
+        finger('pointerdown', 11, 120);
+        finger('pointerdown', 12, 270);
+        finger('pointermove', 11, 90);
+        finger('pointermove', 12, 300);
+        finger('pointerup', 11, 90);
+        finger('pointerup', 12, 300);
+      });
     await mobile.waitForFunction(
       (position) => earthAudit.frame.slice(32, 35).some((v, i) => v !== position[i]),
       original.slice(32, 35),

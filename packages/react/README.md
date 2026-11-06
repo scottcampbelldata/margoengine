@@ -632,4 +632,6 @@ export function App() {
 - `Grid` needs `@margoengine/lines`, and lets go of its plugin on unmount.
 - `DevTools` needs `@margoengine/inspector` and `@margoengine/stats`, loaded only when it opens, and is off in a production
   build unless you pass `enabled`, including one with no global `process`, which is every browser build. In React 19 development builds a mesh without a `name` shows the components that made it,
-  such as "Box in Part".
+  such as "Box in Part". Safari and other WebKit browsers drop a component that ends in `return <Mesh ... />` from that name, as
+  their engine replaces the frame of a tail call: give the mesh a `name`, or assign the element first
+  (`const mesh = <Mesh ... />; return mesh;`).

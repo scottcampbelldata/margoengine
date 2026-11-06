@@ -186,7 +186,8 @@ const video=document.createElement('video'),source=document.createElement('canva
 video.muted=true;video.playsInline=true;video.srcObject=source.captureStream(30);
 const videoTexture=new Texture(video);
 scenarios.video=()=>createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:videoTexture}));
-window.videoStep=async color=>{if(video.paused)await video.play();sc.fillStyle=color;sc.fillRect(0,0,16,16);const t=performance.now();while(performance.now()-t<600)await new Promise(r=>requestAnimationFrame(r));engine.render();await device.queue.onSubmittedWorkDone();return {readyState:video.readyState,time:video.currentTime,errors:errors.splice(0)};};
+// The paint comes before the wait: WebKit's canvas stream sends no frame until the canvas changes, and play() waits for one.
+window.videoStep=async color=>{const playing=video.paused?video.play():undefined;sc.fillStyle=color;sc.fillRect(0,0,16,16);await playing;const t=performance.now();while(performance.now()-t<600)await new Promise(r=>requestAnimationFrame(r));engine.render();await device.queue.onSubmittedWorkDone();return {readyState:video.readyState,time:video.currentTime,errors:errors.splice(0)};};
 window.check={
   async run(name){device.pushErrorScope('validation');const model=await scenarios[name]();window.current=model;engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0)};},
   async step(){device.pushErrorScope('validation');window.current.step();engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return [e?.message,...errors.splice(0)].filter(Boolean);},

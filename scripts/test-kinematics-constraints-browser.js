@@ -276,6 +276,8 @@ try {
     const points = {
       start: project(0.9, 0.7, demo.dragShell),
       overhead: project(demo.root[0], 2.3),
+      // Metres of height per pixel down the canvas, around 2.3 m.
+      metresPerPixel: 0.1 / (project(demo.root[0], 2.3).y - project(demo.root[0], 2.4).y),
       waist: project(-0.22, 0.7, demo.dragShell),
       overshoot: project(demo.root[0], 2.7),
       bounds: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
@@ -293,10 +295,17 @@ try {
       'The camera should frame the starting, overhead, and overshoot pointer targets',
     );
   }
+  // WebKit delivers mouse positions in whole pixels, Chromium as asked: the check follows the pixel that arrived.
+  await app.page.evaluate(() => {
+    const canvas = document.querySelector('canvas');
+    canvas.addEventListener('pointermove', (event) => (window.lastPointer = { x: event.clientX, y: event.clientY }));
+  });
   await app.page.mouse.move(overheadPixels.start.x, overheadPixels.start.y);
   await app.page.mouse.down();
   await app.page.mouse.move(overheadPixels.overhead.x, overheadPixels.overhead.y, { steps: 90 });
   await app.page.mouse.up();
+  const overheadHeight =
+    2.3 + (overheadPixels.overhead.y - (await app.page.evaluate(() => window.lastPointer.y))) * overheadPixels.metresPerPixel;
   const overhead = await app.page.evaluate(() => {
     const demo = window.kinematicsDemo;
     for (let i = 0; i < 180; i++) {
@@ -313,7 +322,7 @@ try {
   });
   assert.equal(overhead.status, 0, 'A reachable overhead pointer drag should be accepted');
   assert.ok(
-    Math.abs(overhead.raw[1] - 2.3) < 0.002,
+    Math.abs(overhead.raw[1] - overheadHeight) < 0.002,
     'Pointer ray mapping should reach above the previous 1.8m ceiling',
   );
   assert.ok(Math.abs(overhead.raw[2]) < 1e-7, 'Interactive dragging should stay on the shoulder plane');
@@ -346,14 +355,15 @@ try {
   );
   assert.ok(waistCrossBody.hand[2] > 0.3, 'Waist dragging should follow the front of the torso');
   assert.ok(waistCrossBody.minimumClearance >= 0.008 - 1e-6);
-  const waistCursorError = await app.page.evaluate((expected) => {
+  const waistCursorError = await app.page.evaluate(() => {
     const cursor = document.querySelector('#raw-cursor'),
-      rect = document.querySelector('canvas').getBoundingClientRect();
+      rect = document.querySelector('canvas').getBoundingClientRect(),
+      pointer = window.lastPointer;
     return Math.hypot(
-      rect.left + parseFloat(cursor.style.left) - expected.x,
-      rect.top + parseFloat(cursor.style.top) - expected.y,
+      rect.left + parseFloat(cursor.style.left) - pointer.x,
+      rect.top + parseFloat(cursor.style.top) - pointer.y,
     );
-  }, overheadPixels.waist);
+  });
   assert.ok(waistCursorError < 0.25, 'The reachable waist target should stay under the pointer as drag depth changes');
   await app.page.screenshot({ path: 'test-results/kinematics-constraints-waist.png', fullPage: true });
   await app.page.mouse.move(overheadPixels.waist.x, overheadPixels.waist.y);

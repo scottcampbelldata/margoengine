@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { launchBrowser, resolveBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
@@ -115,23 +115,34 @@ try {
       decoder.close();
       return { repetitionCount: String(track.repetitionCount), frames };
     };
-    const art = await decode(await encodeGIF(3, (i) => pixelArt[i], { fps: 25 })),
+    const artBytes = await encodeGIF(3, (i) => pixelArt[i], { fps: 25 }),
+      art = await decode(artBytes),
+      // The browser's image decoder as a second reader of the first frame, alpha included.
+      still = await createImageBitmap(new Blob([artBytes], { type: 'image/gif' })),
+      stillContext = new OffscreenCanvas(still.width, still.height).getContext('2d'),
       spin = await decode(
         await encodeGIF(4, (i) => {
           engine.camera.position = [6 * Math.sin(i * 0.4), 1, 6 * Math.cos(i * 0.4)];
           return capture(engine, { width: 96, height: 64, background: '#202830' });
         }),
       );
+    stillContext.drawImage(still, 0, 0);
+    const expected = (source, i) => {
+      const alpha = source[i - (i % 4) + 3];
+      return alpha < 128 ? 0 : i % 4 === 3 ? 255 : source[i];
+    };
     report.gif = {
       art: {
         repetitionCount: art.repetitionCount,
         durations: art.frames.map((f) => f.duration),
-        exact: art.frames.every((f, k) =>
-          f.data.every((v, i) => {
-            const source = pixelArt[k].data,
-              alpha = source[i - (i % 4) + 3];
-            return v === (alpha < 128 ? 0 : i % 4 === 3 ? 255 : source[i]);
-          }),
+        colours: art.frames.every((f, k) =>
+          f.data.every((v, i) => i % 4 === 3 || v === expected(pixelArt[k].data, i)),
+        ),
+        alpha: art.frames.every((f, k) =>
+          f.data.every((v, i) => i % 4 !== 3 || v === expected(pixelArt[k].data, i)),
+        ),
+        still: Array.from(stillContext.getImageData(0, 0, still.width, still.height).data).every(
+          (v, i) => v === expected(pixelArt[0].data, i),
         ),
       },
       spin: { frames: spin.frames.length, durations: spin.frames.map((f) => f.duration) },
@@ -227,11 +238,17 @@ try {
   report.transparent.green[0].forEach((v, i) => near(v, [0, 255, 0, 128][i], 2, 'half-transparent green background'));
   assert.equal(report.transparent.green[1][3], 255);
   // GIF through the browser's decoder.
-  assert.equal(report.gif.art.repetitionCount, 'Infinity', 'loops forever');
-  assert.deepEqual(report.gif.art.durations, [40000, 40000, 40000], '25 fps: 4/100 s');
-  assert.ok(report.gif.art.exact, 'pixel art decodes exactly, transparent pixels clear');
+  // WebKit's ImageDecoder gives its own -1 for "forever" where the WebCodecs spec says Infinity.
+  assert.equal(report.gif.art.repetitionCount, resolveBrowser().engine === 'webkit' ? '-1' : 'Infinity', 'loops forever');
+  // A GIF delay is a whole number of 1/100 s, so that is the unit to compare in: WebKit reports 4/100 s as 39,999 us.
+  const hundredths = (durations) => durations.map((us) => Math.round(us / 10000));
+  assert.deepEqual(hundredths(report.gif.art.durations), [4, 4, 4], '25 fps: 4/100 s');
+  assert.ok(report.gif.art.colours, 'pixel art decodes exactly');
+  assert.ok(report.gif.art.still, 'the first frame decodes exactly as an image, transparent pixels clear');
+  // WebKit's ImageDecoder frames come out opaque, so there the clear pixels of later frames have no second reader.
+  if (resolveBrowser().engine !== 'webkit') assert.ok(report.gif.art.alpha, 'every frame keeps its transparent pixels');
   assert.equal(report.gif.spin.frames, 4);
-  assert.deepEqual(report.gif.spin.durations, [30000, 40000, 30000, 30000]);
+  assert.deepEqual(hundredths(report.gif.spin.durations), [3, 4, 3, 3]);
   // JPEG.
   assert.deepEqual([report.jpeg.width, report.jpeg.height], [333, 111]);
   report.jpeg.centre.slice(0, 3).forEach((v, i) => near(v, report.shot.centre[i], 12, 'JPEG centre colour'));
