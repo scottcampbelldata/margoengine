@@ -117,6 +117,42 @@ engine.start();
   (`computePrimitiveBVHAsync` builds them in a worker beforehand). For rigid bodies, joints and vehicles use
   `@margoengine/physics` (Rapier).
 
+## Third-person camera: `@margoengine/controls/third-person`
+
+`ThirdPersonControls` follows a mesh, a model or a position function on a spring arm. The pivot above the subject trails
+it on a critically damped spring (`lag`), and each frame the arm is swept from the pivot to the camera with the
+`@margoengine/bvh` Raycaster: a centre ray and four rays `probeRadius` around it, nine rays in all. When something is in
+the way the arm shortens in the same frame, so a wall never sits between the camera and the subject; it lengthens over
+`returnTime` once clear. The subject, its children and `ignore` never stop the arm. The app moves the subject;
+`heading` is the camera's forward direction on the ground for doing that.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {ThirdPersonControls} from 'margoengine/controls/third-person';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const hero = engine.createMesh().setGeometry(box());
+const wall = engine.createMesh().setGeometry(box()).setPosition([0, 1, 3]).setScale([8, 2, 0.2]);
+const follow = ThirdPersonControls.attach(engine, hero, {distance: 5, shoulder: 0.5});
+follow.lag = 0.2;                        // softer follow; 0 is rigid
+follow.colliders = [wall];               // default: every visible mesh and model
+engine.onFrame((_, delta) => {
+  const [x, , z] = follow.heading;       // walk where the camera faces
+  hero.setPosition([hero.position.x + x * delta, 0, hero.position.z + z * delta]);
+});
+addEventListener('pointermove', event => {
+  if (document.pointerLockElement) follow.rotate(-event.movementX * 0.003, event.movementY * 0.003);
+});
+engine.start();
+```
+
+Options and properties: `distance` (4), `minDistance` (1), `maxDistance` (12), `pivotOffset` (`[0, 1.5, 0]`), `shoulder`
+(0), `yaw` and `pitch` (from the camera at attach), `minPitch` (-0.6), `maxPitch` (1.4), `rotateSpeed` (1), `zoomSpeed` (1),
+`lag` (0.12 s), `returnTime` (0.25 s), `probeRadius` (0.2), `collide` (true), `colliders` (null: everything), `ignore`
+(none), `raycaster` (a new one; set `layers` or `filter` on it). `armLength` reads the arm's length now, `snap()` jumps
+the pivot to the subject after a teleport, and `rotate(yaw, pitch)` takes gamepads, pointer lock or
+`@margoengine/input` actions. Events: `start`, `change`, `end`.
+
 Without an engine, pass a `Camera` and an element and drive the controls yourself: `const fly = new FlyControls(camera, canvas); engine.onFrame((_, delta) => fly.update(delta));`.
 
 `OrbitControls.update()` reuses its camera vectors during continuous updates. Copy `camera.position` and `camera.target` when taking a snapshot.
@@ -143,6 +179,7 @@ up direction and angular motion retain the small pole safety gap; rotating away 
 | `PointerLockControls` | `lock()` from a click, mouse look while locked, WASD/arrows/R/F through `update(delta)`, plus `moveForward`, `moveRight`, `moveUp`. |
 | `TransformControls` | Translate (axis arrows, plane squares, center screen-plane handle), rotate (axis rings, view ring, free trackball disc), scale (axis handles, uniform center). |
 | `WalkControls` (`/walk`) | WASD/arrows, mouse look (pointer lock or drag), gamepad sticks, touch thumbstick + drag-look; collides with the scene, holds eye height, climbs stairs. |
+| `ThirdPersonControls` (`/third-person`) | Follows a subject on a spring arm that pulls in at walls. Drag or one finger turns the view, the wheel or a pinch changes the distance. |
 | `DragControls` | Left button or one finger grabs the nearest listed core mesh or gltf-pro model and moves it on the view plane, a world plane (`plane`) or a world axis (`axis`). Mouse hover reports the object under the pointer. |
 
 Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)` (returns true when the camera moved), `dispose()` and `addEventListener`. Camera controls emit `change`, and the drag-based ones `start` and `end`. `PointerLockControls` emits `lock` and `unlock`. `TransformControls` emits `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`), `mode-changed` and `space-changed`. `DragControls` emits `dragstart` (`object`, `hit`), `drag`, `dragend`, `hoveron` and `hoveroff` (each with `object`).
@@ -155,7 +192,7 @@ module graph: `@margoengine/controls/orbit` (`OrbitControls`, `MapControls`, `MO
 `@margoengine/controls/fly` and `@margoengine/controls/trackball` (`FlyControls` and `TrackballControls`, each with the
 `Controls` base),
 `@margoengine/controls/transform` (`TransformControls` and its types), `@margoengine/controls/drag` (`DragControls`;
-loads bvh) and `@margoengine/controls/profiles` (the navigation profiles). They are the same classes as the root's.
+loads bvh), `@margoengine/controls/third-person` (`ThirdPersonControls`; loads bvh) and `@margoengine/controls/profiles` (the navigation profiles). They are the same classes as the root's.
 
 ## Arcball: `@margoengine/controls/arcball`
 
@@ -392,6 +429,12 @@ any of them.
 ## Tests
 
 `npm test` in `packages/controls` runs Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, roll in fly and trackball (Q and E at `rollSpeed`, the body axes, looping past the vertical, an orthonormal frame after long flights and tumbles, the rendered matrix, reset), the arcball (sphere mapping continuity, the angle and axis of a drag across the centre, roll and passing over the pole, an orthonormal frame after 1000 drags, pan and zoom keeping the cursor point on its pixel under perspective and fixed-size orthographic cameras, distance and zoom limits, damping coming to rest at 30 and 60 fps, enable flags and reset), fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, constant screen size, picking, drags and orbit pan under an orthographic camera at several zooms, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, arrows flipping to the camera with a margin and held during a drag, the delta line and swept arc, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup. Drag tests move a box under a scaled parent on the view plane (checked against an independent ray-plane intersection), along an axis and on the ground plane, a gltf-pro model by touch under an orthographic camera (600 CSS pixels for 6 world units), and check events, hover, misses falling through to later listeners, other fingers, disposed meshes and models, and cleanup.
+
+`tests/third-person.test.js` covers `ThirdPersonControls` on real core engines: the arm's place and the view kept from the
+attached camera, a wall pulling the arm in within the frame with the camera on the near side at every yaw of a full turn,
+the eased return at 30 and 60 fps, a corridor wall beside the pivot not collapsing the arm, the shoulder, the subject,
+children and `ignore` skipped, explicit colliders, the spring settling alike at 30 and 60 fps, `snap`, drag, wheel, pinch and pitch limits, a
+disposed subject and listener cleanup.
 
 `tests/walk.test.js` covers `WalkControls` on real core engines with generated geometry, at fixed time steps: a 12-step
 stair of 0.18 m risers climbed and descended with the eye never jumping more than 6 cm a frame, 0.19 m climbed and 0.25 m

@@ -65,6 +65,10 @@
       "types": "./dist/profiles.d.ts",
       "import": "./dist/profiles.js"
     },
+    "./third-person": {
+      "types": "./dist/third-person.d.ts",
+      "import": "./dist/third-person.js"
+    },
     "./walk": {
       "types": "./dist/walk.d.ts",
       "import": "./dist/walk.js"
