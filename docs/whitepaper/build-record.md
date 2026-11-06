@@ -864,7 +864,7 @@ The last two jobs on the loaders list, each in its own optional entry, and one f
 | # | Job | Status | Commit | New entry | Claim |
 | --- | --- | --- | --- | --- | --- |
 | 1 | OpenVDB sparse volumes | DONE, GAP OPEN | `5ad2181d1` | `@margoengine/loaders/vdb` | LIM-202 |
-| 2 | MaterialX and Lottie | DONE, GAP OPEN | this commit | `/materialx`, `/lottie` | LIM-204 |
+| 2 | MaterialX and Lottie | DONE, GAP OPEN | `2b8b9fea3` | `/materialx`, `/lottie` | LIM-205 |
 
 - **Fix first:** `294a0c12c` made `check-wall-budgets` and `check-fixed-waits` read tracked files only. Both walked the disk, so a scratch build in a git-ignored folder failed `verify`, as it did in batch 39 job 2. On the tree at the fix, the list lost the 21 ignored `.lane` files and nothing else. Regression tests: the ignored-file tests in `tests/check-wall-budgets.test.js` and `tests/check-fixed-waits.test.js`, which failed without the fix.
 - **Bugs:** one, caught before landing: a Lottie trim placed its cut by the curve parameter, not by length, so 25 to 75 percent of a straight line came out as 15.6 to 84.4. It now measures along the curve (`lottie.test.js`, "a trim measures length along a curve").
