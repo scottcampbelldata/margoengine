@@ -62,6 +62,12 @@ export interface LineMaterialOptions {
    * do not flicker through it. 0.001 at 10 units away is 1 cm. Default 0.
    */
   depthBias?: number;
+  /**
+   * Turn alpha into MSAA coverage instead of blending: translucent lines and antialiased edges need no draw order, and with
+   * `depthWrite` a line is one draw with its edge in the depth buffer sample by sample. Takes effect with MSAA on; without
+   * it the line blends as usual. Opacity comes in steps of one sample. Default false.
+   */
+  alphaToCoverage?: boolean;
   /** One-pixel coverage ramp on edges, caps and dash ends. Default true. */
   antialias?: boolean;
   /** Fogged by the `Lines` plugin's fog (`setFog`); false keeps this material clear. Default true. */
@@ -93,6 +99,7 @@ export class LineMaterial {
   depthWrite = false;
   behind = false;
   depthBias = 0;
+  alphaToCoverage = false;
   antialias = true;
   fog = true;
   /** false (default): `clippingPlanes` cut away what is behind any plane; true: only what is behind every plane. */
@@ -147,6 +154,7 @@ export class LineMaterial {
       this.onTop,
       this.depthWrite,
       this.behind,
+      this.alphaToCoverage,
       this.antialias,
       this.fog,
       this.clipIntersection,

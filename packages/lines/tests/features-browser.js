@@ -291,8 +291,27 @@ async function hidden() {
   return 'HiddenLine draws edges behind a surface dashed or faded while edges on the surface stay solid';
 }
 
+async function coverage() {
+  const { lines, capture, frame, done } = await rig();
+  lines.add(horizontal(0, { color: RED, opacity: 0.5, alphaToCoverage: true }));
+  lines.add(vertical(0, { color: GREEN, opacity: 0.5, alphaToCoverage: true }));
+  const crossing = (await frame()).at(128, 128),
+    samples = capture.target.samples;
+  // With MSAA the later line takes over the same samples; without, it blends and red stays in the mix.
+  if (samples > 1) assert(crossing[0] < 30 && crossing[1] > 90, `Coverage replaces at a crossing: ${crossing}`);
+  else assert(crossing[0] > 30 && crossing[1] > 90, `Without MSAA lines blend: ${crossing}`);
+  // Writing depth too, the nearer line wins in either order, opaque, in one draw each.
+  lines.clear();
+  lines.add(horizontal(1, { color: RED, depthWrite: true, alphaToCoverage: true }));
+  lines.add(vertical(0, { color: GREEN, depthWrite: true, alphaToCoverage: true }));
+  assert(isRed((await frame()).at(128, 128)), 'The nearer covered line wins a crossing');
+  assert(lines.stats.drawCalls === (samples > 1 ? 2 : 4), `Draw calls: ${lines.stats.drawCalls}`);
+  done();
+  return `alphaToCoverage at ${samples} samples: crossing ${crossing.slice(0, 3)}`;
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking, trail, batch, hidden]) checks.push(await check());
+  for (const check of [depthWrite, picking, trail, batch, hidden, coverage]) checks.push(await check());
   return checks;
 };

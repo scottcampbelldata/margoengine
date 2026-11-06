@@ -36,7 +36,7 @@ const STYLE_BYTES = 224;
 
 /**
  * Pipeline variant bits: draw over the scene, fogged, write depth, a width per point, only behind the scene, a depth
- * bias; the draw step (shader.ts) sits above them.
+ * bias, alpha to coverage; the draw step (shader.ts) sits above them.
  */
 const ON_TOP = 1,
   FOGGED = 2,
@@ -44,7 +44,11 @@ const ON_TOP = 1,
   WIDTHS = 8,
   BEHIND = 16,
   BIAS = 32,
+  COVER = 64,
   STEP = 1024;
+
+/** GPUColorWrite's red, green and blue. */
+const RGB = 7;
 
 /** Options for the `Lines` plugin. An empty name or non-finite order throws a TypeError. */
 export interface LinesOptions {
@@ -182,7 +186,7 @@ export class Lines implements EnginePlugin {
 
   /** The shader module of a variant, made when first used. */
   private module(variant: number): GPUShaderModule {
-    const key = variant & ~(ON_TOP | WRITE | BEHIND);
+    const key = variant & ~(ON_TOP | WRITE | BEHIND | COVER);
     let module = this.modules.get(key);
     if (!module) {
       let code = variant & FOGGED ? foggedLineShader() : lineShader;
@@ -205,6 +209,7 @@ export class Lines implements EnginePlugin {
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const fogged = (variant & FOGGED) !== 0,
+        covered = (variant & COVER) !== 0,
         fog = fogged ? this.fogResources() : undefined,
         module = this.module(variant);
       pipeline = this.device!.createRenderPipeline({
@@ -213,15 +218,11 @@ export class Lines implements EnginePlugin {
         fragment: {
           module,
           entryPoint: 'fragment',
-          targets: [
-            {
-              format,
-              blend: alphaBlend,
-            },
-          ],
+          // Coverage replaces blending; the scene's own alpha stays.
+          targets: [covered ? { format, writeMask: RGB } : { format, blend: alphaBlend }],
         },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
-        multisample: { count },
+        multisample: covered ? { count, alphaToCoverageEnabled: true } : { count },
         depthStencil: {
           format: depthFormat,
           depthWriteEnabled: (variant & WRITE) !== 0,
@@ -441,14 +442,17 @@ export class Lines implements EnginePlugin {
       edge = variant >= 2 * STEP;
     let current: GPURenderPipeline | undefined;
     for (const [line, r] of list) {
-      const { fog, antialias, dashed, behind, depthBias } = line.material;
-      if (edge && !antialias) continue;
+      const { fog, antialias, dashed, behind, depthBias, alphaToCoverage } = line.material,
+        covered = alphaToCoverage && count > 1;
+      // Coverage needs no steps: the edge is in the samples, so the first draw is the whole line.
+      if (edge && (!antialias || covered)) continue;
       const bits =
           (line['pointWidths'] && !dashed ? WIDTHS : 0) |
           (behind ? BEHIND : 0) |
           (depthBias ? BIAS : 0) |
+          (covered ? COVER : 0) |
           (fogged && fog ? FOGGED : 0),
-        next = this.pipeline(context.format, depthFormat, count, variant | bits);
+        next = this.pipeline(context.format, depthFormat, count, (covered ? variant % STEP : variant) | bits);
       if (next !== current) pass.setPipeline((current = next));
       pass.setBindGroup(1, r.group);
       pass.draw(VERTICES_PER_SEGMENT, line.segmentCount);

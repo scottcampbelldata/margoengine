@@ -74,6 +74,7 @@ dashed.dashOffset += 0.01;
 | `vertexColors` | when colors exist | |
 | `onTop` | `false` | Skip the depth test |
 | `depthWrite` | `false` | Write depth: crossing lines occlude each other and later passes respect them |
+| `alphaToCoverage` | `false` | Turn alpha into MSAA coverage instead of blending; see [Alpha to coverage](#alpha-to-coverage) |
 | `behind` | `false` | Draw only where the scene is in front of the line; see [Hidden lines](#hidden-lines) |
 | `depthBias` | `0` | Fraction of its distance the line moves nearer for depth tests, 0 up to 1, so edges on a surface do not flicker |
 | `antialias` | `true` | |
@@ -203,6 +204,29 @@ console.log(batches.stats); // {batches, segments, drawCalls} of the last frame
 A batch is one draw while it fits one GPU buffer: 8,388,608 segments at WebGPU's default `maxBufferSize` of 256 MiB, and one further draw for each buffer past that. A batch takes at most 67,108,864 segments. It keeps a CPU copy, 32 bytes a segment, to refill the GPU after a device loss.
 
 Segments are independent: square ends, so those that share a point overlap at the corner, and translucent corners are darker there. There are no joins, round caps, dashes, fog, clipping planes, depth writing or picking. Use `Line` where those matter. WebGPU only.
+
+## Alpha to coverage
+
+`alphaToCoverage: true` turns a line's alpha into MSAA coverage instead of blending it, so translucent lines and antialiased edges need no draw order, and a line that also writes depth keeps its edge sample by sample.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Line, Lines} from 'margoengine/lines';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const lines = Lines.attach(engine);
+
+lines.add(new Line({
+  positions: [-2, 0, 0, 2, 0, 0],
+  width: 6,
+  color: '#2a7de1',
+  depthWrite: true,
+  alphaToCoverage: true,
+}));
+```
+
+It takes effect when the engine draws with MSAA, and without MSAA the line blends as usual, so one setting runs everywhere. Opacity comes in steps of one sample: four steps at 4x MSAA. Lines of the same opacity use the same samples, so the later one replaces the earlier one where they cross instead of mixing with it.
 
 ## Hidden lines
 

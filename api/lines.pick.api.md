@@ -108,6 +108,7 @@ class LineMaterial {
     depthWrite: boolean;
     behind: boolean;
     depthBias: number;
+    alphaToCoverage: boolean;
     antialias: boolean;
     fog: boolean;
     clipIntersection: boolean;
@@ -136,6 +137,7 @@ interface LineMaterialOptions {
     depthWrite?: boolean;
     behind?: boolean;
     depthBias?: number;
+    alphaToCoverage?: boolean;
     antialias?: boolean;
     fog?: boolean;
     clippingPlanes?: readonly (readonly number[])[];

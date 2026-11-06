@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4591297,
+  "total": 4591909,
   "history": [
     {
       "date": "2026-10-24",
@@ -1748,6 +1748,12 @@
       "commit": "a29232337",
       "reason": "New lines entry ./hidden: HiddenLine, and behind and depthBias on LineMaterial",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d480e69fe",
+      "reason": "alphaToCoverage on LineMaterial",
+      "grew": 1
     }
   ],
   "items": {
@@ -1951,7 +1957,7 @@
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/refracted": 7846,
-    "@margoengine/lines": 18423,
+    "@margoengine/lines": 19035,
     "@margoengine/lines/batch": 6524,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,
