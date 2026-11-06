@@ -1182,6 +1182,10 @@
       "types": "./dist/materials/batched.d.ts",
       "import": "./dist/materials/batched.js"
     },
+    "./materials/mips": {
+      "types": "./dist/materials/mips.d.ts",
+      "import": "./dist/materials/mips.js"
+    },
     "./materials/layered": {
       "types": "./dist/materials/layered.d.ts",
       "import": "./dist/materials/layered.js"

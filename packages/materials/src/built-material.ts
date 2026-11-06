@@ -703,7 +703,7 @@ export class Texture {
         slot.version = this.version;
         refit();
       }
-      const format = (sRGB && !k.own ? k.base + '-srgb' : k.base) as GPUTextureFormat;
+      const format = (sRGB && !k.own && k.base !== 'rgba16float' ? k.base + '-srgb' : k.base) as GPUTextureFormat;
       return [this.viewOf(slot, slot.texture, format, k.dimension), slot.sampler];
     }
     if (k.type === 'equirect') {

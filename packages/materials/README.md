@@ -771,6 +771,30 @@ Limits: 8 layers and 9 distinct textures per feature (a Texture used twice in th
 are fixed at creation; numbers stay live. Layer normals use the surface's own tangent frame, which comes from the UVs
 when the geometry has no tangents.
 
+### Your own mip levels
+
+`@margoengine/materials/mips` makes a Texture from a chain you supply, for hand-painted far levels or a tool's baked ones
+that a generated box filter would lose: detail that fades with distance, thin lines that stay.
+
+```ts
+import { PbrMaterial } from '@margoengine/materials';
+import { mipTexture } from '@margoengine/materials/mips';
+
+const level = (size: number, grey: number) => ({
+  data: new Uint8Array(Array.from({ length: size * size }, () => [grey, grey, grey, 255]).flat()),
+  width: size,
+  height: size,
+});
+const fence = mipTexture([level(64, 200), level(32, 160), level(16, 120), level(8, 90)], { wrapS: 'repeat', wrapT: 'repeat' });
+export const material = new PbrMaterial({ map: fence });
+```
+
+Levels go largest first, each half the one before, rounded down, at least 1. A level is raw texels (row 0 at v = 0), or an
+image, canvas or bitmap, read as 8-bit RGBA with its alpha as the browser keeps it. A chain may stop early: nothing is
+generated past it, so a far surface keeps the last level. `format: 'rgba16float'` takes a `Float32Array` or half-float
+bits for values past 1, always linear. `loadMipTexture(urls, options)` does the same for image URLs, with `signal` and
+`fetch`. Other options are the Texture's own; `mipmaps`, `dimension` and `flipY` are fixed by the chain.
+
 ## Parallax, triplanar and subsurface
 
 Three more surface options, live like the others. Each compiles into a material's shader only while it is in use:

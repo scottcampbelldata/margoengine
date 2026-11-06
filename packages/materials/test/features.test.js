@@ -182,3 +182,19 @@ test('layered: textures shared between layers bind once, and only its users see 
   assert.match(tinted, /\*f\.base\*vec4f\(1,1,1,i\.color\.a\);/);
   assert.throws(() => f.shader('no surface here', 2), /standard gltf-pro PBR shader/);
 });
+
+test('mipTexture: a chain must halve, hold enough texels and match its format', async () => {
+  const { mipTexture } = await import('../dist/mips.js');
+  const level = (n) => ({ data: new Uint8Array(n * n * 4), width: n, height: n });
+  const t = mipTexture([level(4), level(2), level(1)]);
+  assert.equal(t.width, 4);
+  assert.equal(t.mipmaps, true);
+  assert.equal(mipTexture([level(4)]).mipmaps, false);
+  assert.equal(mipTexture([{ data: new Uint8Array(8 * 2 * 4), width: 8, height: 2 }, { data: new Uint8Array(4 * 1 * 4), width: 4, height: 1 }, { data: new Uint8Array(2 * 4), width: 2, height: 1 }]).width, 8);
+  assert.throws(() => mipTexture([]), /needs mip levels/);
+  assert.throws(() => mipTexture([level(4), level(1)]), /level 1 must be 2 x 2, not 1 x 1/);
+  assert.throws(() => mipTexture([{ data: new Uint8Array(4), width: 4, height: 4 }]), /level 0 needs 64 values/);
+  assert.throws(() => mipTexture([{ data: new Float32Array(64), width: 4, height: 4 }]), /must hold bytes/);
+  assert.throws(() => mipTexture([level(4)], { format: 'rgba16float' }), /half-float bits/);
+  assert.throws(() => mipTexture([{ data: new Float32Array(64), width: 4, height: 4 }], { format: 'rgba16float', colorSpace: 'srgb' }), /are linear/);
+});

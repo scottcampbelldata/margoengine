@@ -201,6 +201,8 @@ export function gpuDimension(texture: GPUTexture, asked: TextureDimension | unde
 /** Block size, block bytes and the device feature of each format a KTX2 transcode produces. */
 const transcoded: Record<string, { block: number; bytes: number; feature?: string }> = {
   'rgba8unorm': { block: 1, bytes: 4 },
+  // Only `@margoengine/materials/mips` makes these; they have no sRGB view.
+  'rgba16float': { block: 1, bytes: 8 },
   'bc7-rgba-unorm': { block: 4, bytes: 16, feature: 'texture-compression-bc' },
   'astc-4x4-unorm': { block: 4, bytes: 16, feature: 'texture-compression-astc' },
   'etc2-rgba8unorm': { block: 4, bytes: 16, feature: 'texture-compression-etc2' },
@@ -248,7 +250,7 @@ export function uploadTranscoded(device: GPUDevice, s: TranscodedTexture, base: 
   const texture = device.createTexture({
     size: [s.width, s.height],
     format: base as GPUTextureFormat,
-    viewFormats: [(base + '-srgb') as GPUTextureFormat],
+    viewFormats: base === 'rgba16float' ? [] : [(base + '-srgb') as GPUTextureFormat],
     mipLevelCount: s.mipmaps.length,
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
   });

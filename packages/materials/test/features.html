@@ -6,6 +6,7 @@ import {Engine} from '/packages/core/dist/index.js';
 import {KTX2LayerDecoder} from '/packages/decoders/dist/ktx2-layers.js';
 import {CubeTexture,NormalMaterial,PbrMaterial,UnlitMaterial,Texture,WgslMaterial,createMesh,createInstancedMesh,loadKTX2Texture} from '/packages/materials/dist/index.js';
 import {alphaHash} from '/packages/materials/dist/alpha-hash.js';
+import {mipTexture} from '/packages/materials/dist/mips.js';
 import {layered} from '/packages/materials/dist/layered.js';
 import {objectNormal} from '/packages/materials/dist/object-normal.js';
 import {TAA} from '/packages/taa/dist/index.js';
@@ -50,7 +51,20 @@ const layerScene=async(material,geometry=quad())=>{
   createMesh(engine,geometry,material);await render();
   const data=await pixels(made);engine.dispose();return {data,errors};
 };
+// A level of one colour, repeated across a quad whose UVs go from 0 to `repeats`.
+const flatLevel=(n,c)=>({data:new Uint8Array(Array.from({length:n*n},()=>c).flat()),width:n,height:n});
+const tiled=(repeats)=>({...quad(),uvs:[0,0,repeats,0,repeats,repeats,0,repeats]});
+const mipOptions={wrapS:'repeat',wrapT:'repeat',minFilter:'nearest',magFilter:'nearest',colorSpace:'linear'};
 window.check={
+  // The colour a surface shows when it is `repeats` times as dense as the base level: the level a chain gave it.
+  async mips({repeats,levels,format,canvas}){
+    const colors=[[255,0,0,255],[0,255,0,255],[0,0,255,255],[255,255,255,255]];
+    let chain=colors.slice(0,levels).map((c,k)=>flatLevel(64>>k,c));
+    if(canvas)chain=chain.map(({data,width,height})=>{const c=new OffscreenCanvas(width,height);c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data),width,height),0,0);return c;});
+    if(format==='rgba16float')chain=colors.slice(0,levels).map((c,k)=>{const n=64>>k,d=new Float32Array(n*n*4);for(let i=0;i<n*n;i++)d.set(c.map(v=>v/255*0.5),i*4);return {data:d,width:n,height:n};});
+    const {data,errors}=await layerScene(new UnlitMaterial({map:mipTexture(chain,{...mipOptions,...(format?{format}:{})})}),tiled(repeats));
+    return {color:at(data,128,128),errors};
+  },
   // Each way of weighing a layer, and what the layer changes: returns linear colours at named points.
   async layeredCheck(kind){
     const blue=[0,0,1,1],left=96,right=160,middle=128;

@@ -17,6 +17,27 @@ const check = (name, ...args) => page.evaluate(([n, a]) => window.check[n](...a)
 const near = (a, b, label, tolerance = 0.02) =>
   a.forEach((v, k) => assert.ok(Math.abs(v - b[k]) <= tolerance, `${label}: ${a} should be ${b}`));
 const jobs = {
+  async mips() {
+    const run = async (o) => {
+      const r = await page.evaluate((v) => window.check.mips(v), o);
+      assert.deepEqual(r.errors, [], JSON.stringify(o));
+      return r.color;
+    };
+    const red = [1, 0, 0],
+      green = [0, 1, 0],
+      blue = [0, 0, 1],
+      white = [1, 1, 1];
+    // The quad is about 177 pixels across, so 64 texels times `repeats` set the level: 2.8 is level 0.
+    near(await run({ repeats: 2, levels: 4 }), red, 'level 0');
+    near(await run({ repeats: 5, levels: 4 }), green, 'level 1');
+    near(await run({ repeats: 10, levels: 4 }), blue, 'level 2');
+    near(await run({ repeats: 20, levels: 4 }), white, 'level 3');
+    near(await run({ repeats: 80, levels: 4 }), white, 'past the chain the last level stays');
+    near(await run({ repeats: 20, levels: 2 }), green, 'a short chain stops at its last level');
+    near(await run({ repeats: 5, levels: 4, canvas: true }), green, 'canvas levels');
+    near(await run({ repeats: 5, levels: 4, format: 'rgba16float' }), [0, 0.5, 0], 'half floats');
+    console.log('mips: each level shows at its own density, short chains stop, canvases and half floats work');
+  },
   async layered() {
     const run = async (kind) => {
       const out = await page.evaluate((k) => window.check.layeredCheck(k), kind);
