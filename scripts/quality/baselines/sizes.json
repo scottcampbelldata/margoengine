@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4615371,
+  "total": 4615951,
   "history": [
     {
       "date": "2026-10-24",
@@ -1790,6 +1790,12 @@
       "commit": "2d75ea2e4",
       "reason": "USDZ shared geometry and the reader's vertex colours, alpha modes and references (Batch 5 job 2)",
       "grew": 4
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "91e3bddec",
+      "reason": "points: adaptive point size in /octree (batch 27 job 1)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2086,7 +2092,7 @@
     "@margoengine/points/e57": 6537,
     "@margoengine/points/las": 5116,
     "@margoengine/points/laz": 8046,
-    "@margoengine/points/octree": 7906,
+    "@margoengine/points/octree": 8486,
     "@margoengine/post": 40110,
     "@margoengine/post/afterimage": 5619,
     "@margoengine/post/bloom": 6716,

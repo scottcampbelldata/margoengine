@@ -15,9 +15,14 @@ export class MemoryOctree implements OctreeSource {
     load(node: OctreeNode): OctreeNodeData;
 }
 
+export interface OctreeAdaptiveSize {
+    scale?: number;
+}
+
 export class OctreeCloud implements EnginePlugin {
     readonly name: string;
     readonly source: OctreeSource;
+    readonly material: PointsMaterial;
     pointBudget: number;
     minNodePixels: number;
     maxLoadedPoints: number;
@@ -45,7 +50,8 @@ export interface OctreeCloudOptions {
     minNodePixels?: number;
     maxLoadedPoints?: number;
     maxConcurrentLoads?: number;
-    material?: PointsMaterialOptions;
+    material?: PointsMaterial | PointsMaterialOptions;
+    adaptiveSize?: boolean | OctreeAdaptiveSize;
     cloud?: Omit<PointCloudOptions, 'positions' | 'colors' | 'colorComponents' | 'material'>;
 }
 

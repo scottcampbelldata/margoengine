@@ -41,9 +41,10 @@ try {
       if (message.type() === 'error') errors.push(message.text());
     });
     await page.goto(`${server.resolvedUrls.local[0]}tests/points.html`);
-    await page.waitForFunction(() => typeof window.runPointTests === 'function');
+    await page.waitForFunction(() => typeof window.runPointTests === 'function' && typeof window.runFeatures === 'function');
     const report = await page.evaluate(() => window.runPointTests());
     assert.equal(report.samples, samples);
+    report.checks.push(...(await page.evaluate(() => window.runFeatures())));
     report.gallery = await page.evaluate(() => window.runGallery());
     assert.deepEqual(report.gallery.errors, []);
     assert.ok(report.gallery.lit > 20000, `Gallery drew too little: ${report.gallery.lit} pixels`);

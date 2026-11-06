@@ -271,9 +271,38 @@ OctreeCloud.attach(engine, points, octree, { pointBudget: 1_000_000, material: {
 | `minNodePixels` | 150 | Refine a node while it spans more than this many pixels. |
 | `maxLoadedPoints` | 3 x `pointBudget` | Points kept loaded before eviction. |
 | `maxConcurrentLoads` | 4 | Nodes loading at once (the rest wait; unwanted loads are aborted). |
-| `material`, `cloud` | defaults | `PointsMaterial` and `PointCloud` options of every node. |
+| `material` | defaults | `PointsMaterial` or its options, shared by every node (`octreeCloud.material`). |
+| `cloud` | defaults | `PointCloud` options of every node. |
+| `adaptiveSize` | `false` | Grow points to fill the gaps left by subsampled nodes; `true` or `{scale}`. |
 
 A failing node is reported to `onError(listener)` (or `engine.onError`) and skipped until `retry()`.
+
+### Adaptive point size
+
+Far parts of a scan draw only coarse nodes, so fixed-size points leave holes. With `adaptiveSize`, each point gets a
+world-unit diameter of `scale` (default 1.5) times the spacing around it. The spacing comes from the density of every
+drawn node at that spot: the node and its parents, and the drawn children the point falls in. A node's density is its
+sample grid, or its point count over its cube's face when it holds fewer points than the grid. So a point shrinks as
+children load around it and stays large in the octants that have none, and a change of level never leaves a hole.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PointsPlugin } from 'margoengine/points';
+import { OctreeCloud, buildOctree } from 'margoengine/points/octree';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine, { pointBudget: 500_000 });
+const positions = new Float32Array(3_000_000).map(() => Math.random() * 100);
+OctreeCloud.attach(engine, points, buildOctree({ positions }), {
+  pointBudget: 500_000,
+  adaptiveSize: { scale: 1.5 },
+  material: { size: 2, shape: 'round' }, // 2 px stays the smallest a point draws
+});
+```
+
+The material is changed to world units with `size` 1 and each point carries its own size. A pixel `size` becomes the
+`minPixelSize`, a world `size` the smallest world diameter, and `maxPixelSize` (default 256) still caps the growth.
+Sizes are rewritten on the CPU only for nodes whose drawn children changed, at most 500,000 points a selection.
 
 ## COPC files (`margoengine/points/copc`)
 
@@ -308,7 +337,7 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 - Per-point colors are stored as RGBA8, so HDR vertex colors are clamped to 0..1.
 - No mipmaps on maps. A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.
 - Transparent points and sprites are not sorted per point. Use `alphaTest` or additive blending for order-independent results. Round antialiased edges of opaque points write depth.
-- No point-size compensation for subsampled blocks yet. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own (COPC is not read).
+- A plain `PointCloud` does not grow its points when the budget subsamples its blocks; `OctreeCloud` does with `adaptiveSize`. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own (COPC is not read).
 - `OctreeCloud` culls in world space and does not follow a mesh transform; place the points in world coordinates.
 
 ## Tests

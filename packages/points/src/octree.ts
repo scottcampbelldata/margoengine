@@ -8,7 +8,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { EnginePlugin } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { PointCloud, type PointCloudOptions } from './cloud.js';
-import type { PointsMaterialOptions } from './material.js';
+import { PointsMaterial, type PointsMaterialOptions } from './material.js';
 
 /** One node: a cube, how many points it holds and its eight child slots. */
 export interface OctreeNode {
@@ -233,10 +233,22 @@ export interface OctreeCloudOptions {
   maxLoadedPoints?: number;
   /** Nodes loading at once. Default 4. */
   maxConcurrentLoads?: number;
-  /** Material of every node's cloud. */
-  material?: PointsMaterialOptions;
+  /** Material shared by every node's cloud. */
+  material?: PointsMaterial | PointsMaterialOptions;
+  /**
+   * Grows each point to fill the gaps of the nodes drawn around it, so a subsampled part of a scan looks solid. The
+   * material then measures in world units with `size` 1 and takes its size from each point; the size it had stays the
+   * smallest a point draws, and `maxPixelSize` the largest. Default false.
+   */
+  adaptiveSize?: boolean | OctreeAdaptiveSize;
   /** Other `PointCloud` options for every node (colour space, block size). */
   cloud?: Omit<PointCloudOptions, 'positions' | 'colors' | 'colorComponents' | 'material'>;
+}
+
+/** Options of `OctreeCloudOptions.adaptiveSize`. */
+export interface OctreeAdaptiveSize {
+  /** Point diameter as a multiple of the spacing around it; 1 only just touches on a perfect grid. Default 1.5. */
+  scale?: number;
 }
 
 /** The part of `PointsPlugin` an `OctreeCloud` uses. */
@@ -250,7 +262,26 @@ interface Loaded {
   controller?: AbortController;
   used: number;
   points: number;
+  /** The drawn nodes under this one when its point sizes were last written. */
+  shape?: string;
 }
+
+/** Point sizes rewritten per selection at most, so a jump of the camera spreads over a few frames. */
+const SIZED_PER_SELECT = 500_000;
+
+/** Points per square unit of a node's sample: its grid spacing, or wider when it holds fewer points than the grid. */
+function nodeDensity(node: OctreeNode): number {
+  const spacing = Math.max(node.spacing, (node.bounds[3] - node.bounds[0]) / Math.sqrt(Math.max(node.count, 1)));
+  return 1 / (spacing * spacing);
+}
+/** The density of a node and every parent, all of which are drawn with it: refinement is additive. */
+function chainDensity(node: OctreeNode): number {
+  let density = 0;
+  for (let n: OctreeNode | null = node; n; n = n.parent) density += nodeDensity(n);
+  return density;
+}
+const sameNodes = (a: readonly OctreeNode[], b: readonly OctreeNode[]) =>
+  a.length === b.length && a.every((node, i) => node === b[i]);
 
 let count = 0;
 
@@ -258,6 +289,8 @@ let count = 0;
 export class OctreeCloud implements EnginePlugin {
   readonly name: string;
   readonly source: OctreeSource;
+  /** The material every node draws with. */
+  readonly material: PointsMaterial;
   pointBudget: number;
   minNodePixels: number;
   maxLoadedPoints: number;
@@ -271,7 +304,10 @@ export class OctreeCloud implements EnginePlugin {
   private readonly loaded = new Map<OctreeNode, Loaded>();
   private readonly failed = new Set<OctreeNode>();
   private readonly maxConcurrent: number;
-  private readonly material?: PointsMaterialOptions;
+  private readonly sizeScale: number = 0;
+  /** Smallest world diameter of a point under `adaptiveSize`. */
+  private readonly sizeFloor: number = 0;
+  private sizesPending = false;
   private readonly cloudOptions: OctreeCloudOptions['cloud'];
   private errorListener?: (node: OctreeNode, error: unknown) => void;
 
@@ -301,8 +337,20 @@ export class OctreeCloud implements EnginePlugin {
       throw new RangeError(
         'Invalid OctreeCloud option; pointBudget, minNodePixels and maxLoadedPoints must be above 0',
       );
-    this.material = options.material;
+    const material =
+      options.material instanceof PointsMaterial ? options.material : new PointsMaterial(options.material);
+    this.material = material;
     this.cloudOptions = options.cloud;
+    if (options.adaptiveSize) {
+      const scale = options.adaptiveSize === true ? 1.5 : (options.adaptiveSize.scale ?? 1.5);
+      if (!(scale > 0) || !Number.isFinite(scale))
+        throw new RangeError('Invalid adaptiveSize.scale; pass a finite number above 0');
+      this.sizeScale = scale;
+      if (material.sizeUnits === 'world') this.sizeFloor = material.size;
+      else material.minPixelSize = Math.min(Math.max(material.minPixelSize, material.size), material.maxPixelSize);
+      material.sizeUnits = 'world';
+      material.size = 1;
+    }
   }
   setup(engine: EngineKernel): void {
     this.engine = engine;
@@ -380,11 +428,71 @@ export class OctreeCloud implements EnginePlugin {
     }
     const shown = new Set(chosen);
     for (const [node, entry] of this.loaded) if (entry.cloud) entry.cloud.visible = shown.has(node);
+    if (this.sizeScale && (this.sizesPending || !sameNodes(chosen, this.visible))) this.fitSizes(chosen, shown);
     this.visible = chosen;
     this.stats.drawn = drawn;
     this.request(wanted);
     this.evict();
     return chosen;
+  }
+
+  /** World diameter of a point in a place of this many points per square unit. */
+  private pointSize(density: number): number {
+    return Math.max(this.sizeFloor, this.sizeScale / Math.sqrt(density));
+  }
+
+  /** Rewrites the point sizes of drawn nodes whose drawn children changed, largest on screen first. */
+  private fitSizes(chosen: OctreeNode[], shown: Set<OctreeNode>): void {
+    const shapes = new Map<OctreeNode, string>(),
+      shape = (node: OctreeNode): string => {
+        let text = '';
+        for (let o = 0; o < 8; o++) {
+          const child = node.children[o];
+          if (child && shown.has(child)) text += `${o}(${shape(child)})`;
+        }
+        shapes.set(node, text);
+        return text;
+      };
+    for (const node of chosen) if (!node.parent || !shown.has(node.parent)) shape(node);
+    let room = SIZED_PER_SELECT;
+    this.sizesPending = false;
+    for (const node of chosen) {
+      const entry = this.loaded.get(node)!,
+        text = shapes.get(node)!;
+      if (entry.shape === text) continue;
+      if (room <= 0) {
+        this.sizesPending = true;
+        break;
+      }
+      room -= node.count;
+      entry.shape = text;
+      this.sizeNode(node, entry.cloud!, shown);
+    }
+  }
+
+  /** Sizes each point of a drawn node by the density where it lies: this node's chain, then drawn nodes below it. */
+  private sizeNode(node: OctreeNode, cloud: PointCloud, shown: Set<OctreeNode>): void {
+    const { positions, sizes } = cloud,
+      base = chainDensity(node);
+    if (!sizes) return;
+    for (let i = 0; i < cloud.count; i++) {
+      const x = positions[i * 3],
+        y = positions[i * 3 + 1],
+        z = positions[i * 3 + 2];
+      let density = base,
+        at = node;
+      for (;;) {
+        const b = at.bounds,
+          octant =
+            (x >= (b[0] + b[3]) / 2 ? 1 : 0) | (y >= (b[1] + b[4]) / 2 ? 2 : 0) | (z >= (b[2] + b[5]) / 2 ? 4 : 0),
+          child = at.children[octant];
+        if (!child || !shown.has(child)) break;
+        density += nodeDensity(child);
+        at = child;
+      }
+      sizes[i] = this.pointSize(density);
+    }
+    cloud.markDirty('sizes');
   }
 
   private request(wanted: { node: OctreeNode; size: number }[]): void {
@@ -413,11 +521,20 @@ export class OctreeCloud implements EnginePlugin {
       const data = await this.source.load(node, signal);
       signal.throwIfAborted();
       if (this.disposed) return;
-      const cloud = new PointCloud({ ...this.cloudOptions, ...data, material: this.material });
+      const cloud = new PointCloud({
+        ...this.cloudOptions,
+        ...data,
+        material: this.material,
+        // Until the first selection that draws it, a node has no drawn children.
+        sizes: this.sizeScale
+          ? new Float32Array(data.positions.length / 3).fill(this.pointSize(chainDensity(node)))
+          : undefined,
+      });
       cloud.visible = false;
       this.points.add(cloud);
       entry.cloud = cloud;
       entry.points = cloud.count;
+      entry.shape = '';
       this.stats.loaded += cloud.count;
     } catch (error) {
       if (signal.aborted) return;
