@@ -4,6 +4,7 @@
 
 ### Apple GPUs
 
+- glTF PBR materials without textures or effects draw in WebKit: it gives an invalid layout for an empty group past the last one a shader uses, so `@margoengine/gltf-pro` now binds one explicit empty group there.
 - Reflection probes no longer lose texels: `LightProbes` wrote two neighbouring texels into one `vec4u` from different workgroups, and an Apple GPU kept only one of them, so about half the texel pairs of the rough levels held a black texel.
 - The south pole of a `GeometryGenerator.sphere` is no longer a ring turned inside out: an accurate `sin` of f32 pi is a tiny negative.
 

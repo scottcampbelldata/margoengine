@@ -11,6 +11,7 @@ import {
 } from '@margoengine/core/extension';
 import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import { splitTRS } from '@margoengine/math/quat';
+import { pipelineGroup } from './group.js';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView, inView } from '../../shared/view-rect.js';
 import { attenuationPower } from '../../shared/attenuation.js';
@@ -380,7 +381,7 @@ function tintGroup(
     ? kept
     : {
         entries: effect.entries,
-        group: device.createBindGroup({ layout: tint.getBindGroupLayout(2), entries: effect.entries }),
+        group: pipelineGroup(device, tint, 2, effect.entries),
       };
 }
 /** A node matrix without an inverse (a zero scale) leaves the draw no normal matrix. */
@@ -1380,9 +1381,11 @@ function textureGroup(
   m: PBRMaterial,
   hooks: GLTFExtendedMaterials | undefined,
 ): GPUBindGroup {
-  return device.createBindGroup({
-    layout: pipeline.getBindGroupLayout(1),
-    entries: r.views.flatMap((view, i) => {
+  return pipelineGroup(
+    device,
+    pipeline,
+    1,
+    r.views.flatMap((view, i) => {
       const binding = i < 5 || !m.extended ? i * 2 : 10 + planOf(m, hooks!).slots[i] * 2;
       return view && (!(r.primitive.extension ?? m.extension)?.replacesPhysical || i < 5)
         ? [
@@ -1391,7 +1394,7 @@ function textureGroup(
           ]
         : [];
     }),
-  });
+  );
 }
 interface DrawScratch {
   context?: Context;
@@ -4661,7 +4664,7 @@ export class PBRModel implements EnginePlugin {
         resource:
           'buffer' in resource ? { buffer: resource.buffer, offset: resource.offset, size: resource.size } : resource,
       }));
-      const group = c.device.createBindGroup({ layout: pipeline.getBindGroupLayout(2), entries: snapshot });
+      const group = pipelineGroup(c.device, pipeline, 2, snapshot);
       cached = { entries: snapshot, group };
     }
     return cached;
