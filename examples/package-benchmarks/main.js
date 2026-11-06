@@ -64,7 +64,6 @@ const demos = {
     label: 'Draco jobs per two-worker batch',
     load: () => import('./decoders.js'),
   },
-  ifc: { sizes: [1, 4, 9], initial: 4, label: 'IFC wall parses per batch', load: () => import('./ifc.js') },
   fbx: { sizes: [1, 4, 9], initial: 4, label: 'Static FBX conversions per batch', load: () => import('./fbx.js') },
   points: {
     sizes: [1, 4, 9],

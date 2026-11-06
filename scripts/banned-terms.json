@@ -1,5 +1,5 @@
 {
-  "about": "Terms no tracked text file, and no tracked PDF's printed text, may contain (scripts/check-banned-terms.mjs, in verify through tests/banned-terms.test.js). They name Scott's private boundary-representation kernel, its packages and its functions, which stay out of this repository (AGENTS.md); CAD file import and CAD formats are fine here. Each entry is the first 24 hex digits of SHA-256 of 'margo-banned:' + the lowercased term, so this file never names them. 'tokens' match whole words (as written, with hyphens removed, and each piece of a hyphenated compound); 'pairs' match two adjacent pieces of an 'a/b/c' path. 'pathTokens' match, like 'tokens', a whole piece of a tracked file's path (split at every character that is not a letter or digit, and between camelCase words), so a file or folder name cannot bring a removed name back either. 'allow' lists { path, reason } entries; it is empty on purpose, bar one entry that waits for a ruling.",
+  "about": "Terms no tracked text file, and no tracked PDF's printed text, may contain (scripts/check-banned-terms.mjs, in verify through tests/banned-terms.test.js). They name Scott's private boundary-representation kernel, its packages and its functions, and his private building-model package and the runtime it used, which stay out of this repository (AGENTS.md); CAD file import and CAD formats are fine here. Each entry is the first 24 hex digits of SHA-256 of 'margo-banned:' + the lowercased term, so this file never names them. 'tokens' match whole words (as written, with hyphens removed, and each piece of a hyphenated compound); 'pairs' match two adjacent pieces of an 'a/b/c' path. 'pathTokens' match, like 'tokens', a whole piece of a tracked file's path (split at every character that is not a letter or digit, and between camelCase words), so a file or folder name cannot bring a removed name back either. 'allow' lists { path, reason } entries; it is empty on purpose, bar one entry that waits for a ruling.",
   "tokens": [
     "41273cbe89746cba15fe90a2",
     "5392dc1fdcc32f016e65ff7a",
@@ -44,14 +44,17 @@
     "ca83d105581d96a646abc8d9",
     "3417117123a8422af4fca227",
     "06f863add81a85f67265e913",
-    "57747c23c1a05544d5469c6e"
+    "57747c23c1a05544d5469c6e",
+    "9d1c2b49d198e755ffdf6781",
+    "b4cd9c8bff631015f3fe7659"
   ],
   "pairs": [
     "3ea53541f37d23ebedd721b1",
     "ae9dc8497543a38ce91de580",
     "fabe4d60643fd7bfe3c01d07",
     "396f67b81b83b2469e9b938f",
-    "db3bc6a29cec43f23e018576"
+    "db3bc6a29cec43f23e018576",
+    "a25b8a2869bd169a32334f5f"
   ],
   "pathTokens": [
     "cebdbc76e83dbc5a0848aac9"

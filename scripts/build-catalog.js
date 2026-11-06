@@ -42,7 +42,6 @@ const layers = {
     'fbx',
     'usdz',
     'exporters',
-    'ifc',
     'blender',
     'cache',
     'splats',

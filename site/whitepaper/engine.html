@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Margo Engine whitepaper</title>
-  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 21,974 bytes gzip; 100 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
+  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 21,974 bytes gzip; 99 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
   <link rel="canonical" href="https://margoengine.com/whitepaper/engine">
   <meta name="theme-color" content="#0b1020">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Margo Engine whitepaper">
-  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 21,974 bytes gzip; 100 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
+  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 21,974 bytes gzip; 99 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
   <meta property="og:url" content="https://margoengine.com/whitepaper/engine">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="../favicon.ico" sizes="32x32">
@@ -30,13 +30,13 @@
 <header class="masthead">
   <p class="eyebrow">Whitepaper · October 2026 · coming soon</p>
   <h1>Margo Engine</h1>
-  <p class="deck">A WebGPU engine for the web. Core plus stage is 21,974 bytes gzipped. The catalog lists 100 packages (none published to npm yet), with one install that holds them all. Every number we publish names its source.</p>
+  <p class="deck">A WebGPU engine for the web. Core plus stage is 21,974 bytes gzipped. The catalog lists 99 packages (none published to npm yet), with one install that holds them all. Every number we publish names its source.</p>
   <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Sizes at commit 51d8786a; tests at 01836c27; other figures name their own commit or date</span><span><a href="./engine.pdf">PDF</a></span></div>
 </header>
 
 <div class="ledger" role="list">
   <div role="listitem"><b>21,974 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; CI fails a change at 25,000</span><i>entry-sizes.json · 51d8786a</i></div>
-  <div role="listitem"><b>100</b><span>packages in the catalog, all reachable from <code>npm i margoengine</code> (none published to npm yet)</span><i>docs/catalog.json</i></div>
+  <div role="listitem"><b>99</b><span>packages in the catalog, all reachable from <code>npm i margoengine</code> (none published to npm yet)</span><i>docs/catalog.json</i></div>
   <div role="listitem"><b>6,498</b><span>Node tests in every <code>npm run verify</code>: 6,496 pass, 2 skipped, 0 fail</span><i>results/test-count.json · 01836c27</i></div>
   <div role="listitem"><b>153 of 161</b><span>three.js features with an equivalent Margo package; 4 partial, 4 missing</span><i>docs/three-parity-matrix.md · bec8b597</i></div>
 </div>
@@ -244,7 +244,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
   <li><strong>49 GPU-call proofs.</strong> A recording GPU logs every call, descriptor, shader and buffer write, and a proof compares a baseline commit with a candidate exactly. That checks claims such as "attaching nothing from this package leaves core's GPU work unchanged". Each proof is pinned to the commit that made its claim, and 20 run against the working tree in every merge.</li>
   <li><strong>Pixels on a real GPU.</strong> The visual check renders 62 views of sample models and demos and compares them with references captured four times per GPU and browser. A view is never compared with references from another GPU (<code>tests/visual/profiles/</code>).</li>
   <li><strong>Every shader compiled.</strong> <code>npm run check:wgsl</code> compiles every WGSL source the packages hold on the browser's WebGPU, with feature flags both on and off, including shaders no view draws.</li>
-  <li><strong>Hostile files.</strong> Every parser of untrusted input has a seeded fuzzer: glTF, Draco, KTX2, meshopt, HDR, EXR, FBX, OBJ, STL, PLY, 3MF, USD, IFC and network snapshots. Its findings were fixed with regression tests. Examples: a 314-byte PLY that allocated 336 MiB, a 3MF zip entry that inflated 1,000-fold, and IFC files that looped forever.</li>
+  <li><strong>Hostile files.</strong> Every parser of untrusted input has a seeded fuzzer: glTF, Draco, KTX2, meshopt, HDR, EXR, FBX, OBJ, STL, PLY, 3MF, USD and network snapshots. Its findings were fixed with regression tests. Examples: a 314-byte PLY that allocated 336 MiB and a 3MF zip entry that inflated 1,000-fold.</li>
   <li><strong>Security.</strong> A review fixed model files whose URIs escaped their directory, a quadratic regular expression in the STL reader, and glTF keys that reached the object prototype. The standard WebGPU path and the other WebGL2 tiers need no <code>'unsafe-eval'</code>; the Wasm kernel needs <code>'wasm-unsafe-eval'</code>, and a strict policy on the page and every worker ran with zero violations in Edge (<code>docs/security.md</code>, <code>results/csp-check.json</code>). The optional WebGL2 CPU compute tier of <code>webgl2-compat</code> builds its shaders as JavaScript with <code>new Function</code>, so it needs <code>'unsafe-eval'</code> on the page and is refused (MargoError <code>unsupported</code>) without it (<code>packages/webgl2-compat/README.md</code>).</li>
 </ul>
 <h3>A claims inventory</h3>

@@ -137,7 +137,7 @@ Doesn't (or needs app code):
 
 - **Huge geometry or child offsets.** Vertex positions and child (node) translations that are themselves kilometres
   from their root are float32 in core when loaded; the plugin cannot recover precision lost at load. Re-centre the
-  asset (most IFC/glTF exporters have a local-origin or RTC option) or load far parts as separate roots. A gltf-pro or
+  asset (most glTF exporters have a local-origin or RTC option) or load far parts as separate roots. A gltf-pro or
   loader option that subtracts an offset at parse time would fix it without core.
 - **State held in local coordinates by other code**: OrbitControls `saveState()`/`reset()`, an orthographic
   `CameraProjection.fit` animation in flight, your own saved views or section planes. Shift them in `onRebase` (or

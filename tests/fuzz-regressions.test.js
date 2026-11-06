@@ -19,7 +19,6 @@ import {
 } from '../packages/loaders/dist/index.js';
 import { convertFBX } from '../packages/fbx/dist/index.js';
 import { parseUSDA as usdzUSDA, parseUSDC, parseUSDZ } from '../packages/usdz/dist/index.js';
-import { parseIFC } from '../packages/ifc/dist/index.js';
 import { V, writeCrate } from '../packages/usdz/tests/crate-writer.js';
 import { zip } from '../scripts/fuzz/targets-assets.js';
 
@@ -220,24 +219,6 @@ test('USDC: counts read from the file are never preallocated (fuzzer reproducers
     const grown = process.memoryUsage().heapUsed + process.memoryUsage().arrayBuffers - before;
     assert.ok(grown < 32 * 2 ** 20, `${name}: ${grown} bytes`);
   }
-});
-
-test('IFC: malformed STEP parameter lists are refused before web-ifc (which loops on them)', async () => {
-  // Found: hang inside web-ifc 0.0.78 StreamAllMeshes on `(#1e999,'Body',...)`; also `#11 x`, `.T.x`, `'a'b`, `$x`,
-  // `#-1`. And web-ifc's own TypeErrors from OpenModel on truncated headers.
-  const { IfcAPI } = await import('web-ifc');
-  const api = new IfcAPI();
-  await api.Init();
-  api.SetLogLevel(6);
-  const wall = readFileSync(join(root, 'packages/ifc/tests/fixtures/wall.ifc'), 'latin1');
-  for (const v of ['#1e999', '#11 x', '.T.x', "'a'b", '$x', '#-1']) {
-    const data = text(wall.replace("(#11,'Body'", `(${v},'Body'`));
-    await quick(v, () => loaderError(() => parseIFC(api, data), 'syntax'));
-  }
-  // web-ifc's OpenModel reads FILE_SCHEMA without checking it exists ("Cannot read properties of undefined").
-  await loaderError(() => parseIFC(api, text(wall.replace(/FILE_SCHEMA\(\('IFC4'\)\);\r?\n/, ''))), 'unsupported');
-  // The API still reads the next file.
-  assert.equal(parseIFC(api, text(wall)).products.length, 1);
 });
 
 test('USD meshes: the convex polygon check has a total work budget', async () => {

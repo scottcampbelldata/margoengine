@@ -90,9 +90,6 @@ Those short runs do not establish physical-mobile or cold-hosted acceptance.
 - Decoders: actual Draco Avocado geometry from
   the package fixture, decoded through a two-worker pool with accessor checks.
   The surface uses transferred geometry, without source textures or KTX2 coverage.
-- IFC: the actual IFC4 wall fixture goes through
-  initialized web-ifc and Margo's tessellator, retaining meter geometry and BIM
-  identifiers. Source wall dimensions remain recorded before display normalization.
 - FBX: the existing ASCII triangle fixture goes
   through actual FBX→GLB conversion. Its converted geometry is displayed;
   this tiny static fixture does not establish production skin/texture/clip support.

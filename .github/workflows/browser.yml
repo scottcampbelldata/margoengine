@@ -68,7 +68,7 @@ jobs:
         with:
           name: margo-blender-addon
           path: dist/margo-blender-addon-v*.zip
-      - name: Verify XR sessions, IFC geometry and USDZ interop
+      - name: Verify XR sessions and USDZ interop
         run: npm run modern:test:interop
       - name: Verify standalone packed interop exports and TypeScript consumers
         run: npm run modern:test:interop:packages

@@ -2,7 +2,7 @@
 
 [Browse the searchable catalog](https://scottcampbelldata.github.io/margoengine/).
 
-Search all 100 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the four standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
+Search all 99 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the four standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
 
 The [release notes](../CHANGELOG.md#unreleased) cover standalone USDZ parsing,
 Draco/Meshopt support in glTF Pro and synchronous parsing behavior. The core and the stage
@@ -41,7 +41,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-100 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+99 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -63,7 +63,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/stats`](../packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling, pipeline compile tracking, a CPU phase breakdown, leak alerts and field telemetry. |
 | [`@margoengine/inspector`](../packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
 
-### Loading and formats (12)
+### Loading and formats (11)
 
 | Package | What it is |
 | --- | --- |
@@ -74,7 +74,6 @@ node --test tests/catalog.test.js
 | [`@margoengine/fbx`](../packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](../packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
 | [`@margoengine/exporters`](../packages/exporters/README.md) | glTF/GLB, STL, OBJ, PLY, USDZ, COLLADA and 3MF exporters for Margo Engine scenes and geometry data. |
-| [`@margoengine/ifc`](../packages/ifc/README.md) | IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime. |
 | [`@margoengine/blender`](../packages/blender/README.md) | Optional offline Blender .margo assets using Margo's WebGPU PBR renderer. |
 | [`@margoengine/cache`](../packages/cache/README.md) | Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback. |
 | [`@margoengine/splats`](../packages/splats/README.md) | Optional Gaussian splats with GPU covariance projection and stable compute radix sorting. |

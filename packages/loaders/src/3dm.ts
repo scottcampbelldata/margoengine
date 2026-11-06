@@ -139,8 +139,8 @@ function using<T extends Disposable, R>(value: T, use: (value: T) => R): R {
 }
 
 /**
- * Reads the meshes, layers and attributes of a Rhino `.3dm` file through a rhino3dm runtime you load and own, the same
- * pattern as `parseIFC`, so its Wasm file is never part of this package. Each object becomes a group of one merged mesh:
+ * Reads the meshes, layers and attributes of a Rhino `.3dm` file through a rhino3dm runtime you load and own, so its Wasm
+ * file is never part of this package. Each object becomes a group of one merged mesh:
  * a mesh as it is, and any other surface object through the render mesh saved in the file. Objects without one are
  * counted in `skipped`; the runtime meshes nothing on its own.
  *

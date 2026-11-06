@@ -164,7 +164,7 @@ Apache-2.0 licensed.
 
 Triangles and convex planar polygons are supported; meshes must author `subdivisionScheme = "none"`. A prim may reference a prim of the same layer (`references = </Path>`, what `exportUSDZ` writes for a shared geometry), and what it authors wins; class prims are not drawn. Binary USDC (the common production USDZ encoding), any other composition, animation, subdivision, hole faces, textures, uniform/face-varying color interpolation and concave polygons are rejected explicitly. Use OpenUSD `usdcat` to convert a binary root, or load it with `@margoengine/usdz`, which reads USDC natively; flatten/tessellate unsupported features before loading. File normals and UVs are not retained; normals are recomputed. `units` defaults to `'meters'`; `'file'` keeps authored scale. `maxDepth` defaults to 32 (maximum 64), `maxEntryBytes` to 64 MiB, and vertex/triangle/ZIP limits apply.
 
-Root `npm run modern:test:interop` checks round trips, units, transforms, visibility, winding, topology/composition errors, CRC, alignment, USDC rejection and budgets. Full IFC geometry parsing is provided separately by `@margoengine/ifc` with web-ifc.
+Root `npm run modern:test:interop` checks round trips, units, transforms, visibility, winding, topology/composition errors, CRC, alignment, USDC rejection and budgets.
 
 ## Optional vertex color and opacity rendering
 
@@ -536,7 +536,7 @@ console.log(positions.length, indices);
 
 ## Rhino 3DM
 
-`parse3DM` from `@margoengine/loaders/3dm` reads the meshes, layers and attributes of a Rhino `.3dm` file through a rhino3dm runtime you install, host and load, the same pattern as `parseIFC`. Its Wasm file is never part of this package.
+`parse3DM` from `@margoengine/loaders/3dm` reads the meshes, layers and attributes of a Rhino `.3dm` file through a rhino3dm runtime you install, host and load. Its Wasm file is never part of this package.
 
 ```ts
 import { parse3DM, type RhinoRuntime } from '@margoengine/loaders/3dm';

@@ -21,13 +21,12 @@ export const OUTPUT = 'THIRD-PARTY-NOTICES.md';
 /** Licences any runtime dependency may carry without review. */
 const ALLOWED = new Set(['MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'Zlib', '0BSD']);
 /** Reviewed exceptions: package -> licence it may carry (see the obligations section of the output). */
-const EXCEPTIONS = { 'web-ifc': 'MPL-2.0' };
+const EXCEPTIONS = {};
 
 /** Why each external runtime dependency or peer exists. A new one fails --check until it is added here. */
 const WHY = {
   '@dimforge/rapier3d-compat': 'Rapier rigid-body solver; optional, the app installs and initializes it',
   '@dimforge/rapier2d-compat': 'Rapier 2D rigid-body solver; optional, the app installs and initializes it',
-  'web-ifc': 'IFC (BIM) parser; the app installs and initializes it, the package only reads its output',
   react: 'React component bindings for the stage',
   'react-dom': 'React DOM root and portal rendering for scene and HTML components',
   scheduler: 'React DOM scheduling dependency',
@@ -437,8 +436,6 @@ ${table(
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/encoder/build (checked 2026-11-06):
     \`basis_encoder.wasm\` (\`dea2778b6d1705b4fdf12053e94cda0ac1cc4340a7e06911778a003ba785808a\`) and
     \`basis_encoder.js\` (\`2c0aa2a648b6fc6006e116074a1dd075d6aaf1adb34d4bfd9818acd79e96537e\`, before the build's static-embind step).
-- **MPL-2.0 (web-ifc, peer of \`@margoengine/ifc\`).** Not redistributed in any tarball: the app installs it. A site or
-  app that serves \`web-ifc.wasm\` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
   (LGPL-3.0) are installed as an optional dependency of Next.js for \`examples/next\`, and
   \`scripts/optimize-demo-assets.js\` and \`scripts/build-scifi-helmet.mjs\` use sharp to resize textures. \`margo-convert

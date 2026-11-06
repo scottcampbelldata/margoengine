@@ -209,7 +209,7 @@ try {
   for (const { path, status } of fetched) assert.equal(status, 200, `${path} answered ${status}`);
   assert.deepEqual(errors, []);
   assert.deepEqual(
-    fetched.map((file) => file.path).filter((file) => /\.wasm$|draco|basis|rapier|recast|ifc|worker/i.test(file)),
+    fetched.map((file) => file.path).filter((file) => /\.wasm$|draco|basis|rapier|recast|worker/i.test(file)),
     [],
     'no Wasm, worker or optional decoder file',
   );

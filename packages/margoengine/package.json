@@ -1002,14 +1002,6 @@
       "types": "./dist/html.d.ts",
       "import": "./dist/html.js"
     },
-    "./ifc": {
-      "types": "./dist/ifc.d.ts",
-      "import": "./dist/ifc.js"
-    },
-    "./ifc/worker": {
-      "types": "./dist/ifc/worker.d.ts",
-      "import": "./dist/ifc/worker.js"
-    },
     "./input": {
       "types": "./dist/input.d.ts",
       "import": "./dist/input.js"
@@ -2537,7 +2529,6 @@
     "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/headless": "^1.0.0",
     "@margoengine/html": "^1.0.0",
-    "@margoengine/ifc": "^1.0.0",
     "@margoengine/input": "^1.0.0",
     "@margoengine/inspector": "^1.0.0",
     "@margoengine/kinematics-constraints": "^1.0.0",
@@ -2612,8 +2603,7 @@
     "@dimforge/rapier2d-compat": ">=0.14.0 <1",
     "@dimforge/rapier3d-compat": ">=0.14.0 <1",
     "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0",
-    "web-ifc": "^0.0.78"
+    "react-dom": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "@dimforge/rapier2d-compat": {
@@ -2626,9 +2616,6 @@
       "optional": true
     },
     "react-dom": {
-      "optional": true
-    },
-    "web-ifc": {
       "optional": true
     }
   }

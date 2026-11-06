@@ -88,7 +88,6 @@ test('consumers load the split entries instead of the heavy roots', () => {
     [dist('usdz', 'worker'), '@margoengine/gltf-pro'],
     [dist('fbx', 'worker'), '@margoengine/gltf-pro'],
     [dist('fbx', 'worker'), '@margoengine/exporters'],
-    [dist('ifc', 'index'), '@margoengine/loaders'],
     [dist('loaders', 'font'), '@margoengine/geometry'],
     [dist('loaders', 'svg'), '@margoengine/geometry'],
     [dist('procedural', 'index'), '@margoengine/geometry'],

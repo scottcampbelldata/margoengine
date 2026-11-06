@@ -5,7 +5,6 @@ import { createWorkload as loaders } from './loaders.js';
 import { createWorkload as exporters } from './exporters.js';
 import { createWorkload as usdz } from './usdz-export.js';
 import { createWorkload as fbx, fixtureGeometry } from './fbx.js';
-import { createWorkload as ifc } from './ifc.js';
 import { createWorkload as decoders } from './decoders.js';
 import { assetWorkload, displayGeometry, geometryData } from './asset-scene.js';
 import { parseOFF } from '../../packages/loaders/dist/index.js';
@@ -109,28 +108,6 @@ test('FBX demo conversion preserves the existing triangle and validates its actu
     if (prior) Object.defineProperty(globalThis, 'FileReader', prior);
     else delete globalThis.FileReader;
   }
-});
-
-test('IFC demo uses real Wasm, preserves BIM identifiers and closes parser ownership', async () => {
-  const w = await ifc(1, options);
-  try {
-    verify(w);
-    assert.equal(w.details().schema, 'IFC4');
-    assert.equal(w.details().trianglesPerModel, 12);
-    assert.equal(w.products[0].expressID, 25);
-    assert.equal(w.products[0].name, 'Test wall');
-    assert.equal(w.products[0].globalId, '1kTvXnbbzCWw8lcMd1dR4o');
-    w.details()
-      .sourceExtentsMeters.toSorted((a, b) => a - b)
-      .forEach((value, index) => assert.ok(Math.abs(value - [0.2, 3, 4][index]) < 1e-5));
-    assert.equal(w.api.IsModelOpen(0), false);
-    await advance(w);
-    assert.equal(w.details().completedJobs, 2);
-  } finally {
-    w.dispose();
-  }
-  w.dispose();
-  assert.equal(w.api.wasmModule, undefined);
 });
 
 test('Asset batching prevents overlap, cancels paused results and rejects late page ownership', async () => {

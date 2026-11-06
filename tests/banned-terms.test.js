@@ -34,6 +34,14 @@ test('every removed CAD name is reported', () => {
   for (const text of banned) assert.notDeepEqual(hitsInLine(`a line with ${text} in it`), [], text.length);
 });
 
+test('the removed building-model package and its runtime are reported, and the bare format name is not', () => {
+  const name = word(105, 102, 99),
+    engine = word(109, 97, 114, 103, 111, 101, 110, 103, 105, 110, 101);
+  for (const text of [`@${engine}/${name}`, `${engine}/${name}`, `${engine}/${name}/worker`, `web-${name}`, `web${name}`])
+    assert.notDeepEqual(hitsInLine(`import x from '${text}'`), [], text);
+  assert.deepEqual(hitsInLine(`a .${name} file, ${name.toUpperCase()}4 and ${name}`), []);
+});
+
 test('ordinary text, IFC files and the kept names pass; binary data is skipped', () => {
   assert.deepEqual(hitsInLine('CAD camera controls, a step function, section planes in prose, featureEdges'), []);
   assert.deepEqual(hitsInLine("ISO-10303-21;\nHEADER;\nFILE_SCHEMA(('IFC4'));"), []);

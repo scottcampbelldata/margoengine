@@ -26,7 +26,6 @@ const defaults = {
   exporters: 4,
   'usdz-export': 4,
   decoders: 4,
-  ifc: 4,
   fbx: 4,
   points: 4,
   toon: 4,
@@ -39,7 +38,7 @@ const defaults = {
   video: 4,
   blender: 4,
 };
-const assetPackages = ['loaders', 'exporters', 'usdz-export', 'decoders', 'ifc', 'fbx'];
+const assetPackages = ['loaders', 'exporters', 'usdz-export', 'decoders', 'fbx'];
 const flags = [
   '--start-maximized',
   '--disable-features=CalculateNativeWinOcclusion',
@@ -529,16 +528,6 @@ async function runBenchmarks() {
                   active.every((worker) => worker.name === 'margoengine-decoder' && worker.messages > 0),
                   'Actual two-worker Draco pool was not used',
                 );
-              }
-              if (name === 'ifc') {
-                assert.equal(details.schema, 'IFC4');
-                assert.equal(details.trianglesPerModel, 12);
-                assert.equal(details.productsPerModel, 1);
-                assert.equal(details.firstExpressID, 25);
-                assert.equal(details.firstProductName, 'Test wall');
-                details.sourceExtentsMeters
-                  .toSorted((a, b) => a - b)
-                  .forEach((value, index) => assert.ok(Math.abs(value - [0.2, 3, 4][index]) < 1e-5));
               }
               if (name === 'fbx') {
                 assert.equal(details.verticesPerModel, 3);

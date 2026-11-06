@@ -45,7 +45,7 @@ async function child() {
     iterations = Number(arg('iterations', Infinity));
   const target = (await loadTargets()).find((t) => t.name === name);
   if (!target) throw new Error(`no fuzz target ${name}`);
-  // stdout carries the JSON lines; what parsers print themselves (web-ifc logs every bad file) goes to stderr, capped.
+  // stdout carries the JSON lines; what parsers print themselves (a wasm parser may log every bad file) goes to stderr, capped.
   let printed = 0;
   console.log =
     console.info =

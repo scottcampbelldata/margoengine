@@ -467,22 +467,6 @@
     "category": "Loading and formats"
   },
   {
-    "id": "ifc",
-    "title": "Ifc",
-    "package": "@margoengine/ifc",
-    "version": "1.0.0",
-    "published": false,
-    "description": "IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime.",
-    "requirements": "See the package guide for requirements",
-    "keywords": "ifc",
-    "install": "npm install @margoengine/ifc@1.0.0",
-    "imports": "import { parseIFC } from '@margoengine/ifc';",
-    "exports": [
-      "parseIFC"
-    ],
-    "category": "Loading and formats"
-  },
-  {
     "id": "blender",
     "title": "Blender",
     "package": "@margoengine/blender",

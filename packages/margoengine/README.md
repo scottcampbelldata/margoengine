@@ -57,7 +57,6 @@ install.
 | Package | Install | Why |
 | --- | --- | --- |
 | `margoengine/physics` | `npm i @dimforge/rapier3d-compat` | You pass the initialized Rapier module to `new Physics(engine, {rapier})` |
-| `margoengine/ifc` | `npm i web-ifc` | You pass an initialized `IfcAPI` to `parseIFC` |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
 
 `margoengine/react` holds every React binding but five groups, each its own entry: `margoengine/react/gltf-pro`

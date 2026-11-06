@@ -37,7 +37,7 @@ who reports in good faith, stays within this policy and does not access other pe
 ## Scope
 
 In scope: the code in the published npm packages and the release process (tarball contents, provenance, dependencies).
-That includes every parser of untrusted input (glTF/GLB, OBJ, STL, PLY, 3MF, FBX, USD/USDZ, IFC, KTX2/Basis,
+That includes every parser of untrusted input (glTF/GLB, OBJ, STL, PLY, 3MF, FBX, USD/USDZ, KTX2/Basis,
 Draco, meshopt, EXR, HDR, .margo and the rest), HTML overlays fed with file or user strings, worker messages, and URIs
 read from model files. What the engine defends against, and what it leaves to the application, is in
 [docs/security.md](docs/security.md).

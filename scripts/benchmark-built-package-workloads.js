@@ -17,7 +17,7 @@ const directory = existing ? resolve(existing.slice('--artifact='.length)) : (aw
 process.env.WORKLOAD_BUILT_DIR = directory;
 console.log(JSON.stringify({ builtArtifact: directory, buildOnly, productionSourceChanged: false }));
 if (!buildOnly) {
-  process.env.WORKLOAD_PACKAGES ??= 'loaders,exporters,usdz-export,decoders,ifc,fbx,points,toon,transitions';
+  process.env.WORKLOAD_PACKAGES ??= 'loaders,exporters,usdz-export,decoders,fbx,points,toon,transitions';
   process.env.WORKLOAD_REPORT_PREFIX ??= `package-built-assets-${new Date().toISOString().replace(/[^0-9TZ]/g, '')}`;
   let source = await readFile('scripts/benchmark-package-workloads.js', 'utf8');
   const replace = (before, after) => {

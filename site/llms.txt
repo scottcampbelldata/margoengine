@@ -50,7 +50,6 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/fbx](https://margoengine.com/llms/packages/fbx.md): Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline.
 - [@margoengine/usdz](https://margoengine.com/llms/packages/usdz.md): Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR.
 - [@margoengine/exporters](https://margoengine.com/llms/packages/exporters.md): glTF/GLB, STL, OBJ, PLY, USDZ, COLLADA and 3MF exporters for Margo Engine scenes and geometry data.
-- [@margoengine/ifc](https://margoengine.com/llms/packages/ifc.md): IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime.
 - [@margoengine/blender](https://margoengine.com/llms/packages/blender.md): Optional offline Blender .margo assets using Margo's WebGPU PBR renderer.
 - [@margoengine/cache](https://margoengine.com/llms/packages/cache.md): Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a…
 - [@margoengine/splats](https://margoengine.com/llms/packages/splats.md): Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.
@@ -182,7 +181,6 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/fbx API](https://margoengine.com/llms/api/fbx.md): 3 entry points
 - [@margoengine/usdz API](https://margoengine.com/llms/api/usdz.md): 2 entry points
 - [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 40 entry points
-- [@margoengine/ifc API](https://margoengine.com/llms/api/ifc.md): 2 entry points
 - [@margoengine/blender API](https://margoengine.com/llms/api/blender.md): 1 entry point
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 3 entry points
 - [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 2 entry points

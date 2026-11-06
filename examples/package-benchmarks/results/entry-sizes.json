@@ -1042,20 +1042,6 @@
         "gzip": 4954
       }
     },
-    "@margoengine/ifc": {
-      ".": {
-        "raw": 5796,
-        "gzip": 2568
-      },
-      "./worker": {
-        "raw": 2557,
-        "gzip": 1219
-      },
-      "dist/workers/ifc.js": {
-        "raw": 7284,
-        "gzip": 3204
-      }
-    },
     "@margoengine/input": {
       ".": {
         "raw": 15015,
@@ -2882,26 +2868,6 @@
       "raw": 4335248,
       "gzip": 1644912,
       "brotli": 1196116
-    },
-    "packages/ifc/dist/workers/ifc.js": {
-      "raw": 7252,
-      "gzip": 3186,
-      "brotli": 2821
-    },
-    "node_modules/web-ifc/web-ifc-api-iife.js": {
-      "raw": 6089952,
-      "gzip": 504591,
-      "brotli": 213065
-    },
-    "node_modules/web-ifc/web-ifc.wasm": {
-      "raw": 1595268,
-      "gzip": 578495,
-      "brotli": 439717
-    },
-    "node_modules/web-ifc/web-ifc-mt.wasm": {
-      "raw": 1558039,
-      "gzip": 574912,
-      "brotli": 424250
     }
   },
   "splits": {

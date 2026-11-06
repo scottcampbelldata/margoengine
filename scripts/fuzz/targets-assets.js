@@ -1,9 +1,8 @@
 // Fuzz targets for the asset parsers (launch gate 11a): @margoengine/loaders (PLY, PCD, OFF, XYZ, VTK, 3MF, USDA/USDZ),
-// fbx, usdz (USDA, USDC, USDZ), ifc (web-ifc), net snapshots and the exporters round trip. Seeds are the repo's fixtures plus files the targets build;
+// fbx, usdz (USDA, USDC, USDZ), net snapshots and the exporters round trip. Seeds are the repo's fixtures plus files the targets build;
 // generators add hostile structure (zip bombs, traversal names, cycles, deep nesting, huge counts).
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { Worker } from 'node:worker_threads';
 import { deflateRawSync } from 'node:zlib';
 import { checkModel, headless } from './formats.js';
 import { bytesOf, concat, isNamed, random } from './harness.js';
@@ -323,17 +322,6 @@ function mutateTree(r, nodes, budget = { n: 1 + r.int(4) }) {
   }
 }
 
-// --- IFC (STEP physical file syntax) ---------------------------------------------------------------------------------
-
-const ifcGenerators = [
-  function ifcCycles(r) {
-    const a = r.pick([11, 12, 999999, 0]);
-    return bytesOf(
-      `ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');\nFILE_NAME('x.ifc','',(''),(''),'','','');\nFILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n#1=IFCPROJECT('0YvctVUKr0kugbFTf53O9L',$,'P',$,$,$,$,(#11),#12);\n#11=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,#${a},$);\n#12=IFCUNITASSIGNMENT((#12));\n#20=IFCLOCALPLACEMENT(#20,#21);\n#21=IFCAXIS2PLACEMENT3D(#22,$,$);\n#22=IFCCARTESIANPOINT((${r.pick(['0.,0.,0.', '1E400,0.,0.', '-1E308,NaN,0.'])}));\n#25=IFCWALL('1kTvXnbbzCWw8lcMd1dR4o',$,'w',$,$,#20,#26,$,$);\n#26=IFCPRODUCTDEFINITIONSHAPE($,$,(#27));\n#27=IFCSHAPEREPRESENTATION(#11,'Body','SweptSolid',(#28));\n#28=IFCEXTRUDEDAREASOLID(#29,#21,#30,${r.pick(['3000.', '-1.', '1E300', '0.'])});\n#29=IFCRECTANGLEPROFILEDEF(.AREA.,$,$,${r.pick(['200.', '0.', '-5.', '1E308'])},4000.);\n#30=IFCDIRECTION((0.,0.,1.));\nENDSEC;\nEND-ISO-10303-21;\n`,
-    );
-  },
-];
-
 // --- the targets ------------------------------------------------------------------------------------------------
 
 const loaders = () => import('@margoengine/loaders');
@@ -349,46 +337,6 @@ const loaderTarget = (name, parse, extra) => ({
   },
   ...extra,
 });
-
-/**
- * Sends `message` to a worker thread kept in `threads[key]` and resolves its reply, or null after `ms`: then the thread
- * is terminated (the next call starts a fresh one), as parseIFCInWorker terminates its worker.
- */
-const threads = {};
-function threadCall(key, code, message, ms) {
-  const thread = (threads[key] ??= new Worker(code, { eval: true }));
-  return new Promise((resolve) => {
-    const answer = (reply) => {
-        clearTimeout(timer);
-        resolve(reply);
-      },
-      timer = setTimeout(() => {
-        thread.off('message', answer);
-        delete threads[key];
-        thread.terminate().then(() => resolve(null));
-      }, ms);
-    thread.once('message', answer);
-    thread.postMessage(message);
-  });
-}
-const closeThreads = () => Promise.all(Object.keys(threads).map((key) => threads[key].terminate()));
-
-const ifcThread = `
-const { parentPort } = require('node:worker_threads');
-const { readFileSync } = require('node:fs');
-const ready = (async () => {
-  const { IfcAPI } = require('web-ifc'), { parseIFC } = await import(${JSON.stringify(new URL('../../packages/ifc/dist/index.js', import.meta.url).href)});
-  const api = new IfcAPI(); await api.Init(); api.SetLogLevel(6);
-  return { api, parseIFC, wall: new Uint8Array(readFileSync(${JSON.stringify(join(root, 'packages/ifc/tests/fixtures/wall.ifc'))})) };
-})();
-parentPort.on('message', async (bytes) => {
-  const { api, parseIFC, wall } = await ready;
-  let error;
-  try { parseIFC(api, bytes); } catch (e) { error = { name: e?.name, code: e?.code, message: String(e?.message ?? e) }; }
-  let dead;
-  if (error) try { parseIFC(api, wall); } catch (e) { dead = String(e?.message ?? e); }
-  parentPort.postMessage({ error, dead });
-});`;
 
 export default [
   loaderTarget('ply', 'parsePLY', {
@@ -557,29 +505,6 @@ export default [
       await this.prepare(new this.Asset(asset.document, asset.buffers), []);
     },
   })),
-  {
-    name: 'ifc',
-    text: true,
-    timeMs: 8000,
-    async setup() {
-      L = await loaders();
-    },
-    seeds: () => [file('packages/ifc/tests/fixtures/wall.ifc')],
-    generators: ifcGenerators,
-    async run(bytes) {
-      // As parseIFCInWorker: web-ifc runs in a worker thread that is terminated at a deadline (web-ifc can loop
-      // forever on schema-invalid models), which then fails with LoaderError 'limit'. After any failure the same
-      // web-ifc API must still read the next file.
-      const reply = await threadCall('ifc', ifcThread, bytes, 5000);
-      if (reply === null) throw new L.LoaderError('IFC', 'limit', 'web-ifc did not finish within 5000 ms');
-      if (reply.dead) throw new Error(`web-ifc API unusable after this input: ${reply.dead}`);
-      if (reply.error)
-        throw reply.error.name === 'LoaderError'
-          ? new L.LoaderError('IFC', reply.error.code, reply.error.message)
-          : Object.assign(new Error(reply.error.message), { name: reply.error.name });
-    },
-    teardown: closeThreads,
-  },
   {
     name: 'net/snapshot',
     seeds: () => [new Uint8Array(256).map((_, i) => i * 7), new Uint8Array(512)],

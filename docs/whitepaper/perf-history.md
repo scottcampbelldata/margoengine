@@ -960,8 +960,7 @@ These entries have no timing. The loss is a feature that did not work.
 - **Fix:** `1316caaf`:
   - counts are checked against the body before allocating;
   - ZIP has a `maxRatio` limit (200x by default for entries over 1 MiB);
-  - 3MF instances are capped at 100,000;
-  - IFC syntax is checked before web-ifc.
+  - 3MF instances are capped at 100,000.
 - **After:** a clean run with seed 3 at 90 s per target found 0 issues.
 - **Rerun:** `npm run fuzz`.
 - **Guard:** `tests/fuzz-regressions.test.js`.

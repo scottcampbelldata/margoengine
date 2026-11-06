@@ -19,7 +19,6 @@ test('parser workers do not inline Draco or KTX2', () => {
     'packages/gltf-pro/dist/workers/progressive.js',
     'packages/fbx/dist/workers/fbx.js',
     'packages/usdz/dist/workers/usdz.js',
-    'packages/ifc/dist/workers/ifc.js',
     'packages/loaders/dist/workers/usd.js',
   ]) {
     const code = text(path);
@@ -35,7 +34,6 @@ test('published worker URLs stay literal import.meta.url', () => {
   const expected = [
     ['packages/gltf-pro/dist', './workers/gltf.js?no-inline'],
     ['packages/gltf-pro/dist', './workers/progressive.js?no-inline'],
-    ['packages/ifc/dist', './workers/ifc.js?no-inline'],
     ['packages/fbx/dist', './workers/fbx.js?no-inline'],
     ['packages/loaders/dist', './workers/usd.js?no-inline'],
     ['packages/usdz/dist', './workers/usdz.js?no-inline'],

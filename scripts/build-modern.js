@@ -216,7 +216,6 @@ const featurePackages = [
   'geometry',
   'terrain',
   'xr',
-  'ifc',
   'usdz',
   'dof',
   'tonemap',

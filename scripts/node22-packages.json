@@ -40,7 +40,6 @@
     "@margoengine/tiles": "3D Tiles tileset parsing and traversal with no GPU",
     "@margoengine/fbx": "the FBX parser",
     "@margoengine/usdz": "the USDZ writer and reader",
-    "@margoengine/ifc": "the IFC parser (web-ifc)",
     "@margoengine/splats": "SPZ, SOG and zstd decoders",
     "@margoengine/webgl2-compat": "the WGSL front end (lexer, parser, type checker), tooling that runs in Node",
     "@margoengine/shader": "shader composition and validation, tooling that runs in Node",

@@ -3,14 +3,14 @@
 
 Margo Engine's own code is licensed under the Apache License 2.0 (`LICENSE` and `NOTICE`; every tarball ships both). This file lists everything else that
 reaches users: npm packages our published packages depend on, third-party code shipped inside our tarballs, and the
-assets the site and examples use. It covers all 102 published packages (100 in `packages/`
+assets the site and examples use. It covers all 101 published packages (99 in `packages/`
 plus `create-margo` and `margo-convert`). `node scripts/supply-chain.mjs --check` (in `npm run verify`, through
 `tests/supply-chain.test.js`) fails when this file is stale, a dependency has no stated reason, a licence is outside
 the allowed list, or a runtime dependency has an install script, a deprecation or a non-registry source.
 
 ## Runtime npm dependencies of published packages (direct and transitive)
 
-90 of 102 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
+90 of 101 packages have no third-party runtime dependency at all (internal `@margoengine/*` ranges only).
 Versions are the ones in `package-lock.json`; users get whatever their own lockfile resolves inside our ranges.
 
 | Package | Version (lock) | Licence | Kind | Used by | Why |
@@ -20,7 +20,6 @@ Versions are the ones in `package-lock.json`; users get whatever their own lockf
 | `react` | 19.3.0 | MIT | optional peer | @margoengine/react, @margoengine/ui, margoengine | React component bindings for the stage |
 | `react-dom` | 19.3.0 | MIT | optional peer | @margoengine/react, margoengine | React DOM root and portal rendering for scene and HTML components |
 | `scheduler` | 0.28.0 | MIT | transitive (via react-dom) | margoengine | React DOM scheduling dependency |
-| `web-ifc` | 0.0.78 | MPL-2.0 | optional peer | @margoengine/ifc, margoengine | IFC (BIM) parser; the app installs and initializes it, the package only reads its output |
 
 None of them has an install script (`preinstall`/`install`/`postinstall`), a deprecation notice or a source other
 than registry.npmjs.org with an integrity hash. Peers are installed by the app, not by us.
@@ -68,8 +67,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/encoder/build (checked 2026-11-06):
     `basis_encoder.wasm` (`dea2778b6d1705b4fdf12053e94cda0ac1cc4340a7e06911778a003ba785808a`) and
     `basis_encoder.js` (`2c0aa2a648b6fc6006e116074a1dd075d6aaf1adb34d4bfd9818acd79e96537e`, before the build's static-embind step).
-- **MPL-2.0 (web-ifc, peer of `@margoengine/ifc`).** Not redistributed in any tarball: the app installs it. A site or
-  app that serves `web-ifc.wasm` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
   (LGPL-3.0) are installed as an optional dependency of Next.js for `examples/next`, and
   `scripts/optimize-demo-assets.js` and `scripts/build-scifi-helmet.mjs` use sharp to resize textures. `margo-convert
@@ -114,7 +111,6 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/gltf-pro` | none | none | LICENSE, NOTICE |
 | `@margoengine/headless` | none | none | LICENSE, NOTICE |
 | `@margoengine/html` | none | none | LICENSE, NOTICE |
-| `@margoengine/ifc` | web-ifc ^0.0.78 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/input` | none | none | LICENSE, NOTICE |
 | `@margoengine/inspector` | none | none | LICENSE, NOTICE |
 | `@margoengine/kinematics-constraints` | none | none | LICENSE, NOTICE |
@@ -124,7 +120,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/lines` | none | none | LICENSE, NOTICE |
 | `@margoengine/loaders` | none | none | LICENSE, NOTICE |
 | `@margoengine/lod` | none | none | LICENSE, NOTICE |
-| `margoengine` | @dimforge/rapier2d-compat >=0.14.0 <1 (optional peer); @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer); web-ifc ^0.0.78 (optional peer) | none | LICENSE, NOTICE |
+| `margoengine` | @dimforge/rapier2d-compat >=0.14.0 <1 (optional peer); @dimforge/rapier3d-compat >=0.14.0 <1 (optional peer); react ^18.0.0 \|\| ^19.0.0 (optional peer); react-dom ^18.0.0 \|\| ^19.0.0 (optional peer) | none | LICENSE, NOTICE |
 | `@margoengine/materials` | none | none | LICENSE, NOTICE |
 | `@margoengine/math` | none | none | LICENSE, NOTICE |
 | `@margoengine/mcp` | none | none | LICENSE, NOTICE |
@@ -226,7 +222,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 
 ## Development and workspace tooling (never shipped)
 
-`package-lock.json` holds 187 third-party entries (build tools, test tools, the examples' and apps' own
-dependencies, platform-optional binaries). Licences: MIT 94, Apache-2.0 46, MPL-2.0 13, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, MIT-0 1.
+`package-lock.json` holds 186 third-party entries (build tools, test tools, the examples' and apps' own
+dependencies, platform-optional binaries). Licences: MIT 94, Apache-2.0 46, MPL-2.0 12, LGPL-3.0-or-later 10, MIT OR Apache-2.0 9, ISC 4, Apache-2.0 AND LGPL-3.0-or-later 3, BSD-2-Clause 2, BSD-3-Clause 2, 0BSD 1, Apache-2.0 AND LGPL-3.0-or-later AND MIT 1, CC-BY-4.0 1, MIT-0 1.
 Install scripts anywhere in the lock: fsevents@2.3.3. Deprecated: whatwg-encoding@3.1.1. CI and releases install with `npm ci`, which refuses a lockfile that does not match `package.json` and checks
 every tarball against its integrity hash.

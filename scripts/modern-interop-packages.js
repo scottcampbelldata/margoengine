@@ -16,11 +16,10 @@ const names = [
     'blender',
     'loaders',
     'exporters',
-    'ifc',
     'xr',
     'usdz',
   ],
-  dependencies = { 'web-ifc': '0.0.78' };
+  dependencies = {};
 for (const name of names) {
   const [pack] = JSON.parse(
     execFileSync(
@@ -57,7 +56,7 @@ execFileSync(process.execPath, [npm, 'install', '--ignore-scripts', '--no-audit'
   stdio: 'inherit',
 });
 await writeFile(join(fixture, 'consumer.ts'), await readFile('tests/modern-interop-consumer.ts', 'utf8'));
-for (const name of ['xr', 'ifc', 'usdz', 'blender']) {
+for (const name of ['xr', 'usdz', 'blender']) {
   const markdown = await readFile(`packages/${name}/README.md`, 'utf8'),
     code = /```ts\r?\n([\s\S]*?)```/.exec(markdown)[1];
   await writeFile(join(fixture, `${name}-readme.ts`), code);
@@ -96,6 +95,6 @@ execFileSync(
 );
 await writeFile(
   join(fixture, 'imports.mjs'),
-  `import {XR,XRManager,XRController,useXRSession} from '@margoengine/xr';import {parseIFC} from '@margoengine/ifc';import {parseUSDZ} from '@margoengine/loaders';import {exportUSDZ} from '@margoengine/exporters';import {parseUSDC,loadUSDZ,parseUSDZ as parsePBRUSDZ} from '@margoengine/usdz';import {decodeMargo,parseMargo,loadMargo} from '@margoengine/blender';if([XR.create,XRManager.create,XRController,useXRSession,parseIFC,parseUSDZ,exportUSDZ,parseUSDC,loadUSDZ,parsePBRUSDZ,decodeMargo,parseMargo,loadMargo].some(value=>typeof value!=='function'))throw new Error('Missing packaged export');console.log('Packed ESM imports and strict NodeNext/Bundler TypeScript/README checks passed');`,
+  `import {XR,XRManager,XRController,useXRSession} from '@margoengine/xr';import {parseUSDZ} from '@margoengine/loaders';import {exportUSDZ} from '@margoengine/exporters';import {parseUSDC,loadUSDZ,parseUSDZ as parsePBRUSDZ} from '@margoengine/usdz';import {decodeMargo,parseMargo,loadMargo} from '@margoengine/blender';if([XR.create,XRManager.create,XRController,useXRSession,parseUSDZ,exportUSDZ,parseUSDC,loadUSDZ,parsePBRUSDZ,decodeMargo,parseMargo,loadMargo].some(value=>typeof value!=='function'))throw new Error('Missing packaged export');console.log('Packed ESM imports and strict NodeNext/Bundler TypeScript/README checks passed');`,
 );
 execFileSync(process.execPath, [join(fixture, 'imports.mjs')], { stdio: 'inherit' });

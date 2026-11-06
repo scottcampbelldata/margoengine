@@ -8,13 +8,11 @@ const fixtures = [
   'packages/loaders/tests/fixtures/torus.ply',
   'packages/loaders/tests/fixtures/decimated-knight.off',
   'packages/loaders/tests/fixtures/bunny.pcd',
-  'packages/ifc/tests/fixtures/wall.ifc',
   'examples/package-benchmarks/fixtures/triangle.fbx',
   'packages/blender/tests/fixtures/triangle.margo',
   'packages/decoders/tests/fixtures/Avocado.gltf',
   'packages/decoders/tests/fixtures/Avocado.bin',
   'examples/assets/robot-expressive.glb',
-  'node_modules/web-ifc/web-ifc.wasm',
   'packages/decoders/dist/draco/draco_wasm_wrapper.js',
   'packages/decoders/dist/draco/draco_decoder.wasm',
 ];
@@ -47,7 +45,7 @@ export async function buildPackageWorkloads(
     root: resolve('examples/package-benchmarks'),
     base: './',
     publicDir: false,
-    assetsInclude: ['**/*.ply', '**/*.off', '**/*.pcd', '**/*.ifc', '**/*.fbx', '**/*.margo', '**/*.gltf', '**/*.bin'],
+    assetsInclude: ['**/*.ply', '**/*.off', '**/*.pcd', '**/*.fbx', '**/*.margo', '**/*.gltf', '**/*.bin'],
     worker: { format: 'es' },
     build: {
       outDir: directory,

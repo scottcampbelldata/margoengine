@@ -16,7 +16,7 @@ option objects you set. Margo does not sanitise these. If your app passes a URL 
 is your app's input to check.
 
 **Untrusted: everything inside an asset file and everything from the network.** glTF/GLB JSON (names, `extras`,
-extensions, URIs), .margo, OBJ/STL/PLY/3MF/PCD/XYZ/OFF/VTK, FBX, USD/USDA/USDC/USDZ, IFC, KTX2/Basis,
+extensions, URIs), .margo, OBJ/STL/PLY/3MF/PCD/XYZ/OFF/VTK, FBX, USD/USDA/USDC/USDZ, KTX2/Basis,
 Draco, meshopt, EXR/HDR/UltraHDR, audio/video metadata, `@margoengine/net` snapshots and replies from Margo's own
 workers.
 

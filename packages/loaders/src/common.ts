@@ -1,5 +1,5 @@
-// Building blocks shared by format loaders: `@margoengine/loaders/common`. Packages that read their own formats (usdz,
-// ifc) import these instead of the root, which loads every parser.
+// Building blocks shared by format loaders: `@margoengine/loaders/common`. Packages that read their own formats (usdz)
+// import these instead of the root, which loads every parser.
 export { LoaderError } from './types.js';
 export type { LoadedGeometry, LoadedGroup, ParseLimits, LoaderErrorCode, AssetResolver } from './types.js';
 export type { BinaryInput } from './util.js';

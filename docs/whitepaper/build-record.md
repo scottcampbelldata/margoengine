@@ -1152,6 +1152,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B16 | React pointer handlers, Picking and HoverHighlight on the WebGL2 preview | DONE | `053eebfd0` | LIM-142 |
 | B18 | Shadow resolution, cascades and fog on or off scale by measured cost | DONE | `75a9990ef` | - |
 | B19 | Long-tail formats: 3DS cameras, lights, keyframes; every LWO map, image map and bone; placed KMZ; loadTextures; parsePCX | DONE | this commit | LIM-195 |
+| IFC | IFC package taken out of this repository, it stays private; 99 public packages | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

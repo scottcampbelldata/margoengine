@@ -106,7 +106,6 @@ test('sizes page lists every file loaded later, with its measured bytes and the 
     'draco_decoder.wasm',
     'basis_transcoder.wasm',
     'rapier3d-compat',
-    'web-ifc.wasm',
     'gltf.js',
     'decoder.worker.js',
   ])
@@ -137,7 +136,7 @@ test('sizes page shows the basic glTF scene network log from the same build: onl
   assert.deepEqual([network.commit, network.dirty], [sizes.commit, sizes.dirty]);
   const paths = network.files.map((file) => file.path);
   assert.deepEqual(
-    paths.filter((path) => /\.wasm$|draco|basis|rapier|recast|ifc|worker/i.test(path)),
+    paths.filter((path) => /\.wasm$|draco|basis|rapier|recast|worker/i.test(path)),
     [],
   );
   for (const role of ['Page', 'Entry: core + stage + app', '@margoengine/gltf (addGLTF)', 'Model'])
