@@ -44,8 +44,10 @@ self.onmessage = async ({ data }) => {
         bytes = new Uint8Array(data.buffer),
         result =
           data.type === 'ktx2-hdr'
-            ? transcodeKTX2HDR(module, bytes, data.target as HDRTranscodeTarget)
-            : (data.type === 'ktx2' ? transcodeKTX2 : transcodeKTX2Layers)(module, bytes, data.target as TranscodeTarget);
+            ? transcodeKTX2HDR(module, bytes, data.target as HDRTranscodeTarget, data.exact)
+            : data.type === 'ktx2'
+              ? transcodeKTX2(module, bytes, data.target as TranscodeTarget)
+              : transcodeKTX2Layers(module, bytes, data.target as TranscodeTarget, data.exact);
       self.postMessage({ id, result }, [result.mipmaps[0].data.buffer as ArrayBuffer]);
     } else throw new TypeError('Unknown decoder job; post a job made by the decoders package');
   } catch (error) {

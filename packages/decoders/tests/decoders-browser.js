@@ -1,6 +1,7 @@
 import { DracoDecoder, KTX2Decoder, createKTX2Texture, getSupportedTranscodeFormat } from '@margoengine/decoders';
 import { KTX2HDRDecoder } from '../dist/ktx2-hdr.js';
 import { KTX2LayerDecoder } from '../dist/ktx2-layers.js';
+import { KTX2Streamer } from '../dist/ktx2-stream.js';
 
 const fixture = async (name) =>
   new Uint8Array(await (await fetch(new URL(`./fixtures/${name}`, import.meta.url))).arrayBuffer());
@@ -241,6 +242,49 @@ window.runDecoderTests = async () => {
   half.dispose();
   native.dispose();
   checks.push(`UASTC HDR cube transcodes to ${native.hdrTarget} in workers and reads back on the GPU`);
+
+  // Streaming: real Range reads, then a texture that grew level by level holds what the whole file gave, bit for bit.
+  const statuses = [],
+    streamFetch = async (...args) => {
+      const response = await fetch(...args);
+      statuses.push(response.status);
+      return response;
+    },
+    streamer = new KTX2Streamer({ device, fetch: streamFetch, headBytes: 4096 }),
+    toFull = async (stream) => {
+      const changes = stream.updates();
+      stream.want(1 << 20);
+      streamer.update();
+      for await (const _texture of changes) if (stream.residentLevel === 0) break;
+    };
+  device.pushErrorScope('validation');
+  const streamCube = await streamer.open('/tests/fixtures/ktx2-layers/cube-uastc-zstd.ktx2'),
+    hdrStream = await streamer.open('/tests/fixtures/ktx2-hdr/cube-uastc-hdr.ktx2'),
+    firstLevel = streamCube.residentLevel;
+  check(statuses.every((status) => status === 206), `Range reads answered ${statuses}`);
+  check(firstLevel > 0 && streamCube.texture.width < 64, `a stream starts small, at level ${firstLevel}`);
+  check(streamCube.format === packedCube.format, `${streamCube.format} stream of a ${packedCube.format} cube`);
+  await toFull(streamCube);
+  await toFull(hdrStream);
+  const streamError = await device.popErrorScope(),
+    streamMeans = await layerMeans(device, streamCube.texture, 64, 6),
+    hdrStreamMeans = await layerMeans(device, hdrStream.texture, 96, 6);
+  check(!streamError, `stream validation: ${streamError?.message}`);
+  check(
+    streamMeans.every((v, i) => v === packedMeans[i]),
+    `streamed cube equals the whole file: ${[...streamMeans]} vs ${[...packedMeans]}`,
+  );
+  check(
+    hdrStreamMeans.every((v, i) => v === nativeMeans[i]),
+    `streamed HDR cube equals the whole file: ${[...hdrStreamMeans]} vs ${[...nativeMeans]}`,
+  );
+  streamCube.want(8);
+  hdrStream.want(8);
+  streamer.budgetBytes = streamCube.bytes(1) + hdrStream.bytes(1);
+  streamer.update();
+  check(streamCube.residentLevel === 1 && streamCube.texture.width === 32, 'a smaller budget drops the finest level');
+  streamer.dispose();
+  checks.push(`KTX2 mips stream by Range reads from level ${firstLevel} up and equal the whole file on the GPU`);
   rgba.dispose();
   negotiated.dispose();
   device.destroy();

@@ -484,16 +484,22 @@ function transcodeImages(
 
 /**
  * Transcode every level, array layer and cube face of an 8-bit KTX2 file. A 2D file comes back as a one-layer texture.
+ * `exact` keeps `target` whatever the size: a one-level file of a stream is part of a larger texture.
  * Checks, handle release and trap handling as in {@link transcodeKTX2}.
  */
-export function transcodeKTX2Layers(basis: BasisModule, bytes: Uint8Array, target: TranscodeTarget): TextureFile {
+export function transcodeKTX2Layers(
+  basis: BasisModule,
+  bytes: Uint8Array,
+  target: TranscodeTarget,
+  exact = false,
+): TextureFile {
   if (!transcodeFormats[target])
     throw new TypeError(`Unknown transcode target ${target}; use one of the targets listed in KTX2Options.target`);
   const index = readKTX2Index(bytes);
   return withKTX2(basis, bytes, (file) => {
     if (file.isHDR?.())
       throw decodeFailed('KTX2: HDR textures need KTX2HDRDecoder from @margoengine/decoders/ktx2-hdr');
-    const chosen: TranscodeTarget = target !== 'rgba8' && (index.width % 4 || index.height % 4) ? 'rgba8' : target,
+    const chosen: TranscodeTarget = !exact && target !== 'rgba8' && (index.width % 4 || index.height % 4) ? 'rgba8' : target,
       format = transcodeFormats[chosen],
       srgb = file.getDFDTransferFunc?.() === transferSRGB;
     return transcodeImages(
@@ -510,13 +516,18 @@ export function transcodeKTX2Layers(basis: BasisModule, bytes: Uint8Array, targe
  * Transcode every level, array layer and cube face of a UASTC HDR file. BC6H falls back to half float when level 0 is
  * not a multiple of 4, as WebGPU needs of block formats. Checks, handle release and trap handling as in {@link transcodeKTX2}.
  */
-export function transcodeKTX2HDR(basis: BasisModule, bytes: Uint8Array, target: HDRTranscodeTarget): TextureFile {
+export function transcodeKTX2HDR(
+  basis: BasisModule,
+  bytes: Uint8Array,
+  target: HDRTranscodeTarget,
+  exact = false,
+): TextureFile {
   if (!hdrFormats[target])
     throw new TypeError(`Unknown HDR target ${target}; use bc6h, astc-hdr-4x4, rgba16float or rgb9e5`);
   const index = readKTX2Index(bytes);
   return withKTX2(basis, bytes, (file) => {
     if (!file.isHDR?.()) throw decodeFailed('KTX2: this file is not HDR; read it with KTX2LayerDecoder or KTX2Decoder');
-    const chosen = target === 'bc6h' && (index.width % 4 || index.height % 4) ? 'rgba16float' : target,
+    const chosen = !exact && target === 'bc6h' && (index.width % 4 || index.height % 4) ? 'rgba16float' : target,
       format = hdrFormats[chosen];
     const result = transcodeImages(file, index, { basis: format.basis, gpu: format.gpu, name: chosen }, false, false);
     // WebGPU has no ASTC HDR format, so no device feature can stand for it.

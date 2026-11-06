@@ -17,7 +17,7 @@ export type HDRTranscodeTarget = 'bc6h' | 'astc-hdr-4x4' | 'rgba16float' | 'rgb9
 export class KTX2HDRDecoder extends KTX2Decoder {
     readonly hdrTarget: HDRTranscodeTarget;
     constructor(options?: KTX2HDROptions);
-    decode(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions): Promise<TextureFile>;
+    decode(data: ArrayBuffer | ArrayBufferView, options?: KTX2LayerDecodeOptions): Promise<TextureFile>;
     createTexture(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions & UploadTextureOptions): Promise<GPUTexture>;
 }
 
@@ -74,10 +74,14 @@ class KTX2Decoder {
     readonly device?: GPUDevice;
     constructor(options?: KTX2Options);
     transcode(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions): Promise<TranscodedKTX2Result>;
-    protected job<T>(type: 'ktx2' | 'ktx2-layers' | 'ktx2-hdr', target: TranscodeTarget | HDRTranscodeTarget, data: ArrayBuffer | ArrayBufferView, options: KTX2DecodeOptions): Promise<T>;
+    protected job<T>(type: 'ktx2' | 'ktx2-layers' | 'ktx2-hdr', target: TranscodeTarget | HDRTranscodeTarget, data: ArrayBuffer | ArrayBufferView, options: KTX2DecodeOptions, exact?: boolean): Promise<T>;
     createTexture(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions & KTX2TextureOptions): Promise<GPUTexture>;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+interface KTX2LayerDecodeOptions extends KTX2DecodeOptions {
+    exactTarget?: string;
 }
 
 interface KTX2Mip {

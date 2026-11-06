@@ -73,6 +73,10 @@
     "./ktx2-hdr": {
       "types": "./dist/ktx2-hdr.d.ts",
       "import": "./dist/ktx2-hdr.js"
+    },
+    "./ktx2-stream": {
+      "types": "./dist/ktx2-stream.d.ts",
+      "import": "./dist/ktx2-stream.js"
     }
   },
   "files": [

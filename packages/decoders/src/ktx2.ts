@@ -62,6 +62,7 @@ export class KTX2Decoder {
     target: TranscodeTarget | HDRTranscodeTarget,
     data: ArrayBuffer | ArrayBufferView,
     options: KTX2DecodeOptions,
+    exact?: boolean,
   ): Promise<T> {
     try {
       requireWorkers('KTX2Decoder');
@@ -69,7 +70,7 @@ export class KTX2Decoder {
       const buffer = payload(data, options.transfer ?? false);
       this.pool ??= new WorkerPool(this.workerLimit);
       return this.pool.run<T>(
-        { type, buffer, target, ...this.urls() },
+        { type, buffer, target, exact, ...this.urls() },
         [buffer],
         options.signal,
         this.timeout ?? jobTimeout(buffer.byteLength),

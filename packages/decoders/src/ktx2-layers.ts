@@ -4,6 +4,7 @@
 // zlib code loads on first use, so neither costs anything until a file needs it.
 import { decodeFailed } from './errors.js';
 import { KTX2Decoder, type KTX2DecodeOptions } from './ktx2.js';
+import type { TranscodeTarget } from './protocol.js';
 import { ASTC_4X4_SFLOAT, readKTX2Index, type KTX2Index } from './ktx2-file.js';
 import { formatBlock, levelBytes, uploadTexture, type TextureFile, type UploadTextureOptions } from './texture-file.js';
 
@@ -153,6 +154,12 @@ export async function parseKTX2(bytes: Uint8Array, options: { signal?: AbortSign
   };
 }
 
+/** Options of {@link KTX2LayerDecoder.decode}. */
+export interface KTX2LayerDecodeOptions extends KTX2DecodeOptions {
+  /** Transcode to exactly this target, whatever the size: for one level of a larger texture, as a stream reads it. */
+  exactTarget?: string;
+}
+
 /**
  * Reads cube maps, cube arrays and 2D arrays from KTX2 files, compressed or not. Basis Universal files transcode in the
  * decoder workers to the format the device has (BC7, ASTC 4x4, ETC2, RGBA8); files that store a GPU format are read
@@ -171,11 +178,12 @@ export class KTX2LayerDecoder extends KTX2Decoder {
    * @throws TypeError `KTX2: invalid file (...)` on a damaged header or level index.
    * @throws MargoError `failed` when the file cannot be transcoded or holds a layout WebGPU cannot sample.
    */
-  async decode(data: ArrayBuffer | ArrayBufferView, options: KTX2DecodeOptions = {}): Promise<TextureFile> {
+  async decode(data: ArrayBuffer | ArrayBufferView, options: KTX2LayerDecodeOptions = {}): Promise<TextureFile> {
     const bytes =
       data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     if (readKTX2Index(bytes).vkFormat) return parseKTX2(bytes, options);
-    return this.job<TextureFile>('ktx2-layers', this.target, data, options);
+    const target = (options.exactTarget ?? this.target) as TranscodeTarget;
+    return this.job<TextureFile>('ktx2-layers', target, data, options, options.exactTarget !== undefined);
   }
 
   /** Uploads a {@link KTX2LayerDecoder.decode} result to `device`, as {@link uploadTexture} does, for any device. */

@@ -111,6 +111,8 @@ export type WorkerRequest =
       type: 'ktx2' | 'ktx2-layers' | 'ktx2-hdr';
       buffer: ArrayBuffer;
       target: TranscodeTarget | HDRTranscodeTarget;
+      /** Keep `target` even when the file's level 0 is not whole blocks. */
+      exact?: boolean;
       transcoderURL: string;
       wasmURL: string;
     };

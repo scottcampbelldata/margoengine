@@ -3,6 +3,7 @@
 import { deviceUnsupported } from './errors.js';
 import { hdrFormats, type HDRTranscodeTarget } from './formats.js';
 import { KTX2Decoder, type KTX2DecodeOptions, type KTX2Options } from './ktx2.js';
+import type { KTX2LayerDecodeOptions } from './ktx2-layers.js';
 import { uploadTexture, type TextureFile, type UploadTextureOptions } from './texture-file.js';
 
 export type { HDRTranscodeTarget } from './formats.js';
@@ -48,8 +49,9 @@ export class KTX2HDRDecoder extends KTX2Decoder {
    * @throws TypeError `KTX2: invalid file (...)` on a damaged header or level index.
    * @throws MargoError `failed` for a file that is not UASTC HDR 4x4, or that cannot be transcoded.
    */
-  decode(data: ArrayBuffer | ArrayBufferView, options: KTX2DecodeOptions = {}): Promise<TextureFile> {
-    return this.job<TextureFile>('ktx2-hdr', this.hdrTarget, data, options);
+  decode(data: ArrayBuffer | ArrayBufferView, options: KTX2LayerDecodeOptions = {}): Promise<TextureFile> {
+    const target = (options.exactTarget ?? this.hdrTarget) as HDRTranscodeTarget;
+    return this.job<TextureFile>('ktx2-hdr', target, data, options, options.exactTarget !== undefined);
   }
 
   /**
