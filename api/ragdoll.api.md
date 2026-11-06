@@ -67,6 +67,10 @@ export interface RagdollPart {
     readonly parent: number;
     readonly length: number;
     readonly radius: number;
+    readonly axis: ArrayLike<number>;
+    readonly rest: ArrayLike<number>;
+    readonly spec: RagdollJoint | null;
+    readonly animated: ArrayLike<number>;
 }
 
 // Not exported from this entry, but used by the exports above:

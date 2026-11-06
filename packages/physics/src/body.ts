@@ -233,6 +233,17 @@ export class PhysicsBody {
   get mass(): number {
     return this.check().mass();
   }
+  /**
+   * Mass in kilograms and inertia in kg m² (about the body's x, y and z axes) on top of what the colliders give. Replaces
+   * what an earlier call added; 0 removes it. Takes effect at the next step.
+   */
+  setAdditionalMass(mass: number, inertia: Vec3 = [0, 0, 0]): this {
+    checkVec(inertia, 'Inertia');
+    if (!(mass >= 0) || mass === Infinity || inertia.some((value) => value < 0))
+      throw new RangeError('Additional mass and inertia must be finite numbers of at least 0; pass kilograms and kg m².');
+    this.check().setAdditionalMassProperties(mass, this.raw.localCom(), vec(inertia), { x: 0, y: 0, z: 0, w: 1 }, true);
+    return this;
+  }
   get gravityScale(): number {
     return this.check().gravityScale();
   }

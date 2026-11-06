@@ -196,6 +196,7 @@ export interface MotorOptions {
     stiffness?: number;
     damping?: number;
     model?: 'acceleration' | 'force';
+    maxForce?: number;
 }
 
 export class Physics implements EnginePlugin, BodyOwner {
@@ -293,6 +294,7 @@ export class PhysicsBody {
     sleep(): this;
     wakeUp(): this;
     get mass(): number;
+    setAdditionalMass(mass: number, inertia?: Vec3): this;
     get gravityScale(): number;
     set gravityScale(value: number);
     get ccd(): boolean;
@@ -329,6 +331,7 @@ export class PhysicsJoint {
     setLimits(min: number, max: number): this;
     get limits(): [number, number] | null;
     setMotor(motor: MotorOptions): this;
+    setRotationMotor(rotation: Quat, motor?: RotationMotorOptions): this;
     clearMotor(): this;
     set contactsEnabled(value: boolean);
     get contactsEnabled(): boolean;
@@ -407,6 +410,8 @@ export interface RapierModule {
         COMPUTE_IMPULSE: number;
     };
     MotorModel: Record<'ForceBased' | 'AccelerationBased', number>;
+    JointAxis?: Record<'AngX' | 'AngY' | 'AngZ', number>;
+    SphericalImpulseJoint?: new (rawSet: never, bodySet: never, handle: number) => SphericalImpulseJoint;
     CoefficientCombineRule: Record<'Average' | 'Min' | 'Multiply' | 'Max', number>;
     ActiveCollisionTypes: {
         ALL: number;
@@ -447,6 +452,10 @@ export interface RopeOptions {
     collider?: Omit<ColliderSettings, 'offset' | 'rotation'>;
     body?: Omit<BodyOptions, 'type' | 'position' | 'rotation' | 'colliders'>;
 }
+
+export type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model' | 'maxForce'> & {
+    targetVelocity?: Vec3;
+};
 
 export interface ShapeCastHit extends Hit {
     distance: number;
@@ -774,6 +783,8 @@ interface RigidBody {
     wakeUp(): void;
     mass(): number;
     gravityScale(): number;
+    localCom(): Vector;
+    setAdditionalMassProperties(mass: number, com: Vector, inertia: Vector, frame: Rotation, wakeUp: boolean): void;
     setGravityScale(scale: number, wakeUp: boolean): void;
     isCcdEnabled(): boolean;
     enableCcd(enabled: boolean): void;
@@ -809,6 +820,14 @@ interface Rotation extends Vector {
 
 interface Shape {
     readonly type: number;
+}
+
+interface SphericalImpulseJoint extends ImpulseJoint {
+    anchor1(): Vector;
+    setLocalFrame1(anchor: Vector, rotation: Rotation): void;
+    configureMotorModel(axis: number, model: number): void;
+    setMotorMaxForce(axis: number, force: number): void;
+    configureMotor(axis: number, position: number, velocity: number, stiffness: number, damping: number): void;
 }
 
 interface Vector {

@@ -93,6 +93,8 @@ export interface RigidBody {
   wakeUp(): void;
   mass(): number;
   gravityScale(): number;
+  localCom(): Vector;
+  setAdditionalMassProperties(mass: number, com: Vector, inertia: Vector, frame: Rotation, wakeUp: boolean): void;
   setGravityScale(scale: number, wakeUp: boolean): void;
   isCcdEnabled(): boolean;
   enableCcd(enabled: boolean): void;
@@ -135,8 +137,17 @@ export interface UnitImpulseJoint extends ImpulseJoint {
   limitsMax(): number;
   setLimits(min: number, max: number): void;
   configureMotorModel(model: number): void;
+  setMotorMaxForce(force: number): void;
   configureMotorVelocity(velocity: number, factor: number): void;
   configureMotor(position: number, velocity: number, stiffness: number, damping: number): void;
+}
+/** Rapier 0.20 and later: a motor per axis of a spherical joint. */
+export interface SphericalImpulseJoint extends ImpulseJoint {
+  anchor1(): Vector;
+  setLocalFrame1(anchor: Vector, rotation: Rotation): void;
+  configureMotorModel(axis: number, model: number): void;
+  setMotorMaxForce(axis: number, force: number): void;
+  configureMotor(axis: number, position: number, velocity: number, stiffness: number, damping: number): void;
 }
 export interface KinematicCharacterController {
   setUp(up: Vector): void;
@@ -312,6 +323,10 @@ export interface RapierModule {
   QueryFilterFlags: Record<'EXCLUDE_SENSORS' | 'EXCLUDE_FIXED' | 'EXCLUDE_KINEMATIC' | 'EXCLUDE_DYNAMIC', number>;
   SolverFlags: { COMPUTE_IMPULSE: number };
   MotorModel: Record<'ForceBased' | 'AccelerationBased', number>;
+  /** Rapier 0.20 and later. */
+  JointAxis?: Record<'AngX' | 'AngY' | 'AngZ', number>;
+  /** Rapier 0.20 and later. */
+  SphericalImpulseJoint?: new (rawSet: never, bodySet: never, handle: number) => SphericalImpulseJoint;
   CoefficientCombineRule: Record<'Average' | 'Min' | 'Multiply' | 'Max', number>;
   ActiveCollisionTypes: { ALL: number };
   ActiveEvents: { COLLISION_EVENTS: number };

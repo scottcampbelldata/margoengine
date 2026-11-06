@@ -1642,6 +1642,10 @@
       "types": "./dist/ragdoll.d.ts",
       "import": "./dist/ragdoll.js"
     },
+    "./ragdoll/powered": {
+      "types": "./dist/ragdoll/powered.d.ts",
+      "import": "./dist/ragdoll/powered.js"
+    },
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"

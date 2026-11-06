@@ -360,3 +360,16 @@ rtest('misuse throws coded errors that name the fix', async () => {
   other.engine.dispose();
   engine.dispose();
 });
+
+rtest('a chest whose shoulders and neck sit around it keeps them: both arms and the head get bodies', async () => {
+  // Regression, found on RiggedFigure: the centre of a chest's children is close to the chest, under minLength, and the
+  // chest was dropped with everything under it.
+  const { realRig } = await import('./rig.js');
+  const rig = await realRig('khronos/RiggedFigure/RiggedFigure.glb');
+  const ragdoll = Ragdoll.attach(rig.physics, { root: rig.node('torso_joint_1') }),
+    names = ragdoll.bones.map((part) => part.node.name);
+  for (const name of ['torso_joint_3', 'arm_joint_L_1', 'arm_joint_R_2', 'neck_joint_1'])
+    assert.ok(names.includes(name), `${name} has a body`);
+  ragdoll.dispose();
+  rig.dispose();
+});

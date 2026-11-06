@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import type { ImpulseJoint, JointData, UnitImpulseJoint } from './rapier-types.js';
+import type { ImpulseJoint, JointData, SphericalImpulseJoint, UnitImpulseJoint } from './rapier-types.js';
 import type { RapierModule } from './shapes.js';
 import type { PhysicsBody } from './body.js';
 import { checkVec, quat, vec, type Quat, type Vec3 } from './math.js';
@@ -16,7 +16,20 @@ export interface MotorOptions {
   damping?: number;
   /** 'acceleration' (default, mass independent) or 'force'. */
   model?: 'acceleration' | 'force';
+  /** The most force (prismatic) or torque (revolute, spherical) the motor applies, in N or N m. Default no cap. */
+  maxForce?: number;
 }
+
+/** A spring toward a rotation, for {@link PhysicsJoint.setRotationMotor}: no targets, the rotation is the target. */
+export type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model' | 'maxForce'> & {
+  targetVelocity?: Vec3;
+};
+
+const maxForce = (motor: { maxForce?: number }): number => {
+  const cap = motor.maxForce ?? Infinity;
+  if (!(cap >= 0)) throw new RangeError('Motor maxForce must be 0 or more; pass newtons or newton metres.');
+  return cap;
+};
 
 interface JointBase {
   /** Anchor in body A's local frame (default origin). */
@@ -68,6 +81,21 @@ export class PhysicsJoint {
       throw new TypeError('Limits and motors need a revolute or prismatic joint');
     return this.raw as UnitImpulseJoint;
   }
+  private motors?: SphericalImpulseJoint;
+  private spherical(): SphericalImpulseJoint {
+    if (!this.valid) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.type !== 'spherical') throw new TypeError('Rotation motors need a spherical joint; use setMotor on a hinge.');
+    if (this.motors) return this.motors;
+    const R = this.owner.rapier;
+    if (!R.SphericalImpulseJoint || !R.JointAxis)
+      throw new MargoError(
+        'unsupported',
+        'Spherical joint motors need Rapier 0.20 or later; upgrade @dimforge/rapier3d-compat.',
+      );
+    // Rapier hands a spherical joint back as a generic one, whose class has no motors: view the same joint as what it is.
+    const raw = this.raw as ImpulseJoint & { rawSet: never; bodySet: never };
+    return (this.motors = new R.SphericalImpulseJoint(raw.rawSet, raw.bodySet, raw.handle));
+  }
   /** Angle (revolute, radians) or translation (prismatic) limits. */
   setLimits(min: number, max: number): this {
     if (!Number.isFinite(min) || !Number.isFinite(max) || min > max)
@@ -84,6 +112,7 @@ export class PhysicsJoint {
     const raw = this.unit(),
       R = this.owner.rapier;
     raw.configureMotorModel(motor.model === 'force' ? R.MotorModel.ForceBased : R.MotorModel.AccelerationBased);
+    raw.setMotorMaxForce(maxForce(motor));
     const velocity = motor.targetVelocity ?? 0;
     if (motor.targetPosition !== undefined)
       raw.configureMotor(motor.targetPosition, velocity, motor.stiffness ?? 1, motor.damping ?? 0);
@@ -91,9 +120,55 @@ export class PhysicsJoint {
     this.wake();
     return this;
   }
+  /**
+   * Spherical joints: a spring that turns body B toward `rotation`, a unit quaternion [x, y, z, w] of body B in body A's
+   * frame, conj(A) * B. It runs in the solver, so a high `stiffness` stays stable and `maxForce` caps the torque. The
+   * With `model: 'force'`, a body of inertia I about the joint moves like a spring of frequency w and damping ratio z
+   * for `stiffness` I w² and `damping` 2 z I w. `targetVelocity` is the relative spin the target itself has, rad/s in the
+   * target's frame, so a moving target is tracked without lag.
+   * @throws TypeError on any other joint type, RangeError for a rotation that is not a unit quaternion.
+   * @throws MargoError with code `unsupported` on a Rapier without spherical motors (before 0.20).
+   */
+  setRotationMotor(rotation: Quat, motor: RotationMotorOptions = {}): this {
+    const raw = this.spherical(),
+      [x, y, z, w] = rotation;
+    if (!(Math.abs(Math.hypot(x, y, z, w) - 1) < 1e-3))
+      throw new RangeError('Rotation motors need a unit quaternion [x, y, z, w]; normalize the rotation.');
+    const R = this.owner.rapier,
+      axes = R.JointAxis!,
+      model = motor.model === 'force' ? R.MotorModel.ForceBased : R.MotorModel.AccelerationBased,
+      cap = maxForce(motor),
+      stiffness = motor.stiffness ?? 1,
+      damping = motor.damping ?? 0;
+    // The solver measures a joint by the vector part of its rotation, which stops telling rotations apart near half a
+    // turn. Moving the joint's frame on body A onto the target keeps what it measures small, and the motors' target 0.
+    raw.setLocalFrame1(raw.anchor1(), quat(rotation));
+    const spin = motor.targetVelocity;
+    [axes.AngX, axes.AngY, axes.AngZ].forEach((axis, k) => {
+      raw.configureMotorModel(axis, model);
+      raw.setMotorMaxForce(axis, cap);
+      raw.configureMotor(axis, 0, spin?.[k] ?? 0, stiffness, damping);
+    });
+    this.wake();
+    return this;
+  }
   /** Turns the motor off. */
   clearMotor(): this {
-    this.unit().configureMotor(0, 0, 0, 0);
+    if (this.type === 'spherical') {
+      const raw = this.spherical(),
+        axes = this.owner.rapier.JointAxis!;
+      for (const axis of [axes.AngX, axes.AngY, axes.AngZ]) {
+        raw.configureMotor(axis, 0, 0, 0, 0);
+        raw.setMotorMaxForce(axis, 0);
+      }
+      this.wake();
+      return this;
+    }
+    const raw = this.unit();
+    // Gains of 0 leave a motor that still holds its target speed of 0: only a cap of 0 frees the joint.
+    raw.configureMotor(0, 0, 0, 0);
+    raw.setMotorMaxForce(0);
+    this.wake();
     return this;
   }
   set contactsEnabled(value: boolean) {

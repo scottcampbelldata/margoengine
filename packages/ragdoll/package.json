@@ -28,6 +28,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./powered": {
+      "types": "./dist/powered.d.ts",
+      "import": "./dist/powered.js"
     }
   },
   "files": [

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7586949,
+  "total": 7590886,
   "history": [
     {
       "date": "2026-10-24",
@@ -2606,6 +2606,12 @@
       "commit": "039af31a3",
       "reason": "WebGPU compatibility level routes in post, shadows, shared and webgl2-compat adapter",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8af24f3c8",
+      "reason": "feat(ragdoll): powered ragdoll (new entry @margoengine/ragdoll/powered)",
+      "grew": 2
     }
   ],
   "items": {
@@ -2970,7 +2976,7 @@
     "@margoengine/netcode/websocket": 1076,
     "@margoengine/oit": 3199,
     "@margoengine/oit/meshes": 747,
-    "@margoengine/physics": 16221,
+    "@margoengine/physics": 16756,
     "@margoengine/physics2d": 7920,
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/palette": 4341,
@@ -3018,6 +3024,7 @@
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 6480,
+    "@margoengine/ragdoll/powered": 3402,
     "@margoengine/react": 8317,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/controls": 4346,

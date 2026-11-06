@@ -42,7 +42,7 @@ engine.start();
 
 `Ragdoll.attach(physics, {root})` walks every node under `root`. A node with children becomes a bone; its capsule runs
 from the node's origin toward its children's centre (the farthest child when that centre is at the origin). End nodes
-and bones shorter than `minLength` (fingers, toes) are left out with their children and keep their animation. The
+and bones whose farthest child is nearer than `minLength` (fingers, toes) are left out with their children and keep their animation. The
 radius is `thickness` times the length, or half the distance the children sit off the bone's line when that is more,
 so a pelvis between the legs and a chest between the arms come out round. Mass is the capsule volume times `density`.
 The pose at construction is the rest pose the joint limits measure from: build it in a T or A pose, or the first frame
@@ -106,7 +106,7 @@ Without an animation, blending back returns to the pose the bones had before the
 | `root` | none | The skeleton's root bone, usually the hips. Pass `root` or `bones`. |
 | `bones` | none | An explicit list of nodes or `{node, joint, length, radius, mass}`. |
 | `joint` | cone, π/4, [-π/6, π/6] | Joint of every bone that does not set its own. |
-| `minLength` | `0.05` | With `root`, bones shorter than this (metres) are left out with their children. |
+| `minLength` | `0.05` | With `root`, bones whose farthest child is nearer than this (metres) are left out with their children. |
 | `thickness` | `0.2` | Capsule radius as a fraction of the bone length. |
 | `density` | `1000` | Kilograms per cubic metre, about a human body's. |
 | `active` | `false` | Start limp. |
@@ -119,6 +119,49 @@ Without an animation, blending back returns to the pose the bones had before the
 Bones need positive uniform world scales (a scale a little off uniform is a known bug, see `docs/known-bugs.md`). Errors follow the package conventions: a `TypeError` or `RangeError` naming
 the fix for bad options, and a `MargoError` with code `disposed` after `dispose()`, `attached` for a second ragdoll on
 one skeleton or the wrong engine, and `unsupported` for a hinge on a Rapier build without joint frames.
+
+## Powered ragdolls (`margoengine/ragdoll/powered`)
+
+`addRagdollMotors(ragdoll, options)` gives every joint a motor that pulls its bone toward the pose the animation gives it, while the bone is physical. The character keeps moving, a hit bends it, and the motors take the pose back, instead of it only going limp.
+
+```ts
+import { Ragdoll } from 'margoengine/ragdoll';
+import { addRagdollMotors } from 'margoengine/ragdoll/powered';
+
+const ragdoll = Ragdoll.attach(physics, { root: hips });
+const motors = addRagdollMotors(ragdoll, { root: 1 });
+ragdoll.activate(); // physical, and still walking its clip
+
+// A hit: the impulse lands on the chest, the limb weakens at once and gets its strength back over 0.6 seconds.
+motors.hit(ragdoll.bones[4], [0, 0, -150], { weaken: 0.8, recover: 0.6 });
+
+motors.setStrength(hand, 0); // that limb hangs while the rest stays powered
+motors.fade(0, 1.5); // weaken over a second and a half: a slow collapse
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `frequency` | `6` | How fast a motor closes on its target, as a natural frequency in hertz. |
+| `damping` | `1` | Damping ratio: 1 settles without overshoot, less rings. |
+| `strength` | `1` | Share of the pull, 0 (limp) to 1. |
+| `maxAcceleration` | `400` | Largest angular acceleration a motor may give the limb it carries, rad/s². Each joint's torque cap is this times the limb's inertia about the joint. Less gives floppier limbs; 400 is what the hands and feet of a real walk clip need. |
+| `root` | `0` | Share of a spring from the world to the root bone, toward where the animation puts it. |
+
+| Member | Meaning |
+| --- | --- |
+| `strength` | Read or set the share of the pull. |
+| `root` | Read or set the root spring's share. |
+| `fade(to, seconds)` | Moves `strength` to `to` over `seconds`. |
+| `setStrength(bone, share)` | The share of a bone and every bone under it. |
+| `hit(bone, impulse, {point, weaken, recover})` | Applies the impulse and weakens the bone, the bones under it and the bones above it up to the root. |
+| `error` | Largest angle, radians, between a powered bone and its target at the last step. |
+| `dispose()` | Takes the motors and the added mass off. `using` works. |
+
+Joint motors are equal and opposite torques on two bodies, so they keep a pose but cannot hold a character up. With `root: 0` a powered character falls over stiff. `root` above 0 keeps it up, and that spring is an outside force, not a muscle: it acts on every bone by its motor's share, so a limp limb still hangs. To stand on its own feet, use a balance controller.
+
+A motor's target stops at the joint's limits, so it never pulls against a limit it would have to pass. The default cone of π/4 is tighter than most clips: give a ragdoll that follows a clip wider limits, or `{type: 'free'}`, or the clip is clipped. The target's own spin is fed to the motor, so a moving pose is tracked without the lag a spring alone has.
+
+Skeletons put small bodies between big limbs, and a solver cannot hold a strong motor against a body hundreds of times lighter. `addRagdollMotors` adds mass up to an eighth of each body's heaviest neighbour and inertia up to a tenth of the heaviest limb it carries, and `dispose()` takes it off.
 
 ## Clean room
 

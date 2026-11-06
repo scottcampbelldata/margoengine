@@ -57,7 +57,7 @@ export interface RagdollOptions {
   bones?: readonly (Mesh | RagdollBone)[];
   /** Joint for every bone that does not set its own. Default `{type: 'cone', swing: π/4, twist: [-π/6, π/6]}`. */
   joint?: RagdollJoint;
-  /** With `root`, bones shorter than this many metres are left out with their children (fingers, toes). Default 0.05. */
+  /** With `root`, bones whose farthest child is nearer than this many metres are left out with it (fingers, toes). Default 0.05. */
   minLength?: number;
   /** Capsule radius as a fraction of the bone length, for bones without a `radius`. Default 0.2. */
   thickness?: number;
@@ -91,6 +91,14 @@ export interface RagdollPart {
   readonly length: number;
   /** Capsule radius in metres. */
   readonly radius: number;
+  /** Unit direction of the bone in its own frame (the body's frame), toward its children. */
+  readonly axis: ArrayLike<number>;
+  /** Rest rotation relative to the parent bone, xyzw; what the joint limits measure from. */
+  readonly rest: ArrayLike<number>;
+  /** The joint as built, every default filled in; null for the root bone. */
+  readonly spec: RagdollJoint | null;
+  /** The local pose the animation last gave the bone, xyz then xyzw: what motors drive toward. */
+  readonly animated: ArrayLike<number>;
 }
 
 interface Cone {
@@ -99,9 +107,7 @@ interface Cone {
   max: number;
 }
 interface Bone extends RagdollPart {
-  /** Unit bone direction in the bone's (and body's) frame. */
   readonly axis: Float64Array;
-  /** Rest rotation relative to the parent bone, conj(parent) * child. */
   readonly rest: Float64Array;
   readonly cone: Cone | null;
   /** Inverse inertia about the bone axis and across it (0 while kinematic). */
@@ -109,8 +115,7 @@ interface Bone extends RagdollPart {
   /** Previous and current physics step poses, xyz then xyzw. */
   readonly prev: Float64Array;
   readonly cur: Float64Array;
-  /** The pose the animation (or the scene) last gave the node: local xyz then xyzw. */
-  readonly base: Float64Array;
+  readonly animated: Float64Array;
   /** What the ragdoll last wrote into the node, to tell an animated pose from its own. */
   readonly written: Float64Array;
   /** The physics pose as a local transform: this frame's, or the one frozen by `deactivate`. */
@@ -421,7 +426,8 @@ export class Ragdoll implements EnginePlugin {
         const parent = parentOf[i] === -1 ? -1 : remap.get(parentOf[i])!;
         const rest = new Float64Array([0, 0, 0, 1]);
         let joint: PhysicsJoint | null = null,
-          cone: Cone | null = null;
+          cone: Cone | null = null,
+          built: RagdollJoint | null = null;
         if (parent !== -1) {
           const up = parts[parent],
             upInverse = conjugateQuaternion(up.world.subarray(3, 7)),
@@ -431,7 +437,7 @@ export class Ragdoll implements EnginePlugin {
             );
           mul(upInverse, rotation, rest);
           const spec2 = spec.joint ?? options.joint ?? DEFAULT_JOINT;
-          ({ joint, cone } = this.join(up.body, body, spec2, anchor, rest));
+          ({ joint, cone, spec: built } = this.join(up.body, body, spec2, anchor, rest));
         }
         // Inverse inertia of a capsule (as a cylinder of the full length): across the axis and about it.
         const across = (mass * (3 * radius * radius + length * length)) / 12,
@@ -445,18 +451,19 @@ export class Ragdoll implements EnginePlugin {
           radius,
           axis,
           rest,
+          spec: built,
           cone,
           inertia: new Float64Array([1 / about, 1 / across]),
           prev: world.slice(),
           cur: world.slice(),
-          base: new Float64Array(7),
+          animated: new Float64Array(7),
           written: new Float64Array(7).fill(NaN),
           local: new Float64Array(7),
           world,
           target: [world[0], world[1], world[2], world[3], world[4], world[5], world[6]],
         };
-        this.readLocal(node, bone.base);
-        bone.local.set(bone.base);
+        this.readLocal(node, bone.animated);
+        bone.local.set(bone.animated);
         remap.set(i, parts.length);
         parts.push(bone);
       }
@@ -518,11 +525,12 @@ export class Ragdoll implements EnginePlugin {
     const walk = (node: Mesh): void => {
       const kids = children.get(node.id);
       if (!kids?.length) return;
-      // The same measure as the bodies use: the children's centre, or the farthest child.
+      // A bone reaches as far as its farthest child: the centre of a chest's shoulders and neck is close to the chest,
+      // and measuring that would drop both arms and the head with it.
       const m = node.matrix,
-        ends = kids.map((kid) => [kid.matrix[12] - m[12], kid.matrix[13] - m[13], kid.matrix[14] - m[14]]);
-      let reach = Math.hypot(...[0, 1, 2].map((k) => ends.reduce((sum, end) => sum + end[k], 0) / ends.length));
-      if (reach < 1e-3) reach = Math.max(...ends.map((end) => Math.hypot(end[0], end[1], end[2])));
+        reach = Math.max(
+          ...kids.map((kid) => Math.hypot(kid.matrix[12] - m[12], kid.matrix[13] - m[13], kid.matrix[14] - m[14])),
+        );
       if (reach < minLength && list.length) return;
       list.push({ node });
       for (const kid of kids) walk(kid);
@@ -539,7 +547,7 @@ export class Ragdoll implements EnginePlugin {
     spec: RagdollJoint,
     anchor: number[],
     rest: Float64Array,
-  ): { joint: PhysicsJoint; cone: Cone | null } {
+  ): { joint: PhysicsJoint; cone: Cone | null; spec: RagdollJoint } {
     const physics = this.physics,
       anchorA = anchor as unknown as Vec3;
     if (spec?.type === 'free' || spec?.type === 'cone') {
@@ -553,7 +561,11 @@ export class Ragdoll implements EnginePlugin {
           );
         cone = { swing, min, max };
       }
-      return { joint: physics.addJoint(parent, child, { type: 'spherical', anchorA, anchorB: [0, 0, 0] }), cone };
+      return {
+        joint: physics.addJoint(parent, child, { type: 'spherical', anchorA, anchorB: [0, 0, 0] }),
+        cone,
+        spec: cone ? { type: 'cone', swing: cone.swing, twist: [cone.min, cone.max] } : { type: 'free' },
+      };
     }
     if (spec?.type !== 'hinge') throw new TypeError("Unknown ragdoll joint type; use 'cone', 'hinge' or 'free'.");
     const axis = spec.axis,
@@ -589,7 +601,7 @@ export class Ragdoll implements EnginePlugin {
     raw.setLocalFrame1({ x: anchor[0], y: anchor[1], z: anchor[2] }, rotation(frameA));
     raw.setLocalFrame2({ x: 0, y: 0, z: 0 }, rotation(frameB));
     joint.setLimits(min, max);
-    return { joint, cone: null };
+    return { joint, cone: null, spec: { type: 'hinge', axis: [unit[0], unit[1], unit[2]], limits: [min, max] } };
   }
 
   /** True while physics drives the bones (after `activate()`, until `deactivate()`). */
@@ -734,7 +746,7 @@ export class Ragdoll implements EnginePlugin {
       written = bone.written;
     for (let k = 0; k < 7; k++)
       if (pose[k] !== written[k]) {
-        bone.base.set(pose);
+        bone.animated.set(pose);
         return;
       }
   }
@@ -746,9 +758,9 @@ export class Ragdoll implements EnginePlugin {
       const { prev, cur, world, local } = bone;
       for (let k = 0; k < 3; k++) world[k] = prev[k] + (cur[k] - prev[k]) * alpha;
       slerp(prev, 3, cur, 3, alpha, world, 3);
-      local[0] = bone.base[0];
-      local[1] = bone.base[1];
-      local[2] = bone.base[2];
+      local[0] = bone.animated[0];
+      local[1] = bone.animated[1];
+      local[2] = bone.animated[2];
       if (bone.parent !== -1) {
         const up = this.parts[bone.parent].world;
         conjugateQuaternion(up.subarray(3, 7), this.q);
@@ -783,10 +795,10 @@ export class Ragdoll implements EnginePlugin {
   private write(): void {
     const weight = this.blend;
     for (const bone of this.parts) {
-      const { base, local, written, node } = bone;
-      slerp(base, 3, local, 3, weight, written, 3);
-      if (bone.parent === -1) for (let k = 0; k < 3; k++) written[k] = base[k] + (local[k] - base[k]) * weight;
-      else for (let k = 0; k < 3; k++) written[k] = base[k];
+      const { animated, local, written, node } = bone;
+      slerp(animated, 3, local, 3, weight, written, 3);
+      if (bone.parent === -1) for (let k = 0; k < 3; k++) written[k] = animated[k] + (local[k] - animated[k]) * weight;
+      else for (let k = 0; k < 3; k++) written[k] = animated[k];
       node.setPosition([written[0], written[1], written[2]]);
       node.setQuaternion([written[3], written[4], written[5], written[6]]);
       // What the store holds after the write (setQuaternion normalizes), so the next frame can tell it from an animation.

@@ -130,8 +130,8 @@ The root-level mesh requirement still applies. A skinned or morphed primitive re
 | Export | Purpose |
 | --- | --- |
 | `Physics` | The world and engine plugin: `update`, `step`, `sync`, `addBody`, `addJoint`, `createCharacterController`, `raycast`, `raycastAll`, `shapeCast`, `projectPoint`, `intersectPoint`, `intersectShape`, `touching`, `on`, `debugRender`, `dispose`; `world` and `rapier` for anything not wrapped |
-| `PhysicsBody` | Pose, teleport (`setPosition`, `setRotation`), kinematic targets (`setNextPosition`, `setNextRotation`), velocities, `addForce`, `applyImpulse` (optionally at a point), `addTorque`, `applyTorqueImpulse`, `resetForces`, sleep and wake, `gravityScale`, `ccd`, locks, `addCollider`, `removeCollider`, `remove`; `raw` is the Rapier `RigidBody` |
-| `PhysicsJoint` | `setLimits`, `setMotor`, `clearMotor`, `contactsEnabled`, `remove`; `raw` is the Rapier `ImpulseJoint` |
+| `PhysicsBody` | Pose, teleport (`setPosition`, `setRotation`), kinematic targets (`setNextPosition`, `setNextRotation`), velocities, `addForce`, `applyImpulse` (optionally at a point), `addTorque`, `applyTorqueImpulse`, `resetForces`, `setAdditionalMass`, sleep and wake, `gravityScale`, `ccd`, locks, `addCollider`, `removeCollider`, `remove`; `raw` is the Rapier `RigidBody` |
+| `PhysicsJoint` | `setLimits`, `setMotor`, `setRotationMotor` (spherical joints: a spring toward a rotation), `clearMotor`, `contactsEnabled`, `remove`; `raw` is the Rapier `ImpulseJoint` |
 | `CharacterController` | `move(desired)` per fixed step, `grounded`, `dispose`; `raw` is Rapier's `KinematicCharacterController` |
 | `Rope` | `new Rope(physics, options)`: `segments`, `joints`, `segmentLength`, `points(out?)`, `remove`, `valid` |
 | `Vehicle` | `new Vehicle(physics, chassis, options)`: `engineForce`, `steering`, `brake`, `setInput`, `speed`, `wheel(i)`, `wheelLocalPose(i)`, `wheelCount`, `dispose`; `raw` is Rapier's `DynamicRayCastVehicleController` |
@@ -162,6 +162,8 @@ Colliders: `shape` is `'box'` (`halfExtents`), `'sphere'` (`radius`), `'capsule'
 
 Joints, `physics.addJoint(bodyA, bodyB, options)`: `type` `'fixed'` (`frameA`, `frameB` rotations), `'spherical'`, `'revolute'` or `'prismatic'` (`axis`, `limits`, `motor`), `'rope'` (`length`) or `'spring'` (`restLength`, `stiffness`, `damping` default 0). All take `anchorA` and `anchorB` in each body's local frame and `contactsEnabled`. Motors take `targetVelocity`, `targetPosition`, `stiffness`, `damping` and `model` (`'acceleration'` or `'force'`).
 
+`joint.setRotationMotor(rotation, {stiffness, damping, model, maxForce, targetVelocity})` turns body B toward a rotation in body A's frame, on a spherical joint. With `model: 'force'`, a body of inertia I about the joint moves like a spring of frequency w and damping ratio z for `stiffness` I w² and `damping` 2 z I w; `maxForce` caps the torque in N m, on every motor; `targetVelocity` is the target's own spin. It moves the joint's frame on body A onto the target, because the solver cannot tell rotations apart near half a turn by their vector part. Rapier 0.20 or later.
+
 Character controller options: `offset` (0.01), `up`, `maxSlopeClimbAngle` (45 degrees), `minSlopeSlideAngle` (30 degrees), `autostep` (`{maxHeight: 0.3, minWidth: 0.2}` or `false`), `snapToGround` (0.2 or `false`), `slide`, `applyImpulsesToDynamicBodies`, `characterMass`.
 
 Queries take `maxDistance`, `solid`, `groups`, `exclude` (a body), `excludeSensors`, `excludeFixed`, `excludeKinematic`, `excludeDynamic` and `predicate(body, collider)`. Ray and shape-cast distances are along the normalized direction. Queries see the world as of the last step.
@@ -170,7 +172,7 @@ Queries take `maxDistance`, `solid`, `groups`, `exclude` (a body), `excludeSenso
 
 - Root-level meshes only (see above). Mesh scale is read once when a geometry-derived collider is built.
 - No built-in debug renderer; use `debugRender()` with `@margoengine/lines`.
-- Not wrapped (reachable through `physics.world` and `physics.rapier`): multibody joints, spherical-joint motors, contact force events, PID controllers, snapshots and serialization, voxel shapes, soft bodies and cloth.
+- Not wrapped (reachable through `physics.world` and `physics.rapier`): multibody joints, contact force events, PID controllers, snapshots and serialization, voxel shapes, soft bodies and cloth.
 - Ropes are rigid links, not soft bodies: a rope of many segments costs one body and one joint per segment. Compound colliders and convex decomposition need Rapier 0.19 or later, rope and spring joints and vehicles Rapier 0.12 or later; older versions throw a `MargoError` with code `unsupported` naming the upgrade.
 - Changing `physics.gravity` wakes sleeping dynamic bodies, so they fall in the new field.
 - A body removed while overlapping a sensor does not emit an end event.

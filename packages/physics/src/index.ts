@@ -17,7 +17,7 @@ export type {
 export { PhysicsBody } from './body.js';
 export type { BodyOptions, BodyType } from './body.js';
 export { PhysicsJoint } from './joints.js';
-export type { JointOptions, JointType, MotorOptions } from './joints.js';
+export type { JointOptions, JointType, MotorOptions, RotationMotorOptions } from './joints.js';
 export { CharacterController } from './character.js';
 export type { CharacterControllerOptions, CharacterMoveResult } from './character.js';
 export { collisionGroups, geometryPositions } from './shapes.js';

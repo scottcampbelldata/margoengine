@@ -935,6 +935,7 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 | Limit projection | T. Jakobsen, "Advanced Character Physics", GDC 2001 (projecting a violated constraint back by moving the body), here a turn of the child about its joint |
 | Capsule inertia | Solid cylinder moments of inertia (standard mechanics tables) |
 | Bodies from bones and blending back | Our own design: one capsule per bone in the bone's world frame, joints at the bone origins, kinematic hit boxes that follow the animation, and a per-bone slerp from the frozen physics pose to the animated pose |
+| Powered ragdolls (`ragdoll/powered`) | Rapier's published joint motor API; J. Tan, K. Liu, G. Turk, "Stable Proportional-Derivative Controllers", IEEE CG&A 2011, for the implicit spring on the root bone; feeding a target's velocity to a PD controller is textbook control. Raising the mass and inertia of small bodies in a chain is our own measure on real rigs |
 
 ## 2D sprites: `@margoengine/sprites`
 
