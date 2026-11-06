@@ -143,7 +143,10 @@ function report({ program, checker }, pkg, entry) {
   };
   const renderExport = (symbol, indent) => {
     const target = resolveAlias(symbol);
-    const declarations = target.declarations ?? [];
+    // Another package's `declare module` merges into this symbol: that is its API, not this entry's.
+    const merged = target.declarations ?? [],
+      own = merged.filter((declaration) => local(declaration.path)),
+      declarations = own.length ? own : merged;
     if (!declarations.length) return `${indent}export { ${symbol.name} }; // unresolved`;
     if (declarations[0].kind === SyntaxKind.SourceFile)
       return `${indent}export namespace ${symbol.name} {\n${renderModule(target, indent + '    ')}\n${indent}}`;
@@ -210,6 +213,13 @@ function report({ program, checker }, pkg, entry) {
         used: new Set([references[index].getText()]),
         text: renderDeclarations(declarations).join('\n'),
       };
+      // A `declare module` in another package gives the same declaration a second, merged symbol.
+      const twin = unexported.find((other) => other.path === item.path && other.text === item.text);
+      if (twin) {
+        twin.used.add(references[index].getText());
+        seen.set(symbol.id, twin);
+        continue;
+      }
       seen.set(symbol.id, item);
       unexported.push(item);
       queue.push(...declarations);

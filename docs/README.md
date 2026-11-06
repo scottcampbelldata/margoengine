@@ -2,7 +2,7 @@
 
 [Browse the searchable catalog](https://scottcampbelldata.github.io/margoengine/).
 
-Search all 99 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the four standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
+Search all 100 packages by task, package name or public runtime export. Copy installation commands and imports, open each package guide, and try the four standalone HTML examples. The catalog marks exact versions available on npm; packages marked Source can be built from the repository until publication.
 
 The [release notes](../CHANGELOG.md#unreleased) cover standalone USDZ parsing,
 Draco/Meshopt support in glTF Pro and synchronous parsing behavior. The core and the stage
@@ -41,7 +41,7 @@ node --test tests/catalog.test.js
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-99 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+100 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -175,13 +175,14 @@ node --test tests/catalog.test.js
 | [`@margoengine/netcode`](../packages/netcode/README.md) | Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests. |
 | [`@margoengine/voxel-net`](../packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
-### Geometry and spatial (3)
+### Geometry and spatial (4)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/bvh`](../packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](../packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](../packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |
+| [`@margoengine/scene`](../packages/scene/README.md) | Scene graph conveniences for core meshes: children, traverse, userData, lookAt and world position, rotation and scale, as functions or as mesh members. |
 
 ### Data and science (2)
 

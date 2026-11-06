@@ -1446,6 +1446,14 @@
       "types": "./dist/scatter/paint.d.ts",
       "import": "./dist/scatter/paint.js"
     },
+    "./scene": {
+      "types": "./dist/scene.d.ts",
+      "import": "./dist/scene.js"
+    },
+    "./scene/mesh": {
+      "types": "./dist/scene/mesh.d.ts",
+      "import": "./dist/scene/mesh.js"
+    },
     "./scenery": {
       "types": "./dist/scenery.d.ts",
       "import": "./dist/scenery.js"
@@ -2017,6 +2025,7 @@
     "@margoengine/road": "^1.0.0",
     "@margoengine/save": "^1.0.0",
     "@margoengine/scatter": "^1.0.0",
+    "@margoengine/scene": "^1.0.0",
     "@margoengine/scenery": "^1.0.0",
     "@margoengine/sciviz": "^1.0.0",
     "@margoengine/selection": "^1.0.0",

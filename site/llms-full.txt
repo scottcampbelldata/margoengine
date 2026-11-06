@@ -303,7 +303,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 
 <!-- package-list: generated from docs/catalog.json by scripts/build-catalog.js; do not edit -->
 
-99 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
+100 packages in 12 layers, the same as the [catalog](https://margoengine.com/catalog/).
 
 ### Start here (3)
 
@@ -437,13 +437,14 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/netcode`](packages/netcode/README.md) | Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests. |
 | [`@margoengine/voxel-net`](packages/voxel-net/README.md) | Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests. |
 
-### Geometry and spatial (3)
+### Geometry and spatial (4)
 
 | Package | What it is |
 | --- | --- |
 | [`@margoengine/bvh`](packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |
+| [`@margoengine/scene`](packages/scene/README.md) | Scene graph conveniences for core meshes: children, traverse, userData, lookAt and world position, rotation and scale, as functions or as mesh members. |
 
 ### Data and science (2)
 
@@ -2564,7 +2565,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-103). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-104). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2680,6 +2681,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
+| Scene graph helpers (`@margoengine/scene`, 2026-11-05) | Each `getWorldPosition`, `getWorldQuaternion` and `worldMatrix` call walks up the parents, at most 64 levels. | They read the local values, so a result is right before any frame; `mesh.matrix` is the last frame's. | Joint limits apply at the next frame, so a value outside its limit counts as written until then. Under a rotated, unevenly scaled parent `getWorldQuaternion` and `getWorldScale` give the nearest values. | Read `mesh.matrix` in a per-frame loop over many meshes; `worldMatrix` stays exact under shear. |
 | Scheduler (`@margoengine/ecs/schedule`) | Enforced: one fixed step size per `Schedule`, at most `maxSteps` (default 8) steps an update; time past that is dropped. Systems are synchronous and single threaded; the fixed phase always runs before the frame phase. | A cap stops a long stall from costing more steps than the next frame can pay for, which would snowball. | `update` returns the steps run and `schedule.dropped` holds the seconds lost. A frame system ordered before a fixed one throws MargoError `'state'`. | Raise `maxSteps`, or run a second `Schedule` for a second rate. |
 | Change detection (`@margoengine/ecs/changes`) | Enforced by method: only `component.add`, `remove`, `touch` and `world.destroy` are seen. A write straight into `fields` is invisible until `touch` reports it, and a row counts as changed even when the value written is the same. 24 bytes per world slot per tracker. | `fields` are plain typed arrays, so loops over them stay at full speed; intercepting each write would cost that speed. | The entity is missing from `changed`. | Call `component.touch(entity)` after direct writes. |
 | Query filters and tags (`@margoengine/ecs/query`, `world.tag`) | Enforced: `with` needs at least one term, and a `Query` cannot run inside its own `forEach`. Entities that start matching during `forEach` wait for the next call. A tag stores no fields but keeps the 8 bytes per world slot of its entity index. | The smallest `with` store is the list to walk, so there must be one. The match list is one buffer per query. | MargoError `'state'` or `TypeError`. | Use a second `Query` to nest. |
@@ -9258,6 +9260,73 @@ Bevel selected edges, cut a loop and slide it, dissolve, merge by distance and b
 never load it. Edge IDs are `"low:high"` vertex pairs (see `polygonMeshEdges`):
 
 [README continues: https://margoengine.com/llms/packages/mesh-edit.md]
+
+=== @margoengine/scene (packages/scene/README.md) ===
+
+# @margoengine/scene
+
+Scene graph conveniences over core meshes, in an optional package so core stays small: `children`, `parent`, `traverse`, `userData`, `lookAt`, `getWorldPosition`, `getWorldQuaternion`, `getWorldScale` and `worldMatrix`. Import only the functions you use, or call `extendMeshes()` once to have them as members of every mesh.
+
+```ts
+import { box, Engine, PbrMaterial } from '@margoengine/core';
+import { children, getWorldPosition, lookAt, traverse, userData } from '@margoengine/scene';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const geometry = box();
+const turret = engine.createMesh().setGeometry(geometry).setPosition([2, 0, 0]);
+const barrel = engine.createMesh(turret).setGeometry(geometry).setPosition([0, 1, 0]);
+barrel.setMaterial(new PbrMaterial({ color: '#d0a040' }));
+
+userData(barrel).ammo = 12;
+lookAt(turret, [0, 0, 5]);
+console.log(children(turret).length, getWorldPosition(barrel));
+traverse(engine.scene, (mesh) => {
+  mesh.visible = true;
+});
+engine.start();
+```
+
+As members, for code that already reads this way:
+
+```ts
+import { box, Engine } from '@margoengine/core';
+import { extendMeshes } from '@margoengine/scene/mesh';
+
+extendMeshes();
+const engine = await Engine.create(document.querySelector('canvas')!);
+const parent = engine.createMesh().setGeometry(box());
+const child = engine.createMesh(parent).setGeometry(box()).setPosition([0, 2, 0]);
+
+child.userData.kind = 'lamp';
+child.lookAt(0, 0, 5);
+parent.traverse((mesh) => console.log(mesh.children.length, mesh.getWorldPosition()));
+engine.start();
+```
+
+`extendMeshes()` adds the members to every mesh on this thread, existing ones included, and its types come with the entry. Importing changes nothing until you call it, and calling it again changes nothing.
+
+| Function | Member | Result |
+| --- | --- | --- |
+| `children(mesh)` | `mesh.children` | Direct children in attach order, as a new array. |
+| `parent(mesh)` | `mesh.parent` | The parent, or null. Change it with `mesh.setParent`. |
+| `traverse(meshOrScene, visitor)` | `mesh.traverse(visitor)` | Calls `visitor` for each mesh, parents before children. A scene starts from its meshes with no parent. The visitor may dispose or move meshes. |
+| `userData(mesh, value?)` | `mesh.userData` | The mesh's own object for your data, made on first use. Margo never reads it. |
+| `lookAt(mesh, target, {up})` | `mesh.lookAt(target, {up})`, `mesh.lookAt(x, y, z)` | Turns the mesh so +Z points at the target, +Y leaning toward `up` (default `[0, 1, 0]`). |
+| `getWorldPosition(mesh, out?)` | `mesh.getWorldPosition(out?)` | World position. |
+| `getWorldQuaternion(mesh, out?)` | `mesh.getWorldQuaternion(out?)` | World rotation `[x, y, z, w]`. |
+| `getWorldScale(mesh, out?)` | `mesh.getWorldScale(out?)` | World scale. A mirror shows as a negative x. |
+| `worldMatrix(mesh)` | | World matrix, column-major, float64. |
+
+`out` is an array of 3 numbers or an object with `x`, `y` and `z`, such as a `Vector3` from `@margoengine/math`; left out, the result is a new `[x, y, z]`. `target` is `[x, y, z]`, `{x, y, z}` or a mesh, meaning its world position.
+
+## Good to know
+
+- World results are right as soon as a value is written, before any frame: they read the local values up the parents, while `mesh.matrix` holds the last frame's matrix. Each call walks up the parents, so read `mesh.matrix` when a per-frame loop over many meshes needs no fresher value.
+- Joint limits apply at the next frame. Until then a value outside its limit counts as written.
+- `lookAt` turns +Z, the way a glTF model faces. A camera looks down its -Z and aims with `camera.target`.
+- `lookAt` holds under any parent, scaled, mirrored or sheared: the direction goes back through the parent's matrix. At the target itself the mesh keeps its rotation, and looking straight along `up` uses the world axis furthest from it.
+- Under a rotated, unevenly scaled parent the world matrix has shear, which no rotation and scale can hold: `getWorldQuaternion` and `getWorldScale` give the nearest ones, and `worldMatrix` stays exact.
 
 === @margoengine/compute (packages/compute/README.md) ===
 

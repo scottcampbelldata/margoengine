@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-103). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-104). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -130,6 +130,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
+| Scene graph helpers (`@margoengine/scene`, 2026-11-05) | Each `getWorldPosition`, `getWorldQuaternion` and `worldMatrix` call walks up the parents, at most 64 levels. | They read the local values, so a result is right before any frame; `mesh.matrix` is the last frame's. | Joint limits apply at the next frame, so a value outside its limit counts as written until then. Under a rotated, unevenly scaled parent `getWorldQuaternion` and `getWorldScale` give the nearest values. | Read `mesh.matrix` in a per-frame loop over many meshes; `worldMatrix` stays exact under shear. |
 | Scheduler (`@margoengine/ecs/schedule`) | Enforced: one fixed step size per `Schedule`, at most `maxSteps` (default 8) steps an update; time past that is dropped. Systems are synchronous and single threaded; the fixed phase always runs before the frame phase. | A cap stops a long stall from costing more steps than the next frame can pay for, which would snowball. | `update` returns the steps run and `schedule.dropped` holds the seconds lost. A frame system ordered before a fixed one throws MargoError `'state'`. | Raise `maxSteps`, or run a second `Schedule` for a second rate. |
 | Change detection (`@margoengine/ecs/changes`) | Enforced by method: only `component.add`, `remove`, `touch` and `world.destroy` are seen. A write straight into `fields` is invisible until `touch` reports it, and a row counts as changed even when the value written is the same. 24 bytes per world slot per tracker. | `fields` are plain typed arrays, so loops over them stay at full speed; intercepting each write would cost that speed. | The entity is missing from `changed`. | Call `component.touch(entity)` after direct writes. |
 | Query filters and tags (`@margoengine/ecs/query`, `world.tag`) | Enforced: `with` needs at least one term, and a `Query` cannot run inside its own `forEach`. Entities that start matching during `forEach` wait for the next call. A tag stores no fields but keeps the 8 bytes per world slot of its entity index. | The smallest `with` store is the list to walk, so there must be one. The match list is one buffer per query. | MargoError `'state'` or `TypeError`. | Use a second `Query` to nest. |

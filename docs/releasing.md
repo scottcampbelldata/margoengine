@@ -27,7 +27,7 @@ Nothing is published without the maintainer's go-ahead for that release. The onl
 1. `npm ci` on a clean checkout. It installs exactly `package-lock.json`, fails if the lockfile and the manifests
    disagree, and checks every tarball against its integrity hash. Never publish from a tree installed with
    `npm install`.
-2. `node scripts/set-version.mjs <x.y.z>`: all 99 packages move in lockstep (`tests/versions.test.js`).
+2. `node scripts/set-version.mjs <x.y.z>`: all 100 packages move in lockstep (`tests/versions.test.js`).
 3. `CHANGELOG.md` has a `## <x.y.z>` section (the workflow fails without one): user-facing changes, breaking changes
    with the migration, security fixes with their advisory.
 4. `npm audit --omit=dev` must report 0 vulnerabilities; any finding is fixed, or justified in the release notes with

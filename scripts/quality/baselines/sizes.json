@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4641168,
+  "total": 4645256,
   "history": [
     {
       "date": "2026-10-24",
@@ -1838,6 +1838,12 @@
       "commit": "299db7639",
       "reason": "matrix and attach in the octree entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "3ff04c8d7",
+      "reason": "new optional package @margoengine/scene: scene graph helpers over core meshes (Batch 17 job 2)",
+      "grew": 2
     }
   ],
   "items": {
@@ -2199,6 +2205,8 @@
     "@margoengine/scatter": 19252,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/tiles": 3415,
+    "@margoengine/scene": 1969,
+    "@margoengine/scene/mesh": 2119,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,
     "@margoengine/sciviz": 36802,

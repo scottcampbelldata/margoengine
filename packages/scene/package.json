@@ -1,0 +1,54 @@
+{
+  "name": "@margoengine/scene",
+  "version": "1.0.0",
+  "description": "Scene graph conveniences for core meshes: children, traverse, userData, lookAt and world position, rotation and scale, as functions or as mesh members.",
+  "keywords": [
+    "margoengine",
+    "scene-graph",
+    "traverse",
+    "lookat",
+    "hierarchy"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/scene"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js scene",
+    "test": "npm run build && node --test tests/*.test.js",
+    "prepack": "npm run build"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mesh": {
+      "types": "./dist/mesh.d.ts",
+      "import": "./dist/mesh.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  }
+}

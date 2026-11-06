@@ -2693,6 +2693,30 @@
     ]
   },
   {
+    "id": "scene",
+    "title": "Scene",
+    "category": "Geometry and spatial",
+    "package": "@margoengine/scene",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Scene graph conveniences for core meshes: children, traverse, userData, lookAt and world position, rotation and scale, as functions or as mesh members.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "scene",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/scene@1.0.0",
+    "imports": "import { children } from '@margoengine/scene';",
+    "exports": [
+      "children",
+      "getWorldPosition",
+      "getWorldQuaternion",
+      "getWorldScale",
+      "lookAt",
+      "parent",
+      "traverse",
+      "userData",
+      "worldMatrix"
+    ]
+  },
+  {
     "id": "compute",
     "title": "Compute",
     "category": "Data and science",

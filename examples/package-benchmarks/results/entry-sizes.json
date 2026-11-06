@@ -1,5 +1,5 @@
 {
-  "commit": "8006a420c",
+  "commit": "3ff04c8d7",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -202,8 +202,8 @@
     },
     "@margoengine/cameras": {
       ".": {
-        "raw": 6809,
-        "gzip": 2752
+        "raw": 6838,
+        "gzip": 2770
       },
       "./origin": {
         "raw": 3141,
@@ -212,6 +212,10 @@
       "./layers": {
         "raw": 1841,
         "gzip": 903
+      },
+      "./offaxis": {
+        "raw": 4218,
+        "gzip": 1822
       }
     },
     "@margoengine/cinematic": {
@@ -1270,8 +1274,8 @@
     },
     "@margoengine/points": {
       ".": {
-        "raw": 60511,
-        "gzip": 20912
+        "raw": 60666,
+        "gzip": 20954
       },
       "./las": {
         "raw": 11572,
@@ -1290,12 +1294,12 @@
         "gzip": 11401
       },
       "./octree": {
-        "raw": 22427,
-        "gzip": 8244
+        "raw": 23761,
+        "gzip": 8716
       },
       "./surfels": {
-        "raw": 38705,
-        "gzip": 13919
+        "raw": 38860,
+        "gzip": 13956
       },
       "./potree": {
         "raw": 8260,
@@ -1562,6 +1566,16 @@
       "./paint": {
         "raw": 2695,
         "gzip": 1251
+      }
+    },
+    "@margoengine/scene": {
+      ".": {
+        "raw": 3554,
+        "gzip": 1713
+      },
+      "./mesh": {
+        "raw": 4154,
+        "gzip": 1863
       }
     },
     "@margoengine/scenery": {
