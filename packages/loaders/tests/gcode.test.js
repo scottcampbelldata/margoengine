@@ -46,9 +46,10 @@ test('layers come back sorted though the file printed them out of order', () => 
   assert.equal(layers[1].extrusion.length, 12, 'a return to a Z joins its layer');
 });
 
-test('retraction and pure E moves draw nothing and only positive E counts as filament', () => {
+test('regression: retraction and pure E moves draw nothing, and filament is the net length pushed', () => {
   const { layers, filament } = parseGCode('G1 Z1\nG1 X5 E5\nG1 E3\nG1 E5\nG1 X9 E4\nG1 X12 E6\n');
-  assert.equal(filament, 5 + 2 + 2);
+  // A slicer's "filament used" is net: counting each recovery again read 1,941 mm for a print of 317 mm.
+  assert.equal(filament, 6);
   assert.equal(layers.length, 1);
   near(layers[0].extrusion, [0, 0, 1, 5, 0, 1, 9, 0, 1, 12, 0, 1]);
   near(layers[0].travel.subarray(6), [5, 0, 1, 9, 0, 1], 'an E that falls is travel');

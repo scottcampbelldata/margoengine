@@ -138,7 +138,7 @@ export function parseGCode(input: BinaryInput | string, options: ParseLimits = {
           if (value !== undefined) position[a] = (a === 3 ? relativeE : relative) ? position[a] + value : value;
         }
         const pushed = position[3] - from[3];
-        if (pushed > 0) filament += pushed;
+        filament += pushed; // A retraction takes back what its recovery pushes again.
         if (position[0] === from[0] && position[1] === from[1] && position[2] === from[2]) break;
         if ((vertices += 2) > maxVertices)
           throw new LoaderError(F, 'limit', `vertex count exceeds the limit of ${maxVertices}`);
