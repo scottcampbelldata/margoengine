@@ -257,7 +257,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/net API](https://margoengine.com/llms/api/net.md): 1 entry point
 - [@margoengine/netcode API](https://margoengine.com/llms/api/netcode.md): 7 entry points
 - [@margoengine/voxel-net API](https://margoengine.com/llms/api/voxel-net.md): 4 entry points
-- [@margoengine/bvh API](https://margoengine.com/llms/api/bvh.md): 8 entry points
+- [@margoengine/bvh API](https://margoengine.com/llms/api/bvh.md): 9 entry points
 - [@margoengine/geometry API](https://margoengine.com/llms/api/geometry.md): 16 entry points
 - [@margoengine/mesh-edit API](https://margoengine.com/llms/api/mesh-edit.md): 8 entry points
 - [@margoengine/scene API](https://margoengine.com/llms/api/scene.md): 3 entry points

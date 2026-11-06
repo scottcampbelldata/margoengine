@@ -232,6 +232,33 @@ console.log(sdf.project([0, 0, 2]));    // back onto the surface
 | `signed` | `true`; `false` bakes plain distance, for open meshes such as terrain or cloth |
 | `accuracy` | 2; higher is closer to the exact winding sum and slower, `Infinity` is exact |
 
+## Inside tests and mesh distance
+
+`@margoengine/bvh/inside` answers two volume questions. `pointInside` and `windingNumber` use the generalized winding number, so small holes and flipped patches barely move the answer, where counting ray crossings flips it. `meshDistance` finds the closest points of two meshes by walking both trees at once, for clearance checks.
+
+```ts
+import {MeshBVH} from 'margoengine/bvh';
+import {meshDistance, pointInside, windingNumber} from 'margoengine/bvh/inside';
+
+const tetrahedron = {
+  positions: [-1, -1, -1, 1, -1, -1, 0, 1, -1, 0, 0, 1],
+  indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3],
+};
+const a = MeshBVH.build(tetrahedron);
+const b = MeshBVH.build(tetrahedron);
+
+console.log(pointInside(a, [0, 0, -0.5]));   // true
+console.log(windingNumber(a, [0, 0, -0.5])); // about 1
+
+const moved = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 0, 0, 1]; // column-major: b into a's space
+const near = meshDistance(a, b, moved, {maxDistance: 10});
+console.log(near?.distance, near?.pointA, near?.pointB, near?.faceA, near?.faceB);
+```
+
+The winding number is 1 inside a closed mesh wound counter-clockwise, 0 outside, -1 inside one wound the other way, and between on an open mesh; `pointInside` asks whether its size is over one half. `accuracy` (default 2) sets how far away a subtree may be replaced by its first-order estimate; `Infinity` sums every triangle. A refit tree answers at its new shape.
+
+`meshDistance` answers `null` past `maxDistance` (default `Infinity`) and stops at the first pair at or below `minDistance` (default 0), which is enough for a pass or fail check. Meshes that touch or cross answer 0. It measures surfaces: a mesh wholly inside another is the gap between the two surfaces away, not 0; add `pointInside` to tell the two apart.
+
 ## GPU traversal
 
 `@margoengine/bvh/gpu` uploads a `MeshBVH` to storage buffers and traces rays in WGSL compute, for picking at scale, baking, path tracing and audio occlusion. `GPUMeshBVH.create` takes a `GPUDevice`, or an `Engine` on WebGPU. The tree is built on the CPU as usual; after `bvh.refit()` call `update()`.

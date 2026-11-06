@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4717329,
+  "total": 4730232,
   "history": [
     {
       "date": "2026-10-24",
@@ -1928,6 +1928,12 @@
       "commit": "1fbb74d7c",
       "reason": "New optional entry bvh/sdf; the main entry grows by a refit counter.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "0ae101b83",
+      "reason": "New optional entry bvh/inside.",
+      "grew": 1
     }
   ],
   "items": {
@@ -1971,6 +1977,7 @@
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/bake": 2583,
     "@margoengine/bvh/gpu": 5208,
+    "@margoengine/bvh/inside": 12903,
     "@margoengine/bvh/lines": 6113,
     "@margoengine/bvh/points": 17799,
     "@margoengine/bvh/scene": 3782,

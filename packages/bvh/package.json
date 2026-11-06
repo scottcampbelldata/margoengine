@@ -64,6 +64,10 @@
     "./sdf": {
       "types": "./dist/sdf.d.ts",
       "import": "./dist/sdf.js"
+    },
+    "./inside": {
+      "types": "./dist/inside.d.ts",
+      "import": "./dist/inside.js"
     }
   },
   "files": [

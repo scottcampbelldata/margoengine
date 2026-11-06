@@ -214,6 +214,10 @@
       "types": "./dist/bvh/sdf.d.ts",
       "import": "./dist/bvh/sdf.js"
     },
+    "./bvh/inside": {
+      "types": "./dist/bvh/inside.d.ts",
+      "import": "./dist/bvh/inside.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"
