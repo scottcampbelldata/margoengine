@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/loaders",
   "version": "1.0.0",
-  "description": "PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, 3DS, LWO, AMF, MD2, PDB, KMZ, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.",
+  "description": "PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, 3DS, LWO, AMF, MD2, PDB, KMZ, NURBS, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -124,6 +124,10 @@
     "./kmz": {
       "types": "./dist/kmz.d.ts",
       "import": "./dist/kmz.js"
+    },
+    "./nurbs": {
+      "types": "./dist/nurbs.d.ts",
+      "import": "./dist/nurbs.js"
     }
   },
   "files": [

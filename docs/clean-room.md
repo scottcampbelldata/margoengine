@@ -629,6 +629,8 @@ File formats written from their public descriptions; no reader of another projec
 | LF19 | PDB ATOM, HETATM, CONECT and MODEL columns | loaders/src/pdb.ts | wwPDB, "Protein Data Bank Contents Guide", format version 3.3 |
 | LF20 | Element colours and covalent radii | loaders/src/pdb.ts | Published CPK colour values; Cordero et al., "Covalent radii revisited", Dalton Trans. 2008 |
 | LF21 | KML `Model`, `Location`, `Orientation` and `Scale`, and the KMZ layout | loaders/src/kmz.ts | OGC, "KML 2.3" standard |
+| LF22 | B-spline basis functions, knot spans and rational evaluation | loaders/src/nurbs.ts | Piegl and Tiller, "The NURBS Book" (2nd ed., 1997), algorithms A2.1 to A2.3 and A4.1, written from the published mathematics |
+| LF23 | Rational circle and sphere test shapes | loaders/tests/nurbs.test.js | Piegl and Tiller, "The NURBS Book", chapter 7 |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 

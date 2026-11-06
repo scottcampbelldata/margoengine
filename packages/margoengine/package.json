@@ -1078,6 +1078,10 @@
       "types": "./dist/loaders/kmz.d.ts",
       "import": "./dist/loaders/kmz.js"
     },
+    "./loaders/nurbs": {
+      "types": "./dist/loaders/nurbs.d.ts",
+      "import": "./dist/loaders/nurbs.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"

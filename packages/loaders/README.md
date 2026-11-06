@@ -58,6 +58,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parse3DS` (`/3ds`), `parseTDS` (`/tds`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
 | `parseLWO` (`/lwo`), `parseAMF` (`/amf`, async), `parseMD2` (`/md2`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
 | `parsePDB` (`/pdb`), `parseKMZ` (`/kmz`, async) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
+| `evaluateNurbsCurve`, `tessellateNurbsCurve`, `evaluateNurbsSurface`, `tessellateNurbsSurface` (`/nurbs`) | See [NURBS curves and surfaces](#nurbs-curves-and-surfaces) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
@@ -526,6 +527,26 @@ console.log((await parseKMZ(await bytes('/maps/tower.kmz'))).models[0]?.location
 - **MD2.** `parseMD2` gives the first frame as a mesh with every frame beside it in one layout, so frames blend as morph targets. Frames named `run1`, `run2` form the clip `run`. Normals are computed from each frame's triangles.
 - **PDB.** `parsePDB` returns atoms as a point cloud with element colours, radii and labels, plus `bonds` as index pairs from CONECT rows and from distance, which `guessBonds: false` turns off. Only the first MODEL loads, and an atom with alternate locations keeps its first.
 - **KMZ.** `parseKMZ` reads the KML document's `<Model>` elements and their COLLADA files, one mesh each, and an archive with no document gives every `.dae` it holds. `location` and `orientation` are returned, not applied, because the map projection is your app's choice. Placemark points, lines and polygons are not read. `read(path)` returns any other file in the archive.
+
+## NURBS curves and surfaces
+
+`@margoengine/loaders/nurbs` evaluates and tessellates NURBS curves and surfaces held as plain data, the numbers a CAD file hands you. Rational weights make circles and spheres exact.
+
+```ts
+import { evaluateNurbsCurve, tessellateNurbsCurve, tessellateNurbsSurface } from '@margoengine/loaders/nurbs';
+
+const arc = { degree: 2, knots: [0, 0, 0, 1, 1, 1], points: [1, 0, 0, 1, 1, 0, 0, 1, 0], weights: [1, Math.SQRT1_2, 1] };
+console.log(evaluateNurbsCurve(arc, 0.5), tessellateNurbsCurve(arc, { tolerance: 0.001 }).length / 3);
+
+const patch = { degreeU: 1, degreeV: 1, knotsU: [0, 0, 1, 1], knotsV: [0, 0, 1, 1], countU: 2, countV: 2,
+  points: [0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0] };
+console.log(tessellateNurbsSurface(patch, { segmentsU: 2, segmentsV: 2 }).indices?.length);
+```
+
+- **Knots.** A knot vector may leave out its two end knots, as Rhino files do. Unclamped curves evaluate on their own domain.
+- **Curves.** `tessellateNurbsCurve` splits each knot span until the curve is within `tolerance` of its chords, so straight runs stay cheap. The result is xyz per point, for `mode: 'strip'` of `@margoengine/lines`. `maxPoints` caps it.
+- **Surfaces.** `tessellateNurbsSurface` makes a triangle grid with exact normals, with grid lines on every distinct knot and `segmentsU` and `segmentsV` quads per span. `evaluateNurbsSurface` gives a point and unit normal, and the normal is zero at a pole.
+- **Whole surfaces.** Trim curves are not applied, and there is no solid modelling: no topology and no boolean operations.
 
 ## Tiled TMX
 
