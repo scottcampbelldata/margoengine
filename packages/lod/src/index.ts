@@ -158,6 +158,7 @@ export class LODSystem implements EnginePlugin {
   private samples = 0;
   private depthFormat?: string;
   private readonly frame = new Float32Array(32);
+  private transition?: (lod: LOD, from: number, to: number) => boolean;
   private readonly descriptor = overlayDepthPass();
   private readonly color = this.descriptor.colorAttachments[0];
   private readonly depth = this.descriptor.depthStencilAttachment;
@@ -347,6 +348,18 @@ export class LODSystem implements EnginePlugin {
     return s;
   }
 
+  /**
+   * Hands level switches to `transition` (`@margoengine/lod/fade` does this): it returns true when it has taken a switch
+   * and shows the new level itself, false to leave it to the system. One at a time. Returns the remover.
+   * @throws MargoError `'state'` when another transition is set.
+   */
+  setTransition(transition: (lod: LOD, from: number, to: number) => boolean): () => void {
+    if (this.transition) throw new MargoError('state', 'LODSystem has a transition; remove it first');
+    this.transition = transition;
+    return () => {
+      if (this.transition === transition) this.transition = undefined;
+    };
+  }
   /** Picks every object's level. Runs automatically before each frame; call it yourself only without `engine.render`. */
   update(): void {
     const e = this.engine;
@@ -401,6 +414,11 @@ export class LODSystem implements EnginePlugin {
     }
   }
   private show(i: number, from: number, to: number): void {
+    if (from >= 0 && this.transition?.(this.handles[i], from, to)) {
+      this.current[i] = to;
+      this.slots[i] = this.levelSlots[i * MAX_LEVELS + to];
+      return;
+    }
     const objects = this.objects[i],
       a = from < 0 ? null : objects[from],
       b = objects[to],

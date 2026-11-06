@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4941393,
+  "total": 4943935,
   "history": [
     {
       "date": "2026-10-24",
@@ -2072,6 +2072,12 @@
       "commit": "906cc2341",
       "reason": "webgl2-compat /xr entry: XR on the layer through an XRWebGLLayer",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "f2abdc317",
+      "reason": "lod: setTransition; new entry lod/fade",
+      "grew": 1
     }
   ],
   "items": {
@@ -2322,6 +2328,7 @@
     "@margoengine/loaders/worker": 8571,
     "@margoengine/lod": 11224,
     "@margoengine/lod/auto": 5498,
+    "@margoengine/lod/fade": 2542,
     "@margoengine/materials": 61113,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,

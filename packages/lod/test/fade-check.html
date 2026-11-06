@@ -1,0 +1,95 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>LOD: dithered fade</title><style>body{margin:0;background:#000}canvas{width:256px;height:256px;display:block}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Two levels the same shape in two colours. Halfway through a fade each colour holds about half of the shape's pixels and
+// together they hold all of them: no hole, no pixel drawn from neither.
+import {Engine,PbrMaterial as CoreMaterial,box} from '/packages/core/dist/index.js';
+import {LODSystem} from '/packages/lod/dist/index.js';
+import {LODFade} from '/packages/lod/dist/fade.js';
+import {createMesh,UnlitMaterial} from '/packages/materials/dist/index.js';
+const canvas=document.querySelector('canvas'),camera={position:[0,0,3],target:[0,0,0],fov:60},errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const system=LODSystem.attach(engine),fade=LODFade.attach(engine,system,{duration:1000});
+const count=()=>{
+  const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
+  engine.render();g.drawImage(canvas,0,0);
+  const d=g.getImageData(0,0,c.width,c.height).data;let red=0,green=0;
+  for(let i=0;i<d.length;i+=4){if(d[i]>d[i+1]+20)red++;else if(d[i+1]>d[i]+20)green++;}
+  return {red,green};
+};
+const settle=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+const walk=async(lod,meshes=null)=>{
+  engine.camera.position=[0,0,3];await settle();await settle();
+  const start=count();
+  engine.camera.position=[0,0,30];
+  system.update();
+  const begun=fade.active;
+  fade.onPreUpdate(500);
+  const middle=count();
+  fade.onPreUpdate(250);
+  const late=count();
+  fade.onPreUpdate(1000);
+  const left=fade.active;
+  const end=count();
+  return {level:lod.level,begun,left,start,middle,late,end};
+};
+const red=[0.9,0.02,0.02],green=[0.02,0.9,0.02];
+window.check={
+  errors,
+  async run(){
+    const out={};
+    // Core meshes on levels of an empty anchor.
+    const anchor=engine.createMesh();
+    const a=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new CoreMaterial({color:red,roughness:1}));
+    const b=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new CoreMaterial({color:green,roughness:1}));
+    const kept=b.material;
+    const lod=system.add(anchor,[{object:a},{object:b,distance:10}],{radius:1});
+    out.core=await walk(lod);
+    out.coreRestored=b.material===kept;
+    out.coreHidden=!a.visible;
+    lod.remove();a.visible=b.visible=false;
+    // Materials meshes, the model route.
+    const geometry={positions:[-1,-1,0,1,-1,0,1,1,0,-1,1,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],indices:[0,1,2,0,2,3]};
+    const m=createMesh(engine,geometry,new UnlitMaterial({color:red})),n=createMesh(engine,geometry,new UnlitMaterial({color:green}));
+    const models=system.add(anchor,[{object:m},{object:n,distance:10}],{radius:1});
+    fade.prepare(models);
+    out.model=await walk(models);
+    models.remove();m.root.visible=n.root.visible=false;
+    // Geometry levels on one anchor: a ghost draws the old one, and goes.
+    const before=engine.meshes.size;
+    const tall=box(1,2,1),wide=box(2,1,1),shape=engine.createMesh().setMaterial(new CoreMaterial({color:green,roughness:1}));
+    const geometries=system.add(shape,[{object:tall},{object:wide,distance:10}],{radius:1});
+    engine.camera.position=[0,0,3];await settle();await settle();
+    const first=count();
+    engine.camera.position=[0,0,3.001];
+    system.update();
+    out.geometryMiddle=count();
+    // Nothing happens at this distance: step the level by hand through the threshold.
+    engine.camera.position=[0,0,30];system.update();fade.onPreUpdate(500);
+    const during=count();fade.onPreUpdate(1000);const after=count();
+    out.geometry={first,during,after,left:fade.active,shape:shape.geometry===wide};
+    out.ghosts=engine.meshes.size-before;
+    geometries.remove();shape.visible=false;
+    // To nothing: the level dissolves and is hidden.
+    const last=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new CoreMaterial({color:green,roughness:1}));
+    const gone=system.add(anchor,[{object:last},{object:null,distance:10}],{radius:1});
+    out.none=await walk(gone);
+    out.noneHidden=!last.visible;
+    gone.remove();
+    // A level disposed in its fade: the end of the fade passes over it.
+    const doomed=engine.createMesh().setGeometry(box(1,1,1)),next=engine.createMesh().setGeometry(box(1,1,1));
+    const short=system.add(anchor,[{object:doomed},{object:next,distance:10}],{radius:1});
+    engine.camera.position=[0,0,3];await settle();
+    engine.camera.position=[0,0,30];system.update();
+    doomed.dispose();fade.onPreUpdate(2000);
+    out.doomed=fade.active;
+    short.remove();
+    fade.dispose();
+    engine.removePlugin(fade.name);
+    await settle();
+    return out;
+  },
+};
+window.ready=true;
+</script></body></html>

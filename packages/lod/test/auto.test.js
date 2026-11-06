@@ -311,6 +311,37 @@ test('autoLOD levels a loaded model: its nodes, materials and transforms, points
   }
 });
 
+test('setTransition takes switches after the first frame, one at a time, and hands them back', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      a = engine.createMesh(),
+      b = engine.createMesh(),
+      lod = system.add(engine.createMesh(), [{ object: a }, { object: b, distance: 10 }], { radius: 1 }),
+      seen = [];
+    let take = true;
+    const remove = system.setTransition((handle, from, to) => (seen.push([handle, from, to]), take));
+    assert.throws(() => system.setTransition(() => false), { code: 'state' });
+    engine.camera.position = [0, 0, 1];
+    system.update();
+    assert.deepEqual(seen, [], 'the first pick shows the level at once');
+    assert.equal(a.visible, true);
+    engine.camera.position = [0, 0, 50];
+    system.update();
+    assert.deepEqual(seen, [[lod, 0, 1]]);
+    assert.equal(lod.level, 1);
+    assert.equal(a.visible, true, 'a transition that takes a switch shows the levels itself');
+    take = false;
+    engine.camera.position = [0, 0, 1];
+    system.update();
+    assert.equal(b.visible, false, 'a refused switch is instant');
+    remove();
+    system.setTransition(() => false)();
+  } finally {
+    engine.dispose();
+  }
+});
+
 test('hierarchicalLOD merges loaded models into one model per cell and file, a primitive per material', async () => {
   const engine = await headless();
   try {

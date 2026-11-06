@@ -195,6 +195,7 @@ function ownNodes(model: PBRModel): LODObject {
     top = model.nodes.filter((node, i) => !children.has(i) && node.visible);
   let visible = true;
   return {
+    model,
     get visible() {
       return visible;
     },

@@ -99,6 +99,7 @@ export class LODSystem implements EnginePlugin {
     levelOf(lod: LOD): number;
     pickProxies(): readonly LOD[];
     remove(lod: LOD): void;
+    setTransition(transition: (lod: LOD, from: number, to: number) => boolean): () => void;
     update(): void;
     onDeviceRestored(): void;
     dispose(): void;

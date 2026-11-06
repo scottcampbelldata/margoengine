@@ -119,6 +119,25 @@ Build and unit tests: npm test --workspace @margoengine/lod. Browser check and b
 `node packages/lod/test/browser-check.mjs`; picking and atlas seams: `node packages/lod/test/imposter-check.mjs` (writes
 `test-results/imposter-check-current.json` with every per-step series).
 
+## Dithered cross-fade: `margoengine/lod/fade`
+
+`LODFade` makes level switches dissolve instead of pop. For `duration` seconds both levels draw, each pixel from exactly one of them by a fixed noise threshold, so the fade costs no blending and no sorting, and the depth buffer stays right. Mesh, model, materials mesh and Geometry levels fade, as does a `null` level, which dissolves the object away.
+
+```ts
+import {createStage} from 'margoengine';
+import {LODSystem} from 'margoengine/lod';
+import {autoLOD} from 'margoengine/lod/auto';
+import {LODFade} from 'margoengine/lod/fade';
+import {box} from 'margoengine/core';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const lods = LODSystem.attach(stage.engine);
+const fade = LODFade.attach(stage.engine, lods, {duration: 0.25}); // seconds, the default
+const lod = await autoLOD(lods, stage.engine.createMesh().setGeometry(box(1, 1, 1)));
+fade.prepare(lod); // optional: adds the fade to model levels now, so the first switch compiles nothing
+```
+
+The fade patches core's mesh shader while `LODFade` is attached, and adds a lighting effect to a model the first time it fades, or at `prepare`. `fade.finish()` ends every fade at once, and `fade.active` counts them. A switch to or from an `Imposter`, the far level of `hierarchicalLOD`, and everything on WebGL2 stay instant. `shadows` sees both levels during the fade, and picking the one that is on the way out until it ends. A `LODSystem` takes one transition at a time, through `lods.setTransition(fn)`, which is what `LODFade` calls.
+
 ## Levels from a file: `LOD.fromModel`
 
 A glTF with `MSFT_lod` loads its level nodes too, hidden, as `model.lods`; `extras.MSFT_screencoverage` gives the switches, read as the bounding sphere's height over the viewport's. Only node levels are read, not `MSFT_lod` on materials.

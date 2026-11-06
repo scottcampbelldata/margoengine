@@ -1002,6 +1002,10 @@
       "types": "./dist/lod/auto.d.ts",
       "import": "./dist/lod/auto.js"
     },
+    "./lod/fade": {
+      "types": "./dist/lod/fade.d.ts",
+      "import": "./dist/lod/fade.js"
+    },
     "./materials": {
       "types": "./dist/materials.d.ts",
       "import": "./dist/materials.js"

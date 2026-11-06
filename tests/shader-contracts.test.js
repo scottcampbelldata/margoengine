@@ -85,6 +85,9 @@ const contracts = [
   ['shader/src/material.ts', 'gltf', 'let p=f.model*vec4f(i.position.xyz,1);'],
   ['shader/src/material.ts', 'gltf', /(struct Out \{[^}]*?)\n\}/],
   ['lod/src/imposter.ts', 'gltf', /@fragment fn fragment\([\s\S]*?let s=surface\(i,front\);/],
+  ['lod/src/fade.ts', 'core', '@location(3) material:vec4f }'],
+  ['lod/src/fade.ts', 'core', 'o.color=i.color.rgb;'],
+  ['lod/src/fade.ts', 'core', /@fragment fn fragment\(i:Output,@builtin\(front_facing\) front:bool\)->@location\(0\) vec4f \{/],
 ];
 const sources = new Map();
 const source = (file) => {
@@ -110,6 +113,12 @@ for (const [file, target, anchor] of contracts) {
     );
   });
 }
+
+test('lod fade guards all three surface entries of the gltf-pro shader', () => {
+  const anchor = 'let s=surface(i,front);';
+  assert.equal(count(pbrShader, anchor), 3);
+  assert.ok(source('lod/src/fade.ts').includes(`'${anchor}'`));
+});
 
 test('shared meshVertex mirrors core vertex inputs, frame layout and position transform', () => {
   const squash = (s) => s.replace(/\s+/g, '');
