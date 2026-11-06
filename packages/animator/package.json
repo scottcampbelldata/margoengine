@@ -60,6 +60,10 @@
     "./mirror": {
       "types": "./dist/mirror.d.ts",
       "import": "./dist/mirror.js"
+    },
+    "./spline-ik": {
+      "types": "./dist/spline-ik.d.ts",
+      "import": "./dist/spline-ik.js"
     }
   },
   "files": [
@@ -69,7 +73,13 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/animation": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/splines": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/splines": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@margoengine/math": "^1.0.0"

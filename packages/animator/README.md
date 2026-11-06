@@ -471,6 +471,32 @@ Partners come from node names: `LeftArm` and `RightArm`, `arm.L` and `arm.R`, `l
 
 `axis` is the axis across the plane of symmetry in the model's space (default `'x'`, for a glTF character facing +Z). `enabled` defaults to true, `states` to every state, and `morphs` (default true) trades morph targets by name, from each mesh's `extras.targetNames`. Each bone's local axes are accounted for from the rest pose, so the two sides of a rig need not share them, and the rest pose stays the rest pose. Root motion travels mirrored and turns the other way. Switching `enabled` is a hard cut; call `smooth()` on an inertialization first for a soft one.
 
+## Spline IK (`margoengine/animator/spline-ik`)
+
+`addSplineIK(animator, chain)` lays a joint chain along a curve, for spines, tails and tentacles. Each joint lands on the curve one bone's length from the joint before, so bones keep their lengths and the chain stays on the curve however tightly it bends. Needs `@margoengine/splines`, an optional peer.
+
+```ts
+import {Animator} from 'margoengine/animator';
+import {addSplineIK, type SplineIKChain} from 'margoengine/animator/spline-ik';
+
+const animator = Animator.attach(animation, {initial: 'idle', states: {idle: 'Idle'}});
+const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
+const points: [number, number, number][] = [[0, 1, 0], [0.4, 1.3, 0], [0.4, 1.8, 0.3], [0, 2.1, 0.5]];
+const tail: SplineIKChain = {
+  joints: [joint('Tail1'), joint('Tail2'), joint('Tail3'), joint('Tail4')], // from first to last
+  curve: points,            // or a Spline of any kind; rewrite the points every frame to animate it
+  anchor: 'root',           // keep the first joint on the body and bring the curve to it
+  twist: [0, Math.PI / 2],  // radians about the chain, at its first and last bone
+};
+const handle = addSplineIK(animator, tail);
+points[3][0] = 0.3;         // read every frame
+console.log(handle.overrun); // how far the chain ran past the curve's end
+```
+
+`curve` is a `Spline` from `@margoengine/splines`, or two or more points for a Catmull-Rom curve through them, in world space unless `space` names a node, so a tail's curve can travel with its body. `anchor` is `'curve'` (default: the first joint moves to the curve) or `'root'` (it stays animated and the curve comes to it). `offset` (default 0) slides the chain along the curve, `twist` (default none) turns it about itself, `weight` (default 1) blends from the animated pose, and `samples` (default 64) sets how finely the curve's frames are built.
+
+Twist follows the curve's rotation-minimising frames (`@margoengine/splines/frames`), started from the animated chain's own, so a curl past half a turn does not flip and a chain on a straight curve does not turn. Past the curve's end the chain carries on along the last tangent, and `overrun` says how far. A joint takes the first place along the curve one bone away, so a hairpin is followed, not cut. Each joint lands exactly on the curve, so a bone is a chord: a chain coarser than the curve cuts its corners.
+
 ## Explicit rotation writer
 
 `AnimatorOptions.writeRotation?: (node: Mesh, rotation: readonly number[]) => void` is an optional, explicit commit hook for applications that own their transform writer. It is captured and validated once during construction. Omit it to keep the current dynamic `Mesh.setQuaternion` call, including method overrides. This is an additive public API option; it does not change core/stage.

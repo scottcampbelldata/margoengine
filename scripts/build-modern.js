@@ -163,6 +163,8 @@ async function buildPackage(name) {
           '@margoengine/decoders/texture',
           '@margoengine/text',
           '@margoengine/bvh',
+          '@margoengine/splines',
+          '@margoengine/splines/frames',
           '@margoengine/vfx',
           '@margoengine/sky',
           '@margoengine/geometry',

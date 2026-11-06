@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5639405,
+  "total": 5645529,
   "history": [
     {
       "date": "2026-10-24",
@@ -2432,6 +2432,12 @@
       "commit": "b263a8d9e",
       "reason": "materials/object-normal is a new entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "cd0773559",
+      "reason": "feat(animator): spline IK (new entry @margoengine/animator/spline-ik)",
+      "grew": 2
     }
   ],
   "items": {
@@ -2450,7 +2456,9 @@
     "@margoengine/animator/fbik": 5618,
     "@margoengine/animator/graph": 8542,
     "@margoengine/animator/inertialize": 2150,
+    "@margoengine/animator/mirror": 2030,
     "@margoengine/animator/motion-matching": 7253,
+    "@margoengine/animator/spline-ik": 4094,
     "@margoengine/animator/sync": 2070,
     "@margoengine/animator/warping": 4883,
     "@margoengine/audio": 7716,

@@ -915,6 +915,26 @@ Crowds of animated characters got cheaper and more varied, and baked simulations
   `npx` twice in a worktree against the rule, `--no-install` and `--version`, which fetched nothing. Job 5's commit carries an 845 line diff in
   `packages/gltf-pro/README.md` from normalized line endings.
 
+## Batch 82: animator
+
+Characters can now blend without a second pose, stay in step, fit any speed and direction, reach with the whole body, play by motion matching, use one clip for both sides, and lay a chain along a curve.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Inertialization | DONE | `be7fa7015` | `@margoengine/animator/inertialize` | LIM-209 |
+| 2 | Sync groups and marker sync | DONE | `2d9790317` | `/sync` | LIM-210 |
+| 3 | Stride, orientation and distance warping | DONE | `cdf0c53db` | `/warping` | LIM-211 |
+| 4 | Full-body IK | DONE | `8d4394bf8` | `/fbik` | LIM-212 |
+| 5 | Motion matching | DONE | `316cf17e2` | `/motion-matching` | LIM-213 |
+| 6 | Runtime pose mirroring | DONE | `68258c7ca` | `/mirror` | LIM-214 |
+| 7 | Spline IK | DONE | this commit | `/spline-ik` | LIM-215 |
+
+- **Bugs:** none reached `main`; each was caught before landing and has a test in its job's file. A state's clip time used the new state's clock during a crossfade, so bones jumped (`tests/modern-animator-sync.test.js`). In full-body IK a leg as straight as the clip drew the pelvis down with no target at all, a far target threw the feet 2.7 m off the ground, and a straight arm's elbow bent along the reach, a 119 mm jump in a frame (`tests/modern-animator-fbik.test.js`). In spline IK a chain jumped 0.42 as the curve's end passed a joint, so the curve now carries on along its last tangent (`tests/modern-animator-spline-ik.test.js`). Motion matching's first weights kept a character idling while it moved, so the path now counts most (`tests/modern-animator-motion-matching.test.js`).
+- **Proved:** on real files: inertialization and sync on Fox.glb's clips, full-body IK on RiggedFigure.glb (hand within 2 mm of a point for 30 frames, both feet within 2 mm of their animated steps), mirroring on Fox.glb and RiggedFigure.glb (within twice each file's own rest asymmetry), spline IK on Fox.glb's tail during its walk, and motion matching picking Fox.glb's Survey, Walk and Run by speed. On stand-ins: warping holds a planted foot under 2 mm from 0.3 to 1.4 m/s and at 45, 60 and 90 degrees, under 6 mm at 3 m/s, against over 100 mm without it. Motion matching's search equals comparing every row on 600 random queries, and across 6 speed changes no joint moves over 150 mm a frame, against 250 mm with the blend off. All CPU tests.
+- **Limits:** LIM-211 and LIM-213 read PROVEN (STAND-IN): warping's foot figures are on a stand-in walk, and no motion capture set has been run through motion matching, whose Fox.glb clips play in place with speeds labelled by hand. No frame time was measured for jobs 3 to 7, and jobs 4, 5 and 7 have quiet-pass lines. Inertialization's speed is a shared-machine diagnostic: 14.5 to 17.1 us a frame on 58 bones during a fade, against 16.5 to 21.5 for a crossfade. Full-body IK's balance is static and has no memory of the last frame. `rigging` already peers on `animator`, so `animator` cannot import `solvePoseIK` or `solveFABRIK`: full-body IK finishes limbs with `solveTwoBoneIK`, and its torso solve is new. Spline IK reuses `Spline` and `SplineFrames`, and `@margoengine/splines` joined the external list in `scripts/build-modern.js`, so it is not bundled into `animator`.
+- **Gate:** job 1 failed once in its package test, on a relative path to Fox.glb from the package folder. Jobs 1 and 2 failed once on `quality api`, on error messages with no fix, and landed in one push. Jobs 6 and 7 failed once on `tests/package-lock-sync.test.js`, because the lock file lacked the new splines peer, and landed in one push. Nothing failed reached `main`. When `main` moved during a landing, the job reran its package and claims tests after the rebase, not `verify`.
+- **Slips:** the helper edited no tracked file during a landing, after the first drafts moved to `.lane/next/`. It wrote a test fixture wrongly in job 6, which a failing test showed and the fixture was fixed; the code did not change. A chained command ran job 7's docs script during a stopped rebase; the rebase was aborted and the step redone, and nothing from it landed. It ran `git stash list` once in the worktree, read only, against the rule that bars `git stash` there.
+
 ## Real files: every loader on a file from a real tool
 
 Batch 39 proved its formats on files the tests built. A file built by the same mind as the reader repeats its mistakes, so Scott approved downloading a public file for every loader (2026-11-06).
