@@ -1,0 +1,94 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Deform nodes check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/stage/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {NodeMaterial,positionLocal,storage,uv,vec3} from '/packages/shader/dist/index.js';
+import {morphing,skinning,worldNormal} from '/packages/shader/dist/deform.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,4],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const dark=()=>{engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0;};
+const base=planeGeometry(2,2,16,16),count=base.positions.length/3;
+// Column-major 4 x 4 matrices: a turn about a slanted axis, so the normals change too, and a shift.
+const pose=(angle,x,y,z)=>{const [a,b,d]=[0.6,0.48,0.64],c=Math.cos(angle),s=Math.sin(angle),t=1-c;return [t*a*a+c,t*a*b+s*d,t*a*d-s*b,0,t*a*b-s*d,t*b*b+c,t*b*d+s*a,0,t*a*d+s*b,t*b*d-s*a,t*d*d+c,0,x,y,z,1];};
+const identity=pose(0,0,0,0),bent=pose(0.7,0.3,0.1,0.2),other=pose(-0.5,-0.2,0.3,0);
+// Bone 1's weight grows across the plane; `rigid` gives it every vertex.
+const share=(i,rigid)=>rigid?1:(base.positions[i*3]+1)/2;
+const skinBuffers=(rigid,bones=bent)=>{
+  const joints=new Uint32Array(count*4),weights=new Float32Array(count*4);
+  for(let i=0;i<count;i++){joints[i*4+1]=1;weights[i*4]=1-share(i,rigid);weights[i*4+1]=share(i,rigid);}
+  return {bones:storage(new Float32Array([...identity,...bones]),'vec4f'),joints:storage(joints,'vec4u'),weights:storage(weights,'vec4f')};
+};
+// Two targets, half and whole weight: a bulge in z along y, a shift in x along y.
+const weightsOf=[0.5,1];
+const offset=(t,i)=>{const x=base.positions[i*3],y=base.positions[i*3+1];return t?[y*0.3,0,0]:[0,0,0.6*(1-y*y)+x*0.2];};
+const normalOffset=(t,i)=>t?[0.2,0,0]:[0,base.positions[i*3+1]*0.4,0];
+const morphBuffers=()=>{
+  const positions=new Float32Array(2*count*4),normals=new Float32Array(2*count*4);
+  for(let t=0;t<2;t++)for(let i=0;i<count;i++){positions.set(offset(t,i),(t*count+i)*4);normals.set(normalOffset(t,i),(t*count+i)*4);}
+  return {count:2,vertices:count,positions:storage(positions,'vec4f'),normals:storage(normals,'vec4f'),weights:storage(new Float32Array(weightsOf),'f32')};
+};
+const blendPoint=(bones,w,p,one)=>[0,1,2].map(k=>{const m=c=>(1-w)*identity[c*4+k]+w*bones[c*4+k];return m(0)*p[0]+m(1)*p[1]+m(2)*p[2]+(one?m(3):0);});
+const unit=v=>{const l=Math.hypot(...v);return v.map(x=>x/l);};
+// The mesh deformed on the CPU; `step` maps (position, normal, vertex) to the new pair.
+const cpu=step=>{const positions=new Float32Array(count*3),normals=new Float32Array(count*3);
+  for(let i=0;i<count;i++){const [p,n]=step([...base.positions.slice(i*3,i*3+3)],[...base.normals.slice(i*3,i*3+3)],i);positions.set(p,i*3);normals.set(n,i*3);}
+  return {...base,positions,normals};};
+const cpuSkin=(p,n,i,rigid=false,bones=bent)=>[blendPoint(bones,share(i,rigid),p,true),unit(blendPoint(bones,share(i,rigid),n,false))];
+const cpuMorph=(p,n,i)=>{const q=[...p],m=[...n];for(let t=0;t<2;t++){const o=offset(t,i),d=normalOffset(t,i);for(let k=0;k<3;k++){q[k]+=o[k]*weightsOf[t];m[k]+=d[k]*weightsOf[t];}}return [q,unit(m)];};
+const flat={color:[0,0,0],toneMapped:false,doubleSided:true};
+const colour=vec3(uv(),0.4),show=(geometry,extra={})=>{dark();return createMesh(engine,geometry,new NodeMaterial({...flat,emissiveNode:colour,positionNormals:'keep',...extra}));};
+// Lit by the sun, so the picture depends on the normal the shading actually used.
+const lit=(geometry,extra={})=>{engine.lighting.direction.set([0.6,0,0.8,Math.PI*2]);engine.lighting.radiance.set([1,1,1,0]);return createMesh(engine,geometry,new NodeMaterial({color:[0.5,0.5,0.5],toneMapped:false,roughness:1,metalness:0,doubleSided:true,positionNormals:'keep',...extra}));};
+const shadowed=(geometry,extra)=>{
+  engine.lighting.direction.set([0.6,0,0.8,Math.PI*2]);engine.lighting.radiance.set([1,1,1,0]);
+  const look={color:[0.25,0.25,0.25],toneMapped:false,roughness:1,metalness:0,doubleSided:true},back=createMesh(engine,planeGeometry(8,8),new Material(look));back.root.setPosition([0,0,-1.5]);
+  const front=createMesh(engine,geometry,new NodeMaterial({...look,positionNormals:'keep',...extra})),shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'});shadows.add(back);shadows.add(front);
+  return {destroy(){engine.removePlugin(shadows.name);back.destroy();front.destroy();}};
+};
+const scaled=mesh=>{mesh.root.setScale([-1,0.5,1]);return mesh;};
+const shifted=g=>({...g,positions:g.positions.map((v,i)=>i%3===1?v+0.25:v)});
+const scenarios={
+  cpuBind:()=>show(base),
+  cpuSkin:()=>show(cpu(cpuSkin)),
+  skin:()=>show(base,{positionNode:skinning(skinBuffers()).position()}),
+  cpuMorph:()=>show(cpu(cpuMorph)),
+  morph:()=>show(base,{positionNode:morphing(morphBuffers()).position()}),
+  // The glTF order: morph targets first, then the bones.
+  cpuChain:()=>show(cpu((p,n,i)=>{const [q,m]=cpuMorph(p,n,i);return cpuSkin(q,m,i);})),
+  chain:()=>show(base,{positionNode:skinning(skinBuffers()).position(morphing(morphBuffers()).position())}),
+  cpuEffect:()=>show(shifted(cpu(cpuSkin))),
+  effect:()=>show(base,{positionNode:skinning(skinBuffers()).position().add(vec3(0,0.25,0))}),
+  cpuNormal:()=>lit(cpu(cpuSkin)),
+  // The pose with the bind normals: the normal test below can only pass if the normals move the picture.
+  cpuStaleNormal:()=>lit(cpu((p,n,i)=>[cpuSkin(p,n,i)[0],n])),
+  normal:()=>{const s=skinning(skinBuffers());return lit(base,{positionNode:s.position(),normalNode:worldNormal(s.normal())});},
+  cpuMorphNormal:()=>lit(cpu(cpuMorph)),
+  cpuMorphStaleNormal:()=>lit(cpu((p,n,i)=>[cpuMorph(p,n,i)[0],n])),
+  morphNormal:()=>{const m=morphing(morphBuffers());return lit(base,{positionNode:m.position(),normalNode:worldNormal(m.normal())});},
+  // A stretched and mirrored mesh: the normal stays perpendicular to the surface.
+  cpuScaledNormal:()=>scaled(lit(cpu(cpuSkin))),
+  scaledNormal:()=>{const s=skinning(skinBuffers());return scaled(lit(base,{positionNode:s.position(),normalNode:worldNormal(s.normal())}));},
+  // One bone for every vertex: the normals a graph re-derives from neighbours are the turned normals.
+  cpuRigid:()=>lit(cpu((p,n,i)=>cpuSkin(p,n,i,true))),
+  rigidNeighbours:()=>lit(base,{positionNode:skinning(skinBuffers(true)).position(),positionNormals:'neighbours'}),
+  cpuNewPose:()=>show(cpu((p,n,i)=>cpuSkin(p,n,i,false,other))),
+  newPose:async()=>{const b=skinBuffers(),m=show(base,{positionNode:skinning(b).position()});engine.render();await device.queue.onSubmittedWorkDone();b.bones.data.set(other,16);b.bones.update();return m;},
+  cpuShadow:()=>shadowed(cpu(cpuSkin),{}),
+  shadow:()=>{const s=skinning(skinBuffers());return shadowed(base,{positionNode:s.position(),normalNode:worldNormal(s.normal())});},
+  // A compute deformer swaps the vertices the pass fetches, so positionLocal is already the posed vertex.
+  cpuDeformed:()=>show(shifted(cpu(cpuSkin))),
+  deformed:()=>{
+    const posed=show(base,{positionNode:positionLocal.add(vec3(0,0.25,0))}),p=posed.primitives[0],v=p.vertices.slice(),moved=cpu(cpuSkin);
+    for(let i=0;i<count;i++)for(let k=0;k<3;k++)v[i*20+k]=moved.positions[i*3+k];
+    const buffer=device.createBuffer({size:v.byteLength,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(buffer,0,v);p.deformed=buffer;return posed;
+  },
+};
+window.check={
+  async run(name){device.pushErrorScope('validation');window.current=await scenarios[name]();engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {errors:[...(e?[e.message]:[]),...errors.splice(0)]};},
+  clear(){window.current?.destroy();window.current=null;engine.render();},
+};
+window.ready=true;
+</script></body></html>

@@ -1666,6 +1666,10 @@
       "types": "./dist/shader/lighting.d.ts",
       "import": "./dist/shader/lighting.js"
     },
+    "./shader/deform": {
+      "types": "./dist/shader/deform.d.ts",
+      "import": "./dist/shader/deform.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"

@@ -255,6 +255,50 @@ createMesh(stage.engine, boxGeometry(1, 1, 1), new NodeMaterial({emissiveNode: v
 
 `node packages/shader/test/inputs-check.mjs` (real GPU, under the GPU lock) reads each input back as a pixel on a wall the camera faces, with and without tangents, and compiles the instance inputs plain, instanced and in uniform rows.
 
+## Skinning and morph targets (`@margoengine/shader/deform`)
+
+Deformation as nodes, so a graph can add its own effect on top and every pass draws the result. `skinning()` is linear blend skinning and `morphing()` is morph targets, both as glTF 2.0 defines them; they run in the vertex stage from `storage()` buffers you fill.
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {NodeMaterial, sin, storage, time, vec3} from 'margoengine/shader';
+import {morphing, skinning, worldNormal} from 'margoengine/shader/deform';
+const stage = await createStage('#app');
+const geometry = planeGeometry(2, 2, 16, 16), vertices = geometry.positions.length / 3;
+const skin = skinning({
+  bones: storage(new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]), 'vec4f'),   // one matrix, four columns
+  joints: storage(new Uint32Array(vertices * 4), 'vec4u'),                            // four bone numbers per vertex
+  weights: storage(new Float32Array(vertices * 4).map((_, i) => (i % 4 ? 0 : 1)), 'vec4f'),
+});
+const morph = morphing({
+  count: 1,
+  vertices,
+  positions: storage(new Float32Array(vertices * 4), 'vec4f'),                        // offsets, target after target
+  weights: storage(new Float32Array([0.5]), 'f32'),
+});
+createMesh(stage.engine, geometry, new NodeMaterial({
+  positionNormals: 'keep',                                                            // normalNode below replaces them
+  positionNode: skin.position(morph.position()).add(vec3(0, sin(time).mul(0.1), 0)),  // morph, then bones, then an effect
+  normalNode: worldNormal(skin.normal(morph.normal())),
+}));
+```
+
+Update the pose by writing the buffer's `data` and calling `update()`, or write the buffer from a `ComputePass`.
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `skinning({bones, joints, weights})` | `{position(p?), normal(n?)}` | `bones` holds the joint matrix times the inverse bind matrix, four `vec4f` columns per bone, in mesh space. `p` and `n` default to the mesh's own, so pass a morph's output to chain them. |
+| `morphing({count, vertices, positions, normals?, weights})` | `{position(p?), normal(n?)}` | The buffers hold `count * vertices` offsets, target after target. Without `normals`, `normal()` is the base normal. |
+| `worldNormal(n)` | a `normalNode` | A mesh-space normal in world space, per vertex and interpolated. Right on scaled and mirrored meshes. |
+
+**Normals.** `normalNode: worldNormal(skin.normal())` costs one blend per vertex and is what glTF asks for. Left out, a `positionNode` makes normals by the rules of [Node output in every pass](#node-output-in-every-pass): three evaluations of the skin per vertex, and the true normal of the deformed surface.
+
+**A character played by `@margoengine/animation`.** Its compute deformer already replaced the vertices every pass fetches, so in a NodeMaterial on such a character `positionLocal` and `normalLocal` are the posed vertex: add an effect with `positionLocal.add(...)` and leave these nodes out. They are for meshes you skin in the graph.
+
+`node packages/shader/test/deform-check.mjs` (real GPU, under the GPU lock) compares each of these with the same mesh deformed on the CPU: position, morph into skin, an effect on top, lit normals (also on a stretched, mirrored mesh, and from neighbours), a new pose, the shadow, and an effect on vertices a compute deformer moved.
+
 ## Node output in every pass
 
 A graph is one description of a surface, so every pass draws it. Each pass gets its own variant, compiled from the same nodes when the material is made:

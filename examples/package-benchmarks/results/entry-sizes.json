@@ -1,5 +1,5 @@
 {
-  "commit": "d8b2f163d",
+  "commit": "10594d01e",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1796,6 +1796,10 @@
       "./lighting": {
         "raw": 25776,
         "gzip": 9540
+      },
+      "./deform": {
+        "raw": 7732,
+        "gzip": 3330
       }
     },
     "@margoengine/shadows": {

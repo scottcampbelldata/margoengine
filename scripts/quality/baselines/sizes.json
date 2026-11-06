@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5071624,
+  "total": 5075210,
   "history": [
     {
       "date": "2026-10-24",
@@ -2246,6 +2246,12 @@
       "commit": "d8b2f163d",
       "reason": "loaders/threemf-materials, new optional entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "10594d01e",
+      "reason": "shader: new deform entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2655,6 +2661,7 @@
     "@margoengine/selection": 20446,
     "@margoengine/shader": 18459,
     "@margoengine/shader/compute-texture": 4761,
+    "@margoengine/shader/deform": 3586,
     "@margoengine/shader/editor": 24745,
     "@margoengine/shader/effects": 8306,
     "@margoengine/shader/graph": 13977,
