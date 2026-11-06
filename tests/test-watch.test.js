@@ -70,9 +70,17 @@ test('a real hang is named and ends the run, children included', () => {
       join(dir, 'open.test.js'),
       "import test from 'node:test';\ntest('leaves a timer', () => { setInterval(() => {}, 1000); });\n",
     );
+    // The shape of the voxel-net hang (af185850f): a failed hook skips the one that closes the server.
+    writeFileSync(
+      join(dir, 'hook.test.js'),
+      "import { createServer } from 'node:net';\nimport test from 'node:test';\n" +
+        "test('holds a server', (t) => {\n  const server = createServer().listen(0);\n" +
+        "  t.after(() => { throw new Error('ENOTEMPTY'); });\n  t.after(() => server.close());\n});\n",
+    );
     for (const [name, expected] of [
       ['blocked.test.js', /HUNG TEST: blocked\.test\.js with no test reported yet/],
       ['open.test.js', /HUNG TEST: open\.test\.js after its last test "leaves a timer"/],
+      ['hook.test.js', /HUNG TEST: hook\.test\.js after its last test "holds a server"/],
     ]) {
       const reporter = new URL('../scripts/support/test-watch.mjs', import.meta.url).href,
         { status, stderr, error } = spawnSync(
