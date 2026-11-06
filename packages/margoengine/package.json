@@ -1030,6 +1030,14 @@
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"
     },
+    "./kinematics-constraints/robot": {
+      "types": "./dist/kinematics-constraints/robot.d.ts",
+      "import": "./dist/kinematics-constraints/robot.js"
+    },
+    "./kinematics-constraints/swept": {
+      "types": "./dist/kinematics-constraints/swept.d.ts",
+      "import": "./dist/kinematics-constraints/swept.js"
+    },
     "./labels": {
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"

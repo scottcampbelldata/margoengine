@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8886608,
+  "total": 8906453,
   "history": [
     {
       "date": "2026-10-24",
@@ -2666,6 +2666,12 @@
       "commit": "c431706bf",
       "reason": "KTX2 export: exporters grows by the new entry, errors keep their type across the worker",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "eddde5ca1",
+      "reason": "feat(kinematics-constraints): swept collision between frames (new entries @margoengine/kinematics-constraints/swept and /robot)",
+      "grew": 2
     }
   ],
   "items": {
@@ -2922,6 +2928,8 @@
     "@margoengine/inspector/resources": 902,
     "@margoengine/inspector/snapshot": 1320,
     "@margoengine/kinematics-constraints": 11751,
+    "@margoengine/kinematics-constraints/robot": 10142,
+    "@margoengine/kinematics-constraints/swept": 9703,
     "@margoengine/labels": 4756,
     "@margoengine/lighting2d": 4389,
     "@margoengine/lightmap": 4053,

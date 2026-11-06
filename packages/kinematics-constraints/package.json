@@ -26,6 +26,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./robot": {
+      "types": "./dist/robot.d.ts",
+      "import": "./dist/robot.js"
+    },
+    "./swept": {
+      "types": "./dist/swept.d.ts",
+      "import": "./dist/swept.js"
     }
   },
   "files": [

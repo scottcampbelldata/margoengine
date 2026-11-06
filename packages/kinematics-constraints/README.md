@@ -273,8 +273,99 @@ Measured on one desktop thread (Node 26, Windows), 64-point hulls unless noted:
 | `solve`, no clear pose, all 34 candidates tried, limb-shaped hulls | 0.44 ms (16 points: 0.17 ms) |
 | `solve`, no clear pose, a round hull nested in a round hull, the slowest shape found | 1.9 ms (16 points: 0.27 ms); a lower `searchBudget` limits it |
 
+## Robots (`margoengine/kinematics-constraints/robot`)
+
+`AvoidanceSolver` works on one two-bone chain and a callback. `Robot` is a whole tree of joints: revolute, continuous, prismatic, fixed and mimic joints, each with its range, and collision shapes that ride on the links. The swept check, the joint-limit solver, the planner and the URDF reader below all take one.
+
+```ts
+import { SphereVolume } from 'margoengine/kinematics-constraints';
+import { Robot } from 'margoengine/kinematics-constraints/robot';
+
+// Each joint's origin is its frame in its parent's frame: this one sits one unit along z.
+const up = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1];
+const arm = new Robot({
+  joints: [
+    { name: 'waist', lower: -3, upper: 3 },
+    { name: 'shoulder', origin: up, axis: [0, 1, 0], lower: -2, upper: 2 },
+  ],
+  shapes: [
+    { joint: 'shoulder', end: [0, 0, 1], radius: 0.1 },
+    { joint: 'waist', points: [-0.2, -0.2, 0, 0.2, -0.2, 0, -0.2, 0.2, 0, 0.2, 0.2, 0, 0, 0, 1] },
+  ],
+});
+
+const ball = new SphereVolume({ center: [2, 0, 1], radius: 0.25 });
+const gap = arm.clearance([0, 0.5], [ball]); // smallest gap of any shape, negative when overlapping
+const wrist = arm.frameMatrix(1); // the world matrix of the last pose, for a bone or a mesh
+console.log(gap, wrist);
+```
+
+| `Robot` member | Use |
+| --- | --- |
+| `new Robot({joints, shapes?, base?})` | `joints` in order, each after its parent. Per joint: `name`, `type` (default `'revolute'`), `parent` (index or name, default the joint before, `null` the base), `origin` (16 values, default identity), `axis` (default `[0, 0, 1]`), `lower`, `upper` (required unless continuous or fixed), `mimic: {joint, multiplier?, offset?}`. Per shape: `joint` (`null` the base) and `{start?, end?, radius}` for a capsule or sphere, or `{points, matrix?}` for a convex hull. |
+| `dof`, `lower`, `upper`, `variableNames` | A configuration `q` holds one number per moving joint that repeats no other, in joint order. |
+| `forward(q)`, `frameMatrix(joint)`, `pointOn(joint, point)` | Forward kinematics, and reading it back as a 16-value matrix or a world point. |
+| `within(q)`, `clamp(q, out?)` | Range check and limit. |
+| `clearance(q, colliders, selfCollision?)`, then `nearestShape`, `nearestCollider` | Smallest signed gap at a pose and who it was between. |
+| `place(q)`, `shapeGap(shape, volume)`, `pairGap(a, b)` | The same, one pair at a time. |
+| `selfCollisionPairs`, `ignoreContactsAt(q, gap?)` | The pairs a self check tests: never shapes on one link or on a joint and its parent. `ignoreContactsAt` leaves out those that touch at a safe pose. |
+| `motionBounds(from, to, out?)` | The most any point of each shape moves on the straight joint-space path. |
+| `setBase(matrix)` | Places the whole robot. |
+
+## Swept collision (`margoengine/kinematics-constraints/swept`)
+
+`solve` and `clearance` look at one instant, so an arm that moves far in one frame can pass straight through a thin wall with both of its poses clear. A swept check looks at the whole motion. Each step measures the gap, and no point of a shape can close that gap faster than its motion bound, so the check can jump that far and no farther (conservative advancement). It never steps past a contact, however thin the obstacle or fast the move.
+
+```ts
+import { AvoidanceSolver, ConvexHullVolume, SolveStatus, type ElbowEvaluator } from 'margoengine/kinematics-constraints';
+import { sweepChain } from 'margoengine/kinematics-constraints/swept';
+
+// A thin plate the forearm must not cross.
+const plate = new ConvexHullVolume({ points: [0.6, 0, -1, 2, 0, -1, 0.6, 0, 1, 2, 0, 1] });
+const solver = new AvoidanceSolver([plate], { minClearance: 0.02, complianceMargin: 0, targetRadius: 0.05 });
+
+// Unit bones: the elbow stands on a circle round the root to hand line.
+const elbowAt: ElbowEvaluator = (_root, hand, angle, out) => {
+  const reach = Math.hypot(hand[0], hand[1], hand[2]), height = Math.sqrt(1 - (reach / 2) ** 2);
+  const x = hand[0] / reach, y = hand[1] / reach;
+  out[0] = (x * reach) / 2 - y * height * Math.cos(angle);
+  out[1] = (y * reach) / 2 + x * height * Math.cos(angle);
+  out[2] = height * Math.sin(angle);
+};
+
+const root = [0, 0, 0] as const;
+const hand = [1, 0.8, 0] as const;
+const elbow = new Float64Array(3);
+elbowAt(root, hand, Math.PI / 2, elbow);
+
+// One big frame, to the far side of the plate. Both poses are clear, so the solver says yes.
+const next = solver.solve(root, hand, [1, -0.8, 0], 1, 1, 0.05, 0.05, 1, elbowAt, { swivelSpeedLimit: 10, searchBudget: 64 });
+if (next.status === SolveStatus.Success) {
+  const motion = sweepChain([root, elbow, hand], [root, next.elbow, next.target], [plate], {
+    radius: 0.05,
+    minClearance: 0.01, // below the solver's gap, or the start pose already counts as a contact
+  });
+  if (!motion.clear) console.log('blocked at', motion.time, 'by collider', motion.collider);
+}
+```
+
+| Check | Motion it certifies |
+| --- | --- |
+| `sweepRobot(robot, from, to, colliders, options?)` | The straight line in joint space from one configuration to the other. |
+| `sweepChain(from, to, colliders, {radius, jointRadius?, ...})` | `from` and `to` list joint positions. The root moves on a line, each bone turns on its shortest arc with its length held, so the output of `AvoidanceSolver` goes straight in. `radius` and `jointRadius` are one number or one per link and joint. |
+| `sweepHull(hull, from, to, colliders, options?)` | Two matrices of rotation, positive scale and translation: a line for the translation, the shortest arc about the hull's origin, the scale eased. For a link hull, pass its bone's world matrices. The hull is left at `to`. |
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `minClearance` | `0` | Gap the motion must keep. |
+| `tolerance` | `1e-4` | A gap this close to `minClearance` counts as reached. It also sets the smallest step. |
+| `maxSteps` | `4096` | Most poses tested. Running out gives `exhausted`, never `clear`. |
+| `selfCollision` | `false` | `sweepRobot` only: also check the robot against itself. |
+
+The result holds `clear`, `exhausted`, `time` (the first contact from 0 to 1, or 1 when clear), `clearance` (the smallest gap at a tested pose, beyond `minClearance`), `steps`, `shape` and `collider`. `time` is never later than the true contact, so the pose there is a safe place to stop. A hull needs colliders with `hullClearanceInto`; every built-in collider has it. Colliders hold still during a check: step a moving obstacle yourself. A motion that starts within the gap stops at time 0.
+
 ## Scope
 
 `Success` describes static analytical proxy clearance at one evaluated instant, within numerical tolerance. It covers neither unsupplied mesh/skinning geometry nor unchecked link portions. Set proxies to enclose the full deformation envelope and any desired padding in your application.
 
-This package does not implement continuous collision detection, swept-path planning between frames, concave mesh collision, a joint-limit solver, dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or use a higher-level planner.
+Motion between frames is checked by `/swept` above. This package does not implement concave mesh collision, a joint-limit solver, dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or use a higher-level planner.

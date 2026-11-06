@@ -785,3 +785,8 @@ function originalSegmentClearance(): ConstraintVolume['segmentClearance'] {
 }
 const hullEvaluate = /* @__PURE__ */ originalEvaluate();
 const hullSegmentClearance = /* @__PURE__ */ originalSegmentClearance();
+
+/** @internal The distinct points of a hull in its local space, flat. Read, do not write. */
+export function hullPoints(hull: ConvexHullVolume): Float64Array {
+  return hull['shape'].points;
+}

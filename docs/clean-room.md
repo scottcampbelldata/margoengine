@@ -940,6 +940,7 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 | Body shapes from the skin (`ragdoll/hulls`) | Reuses `rigging/hulls`, which is quickhull as already cited; the box is a plain search over turns about the bone, of our own design |
 | Saved profiles (`ragdoll/profile`) | Our own format. Mass shares from P. de Leva, J. Biomechanics 1996; segment lengths from Drillis and Contini, 1966; joint ranges from common published ranges of motion |
 | Balance (`ragdoll/balance`) | Capture point from J. Pratt et al., Humanoids 2006; foot placement in the manner of SIMBICON, K. Yin, K. Loken, M. van de Panne, SIGGRAPH 2007; leg angles by the law of cosines |
+| Kinematics swept collision (`kinematics-constraints/swept`, `/robot`) | Conservative advancement from B. Mirtich, PhD thesis, UC Berkeley, 1996; per-link motion bound from F. Schwarzer, M. Saha, J.-C. Latombe, WAFR 2002; quaternion from a matrix from K. Shoemake, SIGGRAPH 1985. No robotics library's source was read |
 
 ## 2D sprites: `@margoengine/sprites`
 
