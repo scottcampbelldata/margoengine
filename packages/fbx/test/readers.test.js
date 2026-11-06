@@ -215,16 +215,24 @@ test('ASCII supports comments, quoted escapes, scientific values, and direct pro
   assert.equal(property(doc.objects.get(2n), 'Custom'), 0.001);
 });
 
-test('document indexing rejects duplicate ids, absent references, and model cycles', async () => {
+test('document indexing rejects duplicate ids and model cycles', async () => {
   const invalids = [
     [roots([geometry(), model(1)]), /duplicate/],
-    [roots(undefined, [connection(1, 99)]), /missing connection/],
-    [roots(undefined, [connection(99, 0)]), /missing connection/],
     [roots([geometry(), model(2), model(3)], [connection(2, 3), connection(3, 2)]), /cycle/],
   ];
   for (const [nodes, expected] of invalids) await assert.rejects(parseDocument(binary(nodes)), expected);
   await assert.rejects(parseDocument(encode(ascii.replace('Model: 2,', 'Model: 1,'))), /duplicate/);
-  await assert.rejects(parseDocument(encode(ascii.replace('C: "OO",1,2', 'C: "OO",1,99'))), /missing connection/);
+});
+
+test('a connection to an object the file left out is dropped, as the FBX SDK writes such links', async () => {
+  const links = (doc) => doc.connections.map((c) => `${c.child}>${c.parent}`);
+  // Either end missing, both ends missing, and a real link beside them that must stay.
+  const doc = await parseDocument(
+    binary(roots(undefined, [connection(1, 99), connection(99, 0), connection(98, 99), connection(1, 2)])),
+  );
+  assert.deepEqual(links(doc), ['1>2']);
+  const text = await parseDocument(encode(ascii.replace('C: "OO",1,2', 'C: "OO",1,99')));
+  assert.deepEqual(links(text), ['2>0']);
 });
 
 test('binary record bounds, sentinels, header integers, array sizes, and encodings are checked', async () => {

@@ -124,8 +124,9 @@ export async function parseDocument(input: ArrayBuffer | ArrayBufferView, signal
       const kind = node.properties[0],
         child = id(node.properties[1]),
         parent = id(node.properties[2]);
-      if (!objects.has(child) || (parent !== 0n && !objects.has(parent)))
-        invalid(`missing connection object ${child} -> ${parent}`);
+      // The FBX SDK writes links to objects it left out of the file, such as curves on properties a plug-in owns: 27 of 195
+      // real files here have them. Such a link joins nothing, so it goes, as the object it names never existed.
+      if (!objects.has(child) || (parent !== 0n && !objects.has(parent))) continue;
       if (kind === 'OP' && typeof node.properties[3] !== 'string') invalid('missing connection property');
       connections.push({ kind, child, parent, ...(kind === 'OP' ? { property: node.properties[3] as string } : {}) });
     }
