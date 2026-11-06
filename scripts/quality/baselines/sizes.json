@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7778826,
+  "total": 7675699,
   "history": [
     {
       "date": "2026-10-24",
@@ -2624,6 +2624,18 @@
       "commit": "c2b2c3e1c",
       "reason": "feat(ragdoll): getting up (new entry @margoengine/ragdoll/getup)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "49b220668",
+      "reason": "Potree reads BROTLI folders, attributes and hierarchy pages; decoders gains the Brotli entry with the RFC dictionary (gap B6)",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "cf66cd230",
+      "reason": "points/copc loads las.js with import() so potree can load it on demand too (an import() beside a static import splits nothing); same code, measured as a separate gzip chunk instead of one, 13792 to 15177",
+      "grew": 1
     }
   ],
   "items": {
@@ -2994,8 +3006,8 @@
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/palette": 4341,
     "@margoengine/pixel/render3d": 3866,
-    "@margoengine/points": 22649,
-    "@margoengine/points/copc": 13792,
+    "@margoengine/points": 22648,
+    "@margoengine/points/copc": 15633,
     "@margoengine/points/e57": 6537,
     "@margoengine/points/las": 14148,
     "@margoengine/points/las base (without LAZ decoder)": 6017,
@@ -3003,7 +3015,7 @@
     "@margoengine/points/laz": 8872,
     "@margoengine/points/octree": 9267,
     "@margoengine/points/pick": 5274,
-    "@margoengine/points/potree": 3653,
+    "@margoengine/points/potree": 17694,
     "@margoengine/points/surfels": 14856,
     "@margoengine/post": 40110,
     "@margoengine/post/afterimage": 5619,
@@ -3279,6 +3291,7 @@
     "margoengine": 308,
     "margoengine/game": 1030,
     "margoengine/viz": 800,
-    "margoengine/web": 599
+    "margoengine/web": 599,
+    "@margoengine/decoders/brotli": 68932
   }
 }

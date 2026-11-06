@@ -22,6 +22,7 @@ export const external = [
   '@margoengine/controls',
   '@margoengine/shadows',
   '@margoengine/decoders',
+  '@margoengine/decoders/brotli',
   '@margoengine/decoders/meshopt',
   '@margoengine/decoders/texture',
   'margoengine',

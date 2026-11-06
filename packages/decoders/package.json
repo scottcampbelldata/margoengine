@@ -50,6 +50,10 @@
       "types": "./dist/png.d.ts",
       "import": "./dist/png.js"
     },
+    "./brotli": {
+      "types": "./dist/brotli.d.ts",
+      "import": "./dist/brotli.js"
+    },
     "./tga": {
       "types": "./dist/tga.d.ts",
       "import": "./dist/tga.js"

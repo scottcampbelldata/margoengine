@@ -53,11 +53,19 @@ const maskOf = (node) => node.children.reduce((mask, child, i) => mask | (child 
 const kids = (node) => node.children.filter(Boolean);
 const bytesOf = (text) => new TextEncoder().encode(text);
 
+/** Spreads 16 bits of one axis into a 48-bit Morton code: bit k goes to bit 3k + axis. */
+function spread(value, axis) {
+  let out = 0n;
+  for (let k = 0; k < 16; k++) if ((value >>> k) & 1) out |= 1n << BigInt(3 * k + axis);
+  return out;
+}
+
 /**
  * A Potree 2.0 folder: position int32, intensity uint16, rgb uint16 (`cloud.wideColors`: values times 257). Hierarchy
- * chunks hold `step` levels, joined by proxy records.
+ * chunks hold `step` levels, joined by proxy records. With encoding `BROTLI` and `compress`, each node is a block per
+ * attribute in the layout measured on real folders (positions as two Morton codes, colours as one), compressed alone.
  */
-export function writePotree2(cloud, { step = 2, encoding = 'DEFAULT', version = '2.0' } = {}) {
+export function writePotree2(cloud, { step = 2, encoding = 'DEFAULT', version = '2.0', compress } = {}) {
   const { root, min, max, spacing } = tree(cloud),
     stride = 12 + 2 + 6,
     all = [];
@@ -66,21 +74,52 @@ export function writePotree2(cloud, { step = 2, encoding = 'DEFAULT', version = 
     kids(node).forEach(walk);
   };
   walk(root);
-  const octree = new Uint8Array(all.reduce((sum, node) => sum + node.points.length * stride, 0)),
-    view = new DataView(octree.buffer),
-    wide = cloud.wideColors ? 257 : 1;
+  let octree = new Uint8Array(all.reduce((sum, node) => sum + node.points.length * stride, 0));
+  const view = new DataView(octree.buffer),
+    wide = cloud.wideColors ? 257 : 1,
+    intensityOf = (i) => cloud.intensity?.[i] ?? 7;
   let at = 0;
-  for (const node of all) {
-    node.offset = at;
-    for (const i of node.points) {
-      for (let a = 0; a < 3; a++)
-        view.setInt32(at + a * 4, Math.round((cloud.positions[i * 3 + a] - min[a]) / SCALE), true);
-      view.setUint16(at + 12, 7, true);
-      for (let c = 0; c < 3; c++) view.setUint16(at + 14 + c * 2, (cloud.colors?.[i * 3 + c] ?? 0) * wide, true);
-      at += stride;
+  if (encoding === 'BROTLI' && compress) {
+    const parts = [];
+    for (const node of all) {
+      const n = node.points.length,
+        plain = new Uint8Array(n * (16 + 2 + 8)),
+        data = new DataView(plain.buffer);
+      node.points.forEach((i, k) => {
+        let high = 0n,
+          low = 0n,
+          colour = 0n;
+        for (let a = 0; a < 3; a++) {
+          const value = Math.round((cloud.positions[i * 3 + a] - min[a]) / SCALE);
+          high |= spread(value >>> 16, a);
+          low |= spread(value & 0xffff, a);
+          colour |= spread((cloud.colors?.[i * 3 + a] ?? 0) * wide, a);
+        }
+        data.setBigUint64(k * 16, high, true);
+        data.setBigUint64(k * 16 + 8, low, true);
+        data.setUint16(n * 16 + k * 2, intensityOf(i), true);
+        data.setBigUint64(n * 18 + k * 8, colour, true);
+      });
+      const packed = compress(plain);
+      node.offset = at;
+      node.bytes = packed.length;
+      at += packed.length;
+      parts.push(packed);
     }
-    node.bytes = at - node.offset;
-  }
+    octree = new Uint8Array(at);
+    for (let i = 0, o = 0; i < parts.length; o += parts[i++].length) octree.set(parts[i], o);
+  } else
+    for (const node of all) {
+      node.offset = at;
+      for (const i of node.points) {
+        for (let a = 0; a < 3; a++)
+          view.setInt32(at + a * 4, Math.round((cloud.positions[i * 3 + a] - min[a]) / SCALE), true);
+        view.setUint16(at + 12, intensityOf(i), true);
+        for (let c = 0; c < 3; c++) view.setUint16(at + 14 + c * 2, (cloud.colors?.[i * 3 + c] ?? 0) * wide, true);
+        at += stride;
+      }
+      node.bytes = at - node.offset;
+    }
   // Chunks: breadth first from each top; a node `step` levels down with children is a proxy to its own chunk.
   const chunks = [{ top: root, nodes: [] }];
   for (let c = 0; c < chunks.length; c++) {
@@ -154,9 +193,10 @@ function folderOf(name, step) {
 
 /**
  * A Potree 1.x folder: per node a `.bin` of position uint32 from the node's corner, colour RGBA and classification, or
- * with `nodeFile(points)` a file of `kind` 'LAS' or 'LAZ'. An `.hrc` file every `step` levels.
+ * with `nodeFile(points)` a file of `kind` 'LAS' or 'LAZ'. An `.hrc` file every `step` levels. `leafZero` writes 0 points
+ * in the record of every leaf, as real PotreeConverter 1.7 folders do.
  */
-export function writePotree1(cloud, { step = 2, version = '1.7', kind, nodeFile } = {}) {
+export function writePotree1(cloud, { step = 2, version = '1.7', kind, nodeFile, leafZero = false } = {}) {
   const { root, min, max, spacing } = tree(cloud),
     files = new Map(),
     stride = 12 + 4 + 1;
@@ -191,7 +231,7 @@ export function writePotree1(cloud, { step = 2, version = '1.7', kind, nodeFile 
       view = new DataView(bytes.buffer);
     queue.forEach(({ node }, i) => {
       view.setUint8(i * 5, maskOf(node));
-      view.setUint32(i * 5 + 1, node.points.length, true);
+      view.setUint32(i * 5 + 1, leafZero && !kids(node).length ? 0 : node.points.length, true);
     });
     files.set(`${folderOf(top.name, step) + top.name}.hrc`, bytes);
     next.forEach(writeHierarchy);

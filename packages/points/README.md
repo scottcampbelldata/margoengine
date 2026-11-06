@@ -440,7 +440,7 @@ import { PotreeSource } from 'margoengine/points/potree';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine, { pointBudget: 2_000_000 });
-const source = await PotreeSource.open('/scans/site/'); // options: fetch, signal
+const source = await PotreeSource.open('/scans/site/'); // options below
 OctreeCloud.attach(engine, points, source, { pointBudget: 2_000_000, adaptiveSize: true });
 engine.camera.position = [0, 50, 200]; // positions are relative to source.origin, the centre of the box
 console.log(source.version, source.points, source.origin);
@@ -448,12 +448,29 @@ console.log(source.version, source.points, source.origin);
 
 | Version | Files | Read |
 | --- | --- | --- |
-| 2.0 | `metadata.json`, `hierarchy.bin`, `octree.bin` | Range requests. Encoding `DEFAULT` only. |
-| 1.5 to 1.8 | `cloud.js`, `.hrc`, one `.bin`, `.las` or `.laz` per node | Whole files per node. `.las` and `.laz` nodes need the option below. |
+| 2.0 | `metadata.json`, `hierarchy.bin`, `octree.bin` | Range requests. Encodings `DEFAULT` and `BROTLI`. |
+| 1.5 to 1.8 | `cloud.js`, `.hrc`, one `.bin`, `.las` or `.laz` per node | Whole files per node. |
+| 1.4 | `cloud.js` with the hierarchy inside, one `.bin`, `.las` or `.laz` per node in one folder | Whole files per node. |
 
-A 1.x folder of LAS or LAZ nodes needs a reader, so a folder of binary nodes never pays for one: `PotreeSource.open(url, {parseLAS})`, with `parseLAS` from `margoengine/points/las`, which brings the LAZ decoder when a compressed node arrives.
+Everything a folder needs loads by itself, only when a folder needs it: `parseLAS` for LAS and LAZ nodes, and `decodeBrotli` of `@margoengine/decoders/brotli` for `BROTLI` folders. A folder of binary nodes pays for neither.
 
-Encoding `BROTLI` throws a `MargoError` with code `unsupported`: browsers have no Brotli stream decoder, so convert with encoding `DEFAULT`. So do versions before 1.5. Only position and colour are read, and the writers in `tests/potree-writer.js` were written here from the public format descriptions: the reader has not yet met a file from PotreeConverter.
+| Option | Default | What it does |
+| --- | --- | --- |
+| `fetch`, `signal` | `globalThis.fetch`, none | The fetch used for every request; cancels the reads of `open`. |
+| `hierarchy` | `'lazy'` | `'lazy'` reads the first hierarchy page at open and each further page when `load` reaches its node, so a very deep folder opens with one request. `'eager'` reads every page at open. `source.expand(node)` reads one page by hand. |
+| `attributes` | `['intensity', 'classification']` | Which attributes `load` gives back in `attributes`, or `'all'`. Names are lower case joined by `_`, so `return_number`, `gps_time`. |
+| `colorBy` | `'rgb'` | `'classification'` colours through `classificationColors`, `'intensity'` through `rampColors` over the range the folder states. |
+| `parseLAS`, `laz`, `brotli` | loaded when met | Replace the LAS reader, LAZ decoder or Brotli decoder. |
+
+```ts
+import { PotreeSource } from 'margoengine/points/potree';
+
+const source = await PotreeSource.open('/scans/site/', { attributes: 'all', colorBy: 'classification' });
+const { positions, attributes } = await source.load(source.root, new AbortController().signal);
+console.log(positions.length / 3, attributes.classification, attributes.gps_time);
+```
+
+A 1.7 hierarchy file lists leaves with 0 points in real folders, so a leaf's `count` comes from its file once `load` has read it. Other encodings and versions before 1.4 throw a `MargoError` with code `unsupported`. The reader is checked on real PotreeConverter output: see `tests/potree-check.mjs`.
 
 ## Surfels (`margoengine/points/surfels`)
 

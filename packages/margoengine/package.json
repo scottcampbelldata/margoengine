@@ -538,6 +538,10 @@
       "types": "./dist/decoders/png.d.ts",
       "import": "./dist/decoders/png.js"
     },
+    "./decoders/brotli": {
+      "types": "./dist/decoders/brotli.d.ts",
+      "import": "./dist/decoders/brotli.js"
+    },
     "./decoders/tga": {
       "types": "./dist/decoders/tga.d.ts",
       "import": "./dist/decoders/tga.js"

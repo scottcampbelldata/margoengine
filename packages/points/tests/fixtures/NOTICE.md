@@ -28,3 +28,4 @@ Fixtures are used only by the tests and are not part of the published package (`
     switching is exercised. No public file of those formats was found.
   - `records.json` holds the SHA-256 digests of what LASzip and lazrs decode from each file. Made once outside the
     repository, through laspy; no code of those projects is here.
+- `potree/` holds parts of two sample folders of https://github.com/potree/potree (branch develop, BSD-2-Clause; Copyright (c) 2011-2020, Markus Schütz; licence text at https://github.com/potree/potree/blob/develop/LICENSE), output of PotreeConverter, committed here, not downloaded by the tests: `lion-1.7` from `pointclouds/lion_takanawa_normals` (`cloud.js`, stored as `cloud.js.json` because it is JSON, `r.hrc`, four nodes) and `lion-1.4-laz` from `pointclouds/lion_takanawa_laz` (`cloud.js`, stored the same way, three nodes).

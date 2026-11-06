@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { brotliCompressSync } from 'node:zlib';
 import { parseLAS, writeLAS } from '../dist/las.js';
+import { classificationColors } from '../dist/index.js';
 import { OctreeCloud } from '../dist/octree.js';
 import { PotreeSource } from '../dist/potree.js';
 import { serve, writePotree1, writePotree2 } from './potree-writer.js';
@@ -28,11 +30,14 @@ const walk = (node, out = []) => {
 };
 const signal = new AbortController().signal;
 
-/** Loads every node, checks each point lies in its node, and returns world points with their colours, sorted. */
+/** Loads every node, reading pages as it goes, checks each point lies in its node, and returns world points with colours, sorted. */
 async function everyPoint(source) {
-  const out = [];
-  for (const node of walk(source.root)) {
-    const data = await source.load(node, signal);
+  const out = [],
+    queue = [source.root];
+  while (queue.length) {
+    const node = queue.shift(),
+      data = await source.load(node, signal);
+    queue.push(...node.children.filter(Boolean));
     assert.equal(data.positions.length, node.count * 3, `node ${node.id} point count`);
     const b = node.bounds;
     for (let i = 0; i < node.count; i++) {
@@ -63,10 +68,76 @@ test('2.0: a folder with proxy chunks gives back every point and colour, by rang
     source = await PotreeSource.open('/scan/', { fetch: serve(writePotree2(cloud, { step: 1 }), '/scan/', log) });
   assert.equal(source.version, '2.0');
   assert.equal(source.points, 6000);
+  assert.equal(log.filter((l) => l.startsWith('hierarchy.bin')).length, 1, 'open reads the first page alone');
+  sameAs(await everyPoint(source), cloud);
   assert.ok(log.filter((l) => l.startsWith('hierarchy.bin')).length > 1, 'proxies were followed');
   assert.ok(walk(source.root).length > 8);
-  sameAs(await everyPoint(source), cloud);
   assert.ok(log.filter((l) => l.startsWith('octree.bin')).every((l) => l.includes('bytes=')));
+});
+
+test('2.0: hierarchy pages read when load reaches them, or all at open with eager', async () => {
+  const cloud = scan(),
+    files = writePotree2(cloud, { step: 1 }),
+    log = [],
+    lazy = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/', log) }),
+    frontier = walk(lazy.root).filter((node) => !node.children.some(Boolean) && node.level === 1);
+  assert.ok(frontier.length > 0, 'the first page stops at proxies');
+  const before = log.length,
+    node = frontier[0];
+  await lazy.expand(node);
+  assert.ok(log.length > before, 'expand reads the page');
+  assert.ok(node.children.some(Boolean));
+  const after = log.length;
+  await lazy.expand(node);
+  assert.equal(log.length, after, 'a page reads once');
+  const eagerLog = [],
+    eager = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/', eagerLog), hierarchy: 'eager' });
+  assert.ok(eagerLog.filter((l) => l.startsWith('hierarchy.bin')).length > 1);
+  assert.ok(walk(eager.root).length > walk(lazy.root).length);
+  sameAs(await everyPoint(eager), cloud);
+});
+
+test('2.0: BROTLI nodes give back every point, colour and attribute', async () => {
+  const cloud = { ...scan(), intensity: Array.from({ length: 6000 }, (_, i) => (i * 37) % 65536) },
+    files = writePotree2(cloud, { encoding: 'BROTLI', compress: (bytes) => brotliCompressSync(bytes) }),
+    source = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/') });
+  sameAs(await everyPoint(source), cloud);
+  const data = await source.load(source.root, signal);
+  assert.equal(data.attributes.intensity.length, source.root.count);
+  const seen = [],
+    queue = [source.root];
+  while (queue.length) {
+    const node = queue.shift();
+    seen.push(...(await source.load(node, signal)).attributes.intensity);
+    queue.push(...node.children.filter(Boolean));
+  }
+  const order = (a, b) => a - b;
+  assert.deepEqual(seen.sort(order), [...cloud.intensity].sort(order), 'every intensity once');
+  const wide = { ...cloud, wideColors: true },
+    packed = writePotree2(wide, { encoding: 'BROTLI', compress: (bytes) => brotliCompressSync(bytes) });
+  sameAs(await everyPoint(await PotreeSource.open('/scan/', { fetch: serve(packed, '/scan/') })), wide);
+});
+
+test('attributes: intensity and classification by default, all on request, and colouring by them', async () => {
+  const cloud = { ...scan(1000), capacity: 200, intensity: Array.from({ length: 1000 }, (_, i) => i * 60) },
+    files = writePotree2(cloud),
+    source = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/') }),
+    { attributes } = await source.load(source.root, signal);
+  assert.ok(attributes.intensity instanceof Uint16Array);
+  assert.equal(attributes.intensity.length, source.root.count);
+  assert.deepEqual(Object.keys(attributes), ['intensity']);
+  const none = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/'), attributes: [] });
+  assert.deepEqual(Object.keys((await none.load(none.root, signal)).attributes), []);
+  const ramp = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/'), attributes: [], colorBy: 'intensity' }),
+    drawn = await ramp.load(ramp.root, signal);
+  assert.equal(drawn.colorComponents, 4);
+  assert.equal(drawn.colors.length, source.root.count * 4);
+  const one = writePotree1(cloud),
+    old = await PotreeSource.open('/scan/cloud.js', { fetch: serve(one, '/scan/'), colorBy: 'classification' }),
+    classes = await old.load(old.root, signal);
+  assert.ok(classes.attributes.classification.every((v) => v === 2));
+  assert.equal(classes.colorComponents, 4);
+  assert.deepEqual([...classes.colors.slice(0, 4)], [...classificationColors([2])]);
 });
 
 test('2.0: 16-bit colours take their high byte; the metadata decides for every node alike', async () => {
@@ -83,11 +154,11 @@ test('2.0: a server that ignores Range still works', async () => {
   sameAs(await everyPoint(source), cloud);
 });
 
-test('2.0: BROTLI, other versions and corrupt data are refused by name', async () => {
+test('2.0: other encodings, other versions and corrupt data are refused by name', async () => {
   const cloud = scan(1000);
   await assert.rejects(
-    PotreeSource.open('/scan/', { fetch: serve(writePotree2(cloud, { encoding: 'BROTLI' }), '/scan/') }),
-    (e) => e.code === 'unsupported' && /BROTLI/.test(e.message),
+    PotreeSource.open('/scan/', { fetch: serve(writePotree2(cloud, { encoding: 'ZSTD' }), '/scan/') }),
+    (e) => e.code === 'unsupported' && /ZSTD/.test(e.message),
   );
   await assert.rejects(
     PotreeSource.open('/scan/metadata.json', { fetch: serve(writePotree2(cloud, { version: '3.0' }), '/scan/') }),
@@ -111,12 +182,53 @@ test('1.x: hierarchy files every few levels give back every point and colour', a
     files = writePotree1(cloud, { step: 2 }),
     source = await PotreeSource.open('/scan', { fetch: serve(files, '/scan/', log) });
   assert.equal(source.version, '1.7');
-  assert.ok(log.filter((l) => l.endsWith('.hrc')).length > 1, 'several hierarchy files');
+  assert.equal(log.filter((l) => l.endsWith('.hrc')).length, 1, 'open reads the first hierarchy file alone');
   assert.ok(
     [...files.keys()].some((k) => /^data\/r\/\d\d\/r\d\d\d?\.bin$/.test(k)),
     'deep nodes sit in folders',
   );
   sameAs(await everyPoint(source), cloud);
+  assert.ok(log.filter((l) => l.endsWith('.hrc')).length > 1, 'several hierarchy files');
+});
+
+test('1.x: a leaf whose record says 0 points takes its count from its file, as real folders need', async () => {
+  const cloud = scan(),
+    source = await PotreeSource.open('/scan', { fetch: serve(writePotree1(cloud, { step: 2, leafZero: true }), '/scan/') });
+  sameAs(await everyPoint(source), cloud);
+  assert.ok(walk(source.root).every((node) => node.count > 0));
+});
+
+test('1.4: the hierarchy inside cloud.js and all node files in one folder', async () => {
+  const cloud = scan(2000),
+    files = writePotree1(cloud, { step: 2 }),
+    meta = JSON.parse(new TextDecoder().decode(files.get('cloud.js'))),
+    flat = new Map(),
+    names = [];
+  for (const [path, bytes] of files)
+    if (path.endsWith('.bin')) {
+      const name = path.split('/').at(-1);
+      flat.set(`data/${name}`, bytes);
+      names.push(name.slice(0, -4));
+    }
+  // Parents first, as cloud.js lists them; counts from the record size of the writer's binary nodes.
+  names.sort((a, b) => a.length - b.length || a.localeCompare(b));
+  flat.set(
+    'cloud.js',
+    new TextEncoder().encode(
+      JSON.stringify({
+        ...meta,
+        version: '1.4',
+        hierarchyStepSize: undefined,
+        hierarchy: names.map((name) => [name, flat.get(`data/${name}.bin`).length / 17]),
+      }),
+    ),
+  );
+  const source = await PotreeSource.open('/scan/cloud.js', { fetch: serve(flat, '/scan/') });
+  assert.equal(source.version, '1.4');
+  sameAs(await everyPoint(source), cloud);
+  const bad = new Map(flat);
+  bad.set('cloud.js', new TextEncoder().encode(JSON.stringify({ ...meta, version: '1.4', hierarchy: [['r', 1], ['r00', 1]] })));
+  await assert.rejects(PotreeSource.open('/scan/cloud.js', { fetch: serve(bad, '/scan/') }), RangeError);
 });
 
 test('1.x: LAS nodes read through the LAS parser', async () => {
@@ -136,10 +248,7 @@ test('1.x: LAS nodes read through the LAS parser', async () => {
     fetch = serve(files, '/scan/'),
     source = await PotreeSource.open('/scan/cloud.js', { fetch, parseLAS });
   sameAs(await everyPoint(source), cloud);
-  await assert.rejects(
-    PotreeSource.open('/scan/cloud.js', { fetch }),
-    (e) => e.code === 'unsupported' && /parseLAS/.test(e.message),
-  );
+  sameAs(await everyPoint(await PotreeSource.open('/scan/cloud.js', { fetch })), cloud);
 });
 
 test('1.x: old versions and unknown attributes are refused by name', async () => {

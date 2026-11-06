@@ -166,7 +166,11 @@ const ASSETS = [
   ],
   [
     'packages/points/tests/fixtures/NOTICE.md',
-    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan); USGS 3DEP lidar tile USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz (public domain, rockyweb.usgs.gov, 609,938 bytes, SHA-256 c2804c3827fd6104acf657803f55ed4e5fa9ba83b4ec481888510385a14e31ae, downloaded 2026-10-27); LAS and LAZ samples from laz-rs tests/data (Apache-2.0, Thomas Montaigu) and laspy tests/data (BSD-2-Clause, Grant Brown, Howard Butler, Thomas Montaigu), with points from them compressed by LASzip, in tests/fixtures/laz',
+    'test fixtures: parts of Potree sample folders (BSD-2-Clause, github.com/potree/potree); Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan); USGS 3DEP lidar tile USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz (public domain, rockyweb.usgs.gov, 609,938 bytes, SHA-256 c2804c3827fd6104acf657803f55ed4e5fa9ba83b4ec481888510385a14e31ae, downloaded 2026-10-27); LAS and LAZ samples from laz-rs tests/data (Apache-2.0, Thomas Montaigu) and laspy tests/data (BSD-2-Clause, Grant Brown, Howard Butler, Thomas Montaigu), with points from them compressed by LASzip, in tests/fixtures/laz',
+  ],
+  [
+    'packages/decoders/src/brotli-data.ts',
+    'the static dictionary and word transformations of RFC 7932, Appendices A and B (IETF Trust; the data every Brotli decoder carries), generated from the RFC text and checked against its CRC-32 values',
   ],
   [
     'packages/decoders/tests/fixtures/NOTICE.md',

@@ -159,6 +159,7 @@ async function buildPackage(name) {
           '@margoengine/loaders',
           '@margoengine/lines',
           '@margoengine/decoders',
+          '@margoengine/decoders/brotli',
           '@margoengine/decoders/meshopt',
           '@margoengine/decoders/texture',
           '@margoengine/text',

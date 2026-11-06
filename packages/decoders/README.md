@@ -117,6 +117,26 @@ checked before any output is allocated; `decoderPath` names another folder for t
 Draco and meshopt modules, for code that uploads textures a `KTX2Decoder` already transcoded. gltf-pro imports these
 from here and loads the root only when a file needs decoding.
 
+## Brotli (`@margoengine/decoders/brotli`)
+
+`decodeBrotli(bytes)` decodes one Brotli stream on the calling thread, written from RFC 7932. Browsers undo Brotli on HTTP
+responses but give a page no way to run it on bytes it holds, and some formats store Brotli inside a file: Potree 2.0
+keeps each node as its own stream, and `@margoengine/points/potree` reads those with this entry.
+
+```ts
+import { decodeBrotli } from '@margoengine/decoders/brotli';
+
+const bytes = decodeBrotli(new Uint8Array(await (await fetch('/node.br')).arrayBuffer()), { maxBytes: 1 << 26 });
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `maxBytes` | 2^30 (1 GiB) | Largest output; a stream that would pass it throws, so a small file cannot fill memory. |
+
+A stream that breaks the format, ends early or passes `maxBytes` throws a `MargoError` with code `failed`. The RFC's 122,784-byte
+dictionary ships in this entry (about 60 KB compressed in the bundle) and unpacks the first time a stream refers to it. The
+tests read every quality, window size and mode of the reference encoder (`node:zlib`).
+
 ## PNG (`@margoengine/decoders/png`)
 
 `decodePNG(bytes, {maxPixels?, bitDepth?})` reads any valid PNG (W3C PNG Specification, Third Edition) to

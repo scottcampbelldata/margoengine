@@ -76,6 +76,7 @@
     "@margoengine/core": "^1.0.0"
   },
   "dependencies": {
+    "@margoengine/decoders": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   }
 }

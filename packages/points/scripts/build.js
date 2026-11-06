@@ -24,7 +24,7 @@ await build({
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`,
     },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
+    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/decoders/brotli'] },
   },
 });
 execFileSync(

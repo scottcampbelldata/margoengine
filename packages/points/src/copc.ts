@@ -1,7 +1,7 @@
 // Cloud Optimized Point Cloud reader, from the public COPC 1.0 specification: a LAZ 1.4 file whose first record (user id
 // `copc`, id 1) gives a cube and where the hierarchy pages are; each page lists voxels and the byte range of their
 // points, one LAZ chunk per voxel. Everything comes by HTTP range requests, so a viewer reads only what it shows.
-import { decodePoints, readLASHeader, type LASHeader, type LASRecord } from './las.js';
+import type { LASHeader, LASRecord } from './las.js';
 import type { OctreeNode, OctreeNodeData, OctreeSource } from './octree.js';
 import { readRange } from './range.js';
 
@@ -81,7 +81,7 @@ export class CopcSource implements OctreeSource {
     const fetcher = options.fetch ?? globalThis.fetch,
       signal = options.signal,
       get = (at: number, bytes: number) => readRange(fetcher, url, at, bytes, signal),
-      first = await get(0, HEADER_BYTES),
+      [first, { readLASHeader }] = await Promise.all([get(0, HEADER_BYTES), import('./las.js')]),
       head = readLASHeaderBytes(first),
       { header, records } = readLASHeader(await get(0, head));
     const info = copcInfo(records),
@@ -160,9 +160,10 @@ export class CopcSource implements OctreeSource {
   async load(node: OctreeNode, signal: AbortSignal): Promise<OctreeNodeData> {
     const { offset, bytes, count } = node as CopcNode;
     if (!count) return { positions: new Float32Array(0) };
-    const [chunk, { decodeLazChunk }] = await Promise.all([
+    const [chunk, { decodeLazChunk }, { decodePoints }] = await Promise.all([
         readRange(this.fetcher, this.url, offset, bytes, signal),
         import('./laz.js'),
+        import('./las.js'),
       ]),
       data = decodeLazChunk(chunk, count, this.header, this.records);
     signal.throwIfAborted();
