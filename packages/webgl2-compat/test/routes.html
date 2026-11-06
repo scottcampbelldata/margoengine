@@ -74,6 +74,8 @@ const cases = {
     const floor = engine.createMesh().setGeometry(box(14, 0.2, 14)).setMaterial(new PbrMaterial({ color: '#8090a0' })).setPosition([0, -0.1, -4]);
     const { Shadows } = await import('/packages/shadows/dist/index.js');
     const shadows = Shadows.attach(engine, { resolution: 2048, distance: 30 });
+    // The route loads by import(); the first reduction runs on the CPU tier if it has not landed, and this scene has no second.
+    while (mode === 'compat' && !shadows.nearestRoute) await new Promise((r) => setTimeout(r, 0));
     shadows.add(floor, { static: true });
     for (const mesh of engine.scene.meshes.values()) if (mesh !== floor) shadows.add(mesh);
   },
