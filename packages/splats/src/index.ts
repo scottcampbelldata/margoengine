@@ -19,7 +19,13 @@ import { applyView } from '../../shared/view-rect.js';
 import { alphaBlend } from '../../shared/pass.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 export { parseSplat, validateSplats, type SplatData } from './data.js';
-export { parsePly, encodeSplat, decomposeCovariance } from './ply.js';
+export {
+  parsePly,
+  encodeSplat,
+  decomposeCovariance,
+  splatsFromAttributes,
+  type GaussianAttributes,
+} from './ply.js';
 export { parseSpz, parseSog, type ParseSpzOptions, type ParseSogOptions, type SogFiles } from './compressed.js';
 export { cropSplats, filterSplats, transformSplats, mergeSplats, decimateSplats, type SplatRegion } from './edit.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; COPY_SRC: number; STORAGE: number; INDEX: number };

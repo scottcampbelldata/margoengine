@@ -68,6 +68,18 @@ async function finishPrepared(
       false,
       prepared.downloadedBytes,
     );
+    // Splats are not vertices: the file loads as loadGLTF does, on this thread.
+    if (asset.hooks.splats) {
+      const model = new PBRModel(instance, asset, images);
+      try {
+        engineRuntime(instance).use(model);
+        await model.attachSplats(options.signal);
+        return model;
+      } catch (error) {
+        model.dispose();
+        throw error;
+      }
+    }
     try {
       prepared = prepareAsset(asset, images);
     } catch (error) {

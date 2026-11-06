@@ -12,6 +12,7 @@ import {
   mergeSplats,
   parsePly,
   parseSplat,
+  splatsFromAttributes,
   transformSplats,
 } from '../dist/data.js';
 
@@ -230,4 +231,26 @@ test('merge joins clouds; decimate keeps each cell weighted mean and second mome
   near(lod.covariances[3], 0.01, 1e-7, 'unchanged across');
   near(lod.colors[0], 0.5, 1e-6, 'mean colour');
   assert.throws(() => decimateSplats(cloud, { cellSize: 0 }), /cellSize/);
+});
+
+test('a flat splat keeps a positive-definite covariance through Float32', () => {
+  // Regression: real captures hold splats far flatter than Float32 can store, so whole files were refused. Axis ratio
+  // 1e-5 (variance ratio 1e-10) and scale 0, each turned 40 degrees off the axes.
+  const half = (40 * Math.PI) / 360,
+    raw = {
+      count: 3,
+      positions: new Float32Array(9),
+      logScales: new Float32Array([0, 0, Math.log(1e-5), 0, -Infinity, 0, -Infinity, -Infinity, -Infinity]),
+      rotations: new Float32Array([Math.cos(half), Math.sin(half), 0, 0, Math.cos(half), 0, Math.sin(half), 0, 1, 0, 0, 0]),
+      dc: new Float32Array(9),
+      alphas: new Float32Array([1, 1, 1]),
+    };
+  const cloud = splatsFromAttributes(raw);
+  // The two long axes stay what they were: the lift touches the thin axis alone, to 1/1024 of the long one at most.
+  // Scales come back through Float32 covariances: 2^-23 relative on each, and 1e-6 holds it.
+  const { scale } = decomposeCovariance(cloud.covariances, 0);
+  scale.sort((a, b) => a - b);
+  assert.ok(Math.abs(scale[2] - 1) < 1e-6 && Math.abs(scale[1] - 1) < 1e-6, String(scale));
+  assert.ok(scale[0] > 0 && scale[0] <= 2 ** -10 * 1.01, String(scale));
+  assert.equal(transformSplats(cloud, [0, 0, 1, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1]).positions.length, 9);
 });

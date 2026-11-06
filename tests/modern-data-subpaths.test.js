@@ -51,6 +51,7 @@ test('data entries preserve public root identities without exposing parser inter
     'parseSog',
     'parseSplat',
     'parseSpz',
+    'splatsFromAttributes',
     'transformSplats',
     'validateSplats',
   ];

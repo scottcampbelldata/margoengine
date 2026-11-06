@@ -540,6 +540,7 @@
       "parseSog",
       "parseSplat",
       "parseSpz",
+      "splatsFromAttributes",
       "transformSplats",
       "validateSplats"
     ],

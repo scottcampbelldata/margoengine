@@ -68,6 +68,7 @@ import {
   type GLTFExtendedMaterials,
 } from './asset.js';
 import { withMaterials } from './default-materials.js';
+import { isSplatPrimitive } from './splat-state.js';
 import {
   pbrShader,
   extendedPBRShader,
@@ -263,7 +264,14 @@ function checkLimits(device: GPUDevice, code: string, combination: () => string[
       );
   }
 }
-export type { GLTFDecoderHooks, GLTFCompressedImage, GLTFExtendedMaterials } from './asset.js';
+import type { GLTFSplatCloud } from './asset.js';
+export type {
+  GLTFDecoderHooks,
+  GLTFCompressedImage,
+  GLTFExtendedMaterials,
+  GLTFSplatCloud,
+  GLTFSplatReader,
+} from './asset.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** Narrow encoding hook for optional GPU deformation consumers. */
@@ -1947,6 +1955,10 @@ export class PBRModel implements EnginePlugin {
   private relative?: Float32Array;
   private engine: Engine;
   private readonly cleanupCallbacks = new Set<() => void>();
+  /** @internal The mesh primitives `decoders.splats` reads in place of drawing them. */
+  readonly splatPrimitives: { primitive: GLTFPrimitive; nodeIndex: number }[] = [];
+  /** The file's Gaussian clouds (KHR_gaussian_splatting), attached to the engine. `model.dispose()` disposes them. */
+  splats: readonly GLTFSplatCloud[] = [];
   private readonly lighting = new Set<LightingEffect>();
   /** `lighting` in order, a new array on every change (draw-memo.ts compares derivation contexts by it). */
   private lightingList: readonly LightingEffect[] = noLighting;
@@ -2122,6 +2134,10 @@ export class PBRModel implements EnginePlugin {
             instances = gpu && reader?.read(asset, gpu);
           for (let j = 0; j < mesh.primitives.length; j++) {
             const p = mesh.primitives[j];
+            if (asset.hooks.splats && isSplatPrimitive(p)) {
+              this.splatPrimitives.push({ primitive: p, nodeIndex: i });
+              continue;
+            }
             // ponytail: progressive's placeholders are triangle boxes, so it leaves points and lines out; stream them if CAD edges need it.
             if (!prepared && (p?.mode ?? 4) < 4 && packed.has(p) && !packed.get(p)!.topology) continue;
             const made: PBRPrimitive = prepared
@@ -2138,7 +2154,7 @@ export class PBRModel implements EnginePlugin {
             (made.topology ? this.pointsAndLines : this.primitives).push(made);
           }
         }
-      if (!this.primitives.length && !this.pointsAndLines.length)
+      if (!this.primitives.length && !this.pointsAndLines.length && !this.splatPrimitives.length)
         throw margoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
       const source: PBRSource = this;
       for (const node of this.created) Object.defineProperty(node, cpuSource, { value: source, configurable: true });
@@ -2211,8 +2227,36 @@ export class PBRModel implements EnginePlugin {
           out[axis + 3] = Math.max(out[axis + 3], n);
         }
     }
+    for (const { bounds } of this.splats)
+      for (let axis = 0; axis < 3; axis++) {
+        out[axis] = Math.min(out[axis], bounds[axis]);
+        out[axis + 3] = Math.max(out[axis + 3], bounds[axis + 3]);
+      }
     if (!Number.isFinite(out[0])) throw margoError('state', 'No geometry; load a model with triangle meshes first');
     return out;
+  }
+  /**
+   * @internal Hands the file's Gaussian splats to `decoders.splats` and keeps the clouds in `splats`. The loaders call it.
+   * A node hidden by KHR_node_visibility, or under a hidden node, gives no cloud.
+   */
+  async attachSplats(signal?: AbortSignal): Promise<void> {
+    const reader = this.asset.hooks.splats;
+    if (!reader || !this.splatPrimitives.length) return;
+    this.engine.store.tick(false);
+    const clouds = await reader.attach(
+      this.engine,
+      this.asset,
+      this.splatPrimitives
+        .filter(({ nodeIndex }) => nodeVisible(this.engine, this.nodes[nodeIndex]))
+        .map(({ primitive, nodeIndex }) => ({ primitive, matrix: this.nodes[nodeIndex].matrix })),
+      signal,
+    );
+    if (this.disposed) {
+      for (const { cloud } of clouds) cloud.dispose();
+      return;
+    }
+    this.splats = clouds;
+    for (const { cloud } of clouds) this.cleanupCallbacks.add(() => cloud.dispose());
   }
   /** Borrowed GPU buffers, preserving one record per primitive and current deformation. */
   get raw() {
@@ -5089,7 +5133,7 @@ export async function loadGLTF(
   url: string | URL,
   options: GLTFLoadOptions = {},
 ): Promise<PBRModel> {
-  return attach(
+  return withSplats(
     instance,
     await loadAsset(
       url,
@@ -5122,7 +5166,7 @@ export async function parseGLTFAsync(
   if (buffersOrOptions === undefined) buffersOrOptions = arguments.length < 4 ? {} : [];
   if (!Array.isArray(buffersOrOptions)) {
     const config = buffersOrOptions;
-    return attach(
+    return withSplats(
       instance,
       await loadAsset(
         undefined,
@@ -5162,7 +5206,7 @@ export async function parseGLTFAsync(
     ktx2: options.ktx2 ?? options.decoders?.ktx2,
     device: engineRuntime(instance).gpu ?? undefined,
   });
-  return attach(instance, { asset, images: images as GLTFImage[] }, options.signal);
+  return withSplats(instance, { asset, images: images as GLTFImage[] }, options.signal);
 }
 const importedSun = new WeakMap<
   Engine,
@@ -5263,6 +5307,20 @@ export function viewGLTFCamera(model: PBRModel, camera: number | GLTFCamera = 0)
       out[15] = 1;
     };
     orthographic.add(view.project);
+  }
+}
+async function withSplats(
+  instance: EngineKernel,
+  loaded: { asset: GLTFAsset; images: GLTFImage[] },
+  signal?: AbortSignal,
+): Promise<PBRModel> {
+  const model = attach(instance, loaded, signal);
+  try {
+    await model.attachSplats(signal);
+    return model;
+  } catch (error) {
+    model.dispose();
+    throw error;
   }
 }
 function attach(

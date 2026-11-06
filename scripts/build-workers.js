@@ -28,6 +28,8 @@ export async function buildWorkers(root) {
           { find: /^@margoengine\/biomes\/workers$/, replacement: poolStub },
           // Nor does it get a GPU device (its options name none), so it never loads the GPU kernels.
           { find: /^@margoengine\/biomes\/gpu$/, replacement: emptyStub },
+          // A file with Gaussian splats goes back to the page before anything reads them (gltf-pro's asyncCompression).
+          { find: /^@margoengine\/splats(\/data)?$/, replacement: emptyStub },
         ],
       },
       build: {

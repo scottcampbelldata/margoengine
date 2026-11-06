@@ -6,6 +6,7 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from "@margoengine/decoders";
+import { Splats } from "@margoengine/splats";
 
 export interface ProgressiveGLTF {
     readonly ready: Promise<PBRModel>;
@@ -379,6 +380,7 @@ interface GLTFDecoderHooks {
         read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined;
     };
     materials?: GLTFExtendedMaterials | false;
+    splats?: GLTFSplatReader | false;
 }
 
 interface GLTFDocument extends GLTFProperty {
@@ -626,6 +628,18 @@ interface GLTFSkin extends GLTFProperty {
   skeleton?: number;
 }
 
+interface GLTFSplatCloud {
+    readonly cloud: Splats;
+    readonly bounds: Float32Array;
+}
+
+interface GLTFSplatReader {
+    attach(engine: Engine, asset: GLTFAsset, primitives: readonly {
+        primitive: GLTFPrimitive;
+        matrix: Float32Array;
+    }[], signal?: AbortSignal): Promise<GLTFSplatCloud[]>;
+}
+
 interface GLTFTexture extends GLTFProperty {
   source?: number;
   sampler?: number;
@@ -833,8 +847,14 @@ class PBRModel implements EnginePlugin {
     readonly pointsAndLines: PBRPrimitive[];
     readonly variants: readonly string[];
     disposed: boolean;
+    readonly splatPrimitives: {
+        primitive: GLTFPrimitive;
+        nodeIndex: number;
+    }[];
+    splats: readonly GLTFSplatCloud[];
     constructor(instance: EngineKernel, asset: GLTFAsset, images?: readonly GLTFImage[], prepared?: readonly (readonly PreparedGeometry[])[]);
     get bounds(): Float32Array;
+    attachSplats(signal?: AbortSignal): Promise<void>;
     get raw(): {
         primitive: PBRPrimitive;
         node: Mesh;

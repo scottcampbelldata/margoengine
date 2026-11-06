@@ -10,6 +10,9 @@ test('optional packages stay isolated and an accessor-only import discards rende
     '@margoengine/animation/sampling',
     '@margoengine/gltf-pro',
     '@margoengine/blender',
+    // gltf-pro loads these on demand: a dynamic import is the one link allowed, which the check below holds.
+    '@margoengine/splats',
+    '@margoengine/splats/data',
   ];
   const optional = [
     'gltf-pro',
@@ -35,7 +38,17 @@ test('optional packages stay isolated and an accessor-only import discards rende
         rollupOptions: { external },
       },
     });
-    const modules = result[0].output.filter((c) => c.type === 'chunk').flatMap((c) => Object.keys(c.modules));
+    const chunks = result[0].output.filter((c) => c.type === 'chunk'),
+      modules = chunks.flatMap((c) => Object.keys(c.modules));
+    assert.ok(
+      chunks.every((c) => !c.imports.some((id) => id.startsWith('@margoengine/splats'))),
+      'splats is a static import of ' + pack,
+    );
+    if (pack === 'gltf-pro')
+      assert.ok(
+        chunks.some((c) => c.dynamicImports.includes('@margoengine/splats')),
+        'gltf-pro loads splats on demand',
+      );
     for (const other of optional.filter((p) => p !== pack))
       assert.ok(
         modules.every((m) => !m.includes('/packages/' + other + '/')),

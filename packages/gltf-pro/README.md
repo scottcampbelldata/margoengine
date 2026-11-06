@@ -24,6 +24,7 @@ buffers. Caller-provided deformation buffers need `COPY_SRC` for CPU snapshots.
 Use `import {GLTFAsset} from '@margoengine/gltf-pro/asset'` for accessor decoding
 without loading PBR rendering or its shaders. The root export retains the same
 constructor; `GLTFDocument` is available as a type from either entry.
+`@margoengine/gltf-pro/splats` exports `gaussianSplats` and `readGaussianSplats` ([below](#gaussian-splats-in-gltf-splats)).
 `@margoengine/gltf-pro/coordinates` exports `textureCoordinates` and the `TextureTransform` type (also on the root)
 for material extensions that read texture coordinates without loading the renderer.
 
@@ -241,6 +242,29 @@ same-device renderers can reuse it. Its optional `lit(code)` rewrites the shader
 after the `addLighting()` effects are composed in (materials' Lambert and Phong
 put their own BRDF in clustered's light loop there); returning `code` changes
 nothing.
+
+### Gaussian splats in glTF (`/splats`)
+
+A file with `KHR_gaussian_splatting` primitives loads through plain `loadGLTF` or `parseGLTFAsync`: the meshes draw as usual, and the splats go to `@margoengine/splats`, so a captured scene and modelled objects share one file, one loader and one depth buffer. Nothing to pass: `@margoengine/gltf-pro/splats` and `@margoengine/splats` load only for a file that holds splats, and the worker loaders read such a file on the page's thread. `@margoengine/splats` is an optional peer dependency; a splat file without it stops with an error that names it.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/capture.glb', {maxDownloadBytes: 2 ** 28});
+const b = model.bounds; // takes in the splat centres
+stage.engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]]);
+console.log(model.splats.map(({cloud}) => cloud.count));
+// model.dispose() disposes the clouds too.
+```
+
+Read against the extension's README (Complete, Ratified by the Khronos Group, as of 2026-11-06) and the draft `KHR_gaussian_splatting_compression_spz_2` (Draft, pull request 2531, as of the same day). Every attribute type of the `ellipse` kernel reads, with spherical harmonics up to degree 3, both colour spaces (`srgb_rec709_display`, `lin_rec709_display`), and the draft's SPZ payload through `parseSpz`. A file written against the draft may leave `kernel` and `colorSpace` out; they then take `ellipse` and `srgb_rec709_display`. A file that breaks the extension's rules, such as a band of harmonics with a coefficient missing, is refused with the fault named. An unknown kernel or colour space is refused too.
+
+- `model.splats` holds `{cloud, bounds}` per cloud. Each primitive is placed by its node's world matrix (centres, shapes and harmonics), then the file's primitives merge into one cloud, so they sort together. Splats past 3,000,000 start another cloud.
+- `{decoders: {splats: false}}` keeps the extension's fallback: the primitive draws as plain points, or a file that requires the extension is refused. Synchronous `parseGLTF` does the same.
+- `readGaussianSplats(asset, primitive, {signal})` from `@margoengine/gltf-pro/splats` returns one primitive's `SplatData` in local space with no GPU, for `cropSplats` and the other `@margoengine/splats/data` tools.
+
+Limits are in [docs/limits.md](../../docs/limits.md): the clouds do not follow later node moves or visibility changes.
 
 ### Optional material extension slot
 

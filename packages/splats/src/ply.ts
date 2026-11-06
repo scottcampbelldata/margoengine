@@ -190,10 +190,11 @@ export interface GaussianAttributes {
 
 /**
  * Converts raw Gaussian attributes to {@link SplatData}: normalised rotations, covariance from rotation and scale,
- * display-space colour to linear (exactly for the base band, to first order for the view-dependent terms).
+ * display-space colour to linear (exactly for the base band, to first order for the view-dependent terms). With
+ * `linear: true` the stored colour is linear already and only clamps.
  * @throws RangeError for a zero rotation, an unsupported SH size, or a cloud that fails `validateSplats`.
  */
-export function splatsFromAttributes(raw: GaussianAttributes): SplatData {
+export function splatsFromAttributes(raw: GaussianAttributes, { linear: stored = false } = {}): SplatData {
   const { count } = raw,
     coefficients = raw.rest ? raw.rest.length / count / 3 : 0,
     perChannel = coefficients + 1;
@@ -225,10 +226,11 @@ export function splatsFromAttributes(raw: GaussianAttributes): SplatData {
     for (let c = 0; c < 3; c++) {
       // Display colour of the base band, converted to linear exactly.
       const display = 0.5 + C0 * raw.dc[i * 3 + c],
-        base = linear(Math.min(1, Math.max(0, display)));
+        clamped = Math.min(1, Math.max(0, display)),
+        base = stored ? clamped : linear(clamped);
       colors[i * 4 + c] = base;
       if (!sh) continue;
-      const k = slope(display);
+      const k = stored ? 1 : slope(display);
       sh[i * perChannel * 3 + c] = (base - 0.5) / C0;
       for (let j = 1; j < perChannel; j++)
         sh[(i * perChannel + j) * 3 + c] = raw.rest![(i * coefficients + j - 1) * 3 + c] * k;
@@ -241,7 +243,15 @@ export function splatsFromAttributes(raw: GaussianAttributes): SplatData {
   return data;
 }
 
-/** Covariance R S S^T R^T of splat `i` from a unit quaternion [x, y, z, w] and axis scales. */
+/** Smallest axis variance a covariance keeps, as a share of its largest: above what Float32 rounding of the matrix moves. */
+const FLATTEST = 2 ** -20;
+
+/**
+ * Covariance R S S^T R^T of splat `i` from a unit quaternion [x, y, z, w] and axis scales. Rounding to Float32 moves an
+ * eigenvalue by up to 3 x 2^-24 of the largest, so a flatter splat, which training often leaves, would round to a matrix
+ * that is not positive definite. An axis stays at FLATTEST of the largest: 1/1024 of its length, and at least a tiny
+ * size for a splat of scale 0. Projection adds 0.3 px^2 to every ellipse, so the thin axis this lifts never shows.
+ */
 function writeCovariance(out: Float32Array, i: number, q: readonly number[], scale: readonly number[]): void {
   const [x, y, z, w] = q,
     r = [
@@ -255,7 +265,9 @@ function writeCovariance(out: Float32Array, i: number, q: readonly number[], sca
       2 * (y * z + x * w),
       1 - 2 * (x * x + y * y),
     ],
-    s = [scale[0] * scale[0], scale[1] * scale[1], scale[2] * scale[2]];
+    variance = [scale[0] * scale[0], scale[1] * scale[1], scale[2] * scale[2]],
+    floor = Math.max(Math.max(...variance) * FLATTEST, 1e-30),
+    s = variance.map((v) => Math.max(v, floor));
   let n = 0;
   for (let row = 0; row < 3; row++)
     for (let col = row; col < 3; col++)

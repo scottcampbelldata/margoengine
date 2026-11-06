@@ -938,6 +938,10 @@
       "types": "./dist/gltf-pro/progressive.d.ts",
       "import": "./dist/gltf-pro/progressive.js"
     },
+    "./gltf-pro/splats": {
+      "types": "./dist/gltf-pro/splats.d.ts",
+      "import": "./dist/gltf-pro/splats.js"
+    },
     "./gltf-pro/coordinates": {
       "types": "./dist/gltf-pro/coordinates.d.ts",
       "import": "./dist/gltf-pro/coordinates.js"

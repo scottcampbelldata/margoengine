@@ -6,6 +6,8 @@ import { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
 import type { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from '@margoengine/decoders';
 import { checkCount, countLimit } from '../../shared/limits.js';
 import type { PBRInstances } from './instancing.js';
+import type { Engine } from '@margoengine/core/extension';
+import type { Splats } from '@margoengine/splats';
 import type { ExtendedPlan } from './shader.js';
 import type {
   GLTFDocument,
@@ -13,12 +15,14 @@ import type {
   GLTFTexture,
   GLTFInstancing,
   GLTFExtensions,
+  GLTFPrimitive,
   GLTFTextureInfo,
 } from '../../shared/gltf.js';
 import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
 import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 export type { GLTFDocument } from '../../shared/gltf.js';
 import { withMaterials } from './default-materials.js';
+import { hasSplats } from './splat-state.js';
 import { hasDraco } from './draco-state.js';
 /** Retained mip bytes let compressed textures upload again after device restoration. */
 export interface KTX2Image {
@@ -44,6 +48,7 @@ export interface GLTFImageOptions {
 /** Async codecs stay on the owning thread; meshopt is synchronous and can be packed in a parser worker. */
 export const asyncCompression = (doc: GLTFDocument): boolean =>
   !!doc.meshes?.some((mesh) => mesh?.primitives?.some((p) => p?.extensions?.KHR_draco_mesh_compression)) ||
+  hasSplats(doc) ||
   !!doc.textures?.some((texture) => texture?.extensions?.KHR_texture_basisu) ||
   !!doc.images?.some((image) => image?.mimeType === 'image/ktx2');
 export const assetLimit = 64 * 1024 * 1024;
@@ -89,6 +94,27 @@ export interface GLTFDecoderHooks {
    * (the extensions are then ignored, as glTF allows). Synchronous `parseGLTF` uses it only when passed.
    */
   materials?: GLTFExtendedMaterials | false;
+  /**
+   * KHR_gaussian_splatting (`gaussianSplats` from @margoengine/gltf-pro/splats): `loadGLTF` and `parseGLTFAsync` import it
+   * on their own when a file holds splats, and the clouds go to @margoengine/splats as `model.splats`. `false` keeps the
+   * point cloud fallback the extension defines. Synchronous `parseGLTF` draws the fallback.
+   */
+  splats?: GLTFSplatReader | false;
+}
+/** One Gaussian cloud of a file, attached to the engine; `bounds` holds min xyz, max xyz of its centres in world space. */
+export interface GLTFSplatCloud {
+  readonly cloud: Splats;
+  readonly bounds: Float32Array;
+}
+/** What gltf-pro needs to read Gaussian splats (`gaussianSplats` from @margoengine/gltf-pro/splats implements it). */
+export interface GLTFSplatReader {
+  /** Reads `primitives`, each placed by its column-major world `matrix`, and attaches their clouds to `engine`. */
+  attach(
+    engine: Engine,
+    asset: GLTFAsset,
+    primitives: readonly { primitive: GLTFPrimitive; matrix: Float32Array }[],
+    signal?: AbortSignal,
+  ): Promise<GLTFSplatCloud[]>;
 }
 /** Structural decoder boundary; supplied hooks may omit metadata derived from accessor declarations. */
 export interface GLTFDracoDecodeOptions extends DracoDecodeOptions {
@@ -148,6 +174,8 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   KHR_materials_iridescence: 'materials',
   KHR_materials_anisotropy: 'materials',
   KHR_materials_diffuse_transmission: 'materials',
+  KHR_gaussian_splatting: 'splats',
+  KHR_gaussian_splatting_compression_spz_2: 'splats',
 };
 const meshopt = (def: GLTFBufferView) =>
   def?.extensions?.EXT_meshopt_compression ?? def?.extensions?.KHR_meshopt_compression;

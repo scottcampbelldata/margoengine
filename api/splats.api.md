@@ -17,6 +17,16 @@ export interface FogLike {
   readonly enabled?: boolean;
 }
 
+export interface GaussianAttributes {
+    count: number;
+    positions: Float32Array;
+    logScales: Float32Array;
+    rotations: Float32Array;
+    dc: Float32Array;
+    alphas: Float32Array;
+    rest?: Float32Array;
+}
+
 export interface ParseSogOptions {
     signal?: AbortSignal;
 }
@@ -92,6 +102,10 @@ export function parseSog(input: ArrayBuffer | ArrayBufferView | SogFiles, option
 export function parseSplat(input: ArrayBuffer | ArrayBufferView): SplatData;
 
 export function parseSpz(input: ArrayBuffer | ArrayBufferView, options?: ParseSpzOptions): Promise<SplatData>;
+
+export function splatsFromAttributes(raw: GaussianAttributes, { linear: stored }?: {
+    linear?: boolean | undefined;
+}): SplatData;
 
 export function transformSplats(data: SplatData, matrix: ArrayLike<number>): SplatData;
 

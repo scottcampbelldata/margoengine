@@ -176,6 +176,7 @@ async function buildPackage(name) {
           '@margoengine/geometry/primitives',
           '@margoengine/geometry/utils',
           /^@margoengine\/(sky|vfx)\//,
+          /^@margoengine\/splats(\/|$)/,
         ],
         output: compactOutput,
       },

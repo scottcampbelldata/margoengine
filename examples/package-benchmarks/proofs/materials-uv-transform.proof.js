@@ -27,7 +27,10 @@ const root = resolve(import.meta.dirname, '../../..'),
 const sources = ['materials/src', 'gltf-pro/src', 'shared'].map((name) => slash(resolve(root, 'packages', name)) + '/');
 // A revision this clone lacks is HISTORICAL (history.js); only a file the revision lacks reads the working tree.
 const show = (from, file) => showAt(from, file.slice(slash(root).length + 1));
-/** materials with gltf-pro (every entry) bundled in (core stays external), both read from `from` or the working tree. */
+/**
+ * materials with gltf-pro (every entry) bundled in, both read from `from` or the working tree. Core and the splats peer
+ * gltf-pro loads on demand stay external, as in the packages' own build.
+ */
 async function load(from) {
   const plugins = [
     {
@@ -63,7 +66,7 @@ async function load(from) {
       target: 'es2022',
       lib: { entry: resolve(root, 'packages/materials/src/index.ts'), formats: ['es'] },
       rollupOptions: {
-        external: (id) => id.startsWith('@margoengine/core'),
+        external: (id) => /^@margoengine\/(core|splats)(\/|$)/.test(id),
         output: { codeSplitting: false },
       },
     },

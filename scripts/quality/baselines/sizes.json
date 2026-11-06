@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8916022,
+  "total": 8953307,
   "history": [
     {
       "date": "2026-10-24",
@@ -2702,6 +2702,12 @@
       "commit": "2f6f46df4",
       "reason": "autoLOD builds skinned and morphed levels and simplifies flat shading: level documents, rig carrying, node following",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "ea67e75ab",
+      "reason": "gltf-pro: the KHR_gaussian_splatting reader hook, model.splats and new entry /splats; splats: splatsFromAttributes exported, flat splat floor",
+      "grew": 7
     }
   ],
   "items": {
@@ -2898,7 +2904,7 @@
     "@margoengine/exporters/usdz": 11717,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 18653,
-    "@margoengine/fbx dist/workers/fbx.js": 53500,
+    "@margoengine/fbx dist/workers/fbx.js": 55486,
     "@margoengine/fbx/export": 7915,
     "@margoengine/fbx/worker": 19547,
     "@margoengine/fsm": 1131,
@@ -2919,17 +2925,18 @@
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
     "@margoengine/gltf": 6831,
-    "@margoengine/gltf-pro": 60645,
-    "@margoengine/gltf-pro dist/workers/gltf.js": 21337,
+    "@margoengine/gltf-pro": 63626,
+    "@margoengine/gltf-pro dist/workers/gltf.js": 23501,
     "@margoengine/gltf-pro dist/workers/progressive.js": 15374,
     "@margoengine/gltf-pro/asset": 5490,
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/extended": 7245,
     "@margoengine/gltf-pro/instancing": 3350,
-    "@margoengine/gltf-pro/prepare": 18208,
-    "@margoengine/gltf-pro/progressive": 67640,
+    "@margoengine/gltf-pro/prepare": 19822,
+    "@margoengine/gltf-pro/progressive": 70098,
     "@margoengine/gltf-pro/scene": 1471,
-    "@margoengine/gltf-pro/worker": 60700,
+    "@margoengine/gltf-pro/splats": 2100,
+    "@margoengine/gltf-pro/worker": 64090,
     "@margoengine/gltf/auto": 14068,
     "@margoengine/gltf/instancing": 1985,
     "@margoengine/gltf/meshopt": 1205,
