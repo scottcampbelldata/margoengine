@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4839655,
+  "total": 4841368,
   "history": [
     {
       "date": "2026-10-24",
@@ -2048,6 +2048,12 @@
       "commit": "d4b71faef",
       "reason": "lod: packed attribute simplifier, materials levels in lod/auto",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "e0990bd31",
+      "reason": "New input entry ./replay: record action streams and replay them. Input root gains setFeed. Core and core + stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -2265,6 +2271,7 @@
     "@margoengine/input/interactions": 1614,
     "@margoengine/input/motion": 1806,
     "@margoengine/input/players": 5248,
+    "@margoengine/input/replay": 1713,
     "@margoengine/inspector": 9302,
     "@margoengine/inspector/frame": 8897,
     "@margoengine/inspector/history": 1101,

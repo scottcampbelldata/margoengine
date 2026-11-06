@@ -55,6 +55,14 @@ export interface InputOptions {
   contexts?: Readonly<Record<string, readonly string[]>>;
 }
 
+/** Takes the place of the devices while set with {@link Input.setFeed}. */
+export interface InputFeed {
+  /** Called at the start of every {@link Input.update}. Calling `setFeed(null)` here gives this update to the devices. */
+  begin(): void;
+  /** What one binding of `action` gives this update, as {@link Input.bindingValue} would report it. */
+  read(action: string, binding: number): number;
+}
+
 /** Plain, JSON-safe snapshot of every action's bindings, as written by {@link Input.exportBindings}. */
 export type BindingMap = Record<string, Binding[]>;
 
@@ -105,6 +113,7 @@ export class Input {
     { x: number; y: number; down: boolean; tapped?: boolean; reset?: () => void }
   >();
   private readonly controls = new Map<string, Record<string, number>>();
+  private feed: InputFeed | null = null;
   private readonly cleanups: (() => void)[] = [];
   private readonly gamepads: () => readonly (Gamepad | null)[];
   private readonly deadzone: number;
@@ -215,13 +224,19 @@ export class Input {
     if (!this.states.has(action)) throw new TypeError('Unknown input action; add it to the actions option first');
     return this.samples.find((sample) => sample.name === action)!.values[binding] ?? 0;
   }
+  /** Read bindings from `feed` instead of the devices, or from the devices again with `null`. See `InputReplay`. */
+  setFeed(feed: InputFeed | null): void {
+    this.feed = feed;
+  }
   /**
    * Sample every binding into its action state and clear the accumulated pointer motion. Call once per tick.
    * @throws MargoError `'disposed'` after {@link Input.dispose}.
    */
   update(): void {
     if (this.disposed) throw new MargoError('disposed', 'Input is disposed; create a new Input');
-    const pads = this.gamepads();
+    this.feed?.begin();
+    const pads = this.gamepads(),
+      feed = this.feed;
     for (let i = 0; i < this.samples.length; i++) {
       const sample = this.samples[i],
         name = sample.name,
@@ -242,6 +257,10 @@ export class Input {
       values.length = bindings.length;
       values.fill(0);
       for (let j = 0; active && j < bindings.length; j++) {
+        if (feed) {
+          value += values[j] = feed.read(name, j);
+          continue;
+        }
         const binding = bindings[j];
         let sample = 0;
         switch (binding.type) {

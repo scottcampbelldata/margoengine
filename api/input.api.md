@@ -78,6 +78,7 @@ export class Input {
     constructor(actions: Readonly<Record<string, readonly Binding[]>>, { target, gamepads, deadzone, contexts }?: InputOptions);
     state(action: string): Readonly<ActionState>;
     bindingValue(action: string, binding: number): number;
+    setFeed(feed: InputFeed | null): void;
     update(): void;
     control(id: string): Record<string, number>;
     removeControl(id: string): void;
@@ -96,6 +97,11 @@ export class Input {
     reset(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+export interface InputFeed {
+    begin(): void;
+    read(action: string, binding: number): number;
 }
 
 export interface InputOptions {

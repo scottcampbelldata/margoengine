@@ -171,6 +171,39 @@ tick();
 
 `input.control(id)` is the general form of this: it returns an object of numbers that `{type: 'control', id, axis}` bindings read (`axis` defaults to `'value'`), so any code can feed an action. `input.removeControl(id)` removes it.
 
+## Recording and replay
+
+`@margoengine/input/replay` records what every binding gave, tick by tick, and plays it back into an `Input`. Game code does not change: it reads the same actions, so tests and attract-mode demos run the real thing.
+
+```ts
+import {Input} from 'margoengine/input';
+import {Interactions} from 'margoengine/input/interactions';
+import {InputRecorder, InputReplay} from 'margoengine/input/replay';
+
+const input = new Input({jump: [{type: 'key', code: 'Space'}]});
+const recorder = new InputRecorder(input);
+for (let tick = 0; tick < 3; tick++) {
+  input.update();
+  recorder.capture(); // once per tick, after input.update()
+}
+const saved = JSON.stringify(recorder.clip());
+
+const replay = new InputReplay(input, saved, {signal: AbortSignal.timeout(60_000)});
+const rules = new Interactions(input, {hop: {type: 'tap', action: 'jump'}}, {now: () => replay.time});
+while (replay.frame + 1 < replay.frames) {
+  input.update(); // takes the next recorded tick; the devices are ignored
+  rules.update();
+}
+input.update(); // past the end: the Input goes back to its devices
+await replay.finished;
+```
+
+- A clip is plain JSON: action and binding channels, the time of each tick, and only the values that changed, so a held key costs nothing per tick. It holds binding values, so rules on one binding replay too.
+- Each `input.update()` plays one tick. Ticks replay in order at whatever rate you call `update`; the recorded time is `replay.time`, so give timing rules that clock and the results match the live run, tick for tick.
+- `new InputReplay(input, clip, {loop, signal})` takes the clip or its JSON text and checks all of it first. `loop` (default false) repeats it, with `time` still rising. `replay.stop()` hands the Input back; `finished` resolves at the end or on `stop`, and rejects if `signal` aborts.
+- Contexts apply during a replay as they do live. An action the clip does not hold reads 0; an action this Input lacks is refused. With `LocalPlayers`, record each `player.input`.
+- `input.setFeed(feed)` is what replay uses: an object with `begin()` and `read(action, binding)` in place of the devices, and `null` to go back.
+
 ## Gestures
 
 ```ts

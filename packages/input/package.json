@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/input",
   "version": "1.0.0",
-  "description": "Semantic keyboard, pointer, gamepad and touch actions with haptics, tap, hold, slow tap and double press rules, local multiplayer and gyro aiming.",
+  "description": "Semantic keyboard, pointer, gamepad and touch actions with haptics, tap, hold, slow tap and double press rules, local multiplayer, gyro aiming, and recording and replay.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -37,6 +37,10 @@
     "./motion": {
       "types": "./dist/motion.d.ts",
       "import": "./dist/motion.js"
+    },
+    "./replay": {
+      "types": "./dist/replay.d.ts",
+      "import": "./dist/replay.js"
     }
   },
   "files": [

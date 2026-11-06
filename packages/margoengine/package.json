@@ -874,6 +874,10 @@
       "types": "./dist/input/motion.d.ts",
       "import": "./dist/input/motion.js"
     },
+    "./input/replay": {
+      "types": "./dist/input/replay.d.ts",
+      "import": "./dist/input/replay.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"
