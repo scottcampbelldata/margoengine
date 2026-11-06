@@ -251,3 +251,116 @@ test('malformed layers throw a LoaderError for format USD with a code to branch 
   assert.match(truncated.message, /^USD: /);
   assert.equal(caught(() => parseUSDA(source, { maxBytes: 8 })).code, 'limit');
 });
+
+const painted = (surface, primvars = '') => `#usda 1.0
+(
+  metersPerUnit = 1
+  upAxis = "Y"
+)
+def Mesh "M" (apiSchemas = ["MaterialBindingAPI"]) {
+  point3f[] points = [(0,0,0),(1,0,0),(0,1,0)]
+  int[] faceVertexCounts = [3]
+  int[] faceVertexIndices = [0,1,2]
+  uniform token subdivisionScheme = "none"
+  ${primvars}
+  rel material:binding = </Paint>
+}
+def Material "Paint" {
+  token outputs:surface.connect = </Paint/Surface.outputs:surface>
+  def Shader "Surface" {
+    uniform token info:id = "UsdPreviewSurface"
+    ${surface}
+    token outputs:surface
+  }
+  def Shader "Color" {
+    uniform token info:id = "UsdPrimvarReader_float3"
+    string inputs:varname = "displayColor"
+    float3 inputs:fallback = (0.5, 0.25, 1)
+    float3 outputs:result
+  }
+  def Shader "Opacity" {
+    uniform token info:id = "UsdPrimvarReader_float"
+    string inputs:varname = "displayOpacity"
+    float inputs:fallback = 1
+    float outputs:result
+  }
+  def Shader "Other" {
+    uniform token info:id = "UsdPrimvarReader_float3"
+    string inputs:varname = "wetness"
+    float3 outputs:result
+  }
+  def Shader "Map" {
+    uniform token info:id = "UsdUVTexture"
+    asset inputs:file = @tile.png@
+    float3 outputs:rgb
+    float outputs:a
+  }
+  def Shader "Second" {
+    uniform token info:id = "UsdUVTexture"
+    asset inputs:file = @other.png@
+    float outputs:a
+  }
+}
+`;
+const toColor = 'color3f inputs:diffuseColor.connect = </Paint/Color.outputs:result>';
+const toOpacity = 'float inputs:opacity.connect = </Paint/Opacity.outputs:result>';
+const colorsOf = (asset) => [...asset.meshes[0].colors].map((v) => Number(v.toFixed(3)));
+
+test('vertex colors read through a UsdPrimvarReader load as COLOR_0', () => {
+  const asset = parseUSDA(
+      painted(toColor, 'color3f[] primvars:displayColor = [(1,0,0),(0,1,0),(0,0,1)] (interpolation = "vertex")'),
+    ),
+    { document } = asset,
+    primitive = document.meshes[0].primitives[0];
+  assert.deepEqual(colorsOf(asset), [1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1]);
+  assert.equal(document.accessors[primitive.attributes.COLOR_0].type, 'VEC4');
+  assert.equal(document.accessors[primitive.attributes.COLOR_0].count, 3);
+  assert.deepEqual(document.materials[0].pbrMetallicRoughness.baseColorFactor, [1, 1, 1, 1]);
+  assert.equal(document.materials[0].alphaMode, 'OPAQUE');
+});
+
+test('vertex opacity blends, indexed primvars resolve and a mesh without the primvar takes the fallback', () => {
+  const asset = parseUSDA(
+    painted(
+      `${toColor}\n${toOpacity}`,
+      `color3f[] primvars:displayColor = [(1,0,0),(0,0,1)] (interpolation = "vertex")
+  int[] primvars:displayColor:indices = [1,0,1]
+  float[] primvars:displayOpacity = [0.5,0.25,1] (interpolation = "vertex")`,
+    ),
+  );
+  assert.deepEqual(colorsOf(asset), [0, 0, 1, 0.5, 1, 0, 0, 0.25, 0, 0, 1, 1]);
+  assert.equal(asset.document.materials[0].alphaMode, 'BLEND');
+  assert.deepEqual(colorsOf(parseUSDA(painted(toColor))).slice(0, 4), [0.5, 0.25, 1, 1]);
+  assert.throws(
+    () => parseUSDA(painted(toColor, 'int[] primvars:displayColor:indices = [0,0,9]\n  color3f[] primvars:displayColor = [(1,0,0)]')),
+    /index outside stream/,
+  );
+});
+
+test('a reader of any other primvar stays refused', () => {
+  assert.throws(
+    () => parseUSDA(painted('color3f inputs:diffuseColor.connect = </Paint/Other.outputs:result>')),
+    /unsupported primvar reader/,
+  );
+});
+
+test('opacity from the base colour map and a threshold keep the alpha mode', async () => {
+  const map = 'color3f inputs:diffuseColor.connect = </Paint/Map.outputs:rgb>\n float inputs:opacity.connect = </Paint/Map.outputs:a>',
+    packed = (layer) =>
+      zip([
+        ['scene.usda', Buffer.from(layer)],
+        ['tile.png', png(1, 2, 3)],
+        ['other.png', png(4, 5, 6)],
+      ]),
+    blend = (await parseUSDZ(packed(painted(map)))).document.materials[0],
+    mask = (await parseUSDZ(packed(painted(`${map}\n float inputs:opacityThreshold = 0.25`)))).document.materials[0],
+    constant = parseUSDA(painted('float inputs:opacity = 0.5\n float inputs:opacityThreshold = 0.75')).document.materials[0];
+  assert.equal(blend.alphaMode, 'BLEND');
+  assert.equal(mask.alphaMode, 'MASK');
+  assert.equal(mask.alphaCutoff, 0.25);
+  assert.equal(constant.alphaMode, 'MASK');
+  await assert.rejects(
+    parseUSDZ(packed(painted(`${map.split('\n')[0]}\n float inputs:opacity.connect = </Paint/Second.outputs:a>`))),
+    /unsupported opacity texture/,
+  );
+});

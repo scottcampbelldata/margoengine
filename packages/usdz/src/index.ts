@@ -41,6 +41,11 @@ export interface USDMesh {
    * authored. The glTF `document` holds them as uvs (s, 1 - t).
    */
   uvs?: Float32Array;
+  /**
+   * Linear vertex colors, four floats per vertex, when the bound material reads `displayColor` or `displayOpacity`
+   * through a UsdPrimvarReader. The glTF `document` holds them as COLOR_0.
+   */
+  colors?: Float32Array;
   /** Triangle corner indices into the vertex streams. */
   indices: Uint32Array;
   /** Index into `document.materials`; a mesh with no binding gets a neutral grey one. */
@@ -104,6 +109,11 @@ function bytes(input: BinaryInput): Uint8Array {
   return input instanceof ArrayBuffer
     ? new Uint8Array(input)
     : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+}
+/** A display primvar's values and, when authored, its index stream. */
+interface DisplayStream {
+  values: ArrayLike<number>;
+  indices?: ArrayLike<number>;
 }
 function numeric(value: unknown, size?: number): ArrayLike<number> {
   if (!Array.isArray(value) && !ArrayBuffer.isView(value)) fail('expected numeric stream');
@@ -390,6 +400,18 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     if (index < 0 && channel !== 'rgb') fail('unsupported texture channel');
     return { path: pathName(file, root), channel: Math.max(0, index), placement: placement(shader) };
   };
+  /**
+   * The fallback of the UsdPrimvarReader feeding `name`, when one does. Only the display primvars mean anything to a
+   * glTF material; a reader of any other primvar is refused, as a general shader graph is.
+   */
+  const display = (path: string, name: string, varname: string, width: number): number[] | undefined => {
+    const shader = connection(path, name)?.split('.outputs:')[0];
+    if (!shader || attrs(shader, 'info:id') !== `UsdPrimvarReader_float${width === 1 ? '' : width}`) return;
+    if (attrs(shader, 'inputs:varname') !== varname) fail('unsupported primvar reader on ' + name);
+    const fallback = attrs(shader, 'inputs:fallback');
+    if (fallback === undefined) return new Array<number>(width).fill(0);
+    return width === 1 ? [scalar(fallback)] : Array.from(numeric(fallback, width));
+  };
   /** A texture for `source` and its glTF texture info, with the sampler and KHR_texture_transform `where` needs. */
   const image = (source: ImageSource, where: Placement): { index: number; extensions?: Record<string, unknown> } => {
     const index = sources.length;
@@ -406,7 +428,9 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     if (!doc.extensionsUsed.includes('KHR_texture_transform')) doc.extensionsUsed.push('KHR_texture_transform');
     return { index, extensions: { KHR_texture_transform: where.transform } };
   };
-  const materialIds = new Map<string, number>();
+  const materialIds = new Map<string, number>(),
+    // Per material: the fallback colour and opacity of the display primvars it reads.
+    displays = new Map<number, { color?: number[]; opacity?: number[] }>();
   function material(path: string): number {
     let binding: string | undefined;
     for (let owner = path; owner && !binding; owner = owner.slice(0, owner.lastIndexOf('/')))
@@ -419,7 +443,10 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     const rgb = numeric(shader ? (attrs(shader, 'inputs:diffuseColor') ?? [0.18, 0.18, 0.18]) : [0.7, 0.7, 0.7], 3),
       opacity = scalar(shader ? (attrs(shader, 'inputs:opacity') ?? 1) : 1),
       roughness = scalar(shader ? (attrs(shader, 'inputs:roughness') ?? 0.5) : 0.5),
-      metallic = scalar(shader ? (attrs(shader, 'inputs:metallic') ?? 0) : 0);
+      metallic = scalar(shader ? (attrs(shader, 'inputs:metallic') ?? 0) : 0),
+      threshold = scalar(shader ? (attrs(shader, 'inputs:opacityThreshold') ?? 0) : 0),
+      color = shader ? display(shader, 'inputs:diffuseColor', 'displayColor', 3) : undefined,
+      vertexOpacity = shader ? display(shader, 'inputs:opacity', 'displayOpacity', 1) : undefined;
     const p: NonNullable<GLTFMaterial['pbrMetallicRoughness']> = {
         baseColorFactor: [scalar(rgb[0]), scalar(rgb[1]), scalar(rgb[2]), opacity],
         roughnessFactor: roughness,
@@ -428,16 +455,29 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
       definition: GLTFMaterial = {
         pbrMetallicRoughness: p,
         doubleSided: true,
-        alphaMode: opacity < 1 ? 'BLEND' : 'OPAQUE',
+      },
+      /** glTF's alpha mode for a surface that is not opaque: USD cuts it out at a threshold above 0, else blends. */
+      seeThrough = () => {
+        definition.alphaMode = threshold > 0 ? 'MASK' : 'BLEND';
+        if (threshold > 0) definition.alphaCutoff = threshold;
       };
+    definition.alphaMode = 'OPAQUE';
+    if (opacity < 1 || vertexOpacity) seeThrough();
+    if (color) p.baseColorFactor = [1, 1, 1, opacity];
     if (shader) {
-      const diffuse = texture(shader, 'inputs:diffuseColor'),
+      const diffuse = color ? undefined : texture(shader, 'inputs:diffuseColor'),
+        alpha = vertexOpacity ? undefined : texture(shader, 'inputs:opacity'),
         normal = texture(shader, 'inputs:normal'),
         rough = texture(shader, 'inputs:roughness'),
         metal = texture(shader, 'inputs:metallic');
       if (diffuse) {
         p.baseColorFactor = [1, 1, 1, opacity];
         p.baseColorTexture = image({ path: diffuse.path }, diffuse.placement);
+      }
+      // glTF holds opacity in the base colour's alpha, so an opacity map has to be that texture's own.
+      if (alpha) {
+        if (alpha.path !== diffuse?.path || alpha.channel !== 3) fail('unsupported opacity texture');
+        seeThrough();
       }
       if (normal) definition.normalTexture = image({ path: normal.path }, normal.placement);
       if (rough || metal) {
@@ -460,6 +500,7 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     const id = doc.materials.length;
     doc.materials.push(definition);
     materialIds.set(key, id);
+    displays.set(id, { color, opacity: vertexOpacity });
     return id;
   }
   function accessor(data: Float32Array | Uint32Array, type: string): number {
@@ -472,11 +513,21 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
     doc.accessors.push({
       bufferView: view,
       componentType: data instanceof Uint32Array ? 5125 : 5126,
-      count: data.length / (type === 'VEC3' ? 3 : type === 'VEC2' ? 2 : 1),
+      count: data.length / (type === 'VEC4' ? 4 : type === 'VEC3' ? 3 : type === 'VEC2' ? 2 : 1),
       type,
     });
     return index;
   }
+  /** The mesh's display primvar, or the reader's fallback as one constant value when the mesh authors none. */
+  const displayStream = (path: string, name: string, fallback: number[], width: number): DisplayStream => {
+    const value = attrs(path, 'primvars:' + name);
+    return value === undefined
+      ? { values: fallback }
+      : {
+          values: numeric(value),
+          indices: attrs(path, 'primvars:' + name + ':indices') as ArrayLike<number> | undefined,
+        };
+  };
   const metadata = specs['/']?.fields ?? {},
     unit = metadata.metersPerUnit ?? 0.01,
     axis = metadata.upAxis ?? 'Y';
@@ -550,7 +601,12 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         positions = new Float32Array(triangles * 9),
         normals = new Float32Array(triangles * 9),
         uvs = uv ? new Float32Array(triangles * 6) : undefined,
-        indices = new Uint32Array(triangles * 3);
+        indices = new Uint32Array(triangles * 3),
+        materialId = material(path),
+        reads = displays.get(materialId)!,
+        colors = reads.color || reads.opacity ? new Float32Array(triangles * 12) : undefined,
+        tint = reads.color && displayStream(path, 'displayColor', reads.color, 3),
+        fade = reads.opacity && displayStream(path, 'displayOpacity', reads.opacity, 1);
       const sample = (
         stream: ArrayLike<number>,
         width: number,
@@ -637,17 +693,33 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
               uvs[at * 2] = uv[u * 2];
               uvs[at * 2 + 1] = uv[u * 2 + 1];
             }
+            if (colors) {
+              const entry = (stream: DisplayStream, width: number, property: string): number => {
+                const i = stream.indices
+                  ? stream.indices[sample(stream.indices, 1, corner, vertex, f, property)]
+                  : sample(stream.values, width, corner, vertex, f, property);
+                if (!Number.isSafeInteger(i) || i < 0 || i * width + width > stream.values.length)
+                  fail('display primvar index outside stream');
+                return i * width;
+              };
+              colors.fill(1, at * 4, at * 4 + 4);
+              if (tint) {
+                const i = entry(tint, 3, 'primvars:displayColor');
+                for (let d = 0; d < 3; d++) colors[at * 4 + d] = tint.values[i + d];
+              }
+              if (fade) colors[at * 4 + 3] = fade.values[entry(fade, 1, 'primvars:displayOpacity')];
+            }
             indices[at] = at;
             at++;
           }
         cursor += count;
       }
       if (!normal) normals.set(computeVertexNormals(positions, indices));
-      const materialId = material(path),
-        attributes: Record<string, number> = {
-          POSITION: accessor(positions, 'VEC3'),
-          NORMAL: accessor(normals, 'VEC3'),
-        };
+      const attributes: Record<string, number> = {
+        POSITION: accessor(positions, 'VEC3'),
+        NORMAL: accessor(normals, 'VEC3'),
+      };
+      if (colors) attributes.COLOR_0 = accessor(colors, 'VEC4');
       // USD st has its origin at the image's bottom left (t up); glTF uvs at its top left (v down): v = 1 - t.
       if (uvs)
         attributes.TEXCOORD_0 = accessor(
@@ -670,6 +742,7 @@ function asset(specs: Specs, entries: Map<string, Uint8Array>, root: string, opt
         positions,
         normals,
         uvs,
+        colors,
         indices,
         material: materialId,
       });
