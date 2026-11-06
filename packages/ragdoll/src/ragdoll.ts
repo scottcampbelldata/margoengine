@@ -90,6 +90,20 @@ export interface RagdollOptions {
   limitStiffness?: number;
 }
 
+/** What every body of a ragdoll shares, as built ({@link Ragdoll.settings}). */
+export interface RagdollSettings {
+  /** Packed collision groups. */
+  readonly collisionGroups: number;
+  /** Friction. */
+  readonly friction: number;
+  /** Linear damping. */
+  readonly linearDamping: number;
+  /** Angular damping. */
+  readonly angularDamping: number;
+  /** Share of a limit error removed per physics step. */
+  readonly limitStiffness: number;
+}
+
 /** A body of a ragdoll and the bone it moves ({@link Ragdoll.bones}). */
 export interface RagdollPart {
   /** The skeleton node. */
@@ -338,11 +352,11 @@ export class Ragdoll implements EnginePlugin {
   readonly name: string;
   /** The bodies, parents before children; `bones[0]` is the root bone. */
   readonly bones: readonly RagdollPart[];
+  /** What every body shares, as built. */
+  readonly settings: RagdollSettings;
   private readonly parts: Bone[];
   private readonly engine: Engine;
   private readonly stiffness: number;
-  private readonly friction: number;
-  private readonly groups: number;
   private readonly unsubscribe: Array<() => void> = [];
   /** How many bones are limp. */
   private loose = 0;
@@ -435,8 +449,13 @@ export class Ragdoll implements EnginePlugin {
     const groups = options.collisionGroups ?? ((0x8000 << 16) | 0x7fff) >>> 0;
     if (!Number.isInteger(groups) || groups < 0 || groups > 0xffffffff)
       throw new RangeError('Ragdoll collisionGroups must be a packed 32-bit integer; build it with collisionGroups().');
-    this.groups = groups;
-    this.friction = options.friction ?? 0.6;
+    this.settings = {
+      collisionGroups: groups,
+      friction: options.friction ?? 0.6,
+      linearDamping: options.linearDamping ?? 0.05,
+      angularDamping: options.angularDamping ?? 0.8,
+      limitStiffness: this.stiffness,
+    };
     try {
       for (const i of order) {
         const spec = list[i],
@@ -512,8 +531,8 @@ export class Ragdoll implements EnginePlugin {
           type: options.active ? 'dynamic' : 'kinematicPosition',
           position: origin as unknown as Vec3,
           rotation,
-          linearDamping: options.linearDamping ?? 0.05,
-          angularDamping: options.angularDamping ?? 0.8,
+          linearDamping: this.settings.linearDamping,
+          angularDamping: this.settings.angularDamping,
           userData: { ragdoll: this, node },
           colliders: this.collider(shape, axis, length, radius, mass),
         });
@@ -606,7 +625,8 @@ export class Ragdoll implements EnginePlugin {
     radius: number,
     mass: number,
   ): ColliderOptions {
-    const settings = { mass, friction: this.friction, collisionGroups: this.groups };
+    const { friction, collisionGroups } = this.settings,
+      settings = { mass, friction, collisionGroups };
     if (shape.type === 'hull') return { shape: 'convexHull', points: shape.points, ...settings };
     if (shape.type === 'box')
       return {

@@ -785,6 +785,7 @@ interface RigidBody {
     gravityScale(): number;
     localCom(): Vector;
     setAdditionalMassProperties(mass: number, com: Vector, inertia: Vector, frame: Rotation, wakeUp: boolean): void;
+    recomputeMassPropertiesFromColliders(): void;
     setGravityScale(scale: number, wakeUp: boolean): void;
     isCcdEnabled(): boolean;
     enableCcd(enabled: boolean): void;

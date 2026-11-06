@@ -1420,6 +1420,19 @@ rtest('maxForce caps a motor at the torque it names, on a ball joint and on a hi
   physics.dispose();
 });
 
+rtest('a body reads the mass of its colliders at once, before any step', () => {
+  // Regression: Rapier folds colliders in at the next step, so a swapped collider read as both for a frame.
+  const physics = create({ gravity: [0, 0, 0] }),
+    body = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.1, mass: 2 } });
+  assert.equal(body.mass, 2);
+  const old = body.colliders[0];
+  body.addCollider({ shape: 'box', halfExtents: [0.1, 0.1, 0.1], mass: 3 });
+  assert.equal(body.mass, 5);
+  body.removeCollider(old);
+  assert.equal(body.mass, 3);
+  physics.dispose();
+});
+
 rtest('additional mass and inertia add to what the colliders give, and 0 takes them off', () => {
   const physics = create({ gravity: [0, 0, 0] }),
     body = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.1, mass: 1 } }),

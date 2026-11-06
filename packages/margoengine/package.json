@@ -1662,6 +1662,10 @@
       "types": "./dist/ragdoll/hulls.d.ts",
       "import": "./dist/ragdoll/hulls.js"
     },
+    "./ragdoll/profile": {
+      "types": "./dist/ragdoll/profile.d.ts",
+      "import": "./dist/ragdoll/profile.js"
+    },
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"

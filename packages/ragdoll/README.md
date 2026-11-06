@@ -241,6 +241,29 @@ The source is the glTF model the skeleton belongs to, or a `RagdollSkin` of your
 
 The same data goes in by hand: `ragdoll.setShape(bone, shape)`, or `shape` on an entry of `bones`, takes `{type: 'capsule'}`, `{type: 'hull', points}` or `{type: 'box', center, halfExtents, rotation}`, in the bone's own frame. `part.shape` reads it back and `part.mass` the mass as built.
 
+## Saved profiles (`margoengine/ragdoll/profile`)
+
+A profile is a ragdoll as plain JSON: bones by name, joints and limits, sizes, masses, shapes and the shared body settings. Tune a ragdoll once, save it, and every copy of the character builds the same one. `humanoidProfile` is a place to start.
+
+```ts
+import { Ragdoll } from 'margoengine/ragdoll';
+import { humanoidProfile, ragdollOptions, saveRagdollProfile } from 'margoengine/ragdoll/profile';
+
+// Anatomical ranges, hinged knees and elbows, published mass shares.
+const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes, { mass: 82 }), model.nodes));
+
+const saved = JSON.stringify(saveRagdollProfile(ragdoll));
+const again = Ragdoll.attach(otherPhysics, ragdollOptions(JSON.parse(saved), otherModel.nodes));
+```
+
+| Function | Gives |
+| --- | --- |
+| `saveRagdollProfile(ragdoll)` | The profile, every value as built. Bones need unique names. |
+| `ragdollOptions(profile, nodes)` | The options for `new Ragdoll` or `Ragdoll.attach`; add your own beside them. It throws a `RangeError` naming a bone the skeleton lacks, and for a profile of a newer version. |
+| `humanoidProfile(nodes, {mass, bones})` | A profile for a humanoid in a T or A pose. `mass` defaults to 70 kg. |
+
+`humanoidProfile` finds bones by the names `detectSkeleton` knows (Mixamo, Godot, Roblox, humanoid). For other names, pass `bones: {hips: node, leftUpperLeg: node, ...}`; it needs hips, a head, and upper and lower arms and legs. Every node between two named bones joins the lower one's mass, with a small cone. `ragdoll.settings` reads the shared settings a profile saves.
+
 ## Clean room
 
 Written from public descriptions only, cited in [docs/clean-room.md](../../docs/clean-room.md); no engine's ragdoll code

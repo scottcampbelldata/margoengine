@@ -738,6 +738,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     const collider = this.world.createCollider(desc, body.raw);
     body.colliders.push(collider);
     this.byCollider.set(collider.handle, body);
+    // Rapier folds a collider's mass in at the next step; a game reads `mass` before that.
+    body.raw.recomputeMassPropertiesFromColliders();
     return collider;
   }
   /** @internal use `body.removeCollider`. */
@@ -748,6 +750,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     body.colliders.splice(index, 1);
     this.byCollider.delete(collider.handle);
     this.world.removeCollider(collider, true);
+    body.raw.recomputeMassPropertiesFromColliders();
   }
 
   /** Removes a body with its colliders, joints and character controllers. */

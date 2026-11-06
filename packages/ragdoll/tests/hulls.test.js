@@ -111,6 +111,11 @@ rtest('hulls fit the real mesh better than capsules, and boxes do too', async ()
     assert.ok(vertexCount >= 4);
     assert.equal(part.body.colliders.length, 1, 'the capsule is gone');
   }
+  assert.deepEqual(
+    ragdoll.bones.map((part) => part.body.mass),
+    masses,
+    'a bone weighs the same at once, for motors added next',
+  );
   rig.frames(2);
   const hulls = fit(rig, mesh, ragdoll);
   fitRagdollShapes(ragdoll, rig.model, { shape: 'box' });

@@ -46,6 +46,7 @@ class Ragdoll implements EnginePlugin {
     readonly physics: Physics;
     readonly name: string;
     readonly bones: readonly RagdollPart[];
+    readonly settings: RagdollSettings;
     constructor(physics: Physics, options: RagdollOptions);
     static attach(physics: Physics, options: RagdollOptions): Ragdoll;
     setShape(bone: Mesh | RagdollPart, shape: RagdollShape): this;
@@ -115,6 +116,14 @@ interface RagdollPart {
     readonly animated: ArrayLike<number>;
     readonly limp: boolean;
     readonly weight: number;
+}
+
+interface RagdollSettings {
+    readonly collisionGroups: number;
+    readonly friction: number;
+    readonly linearDamping: number;
+    readonly angularDamping: number;
+    readonly limitStiffness: number;
 }
 
 type RagdollShape = {

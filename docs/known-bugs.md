@@ -158,6 +158,14 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### A limp ragdoll keeps moving on a floor when a limit and a contact cannot both hold
+
+- **What:** a ragdoll lying where a floor holds a limb past its cone limit never comes to rest: Knight.glb with the humanoid preset and fitted hulls, pushed over, still has a hand at 0.7 to 1 m/s after 20 s, with the limb up to 0.8 rad past its limit. Capsules settle under default limits (0.05 m/s) because they are thin enough to meet the limits on the floor. Limits a body can meet lying down settle hulls as well (`swing` 2.5, under 0.05 m/s).
+- **Repro:** `Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes, { bones }), model.nodes))`, `fitRagdollShapes(ragdoll, model)`, `activate()`, then 300 N s on the chest, as in `packages/ragdoll/tests/profile.test.js`, and read the bodies' `linearVelocity` after 1,200 frames.
+- **Cause:** the cone limit pass turns the bone back toward its limit from outside the solver, each step, into the floor that put it there; the solver pushes it out, and the two exchange energy for ever. Hinges use Rapier's own limits and do not do this.
+- **Tried, measured on the same falls:** skipping the correction on touching limbs settles it (under 0.1 m/s) but a spine ended 2.3 rad past its limit. A fifth of the correction on touching limbs left 0.2 to 0.65 m/s and 0.5 to 1.6 rad. Pulling the joint back with its motor, inside the solver, settled it (under 0.2 m/s) but left bones 1.1 to 1.9 rad past their limits and tore a pinned joint test apart by 3 cm. Each trades a moving limb for a broken pose, so none shipped.
+- **Needed to close:** a cone limit as a real solver constraint, with stiffness that does not depend on the limb's own inertia, so a wrist under a body holds as well as a thigh. Rapier has per axis limits on a generic joint, which make a pyramid rather than a cone.
+
 ### A ragdoll refuses a bone scale a little off uniform
 
 - **What:** `new Ragdoll` and `Ragdoll.attach` in `@margoengine/ragdoll` throw on a world scale such as 0.9995, 1, 0.9986, which real exporters write (the hair of the VRM Consortium's Seed-san sample has them).

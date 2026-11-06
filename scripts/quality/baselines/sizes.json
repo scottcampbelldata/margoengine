@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7866534,
+  "total": 7868938,
   "history": [
     {
       "date": "2026-10-24",
@@ -2642,6 +2642,12 @@
       "commit": "72fcc57f9",
       "reason": "feat(ragdoll): body shapes from the skin (new entry @margoengine/ragdoll/hulls)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "527b83f2d",
+      "reason": "new entry ragdoll/profile: saved profiles and a humanoid preset",
+      "grew": 1
     }
   ],
   "items": {
@@ -3059,6 +3065,7 @@
     "@margoengine/ragdoll/getup": 1994,
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
+    "@margoengine/ragdoll/profile": 2404,
     "@margoengine/react": 8317,
     "@margoengine/react/animation": 3015,
     "@margoengine/react/controls": 4346,

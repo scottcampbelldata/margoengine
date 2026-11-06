@@ -938,6 +938,7 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 | Powered ragdolls (`ragdoll/powered`) | Rapier's published joint motor API; J. Tan, K. Liu, G. Turk, "Stable Proportional-Derivative Controllers", IEEE CG&A 2011, for the implicit spring on the root bone; feeding a target's velocity to a PD controller is textbook control. Raising the mass and inertia of small bodies in a chain is our own measure on real rigs |
 | Getting up (`ragdoll/getup`) | Our own design from the public description of the technique (choose a clip by how the body lies, align the character to the body, blend from the ragdoll's pose); turn extraction is the swing-twist decomposition above |
 | Body shapes from the skin (`ragdoll/hulls`) | Reuses `rigging/hulls`, which is quickhull as already cited; the box is a plain search over turns about the bone, of our own design |
+| Saved profiles (`ragdoll/profile`) | Our own format. Mass shares from P. de Leva, J. Biomechanics 1996; segment lengths from Drillis and Contini, 1966; joint ranges from common published ranges of motion |
 
 ## 2D sprites: `@margoengine/sprites`
 
