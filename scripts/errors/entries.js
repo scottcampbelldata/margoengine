@@ -224,10 +224,11 @@ export const entries = [
       'encodeWithFFmpeg needs an output file',
       'ffmpeg was not found',
       'ffmpeg failed',
+      'Headless stages alive at once share one gpu',
     ],
     cause:
-      'A `@margoengine/headless` call got something it cannot use: no WebGPU binding, a size that is not a whole number, an engine on a page canvas or the WebGL2 backend, a read before the first frame, or an HDR format. For video: an empty or mixed-size sequence, a codec its container cannot hold, a runtime without WebCodecs (Node has none), an odd size for H.264, or an ffmpeg that is missing or exited with an error.',
-    fix: "Pass `installGPU` the `gpu` from your binding, give `createHeadlessCanvas` whole sizes from 1, create the engine on that canvas with `backend: 'webgpu'`, and call `engine.render()` before `readPixels` or `toPNG`. HDR output cannot be read this way; leave the canvas format at its default. For video, keep every frame one size, use even sizes for H.264, call `encodeVideo` in a browser or worker or pass `webCodecs`, use `encodeWithFFmpeg` in Node, and read the end of ffmpeg's log in the error's `cause`.",
+      'A `@margoengine/headless` call got something it cannot use: no WebGPU binding, a size that is not a whole number, an engine on a page canvas or the WebGL2 backend, a read before the first frame, or an HDR format. For video: an empty or mixed-size sequence, a codec its container cannot hold, a runtime without WebCodecs (Node has none), an odd size for H.264, or an ffmpeg that is missing or exited with an error. Two headless stages alive at once on different `gpu` objects would fight over the same globals.',
+    fix: "Pass `installGPU` the `gpu` from your binding, give `createHeadlessCanvas` whole sizes from 1, create the engine on that canvas with `backend: 'webgpu'`, and call `engine.render()` before `readPixels` or `toPNG`. HDR output cannot be read this way; leave the canvas format at its default. For video, keep every frame one size, use even sizes for H.264, call `encodeVideo` in a browser or worker or pass `webCodecs`, use `encodeWithFFmpeg` in Node, and read the end of ffmpeg's log in the error's `cause`. Give headless stages alive at once the same `gpu`.",
   },
   {
     id: 'pixel-options',

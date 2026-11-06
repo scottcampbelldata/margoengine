@@ -37,6 +37,19 @@ try {
   assert.ok(drawn > 1000, `the cube drew (${drawn} pixels differ from the corner)`);
   assert.deepEqual(pageErrors, []);
   console.log(`ok headless: ${format}, changed ${metrics.changed}, hot ${metrics.hot}, mean ${metrics.mean}`);
+  // The same stage scene through createStage on a page and createHeadlessStage, with a lazy feature attached.
+  await page.evaluate(() => window.check.stagePage());
+  const stageSeen = await decodePNG(new Uint8Array(await page.locator('#stage').screenshot())),
+    stageRun = await page.evaluate(() => window.check.stageHeadless()),
+    stageRead = await decodePNG(new Uint8Array(stageRun.png)),
+    stageMetrics = compare(stageSeen, stageRead);
+  assert.deepEqual(stageRun.errors, [], 'no validation errors');
+  assert.deepEqual([stageRead.width, stageRead.height], [320, 180]);
+  assert.ok(stageMetrics.changed <= LIMITS.changed, `stage changed ${stageMetrics.changed}`);
+  assert.ok(stageMetrics.hot <= LIMITS.hot, `stage hot ${stageMetrics.hot}`);
+  assert.equal(stageRun.ticks, 1);
+  assert.deepEqual(stageRun.size, [64, 48]);
+  console.log(`ok stage: changed ${stageMetrics.changed}, hot ${stageMetrics.hot}, mean ${stageMetrics.mean}`);
   // Video: the browser's encoder, Margo's container, the browser's demuxer and decoder. MOST_DIFFERENCE is the mean
   // channel error a 4 Mbit/s encode of a 256 x 192 cube may show; the wrong frame must show more than any right one.
   const MOST_DIFFERENCE = 2;

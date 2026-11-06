@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-090). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-091). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -156,6 +156,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Tested hardware | Committed real-GPU results come from two Windows 11 machines in Edge 155: the Intel Arc 140V laptop above and an NVIDIA RTX A6000 desktop (its own visual-baseline profile, `nvidia-ampere-msedge-155`; the voxel results above come from it). Phones: the demos were run by hand on an iPhone (Safari), with no scripted run or committed result; a Galaxy S23 Ultra report of a slow island demo is unresolved. | One developer, two machines so far. | Behaviour elsewhere follows WebGPU's guarantees but is unverified. | An Apple M6 Mac mini ran the voxel sandbox and the biome checks by script (macOS 27.2, Chrome 157 and Playwright WebKit 27.2). Untested: AMD GPUs, NVIDIA GPUs other than the A6000, other Apple silicon, Android devices other than the S23 report, Linux, ChromeOS. Results from these are welcome; [reproduce.md](whitepaper/reproduce.md) has the commands. |
 | Browsers | Verified: Edge 155 (Chromium) on Windows, automated (real-GPU suites, visual regression, CSP). iPhone Safari: run by hand only (above). Firefox: not verified. macOS Safari: not verified (Playwright WebKit 27.2 ran the voxel sandbox on an Apple M6, but it is not Safari). | Same as above. | Where a browser lacks WebGPU, `Engine.create` reports it (see "WebGPU first"). | Chrome uses the same Chromium engine as Edge; the automated suites run in Edge. CSP behaviour in Firefox and Safari is unverified. |
 | WebXR AR hit testing | Not measured: `@margoengine/xr` `HitTest` has never run on an AR headset or phone. It is checked against the W3C WebXR Hit Test Module's interfaces with a mocked session (hit results, transient input, anchors, failure paths: [hit-test.test.js](../packages/xr/tests/hit-test.test.js)). | No AR device is in the test setup, and immersive AR needs the native WebGPU XR binding. | `XR.isSupported('immersive-ar')` is false where the browser cannot run it; on a device that can, behaviour is unverified. | Plane detection, depth sensing and light estimation are not wrapped; read them from the native session (`xr.session`). |
+| Headless stage (`@margoengine/headless/stage`, 2026-11-05) | No camera controls and no frame loop: `step(delta)` advances time. `engine.onFrame` callbacks do not run, because only `engine.start()` runs them and it needs `requestAnimationFrame`. Stages alive at once share one `gpu`. | `installGPU` changes globals, so a second implementation at once would replace the first's. The frame loop belongs to core, which stays frozen. | A package that drives itself from `engine.onFrame` does not advance; plugins, which update through `render`, do. | Use `stage.onTick` and `stage.step`. Dispose stages on one `gpu` before using another. |
 
 ### React page
 

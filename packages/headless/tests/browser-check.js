@@ -2,6 +2,9 @@
 import { Camera, Engine, PbrMaterial, box } from '../../core/src/index.ts';
 import { createHeadlessCanvas, installGPU, toPNG } from '../src/index.ts';
 import { encodeVideo, renderFrames } from '../src/video.ts';
+import { createHeadlessStage } from '../src/stage.ts';
+import { createStage } from '../../stage/src/index.ts';
+import { addSky } from '../../stage/src/sky.ts';
 
 const scene = (engine) => {
   engine
@@ -30,6 +33,33 @@ window.check = {
     installed.dispose();
     return { png: [...png], format, errors };
   },
+};
+// One stage scene with a lazily loaded feature, in a 16:9 image so a square fit would show.
+const stageScene = async (stage) => {
+  stage.box({ color: '#84d6bd', size: [2, 1, 1] });
+  stage.sphere({ color: '#d68484', radius: 0.5, position: [1.5, 0, 0] });
+  await addSky(stage);
+  stage.fit();
+};
+window.check.stagePage = async () => {
+  const stage = await createStage('#stage', { backend: 'webgpu', controls: false, autoStart: false });
+  await stageScene(stage);
+  stage.engine.render();
+  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+};
+window.check.stageHeadless = async () => {
+  const errors = [],
+    stage = await createHeadlessStage({ width: 320, height: 180 });
+  stage.engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+  await stageScene(stage);
+  const png = await stage.toPNG();
+  let ticks = 0;
+  stage.onTick(() => ticks++);
+  stage.step(1 / 30);
+  stage.resize(64, 48);
+  const { width, height } = await stage.readPixels();
+  stage.dispose();
+  return { png: [...png], ticks, size: [width, height], errors };
 };
 /** Mean absolute difference per channel of two RGBA arrays, alpha left out. */
 const difference = (a, b) => {

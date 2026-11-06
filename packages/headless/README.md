@@ -32,7 +32,37 @@ engine.dispose();
 | `encodePNG(pixels)` | RGBA pixels as PNG file bytes. |
 
 Call `engine.render()` yourself: `engine.start()` needs `requestAnimationFrame`, which Node does not have. `createStage`
-needs a page, so use `Engine` and packages that take an engine, such as `parseGLTF` from `@margoengine/gltf`.
+needs a page; `createHeadlessStage` below is its server version.
+
+## A stage without a page
+
+`@margoengine/headless/stage` gives server thumbnails the same short setup as a page. `createHeadlessStage` returns a real
+`Stage`, so its methods and the stage's feature entries work as they do on a page. It needs `@margoengine/stage`, an optional
+peer:
+
+```ts
+import { writeFile } from 'node:fs/promises';
+import { createHeadlessStage } from '@margoengine/headless/stage';
+import { addSky } from '@margoengine/stage/sky';
+
+declare const gpu: GPU; // from your binding
+
+using stage = await createHeadlessStage({ gpu, width: 640, height: 360 });
+stage.box({ color: '#84d6bd' });
+await addSky(stage);
+stage.fit();
+await writeFile('thumbnail.png', await stage.toPNG());
+```
+
+| Export | What it does |
+| --- | --- |
+| `createHeadlessStage({ width, height, gpu?, globals?, onError?, ...engineOptions })` | Installs the GPU and creates the engine on a stand-in canvas. `width` and `height` are required. `gpu` defaults to `navigator.gpu`, `globals` to none. The backend is always WebGPU. Stages alive at once must share one `gpu`; the globals are restored when the last is disposed. |
+| `stage.toPNG({ signal? })`, `stage.readPixels({ signal? })` | Draws a frame and gives it as PNG bytes or RGBA pixels. |
+| `stage.step(delta?)` | Runs `onTick` callbacks, then draws a frame that advances plugins by `delta` seconds (default 0). Nothing runs by itself: there are no camera controls and no frame loop. |
+| `stage.resize(width, height)` | Sets the image size for the next frame. |
+
+`stage.onTick` runs on `step`; `engine.onFrame` callbacks belong to `engine.start()`, so they do not run here. To load a model
+with `addGLTF`, pass an absolute URL, since Node has no page address to resolve against.
 
 ## Image sequences and video
 

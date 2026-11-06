@@ -35,6 +35,10 @@
     "./ffmpeg": {
       "types": "./dist/ffmpeg.d.ts",
       "import": "./dist/ffmpeg.js"
+    },
+    "./stage": {
+      "types": "./dist/stage.d.ts",
+      "import": "./dist/stage.js"
     }
   },
   "files": [
@@ -46,12 +50,18 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/stage": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js headless",
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu": "cd ../.. && node packages/headless/tests/browser-check.mjs",
     "prepack": "npm run build"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/stage": {
+      "optional": true
+    }
   }
 }
