@@ -352,6 +352,60 @@ console.log(weights.toInfluences(), unreached); // JOINTS_0 and WEIGHTS_0
 
 The result also gives `grid`, `voxels` and `unreached`: vertices no bone reached through the solid, such as a hat that floats clear of the head, which take the same falloff from straight-line distances. Where a hole lets the outside into the mesh, the fill grows from the bones through voxels with surface on at least four of the six axis directions. Pick bone heat for clean, closed meshes: it is faster and its weights flow along the surface.
 
+## Corrective shapes (`margoengine/rigging/correctives`)
+
+Linear skinning collapses elbows, knees and shoulders. A corrective is a blend shape sculpted to fix that, and this entry drives it from the joint's rotation: full at the pose you sculpted it for, off at rest. `addCorrectives` runs after the pose and after any IK added before it.
+
+```ts
+import type { Animator } from 'margoengine/animator';
+import { addCorrectives } from 'margoengine/rigging/correctives';
+
+declare const animator: Animator; // on a model with an elbow at node 12 and a morph target 3 on the mesh at node 2
+const s = Math.sin(1);
+const elbow = addCorrectives(animator, {
+  shapes: [{ node: 2, target: 3, joint: 12, pose: [s, 0, 0, Math.cos(1)], curve: 'smooth' }], // full at two radians
+});
+elbow.dispose(); // shapes back to 0
+```
+
+A joint that swings every way, a shoulder, needs several sculpted poses. Give them as a pose space: each sample holds exactly its own weights, and rotations between them blend. Include the rest pose with zero weights, or the shapes stay on away from every sample.
+
+```ts
+import { Correctives } from 'margoengine/rigging/correctives';
+
+const r = Math.SQRT1_2;
+const shoulder = new Correctives({
+  spaces: [
+    {
+      joint: 7,
+      shapes: [
+        { node: 2, target: 4 }, // arm raised
+        { node: 2, target: 5 }, // arm forward
+      ],
+      samples: [
+        { rotation: [0, 0, 0, 1], weights: [0, 0] },
+        { rotation: [0, 0, r, r], weights: [1, 0] },
+        { rotation: [r, 0, 0, r], weights: [0, 1] },
+      ],
+    },
+  ],
+});
+console.log(shoulder.evaluate(() => [0, 0, r, r])); // [{ node: 2, target: 4, weight: 1 }, { node: 2, target: 5, weight: 0 }]
+```
+
+| Shape field | Default | Meaning |
+| --- | --- | --- |
+| `node`, `target` | required | The mesh's glTF node and the morph target. |
+| `joint` | required | The bone that drives it. |
+| `pose` | required | The joint's local rotation where the shape is full. |
+| `rest` | the joint's rest | The joint's local rotation where the shape is off. |
+| `cone` | none | Radians off the line from `rest` to `pose` at which the shape has faded out. With none only the bend along that line counts, so a hinge's twist does nothing. |
+| `start` | `0` | Reading where the shape starts: `0.5` keeps it off for the first half of the bend. |
+| `curve` | `'linear'` | `'smooth'` eases in and out. |
+| `amount` | `1` | Weight at full bend. |
+
+Shapes on one target add up, then clamp to 0 to 1. `width` on a pose space sets the Gaussian width in radians; the default is the mean angle from each sample to its nearest neighbour. Pose spaces are solved once when made. `Correctives` is plain data, so `evaluate(rotationOf, restOf)` runs with no engine. A driven morph target belongs to the correctives: a clip's track on it is overwritten.
+
 ## Retarget presets (`margoengine/rigging/retarget`)
 
 Clips made for one skeleton play on another: `prepareRetarget(source, target)` recognises each rig's naming (Mixamo with any `mixamorig` prefix, Godot's humanoid profile, Roblox R15, the joints of `@margoengine/exporters/skin`'s `humanoidJoints()`, or the 55 humanoid bone names themselves), maps every target bone to its source bone, and by default turns the target's reference pose so each bone points the way the source's does at rest (an A-pose character driven by T-pose clips). Pass the result to `@margoengine/animation`'s `Retarget`:

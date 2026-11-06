@@ -695,6 +695,7 @@ Maya, Pinocchio, libigl, three.js, Babylon, Godot, Unity, Unreal and the like) w
 | Spring bones (`rigging/springs`) | The VRMC_springBone 1.0 specification (VRM Consortium), its fields and its non-normative algorithm section; L. Verlet, "Computer experiments on classical fluids", Physical Review 159, 1967; the time-corrected step and the damped spring are elementary mechanics |
 | VRM avatars (`rigging/vrm`) | The VRMC_vrm 1.0 and VRMC_springBone 1.0 specifications (VRM Consortium) and the glTF 2.0 binary container specification (Khronos); the two sample avatars are data, read and never studied for code |
 | Voxel weights (`rigging/voxel-weights`) | O. Dionne and M. de Lasa, "Geodesic voxel binding for production character meshes", SCA 2013; the fill vote for open meshes is ours |
+| Corrective shapes (`rigging/correctives`) | J. P. Lewis, M. Cordner and N. Fong, "Pose space deformation", SIGGRAPH 2000, for the radial basis interpolation; the single-joint reading is plain rotation-vector projection |
 
 ## Game AI: `@margoengine/behavior`
 

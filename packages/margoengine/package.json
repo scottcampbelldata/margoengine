@@ -1730,6 +1730,10 @@
       "types": "./dist/rigging/voxel-weights.d.ts",
       "import": "./dist/rigging/voxel-weights.js"
     },
+    "./rigging/correctives": {
+      "types": "./dist/rigging/correctives.d.ts",
+      "import": "./dist/rigging/correctives.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

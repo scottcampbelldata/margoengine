@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6436088,
+  "total": 6492726,
   "history": [
     {
       "date": "2026-10-24",
@@ -2534,6 +2534,12 @@
       "commit": "e08b6e807",
       "reason": "bvh/alpha: modelAlphaMasks reads a loaded model's cut-outs (audit row A7)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "0f8664fee",
+      "reason": "feat(rigging): corrective shapes (new entry @margoengine/rigging/correctives)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2962,6 +2968,7 @@
     "@margoengine/react/voxel": 2200,
     "@margoengine/react/xr": 3818,
     "@margoengine/rigging": 7870,
+    "@margoengine/rigging/correctives": 2242,
     "@margoengine/rigging/hulls": 2759,
     "@margoengine/rigging/ik": 3740,
     "@margoengine/rigging/retarget": 2862,
@@ -3032,7 +3039,7 @@
     "@margoengine/stage/shadows": 750,
     "@margoengine/stage/sky": 719,
     "@margoengine/stage/viewer": 2480,
-    "@margoengine/stage/xr": 2185,
+    "@margoengine/stage/xr": 2138,
     "@margoengine/staging": 7875,
     "@margoengine/stats": 4934,
     "@margoengine/stats/beacon": 1639,
@@ -3114,7 +3121,7 @@
     "@margoengine/webgl/restore": 1097,
     "@margoengine/webgl2-compat": 102814,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 72383,
-    "@margoengine/webgl2-compat lazy compute runtime and read-back": 31744,
+    "@margoengine/webgl2-compat lazy compute runtime and read-back": 31741,
     "@margoengine/webgl2-compat/adapter": 880,
     "@margoengine/webgl2-compat/compute": 49684,
     "@margoengine/webgl2-compat/device": 102935,
