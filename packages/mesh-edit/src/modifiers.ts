@@ -1,12 +1,12 @@
 // @margoengine/mesh-edit/modifiers: a non-destructive stack of mirror, array, solidify, screw and lattice deform. The
 // base mesh is never changed; `MeshModifierStack` re-runs from the first stage that is out of date. Output face IDs are
 // built from base IDs, so a re-run names the same face the same way and selections survive.
-import type { MutableVec2, MutableVec3, Vec3 } from '@margoengine/math';
+import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { assertOptions } from './edit-support.js';
-import { assertPolygonMesh, collectPolygonEdges, faceGeometryError, newellNormal } from './polygon.js';
-import { loopFaces } from './polygon-split.js';
+import { FaceSink } from './face-sink.js';
+import { assertPolygonMesh, collectPolygonEdges, newellNormal } from './polygon.js';
 import { clonePolygonMesh, createMeshEditResult } from './result.js';
-import type { MeshEditResult, PolygonFace, PolygonMesh } from './types.js';
+import type { MeshEditResult, PolygonMesh } from './types.js';
 import { weldMeshVertices } from './weld.js';
 
 /** An axis by name. */
@@ -105,63 +105,6 @@ function vectorOption(value: unknown, fallback: Vec3, label: string): Vec3 {
   if (!Array.isArray(v) || v.length !== 3 || !v.every((x) => Number.isFinite(x)))
     throw new TypeError(`${label} must be three finite numbers; supply [x, y, z].`);
   return v as unknown as Vec3;
-}
-
-/** Collects output faces, splitting any that a move left warped, and records which input face each came from. */
-class FaceSink {
-  readonly faces: PolygonFace[] = [];
-  readonly faceMap: Record<string, string[]> = {};
-  split = 0;
-
-  constructor(
-    source: PolygonMesh,
-    readonly vertices: MutableVec3[],
-  ) {
-    for (const face of source.faces) this.faceMap[face.id] = [];
-  }
-
-  add(from: string, id: string, vertices: readonly number[], uv: readonly (readonly number[])[]): void {
-    const corners: number[] = [],
-      uvs: MutableVec2[] = [];
-    vertices.forEach((v, i) => {
-      if (v === corners[corners.length - 1]) return;
-      corners.push(v);
-      uvs.push([uv[i][0], uv[i][1]]);
-    });
-    while (corners.length > 1 && corners[0] === corners[corners.length - 1]) {
-      corners.pop();
-      uvs.pop();
-    }
-    if (corners.length < 3) return;
-    if (!faceGeometryError(this.vertices, corners)) {
-      this.faces.push({ id, vertices: corners, uv: uvs });
-      this.faceMap[from].push(id);
-      return;
-    }
-    let next = 0;
-    const pieces = loopFaces(this.vertices, corners, uvs, id, () => `${id}~t${++next}`);
-    if (!pieces) {
-      this.split++;
-      return;
-    }
-    if (pieces.length > 1) this.split++;
-    for (const piece of pieces) {
-      this.faces.push(piece);
-      this.faceMap[from].push(piece.id);
-    }
-  }
-
-  result(source: PolygonMesh, vertexMap: number[][], diagnostics: string[] = []): MeshEditResult {
-    const mesh = { vertices: this.vertices, faces: this.faces };
-    if (this.split) diagnostics.push(`${this.split} warped faces were split or dropped to stay valid.`);
-    return createMeshEditResult(source, mesh, {
-      vertexMap,
-      faceMap: this.faceMap,
-      createdVertices: vertexMap.flatMap((list, v) => list.filter((x) => x !== v)),
-      removedVertices: [],
-      diagnostics,
-    });
-  }
 }
 
 function applyMirror(mesh: PolygonMesh, modifier: MirrorModifier): MeshEditResult {

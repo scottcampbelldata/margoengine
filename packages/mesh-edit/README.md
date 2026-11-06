@@ -151,6 +151,28 @@ console.log(triangles.length, pieces.length, imported.mesh.faces.length, cut.cut
   face-varying mesh: smoothed inside each island, linear on seams and island corners (`'linear'` interpolates each
   face). Because faces stay planar, curved quads are split into two triangles; flat areas keep quads. Up to 4 levels
   and 200000 output faces.
+## Smooth and relax
+
+Clean a scan or soften a blocky edit without losing size:
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { smoothMesh } from 'margoengine/mesh-edit/modeling';
+
+const box = createPrimitiveMesh('cube', 'box');
+// Taubin by default: noise goes, the volume stays.
+const { mesh } = smoothMesh(box, { iterations: 20 });
+// Only some vertices move; the rest steer them.
+const part = smoothMesh(box, { vertices: [0, 1], method: 'laplacian', iterations: 3 });
+console.log(mesh.faces.length, part.mesh.faces.length);
+```
+
+- `smoothMesh(mesh, {method, iterations, factor, passBand, vertices, pinBoundary, signal})` returns a `MeshEditResult`.
+- `method`: `'taubin'` (default; Taubin, 1995) follows each step with a negative one, so the shape does not shrink. `'laplacian'` only pulls each vertex toward its neighbors, and the shape shrinks.
+- `iterations` is 1 to 10000 (default 10). `factor` is above 0 and at most 1 (default 0.5). `passBand` is between 0 and 1 (default 0.1): details below that frequency survive, so a larger value smooths harder.
+- `vertices` limits the moves to a selection. `pinBoundary` (default true) holds open edges still, so a surface keeps its outline.
+- Neighbors weigh equally, so a mesh with uneven triangles drifts a little along its surface. Run `remeshMesh` first on very uneven scans. Corner UVs stay, and a face the move warps is split into valid convex pieces (`id~t1`, ...).
+
 
 ## Booleans
 

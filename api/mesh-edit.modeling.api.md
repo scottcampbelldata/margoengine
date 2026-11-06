@@ -165,6 +165,16 @@ export interface SimplifyResult {
     sourceVertices: number[];
 }
 
+export interface SmoothOptions {
+    method?: 'taubin' | 'laplacian';
+    iterations?: number;
+    factor?: number;
+    passBand?: number;
+    vertices?: readonly number[];
+    pinBoundary?: boolean;
+    signal?: AbortSignal;
+}
+
 export interface SubdivideOptions extends MeshEditOptions {
     levels?: number;
     uv?: 'smooth' | 'linear';
@@ -229,6 +239,8 @@ export function polygonMeshFromTriangles(source: ImportTriangles, options?: Impo
 export function simplifyMesh(mesh: PolygonMesh, options?: SimplifyOptions): SimplifyResult;
 
 export function slideMeshEdges(mesh: PolygonMesh, edges: readonly string[], factor: number, options?: EdgeSlideOptions): ComponentEditResult;
+
+export function smoothMesh(mesh: PolygonMesh, options?: SmoothOptions): MeshEditResult;
 
 export function splitMeshConcaveFaces(mesh: PolygonMesh, options?: MeshEditOptions): MeshEditResult;
 
