@@ -7,6 +7,7 @@ import { EngineOptions, Mesh } from "@margoengine/core";
 import { Stage } from "@margoengine/stage";
 
 export class HeadlessStage extends Stage {
+    constructor(engine: Stage['engine']);
     onTick(callback: (delta: number) => void): () => void;
     step(delta?: number): void;
     resize(width: number, height: number): void;

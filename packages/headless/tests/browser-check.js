@@ -59,7 +59,10 @@ window.check.stageHeadless = async () => {
   const png = await stage.toPNG();
   let ticks = 0;
   stage.onTick(() => ticks++);
+  let frames = 0;
+  stage.engine.onFrame(() => frames++);
   stage.step(1 / 30);
+  if (frames !== 1) throw new Error(`engine.onFrame ran ${frames} times on one step`);
   stage.resize(64, 48);
   const { width, height } = await stage.readPixels();
   stage.dispose();

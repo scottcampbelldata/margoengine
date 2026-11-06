@@ -58,10 +58,10 @@ await writeFile('thumbnail.png', await stage.toPNG());
 | --- | --- |
 | `createHeadlessStage({ width, height, gpu?, globals?, onError?, ...engineOptions })` | Installs the GPU and creates the engine on a stand-in canvas. `width` and `height` are required. `gpu` defaults to `navigator.gpu`, `globals` to none. The backend is always WebGPU. Stages alive at once must share one `gpu`; the globals are restored when the last is disposed. |
 | `stage.toPNG({ signal? })`, `stage.readPixels({ signal? })` | Draws a frame and gives it as PNG bytes or RGBA pixels. |
-| `stage.step(delta?)` | Runs `onTick` callbacks, then draws a frame that advances plugins by `delta` seconds (default 0). Nothing runs by itself: there are no camera controls and no frame loop. |
+| `stage.step(delta?)` | Runs `onTick` and `engine.onFrame` callbacks, then draws a frame that advances plugins by `delta` seconds (default 0). Nothing runs by itself: there are no camera controls and no frame loop. |
 | `stage.resize(width, height)` | Sets the image size for the next frame. |
 
-`stage.onTick` runs on `step`; `engine.onFrame` callbacks belong to `engine.start()`, so they do not run here. To load a model
+`stage.onTick` and `stage.engine.onFrame` both run on `step`, so a package that drives itself from `onFrame` advances here too. To load a model
 with `addGLTF`, pass an absolute URL, since Node has no page address to resolve against.
 
 ## Image sequences and video

@@ -13,6 +13,11 @@ function fakeEngine(canvas) {
     onError: undefined,
     camera: { fitToBoundingBox: (_min, _max, options) => log.push(['fit', options.aspect]) },
     scene: { meshes: new Map() },
+    frames: new Set(),
+    onFrame(callback) {
+      this.frames.add(callback);
+      return () => this.frames.delete(callback);
+    },
     use(plugin) {
       plugins.push(plugin);
       plugin.setup?.(this);
@@ -111,6 +116,26 @@ test('step runs onTick callbacks, then draws with that delta', async (t) => {
   remove();
   stage.step(1);
   assert.equal(ticks.length, 2);
+});
+
+test('step runs engine.onFrame callbacks, so a package that drives itself from them advances', async (t) => {
+  const seen = {};
+  stubEngine(t, seen);
+  using stage = await createHeadlessStage({ gpu, width: 1, height: 1 });
+  const frames = [],
+    remove = stage.engine.onFrame((engine, delta) => {
+      frames.push([engine, delta]);
+      seen.engine.log.push(['frame']);
+    });
+  stage.onTick(() => seen.engine.log.push(['tick']));
+  assert.equal(seen.engine.frames.size, 1, 'core keeps it too, for engine.start() on a page');
+  stage.step(0.5);
+  assert.deepEqual(frames, [[seen.engine, 0.5]]);
+  assert.deepEqual(seen.engine.log, [['tick'], ['frame'], ['render', 0.5]]);
+  remove();
+  assert.equal(seen.engine.frames.size, 0);
+  stage.step(1);
+  assert.equal(frames.length, 1);
 });
 
 test('fit sees the image size as the CSS size, and the canvas keeps none after', async (t) => {

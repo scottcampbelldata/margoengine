@@ -52,6 +52,22 @@ function acquire(gpu: GPUBinding, globals: HeadlessStageOptions['globals']): () 
  */
 export class HeadlessStage extends Stage {
   readonly #ticks = new Set<(delta: number) => void>();
+  readonly #frames = new Set<Parameters<Stage['engine']['onFrame']>[0]>();
+
+  constructor(engine: Stage['engine']) {
+    super(engine);
+    // Core runs these callbacks only from its requestAnimationFrame loop, and a package that drives itself from them
+    // would stand still here. They stay registered with core too, for an `engine.start()` on a page.
+    const register = engine.onFrame.bind(engine);
+    engine.onFrame = (callback) => {
+      const remove = register(callback);
+      this.#frames.add(callback);
+      return () => {
+        remove();
+        this.#frames.delete(callback);
+      };
+    };
+  }
 
   /** Runs on each {@link HeadlessStage.step}. Returns a function that removes it. */
   override onTick(callback: (delta: number) => void): () => void {
@@ -59,9 +75,10 @@ export class HeadlessStage extends Stage {
     return () => void this.#ticks.delete(callback);
   }
 
-  /** Runs `onTick` callbacks, then draws a frame that advances plugins and animation by `delta` seconds. Default 0. */
+  /** Runs `onTick` and `engine.onFrame` callbacks, then draws a frame that advances plugins and animation by `delta` seconds. Default 0. */
   step(delta = 0): void {
     for (const tick of this.#ticks) tick(delta);
+    for (const frame of this.#frames) frame(this.engine, delta);
     this.engine.render({ delta });
   }
 
