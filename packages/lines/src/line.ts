@@ -207,6 +207,12 @@ export class Line {
   capacityVersion = 0;
   /** Total length for dashes, including a loop's closing segment. */
   totalDistance = 0;
+  /** Solid triangles drawn with the line, for helpers: x, y, z, opacity per corner, or null (`setFill`). */
+  private fill: Float32Array | null = null;
+  /** Bumped when `fill` changes; read by the plugin. */
+  private fillVersion = 0;
+  /** Every corner of `fill` is opaque, so it writes depth. */
+  private fillOpaque = false;
   /** The points' fourth value scales the width at each point instead of holding a dash distance (`Trail`); dashes win. */
   protected pointWidths = false;
   private pointCount = 0;
@@ -318,6 +324,16 @@ export class Line {
    * frame); helpers override it to follow their targets. Return false to skip this frame.
    */
   update(_engine: EngineKernel, _delta?: number): boolean | void {}
+
+  /**
+   * Sets solid triangles drawn before the line in its matrix and material colour, unlit: x, y, z, opacity per corner, three
+   * corners each. `opaque` says every corner has opacity 1, so they write depth while the material's opacity is 1.
+   */
+  protected setFill(corners: Float32Array | null, opaque = false): void {
+    this.fill = corners;
+    this.fillOpaque = opaque;
+    this.fillVersion++;
+  }
 
   /** Sets the point count within the current capacity, for subclasses that write `points` and `colors` themselves. */
   protected resize(count: number): void {

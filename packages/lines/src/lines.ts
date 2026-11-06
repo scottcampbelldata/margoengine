@@ -5,7 +5,7 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
 import { fillFrame } from './math.js';
-import { biasedShader, foggedLineShader, lineShader, phasedShader, pointWidthShader } from './shader.js';
+import { biasedShader, filledShader, foggedLineShader, lineShader, phasedShader, pointWidthShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 import { overlayDepthPass, overlayPass, alphaBlend } from '../../shared/pass.js';
@@ -24,6 +24,8 @@ interface Resources {
   floats: Float32Array;
   uints: Uint32Array;
   written: Float32Array;
+  /** The buffer of the line's solid triangles, with `group` over it in place of the points. */
+  fill?: { buffer: GPUBuffer; group: GPUBindGroup; bytes: number; version: number };
 }
 
 let warned = false;
@@ -36,7 +38,7 @@ const STYLE_BYTES = 224;
 
 /**
  * Pipeline variant bits: draw over the scene, fogged, write depth, a width per point, only behind the scene, a depth
- * bias, alpha to coverage; the draw step (shader.ts) sits above them.
+ * bias, alpha to coverage, solid triangles; the draw step (shader.ts) sits above them.
  */
 const ON_TOP = 1,
   FOGGED = 2,
@@ -45,7 +47,11 @@ const ON_TOP = 1,
   BEHIND = 16,
   BIAS = 32,
   COVER = 64,
+  FILL = 512,
   STEP = 1024;
+
+/** Solid triangles write depth when nothing about them is translucent. */
+const fillWrites = (line: Line): boolean => line['fillOpaque'] && line.material.opacity === 1 && !line.material.behind;
 
 /** GPUColorWrite's red, green and blue. */
 const RGB = 7;
@@ -81,6 +87,8 @@ export class Lines implements EnginePlugin {
   private readonly frameData = new Float32Array(24);
   /** This frame's lines in draw order: depth-tested writers, depth-tested, on-top writers, on-top. */
   private readonly drawLists: Array<Array<[Line, Resources]>> = [[], [], [], []];
+  /** This frame's lines with solid triangles: depth-tested, on-top. */
+  private readonly fillLists: Array<Array<[Line, Resources]>> = [[], []];
   private readonly descriptor = overlayPass();
   private readonly writeDescriptor = overlayDepthPass();
   private fogSource: FogLike | null = null;
@@ -192,6 +200,7 @@ export class Lines implements EnginePlugin {
       let code = variant & FOGGED ? foggedLineShader() : lineShader;
       if (variant & WIDTHS) code = pointWidthShader(code);
       if (variant & BIAS) code = biasedShader(code);
+      if (variant & FILL) code = filledShader(code);
       code = phasedShader(code, Math.floor(variant / STEP));
       module = this.device!.createShaderModule({ code });
       this.modules.set(key, module);
@@ -214,7 +223,7 @@ export class Lines implements EnginePlugin {
         module = this.module(variant);
       pipeline = this.device!.createRenderPipeline({
         layout: fog?.pipeline ?? this.layouts!.pipeline,
-        vertex: { module, entryPoint: 'vertex' },
+        vertex: { module, entryPoint: variant & FILL ? 'fillVertex' : 'vertex' },
         fragment: {
           module,
           entryPoint: 'fragment',
@@ -307,7 +316,37 @@ export class Lines implements EnginePlugin {
     r.uniform.destroy();
     r.points.destroy();
     r.colors.destroy();
+    r.fill?.buffer.destroy();
     this.resources.delete(line);
+  }
+
+  /** Uploads a line's solid triangles when they changed. */
+  private uploadFill(line: Line, r: Resources, corners: Float32Array): void {
+    const device = this.device!;
+    if (r.fill?.bytes !== corners.byteLength) {
+      r.fill?.buffer.destroy();
+      const buffer = device.createBuffer({
+        size: corners.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      r.fill = {
+        buffer,
+        group: device.createBindGroup({
+          layout: this.layouts!.style,
+          entries: [
+            { binding: 0, resource: { buffer: r.uniform } },
+            { binding: 1, resource: { buffer } },
+            { binding: 2, resource: { buffer: r.colors } },
+          ],
+        }),
+        bytes: corners.byteLength,
+        version: -1,
+      };
+    }
+    if (r.fill.version !== line['fillVersion']) {
+      device.queue.writeBuffer(r.fill.buffer, 0, corners as Float32Array<ArrayBuffer>);
+      r.fill.version = line['fillVersion'];
+    }
   }
 
   /** Updates every drawable line, uploads what changed and sorts the lines into `drawLists`. */
@@ -315,6 +354,7 @@ export class Lines implements EnginePlugin {
     const device = this.device!,
       lists = this.drawLists;
     for (const list of lists) list.length = 0;
+    for (const list of this.fillLists) list.length = 0;
     for (const line of this.members) {
       if (!line.visible || line.update(engine, delta) === false) continue;
       const mesh = line.attachedMesh,
@@ -370,6 +410,11 @@ export class Lines implements EnginePlugin {
         r.written.set(f);
       }
       lists[(material.onTop ? 2 : 0) + (material.depthWrite && !material.behind ? 0 : 1)].push([line, r]);
+      const corners = line['fill'];
+      if (corners?.length) {
+        this.uploadFill(line, r, corners);
+        this.fillLists[material.onTop ? 1 : 0].push([line, r]);
+      }
     }
   }
 
@@ -409,8 +454,10 @@ export class Lines implements EnginePlugin {
       writeFog(fog!, camera.position, this.fogData);
       device.queue.writeBuffer(this.fogResources().buffer, 0, this.fogData);
     }
-    // Depth stays read only unless a line writes it.
-    const descriptor = lists[0].length || lists[2].length ? this.writeDescriptor : this.descriptor;
+    // Depth stays read only unless a line or an opaque fill writes it.
+    const fills = this.fillLists,
+      writes = lists[0].length || lists[2].length || fills.some((list) => list.some(([line]) => fillWrites(line))),
+      descriptor = writes ? this.writeDescriptor : this.descriptor;
     descriptor.colorAttachments[0].view = context.color;
     descriptor.depthStencilAttachment.view = context.depth;
     const pass = context.encoder.beginRenderPass(descriptor);
@@ -421,6 +468,7 @@ export class Lines implements EnginePlugin {
     // solid parts, so a ramp blends over the line it crosses instead of being cut by it.
     for (let i = 0; i < 4; i += 2) {
       const onTop = i ? ON_TOP : 0;
+      this.drawFills(pass, context, fills[i / 2], fogged, onTop);
       this.drawList(pass, context, lists[i], fogged, onTop | WRITE | STEP);
       this.drawList(pass, context, lists[i], fogged, onTop | (2 * STEP));
       this.drawList(pass, context, lists[i + 1], fogged, onTop);
@@ -428,6 +476,26 @@ export class Lines implements EnginePlugin {
     pass.end();
     for (const list of lists) list.length = 0;
   };
+
+  /** Draws the solid triangles of `list`. */
+  private drawFills(
+    pass: GPURenderPassEncoder,
+    context: PassContext & { backend: 'webgpu' },
+    list: ReadonlyArray<[Line, Resources]>,
+    fogged: boolean,
+    onTop: number,
+  ): void {
+    const depthFormat = context.descriptor.depthStencil!.format,
+      count = context.descriptor.multisample?.count ?? 1;
+    for (const [line, r] of list) {
+      const { fog, behind } = line.material,
+        bits = (fillWrites(line) ? WRITE : 0) | (behind ? BEHIND : 0) | (fogged && fog ? FOGGED : 0);
+      pass.setPipeline(this.pipeline(context.format, depthFormat, count, FILL | onTop | bits));
+      pass.setBindGroup(1, r.fill!.group);
+      pass.draw(line['fill']!.length / 4);
+      this.stats.drawCalls++;
+    }
+  }
 
   /** Draws `list` with pipeline `variant`, fogged per material. The edge ramp step skips lines that have no ramp. */
   private drawList(

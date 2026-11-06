@@ -196,6 +196,23 @@ export const phasedShader = (code: string, phase: number): string =>
     ? code.replace('let alpha=i.color.a*cover;', `if(cover${phase === 1 ? '<' : '>='}0.5){discard;}let alpha=i.color.a*cover;`)
     : code;
 
+/**
+ * `code` for solid triangles: a vertex entry of their own over `points`, into the same fragment, so fog and clipping
+ * planes apply and only the dashes do not.
+ */
+export const filledShader = (code: string): string =>
+  code.replace('if((style.flags.z&32u)!=0u){\n    let dash=', 'if(false){\n    let dash=') +
+  /* wgsl */ `
+@vertex fn fillVertex(@builtin(vertex_index) vi:u32)->Out{
+  var o:Out;
+  let p=points[vi];let w=style.model*vec4f(p.xyz,1.0);
+  o.clip=frame.viewProj*w;
+  o.color=vec4f(style.color.rgb,style.color.a*p.w);
+  o.edge=vec4f(0.0,1.0,-1e4,-1e4);o.dist=0.0;o.world=w.xyz/w.w;
+  return o;
+}
+`;
+
 /** `code` for lines with a width scale per point: the fourth value of each point scales the half width. */
 export const pointWidthShader = (code: string): string =>
   code.replace(

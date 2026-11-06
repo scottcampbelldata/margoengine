@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-087). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-088). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -71,6 +71,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Massive line batches (`LineBatch` in `@margoengine/lines/batch`) | Enforced: 67,108,864 segments a batch; one draw per 8,388,608 segments at the default 256 MiB `maxBufferSize`. By method: independent segments with square ends: no joins, round caps, dashes, fog, clipping planes, depth writing or picking; colours at 8 bits a channel; a CPU copy of 32 bytes a segment stays for device loss. | Six vertices and 32 bytes a segment, where `Line` draws 78 vertices and reads a storage buffer whose binding size limits it. | Translucent corners are darker where segments overlap; memory is 64 bytes a segment across CPU and GPU. | Use `Line` where those features matter. |
 | Hidden lines (`HiddenLine` in `@margoengine/lines/hidden`, `behind` and `depthBias` on `LineMaterial`) | By method: the test is against scene depth, so surfaces that write no depth hide nothing; `depthBias` (default 0.001 of the distance) decides what counts as on a surface, so an edge closer behind a surface than that shows as seen. Dashes run in world units. Hidden lines do not pick. | A depth test is one draw with no mesh analysis, on any scene; exact CAD hidden-line removal would need the geometry on the CPU. | A very thin wall can show an edge behind it as seen. | Lower `depthBias`, or raise it if a far model flickers. |
 | Alpha to coverage on lines (`alphaToCoverage` on `LineMaterial`) | By method: works with MSAA only and falls back to blending without it; opacity comes in steps of one sample, four at 4x MSAA; lines of equal opacity use the same samples, so the later replaces the earlier at a crossing. | MSAA hardware turns alpha into a sample mask, which is what makes it independent of draw order. | Fine opacity changes band at low sample counts. | Leave it off and blend, or raise the sample count. |
+| Filled helpers (`solidHead` on `ArrowHelper`, `fillOpacity` on `PlaneHelper`) | By method: a fill is flat colour with no lighting and does not pick. An opaque fill writes depth; translucent fills blend in the order added. | Helpers are guides, so they stay readable in any light and need no material or mesh. | A solid head has no shading, so its shape reads from its outline. | Use a mesh from `@margoengine/core` where lighting matters. |
 
 
 | Limit | Starts at | Why | What you see | Escape hatch |

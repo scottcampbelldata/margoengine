@@ -15,6 +15,7 @@ export class ArrowHelper extends Line {
         color?: ColorInput;
         headLength?: number;
         headWidth?: number;
+        solidHead?: boolean;
     } & HelperOptions);
     setDirection(direction: Vec3): this;
     setOrigin(origin: Vec3): this;
@@ -157,6 +158,7 @@ export class Line {
     attach(mesh: Mesh | null): this;
     setMatrix(matrix: Mat4): this;
     update(_engine: EngineKernel, _delta?: number): boolean | void;
+    protected setFill(corners: Float32Array | null, opaque?: boolean): void;
     protected resize(count: number): void;
     updateDistances(model: Mat4): void;
     bind(owner: LineOwner | undefined): void;
@@ -268,6 +270,7 @@ export class PlaneHelper extends Line {
         constant?: number;
         size?: number;
         color?: ColorInput;
+        fillOpacity?: number;
     } & HelperOptions);
     setPlane(normal: Vec3, constant?: number, size?: number): this;
 }

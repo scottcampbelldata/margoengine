@@ -82,7 +82,7 @@ dashed.dashOffset += 0.01;
 
 `new Lines({name, order})` sets the plugin name (default `'lines'`) and pass order (default `20`). `lines.stats` reports lines, segments and draw calls of the last frame.
 
-Helpers are `Line` subclasses and take the material options too (they default to butt caps and miter joins): `GridHelper({size, divisions, color1, color2})`, `PolarGridHelper({radius, sectors, rings, divisions, color1, color2})`, `AxesHelper({size})`, `Box3Helper(min, max, {color})`, `BoxHelper(mesh, {color})` (world bounds every frame), `ArrowHelper({direction, origin, length, color, headLength, headWidth})`, `CameraHelper(camera, {aspect})` (unprojects `camera.matrix`), `PlaneHelper({normal, constant, size, color})` and `VertexNormalsHelper(mesh, {size, color})` (world space with the normal matrix).
+Helpers are `Line` subclasses and take the material options too (they default to butt caps and miter joins): `GridHelper({size, divisions, color1, color2})`, `PolarGridHelper({radius, sectors, rings, divisions, color1, color2})`, `AxesHelper({size})`, `Box3Helper(min, max, {color})`, `BoxHelper(mesh, {color})` (world bounds every frame), `ArrowHelper({direction, origin, length, color, headLength, headWidth, solidHead})`, `CameraHelper(camera, {aspect})` (unprojects `camera.matrix`), `PlaneHelper({normal, constant, size, color, fillOpacity})` and `VertexNormalsHelper(mesh, {size, color})` (world space with the normal matrix).
 
 Light helpers (`PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`,
 `RectAreaLightHelper`) take the light objects themselves, typed by shape so lines imports neither
@@ -253,6 +253,24 @@ A `HiddenLine` takes any `LineMaterial` option. It starts from its source's colo
 
 Underneath it is a line with `behind: true`, which turns the depth test around. An edge lying on a surface sits at the surface's own depth, so a test either way flickers along it; `depthBias` (0.001 here, and given to the source too when it has none) moves both lines that fraction of their distance nearer, so edges on a surface count as seen. Raise it if a far, large model still flickers; too high and edges just behind a surface count as seen. Hidden lines test against what has drawn depth before them, so meshes count and transparent surfaces that write no depth do not. They do not pick.
 
+## Filled helpers
+
+`ArrowHelper` draws its head as a wire cone until `solidHead: true` fills it. `PlaneHelper` draws an outline with diagonals, and `fillOpacity` above 0 fills the square, the usual way to see a clipping plane.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {ArrowHelper, Lines, PlaneHelper} from 'margoengine/lines';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const lines = Lines.attach(engine);
+
+lines.add(new ArrowHelper({direction: [1, 1, 0], length: 2, width: 3, solidHead: true}));
+lines.add(new PlaneHelper({normal: [0, 1, 0], size: 4, fillOpacity: 0.25, color: '#2a7de1'}));
+```
+
+Fills take the helper's colour, opacity, fog and clipping planes, are not lit, and draw before the helper's lines. An opaque fill writes depth, whatever `depthWrite` says, so a solid head sorts against everything in the scene that follows; a translucent one writes none, so several overlapping ones blend in the order they were added. Fills do not pick.
+
 ## Fog
 
 `lines.setFog(fog)` fogs every line whose material has `fog: true` (the default) with `@margoengine/environment`'s `Fog`
@@ -390,7 +408,7 @@ A hit gives the `line`, the `segment` index, the world `point` on the centre lin
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
 - By default lines do not write depth, so crossing lines do not occlude each other unless they set [`depthWrite`](#depth-writing). `engine.pick` finds lines through [`LinePicking`](#gpu-picking) only. Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
 - Dashes run continuously through joins, and caps apply to line ends only, not to each dash. World-unit widths ignore the mesh scale.
-- `ArrowHelper` draws its head as a wire cone, and `PlaneHelper` draws an outline with diagonals; there are no filled meshes. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
+- Filled helper shapes are flat colour with no lighting, and do not pick; the lines around them do. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
 
 ## Feature edges and gradients
 

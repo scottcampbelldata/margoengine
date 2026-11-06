@@ -79,6 +79,7 @@ class Line {
     attach(mesh: Mesh | null): this;
     setMatrix(matrix: Mat4): this;
     update(_engine: EngineKernel, _delta?: number): boolean | void;
+    protected setFill(corners: Float32Array | null, opaque?: boolean): void;
     protected resize(count: number): void;
     updateDistances(model: Mat4): void;
     bind(owner: LineOwner | undefined): void;

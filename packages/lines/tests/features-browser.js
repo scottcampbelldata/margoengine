@@ -1,6 +1,6 @@
 // Real-GPU checks of the optional line features, on a canvas of their own. Each check returns a line for the report.
 import { Engine, box } from '@margoengine/core';
-import { Lines, Line } from '@margoengine/lines';
+import { Lines, Line, ArrowHelper, PlaneHelper } from '@margoengine/lines';
 import { LinePicking } from '@margoengine/lines/pick';
 import { Trail } from '@margoengine/lines/trail';
 import { Picking } from '../../selection/dist/index.js';
@@ -310,8 +310,40 @@ async function coverage() {
   return `alphaToCoverage at ${samples} samples: crossing ${crossing.slice(0, 3)}`;
 }
 
+async function filled() {
+  const { lines, frame, done } = await rig();
+  const at = (image, x, y, z = 0) => image.at(Math.round(pixel(x, y, z)[0]), Math.round(pixel(x, y, z)[1]));
+  const arrow = lines.add(
+    new ArrowHelper({ direction: [1, 0, 0], origin: [-3, 0, 0], length: 6, headLength: 3, headWidth: 3, color: RED, width: 2, solidHead: true }),
+  );
+  // Between the wire spokes of the head, only a fill can be red.
+  let image = await frame();
+  for (const [x, y] of [[1, 0.25], [0.5, -0.3], [1.5, 0.18]]) assert(isRed(at(image, x, y)), `The head is solid at ${x},${y}`);
+  // It writes depth: a line behind it, drawn later, stays hidden.
+  const beside = [1, -3, -1, 1, 3, -1];
+  const behind = lines.add(vertical(-1, { color: GREEN, positions: beside, width: 4 }));
+  image = await frame();
+  assert(isRed(at(image, 1, 0.15, -1)), 'A solid head hides what is behind it');
+  lines.remove(behind);
+  lines.remove(arrow);
+  // A translucent plane facing the camera tints what is under it and writes no depth, and clipping planes cut it.
+  const plane = lines.add(new PlaneHelper({ normal: [0, 0, 1], size: 4, color: BLUE, fillOpacity: 0.5 }));
+  lines.add(vertical(-1, { color: RED, positions: beside, width: 6 }));
+  image = await frame();
+  const clear = at(image, -3, 0.7),
+    tint = at(image, -1.3, 0.7);
+  assert(tint[2] > clear[2] + 40 && tint[2] < 250, `A translucent fill tints: ${tint} over ${clear}`);
+  assert(isRed(at(image, 1, 0.7, -1)), 'A translucent fill writes no depth');
+  plane.material.clippingPlanes = [[-1, 0, 0, -3]];
+  image = await frame();
+  const cut = at(image, -1.3, 0.7);
+  assert(Math.abs(cut[2] - clear[2]) < 3, `Clipping planes cut a fill: ${cut} over ${clear}`);
+  done();
+  return 'ArrowHelper solidHead and PlaneHelper fillOpacity fill, write depth when opaque, blend when not, and clip';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking, trail, batch, hidden, coverage]) checks.push(await check());
+  for (const check of [depthWrite, picking, trail, batch, hidden, coverage, filled]) checks.push(await check());
   return checks;
 };

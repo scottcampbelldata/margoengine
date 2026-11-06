@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4598984,
+  "total": 4599620,
   "history": [
     {
       "date": "2026-10-24",
@@ -1760,6 +1760,12 @@
       "commit": "72aced94b",
       "reason": "New optional entries @margoengine/headless/video and /ffmpeg: image sequences and video output",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "2f129876b",
+      "reason": "Filled helper shapes: solid triangles on Line, ArrowHelper solidHead, PlaneHelper fillOpacity",
+      "grew": 1
     }
   ],
   "items": {
@@ -1965,7 +1971,7 @@
     "@margoengine/lightmap": 4053,
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/refracted": 7846,
-    "@margoengine/lines": 19035,
+    "@margoengine/lines": 19671,
     "@margoengine/lines/batch": 6524,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,

@@ -361,7 +361,8 @@ export class BoxHelper extends Line {
  * An arrow: a shaft from `origin` along `direction` (normalised; its length does not matter) and a wire-cone head
  * whose tip is `length` from the origin. The head is `headLength` long with a base `headWidth` across.
  * Defaults: direction [0, 0, 1], origin [0, 0, 0], length 1, headLength 0.25 * length, headWidth 0.5 * headLength,
- * colour '#f0931e'. The first segment is the shaft, origin to head base.
+ * colour '#f0931e', and `solidHead` false: true fills the cone, in the arrow's colour and unlit, and writes depth. The
+ * first segment is the shaft, origin to head base.
  * @throws TypeError when direction or origin is not 3 values; RangeError when a value is not finite, the direction has
  * zero length, `length` is not positive, or a head size is negative or the head is longer than the arrow.
  */
@@ -372,6 +373,8 @@ export class ArrowHelper extends Line {
   private headLength = HEAD_LENGTH;
   private headWidth = HEAD_LENGTH * HEAD_WIDTH;
   private readonly out = new Float32Array((1 + 2 * ARROW_SPOKES) * 6);
+  /** Each spoke's side and base triangle when the head is solid, else null. */
+  private readonly cone: Float32Array | null;
   constructor(
     options: {
       direction?: Vec3;
@@ -380,6 +383,7 @@ export class ArrowHelper extends Line {
       color?: ColorInput;
       headLength?: number;
       headWidth?: number;
+      solidHead?: boolean;
     } & HelperOptions = {},
   ) {
     const {
@@ -389,9 +393,11 @@ export class ArrowHelper extends Line {
       color = OUTLINE,
       headLength,
       headWidth,
+      solidHead = false,
       ...style
     } = options;
     super({ ...styled(style), color, mode: 'segments' });
+    this.cone = solidHead ? new Float32Array(ARROW_SPOKES * 24) : null;
     this.direction = unitDirection(direction, 'Direction');
     this.origin = vector(origin, 'Arrow origin');
     this.setLength(length, headLength, headWidth);
@@ -441,6 +447,24 @@ export class ArrowHelper extends Line {
       rim(i, spoke + 3);
       rim(i, spoke + 6);
       rim(i + 1, spoke + 9);
+    }
+    const cone = this.cone;
+    if (cone) {
+      const corner = (at: number, from: ArrayLike<number>, offset: number) => {
+        for (let k = 0; k < 3; k++) cone[at + k] = from[offset + k];
+        cone[at + 3] = 1;
+      };
+      for (let i = 0; i < ARROW_SPOKES; i++) {
+        const spoke = 6 + i * 12,
+          at = i * 24;
+        corner(at, tip, 0);
+        corner(at + 4, out, spoke + 6);
+        corner(at + 8, out, spoke + 9);
+        corner(at + 12, base, 0);
+        corner(at + 16, out, spoke + 9);
+        corner(at + 20, out, spoke + 6);
+      }
+      this.setFill(cone, true);
     }
     return this.setPositions(out);
   }
@@ -553,15 +577,24 @@ export class CameraHelper extends Line {
 /**
  * The plane `normal . p + constant = 0` (the normal need not be unit length): a square `size` across centred on the
  * point of the plane nearest the origin, with both diagonals. Its in-plane rotation uses the same basis as ArrowHelper.
- * Defaults: normal [0, 1, 0], constant 0, size 1, colour '#f0931e'.
+ * `fillOpacity` above 0 also fills the square in the same colour, unlit; at 1 it writes depth.
+ * Defaults: normal [0, 1, 0], constant 0, size 1, colour '#f0931e', fillOpacity 0.
  * @throws TypeError when the normal is not 3 values; RangeError when it is not finite or zero, `constant` is not
- * finite, or `size` is not positive.
+ * finite, `size` is not positive, or `fillOpacity` is outside 0..1.
  */
 export class PlaneHelper extends Line {
   private readonly out = new Float32Array(36);
-  constructor(options: { normal?: Vec3; constant?: number; size?: number; color?: ColorInput } & HelperOptions = {}) {
-    const { normal = [0, 1, 0], constant = 0, size = 1, color = OUTLINE, ...style } = options;
+  /** Two triangles when the plane is filled, else null. */
+  private readonly square: Float32Array | null;
+  private readonly fillOpacity: number;
+  constructor(
+    options: { normal?: Vec3; constant?: number; size?: number; color?: ColorInput; fillOpacity?: number } & HelperOptions = {},
+  ) {
+    const { normal = [0, 1, 0], constant = 0, size = 1, color = OUTLINE, fillOpacity = 0, ...style } = options;
     super({ ...styled(style), color, mode: 'segments' });
+    if (!(fillOpacity >= 0 && fillOpacity <= 1)) throw new RangeError('Fill opacity must be 0..1');
+    this.fillOpacity = fillOpacity;
+    this.square = fillOpacity ? new Float32Array(24) : null;
     this.setPlane(normal, constant, size);
   }
   /** Replaces the plane, reusing the line's buffers. */
@@ -590,6 +623,14 @@ export class PlaneHelper extends Line {
       this.out.set(c[a], o);
       this.out.set(c[b], o + 3);
       o += 6;
+    }
+    const square = this.square;
+    if (square) {
+      [0, 1, 2, 0, 2, 3].forEach((corner, i) => {
+        square.set(c[corner], i * 4);
+        square[i * 4 + 3] = this.fillOpacity;
+      });
+      this.setFill(square, this.fillOpacity === 1);
     }
     return this.setPositions(this.out);
   }
