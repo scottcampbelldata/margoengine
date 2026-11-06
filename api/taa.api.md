@@ -73,8 +73,27 @@ interface CasterCutout {
   alphaTransform?: Float32Array;
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   vertexAlpha?: boolean;
-  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  displacement?: CasterDisplacement;
   clip?: GPUBufferBinding;
   surfaceClip?: GPUBufferBinding;
 }
+
+type CasterDisplacement =
+  | {
+      readonly buffer: GPUBuffer;
+      readonly view: GPUTextureView;
+      readonly sampler: GPUSampler;
+      readonly key?: undefined;
+      readonly depth?: undefined;
+      readonly entries?: undefined;
+      readonly layout?: undefined;
+      readonly cuts?: undefined;
+    }
+  | {
+      readonly key: string;
+      depth(code: string, group: number): string;
+      entries(): GPUBindGroupEntry[];
+      layout(): GPUBindGroupLayout;
+      readonly cuts: boolean;
+    };
 ```

@@ -9,12 +9,36 @@ export interface CasterCutout {
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices). */
-  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  displacement?: CasterDisplacement;
   /** Planes that clip the shadow (materials `clippingPlanes` with `clipShadows`, 80-byte vertices). */
   clip?: GPUBufferBinding;
   /** Planes that clip the surface, whatever `clipShadows` says (80-byte vertices). */
   surfaceClip?: GPUBufferBinding;
 }
+/**
+ * What moves a caster's vertices: a displacement map's uniform, view and sampler, or a shader patch of its own (a
+ * NodeMaterial's graph), with a `key` for its pipeline and its bind group.
+ */
+export type CasterDisplacement =
+  | {
+      readonly buffer: GPUBuffer;
+      readonly view: GPUTextureView;
+      readonly sampler: GPUSampler;
+      readonly key?: undefined;
+      readonly depth?: undefined;
+      readonly entries?: undefined;
+      readonly layout?: undefined;
+      readonly cuts?: undefined;
+    }
+  | {
+      readonly key: string;
+      depth(code: string, group: number): string;
+      entries(): GPUBindGroupEntry[];
+      /** The group's layout, for passes that build their pipeline layouts by hand. */
+      layout(): GPUBindGroupLayout;
+      /** The patch discards fragments, so a pass that skips the fragment stage of opaque casters needs it here. */
+      readonly cuts: boolean;
+    };
 /** A depth-only caster pipeline (less-equal depth into depth32float, line lists for `lines`). */
 export function casterPipeline(
   device: GPUDevice,
@@ -32,7 +56,7 @@ export function casterRuntime<S extends object, R>(source: S, engine: unknown, n
 export function displacementGroup(
   device: GPUDevice,
   layout: () => GPUBindGroupLayout,
-  displacement: { buffer: GPUBuffer; view: GPUTextureView; sampler: GPUSampler } | undefined,
+  displacement: CasterDisplacement | undefined,
 ): GPUBindGroup | undefined;
 /** WGSL of an opacity map at bindings `first` to `first` + 2 (default 4) of `group`, and `margoOpacityAt` of both UV sets. */
 export function opacityCode(group: number, first?: number): string;

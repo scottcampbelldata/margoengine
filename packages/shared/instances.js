@@ -11,7 +11,7 @@ const instanceInput =
 export const instancedDepth = (code) =>
   code
     .replace('@location(4) color:vec4f', '@location(4) color:vec4f,' + instanceInput)
-    .replace('f.model*vec4f(', 'f.model*mat4x4f(i.m0,i.m1,i.m2,i.m3)*vec4f(')
+    .replaceAll('f.model*vec4f(', 'f.model*mat4x4f(i.m0,i.m1,i.m2,i.m3)*vec4f(')
     .replace('o.alpha=i.color.a;', 'o.uv=o.uv*i.uvt.xy+i.uvt.zw;o.alpha=i.color.a*i.tint.a;');
 /** World matrix of instance `k` (node matrix times the instance's node-space matrix) into `out`. */
 export function instanceMatrix(node, data, k, out) {

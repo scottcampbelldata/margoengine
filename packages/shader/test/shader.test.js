@@ -580,6 +580,7 @@ test('importing a colour node and NodeMaterial leaves post, compute and textures
     assert.ok(!minimal.text.includes(marker), marker + ' (compute, post or texture code) was not shaken out');
   assert.ok(minimal.gzip < all.gzip * 0.6, `minimal ${minimal.gzip} vs all ${all.gzip}`);
   // The whole-package budget follows what the root holds: 12,500 B, then 14,500 B with statements (control.ts, 2.1 kB),
-  // then 16,000 B with the compute model (workgroup memory, barriers, grids, atomics, 1.3 kB). Minimal stays at 6,500 B.
-  assert.ok(minimal.gzip < 6500 && all.gzip < 16000, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
+  // then 16,000 B with the compute model (workgroup memory, barriers, grids, atomics, 1.3 kB), then 17,500 B and a minimal
+  // 7,800 B (from 6,500 B) with the depth passes' view of a graph and normals after positionNode, which NodeMaterial holds.
+  assert.ok(minimal.gzip < 7800 && all.gzip < 17500, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
 });

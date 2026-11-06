@@ -95,7 +95,7 @@ export interface LocalShadowPrimitive {
   alphaTransform?: Float32Array;
   instances?: { readonly count: number; upload(device: GPUDevice): GPUBuffer };
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices), bound at group 1. */
-  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  displacement?: import('../../shared/caster.js').CasterDisplacement;
   /**
    * Opacity map of the cut-out (materials `alphaMap`, 80-byte vertices): its green channel, through UV rows 0 and 1 of
    * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Requires 80-byte vertices.
@@ -176,7 +176,7 @@ export class LocalShadowMaps {
   private alphaSampler?: GPUSampler;
   private views: GPUTextureView[] = [];
   private entries: GPUBindGroupEntry[] = [];
-  private pipelines = new Map<number, GPURenderPipeline>();
+  private pipelines = new Map<string, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<object, Draw>>();
   private sources: Source[] = [];
   private readonly values: Float32Array;
@@ -567,19 +567,20 @@ export class LocalShadowMaps {
     const lines = p.topology === 'line-list',
       solid = p.stride === 80 && p.vertexAlpha === false,
       key =
-        p.stride +
+        (displacement?.key ?? '') +
+        (p.stride +
         (transform ? 1 : 0) +
         (inst ? 2 : 0) +
         (lines ? 4 : 0) +
         (displacement ? 8 : 0) +
         (opacity ? 16 : 0) +
-        (solid ? 32 : 0);
+        (solid ? 32 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const depth = depthShader(p.stride === 80, !!transform),
-        code = displacement ? displacedDepth(depth, 1) : depth,
+        code = displacement ? displacedDepth(depth, 1, displacement) : depth,
         placed = inst
-          ? instancedDepth(code).replace(
+          ? instancedDepth(code).replaceAll(
               'localDepth.model*vec4f(',
               'localDepth.model*mat4x4f(i.m0,i.m1,i.m2,i.m3)*vec4f(',
             )

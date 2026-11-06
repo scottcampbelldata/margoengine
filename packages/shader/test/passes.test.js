@@ -1,0 +1,129 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  NodeMaterial,
+  cameraPosition,
+  discard,
+  materialColor,
+  normalLocal,
+  positionLocal,
+  positionWorld,
+  sin,
+  texture,
+  uniform,
+  uv,
+  vec3,
+} from '../dist/index.js';
+import { Texture } from '../../materials/dist/index.js';
+import { displacedDepth } from '../../shared/displacement.js';
+import { instancedDepth } from '../../shared/instances.js';
+
+const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf-pro/src/shader.ts');
+const { shadowDepth } = await import('../../shadows/src/shader.ts');
+const device = { fake: true };
+const depth = (m, code = shadowDepth(true)) => {
+  const record = m.caster(device);
+  return { record, code: displacedDepth(code, 1, record) };
+};
+const wave = positionLocal.add(normalLocal.mul(sin(positionLocal.x)));
+
+test('a positionNode that works from the position re-derives normals from its neighbours', () => {
+  const m = new NodeMaterial({ positionNode: wave });
+  for (const source of [pbrShader, extendedPBRShader, physicalShader()]) {
+    const code = m.shader(source, 2);
+    assert.ok(code.includes('o.normal=(f.normalMatrix*vec4f(margoNormal,0)).xyz;'));
+    assert.ok(!code.includes('o.normal=(f.normalMatrix*vec4f(i.normal.xyz,0)).xyz;'));
+  }
+  assert.ok(m.vertexCode.includes('sin(margoA.x)') && m.vertexCode.includes('sin(margoB.x)'), m.vertexCode);
+  assert.ok(m.vertexCode.indexOf('margoCross') < m.vertexCode.indexOf('let p=f.model'));
+});
+
+test('a positionNode that reads uv() takes the normal of each triangle in the fragment', () => {
+  const m = new NodeMaterial({ positionNode: positionLocal.add(normalLocal.mul(uv().x)) });
+  assert.ok(!m.vertexCode.includes('margoNormal'));
+  assert.ok(m.fragmentCode.includes('dpdx(i.position)'));
+  const chosen = new NodeMaterial({ positionNode: wave, positionNormals: 'faces' });
+  assert.ok(chosen.fragmentCode.includes('dpdx(i.position)') && !chosen.vertexCode.includes('margoNormal'));
+  const told = new NodeMaterial({ positionNode: positionLocal.add(normalLocal.mul(uv().x)), positionNormals: 'neighbours' });
+  assert.ok(told.vertexCode.includes('margoNormal'));
+});
+
+test('positionNormals keep, a normalNode and a graph with no positionNode leave the normals alone', () => {
+  const kept = new NodeMaterial({ positionNode: wave, positionNormals: 'keep' });
+  assert.ok(kept.shader(pbrShader, 2).includes('o.normal=(f.normalMatrix*vec4f(i.normal.xyz,0)).xyz;'));
+  assert.ok(!kept.fragmentCode.includes('dpdx'));
+  const told = new NodeMaterial({ positionNode: positionLocal.add(uv().x), normalNode: vec3(0, 1, 0) });
+  assert.ok(!told.fragmentCode.includes('dpdx'));
+  assert.equal(new NodeMaterial({ colorNode: vec3(1, 0, 0) }).vertexCode.trim(), 'let p=f.model*vec4f(i.position.xyz,1);');
+});
+
+test('the G-buffer pass reads the same patched vertex and surface as the colour pass', () => {
+  const m = new NodeMaterial({ positionNode: wave, colorNode: discard(uv().x.lessThan(0.5), vec3(1, 0, 0)) }),
+    code = m.shader(pbrShader, 2),
+    gbuffer = code.slice(code.indexOf('@fragment fn gbuffer('));
+  assert.ok(gbuffer.includes('surface(i,front)'));
+  assert.equal(code.split('{ discard; }').length, 2, 'once, in surface()');
+  assert.ok(code.indexOf('{ discard; }') < code.indexOf('@fragment fn fragment('));
+});
+
+test('a depth pass gets the position graph, with its world inputs through the caster matrix', () => {
+  const m = new NodeMaterial({ positionNode: wave.add(positionWorld.mul(0)) }),
+    { record, code } = depth(m);
+  assert.match(record.key, /^n\d+$/);
+  assert.ok(code.includes('vec4f(margoPosition,1)') && !code.includes('f.model*vec4f(i.position.xyz,1);o.uv'));
+  assert.ok(code.includes('@location(1) normal:vec4f'));
+  assert.ok(code.includes('margoPosition=') && code.includes('let margoWorld=(f.model*vec4f(i.position.xyz,1)).xyz;'));
+  assert.equal(m.caster(device), record, 'one record per device');
+  assert.notEqual(new NodeMaterial({ positionNode: wave }).caster(device).key, record.key);
+});
+
+test('instanced casters carry the instance matrix through every use of the model', () => {
+  const m = new NodeMaterial({ positionNode: wave.add(positionWorld.mul(0)) }),
+    { code } = depth(m),
+    instanced = instancedDepth(code);
+  assert.ok(!instanced.includes('f.model*vec4f('), 'no use is left without it');
+});
+
+test('a depth pass gets the graph discards through its own varyings', () => {
+  const m = new NodeMaterial({ colorNode: discard(uv().x.lessThan(0.5), vec3(1, 0, 0)) }),
+    { code } = depth(m);
+  assert.ok(code.includes('@builtin(front_facing) front:bool'));
+  assert.match(code, /struct Out \{[^}]*@location\(8\) ndv0:vec2f\}/);
+  assert.ok(code.includes('o.ndv0=i.uv.xy;') && code.includes('if (i.ndv0.x < 0.5) { discard; }'), code);
+  assert.ok(code.indexOf('{ discard; }') < code.indexOf('if(textureSampleLevel'), 'ahead of the alpha test');
+});
+
+test('the depth bind group holds what the depth shader reaches, not what only the colour reads', () => {
+  const made = { createBindGroupLayout: (d) => d },
+    map = new Texture({ data: new Uint8Array(16), width: 2, height: 2 }),
+    m = new NodeMaterial({ positionNode: positionLocal.mul(uniform(1)), emissiveNode: texture(map).rgb }),
+    { entries } = m.caster(made).layout();
+  assert.ok(depth(m).code.includes('ndu'));
+  assert.equal(entries.length, 1, JSON.stringify(entries));
+  assert.deepEqual(entries[0].buffer, { type: 'uniform' });
+  const cut = new NodeMaterial({ colorNode: discard(texture(map).a.lessThan(0.5), vec3(1, 0, 0)) }).caster(made),
+    kinds = cut.layout().entries.map((e) => Object.keys(e).find((k) => k !== 'binding' && k !== 'visibility'));
+  assert.deepEqual(kinds.sort(), ['sampler', 'texture']);
+  assert.equal(cut.cuts, true);
+});
+
+test('a graph with nothing for a depth pass has no caster, so it stays a static plain caster', () => {
+  assert.equal(new NodeMaterial({ colorNode: vec3(1, 0, 0) }).caster(device), undefined);
+  assert.equal(new NodeMaterial({ emissiveNode: vec3(1, 0, 0), opacityNode: 0.5 }).caster(device), undefined);
+});
+
+test('what a depth pass cannot read drops that half of the graph, and only that half', () => {
+  const camera = new NodeMaterial({ positionNode: positionLocal.add(cameraPosition.mul(0.1)) });
+  assert.equal(camera.caster(device), undefined, 'no camera in a shadow pass: the mesh casts unmoved');
+  const material = new NodeMaterial({
+      positionNode: wave,
+      colorNode: discard(materialColor.a.lessThan(0.5), vec3(1, 0, 0)),
+    }),
+    { code } = depth(material);
+  assert.ok(code.includes('sin(i.position.x)') && !code.includes('{ discard; }'));
+});
+
+test('a depth shader without the hook points is refused with the fix', () => {
+  const m = new NodeMaterial({ positionNode: wave });
+  assert.throws(() => m.caster(device).depth('fn other() {}', 1), /caster depth shader/);
+});

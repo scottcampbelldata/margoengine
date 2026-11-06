@@ -159,11 +159,7 @@ export interface LocalShadowPrimitive {
         readonly count: number;
         upload(device: GPUDevice): GPUBuffer;
     };
-    displacement?: {
-        readonly buffer: GPUBuffer;
-        readonly view: GPUTextureView;
-        readonly sampler: GPUSampler;
-    };
+    displacement?: import('./shared/caster.js').CasterDisplacement;
     opacity?: {
         readonly buffer: GPUBuffer;
         readonly view: GPUTextureView;

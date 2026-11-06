@@ -588,11 +588,11 @@ export class ContactShadows implements EnginePlugin {
       solid = stride === 80 && p.vertexAlpha === false,
       displaced = !!p.displacement,
       clipped = !!p.clip,
-      key = `${stride}|${instanced}|${lines}|${transformed}|${opacity}|${solid}|${displaced}|${clipped}`;
+      key = `${stride}|${instanced}|${lines}|${transformed}|${opacity}|${solid}|${p.displacement?.key ?? displaced}|${clipped}`;
     let pipeline = this.occluders.get(key);
     if (!pipeline) {
       let code = stride === 24 ? coreOccluder : pbrOccluder(transformed);
-      if (displaced) code = displacedDepth(code, 1);
+      if (displaced) code = displacedDepth(code, 1, p.displacement);
       if (instanced) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);

@@ -955,7 +955,7 @@ export interface PBRMaterial extends GLTFMaterial {
    * Vertex displacement the shading applies (`@margoengine/materials` displacementMap), for shadow casters to apply
    * too: the materials feature uniform, the map's view and its sampler (shared/displacement.js `displacedDepth`).
    */
-  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  displacement?: import('../../shared/caster.js').CasterDisplacement;
   /**
    * Clipping planes the shading applies (`@margoengine/materials` clippingPlanes with clipShadows), for shadow casters
    * to clip too: a uniform of up to 6 world planes in the scene `section` binding's layout (plane count in settings.x).

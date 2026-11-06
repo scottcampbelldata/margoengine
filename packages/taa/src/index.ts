@@ -641,7 +641,9 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       throw new TypeError(
         'Invalid TAA alpha transform; set it to a Float32Array of 8 finite numbers on a primitive with stride 80.',
       );
-    const { opacity, displacement, surfaceClip: clip } = p;
+    const { opacity, surfaceClip: clip } = p,
+      // A node graph's vertices reach this pass unmoved, so it keeps camera motion there (docs/limits.md).
+      displacement = p.displacement?.entries ? undefined : p.displacement;
     if ((opacity || displacement || clip) && p.stride !== 80)
       throw new TypeError('Invalid TAA opacity map, displacement or clip; use it on a primitive with stride 80.');
     const pbr = p.stride === 80,

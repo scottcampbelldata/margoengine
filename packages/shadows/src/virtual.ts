@@ -170,7 +170,7 @@ export class VirtualShadows implements EnginePlugin {
   private readonly lightingOwners = new Map<ShadowSource, { remove: () => void; count: number }>();
   private readonly hooks = new Map<number, { declarations: string; direct(direct: string): string }>();
   private readonly shaders = new Map<number, Map<string, string>>();
-  private readonly pipelines = new Map<number, GPURenderPipeline>();
+  private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly draws = new Map<Mesh, Map<object, Draw>>();
   private casters: Draw[] = [];
   private readonly receivers: Draw[] = [];
@@ -684,18 +684,19 @@ export class VirtualShadows implements EnginePlugin {
     const lines = p.topology === 'line-list',
       solid = p.stride === 80 && p.vertexAlpha === false,
       key =
-        p.stride +
+        (displacement?.key ?? '') +
+        (p.stride +
         (transform ? 1 : 0) +
         (inst ? 2 : 0) +
         (lines ? 4 : 0) +
         (section ? 8 : 0) +
         (displacement ? 16 : 0) +
         (opacity ? 32 : 0) +
-        (solid ? 64 : 0);
+        (solid ? 64 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
-      if (displacement) code = displacedDepth(code, 1);
+      if (displacement) code = displacedDepth(code, 1, displacement);
       if (inst) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);

@@ -206,6 +206,7 @@ export class NodeMaterial extends Material {
     surfaceGraph?: SurfaceGraph;
     constructor(options?: NodeMaterialOptions, extra?: (program: Program) => void);
     shader(source: string, group: number): string;
+    caster(device: GPUDevice, engine?: Engine): CasterDisplacement | undefined;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }
 
@@ -217,6 +218,7 @@ export interface NodeMaterialOptions extends MaterialOptions {
     emissiveNode?: Node<'vec3f'>;
     normalNode?: Node<'vec3f'>;
     positionNode?: Node<'vec3f'>;
+    positionNormals?: 'neighbours' | 'faces' | 'keep';
 }
 
 export class NodePass implements EnginePlugin {
@@ -669,6 +671,25 @@ type Body = () => unknown;
 type Bools<T extends Type> = Node<VecOf<'bool', Size<T>>>;
 
 type C = 'x' | 'y' | 'z' | 'w';
+
+type CasterDisplacement =
+  | {
+      readonly buffer: GPUBuffer;
+      readonly view: GPUTextureView;
+      readonly sampler: GPUSampler;
+      readonly key?: undefined;
+      readonly depth?: undefined;
+      readonly entries?: undefined;
+      readonly layout?: undefined;
+      readonly cuts?: undefined;
+    }
+  | {
+      readonly key: string;
+      depth(code: string, group: number): string;
+      entries(): GPUBindGroupEntry[];
+      layout(): GPUBindGroupLayout;
+      readonly cuts: boolean;
+    };
 
 type Count<S extends string, A extends 0[] = []> = S extends `${infer _}${infer Rest}` ? Count<Rest, [...A, 0]> : A['length'];
 

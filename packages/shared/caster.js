@@ -66,7 +66,7 @@ export const displacementGroup = (device, layout, displacement) =>
   displacement
     ? device.createBindGroup({
         layout: layout(),
-        entries: [
+        entries: displacement.entries?.() ?? [
           { binding: 0, resource: { buffer: displacement.buffer } },
           { binding: 1, resource: displacement.view },
           { binding: 2, resource: displacement.sampler },

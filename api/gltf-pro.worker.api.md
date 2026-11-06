@@ -784,11 +784,7 @@ interface PBRMaterial extends GLTFMaterial {
     renderState?: PBRRenderState;
     extension?: MaterialExtension;
     shading?: PBRMaterialShading;
-    displacement?: {
-        readonly buffer: GPUBuffer;
-        readonly view: GPUTextureView;
-        readonly sampler: GPUSampler;
-    };
+    displacement?: import('./shared/caster.js').CasterDisplacement;
     clip?: GPUBufferBinding;
     surfaceClip?: GPUBufferBinding;
     castMask?: {
@@ -856,11 +852,7 @@ class PBRModel implements EnginePlugin {
             readonly sampler: GPUSampler;
         } | undefined;
         vertexAlpha?: boolean | undefined;
-        displacement?: {
-            readonly buffer: GPUBuffer;
-            readonly view: GPUTextureView;
-            readonly sampler: GPUSampler;
-        } | undefined;
+        displacement?: import("./shared/caster.js").CasterDisplacement | undefined;
         clip?: GPUBufferBinding | undefined;
     }[];
     setup(engine: Engine, device?: GPUDevice | null): void;
@@ -905,11 +897,7 @@ class PBRModel implements EnginePlugin {
             readonly sampler: GPUSampler;
         } | undefined;
         vertexAlpha?: boolean | undefined;
-        displacement?: {
-            readonly buffer: GPUBuffer;
-            readonly view: GPUTextureView;
-            readonly sampler: GPUSampler;
-        } | undefined;
+        displacement?: import("./shared/caster.js").CasterDisplacement | undefined;
         clip?: GPUBufferBinding | undefined;
     }[];
     readPickingGeometry(): Promise<readonly PBRPickingGeometry[]>;

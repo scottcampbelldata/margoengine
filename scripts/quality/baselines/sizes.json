@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5041766,
+  "total": 5048929,
   "history": [
     {
       "date": "2026-10-24",
@@ -2216,6 +2216,12 @@
       "commit": "b7bde42a9",
       "reason": "New quality entry ./power: eases off on battery and heat; root reads the lowered tab flag. Core and core + stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "338023c66",
+      "reason": "shader: NodeMaterial holds per-pass variants and normals after positionNode; shadows, clustered, selection, staging and taa take the shared caster record",
+      "grew": 4
     }
   ],
   "items": {
@@ -2620,12 +2626,12 @@
     "@margoengine/sciviz/colormaps": 4427,
     "@margoengine/sciviz/maths": 5638,
     "@margoengine/selection": 20446,
-    "@margoengine/shader": 15681,
+    "@margoengine/shader": 17330,
     "@margoengine/shader/compute-texture": 4761,
-    "@margoengine/shader/editor": 21836,
+    "@margoengine/shader/editor": 23765,
     "@margoengine/shader/effects": 8306,
-    "@margoengine/shader/graph": 11088,
-    "@margoengine/shader/lighting": 7392,
+    "@margoengine/shader/graph": 13020,
+    "@margoengine/shader/lighting": 9045,
     "@margoengine/shader/noise": 4753,
     "@margoengine/shader/raw": 10429,
     "@margoengine/shader/readback": 8876,

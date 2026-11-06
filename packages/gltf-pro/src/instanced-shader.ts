@@ -26,8 +26,9 @@ export function instancedShader(code: string): string {
   );
   edit('let p=f.model*vec4f(', 'let p=margoI*vec4f(');
   edit(
-    'o.normal=(f.normalMatrix*vec4f(i.normal.xyz,0)).xyz;',
-    'o.normal=mat3x3f(cross(margoI[1].xyz,margoI[2].xyz),cross(margoI[2].xyz,margoI[0].xyz),cross(margoI[0].xyz,margoI[1].xyz))*i.normal.xyz*margoS;',
+    // margoNormal: a shader node graph's normal after its positionNode.
+    /o\.normal=\(f\.normalMatrix\*vec4f\((i\.normal\.xyz|margoNormal),0\)\)\.xyz;/,
+    'o.normal=mat3x3f(cross(margoI[1].xyz,margoI[2].xyz),cross(margoI[2].xyz,margoI[0].xyz),cross(margoI[0].xyz,margoI[1].xyz))*$1*margoS;',
   );
   edit(
     '(f.model*vec4f(i.tangent.xyz,0)).xyz,i.tangent.w*f.coordsB.y)',

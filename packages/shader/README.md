@@ -224,6 +224,39 @@ read back exactly (65 ms on an NVIDIA Ampere GPU in Edge), a job on an engine th
 submit and while mapping, engine disposal and `device.destroy()` at both points, and a pipeline over the storage-binding
 limit; every job destroyed its buffers and no GPU error escaped.
 
+## Node output in every pass
+
+A graph is one description of a surface, so every pass draws it. Each pass gets its own variant, compiled from the same nodes when the material is made:
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {Shadows} from 'margoengine/shadows';
+import {NodeMaterial, discard, normalLocal, positionLocal, sin, time, uv, vec3} from 'margoengine/shader';
+const stage = await createStage('#app');
+const flag = new NodeMaterial({
+  doubleSided: true,
+  positionNode: positionLocal.add(normalLocal.mul(sin(positionLocal.x.mul(6).add(time)).mul(0.1))),   // shading follows the wave
+  colorNode: discard(uv().y.lessThan(0.1), vec3(0.8, 0.1, 0.1)),                                      // the shadow has the same hole
+});
+const mesh = createMesh(stage.engine, planeGeometry(2, 1, 64, 32), flag), shadows = Shadows.attach(stage.engine);
+shadows.add(mesh);
+```
+
+| Pass | `positionNode` | `normalNode` | `discard()` |
+| --- | --- | --- | --- |
+| Colour, SSAO's G-buffer and ambient passes | yes | yes | yes |
+| `Shadows`, `VirtualShadows`, `LocalShadows`, `Clustered` integrated shadows | yes | not read | yes |
+| Picking primitives and contact shadows | yes | not read | yes |
+| TAA velocity | no: such a surface keeps camera motion | not read | no |
+
+**Normals.** After a `positionNode`, normals follow the new shape. `positionNormals: 'neighbours'` evaluates the graph again 0.001 mesh units to two sides of each vertex: smooth, for shapes worked out from `positionLocal`, at three evaluations of the graph per vertex. `'faces'` takes each triangle's normal in the fragment, for graphs that read `uv()`, whose neighbours a vertex cannot know: it shows facets on a coarse mesh and keeps a normal map's detail on top. `'keep'` leaves the mesh's normals. The default is `'faces'` when the graph reads `uv()`, else `'neighbours'`; a `normalNode` wins over `'faces'`.
+
+**What a depth pass cannot read.** A shadow has no view of the camera or of the material's computed values. A `positionNode` that reads `cameraPosition` or `viewDirection` casts the mesh unmoved, and fragment nodes that read those or `materialColor`, `materialNormal`, `materialRoughness`, `materialMetalness` or `materialEmissive` cast without their `discard()`; the colour pass is not affected. A `positionNode` also replaces a `displacementMap` in depth passes. Such a caster counts as moving, so shadow caches redraw it each frame.
+
+`node packages/shader/test/passes-check.mjs` (real GPU, under the GPU lock) checks these on pixels: a caster moved by a graph against a plain mesh placed there in all four shadow passes, a cut caster against a half-sized one, both normal modes against the analytic normal of a wave, and SSAO's G-buffer pass drawing such a surface.
+
 ## Lighting written in the graph (`@margoengine/shader/lighting`)
 
 `LightingMaterial` is a `NodeMaterial` that writes its own lighting: toon steps, hatching, a custom BRDF. Shadows, clustered lights and the environment keep working, because the graph reads what those effects worked out. Attach them as for any material.
@@ -455,15 +488,15 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 ## Limits
 
 - Nodes are fixed when a NodeMaterial, NodePass or ComputePass is constructed; build a new one to change the graph. Only uniform values, textures' pixels and storage contents change live.
-- NodeMaterial patches gltf-pro's beauty shader (standard and KHR physical variants): shadows, SSAO's G-buffer and depth-equal passes see neither `positionNode` nor `normalNode`; normals are not re-derived after a vertex offset; at most 8 varyings. Its bindings start at group 2, binding 48, and node textures count against WebGPU's 16 sampled textures per stage: a `NodeMaterial` on a materials mesh fits 6 texture nodes alone, 5 with directional shadows and 3 with shadows, IBL and LocalShadows; past that, gltf-pro throws a `RangeError` naming the combination.
-- `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; `If` runs one. `discard` in a NodeMaterial affects the beauty pass only: shadows still see the whole surface, and a NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `texture(map, uv)`, `dpdx`, `dpdy` and `fwidth` inside an `If`, `Switch` or `While` on a per-pixel value, or a loop with a non-uniform bound or a `Break` on one, are a WGSL uniformity error, reported when the pipeline compiles; pass `texture` an explicit level there or sample before the branch.
+- NodeMaterial patches gltf-pro's shader (standard and KHR physical variants); [Node output in every pass](#node-output-in-every-pass) lists what the other passes see. At most 8 varyings. Its bindings start at group 2, binding 48, and node textures count against WebGPU's 16 sampled textures per stage: a `NodeMaterial` on a materials mesh fits 6 texture nodes alone, 5 with directional shadows and 3 with shadows, IBL and LocalShadows; past that, gltf-pro throws a `RangeError` naming the combination.
+- `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; `If` runs one. A NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `texture(map, uv)`, `dpdx`, `dpdy` and `fwidth` inside an `If`, `Switch` or `While` on a per-pixel value, or a loop with a non-uniform bound or a `Break` on one, are a WGSL uniformity error, reported when the pipeline compiles; pass `texture` an explicit level there or sample before the branch.
 - Raw meshes are not picked by `engine.pick`, are not culled, and draw only into the main colour and depth: shadows, SSAO and SSR G-buffers and depth prepasses do not see them. Raw uniforms are scalars, vectors, mat3x3f and mat4x4f (no arrays or structs); no storage buffers or extra bind groups; one colour target; 32-bit attribute formats only.
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
 - Storage textures are 2D, one mip level, one sample; `@margoengine/shader/compute-texture` has no 3D or array form.
 - ComputePass dispatches at most 65,535 workgroups per axis (an indirect dispatch is checked by the GPU only) and runs every frame while attached (`computeReadback` runs once; an atomic counter keeps counting unless `update()` resets it). Workgroup memory has no struct elements, and all of a pass's must fit the device's 16,384 bytes. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
 - No GLSL/WebGL2 output, no node editor, no built-in noise library (write it with `Fn` or `wgslFn`), no light, shadow or environment nodes, no skinning or morph nodes, no MRT outputs.
 
-Size (min + gzip, Rolldown, peers external): whole package 15.2 kB (11.8 kB before statements, 13.9 kB before the compute model); `NodeMaterial` with colour nodes only, 6.0 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
+Size (min + gzip, Rolldown, peers external): whole package 16.8 kB (11.8 kB before statements, 13.9 kB before the compute model, 15.2 kB before node output in every pass); `NodeMaterial` with colour nodes only, 7.7 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
 
 Apache-2.0. Optional, tree-shakable package; peers `@margoengine/core`, `@margoengine/materials` and `@margoengine/gltf-pro` (^0.1.0 || ^1.0.0).
 

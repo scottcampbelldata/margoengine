@@ -58,6 +58,25 @@ export const batchShader = "\nstruct Vertex {position:vec4f,normal:vec4f,tangent
 
 type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 
+type CasterDisplacement =
+  | {
+      readonly buffer: GPUBuffer;
+      readonly view: GPUTextureView;
+      readonly sampler: GPUSampler;
+      readonly key?: undefined;
+      readonly depth?: undefined;
+      readonly entries?: undefined;
+      readonly layout?: undefined;
+      readonly cuts?: undefined;
+    }
+  | {
+      readonly key: string;
+      depth(code: string, group: number): string;
+      entries(): GPUBindGroupEntry[];
+      layout(): GPUBindGroupLayout;
+      readonly cuts: boolean;
+    };
+
 type CubeSource = {
     faces: readonly (ImageSource | ImageData | RawImage | DataImage)[];
 } | {
@@ -353,6 +372,7 @@ class Material {
     dispose(): void;
     [Symbol.dispose]: () => void;
     shader(source: string, group: number): string;
+    caster(_device: GPUDevice, _engine?: Engine): CasterDisplacement | undefined;
     relight(code: string): string;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }

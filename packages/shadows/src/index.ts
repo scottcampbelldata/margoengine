@@ -171,7 +171,7 @@ export interface ShadowPrimitive {
    */
   clip?: GPUBufferBinding;
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices): bound at group 1. */
-  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  displacement?: import('../../shared/caster.js').CasterDisplacement;
   /**
    * Opacity map of the cut-out (materials `alphaMap`, 80-byte vertices): its green channel, through UV rows 0 and 1 of
    * `buffer` (the materials feature uniform), multiplies the alpha `cutoff` tests. Such a caster redraws every frame.
@@ -340,7 +340,7 @@ export class Shadows implements EnginePlugin {
   private views: GPUTextureView[] = [];
   private cachedViews: GPUTextureView[] = [];
   private entries: GPUBindGroupEntry[] = [];
-  private pipelines = new Map<number, GPURenderPipeline>();
+  private pipelines = new Map<string, GPURenderPipeline>();
   private draws = new Map<Mesh, Map<object, Draw>>();
   /** Per nesting level and pass kind (level * 2 + cached): vertex buffer, then index buffer, to its batch. */
   private readonly batches: Map<GPUBuffer, Map<GPUBuffer, Batch>>[] = [];
@@ -1555,7 +1555,8 @@ export class Shadows implements EnginePlugin {
     const lines = p.topology === 'line-list',
       solid = p.stride === 80 && p.vertexAlpha === false,
       key =
-        p.stride +
+        (displacement?.key ?? '') +
+        (p.stride +
         (transform ? 1 : 0) +
         (inst ? 2 : 0) +
         (lines ? 4 : 0) +
@@ -1564,7 +1565,7 @@ export class Shadows implements EnginePlugin {
         (material ? 32 : 0) +
         (opacity ? 64 : 0) +
         (tinted ? 128 : 0) +
-        (solid ? 256 : 0);
+        (solid ? 256 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
@@ -1572,7 +1573,7 @@ export class Shadows implements EnginePlugin {
         code = code
           .replace('@fragment fn fragment(i:Out){', '@fragment fn fragment(i:Out)->@location(0) vec4f{')
           .replace('{discard;}}', '{discard;}return vec4f(1);}');
-      if (displacement) code = displacedDepth(code, 1);
+      if (displacement) code = displacedDepth(code, 1, displacement);
       if (inst) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);

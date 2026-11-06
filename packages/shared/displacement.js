@@ -18,12 +18,13 @@ ${displacementWgsl}`;
 /**
  * A caster depth shader (80-byte PBR vertices, `@location(0) position:vec4f`, `@location(3) uv:vec4f`, a vertex stage
  * placing `vec4f(i.position.xyz,1)`) displaced by a ShadowPrimitive's `displacement`: its uniform, view and sampler at
- * bindings 0-2 of `group`. Reads the normal at location 1 (offset 16).
+ * bindings 0-2 of `group`. Reads the normal at location 1 (offset 16). A `displacement` with a `depth` function (a
+ * NodeMaterial's graph) patches the shader itself.
  */
-export function displacedDepth(code, group) {
-  const out = code
-    .replace('@location(0) position:vec4f,', '@location(0) position:vec4f,@location(1) normal:vec4f,')
-    .replace('vec4f(i.position.xyz,1)', 'vec4f(i.position.xyz+i.normal.xyz*margoDisplacement(i.uv),1)');
+export function displacedDepth(code, group, displacement) {
+  const input = code.replace('@location(0) position:vec4f,', '@location(0) position:vec4f,@location(1) normal:vec4f,');
+  if (displacement?.depth) return displacement.depth(input, group);
+  const out = input.replace('vec4f(i.position.xyz,1)', 'vec4f(i.position.xyz+i.normal.xyz*margoDisplacement(i.uv),1)');
   if (out.split('margoDisplacement(i.uv)').length !== 2 || !out.includes('@location(1) normal:vec4f'))
     throw new TypeError('Displaced shadow casters need 80-byte PBR vertices; draw them with a PBR depth shader');
   return displacementCode(group) + out;

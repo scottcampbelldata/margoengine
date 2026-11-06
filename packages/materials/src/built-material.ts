@@ -26,6 +26,7 @@ import { envFloats, envMapLit, envMapShader, packEnv, type EnvCombine, type Envi
 import { readResponse } from '../../shared/loading.js';
 import { attenuationPower } from '../../shared/attenuation.js';
 import { clusterBrdf } from '../../shared/light-terms.js';
+import type { CasterDisplacement } from '../../shared/caster.js';
 import { primitiveAfterOpaque } from '../../shared/material-routing.js';
 import { MargoError } from '@margoengine/math/errors';
 import { hexColor, parseColor, type ColorInput } from '@margoengine/math/color';
@@ -3297,6 +3298,10 @@ export class Material {
     if (bare(this)) return bareShader(source);
     return materialShader(source, group, this.shading);
   }
+  /** @internal What depth passes draw in place of the displacement map, for a subclass that moves vertices its own way. */
+  caster(_device: GPUDevice, _engine?: Engine): CasterDisplacement | undefined {
+    return undefined;
+  }
   /** @internal A subclass's edit of `code` once the scene's lighting effects are composed into it. */
   relight(code: string): string {
     return code;
@@ -3891,7 +3896,10 @@ const surfaceFields: PropertyDescriptorMap = {
   extended: live(extendedOf),
   extensions: live(extensionsOf),
   renderState: live(renderStateOf),
-  displacement: live((m, g) => displacementOf(m, g[recordRuntime].gpu, g[recordRuntime])),
+  displacement: live((m, g) => {
+    const device = g[recordRuntime].gpu;
+    return (device && m.caster(device, g[recordRuntime])) ?? displacementOf(m, device, g[recordRuntime]);
+  }),
   clip: live((m, g) => clipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   surfaceClip: live((m, g) => surfaceClipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   castMask: live((m, g) => castMaskOf(m, g[recordRuntime].gpu, g[recordRuntime])),

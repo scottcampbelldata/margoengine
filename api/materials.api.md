@@ -413,6 +413,7 @@ export class Material {
     dispose(): void;
     [Symbol.dispose]: () => void;
     shader(source: string, group: number): string;
+    caster(_device: GPUDevice, _engine?: Engine): CasterDisplacement | undefined;
     relight(code: string): string;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }
@@ -964,6 +965,25 @@ export function transformUVs(uvs: ArrayLike<number>, { offset, scale, rotation }
 export function transmission(options?: TransmissionOptions): MaterialExtension;
 
 // Not exported from this entry, but used by the exports above:
+
+type CasterDisplacement =
+  | {
+      readonly buffer: GPUBuffer;
+      readonly view: GPUTextureView;
+      readonly sampler: GPUSampler;
+      readonly key?: undefined;
+      readonly depth?: undefined;
+      readonly entries?: undefined;
+      readonly layout?: undefined;
+      readonly cuts?: undefined;
+    }
+  | {
+      readonly key: string;
+      depth(code: string, group: number): string;
+      entries(): GPUBindGroupEntry[];
+      layout(): GPUBindGroupLayout;
+      readonly cuts: boolean;
+    };
 
 type DistanceKeys = 'depthPacking' | 'referencePosition' | 'nearDistance' | 'farDistance';
 

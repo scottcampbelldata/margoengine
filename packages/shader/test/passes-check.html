@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Node passes check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/stage/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+import {SSAO} from '/packages/post/dist/index.js';
+import {NodeMaterial,discard,normalLocal,normalWorld,materialNormal,positionLocal,sin,uv,vec3} from '/packages/shader/dist/index.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const flat={color:[0.25,0.25,0.25],toneMapped:false,roughness:1,metalness:0};
+const sun=(intensity,direction=[0,0,1])=>{engine.lighting.direction.set([...direction,intensity]);engine.lighting.radiance.set([1,1,1,0]);};
+const slant=[0.6,0,0.8],plainMap=()=>Shadows.attach(engine,{resolution:1024,filter:'hard'}),pages=()=>VirtualShadows.attach(engine,{distance:20,filter:'hard'});
+// A wall behind a small caster at z = 0.5, drawn beside the shadow it throws under the slanted sun.
+const wall=()=>createMesh(engine,planeGeometry(4,4),new Material(flat));
+const caster=(material,at=[0.6,0,0.5],width=0.5)=>{const mesh=createMesh(engine,planeGeometry(width,0.5),material);mesh.root.setPosition(at);return mesh;};
+const moved=()=>new NodeMaterial({...flat,positionNode:positionLocal.add(vec3(0,0.5,0))});
+const cut=()=>new NodeMaterial({...flat,doubleSided:true,colorNode:discard(uv().x.lessThan(0.5),vec3(0.25,0.25,0.25))});
+const withShadows=(attach,make)=>{
+  sun(Math.PI*2,slant);
+  const back=wall(),front=make(),shadows=attach();shadows.add(back);shadows.add(front);
+  return {destroy(){engine.removePlugin(shadows.name);back.destroy();front.destroy();}};
+};
+const withLocal=make=>{
+  sun(0);
+  const back=wall(),front=make(),lights=Clustered.attach(engine),local=LocalShadows.attach(engine,{lights,resolution:1024});
+  lights.add(back);lights.setLights([{position:[1.8,0,2.4],range:12,direction:[-0.6,0,-0.8],innerAngle:0.9,outerAngle:1.1,color:[1,1,1],intensity:30,castShadow:true}]);
+  local.add(back);local.add(front);
+  return {destroy(){engine.removePlugin(local.name);engine.removePlugin(lights.name);back.destroy();front.destroy();}};
+};
+const withIntegrated=make=>{
+  sun(0);
+  const back=wall(),front=make(),lights=Clustered.attach(engine,{shadows:{resolution:1024}});
+  lights.add(back);lights.setLights([{position:[1.8,0,2.4],range:12,direction:[-0.6,0,-0.8],innerAngle:0.9,outerAngle:1.1,color:[1,1,1],intensity:30,shadow:true}]);
+  lights.addShadowCaster(front);
+  return {destroy(){engine.removePlugin(lights.name);back.destroy();front.destroy();}};
+};
+// The normal shown as a colour: x -> red, y -> green, z -> blue, each 0.5 + n / 2.
+const normalColour=n=>n.mul(0.5).add(0.5);
+const dense=()=>planeGeometry(2,2,128,128);
+const scenarios={
+  plainShadow:()=>withShadows(plainMap,()=>caster(new Material(flat),[0.6,0.5,0.5])),
+  movedShadow:()=>withShadows(plainMap,()=>caster(moved())),
+  cutShadow:()=>withShadows(plainMap,()=>caster(cut())),
+  halfShadow:()=>withShadows(plainMap,()=>caster(new Material({...flat,doubleSided:true}),[0.725,0,0.5],0.25)),
+  virtualPlain:()=>withShadows(pages,()=>caster(new Material(flat),[0.6,0.5,0.5])),
+  virtualMoved:()=>withShadows(pages,()=>caster(moved())),
+  localPlain:()=>withLocal(()=>caster(new Material(flat),[0.6,0.5,0.5])),
+  localMoved:()=>withLocal(()=>caster(moved())),
+  integratedPlain:()=>withIntegrated(()=>caster(new Material(flat),[0.6,0.5,0.5])),
+  integratedMoved:()=>withIntegrated(()=>caster(moved())),
+  // z = 0.2 sin(4x): the normal is (-0.8 cos(4x), 0, 1) normalised.
+  neighbours:()=>{sun(0);const m=createMesh(engine,dense(),new NodeMaterial({color:[0,0,0],toneMapped:false,positionNode:positionLocal.add(normalLocal.mul(sin(positionLocal.x.mul(4)).mul(0.2))),emissiveNode:normalColour(normalWorld)}));return m;},
+  // The same surface from uv: x runs 0..1 across the plane, so 8u - 4 is 4x.
+  faces:()=>{sun(0);const m=createMesh(engine,dense(),new NodeMaterial({color:[0,0,0],toneMapped:false,positionNode:positionLocal.add(normalLocal.mul(sin(uv().x.mul(8).sub(4)).mul(0.2))),emissiveNode:normalColour(materialNormal)}));return m;},
+  kept:()=>{sun(0);const m=createMesh(engine,dense(),new NodeMaterial({color:[0,0,0],toneMapped:false,positionNormals:'keep',positionNode:positionLocal.add(normalLocal.mul(sin(positionLocal.x.mul(4)).mul(0.2))),emissiveNode:normalColour(normalWorld)}));return m;},
+  // The G-buffer pass of SSAO on a moved, cut, re-derived surface must build and draw.
+  gbuffer:()=>{sun(1);const m=createMesh(engine,dense(),new NodeMaterial({...flat,positionNode:positionLocal.add(normalLocal.mul(sin(positionLocal.x.mul(4)).mul(0.2))),colorNode:discard(uv().x.lessThan(0.25),vec3(1,1,1))})),ssao=SSAO.attach(engine);ssao.add(m);return {destroy(){ssao.dispose?.();engine.removePlugin(ssao.name);m.destroy();}};},
+};
+window.check={
+  async run(name){device.pushErrorScope('validation');const model=await scenarios[name]();window.current=model;engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {errors:[...(e?[e.message]:[]),...errors.splice(0)]};},
+  clear(){window.current?.destroy();window.current=null;engine.render();},
+};
+window.ready=true;
+</script></body></html>

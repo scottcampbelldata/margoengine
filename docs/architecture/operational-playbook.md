@@ -745,6 +745,7 @@ slower baseline is invalid; compare the run's baseline against the recorded base
 | GPU driver reset produced a misleading code failure | One evidence-backed retry with explicit result annotation. |
 | Public generated records or prose drifted | Revision-stamped generation, public-truth checks, and whitepaper evidence. |
 | A pass other than the colour pass drew a material's whole surface | `packages/materials/test/cutout-passes-browser.mjs` (picking, contact shadows, TAA velocity) and `packages/shadows/test/cutout-casters-browser.mjs` (every shadow map pass, virtual included) read pixels and velocities through a cut-out, a displaced surface and a clipping plane. |
+| A node graph's vertex offset and discards reached only the colour pass | `packages/shader/test/passes-check.mjs` compares a moved caster with a plain mesh placed there in `Shadows`, `VirtualShadows`, `LocalShadows` and integrated clustered shadows, and a cut caster with a half-sized one. Depth passes take the graph through the `displacement` record of a primitive (`CasterDisplacement` in `packages/shared/caster.d.ts`), so caster caches treat it as moving. Still missing: TAA velocity for such a surface (docs/limits.md). |
 
 ## 5. Current evidence gaps
 

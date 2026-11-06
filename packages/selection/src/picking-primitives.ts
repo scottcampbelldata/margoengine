@@ -37,7 +37,7 @@ export interface PickingPrimitive {
   /** False keeps vertex alpha out of the test, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
   /** Vertex displacement of the surface (materials `displacementMap`): the shape a click lands on. */
-  displacement?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
+  displacement?: import('../../shared/caster.js').CasterDisplacement;
   /** Planes that clip the surface (materials `clippingPlanes`): a click through them misses. */
   clip?: GPUBufferBinding;
   doubleSided?: boolean;
@@ -312,7 +312,7 @@ export class PickingPrimitives {
         { opacity, displacement, clip } = p,
         variant =
           opacity || displacement || clip || p.vertexAlpha === false
-            ? this.pipeline(options, !!opacity, p.vertexAlpha === false, !!displacement, !!clip)
+            ? this.pipeline(options, !!opacity, p.vertexAlpha === false, displacement, !!clip)
             : pipeline;
       let record = draws[index];
       if (
@@ -408,10 +408,11 @@ export class PickingPrimitives {
     options: DrawOptions,
     opacity = false,
     solid = false,
-    displaced = false,
+    displacement?: PickingPrimitive['displacement'],
     clipped = false,
   ): GPURenderPipeline {
     const mask = !!options.mask,
+      displaced = !!displacement,
       key = [
         options.format,
         options.depthFormat,
@@ -420,7 +421,7 @@ export class PickingPrimitives {
         mask,
         opacity,
         solid,
-        displaced,
+        displacement?.key ?? displaced,
         clipped,
       ].join(':');
     let pipeline = this.pipelines.get(key);
@@ -430,7 +431,7 @@ export class PickingPrimitives {
           'Too many picking primitive variants; reduce distinct formats, sample counts and mask modes to 64 or fewer.',
         );
       let code = shader(mask);
-      if (displaced) code = displacedDepth(code, 1);
+      if (displaced) code = displacedDepth(code, 1, displacement);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
       if (clipped) code = clippedDepth(code, 3, 'materialClip');
