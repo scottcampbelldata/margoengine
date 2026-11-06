@@ -180,6 +180,7 @@ export class LineMaterial {
     cap: LineCap;
     miterLimit: number;
     dashed: boolean;
+    dashCap: LineCap;
     dashSize: number;
     gapSize: number;
     dashOffset: number;
@@ -209,6 +210,7 @@ export interface LineMaterialOptions {
     cap?: LineCap;
     miterLimit?: number;
     dashed?: boolean;
+    dashCap?: LineCap;
     dashSize?: number;
     gapSize?: number;
     dashOffset?: number;

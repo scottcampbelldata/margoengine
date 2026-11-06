@@ -227,6 +227,22 @@ export const biasedShader = (code: string): string =>
     'o.clip=vec4f(base.xy+cr.off/(0.5*frame.viewport.xy)*base.w,min(base.z*(1.0+style.b.w),base.w),base.w);',
   );
 
+/** The fragment's dash step, which `dashCapShader` replaces. */
+const dashStep = 'cover*=select(select(0.0,1.0,inside>=0.0),clamp(inside/fw+0.5,0.0,1.0),aa);';
+
+/**
+ * `code` for dashes with round or square ends. Each reaches half the line width past the dash, in pixels. A round end
+ * is the distance to the dash's end point, which only cuts deeper than the side ramp already in `cover`.
+ */
+export const dashCapShader = (code: string, cap: 'round' | 'square'): string =>
+  code.replace(
+    dashStep,
+    cap === 'square'
+      ? 'let past=inside/fw+i.edge.y;cover*=select(select(0.0,1.0,past>=0.0),clamp(past+0.5,0.0,1.0),aa);'
+      : 'let past=max(-inside/fw,0.0);let sd=sqrt(past*past+i.edge.x*i.edge.x)-i.edge.y;' +
+          'cover=min(cover,select(select(0.0,1.0,sd<=0.0),clamp(0.5-sd,0.0,1.0),aa));',
+  );
+
 const fogEdits: Array<[string, string]> = [
   // Lines blend alpha over the scene, so a fogged line fades toward the fog colour, in linear before any encoding.
   [

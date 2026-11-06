@@ -71,6 +71,7 @@ dashed.dashOffset += 0.01;
 | `cap` | `'round'` | `'butt'`, `'round'`, `'square'` |
 | `miterLimit` | `4` | Miter length over width before falling back to bevel |
 | `dashed`, `dashSize`, `gapSize`, `dashOffset` | `false`, `1`, `1`, `0` | World units |
+| `dashCap` | `'butt'` | The shape of each dash's ends: `'butt'`, `'round'` or `'square'`; see [Dash caps](#dash-caps) |
 | `vertexColors` | when colors exist | |
 | `onTop` | `false` | Skip the depth test |
 | `depthWrite` | `false` | Write depth: crossing lines occlude each other and later passes respect them |
@@ -204,6 +205,30 @@ console.log(batches.stats); // {batches, segments, drawCalls} of the last frame
 A batch is one draw while it fits one GPU buffer: 8,388,608 segments at WebGPU's default `maxBufferSize` of 256 MiB, and one further draw for each buffer past that. A batch takes at most 67,108,864 segments. It keeps a CPU copy, 32 bytes a segment, to refill the GPU after a device loss.
 
 Segments are independent: square ends, so those that share a point overlap at the corner, and translucent corners are darker there. There are no joins, round caps, dashes, fog, clipping planes, depth writing or picking. Use `Line` where those matter. WebGPU only.
+
+## Dash caps
+
+`dashCap` shapes the ends of every dash. `'round'` and `'square'` reach half the line width past the dash, so they add that to its length on screen, and a tiny `dashSize` with `'round'` draws a row of dots.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Line, Lines} from 'margoengine/lines';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const lines = Lines.attach(engine);
+
+lines.add(new Line({
+  positions: [-2, 0, 0, 2, 0, 0],
+  width: 8,
+  dashed: true,
+  dashSize: 0.001,
+  gapSize: 0.3,
+  dashCap: 'round',   // dots
+}));
+```
+
+`dashSize` and `gapSize` stay in world units and the cap's reach is in the line's width, so a gap narrower than the line width closes up. Dash ends are drawn in the line's fragment, so a cap never reaches past the line's own ends, and a pick still counts the gaps as line.
 
 ## Alpha to coverage
 
@@ -407,7 +432,7 @@ A hit gives the `line`, the `segment` index, the world `point` on the centre lin
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
 - By default lines do not write depth, so crossing lines do not occlude each other unless they set [`depthWrite`](#depth-writing). `engine.pick` finds lines through [`LinePicking`](#gpu-picking) only. Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
-- Dashes run continuously through joins, and caps apply to line ends only, not to each dash. World-unit widths ignore the mesh scale.
+- Dashes run continuously through joins, and `cap` applies to line ends only; `dashCap` shapes each dash. World-unit widths ignore the mesh scale.
 - Filled helper shapes are flat colour with no lighting, and do not pick; the lines around them do. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
 
 ## Feature edges and gradients

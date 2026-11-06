@@ -342,8 +342,49 @@ async function filled() {
   return 'ArrowHelper solidHead and PlaneHelper fillOpacity fill, write depth when opaque, blend when not, and clip';
 }
 
+async function dashCaps() {
+  const { lines, frame, done } = await rig();
+  // 22.17 pixels a unit at z = 0. A dash of 1 unit with its centre at the screen centre, and a 16 px wide line.
+  const line = lines.add(
+    new Line({
+      positions: [-1.5, 0, 0, 1.5, 0, 0],
+      width: 16,
+      cap: 'butt',
+      color: RED,
+      dashed: true,
+      dashSize: 1,
+      gapSize: 2,
+      dashOffset: 2,
+    }),
+  );
+  const end = Math.round(pixel(0.5, 0, 0)[0]);
+  const read = async (dashCap) => {
+    line.material.dashCap = dashCap;
+    const image = await frame();
+    return {
+      inside: isRed(image.at(end - 3, 128)),
+      past: isRed(image.at(end + 5, 128)),
+      corner: isRed(image.at(end + 6, 121)),
+      beyond: isRed(image.at(end + 11, 128)),
+    };
+  };
+  const butt = await read('butt'),
+    square = await read('square'),
+    round = await read('round');
+  assert(butt.inside && !butt.past, `A butt end stops at the dash: ${JSON.stringify(butt)}`);
+  assert(square.past && square.corner && !square.beyond, `A square end reaches half the width: ${JSON.stringify(square)}`);
+  assert(round.past && !round.corner && !round.beyond, `A round end is round: ${JSON.stringify(round)}`);
+  // A dot: a dash near zero with round ends is a disc as wide as the line.
+  line.material.set({ dashSize: 0.001, gapSize: 3, dashOffset: 1.5, dashCap: 'round' });
+  const image = await frame();
+  assert(isRed(image.at(128, 128)) && isRed(image.at(134, 128)) && isRed(image.at(128, 134)), 'A dot has its width');
+  assert(!isRed(image.at(134, 134)) && !isRed(image.at(138, 128)), 'A dot is round');
+  done();
+  return 'dashCap draws round and square ends on every dash, and dots';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking, trail, batch, hidden, coverage, filled]) checks.push(await check());
+  for (const check of [depthWrite, picking, trail, batch, hidden, coverage, filled, dashCaps]) checks.push(await check());
   return checks;
 };

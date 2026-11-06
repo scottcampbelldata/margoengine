@@ -5,7 +5,7 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
 import { fillFrame } from './math.js';
-import { biasedShader, filledShader, foggedLineShader, lineShader, phasedShader, pointWidthShader } from './shader.js';
+import { biasedShader, dashCapShader, filledShader, foggedLineShader, lineShader, phasedShader, pointWidthShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 import { overlayDepthPass, overlayPass, alphaBlend } from '../../shared/pass.js';
@@ -38,7 +38,7 @@ const STYLE_BYTES = 224;
 
 /**
  * Pipeline variant bits: draw over the scene, fogged, write depth, a width per point, only behind the scene, a depth
- * bias, alpha to coverage, solid triangles; the draw step (shader.ts) sits above them.
+ * bias, alpha to coverage, round or square dash ends, solid triangles; the draw step (shader.ts) sits above them.
  */
 const ON_TOP = 1,
   FOGGED = 2,
@@ -47,6 +47,8 @@ const ON_TOP = 1,
   BEHIND = 16,
   BIAS = 32,
   COVER = 64,
+  ROUND_DASH = 128,
+  SQUARE_DASH = 256,
   FILL = 512,
   STEP = 1024;
 
@@ -200,6 +202,8 @@ export class Lines implements EnginePlugin {
       let code = variant & FOGGED ? foggedLineShader() : lineShader;
       if (variant & WIDTHS) code = pointWidthShader(code);
       if (variant & BIAS) code = biasedShader(code);
+      if (variant & ROUND_DASH) code = dashCapShader(code, 'round');
+      if (variant & SQUARE_DASH) code = dashCapShader(code, 'square');
       if (variant & FILL) code = filledShader(code);
       code = phasedShader(code, Math.floor(variant / STEP));
       module = this.device!.createShaderModule({ code });
@@ -510,7 +514,7 @@ export class Lines implements EnginePlugin {
       edge = variant >= 2 * STEP;
     let current: GPURenderPipeline | undefined;
     for (const [line, r] of list) {
-      const { fog, antialias, dashed, behind, depthBias, alphaToCoverage } = line.material,
+      const { fog, antialias, dashed, dashCap, behind, depthBias, alphaToCoverage } = line.material,
         covered = alphaToCoverage && count > 1;
       // Coverage needs no steps: the edge is in the samples, so the first draw is the whole line.
       if (edge && (!antialias || covered)) continue;
@@ -519,6 +523,8 @@ export class Lines implements EnginePlugin {
           (behind ? BEHIND : 0) |
           (depthBias ? BIAS : 0) |
           (covered ? COVER : 0) |
+          (dashed && dashCap === 'round' ? ROUND_DASH : 0) |
+          (dashed && dashCap === 'square' ? SQUARE_DASH : 0) |
           (fogged && fog ? FOGGED : 0),
         next = this.pipeline(context.format, depthFormat, count, (covered ? variant % STEP : variant) | bits);
       if (next !== current) pass.setPipeline((current = next));

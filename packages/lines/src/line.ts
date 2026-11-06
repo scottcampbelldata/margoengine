@@ -36,6 +36,11 @@ export interface LineMaterialOptions {
   miterLimit?: number;
   /** Draw dashes along the line. Default false. */
   dashed?: boolean;
+  /**
+   * The shape of each dash's ends: 'butt' stops at the dash length, 'round' and 'square' reach half the line width past
+   * it, so a `dashSize` near 0 draws dots. Default 'butt'.
+   */
+  dashCap?: LineCap;
   /** Dash length in world units along the line. Must be positive. Default 1. */
   dashSize?: number;
   /** Gap length between dashes in world units. Non-negative. Default 1. */
@@ -91,6 +96,7 @@ export class LineMaterial {
   cap: LineCap = 'round';
   miterLimit = 4;
   dashed = false;
+  dashCap: LineCap = 'butt';
   dashSize = 1;
   gapSize = 1;
   dashOffset = 0;
@@ -146,7 +152,7 @@ export class LineMaterial {
     if (this.miterLimit < 1) throw new RangeError('Miter limit must be at least 1');
     if (this.dashSize <= 0 || this.gapSize < 0)
       throw new RangeError('Dash size must be positive and gap size non-negative');
-    if (!JOINS.includes(this.join) || !CAPS.includes(this.cap))
+    if (!JOINS.includes(this.join) || !CAPS.includes(this.cap) || !CAPS.includes(this.dashCap))
       throw new TypeError('Unknown line join or cap; use the values listed in the line options');
     for (const flag of [
       this.worldUnits,
