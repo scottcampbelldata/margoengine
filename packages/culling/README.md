@@ -249,6 +249,33 @@ default 0 draws it however small). The first level's bounding sphere stands for 
 cast no shadows through this class, and the WebGL2 layer draws every shown instance at the first level.
 
 
+## One large mesh, cluster by cluster: `MeshletMesh`
+
+`MeshletMesh` from `margoengine/culling/meshlets` splits one mesh into clusters of neighbouring triangles. Each frame a compute
+pass tests every cluster against the frustum and against a cone of its normals, and the main pass draws only the kept clusters.
+Clusters facing away are dropped only when the back-face discard would drop their triangles anyway: a single-sided material, a
+perspective camera, no mirroring. The image does not change.
+
+```js
+import { Engine, box, PbrMaterial } from 'margoengine';
+import { MeshletMesh } from 'margoengine/culling/meshlets';
+
+const engine = await Engine.create(document.querySelector('canvas'));
+const mesh = MeshletMesh.attach(engine, [
+  {
+    geometry: box(4, 4, 4),
+    material: new PbrMaterial({ doubleSided: false }),
+    transforms: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+  },
+]);
+mesh.setTransform(0, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 1]);
+```
+
+It takes one batch of one part. `maxVertices` (default 64) and `maxTriangles` (124) set the cluster size, next to the options of
+`CulledParts`, whose picking, shadows and part culling it keeps; those draw the whole mesh. `buildMeshlets(geometry)` gives the
+clusters alone. `readTriangles()` resolves how many triangles the last frame kept. The WebGL2 layer draws the whole mesh.
+
+
 ## Moving objects: `DynamicInstances`
 
 Tens or hundreds of thousands of objects that move, hide, appear and go, with a fixed amount of engine CPU work per

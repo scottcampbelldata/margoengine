@@ -1194,4 +1194,4 @@ features add no core or stage functionality.
 | Rendering in a worker, render into layers, compute writing textures, SSAA and upscaling, environment blend, KTX2 arrays and cubes, NRRD, subsurface blur | Missing, after v1.0.0 |
 | WebXR plane detection, depth, light estimation, controller and hand models, plugin passes in XR | Needs a headset test first (`@margoengine/xr`) |
 | WebGL2 for every package | In development: `@margoengine/webgl2-compat` |
-| Long-tail loaders, Draco, KTX2 or G-code writers, stereo on a flat screen, deferred shading, meshlets, cloth, fluids | Not planned for v1.0.0 |
+| Long-tail loaders, Draco, KTX2 or G-code writers, stereo on a flat screen, deferred shading, cloth, fluids | Not planned for v1.0.0 |

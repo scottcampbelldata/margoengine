@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Geometry, PbrMaterial } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
 export interface CulledBatch {
     geometry: Geometry;
@@ -52,6 +52,8 @@ export class CulledInstances implements EnginePlugin {
     protected singleSided(batch: number): boolean;
     protected write(i: number, m: ArrayLike<number>): void;
     protected bind(pipeline: GPUComputePipeline | GPURenderPipeline, entries: [number, GPUBindingResource][]): GPUBindGroup;
+    protected refine(_c: Context): void;
+    protected mainIndex(_batch: number, index: GPUBuffer): GPUBuffer;
     protected release(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -133,4 +135,10 @@ export interface OccluderSource {
     drawOccluder?(context: OccluderContext): void;
     readonly disposed?: boolean;
 }
+
+// Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 ```

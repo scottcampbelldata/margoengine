@@ -1,7 +1,7 @@
 # Reading the three.js parity counts
 
 Date: 2026-10-31. The table in [threejs-parity.md](threejs-parity.md) was rewritten by feature group:
-**191 features, 158 COVERED, 4 PARTIAL, 16 MISSING**, plus 13 NOT PLANNED by decision. The earlier table
+**191 features, 158 COVERED, 5 PARTIAL, 16 MISSING**, plus 12 NOT PLANNED by decision. The earlier table
 counted 161 rows (153 / 4 / 4); its coarse rows hid gaps that now have rows of their own. The rows and the
 [to-do table](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
@@ -27,10 +27,10 @@ zero core bytes. The row stays PARTIAL: the layer's base is 72,556 B gzip (limit
 | DRACOExporter, KTX2Exporter | glTF export is `@margoengine/exporters`; these two are not planned (EXR is written by `@margoengine/environment/exr-write`). |
 | XRControllerModelFactory, XRHandModelFactory | Poses and 25 hand joints exist; models come after a headset test. |
 
-## The 4 PARTIAL rows
+## The 5 PARTIAL rows
 
 WebGL2 fallback: see above.
 
-Narrower APIs that already have a Margo path: Node materials (typed WGSL nodes, not a statement language), WebXR VR
+Narrower APIs that already have a Margo path: meshlets (`MeshletMesh`: one mesh, one matrix, no instancing), Node materials (typed WGSL nodes, not a statement language), WebXR VR
 (untested on a headset) and WebXR AR (hit testing and anchors, untested on a device; no plane detection, depth sensing
 or light estimation).

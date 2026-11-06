@@ -458,6 +458,10 @@
       "types": "./dist/culling/lod.d.ts",
       "import": "./dist/culling/lod.js"
     },
+    "./culling/meshlets": {
+      "types": "./dist/culling/meshlets.d.ts",
+      "import": "./dist/culling/meshlets.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

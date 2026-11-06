@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4816080,
+  "total": 4833054,
   "history": [
     {
       "date": "2026-10-24",
@@ -2030,6 +2030,12 @@
       "commit": "8388ca3cb",
       "reason": "New webgl entry ./restore: lost context recovery and rebootDevice on the WebGL2 preview; the root entry gains the restore step it needs",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "54e6e3642",
+      "reason": "culling: new meshlets entry; root gains refine and mainIndex hooks",
+      "grew": 1
     }
   ],
   "items": {
@@ -2136,6 +2142,7 @@
     "@margoengine/culling": 14096,
     "@margoengine/culling/dynamic": 7461,
     "@margoengine/culling/lod": 4010,
+    "@margoengine/culling/meshlets": 16974,
     "@margoengine/culling/models": 3624,
     "@margoengine/culling/parts": 15027,
     "@margoengine/culling/shadows": 20972,

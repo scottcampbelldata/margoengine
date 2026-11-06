@@ -571,6 +571,7 @@ export class CulledInstances implements EnginePlugin {
       pass.dispatchWorkgroups(groups);
       pass.end();
     }
+    this.refine(c);
     // Main pass: core's own shader and pipeline state (sections, fog and other shader hooks apply), core's targets.
     const key = c.shader + c.format + c.descriptor.multisample?.count + c.descriptor.depthStencil!.format;
     if (key !== this.pipelineKey) {
@@ -623,10 +624,16 @@ export class CulledInstances implements EnginePlugin {
       const g = this.geometryBuffers.get(batch.geometry)!;
       main.setVertexBuffer(0, g.vertex);
       main.setVertexBuffer(1, b.drawn, this.starts[i] * 96);
-      main.setIndexBuffer(g.index, 'uint32');
+      main.setIndexBuffer(this.mainIndex(i, g.index), 'uint32');
       main.drawIndexedIndirect(b.args, i * 20);
     });
     main.end();
+  }
+  /** Runs after the parts are culled and before the main pass; see `./meshlets`. */
+  protected refine(_c: Context): void {}
+  /** The index buffer the main pass draws a batch with. */
+  protected mainIndex(_batch: number, index: GPUBuffer): GPUBuffer {
+    return index;
   }
   protected release(): void {
     this.route = undefined;

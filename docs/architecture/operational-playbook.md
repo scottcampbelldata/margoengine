@@ -421,6 +421,14 @@ atomic add, and the counts are copied to each level's indirect arguments, so cor
 the WebGL2 layer every shown instance draws the first level. Evidence: `packages/culling/test/gpu/lod-check.mjs`, 0 differing
 pixels against core meshes with levels worked out on the CPU, RTX A6000. Still missing: a timed run.
 
+`MeshletMesh` (`@margoengine/culling/meshlets`) splits one mesh into clusters of up to 64 vertices and 124 triangles, grown
+breadth first over shared vertices. One workgroup per cluster tests its sphere against the frustum and, on a single-sided
+batch under a perspective camera with a positive determinant, its normal cone against the camera, then appends its indices
+to a kept index buffer that the main pass draws. The cone test is in the mesh's own space: which side of a plane a point is on
+survives any affine map of positive determinant, so uneven scale needs no wider cone. It drops only triangles the back-face
+discard would drop. Evidence: `packages/culling/test/gpu/meshlets-check.mjs`, 0 differing pixels against a core mesh, RTX
+A6000. Still missing: a timed run, Hi-Z per cluster, and instancing of a clustered mesh.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback

@@ -45,6 +45,10 @@
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
+    },
+    "./meshlets": {
+      "types": "./dist/meshlets.d.ts",
+      "import": "./dist/meshlets.js"
     }
   },
   "files": [
@@ -65,6 +69,6 @@
     "build": "node ../../scripts/build-optional.js culling",
     "test": "npm run build && node --test tests/*.test.js test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/culling/test/gpu/dynamic-check.mjs && node packages/culling/test/gpu/parts-check.mjs && node packages/culling/test/gpu/last-pass-check.mjs && node packages/culling/test/gpu/meshes-occlusion-check.mjs && node packages/culling/test/gpu/models-cull-check.mjs && node packages/culling/test/gpu/occluders-check.mjs && node packages/culling/test/gpu/bounds-check.mjs && node packages/culling/test/gpu/shadows-cull-check.mjs && node packages/culling/test/gpu/lod-check.mjs"
+    "test:gpu": "cd ../.. && node packages/culling/test/gpu/dynamic-check.mjs && node packages/culling/test/gpu/parts-check.mjs && node packages/culling/test/gpu/last-pass-check.mjs && node packages/culling/test/gpu/meshes-occlusion-check.mjs && node packages/culling/test/gpu/models-cull-check.mjs && node packages/culling/test/gpu/occluders-check.mjs && node packages/culling/test/gpu/bounds-check.mjs && node packages/culling/test/gpu/shadows-cull-check.mjs && node packages/culling/test/gpu/lod-check.mjs && node packages/culling/test/gpu/meshlets-check.mjs"
   }
 }

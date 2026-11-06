@@ -9,9 +9,9 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 | Status | Count | Meaning |
 | --- | --- | --- |
 | COVERED | 158 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 4 | Some of it exists, but a common use case is missing. The notes say what. |
+| PARTIAL | 5 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 16 | Worth having and not written yet. Listed below with what to do. |
-| NOT PLANNED | 13 | Out of scope by decision. The note says why and what to use instead. |
+| NOT PLANNED | 12 | Out of scope by decision. The note says why and what to use instead. |
 
 The earlier version of this table had 161 rows and hid several gaps inside one coarse row or inside a COVERED row's notes. Those gaps now have rows of their own, which is why the MISSING count went up while no feature was lost.
 
@@ -57,7 +57,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Hardware clip and cull distances | MISSING | materials `clippingPlanes` | | WGSL `clip_distances` is an optional feature. Material clipping planes cover the use. |
 | Supersampling and upscaling (SSAA, FSR 1, TAA upscale) | MISSING | quality, taa | | `quality` lowers resolution with no upscale filter; TAA has no upscaling mode. |
 | Deferred shading pipeline | NOT PLANNED | clustered, post `SceneTargets` | | Clustered forward lighting is the architecture; MRT serves G-buffer uses. |
-| Meshlet (cluster) rendering with per-cluster culling | NOT PLANNED | culling | | Out of scope for v1.0.0 ([limits](limits.md)). |
+| Meshlet (cluster) rendering with per-cluster culling | PARTIAL | culling | `MeshletMesh` | One mesh, one matrix; no instancing or Hi-Z per cluster ([limits](limits.md)). |
 | SVGRenderer (vector output of a scene) | NOT PLANNED |  | | Margo draws with WebGPU. SVG is read, not written as a frame. |
 | Triangle-mesh path tracer | NOT PLANNED | voxel-pathtracer | | The path tracer traces voxel scenes only; a mesh tracer would be a later package. |
 | Voxel cone-traced global illumination | NOT PLANNED | environment probes, post `SSGI` | | Probes and one-bounce SSGI are the indirect light. |
@@ -309,10 +309,11 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows (2026-11-05): 4 PARTIAL, 16 MISSING. Each fix goes in the optional package named; core stays frozen for features.
+Recounted from the rows (2026-11-06): 5 PARTIAL, 16 MISSING. Each fix goes in the optional package named; core stays frozen for features.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
+| Meshlet rendering | PARTIAL. One mesh, one matrix; no instancing or Hi-Z per cluster. | Extend `@margoengine/culling/meshlets`. |
 | Node materials / TSL | PARTIAL. No statement-level `If`, workgroup memory or light nodes. | Extend `@margoengine/shader`. |
 | WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. | Test on a device first, then the XR layers, locomotion and plugin-pass row, then controller and hand models. |
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel path tracer and XR refuse the layer, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
