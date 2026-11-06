@@ -5,6 +5,7 @@
 //
 //   REAL_FILES_DIR       where downloads go, one folder per format (default test-results/real-files)
 //   REAL_FILES_RUNTIMES  a folder whose node_modules holds rhino3dm, the caller-owned hook, and laz-perf, to compare
+//                        (`npm run test:real-files:runtimes -w @margoengine/loaders` fetches them: opt in, never shipped).
 //                        LAZ records with. Without it the 3DM rows are reported as not run, and the exit code says so,
 //                        and the LAZ rows skip that comparison.
 //   REAL_FILES_ONLY      comma-separated formats or ids to run
@@ -49,7 +50,7 @@ import { parseLWO } from '../dist/lwo.js';
 import { parseMD2 } from '../dist/md2.js';
 import { parseBVH } from '../dist/mocap.js';
 import { parseNRRD } from '../dist/nrrd.js';
-import { evaluateNurbsCurve } from '../dist/nurbs.js';
+import { evaluateNurbsCurve, evaluateNurbsSurface } from '../dist/nurbs.js';
 import { parsePDB } from '../dist/pdb.js';
 import { parseSVG } from '../dist/svg.js';
 import { loadTextures } from '../dist/textures.js';
@@ -687,12 +688,13 @@ const checks = {
             points = [],
             weights = [];
           for (let k = 0; k < n; k++) {
-            const p = nurbs.points().get(k);
-            points.push(p.location?.[0] ?? p[0], p.location?.[1] ?? p[1], p.location?.[2] ?? p[2]);
-            weights.push(p.weight ?? 1);
+            // The runtime gives a control point multiplied by its weight.
+            const [x, y, z, w] = nurbs.points().get(k);
+            points.push(x / w, y / w, z / w);
+            weights.push(w);
           }
           const domain = nurbs.domain,
-            t = (domain[0] + domain[1]) * 0.37,
+            t = domain[0] + (domain[1] - domain[0]) * 0.37,
             ours = evaluateNurbsCurve(
               { degree: nurbs.degree, knots: Array.from({ length: knots.count }, (_, k) => knots.get(k)), points, weights },
               t,
@@ -703,13 +705,58 @@ const checks = {
         }
       }
     }
+    // Whole surfaces: Margo's evaluator against the runtime's own at points inside each one, read from the file's numbers.
+    let plain = 0,
+      surfaceWorst = 0;
+    for (let i = 0; i < total; i++) {
+      const geometry = objects.get(i).geometry(),
+        brepFace = geometry.isSurface === true ? geometry.faces().get(0) : undefined;
+      if (brepFace?.getMesh(rhino.MeshType.Any)) continue;
+      const nurbs = brepFace ? brepFace.underlyingSurface().toNurbsSurface() : geometry.knotsU ? geometry : undefined;
+      if (!nurbs) continue;
+      plain++;
+      const list = nurbs.points(),
+        points = [],
+        weights = [],
+        knots = (table) => Array.from({ length: table.count }, (_, k) => table.get(k));
+      for (let u = 0; u < list.countU; u++)
+        for (let v = 0; v < list.countV; v++) {
+          points.push(...list.getPoint(u, v));
+          weights.push(list.get(u, v)[3]);
+        }
+      const data = {
+          degreeU: nurbs.degree(0),
+          degreeV: nurbs.degree(1),
+          knotsU: knots(nurbs.knotsU()),
+          knotsV: knots(nurbs.knotsV()),
+          countU: list.countU,
+          countV: list.countV,
+          points,
+          weights,
+        },
+        [u0, u1] = nurbs.domain(0),
+        [v0, v1] = nurbs.domain(1);
+      for (const a of [0.13, 0.5, 0.87])
+        for (const b of [0.21, 0.5, 0.79]) {
+          const u = u0 + (u1 - u0) * a,
+            v = v0 + (v1 - v0) * b,
+            ours = evaluateNurbsSurface(data, u, v).position,
+            theirs = nurbs.pointAt(u, v);
+          surfaceWorst = Math.max(surfaceWorst, Math.hypot(ours[0] - theirs[0], ours[1] - theirs[1], ours[2] - theirs[2]));
+        }
+    }
     const parsed = parse3DM(rhino, bytes, { hidden: true }),
       meshes = parsed.groups.length;
+    assert.equal(parsed.surfaces, plain, 'objects drawn from their surface');
+    assert.ok(worst < 1e-9, `curve points match the runtime: ${worst}`);
+    assert.ok(surfaceWorst < 1e-9, `surface points match the runtime: ${surfaceWorst}`);
+    if (item.surfaces !== undefined) assert.equal(parsed.surfaces, item.surfaces, 'surfaces of this file');
     assert.equal(meshes + parsed.skipped, total, 'objects');
     assert.equal(parsed.layers.length, file.layers().count, 'layers');
     return {
-      result: `${total} objects, ${meshes} meshes, ${parsed.skipped} skipped, ${parsed.layers.length} layers, ${meshes ? checkGeometry(parsed) : 'no saved meshes'}; ${curves} curves, largest NURBS difference from rhino3dm ${worst}`,
-      draw: meshes ? [mesh(parsed)] : [],
+      result: `${total} objects, ${meshes} meshes, ${parsed.surfaces} from surfaces (largest difference ${surfaceWorst.toExponential(1)}), ${parsed.skipped} skipped, ${parsed.layers.length} layers, ${meshes ? checkGeometry(parsed) : 'no saved meshes'}; ${curves} curves, largest NURBS difference from rhino3dm ${worst}`,
+      // Rhino's default colour is black, which a dark picture would hide: this shows the shape.
+      draw: meshes ? [mesh({ ...parsed, groups: parsed.groups.map(({ color, ...group }) => group) })] : [],
     };
   },
   async threeds(bytes, item) {

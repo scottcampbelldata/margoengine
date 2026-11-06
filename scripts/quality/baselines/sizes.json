@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9029690,
+  "total": 9016965,
   "history": [
     {
       "date": "2026-10-24",
@@ -2858,6 +2858,12 @@
       "commit": "a2742c9be",
       "reason": "gltf-pro gains the physics entry, physics gains the generic joint",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "cc64e08ec",
+      "reason": "3dm entry: surfaces saved with no render mesh tessellate through the shared NURBS evaluator (gap B3), which brings geometry/nurbs into the entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -3135,7 +3141,7 @@
     "@margoengine/lines/trail": 5197,
     "@margoengine/loaders": 52602,
     "@margoengine/loaders dist/workers/usd.js": 8435,
-    "@margoengine/loaders/3dm": 2218,
+    "@margoengine/loaders/3dm": 4094,
     "@margoengine/loaders/3ds": 3642,
     "@margoengine/loaders/amf": 5645,
     "@margoengine/loaders/common": 3417,

@@ -26,13 +26,22 @@ export interface RhinoDocument extends Disposable {
     } & Disposable;
 }
 
+export interface RhinoFace extends Disposable {
+    getMesh(type: unknown): RhinoMesh | null | undefined;
+    underlyingSurface?(): Disposable & {
+        toNurbsSurface(): RhinoNurbsSurface | null | undefined;
+    };
+    orientationIsReversed?: boolean;
+}
+
 export interface RhinoGeometry extends Disposable {
     vertices?: RhinoMesh['vertices'];
     vertexColors?: RhinoMesh['vertexColors'];
     getMesh?(type: unknown): RhinoMesh | null | undefined;
-    faces?(): IndexedList<{
-        getMesh(type: unknown): RhinoMesh | null | undefined;
-    } & Disposable>;
+    faces?(): IndexedList<RhinoFace>;
+    isSurface?: boolean;
+    knotsU?: RhinoNurbsSurface['knotsU'];
+    degree?: RhinoNurbsSurface['degree'];
 }
 
 export interface RhinoLayer extends Disposable {
@@ -48,6 +57,18 @@ export interface RhinoMesh extends Disposable {
     normals?(): IndexedList<number[]>;
     textureCoordinates?(): IndexedList<number[]>;
     vertexColors?(): IndexedList<RhinoColor>;
+}
+
+export interface RhinoNurbsSurface extends Disposable {
+    degree(direction: number): number;
+    knotsU(): IndexedList<number>;
+    knotsV(): IndexedList<number>;
+    points(): Disposable & {
+        countU: number;
+        countV: number;
+        get(u: number, v: number): number[];
+        getPoint(u: number, v: number): number[];
+    };
 }
 
 export interface RhinoRuntime {
@@ -73,7 +94,7 @@ export interface ThreeDMLayer {
     visible: boolean;
 }
 
-export interface ThreeDMOptions extends ParseLimits {
+export interface ThreeDMOptions extends ParseLimits, Pick<NurbsSurfaceOptions, 'segmentsU' | 'segmentsV'> {
     units?: 'meters' | 'file';
     hidden?: boolean;
 }
@@ -83,6 +104,7 @@ export interface ThreeDMResult extends LoadedGeometry {
     layers: ThreeDMLayer[];
     metersPerUnit?: number;
     skipped: number;
+    surfaces: number;
 }
 
 export function parse3DM(rhino: RhinoRuntime, input: BinaryInput, options?: ThreeDMOptions): ThreeDMResult;
@@ -117,6 +139,11 @@ interface LoadedGroup {
     name?: string;
     objectId?: string;
     color?: [number, number, number, number];
+}
+
+interface NurbsSurfaceOptions extends ParseLimits {
+    segmentsU?: number;
+    segmentsV?: number;
 }
 
 interface ParseLimits {

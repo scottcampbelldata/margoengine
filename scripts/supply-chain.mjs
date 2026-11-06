@@ -476,7 +476,8 @@ dependencies, platform-optional binaries). Licences: ${Object.entries(tally)
 Install scripts anywhere in the lock: ${scripts.length ? scripts.join(', ') : 'none'}. Deprecated: ${
     deprecated.length ? deprecated.join(', ') : 'none'
   }. \`webgpu\` is a development dependency only, for the Node proof of \`@margoengine/headless\`, and is never shipped; its
-install script only clears the macOS quarantine flag on its binary. CI and releases install with \`npm ci\`, which refuses a lockfile that does not match \`package.json\` and checks
+install script only clears the macOS quarantine flag on its binary. \`rhino3dm\` and \`laz-perf\` are not in the lock: the opt-in
+\`test:real-files:runtimes\` tool of \`@margoengine/loaders\` fetches them at pinned versions into an ignored folder, for real-file tests only. CI and releases install with \`npm ci\`, which refuses a lockfile that does not match \`package.json\` and checks
 every tarball against its integrity hash.
 `;
 }

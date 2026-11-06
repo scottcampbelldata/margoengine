@@ -25,17 +25,40 @@ function runtime({ objects = [], layers = [], unit = { value: 2 } } = {}) {
       textureCoordinates: () => table(uvs ?? []),
       vertexColors: () => table(colors ?? []),
     });
+  // get() gives a control point multiplied by its weight, as the real runtime does.
+  const nurbs = ({ countU, countV, knotsU, knotsV, degree = 1, point, weight = () => 1 }) =>
+    handle({
+      degree: () => degree,
+      knotsU: () => table(knotsU),
+      knotsV: () => table(knotsV),
+      points: () =>
+        handle({
+          countU,
+          countV,
+          getPoint: point,
+          get: (u, v) => [...point(u, v).map((x) => x * weight(u, v)), weight(u, v)],
+        }),
+    });
   const geometry = (source) => {
     if (source.mesh) return mesh(source.mesh);
     if (source.renderMesh !== undefined)
       return handle({
         getMesh: (type) => ((state.type = type), source.renderMesh && mesh(source.renderMesh)),
       });
+    if (source.surface) return nurbs(source.surface);
     if (source.faces)
       return handle({
         // Like a real solid: vertices of its own kind, which are not a mesh's triples.
         vertices: () => table([{ location: [0, 0, 0] }]),
-        faces: () => table(source.faces, (face) => handle({ getMesh: () => face && mesh(face) })),
+        isSurface: source.isSurface,
+        faces: () =>
+          table(source.faces, (face) =>
+            handle({
+              getMesh: () => (face?.vertices ? mesh(face) : null),
+              orientationIsReversed: face?.reversed,
+              underlyingSurface: () => handle({ toNurbsSurface: () => nurbs(face.surface) }),
+            }),
+          ),
       });
     return handle({});
   };
@@ -238,4 +261,63 @@ test('regression: a table whose own delete removes an entry is freed through the
   const model = parse3DM({ File3dm: { fromByteArray: () => new Document() } }, BYTES);
   assert.equal(model.layers[0].name, 'Default');
   assert.equal(live, 0);
+});
+
+const PLANE = {
+  countU: 2,
+  countV: 3,
+  knotsU: [0, 1],
+  knotsV: [0, 1, 2],
+  point: (u, v) => [u * 1000, v * 1000, 0],
+};
+
+test('a surface object saved with no render mesh is drawn through the NURBS evaluator, every handle freed', () => {
+  const rhino = runtime({ objects: [{ surface: PLANE }] }),
+    g = parse3DM(rhino, BYTES, { segmentsU: 2, segmentsV: 1 });
+  assert.equal(g.surfaces, 1);
+  assert.equal(g.skipped, 0);
+  assert.equal(g.positions.length / 3, 3 * 3);
+  assert.equal(g.indices.length / 3, 2 * 2 * 2);
+  assert.deepEqual([...g.positions.slice(-3)], [1, 2, 0]);
+  assert.deepEqual([...g.normals.slice(0, 3)], [0, 0, 1]);
+  assert.equal(g.groups[0].count, g.indices.length);
+  assert.equal(rhino.state.live, 0);
+});
+
+test('a weighted control point is read without its weight', () => {
+  const rhino = runtime({ objects: [{ surface: { ...PLANE, weight: (u) => (u ? 2 : 1) } }] }),
+    g = parse3DM(rhino, BYTES, { segmentsU: 1, segmentsV: 1, units: 'file' });
+  assert.deepEqual([...g.positions.slice(-3)], [1000, 2000, 0]);
+});
+
+test('a solid that is one plain surface draws, with a reversed face turned over', () => {
+  const rhino = runtime({ objects: [{ isSurface: true, faces: [{ surface: PLANE, reversed: true }] }] }),
+    g = parse3DM(rhino, BYTES, { segmentsU: 1, segmentsV: 1 }),
+    plain = parse3DM(runtime({ objects: [{ surface: PLANE }] }), BYTES, { segmentsU: 1, segmentsV: 1 });
+  assert.equal(g.surfaces, 1);
+  assert.equal(g.normals[2], -1);
+  assert.deepEqual([...g.indices.slice(0, 3)], [plain.indices[0], plain.indices[2], plain.indices[1]]);
+  assert.equal(rhino.state.live, 0);
+});
+
+test('a solid that may be trimmed stays skipped: nothing draws past a trim', () => {
+  const rhino = runtime({ objects: [{ isSurface: false, faces: [{ surface: PLANE }, { surface: PLANE }] }] }),
+    g = parse3DM(rhino, BYTES);
+  assert.equal(g.skipped, 1);
+  assert.equal(g.surfaces, 0);
+  assert.equal(g.groups.length, 0);
+  assert.equal(rhino.state.live, 0);
+});
+
+test('a surface and a mesh in one file keep their arrays aligned', () => {
+  const g = parse3DM(runtime({ objects: [{ mesh: TRIANGLE }, { surface: PLANE }] }), BYTES);
+  assert.equal(g.normals.length, g.positions.length);
+  assert.equal(g.uvs.length, (g.positions.length / 3) * 2);
+});
+
+test('a surface past the vertex limit refuses', () => {
+  assert.throws(
+    () => parse3DM(runtime({ objects: [{ surface: PLANE }] }), BYTES, { maxVertices: 4 }),
+    (error) => error instanceof LoaderError && error.code === 'limit',
+  );
 });

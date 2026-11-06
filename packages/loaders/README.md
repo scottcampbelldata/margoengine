@@ -132,7 +132,7 @@ The repository's speed matrix (`docs/whitepaper`, row 10.11) measures this loade
 
 ## Real files
 
-`tests/real-files/manifest.json` names 104 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
+`tests/real-files/manifest.json` names 108 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
 
 ```sh
 npm run test:real-files -w @margoengine/loaders
@@ -144,7 +144,7 @@ The script downloads each file by URL into `test-results/real-files`, refuses on
 | --- | --- | --- |
 | `REAL_FILES_DIR` | `test-results/real-files` | Where files are kept between runs. |
 | `REAL_FILES_ONLY` | every row | Comma-separated formats or row ids. |
-| `REAL_FILES_RUNTIMES` | unset | A folder whose `node_modules` holds `rhino3dm` and `laz-perf`. Without it the 3DM rows read NOT RUN, and LAZ rows skip the comparison with laz-perf. |
+| `REAL_FILES_RUNTIMES` | unset | A folder whose `node_modules` holds `rhino3dm` and `laz-perf`. Without it the 3DM rows read NOT RUN, and LAZ rows skip the comparison with laz-perf. `npm run test:real-files:runtimes -w @margoengine/loaders` fetches both into `test-results/real-files-runtimes`, at pinned versions with install scripts off. It is an opt-in test tool: neither runtime is a dependency or ships. |
 | `REAL_FILES_RENDER` | unset | `1` draws every geometry through the real engine on the GPU and fails a blank picture. |
 | `REAL_FILES_TRACE` | unset | Prints the stack of a failure. |
 
@@ -536,7 +536,7 @@ console.log(positions.length, indices);
 
 ## Rhino 3DM
 
-`parse3DM` from `@margoengine/loaders/3dm` reads the meshes, layers and attributes of a Rhino `.3dm` file through a rhino3dm runtime you install, host and load. Its Wasm file is never part of this package.
+`parse3DM` from `@margoengine/loaders/3dm` reads the meshes, untrimmed surfaces, layers and attributes of a Rhino `.3dm` file through a rhino3dm runtime you install, host and load. Its Wasm file is never part of this package.
 
 ```ts
 import { parse3DM, type RhinoRuntime } from '@margoengine/loaders/3dm';
@@ -549,12 +549,12 @@ export async function loadChair(rhino: RhinoRuntime) {
 }
 ```
 
-- **Geometry.** Each object is a group of one merged mesh: a mesh as it is, and any other surface object through the render mesh saved in the file. The runtime meshes nothing on its own, so an object saved without a render mesh is counted in `skipped`. Save the file from Rhino with render meshes kept.
+- **Geometry.** Each object is a group of one merged mesh: a mesh as it is, and any other surface object through the render mesh saved in the file. With no render mesh, a NURBS surface and a solid that is one plain surface are tessellated by `@margoengine/loaders/nurbs` and counted in `surfaces`; `segmentsU` and `segmentsV` set the quads per knot span, default 4 times the degree. Other solids saved without a render mesh are counted in `skipped`, because any face may be trimmed and the runtime gives no trim curves. Nothing draws past a trim. Save the file from Rhino with render meshes kept to see them.
 - **Attributes.** A group has the object's `name`, `id`, `layer`, `material` and `userStrings`, and its colour, from the object or else its layer. `layers` lists each layer's name, full path, colour and visibility.
 - **Units.** Metres by the file's unit system; `units: 'file'` keeps the file's own numbers. A file with no known unit keeps them too, and `metersPerUnit` is left unset.
 - **Hidden.** Hidden objects and objects on hidden layers stay out unless `hidden: true`.
 - **Memory.** Every handle the runtime gives out is freed before `parse3DM` returns, failures included.
-- **Tested.** Against a stand-in with rhino3dm's shape in `npm test`, and against the real rhino3dm 8.35 on McNeel's sample files in `npm run test:real-files`.
+- **Tested.** Against a stand-in with rhino3dm's shape in `npm test`, and against the real rhino3dm 8.35 on McNeel's sample files in `npm run test:real-files`, surfaces saved with no render mesh included: each matches the runtime's own `pointAt` to within 1e-9.
 
 ## 3DS, LWO, AMF, MD2, PDB and KMZ
 

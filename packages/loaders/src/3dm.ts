@@ -1,4 +1,5 @@
-// Rhino 3DM files through a caller-owned rhino3dm runtime: meshes, layers and object attributes.
+// Rhino 3DM files through a caller-owned rhino3dm runtime: meshes, untrimmed surfaces, layers and object attributes.
+import { tessellateNurbsSurface, type NurbsSurfaceOptions } from './nurbs.js';
 import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } from './types.js';
 import { floats, limits, toBytes, uints, type BinaryInput } from './util.js';
 
@@ -39,12 +40,37 @@ export interface RhinoMesh extends Disposable {
   textureCoordinates?(): IndexedList<number[]>;
   vertexColors?(): IndexedList<RhinoColor>;
 }
-/** What an object's geometry may offer. Anything with no mesh is counted in `skipped`. */
+/** The part of a rhino3dm NURBS surface this entry reads. */
+export interface RhinoNurbsSurface extends Disposable {
+  degree(direction: number): number;
+  knotsU(): IndexedList<number>;
+  knotsV(): IndexedList<number>;
+  points(): Disposable & {
+    countU: number;
+    countV: number;
+    /** Control point `[x * w, y * w, z * w, w]`. */
+    get(u: number, v: number): number[];
+    /** Control point `[x, y, z]`. */
+    getPoint(u: number, v: number): number[];
+  };
+}
+/** The part of a rhino3dm solid's face this entry reads. */
+export interface RhinoFace extends Disposable {
+  getMesh(type: unknown): RhinoMesh | null | undefined;
+  underlyingSurface?(): Disposable & { toNurbsSurface(): RhinoNurbsSurface | null | undefined };
+  orientationIsReversed?: boolean;
+}
+/** What an object's geometry may offer. Anything with no mesh and no untrimmed surface is counted in `skipped`. */
 export interface RhinoGeometry extends Disposable {
   vertices?: RhinoMesh['vertices'];
   vertexColors?: RhinoMesh['vertexColors'];
   getMesh?(type: unknown): RhinoMesh | null | undefined;
-  faces?(): IndexedList<{ getMesh(type: unknown): RhinoMesh | null | undefined } & Disposable>;
+  faces?(): IndexedList<RhinoFace>;
+  /** True on a solid that is one face with no trims of its own. */
+  isSurface?: boolean;
+  /** Only a surface object has these. */
+  knotsU?: RhinoNurbsSurface['knotsU'];
+  degree?: RhinoNurbsSurface['degree'];
 }
 /** The part of a rhino3dm object's attributes this entry reads. */
 export interface RhinoAttributes extends Disposable {
@@ -76,7 +102,7 @@ export interface RhinoRuntime {
 }
 
 /** Options of {@link parse3DM}. */
-export interface ThreeDMOptions extends ParseLimits {
+export interface ThreeDMOptions extends ParseLimits, Pick<NurbsSurfaceOptions, 'segmentsU' | 'segmentsV'> {
   /** `'meters'` (default) scales by the file's unit when it has one; `'file'` keeps the file's own units. */
   units?: 'meters' | 'file';
   /** Read objects that are hidden, or on a hidden layer. Default false. */
@@ -111,8 +137,10 @@ export interface ThreeDMResult extends LoadedGeometry {
   layers: ThreeDMLayer[];
   /** Metres per file unit, when the file names a unit. */
   metersPerUnit?: number;
-  /** Objects without a mesh, such as curves, points and solids saved without their render mesh. */
+  /** Objects without a mesh or an untrimmed surface, such as curves, points and solids saved without their render mesh. */
   skipped: number;
+  /** Objects drawn from their NURBS surface, because the file saved no render mesh for them. */
+  surfaces: number;
 }
 
 const unit = (color: RhinoColor | undefined): [number, number, number, number] =>
@@ -191,7 +219,8 @@ function read(
   let hasNormals = false,
     hasUVs = false,
     hasColors = false,
-    skipped = 0;
+    skipped = 0,
+    surfaces = 0;
 
   const layers = using(document.layers(), (table) => {
     const out: ThreeDMLayer[] = [];
@@ -256,8 +285,57 @@ function read(
       hasColors = true;
   };
 
+  /** Adds a whole surface through the one NURBS evaluator: the runtime meshes nothing, and it has no trims to apply. */
+  const addSurface = (surface: RhinoNurbsSurface, reversed: boolean): void => {
+    const knots = (list: IndexedList<number>): number[] =>
+      using(list, (table) => Array.from({ length: table.count }, (_, i) => table.get(i)));
+    const grid = using(surface.points(), (list) => {
+        const { countU, countV } = list,
+          points: number[] = [],
+          weights: number[] = [];
+        for (let u = 0; u < countU; u++)
+          for (let v = 0; v < countV; v++) {
+            points.push(...list.getPoint(u, v));
+            weights.push(list.get(u, v)[3]);
+          }
+        return { countU, countV, points, weights };
+      }),
+      base = positions.length / 3,
+      { positions: at, normals: facing, uvs: coordinates, indices: order } = tessellateNurbsSurface(
+        {
+          degreeU: surface.degree(0),
+          degreeV: surface.degree(1),
+          knotsU: knots(surface.knotsU()),
+          knotsV: knots(surface.knotsV()),
+          ...grid,
+        },
+        {
+          segmentsU: options.segmentsU,
+          segmentsV: options.segmentsV,
+          maxVertices: maxVertices - base,
+          maxTriangles: maxTriangles - indices.length / 3,
+        },
+      ),
+      flip = reversed ? -1 : 1;
+    for (let i = 0; i < at.length; i += 3) {
+      positions.push3(at[i] * scale, at[i + 1] * scale, at[i + 2] * scale);
+      normals.push3(facing![i] * flip, facing![i + 1] * flip, facing![i + 2] * flip);
+      colors.push3(1, 1, 1);
+    }
+    for (let i = 0; i < coordinates!.length; i++) uvs.push(coordinates![i]);
+    for (let i = 0; i < order!.length; i += 3)
+      if (reversed) indices.push3(base + order![i], base + order![i + 2], base + order![i + 1]);
+      else indices.push3(base + order![i], base + order![i + 1], base + order![i + 2]);
+    hasNormals = hasUVs = true;
+    surfaces++;
+  };
+
   /** Adds the object's meshes and says whether it had any. */
   const addGeometry = (geometry: RhinoGeometry): boolean => {
+    if (geometry.knotsU && geometry.degree) {
+      addSurface(geometry as unknown as RhinoNurbsSurface, false);
+      return true;
+    }
     // A solid has `vertices` and `faces` too, of another kind; only a mesh has vertex colours.
     if (geometry.vertices && geometry.vertexColors) {
       addMesh(geometry as unknown as RhinoMesh);
@@ -277,6 +355,15 @@ function read(
           const mesh = face.getMesh(meshType);
           if (!mesh) return;
           using(mesh, addMesh);
+          any = true;
+        });
+      // A face of a solid can be trimmed, and the runtime gives no trim curves: only a solid it calls one plain surface
+      // draws from its surface, so nothing shows past a trim.
+      if (!any && geometry.isSurface && faces.count === 1)
+        using(faces.get(0), (face) => {
+          const nurbs = face.underlyingSurface && using(face.underlyingSurface(), (surface) => surface.toNurbsSurface());
+          if (!nurbs) return;
+          using(nurbs, (surface) => addSurface(surface, face.orientationIsReversed === true));
           any = true;
         });
       return any;
@@ -317,6 +404,7 @@ function read(
     groups,
     layers,
     skipped,
+    surfaces,
   };
   if (hasNormals) result.normals = normals.result();
   if (hasUVs) result.uvs = uvs.result();
