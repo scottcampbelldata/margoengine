@@ -770,6 +770,10 @@
       "types": "./dist/headless/stage.d.ts",
       "import": "./dist/headless/stage.js"
     },
+    "./headless/compare": {
+      "types": "./dist/headless/compare.d.ts",
+      "import": "./dist/headless/compare.js"
+    },
     "./html": {
       "types": "./dist/html.d.ts",
       "import": "./dist/html.js"

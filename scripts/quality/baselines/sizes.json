@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4602926,
+  "total": 4605533,
   "history": [
     {
       "date": "2026-10-24",
@@ -1772,6 +1772,12 @@
       "commit": "6b73a37f3",
       "reason": "New optional entry @margoengine/headless/stage: a stage with no page",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "1eb3b58f4",
+      "reason": "headless gains the compare entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -1959,6 +1965,7 @@
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/worker": 60700,
     "@margoengine/headless": 2864,
+    "@margoengine/headless/compare": 2607,
     "@margoengine/headless/ffmpeg": 1434,
     "@margoengine/headless/stage": 3306,
     "@margoengine/headless/video": 5641,

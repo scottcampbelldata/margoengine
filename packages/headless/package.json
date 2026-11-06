@@ -39,6 +39,10 @@
     "./stage": {
       "types": "./dist/stage.d.ts",
       "import": "./dist/stage.js"
+    },
+    "./compare": {
+      "types": "./dist/compare.d.ts",
+      "import": "./dist/compare.js"
     }
   },
   "files": [

@@ -127,4 +127,33 @@ await encodeWithFFmpeg(renderFrames(engine, { frames: 90 }), { output: 'turntabl
 
 Frames must all be one size. Video drops alpha. H.264 and the default ffmpeg settings need even sizes.
 
+## Comparing images
+
+`@margoengine/headless/compare` is for visual regression tests of your own scenes. `compareImages` takes RGBA pixels or PNG
+file bytes, made by any tool, and says whether a picture still matches its reference:
+
+```ts
+import assert from 'node:assert/strict';
+import { readFile, writeFile } from 'node:fs/promises';
+import { encodePNG, readPixels } from '@margoengine/headless';
+import { compareImages } from '@margoengine/headless/compare';
+import { Engine } from '@margoengine/core';
+
+declare const engine: Engine; // on a headless canvas, with the scene drawn
+
+const result = await compareImages(await readPixels(engine), await readFile('reference.png'));
+if (!result.pass) await writeFile('difference.png', await encodePNG(result.image));
+assert.ok(result.pass, `${result.different} pixels changed, SSIM ${result.ssim}`);
+```
+
+| Export | What it does |
+| --- | --- |
+| `compareImages(actual, reference, { threshold?, maxRatio?, minSSIM? })` | Both limits must hold for `pass`. `maxRatio` defaults to 0.001, `minSSIM` to 0.99, `threshold` to 2. Resolves the `pixelDiff` result with `image`, plus `pass` and `ssim`. |
+| `pixelDiff(a, b, { threshold?, image? })` | `{ different, total, ratio, largest, mean }`. A pixel differs when a channel moves more than `threshold`, 0 to 255, default 2. Colours are compared premultiplied, so colour under full transparency does not count. `image: true` adds changed pixels in red over a faded `a`. |
+| `ssim(a, b, { window?, sigma?, map? })` | Structural similarity as `{ score }`: 1 for identical images. `window` defaults to 11, `sigma` to 1.5, as published, on luma. `map: true` adds the score of each window. |
+| `decodePNG(bytes)` | A PNG file as RGBA pixels: every colour type and bit depth, 16-bit samples cut to 8. Interlaced files reject. Colour profiles and gamma are ignored. |
+
+A pixel count sees how many pixels moved, and SSIM sees whether the picture looks different: a slight brightness change fails
+the first and passes the second, and a small hole does the opposite. Images of different sizes reject.
+
 The errors are listed at [margoengine.com/errors#headless](https://margoengine.com/errors#headless).
