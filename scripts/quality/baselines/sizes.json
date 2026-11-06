@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5158675,
+  "total": 5162148,
   "history": [
     {
       "date": "2026-10-24",
@@ -2324,11 +2324,18 @@
       "commit": "8be384257",
       "reason": "4D simplex and Worley nodes in @margoengine/shader/noise",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "c5cb5c435",
+      "reason": "feat(animation): dual quaternion skinning (new entry @margoengine/animation/dqs)",
+      "grew": 1
     }
   ],
   "items": {
     "@margoengine/animation": 22595,
     "@margoengine/animation/clip-utils": 5160,
+    "@margoengine/animation/dqs": 3473,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/morph-gpu": 3265,
     "@margoengine/animation/pointer": 7146,

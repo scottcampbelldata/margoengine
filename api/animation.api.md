@@ -78,6 +78,7 @@ export interface AnimationOptions {
     loop?: boolean;
     speed?: number;
     pointers?: PointerChannels;
+    skinning?: SkinningMode;
 }
 
 export interface BakedChannel<N> {
@@ -254,6 +255,12 @@ export class Skin implements EnginePlugin {
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+export interface SkinningMode {
+    readonly name: string;
+    shader(extra: boolean): string;
+    encode(palette: Float32Array): void;
 }
 
 export function applyKeyframeClip(clip: KeyframeClip, time: number): void;

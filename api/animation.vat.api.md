@@ -141,6 +141,7 @@ interface AnimationOptions {
     loop?: boolean;
     speed?: number;
     pointers?: PointerChannels;
+    skinning?: SkinningMode;
 }
 
 type AnimationPath = 'translation' | 'rotation' | 'scale' | 'weights';
@@ -221,6 +222,12 @@ interface PropertyKeyframeTrack {
 }
 
 type PropertyValueType = 'number' | 'vector' | 'color' | 'quaternion';
+
+interface SkinningMode {
+    readonly name: string;
+    shader(extra: boolean): string;
+    encode(palette: Float32Array): void;
+}
 
 interface Track {
     node: number;

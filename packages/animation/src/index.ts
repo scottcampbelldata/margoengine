@@ -7,6 +7,7 @@ import { ordinaryWeightBuffer } from './weight-buffer.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { sampleTrackInto, type Interpolation } from './sampling.js';
 import { DeformArena, weightRegion, type DispatchCache, type Slot, type SlotSpec } from './batch.js';
+import type { SkinningMode } from './shader.js';
 import type { PointerChannels, PointerPlan } from './pointer.js';
 import { applyKeyframeClip, type KeyframeClip } from './keyframes.js';
 export { createMaterialAnimation } from './material-animation.js';
@@ -24,6 +25,7 @@ import {
   morphDefinition,
 } from './gltf.js';
 export { sampleTrack, sampleTrackInto, type ClipMarker, type Interpolation } from './sampling.js';
+export type { SkinningMode } from './shader.js';
 export { Skeleton, Skin, type BoneData, type BonePose } from './skin.js';
 export {
   createKeyframeClip,
@@ -113,6 +115,11 @@ export interface AnimationOptions {
    * duration) and listed in `warnings`.
    */
   pointers?: PointerChannels;
+  /**
+   * How bones blend, opt-in so apps that do not use it do not ship it: pass `dualQuaternionSkinning` from
+   * `@margoengine/animation/dqs`. Unset blends matrices linearly. Fixed for the Animation's life.
+   */
+  skinning?: SkinningMode;
 }
 // Without the pointer entry: keep ordinary channels, skip and report pointer channels.
 function skipPointers(model: PBRModel, def: ReturnType<typeof animationDefinition>, clip: string): PointerPlan {
@@ -418,6 +425,9 @@ export class Animation implements EnginePlugin {
       (this.options.speed ?? 1) < 0
     )
       throw new RangeError('Invalid animation options; loop must be a boolean and speed a finite number >= 0');
+    const skinning = this.options.skinning;
+    if (skinning !== undefined && (typeof skinning?.shader !== 'function' || typeof skinning.encode !== 'function'))
+      throw new TypeError('Invalid skinning option; pass dualQuaternionSkinning from @margoengine/animation/dqs');
     if (this.options.pointers !== undefined && typeof this.options.pointers !== 'function')
       throw new TypeError(
         'Animation pointers option must be pointerChannels; import it from @margoengine/animation/pointer',
@@ -620,6 +630,7 @@ export class Animation implements EnginePlugin {
         targets: targets.length,
         joints: joints.length,
         extra,
+        mode: joints.length ? this.options.skinning : undefined,
         asset: this.model.asset,
         definition: p.definition,
         skin: skinId,
@@ -632,7 +643,7 @@ export class Animation implements EnginePlugin {
     const slots = arena.add(specs);
     this.slots.push(...slots);
     // Compile the pipelines the model needs while it loads, not on its first frame.
-    for (const slot of slots) arena.pipeline(slot.extra);
+    for (const slot of slots) arena.pipeline(slot.extra, slot.mode);
     records.forEach((record, i) => {
       record.slot = slots[i];
       const weights = record.primitive.weights;
@@ -726,6 +737,7 @@ export class Animation implements EnginePlugin {
         for (let i = 0; i < r.palette.length; i++)
           if (!Number.isFinite(r.palette[i]))
             throw new RangeError('Skin matrix overflow; use finite joint transforms and inverse bind matrices');
+        this.options.skinning?.encode(r.palette);
         const queue = context.device.queue,
           writer = queue.writeBuffer,
           reusable = reusableWriter(queue, writer);

@@ -452,6 +452,36 @@ layers use: translation and weights subtract, scale divides (a zero reference ax
 `inverse(reference) * rotation`. Every key keeps its time and interpolation, so the result is exact between keys too.
 `applyAdditiveClip` adds to whatever pose the skeleton holds, so applying it twice adds twice.
 
+## Dual quaternion skinning (`@margoengine/animation/dqs`)
+
+Blended matrices pinch a joint that twists: a forearm turned 170 degrees shrinks to under a tenth of its radius halfway
+along. Pass `dualQuaternionSkinning` and the bones blend as rigid motions, so the arm keeps its volume. It is a per
+`Animation` choice, made when you create it. The cost is one matrix split per bone per frame on the CPU, and more
+arithmetic per vertex on the GPU.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {dualQuaternionSkinning} from 'margoengine/animation/dqs';
+
+const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
+const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
+const animation = Animation.attach(model, {skinning: dualQuaternionSkinning});
+animation.play('Walking');
+```
+
+Scaled, stretched, sheared and mirrored bones keep working: each bone's matrix splits exactly into a rotation, a
+translation and a symmetric stretch, the stretch blends linearly and applies first, then the blended rigid motion. A
+vertex held by one bone lands where the matrix puts it. A bone scaled to nothing still encodes, so hiding a part that
+way works. Between two bones of different scale the result differs from a linear blend, because the stretch applies
+about the mesh origin rather than each joint. Four and eight influences, morph targets under the skin, clones and
+models of both kinds in one scene all work; each kind is its own dispatch.
+
+`encodeDualQuaternions(palette, out?)` turns 16-float bone matrices into 16-float slots (rotation, dual part, stretch),
+and `skinDualQuaternion(slots, joints, weights, position, normal?)` is the shader's CPU twin, for tests and CPU picking.
+Only `Animation` has the option: `Skin` on raw data, `bakeVAT` and the bone-texture crowd stay linear.
+
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:

@@ -2,7 +2,7 @@
 // primitives of many models deform in one dispatch per pipeline (four- and eight-influence) and buffer page instead
 // of one dispatch each. Readers find a primitive's vertices at `PBRPrimitive.deformedOffset` in `deformed`.
 import type { PBRPrimitive } from '@margoengine/gltf-pro';
-import { batchedDeformationShader } from './shader.js';
+import { batchedDeformationShader, type SkinningMode } from './shader.js';
 
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number };
 
@@ -60,6 +60,8 @@ export interface SlotSpec {
   joints: number;
   /** Eight influences per vertex (JOINTS_1/WEIGHTS_1) rather than four. */
   extra: boolean;
+  /** How the bones blend; unset is linear. Bones of a mode are the 16 floats it encodes. */
+  mode?: SkinningMode;
   /** Identity of the asset data the deltas and influences come from: equal keys share one copy. */
   asset: object;
   definition: object;
@@ -75,6 +77,7 @@ export interface Slot {
   readonly targets: number;
   readonly joints: number;
   readonly extra: boolean;
+  readonly mode?: SkinningMode;
   readonly source: Block;
   readonly output: Range;
   readonly weights: Range;
@@ -141,6 +144,8 @@ export class DeformArena {
   readonly pages: Page[] = [];
   version = 0;
   private pipelines: (GPUComputePipeline | undefined)[] = [];
+  /** Skinning modes seen, linear first: a pipeline's index is twice its mode's index, plus one for eight influences. */
+  private readonly modes: (SkinningMode | undefined)[] = [undefined];
   private readonly limit: number;
   private readonly alignment: number;
   private constructor(readonly device: GPUDevice) {
@@ -153,12 +158,16 @@ export class DeformArena {
     if (!arena) arenas.set(device, (arena = new DeformArena(device)));
     return arena;
   }
-  pipeline(extra: boolean): GPUComputePipeline {
-    const at = +extra;
-    return (this.pipelines[at] ??= this.device.createComputePipeline({
+  private variant(extra: boolean, mode: SkinningMode | undefined): number {
+    let index = this.modes.indexOf(mode);
+    if (index < 0) index = this.modes.push(mode) - 1;
+    return index * 2 + +extra;
+  }
+  pipeline(extra: boolean, mode?: SkinningMode): GPUComputePipeline {
+    return (this.pipelines[this.variant(extra, mode)] ??= this.device.createComputePipeline({
       layout: 'auto',
       compute: {
-        module: this.device.createShaderModule({ code: batchedDeformationShader(extra) }),
+        module: this.device.createShaderModule({ code: mode?.shader(extra) ?? batchedDeformationShader(extra) }),
         entryPoint: 'main',
       },
     }));
@@ -250,25 +259,25 @@ export class DeformArena {
     )
       return cache.dispatches;
     const dispatches: Dispatch[] = [],
-      work = new Map<Page, [number[], number[]]>();
+      work = new Map<Page, number[][]>();
     for (const owner of owners)
       for (const slot of slotsOf(owner)) {
         const page = slot.page;
         if (!page.slots.has(slot)) continue;
         this.records(page);
         let lists = work.get(page);
-        if (!lists) work.set(page, (lists = [[], []]));
-        const list = lists[+slot.extra];
+        if (!lists) work.set(page, (lists = []));
+        const list = (lists[this.variant(slot.extra, slot.mode)] ??= []);
         for (let first = 0; first < slot.count; first += WORKGROUP) list.push(slot.index, first);
       }
     const max = this.device.limits.maxComputeWorkgroupsPerDimension ?? 65535;
     try {
       for (const [page, lists] of work)
-        for (let extra = 0; extra < 2; extra++) {
-          const list = lists[extra],
-            n = list.length / 2;
-          if (!n) continue;
-          const pipeline = this.pipeline(!!extra),
+        for (let variant = 0; variant < lists.length; variant++) {
+          const list = lists[variant];
+          if (!list?.length) continue;
+          const n = list.length / 2,
+            pipeline = this.pipeline(!!(variant & 1), this.modes[variant >> 1]),
             data = new Uint32Array(list.length + 2);
           data[0] = n;
           data.set(list, 2);
@@ -405,6 +414,7 @@ export class DeformArena {
       targets: spec.targets,
       joints: spec.joints,
       extra: spec.extra,
+      mode: spec.mode,
       source: shared(page.source, 's', spec.count, () => spec.primitive.vertices)!,
       output: allocate(page.output, spec.count),
       weights: allocate(page.weights, weightRegion(spec.targets)),

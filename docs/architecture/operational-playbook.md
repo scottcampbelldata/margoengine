@@ -275,6 +275,14 @@ layout, so kernels order work by seats taken with one workgroup atomic, never by
 sizes 32 (RTX A6000) and 4 (SwiftShader, `BROWSER_ARGS` with `--enable-unsafe-swiftshader` and
 `--use-webgpu-adapter=swiftshader`).
 
+Skinning has one optional second path: `@margoengine/animation/dqs` blends dual quaternions in the batched deformation
+shader, a pipeline of its own beside the linear one, reading the same 64-byte bone slots (rotation, dual part, symmetric
+stretch). The CPU splits each bone matrix by polar decomposition in double precision (Jacobi on the Gram matrix, so a
+rank-deficient bone still gives a rotation). Quaternion signs follow the heaviest influence, because glTF fills spare
+influences with joint 0 and an idle joint must not choose them. Checked on the RTX A6000 only: 28,512 values against the
+double-precision twin, worst 8.8e-7 in position and 2.1e-7 in normal; the narrowest ring of a 170 degree twist stays at
+radius 1.000 where the linear path gives 0.087 (`npm run test:gpu:dqs -w @margoengine/animation`). Unmeasured: its frame cost.
+
 ## 3. Rendering backends and hardware tiers
 
 **Area light integrals (2026-11-05).** `@margoengine/clustered/area` returns early from a quad with nothing to clip; the clip's own result, by the same operations. Evidence: `packages/clustered/test/ltc-edge.test.js` (bit for bit in float32) and `examples/package-benchmarks/area-lights-gpu.mjs` as the package's `test:gpu:area` (11 frames byte-equal, RTX A6000 only).
@@ -871,3 +879,4 @@ The following remain technical gaps, not permission to weaken a check:
 24. The headless stage has not run in Node: no WebGPU binding is in the repository.
 25. Draw counts in LIM rows are printed by GPU checks and asserted only as bounds, and no result file holds them.
 26. `ScenePass` (`@margoengine/shader/pass`) has no check in a multi-view frame, and its `velocity()` follows one camera.
+27. Dual quaternion skinning has no frame-time measurement and no run on a GPU other than the RTX A6000.

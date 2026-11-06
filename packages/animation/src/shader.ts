@@ -40,13 +40,44 @@ export const deformationShader8 = deformationShader
     'boneMatrices[inf.joints.w]*inf.weights.w+boneMatrices[inf.jointsExtra.x]*inf.weightsExtra.x+boneMatrices[inf.jointsExtra.y]*inf.weightsExtra.y+boneMatrices[inf.jointsExtra.z]*inf.weightsExtra.z+boneMatrices[inf.jointsExtra.w]*inf.weightsExtra.w;',
   );
 
+/** Another way to blend bones: `Animation`'s `skinning` option. `@margoengine/animation/dqs` holds the one Margo ships. */
+export interface SkinningMode {
+  /** Names the mode in the arena's pipeline table and in errors. */
+  readonly name: string;
+  /** The batched compute shader, four influences or (`extra`) eight. */
+  shader(extra: boolean): string;
+  /** Rewrites a bone palette in place, 16 floats per bone, into what the shader reads. Runs after the palette is checked. */
+  encode(palette: Float32Array): void;
+}
+
+/** Text a skinning mode puts into the batched shader: module-scope `functions`, and the `blend` that moves `v`. */
+export interface SkinningShader {
+  functions: string;
+  blend: string;
+}
+
+const linearBlend = (extra: boolean) => /* wgsl */ `let skin=boneMatrices[s.bones+joints.x]*jointWeights.x+boneMatrices[s.bones+joints.y]*jointWeights.y+boneMatrices[s.bones+joints.z]*jointWeights.z+boneMatrices[s.bones+joints.w]*jointWeights.w${
+  extra
+    ? '+boneMatrices[s.bones+jointsExtra.x]*weightsExtra.x+boneMatrices[s.bones+jointsExtra.y]*weightsExtra.y+boneMatrices[s.bones+jointsExtra.z]*weightsExtra.z+boneMatrices[s.bones+jointsExtra.w]*weightsExtra.w'
+    : ''
+};
+    v.position=skin*vec4f(v.position.xyz,1);
+    let normalMatrix=mat3x3f(cross(skin[1].xyz,skin[2].xyz),cross(skin[2].xyz,skin[0].xyz),cross(skin[0].xyz,skin[1].xyz));
+    let handedness=sign(dot(skin[0].xyz,cross(skin[1].xyz,skin[2].xyz)));
+    v.normal=vec4f(normalMatrix*v.normal.xyz*handedness,0);
+    v.tangent=vec4f((skin*vec4f(v.tangent.xyz,0)).xyz,v.tangent.w*handedness);`;
+
 /**
  * Batched deformation (batch.ts): many primitives in one dispatch. Each workgroup deforms 64 vertices of one slot,
  * named by the work list (`work[0].x` workgroups, then a slot index and first vertex per workgroup); each slot record
  * gives where its vertices, deltas, weights, bones and influences start in the shared buffers. The per-vertex
  * arithmetic is the per-primitive shader's, term for term, so the output is the same bits. `extra`: eight influences.
+ * `skin` replaces that arithmetic for a skinning mode.
  */
-export function batchedDeformationShader(extra: boolean): string {
+export function batchedDeformationShader(
+  extra: boolean,
+  skin: SkinningShader = { functions: '', blend: linearBlend(extra) },
+): string {
   return /* wgsl */ `
 struct Vertex {position:vec4f,normal:vec4f,tangent:vec4f,uv:vec4f,color:vec4f}
 struct Morph {position:vec4f,normal:vec4f,tangent:vec4f}
@@ -59,6 +90,7 @@ struct Slot {source:u32,output:u32,count:u32,targets:u32,morphs:u32,weights:u32,
 @group(0) @binding(5) var<storage,read> influences:array<vec4u>;
 @group(0) @binding(6) var<storage,read> slots:array<Slot>;
 @group(0) @binding(7) var<storage,read> work:array<vec2u>;
+${skin.functions}
 @compute @workgroup_size(64) fn main(@builtin(workgroup_id) group:vec3u,@builtin(num_workgroups) groups:vec3u,@builtin(local_invocation_index) lane:u32) {
   let item=group.y*groups.x+group.x;
   if(item>=work[0].x){return;}
@@ -73,16 +105,7 @@ struct Slot {source:u32,output:u32,count:u32,targets:u32,morphs:u32,weights:u32,
     let at=s.influences+i*${extra ? 4 : 2}u;let joints=influences[at];let jointWeights=bitcast<vec4f>(influences[at+1u]);${
       extra ? 'let jointsExtra=influences[at+2u];let weightsExtra=bitcast<vec4f>(influences[at+3u]);' : ''
     }
-    let skin=boneMatrices[s.bones+joints.x]*jointWeights.x+boneMatrices[s.bones+joints.y]*jointWeights.y+boneMatrices[s.bones+joints.z]*jointWeights.z+boneMatrices[s.bones+joints.w]*jointWeights.w${
-      extra
-        ? '+boneMatrices[s.bones+jointsExtra.x]*weightsExtra.x+boneMatrices[s.bones+jointsExtra.y]*weightsExtra.y+boneMatrices[s.bones+jointsExtra.z]*weightsExtra.z+boneMatrices[s.bones+jointsExtra.w]*weightsExtra.w'
-        : ''
-    };
-    v.position=skin*vec4f(v.position.xyz,1);
-    let normalMatrix=mat3x3f(cross(skin[1].xyz,skin[2].xyz),cross(skin[2].xyz,skin[0].xyz),cross(skin[0].xyz,skin[1].xyz));
-    let handedness=sign(dot(skin[0].xyz,cross(skin[1].xyz,skin[2].xyz)));
-    v.normal=vec4f(normalMatrix*v.normal.xyz*handedness,0);
-    v.tangent=vec4f((skin*vec4f(v.tangent.xyz,0)).xyz,v.tangent.w*handedness);
+    ${skin.blend}
   }
   v.normal=vec4f(normalize(v.normal.xyz),0);output[s.output+i]=v;
 }
