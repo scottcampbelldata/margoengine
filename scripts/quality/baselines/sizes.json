@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4779758,
+  "total": 4783382,
   "history": [
     {
       "date": "2026-10-24",
@@ -1988,6 +1988,12 @@
       "commit": "e0fa80488",
       "reason": "culling: CulledMeshes occlusion (Hi-Z for core meshes: occluder pass, early and cull kernels) in the root, where the class lives; pyramid.ts shared with CulledInstances",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "7c8968142",
+      "reason": "new entry @margoengine/culling/models (CulledModels); gltf-pro gains primitive.redirect, a few lines in the draw",
+      "grew": 1
     }
   ],
   "items": {
@@ -2093,6 +2099,7 @@
     "@margoengine/creative/toon": 1188,
     "@margoengine/culling": 12250,
     "@margoengine/culling/dynamic": 7461,
+    "@margoengine/culling/models": 3624,
     "@margoengine/culling/parts": 13025,
     "@margoengine/cutscene": 6822,
     "@margoengine/decoders": 492515,

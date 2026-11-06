@@ -5,7 +5,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { loadCompatRoute } from '../../shared/compat.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { Pyramid, depthKind, exactShader, levelTable, occluderPipeline } from './pyramid.js';
-import { common, computeShader, occlusionCode, sphereCode } from './shaders.js';
+import { common, computeShader, cullInputs, fillFrame, instanceCull, occlusionCode, sphereCode } from './shaders.js';
 
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -34,51 +34,14 @@ export interface CulledMeshesOptions {
 
 // One dispatch triple per core batch: frustum (+ screen size) test with a workgroup scan, a scan of the workgroup totals,
 // then a stable scatter of the kept 96-byte instance records (original order, so coplanar faces resolve as in core).
-const inputs = `
-struct Frame {camera:mat4x4f,planes:array<vec4f,6>,size:vec4f}
-struct Part {count:u32,indices:u32,pad:vec2u,sphere:vec4f}
-`;
-const shader = `${inputs}
-struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
-@group(0) @binding(0) var<uniform> f:Frame;
-@group(0) @binding(1) var<uniform> b:Part;
-@group(0) @binding(2) var<storage,read> records:array<Record>;
-@group(0) @binding(3) var<storage,read_write> visible:array<u32>;
-@group(0) @binding(4) var<storage,read_write> local:array<u32>;
-@group(0) @binding(5) var<storage,read_write> groups:array<u32>;
-@group(0) @binding(6) var<storage,read_write> drawn:array<Record>;
-@group(0) @binding(7) var<storage,read_write> args:array<u32>;
-var<workgroup> scratch:array<u32,256>;
-${sphereCode}
-@compute @workgroup_size(256) fn cull(@builtin(global_invocation_id) g:vec3u,@builtin(local_invocation_index) l:u32,@builtin(workgroup_id) w:vec3u) {
-  let i=g.x;var v=0u;
-  if(i<b.count){if(keep(bound(records[i].m))){v=1u;}visible[i]=v;}
-  scratch[l]=v;workgroupBarrier();
-  for(var o=1u;o<256u;o=o<<1u){var t=0u;if(l>=o){t=scratch[l-o];}workgroupBarrier();scratch[l]+=t;workgroupBarrier();}
-  if(i<b.count){local[i]=scratch[l]-v;}
-  if(l==255u){groups[w.x]=scratch[255];}
-}
-@compute @workgroup_size(256) fn scan(@builtin(local_invocation_index) l:u32) {
-  let n=(b.count+255u)/256u;let per=(n+255u)/256u;let lo=min(l*per,n);let hi=min(lo+per,n);
-  var sum=0u;for(var k=lo;k<hi;k++){sum+=groups[k];}
-  scratch[l]=sum;workgroupBarrier();
-  for(var o=1u;o<256u;o=o<<1u){var t=0u;if(l>=o){t=scratch[l-o];}workgroupBarrier();scratch[l]+=t;workgroupBarrier();}
-  var run=scratch[l]-sum;for(var k=lo;k<hi;k++){let t=groups[k];groups[k]=run;run+=t;}
-}
-@compute @workgroup_size(256) fn scatter(@builtin(global_invocation_id) g:vec3u) {
-  let i=g.x;if(i>=b.count){return;}
-  let p=groups[i>>8u]+local[i];let v=visible[i];
-  if(v==1u){drawn[p]=records[i];}
-  if(i==b.count-1u){args[0]=b.indices;args[1]=p+v;args[2]=0u;args[3]=0u;args[4]=0u;}
-}
-`;
+const shader = instanceCull('', 'records[i].m');
 
 // With occlusion: `early` lists last frame's kept instances that are large enough to occlude, and `cull` replaces the
 // plain kernel, adding the Hi-Z test; the plain scan and scatter follow it. Separate bindings: the plain kernels' six
 // storage buffers plus these would pass WebGPU's eight per stage.
 const occludedShader =
   common +
-  inputs +
+  cullInputs() +
   `
 @group(0) @binding(1) var<uniform> f:Frame;
 @group(0) @binding(2) var<uniform> b:Part;
@@ -269,16 +232,8 @@ export class CulledMeshes implements EnginePlugin {
       size: this.frame.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    const m = c.camera.matrix,
-      canvas = engine.canvas,
-      ratio = canvas.clientWidth ? c.width / canvas.clientWidth : 1,
-      f = this.frame;
-    f.set(m);
-    f.set(c.camera.planes, 16);
-    f[40] = c.width;
-    f[41] = (Math.hypot(m[1], m[5], m[9]) * c.height) / 2;
-    f[42] = this.minRadius * ratio;
-    d.queue.writeBuffer(this.frameBuffer, 0, f as Float32Array<ArrayBuffer>);
+    fillFrame(this.frame, c, engine.canvas, this.minRadius);
+    d.queue.writeBuffer(this.frameBuffer, 0, this.frame as Float32Array<ArrayBuffer>);
     const route = this.route,
       p = this.pipelines,
       live = new Set<Geometry>(),

@@ -446,6 +446,10 @@
       "types": "./dist/culling/parts.d.ts",
       "import": "./dist/culling/parts.js"
     },
+    "./culling/models": {
+      "types": "./dist/culling/models.d.ts",
+      "import": "./dist/culling/models.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

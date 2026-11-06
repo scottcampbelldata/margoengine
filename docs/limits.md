@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-135). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-136). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -97,6 +97,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Mipmaps on point and sprite maps (`mipmaps`) | Enforced: an uploaded image gets a full chain, default on for points, off for sprites. By method: sprite atlases are left without mips as levels bleed between cells; `alphaTest` tests the filtered alpha. | One chain a map, made at upload. | An atlas sprite drawn small still shimmers, and a video map pays for a chain per upload. | Use a gutter around atlas cells with `mipmaps: true`, or `mipmaps: false` on a video. |
 | Materials per part (`CulledParts` in `@margoengine/culling/parts`) | By method: a batch is one geometry, and each part's record holds its own colour, roughness, metalness and sidedness. No textures per part. | Core's `PbrMaterial` has no textures, and the record is what the draw reads, so colours cost no extra batch or draw. | A CAD assembly with hundreds of colours stays one batch per shape. A batch mixing single-sided and double-sided parts leaves the back-culled pipeline. | Build batches with `groupParts`; keep sidedness uniform inside a batch where the back-culled pipeline matters. |
 | Occlusion for core meshes (`CulledMeshes`, `occlusion: true`, `@margoengine/culling`) | By method: occluders are last frame's kept instances of at least `occluderSize` pixels (default 8), redrawn with this frame's camera; only core's own batches occlude; a frame whose shader moves or discards surfaces (section planes) culls by frustum alone. | Hi-Z needs a depth the package can read, and core's depth target has no texture binding, so occluders are drawn a second time. | Hidden instances stop drawing from the second frame; the image matches core's. Each frame pays one depth pass and one pyramid. | Leave it off on open layouts, where the pass costs more than it saves. |
+| GPU culling of models (`CulledModels` in `@margoengine/culling/models`) | By method: covers primitives with `instances` (EXT_mesh_gpu_instancing, `PBRInstances`, `createInstancedMesh`), against the frustum and screen size. Skinned, morphed and non-instanced primitives are not culled; a displacing shader needs `padding`; the WebGL2 layer culls nothing. | Bounds of a deformed primitive are only known on the GPU, and a primitive without `instances` is one draw with no rows to compact. | Rows cost no CPU per frame; each culled primitive costs one uniform write and three dispatches. Non-instanced primitives still cost one draw each. | Give repeated objects `instances`. |
 
 ## Geometry
 

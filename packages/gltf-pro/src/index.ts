@@ -1006,6 +1006,12 @@ export interface PBRPrimitive {
   deformedOffset?: number;
   /** Draw once per instance (node space) in one instanced draw, see `PBRInstances` (@margoengine/gltf-pro/instancing); set for EXT_mesh_gpu_instancing nodes when `decoders.instancing` is passed. */
   instances?: PBRInstances;
+  /**
+   * Set by a GPU-culling package (`CulledModels` in @margoengine/culling/models) on a primitive with `instances`: its
+   * draws read rows from `instances` and drawIndexedIndirect arguments from `args` (offset 0), as core reads
+   * `Batch.redirect`. Depth casters, picking and export keep reading every row. A wireframe draw ignores it.
+   */
+  redirect?: { instances: GPUBuffer; args: GPUBuffer };
   /** The 80-byte-stride vertex and uint32 index buffers while the model is set up on a device (for picking and outlines). */
   buffers?: { vertex: GPUBuffer; index: GPUBuffer };
   /** Set for glTF POINTS (`point-list`) and LINES, LINE_LOOP, LINE_STRIP (`line-list`, as index pairs); absent for triangles. */
@@ -3278,7 +3284,9 @@ export class PBRModel implements EnginePlugin {
           topology = p.topology ?? (wireframe ? 'line-list' : undefined),
           index = wireframe?.index ?? r.index,
           count = wireframe?.count ?? p.indices.length;
-        const instances = inst?.upload(c.device);
+        const uploaded = inst?.upload(c.device),
+          redirect = inst && !wireframe ? p.redirect : undefined,
+          instances = redirect?.instances ?? uploaded;
         const a = node.matrix,
           det =
             a[0] * (a[5] * a[10] - a[6] * a[9]) -
@@ -3444,7 +3452,8 @@ export class PBRModel implements EnginePlugin {
           }
           setBuffers(bound, vertex, instances, index, vertexOffset);
           applyStencilReference(target, state);
-          if (inst) target.drawIndexed(count, inst.count);
+          if (redirect) target.drawIndexedIndirect(redirect.args, 0);
+          else if (inst) target.drawIndexed(count, inst.count);
           else target.drawIndexed(count);
         }
         setPipeline(bound, pipeline);
@@ -3458,7 +3467,8 @@ export class PBRModel implements EnginePlugin {
         setBuffers(bound, vertex, instances, index, vertexOffset);
         // A preceding material may have changed the reference on this shared pass.
         applyStencilReference(target, state);
-        if (inst) target.drawIndexed(count, inst.count);
+        if (redirect) target.drawIndexedIndirect(redirect.args, 0);
+        else if (inst) target.drawIndexed(count, inst.count);
         else target.drawIndexed(count);
         if (!external && !carry && blend && mode !== 'gbuffer' && !through && !capture) {
           pass!.end();

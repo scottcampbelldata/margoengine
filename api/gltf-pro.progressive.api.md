@@ -959,6 +959,10 @@ interface PBRPrimitive {
     deformed?: GPUBuffer;
     deformedOffset?: number;
     instances?: PBRInstances;
+    redirect?: {
+        instances: GPUBuffer;
+        args: GPUBuffer;
+    };
     buffers?: {
         vertex: GPUBuffer;
         index: GPUBuffer;

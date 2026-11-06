@@ -157,6 +157,43 @@ core's (`test/gpu/meshes-occlusion-check.mjs`).
 - It costs a depth pass and a pyramid, so it pays in dense or enclosed scenes. Only core's meshes occlude.
 - WebGL2 compatibility layer: frustum and screen size only, the same image with more drawn.
 
+## Loaded models and materials meshes: `CulledModels`
+
+`CulledModels` from `margoengine/culling/models` runs the same compute cull on the instanced primitives of gltf-pro
+models and materials meshes, whatever they were loaded or built from, so a forest of a million trees costs the CPU the
+same as ten.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {boxGeometry} from 'margoengine/geometry';
+import {Material, createInstancedMesh} from 'margoengine/materials';
+import {CulledModels} from 'margoengine/culling/models';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const trees = createInstancedMesh(engine, boxGeometry(1, 4, 1), new Material({color: '#3f7a4a'}), 50_000);
+for (let i = 0; i < 50_000; i++)
+  trees.instances.setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 250) * 3, 0, Math.floor(i / 250) * 3, 1]);
+
+const culled = CulledModels.attach(engine, [trees], {minRadius: 1});   // drops rows under 1 CSS px in radius too
+engine.start();
+setTimeout(async () => console.log(await culled.readCounts()), 1000);   // rows drawn per primitive
+```
+
+Each frame, before any draw, every primitive of an added model that has `instances` tests its rows against the frustum,
+compacts the kept rows in order, and sets `primitive.redirect`, gltf-pro's hook for this, which core's `Batch.redirect`
+matches; every draw of the primitive in that frame (main pass, SSAO, outline) reads the kept rows with one indirect draw.
+A glTF with EXT_mesh_gpu_instancing, a `PBRInstances` you assign and `createInstancedMesh` all go the same way. With no
+`minRadius` the image is the same as without culling.
+
+- `culled.add(model, {padding})` and `culled.remove(model)` work at any time. A shader that moves vertices past the
+  geometry, such as a displacement map, needs `padding` of at least the farthest it moves them, in the primitive's units.
+- Shadows, picking and export read every row, so casters outside the view still cast.
+- Skinned and morphed primitives are not culled: their bounds are only known on the GPU. Primitives without `instances`
+  draw as before, one draw each, so their CPU cost still grows with their number.
+- Frustum and screen size only: no occlusion here.
+- WebGL2 compatibility layer: nothing is culled and every row draws, the same image. The `@margoengine/webgl` renderer
+  is not supported (`MargoError` `'unsupported'`).
+
 ## Moving objects: `DynamicInstances`
 
 Tens or hundreds of thousands of objects that move, hide, appear and go, with a fixed amount of engine CPU work per

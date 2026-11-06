@@ -25,6 +25,68 @@ fn keep(s:vec4f)->bool {
 }
 `;
 
+/** The `Frame` and `Part` uniforms of the instance culls; `part` adds fields to `Part`. */
+export const cullInputs = (part = ''): string => `
+struct Frame {camera:mat4x4f,planes:array<vec4f,6>,size:vec4f}
+struct Part {count:u32,indices:u32,pad:vec2u,sphere:vec4f${part}}
+`;
+
+/**
+ * One dispatch triple per list of 96-byte instance records: frustum (+ screen size) test with a workgroup scan, a scan of
+ * the workgroup totals, then a stable scatter of the kept records (original order, so coplanar faces resolve as in core).
+ * `matrix` is the WGSL of record i's world matrix.
+ */
+export const instanceCull = (part: string, matrix: string): string => `${cullInputs(part)}
+struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
+@group(0) @binding(0) var<uniform> f:Frame;
+@group(0) @binding(1) var<uniform> b:Part;
+@group(0) @binding(2) var<storage,read> records:array<Record>;
+@group(0) @binding(3) var<storage,read_write> visible:array<u32>;
+@group(0) @binding(4) var<storage,read_write> local:array<u32>;
+@group(0) @binding(5) var<storage,read_write> groups:array<u32>;
+@group(0) @binding(6) var<storage,read_write> drawn:array<Record>;
+@group(0) @binding(7) var<storage,read_write> args:array<u32>;
+var<workgroup> scratch:array<u32,256>;
+${sphereCode}
+@compute @workgroup_size(256) fn cull(@builtin(global_invocation_id) g:vec3u,@builtin(local_invocation_index) l:u32,@builtin(workgroup_id) w:vec3u) {
+  let i=g.x;var v=0u;
+  if(i<b.count){if(keep(bound(${matrix}))){v=1u;}visible[i]=v;}
+  scratch[l]=v;workgroupBarrier();
+  for(var o=1u;o<256u;o=o<<1u){var t=0u;if(l>=o){t=scratch[l-o];}workgroupBarrier();scratch[l]+=t;workgroupBarrier();}
+  if(i<b.count){local[i]=scratch[l]-v;}
+  if(l==255u){groups[w.x]=scratch[255];}
+}
+@compute @workgroup_size(256) fn scan(@builtin(local_invocation_index) l:u32) {
+  let n=(b.count+255u)/256u;let per=(n+255u)/256u;let lo=min(l*per,n);let hi=min(lo+per,n);
+  var sum=0u;for(var k=lo;k<hi;k++){sum+=groups[k];}
+  scratch[l]=sum;workgroupBarrier();
+  for(var o=1u;o<256u;o=o<<1u){var t=0u;if(l>=o){t=scratch[l-o];}workgroupBarrier();scratch[l]+=t;workgroupBarrier();}
+  var run=scratch[l]-sum;for(var k=lo;k<hi;k++){let t=groups[k];groups[k]=run;run+=t;}
+}
+@compute @workgroup_size(256) fn scatter(@builtin(global_invocation_id) g:vec3u) {
+  let i=g.x;if(i>=b.count){return;}
+  let p=groups[i>>8u]+local[i];let v=visible[i];
+  if(v==1u){drawn[p]=records[i];}
+  if(i==b.count-1u){args[0]=b.indices;args[1]=p+v;args[2]=0u;args[3]=0u;args[4]=0u;}
+}
+`;
+
+/** Fills an instance cull's 44-float `Frame`: the camera, its planes, the width, pixels per unit and `minRadius` in device pixels. */
+export function fillFrame(
+  f: Float32Array,
+  c: { camera: { matrix: Float32Array; planes: ArrayLike<number> }; width: number; height: number },
+  canvas: { clientWidth: number },
+  minRadius: number,
+): void {
+  const m = c.camera.matrix,
+    ratio = canvas.clientWidth ? c.width / canvas.clientWidth : 1;
+  f.set(m);
+  f.set(c.camera.planes, 16);
+  f[40] = c.width;
+  f[41] = (Math.hypot(m[1], m[5], m[9]) * c.height) / 2;
+  f[42] = minRadius * ratio;
+}
+
 /** The occluder and Hi-Z tests of a world sphere; they read `u` and `hiz`. */
 export const occlusionCode = `
 // Screen radius in pixels (exact for perspective and orthographic cameras): large parts become occluders.
