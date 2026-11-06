@@ -815,6 +815,8 @@ export interface Resource {
   readonly bindings: number;
   declare(name: string, group: number, binding: number, compute: boolean): string;
   entries(device: GPUDevice, host: Host): GPUBindingResource[];
+  /** Runs after each ComputePass dispatch that binds it: a ping-pong pair swaps here. */
+  finish?(): void;
 }
 /**
  * One shader stage a host compiles nodes for (`vertex`, `fragment`, `post` or `compute`): the WGSL each built-in such

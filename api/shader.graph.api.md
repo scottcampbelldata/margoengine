@@ -274,6 +274,7 @@ interface Resource {
     readonly bindings: number;
     declare(name: string, group: number, binding: number, compute: boolean): string;
     entries(device: GPUDevice, host: Host): GPUBindingResource[];
+    finish?(): void;
 }
 
 type Scalar = 'f32' | 'i32' | 'u32' | 'bool';

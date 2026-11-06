@@ -274,6 +274,7 @@ export interface Resource {
     readonly bindings: number;
     declare(name: string, group: number, binding: number, compute: boolean): string;
     entries(device: GPUDevice, host: Host): GPUBindingResource[];
+    finish?(): void;
 }
 
 export const STMT = 4;

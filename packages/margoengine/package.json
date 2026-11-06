@@ -1630,6 +1630,10 @@
       "types": "./dist/shader/editor.d.ts",
       "import": "./dist/shader/editor.js"
     },
+    "./shader/compute-texture": {
+      "types": "./dist/shader/compute-texture.d.ts",
+      "import": "./dist/shader/compute-texture.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"

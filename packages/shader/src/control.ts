@@ -25,12 +25,13 @@ type Body = () => unknown;
 const fail = (message: string): never => {
   throw new TypeError(message);
 };
-/** Adds a statement to the body being recorded. */
-function push<T extends Node>(n: T, name: string): T {
+/** @internal Adds a statement to the body being recorded. */
+export function push<T extends Node>(n: T, name: string): T {
   (effects.list ?? fail(`${name} runs inside block(), a ComputePass body or another statement body`)).push(n);
   return n;
 }
-const statement = (args: Node[], emit: (b: Builder, n: Node) => void): Node =>
+/** @internal A node that writes statements and has no value. */
+export const statement = (args: Node[], emit: (b: Builder, n: Node) => void): Node =>
   new Node(
     'bool',
     'S' + unique(),

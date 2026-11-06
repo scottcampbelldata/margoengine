@@ -1,0 +1,87 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Compute texture check</title><style>body{margin:0}#host{width:200px;height:200px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/stage/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {createMesh} from '/packages/materials/dist/index.js';
+import {NodeMaterial,ComputePass,storage,uniform,texture,vec4,uvec2,ivec2,uint,float,Loop,If,Var,block} from '/packages/shader/dist/index.js';
+import {storageTexture,pingPong} from '/packages/shader/dist/compute-texture.js';
+import {computeReadback} from '/packages/shader/dist/readback.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const size=32;
+// Conway's life on a wrapped grid: the pair must swap after each dispatch or the generations come out wrong.
+const seed=new Uint8Array(size*size*4);
+{let s=12345;for(let i=0;i<size*size;i++){s=(s*1103515245+12345)&0x7fffffff;const v=(s>>16)&1?255:0;seed.set([v,0,0,255],i*4);}}
+const life=pingPong(size,size,{format:'rgba8unorm',data:seed});
+const step=new ComputePass(life.pixels,i=>{
+  const at=life.coord(i),x=at.x.toInt(),y=at.y.toInt(),sum=Var(0);
+  Loop({from:-1,to:2},dy=>{Loop({from:-1,to:2},dx=>{
+    If(dx.equal(0).and(dy.equal(0)),()=>{}).Else(()=>sum.addAssign(life.load(ivec2(x.add(dx).add(size).mod(size),y.add(dy).add(size).mod(size))).x));
+  });});
+  const me=life.load(at).x,n=sum.add(0.5).floor(),alive=n.equal(3).or(n.equal(2).and(me.greaterThan(0.5)));
+  const out=Var(0);If(alive,()=>out.assign(1));
+  return life.store(at,vec4(out,0,0,1));
+});
+const readTexel=async(t,bytesPerTexel,Kind)=>{
+  const bytesPerRow=Math.ceil(t.width*bytesPerTexel/256)*256,read=device.createBuffer({size:bytesPerRow*t.height,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+  encoder.copyTextureToBuffer({texture:t.texture(device)},{buffer:read,bytesPerRow},[t.width,t.height]);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);
+  const bytes=new Uint8Array(read.getMappedRange()),out=new Uint8Array(t.width*t.height*bytesPerTexel);
+  for(let y=0;y<t.height;y++)out.set(bytes.subarray(y*bytesPerRow,y*bytesPerRow+t.width*bytesPerTexel),y*t.width*bytesPerTexel);
+  read.unmap();read.destroy();return [...new Kind(out.buffer)];
+};
+const stepOnce=async(pass)=>{const encoder=device.createCommandEncoder();pass.encode(device,encoder,{width:1,height:1,delta:0});device.queue.submit([encoder.finish()]);await device.queue.onSubmittedWorkDone();};
+window.check={
+  seed:()=>[...seed],size,
+  // Eight generations by hand, then read the front image.
+  async life(){device.pushErrorScope('validation');for(let k=0;k<8;k++)await stepOnce(step);const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),texels:await readTexel(life,4,Uint8Array)};},
+  // A material samples the pair every frame: it must follow the front image as it swaps.
+  async follows(){
+    const tint=uniform([1,0,0,1],{name:'tint'}),t=pingPong(4,4),fill=new ComputePass(t.pixels,i=>t.store(t.coord(i),tint));
+    engine.use(fill);const mesh=createMesh(engine,planeGeometry(2,2),new NodeMaterial({shading:'basic',colorNode:texture(t).rgb}));
+    const grab=async()=>{engine.render();await device.queue.onSubmittedWorkDone();const c=document.querySelector('canvas');return c.toDataURL('image/png');};
+    const shots=[];for(const color of [[1,0,0,1],[0,1,0,1],[0,0,1,1]]){tint.value=color;shots.push(await grab());}
+    engine.removePlugin(fill.name);mesh.destroy();t.dispose();
+    return {shots,errors:errors.splice(0)};
+  },
+  // Every format writes and reads back through a second pass with textureLoad, and a chain of passes keeps the order.
+  async formats(list){
+    const out={};
+    for(const [format,value,Kind] of list){
+      device.pushErrorScope('validation');
+      const t=storageTexture(4,4,{format}),n=t.pixels,kind=/uint$/.test(format)?'u32':/sint$/.test(format)?'i32':'f32';
+      const write=new ComputePass(n,i=>t.store(t.coord(i),kind==='f32'?vec4(...value):(kind==='u32'?uvec4n(value):ivec4n(value))));
+      await stepOnce(write);
+      const type=kind==='f32'?'vec4f':kind==='u32'?'vec4u':'vec4i',target=storage(n,type);
+      const {data}=await computeReadback(device,n,i=>target.store(i,t.load(t.coord(i))),target);
+      const e=await device.popErrorScope();
+      out[format]={error:e?.message??null,first:[...data.slice(0,4)]};
+      t.dispose();target.dispose();
+    }
+    return {out,errors:errors.splice(0)};
+  },
+  // A blur that samples with texture(t, uv, 0) in compute: a 1-texel-wide bright column spreads into its neighbours.
+  async blur(){
+    const n=8,data=new Uint16Array(n*n*4),one=0x3c00;for(let y=0;y<n;y++)data.set([one,one,one,one],(y*n+4)*4);
+    const t=pingPong(n,n,{data,filter:'nearest'}),pass=new ComputePass(t.pixels,i=>{const at=t.coord(i),p=t.uv(at),px=1/n;return t.store(at,texture(t,p.sub(vec2c(px)),0).add(texture(t,p,0)).add(texture(t,p.add(vec2c(px)),0)).div(3));});
+    device.pushErrorScope('validation');await stepOnce(pass);const e=await device.popErrorScope();
+    const out=storage(n*n,'vec4f'),{data:row}=await computeReadback(device,n*n,i=>out.store(i,t.load(t.coord(i))),out);
+    t.dispose();out.dispose();return {error:e?.message??null,row:[...row].filter((_,k)=>k%4===0).slice(0,n),errors:errors.splice(0)};
+  },
+  // In place on r32float where the browser allows it: each texel adds one to itself on every dispatch.
+  async inPlace(){
+    if(!navigator.gpu.wgslLanguageFeatures?.has('readonly_and_readwrite_storage_textures'))return {skipped:true,errors:[]};
+    const t=storageTexture(4,4,{format:'r32float',readWrite:true}),pass=new ComputePass(t.pixels,i=>{const at=t.coord(i);return t.store(at,t.load(at).add(1));});
+    device.pushErrorScope('validation');await stepOnce(pass);await stepOnce(pass);await stepOnce(pass);const e=await device.popErrorScope();
+    const values=await readTexel(t,4,Float32Array);t.dispose();return {error:e?.message??null,values,errors:errors.splice(0)};
+  },
+  // A device loss brings the first contents back.
+  async restored(){
+    const data=new Uint8Array([1,2,3,4]),t=storageTexture(1,1,{format:'rgba8uint',data});
+    const before=await readTexel(t,4,Uint8Array);t.dispose();const after=await readTexel(t,4,Uint8Array);t.dispose();return {before,after};
+  },
+};
+const uvec4n=v=>uvec4c(...v),ivec4n=v=>ivec4c(...v);
+import {uvec4 as uvec4c,ivec4 as ivec4c,vec2 as vec2c} from '/packages/shader/dist/index.js';
+window.ready=true;
+</script></body></html>

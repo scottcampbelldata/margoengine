@@ -339,6 +339,7 @@ export class ComputePass implements EnginePlugin {
     pass.setBindGroup(0, this.group);
     pass.dispatchWorkgroups(Math.ceil(this.count / this.size));
     pass.end();
+    for (const r of this.program.resources) r.resource.finish?.();
   }
   onDeviceRestored(): void {
     this.pipeline = this.group = undefined;

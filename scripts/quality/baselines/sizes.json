@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5006295,
+  "total": 5011322,
   "history": [
     {
       "date": "2026-10-24",
@@ -2174,6 +2174,12 @@
       "commit": "7201eef90",
       "reason": "gltf gains the meshopt entry; the root reads fallback buffers",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "a9353333a",
+      "reason": "shader/compute-texture: new optional entry, storage textures and ping-pong pairs for ComputePass",
+      "grew": 2
     }
   ],
   "items": {
@@ -2574,13 +2580,14 @@
     "@margoengine/sciviz/colormaps": 4427,
     "@margoengine/sciviz/maths": 5638,
     "@margoengine/selection": 20446,
-    "@margoengine/shader": 14388,
+    "@margoengine/shader": 14385,
+    "@margoengine/shader/compute-texture": 4761,
     "@margoengine/shader/editor": 21836,
     "@margoengine/shader/effects": 8306,
     "@margoengine/shader/graph": 11088,
     "@margoengine/shader/noise": 4753,
     "@margoengine/shader/raw": 10429,
-    "@margoengine/shader/readback": 7620,
+    "@margoengine/shader/readback": 7889,
     "@margoengine/shadows": 17321,
     "@margoengine/shadows/virtual": 14601,
     "@margoengine/sky": 16975,

@@ -224,6 +224,35 @@ read back exactly (65 ms on an NVIDIA Ampere GPU in Edge), a job on an engine th
 submit and while mapping, engine disposal and `device.destroy()` at both points, and a pipeline over the storage-binding
 limit; every job destroyed its buffers and no GPU error escaped.
 
+## Compute that writes textures (`@margoengine/shader/compute-texture`)
+
+`storageTexture` is a texture a ComputePass writes; `pingPong` is a pair that a pass reads and writes in steps, for simulations, painting and repeated filters. Both work with `texture()`, so a material, NodePass or later pass reads them like any other texture.
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {ComputePass, NodeMaterial, texture, vec2, vec4} from 'margoengine/shader';
+import {pingPong} from 'margoengine/shader/compute-texture';
+const stage = await createStage('#app');
+const grid = pingPong(256, 256);                                     // rgba16float, zeros
+ComputePass.attach(stage.engine, grid.pixels, i => {
+  const at = grid.coord(i), p = grid.uv(at), step = vec2(1 / 256, 0);
+  const blur = texture(grid, p.sub(step), 0).add(texture(grid, p.add(step), 0)).mul(0.5);   // filtered reads of last step
+  return grid.store(at, blur.mul(0.99).add(vec4(p.x.mul(0.01))));                           // writes the next
+});
+createMesh(stage.engine, planeGeometry(2, 2), new NodeMaterial({shading: 'basic', colorNode: texture(grid).rgb}));
+```
+
+- **Formats.** All 16 that every WebGPU device can write: `rgba8unorm`, `rgba8snorm`, `rgba8uint`, `rgba8sint`, `rgba16float` (default), `rgba16uint`, `rgba16sint`, and `r32`, `rg32`, `rgba32` in `float`, `uint` and `sint`. `load` and `store` use `vec4f`, `vec4u` or `vec4i` to match. `texture()` works on `rgba8unorm`, `rgba8snorm`, `rgba16float`, and on 32-bit floats where the device has `float32-filterable`; other formats throw a MargoError `'unsupported'` when bound, and `load` reads them.
+- **The pair.** `load` and `texture()` read the front image; `store` writes the back one. A pass that stores swaps the pair after its dispatch, so two passes in a frame run as two steps, and a pass that only reads swaps nothing. `swap()` does it by hand. The back image holds the step before last, so write every texel you want kept.
+- **One texture, one role per pass.** A pass reads or writes a `storageTexture`, because WebGPU refuses both in one dispatch; doing both throws when the pass is built. For r32 formats, `{readWrite: true}` allows it in place, each invocation on its own texels; it needs the browser's WGSL feature `readonly_and_readwrite_storage_textures` and throws a MargoError `'unsupported'` without it. Reads and writes of different invocations are not ordered: use `pingPong` for neighbours.
+- **Helpers.** `t.pixels` is the count for one invocation per texel, `t.coord(i)` the texel of invocation `i`, and `t.uv(coord)` its centre as 0..1. `store` runs where it is made, also inside `If` and `Loop`. Options: `data` (first contents, and what a device loss restores), `filter`, `wrap`.
+- **Baking.** `t.texture(device)` is the GPUTexture to copy from. To get texels on the CPU, read them through `computeReadback`: `computeReadback(engine, t.pixels, i => out.store(i, t.load(t.coord(i))), out)`.
+- **Lifecycle.** `dispose()` (or `using`) destroys the GPU copies; the next use makes them again from `data`, as a device loss does. What compute wrote is not kept across either.
+
+`node packages/shader/test/compute-texture-check.mjs` (real GPU, under the GPU lock): eight generations of Conway's life on a 32 x 32 pair equal a CPU run, a material follows the pair as it swaps, all 16 formats write and read back through a second pass, a blur sampling in compute gives exact thirds, and in-place r32float counts to 3.
+
 ## Raw shaders (`@margoengine/shader/raw`, 10.1 kB min+gzip)
 
 Your own WGSL vertex and fragment
@@ -340,6 +369,7 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 - `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; `If` runs one. `discard` in a NodeMaterial affects the beauty pass only: shadows still see the whole surface, and a NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `texture(map, uv)`, `dpdx`, `dpdy` and `fwidth` inside an `If`, `Switch` or `While` on a per-pixel value, or a loop with a non-uniform bound or a `Break` on one, are a WGSL uniformity error, reported when the pipeline compiles; pass `texture` an explicit level there or sample before the branch.
 - Raw meshes are not picked by `engine.pick`, are not culled, and draw only into the main colour and depth: shadows, SSAO and SSR G-buffers and depth prepasses do not see them. Raw uniforms are scalars, vectors, mat3x3f and mat4x4f (no arrays or structs); no storage buffers or extra bind groups; one colour target; 32-bit attribute formats only.
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
+- Storage textures are 2D, one mip level, one sample; `@margoengine/shader/compute-texture` has no 3D or array form.
 - ComputePass is one-dimensional (up to 65535 workgroups), runs every frame while attached (`computeReadback` runs once) (an atomic counter keeps counting unless `update()` resets it), and has no workgroup memory, barriers or atomics on workgroup variables, and no `atomicSub`/`And`/`Or`/`Xor`/`Exchange`/`CompareExchange` yet. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
 - No GLSL/WebGL2 output, no node editor, no built-in noise library (write it with `Fn` or `wgslFn`), no light, shadow or environment nodes, no skinning or morph nodes, no MRT outputs.
 
