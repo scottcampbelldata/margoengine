@@ -301,6 +301,27 @@ console.log(half.triangles, half.error, lods.map((level) => level.triangles.afte
   give provenance.
 - `meshLODChain(mesh, {ratios = [0.5, 0.25, 0.125]})` simplifies each level from the previous one, so levels nest and
   seams match between them.
+## Remeshing
+
+Rebuild a messy or scanned mesh into even faces before sculpting, simulation or simplification:
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { remeshMesh, remeshMeshVoxels } from 'margoengine/mesh-edit/remesh';
+
+const box = createPrimitiveMesh('cube', 'box');
+// Even triangles on the same surface; the cube keeps its corners and creases.
+const even = remeshMesh(box, { targetLength: 0.1 });
+// A new closed surface from a voxel grid, with quad topology.
+const voxels = remeshMeshVoxels(box, { voxelSize: 0.05 });
+console.log(even.mesh.faces.length, voxels.quads.length, voxels.nonManifoldEdges);
+```
+
+- `remeshMesh(mesh, {targetLength, iterations = 5, sharpAngle = 40 degrees in radians, preserveSeams = true, createId, signal})` is isotropic remeshing (Botsch and Kobbelt, 2004): each round splits edges over 4/3 of the target, collapses those under 4/5, flips toward six neighbors per vertex, relaxes along the surface and snaps back onto the input. `targetLength` defaults to the mean edge length. Open edges, creases above `sharpAngle` and UV seams stay in place. Corner UVs carry over, and `sources` names the input face under each output face. The output is triangles.
+- `remeshMeshVoxels(mesh, {voxelSize, maxCells = 16777216, createId, signal})` builds a signed distance grid and extracts it with surface nets (Gibson, 1998). Whatever the input's triangles were, the result has edges of about `voxelSize`; gaps under a voxel close and details under a voxel go. The input must be closed (use `fillMeshHoles` first). Inside is decided by parity, so where two parts overlap the shared region counts as outside: union them first if that matters. UVs do not carry over.
+- A `PolygonMesh` face must be planar, so a warped grid quad is stored as two triangles. `quads` always lists the full quad topology as vertex indices of `mesh`.
+- `nonManifoldEdges` counts edges joining four faces, which happens where two sheets of the surface pass within a voxel. A finer `voxelSize` separates them.
+
 
 ## UV unwrap and lightmap UVs
 

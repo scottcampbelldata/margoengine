@@ -38,6 +38,10 @@
     "./modifiers": {
       "types": "./dist/modifiers.d.ts",
       "import": "./dist/modifiers.js"
+    },
+    "./remesh": {
+      "types": "./dist/remesh.d.ts",
+      "import": "./dist/remesh.js"
     }
   },
   "files": [

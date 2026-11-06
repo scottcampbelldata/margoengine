@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4493624,
+  "total": 4502346,
   "history": [
     {
       "date": "2026-10-24",
@@ -1652,6 +1652,12 @@
       "commit": "0c6ce3a25",
       "reason": "New mesh-edit entries ./boolean-exact and ./modifiers",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "62e44bced",
+      "reason": "New mesh-edit entry ./remesh: isotropic and voxel remeshing",
+      "grew": 2
     }
   ],
   "items": {
@@ -1906,6 +1912,7 @@
     "@margoengine/mesh-edit/boolean-exact": 9657,
     "@margoengine/mesh-edit/modeling": 32035,
     "@margoengine/mesh-edit/modifiers": 8566,
+    "@margoengine/mesh-edit/remesh": 8721,
     "@margoengine/mixer": 6926,
     "@margoengine/navmesh": 7120,
     "@margoengine/navmesh/build": 11699,
@@ -2137,6 +2144,7 @@
     "leak @margoengine/materials -> @margoengine/gltf-pro": 1,
     "leak @margoengine/materials/batched -> @margoengine/gltf-pro": 1,
     "leak @margoengine/mesh-edit -> @margoengine/bvh/tree": 1,
+    "leak @margoengine/mesh-edit/remesh -> @margoengine/bvh/tree": 1,
     "leak @margoengine/oit/meshes -> @margoengine/gltf-pro": 1,
     "leak @margoengine/oit/meshes -> @margoengine/materials": 1,
     "leak @margoengine/shader -> @margoengine/gltf-pro": 1,

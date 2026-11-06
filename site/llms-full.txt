@@ -2562,7 +2562,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-062). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-063). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2640,6 +2640,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Exact booleans (`@margoengine/mesh-edit/boolean-exact`) | Enforced by method: every side test and all topology are exact, then corners round to float64. Faces thinner than about 4e-9 of their length, or a few float64 steps, fold away; `collapsedFaces` counts them. Inputs must not intersect themselves. Measured 0.8 s for one operation on 1,728 faces and 40 to 75 s on 10,368 (work grows with faces squared). | `PolygonMesh` stores float64 corners and every face must pass the validity check, so a true result thinner than that has no valid float64 face. | A closed valid mesh that can differ from the exact solid by about 4e-9 of a face length; `MargoError` `failed` for a self-intersecting input. | `booleanMeshes` in `/modeling` is faster on clean inputs; scale thin features up, or split large meshes. |
 | Modifier stack (`@margoengine/mesh-edit/modifiers`) | Enforced: array `count` 1 to 4096, screw `steps` up to 4096, lattice 2 to 16 controls per axis. Not checked: walls thicker than a concave radius fold over themselves, and a screw profile is a surface because `PolygonMesh` has no loose edges. | The stack stays pure CPU work on valid polygon meshes; those limits bound one evaluate. | `RangeError` or `TypeError` from `evaluate`; a folded wall has faces that cross, with no error. | Thin the wall, or run `booleanMeshesExact` on the parts. |
 | Smoothing (`smoothMesh` in `@margoengine/mesh-edit/modeling`) | Enforced: 1 to 10,000 passes. By method: neighbors weigh equally, so uneven triangles drift along the surface. | Equal weights need no angle data and are what Taubin's method describes; cotangent weights fail on the thin triangles scans have. | Volume stays within 2% on a noisy sphere over 20 passes; very uneven meshes change shape slightly along the surface. | Run `remeshMesh` first. |
+| Remeshing (`@margoengine/mesh-edit/remesh`) | Enforced: voxel grids stop at `maxCells`, 16,777,216 by default, and need a closed input. By method: isotropic output is triangles, a warped voxel quad is stored as two triangles (`quads` keeps the topology), parity counts an overlap of two parts as outside, and UVs do not carry through voxels. | Faces must be planar, and a grid has no link back to corner UVs. | `RangeError` above `maxCells`; `TypeError` for open input; `nonManifoldEdges` above 0 where two sheets pass within a voxel. | Raise `voxelSize` or `maxCells`; `fillMeshHoles` closes input; `booleanMeshesExact` unions overlapping parts first. |
 
 ## Entities
 

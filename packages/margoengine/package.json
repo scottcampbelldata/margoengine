@@ -1018,6 +1018,10 @@
       "types": "./dist/mesh-edit/modifiers.d.ts",
       "import": "./dist/mesh-edit/modifiers.js"
     },
+    "./mesh-edit/remesh": {
+      "types": "./dist/mesh-edit/remesh.d.ts",
+      "import": "./dist/mesh-edit/remesh.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"
