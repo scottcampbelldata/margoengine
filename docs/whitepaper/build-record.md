@@ -955,11 +955,12 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 
 | Gap | Job | Status | Commit | Claim |
 | --- | --- | --- | --- | --- |
-| C20 | Claims read PROVEN on stand-in proof: seven now read PROVEN (STAND-IN) and say what stood in; LIM-193 and LIM-197 name the real run in LIM-208 | DONE | `28bf8fb66` | LIM-091, 109, 120, 129, 134, 149, 151, 193, 197 |
+| C20 | Claims read PROVEN on stand-in proof: seven now read PROVEN (STAND-IN) and say what stood in; LIM-193 and LIM-197 name the real run in LIM-208 | DONE | `e4d931a4c` | LIM-091, 109, 120, 129, 134, 149, 151, 193, 197 |
+| B8 | loadAuto moves on a limit only the light loader has, and gltf-pro keeps a file's instances | DONE | `28bf8fb66` | LIM-174 |
 | B9 | MeshBridge.sync writes through TransformWriter, one write per group for each run of changed rows | DONE | `e1daa8a3e` | - |
 | B17 | engine.onFrame callbacks run on a headless stage's step | DONE | `8fdc212d4` | - |
 | A9 | resolveFromURL reads LDraw parts from a hosted library, and the README says where to get it | DONE | `69ad9dc6d` | - |
-| A8 | The headless README opens with the ffmpeg need for video in Node | DONE | this commit | - |
+| A8 | The headless README opens with the ffmpeg need for video in Node | DONE | `22b5cdaa7` | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 
@@ -977,5 +978,3 @@ Batch 39 built a second LAS reader with a hook and said no decoder existed, whil
 - **Limits:** formats 4, 5 and 9 and the channel samples are real points that LASzip compressed, because no public file was found: LASzip wrote them, Margo did not. Compressor 0, compressor 1 with version 2 items and chunk size 0 are stand-in proof, on the test encoder, because no tool here writes them. LAZ item version 1 stays refused: neither the LAZ specification 1.4 R1 nor the LASzip paper describes it, and real samples of it exist. The LAStools sample files matched too but have no clear licence, so they are not committed.
 - **Unmeasured:** no speed was measured, and no file larger than the 697,721 points of `las_with_several_extra_byte_bloc.laz` was read.
 - **Gate:** lint, hygiene, verify, the points and loaders tests and browser tests and `tests/claims-file.test.js`, the push from one script gated on exit codes. Verify failed three times first, each fixed before the push: the `sizes` and `duplicates` gates, which led to dropping two value re-exports from `loaders/las` and holding `points/las` as a base and a lazy part; `tests/dist-dynamic-imports.test.js`, as `points/copc` imported the decoder statically, now `import()`; and the `points/copc` budget after that move. Budgets of `points/las`, `/laz` and `/copc` grew, with the reason in `scripts/quality/baselines/sizes.json` and the figures in `docs/limits.md`. Nothing failed reached `main`.
-| C20 | Claims read PROVEN on stand-in proof: seven now read PROVEN (STAND-IN) and say what stood in; LIM-193 and LIM-197 name the real run in LIM-208 | DONE | `e4d931a4c` | LIM-091, 109, 120, 129, 134, 149, 151, 193, 197 |
-| B8 | loadAuto moves on a limit only the light loader has, and gltf-pro keeps a file's instances | DONE | this commit | LIM-174 |
