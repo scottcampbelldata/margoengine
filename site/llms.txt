@@ -234,7 +234,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/animation API](https://margoengine.com/llms/api/animation.md): 11 entry points
 - [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 9 entry points
 - [@margoengine/kinematics-constraints API](https://margoengine.com/llms/api/kinematics-constraints.md): 1 entry point
-- [@margoengine/rigging API](https://margoengine.com/llms/api/rigging.md): 8 entry points
+- [@margoengine/rigging API](https://margoengine.com/llms/api/rigging.md): 9 entry points
 - [@margoengine/tween API](https://margoengine.com/llms/api/tween.md): 1 entry point
 - [@margoengine/cinematic API](https://margoengine.com/llms/api/cinematic.md): 1 entry point
 - [@margoengine/cutscene API](https://margoengine.com/llms/api/cutscene.md): 1 entry point

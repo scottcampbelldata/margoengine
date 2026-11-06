@@ -696,6 +696,7 @@ Maya, Pinocchio, libigl, three.js, Babylon, Godot, Unity, Unreal and the like) w
 | VRM avatars (`rigging/vrm`) | The VRMC_vrm 1.0 and VRMC_springBone 1.0 specifications (VRM Consortium) and the glTF 2.0 binary container specification (Khronos); the two sample avatars are data, read and never studied for code |
 | Voxel weights (`rigging/voxel-weights`) | O. Dionne and M. de Lasa, "Geodesic voxel binding for production character meshes", SCA 2013; the fill vote for open meshes is ours |
 | Corrective shapes (`rigging/correctives`) | J. P. Lewis, M. Cordner and N. Fong, "Pose space deformation", SIGGRAPH 2000, for the radial basis interpolation; the single-joint reading is plain rotation-vector projection |
+| Weight transfer (`rigging/transfer`) | R. Abdrashitov, K. Raichstat, J. Monsen and D. Hill, "Robust skin weights transfer via weight inpainting", SIGGRAPH Asia 2023 Technical Communications, for matching by distance and normal; the fill is a plain weighted average, not its inpainting solve |
 
 ## Game AI: `@margoengine/behavior`
 

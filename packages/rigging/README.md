@@ -406,6 +406,36 @@ console.log(shoulder.evaluate(() => [0, 0, r, r])); // [{ node: 2, target: 4, we
 
 Shapes on one target add up, then clamp to 0 to 1. `width` on a pose space sets the Gaussian width in radians; the default is the mean angle from each sample to its nearest neighbour. Pose spaces are solved once when made. `Correctives` is plain data, so `evaluate(rotationOf, restOf)` runs with no engine. A driven morph target belongs to the correctives: a clip's track on it is overwritten.
 
+## Weight transfer (`margoengine/rigging/transfer`)
+
+Copies skin weights from a rigged mesh to clothing, or to any mesh around it. Each vertex takes the weights at the closest point of the source's surface, read across that triangle. A match counts only when it is near and the two surfaces lie alike, so a sleeve vertex next to the torso does not take the torso's weights; those vertices are filled in from the matched ones around them, over the target's own surface.
+
+```ts
+import { WeightMap } from 'margoengine/rigging';
+import { transferWeights } from 'margoengine/rigging/transfer';
+
+// A rigged triangle with one bone per corner, and a smaller one 1 cm in front of it.
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+const body = { positions, indices: [0, 1, 2], weights: new WeightMap(3, 3, [1, 0, 0, 0, 1, 0, 0, 0, 1]) };
+const shirt = { positions: new Float32Array([0.1, 0.1, 0.01, 0.5, 0.1, 0.01, 0.1, 0.5, 0.01]), indices: [0, 1, 2] };
+const { weights, matched, filled } = await transferWeights(body, shirt);
+console.log(weights.toInfluences(), matched, filled);
+```
+
+`weights` on the source is a `WeightMap`, or `{ joints, weights }` as JOINTS_0 and WEIGHTS_0 hold them. Both meshes share one space, so pose them alike first.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `maxDistance` | `0.05` | Farthest a match may be, as a fraction of the source's size. |
+| `maxAngle` | `60` | Largest angle between the two surfaces at a match, degrees. Either facing counts, because cloth is often one layer with its normals any way round. |
+| `iterations` | `1000` | Most sweeps of the fill; it stops sooner once weights settle. |
+| `threshold` | `1e-4` | Weights below this are dropped before renormalising. |
+| `boneCount` | the source's | Bones in the result, for influences that do not use the last ones. |
+| `weld` | `1e-6` | Welding tolerance of the target as a fraction of its size. |
+| `signal` | none | Cancels the transfer. |
+
+`matched` and `filled` count target points. A part of the target with no match at all, such as a hat clear of the head, keeps the closest weights as they are.
+
 ## Retarget presets (`margoengine/rigging/retarget`)
 
 Clips made for one skeleton play on another: `prepareRetarget(source, target)` recognises each rig's naming (Mixamo with any `mixamorig` prefix, Godot's humanoid profile, Roblox R15, the joints of `@margoengine/exporters/skin`'s `humanoidJoints()`, or the 55 humanoid bone names themselves), maps every target bone to its source bone, and by default turns the target's reference pose so each bone points the way the source's does at rest (an A-pose character driven by T-pose clips). Pass the result to `@margoengine/animation`'s `Retarget`:

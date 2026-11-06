@@ -1738,6 +1738,10 @@
       "types": "./dist/rigging/correctives.d.ts",
       "import": "./dist/rigging/correctives.js"
     },
+    "./rigging/transfer": {
+      "types": "./dist/rigging/transfer.d.ts",
+      "import": "./dist/rigging/transfer.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

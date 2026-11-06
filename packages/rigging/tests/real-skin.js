@@ -31,7 +31,10 @@ function accessorReader(doc, bin) {
   };
 }
 
-/** The first node's mesh with `skin` (or the mesh named by `pick`) as test data. */
+/**
+ * The first node with a mesh and a skin that `pick` passes, as test data. `parts` lists its primitives: each one's first
+ * vertex, vertex count and own indices.
+ */
 export function realSkin(url, pick = () => true) {
   const chunks = glbChunks(new Uint8Array(readFileSync(url))),
     doc = JSON.parse(new TextDecoder().decode(chunks.find((c) => c.type === GLB_JSON).data)),
@@ -54,7 +57,8 @@ export function realSkin(url, pick = () => true) {
   });
   const positions = [],
     indices = [],
-    authored = [];
+    authored = [],
+    parts = [];
   for (const primitive of doc.meshes[node.mesh].primitives) {
     const base = positions.length / 3,
       p = accessor(primitive.attributes.POSITION),
@@ -63,6 +67,7 @@ export function realSkin(url, pick = () => true) {
       list = primitive.indices === undefined ? Array.from({ length: p.length / 3 }, (_, i) => i) : accessor(primitive.indices),
       scale = { 5121: 255, 5123: 65535 }[doc.accessors[primitive.attributes.WEIGHTS_0].componentType] ?? 1;
     positions.push(...p);
+    parts.push({ first: base, count: p.length / 3, indices: Uint32Array.from(list) });
     for (const i of list) indices.push(base + i);
     for (let v = 0; v < p.length / 3; v++) {
       const row = new Map();
@@ -75,6 +80,7 @@ export function realSkin(url, pick = () => true) {
     joints,
     mesh: { positions: Float32Array.from(positions), indices: Uint32Array.from(indices) },
     authored,
+    parts,
   };
 }
 

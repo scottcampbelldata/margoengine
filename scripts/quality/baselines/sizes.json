@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7396830,
+  "total": 7400510,
   "history": [
     {
       "date": "2026-10-24",
@@ -2552,6 +2552,12 @@
       "commit": "8fad0f658",
       "reason": "new entry jxl ships a lazily fetched 1.7 MB Wasm, and decodePNG gains bitDepth",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "5cd082ccd",
+      "reason": "feat(rigging): weight transfer (new entry @margoengine/rigging/transfer)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2986,6 +2992,7 @@
     "@margoengine/rigging/ik": 3740,
     "@margoengine/rigging/retarget": 2862,
     "@margoengine/rigging/springs": 5069,
+    "@margoengine/rigging/transfer": 3680,
     "@margoengine/rigging/voxel-weights": 5535,
     "@margoengine/rigging/vrm": 10526,
     "@margoengine/road": 1171,
