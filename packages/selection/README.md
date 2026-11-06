@@ -145,5 +145,25 @@ Width is viewport pixels, 1..32. The selection mask uses the matching core or re
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/selection
+## On the WebGL2 preview
+
+`Picking` and `HoverHighlight` run on the preview when `webglPicking` is attached first. They find core meshes, a hit holds
+`mesh` only, `pickMany` makes one pick a point, overlays refuse with `unsupported`, and `Selection` cannot draw there, so
+hover shows through `onHover`:
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {HoverHighlight, Picking} from 'margoengine/selection';
+import {webglPicking, webglRenderer} from 'margoengine/webgl/pick';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgl2', fallback: webglRenderer});
+engine.createMesh().setGeometry(box());
+engine.start();
+engine.use(webglPicking());
+const picking = Picking.attach(engine);
+HoverHighlight.attach(engine, {picking, onHover: (mesh) => console.log(mesh)});
+```
+
 Real WebGPU checks: npm run test:browser --workspace @margoengine/selection
 

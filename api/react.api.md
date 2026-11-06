@@ -4,6 +4,7 @@
 
 ```ts
 import { Camera, EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, RenderView, Vec3 } from "@margoengine/core";
+import { EnginePlugin } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 import { Stage } from "@margoengine/stage";
 import { CSSProperties, ReactNode } from "react";
@@ -26,6 +27,7 @@ export interface CanvasProps extends EngineOptions {
     maxDpr?: number;
     loadFallback?: (signal: AbortSignal) => Promise<RendererFactory | {
         webglRenderer: RendererFactory;
+        webglPicking?: () => EnginePlugin;
     }>;
     fallbackContent?: ReactNode;
 }

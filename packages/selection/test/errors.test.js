@@ -12,7 +12,7 @@ test('selection and picking throw coded errors that name the fix', () => {
     code: 'unsupported',
     message: /WebGPU/,
   });
-  assert.throws(() => new Picking().setup({ gpu: null }), {
+  assert.throws(() => new Picking().setup({ gpu: null, hasPlugin: () => false }), {
     name: 'MargoError',
     code: 'unsupported',
     message: /WebGPU/,

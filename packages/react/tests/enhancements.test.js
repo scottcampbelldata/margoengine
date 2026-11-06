@@ -584,6 +584,28 @@ test('canvas skips picking without handlers and on an unsupported WebGL backend'
   assert.deepEqual(errors, []);
 });
 
+test('the WebGL2 preview picks once webglPicking is there, from loadFallback or attached by the app', async () => {
+  const webglRenderer = () => ({ backend: 'webgl2' }),
+    webglPicking = () => ({ name: 'webgl-pick', setup() {} });
+  for (const props of [
+    { backend: 'webgl2', loadFallback: async () => ({ webglRenderer, webglPicking }) },
+    { backend: 'webgl2', fallback: webglRenderer, onCreated: (stage) => stage.engine.use(webglPicking()) },
+  ]) {
+    let clicks = 0;
+    const view = render(tree(React.createElement(Mesh, { onClick: () => clicks++ }), props));
+    await flush();
+    const engine = engines.at(-1);
+    assert.equal(engine.plugins.has('webgl-pick'), true);
+    engine.hit = [...engine.meshes.values()][0];
+    engine.canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 300 });
+    await pointer(engine.canvas, 'pointerdown', 5, 6);
+    await pointer(engine.canvas, 'pointerup', 5, 6);
+    assert.equal(clicks, 1);
+    assert.deepEqual(engine.picks.at(-1), [5, 6]);
+    view.unmount();
+  }
+});
+
 test('Model pointer handlers dispatch for a loaded primitive and update without reloading', async () => {
   let first = 0,
     second = 0;

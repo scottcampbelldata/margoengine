@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9043685,
+  "total": 9013637,
   "history": [
     {
       "date": "2026-10-24",
@@ -2780,6 +2780,12 @@
       "commit": "bbb2459dd",
       "reason": "gltf-pro and materials gain KHR_materials_volume_scatter",
       "grew": 7
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "6da9526b0",
+      "reason": "webgl/pick now re-exports webglRenderer so one loadFallback import gives a React Canvas both; the renderer is needed wherever this entry runs",
+      "grew": 1
     }
   ],
   "items": {
@@ -3386,7 +3392,7 @@
     "@margoengine/weather/hail": 4278,
     "@margoengine/webgl": 3663,
     "@margoengine/webgl/auto": 3942,
-    "@margoengine/webgl/pick": 2385,
+    "@margoengine/webgl/pick": 5010,
     "@margoengine/webgl/restore": 1097,
     "@margoengine/webgl2-compat": 102814,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 72383,

@@ -2810,7 +2810,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | --- | --- | --- | --- | --- |
 | WebGPU compatibility level (`@margoengine/webgl2-compat/adapter`, 2026-11-05, packages 2026-11-06) | Checked on a forced device (Chromium, RTX A6000, D3D12), not yet on a real OpenGL ES or Direct3D 11 class GPU. Runs: core (same pixels as the full level), pick, device restore, materials `createMesh` and `createInstancedMesh`, `Shadows` (same pixels as the full level, soft shadow on a floor), `CulledInstances`, `PostStack` with `Bloom` and `Tonemap`. | The level forbids `textureLoad` of depth texture types, `sample_index` and a plain sampler on a depth texture, two views of one texture in a dispatch, and multisampled `rgba16float`. The adapter rewrites depth textures that are only loaded to float types; `Shadows` binds its map twice, `SceneTarget` copies depth with a masked draw per sample, `Bloom` keeps each level in its own texture, and `PostStack` captures 4x in `rg11b10ufloat`. | Accepted difference: that capture has less precision and no alpha, measured at most 2 of 255 from the full level on the Bloom and Tonemap frame, 4,066 of 16,384 bytes differing. An adapter without `rg11b10ufloat-renderable` gets a validation error at a 4x capture. Fog, volumetrics, points, water spray and soft `VirtualShadows` are in [known-bugs.md](known-bugs.md). A real older GPU also has its own lower limits, which a forced run cannot show. | Install `@margoengine/webgl2-compat` instead on such a device: all of these run there. |
 | Rendering in a worker (`@margoengine/worker`, 2026-11-05) | Proved on Chromium with a real GPU: core, a control package, the stage class and the WebGL2 fallback run on a transferred canvas with no core change, and neither thread stops the other ([browser-check.mjs](../packages/worker/tests/browser-check.mjs)). Firefox and Safari have not been run. | A worker has no DOM: it cannot stop a browser default in time, and pointer lock stays on the page. | The page stops `wheel` and `contextmenu` defaults once the worker listens for them, and no other; input arrives one message later; `mount` needs a page. | `new Stage(engine)` in the worker; a page path behind `workerCanvasSupported()`. |
-| Picking on the WebGL2 preview (`@margoengine/webgl/pick`, 2026-11-06) | Proved in Chromium on real WebGL2: CSS pixels, depth, single and double-sided faces, hidden meshes, views, layers, and a canvas left unchanged ([browser-check.mjs](../packages/webgl/test/browser-check.mjs)). Firefox and Safari have not been run. Mesh ids up to 16,777,216, the largest whole number a 32-bit float holds. | Core's pick refuses every renderer but WebGPU's before any plugin hook, so the plugin covers `pick` and `render` on that one engine; core stays frozen. | Each pick blocks on one `readPixels` and refreshes the scene as a frame does. A plugin's `onPick` is not called, and `Picking` from `@margoengine/selection` still needs WebGPU. | `engine.pick` on WebGPU or the compatibility layer. |
+| Picking on the WebGL2 preview (`@margoengine/webgl/pick`, 2026-11-06) | Proved in Chromium on real WebGL2: CSS pixels, depth, single and double-sided faces, hidden meshes, views, layers, a canvas left unchanged, `Picking` and `HoverHighlight` from `selection`, which answer with the mesh only and take one pick a point in `pickMany`, and React pointer handlers ([browser-check.mjs](../packages/webgl/test/browser-check.mjs)). Firefox and Safari have not been run. Mesh ids up to 16,777,216, the largest whole number a 32-bit float holds. | Core's pick refuses every renderer but WebGPU's before any plugin hook, so the plugin covers `pick` and `render` on that one engine; core stays frozen. | Each pick blocks on one `readPixels` and refreshes the scene as a frame does. A plugin's `onPick` is not called, and `Picking` from `@margoengine/selection` still needs WebGPU. | `engine.pick` on WebGPU or the compatibility layer. |
 | Context restore on the WebGL2 preview (`@margoengine/webgl/restore`, 2026-11-06) | Proved in Chromium with `WEBGL_lose_context`: identical pixels after a loss, picks, geometry added during the loss, `onDeviceRestored` in each scene, and a reboot on a live context ([browser-check.mjs](../packages/webgl/test/browser-check.mjs)). Firefox and Safari have not been run. `rebootDevice` waits 30,000 ms by default (`timeout`) for a lost context. | The browser decides whether a lost context returns, and the plugin must be attached before the loss, or the browser never gives it back. | Frames draw nothing during a loss. A timed-out wait reports `timeout`, and a later restore still recovers. An app that draws on demand draws again itself, from `onDeviceRestored`. | A new engine on a new canvas. |
 | XR on the WebGL2 compatibility layer (`@margoengine/webgl2-compat/xr`, 2026-11-06) | Run on real devices with stand-ins for `navigator.xr`, `XRGPUBinding` and `XRWebGLLayer`: no pixel differs from native WebGPU in either eye (Chromium, RTX A6000, [xr-browser.mjs](../packages/webgl2-compat/test/xr-browser.mjs)). No headset or phone has run it, and Firefox and Safari have not been run. | WebGL2 sessions show an `XRWebGLLayer`, whose framebuffer takes draws only, and its depth buffer cannot be filled from another texture. | One extra full-eye copy a frame, and no depth for the compositor to reproject by. The first frame that makes a compute pipeline shows nothing while the compute runtime loads. | `installXR({ framebufferScale })` to trade sharpness for speed; WebGPU where the browser has it. |
 | Automatic escalation from the preview (`@margoengine/webgl/auto`, 2026-11-06) | Proved in Chromium with WebGPU removed and with it present ([browser-check.mjs](../packages/webgl/test/browser-check.mjs)). Firefox and Safari have not been run. Only a refusal (code `unsupported`) during `setup` escalates, and only with `loadCompat`. | The layer cannot show frames on a canvas that holds the preview's context, and a canvas keeps its first context, so the element is replaced with a copy; listeners on the old element do not carry over. The app passes the import because no package may name the layer ([isolation.test.js](../packages/webgl2-compat/test/isolation.test.js)). | `setup` runs twice when escalating. A package added after `setup` refuses as usual. The React `Canvas` does not use this path. | Install the layer yourself before `Engine.create`, as its README shows. |
@@ -3148,17 +3148,6 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   and not at 1280 x 720 (0 of 11 loads). First seen as 20 (light then high) and 30 (high then high), with the rate of the page's own `requestAnimationFrame` the same, frame CPU
   2 ms and the GPU 24% busy. Cause not found. Ruled out: GPU load, CPU load, the back-forward cache as the only cause, and the old page's device (destroying it on `pagehide`
   still gave 3 of 25). A plain WebGPU page that only clears held 60 in 20 of 20 loads at the same size, so a frame's real work plays a part. Safari not run.
-
-### React pointer handlers stay off on the WebGL2 preview
-
-- **What:** `@margoengine/webgl/pick` gives the preview a working `engine.pick`, but the React `Canvas` still ignores
-  `onClick`, `onPointerOver` and `onPointerOut` on the preview and warns that picking needs WebGPU. Apps that call
-  `engine.pick` themselves work.
-- **Repro:** a `Canvas` with `backend="webgl2"` and `loadFallback`, a mesh with `onClick`, and
-  `engine.use(webglPicking())`: the handler never runs.
-- **Cause:** `canPick` in `packages/react/src/components.tsx` returns false for every `webgl2` engine, and the dev warning
-  in the same file fires on the same test.
-- **Needed to close:** both tests also ask `engine.plugins.has('webgl-pick')`, with a test in the React package.
 
 ### The path tracer never compiles on ANGLE Direct3D 11 (parked)
 
@@ -3694,6 +3683,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| The result cache shadow report said "same inputs built different bytes" for `build:package:fbx` and `build:package:usdz` after a rebase | The builds are deterministic (two builds of each gave the same hash). The key was short: a worker bundle and any subpath outside the external list take in the dist of another package, which the bundler reads natively, and a package build declared only its own sources and `packages/shared`. A rebase that changed only `gltf-pro` changed `dist/workers/fbx.js` on an equal key. Changing one string in `gltf-pro`'s dist and building the two packages alone moved both hashes, and restoring it moved them back | A package build now keys on the dist of every package the build order puts before it, near and far (`packageClosure`), so a dependency's change is a changed input. Key version 3, so old entries miss | `tests/result-cache.test.js` |
 | `PotreeSource` lost about 70% of a real 1.7 folder: `lion_takanawa_normals` read 101,456 of 341,989 points | PotreeConverter writes 0 points in the `.hrc` record of a leaf. The reader took that as an empty node and dropped it; the test writer never wrote such a record, so only a real folder showed it | A listed leaf of 0 points takes its count from its file when `load` reads it | `packages/points/tests/potree-real.test.js`, `packages/points/tests/potree.test.js` ("a leaf whose record says 0 points") |
 | `solvePoseIK`, `addIKChain`, `addCCDChain`, `addLookAt`, `addFootIK` and the shared pose tools (foot placement, warping, full-body IK, spline IK) threw on scales such as 0.9995, 1, 0.9986, which real exporters write | Each compared the three scales with a 1e-5 limit, because it read one scale for all axes | Each axis keeps its own scale; only flat and mirrored matrices are refused | The "off uniform" tests in `packages/rigging/tests/ik.test.js`, `packages/rigging/tests/ik-animator.test.js`, `tests/modern-animator-ccd.test.js`, `tests/modern-animator-look-at.test.js`, `tests/modern-animator-depth.test.js` |
 | npm run verify hung once in its unit test step until its 1,500 s limit, with no test named, on 2026-11-06 | Likely `packages/voxel-net/tests/server.test.js`: under load a generator thread made the folder removal fail with ENOTEMPTY, a failed hook ends the hooks, the server stayed open and the file never ended (3 of 192 runs). The first run's log was not kept, so the link is inference from its load and symptom | Hooks in the order that closes the server first (`af185850f`, 0 of 256 runs). A leak of this shape now fails as `HUNG TEST:` with the file and test, and `--test-force-exit` stays off because it would hide the leak | `tests/test-watch.test.js`, "a real hang is named" |
@@ -4214,7 +4204,8 @@ const fallback = navigator.gpu ? undefined : (await import('margoengine/webgl'))
 const engine = await Engine.create(canvas, {fallback});
 ```
 
-In React, use the Canvas props `loadFallback={() => import('margoengine/webgl')}` and `fallbackContent`
+In React, use the Canvas props `loadFallback={() => import('margoengine/webgl')}` and `fallbackContent`; load
+`margoengine/webgl/pick` there instead when the scene has pointer handlers
 (see the [React README](../react/README.md)).
 
 `fallback: canvas => webglRenderer(canvas, {transparent: true})` gives the WebGL2 canvas `alpha: true`
@@ -4249,8 +4240,10 @@ Each pick refreshes the scene as a frame does (without changing the canvas), dra
 that one pixel with a blocking `readPixels`. The program and target are made by the first pick. A view that draws into a
 texture cannot be picked here, because the preview refuses to draw one. `engine.removePlugin('webgl-pick')` gives the
 engine back core's answer. Picking covers the core meshes this renderer draws: a plugin's `onPick` hook is not called
-on the preview, and `Picking` from `margoengine/selection` still needs WebGPU. The React Canvas keeps its pointer
-handlers off on the preview ([known-bugs.md](../../docs/known-bugs.md)).
+on the preview. `Picking` from `margoengine/selection` attaches after this plugin and answers through it, so
+`HoverHighlight` works with `onHover`; a hit holds the mesh only, and `pickMany` costs one such pick a point. `/pick` also
+exports `webglRenderer`, so a React Canvas gets working pointer handlers from
+`loadFallback={() => import('margoengine/webgl/pick')}`.
 
 ## Lost contexts
 
@@ -4270,9 +4263,6 @@ engine.createMesh().setGeometry(box());
 engine.use(webglRestore({timeout: 30_000}));
 engine.onError = (error) => console.error(error);
 engine.start();
-
-// Rebuilds at once on a live context; on a lost one, resolves when the browser gives it back.
-await engine.rebootDevice();
 ```
 
 [README continues: https://margoengine.com/llms/packages/webgl.md]

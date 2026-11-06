@@ -162,10 +162,11 @@ from the DOM. These rules come from the code in `src/components.tsx` and apply t
   the mesh that is drawn, and use one handler function for several meshes if they share behaviour.
 - **An orbit drag is not a click.** A click needs the pointer to move no more than 3 CSS pixels between press and
   release, and only the primary button counts.
-- **WebGPU only.** `engine.pick` needs WebGPU, so on the WebGL2 fallback no handler fires. In development the Canvas
-  prints one `MargoError` (code `unsupported`) the first time a handler is registered on the fallback, and nothing in a
-  production build. The fix is to handle input on the canvas element yourself, or to show `fallbackContent` instead of
-  a scene that depends on clicks when WebGPU is missing.
+- **On the WebGL2 fallback.** Handlers fire when the engine has `webglPicking`, and the plain way to give it that is
+  `<Canvas loadFallback={() => import('margoengine/webgl/pick')}>`: that entry holds the renderer and the picking. With a
+  `fallback` prop, attach it yourself in `onCreated`. Only core meshes are picked there. Without it no handler fires:
+  in development the Canvas prints one `MargoError` (code `unsupported`) the first time a handler is registered, and
+  nothing in a production build.
 - **Handlers get** `nativeEvent`, `object` (also `mesh` and `target`: the hit mesh), `x` and `y` (canvas pixels) and
   `clientX` and `clientY`.
 
@@ -588,7 +589,7 @@ The measured breakdown of a React build, package by package, is in [docs/limits.
   namespace form `<Margo.mesh>`. In development the Canvas prints a warning that names the component to use.
 - **A hook throws a `state` error.** `useMargo`, `usePhysics` and `useXR` work only inside their provider (`<Canvas>`, `<Physics>`, `<XR>`).
 - **The scene re-renders constantly.** Per-frame values belong in refs: see [State vs the frame loop](#state-vs-the-frame-loop).
-- **A click handler never runs, or a test sees the old state.** Picking is asynchronous and does not bubble: see [Pointer events and picking](#pointer-events-and-picking). Handlers need WebGPU.
+- **A click handler never runs, or a test sees the old state.** Picking is asynchronous and does not bubble: see [Pointer events and picking](#pointer-events-and-picking). The WebGL2 fallback needs `webglPicking`.
 - **Textures on `Box` or `Sphere`.** They take a colour only. Use a glTF `Model`, or `createMesh` from `margoengine/materials` in an effect.
 - **Next.js error about hooks in a server component.** Put the `Canvas` in a file that starts with `'use client'`.
 

@@ -92,6 +92,19 @@ try {
     engine.render();
     // The frame after a pick draws as before.
     out.again = pixel().join() === drawn.join();
+    // `selection` answers through the plugin: a pick, a list of points, and hover from a real pointer event.
+    const { HoverHighlight, Picking } = await import('/packages/selection/dist/index.js');
+    const picking = Picking.attach(engine);
+    out.tool = name((await picking.pick(52, 64))?.mesh);
+    out.many = (await picking.pickMany([[52, 64], [140, 64], [4, 4], [-1, 4]])).map((hit) => name(hit?.mesh));
+    let hover;
+    const hovered = new Promise((done) => {
+      hover = HoverHighlight.attach(engine, { picking, onHover: (mesh) => done(name(mesh)) });
+    });
+    canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: 140, clientY: 64, pointerType: 'mouse' }));
+    out.hover = await hovered;
+    hover.dispose();
+    picking.dispose();
     engine.removePlugin(plugin.name);
     out.removed = await engine.pick(52, 64).then(
       () => 'resolved',
@@ -106,6 +119,9 @@ try {
   });
   assert.equal(picks.refused, 'unsupported', 'without the plugin core still refuses');
   assert.equal(picks.before, 'left', 'a pick before the first frame works');
+  assert.equal(picks.tool, 'left', 'Picking from selection answers on the preview');
+  assert.deepEqual(picks.many, ['left', 'right', null, null]);
+  assert.equal(picks.hover, 'right', 'HoverHighlight sees the mesh under a real pointer event');
   assert.deepEqual(picks.hits, ['left', 'right', null, null, null]);
   assert.equal(picks.same, true, 'picking leaves the canvas as it was');
   assert.equal(picks.bad, 'RangeError');

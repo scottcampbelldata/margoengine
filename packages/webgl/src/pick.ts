@@ -7,6 +7,9 @@ const pickVertex = `#version 300 es
 precision highp float;layout(location=0) in vec3 p;layout(location=2) in vec4 m0;layout(location=3) in vec4 m1;layout(location=4) in vec4 m2;layout(location=5) in vec4 m3;layout(location=7) in vec4 factors;uniform mat4 camera;flat out uint id;flat out vec2 face;void main(){id=uint(factors.w);face=vec2(dot(m0.xyz,cross(m1.xyz,m2.xyz)),factors.z);gl_Position=camera*(mat4(m0,m1,m2,m3)*vec4(p,1));}`;
 const pickFragment = `#version 300 es
 precision highp float;precision highp int;flat in uint id;flat in vec2 face;layout(location=0) out uint o;void main(){if(gl_FrontFacing!=(face.x>0.0)&&face.y<0.5)discard;o=id;}`;
+// So one import gives a React Canvas both: `loadFallback={() => import('margoengine/webgl/pick')}`.
+export { webglRenderer } from './index.js';
+
 /** The clear value of the id target: no mesh. */
 const none = 0xffffffff;
 

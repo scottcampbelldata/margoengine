@@ -115,6 +115,14 @@ test('pointer handlers on the WebGL2 fallback warn once with the limit and the f
   assert.equal(warnings.length, 1, 'printed once per page');
 });
 
+test('pointer handlers on the WebGL2 fallback with webglPicking do not warn', async () => {
+  globalThis.testBackend = 'webgl2';
+  const onCreated = (stage) => stage.engine.use({ name: 'webgl-pick', setup() {} });
+  render(h(Canvas, { onCreated }, h(Handlers)));
+  await flush();
+  assert.equal(warnings.length, 0);
+});
+
 test('pointer handlers on WebGPU do not warn', async () => {
   render(h(Canvas, null, h(Handlers)));
   await flush();

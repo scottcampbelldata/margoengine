@@ -1111,9 +1111,11 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B10 | Workgroup autotuning for the package's own kernels | DONE | `dd10fafb1` | LIM-082 |
 | B11 | autoLOD levels skinned, morphed and flat-shaded models, node animation follows | DONE | `d34fd6c26` | LIM-147, LIM-252 |
 | B12 | MeshletMesh parts, Hi-Z, shadow clusters | DONE | `e3e3d5958` | LIM-145 |
-| B13 | addScene lights, cameras, one load per URL | DONE | this commit | LIM-131 |
-| B14 | sceneColor reads the frame; ScenePass shares models with SSR | DONE | this commit | LIM-192 |
-| B15 | Depth passes read the main camera; TAA velocity follows the graph | DONE | this commit | LIM-177 |
+| B13 | addScene lights, cameras, one load per URL | DONE | `37b0150f9` | LIM-131 |
+| B14 | sceneColor reads the frame; ScenePass shares models with SSR | DONE | `5d07337d5` | LIM-192 |
+| B15 | Depth passes read the main camera; TAA velocity follows the graph | DONE | `d55780d05` | LIM-177 |
+| Cache | Result cache: a package build keys on the dist of what it depends on | DONE | this commit | - |
+| B16 | React pointer handlers, Picking and HoverHighlight on the WebGL2 preview | DONE | this commit | LIM-142 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

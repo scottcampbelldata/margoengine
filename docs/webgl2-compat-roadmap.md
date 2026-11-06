@@ -29,7 +29,8 @@ that.
   `fallback: webglRenderer` from `@margoengine/webgl`. With it, core meshes draw on WebGL2 (per-pixel PBR from each
   mesh's constant colour, one directional light plus ambient, no textures or effects). Packages that need
   WebGPU throw `MargoError` code `unsupported` naming themselves; core's `engine.pick` throws `WebGPU required` unless
-  the app adds `webglPicking` from `@margoengine/webgl/pick`.
+  the app adds `webglPicking` from `@margoengine/webgl/pick`, which also carries `Picking` from `selection` and the React
+  Canvas's pointer handlers.
   Covered by [webgl-preview.test.js](../tests/webgl-preview.test.js) in `npm run verify` and by the pixel readback in
   `check:no-webgpu`.
 

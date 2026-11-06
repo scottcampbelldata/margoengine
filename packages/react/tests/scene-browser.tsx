@@ -53,6 +53,7 @@ let root: Root | undefined,
   frames = 0,
   renders = 0,
   clicks = 0,
+  previewClicks = 0,
   gltf: MeshRef | undefined,
   fbx: MeshRef | undefined,
   body: PhysicsBody | undefined,
@@ -72,8 +73,10 @@ const report = (error: unknown) => errors.push(String(error));
 const originalCreate = Engine.create;
 Engine.create = async function (...args: Parameters<typeof Engine.create>) {
   const engine = await originalCreate.apply(this, args),
-    device = engine.gpu!;
+    device = engine.gpu;
   engines.push(engine);
+  // The WebGL2 preview has no device to watch.
+  if (!device) return engine;
   device.addEventListener('uncapturederror', (event: GPUUncapturedErrorEvent) => gpuErrors.push(event.error.message));
   const bind = device.createBindGroup.bind(device);
   device.createBindGroup = (descriptor) => {
@@ -497,6 +500,38 @@ async function mount(next: Mode) {
   await settle();
   return snapshot();
 }
+/** The WebGL2 preview with pointer handlers from one `loadFallback` import, and the canvas point of the box. */
+async function preview() {
+  if (root) await unmount();
+  current = undefined;
+  previewClicks = 0;
+  root = createRoot(app);
+  root.render(
+    <StrictMode>
+      <Canvas
+        backend="webgl2"
+        loadFallback={() => import('@margoengine/webgl/pick')}
+        style={{ width: 256, height: 256 }}
+        camera={{ position: [0, 0, 4], target: [0, 0, 0], near: 0.1, far: 40 }}
+        onCreated={(stage) => {
+          current = engineRuntime(stage.engine);
+        }}
+        onError={report}
+      >
+        <Box args={[1, 1, 1]} onClick={() => previewClicks++} />
+      </Canvas>
+    </StrictMode>,
+  );
+  await until(() => !!current && !current.disposed && current.meshes.size > 0, 'preview ready');
+  await settle();
+  const bounds = current!.canvas.getBoundingClientRect();
+  return {
+    backend: current!.backend,
+    plugin: current!.plugins.has('webgl-pick'),
+    box: { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 },
+    empty: { x: bounds.left + 8, y: bounds.top + 8 },
+  };
+}
 async function singleFrame() {
   const before = { frames, renders };
   await draw();
@@ -591,6 +626,8 @@ async function verifyPhysics() {
     await draw();
   },
   physics: verifyPhysics,
+  preview,
+  previewClicks: () => previewClicks,
   get errors() {
     return errors;
   },

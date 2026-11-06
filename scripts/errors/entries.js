@@ -81,7 +81,7 @@ export const entries = [
     kind: 'family',
     messages: ['WebGPU required', 'WebGPU unavailable', 'WebGPU adapter unavailable', 'No WebGPU canvas'],
     cause:
-      '`engine.pick` and `engine.rebootDevice` need the WebGPU backend; on the WebGL2 fallback they reject. `Engine.create` found no `navigator.gpu`, no adapter, or a canvas that already has another context.',
+      '`engine.pick` and `engine.rebootDevice` need the WebGPU backend; on the WebGL2 fallback they reject unless the app adds `webglPicking` and `webglRestore`. `Engine.create` found no `navigator.gpu`, no adapter, or a canvas that already has another context.',
     fix: 'Use a browser with WebGPU (current Chrome, Edge or Safari; margoengine.com/webgpu), turn on hardware acceleration, or pass `{backend: "auto", fallback: webglRenderer}` from `@margoengine/webgl`. Give the engine a fresh canvas that has no 2D or WebGL context.',
   },
   {

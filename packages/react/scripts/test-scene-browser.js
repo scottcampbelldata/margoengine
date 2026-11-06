@@ -121,6 +121,14 @@ try {
     }
     await page.evaluate(() => window.reactScene.unmount());
   }
+  const preview = await page.evaluate(() => window.reactScene.preview());
+  assert.equal(preview.backend, 'webgl2');
+  assert.equal(preview.plugin, true);
+  await page.mouse.click(preview.empty.x, preview.empty.y);
+  await page.mouse.click(preview.box.x, preview.box.y);
+  await page.waitForFunction(() => window.reactScene.previewClicks() === 1);
+  await page.evaluate(() => window.reactScene.unmount());
+  result.checks.push({ name: 'WebGL2 preview: a click fires its handler on real WebGL2, a click on nothing does not' });
   for (let cycle = 0; cycle < 2; cycle++) {
     await page.evaluate(() => window.reactScene.mount('kit'));
     await page.evaluate(() => window.reactScene.singleFrame());

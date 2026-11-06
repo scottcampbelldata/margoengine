@@ -62,7 +62,7 @@
     <section id="webgpu">
       <h2><a href="#webgpu">WebGPU required or unavailable</a></h2>
       <p class="messages"><code>WebGPU required</code> <code>WebGPU unavailable</code> <code>WebGPU adapter unavailable</code> <code>No WebGPU canvas</code></p>
-      <p><strong>Cause.</strong> <code>engine.pick</code> and <code>engine.rebootDevice</code> need the WebGPU backend; on the WebGL2 fallback they reject. <code>Engine.create</code> found no <code>navigator.gpu</code>, no adapter, or a canvas that already has another context.</p>
+      <p><strong>Cause.</strong> <code>engine.pick</code> and <code>engine.rebootDevice</code> need the WebGPU backend; on the WebGL2 fallback they reject unless the app adds <code>webglPicking</code> and <code>webglRestore</code>. <code>Engine.create</code> found no <code>navigator.gpu</code>, no adapter, or a canvas that already has another context.</p>
       <p><strong>Fix.</strong> Use a browser with WebGPU (current Chrome, Edge or Safari; margoengine.com/webgpu), turn on hardware acceleration, or pass <code>{backend: "auto", fallback: webglRenderer}</code> from <code>@margoengine/webgl</code>. Give the engine a fresh canvas that has no 2D or WebGL context.</p>
     </section>
     <section id="device-restore">

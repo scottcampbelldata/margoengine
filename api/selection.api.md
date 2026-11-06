@@ -27,7 +27,7 @@ export class HoverHighlight {
 
 export interface HoverHighlightOptions {
     picking: HoverPicker;
-    outline: HoverOutline;
+    outline?: HoverOutline;
     element?: SelectionElement;
     onHover?: (mesh: Mesh | null) => void;
     signal?: AbortSignal;

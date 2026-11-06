@@ -16,6 +16,7 @@ import {
   box,
   PbrMaterial as Material,
   type EngineOptions,
+  type EnginePlugin,
   type Vec3,
   type Geometry,
 } from '@margoengine/core/extension';
@@ -103,13 +104,16 @@ export interface CanvasProps extends EngineOptions {
    * Loads the renderer factory for browsers without WebGPU, for example `() => import('margoengine/webgl')`. The Canvas
    * checks for WebGPU itself (`navigator.gpu` and a successful `requestAdapter()`) before it creates the engine and
    * calls this only when WebGPU is missing (or `backend` is `'webgl2'`), so WebGPU visitors download none of the
-   * fallback package. It resolves to the factory (`webglRenderer`) or to a module exporting it as `webglRenderer`.
+   * fallback package. It resolves to the factory (`webglRenderer`) or to a module exporting it as `webglRenderer`. A
+   * module that also exports `webglPicking` (`margoengine/webgl/pick`) gives the preview working pointer handlers.
    * `signal` aborts when the Canvas unmounts or recreates its engine while the load is still pending. A rejection
    * becomes a `MargoError` with code `unsupported`, sent to `onError` and shown as `fallbackContent` or the plain
    * message. Ignored when `fallback` is given or `backend` is `'webgpu'`; read when the engine is created, so a new
    * function does not recreate the engine. Default: none.
    */
-  loadFallback?: (signal: AbortSignal) => Promise<RendererFactory | { webglRenderer: RendererFactory }>;
+  loadFallback?: (
+    signal: AbortSignal,
+  ) => Promise<RendererFactory | { webglRenderer: RendererFactory; webglPicking?: () => EnginePlugin }>;
   /**
    * Shown in place of the default text when the browser has no WebGPU and no usable renderer fallback: an SVG, a
    * skeleton or a pre-rendered image. `onError` still receives the coded `unsupported` error. Default: the plain
@@ -145,8 +149,10 @@ async function resolveFallback(load: NonNullable<CanvasProps['loadFallback']>, s
   const factory = typeof loaded === 'function' ? loaded : loaded?.webglRenderer;
   if (typeof factory !== 'function')
     throw new MargoError('unsupported', 'loadFallback must resolve to a renderer factory or { webglRenderer }.');
-  return factory;
+  return { factory, picking: typeof loaded === 'function' ? undefined : loaded.webglPicking };
 }
+/** Core's pick answers on every backend but the preview, where `webglPicking` covers it. */
+const hasPick = (engine: Engine) => engine.backend !== 'webgl2' || engine.plugins.has('webgl-pick');
 /** The margo canvas component. */
 export function MargoCanvas({
   children,
@@ -193,7 +199,7 @@ export function MargoCanvas({
     if (envReadable && process.env.NODE_ENV !== 'production' && engine?.backend === 'webgl2') {
       const set = handlers.set.bind(handlers);
       handlers.set = (id, value) => {
-        if (value.onClick || value.onPointerOver || value.onPointerOut) warnPickingWithoutWebGPU();
+        if ((value.onClick || value.onPointerOver || value.onPointerOut) && !hasPick(engine)) warnPickingWithoutWebGPU();
         return set(id, value);
       };
     }
@@ -280,12 +286,15 @@ export function MargoCanvas({
       .then(async () => {
         if (cancelled) return;
         if (maxDpr !== undefined) releasePixelRatio = capPixelRatio(maxDpr);
-        let renderer = fallback;
+        let renderer = fallback,
+          picking: (() => EnginePlugin) | undefined;
         const load = fallbackLoader.current;
         if (!renderer && load && backend !== 'webgpu' && (backend === 'webgl2' || !(await hasWebGPU()))) {
           if (cancelled) return;
-          renderer = await resolveFallback(load, abort.signal);
+          const loaded = await resolveFallback(load, abort.signal);
           if (cancelled) return;
+          renderer = loaded.factory;
+          picking = loaded.picking;
         }
         const instance = await Engine.create(element, {
           capacity,
@@ -307,6 +316,7 @@ export function MargoCanvas({
             observer = new ResizeObserver(() => invalidateRef.current());
             observer.observe(element);
           }
+          if (picking && instance.backend === 'webgl2') instance.use(picking());
           const next = new StageFacade(instance as unknown as EngineKernel);
           if (cameraOptions.current) Object.assign(instance.camera, cameraOptions.current);
           created.current?.(next);
@@ -376,7 +386,7 @@ export function MargoCanvas({
       down.y = event.clientY;
     };
     const canPick = () => {
-      if (engine.backend === 'webgl2') return false;
+      if (!hasPick(engine)) return false;
       for (const handlers of pointerHandlers.values())
         if (handlers.onClick || handlers.onPointerOver || handlers.onPointerOut) return true;
       return false;

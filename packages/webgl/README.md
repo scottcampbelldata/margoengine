@@ -30,7 +30,8 @@ const fallback = navigator.gpu ? undefined : (await import('margoengine/webgl'))
 const engine = await Engine.create(canvas, {fallback});
 ```
 
-In React, use the Canvas props `loadFallback={() => import('margoengine/webgl')}` and `fallbackContent`
+In React, use the Canvas props `loadFallback={() => import('margoengine/webgl')}` and `fallbackContent`; load
+`margoengine/webgl/pick` there instead when the scene has pointer handlers
 (see the [React README](../react/README.md)).
 
 `fallback: canvas => webglRenderer(canvas, {transparent: true})` gives the WebGL2 canvas `alpha: true`
@@ -65,8 +66,10 @@ Each pick refreshes the scene as a frame does (without changing the canvas), dra
 that one pixel with a blocking `readPixels`. The program and target are made by the first pick. A view that draws into a
 texture cannot be picked here, because the preview refuses to draw one. `engine.removePlugin('webgl-pick')` gives the
 engine back core's answer. Picking covers the core meshes this renderer draws: a plugin's `onPick` hook is not called
-on the preview, and `Picking` from `margoengine/selection` still needs WebGPU. The React Canvas keeps its pointer
-handlers off on the preview ([known-bugs.md](../../docs/known-bugs.md)).
+on the preview. `Picking` from `margoengine/selection` attaches after this plugin and answers through it, so
+`HoverHighlight` works with `onHover`; a hit holds the mesh only, and `pickMany` costs one such pick a point. `/pick` also
+exports `webglRenderer`, so a React Canvas gets working pointer handlers from
+`loadFallback={() => import('margoengine/webgl/pick')}`.
 
 ## Lost contexts
 

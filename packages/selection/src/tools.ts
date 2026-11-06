@@ -561,8 +561,11 @@ export interface HoverOutline {
 export interface HoverHighlightOptions {
   /** `Picking.attach(engine)`. */
   picking: HoverPicker;
-  /** A `Selection` used only for the hover outline: `Selection.attach(engine, {name: 'hover', color: [1, 0.9, 0.3]})`. */
-  outline: HoverOutline;
+  /**
+   * A `Selection` used only for the hover outline: `Selection.attach(engine, {name: 'hover', color: [1, 0.9, 0.3]})`.
+   * Default: no outline, only `onHover`, which is the way on the WebGL2 preview, where `Selection` cannot draw.
+   */
+  outline?: HoverOutline;
   /** Element to listen on. Default: the engine canvas. */
   element?: SelectionElement;
   /** Called with the mesh under the pointer (or null) whenever it changes. */
@@ -615,7 +618,7 @@ export class HoverHighlight {
   private change(mesh: Mesh | null): void {
     if (mesh === this.mesh) return;
     this.mesh = mesh;
-    this.options.outline.set(mesh ? [mesh] : []);
+    this.options.outline?.set(mesh ? [mesh] : []);
     this.options.onHover?.(mesh);
   }
   private readonly onLeave = (): void => {

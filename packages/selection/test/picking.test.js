@@ -65,6 +65,45 @@ function harness(samples = 4) {
     },
   };
 }
+test('On the WebGL2 preview Picking needs webglPicking, then answers through engine.pick with the mesh', async () => {
+  const mesh = { id: 3 },
+    plugins = new Set(),
+    asked = [];
+  const engine = {
+    canvas: { width: 100, height: 50, clientWidth: 100, clientHeight: 50 },
+    hasPlugin: (name) => plugins.has(name),
+    removePlugin: (name) => plugins.delete(name),
+    async pick(x, y, view) {
+      asked.push([x, y, view]);
+      return x < 50 ? mesh : null;
+    },
+  };
+  assert.throws(
+    () => new Picking().setup(engine),
+    (error) => error.code === 'unsupported' && /webglPicking/.test(error.message),
+  );
+  plugins.add('webgl-pick');
+  const picking = new Picking();
+  picking.setup(engine);
+  plugins.add('picking');
+  assert.equal(Picking.forEngine(engine), picking);
+  const passes = [];
+  picking.registerPasses({ add: (pass) => passes.push(pass) });
+  assert.deepEqual(passes, [], 'the preview has no frame of its own to capture');
+  assert.deepEqual(await picking.pick(10, 10), { mesh });
+  assert.equal(await picking.pick(60, 10), null);
+  const view = { viewport: [0, 0, 50, 50] };
+  assert.deepEqual(await picking.pickMany([[10, 10], [60, 10], [-1, 0], [200, 0]], view), [{ mesh }, null, null, null]);
+  assert.deepEqual(asked.at(-1), [60, 10, view]);
+  assert.throws(
+    () => picking.addOverlay({}),
+    (error) => error.code === 'unsupported',
+  );
+  picking.dispose();
+  assert.equal(Picking.forEngine(engine), undefined);
+  await assert.rejects(picking.pick(1, 1), (error) => error.code === 'disposed');
+});
+
 test('Picking micro frames bind complete canonical ambient data', async () => {
   for (const ambient of [undefined, new Float32Array([2, 0.5, 0])]) {
     const h = harness();

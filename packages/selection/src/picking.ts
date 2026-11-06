@@ -281,6 +281,8 @@ export class Picking implements EnginePlugin {
   addOverlay(overlay: PickingOverlay): () => void {
     if (this.disposed)
       throw new MargoError('disposed', 'Picking is disposed; create a new Picking to register overlays.');
+    if (this.engine && !this.device)
+      throw new MargoError('unsupported', 'Picking overlays need WebGPU; the WebGL2 preview picks core meshes only.');
     let slot = this.overlays.indexOf(undefined);
     if (slot < 0) slot = this.overlays.length;
     if (slot >= 8) throw new RangeError('Picking takes at most 8 overlays; remove one first.');
@@ -291,7 +293,17 @@ export class Picking implements EnginePlugin {
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'Picking is disposed; create a new Picking to attach.');
-    if (!engine.gpu) throw new MargoError('unsupported', 'Picking requires WebGPU; use a browser with WebGPU enabled.');
+    if (!engine.gpu) {
+      if (!engine.hasPlugin('webgl-pick'))
+        throw new MargoError(
+          'unsupported',
+          'Picking requires WebGPU; on the WebGL2 preview attach webglPicking from @margoengine/webgl/pick first.',
+        );
+      // The preview has no WebGPU target to draw into: its engine.pick is the whole route, and it finds core meshes.
+      this.engine = engine;
+      attachedPickers.set(engine, this);
+      return;
+    }
     this.engine = engine;
     this.device = engine.gpu;
     this.primitives.setup(engine);
@@ -311,7 +323,7 @@ export class Picking implements EnginePlugin {
     attachedPickers.set(engine, this);
   }
   registerPasses(graph: FrameGraph): void {
-    if (this.options.capture === false) return;
+    if (this.options.capture === false || !this.device) return;
     graph.add({
       name: 'picking:capture',
       order: -1,
@@ -464,13 +476,16 @@ export class Picking implements EnginePlugin {
     const mesh = await this.engine!.pick(x, y, view),
       hit = this.last as PickHit | null;
     this.last = null;
+    // The preview's pick does not go through `onPick`, so there is no fuller hit than the mesh.
+    if (!this.device) return mesh ? { mesh } : null;
     return mesh && hit?.mesh === mesh ? hit : null;
   }
   /**
    * The picks of `engine.pick` for many canvas CSS pixels, answered from one readback: one turn in the engine's pick
    * queue (so overlapping picks keep their order), one refresh of the scene, then every point's pass submitted with no
    * wait between them. All points read the same scene. A point outside the canvas answers null. With several views on
-   * the canvas and no `view`, points outside the first point's view are picked one at a time.
+   * the canvas and no `view`, points outside the first point's view are picked one at a time. On the WebGL2 preview
+   * every point is a pick of its own.
    */
   async pickMany(points: readonly (readonly [number, number])[], view?: RenderView): Promise<(PickHit | null)[]> {
     this.ready();
@@ -484,6 +499,10 @@ export class Picking implements EnginePlugin {
       inside = ([x, y]: readonly [number, number]) => x >= 0 && y >= 0 && x < width && y < height,
       first = points.find(inside);
     if (!first) return out;
+    if (!this.device) {
+      for (const [i, point] of points.entries()) if (inside(point)) out[i] = await this.pick(point[0], point[1], view);
+      return out;
+    }
     const batch: PickBatch = { points, out, outside: [] };
     this.batch = batch;
     try {
@@ -900,6 +919,7 @@ export class Picking implements EnginePlugin {
   }
   private release(): void {
     if (this.engine && attachedPickers.get(this.engine) === this) attachedPickers.delete(this.engine);
+    if (!this.device) return;
     this.primitives.release();
     for (const resource of [this.ids, this.micro, this.depth, this.uniform, this.read, this.instances])
       retire(this.device!, resource);
