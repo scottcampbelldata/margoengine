@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
+import { cubeDocument } from '../tests/support/cube-png.js';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 'free' }),
@@ -271,7 +272,189 @@ const sceneLight = (pixel) => {
   return c.map((v) => v + offset);
 };
 
+/** Draws the real EXT_lights_ies wall through loadGLTF and `/lights`, its fixture turned to `rotation`; without `light`, unlit by it. */
+async function iesWall({ name = 'Example.gltf', rotation, light = true } = {}) {
+  if (rotation) {
+    const doc = JSON.parse(readFileSync('packages/gltf-pro/tests/fixtures/lights/Example.gltf', 'utf8'));
+    doc.nodes[2].rotation = rotation;
+    await page.route('**/Turned.gltf', (route) => route.fulfill({ json: doc }));
+    name = 'Turned.gltf';
+  }
+  await open();
+  await page.evaluate(
+    async ({ name, light }) => {
+      const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+        { applyGLTFLightExtensions } = await import('/packages/gltf-pro/dist/lights.js'),
+        { engine } = window.check,
+        model = await loadGLTF(engine, `/packages/gltf-pro/tests/fixtures/lights/${name}`);
+      engine.camera.position = [0, 0, 9];
+      engine.camera.target = [0, 0, 0];
+      engine.lighting.radiance.fill(0);
+      engine.lighting.ambient.fill(0);
+      if (light) window.check.lights = await applyGLTFLightExtensions(model, { exposure: 0.03 });
+    },
+    { name, light },
+  );
+  const image = await pixels();
+  await close();
+  if (rotation) await page.unroute('**/Turned.gltf');
+  return image;
+}
+/** Canvas pixel of the wall's front at x, y, seen from z = 9 at the default 60 degrees. */
+const wallPixel = (x, y) => {
+  const half = 8.95 * Math.tan(Math.PI / 6);
+  return [Math.round(size / 2 + (x / half) * (size / 2)), Math.round(size / 2 - (y / half) * (size / 2))];
+};
+/** A quad facing the camera in an image-based light, with the file's `cube`. Returns the middle pixel. */
+async function cubeQuad(cube) {
+  await open();
+  await page.evaluate(
+    async ({ cube }) => {
+      const { parseGLTFAsync } = await import('/packages/gltf-pro/dist/index.js'),
+        { applyGLTFLightExtensions } = await import('/packages/gltf-pro/dist/lights.js'),
+        { engine } = window.check,
+        floats = new Float32Array([
+          ...[-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0],
+          ...[0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+        ]),
+        indices = new Uint16Array([0, 1, 2, 0, 2, 3]),
+        bytes = new Uint8Array(floats.byteLength + indices.byteLength);
+      bytes.set(new Uint8Array(floats.buffer));
+      bytes.set(new Uint8Array(indices.buffer), floats.byteLength);
+      const view = (byteOffset, byteLength) => ({ buffer: 0, byteOffset, byteLength }),
+        doc = {
+          asset: { version: '2.0' },
+          scene: 0,
+          scenes: [{ nodes: [0], extensions: { EXT_lights_image_based: { light: 0 } } }],
+          nodes: [{ mesh: 0 }],
+          meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
+          materials: [{ pbrMetallicRoughness: { metallicFactor: 0, roughnessFactor: 1 } }],
+          buffers: [{ byteLength: bytes.byteLength }],
+          bufferViews: [view(0, 48), view(48, 48), view(96, 12)],
+          accessors: [
+            { bufferView: 0, componentType: 5126, count: 4, type: 'VEC3', min: [-1, -1, 0], max: [1, 1, 0] },
+            { bufferView: 1, componentType: 5126, count: 4, type: 'VEC3' },
+            { bufferView: 2, componentType: 5123, count: 6, type: 'SCALAR' },
+          ],
+          // The images stand apart from what the material reads: nothing here is a texture.
+          images: cube.images,
+          extensions: { EXT_lights_image_based: { lights: [cube.light] } },
+        };
+      const model = await parseGLTFAsync(engine, doc, [bytes], []);
+      window.check.lights = await applyGLTFLightExtensions(model);
+      engine.lighting.radiance.fill(0);
+      engine.lighting.ambient.fill(0);
+      engine.camera.position = [0, 0, 4];
+      engine.camera.target = [0, 0, 0];
+    },
+    { cube },
+  );
+  const image = await pixels(),
+    middle = image.at(size / 2, size / 2);
+  await close();
+  return middle;
+}
+
 const checks = {
+  // The file's wall stands 0.1 behind a fixture aimed down it at y = 3. On the row y = 1, 2 below the fixture, the profile
+  // dips to 3250 cd at 20 degrees and comes back to 5250 at 30, so the wall gets brighter going outward, which a light that
+  // falls off smoothly cannot do. Each pixel is held to Lambert's law for its own place on the wall: the green of the tint
+  // times exposure x I(theta) x cos i / d^2 / pi, with cos i = 0.1 / d.
+  async 'lights: the real EXT_lights_ies Example draws its profile on the wall, from a uri and a bufferView'() {
+    const plain = await iesWall({ light: false }),
+      wall = await iesWall(),
+      view = await iesWall({ name: 'Example_bufferView.gltf' }),
+      dip = sceneLight(wall.at(...wallPixel(0.728, 1))),
+      ring = sceneLight(wall.at(...wallPixel(1.155, 1))),
+      { parseIES, iesCandela } = await import('../../clustered/dist/ies.js'),
+      profile = parseIES(readFileSync('packages/gltf-pro/tests/fixtures/lights/LightProfile.ies', 'latin1')),
+      lambert = (x, y) => {
+        const half = 8.95 * Math.tan(Math.PI / 6),
+          [px, py] = wallPixel(x, y),
+          dx = ((px + 0.5) / (size / 2) - 1) * half,
+          h = 3 - (1 - (py + 0.5) / (size / 2)) * half,
+          d = Math.hypot(dx, h, 0.1),
+          theta = (Math.atan2(Math.hypot(dx, 0.1), h) * 180) / Math.PI;
+        return (0.485 * 0.03 * iesCandela(profile, theta, 0) * 0.1) / d ** 3 / Math.PI;
+      };
+    assert.deepEqual(plain.at(...wallPixel(0.728, 1)), [0, 0, 0], 'the wall has no other light');
+    console.log(`wall: 20 degrees ${dip.map((v) => v.toFixed(3))}, 30 degrees ${ring.map((v) => v.toFixed(3))}`);
+    console.log(`Lambert: ${lambert(0.728, 1).toFixed(3)}, ${lambert(1.155, 1).toFixed(3)}`);
+    assert.ok(ring[1] > dip[1] * 1.05, `the ring at 30 degrees is brighter than the dip at 20: ${ring[1]} ${dip[1]}`);
+    // An 8-bit step here is about 1 percent, and the shader's grid is 1 degree: 5 percent holds those and no wrong candela.
+    assert.ok(Math.abs(dip[1] / lambert(0.728, 1) - 1) < 0.05, `the file's candela at 20 degrees: ${dip}`);
+    assert.ok(Math.abs(ring[1] / lambert(1.155, 1) - 1) < 0.05, `the file's candela at 30 degrees: ${ring}`);
+    // color is 0.181, 0.485, 0: the green over red of the tint, whatever the candela.
+    assert.ok(Math.abs(ring[0] / ring[1] - 0.181 / 0.485) < 0.1, `the file's tint: ${ring}`);
+    for (const point of [[0.728, 1], [1.155, 1], [0, 2]]) {
+      const [px, py] = wallPixel(...point);
+      assert.deepEqual(view.at(px, py), wall.at(px, py), `bufferView against uri at ${point}`);
+    }
+  },
+  // The node is at y = 3: aimed down it lights the wall below and not above, and aimed up the other way round, which a
+  // spot cone from the light's down axis could not reach.
+  async 'lights: turning the node turns the beam, past a hemisphere'() {
+    const s = Math.SQRT1_2,
+      down = await iesWall(),
+      up = await iesWall({ rotation: [s, 0, 0, s] }),
+      green = (image, y) => image.at(...wallPixel(0, y))[1];
+    console.log(`above, below: down ${green(down, 3.4)} ${green(down, 2.6)}, up ${green(up, 3.4)} ${green(up, 2.6)}`);
+    assert.ok(green(down, 2.6) > 100 && green(down, 3.4) === 0, 'aimed down');
+    assert.ok(green(up, 3.4) > 100 && green(up, 2.6) === 0, 'aimed up');
+  },
+  // Stand-in cube: the file EnvironmentTest cannot be committed. Only +Z shines, and the quad faces +Z. Half a turn puts
+  // the bright face behind it, and a quarter turn beside it, where a Lambert surface still sees none of the face's centre
+  // but some of its edge: the order bright, side, behind is what irradiance allows.
+  async 'lights: an image-based light lights what faces it and its rotation turns it (stand-in cube)'() {
+    const dark = [0, 0, 0, 255],
+      white = [255, 255, 255, 255],
+      colors = [dark, dark, dark, dark, white, dark],
+      s = Math.SQRT1_2,
+      facing = await cubeQuad(cubeDocument(colors)),
+      side = await cubeQuad(cubeDocument(colors, { rotation: [0, s, 0, s] })),
+      behind = await cubeQuad(cubeDocument(colors, { rotation: [0, 1, 0, 0] })),
+      doubled = await cubeQuad(cubeDocument(colors, { intensity: 2 }));
+    console.log(`cube: facing ${facing}, side ${side}, behind ${behind}, intensity 2 ${doubled}`);
+    assert.ok(facing[0] > side[0] + 10 && side[0] >= behind[0], 'the bright face is in front, then beside, then behind');
+    assert.ok(doubled[0] > facing[0] + 5, 'intensity scales it');
+  },
+  // Adobe Stock licence: stays out of the repository, read from MARGO_SPLAT_SAMPLES/ibl when it is there.
+  async 'lights: the real EnvironmentTest (Adobe Dimension) lights its spheres'() {
+    const folder = process.env.MARGO_SPLAT_SAMPLES;
+    if (!folder || !existsSync(join(folder, 'ibl/EnvironmentTest.gltf'))) {
+      console.log('EnvironmentTest absent: set MARGO_SPLAT_SAMPLES (tests/fixtures/lights/NOTICE.md)');
+      return;
+    }
+    await page.route('**/ibl-sample/**', (route) =>
+      route.fulfill({ body: readFileSync(join(folder, 'ibl', new URL(route.request().url()).pathname.split('/ibl-sample/')[1])) }),
+    );
+    const draw = async (light) => {
+        await open();
+        await page.evaluate(
+          async ({ light }) => {
+            const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+              { applyGLTFLightExtensions } = await import('/packages/gltf-pro/dist/lights.js'),
+              { engine } = window.check,
+              model = await loadGLTF(engine, '/ibl-sample/EnvironmentTest.gltf'),
+              b = model.bounds;
+            engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]]);
+            if (light) window.check.lights = await applyGLTFLightExtensions(model, { background: true });
+          },
+          { light },
+        );
+        const image = await pixels();
+        await close();
+        return image;
+      },
+      lit = await draw(true),
+      plain = await draw(false);
+    await page.unroute('**/ibl-sample/**');
+    let changed = 0;
+    for (let i = 0; i < lit.data.length; i += 4)
+      if (Math.abs(lit.data[i] - plain.data[i]) + Math.abs(lit.data[i + 2] - plain.data[i + 2]) > 24) changed++;
+    console.log(`EnvironmentTest: ${changed} of ${size * size} pixels change under its light`);
+    assert.ok(changed > (size * size) / 4, 'the file light reaches the picture');
+  },
   // The spec compares a dense medium to a plain diffuse surface of the multi-scatter colour, and a thin one has no medium.
   // Black diffuse transmission colour leaves the back lobe out, so only the scattered lobe differs between these.
   async 'scatter: dense is the diffuse surface of its colour, thin is none, between is the share of the formula'() {

@@ -185,7 +185,7 @@ local.add(table);
 
 ## IES profiles
 
-`@margoengine/clustered/ies` reads IES LM-63 photometric files (the 1986 to 2019 revisions, type C photometry) and
+`@margoengine/clustered/ies` reads IES LM-63 photometric files (the 1986 to 2019 revisions, type B and C photometry) and
 shapes point and spot lights with them:
 
 ```ts
@@ -207,8 +207,10 @@ cone term, so `intensity` is the candela of the brightest direction: `profile.pe
 a spot's `direction`, or straight down for a point light; horizontal angle 0 is world +x made perpendicular to that axis
 (+z when the axis is within 26° of x), turning counterclockwise seen from behind the light (from above, for a downlight),
 plus `rotation` radians. Mirrored files (last horizontal angle 90° or 180°, or 90° to 270°) are unfolded as LM-63
-describes; vertical angles outside the file emit nothing; lamp tilt data is read past and not applied; types A and B
-throw. The shader reads a 1° × 5° grid of each profile (one column when it is rotationally symmetric) from one storage
+describes; vertical angles outside the file emit nothing; lamp tilt data is read past and not applied; type A throws.
+A type B file (floodlights) is resampled onto the same 1° × 5° grid with its beam at vertical angle 0, its horizontal
+angles along plane 0 and its vertical angles along plane 90; past the angles it measured it emits nothing. The ballast-lamp
+factor scales candela only in files before LM-63-2002: later revisions keep that place for other things. The shader reads a 1° × 5° grid of each profile (one column when it is rotationally symmetric) from one storage
 buffer (binding 142), filtered bilinearly by hand: no textures. At most 16 distinct profiles at a time. Without profiles
 it adds nothing to the shaders or the GPU work.
 

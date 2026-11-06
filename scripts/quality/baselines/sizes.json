@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9064391,
+  "total": 9068176,
   "history": [
     {
       "date": "2026-10-24",
@@ -2798,6 +2798,12 @@
       "commit": "04c8e5212",
       "reason": "exporters/usdz-anim: new entry for skins and clips in USDZ",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "007bee857",
+      "reason": "gltf-pro gains the lights entry; clustered parseIES gains type B",
+      "grew": 2
     }
   ],
   "items": {
@@ -2877,7 +2883,7 @@
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/directional": 2535,
     "@margoengine/clustered/flicker": 845,
-    "@margoengine/clustered/ies": 3953,
+    "@margoengine/clustered/ies": 4268,
     "@margoengine/clustered/physical-lobes": 931,
     "@margoengine/clustered/projector": 2871,
     "@margoengine/clustered/shadows": 11769,
@@ -3025,6 +3031,7 @@
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/extended": 8224,
     "@margoengine/gltf-pro/instancing": 3350,
+    "@margoengine/gltf-pro/lights": 3470,
     "@margoengine/gltf-pro/prepare": 21088,
     "@margoengine/gltf-pro/progressive": 70098,
     "@margoengine/gltf-pro/scene": 1471,

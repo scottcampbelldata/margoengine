@@ -184,6 +184,10 @@ const ASSETS = [
     'test fixture: ScatteringSkull.gltf, the material of the Khronos glTF-Sample-Assets sample (CC0-1.0, Vladimir Petkovic and Adobe Inc.)',
   ],
   [
+    'packages/gltf-pro/tests/fixtures/lights/NOTICE.md',
+    'test fixtures: the EXT_lights_ies Example files and LightProfile.ies from https://github.com/BabylonJS/Assets/tree/master/meshes/EXT_lights_ies (CC-BY-4.0, The Babylon.js contributors)',
+  ],
+  [
     'packages/gltf-pro/tests/fixtures/splats/NOTICE.md',
     'test fixtures: CesiumJS sh_unit_cube.glb (Apache-2.0, Cesium GS, Inc.) and the godot-gsplat minimal_point sample from luma.gl (MIT, KOGA Mitsuhiro)',
   ],

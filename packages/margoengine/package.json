@@ -954,6 +954,10 @@
       "types": "./dist/gltf-pro/splats.d.ts",
       "import": "./dist/gltf-pro/splats.js"
     },
+    "./gltf-pro/lights": {
+      "types": "./dist/gltf-pro/lights.d.ts",
+      "import": "./dist/gltf-pro/lights.js"
+    },
     "./gltf-pro/coordinates": {
       "types": "./dist/gltf-pro/coordinates.d.ts",
       "import": "./dist/gltf-pro/coordinates.js"

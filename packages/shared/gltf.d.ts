@@ -6,6 +6,15 @@ export interface GLTFProperty<E extends Record<string, unknown> = GLTFExtensions
   [key: string]: unknown;
 }
 
+/** One entry of EXT_lights_image_based `lights`. */
+export interface GLTFImageBasedLight extends GLTFProperty {
+  rotation?: number[];
+  intensity?: number;
+  irradianceCoefficients: number[][];
+  specularImages: number[][];
+  specularImageSize: number;
+}
+
 /** Known extension payloads retain their schema; application-specific extensions remain unknown. */
 export interface GLTFExtensions {
   [key: string]: unknown;
@@ -18,6 +27,15 @@ export interface GLTFExtensions {
   KHR_texture_transform?: GLTFTextureTransform;
   EXT_mesh_gpu_instancing?: GLTFInstancing;
   KHR_lights_punctual?: { light?: number; lights?: GLTFLightDefinition[] };
+  // On the document: `lights`. On a node: `light`, `multiplier`, `color`.
+  EXT_lights_ies?: {
+    lights?: { name?: string; uri?: string; bufferView?: number; mimeType?: string }[];
+    light?: number;
+    multiplier?: number;
+    color?: number[];
+  };
+  // On the document: `lights`. On a scene: `light`.
+  EXT_lights_image_based?: { lights?: GLTFImageBasedLight[]; light?: number };
   KHR_node_visibility?: { visible?: boolean };
   KHR_materials_variants?: { variants?: { name: string }[]; mappings?: { material: number; variants: number[] }[] };
   KHR_materials_unlit?: object;

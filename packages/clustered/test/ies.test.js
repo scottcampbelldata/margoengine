@@ -46,7 +46,7 @@ test('parseIES skips tilt data, folds mirrored horizontal angles and rejects wha
   const full = parseIES(iesFile([0, 90], [0, 90, 180, 270], (t, p) => p));
   assert.equal(iesCandela(full, 0, 315), 135);
   assert.equal(iesCandela(full, 120, 0), 0, 'past the last vertical angle');
-  assert.throws(() => parseIES(iesFile([0, 90], [0], () => 1).replace(' 1 2 0.1', ' 2 2 0.1')), TypeError, 'type B');
+  assert.throws(() => parseIES(iesFile([0, 90], [0], () => 1).replace(' 1 2 0.1', ' 3 2 0.1')), /type A/);
   for (const bad of [
     'no tilt line',
     iesFile([0, 90], [0], () => 1).replace('0 90\r\n', '90 0\r\n'),
@@ -55,6 +55,67 @@ test('parseIES skips tilt data, folds mirrored horizontal angles and rejects wha
   ])
     assert.throws(() => parseIES(bad), RangeError);
   assert.throws(() => parseIES(5), TypeError);
+});
+
+test('parseIES reads the 2019 first line, and scales by the ballast-lamp factor only where the format has one', () => {
+  const file = (format, factor) =>
+    iesFile([0, 90], [0], () => 100)
+      .replace('IESNA:LM-63-2002', format)
+      .replace('1.0 1.0 20', `1.0 ${factor} 20`);
+  // 2019 holds the file generation type here and 2002 a retired field: neither is a photometric factor.
+  const current = parseIES(file('IES:LM-63-2019', 1.10001));
+  assert.equal(current.format, 'IES:LM-63-2019');
+  assert.equal(current.peak, 100);
+  assert.equal(parseIES(file('IESNA:LM-63-2002', 1.5)).peak, 100);
+  assert.equal(parseIES(file('IESNA:LM-63-1995', 1.5)).peak, 150);
+  assert.equal(parseIES(file('IESNA91', 1.5)).peak, 150);
+  assert.equal(parseIES(file('IESNA:LM-63-1995', 0)).peak, 100, 'an unset factor counts as 1');
+});
+
+/** A type B file: `candela(V, H)` at each vertical and horizontal angle. */
+const typeB = (vertical, horizontal, candela) =>
+  iesFile(vertical, horizontal, (v, h) => candela(v, h)).replace(/ 1 2 0\.1/, ' 2 2 0.1');
+test('parseIES puts a type B table on the type C grid: beam at vertical 0, H along plane 0 and V along plane 90', () => {
+  const angles = range(-90, 90, 10),
+    // Linear in both angles, so reading between table angles is exact.
+    plane = (v, h) => 1000 + 3 * h + 2 * v,
+    profile = parseIES(typeB(angles, angles, plane));
+  assert.equal(profile.vertical[0], 0);
+  assert.equal(profile.horizontal.at(-1), 360);
+  const near = (theta, phi, want) => {
+    const got = iesCandela(profile, theta, phi);
+    assert.ok(Math.abs(got - want) < 1e-6, `${theta}, ${phi}: ${got} against ${want}`);
+  };
+  near(0, 0, 1000);
+  near(30, 0, plane(0, 30));
+  near(30, 180, plane(0, -30));
+  near(40, 90, plane(40, 0));
+  near(40, 270, plane(-40, 0));
+  // Off both planes: x = sin 60 cos 45, y = sin 60 sin 45, z = cos 60, so H = asin(x) and V = atan2(y, z).
+  const t = Math.PI / 3,
+    x = Math.sin(t) * Math.SQRT1_2,
+    degrees = 180 / Math.PI;
+  near(60, 45, plane(Math.atan2(x, Math.cos(t)) * degrees, Math.asin(x) * degrees));
+  // Behind the fixture, past V = 90, nothing was measured.
+  assert.equal(iesCandela(profile, 120, 90), 0);
+  assert.equal(iesCandela(profile, 180, 0), 0);
+});
+
+test('a type B table from 0 mirrors, and a table that stops short emits nothing past its end', () => {
+  const quarter = parseIES(typeB(range(0, 90, 10), range(0, 90, 10), (v, h) => 500 + h + 2 * v));
+  assert.ok(Math.abs(iesCandela(quarter, 30, 180) - 530) < 1e-6, 'H mirrors');
+  assert.ok(Math.abs(iesCandela(quarter, 30, 270) - 560) < 1e-6, 'V mirrors');
+  const narrow = parseIES(typeB(range(-20, 20, 10), range(-20, 20, 10), () => 100));
+  assert.equal(iesCandela(narrow, 10, 0), 100);
+  assert.equal(iesCandela(narrow, 30, 0), 0);
+  assert.equal(iesCandela(narrow, 30, 90), 0);
+  for (const bad of [
+    typeB([0, 90], [0], () => 1),
+    typeB([-120, 0], [0, 90], () => 1),
+    typeB([0, 90], [-120, 0], () => 1),
+    typeB([0, 120], [0, 90], () => 1),
+  ])
+    assert.throws(() => parseIES(bad), RangeError);
 });
 
 test('IESLights packs one profile per distinct file, per-light ids and rotations; the shader mirror matches the profile', () => {

@@ -38,6 +38,7 @@ export function modelFromPrepared(
       prepared.maxDownloadBytes,
       prepared.maxNodes,
     );
+    asset.baseURL = prepared.baseURL;
     for (const [index, data] of prepared.accessors) asset['cache'].set(index, data);
     prepared.doc.meshes?.forEach((mesh, i) =>
       mesh?.primitives?.forEach((p, j) => {

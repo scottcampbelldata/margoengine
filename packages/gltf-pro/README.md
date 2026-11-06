@@ -317,6 +317,38 @@ Read against the extension's README (Complete, Ratified by the Khronos Group, as
 
 Limits are in [docs/limits.md](../../docs/limits.md): the clouds do not follow later node moves or visibility changes.
 
+### IES fixtures and image-based lights in glTF (`/lights`)
+
+`EXT_lights_ies` puts measured light fixtures on a file's nodes and `EXT_lights_image_based` gives a scene its environment. Every loader reads a file that uses them, even as required extensions, and keeps them as data; `applyGLTFLightExtensions` turns them into lights, loading `@margoengine/clustered` and `@margoengine/environment` only when the file has that light.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {applyGLTFLightExtensions} from 'margoengine/gltf-pro/lights';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/lobby.gltf');
+const lights = await applyGLTFLightExtensions(model, {exposure: 0.01, background: true});
+console.log(lights.iesLights.map(({profile}) => profile.peak), lights.imageLight?.intensity);
+// lights.dispose() removes all of it.
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `exposure` | `1` | Scales every fixture's candela: IES files are in real candela, which is far brighter than a scene's sun of 1. |
+| `background` | `false` | Draws the image-based light's cube behind the scene. |
+| `clustered` | one attached here | The `Clustered` to add to; the file's `KHR_lights_punctual` point and spot lights join the same list. |
+| `scene` | the file's `scene`, else 0 | The scene whose image-based light to use. |
+| `baseURL`, `fetch`, `signal` | where `loadGLTF` read the file, `globalThis.fetch`, none | How `.ies` and image files are read. |
+
+Read against the two extensions' READMEs on the Khronos glTF repository as of 2026-11-06: `EXT_lights_ies` (Vendor extension, status Complete) and `EXT_lights_image_based` (Multi-Vendor extension). Neither is a draft.
+
+- A fixture is a clustered point light with its profile resampled for its node, so it can aim anywhere, uplights included. The beam runs down the node's -Z. `multiplier` and `color` scale it as the extension says; `color` clamps to 0 to 1.
+- `.ies` files read through `parseIES`: types B and C, as the extension requires. Type A, which it leaves optional, is refused.
+- A cube face reads as the sRGB decode of rgb / alpha with its rows swapped, which is how the one real file reads. `Environment` prefilters its own mips from mip 0, so the file's lower mips are not read, and its own irradiance comes from the same cube: `irradianceCoefficients` stays in `lights.imageLight` as data.
+- `gltfIESLights(model)` and `gltfImageLight(model)` return the data without a GPU; `orientIES` and `rotateCube` are the steps between.
+
+Limits are in [docs/limits.md](../../docs/limits.md): lights stay where their nodes were when applied, and at most 16 fixtures differ in profile or aim.
+
 ### Optional material extension slot
 
 Attach a `MaterialExtension` to `primitive.extension`, or to the shared

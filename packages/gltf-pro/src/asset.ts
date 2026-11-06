@@ -164,6 +164,9 @@ const supported = new Set([
   'EXT_texture_webp',
   'EXT_texture_avif',
   'EXT_mesh_gpu_instancing',
+  // Data until @margoengine/gltf-pro/lights applies them.
+  'EXT_lights_ies',
+  'EXT_lights_image_based',
   // Played by @margoengine/animation (Animation); gltf-pro loads the channels as data.
   'KHR_animation_pointer',
 ]);
@@ -349,6 +352,8 @@ export class GLTFAsset {
   readonly buffers: Uint8Array[];
   private readonly cache = new Map<number, Float32Array>();
   private readonly viewCache = new Map<number, Uint8Array>();
+  /** Where `loadGLTF` read the file from, for files named relative to it; unset for a parsed document. */
+  baseURL?: string;
   private decoded = 0;
   /** @internal Remaining retained decode budget, checked before decoder output allocation. */
   get remainingDecodedBytes(): number {
@@ -924,6 +929,7 @@ export async function loadAsset(
     } else buffers[i] = await fetchBytes(resolve(def.uri));
   }
   const asset = new GLTFAsset(doc, buffers, binary, await withMaterials(doc, decoders), limit, maxNodes);
+  asset.baseURL = base?.href;
   if (deferCompression && asyncCompression(doc))
     return { asset, images, deferred: true, baseURL: base?.href, downloadedBytes: total };
   const sources = ktxSources(doc),

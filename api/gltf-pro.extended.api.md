@@ -39,6 +39,13 @@ interface GLTFExtensions {
   KHR_texture_transform?: GLTFTextureTransform;
   EXT_mesh_gpu_instancing?: GLTFInstancing;
   KHR_lights_punctual?: { light?: number; lights?: GLTFLightDefinition[] };
+  EXT_lights_ies?: {
+    lights?: { name?: string; uri?: string; bufferView?: number; mimeType?: string }[];
+    light?: number;
+    multiplier?: number;
+    color?: number[];
+  };
+  EXT_lights_image_based?: { lights?: GLTFImageBasedLight[]; light?: number };
   KHR_node_visibility?: { visible?: boolean };
   KHR_materials_variants?: { variants?: { name: string }[]; mappings?: { material: number; variants: number[] }[] };
   KHR_materials_unlit?: object;
@@ -100,6 +107,14 @@ interface GLTFExtensions {
     bumpTexture?: GLTFTextureInfo;
     heightSpace?: 'world' | 'object';
   };
+}
+
+interface GLTFImageBasedLight extends GLTFProperty {
+  rotation?: number[];
+  intensity?: number;
+  irradianceCoefficients: number[][];
+  specularImages: number[][];
+  specularImageSize: number;
 }
 
 interface GLTFInstancing {

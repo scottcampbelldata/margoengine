@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // IES photometric profiles (ANSI/IES LM-63, the standard file format for luminaire photometry) for clustered point and spot
-// lights. parseIES reads an LM-63 file (1986, 1991, 1995, 2002 and 2019 revisions; type C photometry); IESLights gives
+// lights. parseIES reads an LM-63 file (1986, 1991, 1995, 2002 and 2019 revisions; type B and C photometry); IESLights gives
 // lights a profile by their position in the clustered list. The profile is resampled on the CPU onto a fixed grid (1 degree
 // of vertical angle by 5 degrees of horizontal angle, or one column when it is rotationally symmetric), normalised to its
 // peak and packed as unorm16 pairs into one storage buffer with a small per-light table; the shader filters it bilinearly
@@ -21,7 +21,7 @@ export interface IESProfile {
   readonly vertical: readonly number[];
   /** Horizontal angles in degrees, ascending (one angle: rotationally symmetric; last 90 or 180: mirrored). */
   readonly horizontal: readonly number[];
-  /** Candela per horizontal angle, then per vertical angle, multipliers (candela, ballast, ballast-lamp) applied. */
+  /** Candela per horizontal angle, then per vertical angle, multipliers (candela, ballast, and ballast-lamp before LM-63-2002) applied. */
   readonly candela: readonly (readonly number[])[];
   /** The largest candela value: the luminous intensity of the light's brightest direction. */
   readonly peak: number;
@@ -55,8 +55,9 @@ const fail = (message: string): never => {
   throw new RangeError(`Invalid IES file: ${message}; pass the text of a valid IES LM-63 photometric file`);
 };
 /**
- * Parses an IES LM-63 photometric file (text). Type C photometry only (luminaires: vertical angle 0 is nadir); types A
- * and B (floodlights, automotive) throw a TypeError. Lamp tilt data (`TILT=INCLUDE`) is read past and not applied.
+ * Parses an IES LM-63 photometric file (text). Type C photometry (luminaires: vertical angle 0 is nadir) reads as it is;
+ * type B (floodlights) is resampled onto a 1 by 5 degree type C grid with the beam at vertical angle 0; type A (automotive)
+ * throws a TypeError. Lamp tilt data (`TILT=INCLUDE`) is read past and not applied.
  */
 export function parseIES(text: string): IESProfile {
   if (typeof text !== 'string')
@@ -66,7 +67,7 @@ export function parseIES(text: string): IESProfile {
   const lines = text.replace(/^﻿/, '').split(/\r\n|\r|\n/);
   let line = 0,
     format = 'LM-63-1986';
-  if (/^\s*IESNA/i.test(lines[0] ?? '')) format = lines[line++].trim();
+  if (/^\s*IES(NA|:)/i.test(lines[0] ?? '')) format = lines[line++].trim();
   const keywords: Record<string, string> = {};
   let last = '';
   for (; line < lines.length && !/^\s*TILT\s*=/i.test(lines[line]); line++) {
@@ -115,21 +116,29 @@ export function parseIES(text: string): IESProfile {
   next('the input watts');
   if (!Number.isInteger(rows) || rows < 1 || !Number.isInteger(columns) || columns < 1)
     fail('the number of vertical and horizontal angles must be positive integers');
-  if (type !== 1)
+  if (type !== 1 && type !== 2)
     throw new TypeError(
-      `IES photometric type ${type === 2 ? 'B' : type === 3 ? 'A' : type} is not supported; give a type C (1) file`,
+      `IES photometric type ${type === 3 ? 'A' : type} is not supported; give a type B (2) or C (1) file`,
     );
-  const vertical = Array.from({ length: rows }, () => next('a vertical angle')),
-    horizontal = Array.from({ length: columns }, () => next('a horizontal angle'));
-  // Unset factors (0 in some writers' "future use" field) count as 1.
-  const scale = multiplier * (ballast > 0 ? ballast : 1) * (ballastLamp > 0 ? ballastLamp : 1);
-  const candela = horizontal.map(() => vertical.map(() => next('a candela value') * scale));
+  if (type === 2 && (rows < 2 || columns < 2)) fail('a type B file needs two or more angles each way');
+  const fileVertical = Array.from({ length: rows }, () => next('a vertical angle')),
+    fileHorizontal = Array.from({ length: columns }, () => next('a horizontal angle'));
+  // LM-63-2002 retired the ballast-lamp factor ("future use") and 2019 gave its place to the file generation type, a code
+  // such as 1.10001. Unset factors (0 in some older writers' field) count as 1.
+  const lampFactor = /LM-63-20/i.test(format) || !(ballastLamp > 0) ? 1 : ballastLamp,
+    scale = multiplier * (ballast > 0 ? ballast : 1) * lampFactor;
+  const fileCandela = fileHorizontal.map(() => fileVertical.map(() => next('a candela value') * scale));
   const ascending = (list: number[]) => list.every((v, i) => i === 0 || v > list[i - 1]);
-  if (!ascending(vertical) || vertical[0] < 0 || vertical[rows - 1] > 180)
-    fail('vertical angles must ascend within 0 to 180 degrees');
-  if (!ascending(horizontal) || horizontal[0] < 0 || horizontal[columns - 1] > 360)
-    fail('horizontal angles must ascend within 0 to 360 degrees');
-  if (!(scale >= 0) || candela.some((row) => row.some((v) => v < 0))) fail('candela values must be 0 or more');
+  const [verticalLow, verticalHigh, horizontalLow, horizontalHigh] = type === 2 ? [-90, 90, -90, 90] : [0, 180, 0, 360];
+  if (!ascending(fileVertical) || fileVertical[0] < verticalLow || fileVertical[rows - 1] > verticalHigh)
+    fail(`vertical angles must ascend within ${verticalLow} to ${verticalHigh} degrees`);
+  if (!ascending(fileHorizontal) || fileHorizontal[0] < horizontalLow || fileHorizontal[columns - 1] > horizontalHigh)
+    fail(`horizontal angles must ascend within ${horizontalLow} to ${horizontalHigh} degrees`);
+  if (!(scale >= 0) || fileCandela.some((row) => row.some((v) => v < 0))) fail('candela values must be 0 or more');
+  const { vertical, horizontal, candela } =
+    type === 2
+      ? typeBGrid(fileVertical, fileHorizontal, fileCandela)
+      : { vertical: fileVertical, horizontal: fileHorizontal, candela: fileCandela };
   const peak = Math.max(...candela.map((row) => Math.max(...row)));
   const profile = {
     format,
@@ -145,6 +154,35 @@ export function parseIES(text: string): IESProfile {
   return Object.freeze(profile);
 }
 
+/**
+ * A type B table on a type C grid, so every reader of a profile sees one kind. Type B's planes meet in a lateral axis:
+ * the vertical angle V tilts the plane about that axis and the horizontal angle H runs along it, with (0, 0) on the beam.
+ * With the beam on z, plane 0 of type C on x (the lateral axis) and plane 90 on y, a direction is
+ * (sin H, cos H sin V, cos H cos V), so H = asin(x) and V = atan2(y, z). A table that starts at 0 is mirrored, and
+ * anything past a table's ends emits nothing.
+ */
+function typeBGrid(vertical: number[], horizontal: number[], table: number[][]) {
+  // Rounded so that a grid point on a table's last angle does not land a rounding error past it.
+  const degrees = (radians: number) => Math.round((radians * 180e9) / Math.PI) / 1e9,
+    mirrored = (list: number[], angle: number) => (list[0] >= 0 ? Math.abs(angle) : angle),
+    rows = Array.from({ length: 181 }, (_, i) => i),
+    columns = Array.from({ length: 73 }, (_, i) => i * 5);
+  const candela = columns.map((phi) =>
+    rows.map((theta) => {
+      const t = (theta * Math.PI) / 180,
+        p = (phi * Math.PI) / 180,
+        v = mirrored(vertical, degrees(Math.atan2(Math.sin(t) * Math.sin(p), Math.cos(t)))),
+        h = mirrored(horizontal, degrees(Math.asin(Math.sin(t) * Math.cos(p))));
+      return interpolate(
+        horizontal,
+        table.map((column) => interpolate(vertical, column, v, 0)),
+        h,
+        0,
+      );
+    }),
+  );
+  return { vertical: rows, horizontal: columns, candela };
+}
 /** `value` at `x` in the ascending `angles`, linear between them; `outside` past either end. */
 function interpolate(angles: readonly number[], values: readonly number[], x: number, outside: number): number {
   const n = angles.length;

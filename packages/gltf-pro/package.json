@@ -64,6 +64,10 @@
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"
     },
+    "./lights": {
+      "types": "./dist/lights.d.ts",
+      "import": "./dist/lights.js"
+    },
     "./coordinates": {
       "types": "./dist/coordinates.d.ts",
       "import": "./dist/coordinates.js"
@@ -81,15 +85,25 @@
     "@margoengine/decoders": "^1.0.0"
   },
   "peerDependencies": {
+    "@margoengine/clustered": "^1.0.0",
     "@margoengine/core": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
     "@margoengine/splats": "^1.0.0"
   },
   "peerDependenciesMeta": {
+    "@margoengine/clustered": {
+      "optional": true
+    },
+    "@margoengine/environment": {
+      "optional": true
+    },
     "@margoengine/splats": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@margoengine/clustered": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/splats": "^1.0.0"
   }
