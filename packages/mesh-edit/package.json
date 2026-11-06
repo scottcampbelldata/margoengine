@@ -46,6 +46,10 @@
     "./sculpt": {
       "types": "./dist/sculpt.d.ts",
       "import": "./dist/sculpt.js"
+    },
+    "./bake": {
+      "types": "./dist/bake.d.ts",
+      "import": "./dist/bake.js"
     }
   },
   "files": [

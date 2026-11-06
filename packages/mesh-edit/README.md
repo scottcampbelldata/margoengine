@@ -372,6 +372,40 @@ console.log(session.mesh().faces.length);
 - `pick(origin, direction)` returns the nearest `{point, normal, distance}`. It tests every triangle, and a dab visits every vertex, so one call costs time in proportion to the mesh.
 - `dynamicTopology` splits and collapses edges under the brush to hold `detailSize` (default the mean edge length), so a long pull does not stretch triangles. Corner UVs interpolate. For `grab` this runs once at the end of the stroke, since it holds fixed vertices.
 - Each stroke is one undo step, `undoLimit` of them (default 32). A step stores the whole surface, because dynamic topology changes more than positions: memory grows with mesh size times `undoLimit`.
+## Baking maps from a detailed mesh
+
+Keep the look of a detailed mesh on a simplified one: bake its normals, ambient occlusion and colour into textures laid out by the low mesh's UVs.
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { bakeMeshMaps } from 'margoengine/mesh-edit/bake';
+import { subdivideMesh } from 'margoengine/mesh-edit/modeling';
+
+const low = createPrimitiveMesh('plane', 'low');
+const high = subdivideMesh(subdivideMesh(low).mesh).mesh;
+const { normal, ao, covered, missed } = bakeMeshMaps(low, high, {
+  width: 256,
+  maps: ['normal', 'ao'],
+  aoRays: 16,
+});
+console.log(normal?.data.length, ao?.width, covered, missed);
+```
+
+Each covered texel casts one ray along the low surface's smooth normal, through `distance` on both sides, and takes the hit nearest the low surface from a float64 `@margoengine/bvh` tree. Images are RGBA8, rows from the top.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `width`, `height` | 512, the width | Texels, 1 to 8192 |
+| `maps` | `['normal']` | Any of `'normal'`, `'ao'`, `'color'` |
+| `distance` | 5% of the high mesh's size | Ray search each way from the low surface |
+| `color` | none | Image read at the high mesh's UVs, or a function of the hit; needed for `'color'` |
+| `aoRays` | 32 | Cosine-weighted rays per texel, 1 to 1024 |
+| `aoDistance` | the high mesh's size | Hits farther away do not occlude |
+| `padding` | 4 | Texels grown out of each island, 0 to 64, so filtering stays off the background |
+| `seed` | 1 | Occlusion rays repeat exactly for a seed |
+| `signal` | none | `AbortSignal`, checked per low triangle |
+
+Normals are tangent space with green up, the glTF convention, in a frame built from the low mesh's UVs. Overlapping UVs share texels, first triangle wins: run `unwrapMesh` first. `missed` counts texels that found nothing; raise `distance` when it is above zero. The bake runs on the calling thread.
 
 
 ## UV unwrap and lightmap UVs

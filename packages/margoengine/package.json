@@ -1030,6 +1030,10 @@
       "types": "./dist/mesh-edit/sculpt.d.ts",
       "import": "./dist/mesh-edit/sculpt.js"
     },
+    "./mesh-edit/bake": {
+      "types": "./dist/mesh-edit/bake.d.ts",
+      "import": "./dist/mesh-edit/bake.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"
