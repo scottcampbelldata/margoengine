@@ -362,13 +362,41 @@ Update the pose by writing the buffer's `data` and calling `update()`, or write 
 
 | Function | Returns | Notes |
 | --- | --- | --- |
+| `skinningFromModel(model, primitive)` | `skinning()`'s result and `{geometry, bones, joints, weights, update()}` | `primitive` is an entry of `model.primitives` whose node has a skin. |
 | `skinning({bones, joints, weights})` | `{position(p?), normal(n?)}` | `bones` holds the joint matrix times the inverse bind matrix, four `vec4f` columns per bone, in mesh space. `p` and `n` default to the mesh's own, so pass a morph's output to chain them. |
 | `morphing({count, vertices, positions, normals?, weights})` | `{position(p?), normal(n?)}` | The buffers hold `count * vertices` offsets, target after target. Without `normals`, `normal()` is the base normal. |
 | `worldNormal(n)` | a `normalNode` | A mesh-space normal in world space, per vertex and interpolated. Right on scaled and mirrored meshes. |
 
 **Normals.** `normalNode: worldNormal(skin.normal())` costs one blend per vertex and is what glTF asks for. Left out, a `positionNode` makes normals by the rules of [Node output in every pass](#node-output-in-every-pass): three evaluations of the skin per vertex, and the true normal of the deformed surface.
 
-**A character played by `@margoengine/animation`.** Its compute deformer already replaced the vertices every pass fetches, so in a NodeMaterial on such a character `positionLocal` and `normalLocal` are the posed vertex: add an effect with `positionLocal.add(...)` and leave these nodes out. They are for meshes you skin in the graph.
+**A loaded glTF character.** `skinningFromModel(model, primitive)` reads the skin for you: joints, weights, inverse bind matrices, the bind pose as `geometry`, and a joint palette that `update()` fills from the model's nodes, so `Animation`, a pose you set by hand or anything else that moves those nodes drives it.
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {NodeMaterial, positionWorld, sin, time, vec3} from 'margoengine/shader';
+import {skinningFromModel, worldNormal} from 'margoengine/shader/deform';
+
+const stage = await createStage('#app', {autoStart: false});
+const {engine} = stage;
+const model = await loadGLTF(engine, '/fox.glb');
+const animation = Animation.attach(model);
+const fox = skinningFromModel(model, model.primitives[0]);
+createMesh(engine, fox.geometry, new NodeMaterial({
+  positionNode: fox.position().add(vec3(0, sin(time).mul(5), 0)),
+  normalNode: worldNormal(fox.normal()),
+  colorNode: positionWorld.normalize(),
+}));
+model.root.visible = false;   // show the node version alone
+engine.onFrame(() => fox.update());
+engine.start();
+```
+
+Draw `fox.geometry` at the world origin: the palette holds world matrices, so the skin lands where the model stands. `update()` reads the matrices of the last transform update, so called from `onFrame` the skin runs a frame behind the joints. `JOINTS_1` (more than four influences) is refused, and a mesh drawn this way keeps its bind pose bounds, so a character that walks far from them needs `engine.render({culling: false})` or its own bounds.
+
+**A character played by `@margoengine/animation`, on its own mesh.** Its compute deformer already replaced the vertices every pass fetches, so in a NodeMaterial on such a character `positionLocal` and `normalLocal` are the posed vertex: add an effect with `positionLocal.add(...)` and leave these nodes out.
 
 `node packages/shader/test/deform-check.mjs` (real GPU, under the GPU lock) compares each of these with the same mesh deformed on the CPU: position, morph into skin, an effect on top, lit normals (also on a stretched, mirrored mesh, and from neighbours), a new pose, the shadow, and an effect on vertices a compute deformer moved.
 

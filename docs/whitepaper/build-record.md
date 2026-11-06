@@ -1010,9 +1010,10 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | A8 | The headless README opens with the ffmpeg need for video in Node | DONE | `22b5cdaa7` | - |
 | B9 | MeshBridge.sync pays one pass when nothing moved (regression of e1daa8a3e) | DONE | `71d56976e` | - |
 | verify | The unit test step names a hung test: 300 s a test, a watch in the runner for a silent file | DONE | `73dace773` | - |
-| A4 | GPUDynamicBVH.fromPrimitive and fromModel follow a real skinned model, proved on Fox.glb at three poses (also closes C7) | DONE | this commit | LIM-128 |
-| A5 | addXRButton finds the WebGL2 route itself and names what is missing; a run on a real headset stays with C4 | DONE | this commit | - |
-| A7 | modelAlphaMasks reads a loaded model's masks, with wrap per axis and KHR_texture_transform, against the GPU pick on AlphaBlendModeTest.glb | DONE | this commit | LIM-130 |
+| A4 | GPUDynamicBVH.fromPrimitive and fromModel follow a real skinned model, proved on Fox.glb at three poses (also closes C7) | DONE | `2ec4bc3d0` | LIM-128 |
+| A5 | addXRButton finds the WebGL2 route itself and names what is missing; a run on a real headset stays with C4 | DONE | `f53734c4a` | - |
+| A7 | modelAlphaMasks reads a loaded model's masks, with wrap per axis and KHR_texture_transform, against the GPU pick on AlphaBlendModeTest.glb | DONE | `343481d21` | LIM-130 |
+| A6 | skinningFromModel reads a loaded glTF skin; checked on the real Fox.glb against the compute deformer (closes C8 too) | DONE | this commit | LIM-188 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

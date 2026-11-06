@@ -5,7 +5,9 @@ import {planeGeometry} from '/packages/geometry/dist/index.js';
 import {Material,createMesh} from '/packages/materials/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {NodeMaterial,positionLocal,storage,uv,vec3} from '/packages/shader/dist/index.js';
-import {morphing,skinning,worldNormal} from '/packages/shader/dist/deform.js';
+import {morphing,skinning,skinningFromModel,worldNormal} from '/packages/shader/dist/deform.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Animation} from '/packages/animation/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,4],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -86,6 +88,28 @@ const scenarios={
     const buffer=device.createBuffer({size:v.byteLength,usage:GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(buffer,0,v);p.deformed=buffer;return posed;
   },
 };
+// Fox.glb: the same pose through the nodes and through Animation's compute deformer, on one flat material, so only the
+// vertices can differ. Run last: it moves the camera and leaves the model hidden.
+let fox;
+const foxReady=async()=>{
+  if(fox)return fox;
+  const model=await loadGLTF(engine,'/examples/assets/khronos/Fox/Fox.glb'),animation=Animation.attach(model);
+  animation.playing=false;animation.seek(animation.clips[0].duration*0.4);
+  engine.camera.position=[60,60,110];engine.camera.target=[0,30,0];
+  dark();engine.render({culling:false});await device.queue.onSubmittedWorkDone();
+  model.root.visible=false;
+  return fox={model,animation,skin:skinningFromModel(model,model.primitives[0])};
+};
+// A later frame of the clip, with the model hidden as the README hides it: the nodes still follow.
+const foxLater=async()=>{const f=await foxReady();f.animation.seek(f.animation.clips[0].duration*0.7);engine.render({culling:false});await device.queue.onSubmittedWorkDone();return f;};
+const foxScenarios={
+  async foxCompute(){const {model,skin}=await foxReady(),mesh=show(skin.geometry),[p]=mesh.primitives,[q]=model.primitives;p.deformed=q.deformed;p.deformedOffset=q.deformedOffset;return mesh;},
+  async foxNodes(){const {skin}=await foxReady();skin.update();return show(skin.geometry,{positionNode:skin.position()});},
+  async foxLaterCompute(){const {model,skin}=await foxLater(),mesh=show(skin.geometry),[p]=mesh.primitives,[q]=model.primitives;p.deformed=q.deformed;p.deformedOffset=q.deformedOffset;return mesh;},
+  async foxLaterNodes(){const {skin}=await foxLater();skin.update();return show(skin.geometry,{positionNode:skin.position()});},
+  async foxBind(){const {skin}=await foxReady();return show(skin.geometry);},
+};
+Object.assign(scenarios,foxScenarios);
 window.check={
   async run(name){device.pushErrorScope('validation');window.current=await scenarios[name]();engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {errors:[...(e?[e.message]:[]),...errors.splice(0)]};},
   clear(){window.current?.destroy();window.current=null;engine.render();},
