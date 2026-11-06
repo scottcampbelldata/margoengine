@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4684970,
+  "total": 4690178,
   "history": [
     {
       "date": "2026-10-24",
@@ -1898,6 +1898,12 @@
       "commit": "f391c8d0b",
       "reason": "new optional entry @margoengine/stage/xr: addXRButton; core and core + stage unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "a24478225",
+      "reason": "New optional entry bvh/gpu: GPU BVH traversal, batch 28 job 1; no existing entry grows",
+      "grew": 1
     }
   ],
   "items": {
@@ -1940,6 +1946,7 @@
     "@margoengine/blender": 4000,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/bake": 2583,
+    "@margoengine/bvh/gpu": 5208,
     "@margoengine/bvh/lines": 6113,
     "@margoengine/bvh/tree": 10524,
     "@margoengine/cache": 2663,

@@ -143,6 +143,54 @@ one laptop core).
 
 `intersectLines(raycaster, lines, options)` from `@margoengine/bvh/lines` picks `@margoengine/lines` lines with a Raycaster's ray, using a BVH per line, and returns the line, segment index, point, distance and offset. It has its own entry, so nothing else pays for it. Options, defaults and an example are in the [lines README](../lines/README.md#picking).
 
+## GPU traversal
+
+`@margoengine/bvh/gpu` uploads a `MeshBVH` to storage buffers and traces rays in WGSL compute, for picking at scale, baking, path tracing and audio occlusion. `GPUMeshBVH.create` takes a `GPUDevice`, or an `Engine` on WebGPU. The tree is built on the CPU as usual; after `bvh.refit()` call `update()`.
+
+```ts
+import {MeshBVH} from 'margoengine/bvh';
+import {GPUMeshBVH} from 'margoengine/bvh/gpu';
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter!.requestDevice();
+const positions = new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]);
+const bvh = MeshBVH.build({positions, indices: [0, 1, 2]});
+
+using gpu = await GPUMeshBVH.create(device, bvh); // disposed at the end of the block
+const hits = await gpu.raycast([{origin: [0, 0, 5], direction: [0, 0, -1]}]);
+console.log(hits.distance[0], hits.faceIndex[0], hits.frontFace[0]); // 5 0 1
+const blocked = await gpu.raycast([{origin: [0, 0, 5], direction: [0, 0, -1]}], {mode: 'any', far: 4});
+console.log(blocked.faceIndex[0]); // -1, a miss
+```
+
+`raycast` reads the answers back: `distance` (Infinity for a miss), `faceIndex` (-1 for a miss), `barycoord` (three weights a ray) and `frontFace`. It takes ray objects, or a `Float32Array` of `GPU_RAY_FLOATS` floats a ray (origin xyz, near, direction xyz, far) with a finite `far`; `packRays(rays, {near, far})` makes one. To keep everything on the GPU, `encodeTrace(encoder, rayBuffer, hitBuffer, count, {mode, side})` adds a trace to your encoder and writes `GPU_HIT_WORDS` words a ray: distance, face index with the front flag in bit 31, and the weights of vertices b and c.
+
+To trace inside your own shader, paste `bvhWGSL({group, binding})` into it and bind `gpu.bindings(binding)`:
+
+```ts
+import {bvhWGSL} from 'margoengine/bvh/gpu';
+
+const code = `${bvhWGSL({group: 1, binding: 0})}
+@group(0) @binding(0) var<storage, read_write> shade: array<f32>;
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+  // side: 0 double, 1 front, 2 back. hit.face == BVH_MISS for a miss.
+  let hit = bvhClosest(vec3f(0.0, 0.0, 5.0), vec3f(0.0, 0.0, -1.0), 0.0, 1000.0, 0u);
+  let blocked = bvhAny(vec3f(0.0, 1.0, 5.0), vec3f(0.0, 0.0, -1.0), 0.0, 1000.0, 0u);
+  shade[id.x] = select(hit.distance, 0.0, blocked.face != BVH_MISS);
+}`;
+console.log(code.length);
+```
+
+| Option | Where | Default |
+| --- | --- | --- |
+| `mode` | `raycast`, `encodeTrace` | `'closest'`; `'any'` stops at the first hit found, which need not be the nearest |
+| `side` | `raycast`, `encodeTrace` | `'double'` (`'front'`, `'back'`) |
+| `near`, `far` | `raycast` with ray objects | 0, Infinity |
+| `signal` | `raycast` | none |
+| `group`, `binding` | `bvhWGSL` | 0, 0 (five bindings from `binding`) |
+
+Queries run in float32, so a `precision: 'float64'` source is rounded on upload. The triangle test is watertight (Woop, Benthin and Wald, JCGT 2013): no ray slips between two triangles that share an edge. Equal distances answer the lowest face index, as `raycastFirst` does. The tree, the rays and the hits must each fit `maxStorageBufferBindingSize`; anything larger throws a RangeError, so request a higher limit or split the work.
+
 ## Benchmark
 
 `npm run bench` on Node 22, one core of a shared 2-core container, 1M triangles:

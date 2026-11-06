@@ -48,6 +48,10 @@
     "./lines": {
       "types": "./dist/lines.d.ts",
       "import": "./dist/lines.js"
+    },
+    "./gpu": {
+      "types": "./dist/gpu.d.ts",
+      "import": "./dist/gpu.js"
     }
   },
   "files": [

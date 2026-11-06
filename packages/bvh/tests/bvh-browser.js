@@ -1,6 +1,7 @@
 import { Engine, Geometry, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { webglRenderer } from '@margoengine/webgl';
+import { gpuChecks } from './gpu-browser.js';
 import {
   MeshBVH,
   Raycaster,
@@ -378,5 +379,6 @@ window.runBVHTests = async () => {
   report.worker = await workerChecks(report);
   report.webgpu = await engineChecks('webgpu', report);
   report.webgl2 = await engineChecks('webgl2', report);
+  report.gpu = await gpuChecks(report);
   return report;
 };

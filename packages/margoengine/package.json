@@ -198,6 +198,10 @@
       "types": "./dist/bvh/lines.d.ts",
       "import": "./dist/bvh/lines.js"
     },
+    "./bvh/gpu": {
+      "types": "./dist/bvh/gpu.d.ts",
+      "import": "./dist/bvh/gpu.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"

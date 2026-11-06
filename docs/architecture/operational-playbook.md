@@ -357,6 +357,12 @@ barriers reached 4.4 million invocations per second.
 frame pass at order -1000 and refuses the WebGL2 backend with `unsupported`. Evidence: `npm run test:gpu` in
 `packages/geometry` on the RTX A6000, reading vertices back and rebuilding after `rebootDevice`.
 
+`@margoengine/bvh/gpu` has no route through these tiers either: `GPUMeshBVH` takes a `GPUDevice` and refuses anything
+else with `unsupported`; WebGL2 keeps the CPU tree. Its ray test is float32 and watertight, with a four-step slack on
+each node's exit distance, so rounding never loses a hit. Evidence: `npm run test:browser` in `packages/bvh` on the
+RTX A6000 compares 100,000 rays with the float64 CPU tree and fires 123,200 rays at vertices and shared edges from
+inside a closed mesh.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback
@@ -648,3 +654,4 @@ The following remain technical gaps, not permission to weaken a check:
     no gate runs either one on Apple GPUs, and other GPUs are not checked. Its shadow lists still append atomically
     (depth only, so the same depth in any order).
 17. Subgroup kernels have run at subgroup sizes 32 and 4 only, and no gate runs size 4.
+18. GPU BVH traversal has no quiet speed measurement and no run on a GPU other than the RTX A6000.
