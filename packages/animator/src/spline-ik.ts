@@ -64,7 +64,7 @@ function frameRotation(tangent: number[], normal: ArrayLike<number>): number[] {
 /**
  * Bends `chain.joints` of `animator` along `chain.curve`, solved every frame after the pose, layers, foot IK and the
  * solvers added before it, for spines, tails and tentacles. Bones keep their lengths; past the curve's end the chain
- * carries on straight along its last tangent. Joints and their ancestors need positive uniform scales. Returns the
+ * carries on straight along its last tangent. Joints and their ancestors need positive scales. Returns the
  * handle; dispose it to stop.
  * @throws RangeError for invalid joints or settings; TypeError for joints that are not a parent-child line.
  */

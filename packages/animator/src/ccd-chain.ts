@@ -2,6 +2,7 @@
 // committed through the Animator's rotation writer. Kept out of the Animator class so an app that never adds a chain
 // does not bundle the solver (the package has no side effects; this module is dropped when unused).
 import type { Mesh, Vec3 } from '@margoengine/core/extension';
+import { rotationToQuaternion } from '@margoengine/math/quat';
 import { quaternionBlend } from './blend.js';
 import { CCDSolver, type CCDJointLimit, type CCDResult } from './ccd.js';
 import type { Animator } from './index.js';
@@ -43,7 +44,7 @@ export interface CCDChain {
  * Adds a Cyclic Coordinate Descent IK chain (Wang and Chen 1991) to `animator`, solved every frame after the pose, the
  * additive layers and foot IK: the joints turn, within their limits, so the chain's end effector reaches
  * `chain.target` (and, with `rotation`, the last joint takes that world rotation). Unreachable targets stretch the
- * chain toward them. Joints and their ancestors need positive uniform scales; rotations commit through the Animator's
+ * chain toward them. Joints and their ancestors need positive scales; rotations commit through the Animator's
  * `writeRotation` when it has one. Returns a function that removes the chain.
  */
 export function addCCDChain(animator: Animator, chain: CCDChain): () => void {
@@ -99,25 +100,57 @@ export function addCCDChain(animator: Animator, chain: CCDChain): () => void {
     const weight = settings();
     if (weight === 0) return;
     const parent = parents[chainNodes[0].id];
+    // The solver keeps one scale per joint, so each offset takes what the frame above has beyond that scale per axis.
+    let ax = 1,
+      ay = 1,
+      az = 1;
     if (parent === -1) {
       solver.parentPosition.fill(0);
       solver.parentRotation.fill(0);
       solver.parentRotation[3] = 1;
       solver.parentScale[0] = 1;
-    } else solver.setParentMatrix(engine.meshes.get(parent)!.matrix);
+    } else {
+      const m = engine.meshes.get(parent)!.matrix,
+        px = Math.hypot(m[0], m[1], m[2]),
+        py = Math.hypot(m[4], m[5], m[6]),
+        pz = Math.hypot(m[8], m[9], m[10]),
+        det =
+          m[0] * (m[5] * m[10] - m[6] * m[9]) -
+          m[4] * (m[1] * m[10] - m[2] * m[9]) +
+          m[8] * (m[1] * m[6] - m[2] * m[5]),
+        mean = (px + py + pz) / 3,
+        q = solver.parentRotation;
+      if (!(det > 0)) throw new RangeError('CCD chain parents need positive scales; remove zero or mirrored scales');
+      rotationToQuaternion(m, q, px, py, pz);
+      const length = Math.hypot(q[0], q[1], q[2], q[3]);
+      for (let k = 0; k < 4; k++) q[k] /= length;
+      solver.parentPosition[0] = m[12];
+      solver.parentPosition[1] = m[13];
+      solver.parentPosition[2] = m[14];
+      solver.parentScale[0] = mean;
+      ax = px / mean;
+      ay = py / mean;
+      az = pz / mean;
+    }
     for (let j = 0; j < chainNodes.length; j++) {
       const id = chainNodes[j].id,
-        sx = t.sx[id];
-      if (!(sx > 0) || Math.abs(sx - t.sy[id]) > 1e-5 * sx || Math.abs(sx - t.sz[id]) > 1e-5 * sx)
-        throw new RangeError('CCD chain joints need positive uniform scales; remove non-uniform joint scales');
-      solver.offsets[j * 3] = t.x[id];
-      solver.offsets[j * 3 + 1] = t.y[id];
-      solver.offsets[j * 3 + 2] = t.z[id];
+        sx = t.sx[id],
+        sy = t.sy[id],
+        sz = t.sz[id];
+      if (!(sx > 0 && sy > 0 && sz > 0))
+        throw new RangeError('CCD chain joints need positive scales; remove zero or mirrored joint scales');
+      solver.offsets[j * 3] = t.x[id] * ax;
+      solver.offsets[j * 3 + 1] = t.y[id] * ay;
+      solver.offsets[j * 3 + 2] = t.z[id] * az;
       solver.rotations[j * 4] = t.qx[id];
       solver.rotations[j * 4 + 1] = t.qy[id];
       solver.rotations[j * 4 + 2] = t.qz[id];
       solver.rotations[j * 4 + 3] = t.qw[id];
-      solver.scales[j] = sx;
+      const mean = (sx + sy + sz) / 3;
+      solver.scales[j] = mean;
+      ax = sx / mean;
+      ay = sy / mean;
+      az = sz / mean;
     }
     const result = solver.solve(chain.target, chain.rotation ?? null, chain.pole ?? null);
     for (let j = 0; j < chainNodes.length; j++) {

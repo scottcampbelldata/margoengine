@@ -64,7 +64,7 @@ const UP: Vec3 = [0, 1, 0],
  * the `ground` node (the flat floor the clip was made on), so stairs and slopes raise and lower feet while lifted swing
  * feet stay lifted. The pelvis drops by the largest downward offset (at most `maxPelvisDrop`) so that foot can reach,
  * then two-bone IK bends every leg toward its pole and, with `alignFeet`, tilts each planted foot to the surface.
- * Bones and their ancestors need positive uniform scales. Returns the handle; dispose it to stop.
+ * Bones and their ancestors need positive scales. Returns the handle; dispose it to stop.
  * @throws RangeError for invalid joints or settings; TypeError for a leg that is not a direct chain below the pelvis.
  */
 export function addFootPlacement(animator: Animator, placement: FootPlacement): FootPlacementHandle {

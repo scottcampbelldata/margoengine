@@ -508,7 +508,7 @@ function skeleton() {
   });
   return result;
 }
-async function animated(options = {}) {
+async function animated(options = {}, edit = () => {}) {
   const store = await TransformStore.create(16),
     engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, store, {
       backend: 'webgl2',
@@ -517,8 +517,9 @@ async function animated(options = {}) {
       render() {},
       dispose() {},
     }),
-    f = skeleton(),
-    model = new PBRModel(engine, new GLTFAsset(f.doc, f.buffers)),
+    f = skeleton();
+  edit(f.doc);
+  const model = new PBRModel(engine, new GLTFAsset(f.doc, f.buffers)),
     animation = new Animation(model),
     animator = new Animator(animation, { initial: 'wave', states: { wave: 'Wave' }, ...options });
   // CPU fixture: satisfy the attachment registry without executing GPU deformation.
@@ -648,4 +649,20 @@ test('addCCDChain validates the chain before it reaches the frame loop', async (
     () => addCCDChain(f.animator, { joints: [2, 3], target: [0, 1, 0] }),
     (error) => error.name === 'MargoError' && error.code === 'disposed',
   );
+});
+
+test('Animator CCD chains take a scale a little off uniform, as exported rigs have', async (t) => {
+  // Regression: real rigs carry scales such as 0.9995, 1, 0.9986 (Seed-san's hair) and the chain threw on them.
+  const uneven = [0.9995, 1, 0.9986],
+    f = await animated({}, (doc) => {
+      for (const node of [2, 3]) doc.nodes[node].scale = uneven;
+    });
+  t.after(() => f.release());
+  f.model.root.setScale(uneven);
+  const chain = { joints: [2, 3, 4], target: [0.8, 1.5, 0.3] };
+  addCCDChain(f.animator, chain);
+  for (let frame = 0; frame < 3; frame++) f.animator.onPreUpdate(1 / 60);
+  assert.ok(distance(f.world(4), chain.target) < 1e-2, `hand ${f.world(4)}`);
+  f.model.root.setScale([-1, 1, 1]);
+  assert.throws(() => f.animator.onPreUpdate(1 / 60), /positive scales/);
 });

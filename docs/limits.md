@@ -15,11 +15,6 @@ How to read "Starts at":
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
 Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -226,6 +221,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Spline IK (`@margoengine/animator/spline-ik`, 2026-11-06) | By method: bones are chords, so a bend tighter than a bone is cut across, and a chain longer than the curve carries on straight past its end. The curve's frames are rebuilt every frame, and a curve of points is rebuilt too, so a very long chain costs more than one on a fixed `Spline`. `space` needs a uniform scale. Speed not yet measured. |
 | Spring bones (`@margoengine/rigging/springs`, 2026-11-06) | Enforced: 256 joints a chain, a joint in one chain only, 8 steps a frame (longer frames slow the swing), jiggle up to 15 Hz. By method: a tail can pass through a collider it crosses within one step, as in the specification; after the push the length hold can leave up to 1 mm of overlap; colliders hold their pose for the frame during a long frame's steps; spheres and capsules only, no planes or inside shapes; a chain has no twist, each bone turns by the shortest arc; strips do not pull on their neighbours, so a skirt of chains can part. 144 Hz differs from 60 Hz by up to 2% of the chain's length. Speed not yet measured. |
 | VRM avatars (`@margoengine/rigging/vrm`, 2026-11-06) | Enforced: VRM 1.0 only; VRM 0.x files are refused with a coded error. By method: MToon draws as its glTF fallback, and a colour bind only MToon has is listed in `unsupported` and not shown; `VRMC_node_constraint` is kept on write and does not run; `firstPerson` is data only; colour binds are checked by value, not in a picture. Not proven: no outside VRM tool has read a file `writeVRM` made (stand-in: read back by Margo only). Not measured: speed. |
+| Uneven bone scales in IK (`@margoengine/rigging/ik`, `@margoengine/animator`, 2026-11-06) | Enforced: flat and mirrored bones are refused. By method: any positive scale is taken, and an uneven scale stretches the bones under it as they turn, so a chain lands as close as that stretch allows (within 0.14% of its length at 0.9995, 1, 0.9986). A `CCDSolver` keeps one scale per joint, so `addCCDChain` uses the mean of the three, and `setParentMatrix` still takes uniform scales only. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 

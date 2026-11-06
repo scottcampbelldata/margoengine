@@ -210,7 +210,7 @@ function nearestSupport(points: readonly (readonly [number, number])[], x: numbe
  * arms, legs and head reach their targets together, moving and turning the pelvis and bending the spine as far as they
  * need to, while legs hold their ground and the centre of mass stays over them. For reaching, climbing and interactions.
  * Move a target by writing into it. Bones keep their lengths; a target beyond reach leaves the limb straight toward it.
- * Bones and their ancestors need positive uniform scales. Returns the handle; dispose it to stop.
+ * Bones and their ancestors need positive scales. Returns the handle; dispose it to stop.
  * @throws RangeError for invalid joints or settings; TypeError for a limb that is not a direct chain below the pelvis.
  */
 export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHandle {

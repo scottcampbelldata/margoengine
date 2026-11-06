@@ -349,3 +349,34 @@ test('foot placement checks its legs and settings', async () => {
   assert.throws(() => addFootPlacement(h.animator, { pelvis: 1, legs: [leg], raycast, weight: 2 }), /weight/);
   h.release();
 });
+
+test('foot placement and foot IK take a scale a little off uniform, as exported rigs have', async () => {
+  // Regression: real rigs carry scales such as 0.9995, 1, 0.9986 (Seed-san's hair) and both threw on them.
+  const uneven = [0.9995, 1, 0.9986],
+    raycast = (origin) => ({ position: [origin[0], ground(origin[0]), origin[2]] }),
+    unevenLegs = () => {
+      const f = legs();
+      for (const node of [1, 2, 3, 5, 6]) f.doc.nodes[node].scale = uneven;
+      return f;
+    },
+    placed = await host(unevenLegs(), { initial: 'stand', states: { stand: 'Stand' } });
+  addFootPlacement(placed.animator, {
+    pelvis: 1,
+    legs: [
+      { hip: 2, knee: 3, ankle: 4, pole: [-0.2, 0.5, 1] },
+      { hip: 5, knee: 6, ankle: 7, pole: [0.2, 0.5, 1] },
+    ],
+    raycast,
+  });
+  placed.frame(1 / 60);
+  near(placed.world(4)[1], 0.15, 5e-3, 'left ankle on the step');
+  near(placed.world(7)[1], -0.15, 5e-3, 'right ankle down the drop');
+  placed.model.root.setScale([-1, 1, 1]);
+  assert.throws(() => placed.frame(1 / 60), /positive scales/);
+  placed.release();
+  const foot = await host(unevenLegs(), { initial: 'stand', states: { stand: 'Stand' } });
+  foot.animator.addFootIK({ hip: 2, knee: 3, ankle: 4, pole: [-0.2, 0.5, 1], raycast });
+  foot.frame(1 / 60);
+  near(foot.world(4)[1], 0.1, 5e-3, 'the ankle on the step');
+  foot.release();
+});

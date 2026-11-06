@@ -46,7 +46,7 @@ function skeleton() {
   });
   return result;
 }
-async function animated() {
+async function animated(edit = () => {}) {
   const store = await TransformStore.create(16),
     engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, store, {
       backend: 'webgl2',
@@ -55,8 +55,9 @@ async function animated() {
       render() {},
       dispose() {},
     }),
-    f = skeleton(),
-    model = new PBRModel(engine, new GLTFAsset(f.doc, f.buffers)),
+    f = skeleton();
+  edit(f.doc);
+  const model = new PBRModel(engine, new GLTFAsset(f.doc, f.buffers)),
     animation = new Animation(model),
     animator = new Animator(animation, { initial: 'wave', states: { wave: 'Wave' } });
   engine.use({ name: animation.name, setup() {} });
@@ -280,4 +281,21 @@ test('origin: inside the lens orbit the look is defined, and [0, 0, 0] matches n
   assert.deepEqual(a.frame(4), b.frame(4));
   assert.throws(() => addLookAt(a.animator, { joints: [4], target: [0, 0, 1], origin: [0, NaN, 0] }), RangeError);
   assert.throws(() => addLookAt(a.animator, { joints: [4], target: [0, 0, 1], origin: [0, 0] }), RangeError);
+});
+
+test('look-at takes a scale a little off uniform, as exported rigs have, and refuses a mirrored one', async (t) => {
+  // Regression: real rigs carry scales such as 0.9995, 1, 0.9986 (Seed-san's hair) and look-at threw on them.
+  const uneven = [0.9995, 1, 0.9986],
+    f = await animated((doc) => {
+      doc.nodes[3].scale = uneven;
+    });
+  t.after(() => f.release());
+  f.model.root.setScale(uneven);
+  const look = { joints: [3, 4], target: [3, 2.5, 2] };
+  addLookAt(f.animator, look);
+  f.animator.onPreUpdate(1 / 30);
+  const head = f.frame(4);
+  assert.ok(dot(head.z, direction(head.position, look.target)) > 1 - 1e-5);
+  f.model.root.setScale([-1, 1, 1]);
+  assert.throws(() => f.animator.onPreUpdate(1 / 30), /positive scales/);
 });

@@ -104,3 +104,37 @@ test('addIKChain reaches a moving target with the elbow toward the pole', async 
   assert.throws(() => addIKChain(animator, chain), RangeError);
   assert.throws(() => addIKChain(animator, { joints: [2, 4], target: [0, 0, 0] }), RangeError);
 });
+
+test('addIKChain takes a scale a little off uniform, as exported rigs have, and refuses a mirrored one', async (t) => {
+  // Regression: real rigs carry scales such as 0.9995, 1, 0.9986 (Seed-san's hair) and the chain threw on them.
+  const store = await TransformStore.create(16),
+    engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, store, {
+      backend: 'webgl2',
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    }),
+    f = skeleton();
+  for (const node of [1, 2, 3]) f.doc.nodes[node].scale = [0.9995, 1, 0.9986];
+  const model = new PBRModel(engine, new GLTFAsset(f.doc, f.buffers)),
+    animation = new Animation(model),
+    animator = new Animator(animation, { initial: 'wave', states: { wave: 'Wave' } });
+  engine.use({ name: animation.name, setup() {} });
+  engine.use(animator);
+  t.after(() => {
+    animator.dispose();
+    animation.dispose();
+    model.dispose();
+    engine.dispose();
+  });
+  const chain = { joints: [2, 3, 4], target: [0.8, 1.5, 0.3], pole: [0, 1, 2] };
+  addIKChain(animator, chain);
+  for (let frame = 0; frame < 3; frame++) animator.onPreUpdate(1 / 60);
+  store.tick(false);
+  const m = model.nodes[4].matrix,
+    gap = Math.hypot(m[12] - chain.target[0], m[13] - chain.target[1], m[14] - chain.target[2]);
+  assert.ok(gap < 5e-3, `the hand lands within the 0.14% stretch of two bones: ${gap}`);
+  model.root.setScale([-1, 1, 1]);
+  assert.throws(() => animator.onPreUpdate(1 / 60), /positive scales/);
+});

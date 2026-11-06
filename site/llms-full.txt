@@ -2572,11 +2572,6 @@ How to read "Starts at":
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
 Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-228). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2783,6 +2778,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Spline IK (`@margoengine/animator/spline-ik`, 2026-11-06) | By method: bones are chords, so a bend tighter than a bone is cut across, and a chain longer than the curve carries on straight past its end. The curve's frames are rebuilt every frame, and a curve of points is rebuilt too, so a very long chain costs more than one on a fixed `Spline`. `space` needs a uniform scale. Speed not yet measured. |
 | Spring bones (`@margoengine/rigging/springs`, 2026-11-06) | Enforced: 256 joints a chain, a joint in one chain only, 8 steps a frame (longer frames slow the swing), jiggle up to 15 Hz. By method: a tail can pass through a collider it crosses within one step, as in the specification; after the push the length hold can leave up to 1 mm of overlap; colliders hold their pose for the frame during a long frame's steps; spheres and capsules only, no planes or inside shapes; a chain has no twist, each bone turns by the shortest arc; strips do not pull on their neighbours, so a skirt of chains can part. 144 Hz differs from 60 Hz by up to 2% of the chain's length. Speed not yet measured. |
 | VRM avatars (`@margoengine/rigging/vrm`, 2026-11-06) | Enforced: VRM 1.0 only; VRM 0.x files are refused with a coded error. By method: MToon draws as its glTF fallback, and a colour bind only MToon has is listed in `unsupported` and not shown; `VRMC_node_constraint` is kept on write and does not run; `firstPerson` is data only; colour binds are checked by value, not in a picture. Not proven: no outside VRM tool has read a file `writeVRM` made (stand-in: read back by Margo only). Not measured: speed. |
+| Uneven bone scales in IK (`@margoengine/rigging/ik`, `@margoengine/animator`, 2026-11-06) | Enforced: flat and mirrored bones are refused. By method: any positive scale is taken, and an uneven scale stretches the bones under it as they turn, so a chain lands as close as that stretch allows (within 0.14% of its length at 0.9995, 1, 0.9986). A `CCDSolver` keeps one scale per joint, so `addCCDChain` uses the mean of the three, and `setParentMatrix` still takes uniform scales only. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 
@@ -3065,6 +3061,13 @@ does not own. Each entry says exactly what is needed to close it.
   run, and the results recorded here.
 
 ## Open defects
+
+### A ragdoll refuses a bone scale a little off uniform
+
+- **What:** `new Ragdoll` and `Ragdoll.attach` in `@margoengine/ragdoll` throw on a world scale such as 0.9995, 1, 0.9986, which real exporters write (the hair of the VRM Consortium's Seed-san sample has them).
+- **Repro:** in `packages/ragdoll/tests/ragdoll.test.js`, set `body.spine.setScale([0.9995, 1, 0.9986])` before `new Ragdoll(physics, { root: body.hips })`.
+- **Cause:** `worldPose` in `packages/ragdoll/src/ragdoll.ts` compares the three scales with a 1e-4 limit, and the same test file pins the refusal of `[1, 2, 1]`. IK, foot placement and look-at dropped their limit on 2026-11-06; here only a looser limit or a changed test would pass it.
+- **Needed to close:** decide whether a ragdoll may take any positive scale, as IK now does. If so, change the check to one for flat and mirrored matrices and replace the pinned refusal in the same commit.
 
 ### npm run verify hung once in its unit test step
 
@@ -3609,9 +3612,9 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   difference.
 
 ## Fixed 2026-11-06
-
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| `solvePoseIK`, `addIKChain`, `addCCDChain`, `addLookAt`, `addFootIK` and the shared pose tools (foot placement, warping, full-body IK, spline IK) threw on scales such as 0.9995, 1, 0.9986, which real exporters write | Each compared the three scales with a 1e-5 limit, because it read one scale for all axes | Each axis keeps its own scale; only flat and mirrored matrices are refused | The "off uniform" tests in `packages/rigging/tests/ik.test.js`, `packages/rigging/tests/ik-animator.test.js`, `tests/modern-animator-ccd.test.js`, `tests/modern-animator-look-at.test.js`, `tests/modern-animator-depth.test.js` |
 | A hung test in the verify unit step named nothing and sat until the step's outer limit | The step prints only when it ends, tests had no time limit, and `--test-timeout` alone cannot reach a blocked event loop or a process that stays alive after its tests | Each test has 300 s (32 s measured for the longest), and a reporter in the runner's process names a file silent for 360 s and ends the run with its children | `tests/test-watch.test.js` |
 | MeshBridge.sync made a world with nothing moving slower than the setter loop it replaced | One walk of the links for the mesh checks, then one per group whether it moved or not, and a read past the end of the row arrays to end a run | One pass checks the meshes and marks the groups that moved; only those get a second walk. A run ends after the loop | `packages/ecs/test/engine.test.js`, "one pass finds what moved" |
 | The light glTF loader called a valid accessor over one million values not valid glTF | The count limit shared one error with the bounds checks | Its own `unsupported` error naming gltf-pro, so `loadAuto` moves on | `packages/gltf/test/auto.test.js` |
@@ -7917,7 +7920,7 @@ engine.start();
 
 For a 2D state use `{parameters:['strafe','forward'],samples:[{value:[0,0],clip:'Idle'},...]}` with unique coordinates. Parameters default to zero. 1D samples must be strictly increasing. Clips loop independently in seconds (`Animation.options.loop` false holds the last frame). `playing = false` pauses state time and crossfades; `Animation.options.speed` scales them, as for Animation playback. `transition(state,duration)` switches states explicitly; predicates are evaluated in declaration order, at most once per frame. Add a layer with `addLayer({clip:'Aim',weight:0.5,mask:[upperBodyNodeIndex,...]})`. Masks use glTF node indices. The returned function removes the layer; mutable weights are validated each frame. `referenceTime` defaults to zero.
 
-`addFootIK({hip,knee,ankle,pole,raycast,offset,probeHeight})` requires a direct three-node leg chain. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For a BVH raycast, adapt its result to `{position}` or `null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive uniform scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
+`addFootIK({hip,knee,ankle,pole,raycast,offset,probeHeight})` requires a direct three-node leg chain. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For a BVH raycast, adapt its result to `{position}` or `null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
 
 ## CCD chains (any length)
 

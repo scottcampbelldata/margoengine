@@ -87,7 +87,7 @@ function unitInto(v: ArrayLike<number> | null | undefined, label: string, out: n
  * that bone rolls about the look direction so its `up` axis is as close to `worldUp` as it can be. A target within
  * 1 mm of the last bone's origin has no usable direction: the bones hold the last aim until it moves out again (the
  * animated pose until there is one), and a bone that would turn the last bone toward an aim point less than 1 mm from
- * it skips its share. Bones and their ancestors need positive uniform scales; rotations commit through the Animator's
+ * it skips its share. Bones and their ancestors need positive scales; rotations commit through the Animator's
  * `writeRotation` when it has one. The solve allocates nothing per frame. Returns a function that removes the
  * constraint.
  * @throws RangeError for invalid joints or settings.
@@ -480,7 +480,7 @@ function between(a: ArrayLike<number>, b: ArrayLike<number>, out: number[]): voi
 function partial(q: number[], n: Float64Array): void {
   if (n[FRACTION] < 1) blend(IDENTITY, q, n, q);
 }
-/** Rotation of a world matrix with a positive uniform scale, into `out` (as rotationToQuaternion, normalized). */
+/** Rotation of a world matrix with positive scales, into `out` (as rotationToQuaternion, normalized). */
 function rotation(e: ArrayLike<number>, out: number[]): void {
   measure(e);
   const sx = hypotTerms[4];
@@ -494,8 +494,9 @@ function rotation(e: ArrayLike<number>, out: number[]): void {
   hypotTerms[2] = e[10];
   hypotOf(3);
   const sz = hypotTerms[4];
-  if (!(sx > 0) || Math.abs(sx - sy) > 1e-5 * sx || Math.abs(sx - sz) > 1e-5 * sx)
-    throw new MargoError('state', 'Look-at bones need positive uniform scales; remove non-uniform scales above them');
+  const det =
+    e[0] * (e[5] * e[10] - e[6] * e[9]) - e[4] * (e[1] * e[10] - e[2] * e[9]) + e[8] * (e[1] * e[6] - e[2] * e[5]);
+  if (!(det > 0)) throw new MargoError('state', 'Look-at bones need positive scales; remove zero or mirrored scales');
   // Shepperd's method with quat-core's fixed branch rule: the trace when strictly positive, else the strictly largest
   // diagonal term, ties to the later axis.
   const m00 = e[0] / sx,

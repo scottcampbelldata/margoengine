@@ -875,9 +875,9 @@ export class Animator implements EnginePlugin {
     const chain: number[] = [];
     for (let id = node.id; id !== -1; id = parents[id]) chain.push(id);
     for (const id of chain.reverse()) {
-      if (t.sx[id] <= 0 || Math.abs(t.sx[id] - t.sy[id]) > 1e-5 || Math.abs(t.sx[id] - t.sz[id]) > 1e-5)
+      if (!(t.sx[id] > 0 && t.sy[id] > 0 && t.sz[id] > 0))
         throw new RangeError(
-          'Foot IK requires positive uniform bone and ancestor scales; set the leg bones and their parents to one equal positive scale',
+          'Foot IK requires positive bone and ancestor scales; remove zero or mirrored scales on the leg and above it',
         );
       q = quaternionMultiply(q, [t.qx[id], t.qy[id], t.qz[id], t.qw[id]]);
     }

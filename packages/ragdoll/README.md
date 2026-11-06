@@ -116,7 +116,7 @@ Without an animation, blending back returns to the pose the bones had before the
 | `angularDamping` | `0.8` | Per body. |
 | `limitStiffness` | `0.2` | Share of a cone limit's error removed per physics step, 0 to 1. |
 
-Bones need positive uniform world scales. Errors follow the package conventions: a `TypeError` or `RangeError` naming
+Bones need positive uniform world scales (a scale a little off uniform is a known bug, see `docs/known-bugs.md`). Errors follow the package conventions: a `TypeError` or `RangeError` naming
 the fix for bad options, and a `MargoError` with code `disposed` after `dispose()`, `attached` for a second ragdoll on
 one skeleton or the wrong engine, and `unsupported` for a hinge on a Rapier build without joint frames.
 

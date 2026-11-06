@@ -1,5 +1,5 @@
 // Moves bones in world terms on a posed skeleton: what foot placement, warping and full-body IK share. Reads world
-// matrices, so each change ticks the store for the next read. Bones and their ancestors need positive uniform scales.
+// matrices, so each change ticks the store for the next read. Bones and their ancestors need positive scales.
 import type { Mesh, Vec3 } from '@margoengine/core/extension';
 import {
   multiplyQuaternions,
@@ -26,20 +26,20 @@ export function poseTools(animator: Animator, label: string) {
   const engine = animator.animation.model.root.engine,
     store = engine.store,
     parents = store.parents;
-  const uniformScale = (m: ArrayLike<number>): number => {
-    const sx = Math.hypot(m[0], m[1], m[2]),
-      sy = Math.hypot(m[4], m[5], m[6]),
-      sz = Math.hypot(m[8], m[9], m[10]);
-    if (!(sx > 0) || Math.abs(sx - sy) > 1e-5 * sx || Math.abs(sx - sz) > 1e-5 * sx)
+  // Exported rigs carry scales a little off uniform, so each axis keeps its own.
+  const scales = (m: ArrayLike<number>): [number, number, number] => {
+    const det =
+      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
+    if (!(det > 0))
       throw new MargoError(
         'state',
-        `${label} bones need positive uniform scales; remove non-uniform scales on the legs and above them`,
+        `${label} bones need positive scales; remove zero or mirrored scales on the legs and above them`,
       );
-    return sx;
+    return [Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10])];
   };
   const rotationOf = (m: ArrayLike<number>): number[] => {
-    const s = uniformScale(m);
-    return normalizeQuaternion(rotationToQuaternion(m, [0, 0, 0, 0], s, s, s));
+    const [sx, sy, sz] = scales(m);
+    return normalizeQuaternion(rotationToQuaternion(m, [0, 0, 0, 0], sx, sy, sz));
   };
   const setWorldRotation = (bone: Mesh, next: ArrayLike<number>): void => {
     const parent = parents[bone.id],
@@ -62,10 +62,10 @@ export function poseTools(animator: Animator, label: string) {
     let local: number[] = [offset[0], offset[1], offset[2]];
     if (parent !== -1) {
       const m = engine.meshes.get(parent)!.matrix,
-        scale = uniformScale(m),
-        q = rotationToQuaternion(m, [0, 0, 0, 0], scale, scale, scale),
+        axes = scales(m),
+        q = rotationOf(m),
         inverse = [-q[0], -q[1], -q[2], q[3]];
-      local = rotateByQuaternion(local, inverse).map((v) => v / scale);
+      local = rotateByQuaternion(local, inverse).map((v, i) => v / axes[i]);
     }
     bone.setPosition([t.x[id] + local[0], t.y[id] + local[1], t.z[id] + local[2]]);
     store.tick(false);

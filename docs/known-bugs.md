@@ -158,6 +158,13 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### A ragdoll refuses a bone scale a little off uniform
+
+- **What:** `new Ragdoll` and `Ragdoll.attach` in `@margoengine/ragdoll` throw on a world scale such as 0.9995, 1, 0.9986, which real exporters write (the hair of the VRM Consortium's Seed-san sample has them).
+- **Repro:** in `packages/ragdoll/tests/ragdoll.test.js`, set `body.spine.setScale([0.9995, 1, 0.9986])` before `new Ragdoll(physics, { root: body.hips })`.
+- **Cause:** `worldPose` in `packages/ragdoll/src/ragdoll.ts` compares the three scales with a 1e-4 limit, and the same test file pins the refusal of `[1, 2, 1]`. IK, foot placement and look-at dropped their limit on 2026-11-06; here only a looser limit or a changed test would pass it.
+- **Needed to close:** decide whether a ragdoll may take any positive scale, as IK now does. If so, change the check to one for flat and mirrored matrices and replace the pinned refusal in the same commit.
+
 ### npm run verify hung once in its unit test step
 
 - **What:** on 2026-11-06 one `npm run verify` run in a worktree passed every other step and then sat in the unit test step until its 1,500 s limit, where the same tree took 166 s minutes before and the next run passed in 380 s. Nothing named the test, because the step prints only when it ends.
@@ -701,9 +708,9 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   difference.
 
 ## Fixed 2026-11-06
-
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| `solvePoseIK`, `addIKChain`, `addCCDChain`, `addLookAt`, `addFootIK` and the shared pose tools (foot placement, warping, full-body IK, spline IK) threw on scales such as 0.9995, 1, 0.9986, which real exporters write | Each compared the three scales with a 1e-5 limit, because it read one scale for all axes | Each axis keeps its own scale; only flat and mirrored matrices are refused | The "off uniform" tests in `packages/rigging/tests/ik.test.js`, `packages/rigging/tests/ik-animator.test.js`, `tests/modern-animator-ccd.test.js`, `tests/modern-animator-look-at.test.js`, `tests/modern-animator-depth.test.js` |
 | A hung test in the verify unit step named nothing and sat until the step's outer limit | The step prints only when it ends, tests had no time limit, and `--test-timeout` alone cannot reach a blocked event loop or a process that stays alive after its tests | Each test has 300 s (32 s measured for the longest), and a reporter in the runner's process names a file silent for 360 s and ends the run with its children | `tests/test-watch.test.js` |
 | MeshBridge.sync made a world with nothing moving slower than the setter loop it replaced | One walk of the links for the mesh checks, then one per group whether it moved or not, and a read past the end of the row arrays to end a run | One pass checks the meshes and marks the groups that moved; only those get a second walk. A run ends after the loop | `packages/ecs/test/engine.test.js`, "one pass finds what moved" |
 | The light glTF loader called a valid accessor over one million values not valid glTF | The count limit shared one error with the bounds checks | Its own `unsupported` error naming gltf-pro, so `loadAuto` moves on | `packages/gltf/test/auto.test.js` |

@@ -241,7 +241,8 @@ export interface IKPose {
 
 /**
  * Solves an IK chain on a pose without an engine: turns the chain's joints (all but the last) so the last reaches
- * `target`, bending toward `pole`. Writes the new rotations into `pose.local`. Bones need positive uniform scales.
+ * `target`, bending toward `pole`. Writes the new rotations into `pose.local`. Bones need positive scales. An uneven
+ * scale stretches the bones under it as they turn, so the last joint lands as close as that stretch allows.
  * @throws RangeError for an invalid chain or pose.
  */
 export function solvePoseIK(pose: IKPose, chain: IKChain): FABRIKResult {
@@ -251,23 +252,32 @@ export function solvePoseIK(pose: IKPose, chain: IKChain): FABRIKResult {
     throw new TypeError('solvePoseIK needs {parents, local} with 10 local numbers per bone');
   const joints = checkChain(chain, count, (child, parent) => parents[child] === parent);
   // World transforms of every ancestor of the chain and the chain itself.
-  const world = (bone: number): { position: number[]; rotation: number[]; scale: number } => {
+  const world = (bone: number): { position: number[]; rotation: number[] } => {
     const path: number[] = [];
     for (let at = bone; at >= 0; at = parents[at]) path.push(at);
     let position = [0, 0, 0],
       rotation = [0, 0, 0, 1],
-      scale = 1;
+      // The world axes of the frame so far, scales included: real rigs carry scales a little off uniform.
+      axes = [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ];
+    const place = (v: ArrayLike<number>): number[] =>
+      [0, 1, 2].map((c) => axes[0][c] * v[0] + axes[1][c] * v[1] + axes[2][c] * v[2]);
     for (let k = path.length - 1; k >= 0; k--) {
       const l = path[k] * 10,
-        s = local[l + 7];
-      if (!(s > 0) || Math.abs(local[l + 8] - s) > 1e-5 * s || Math.abs(local[l + 9] - s) > 1e-5 * s)
-        throw new RangeError(`IK bone ${path[k]} needs a positive uniform scale; remove its non-uniform scale`);
-      const offset = rotateByQuaternion([local[l] * scale, local[l + 1] * scale, local[l + 2] * scale], rotation);
+        turn = [local[l + 3], local[l + 4], local[l + 5], local[l + 6]];
+      if (!(local[l + 7] > 0 && local[l + 8] > 0 && local[l + 9] > 0))
+        throw new RangeError(`IK bone ${path[k]} needs positive scales; remove its zero or mirrored scale`);
+      const offset = place([local[l], local[l + 1], local[l + 2]]);
       position = [position[0] + offset[0], position[1] + offset[1], position[2] + offset[2]];
-      rotation = multiplyQuaternions(rotation, [local[l + 3], local[l + 4], local[l + 5], local[l + 6]]);
-      scale *= s;
+      rotation = multiplyQuaternions(rotation, turn);
+      axes = [0, 1, 2].map((a) =>
+        place(rotateByQuaternion([0, 1, 2].map((c) => (c === a ? local[l + 7 + a] : 0)), turn)),
+      );
     }
-    return { position, rotation, scale };
+    return { position, rotation };
   };
   const frames = joints.map(world),
     parentOfFirst = parents[joints[0]],
@@ -456,8 +466,8 @@ export interface AnimatorIKChain extends FABRIKOptions {
 /**
  * Adds a FABRIK IK chain with an optional pole to `animator` (`@margoengine/animator`), solved every frame after the
  * pose, additive layers and foot IK: the chain's joints turn so the last joint reaches `chain.target`, the bend facing
- * `chain.pole`. The last joint keeps its animated local rotation. Joints and their ancestors need positive uniform
- * scales; rotations commit through the Animator's `writeRotation` when it has one. Returns a function that removes
+ * `chain.pole`. The last joint keeps its animated local rotation. Joints and their ancestors need positive scales;
+ * rotations commit through the Animator's `writeRotation` when it has one. Returns a function that removes
  * the chain. For joint limits, use `addCCDChain` from `@margoengine/animator`.
  */
 export function addIKChain(animator: Animator, chain: AnimatorIKChain): () => void {
@@ -498,12 +508,13 @@ export function addIKChain(animator: Animator, chain: AnimatorIKChain): () => vo
   });
 }
 
-/** The rotation of a world matrix with a positive uniform scale. */
+/** The rotation of a world matrix with positive scales, each column divided by its own. */
 function worldRotation(m: ArrayLike<number>): number[] {
   const sx = Math.hypot(m[0], m[1], m[2]),
     sy = Math.hypot(m[4], m[5], m[6]),
-    sz = Math.hypot(m[8], m[9], m[10]);
-  if (!(sx > 0) || Math.abs(sx - sy) > 1e-5 * sx || Math.abs(sx - sz) > 1e-5 * sx)
-    throw new RangeError('IK chain joints need positive uniform scales; remove non-uniform joint scales');
+    sz = Math.hypot(m[8], m[9], m[10]),
+    det =
+      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
+  if (!(det > 0)) throw new RangeError('IK chain joints need positive scales; remove zero or mirrored joint scales');
   return normalizeQuaternion(rotationToQuaternion(m, [0, 0, 0, 0], sx, sy, sz));
 }

@@ -109,7 +109,7 @@ const trackOf = (clip: Clip, joint: number) =>
  * added before it. Write the character's real `velocity` into the object each frame: the hips turn toward it, up to
  * `maxTurn`, the spine hands the turn back, and each foot's stride scales by real speed over clip speed, with the pelvis
  * dropping when legs would not reach. Past `minStride` and `maxStride` the clip's rate changes instead, from the next
- * frame, so a stopped character stops stepping. Bones and their ancestors need positive uniform scales. Returns the
+ * frame, so a stopped character stops stepping. Bones and their ancestors need positive scales. Returns the
  * handle; dispose it to stop.
  * @throws RangeError for invalid joints or settings; TypeError for a leg that is not a direct chain below the pelvis.
  */

@@ -175,3 +175,38 @@ test('a chain folded onto its own line still reaches, keeping its lengths', () =
   assert.ok(Math.abs(distance(point(points, 0), point(points, 1)) - 1) < 1e-9);
   assert.ok(Math.abs(distance(point(points, 1), point(points, 2)) - 1) < 1e-9);
 });
+
+test('solvePoseIK takes a scale a little off uniform, as exported rigs have, and refuses a mirrored one', () => {
+  // Regression: real rigs carry scales such as 0.9995, 1, 0.9986 (Seed-san's hair) and IK refused them.
+  const uneven = [0.9995, 1, 0.9986],
+    local = Float64Array.from([
+      ...[0, 0, 0, 0, 0, 0, 1, ...uneven],
+      ...[0, 1, 0, 0, 0, 0, 1, ...uneven],
+      ...[0, 1, 0, 0, 0, 0, 1, ...uneven],
+      ...[0, 1, 0, 0, 0, 0, 1, 1, 1, 1],
+    ]),
+    parents = [-1, 0, 1, 2],
+    target = [1.1, 1.8, 0.3];
+  solvePoseIK({ parents, local }, { joints: [1, 2, 3], target });
+  // The last joint through full matrices, the way the engine places it.
+  const rotate = (q, v) => {
+    const [x, y, z, w] = q,
+      t = [2 * (y * v[2] - z * v[1]), 2 * (z * v[0] - x * v[2]), 2 * (x * v[1] - y * v[0])];
+    return [
+      v[0] + w * t[0] + y * t[2] - z * t[1],
+      v[1] + w * t[1] + z * t[0] - x * t[2],
+      v[2] + w * t[2] + x * t[1] - y * t[0],
+    ];
+  };
+  let point = [0, 0, 0];
+  for (let bone = 3; bone >= 0; bone--) {
+    const l = bone * 10,
+      scaled = point.map((v, i) => v * local[l + 7 + i]),
+      turned = rotate(Array.from(local.subarray(l + 3, l + 7)), scaled);
+    point = turned.map((v, i) => v + local[l + i]);
+  }
+  const gap = Math.hypot(point[0] - target[0], point[1] - target[1], point[2] - target[2]);
+  assert.ok(gap < 5e-3, `the hand lands within the 0.14% stretch of two bones: ${gap}`);
+  local[17] = -1;
+  assert.throws(() => solvePoseIK({ parents, local }, { joints: [1, 2, 3], target }), /positive scales/);
+});

@@ -26,7 +26,7 @@ engine.start();
 
 For a 2D state use `{parameters:['strafe','forward'],samples:[{value:[0,0],clip:'Idle'},...]}` with unique coordinates. Parameters default to zero. 1D samples must be strictly increasing. Clips loop independently in seconds (`Animation.options.loop` false holds the last frame). `playing = false` pauses state time and crossfades; `Animation.options.speed` scales them, as for Animation playback. `transition(state,duration)` switches states explicitly; predicates are evaluated in declaration order, at most once per frame. Add a layer with `addLayer({clip:'Aim',weight:0.5,mask:[upperBodyNodeIndex,...]})`. Masks use glTF node indices. The returned function removes the layer; mutable weights are validated each frame. `referenceTime` defaults to zero.
 
-`addFootIK({hip,knee,ankle,pole,raycast,offset,probeHeight})` requires a direct three-node leg chain. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For a BVH raycast, adapt its result to `{position}` or `null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive uniform scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
+`addFootIK({hip,knee,ankle,pole,raycast,offset,probeHeight})` requires a direct three-node leg chain. The callback receives a world-space origin above the current ankle and a downward ray. Return `{position,normal?}` or `null`; supply terrain collision data or an existing BVH. For a BVH raycast, adapt its result to `{position}` or `null`. Normals align the ankle's local +Y with the terrain. Bones/ancestors require positive scales. Unreachable targets clamp to the leg's reach; the pole chooses the knee bend direction. `solveTwoBoneIK()` is also exported as a standalone analytical solver.
 
 ## CCD chains (any length)
 
@@ -58,7 +58,7 @@ const remove = addCCDChain(animator, reach);
 - **`rotation`** turns the last joint to that world rotation. Each other joint also turns about its own joint-to-effector line (which leaves the effector where it is) to remove what it can of the orientation error.
 - **`pole`** turns the chain, after each sweep, about its root-to-effector line so the bend faces the pole (the effector stays put).
 - **`weight`** blends from the animated pose (0) to the solved chain (1). `maxAngle` caps one joint's turn per sweep.
-- Joints and their ancestors need positive uniform scales. Rotations commit through `writeRotation` when it is set.
+- Joints and their ancestors need positive scales. Rotations commit through `writeRotation` when it is set.
 
 `CCDSolver` is the solver on its own, for chains that are not glTF nodes: `new CCDSolver(offsets, tip)` takes one translation per joint (in the previous joint's frame) and keeps everything in `Float64Array`s (`rotations`, `rest`, `scales`, `positions`, `worldRotations`, `parentPosition`, `parentRotation`, `parentScale`). Its settings are fields (`iterations`, `tolerance`, `angleTolerance`, `maxAngle`, `reach`), limits are set once with `setLimit(index, limit)`, and `solve(target, rotation?, pole?)` turns `rotations` in place and returns a reused `{iterations, distance, angle, reached}`. `setParentMatrix(m)` takes a parent bone's world matrix.
 
@@ -141,7 +141,7 @@ removeLook();
 removeAim();
 ```
 
-Each bone in turn takes its share of what is left, so the last bone's axis ends exactly on the target (or `maxAngle` from where the animation pointed it). With `origin` the bone still turns about its own origin, and the ray from `origin` along `axis` passes through the target; a target nearer the bone than that ray reaches gets the ray's nearest point turned toward it. A target within 1 mm of the last bone's origin has no usable direction, so the bones hold the last aim until it moves out again (a dragged target can pass through the head without a jump or an error). The solve allocates nothing per frame. `weight` below 1 blends every bone's local rotation from the animated one to the solved one. Bones and their ancestors need positive uniform scales; rotations commit through `writeRotation` when it is set. For IK chains with poles see `addIKChain` in [`@margoengine/rigging`](../rigging/README.md).
+Each bone in turn takes its share of what is left, so the last bone's axis ends exactly on the target (or `maxAngle` from where the animation pointed it). With `origin` the bone still turns about its own origin, and the ray from `origin` along `axis` passes through the target; a target nearer the bone than that ray reaches gets the ray's nearest point turned toward it. A target within 1 mm of the last bone's origin has no usable direction, so the bones hold the last aim until it moves out again (a dragged target can pass through the head without a jump or an error). The solve allocates nothing per frame. `weight` below 1 blends every bone's local rotation from the animated one to the solved one. Bones and their ancestors need positive scales; rotations commit through `writeRotation` when it is set. For IK chains with poles see `addIKChain` in [`@margoengine/rigging`](../rigging/README.md).
 
 ## Triggers, exit times, any-state transitions and events
 
@@ -283,7 +283,7 @@ console.log(feet.pelvisOffset, feet.footOffsets);
 feet.dispose();
 ```
 
-The placement object is read every frame, so poles, weight and the raycast may change. A leg whose ray misses keeps its animated pose. Each frame starts from the animated pose, so nothing accumulates. Bones and their ancestors need positive uniform scales; rotations commit through `writeRotation` when it is set.
+The placement object is read every frame, so poles, weight and the raycast may change. A leg whose ray misses keeps its animated pose. Each frame starts from the animated pose, so nothing accumulates. Bones and their ancestors need positive scales; rotations commit through `writeRotation` when it is set.
 
 ## Inertialization (`margoengine/animator/inertialize`)
 
