@@ -1076,9 +1076,9 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 327,526 B |
-| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 289,055 B |
-| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 156,772 B |
+| `margoengine/game` | Games: models, animation, light and shadow, sky, physics, audio, input, effects | 333,278 B |
+| `margoengine/viz` | Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text | 292,712 B |
+| `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 161,713 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
 part of a kit pays for that part; core + stage alone is 22,859 B). Wasm decoders, workers and lazily loaded parts
@@ -2571,7 +2571,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-198). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-199). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2755,6 +2755,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | GPU morph weights (`@margoengine/animation/morph-gpu`, 2026-11-06) | Not measured for speed yet: the 16 B a frame and one dispatch per page are counted, the frame time is not. `Animation.upload` still loops over each copy to check its weights and bones, so CPU work is smaller per copy, not zero. Time is float32 in the shader: steps of about 0.24 ms after an hour of play. Copies must share one asset. Driven weights ignore `setMorph`, and `primitive.weights` on the CPU does not follow them. | The tracks are shared, and reading weights back would stall the frame. | A long-running crowd loses fine timing slowly. CPU code that reads `primitive.weights` sees old values. | Set `player.time` back by whole loops of the clip. Use `Animation` for a character whose weights you read or set by hand. |
 | Animation LOD (`@margoengine/animation/lod`, 2026-11-06) | CPU only, and not measured for speed yet: how many copies update is counted, the frame time is not. Every copy still goes through the GPU deform dispatch each frame, and each still draws. Visibility is a sphere at the model root against the view, with no occlusion. `depth` counts node levels from the scene roots, so its meaning depends on the rig. A tier with a depth does not play `KHR_animation_pointer` channels. Deeper bones hold, so a far character can show a slightly wrong pose until it comes closer. | A skipped pose must still draw, and the deformed output is what draws. | A crowd limited by the GPU gains little. A copy far larger than its `radius` can stop updating while part of it shows. | Set `radius` to cover the character. Use `VATCrowd` when the GPU is the limit. |
 | Clip editing (`@margoengine/animation/clip-utils`, 2026-11-06) | By method: an eased or cubic segment that a cut passes through becomes straight keys at `fps` (default 60), so it follows the curve only to that step; segments kept whole stay exact. Works on `KeyframeClip`s, not glTF clips. `makeAdditive` leaves property tracks out, and `applyAdditiveClip` poses a `Skeleton` only, without morph weights. | An eased curve is defined over its whole segment, so one key cannot carry part of it. | Very fine motion inside a cut curve can flatten between samples. | Pass a higher `fps`. For a glTF clip use an `@margoengine/animator` additive layer. |
+| Engine ticks per `cloneModel` copy (2026-11-06) | None when the copy can take its source's static batches, skinned models included, so a crowd no longer costs a tick of every mesh per copy. One when the source moved since baking, has a parent, or had its geometry rewritten: the copy bakes for itself. A copy's world matrices publish with the next tick; a direct `node.matrix` read before it sees the old value. The time saved is not measured yet. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 
@@ -3510,17 +3511,17 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   (`@margoengine/animation/morph-gpu`, 2026-11-06) samples and writes the weights on the GPU; its effect on `p-morph`
   is not measured yet (quiet pass).
 
-### cloneModel: one engine-wide tick per copy
+### cloneModel: slower than three's clone
 
 - **What:** `p-skeleton-clone`, 50 `cloneModel` copies of RobotExpressive per call (the call also destroys the
   previous 50): 14.3 ms against three's `SkeletonUtils.clone` 8.1 (run `20261105-235810`, busy machine, diagnostic; 84.5
-  before entry 28, 63.6 before entry 29, 47.9 before entry 32, 16.8 before entry 59).
+  before entry 28, 63.6 before entry 29, 47.9 before entry 32, 16.8 before entry 59). That run still had one tick a copy;
+  the tick is gone since 2026-11-06 (table below) and the row has not been run again, so its new time is unknown.
 - **Cause (measured with timers in the scene, 2026-11-05, before entry 59):** a call was 100 ticks (6.4 ms), `destroy` of
   the old copies (2.9 ms), `setup` beyond its ticks (5 ms) and `new PBRModel` and the node copy (8 ms). three's clone
-  creates objects only. Entry 59 removed the second tick of each copy.
-- **Plan:** the tick left per copy publishes the copy's node matrices before baking reads them, and a public read of a
-  node right after loading needs it too, so it cannot simply go. Next: a tick that visits only what changed
-  (kernel, so core: ask Scott first), or cheaper node creation in `PBRModel`.
+  creates objects only.
+- **Plan:** rerun the row in the quiet pass. Whatever is left is `destroy`, `setup` and node creation: make those
+  cheaper, or publish the rest as an accepted difference if it is work three does not do.
 
 ### GPU picking waits for one readback per pick
 
@@ -3593,6 +3594,8 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 | `npm run verify` ended with `EPERM` in `ResultStore.put` while another lane ran it | Every `put` prunes its step, and Windows refuses a delete while another lane reads or deletes the same file | A refused delete leaves the entry for the next `put`; any other error still throws | `tests/result-cache.test.js`, "a prune another run blocks leaves the entry for the next put; other errors still throw" |
 | Light tier: 50 FPS on a 100 Hz display, in every browser (a Dell S2725HS, which macOS runs at 100 Hz by default; 90 Hz gave 45, 165 Hz gave 55, and 75 Hz about 58 with 1 ms of jitter) | `capFrameRate` skipped every refresh sooner than 12.67 ms after the last frame, so on a display with no multiple near 60 it dropped every other refresh. Phones are not paced, so a phone on the same page showed 60 | `@margoengine/quality`: each frame spans the most whole refreshes that still reach the rate, counted from a median of the last 16 callback gaps, so no display falls below it and jitter cannot move it. Real page, simulated 100 Hz clock, Apple M6: 50.0 before and 100 after, in Chrome 157 and Playwright WebKit 27.2 | `packages/quality/test/quality.test.js`: "the cap never renders below its rate, at any refresh rate", "the cap holds its rate through callback jitter and whole-millisecond timestamps" |
 | Light tier: an Apple M6 read 19 to 32 ms of GPU time a frame while holding 60 FPS, so its reading was over the limit by four times | The reading added up each pass's time, and an M6 runs a frame's 11 passes side by side: 31.9 ms of passes in 8.5 ms of GPU time (Chrome, 90th percentile) | `@margoengine/quality`: a frame reads the time its passes cover, so passes that overlap count once. Passes that run in turn read as before (an RTX A6000 reads 4.33 ms either way). An M6 now reads 8.4 to 9.1 ms at 60 FPS, which is still over `FAST_GPU_MS` (8), so this scene stays on the light tier there | `packages/quality/test/quality.test.js`: "passes that run at the same time count once" |
+| `compile()` on a model with no published matrices skipped every draw as singular and compiled nothing, so the first frame blocked anyway | a node's matrix is zero until its first tick, and a zero matrix reads as singular | `compile` ticks when the root is unpublished | `packages/gltf-pro/tests/model-runs.test.js` ("compile() builds first-frame pipelines") |
+| `cloneModel`: each copy ran a tick of every mesh of the engine to bake its static batches, so a crowd cost quadratic time (`p-skeleton-clone`: 100 ticks a call, 6.4 ms, before entry 59 halved them) | baking read world matrices, and a tick is the only way to publish them | a copy takes the source's batches (`PBRModel.adoptStaticBatches`): the same baked arrays and part poses at the same pose, so it bakes nothing and ticks nothing; a source moved since baking, or parented, still costs its one tick | `packages/gltf-pro/tests/model-runs.test.js` ("a copy that takes its source batches costs no engine tick", "where the batches do not fit"), `packages/animation/tests/clone.test.js` ("cloneModel of a registered model runs no engine tick") |
 | `cloneModel`: every copy uploaded and mipped its own textures (`p-morph`: 700 textures, 300 bitmap copies, 300 submits, about 560 MB of texture memory for 100 copies; the first frame waited 200 ms for it) | the copies held separate `createImageBitmap` copies, so nothing could tell they were one image, and gltf-pro's texture cache was per model | copies hold the source's images (`PBRModel.shareImages`, counted) and gltf-pro shares textures per device, image and format, each freed with its last holder | `packages/gltf-pro/tests/model-runs.test.js` ("copies of one image share its GPU texture"), `packages/animation/tests/clone.test.js` ("cloneModel holds the source image") |
 | Apple GPUs: 4x MSAA edges of scatter instances changed from frame to frame (Apple M6, Metal: a still biome view drew about 420 of 76,800 pixels differently every frame; `node packages/biomes/tests/shadows-check.mjs --msaa` failed its control, 1,149 values differ) | scatter's WebGPU cull appended each visible instance at an `atomicAdd` slot, so the LOD rings held the frame's instances in whichever order the GPU's threads ran, and the M6 draws an instance's MSAA edge pixels by that order | the commit "fix(scatter): cull in candidate order on WebGPU": each candidate stores its ring flags (and its instance) at its own index, the prefix count of `packages/shared/prefix.js` gives each its slot and each ring is compacted (`packages/scatter/src/order.ts`, shared with the WebGL2 route). On the M6 the frame-repeat check is exact and `shadows-check.mjs --msaa` passes (control 0); its cost is in [limits.md](limits.md) (Rendering, "Scatter cull in candidate order") | `packages/scatter/test/order.test.js` (fails with the atomic cull: its rings come out reversed when the threads run in reverse); `packages/scatter/test/repeat.browser.mjs` (6 still 4x MSAA frames bit-identical) |
 

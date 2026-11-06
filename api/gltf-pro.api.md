@@ -335,6 +335,7 @@ export class PBRModel implements EnginePlugin {
         readonly start: number;
         readonly count: number;
     }): void;
+    adoptStaticBatches(source: PBRModel): boolean;
     registerPasses(graph: FrameGraph): void;
     shareImages(): GLTFImage[];
     compile(): Promise<void>;

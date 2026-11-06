@@ -161,6 +161,162 @@ test('copies of one asset share their baked static batch arrays and its buffers'
   assert.notEqual(moved['staticBatches'][0].primitive.vertices, one.primitive.vertices, 'another pose bakes anew');
 });
 
+/** A registered, drawn source with one static batch, a count of engine ticks from here on, and the steps of a copy. */
+async function batched(t) {
+  const f = await fixture(t),
+    doc = { ...f.doc, materials: [{}], nodes: [{ mesh: 0 }, { mesh: 0, translation: [3, 0, 0] }] },
+    source = parseGLTF(f.engine, doc, f.buffers);
+  if (f.engine.plugins.get(source.name) !== source) f.engine.use(source);
+  f.frame();
+  const store = f.engine.store,
+    tick = store.tick,
+    count = { ticks: 0 };
+  store.tick = function (...args) {
+    count.ticks++;
+    return tick.apply(this, args);
+  };
+  t.after(() => {
+    store.tick = tick;
+  });
+  const copy = (from = source) => {
+    const model = new PBRModel(f.engine, from.asset, []),
+      taken = model.adoptStaticBatches(from);
+    f.engine.use(model);
+    return { model, taken };
+  };
+  return { ...f, doc, source, count, copy };
+}
+
+test('a copy that takes its source batches costs no engine tick and draws them merged', async (t) => {
+  // p-skeleton-clone: a tick runs every mesh of the engine, so a crowd of copies cost quadratic time.
+  const f = await batched(t),
+    copies = [];
+  for (let i = 0; i < 10; i++) {
+    const { model, taken } = f.copy();
+    assert.equal(taken, true);
+    copies.push(model);
+  }
+  assert.equal(f.count.ticks, 0, 'ten copies, no tick');
+  const [baked] = f.source['staticBatches'];
+  for (const copy of copies) {
+    const [batch] = copy['staticBatches'];
+    assert.equal(batch.primitive.vertices, baked.primitive.vertices, 'the same baked arrays');
+    assert.equal(batch.primitive.buffers.vertex, baked.primitive.buffers.vertex, 'one upload');
+    assert.notEqual(batch.node, baked.node, 'a batch node of its own');
+    assert.equal(f.engine.store.parents[batch.node.id], copy.root.id);
+    assert.deepEqual(
+      batch.parts.map((p) => p.primitive),
+      copy.primitives,
+      'its own primitives',
+    );
+    assert.equal(batch.material, copy.primitives[0].material, 'its own material');
+    assert.equal(batch.parts[0].stamp, baked.parts[0].stamp);
+  }
+  f.engine.store.tick(false); // what an engine frame runs first
+  f.frame();
+  assert.equal(f.count.ticks, 1, 'one tick places the whole crowd');
+  for (const copy of copies) {
+    assert.equal(copy['pose'](copy['staticBatches'][0]), true, 'the stamps match the published pose: it draws merged');
+    assert.equal(copy['resources'].filter((r) => r.batch).length, 1);
+    assert.ok(copy['resources'].filter((r) => !r.batch).every((r) => r.mergedInto));
+  }
+  // Each stays its own: a part moved on one copy leaves that copy's batch and no other.
+  copies[0].nodes[1].setPosition([9, 0, 0]);
+  f.engine.store.tick(false);
+  assert.equal(copies[0]['pose'](copies[0]['staticBatches'][0]), false);
+  assert.equal(copies[1]['pose'](copies[1]['staticBatches'][0]), true);
+  // The shared buffers outlive the source, and the last holder frees them.
+  const shared = baked.primitive.buffers.vertex;
+  f.source.dispose();
+  assert.equal(shared.destroyed, false);
+  for (const copy of copies) copy.dispose();
+  assert.equal(shared.destroyed, true);
+});
+
+test('a hidden source still hands over its batches, and a shown copy draws them merged', async (t) => {
+  const f = await batched(t);
+  f.source.root.visible = false;
+  f.count.ticks = 0;
+  const { model, taken } = f.copy();
+  assert.equal(taken, true, 'a hidden template is the usual crowd source');
+  assert.equal(f.count.ticks, 0);
+  f.engine.store.tick(false);
+  f.frame();
+  assert.equal(model['pose'](model['staticBatches'][0]), true);
+});
+
+test('a source with nothing to bake hands over that too, so skinned crowds cost no tick either', async (t) => {
+  const f = await fixture(t),
+    source = parseGLTF(f.engine, f.doc, f.buffers); // one blended primitive: no batch
+  if (f.engine.plugins.get(source.name) !== source) f.engine.use(source);
+  assert.deepEqual(source['staticBatches'], []);
+  const copy = new PBRModel(f.engine, source.asset, []);
+  assert.equal(copy.adoptStaticBatches(source), true);
+  assert.deepEqual(copy['staticBatches'], []);
+});
+
+test('where the batches do not fit, a copy bakes for itself and still comes out right', async (t) => {
+  const f = await batched(t),
+    store = f.engine.store;
+  // A part moved since baking: the batch no longer describes the pose a copy starts in.
+  f.source.nodes[1].setPosition([5, 0, 0]);
+  store.tick(false);
+  f.count.ticks = 0;
+  const moved = new PBRModel(f.engine, f.source.asset, []);
+  moved.nodes[1].setPosition([5, 0, 0]);
+  assert.equal(moved.adoptStaticBatches(f.source), false, 'the source left its batch');
+  assert.equal(moved['staticBatches'], undefined, 'a refusal changes nothing');
+  f.engine.use(moved);
+  assert.equal(f.count.ticks, 1, 'one tick to bake');
+  const [batch] = moved['staticBatches'];
+  assert.notEqual(batch.primitive.vertices, f.source['staticBatches'][0].primitive.vertices, 'baked at the new pose');
+  f.frame();
+  assert.equal(moved['pose'](batch), true);
+  assert.equal(moved.adoptStaticBatches(f.source), false, 'already baked');
+
+  // A parented source rounds its matrices apart from its unparented copy.
+  const other = parseGLTF(f.engine, f.doc, f.buffers),
+    parent = f.engine.createMesh();
+  if (f.engine.plugins.get(other.name) !== other) f.engine.use(other);
+  parent.setPosition([0.1, 0.2, 0.3]);
+  other.root.setParent(parent);
+  store.tick(false);
+  assert.equal(f.copy(other).taken, false, 'a parented source is not copied from');
+  assert.equal(new PBRModel(f.engine, other.asset, []).adoptStaticBatches(f.source), false, 'another asset');
+
+  // Rewritten geometry retires the source's batches; a copy with the asset's arrays can still bake.
+  const rewritten = parseGLTF(f.engine, f.doc, f.buffers);
+  if (f.engine.plugins.get(rewritten.name) !== rewritten) f.engine.use(rewritten);
+  rewritten.writeGeometry(
+    rewritten.primitives.map((p) => ({ vertices: p.vertices.slice(), indices: p.indices.slice() })),
+  );
+  assert.deepEqual(rewritten['staticBatches'], []);
+  const fresh = f.copy(rewritten);
+  assert.equal(fresh.taken, false);
+  assert.equal(fresh.model['staticBatches'].length, 1, 'the copy bakes what its source gave up');
+
+  // A source not set up has nothing to give, and a disposed one neither.
+  const idle = new PBRModel(f.engine, f.source.asset, []);
+  assert.equal(new PBRModel(f.engine, f.source.asset, []).adoptStaticBatches(idle), false, 'not baked yet');
+  const late = new PBRModel(f.engine, f.source.asset, []);
+  f.source.dispose();
+  assert.equal(late.adoptStaticBatches(f.source), false, 'disposed');
+});
+
+test('a copy whose document material cannot batch does not take a batch its edited source could', async (t) => {
+  const f = await fixture(t),
+    doc = { ...f.doc, materials: [{ alphaMode: 'BLEND' }], nodes: [{ mesh: 0 }, { mesh: 0, translation: [3, 0, 0] }] },
+    { asset } = parseGLTF(f.engine, doc, f.buffers),
+    source = new PBRModel(f.engine, asset, []),
+    copy = new PBRModel(f.engine, asset, []),
+    opaque = parseGLTF(f.engine, { ...doc, materials: [{}] }, f.buffers);
+  // Edited before setup, so the source bakes what its document says stays apart.
+  for (const p of source.primitives) p.material = opaque.primitives[0].material;
+  f.engine.use(source);
+  assert.equal(source['staticBatches'].length, 1);
+  assert.equal(copy.adoptStaticBatches(source), false);
+});
+
 test('a model with a static batch costs one engine tick to set up, and its first draw still finds the batch node placed', async (t) => {
   // p-skeleton-clone: two ticks per copy, and a tick runs every mesh of the engine.
   const f = await fixture(t),
@@ -366,6 +522,15 @@ test('compile() builds first-frame pipelines off the frame, and a draw it did no
   await unforeseen.compile();
   f.frame();
   assert.equal(sync.length, 1, 'the draw compiled what it needed');
+
+  // A copy made with no tick has no world matrices yet: compile() publishes them instead of skipping a singular node.
+  renderer.target = { ...renderer.target, format: 'rgba16float' };
+  const copy = new PBRModel(f.engine, a.asset, a.shareImages());
+  assert.equal(copy.adoptStaticBatches(a), true);
+  f.engine.use(copy);
+  const compiledBefore = later.length;
+  await copy.compile();
+  assert.ok(later.length > compiledBefore, 'the copy compiled for this target');
   a.dispose();
   await assert.rejects(a.compile(), (error) => error.code === 'disposed');
 });

@@ -301,7 +301,12 @@ engine.use(second);
 ```
 
 `shareImages()` counts the new holder at once: pass the images to `closeImages(images)` if no model ends up holding
-them.
+them.
+
+`second.adoptStaticBatches(first)`, called before `engine.use(second)`, takes `first`'s baked static batches so
+`second` skips baking and the engine-wide tick baking needs. `second` must be a fresh model of the same asset in the
+same local pose, and `first` must be set up and unparented. It returns false, changing nothing, when the batches do not
+fit, and `second` then bakes for itself. Either way draws are right. `cloneModel` in `@margoengine/animation` calls it.
 
 `model.compile()` compiles the model's render pipelines without blocking, so its first frame does not wait for them.
 Call it once the scene's lights and effects are set: anything that changes a shader afterwards compiles on the draw as

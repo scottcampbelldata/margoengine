@@ -11,7 +11,8 @@ import { MargoError } from '@margoengine/math/errors';
  * baked static batches at the same pose), between the copies, freeing each with its last holder in any disposal order;
  * an `Animation` shares the bind-pose vertices, morph deltas and skin influences the same way. Deformed output,
  * weights, bones, uniforms and bind groups are per model. Materials come from the document, so edits made to the
- * source's materials at runtime are not copied. Clone after a progressive load has finished.
+ * source's materials at runtime are not copied. Clone after a progressive load has finished. A copy costs no engine
+ * tick, so its world matrices publish with the next one: every frame and pick, and `model.bounds`, run it first.
  */
 export async function cloneModel(model: PBRModel): Promise<PBRModel> {
   if (!(model instanceof PBRModel)) throw new TypeError('cloneModel needs a glTF-pro PBRModel; pass a loaded model');
@@ -41,6 +42,8 @@ export async function cloneModel(model: PBRModel): Promise<PBRModel> {
     copy(model.root, clone.root);
     model.nodes.forEach((node, i) => copy(node, clone!.nodes[i]));
     model.primitives.forEach((p, i) => clone!.primitives[i]?.weights.set(p.weights));
+    // Baking would cost a tick of every mesh of the engine per copy; the source's batches fit at this very pose.
+    clone.adoptStaticBatches(model);
     if (engine.plugins.get(model.name) === model) engine.use(clone);
     return clone;
   } catch (error) {

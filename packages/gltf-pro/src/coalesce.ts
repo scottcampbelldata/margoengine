@@ -58,7 +58,8 @@ function determinant(m: ArrayLike<number>): number {
   return m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
 }
 
-function eligible(p: PBRPrimitive): boolean {
+/** True for a primitive a static batch can hold, whatever it shares a material with. */
+export function eligible(p: PBRPrimitive): boolean {
   const m = p.material;
   if (p.topology || p.instances || p.deformed) return false;
   if (primitiveAfterOpaque(p)) return false;
@@ -99,6 +100,42 @@ function bakeVertex(
   dst[o + 10] = relative[2] * tx + relative[6] * ty + relative[10] * tz;
   dst[o + 11] = src[11] * (mirror ? -1 : 1);
   dst.set(src.subarray(12, 20), o + 12);
+}
+
+function batchPrimitive(
+  node: Mesh,
+  material: PBRMaterial,
+  vertices: Float32Array,
+  indices: Uint32Array,
+): PBRPrimitive {
+  return {
+    node,
+    nodeIndex: -1,
+    vertices,
+    indices,
+    definition: { attributes: { POSITION: 0 }, mode: 4 },
+    material,
+    weights: new Float32Array(0),
+    targetNames: [],
+  };
+}
+
+/**
+ * Batches of a copy from `source`'s: the same baked arrays and part poses, with the copy's own primitives and nodes.
+ * `own` gives the copy's primitive for a source primitive.
+ */
+export function copyStaticBatches(
+  source: readonly StaticBatch[],
+  own: (primitive: PBRPrimitive) => PBRPrimitive,
+  createNode: () => Mesh,
+): StaticBatch[] {
+  return source.map((batch) => {
+    const node = createNode(),
+      parts = batch.parts.map((part) => ({ ...part, primitive: own(part.primitive) })),
+      material = parts[0].primitive.material,
+      { vertices, indices } = batch.primitive;
+    return { node, material, primitive: batchPrimitive(node, material, vertices, indices), parts };
+  });
 }
 
 /** Groups of two or more static primitives that can share one draw. World matrices must already be published. */
@@ -181,20 +218,10 @@ export function buildStaticBatches(
       list.push({ parts: parts.flatMap((p) => [p.vertices, p.indices]), stamps, vertices: baked, indices: merged });
     }
     const node = createNode();
-    const primitive: PBRPrimitive = {
-      node,
-      nodeIndex: -1,
-      vertices: baked,
-      indices: merged,
-      definition: { attributes: { POSITION: 0 }, mode: 4 },
-      material,
-      weights: new Float32Array(0),
-      targetNames: [],
-    };
     batches.push({
       node,
       material,
-      primitive,
+      primitive: batchPrimitive(node, material, baked, merged),
       parts: parts.map((part, i) => ({
         primitive: part,
         stamp: stamps[i],

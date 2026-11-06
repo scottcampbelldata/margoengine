@@ -122,7 +122,7 @@ export type { PBRDeviceRenderer, PBRDeformationRenderer } from './replica.js';
 // Type only: PBRInstances and the EXT_mesh_gpu_instancing reader load with @margoengine/gltf-pro/instancing.
 import type { PBRInstances } from './instancing.js';
 import { packed, packPrimitive } from './pack.js';
-import { buildStaticBatches, type StaticBatch } from './coalesce.js';
+import { buildStaticBatches, copyStaticBatches, eligible, type StaticBatch } from './coalesce.js';
 // Progressive sets this on the asset until real vertices and instances replace the placeholder boxes.
 const deferStaticBatches = Symbol.for('margoengine.gltf-pro.defer-static-batches');
 interface StaticBatchDeferral {
@@ -2459,6 +2459,45 @@ export class PBRModel implements EnginePlugin {
     for (const r of this.resources) r.mergedInto = undefined;
     this.staticBatches = [];
   }
+  /**
+   * Takes `source`'s baked static batches instead of baking, for a copy of it (one asset, the same node transforms)
+   * that is not set up yet. Baking reads world matrices, and publishing those is a tick of every mesh of the engine,
+   * so a crowd of copies cost a tick each. Returns false, changing nothing, when `source`'s batches do not fit: this
+   * model then bakes for itself at setup. Draws are right either way, because a part away from its baked pose draws
+   * alone.
+   */
+  adoptStaticBatches(source: PBRModel): boolean {
+    const host = this.asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral },
+      batches = source.staticBatches,
+      mine = this.primitives,
+      theirs = source.primitives;
+    if (
+      this.disposed ||
+      source.disposed ||
+      this.asset !== source.asset ||
+      this.staticBatches !== undefined ||
+      !batches ||
+      host[deferStaticBatches] ||
+      mine.length !== theirs.length ||
+      // Rewritten geometry retires the batches: a copy holding the asset's arrays can still bake them.
+      mine.some((p, i) => p.vertices !== theirs[i].vertices || p.indices !== theirs[i].indices) ||
+      // A parented source rounds its matrices apart from an unparented copy, so the stamps would not match.
+      this.engine.store.parents[source.root.id] !== -1
+    )
+      return false;
+    const index = new Map(theirs.map((p, i) => [p, i])),
+      own = (p: PBRPrimitive) => mine[index.get(p)!];
+    for (const batch of batches) {
+      if (!source.pose(batch, undefined, true)) return false;
+      const material = own(batch.parts[0].primitive).material;
+      for (const part of batch.parts) {
+        const copy = own(part.primitive);
+        if (copy.material !== material || !eligible(copy)) return false;
+      }
+    }
+    this.staticBatches = copyStaticBatches(batches, own, () => this.batchNode());
+    return true;
+  }
   /** Bakes static same-material triangles once the asset's geometry and instances are final. */
   private commitStaticBatches(): void {
     const host = this.asset as GLTFAsset & { [deferStaticBatches]?: StaticBatchDeferral };
@@ -2472,6 +2511,11 @@ export class PBRModel implements EnginePlugin {
       this.bufferUpload(device),
     );
   }
+  private batchNode(): Mesh {
+    const node = this.engine.createMesh(this.root);
+    this.created.push(node);
+    return node;
+  }
   /** Bakes static same-material triangles once, after world matrices exist, and uploads that mesh on each device. */
   private installBatches(
     device: GPUDevice,
@@ -2483,11 +2527,7 @@ export class PBRModel implements EnginePlugin {
     if (host[deferStaticBatches] || !Object.hasOwn(this, 'engine')) return;
     if (this.staticBatches === undefined) {
       this.engine.store.tick(false);
-      this.staticBatches = buildStaticBatches(this.primitives, this.root, () => {
-        const node = this.engine.createMesh(this.root);
-        this.created.push(node);
-        return node;
-      });
+      this.staticBatches = buildStaticBatches(this.primitives, this.root, () => this.batchNode());
       // No tick for the batch nodes: a tick runs every mesh of the engine, and the next one publishes them (`pose`).
     }
     if (this.resources.some((r) => r.batch)) return;
@@ -2517,8 +2557,11 @@ export class PBRModel implements EnginePlugin {
       }
     }
   }
-  /** True while every baked part still has the captured root-relative pose, material and visibility, and is in `context`'s view. */
-  private pose(batch: StaticBatch, context?: Context): boolean {
+  /**
+   * True while every baked part still has the captured root-relative pose, material and visibility, and is in
+   * `context`'s view. `anyVisibility` leaves visibility out, for a batch that is only being copied.
+   */
+  private pose(batch: StaticBatch, context?: Context, anyVisibility = false): boolean {
     this.relative ??= new Float32Array(16);
     // A batch node sits at the root. It differs only before its first tick, which every engine frame and pick has run
     // by now: this serves a draw made without one (`frameGraph.execute`).
@@ -2545,7 +2588,7 @@ export class PBRModel implements EnginePlugin {
         primitive.indices !== part.indices
       )
         return false;
-      if (!nodeVisible(this.engine, primitive.node)) return false;
+      if (!anyVisibility && !nodeVisible(this.engine, primitive.node)) return false;
       multiplyMatrices(this.inverse, primitive.node.matrix, relative);
       const stamp = part.stamp;
       for (let c = 0; c < 16; c++) if (relative[c] !== stamp[c]) return false;
@@ -2765,6 +2808,8 @@ export class PBRModel implements EnginePlugin {
     const target = this.engine.renderTarget,
       device = this.engine.gpu;
     if (!target || !device) return;
+    // A `cloneModel` copy has no world matrices before the next tick, and a zero matrix reads as a singular node.
+    if (!this.root.matrix[15]) this.engine.store.tick(false);
     const c = {
         device,
         format: target.format,

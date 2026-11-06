@@ -1,11 +1,13 @@
 // cloneModel: an independent copy of a skinned glTF-pro model that animates apart from its source.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
 import { exportGLB } from '../../exporters/dist/index.js';
 import { Animation } from '../dist/index.js';
 import { cloneModel } from '../dist/skeleton-utils.js';
 import { skinnedStrip } from '../test/fixture.js';
+import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { axisAngle, engine, fromGLB, model, near, position, quaternion, sameRotation } from './support/models.js';
 
 test('a clone has its own nodes in the source pose, shares the parsed asset, and animates independently', async () => {
@@ -134,4 +136,58 @@ test('cloneModel holds the source image instead of copying it, closing it with t
     if (created === undefined) delete globalThis.createImageBitmap;
     else globalThis.createImageBitmap = created;
   }
+});
+
+test('cloneModel of a registered model runs no engine tick, skinned or static, and the next tick places the copy', async (t) => {
+  // p-skeleton-clone: each copy ran a tick of every mesh of the engine, so a crowd cost quadratic time.
+  const gpu = optionalGPU(),
+    store = await TransformStore.create(64),
+    e = new Engine(
+      { width: 8, height: 8, clientWidth: 8, clientHeight: 8 },
+      store,
+      { backend: 'webgpu', gpu: gpu.engine.gpu, add() {}, remove() {}, render() {}, dispose() {} },
+      { position: [0, 0, 4], target: [0, 0, 0] },
+      null,
+    ),
+    vertices = new Float32Array(3 * 20),
+    doc = {
+      asset: { version: '2.0' },
+      materials: [{}],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+      nodes: [{ mesh: 0 }, { mesh: 0, translation: [3, 0, 0] }],
+    };
+  t.after(() => {
+    e.dispose();
+    gpu.cleanup();
+  });
+  vertices.set([0, 0, 0, 1, 0, 0, 1, 0], 0);
+  vertices.set([1, 0, 0, 1, 0, 0, 1, 0], 20);
+  vertices.set([0, 1, 0, 1, 0, 0, 1, 0], 40);
+  store.tick(false);
+  const geometry = [[{ vertices, indices: new Uint32Array([0, 1, 2]) }]],
+    statics = new PBRModel(e, new GLTFAsset(doc, []), [], geometry),
+    skinned = model(e, skinnedStrip());
+  e.use(statics);
+  e.use(skinned);
+  store.tick(false);
+  const tick = store.tick;
+  let ticks = 0;
+  store.tick = function (...args) {
+    ticks++;
+    return tick.apply(this, args);
+  };
+  t.after(() => {
+    store.tick = tick;
+  });
+  const copies = [];
+  for (let i = 0; i < 5; i++) copies.push(await cloneModel(statics), await cloneModel(skinned));
+  assert.equal(ticks, 0, 'ten copies, no tick');
+  assert.ok(copies.every((copy) => e.plugins.get(copy.name) === copy));
+  assert.equal(copies[0]['staticBatches'].length, 1, 'a static copy holds its batch');
+  assert.equal(copies[0]['staticBatches'][0].primitive.vertices, statics['staticBatches'][0].primitive.vertices);
+  assert.equal(copies[1]['staticBatches'].length, 0);
+  assert.equal(copies[0].nodes[1].matrix[12], 0, 'not published yet: the documented cost');
+  const bounds = copies[0].bounds;
+  assert.equal(copies[0].nodes[1].matrix[12], 3, 'model.bounds ticks first');
+  assert.equal(bounds[3], 4);
 });

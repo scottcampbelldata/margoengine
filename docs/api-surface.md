@@ -79,7 +79,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 219 |
 | @margoengine/sciviz | `.` 71, `./bricks` 21, `./colormaps` 11, `./maths` 37 | 62 |  | 35,812 |
 | @margoengine/selection | `.` 27 | 5 |  | 20,184 |
-| @margoengine/shader | `.` 188, `./noise` 9, `./graph` 17, `./readback` 4, `./raw` 13, `./effects` 19, `./editor` 24, `./compute-texture` 9, `./lighting` 11, `./deform` 7, `./pass` 5, `./utils` 37 | 318 |  | 17,921 |
+| @margoengine/shader | `.` 188, `./noise` 9, `./graph` 17, `./readback` 4, `./raw` 13, `./effects` 19, `./editor` 24, `./compute-texture` 9, `./lighting` 11, `./deform` 7, `./pass` 5, `./utils` 37 | 318 |  | 17,929 |
 | @margoengine/shadows | `.` 10, `./virtual` 3 | 9 |  | 17,192 |
 | @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 8, `./sun` 19 | 97 |  | 16,480 |
 | @margoengine/splats | `.` 19, `./data` 17 |  |  | 24,719 |

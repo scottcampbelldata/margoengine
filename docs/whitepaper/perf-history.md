@@ -631,7 +631,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   | --- | --- | --- | --- |
   | `p-skeleton-clone`, ms a call | 47.9 | 17.6 | 7.8 (WebGL), slower |
 
-  Still open, in [known-bugs.md](../known-bugs.md#clonemodel-one-engine-wide-tick-per-copy): `installBatches`
+  Still open then (entry 59 and 2026-11-06 closed it; the rest is in [known-bugs.md](../known-bugs.md#clonemodel-slower-than-threes-clone)): `installBatches`
   runs two engine-wide kernel ticks per model, quadratic in the copies (about 6.5 ms), then per-copy uniforms and bind
   groups and core node creation.
 - **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity --cases=p-skeleton-clone
@@ -1572,7 +1572,8 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   the two differ: that serves a draw made with no tick (`frameGraph.execute`), and an engine frame never reaches it.
 - **After:** 14.3 ms against 8.1 (run `20261105-235810`, `--no-gate`, busy machine, diagnostic). The planned baking on
   first use was not built: the tick before baking also publishes node matrices that code may read right after loading.
-- **Left:** see [known-bugs.md](../known-bugs.md#clonemodel-one-engine-wide-tick-per-copy).
+- **Left:** the last tick went on 2026-11-06 (`PBRModel.adoptStaticBatches`, not measured yet); the rest is in
+  [known-bugs.md](../known-bugs.md#clonemodel-slower-than-threes-clone).
 - **Rerun:** `node bench/cli.mjs parity --cases=p-skeleton-clone --engines=margo,three-webgl-parity --runs=3`.
 - **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, "a model with a static batch costs one engine tick to set up".
 

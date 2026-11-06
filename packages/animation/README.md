@@ -488,6 +488,12 @@ vertices, morph deltas, skin influences), so a clone uploads no geometry and no 
 own deformed output, weights, bones, uniforms and bind groups. Disposing any model, source included, leaves the others
 working: each image, texture and buffer goes with its last holder. Materials are rebuilt from the document, so runtime material edits on the source are not copied.
 
+A copy costs no engine tick, so spawning a crowd does not touch the rest of the scene: it takes the source's baked
+static batches instead of baking its own. Its world matrices therefore publish with the next tick. Every frame and
+pick runs one first, as do `model.bounds`, `extras()`, `clusteredLights()`, `readPickingGeometry()` and `compile()`, so
+only a direct read of `node.matrix` right after `cloneModel` sees the old value, as after any `setPosition`. A source
+that was moved since baking, or has a parent, costs its copy one tick to bake for itself.
+
 `retargetRig(skeletonOrModel)` reads a bone hierarchy and its current local pose, which becomes the rig's rest pose; a
 model's rig is every node, so armature and mesh nodes count toward bone orientations. `new Retarget(source, target,
 options)` maps target bones to source bones by name (`names` overrides, `''` leaves a bone at rest; unnamed glTF nodes
