@@ -10,7 +10,8 @@ import {Scatter} from '/packages/scatter/dist/index.js';
 import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 const canvas=document.querySelector('canvas'),errors=[];
-const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,15,40],target:[0,0,-40],near:0.5,far:600}}),device=engine.gpu;
+// ?exact: one sample a pixel, for the blades scene (shadow-cull.browser.mjs says why).
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,15,40],target:[0,0,-40],near:0.5,far:600},...(location.search==='?exact'?{exactSize:[384,384]}:{})}),device=engine.gpu;
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 engine.lighting.direction.set([0.6,1,0.3]);
 const floor=engine.createMesh().setGeometry(box(800,0.1,800)).setPosition([0,-0.05,0]);

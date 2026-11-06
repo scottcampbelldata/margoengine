@@ -8,6 +8,9 @@
 //    indirect draws of each cascade name every instance whose bounds reach that cascade's light box and none whose
 //    bounds lie outside it (classified on the CPU from Shadows' matrices), so the distant trees are drawn in no cascade.
 // Before prepareShadow, every cascade drew every visible instance: 4 cascades cost 4 full redraws of every tree.
+// The blades scene runs at one sample a pixel: blades read their varyings at the centroid (instances.ts), and on an
+// Apple GPU that point follows how the GPU's hidden surface removal batched a tile, which varies from frame to frame
+// under this much geometry (docs/limits.md, "Apple GPUs: centroid varyings"). Shadow maps and frames still match exactly.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
@@ -43,9 +46,11 @@ function planes(m) {
 await runSuite(
   async () => {
     console.log('adapter', JSON.stringify(hardware.webgpu));
-    await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
-    const results = {};
+    const start = page.url(),
+      results = {};
     for (const scene of ['scatter', 'blades', 'tiles']) {
+      await page.goto(scene === 'blades' ? `${start}?exact` : start);
+      await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
       await show(scene, 'new');
       await show(scene, 'full');
       await page.evaluate(() => window.check.depth('full'));
