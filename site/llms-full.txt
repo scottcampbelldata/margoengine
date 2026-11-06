@@ -2566,7 +2566,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-162). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-163). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2806,6 +2806,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | **Entry, requested before the page runs** | **288,234** | **94,251** | Budget 100,000 B gzip |
 | `@margoengine/controls/orbit` + its view helpers + profiles, when `OrbitControls` mounts | 17,999 | 6,951 | Yes, for orbiting |
 | **Everything the page fetches** | **306,233** | **101,202** | |
+| Quantized glTF on the light path (`@margoengine/gltf/quantized`, 2026-11-06) | By method: integer POSITION and normalized NORMAL turn into floats on load, so the file shrinks on the wire and not on the GPU. Sparse accessors and any other form stay refused. | Core's vertex layout is float xyz, and core is frozen. | A quantized file loads with no gltf-pro, at 24 B per vertex on the GPU. | `@margoengine/gltf-pro` reads the same file. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in
@@ -4370,6 +4371,30 @@ import { loadGLTF } from 'margoengine/gltf';
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const engine = await Engine.create(canvas);
 const model = await loadGLTF(engine, '/model.glb');
+engine.start();
+// On teardown: model.dispose(); engine.dispose();
+```
+
+## Optional features
+
+The root loader reads static models with float positions and constant colours. Each feature below is its own entry, so
+a file that needs none of them costs none of their bytes. Pass the ones you want in `extensions`, to `loadGLTF` or
+`parseGLTF`; they combine. A file needing something no entry covers still throws, with a pointer to `@margoengine/gltf-pro`.
+
+### Quantized meshes
+
+`@margoengine/gltf/quantized` reads `KHR_mesh_quantization`: integer POSITION (signed or unsigned, 8 or 16 bit,
+normalized or not) and normalized signed 8 or 16 bit NORMAL. Optimizers such as gltfpack write these. Values turn into
+floats on load, so the file is smaller on the wire and the same size on the GPU.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf';
+import { quantized } from 'margoengine/gltf/quantized';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
+const model = await loadGLTF(engine, '/packed.glb', { extensions: [quantized] });
 engine.start();
 // On teardown: model.dispose(); engine.dispose();
 ```

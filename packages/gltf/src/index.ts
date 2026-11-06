@@ -8,26 +8,11 @@ import { checkCount, countLimit } from '../../shared/limits.js';
 import { parseJSON } from '../../shared/json.js';
 import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
-import { readComponent } from '../../shared/accessor.js';
+import { entry, integer, readAccessor } from './accessor.js';
 
 const limit = 64 * 1024 * 1024;
 import type { GLTFDocument as Document, GLTFNode } from '../../shared/gltf.js';
-const integer = (value: unknown, label: string, min = 0): number => {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min)
-    throw new TypeError(
-      `Invalid glTF ${label}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
-    );
-  return value;
-};
 const isObject = (value: unknown): boolean => !!value && typeof value === 'object' && !Array.isArray(value);
-const entry = <T>(array: readonly T[] | undefined, id: unknown, label: string): T => {
-  const value = array?.[integer(id, label)];
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new TypeError(
-      `Missing glTF ${label}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
-    );
-  return value;
-};
 // Malformed UTF-8 or JSON is a named error, not the TextDecoder's TypeError or JSON.parse's SyntaxError.
 function text(data: Uint8Array): string {
   try {
@@ -76,7 +61,7 @@ function embedded(uri: string): Uint8Array {
   }
   return Uint8Array.from(decoded, (c) => c.charCodeAt(0));
 }
-function validate(doc: Document, maxNodes?: number): void {
+function validate(doc: Document, maxNodes: number | undefined, extensions: readonly GLTFExtension[]): void {
   const nodeLimit = countLimit('maxNodes', maxNodes);
   if (!doc || doc.asset?.version !== '2.0') throw new TypeError('Expected glTF 2.0');
   for (const field of [
@@ -100,7 +85,11 @@ function validate(doc: Document, maxNodes?: number): void {
         `Invalid glTF ${field} entry; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
       );
   }
-  if (doc.extensionsRequired?.length || doc.skins?.length || doc.animations?.length)
+  if (
+    doc.extensionsRequired?.some((name) => !extensions.some((extension) => extension.handles.includes(name))) ||
+    doc.skins?.length ||
+    doc.animations?.length
+  )
     throw new MargoError(
       'unsupported',
       'Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported; load it with @margoengine/gltf-pro',
@@ -143,8 +132,25 @@ export interface Model {
   nodes: readonly MeshHandle[];
   dispose(): void;
 }
+/** The parts of a file an extension reads: the document and its buffers, in document order. */
+export interface GLTFFile {
+  doc: Document;
+  buffers: readonly Uint8Array[];
+}
+/**
+ * One optional feature of the light loader, passed in `GLTFOptions.extensions`. Each lives in its own entry, so a file
+ * that needs none of them costs none of their bytes.
+ */
+export interface GLTFExtension {
+  /** The glTF extension names this one implements: `extensionsRequired` may list them. */
+  readonly handles: readonly string[];
+  /** Reads vertex attribute `semantic` from accessor `id`, as float xyz; undefined leaves it to the loader. */
+  attribute?(file: GLTFFile, semantic: string, id: number): Float32Array | undefined;
+}
 /** Options for parseGLTF and loadGLTF. */
 export interface GLTFOptions {
+  /** Optional features from the `@margoengine/gltf/*` entries, for example `[quantized]`. Default none. */
+  extensions?: readonly GLTFExtension[];
   /** Most glTF nodes the file may have, each one a core mesh (default 100,000; up to core's 8,388,608 entities). */
   maxNodes?: number;
   /**
@@ -161,11 +167,11 @@ export function parseGLTF(
   instance: EngineKernel,
   input: string | object | ArrayBuffer | ArrayBufferView,
   suppliedBuffers: Array<ArrayBuffer | ArrayBufferView> = [],
-  { maxNodes }: GLTFOptions = {},
+  { maxNodes, extensions = [] }: GLTFOptions = {},
 ): Model {
   const engine = engineRuntime(instance);
   const { doc, binary } = container(input);
-  validate(doc, maxNodes);
+  validate(doc, maxNodes, extensions);
   let total = 0,
     vertices = 0;
   const buffers = (doc.buffers ?? []).map((def, i) => {
@@ -183,47 +189,18 @@ export function parseGLTF(
     if (total > limit) throw new RangeError('glTF buffers exceed 64 MiB; load a smaller file or split it');
     return data.subarray(0, length);
   });
-  const accessor = (id: unknown, index = false): Float32Array | Uint32Array => {
-    const a = entry(doc.accessors, id, 'accessor'),
-      v = entry(doc.bufferViews, a.bufferView, 'bufferView'),
-      buffer = buffers[integer(v.buffer, 'buffer reference')];
-    if (
-      !buffer ||
-      a.sparse ||
-      a.normalized ||
-      a.type !== (index ? 'SCALAR' : 'VEC3') ||
-      !(index ? [5121, 5123, 5125] : [5126]).includes(a.componentType)
-    )
-      throw new MargoError(
-        'unsupported',
-        'Unsupported glTF accessor; use float positions and unsigned integer indices, or load it with @margoengine/gltf-pro',
-      );
-    const size = a.componentType === 5121 ? 1 : a.componentType === 5123 ? 2 : 4,
-      components = index ? 1 : 3,
-      count = integer(a.count, 'accessor count', 1),
-      offset = integer(a.byteOffset ?? 0, 'accessor offset'),
-      start = integer(v.byteOffset ?? 0, 'view offset'),
-      length = integer(v.byteLength, 'view length', 1),
-      stride = integer(v.byteStride ?? size * components, 'stride', size * components);
-    if (
-      count > 1_000_000 ||
-      start + length > buffer.length ||
-      offset + (count - 1) * stride + components * size > length ||
-      start % size ||
-      offset % size ||
-      stride % size ||
-      stride > 252 ||
-      (index && v.byteStride !== undefined)
-    )
-      throw new RangeError(
-        'Invalid glTF accessor bounds/stride; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
-      );
-    const view = new DataView(buffer.buffer, buffer.byteOffset + start, length),
-      out = index ? new Uint32Array(count) : new Float32Array(count * 3);
-    for (let i = 0; i < count; i++)
-      for (let c = 0; c < components; c++)
-        out[i * components + c] = readComponent(view, offset + i * stride + c * size, a.componentType);
-    return out;
+  const file = { doc, buffers };
+  const attribute = (semantic: string, id: unknown): Float32Array => {
+    for (const extension of extensions) {
+      const values = extension.attribute?.(file, semantic, integer(id, 'accessor'));
+      if (values) return values;
+    }
+    return readAccessor(
+      file,
+      id,
+      3,
+      (a) => !a.normalized && a.type === 'VEC3' && a.componentType === 5126,
+    ) as Float32Array;
   };
   const materials = (doc.materials ?? []).map((m) => {
     const p = m.pbrMetallicRoughness ?? {},
@@ -267,12 +244,18 @@ export function parseGLTF(
           'unsupported',
           'Minimal glTF requires rigid triangles without vertex colors; load it with @margoengine/gltf-pro',
         );
-      let positions = accessor(p.attributes?.POSITION) as Float32Array,
-        normals = p.attributes?.NORMAL === undefined ? null : (accessor(p.attributes.NORMAL) as Float32Array);
+      let positions = attribute('POSITION', p.attributes?.POSITION),
+        normals = p.attributes?.NORMAL === undefined ? null : attribute('NORMAL', p.attributes.NORMAL);
       let indices =
         p.indices === undefined
           ? Uint32Array.from({ length: positions.length / 3 }, (_, i) => i)
-          : (accessor(p.indices, true) as Uint32Array);
+          : (readAccessor(
+              file,
+              p.indices,
+              1,
+              (a) => !a.normalized && a.type === 'SCALAR' && [5121, 5123, 5125].includes(a.componentType),
+              true,
+            ) as Uint32Array);
       if (indices.length % 3) throw new RangeError('Indices must contain complete triangles');
       vertices += normals ? positions.length / 3 : indices.length;
       if (vertices > 1_000_000)
@@ -406,6 +389,7 @@ export async function loadGLTF(
     signal,
     maxNodes,
     allowedURLs,
+    extensions = [],
     fetch: get = globalThis.fetch,
   }: GLTFOptions & { signal?: AbortSignal; fetch?: typeof fetch } = {},
 ): Promise<Model> {
@@ -424,7 +408,7 @@ export async function loadGLTF(
   const data = await fetchBytes(base, true),
     glb = isGLB(data),
     { doc, binary } = container(glb ? data : text(data));
-  validate(doc, maxNodes);
+  validate(doc, maxNodes, extensions);
   const buffers = [];
   for (const def of doc.buffers ?? []) {
     if (!def.uri) buffers.push(binary ?? new Uint8Array());
@@ -436,5 +420,5 @@ export async function loadGLTF(
     } else buffers.push(await fetchBytes(assetURL(def.uri, base, allowedURLs, 'glTF buffer')));
   }
   signal?.throwIfAborted();
-  return parseGLTF(engine, doc, buffers, { maxNodes });
+  return parseGLTF(engine, doc, buffers, { maxNodes, extensions });
 }

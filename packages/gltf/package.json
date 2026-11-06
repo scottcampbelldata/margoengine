@@ -26,7 +26,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --test --test-name-pattern=\"glTF loader|GLB,\" ../../tests/modern.test.js",
+    "test": "node --test test/*.test.js && node --test --test-name-pattern=\"glTF loader|GLB,\" ../../tests/modern.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -34,6 +34,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./quantized": {
+      "types": "./dist/quantized.d.ts",
+      "import": "./dist/quantized.js"
     }
   },
   "files": [
