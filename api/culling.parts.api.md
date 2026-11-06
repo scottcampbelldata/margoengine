@@ -98,6 +98,8 @@ class CulledInstances implements EnginePlugin {
     get count(): number;
     setTransform(batch: number, index: number, matrix: ArrayLike<number>): void;
     setVisible(batch: number, index: number, visible: boolean): void;
+    addOccluder(source: OccluderMesh | OccluderSource): this;
+    removeOccluder(source: OccluderMesh | OccluderSource): this;
     readCounts(): Promise<number[]>;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -122,4 +124,48 @@ interface CulledInstancesOptions {
 }
 
 type CullingMode = 'none' | 'frustum' | 'occlusion';
+
+interface OccluderContext {
+    device: GPUDevice;
+    pass: GPURenderPassEncoder;
+    samples: number;
+}
+
+interface OccluderMesh {
+    readonly id: number;
+    readonly geometry?: Geometry | null;
+    readonly matrix: ArrayLike<number>;
+}
+
+interface OccluderPrimitive {
+    primitive?: object;
+    node: {
+        readonly id: number;
+        readonly matrix: ArrayLike<number>;
+    };
+    vertex: GPUBuffer;
+    vertexOffset?: number;
+    index: GPUBuffer;
+    count: number;
+    stride: number;
+    topology?: string;
+    cutoff?: number;
+    alpha?: number;
+    displacement?: object;
+    clip?: object;
+    instances?: {
+        readonly count: number;
+        readonly mirrored?: boolean;
+        upload(device: GPUDevice): GPUBuffer;
+    };
+}
+
+interface OccluderSource {
+    readonly shadowPrimitives?: readonly OccluderPrimitive[];
+    readonly tintPrimitives?: readonly {
+        primitive?: object;
+    }[];
+    drawOccluder?(context: OccluderContext): void;
+    readonly disposed?: boolean;
+}
 ```

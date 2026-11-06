@@ -5,10 +5,12 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { MargoError } from '@margoengine/math/errors';
 import { computeShader } from './shaders.js';
 import { Pyramid, depthKind, exactShader, levelTable, occluderPipeline } from './pyramid.js';
+import { OccluderList, type OccluderMesh, type OccluderSource } from './occluders.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 export { CulledMeshes } from './meshes.js';
 export type { CulledMeshesOptions } from './meshes.js';
+export type { OccluderContext, OccluderMesh, OccluderPrimitive, OccluderSource } from './occluders.js';
 
 declare const GPUBufferUsage: {
   MAP_READ: number;
@@ -100,6 +102,7 @@ export class CulledInstances implements EnginePlugin {
   private groups: Record<string, GPUBindGroup> = {};
   private hiz?: Pyramid;
   private samples = 0;
+  private outside?: OccluderList;
   // The main pass draws with core's pipeline state; single-sided batches without mirrored parts use its back-culled
   // variant (cullMode back, override C=1 compiles out the back-face discard), as core does for its own batches.
   private pipeline?: GPURenderPipeline;
@@ -196,6 +199,21 @@ export class CulledInstances implements EnginePlugin {
     const i = this.index(batch, index);
     if (typeof visible !== 'boolean') throw new TypeError('Invalid visibility; pass true or false');
     this.show(i, +!visible);
+  }
+  /**
+   * Lets geometry that is not a part hide parts in `'occlusion'` mode, so a building hides what is behind it: a core mesh,
+   * a gltf-pro model, a materials mesh or a `Terrain`. It is drawn depth-only each frame, every primitive of it, so add
+   * the large things. Cut-out, blended, displaced and clipped primitives do not occlude, and neither do back faces.
+   * @throws TypeError for anything else.
+   */
+  addOccluder(source: OccluderMesh | OccluderSource): this {
+    (this.outside ??= new OccluderList()).add(source);
+    return this;
+  }
+  /** Stops `source` occluding from the next frame. */
+  removeOccluder(source: OccluderMesh | OccluderSource): this {
+    this.outside?.remove(source);
+    return this;
   }
   /** Reads back how many parts of each batch were drawn in the latest submitted frame (for tests and benchmarks). */
   async readCounts(): Promise<number[]> {
@@ -518,6 +536,7 @@ export class CulledInstances implements EnginePlugin {
           pass.setIndexBuffer(g.index, 'uint32');
           pass.drawIndexedIndirect(b.earlyArgs, i * 20);
         });
+        this.outside?.draw(pass, c, this.engine!, this.samples);
         pass.end();
       }
       const pass = c.encoder.beginComputePass();
@@ -592,6 +611,7 @@ export class CulledInstances implements EnginePlugin {
   }
   protected release(): void {
     this.route = undefined;
+    this.outside?.release();
     for (const buffer of Object.values(this.buffers)) buffer.destroy();
     for (const g of this.geometryBuffers.values()) {
       g.vertex.destroy();

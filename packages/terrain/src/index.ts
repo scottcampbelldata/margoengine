@@ -161,6 +161,7 @@ export class Terrain implements EnginePlugin {
   private sampler?: GPUSampler;
   private layout?: GPUBindGroupLayout;
   private shadowPipeline?: GPURenderPipeline;
+  private occluder?: { samples: number; pipeline: GPURenderPipeline };
   private rings: Ring[] = [];
   private pipelines = new Map<string, GPURenderPipeline>();
   private lightingGroups = new Map<GPURenderPipeline, LightingGroup>();
@@ -689,6 +690,39 @@ export class Terrain implements EnginePlugin {
     this.lightingGroups.set(pipeline, { device, entries: snapshot, group });
     return group;
   }
+  /**
+   * Draws the terrain's depth with the frame's camera into an occluder pass of @margoengine/culling
+   * (`parts.addOccluder(terrain)`): the rings the main pass draws, on the same uniforms.
+   */
+  drawOccluder({ pass, samples }: { pass: GPURenderPassEncoder; samples: number }): void {
+    if (this.disposed || !this.device) return;
+    if (this.occluder?.samples !== samples) {
+      const module = this.device.createShaderModule({
+        code: terrainVertex + `@fragment fn outside(i:Output){${terrainOutside}}`,
+      });
+      this.occluder = {
+        samples,
+        pipeline: this.device.createRenderPipeline({
+          layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.layout!] }),
+          vertex: {
+            module,
+            entryPoint: 'vertex',
+            buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
+          },
+          fragment: { module, entryPoint: 'outside', targets: [] },
+          multisample: { count: samples },
+          depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater-equal' },
+        }),
+      };
+    }
+    pass.setPipeline(this.occluder.pipeline);
+    pass.setVertexBuffer(0, this.vertex!);
+    for (let i = 0; i < this.rings.length; i++) {
+      pass.setBindGroup(0, this.rings[i].group);
+      pass.setIndexBuffer(i ? this.ring! : this.center!, 'uint32');
+      pass.drawIndexed(i ? this.ringCount : this.centerCount);
+    }
+  }
   drawShadow({
     context,
     pass,
@@ -732,6 +766,7 @@ export class Terrain implements EnginePlugin {
     this.vertex = this.center = this.ring = this.rules = undefined;
     this.rings = [];
     this.pipelines.clear();
+    this.occluder = undefined;
     this.lightingGroups.clear();
     this.shadowPipeline = undefined;
     this.layout = undefined;

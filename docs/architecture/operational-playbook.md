@@ -392,6 +392,12 @@ reads `primitive.redirect` as core reads `Batch.redirect`, so its colour and dep
 picking keep every row. Evidence: `packages/culling/test/gpu/models-cull-check.mjs`, 0 differing pixels with and without
 shadows, RTX A6000. Still missing: a timed run, and any cull for non-instanced primitives.
 
+`addOccluder` puts core meshes, models and Terrain into the occluder pass of `CulledInstances`, each with the maths of its
+own draw (core's `camera*(model*p)`; Terrain's rings on its own uniforms). An occluder must be a surface the frame shows,
+so only front faces draw, by the sign of the matrix, and cut-out, blended, displaced and clipped primitives are left out.
+Evidence: `packages/culling/test/gpu/occluders-check.mjs`, 0 differing pixels against core, 0 of 576 parts drawn behind a
+core wall, a materials wall and a terrain ridge, RTX A6000.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback

@@ -269,6 +269,45 @@ above a plain instanced draw with no culling: [known-bugs.md](../../docs/known-b
   layout the depth prepass and pyramid cost more than they save (numbers below).
 - `'none'`: draw every part that is not hidden.
 
+## Any geometry as occluder
+
+In `'occlusion'` mode only parts hide parts until you say otherwise. `addOccluder` adds a core mesh, a gltf-pro model, a
+materials mesh or a `Terrain`, so a building hides the parts behind it even though it is not a part:
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {CulledParts} from 'margoengine/culling/parts';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const transforms = new Float32Array(16 * 1000);
+for (let i = 0; i < 1000; i++)
+  transforms.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 40) - 20, 0, -Math.floor(i / 40), 1], i * 16);
+const parts = CulledParts.attach(engine, [
+  {geometry: box(0.5, 0.5, 0.5), material: new PbrMaterial({color: '#c9ccd1'}), transforms},
+], {culling: 'occlusion'});
+
+const building = engine.createMesh().setGeometry(box(60, 20, 2)).setMaterial(new PbrMaterial({color: '#8d99a6'}));
+building.setPosition([0, 0, 8]);
+parts.addOccluder(building);       // also a loaded model, a materials mesh or a Terrain
+engine.camera.position = [0, 2, 30];
+engine.camera.target = [0, 0, 0];
+engine.start();
+setTimeout(async () => console.log(await parts.readCounts()), 1000);   // few of the 1,000 parts draw
+```
+
+Each frame the occluders are drawn into the same depth target as the parts, with the same camera and vertex maths as
+their own draws, so the image does not change (`test/gpu/occluders-check.mjs`).
+
+- Every primitive of an occluder is drawn each frame, without culling: add the large things, not everything.
+- Only front faces occlude, so an open single-sided surface never hides what its back shows. A hidden mesh, or one not in
+  the view's layers, does not occlude. A mirrored row of `PBRInstances` turns its primitive off as an occluder.
+- Alpha cut-outs, blended and transmissive primitives, displacement maps and clipping planes do not occlude: their
+  depth is not what the geometry says. A material extension that moves vertices cannot be seen from here, so do not add
+  a model that uses one.
+- `Terrain` draws its own rings on its own uniforms (`terrain.drawOccluder`), and any object with `drawOccluder` can do
+  the same: depth greater-equal, at the `samples` it is given. `CulledMeshes` has no `addOccluder`: it runs before the
+  frame's deformers.
+
 ## How it works
 
 Per frame, inside one plugin pass after core's main pass:
@@ -324,5 +363,5 @@ layouts), no WebGPU errors; occlusion drew as few as 4,770 of 28,672 parts where
   part. At most 1,000,000 parts and 96 bytes x parts within `maxStorageBufferBindingSize`.
 - Bounding spheres: thin parts just behind a surface (a nut under a plate, seen obliquely) are rarely culled, and on an
   open layout the depth prepass and pyramid cost more GPU time than occlusion saves; use `'frustum'` there.
-- Occluders are this package's own parts; core meshes and other plugins' geometry do not occlude.
+- Occluders are the package's own parts plus what `addOccluder` names; everything else draws but does not occlude.
 - One frame shader variant is cached; changing `PassContext.shader` every frame recompiles.

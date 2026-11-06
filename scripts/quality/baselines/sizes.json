@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4783382,
+  "total": 4786244,
   "history": [
     {
       "date": "2026-10-24",
@@ -1994,6 +1994,12 @@
       "commit": "7c8968142",
       "reason": "new entry @margoengine/culling/models (CulledModels); gltf-pro gains primitive.redirect, a few lines in the draw",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d3d70887b",
+      "reason": "culling: addOccluder (occluders.ts) in the root, where the occlusion pass lives; terrain gains drawOccluder",
+      "grew": 2
     }
   ],
   "items": {
@@ -2097,10 +2103,10 @@
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,
-    "@margoengine/culling": 12250,
+    "@margoengine/culling": 13600,
     "@margoengine/culling/dynamic": 7461,
     "@margoengine/culling/models": 3624,
-    "@margoengine/culling/parts": 13025,
+    "@margoengine/culling/parts": 14537,
     "@margoengine/cutscene": 6822,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,

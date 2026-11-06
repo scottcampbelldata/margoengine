@@ -29,6 +29,10 @@ export class Terrain implements EnginePlugin {
     setCapture(hook: TerrainCapture): () => void;
     onDispose(callback: () => void): () => void;
     draw(c: TerrainPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
+    drawOccluder({ pass, samples }: {
+        pass: GPURenderPassEncoder;
+        samples: number;
+    }): void;
     drawShadow({ context, pass, matrix, cascade }: {
         context: TerrainPassContext;
         pass: GPURenderPassEncoder;
