@@ -51,6 +51,7 @@ try {
     ['glb', Uint8Array.from(report.glb)],
     ['gltf', report.gltf],
     ['flat', Uint8Array.from(report.flat)],
+    ['draco', Uint8Array.from(report.draco)],
   ]) {
     const result = await validate(data);
     assert.equal(result.errors, 0, `${name}: ${JSON.stringify(result.messages)}`);
@@ -72,6 +73,7 @@ try {
   report.glbBytes = report.glb.length;
   delete report.glb;
   delete report.flat;
+  delete report.draco;
   delete report.gltf;
   await writeFile(resolve(results, 'exporters-browser.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));

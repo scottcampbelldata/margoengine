@@ -168,6 +168,10 @@
     "./roblox-uv": {
       "types": "./dist/roblox-uv.d.ts",
       "import": "./dist/roblox-uv.js"
+    },
+    "./draco": {
+      "types": "./dist/draco.d.ts",
+      "import": "./dist/draco.js"
     }
   },
   "files": [

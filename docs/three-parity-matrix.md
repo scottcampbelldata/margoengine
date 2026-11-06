@@ -1,7 +1,7 @@
 # Reading the three.js parity counts
 
 Date: 2026-10-31. The table in [threejs-parity.md](threejs-parity.md) was rewritten by feature group:
-**193 features, 161 COVERED, 5 PARTIAL, 15 MISSING**, plus 12 NOT PLANNED by decision. The earlier table
+**194 features, 162 COVERED, 5 PARTIAL, 15 MISSING**, plus 12 NOT PLANNED by decision. The earlier table
 counted 161 rows (153 / 4 / 4); its coarse rows hid gaps that now have rows of their own. The rows and the
 [to-do table](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
@@ -24,7 +24,7 @@ zero core bytes. The row stays PARTIAL: the layer's base is 70,274 B gzip (limit
 | --- | --- |
 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | Use `@margoengine/xr` for stereo. Anaglyph is not planned. |
 | Long-tail model loaders (LDraw, VRML, 3DS, LWO, AMF, MD2, PDB, GCode, BVH motion capture, 3DM, KMZ, TDS) | Add one when a project brings that file. |
-| DRACOExporter, KTX2Exporter | glTF export is `@margoengine/exporters`; these two are not planned (EXR is written by `@margoengine/environment/exr-write`). |
+| KTX2Exporter | glTF export is `@margoengine/exporters`; this one is not planned (EXR is written by `@margoengine/environment/exr-write`, Draco by `@margoengine/exporters/draco`). |
 | XRControllerModelFactory, XRHandModelFactory | Poses and 25 hand joints exist; models come after a headset test. |
 
 ## The 5 PARTIAL rows

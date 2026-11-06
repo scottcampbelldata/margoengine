@@ -200,6 +200,30 @@ export const LAZY_FILES = [
     measure: 'file',
     when: 'With the JPEG XL glue above',
   },
+  {
+    package: '@margoengine/exporters',
+    file: 'packages/exporters/dist/encoder.worker.js',
+    label: 'encoder.worker.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'First `compressDraco()` in a browser: one worker per call, ended when the call finishes',
+  },
+  {
+    package: '@margoengine/exporters',
+    file: 'packages/exporters/dist/draco-encoder/draco_encoder_wrapper.js',
+    label: 'draco-encoder/draco_encoder_wrapper.js',
+    kind: 'Draco encoder glue',
+    measure: 'file',
+    when: 'With the encoder worker above; `encoderPath` serves it from elsewhere',
+  },
+  {
+    package: '@margoengine/exporters',
+    file: 'packages/exporters/dist/draco-encoder/draco_encoder.wasm',
+    label: 'draco-encoder/draco_encoder.wasm',
+    kind: 'Wasm',
+    measure: 'file',
+    when: 'With the Draco encoder glue above',
+  },
   // Parser workers: one per call, from each package's `/worker` entry (or progressive loading).
   // Draco and KTX2 are not inside these scripts. A compressed file is handed back to the owning thread,
   // which uses @margoengine/decoders' own worker and Wasm.
@@ -357,4 +381,4 @@ export const LAZY_SPLITS = [
 
 /** Built files that load on their own at runtime; each must be in LAZY_FILES. Paths relative to the repository root. */
 export const isLazyBuildFile = (path) =>
-  /^packages\/[^/]+\/dist\/(.*\.wasm|workers\/[^/]+\.js|[^/]*\.worker\.js|(draco|draco-full|basis|jxl)\/[^/]+\.js)$/.test(path);
+  /^packages\/[^/]+\/dist\/(.*\.wasm|workers\/[^/]+\.js|[^/]*\.worker\.js|(draco|draco-full|draco-encoder|basis|jxl)\/[^/]+\.js)$/.test(path);

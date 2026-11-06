@@ -3,7 +3,7 @@
 Import `margoengine/exporters` from the `margoengine` package, or `@margoengine/exporters` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static USDZ and static COLLADA 1.4.1 (`.dae`) export for Margo Engine scenes
-and plain geometry data, plus SHA-256 for checking exported files.
+and plain geometry data, plus SHA-256 for checking exported files. [Compressed GLB files](#compressed-glb-files) are optional entries.
 
 Build from source with `npm run build` in `packages/exporters`.
 
@@ -652,6 +652,42 @@ normalized Float32 copies of each geometry's vertex data and indices, and Float3
 bind matrices; copies of extras; the JSON text, which is built before its size is known; and finally the GLB itself.
 PNG encoding is not part of `exportGLB`: textures arrive as encoded bytes (`paletteTexture` and `encodePNG` run
 before it, outside these limits). `exportGLTF` and `exportModel` take no limits.
+
+## Compressed GLB files
+
+Each of these takes GLB bytes and returns smaller GLB bytes, so it follows any writer here and any GLB from elsewhere. Materials, images, skins, animations, extensions and extras stay as they were.
+
+### Draco (`@margoengine/exporters/draco`)
+
+`compressDraco(glb, options)` stores triangle geometry as KHR_draco_mesh_compression, with Google's own Draco encoder in Wasm. The encoder loads on the first call: in a worker in a browser, in process in Node. An app that never compresses never fetches it.
+
+```ts
+import { exportGLB } from 'margoengine/exporters';
+import { compressDraco } from 'margoengine/exporters/draco';
+
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
+const source = exportGLB({ nodes: [{ geometry: { positions, normals, indices: [0, 1, 2, 0, 2, 3] } }] });
+
+const { glb, compressed, skipped } = await compressDraco(source, { positionBits: 14 });
+console.log(`${source.length} -> ${glb.length} bytes, ${compressed} primitives, ${skipped.length} left as they were`);
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `positionBits` | 14 | POSITION. The primitives of a mesh share one grid, so a seam between them stays closed |
+| `normalBits` | 10 | NORMAL, on Draco's octahedron |
+| `texcoordBits` | 12 | Float TEXCOORD_n |
+| `colorBits` | 8 | Float COLOR_n |
+| `tangentBits` | 12 | TANGENT |
+| `weightBits` | 0 | Float WEIGHTS_n. Exact by default: quantized weights no longer add up to 1 |
+| `encodeSpeed`, `decodeSpeed` | 5 | From 0, the smallest file, to 10, the fastest |
+| `encoderPath` | the bundled copy | URL of a folder with `draco_encoder_wrapper.js` and `draco_encoder.wasm` |
+| `signal` | none | Stops the encode: at once in a browser, between meshes in Node |
+
+Bits of 0 keep a float attribute exact. Integer attributes such as JOINTS_n and `_CUSTOM` attributes are always exact. Draco is lossy above that: a position lands on a grid of `2 ** positionBits - 1` steps across the mesh's widest axis, so at most half a step from where it was. Accessor `count`, `min` and `max` describe what a decoder gets, to the last bit.
+
+Draco has no place for morph targets and can reorder vertices, so a primitive with targets stays uncompressed, and so do points, lines, strips and fans. `skipped` names each one with its reason. Primitives that differ only in material share one stream. `compressDraco` refuses a GLB with meshopt buffers, and a file with nothing to compress comes back as the same bytes.
 
 ## Limits
 

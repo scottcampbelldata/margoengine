@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7590886,
+  "total": 7776832,
   "history": [
     {
       "date": "2026-10-24",
@@ -2612,6 +2612,12 @@
       "commit": "8af24f3c8",
       "reason": "feat(ragdoll): powered ragdoll (new entry @margoengine/ragdoll/powered)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "c276a8337",
+      "reason": "new entry exporters/draco ships a lazily fetched Draco encoder Wasm",
+      "grew": 1
     }
   ],
   "items": {
@@ -2776,6 +2782,7 @@
     "@margoengine/exporters/capture": 7241,
     "@margoengine/exporters/collect": 7908,
     "@margoengine/exporters/dae": 10560,
+    "@margoengine/exporters/draco": 185946,
     "@margoengine/exporters/godot": 10258,
     "@margoengine/exporters/godot-2d": 3416,
     "@margoengine/exporters/godot-addon": 1609,

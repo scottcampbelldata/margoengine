@@ -790,6 +790,10 @@
       "types": "./dist/exporters/roblox-uv.d.ts",
       "import": "./dist/exporters/roblox-uv.js"
     },
+    "./exporters/draco": {
+      "types": "./dist/exporters/draco.d.ts",
+      "import": "./dist/exporters/draco.js"
+    },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
       "import": "./dist/fbx.js"

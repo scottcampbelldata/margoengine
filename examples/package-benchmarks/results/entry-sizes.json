@@ -1,5 +1,5 @@
 {
-  "commit": "1d3ed67f3",
+  "commit": "ef15eccc6",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -806,6 +806,10 @@
       "./roblox-uv": {
         "raw": 7316,
         "gzip": 3401
+      },
+      "./draco": {
+        "raw": 575258,
+        "gzip": 180530
       }
     },
     "@margoengine/fbx": {
@@ -1556,8 +1560,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 46775,
-        "gzip": 15748
+        "raw": 48553,
+        "gzip": 16267
       }
     },
     "@margoengine/physics2d": {
@@ -1750,8 +1754,12 @@
     },
     "@margoengine/ragdoll": {
       ".": {
-        "raw": 15877,
-        "gzip": 6224
+        "raw": 16271,
+        "gzip": 6408
+      },
+      "./powered": {
+        "raw": 7727,
+        "gzip": 3146
       }
     },
     "@margoengine/react": {
@@ -2645,9 +2653,9 @@
       "brotli": 9639
     },
     "packages/physics/dist/index.js": {
-      "raw": 46775,
-      "gzip": 15748,
-      "brotli": 14004
+      "raw": 48553,
+      "gzip": 16267,
+      "brotli": 14446
     },
     "packages/save/dist/index.js": {
       "raw": 19849,
@@ -2703,6 +2711,21 @@
       "raw": 1698491,
       "gzip": 610146,
       "brotli": 427795
+    },
+    "packages/exporters/dist/encoder.worker.js": {
+      "raw": 2061,
+      "gzip": 1042,
+      "brotli": 935
+    },
+    "packages/exporters/dist/draco-encoder/draco_encoder_wrapper.js": {
+      "raw": 49007,
+      "gzip": 10087,
+      "brotli": 8693
+    },
+    "packages/exporters/dist/draco-encoder/draco_encoder.wasm": {
+      "raw": 370188,
+      "gzip": 110087,
+      "brotli": 82436
     },
     "packages/gltf-pro/dist/workers/gltf.js": {
       "raw": 64317,

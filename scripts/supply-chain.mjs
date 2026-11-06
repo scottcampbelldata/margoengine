@@ -59,6 +59,16 @@ export const BUNDLED = [
     notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
   },
   {
+    package: '@margoengine/exporters',
+    component: 'Draco 3D encoder (Google)',
+    licence: 'Apache-2.0',
+    files: 'dist/draco-encoder/draco_encoder.wasm, dist/draco-encoder/draco_encoder_wrapper.js',
+    source:
+      'packages/exporters/vendor/draco-encoder: Draco 1.5.7 official encoder, https://github.com/google/draco/tree/1.5.7/javascript, also in npm draco3d 1.5.7 as draco_encoder_nodejs.js (draco_encoder.wasm sha256 d2a3ac80c91980d5d321c116454834ff36264825c6d1794cc84e42288f158958, draco_encoder_wrapper.js sha256 8434adecd1446459601763e499be3697546056bca90b286a538ae0483a00845a), byte-identical',
+    modified: 'no',
+    notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
+  },
+  {
     package: '@margoengine/decoders',
     component: 'jxl-oxide JPEG XL decoder (Wonwoo Choi)',
     licence: 'MIT OR Apache-2.0',

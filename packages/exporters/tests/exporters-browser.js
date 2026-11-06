@@ -163,6 +163,38 @@ window.runExporterTests = async () => {
   assert(report.formats.stlBytes === 84 + 48 * 50, 'STL size');
   checks.push('STL, OBJ and PLY export from a live engine');
 
+  // Draco in a real worker: the encoder and its Wasm load from the package, and Google's decoder reads the stream back.
+  const { compressDraco } = await import('@margoengine/exporters/draco'),
+    { DracoDecoder } = await import('@margoengine/decoders'),
+    plain = exportGLB(engine),
+    draco = await compressDraco(plain);
+  assert(draco.compressed > 0 && draco.glb.length > 0, 'Draco compressed nothing');
+  report.draco = Array.from(draco.glb);
+  const binAt = 20 + new DataView(draco.glb.buffer, draco.glb.byteOffset).getUint32(12, true),
+    json = JSON.parse(new TextDecoder().decode(draco.glb.subarray(20, binAt))),
+    primitive = json.meshes[0].primitives[0],
+    extension = primitive.extensions.KHR_draco_mesh_compression,
+    view = json.bufferViews[extension.bufferView],
+    stream = draco.glb.subarray(
+      binAt + 8 + (view.byteOffset ?? 0),
+      binAt + 8 + (view.byteOffset ?? 0) + view.byteLength,
+    ),
+    decoder = new DracoDecoder(),
+    decoded = await decoder.decode(stream, { attributeIds: extension.attributes });
+  decoder.dispose();
+  assert(decoded.vertexCount === json.accessors[primitive.attributes.POSITION].count, 'Draco vertex count');
+  const stopped = new AbortController(),
+    pending = compressDraco(plain, { signal: stopped.signal });
+  stopped.abort();
+  assert(
+    await pending.then(
+      () => false,
+      (error) => error.name === 'AbortError',
+    ),
+    'Draco abort',
+  );
+  checks.push('compressDraco runs in its worker, the Draco decoder reads the stream, and an abort stops it');
+
   if (gpu) report.validationError = (await gpu.popErrorScope())?.message ?? null;
   report.gpuErrors = gpuErrors;
   assert(

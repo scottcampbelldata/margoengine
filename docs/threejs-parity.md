@@ -4,11 +4,11 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 ## Summary
 
-193 three.js features in 19 areas (recounted from the rows 2026-10-31; 51 of the COVERED rows are marked †):
+194 three.js features in 19 areas (recounted from the rows 2026-10-31; 51 of the COVERED rows are marked †):
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 161 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 162 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 5 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 15 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 12 | Out of scope by decision. The note says why and what to use instead. |
@@ -206,7 +206,8 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | OBJExporter, STLExporter, PLYExporter | COVERED † | exporters `exportOBJ` (with MTL), `exportSTL`, `exportPLY` | | |
 | USDZExporter | COVERED | exporters `exportUSDZ` (`packages/exporters/src/usdz.ts`), re-exported by usdz-export | | UsdPreviewSurface with textures: base colour (with alpha to opacity, `opacityThreshold` for masks), metal-rough channels, normal, occlusion and emissive maps, `st`/`st1` texcoords with the V flip, base-colour texture transform and wrap modes; images stored unchanged and 64-byte aligned. Round-trip tested through `@margoengine/usdz`. A geometry two or more nodes draw is written once and referenced, as three shares its geometries; other hierarchy is baked. Vertex colours together with a base-colour texture are rejected (UsdPreviewSurface cannot multiply them). Quick Look on a Mac draws the kit as intended apart from `normalScale` and vertex colours; no phone yet: see [known-bugs.md](known-bugs.md). |
 | EXRExporter | COVERED | environment `encodeEXR` (`@margoengine/environment/exr-write`, `packages/environment/src/exr-write.ts`) | | Scanline OpenEXR with named HALF, FLOAT or UINT channels and no or ZIP compression, the format `parseEXR` reads. |
-| DRACOExporter, KTX2Exporter | NOT PLANNED | exporters | | glTF export is the exporter. Draco, KTX2 and G-code writers are not planned. |
+| DRACOExporter | COVERED | exporters `compressDraco` (`@margoengine/exporters/draco`, `packages/exporters/src/draco.ts`) | | Writes Draco into a GLB as KHR_draco_mesh_compression, with Google's encoder; three's exporter writes a bare `.drc` file. |
+| KTX2Exporter | NOT PLANNED | exporters | | glTF export is the exporter. KTX2 and G-code writers are not planned. |
 
 ### 12. Animation
 
