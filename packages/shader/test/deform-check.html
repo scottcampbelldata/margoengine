@@ -105,7 +105,8 @@ const foxLater=async()=>{const f=await foxReady();f.animation.seek(f.animation.c
 const foxScenarios={
   async foxCompute(){const {model,skin}=await foxReady(),mesh=show(skin.geometry),[p]=mesh.primitives,[q]=model.primitives;p.deformed=q.deformed;p.deformedOffset=q.deformedOffset;return mesh;},
   async foxNodes(){const {skin}=await foxReady();skin.update();return show(skin.geometry,{positionNode:skin.position()});},
-  async foxLaterCompute(){const {model,skin}=await foxLater(),mesh=show(skin.geometry),[p]=mesh.primitives,[q]=model.primitives;p.deformed=q.deformed;p.deformedOffset=q.deformedOffset;return mesh;},
+  // The compute deformer waits while a model is hidden (animation README), so the reference shows it for the frame that deforms.
+  async foxLaterCompute(){const {model,skin}=await foxLater();model.root.visible=true;engine.render({culling:false});await device.queue.onSubmittedWorkDone();model.root.visible=false;const mesh=show(skin.geometry),[p]=mesh.primitives,[q]=model.primitives;p.deformed=q.deformed;p.deformedOffset=q.deformedOffset;return mesh;},
   async foxLaterNodes(){const {skin}=await foxLater();skin.update();return show(skin.geometry,{positionNode:skin.position()});},
   async foxBind(){const {skin}=await foxReady();return show(skin.geometry);},
 };
