@@ -36,6 +36,10 @@
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"
+    },
+    "./inertialize": {
+      "types": "./dist/inertialize.d.ts",
+      "import": "./dist/inertialize.js"
     }
   },
   "files": [

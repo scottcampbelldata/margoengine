@@ -85,6 +85,8 @@ class Animator implements EnginePlugin {
     addFootIK(foot: FootIK): () => void;
     addSolver(step: () => void): () => void;
     addPoseStep(step: (position: number[][], rotation: number[][]) => void): () => void;
+    addLateStep(step: (pose: Pose, step: number) => void): () => void;
+    cancelFade(): void;
     restRotation(index: number): readonly number[];
     writeNodeRotation(node: Mesh, rotation: readonly number[]): void;
     setup(engine: Engine): void;
@@ -161,5 +163,12 @@ interface FootIK {
 interface GroundHit {
     position: Vec3;
     normal?: Vec3;
+}
+
+interface Pose {
+    position: number[][];
+    rotation: number[][];
+    scale: number[][];
+    weights: Map<number, Float32Array>;
 }
 ```

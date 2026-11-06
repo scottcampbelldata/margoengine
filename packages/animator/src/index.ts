@@ -134,7 +134,8 @@ export interface FootIK {
   /** How far above the ankle the ray starts, in metres; above 0. Default 1. */
   probeHeight?: number;
 }
-interface Pose {
+/** @internal One frame's finished pose: local transforms per glTF node, morph weights per node. */
+export interface Pose {
   position: number[][];
   rotation: number[][];
   scale: number[][];
@@ -211,6 +212,7 @@ export class Animator implements EnginePlugin {
   private feet = new Set<FootIK>();
   private readonly solvers: Array<() => void> = [];
   private readonly poseSteps: Array<(position: number[][], rotation: number[][]) => void> = [];
+  private readonly lateSteps: Array<(pose: Pose, step: number) => void> = [];
   private disposed = false;
   private readonly triggers = new Set<string>();
   private readonly durations = new Map<string, number>();
@@ -472,6 +474,22 @@ export class Animator implements EnginePlugin {
       if (index !== -1) this.poseSteps.splice(index, 1);
     };
   }
+  /**
+   * @internal A step that edits the finished pose (after crossfades and layers, before it reaches the nodes, foot IK and
+   * the solvers), with the seconds of animation time this frame advanced. Returns its remover.
+   */
+  addLateStep(step: (pose: Pose, step: number) => void): () => void {
+    if (this.disposed) throw new MargoError('disposed', 'Animator is disposed; attach a new Animator');
+    this.lateSteps.push(step);
+    return () => {
+      const index = this.lateSteps.indexOf(step);
+      if (index !== -1) this.lateSteps.splice(index, 1);
+    };
+  }
+  /** @internal Ends the crossfade in progress: the pose jumps to the current state on this frame. */
+  cancelFade(): void {
+    this.fade = undefined;
+  }
   /** @internal Node `index`'s rest (loaded) rotation, x y z w; read-only. */
   restRotation(index: number): readonly number[] {
     return this.rest.rotation[index];
@@ -620,6 +638,7 @@ export class Animator implements EnginePlugin {
           );
         }
       }
+    for (let i = 0; i < this.lateSteps.length; i++) this.lateSteps[i](pose, step);
     this.current = pose;
     const nodes = this.animation.model.nodes;
     for (let i = 0; i < nodes.length; i++) this.applyNode(nodes[i], pose, i);
@@ -844,6 +863,7 @@ export class Animator implements EnginePlugin {
     this.triggers.clear();
     this.solvers.length = 0;
     this.poseSteps.length = 0;
+    this.lateSteps.length = 0;
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;

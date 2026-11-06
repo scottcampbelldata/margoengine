@@ -90,6 +90,10 @@
       "types": "./dist/animator/graph.d.ts",
       "import": "./dist/animator/graph.js"
     },
+    "./animator/inertialize": {
+      "types": "./dist/animator/inertialize.d.ts",
+      "import": "./dist/animator/inertialize.js"
+    },
     "./audio": {
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"

@@ -40,6 +40,8 @@ export class Animator implements EnginePlugin {
     addFootIK(foot: FootIK): () => void;
     addSolver(step: () => void): () => void;
     addPoseStep(step: (position: number[][], rotation: number[][]) => void): () => void;
+    addLateStep(step: (pose: Pose, step: number) => void): () => void;
+    cancelFade(): void;
     restRotation(index: number): readonly number[];
     writeNodeRotation(node: Mesh, rotation: readonly number[]): void;
     setup(engine: Engine): void;
@@ -226,6 +228,13 @@ export interface PlacedLeg {
     knee: number;
     ankle: number;
     pole: Vec3;
+}
+
+export interface Pose {
+    position: number[][];
+    rotation: number[][];
+    scale: number[][];
+    weights: Map<number, Float32Array>;
 }
 
 export interface RootMotion {

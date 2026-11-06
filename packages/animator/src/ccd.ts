@@ -94,7 +94,7 @@ const finiteArray = (v: ArrayLike<number> | null | undefined, size: number): boo
 
 // Quaternions are [x, y, z, w] at an offset into a Float64Array; out may alias a or b.
 // out = a * b
-function multiply(out: Float64Array, o: number, a: Float64Array, ao: number, b: Float64Array, bo: number): void {
+export function multiply(out: Float64Array, o: number, a: Float64Array, ao: number, b: Float64Array, bo: number): void {
   const ax = a[ao],
     ay = a[ao + 1],
     az = a[ao + 2],
@@ -131,7 +131,7 @@ function multiplyConjugate(
   out[o + 3] = aw * bw - ax * bx - ay * by - az * bz;
 }
 // out = a * conj(b)
-function multiplyByConjugate(out: Float64Array, o: number, a: Float64Array, ao: number, b: Float64Array, bo: number) {
+export function multiplyByConjugate(out: Float64Array, o: number, a: Float64Array, ao: number, b: Float64Array, bo: number) {
   const ax = a[ao],
     ay = a[ao + 1],
     az = a[ao + 2],

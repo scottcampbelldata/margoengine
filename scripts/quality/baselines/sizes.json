@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5202629,
+  "total": 5204775,
   "history": [
     {
       "date": "2026-10-24",
@@ -2366,6 +2366,12 @@
       "commit": "67c543843",
       "reason": "feat(animation): geometry caches play as they stream (new entry @margoengine/animation/geometry-cache)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "ef9d0bc90",
+      "reason": "animator/inertialize, new optional entry; Animator gains the late pose step it runs on",
+      "grew": 1
     }
   ],
   "items": {
@@ -2382,6 +2388,7 @@
     "@margoengine/animation/vat": 8512,
     "@margoengine/animator": 18654,
     "@margoengine/animator/graph": 8225,
+    "@margoengine/animator/inertialize": 2150,
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 8909,
     "@margoengine/behavior/steering": 3827,
@@ -2621,7 +2628,7 @@
     "@margoengine/loaders/amf": 5645,
     "@margoengine/loaders/common": 3417,
     "@margoengine/loaders/font": 6577,
-    "@margoengine/loaders/gcode": 1966,
+    "@margoengine/loaders/gcode": 1962,
     "@margoengine/loaders/kmz": 16930,
     "@margoengine/loaders/las": 2463,
     "@margoengine/loaders/ldraw": 4126,

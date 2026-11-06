@@ -285,6 +285,31 @@ feet.dispose();
 
 The placement object is read every frame, so poles, weight and the raycast may change. A leg whose ray misses keeps its animated pose. Each frame starts from the animated pose, so nothing accumulates. Bones and their ancestors need positive uniform scales; rotations commit through `writeRotation` when it is set.
 
+## Inertialization (`margoengine/animator/inertialize`)
+
+`addInertialization(animator, {duration})` replaces crossfades. A state change plays the new pose at once, and the difference between where the old motion was heading and the new pose fades out by itself, keeping the old motion's speed. Only the new state is sampled and there is no snapshot of the old pose to mix. Transitions, triggers and `animator.transition()` work as before.
+
+```ts
+import {Animator} from 'margoengine/animator';
+import {addInertialization} from 'margoengine/animator/inertialize';
+
+const animator = Animator.attach(animation, {
+  initial: 'run',
+  states: {run: 'Run', stop: 'Stop'},
+  transitions: [{from: 'run', to: 'stop', when: (p) => p.speed < 0.1, duration: 0.25}],
+});
+const inertia = addInertialization(animator); // each transition's duration is how long its offset fades
+animator.parameters.speed = 0;
+console.log(inertia.active, inertia.remaining); // true while something fades, and for how many seconds
+inertia.dispose();                              // back to crossfades
+```
+
+- **`duration`** (default: each transition's own `duration`) fixes one fade length for every switch. Without it, a transition of 0 stays a hard cut.
+- **Speed.** The frame after a switch continues the old motion, the next measures the new pose's speed, and the offset starts from their difference, so nothing pops and the speed along the offset does not jump. Sideways speed is dropped (see [limits](../../docs/limits.md)).
+- **It ends exactly.** After the fade the pose is the new state's, to the bit. An offset that is already closing never crosses the target: its fade is cut short instead.
+- **What fades:** local positions, rotations, scales and morph weights, on the finished pose (states and layers). Foot IK and solvers run after it, so their targets are still met.
+- **`smooth(duration?)`** fades a jump the graph did not cause, such as a clip time set by hand or a layer switched on: call it, then change the pose.
+
 ## Explicit rotation writer
 
 `AnimatorOptions.writeRotation?: (node: Mesh, rotation: readonly number[]) => void` is an optional, explicit commit hook for applications that own their transform writer. It is captured and validated once during construction. Omit it to keep the current dynamic `Mesh.setQuaternion` call, including method overrides. This is an additive public API option; it does not change core/stage.
