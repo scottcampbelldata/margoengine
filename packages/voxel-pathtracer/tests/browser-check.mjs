@@ -69,7 +69,12 @@ const started = performance.now(),
   reportName = args.find((a) => a.startsWith('--report='))?.slice(9),
   stallInRender = Number(args.find((a) => a.startsWith('--stall-in-render='))?.slice(18) ?? 0),
   stallMs = stallLimitMs(),
-  context = await openBrowser({ startPath: path, port }),
+  // On the layer, ANGLE's Vulkan backend on Windows: its Direct3D backend takes minutes on the tracer's kernels (limits.md).
+  context = await openBrowser({
+    startPath: path,
+    port,
+    ...(args.includes('--compat') && process.platform === 'win32' ? { args: ['--use-angle=vulkan'] } : {}),
+  }),
   { page, hardware } = context,
   pageErrors = [],
   timings = {},

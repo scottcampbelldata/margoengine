@@ -1,5 +1,5 @@
 {
-  "commit": "c57eb2a80",
+  "commit": "fdc0237cf",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1066,16 +1066,20 @@
     },
     "@margoengine/lod": {
       ".": {
-        "raw": 37653,
-        "gzip": 13232
+        "raw": 40363,
+        "gzip": 13899
       },
       "./auto": {
-        "raw": 13326,
-        "gzip": 5246
+        "raw": 14161,
+        "gzip": 5575
       },
       "./fade": {
         "raw": 5499,
         "gzip": 2286
+      },
+      "./stream": {
+        "raw": 3514,
+        "gzip": 1522
       }
     },
     "margoengine": {
@@ -1704,8 +1708,8 @@
     },
     "@margoengine/selection": {
       ".": {
-        "raw": 64629,
-        "gzip": 20075
+        "raw": 64877,
+        "gzip": 20151
       }
     },
     "@margoengine/shader": {
@@ -1905,13 +1909,25 @@
         "raw": 13992,
         "gzip": 4798
       },
+      "./beacon": {
+        "raw": 3315,
+        "gzip": 1383
+      },
       "./compile": {
         "raw": 4138,
         "gzip": 1626
       },
+      "./leaks": {
+        "raw": 3742,
+        "gzip": 1665
+      },
+      "./phases": {
+        "raw": 3263,
+        "gzip": 1458
+      },
       "./report": {
-        "raw": 2263,
-        "gzip": 1122
+        "raw": 2346,
+        "gzip": 1151
       }
     },
     "@margoengine/taa": {
@@ -2202,8 +2218,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 223047,
-        "gzip": 78817
+        "raw": 229082,
+        "gzip": 80273
       },
       "./studio": {
         "raw": 2228,
@@ -2246,8 +2262,8 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 331540,
-        "gzip": 99819
+        "raw": 331937,
+        "gzip": 99935
       },
       "./adapter": {
         "raw": 1123,
@@ -2258,8 +2274,8 @@
         "gzip": 48236
       },
       "./device": {
-        "raw": 330667,
-        "gzip": 99936
+        "raw": 331064,
+        "gzip": 100064
       },
       "./glsl": {
         "raw": 145692,
@@ -2270,8 +2286,8 @@
         "gzip": 26476
       },
       "./xr": {
-        "raw": 333979,
-        "gzip": 100952
+        "raw": 334376,
+        "gzip": 101157
       }
     },
     "@margoengine/wfc": {
@@ -2462,14 +2478,14 @@
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {
-        "raw": 242206,
-        "gzip": 72354,
+        "raw": 242365,
+        "gzip": 72398,
         "target": 73000
       },
       "lazy": {
         "name": "compute runtime",
-        "raw": 89333,
-        "gzip": 28002,
+        "raw": 89571,
+        "gzip": 28075,
         "loadedBy": "the first compute pipeline on the layer (import() of compute/runtime.js in device/device.ts)"
       }
     }

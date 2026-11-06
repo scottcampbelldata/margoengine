@@ -619,16 +619,36 @@ test('models up to 2048 per axis: a sparse 2048 x 64 x 2048 world, emitters past
   t2.dispose();
 });
 
-test('setup refuses a device of the WebGL2 compatibility layer with a coded error naming the route', () => {
-  const device = fakeDevice();
-  device.adapterInfo = { vendor: 'margo-webgl2', architecture: 'webgl2' };
-  const harness = fakeEngine(device);
-  assert.throws(() => VoxelPathTracer.attach(harness.engine, { scene: simpleScene() }), {
-    code: 'unsupported',
-    message:
-      /VoxelPathTracer needs the browser's own WebGPU; on the WebGL2 compatibility layer draw the voxels with @margoengine\/voxel/,
-  });
-  assert.equal(device.buffers.length, 0, 'nothing was allocated');
+test("on the WebGL2 layer trace compiles as the route's fragment shader, and only there", async () => {
+  const compiled = async (adapterInfo) => {
+    const device = fakeDevice(),
+      modules = [],
+      draws = [],
+      kernels = [],
+      module = device.createShaderModule,
+      kernel = device.createComputePipelineAsync;
+    device.adapterInfo = adapterInfo;
+    device.createShaderModule = (d) => (modules.push(d.code), module(d));
+    device.createRenderPipelineAsync = async (d) => (draws.push(d), { ...d, kind: 'render' });
+    device.createComputePipelineAsync = (d) => (kernels.push(d.compute.entryPoint), kernel(d));
+    const tracer = VoxelPathTracer.attach(fakeEngine(device).engine, { scene: simpleScene() });
+    await tracer.ready;
+    const draw = draws.find((d) => d.label === 'voxel-pathtracer trace');
+    tracer.dispose();
+    return { modules, draw, kernels };
+  };
+  const layer = await compiled({ vendor: 'margo-webgl2', architecture: 'webgl2' }),
+    sums = layer.modules.find((code) => code.includes('fn sums'));
+  assert.equal(layer.draw.fragment.targets.length, 4, 'one draw writes all four sums');
+  assert.ok(sums.includes('radiance(px)'), "the kernel's own sample loop");
+  assert.ok(!/\baccum\b/.test(sums), 'the fragment shader stores nothing');
+  assert.ok(layer.modules.some((code) => code.includes('fn add')));
+  assert.ok(!layer.kernels.includes('trace'), 'no trace compute pipeline for the CPU tier');
+  assert.ok(layer.kernels.includes('add') && layer.kernels.includes('ids'));
+  const native = await compiled(undefined);
+  assert.equal(native.draw, undefined);
+  assert.ok(native.kernels.includes('trace') && !native.kernels.includes('add'));
+  assert.ok(!native.modules.some((code) => code.includes('fn sums')));
 });
 
 // d10222cf2: a comparison and an ampersand mixed without parentheses, which WGSL rejects, so no pipeline could be built.

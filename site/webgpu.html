@@ -33,19 +33,19 @@ difference and the frame times as you watch.</p>
 
 <h2>What it cannot run</h2>
 <ul>
-<li>The voxel path tracer (the voxel sandbox's photo mode): WebGL2's shader compiler takes from 20 seconds to several
-minutes for each of its kernels.</li>
-<li>WebXR sessions: WebXR on WebGL2 needs a different kind of layer.</li>
+<li>WebXR sessions, unless the page installs the layer's XR entry: WebXR on WebGL2 needs a different kind of layer.</li>
 </ul>
-<p>A demo part that needs either shows a message over the scene naming the error code, MargoError
-<code>unsupported</code>, instead of a blank or frozen view.</p>
+<p>A demo part that needs it shows a message over the scene naming the error code, MargoError
+<code>unsupported</code>, instead of a blank or frozen view. The voxel path tracer (the voxel sandbox's photo mode) runs,
+but on Windows browsers that draw through Direct3D its shaders take many minutes to compile, and the ordinary image
+stays on screen until they do.</p>
 
 <h2>Pages with a Content Security Policy</h2>
 <p>Rendering on the layer needs nothing special. Compute shaders that WebGL2 cannot run on the GPU (atomics, shared
 workgroup memory, barriers) run on the CPU as JavaScript that the layer compiles at run time with
-<code>new Function</code>. A page whose Content Security Policy does not allow <code>'unsafe-eval'</code> gets those
-kernels refused with MargoError code <code>unsupported</code>; everything else still runs. With WebGPU, nothing in the
-engine needs <code>'unsafe-eval'</code>.</p>
+<code>new Function</code>. A page whose Content Security Policy does not allow <code>'unsafe-eval'</code> runs those
+kernels on an interpreter instead, 13 to 41 times slower. With WebGPU, nothing in the engine needs
+<code>'unsafe-eval'</code>.</p>
 
 <h2>Browsers with WebGPU</h2>
 <p>For the full speed of the demos, update to one of these and reload:</p>

@@ -103,7 +103,7 @@ What it does:
   44 ms for 10,000 splats; one readback of the keys a frame); `CulledInstances` and `CulledMeshes` cull against the
   frustum on the CPU and upload what they keep (1.1 ms instead of 11.7 ms for 10,000 parts; `'occlusion'` culls
   against the frustum only there). Each draws the same pixels as on native WebGPU. VFX, creative particles and
-  scatter run their WebGPU kernels on the CPU tier, the plan's route for them. The voxel path tracer refuses the layer with MargoError code `unsupported`.
+  scatter run their WebGPU kernels on the CPU tier, the plan's route for them. The voxel path tracer runs its `trace` kernel as a fragment shader with four float targets and the rest on the tiers above; ANGLE's Direct3D backend needs a long time to compile it (its [README](../voxel-pathtracer/README.md#on-the-webgl2-compatibility-layer)).
 - **WGSL front end** (`margoengine/webgl2-compat/wgsl`, milestone M1): `checkWGSL(source)` and `parseWGSL(source)`.
 - `webgl2Capabilities(gl)` and `probeWebGL2()`: what a browser's WebGL2 offers and the tier it reaches. The layer
   renders only on the `full` tier: renderable float colour targets (`EXT_color_buffer_float`) and `highp` in fragment
@@ -301,8 +301,8 @@ browsers' own WebGPU compilers, where it was recorded.
   that uses them while it waits for that load).
 - The corpus (`npm run test:browser`): all 1,049 vertex and fragment entry points compile, all 459 distinct stage pairs
   of the recorded render pipelines link, all 624 recorded render pipelines draw once through the device, and 397
-  recorded compute pipelines are translated for their tier and dispatched once, none refused (the voxel path tracer's 20, out of
-  scope on WebGL2, are only planned).
+  recorded compute pipelines are translated for their tier and dispatched once, none refused (the voxel path tracer's 20 are only planned here,
+  because its compile times on ANGLE's Direct3D backend do not fit this check; its own check runs them on Vulkan).
 
 Nothing runs at import time, the package has no dependencies, and core, the stage and every other package never
 import it (a test in this package checks that), so the WebGPU path is byte-identical with or without it.

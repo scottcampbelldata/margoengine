@@ -15,7 +15,8 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { agx } from '../../shared/agx.js';
-import { compatTier } from '../../shared/compat.js';
+import { compatTier, loadCompatRoute } from '../../shared/compat.js';
+import type { RouteKernel, TraceInputs, TraceRoute } from './compat.js';
 import { acesNarkowicz } from '../../shared/aces.js';
 import {
   FLAG_CLAMP,
@@ -138,8 +139,11 @@ class Runs {
   }
 }
 
+/** `trace` is a compute pipeline, or on the WebGL2 layer the route's stand-in (compat.ts). */
+type TraceKernel = GPUComputePipeline | RouteKernel;
+
 interface Pipelines {
-  trace: GPUComputePipeline;
+  trace: TraceKernel;
   ids: GPUComputePipeline;
   prepare: GPUComputePipeline;
   atrous: GPUComputePipeline;
@@ -170,8 +174,12 @@ interface Gpu {
    * The tracing kernels that read model material tables (TABLES), compiled when a scene first has them, and their
    * coverage kernel.
    */
-  tableKernelsPending?: Promise<{ trace: GPUComputePipeline; ids: GPUComputePipeline }>;
-  tableKernels?: { trace: GPUComputePipeline; ids: GPUComputePipeline };
+  tableKernelsPending?: Promise<{ trace: TraceKernel; ids: GPUComputePipeline }>;
+  tableKernels?: { trace: TraceKernel; ids: GPUComputePipeline };
+  /** On the WebGL2 layer: how `trace` runs there (compat.ts), and what each trace bind group binds, for that route. */
+  route?: Promise<TraceRoute>;
+  routeReady?: TraceRoute;
+  inputs?: WeakMap<GPUBindGroup, TraceInputs>;
   tableCoverage?: Promise<GPUComputePipeline>;
   display: Map<string, { pipeline?: GPURenderPipeline }>;
   buffers: SceneBuffers;
@@ -658,12 +666,6 @@ export class VoxelPathTracer implements EnginePlugin {
     const device = engine.gpu;
     if (!device)
       throw new MargoError('unsupported', 'VoxelPathTracer needs the WebGPU backend; create the engine with WebGPU');
-    // Out of scope on the WebGL2 layer: ANGLE's Direct3D shader compiler takes 20 s to minutes for each kernel.
-    if (compatTier(device) === 'webgl2')
-      throw new MargoError(
-        'unsupported',
-        "VoxelPathTracer needs the browser's own WebGPU; on the WebGL2 compatibility layer draw the voxels with @margoengine/voxel",
-      );
     this.#engine = engine;
     this.#state(device);
   }
@@ -825,6 +827,10 @@ export class VoxelPathTracer implements EnginePlugin {
         resources: 0,
       };
     this.#gpu = gpu;
+    if (compatTier(device) === 'webgl2') gpu.inputs = new WeakMap();
+    gpu.route = loadCompatRoute(device, () => import('./compat.js'))?.then(
+      ({ TraceRoute }) => (gpu.routeReady = new TraceRoute(device)),
+    );
     gpu.buffers = {
       table0: this.#buffer(
         gpu,
@@ -866,7 +872,7 @@ export class VoxelPathTracer implements EnginePlugin {
       () => {},
     );
     Promise.all([
-      compute(trace, 'trace', traceLayout),
+      this.#trace(gpu, false),
       compute(trace, 'ids', traceLayout),
       compute(denoise, 'prepare', denoiseLayout),
       compute(denoise, 'atrous', denoiseLayout),
@@ -909,6 +915,7 @@ export class VoxelPathTracer implements EnginePlugin {
     const gpu = this.#gpu;
     if (!gpu) return;
     this.#gpu = undefined;
+    gpu.routeReady?.destroy();
     for (const b of Object.values(gpu.buffers)) this.#destroy(b);
     this.#destroy(gpu.tables);
     this.#destroy(gpu.tableScratch);
@@ -1116,7 +1123,7 @@ export class VoxelPathTracer implements EnginePlugin {
     band?: { frame: number; at: number; size: number },
   ): GPUBindGroup {
     const image = (buffer: GPUBuffer) => (band ? { buffer, offset: band.at, size: band.size } : { buffer });
-    return gpu.device.createBindGroup({
+    const group = gpu.device.createBindGroup({
       layout: gpu.traceLayout,
       entries: [
         { binding: 0, resource: band ? { buffer: frame, offset: band.frame, size: FRAME_BYTES } : { buffer: frame } },
@@ -1132,6 +1139,22 @@ export class VoxelPathTracer implements EnginePlugin {
         { binding: 10, resource: t.caustics ? image(t.caustics) : { buffer: gpu.dummy } },
       ],
     });
+    gpu.inputs?.set(group, {
+      frame: band ? { buffer: frame, offset: band.frame, size: FRAME_BYTES } : { buffer: frame },
+      table0: buffers.table0,
+      voxels: buffers.voxels,
+      scene: buffers.scene,
+      materials: buffers.materials,
+      env: buffers.env,
+      tables: gpu.tables,
+      images: [
+        image(t.accum),
+        image(t.albedo),
+        image(t.normals),
+        t.caustics ? image(t.caustics) : { buffer: gpu.dummy },
+      ],
+    });
+    return group;
   }
 
   // Corner rays (near-plane points at `origins`, directions toward NDC depth 0.5 at `directions`) and the lens frame
@@ -1444,13 +1467,15 @@ export class VoxelPathTracer implements EnginePlugin {
     });
   }
 
+  // `trace` itself: on the WebGL2 layer the route's stand-in.
+  #trace(gpu: Gpu, tables: boolean): Promise<TraceKernel> {
+    return gpu.route ? gpu.route.then((route) => route.kernel(tables)) : this.#traceKernel(gpu, 'trace', tables);
+  }
+
   // The trace and id kernels for the current scene: the base ones, or (a scene with model material tables) the TABLES
   // ones, compiled the first time they are needed.
-  #tableKernels(gpu: Gpu): Promise<{ trace: GPUComputePipeline; ids: GPUComputePipeline }> {
-    gpu.tableKernelsPending ??= Promise.all([
-      this.#traceKernel(gpu, 'trace', true),
-      this.#traceKernel(gpu, 'ids', true),
-    ]).then(
+  #tableKernels(gpu: Gpu): Promise<{ trace: TraceKernel; ids: GPUComputePipeline }> {
+    gpu.tableKernelsPending ??= Promise.all([this.#trace(gpu, true), this.#traceKernel(gpu, 'ids', true)]).then(
       ([trace, ids]) => {
         if (this.#gpu === gpu) gpu.tableKernels = { trace, ids };
         return { trace, ids };
@@ -1478,7 +1503,7 @@ export class VoxelPathTracer implements EnginePlugin {
     gpu: Gpu,
     view: View,
     c: Context,
-    pipeline: GPUComputePipeline,
+    pipeline: TraceKernel,
     width: number,
     height: number,
     s0: number,
@@ -1531,6 +1556,10 @@ export class VoxelPathTracer implements EnginePlugin {
       for (const [i, k] of chunks.entries()) if (!write(view.bands.frames, i * stride, k)) return false;
       groups = view.bands.groups;
     }
+    if ('sums' in pipeline) {
+      for (const [i, k] of chunks.entries()) this.#routeTrace(gpu, c.encoder, pipeline, groups[i], width, k.rows);
+      return true;
+    }
     const pass = c.encoder.beginComputePass();
     pass.setPipeline(pipeline);
     for (const [i, k] of chunks.entries()) {
@@ -1539,6 +1568,23 @@ export class VoxelPathTracer implements EnginePlugin {
     }
     pass.end();
     return true;
+  }
+
+  #routeTrace(
+    gpu: Gpu,
+    encoder: GPUCommandEncoder,
+    kernel: RouteKernel,
+    group: GPUBindGroup,
+    width: number,
+    rows: number,
+  ): void {
+    (gpu.routeReady as TraceRoute).encode(
+      encoder,
+      kernel,
+      (gpu.inputs as WeakMap<GPUBindGroup, TraceInputs>).get(group)!,
+      width,
+      rows,
+    );
   }
 
   #execute(c: Context): void {
@@ -1886,12 +1932,15 @@ export class VoxelPathTracer implements EnginePlugin {
               o.wavelength,
               o.transparent,
             );
-            const e = device.createCommandEncoder(),
-              pass = e.beginComputePass();
-            pass.setPipeline(kernels.trace);
-            pass.setBindGroup(0, group!);
-            pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
-            pass.end();
+            const e = device.createCommandEncoder();
+            if ('sums' in kernels.trace) this.#routeTrace(gpu, e, kernels.trace, group!, w, h);
+            else {
+              const pass = e.beginComputePass();
+              pass.setPipeline(kernels.trace);
+              pass.setBindGroup(0, group!);
+              pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
+              pass.end();
+            }
             device.queue.submit([e.finish()]);
             if (++submitted % 4 === 0) await device.queue.onSubmittedWorkDone();
           }

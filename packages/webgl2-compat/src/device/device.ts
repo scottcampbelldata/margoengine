@@ -537,9 +537,9 @@ export class CompatDevice extends EventTarget {
     return pipeline;
   }
   createComputePipelineAsync(descriptor: GPUComputePipelineDescriptor): Promise<CompatComputePipeline> {
-    return this.loadCompute().then(() => {
+    return this.loadCompute().then(async () => {
       const pipeline = new CompatComputePipeline(this, descriptor);
-      pipeline.ready();
+      await pipeline.readyAsync();
       if (pipeline.failure)
         throw Object.assign(new DOMException(pipeline.failure, 'OperationError'), {
           name: 'GPUPipelineError',

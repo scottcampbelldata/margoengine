@@ -375,6 +375,11 @@ culling and shadows. A CPU-tier kernel that reads a GPU-written resource waits f
 kernel can cost a whole frame: the sky projection cost 57 ms that way. Evidence: `routes.test.js` and the frame budget of
 `visual:compat:budget`; the integrated-GPU budget run is still missing.
 
+The voxel path tracer has a route too (`packages/voxel-pathtracer/src/compat.ts`): `trace` runs as a fragment shader
+cut from the WebGPU kernel's own text, writing four `rgba32float` targets, and a scatter kernel adds them to the image
+buffers. Evidence: `packages/voxel-pathtracer/tests/browser-check.mjs --compat` on ANGLE Vulkan. Still missing: a run on
+ANGLE Metal and on an integrated GPU. ANGLE on Direct3D 11, the default on Windows, had not finished `trace` after 20 minutes (its smaller kernels take 27 to 86 s each), while the page kept drawing at full rate.
+
 The CPU tier's `new Function` applies only to this opt-in compatibility path, and a strict policy sends it to the
 interpreter instead of refusing it. General claims that nothing builds code at run time must stay scoped to the native
 engine. Evidence: `packages/webgl2-compat/test/interpret.test.js` compares the two paths over the corpus, and

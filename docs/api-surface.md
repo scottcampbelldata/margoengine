@@ -51,7 +51,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/lightmap | `.` 9, `./global` 4, `./refracted` 6 | 12 |  | 3,801 |
 | @margoengine/lines | `.` 50, `./edges` 6, `./pick` 4, `./trail` 2, `./batch` 5, `./hidden` 2 | 39 |  | 19,269 |
 | @margoengine/loaders | `.` 142, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2, `./mocap` 6, `./vrml` 4, `./gcode` 3 | 39 |  | 51,870 |
-| @margoengine/lod | `.` 23, `./auto` 9, `./fade` 6, `./stream` 7 | 34 |  | 13,232 |
+| @margoengine/lod | `.` 23, `./auto` 9, `./fade` 6, `./stream` 7 | 34 |  | 13,306 |
 | margoengine | `.` 23, `./game` 43, `./viz` 33, `./web` 15 |  |  | 52 |
 | @margoengine/materials | `.` 112, `./atlas` 8, `./transmission` 8, `./batched` 4 | 48 |  | 60,668 |
 | @margoengine/math | `.` 72, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 3, `./matrix3` 1, `./matrix4` 1, `./color` 15, `./box3` 1, `./obb` 1, `./line3` 1, `./triangle` 1, `./color-space` 5, `./capsule` 3, `./sphere` 1, `./plane` 1, `./ray` 2, `./frustum` 1, `./project` 5, `./spherical` 1, `./cylindrical` 1, `./sh` 2, `./mathutils` 21, `./mat4` 11, `./validate` 3, `./quat` 10, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 129 |  | 19,697 |
@@ -105,11 +105,11 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/voxel | `.` 22, `./query` 7, `./codec` 9, `./stream` 5, `./generate` 5, `./bevel` 5, `./mesher` 12, `./light` 3, `./vox` 14, `./physics` 2, `./render` 10, `./lightmap` 3 | 80 |  | 5,871 |
 | @margoengine/voxel-edit | `.` 59, `./edit` 28, `./pick` 4, `./sparse` 16, `./mesh` 11, `./vox` 23, `./animation` 8, `./history` 3, `./export` 4, `./formats` 13, `./assist` 3, `./library` 6, `./smooth` 3, `./voxelize` 5 | 81 |  | 7,533 |
 | @margoengine/voxel-net | `.` 34, `./server` 13, `./bot` 4, `./file-store` 1 | 15 |  | 8,033 |
-| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 78,817 |
+| @margoengine/voxel-pathtracer | `.` 53, `./studio` 12 | 7 |  | 80,273 |
 | @margoengine/water | `.` 8 |  |  | 19,597 |
 | @margoengine/weather | `.` 37, `./hail` 6 |  |  | 4,974 |
 | @margoengine/webgl | `.` 5, `./pick` 1, `./restore` 2, `./auto` 2 |  |  | 3,407 |
-| @margoengine/webgl2-compat | `.` 15, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5 | 142 |  | 99,819 |
+| @margoengine/webgl2-compat | `.` 15, `./adapter` 3, `./compute` 84, `./device` 106, `./glsl` 90, `./wgsl` 76, `./xr` 5 | 142 |  | 99,935 |
 | @margoengine/wfc | `.` 3, `./overlapping` 5 |  |  | 1,744 |
 | @margoengine/worker | `.` 5, `./canvas` 3 |  |  | 1,872 |
 | @margoengine/xr | `.` 30 |  |  | 6,580 |

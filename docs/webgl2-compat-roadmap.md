@@ -234,7 +234,7 @@ Expected result per package on WebGL2. "Same" means the same pixels within the p
 | splats | Depth sort in a worker (C), the established WebGL approach; projection in the vertex shader | Same image, sort lags by a frame |
 | culling and scatter packs | GPU-driven culling off; core's CPU frustum culling remains; scatter places instances on the CPU | Same image, more draw calls |
 | stats, inspector | No GPU timestamps | CPU timings only |
-| voxel-pathtracer | Out of scope for the first release; revisit after M8 | Not available on WebGL2 |
+| voxel-pathtracer | `trace` as a fragment shader writing four `rgba32float` targets, added to the image by a small kernel (C); the rest on the tiers above | Same results; ANGLE on Direct3D 11, the default on Windows, had not finished `trace` after 20 minutes (its smaller kernels take 27 to 86 s each), while the page kept drawing at full rate. |
 | xr | WebXR on WebGL2 needs `XRWebGLLayer`, a separate path | The `/xr` entry's `installXR()` (2026-11-06): a binding of `XRGPUBinding`'s shape on an `XRWebGLLayer`; no headset has run it |
 | webgl (preview) | Kept as the small preview for apps that only show plain meshes | Unchanged |
 
@@ -288,7 +288,7 @@ of native frame time on the desktop GPU. M7 replaces these with measured numbers
 
 ## Out of scope for this version
 
-WebXR on WebGL2, the voxel path tracer, GPU timestamps, zero-copy video, per-sample MSAA effects, 1,000,000-particle
+GPU timestamps, zero-copy video, per-sample MSAA effects, 1,000,000-particle
 budgets and GPU-driven culling on WebGL2.
 
 ## Decisions (M0, 2026-10-27)

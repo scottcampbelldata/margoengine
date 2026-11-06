@@ -236,6 +236,7 @@ class CompatComputePipeline {
     constructor(device: CompatDevice, descriptor: GPUComputePipelineDescriptor);
     getBindGroupLayout(index: number): CompatBindGroupLayout;
     readonly shared: (group: number, binding: number) => boolean;
+    readyAsync(): Promise<void>;
     ready(): boolean;
 }
 
@@ -506,10 +507,11 @@ class CompatValidationError extends Error {
 
 interface ComputeBuilt {
     readonly tier: string;
+    readonly linked?: Promise<void>;
 }
 
 interface ComputeRuntime {
-    build(pipeline: CompatComputePipeline): ComputeBuilt;
+    build(pipeline: CompatComputePipeline, deferred?: boolean): ComputeBuilt;
     dispatch(r: Replayer, pipeline: CompatComputePipeline, groups: readonly BoundGroup[], count: readonly number[]): void;
 }
 

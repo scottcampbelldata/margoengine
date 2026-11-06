@@ -7,7 +7,8 @@ path-traced image of your voxel scene through the engine camera, refining every 
 renders off-screen PNGs and float images of any size, and answers ray picks against the same scene.
 
 Optional and tree-shakable: `@margoengine/core` and the `margoengine` stage never import it. It needs the WebGPU backend
-(`MargoError` `unsupported` otherwise) and has no runtime dependency besides `@margoengine/math`.
+(`MargoError` `unsupported` otherwise), which the [WebGL2 compatibility layer](#on-the-webgl2-compatibility-layer) also
+provides, and has no runtime dependency besides `@margoengine/math`.
 
 Written clean-room from public rendering literature (see [How it works](#how-it-works)). It reproduces the kinds of
 materials, lights and camera effects voxel editors offer; it does not claim to reproduce any other renderer's private
@@ -302,6 +303,39 @@ disposal releases them.
   and `engine.dispose()` dispose it too.
 - `stats`: `samples`, `frameMs` (wall clock between traced frames), `gpuBytes`, `converged`, plus `width`, `height`,
   `sceneRevision`.
+
+## On the WebGL2 compatibility layer
+
+Install the layer before `Engine.create` and the tracer runs with nothing else changed: viewport, denoiser, captures,
+picks and device restores, with the same options.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { install } from 'margoengine/webgl2-compat';
+import { VoxelPathTracer, type VoxelTraceScene } from 'margoengine/voxel-pathtracer';
+
+const canvas = document.querySelector('canvas')!;
+const scene: VoxelTraceScene = {
+  revision: 1,
+  models: [{ id: 'cube', revision: 1, size: [1, 1, 1], voxels: new Uint8Array([1]) }],
+  instances: [{ id: 'cube-1', modelId: 'cube', matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }],
+  materials: [{ id: 1, color: [0.8, 0.75, 0.7], type: 'diffuse' }],
+};
+await install();
+const engine = await Engine.create(canvas);
+const tracer = VoxelPathTracer.attach(engine, { scene });
+await tracer.ready; // the raster image, then the preview, until the kernels compile
+```
+
+The WebGL2 kernels are the WebGPU ones except `trace`: its stores cannot run on the GPU on WebGL2, so the same sample loop
+runs in a fragment shader writing four `rgba32float` targets and a small kernel adds them to the image. That route is a
+lazy chunk (`src/compat.ts`) only the layer downloads. Results agree with the analytic checks at the same tolerances, and
+the `trace` module stays the one source of the maths.
+
+Compile time decides whether this is useful. ANGLE on Vulkan compiled everything in about 20 s on an RTX A6000; ANGLE on Direct3D 11, the default on Windows, had not finished `trace` after 20 minutes (its smaller kernels take 27 to 86 s each), while the page kept drawing at full rate.
+Frames before `ready` show the raster image, so nothing stops working in the meantime. Speed against native WebGPU on one
+GPU, diagnostic because other jobs ran: a 1500 x 1100, 64-sample denoised render took 6.4 s against 2.3 s, and a
+400 x 240 viewport frame 24 ms against 9 ms.
 
 ## Captures, float images and picks
 

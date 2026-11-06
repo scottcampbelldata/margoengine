@@ -463,6 +463,27 @@ window.check = {
     }
     return out;
   },
+  /** Compat only: createComputePipelineAsync asks whether the link is done before anything that waits for it. */
+  async asyncLink() {
+    const device = await (await createCompatGPU().requestAdapter()).requestDevice();
+    const gl = device.gl,
+      get = gl.getProgramParameter.bind(gl),
+      asked = [];
+    gl.getProgramParameter = (program, name) => (asked.push(name), get(program, name));
+    await device.createComputePipelineAsync({
+      layout: 'auto',
+      compute: {
+        module: device.createShaderModule({
+          code: `@group(0) @binding(0) var<storage, read_write> out: array<u32>;
+            @compute @workgroup_size(1) fn main() { out[0] = 7u; }`,
+        }),
+        entryPoint: 'main',
+      },
+    });
+    const first = asked[0] === device.ext.parallel?.COMPLETION_STATUS_KHR;
+    device.destroy();
+    return first;
+  },
   /** Compat only: a refusal must be coded. */
   async refusal() {
     const device = await (await createCompatGPU().requestAdapter()).requestDevice();

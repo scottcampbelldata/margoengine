@@ -20,8 +20,8 @@ for (const m of modules) {
       const id = JSON.stringify(p.compute);
       if (!seen.has(id)) {
         seen.add(id);
-        // The voxel path tracer is out of scope on WebGL2 (roadmap, package plan): its compute shaders take ANGLE's
-        // Direct3D shader compiler 20 s to several minutes each. compute.test.js still plans all of them.
+        // The voxel path tracer's compute shaders take ANGLE's Direct3D shader compiler 20 s to several minutes each,
+        // which does not fit this check. compute.test.js plans all of them, and its browser-check.mjs --compat runs them.
         if (m.package === 'voxel-pathtracer') outOfScope++;
         else computes.push({ ...p, id: `${m.package} ${m.key} ${p.compute.entryPoint ?? ''}` });
       }
@@ -57,7 +57,7 @@ try {
     .map(([tier, n]) => `  ${n} x ${tier}`)
     .join('\n');
   console.log(
-    `WGSL corpus compute: ${computes.length} recorded compute pipelines dispatched on WebGL2 (${outOfScope} of the voxel path tracer, out of scope, not dispatched):\n${tiers}`,
+    `WGSL corpus compute: ${computes.length} recorded compute pipelines dispatched on WebGL2 (${outOfScope} of the voxel path tracer, checked on their own, not dispatched):\n${tiers}`,
   );
   if (compute.failures.length) console.log(`FAILURES ${compute.failures.length}:\n${compute.failures.join('\n')}`);
   assert.deepEqual(compute.failures, []);

@@ -15,7 +15,7 @@ Margo replaces three.js.
 `@margoengine/webgl2-compat` (milestones M0 to M8 of [webgl2-compat-roadmap.md](webgl2-compat-roadmap.md)) puts a WebGPU-shaped
 device on WebGL2 and translates every WGSL shader to GLSL ES 3.00, so core and the optional packages run unchanged at
 zero core bytes. The row stays PARTIAL: the layer's base is 72,354 B gzip (limit
-73,000 B, an accepted difference) with a lazy compute runtime of 28,002 B, the voxel path tracer refuses it, XR needs its `/xr` entry and has not run on a headset, and CPU-tier compute kernels run on a slower interpreter without `unsafe-eval`. Every site demo (27) and Khronos gallery model (32) loads it without WebGPU: 20 demos and all 32 models draw the same pixels as native, 7 demos run with one accepted difference. It is the site's fallback. The small
+73,000 B, an accepted difference) with a lazy compute runtime of 28,002 B, the voxel path tracer compiles slowly on ANGLE Direct3D, XR needs its `/xr` entry and has not run on a headset, and CPU-tier compute kernels run on a slower interpreter without `unsafe-eval`. Every site demo (27) and Khronos gallery model (32) loads it without WebGPU: 20 demos and all 32 models draw the same pixels as native, 7 demos run with one accepted difference. It is the site's fallback. The small
 `@margoengine/webgl` preview (core meshes only) stays for v1.0; the React Canvas's `loadFallback` loads it and `fallbackContent` replaces the plain message. The layer is installed with `install()` before `Engine.create`.
 
 ## The 4 MISSING rows

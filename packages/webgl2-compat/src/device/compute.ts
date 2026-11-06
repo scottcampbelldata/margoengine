@@ -19,12 +19,14 @@ import type { Replayer } from './render.js';
 /** What the compute entry builds for a pipeline (opaque to the device). */
 export interface ComputeBuilt {
   readonly tier: string;
+  /** With a deferred build of a GPU tier: resolves once every program has linked. */
+  readonly linked?: Promise<void>;
 }
 
 /** The part of the compute entry the device calls (compute/runtime.ts). */
 export interface ComputeRuntime {
   /** Plans and translates a pipeline; throws MargoError code `unsupported` for what no tier can run. */
-  build(pipeline: CompatComputePipeline): ComputeBuilt;
+  build(pipeline: CompatComputePipeline, deferred?: boolean): ComputeBuilt;
   /** Runs one dispatch with the bind groups bound at the time it was recorded. */
   dispatch(r: Replayer, pipeline: CompatComputePipeline, groups: readonly BoundGroup[], count: readonly number[]): void;
 }
@@ -142,6 +144,14 @@ export class CompatComputePipeline {
   /** True when a storage binding reads from its bind group's shared data texture (no dynamic offset). */
   readonly shared = (group: number, binding: number): boolean =>
     !this.explicit?.bindGroupLayouts[group]?.entries.find((e) => e.binding === binding)?.buffer?.hasDynamicOffset;
+
+  /** As {@link ready}, leaving the link to the driver's own thread: nothing here waits for it. */
+  async readyAsync(): Promise<void> {
+    if (this.built || this.failure || !this.entry) return;
+    const built = (this.device.computeRuntime as ComputeRuntime).build(this, true);
+    await built.linked;
+    this.built = built;
+  }
 
   /** Builds the pipeline with the loaded compute runtime (once); false when it cannot run. */
   ready(): boolean {

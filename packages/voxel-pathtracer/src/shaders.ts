@@ -73,7 +73,7 @@ import {
 import { ggxDenominator } from '../../shared/light-terms.js';
 
 /** Frame uniform shared by the trace and ids entry points (layout in layout.ts, FRAME_BYTES). */
-const FRAME = /* wgsl */ `
+export const FRAME: string = /* wgsl */ `
 struct Frame {
  origins:array<vec4f,4>,
  eye:vec4f,

@@ -38,9 +38,11 @@ import { type CPUKernel, compileCPU, evalAllowed, useInterpreter } from './js.js
 interface Draw {
   readonly target: ComputeTarget;
   readonly pipeline: CompatRenderPipeline;
-  readonly cn: WebGLUniformLocation | null;
-  readonly ct: WebGLUniformLocation | null;
-  readonly dims: readonly { group: number; binding: number; location: WebGLUniformLocation }[];
+  /** The program's stage the dimensions are read from, then what `settle` reads once it has linked. */
+  readonly stage: ReturnType<typeof emitCompute>['vertex'];
+  cn: WebGLUniformLocation | null;
+  ct: WebGLUniformLocation | null;
+  dims: readonly { group: number; binding: number; location: WebGLUniformLocation }[];
 }
 interface GPUBuilt extends ComputeBuilt {
   readonly tier: 'fragment' | 'scatter';
@@ -79,7 +81,7 @@ class Runtime implements ComputeRuntime {
     this.gl = device.gl;
   }
 
-  build(p: CompatComputePipeline): ComputeBuilt {
+  build(p: CompatComputePipeline, deferred = false): ComputeBuilt {
     const ir = p.module.ir,
       entry = p.entry;
     if (!ir || !entry)
@@ -87,7 +89,7 @@ class Runtime implements ComputeRuntime {
     const plan = planCompute(ir, entry, p.constants);
     if (plan.tier === 'cpu') return { tier: 'cpu', plan, kernel: compileCPU(ir, entry, p.constants) } as CPUBuilt;
     try {
-      return this.buildGPU(p, plan);
+      return this.buildGPU(p, plan, deferred);
     } catch (error) {
       // What GLSL cannot express (f16 values in uniform buffers, say) runs on the CPU tier instead.
       if ((error as { code?: string }).code !== 'unsupported') throw error;
@@ -99,7 +101,28 @@ class Runtime implements ComputeRuntime {
     }
   }
 
-  private buildGPU(p: CompatComputePipeline, plan: ComputePlan): GPUBuilt {
+  /** Checks a draw's link and reads its uniforms; before the driver has finished this waits for it. */
+  private settle(d: Draw): void {
+    const pipeline = d.pipeline;
+    pipeline.finish();
+    if (pipeline.failure || !pipeline.program)
+      throw fault(
+        'failed',
+        `WebGL2 compatibility made a compute program WebGL2 refused (a bug: report it): ${pipeline.failure}`,
+        'compatibility-layer',
+      );
+    const gl = this.gl,
+      program = pipeline.program;
+    d.cn = gl.getUniformLocation(program, '_cn');
+    d.ct = gl.getUniformLocation(program, '_ct');
+    d.dims = d.stage.dimensions.map((x) => ({
+      group: x.group,
+      binding: x.binding,
+      location: gl.getUniformLocation(program, x.name) as WebGLUniformLocation,
+    }));
+  }
+
+  private buildGPU(p: CompatComputePipeline, plan: ComputePlan, deferred: boolean): GPUBuilt {
     const ir = p.module.ir as NonNullable<CompatComputePipeline['module']['ir']>,
       entry = p.entry as NonNullable<CompatComputePipeline['entry']>;
     const layout = new CompatPipelineLayout({ bindGroupLayouts: p.layouts as never });
@@ -120,31 +143,21 @@ class Runtime implements ComputeRuntime {
           fragment: { module: null as never, targets: [{ format }] },
           primitive: { topology: plan.tier === 'scatter' ? 'point-list' : 'triangle-list' },
         },
-        false,
+        true,
         glsl,
       );
-      pipeline.finish();
-      if (pipeline.failure || !pipeline.program)
-        throw fault(
-          'failed',
-          `WebGL2 compatibility made a compute program WebGL2 refused (a bug: report it): ${pipeline.failure}`,
-          'compatibility-layer',
-        );
-      const gl = this.gl,
-        program = pipeline.program;
       const stage = plan.tier === 'fragment' ? glsl.fragment : glsl.vertex;
-      return {
-        target,
-        pipeline,
-        cn: gl.getUniformLocation(program, '_cn'),
-        ct: gl.getUniformLocation(program, '_ct'),
-        dims: stage.dimensions.map((d) => ({
-          group: d.group,
-          binding: d.binding,
-          location: gl.getUniformLocation(program, d.name) as WebGLUniformLocation,
-        })),
-      };
+      return { target, pipeline, stage, cn: null, ct: null, dims: [] };
     });
+    // ANGLE's Direct3D backend takes minutes on a large kernel: an async pipeline must not wait for it on this thread.
+    if (deferred)
+      return {
+        tier: plan.tier,
+        plan,
+        draws,
+        linked: Promise.all(draws.map((d) => d.pipeline.whenLinked().then(() => this.settle(d)))).then(() => undefined),
+      } as GPUBuilt;
+    for (const d of draws) this.settle(d);
     return { tier: plan.tier, plan, draws } as GPUBuilt;
   }
 
