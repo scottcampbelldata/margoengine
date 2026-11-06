@@ -790,6 +790,10 @@
       "types": "./dist/gltf/quantized.d.ts",
       "import": "./dist/gltf/quantized.js"
     },
+    "./gltf/textured": {
+      "types": "./dist/gltf/textured.d.ts",
+      "import": "./dist/gltf/textured.js"
+    },
     "./gltf-pro": {
       "types": "./dist/gltf-pro.d.ts",
       "import": "./dist/gltf-pro.js"

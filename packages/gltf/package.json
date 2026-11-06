@@ -27,6 +27,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js && node --test --test-name-pattern=\"glTF loader|GLB,\" ../../tests/modern.test.js",
+    "test:gpu": "node ../../scripts/test-gltf-browser.mjs",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -38,6 +39,10 @@
     "./quantized": {
       "types": "./dist/quantized.d.ts",
       "import": "./dist/quantized.js"
+    },
+    "./textured": {
+      "types": "./dist/textured.d.ts",
+      "import": "./dist/textured.js"
     }
   },
   "files": [

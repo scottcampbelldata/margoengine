@@ -2566,7 +2566,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-165). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-166). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2808,6 +2808,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | `@margoengine/controls/orbit` + its view helpers + profiles, when `OrbitControls` mounts | 17,999 | 6,951 | Yes, for orbiting |
 | **Everything the page fetches** | **306,233** | **101,202** | |
 | Quantized glTF on the light path (`@margoengine/gltf/quantized`, 2026-11-06) | By method: integer POSITION and normalized NORMAL turn into floats on load, so the file shrinks on the wire and not on the GPU. Sparse accessors and any other form stay refused. | Core's vertex layout is float xyz, and core is frozen. | A quantized file loads with no gltf-pro, at 24 B per vertex on the GPU. | `@margoengine/gltf-pro` reads the same file. |
+| Textured glTF on the light path (`@margoengine/gltf/textured`, 2026-11-06) | By method: base colour map and MASK only, WebGPU only. One extra render pass per frame for all textured meshes of a scene. A cut-out picks and casts shadows as solid, edges are not antialiased inside a texel, and `engine.stats.drawCalls` leaves these draws out. | Core draws one constant colour, so the entry claims the batch and draws it with core's shader plus a texture read. | A one-texture prop loads with no gltf-pro. | `@margoengine/gltf-pro` for other maps, BLEND, compressed textures. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in
@@ -4399,6 +4400,29 @@ const model = await loadGLTF(engine, '/packed.glb', { extensions: [quantized] })
 engine.start();
 // On teardown: model.dispose(); engine.dispose();
 ```
+
+### Base colour maps and cut-outs
+
+`@margoengine/gltf/textured` draws `baseColorTexture` and `alphaMode: 'MASK'`, so a prop with one texture stays on the
+light path. It reads any `TEXCOORD_n` set, in float or normalized form, applies `KHR_texture_transform`, multiplies by
+`baseColorFactor` and cuts at `alphaCutoff` (default 0.5). PNG and JPEG images come from the GLB, a data URI or a URL
+next to the file. Other maps, `BLEND`, and compressed or WebP textures still need `@margoengine/gltf-pro`.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf';
+import { textured } from 'margoengine/gltf/textured';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
+const model = await loadGLTF(engine, '/prop.glb', { extensions: [textured] });
+engine.start();
+// On teardown: model.dispose(); engine.dispose();
+```
+
+Images decode asynchronously, so for bytes already in memory use `parseGLTFAsync(engine, bytes, [], { extensions })` in
+place of `parseGLTF`. WebGPU only: a WebGL engine refuses the file. The meshes stay core meshes, so they move, pick and
+dispose as usual, and packages that patch core's shader apply to them. A cut-out picks and casts shadows as solid.
 
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 

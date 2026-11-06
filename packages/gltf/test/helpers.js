@@ -50,3 +50,77 @@ export function vertexData(geometry) {
   }
   return { positions, normals };
 }
+
+/** A WebGPU device that records what it was given; enough for what the textured entry does before a frame. */
+function recordingDevice() {
+  const buffers = new Set(),
+    textures = new Set(),
+    device = {
+      limits: { maxTextureDimension2D: 8192 },
+      vertexUploads: [],
+      uniformUploads: [],
+      createBuffer(descriptor) {
+        const buffer = {
+          ...descriptor,
+          destroy: () => buffers.delete(buffer),
+        };
+        buffers.add(buffer);
+        return buffer;
+      },
+      createTexture(descriptor) {
+        const texture = {
+          ...descriptor,
+          format: descriptor.format,
+          createView: () => ({}),
+          destroy: () => textures.delete(texture),
+        };
+        textures.add(texture);
+        return texture;
+      },
+      createShaderModule: () => ({}),
+      createRenderPipeline: () => ({ getBindGroupLayout: () => ({}) }),
+      createBindGroup: () => ({}),
+      createSampler: (descriptor) => descriptor,
+      createCommandEncoder: () => ({
+        beginRenderPass: () => ({ setPipeline() {}, setBindGroup() {}, draw() {}, end() {} }),
+        finish: () => ({}),
+      }),
+      queue: {
+        submit() {},
+        writeTexture() {},
+        copyExternalImageToTexture() {},
+        writeBuffer(buffer, _offset, data) {
+          (buffer.usage & 1 ? device.vertexUploads : device.uniformUploads).push(Float32Array.from(data));
+        },
+      },
+      liveBuffers: () => buffers.size,
+      liveTextures: () => textures.size,
+    };
+  return device;
+}
+
+/** An engine on {@link recordingDevice}, with the WebGPU usage flags Node lacks. */
+export async function gpuEngine(t, capacity = 64) {
+  const flags = { GPUBufferUsage: { VERTEX: 1, UNIFORM: 2, COPY_DST: 4 }, GPUTextureUsage: { TEXTURE_BINDING: 1, COPY_DST: 2, RENDER_ATTACHMENT: 4 } };
+  for (const [name, value] of Object.entries(flags)) {
+    globalThis[name] = value;
+    t.after(() => delete globalThis[name]);
+  }
+  const store = await TransformStore.create(capacity),
+    device = recordingDevice(),
+    renderer = { backend: 'webgpu', gpu: device, add() {}, remove() {}, render() {}, dispose() {} },
+    engine = new Engine({ width: 200, height: 200, clientWidth: 200, clientHeight: 200 }, store, renderer, undefined, null);
+  return { engine, device };
+}
+
+/** Stands in for createImageBitmap, counting what it opened and closed. */
+export function withBitmaps(t, { width = 4, height = 4 } = {}) {
+  const record = { opened: 0, closed: 0, bytes: [] };
+  globalThis.createImageBitmap = async (blob) => {
+    record.opened++;
+    record.bytes.push(new Uint8Array(await blob.arrayBuffer()));
+    return { width, height, close: () => record.closed++ };
+  };
+  t.after(() => delete globalThis.createImageBitmap);
+  return record;
+}

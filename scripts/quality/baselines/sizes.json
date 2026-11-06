@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4994672,
+  "total": 5001057,
   "history": [
     {
       "date": "2026-10-24",
@@ -2150,6 +2150,12 @@
       "commit": "56dd458ac",
       "reason": "New quality entry ./ssaa: supersampled stills averaged in linear light. Core and core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "04eac421b",
+      "reason": "New gltf entry ./textured and the root's load, read and finish hooks: base colour maps and MASK on the light path. Core and core + stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -2341,7 +2347,7 @@
     "@margoengine/geometry/tessellate": 1491,
     "@margoengine/geometry/triangulate": 6805,
     "@margoengine/geometry/utils": 8665,
-    "@margoengine/gltf": 6285,
+    "@margoengine/gltf": 6831,
     "@margoengine/gltf-pro": 58819,
     "@margoengine/gltf-pro dist/workers/gltf.js": 21337,
     "@margoengine/gltf-pro dist/workers/progressive.js": 15374,
@@ -2354,6 +2360,7 @@
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/worker": 60700,
     "@margoengine/gltf/quantized": 1385,
+    "@margoengine/gltf/textured": 5839,
     "@margoengine/headless": 2864,
     "@margoengine/headless/compare": 2607,
     "@margoengine/headless/ffmpeg": 1434,

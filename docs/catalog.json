@@ -269,7 +269,8 @@
     "imports": "import { Engine } from '@margoengine/core';\nimport { loadGLTF, parseGLTF } from '@margoengine/gltf';",
     "exports": [
       "loadGLTF",
-      "parseGLTF"
+      "parseGLTF",
+      "parseGLTFAsync"
     ],
     "example": "./examples/gltf.html",
     "exampleTitle": "Load a glTF triangle",

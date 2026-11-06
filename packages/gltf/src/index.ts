@@ -1,6 +1,6 @@
 import { engineRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
-import { Geometry, PbrMaterial, type Mesh } from '@margoengine/core/extension';
+import { Geometry, PbrMaterial, type Engine, type Mesh } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { splitTRS } from '@margoengine/math/quat';
 import { readResponse } from '../../shared/loading.js';
@@ -11,7 +11,7 @@ import { GLB_BIN, glbChunks, isGLB } from '../../shared/glb.js';
 import { entry, integer, readAccessor } from './accessor.js';
 
 const limit = 64 * 1024 * 1024;
-import type { GLTFDocument as Document, GLTFNode } from '../../shared/gltf.js';
+import type { GLTFDocument as Document, GLTFNode, GLTFPrimitive } from '../../shared/gltf.js';
 const isObject = (value: unknown): boolean => !!value && typeof value === 'object' && !Array.isArray(value);
 // Malformed UTF-8 or JSON is a named error, not the TextDecoder's TypeError or JSON.parse's SyntaxError.
 function text(data: Uint8Array): string {
@@ -132,10 +132,23 @@ export interface Model {
   nodes: readonly MeshHandle[];
   dispose(): void;
 }
-/** The parts of a file an extension reads: the document and its buffers, in document order. */
+/** A file on its way through the loader. An extension may replace `doc` and `buffers`, never change what they hold. */
 export interface GLTFFile {
   doc: Document;
+  /** Buffer data, in document order. */
   buffers: readonly Uint8Array[];
+  /** The `maxNodes` option, if set. */
+  maxNodes?: number;
+  /** Fetches a URI found in the file, under `loadGLTF`'s rules. Absent when the file came from memory. */
+  fetch?(uri: string): Promise<Uint8Array>;
+}
+/** What the loader made of a file, for `GLTFExtension.finish`. */
+export interface GLTFBuilt {
+  engine: Engine;
+  /** Each primitive in the file. `expanded` holds the source vertex of each geometry vertex when normals were generated. */
+  primitives: readonly { geometry: Geometry; source: GLTFPrimitive; expanded?: Uint32Array }[];
+  /** The mesh of each node by node index; empty where a node is not in the loaded scene. */
+  nodes: readonly (MeshHandle | undefined)[];
 }
 /**
  * One optional feature of the light loader, passed in `GLTFOptions.extensions`. Each lives in its own entry, so a file
@@ -146,6 +159,12 @@ export interface GLTFExtension {
   readonly handles: readonly string[];
   /** Reads vertex attribute `semantic` from accessor `id`, as float xyz; undefined leaves it to the loader. */
   attribute?(file: GLTFFile, semantic: string, id: number): Float32Array | undefined;
+  /** Asynchronous work before anything is built. An extension with `load` needs `parseGLTFAsync` or `loadGLTF`. */
+  load?(file: GLTFFile, signal?: AbortSignal): Promise<void>;
+  /** Runs after every `load`, before the loader reads the document. */
+  read?(file: GLTFFile): void;
+  /** Runs on the finished model; may wrap `model.dispose`. A throw rolls the model back. */
+  finish?(model: Model, file: GLTFFile, built: GLTFBuilt): void;
 }
 /** Options for parseGLTF and loadGLTF. */
 export interface GLTFOptions {
@@ -160,20 +179,14 @@ export interface GLTFOptions {
    */
   allowedURLs?: readonly string[];
 }
-/**
- * Parses glTF JSON, an object or GLB bytes into core meshes, one per node. Rejects absolute, cross-origin and `../` buffer URIs unless allowed. @throws TypeError for a malformed file; RangeError over the size limits.
- */
-export function parseGLTF(
-  instance: EngineKernel,
+function open(
   input: string | object | ArrayBuffer | ArrayBufferView,
-  suppliedBuffers: Array<ArrayBuffer | ArrayBufferView> = [],
-  { maxNodes, extensions = [] }: GLTFOptions = {},
-): Model {
-  const engine = engineRuntime(instance);
+  suppliedBuffers: Array<ArrayBuffer | ArrayBufferView>,
+  { maxNodes, extensions = [] }: GLTFOptions,
+): GLTFFile {
   const { doc, binary } = container(input);
   validate(doc, maxNodes, extensions);
-  let total = 0,
-    vertices = 0;
+  let total = 0;
   const buffers = (doc.buffers ?? []).map((def, i) => {
     const length = integer(def.byteLength, 'buffer length', 1);
     const data = suppliedBuffers[i]
@@ -189,7 +202,14 @@ export function parseGLTF(
     if (total > limit) throw new RangeError('glTF buffers exceed 64 MiB; load a smaller file or split it');
     return data.subarray(0, length);
   });
-  const file = { doc, buffers };
+  return { doc, buffers, maxNodes };
+}
+function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = [] }: GLTFOptions): Model {
+  const engine = engineRuntime(instance);
+  for (const extension of extensions) extension.read?.(file);
+  const { doc } = file;
+  if (extensions.length) validate(doc, maxNodes, extensions);
+  let vertices = 0;
   const attribute = (semantic: string, id: unknown): Float32Array => {
     for (const extension of extensions) {
       const values = extension.attribute?.(file, semantic, integer(id, 'accessor'));
@@ -219,7 +239,7 @@ export function parseGLTF(
     )
       throw new MargoError(
         'unsupported',
-        'Minimal PBR supports opaque constant colors; textures, emission and transparency require @margoengine/gltf-pro',
+        'Minimal PBR supports opaque constant colors; add @margoengine/gltf/textured for a base colour map or MASK; other maps, emission and transparency require @margoengine/gltf-pro',
       );
     return new PbrMaterial({
       color: color.slice(0, 3),
@@ -257,6 +277,7 @@ export function parseGLTF(
               true,
             ) as Uint32Array);
       if (indices.length % 3) throw new RangeError('Indices must contain complete triangles');
+      const expanded = normals ? undefined : indices;
       vertices += normals ? positions.length / 3 : indices.length;
       if (vertices > 1_000_000)
         throw new RangeError('glTF exceeds one million vertices; load a smaller file or split it');
@@ -296,7 +317,7 @@ export function parseGLTF(
           ? new PbrMaterial({ color: [1, 1, 1], roughness: 1, metalness: 1, doubleSided: false })
           : materials[integer(p.material, 'material reference')];
       if (!material) throw new TypeError('Missing material; point the primitive at an existing material index');
-      return { geometry: new Geometry(positions, normals, indices), material };
+      return { geometry: new Geometry(positions, normals, indices), material, source: p, expanded };
     });
   });
   const nodes = doc.nodes ?? [],
@@ -335,7 +356,9 @@ export function parseGLTF(
     );
   const created: Mesh[] = [],
     renderable: Mesh[] = [],
-    imported: Mesh[] = [];
+    imported: Mesh[] = [],
+    handles: Mesh[] = [];
+  let model: Model | undefined;
   try {
     const root = engine.createMesh();
     created.push(root);
@@ -348,6 +371,7 @@ export function parseGLTF(
       const mesh = engine.createMesh(parent);
       created.push(mesh);
       imported.push(mesh);
+      handles[id] = mesh;
       mesh.name = typeof node.name === 'string' ? node.name : '';
       transform(mesh, node);
       if (node.mesh !== undefined) {
@@ -364,18 +388,54 @@ export function parseGLTF(
     }
     if (!renderable.length)
       throw new MargoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
-    return {
-      root,
-      meshes: renderable,
-      nodes: imported,
-      dispose() {
-        for (let i = created.length - 1; i >= 0; i--) created[i].dispose();
-      },
+    const release = () => {
+      for (let i = created.length - 1; i >= 0; i--) created[i].dispose();
     };
+    model = { root, meshes: renderable, nodes: imported, dispose: release };
+    for (const extension of extensions)
+      extension.finish?.(model, file, { engine, primitives: definitions.flat(), nodes: handles });
+    return model;
   } catch (error) {
-    for (let i = created.length - 1; i >= 0; i--) created[i].dispose();
+    if (model) model.dispose();
+    else for (let i = created.length - 1; i >= 0; i--) created[i].dispose();
     throw error;
   }
+}
+async function finishLoad(
+  instance: EngineKernel,
+  file: GLTFFile,
+  options: GLTFOptions,
+  signal: AbortSignal | undefined,
+): Promise<Model> {
+  for (const extension of options.extensions ?? []) {
+    await extension.load?.(file, signal);
+    signal?.throwIfAborted();
+  }
+  return build(instance, file, options);
+}
+
+/**
+ * Parses glTF JSON, an object or GLB bytes into core meshes, one per node. Rejects absolute, cross-origin and `../` buffer URIs unless allowed. @throws TypeError for a malformed file; RangeError over the size limits.
+ */
+export function parseGLTF(
+  instance: EngineKernel,
+  input: string | object | ArrayBuffer | ArrayBufferView,
+  suppliedBuffers: Array<ArrayBuffer | ArrayBufferView> = [],
+  options: GLTFOptions = {},
+): Model {
+  if (options.extensions?.some((extension) => extension.load))
+    throw new MargoError('unsupported', 'This glTF extension loads asynchronously; use parseGLTFAsync or loadGLTF');
+  return build(instance, open(input, suppliedBuffers, options), options);
+}
+/** parseGLTF for extensions with asynchronous work, such as `textured`. Aborts with `signal`. */
+export async function parseGLTFAsync(
+  instance: EngineKernel,
+  input: string | object | ArrayBuffer | ArrayBufferView,
+  suppliedBuffers: Array<ArrayBuffer | ArrayBufferView> = [],
+  { signal, ...options }: GLTFOptions & { signal?: AbortSignal } = {},
+): Promise<Model> {
+  signal?.throwIfAborted();
+  return finishLoad(instance, open(input, suppliedBuffers, options), options, signal);
 }
 
 /**
@@ -420,5 +480,8 @@ export async function loadGLTF(
     } else buffers.push(await fetchBytes(assetURL(def.uri, base, allowedURLs, 'glTF buffer')));
   }
   signal?.throwIfAborted();
-  return parseGLTF(engine, doc, buffers, { maxNodes, extensions });
+  const options = { maxNodes, extensions },
+    file = open(doc, buffers, options);
+  file.fetch = (uri) => fetchBytes(assetURL(uri, base, allowedURLs, 'glTF image'));
+  return finishLoad(engine, file, options, signal);
 }

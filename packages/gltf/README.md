@@ -45,6 +45,29 @@ engine.start();
 // On teardown: model.dispose(); engine.dispose();
 ```
 
+### Base colour maps and cut-outs
+
+`@margoengine/gltf/textured` draws `baseColorTexture` and `alphaMode: 'MASK'`, so a prop with one texture stays on the
+light path. It reads any `TEXCOORD_n` set, in float or normalized form, applies `KHR_texture_transform`, multiplies by
+`baseColorFactor` and cuts at `alphaCutoff` (default 0.5). PNG and JPEG images come from the GLB, a data URI or a URL
+next to the file. Other maps, `BLEND`, and compressed or WebP textures still need `@margoengine/gltf-pro`.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf';
+import { textured } from 'margoengine/gltf/textured';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
+const model = await loadGLTF(engine, '/prop.glb', { extensions: [textured] });
+engine.start();
+// On teardown: model.dispose(); engine.dispose();
+```
+
+Images decode asynchronously, so for bytes already in memory use `parseGLTFAsync(engine, bytes, [], { extensions })` in
+place of `parseGLTF`. WebGPU only: a WebGL engine refuses the file. The meshes stay core meshes, so they move, pick and
+dispose as usual, and packages that patch core's shader apply to them. A cut-out picks and casts shadows as solid.
+
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 
 Apache-2.0 licensed.
