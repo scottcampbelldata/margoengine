@@ -59,6 +59,16 @@ export interface FeatureTargets {
         options: {
             filter?: 'soft' | 'pcf' | 'hard';
             distance?: number;
+            resolution?: number | readonly [number, number];
+            cascades?: number;
+            bounds?: unknown;
+            frustum?: unknown;
+        };
+    };
+    volumetric?: {
+        options: {
+            enabled?: boolean;
+            grid?: readonly [number, number, number];
         };
     };
     lod?: {
@@ -80,7 +90,7 @@ export interface WatchFeaturesOptions extends FeatureScalerOptions, FrameTimers 
     onChange?: (change: FeatureChange) => void;
 }
 
-export function featureKnobs({ post, ssao, ssr, shadows, lod, camera }: FeatureTargets): FeatureKnob[];
+export function featureKnobs({ post, ssao, ssr, shadows, volumetric, lod, camera }: FeatureTargets): FeatureKnob[];
 
 export function optionKnob<T extends object, K extends keyof T>(name: string, target: T, key: K, values: readonly T[K][], weight?: number): FeatureKnob;
 

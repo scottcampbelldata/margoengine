@@ -32,7 +32,7 @@ export interface VolumetricLightSource {
 
 /** `VolumetricFog` settings (froxel-grid scattering with shadowed light shafts); invalid values throw RangeError. */
 export interface VolumetricFogOptions {
-  /** Whether to register the fog pass (default true). Set false to skip volumetric fog. */
+  /** Whether the fog draws (default true). Live: false skips its pass from the next frame and keeps its grid. */
   enabled?: boolean;
   /** Extinction per metre at and below `height` (default 0.02). */
   density?: number;
@@ -328,12 +328,15 @@ export class VolumetricFog implements EnginePlugin {
   }
   // After opaque meshes (0), sky (2) and water (4), where sky fog would run; before VFX (6) and post (10+).
   registerPasses(graph: FrameGraph): void {
-    if (this.options.enabled === false) return;
     graph.add({
       name: this.name,
       order: 5,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.forView(c).render(c);
+        if (c.backend !== 'webgpu') return;
+        const view = this.forView(c);
+        // A frame without fog breaks the history, so the next one starts from itself.
+        if (this.options.enabled === false) view.valid = false;
+        else view.render(c);
       },
     });
   }

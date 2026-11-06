@@ -269,8 +269,22 @@ export interface FeatureTargets {
   ssao?: { enabled: boolean; options: { samples?: number } };
   /** `SSR`: steps halve twice, then it switches off. */
   ssr?: { enabled: boolean; options: { steps?: number } };
-  /** `Shadows`: the filter goes soft, pcf, hard; a set `distance` then falls to 70% and 50%. */
-  shadows?: { options: { filter?: 'soft' | 'pcf' | 'hard'; distance?: number } };
+  /**
+   * `Shadows`: the filter goes soft, pcf, hard; a set `distance` falls to 70% and 50%; `resolution` halves twice;
+   * `cascades` falls one at a time to two.
+   */
+  shadows?: {
+    options: {
+      filter?: 'soft' | 'pcf' | 'hard';
+      distance?: number;
+      resolution?: number | readonly [number, number];
+      cascades?: number;
+      bounds?: unknown;
+      frustum?: unknown;
+    };
+  };
+  /** `VolumetricFog`: the grid halves, then it switches off. */
+  volumetric?: { options: { enabled?: boolean; grid?: readonly [number, number, number] } };
   /** `LODSystem`: `bias` grows 1.5 and 2 times, so detail drops nearer the camera. */
   lod?: { bias: number };
   /** Camera: `far` falls to 75% and 50%. What lies past it stops drawing, so pair it with fog. */
@@ -295,10 +309,18 @@ const halved = <K extends string>(
 
 /**
  * Knobs for the features an app passes, each starting from its current value, in the order they are tried before
- * anything is measured: post effects, ambient occlusion, reflections, shadows, level of detail, view distance. A
- * feature already off gets no knob.
+ * anything is measured: post effects, ambient occlusion, reflections, shadows, volumetric fog, level of detail, view
+ * distance. A feature already off gets no knob.
  */
-export function featureKnobs({ post = [], ssao, ssr, shadows, lod, camera }: FeatureTargets): FeatureKnob[] {
+export function featureKnobs({
+  post = [],
+  ssao,
+  ssr,
+  shadows,
+  volumetric,
+  lod,
+  camera,
+}: FeatureTargets): FeatureKnob[] {
   const knobs: FeatureKnob[] = post
     .filter((effect) => effect.enabled)
     .map((effect) => optionKnob(effect.name, effect, 'enabled', [true, false], 1));
@@ -312,6 +334,33 @@ export function featureKnobs({ post = [], ssao, ssr, shadows, lod, camera }: Fea
       const { distance } = options;
       knobs.push(optionKnob('shadow distance', options, 'distance', [distance, distance * 0.7, distance * 0.5], 1.5));
     }
+    const { resolution = 2048, cascades = 4 } = options,
+      smaller = (by: number) => {
+        const edge = (size: number) => Math.max(16, size / by);
+        return typeof resolution === 'number' ? edge(resolution) : ([edge(resolution[0]), edge(resolution[1])] as const);
+      },
+      sizes = [resolution, smaller(2), smaller(4)].filter(
+        (size, i, all) => !i || JSON.stringify(size) !== JSON.stringify(all[i - 1]),
+      );
+    if (sizes.length > 1) knobs.push(optionKnob('shadow resolution', options, 'resolution', sizes, 2));
+    if (!options.bounds && !options.frustum && cascades > 2) {
+      const counts = Array.from({ length: cascades - 1 }, (_, i) => cascades - i);
+      knobs.push(optionKnob('shadow cascades', options, 'cascades', counts, 2));
+    }
+  }
+  if (volumetric && volumetric.options.enabled !== false) {
+    const { options } = volumetric,
+      grid = options.grid ?? ([160, 90, 64] as const),
+      half = grid.map((size) => Math.max(2, size >> 1)) as unknown as readonly [number, number, number];
+    knobs.push({
+      name: 'volumetric fog',
+      levels: 3,
+      weight: 2,
+      apply(level) {
+        options.enabled = level < 2;
+        if (level < 2) options.grid = level ? half : grid;
+      },
+    });
   }
   if (lod) knobs.push(optionKnob('level of detail', lod, 'bias', [lod.bias, lod.bias * 1.5, lod.bias * 2], 2));
   if (camera) {

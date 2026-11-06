@@ -1,7 +1,8 @@
 // Real-GPU check of watchFeatures, built packages. Takes the GPU lock itself around the browser.
 // node packages/quality/test/features-browser.mjs
-// The fake knobs in features.test.js cannot show that a real effect takes a change while running. This drives Shadows
-// and SSAO through every level with a budget no GPU meets, and reads what changed on the GPU: pictures, and validation.
+// The fake knobs in features.test.js cannot show that a real effect takes a change while running. This drives Shadows,
+// VolumetricFog and SSAO through every level with a budget no GPU meets, and reads what changed on the GPU: pictures, and
+// validation.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { acquire } from '../../../scripts/gpu-lock.mjs';
@@ -24,6 +25,7 @@ try {
     const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
       { Shadows } = await import('/packages/shadows/dist/index.js'),
       { SSAO } = await import('/packages/post/dist/ssao.js'),
+      { VolumetricFog } = await import('/packages/environment/dist/volumetric.js'),
       { FeatureScaler, featureKnobs, watchFeatures } = await import('/packages/quality/dist/features.js'),
       { supersample } = await import('/packages/quality/dist/ssaa.js'),
       canvas = document.querySelector('canvas'),
@@ -33,7 +35,9 @@ try {
     engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
     const material = new PbrMaterial({ color: '#c0c0b8' });
     const shadows = Shadows.attach(engine, { distance: 60 }),
-      ssao = SSAO.attach(engine);
+      ssao = SSAO.attach(engine),
+      // No history, so level 0 gives the same picture however it was reached.
+      volumetric = VolumetricFog.attach(engine, { temporal: 0, density: 0.05 });
     shadows.add(engine.createMesh().setGeometry(box(30, 0.2, 30)).setPosition([0, -1, 0]).setMaterial(material));
     for (let x = -3; x <= 3; x++)
       shadows.add(
@@ -46,7 +50,7 @@ try {
     const
       camera = engine.camera,
       far = camera.far,
-      knobs = featureKnobs({ ssao, shadows, camera }),
+      knobs = featureKnobs({ ssao, shadows, volumetric, camera }),
       shot = async () => (await supersample(engine, { samples: 1 })).data,
       differ = (a, b) => a.reduce((sum, value, i) => sum + (value !== b[i]), 0),
       first = await shot(),
@@ -84,7 +88,16 @@ try {
     const raised = { ...watch.scaler.levels };
     watch.dispose();
     await frames(3);
-    const after = [ssao.enabled, ssao.options.samples, shadows.options.filter, shadows.options.distance, camera.far === far];
+    const after = [
+      ssao.enabled,
+      ssao.options.samples,
+      shadows.options.filter,
+      shadows.options.distance,
+      shadows.options.resolution,
+      shadows.options.cascades,
+      volumetric.options.enabled,
+      camera.far === far,
+    ];
     await engine.gpu.queue.onSubmittedWorkDone();
     return {
       names: knobs.map((knob) => knob.name),
@@ -100,11 +113,22 @@ try {
     };
   });
   console.log(JSON.stringify(result));
-  assert.deepEqual(result.names, ['ssao', 'shadow filter', 'shadow distance', 'view distance']);
+  assert.deepEqual(result.names, [
+    'ssao',
+    'shadow filter',
+    'shadow distance',
+    'shadow resolution',
+    'shadow cascades',
+    'volumetric fog',
+    'view distance',
+  ]);
   assert.equal(result.back, 0, 'every feature back at level 0 gives the same picture');
   assert.ok(result.steps.ssao.at(-1) > 0, 'switching SSAO off shows');
   assert.ok(result.steps['shadow filter'].at(-1) > 0, 'a shadow filter change takes effect while running');
   assert.ok(result.steps['shadow distance'].at(-1) >= 0);
+  assert.ok(result.steps['shadow resolution'].at(-1) > 0, 'a smaller shadow map shows while running');
+  assert.ok(result.steps['shadow cascades'].at(-1) > 0, 'fewer cascades show while running');
+  assert.ok(result.steps['volumetric fog'].at(-1) > 0, 'switching the fog off shows');
   assert.ok(result.changes >= 4);
   assert.ok(
     Object.values(result.low).every((level) => level > 0),
@@ -114,7 +138,7 @@ try {
     Object.values(result.raised).every((level) => level === 0),
     `everything came back under a generous one: ${JSON.stringify(result.raised)}`,
   );
-  assert.deepEqual(result.after, [true, 32, 'soft', 60, true]);
+  assert.deepEqual(result.after, [true, 32, 'soft', 60, 2048, 4, true, true]);
   assert.deepEqual(result.errors, []);
   assert.deepEqual(problems, []);
   console.log('features browser check passed');

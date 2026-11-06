@@ -95,7 +95,8 @@ export interface ShadowOptions {
   filter?: ShadowFilter;
   /**
    * Cascades, 1 to 4 (default 4). Fewer cascades render fewer depth passes per frame and cover `distance` with coarser
-   * texels; the phone quality tier uses 2. Ignored with `bounds` or `frustum` (always one map). Fixed at construction.
+   * texels; the phone quality tier uses 2. Ignored with `bounds` or `frustum` (always one map). Live: a new count
+   * reallocates the maps next frame (only then).
    */
   cascades?: number;
   /**
@@ -367,7 +368,9 @@ export class Shadows implements EnginePlugin {
   private readonly rangeBox = new Float64Array(6);
   private readonly sphere = new Float64Array(4);
   private readonly rangeCenter = new Float64Array(4);
-  private readonly cascadeCount: number;
+  private cascadeCount = 1;
+  /** The layers the maps were allocated with. */
+  private mapCascades = 0;
   /** Validated map size, and the size the maps were allocated at. */
   private width = 2048;
   private height = 2048;
@@ -432,8 +435,6 @@ export class Shadows implements EnginePlugin {
   private readonly tintPass: GPURenderPassDescriptor = { colorAttachments: [this.tintAttachment] };
   constructor(readonly options: ShadowOptions = {}) {
     this.options = preset('shadows', options);
-    this.cascadeCount = this.options.bounds || this.options.frustum ? 1 : (this.options.cascades ?? 4);
-    this.copySize.depthOrArrayLayers = this.cascadeCount;
     this.colored = this.options.colored === true;
     this.validate();
   }
@@ -508,10 +509,6 @@ export class Shadows implements EnginePlugin {
     const cascades = o.cascades ?? 4;
     if (!Number.isInteger(cascades) || cascades < 1 || cascades > 4)
       throw new RangeError('Invalid shadow cascades: use an integer from 1 to 4');
-    if ((o.bounds || frustum ? 1 : cascades) !== this.cascadeCount)
-      throw new RangeError(
-        'Shadow bounds mode, frustum mode and cascade count cannot change after construction; create a new Shadows instead',
-      );
     if ((o.colored ?? false) !== this.colored)
       throw new TypeError('Shadow colored is fixed at construction and a boolean; create a new Shadows instead');
     const filter = o.filter ?? 'soft';
@@ -555,6 +552,7 @@ export class Shadows implements EnginePlugin {
     }
     this.width = width;
     this.height = height;
+    this.cascadeCount = o.bounds || frustum ? 1 : cascades;
   }
   /** Light-space x and y scale differently: receivers take the per-axis filter (shader.ts `shadowSampling`). */
   private anisotropic(): boolean {
@@ -775,6 +773,7 @@ export class Shadows implements EnginePlugin {
     );
     this.mapWidth = this.width;
     this.mapHeight = this.height;
+    this.mapCascades = this.copySize.depthOrArrayLayers = this.cascadeCount;
     if (this.colored) this.tintTextures();
   }
   private tintTextures(): void {
@@ -930,7 +929,7 @@ export class Shadows implements EnginePlugin {
   private render(c: ShadowPassContext): void {
     this.validate();
     this.frameSerial++;
-    if (this.width !== this.mapWidth || this.height !== this.mapHeight) {
+    if (this.width !== this.mapWidth || this.height !== this.mapHeight || this.cascadeCount !== this.mapCascades) {
       this.checkLimits();
       this.textures();
       this.bind();

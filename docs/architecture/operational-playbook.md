@@ -632,8 +632,8 @@ the texture limit.
 cost over one window after it, against the window before, is the step's measured saving. A saving under 3% of the frame
 gives the step back and rests it for 120 decisions. Known savings choose later steps, least visible first among those
 that cover the shortfall; a feature returns under 70% of budget if its saving leaves the frame under 90%. Evidence:
-`packages/quality/test/features.test.js` on a modelled scene, and `features-browser.mjs` driving real `SSAO` and
-`Shadows` through every level. Missing: how good the savings are in a real scene under load, for the quiet pass.
+`packages/quality/test/features.test.js` on a modelled scene, and `features-browser.mjs` driving real `SSAO`,
+`Shadows` (filter, distance, resolution, cascades) and `VolumetricFog` (grid, on and off) through every level. Missing: how good the savings are in a real scene under load, for the quiet pass.
 
 `watchPower` (`@margoengine/quality/power`) adds a third input to tiers. Level 1 (on battery) and level 2 (hot, CPU
 pressure or low battery) cap the frame rate and cut the `FeatureScaler` budget; on the full tier they set this tab's next

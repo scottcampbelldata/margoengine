@@ -1114,8 +1114,9 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B13 | addScene lights, cameras, one load per URL | DONE | `37b0150f9` | LIM-131 |
 | B14 | sceneColor reads the frame; ScenePass shares models with SSR | DONE | `5d07337d5` | LIM-192 |
 | B15 | Depth passes read the main camera; TAA velocity follows the graph | DONE | `d55780d05` | LIM-177 |
-| Cache | Result cache: a package build keys on the dist of what it depends on | DONE | this commit | - |
-| B16 | React pointer handlers, Picking and HoverHighlight on the WebGL2 preview | DONE | this commit | LIM-142 |
+| Cache | Result cache: a package build keys on the dist of what it depends on | DONE | `053eebfd0` | - |
+| B16 | React pointer handlers, Picking and HoverHighlight on the WebGL2 preview | DONE | `053eebfd0` | LIM-142 |
+| B18 | Shadow resolution, cascades and fog on or off scale by measured cost | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

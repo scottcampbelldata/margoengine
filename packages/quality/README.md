@@ -108,6 +108,8 @@ comes back, if its measured cost still leaves the frame under 90%; a rise that h
 | `ssao` | `samples` halve twice, then `enabled` false | 1 |
 | `ssr` | `steps` halve twice, then `enabled` false | 1 |
 | `shadows` | `filter` soft, pcf, hard; a set `distance` to 70% and 50% | 1.5 |
+| `shadows` | `resolution` halves twice; `cascades` one at a time to two (not with `bounds` or `frustum`) | 2 |
+| `volumetric` | `grid` halves, then `enabled` false | 2 |
 | `lod` | `bias` 1.5 and 2 times | 2 |
 | `camera` | `far` to 75% and 50%; what lies past it stops drawing, so pair it with fog | 3 |
 
@@ -116,9 +118,8 @@ so anything can be one. `FeatureScaler` is the same logic without timers: `push(
 `budget` can be set at any time, and `restart()` drops the running measure after a change it did not make, such as a new
 scene. Options: `budget` 12, `window` 30, `settle` 8 (samples ignored after a change), `minSaving` 0.03.
 
-A first change of shadow filter compiles shader variants, so that frame hitches once; `settle` keeps it out of the
-measure. Options that only apply at construction (shadow `resolution`, `cascades`, `VolumetricFog` on or off) cannot be
-knobs: they are what the tier presets below set.
+A first change of shadow filter compiles shader variants, and a change of shadow `resolution` or `cascades` or of the fog
+`grid` allocates new textures, so that frame hitches once; `settle` keeps it out of the measure.
 
 ## Battery and heat
 
@@ -179,7 +180,7 @@ packages never import this package: the global is the whole contract, so an app 
 | `scatter` | `@margoengine/scatter` `Scatter` | `lodFade` | 2 | 2 | 0 |
 
 The phone preset publishes `ssao: { enabled: false }` and `volumetric: { enabled: false }`. Disabled `VolumetricFog`
-registers no passes; omitting `enabled` keeps it on. Explicit feature options still win over preset defaults.
+skips its pass and makes no textures; omitting `enabled` keeps it on. Explicit feature options still win over preset defaults.
 
 Shadows on the light and phone tiers use `filter: 'pcf'`: four hardware comparison taps per lit pixel instead of PCSS's
 16 blocker reads and 32 taps (a fixed edge about three texels wide instead of contact-hardening penumbrae). Phones also

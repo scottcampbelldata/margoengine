@@ -69,7 +69,7 @@ for (const [device, userAgent] of [
         assert.equal(new SSAO().enabled, false);
         const passes = [];
         new VolumetricFog().registerPasses({ add: (pass) => passes.push(pass) });
-        assert.deepEqual(passes, []);
+        assert.doesNotThrow(() => passes[0].execute({ backend: 'webgpu' }), 'an unattached fog draws nothing here');
       }
     } finally {
       delete globalThis.margoLow;
@@ -97,10 +97,10 @@ test('desktop user agents keep light scaling and high defaults after a phone tie
   }
 });
 
-test('VolumetricFog with enabled false registers no passes', () => {
+test('VolumetricFog with enabled false keeps a pass that draws nothing, so enabled stays live', () => {
   const passes = [];
   new VolumetricFog({ enabled: false }).registerPasses({ add: (pass) => passes.push(pass) });
-  assert.deepEqual(passes, []);
+  assert.doesNotThrow(() => passes[0].execute({ backend: 'webgpu' }), 'an unattached fog draws nothing here');
 });
 
 test('VolumetricFog without enabled still registers its pass', () => {

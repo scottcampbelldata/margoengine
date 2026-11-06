@@ -5,7 +5,7 @@ import { mockGPU, context, passes } from '../../../examples/package-benchmarks/p
 
 const bounds = { min: [-1.55, -0.35, -1.55], max: [1.55, 2, 1.6] };
 
-test('fixed shadow bounds reject invalid boxes and cannot switch resource modes after construction', () => {
+test('fixed shadow bounds reject invalid boxes, and going back to cascades is live', () => {
   for (const value of [
     null,
     {},
@@ -16,7 +16,7 @@ test('fixed shadow bounds reject invalid boxes and cannot switch resource modes 
     assert.throws(() => new Shadows({ bounds: value }), /Invalid shadow bounds/);
   const shadows = new Shadows({ bounds });
   shadows.options.bounds = undefined;
-  assert.throws(() => shadows.setup({ gpu: {} }), /bounds mode/);
+  assert.doesNotThrow(() => shadows.validate());
 });
 
 test('support-point bounds validate finite enclosed Vec3 data and revalidate edits', () => {

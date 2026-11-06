@@ -243,10 +243,11 @@ test('featureKnobs starts from what the app set and turns down what it can', () 
     off = { name: 'dof', enabled: false },
     ssao = { enabled: true, options: { samples: 16 } },
     ssr = { enabled: true, options: {} },
-    shadows = { options: { filter: 'pcf', distance: 100 } },
+    shadows = { options: { filter: 'pcf', distance: 100, resolution: [1024, 512] } },
+    volumetric = { options: {} },
     lod = { bias: 2 },
     camera = { far: 1000, near: 0.1 },
-    knobs = featureKnobs({ post: [bloom, off], ssao, ssr, shadows, lod, camera });
+    knobs = featureKnobs({ post: [bloom, off], ssao, ssr, shadows, volumetric, lod, camera });
   assert.deepEqual(
     knobs.map(({ name, levels, weight }) => [name, levels, weight]),
     [
@@ -255,6 +256,9 @@ test('featureKnobs starts from what the app set and turns down what it can', () 
       ['ssr', 4, 1],
       ['shadow filter', 2, 1.5],
       ['shadow distance', 3, 1.5],
+      ['shadow resolution', 3, 2],
+      ['shadow cascades', 3, 2],
+      ['volumetric fog', 3, 2],
       ['level of detail', 3, 2],
       ['view distance', 3, 3],
     ],
@@ -262,6 +266,18 @@ test('featureKnobs starts from what the app set and turns down what it can', () 
   const by = Object.fromEntries(knobs.map((knob) => [knob.name, knob]));
   by.bloom.apply(1);
   assert.equal(bloom.enabled, false);
+  by['shadow resolution'].apply(2);
+  assert.deepEqual(shadows.options.resolution, [256, 128]);
+  by['shadow resolution'].apply(0);
+  assert.deepEqual(shadows.options.resolution, [1024, 512]);
+  by['shadow cascades'].apply(2);
+  assert.equal(shadows.options.cascades, 2);
+  by['volumetric fog'].apply(1);
+  assert.deepEqual([volumetric.options.enabled, volumetric.options.grid], [true, [80, 45, 32]]);
+  by['volumetric fog'].apply(2);
+  assert.equal(volumetric.options.enabled, false);
+  by['volumetric fog'].apply(0);
+  assert.deepEqual([volumetric.options.enabled, volumetric.options.grid], [true, [160, 90, 64]]);
   by.ssao.apply(2);
   assert.deepEqual([ssao.enabled, ssao.options.samples], [true, 4]);
   by.ssao.apply(3);
@@ -285,9 +301,12 @@ test('featureKnobs leaves out what cannot go lower', () => {
   assert.deepEqual(
     featureKnobs({
       ssao: { enabled: false, options: {} },
-      shadows: { options: { filter: 'hard' } },
+      shadows: { options: { filter: 'hard', resolution: 16, cascades: 2 } },
+      volumetric: { options: { enabled: false } },
       camera: { far: 1, near: 0.9 },
     }),
     [],
   );
+  const fixed = featureKnobs({ shadows: { options: { filter: 'hard', resolution: 16, bounds: {} } } });
+  assert.deepEqual(fixed, [], 'a box has one map: no cascades to lose');
 });

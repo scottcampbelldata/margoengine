@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9013637,
+  "total": 9046575,
   "history": [
     {
       "date": "2026-10-24",
@@ -2786,6 +2786,12 @@
       "commit": "6da9526b0",
       "reason": "webgl/pick now re-exports webglRenderer so one loadFallback import gives a React Canvas both; the renderer is needed wherever this entry runs",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "053eebfd0",
+      "reason": "live shadow cascades, and resolution, cascades and fog knobs in featureKnobs",
+      "grew": 1
     }
   ],
   "items": {
@@ -3208,7 +3214,7 @@
     "@margoengine/procedural/standin": 673,
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 3942,
-    "@margoengine/quality/features": 2147,
+    "@margoengine/quality/features": 2412,
     "@margoengine/quality/power": 2653,
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,

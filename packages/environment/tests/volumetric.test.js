@@ -286,6 +286,28 @@ test("froxel lights take each light's decay, cone and unlimited range from clust
   }
 });
 
+test('enabled is live: off skips the pass and its history, on draws again on the same grid', () => {
+  const { fog, frame, record } = rig();
+  try {
+    const drawn = () => record(() => frame(0)).filter((e) => e[0] === 'beginComputePass' || e[0] === 'beginRenderPass');
+    assert.ok(drawn().length > 0);
+    assert.ok(drawn().length > 0, 'a second frame has history');
+    fog.options.enabled = false;
+    assert.deepEqual(drawn(), []);
+    fog.options.enabled = true;
+    const events = record(() => frame(0));
+    assert.ok(events.some((e) => e[0] === 'beginRenderPass'));
+    assert.deepEqual(
+      events.filter((e) => e[0] === 'texture'),
+      [],
+      'the grid stayed',
+    );
+    assert.equal(fog.values[43], 0, 'history starts over');
+  } finally {
+    fog.dispose();
+  }
+});
+
 test('refuses to fog twice: environment Fog or sky fog switched on', () => {
   const fog = { name: 'fog', heightFalloff: 0, enabled: true },
     sky = { name: 'sky', options: { fog: { depth: () => undefined } } };

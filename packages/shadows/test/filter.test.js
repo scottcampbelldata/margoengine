@@ -152,16 +152,37 @@ test('cascades 1-4 split the distance among that many layers; bounds keep one ma
     );
     assert.equal(fixed.frame().filter((e) => e[0] === 'beginRenderPass').length, 1);
     fixed.shadows.options.bounds = undefined;
-    assert.throws(() => fixed.frame(1), /cannot change after construction/);
+    assert.equal(fixed.frame(1).filter((e) => e[0] === 'beginRenderPass').length, 3, 'its own cascades, next frame');
   } finally {
     fixed.dispose();
   }
-  const four = await harness({});
+});
+
+test('the cascade count is live: the maps reallocate once, the frame draws that many, and receivers get a new view', async () => {
+  const h = await harness({});
   try {
-    four.shadows.options.cascades = 2;
-    assert.throws(() => four.frame(), /cascade count cannot change after construction/);
+    const maps = (events) => events.filter((e) => e[0] === 'texture' && e[2].format === 'depth32float');
+    h.frame();
+    const before = h.shadows.bindings();
+    h.shadows.options.cascades = 2;
+    const lower = h.frame(1);
+    assert.deepEqual(
+      maps(lower).map((e) => e[2].size[2]),
+      [2, 2],
+      'cached and combined, once',
+    );
+    assert.equal(lower.filter((e) => e[0] === 'beginRenderPass').length, 2);
+    assert.equal(lower.find((e) => e[0] === 'copyTextureToTexture')[3].depthOrArrayLayers, 2);
+    assert.notEqual(h.shadows.bindings(), before, 'receivers rebuild their groups');
+    assert.deepEqual(maps(h.frame(2)), [], 'no new maps while the count stands');
+    h.shadows.options.cascades = 4;
+    const higher = h.frame(3);
+    assert.equal(higher.filter((e) => e[0] === 'beginRenderPass').length, 4);
+    assert.equal(higher.find((e) => e[0] === 'copyTextureToTexture')[3].depthOrArrayLayers, 4);
+    h.shadows.options.cascades = 5;
+    assert.throws(() => h.frame(4), /cascades/);
   } finally {
-    four.dispose();
+    h.dispose();
   }
 });
 

@@ -51,10 +51,9 @@ test('resolution takes one integer or [width, height] powers of two; frustum tak
     /bounds and frustum/,
   );
   assert.doesNotThrow(() => new Shadows({ frustum: { ...frustum(), near: -4 } }));
-  // A frustum is one map like bounds: the two swap live, cascades do not.
+  // A frustum is one map like bounds: the two swap live.
   const shadows = new Shadows({ frustum: frustum() });
   shadows.options.frustum = undefined;
-  assert.throws(() => shadows.setup({ gpu: {} }), /frustum mode/);
   shadows.options.bounds = { min: [0, 0, 0], max: [1, 1, 1] };
   assert.doesNotThrow(() => shadows.setup({ gpu: mockGPU().device, removePlugin() {} }));
   shadows.dispose();
