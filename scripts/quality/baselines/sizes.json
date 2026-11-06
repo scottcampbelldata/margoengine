@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5148202,
+  "total": 5155497,
   "history": [
     {
       "date": "2026-10-24",
@@ -2306,6 +2306,12 @@
       "commit": "51c7d15eb",
       "reason": "loaders/las, new optional entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "70ba8a250",
+      "reason": "new entry @margoengine/shader/utils",
+      "grew": 1
     }
   ],
   "items": {
@@ -2738,6 +2744,7 @@
     "@margoengine/shader/pass": 11323,
     "@margoengine/shader/raw": 10429,
     "@margoengine/shader/readback": 8876,
+    "@margoengine/shader/utils": 7295,
     "@margoengine/shadows": 17321,
     "@margoengine/shadows/virtual": 14601,
     "@margoengine/sky": 16975,

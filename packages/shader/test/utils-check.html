@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Utility nodes check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/stage/dist/index.js';
+import {planeGeometry,sphereGeometry} from '/packages/geometry/dist/index.js';
+import {Texture,MatcapMaterial,createMesh} from '/packages/materials/dist/index.js';
+import {NodeMaterial,float,positionWorld,storage,texture,uv,vec3,vec4} from '/packages/shader/dist/index.js';
+import {computeReadback} from '/packages/shader/dist/readback.js';
+import * as U from '/packages/shader/dist/utils.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0],near:0.5,far:50}});
+const engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0;
+const show=(emissiveNode,extra={},geometry=planeGeometry(2,2))=>createMesh(engine,geometry,new NodeMaterial({color:[0,0,0],toneMapped:false,emissiveNode,...extra}));
+const texel=(r,g,b)=>new Texture({data:new Uint8Array([r,g,b,255]),width:1,height:1},{colorSpace:'linear'});
+const half=n=>n.mul(0.5).add(0.5);
+const normalOf=(n,extra,geometry)=>show(half(n),extra,geometry);
+const tangents=()=>({...planeGeometry(2,2),tangents:new Float32Array(Array.from({length:4},()=>[1,0,0,1]).flat())});
+// Raw rows run from v = 0 up, the order a flipped image is stored in: blue is the image's bottom row, red its top.
+const panorama=new Texture({data:new Uint8Array([0,0,255,255, 0,0,255,255, 255,0,0,255, 255,0,0,255]),width:2,height:2},{colorSpace:'linear',magFilter:'nearest',minFilter:'nearest',mipmaps:false});
+const gradient=(()=>{const n=32,d=new Uint8Array(n*n*4);for(let y=0;y<n;y++)for(let x=0;x<n;x++)d.set([x*8,y*8,128,255],(y*n+x)*4);return new Texture({data:d,width:n,height:n},{colorSpace:'linear',mipmaps:false});})();
+// The camera 3 in front of the wall's middle and 3 to its right, looking at the middle: 45 degrees to the surface.
+const side=(build)=>()=>{engine.camera.position=[3,0,3];window.reset=()=>{engine.camera.position=[0,0,3];};return build();};
+const shift=(coord)=>vec3(coord.sub(uv()).x.abs().mul(5),0,0);
+const scenarios={
+  normalFlat:()=>normalOf(U.normalMap(texture(texel(128,128,255)).rgb)),
+  normalRight:()=>normalOf(U.normalMap(vec3(1,0.5,0.5))),
+  normalUp:()=>normalOf(U.normalMap(vec3(0.5,1,0.5))),
+  normalDown:()=>normalOf(U.normalMap(vec3(0.5,1,0.5),{flipY:false})),
+  normalTangents:()=>normalOf(U.normalMap(vec3(0.5,1,0.5),{frame:'tangents'}),{},tangents()),
+  normalStrength:()=>normalOf(U.normalMap(vec3(1,0.5,1),{strength:0.5})),
+  normalTurned:()=>normalOf(U.normalMap(vec3(1,0.5,0.5),{coord:U.rotateUV(uv(),Math.PI/2)})),
+  bump:()=>normalOf(U.bumpNormal(positionWorld.x.mul(0.5))),
+  bumpStrength:()=>normalOf(U.bumpNormal(positionWorld.x.mul(0.5),{strength:2})),
+  bumpBack:()=>normalOf(U.bumpNormal(positionWorld.x.mul(-0.5))),
+  triplanarZ:()=>{engine.camera.position=[0.25,0.75,3];engine.camera.target=[0.25,0.75,0];window.reset=()=>{engine.camera.position=[0,0,3];engine.camera.target=[0,0,0];};const m=show(U.triplanar(q=>vec4(q,0,1)).rgb);m.root.setPosition([0.25,0.75,0]);return m;},
+  triplanarShared:()=>show(U.triplanar(q=>vec4(q,0,1),{position:vec3(0.25,0.75,0.5),normal:vec3(1,1,0).normalize()}).rgb),
+  parallaxConstant:side(()=>show(shift(U.parallaxUV(()=>float(0.6),{scale:0.1})))),
+  parallaxTangents:side(()=>show(shift(U.parallaxUV(()=>float(0.6),{scale:0.1,frame:'tangents'})),{},tangents())),
+  parallaxOneStep:side(()=>show(shift(U.parallaxUV(()=>float(0.6),{scale:0.1,steps:1})))),
+  parallaxTop:side(()=>show(shift(U.parallaxUV(()=>float(1),{scale:0.1})))),
+  parallaxRamp:side(()=>show(shift(U.parallaxUV(q=>q.x,{scale:0.1,steps:64})))),
+  matcapNode:()=>createMesh(engine,sphereGeometry(1,64,32),new NodeMaterial({shading:'basic',color:[0,0,0],toneMapped:false,emissiveNode:texture(gradient,U.matcapUV()).rgb})),
+  matcapMaterial:()=>createMesh(engine,sphereGeometry(1,64,32),new MatcapMaterial({matcap:gradient})),
+  panoramaTop:()=>show(texture(panorama,U.equirectUV(vec3(0,1,0)),0).rgb),
+  panoramaBottom:()=>show(texture(panorama,U.equirectUV(vec3(0,-1,0)),0).rgb),
+};
+// Random inputs, with the oscillators' phases kept off their jumps, where f32 and f64 can land on either side, and the first
+// rows at 0 and 1, where the dodge and burn formulas branch.
+let seed=12345;const random=()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;
+const N=256,a=new Float32Array(N*4),b=new Float32Array(N*4);
+for(let i=0;i<N*4;i++){a[i]=random();b[i]=random();}
+for(let i=0;i<N;i++){a[i*4]=(Math.floor(a[i*4]*200)+0.25)/200;if(i<4)for(let k=0;k<3;k++){a[i*4+k]=i&1;b[i*4+k]=(i>>1)&1;}}
+const row=(data,i)=>Array.from(data.slice(i*4,i*4+3));
+window.check={
+  async run(name){device.pushErrorScope('validation');const model=await scenarios[name]();window.current=model;engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {errors:[...(e?[e.message]:[]),...errors.splice(0)]};},
+  clear(){window.current?.destroy();window.current=null;window.reset?.();window.reset=null;engine.render();},
+  async maths(){
+    const A=storage(a.slice(),'vec4f'),B=storage(b.slice(),'vec4f'),table={
+      luminance:(x)=>vec3(U.luminance(x),0,0),saturation:(x,y)=>U.saturation(x,y.x.mul(2)),hue:(x,y)=>U.hue(x,y.x.mul(6)),
+      rotateUV:(x,y)=>vec3(U.rotateUV(x.xy,y.x.mul(6)),0),rotateAxis:(x,y)=>U.rotateAxis(x,vec3(0,0.6,0.8),y.x.mul(6)),
+      remap:(x)=>U.remap(x,0.25,0.75,-1,3),remapClamp:(x)=>U.remapClamp(x,0.25,0.75,-1,3),
+      oscSine:(x)=>vec3(U.oscSine(x.x.mul(7)),0,0),oscSquare:(x)=>vec3(U.oscSquare(x.x.mul(7)),0,0),oscTriangle:(x)=>vec3(U.oscTriangle(x.x.mul(7)),0,0),oscSawtooth:(x)=>vec3(U.oscSawtooth(x.x.mul(7)),0,0),
+      blendHalf:(x,y)=>U.blendScreen(x,y,0.5),
+    };
+    for(const k of Object.keys(U))if(k.startsWith('blend'))table[k]=(x,y)=>U[k](x,y);
+    const results={};
+    for(const [name,f] of Object.entries(table)){
+      const out=storage(N,'vec4f');
+      const {data}=await computeReadback(engine,N,i=>out.store(i,vec4(f(A.element(i).xyz,B.element(i).xyz),1)),out);
+      results[name]=Array.from({length:N},(_,i)=>row(data,i));out.dispose();
+    }
+    A.dispose();B.dispose();
+    return {names:Object.keys(table),inputs:{a:Array.from({length:N},(_,i)=>row(a,i)),b:Array.from({length:N},(_,i)=>row(b,i))},results,errors:errors.splice(0)};
+  },
+  async equirect(){
+    const read=async(d,options)=>{const o=storage(1,'vec2f'),{data}=await computeReadback(engine,1,i=>o.store(i,U.equirectUV(vec3(...d),options)),o);o.dispose();return Array.from(data);};
+    return {front:await read([0,0,-1]),right:await read([1,0,0]),left:await read([-1,0,0]),up:await read([0,1,0]),down:await read([0,-1,0]),upUnflipped:await read([0,1,0],{flipY:false})};
+  },
+};
+window.ready=true;
+</script></body></html>

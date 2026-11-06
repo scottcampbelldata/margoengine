@@ -1,6 +1,6 @@
 {
-  "commit": "51c7d15eb",
-  "dirty": true,
+  "commit": "70ba8a250",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 56738,
@@ -1818,8 +1818,8 @@
     },
     "@margoengine/shader": {
       ".": {
-        "raw": 51482,
-        "gzip": 17921
+        "raw": 51486,
+        "gzip": 17929
       },
       "./noise": {
         "raw": 11276,
@@ -1830,8 +1830,8 @@
         "gzip": 13569
       },
       "./readback": {
-        "raw": 21689,
-        "gzip": 8617
+        "raw": 21685,
+        "gzip": 8618
       },
       "./raw": {
         "raw": 27308,
@@ -1860,6 +1860,10 @@
       "./pass": {
         "raw": 29530,
         "gzip": 10993
+      },
+      "./utils": {
+        "raw": 17208,
+        "gzip": 7039
       }
     },
     "@margoengine/shadows": {

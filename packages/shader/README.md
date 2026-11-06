@@ -185,6 +185,52 @@ real adapter by `node packages/shader/test/noise-check.mjs` (under the GPU lock)
 reseeds without recompiling. Fractal sums unroll at graph build time (`octaves` 1..16). Not included: 4D simplex and
 Worley on the GPU. Example: `examples/noise.html` (terrain with CPU-placed markers resting on the GPU surface).
 
+## Utility nodes (`@margoengine/shader/utils`)
+
+Ready nodes for what graphs keep rewriting. Each is plain nodes, so what you leave out costs nothing.
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh, loadTexture} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {NodeMaterial, positionWorld, texture, vec3} from 'margoengine/shader';
+import {blendOverlay, bumpNormal, hue, normalMap, oscSine, parallaxUV, remap, triplanar} from 'margoengine/shader/utils';
+const stage = await createStage('#app');
+const [albedo, normals, height] = await Promise.all([
+  loadTexture('/brick.jpg'),
+  loadTexture('/brick-normal.png', {colorSpace: 'linear'}),
+  loadTexture('/brick-height.png', {colorSpace: 'linear'}),
+]);
+const carved = parallaxUV(height, {scale: 0.04});                                  // read every map with this UV
+createMesh(stage.engine, planeGeometry(4, 4), new NodeMaterial({
+  colorNode: blendOverlay(texture(albedo, carved).rgb, vec3(0.6, 0.5, 0.4), 0.5),
+  normalNode: normalMap(texture(normals, carved).rgb),
+}));
+const rock = new NodeMaterial({
+  colorNode: hue(triplanar(albedo, {scale: 0.5}).rgb, remap(oscSine(), 0, 1, -0.2, 0.2)),   // no UVs needed
+  normalNode: bumpNormal(positionWorld.y.mul(8).sin().mul(0.02)),
+});
+createMesh(stage.engine, planeGeometry(2, 2), rock);
+```
+
+| Node | Gives | Notes |
+| --- | --- | --- |
+| `normalMap(rgb, {strength, frame, coord, flipY})` | a `normalNode` | `rgb` is the map's colour, so load it with `{colorSpace: 'linear'}`. `frame: 'derivatives'` (default) works on any mesh; `'tangents'` reads the mesh's. `flipY: false` is for glTF UVs, with their origin at the top left. |
+| `bumpNormal(height, {strength, normal})` | a `normalNode` | `height` in world units, as a node. Tilts `normal`, by default the surface's. |
+| `triplanar(map, {position, normal, scale, sharpness})` | `vec4f` | `map` is a `Texture` or a function of a UV. Three reads. World space by default; `positionLocal` and `normalLocal` stick it to the object. |
+| `parallaxUV(height, {coord, scale, steps, frame})` | `vec2f` | `height` is a `Texture` (red, 1 at the surface) or a function of a UV. `scale` is the depth in UV units, default 0.05. `steps: 1` is a plain offset; the default 16 searches. |
+| `rotateUV(coord, angle, center?)`, `rotateAxis(v, axis, angle)` | `vec2f`, `vec3f` | Radians. `center` defaults to 0.5; `axis` must be unit length. |
+| `matcapUV(normal?, position?)` | `vec2f` | View space, and the same lookup as `MatcapMaterial`. |
+| `equirectUV(direction, {flipY})` | `vec2f` | The panorama layout of `@margoengine/environment`: the image's middle faces -z. `flipY: false` is for images not stored flipped. |
+| `luminance(rgb)`, `saturation(rgb, amount)`, `hue(rgb, angle)` | `f32`, `vec3f` | Linear colour, Rec. 709 weights. `saturation` 0 is grey. `hue` turns about the grey axis, in radians, so it keeps the sum of the channels and not the luminance. |
+| `blendAdd`, `blendSubtract`, `blendMultiply`, `blendScreen`, `blendOverlay`, `blendHardLight`, `blendSoftLight`, `blendDodge`, `blendBurn`, `blendDarken`, `blendLighten`, `blendDifference`, `blendExclusion` | `vec3f` | `(base, top, opacity = 1)`, the W3C formulas, for colours from 0 to 1. Brighter light clips. |
+| `remap(x, inLow, inHigh, outLow = 0, outHigh = 1)`, `remapClamp(...)` | as `x` | Scalars or vectors. `remap` runs past the ends, `remapClamp` stops at them. `inLow` and `inHigh` must differ. |
+| `oscSine(t = time)`, `oscSquare`, `oscTriangle`, `oscSawtooth` | `f32` | 0 to 1, one period per unit of `t`, so one a second by default. `oscSine(time.mul(4))` runs four times as fast. |
+
+`normalMap`, `bumpNormal` and `parallaxUV` read screen derivatives, or a texture in a search, so they belong in fragment nodes. Outside a uniform branch the derivative rule of [Limits](#limits) applies, and `parallaxUV`'s `height` function must sample with an explicit level (`texture(map, q, 0).r`). A `Texture` passed to it is read at level 0, so a distant surface can shimmer. The search sees no silhouette: the mesh's outline stays flat. Grazing views are held at about 84 degrees, so the shift stays bounded.
+
+`node packages/shader/test/utils-check.mjs` (real GPU, under the GPU lock) runs the maths nodes and all 13 blend modes over 256 random inputs against JavaScript formulas, and reads the rest back from a wall: each normal map direction in both frames, a known slope through `bumpNormal`, both projections of `triplanar`, `parallaxUV` against the depth worked out by hand for a flat and a sloped field at 45 degrees, `matcapUV` against `MatcapMaterial` on a sphere, and a panorama's top and bottom rows.
+
 ## Read back one dispatch (`@margoengine/shader/readback`, +1.0 kB min+gzip over the root entry)
 
 `ComputePass` runs every frame while attached. For a one-off result on the CPU (an editor tool, a bake, a test),
@@ -617,7 +663,7 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
 - Storage textures are 2D, one mip level, one sample; `@margoengine/shader/compute-texture` has no 3D or array form.
 - ComputePass dispatches at most 65,535 workgroups per axis (an indirect dispatch is checked by the GPU only) and runs every frame while attached (`computeReadback` runs once; an atomic counter keeps counting unless `update()` resets it). Workgroup memory has no struct elements, and all of a pass's must fit the device's 16,384 bytes. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
-- No GLSL/WebGL2 output, no skinning or morph nodes, no MRT outputs.
+- No GLSL/WebGL2 output.
 
 Size (min + gzip, Rolldown, peers external): whole package 17.9 kB (11.8 kB before statements, 13.9 kB before the compute model, 15.2 kB before node output in every pass, 16.8 kB before the input nodes); `NodeMaterial` with colour nodes only, 8.4 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
 

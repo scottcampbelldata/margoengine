@@ -1730,6 +1730,10 @@
       "types": "./dist/shader/pass.d.ts",
       "import": "./dist/shader/pass.js"
     },
+    "./shader/utils": {
+      "types": "./dist/shader/utils.d.ts",
+      "import": "./dist/shader/utils.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"
