@@ -304,13 +304,15 @@ test('a chunk whose generation fails once is generated again, and the waiting pl
   const dir = mkdtempSync(joinPath(tmpdir(), 'voxel-net-flaky-'));
   process.env.VOXEL_NET_FLAKY = 'once';
   process.env.VOXEL_NET_FLAKY_DIR = dir;
+  const errors = [],
+    { server, url } = await start(t, { generator: flaky, spawn: () => [16, 16] });
+  // After start's hook: hooks run in order, and a generator thread still making its marker folders here makes the
+  // removal fail with ENOTEMPTY. A failed hook ends the hooks, so the server stayed open and the file never ended.
   t.after(() => {
     delete process.env.VOXEL_NET_FLAKY;
     delete process.env.VOXEL_NET_FLAKY_DIR;
     rmSync(dir, { recursive: true, force: true });
   });
-  const errors = [],
-    { server, url } = await start(t, { generator: flaky, spawn: () => [16, 16] });
   server.onError = (error) => errors.push(error);
   const a = await join(url);
   await drive([a.client], 8000, undefined, spawned([a.client]));
@@ -346,6 +348,7 @@ test('a chunk that keeps failing closes the waiting player with 1011 and a reaso
 // chunk aborts the whole process in Node ("close before init"), a native assertion nothing can catch: a shard closing
 // under load took the process down. The thread is held in the job here, so the bad order is certain: without the fix it
 // is terminated in the job and writes nothing.
+// Call it after `start`: its hook then runs after the server closed, with no generator thread left in the folder.
 const heldDir = (t, env = {}) => {
   const dir = mkdtempSync(joinPath(tmpdir(), 'voxel-net-held-'));
   process.env.VOXEL_NET_HELD_DIR = dir;
@@ -362,8 +365,8 @@ const held = new URL('./held-generator.js', import.meta.url);
 test('close lets a generator thread finish the chunk it is making and end by itself', {
   timeout: 60_000,
 }, async (t) => {
-  const dir = heldDir(t),
-    { server, url } = await start(t, { generator: held, workers: 1 }),
+  const { server, url } = await start(t, { generator: held, workers: 1 }),
+    dir = heldDir(t),
     a = await join(url);
   await drive([a.client], 30_000, undefined, () => existsSync(joinPath(dir, 'started')));
   assert.ok(existsSync(joinPath(dir, 'started')), 'a job is in the thread');
@@ -376,8 +379,8 @@ test('close lets a generator thread finish the chunk it is making and end by its
 });
 
 test('a generator that never returns does not hold close for ever', { timeout: 60_000 }, async (t) => {
-  const dir = heldDir(t, { VOXEL_NET_HELD_FOREVER: '1' }),
-    { server, url } = await start(t, { generator: held, workers: 1 }),
+  const { server, url } = await start(t, { generator: held, workers: 1 }),
+    dir = heldDir(t, { VOXEL_NET_HELD_FOREVER: '1' }),
     a = await join(url);
   await drive([a.client], 30_000, undefined, () => existsSync(joinPath(dir, 'started')));
   assert.ok(existsSync(joinPath(dir, 'started')), 'a job is in the thread');
