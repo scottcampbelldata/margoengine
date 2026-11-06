@@ -10,6 +10,7 @@ import { PostStack } from '/packages/post/dist/stack.js';
 import { Bloom } from '/packages/post/dist/bloom.js';
 import { Tonemap } from '/packages/tonemap/dist/index.js';
 import { allowCompatibilityAdapters } from '/packages/webgl2-compat/dist/adapter.js';
+import { SceneTarget } from '/packages/shared/msaa.js';
 
 const open = async (options) => {
   const canvas = document.createElement('canvas');
@@ -43,6 +44,113 @@ const scene = (engine) =>
 const close = ({ canvas, engine }) => {
   engine.dispose();
   canvas.remove();
+};
+
+/** A box over a floor, seen from above: the floor shows the shadow, soft by default, so the blocker search runs. */
+const floorScene = (engine) => {
+  const floor = engine.createMesh().setGeometry(box()).setScale([8, 0.1, 8]).setPosition([0, -1.5, 0]);
+  floor.setMaterial(new PbrMaterial({ color: '#ffffff', roughness: 0.8 }));
+  return [scene(engine), floor];
+};
+const shadowScene = (engine) => {
+  const shadows = Shadows.attach(engine, { resolution: 256, distance: 20 });
+  for (const mesh of floorScene(engine)) shadows.add(mesh);
+};
+const postScene = (engine) => {
+  scene(engine);
+  PostStack.attach(engine, [new Bloom({ strength: 0.6 }), new Tonemap()]);
+};
+/** The last of three frames of a scene seen from above, on a new engine. */
+const frames = async (build) => {
+  const view = await open({ camera: { position: [0, 3, 4], target: [0, 0, 0] } });
+  await build(view.engine);
+  let bytes;
+  // fixed-wait: three frames, a count of frames rather than a time, so a package's later passes run too.
+  for (let i = 0; i < 3; i++) bytes = await frame(view);
+  await view.engine.gpu.queue.onSubmittedWorkDone();
+  const errors = [...view.errors];
+  close(view);
+  return { bytes, errors };
+};
+/** How many bytes of two frames differ, and by how much at most. */
+const compare = (a, b) => {
+  let count = 0,
+    largest = 0;
+  for (let i = 0; i < a.length; i++) {
+    const difference = Math.abs(a[i] - b[i]);
+    count += +(difference > 0);
+    largest = Math.max(largest, difference);
+  }
+  return { count, largest };
+};
+
+/** Four different depth samples in one pixel, copied by SceneTarget into a 4x texture, read back sample by sample. */
+const sampleCopy = async (device) => {
+  const size = [1, 1],
+    usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    color = device.createTexture({ size, format: 'rgba8unorm', usage }),
+    depth = device.createTexture({ size, format: 'depth32float', usage }),
+    target = new SceneTarget(device, color, depth, 4),
+    copy = device.createTexture({ size, format: 'depth32float', sampleCount: 4, usage }),
+    encoder = device.createCommandEncoder(),
+    pass = encoder.beginRenderPass({
+      colorAttachments: [],
+      depthStencilAttachment: { view: target.depth, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' },
+    });
+  for (let sample = 0; sample < 4; sample++) {
+    const module = device.createShaderModule({
+      code: `@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}
+@fragment fn fragment()->@builtin(frag_depth) f32 {return ${(sample + 1) / 8};}`,
+    });
+    pass.setPipeline(
+      device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: { module, entryPoint: 'fragment', targets: [] },
+        depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'always' },
+        multisample: { count: 4, mask: 1 << sample },
+      }),
+    );
+    pass.draw(3);
+  }
+  pass.end();
+  target.copyDepth(encoder, copy.createView(), 4, 'depth32float');
+  const layout = device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'unfilterable-float', multisampled: true } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      ],
+    }),
+    pipeline = device.createComputePipeline({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
+      compute: {
+        module: device.createShaderModule({
+          code: `@group(0) @binding(0) var map:texture_multisampled_2d<f32>;@group(0) @binding(1) var<storage,read_write> out:array<f32,4>;
+@compute @workgroup_size(1) fn main(){for(var i=0;i<4;i++){out[i]=textureLoad(map,vec2u(0),i).x;}}`,
+        }),
+        entryPoint: 'main',
+      },
+    }),
+    buffer = device.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
+    back = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+    read = encoder.beginComputePass();
+  read.setPipeline(pipeline);
+  read.setBindGroup(
+    0,
+    device.createBindGroup({
+      layout,
+      entries: [
+        { binding: 0, resource: copy.createView() },
+        { binding: 1, resource: { buffer } },
+      ],
+    }),
+  );
+  read.dispatchWorkgroups(1);
+  read.end();
+  encoder.copyBufferToBuffer(buffer, 0, back, 0, 16);
+  device.queue.submit([encoder.finish()]);
+  await back.mapAsync(GPUMapMode.READ);
+  return [...new Float32Array(back.getMappedRange())];
 };
 
 /** Each one sets up a scene on the engine; the check draws three frames and looks for an error or a blank canvas. */
@@ -81,7 +189,11 @@ window.check = {
       };
     scene(full.engine);
     const expected = await frame(full);
+    const samplesFull = await sampleCopy(full.engine.gpu);
     close(full);
+    const floorFull = await frames(floorScene),
+      shadowFull = await frames(shadowScene),
+      postFull = await frames(postScene);
 
     const adapters = allowCompatibilityAdapters({ force: true }),
       compat = await open({}),
@@ -106,8 +218,19 @@ window.check = {
         core: restored.features.has('core-features-and-limits'),
         drew: (await frame(compat))[(32 * 64 + 32) * 4],
       };
-    const coreErrors = [...compat.errors];
+    const coreErrors = [...compat.errors],
+      samples = await sampleCopy(restored);
     close(compat);
+    const shadowLevel = await frames(shadowScene),
+      postLevel = await frames(postScene),
+      levels = {
+        shadowCast: compare(floorFull.bytes, shadowFull.bytes),
+        shadow: compare(shadowFull.bytes, shadowLevel.bytes),
+        post: compare(postFull.bytes, postLevel.bytes),
+        samplesFull,
+        samples,
+        errors: [...shadowLevel.errors, ...postLevel.errors],
+      };
 
     const packages = {};
     for (const [name, build] of Object.entries(PACKAGES)) {
@@ -127,7 +250,7 @@ window.check = {
       if (view) close(view);
     }
     adapters.dispose();
-    return { fullLimits, limits, pixels: pixels.length, different, pick: pick === mesh, miss: miss === null, afterLoss, coreErrors, packages };
+    return { fullLimits, limits, levels, pixels: pixels.length, different, pick: pick === mesh, miss: miss === null, afterLoss, coreErrors, packages };
   },
 };
 window.ready = true;

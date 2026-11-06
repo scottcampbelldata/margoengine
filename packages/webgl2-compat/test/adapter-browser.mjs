@@ -27,8 +27,17 @@ try {
   assert.equal(result.afterLoss.replaced, true);
   assert.ok(result.afterLoss.drew > 60, 'a restored device draws');
   assert.deepEqual(result.coreErrors, []);
-  // Each of these runs on the level; docs/known-bugs.md lists the packages that do not yet.
-  for (const name of ['core alone', 'materials createMesh', 'materials createInstancedMesh'])
+  assert.deepEqual(result.levels.errors, []);
+  // Each of four depth samples comes through SceneTarget's copy as itself at both levels.
+  assert.deepEqual(result.levels.samplesFull, [0.125, 0.25, 0.375, 0.5]);
+  assert.deepEqual(result.levels.samples, [0.125, 0.25, 0.375, 0.5]);
+  // Shadows draw a real shadow, and the same frame at both levels: the blocker search reads the same depths.
+  assert.ok(result.levels.shadowCast.count > 0, 'the box shades the floor');
+  assert.equal(result.levels.shadow.count, 0, 'the shadowed frame is the same at both levels');
+  // PostStack's multisampled capture is rg11b10ufloat at the level (docs/limits.md): the frame may round apart, by this.
+  assert.ok(result.levels.post.largest <= 2, `the post frame stays within 2 of 255, got ${result.levels.post.largest}`);
+  // Each of these runs on the level.
+  for (const name of ['core alone', 'materials createMesh', 'materials createInstancedMesh', 'shadows', 'culling', 'post bloom and tonemap'])
     assert.match(result.packages[name], /^ok, [1-9]/, name);
   assert.deepEqual(pageErrors, []);
 } finally {

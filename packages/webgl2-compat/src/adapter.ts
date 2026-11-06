@@ -21,6 +21,34 @@ export interface CompatibilityAdapters {
 
 let active: CompatibilityAdapters | undefined;
 
+const floatTypes: Record<string, string> = {
+  texture_depth_2d: 'texture_2d<f32>',
+  texture_depth_2d_array: 'texture_2d_array<f32>',
+  texture_depth_multisampled_2d: 'texture_multisampled_2d<f32>',
+};
+
+/**
+ * WGSL for the compatibility level, which forbids `textureLoad` of a depth texture type: a depth texture that is only
+ * loaded becomes the float texture type that holds the same value, and each load takes its `.x`. A default layout
+ * makes such a binding `unfilterable-float`, which a depth texture may bind to. One that a sampler also reads stays.
+ */
+function floatDepthLoads(code: string): string {
+  for (const [declaration, name, type] of code.matchAll(/var\s+(\w+)\s*:\s*(texture_depth_(?:multisampled_2d|2d_array|2d))\b/g)) {
+    const load = new RegExp(`\\btextureLoad\\s*\\(\\s*${name}\\s*,`, 'g'),
+      starts = [...code.matchAll(load)].map((m) => m.index + m[0].length);
+    if (!starts.length || new RegExp(`\\btexture(?:Sample|Gather)\\w*\\s*\\(\\s*${name}\\s*,`).test(code)) continue;
+    // From the last call back, so earlier positions stay right.
+    for (const start of starts.reverse()) {
+      let depth = 1,
+        at = start;
+      while (depth) depth += code[at] === '(' ? 1 : code[at] === ')' ? -1 : 0, at++;
+      code = code.slice(0, at) + '.x' + code.slice(at);
+    }
+    code = code.replace(declaration, declaration.replace(type, floatTypes[type]));
+  }
+  return code;
+}
+
 /**
  * Gives a compatibility adapter's devices what Margo's code expects of a device. A device starts at the level's low
  * defaults (workgroups of 128, 4 colour attachments) whatever the adapter can do, and core and the packages ask for no
@@ -38,13 +66,18 @@ const prepare = (adapter: GPUAdapter | null): GPUAdapter | null => {
     const device = await requestDevice.call(adapter, {
         ...descriptor,
         requiredLimits: { ...limits, ...descriptor?.requiredLimits },
+        // PostStack's HDR capture at this level: the one float format it can multisample.
+        requiredFeatures: [
+          ...(descriptor?.requiredFeatures ?? []),
+          ...(adapter.features.has('rg11b10ufloat-renderable') ? (['rg11b10ufloat-renderable'] as const) : []),
+        ],
       }),
       createShaderModule = device.createShaderModule;
     if (!device.features.has('core-features-and-limits'))
       device.createShaderModule = (module) =>
         createShaderModule.call(device, {
           ...module,
-          code: module.code.replace(/@interpolate\(\s*flat\s*\)/g, '@interpolate(flat, either)'),
+          code: floatDepthLoads(module.code).replace(/@interpolate\(\s*flat\s*\)/g, '@interpolate(flat, either)'),
         });
     return device;
   };

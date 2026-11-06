@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { SceneTarget } from '../../shared/msaa.js';
+import { compatibilityLevel } from '../../shared/compat.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -16,6 +17,15 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 const owners = ['bloom', 'ssao', 'dof', 'tonemap', 'post-processing'],
   rank = { hdr: 0, display: 1, ldr: 2 },
   single = { count: 1 };
+
+/**
+ * The HDR capture's format. Linear half floats, except where the capture is multisampled at WebGPU's compatibility level,
+ * which cannot multisample them: there rg11b10ufloat, with less precision and no alpha.
+ */
+const captureFormat = (d: GPUDevice, samples: number): GPUTextureFormat =>
+  samples > 1 && compatibilityLevel(d) && d.features.has('rg11b10ufloat-renderable')
+    ? 'rg11b10ufloat'
+    : 'rgba16float';
 
 /** One HDR scene capture shared by several effects, applied in array order: HDR effects (SSAO, DOF, Bloom, Afterimage),
  * at most one display effect (Tonemap or creative PostProcessing), then LDR effects (SMAA or FXAA, Glitch). Without a
@@ -76,7 +86,8 @@ export class PostStack implements EnginePlugin {
   /** The 1x linear HDR scene capture (rgba16float) while the stack has an HDR or display effect, e.g. for
    * Water({sceneColor:()=>stack.sceneTexture}) refraction alongside SSAO; undefined with only LDR effects or before the first frame. */
   get sceneTexture(): GPUTexture | undefined {
-    return this.color?.format === 'rgba16float' ? this.color : undefined;
+    const format = this.color?.format;
+    return format === 'rgba16float' || format === 'rg11b10ufloat' ? this.color : undefined;
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
@@ -126,7 +137,7 @@ export class PostStack implements EnginePlugin {
     }
     const samples = c.descriptor.multisample?.count ?? 4,
       depth = c.descriptor.depthStencil!.format,
-      format = hdr ? 'rgba16float' : c.format,
+      format = hdr ? captureFormat(c.device, samples) : c.format,
       h = this.host;
     if (
       this.color?.width !== c.width ||

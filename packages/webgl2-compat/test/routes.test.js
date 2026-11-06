@@ -8,7 +8,7 @@ import { registerHooks } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { planCompute, runComputeOnCPU } from '../dist/compute.js';
 import { COMPAT_VENDOR as layerVendor } from '../dist/device.js';
-import { COMPAT_VENDOR, compatTier, loadCompatRoute } from '../../shared/compat.js';
+import { COMPAT_VENDOR, compatibilityLevel, compatTier, loadCompatRoute } from '../../shared/compat.js';
 import { prefixDownShader, prefixLevels, prefixTopShader, prefixUpShader } from '../../shared/prefix.js';
 
 const packages = fileURLToPath(new URL('../../', import.meta.url));
@@ -54,6 +54,16 @@ test('compatTier and loadCompatRoute: the layer by its vendor, nothing loaded on
   assert.equal(loadCompatRoute({ adapterInfo: { vendor: 'nvidia' } }, load), undefined);
   assert.equal(await loadCompatRoute({ adapterInfo: { vendor: COMPAT_VENDOR } }, load), 1);
   assert.equal(loads, 1);
+});
+
+test('compatibilityLevel: a native device without core-features-and-limits, never the layer', () => {
+  const full = { features: new Set(['core-features-and-limits']) },
+    level = { features: new Set() },
+    layer = { features: new Set(), adapterInfo: { vendor: COMPAT_VENDOR } };
+  assert.equal(compatibilityLevel(level), true);
+  assert.equal(compatibilityLevel(full), false);
+  assert.equal(compatibilityLevel(layer), false);
+  assert.equal(compatibilityLevel(undefined), false);
 });
 
 test('DOF: the CoC, tile and bokeh kernels without workgroup memory run as fragment draws', async () => {

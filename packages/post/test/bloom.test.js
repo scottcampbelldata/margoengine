@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Bloom, SSAO, bloomWeights } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { SceneTarget } from '../../shared/msaa.js';
 
 test('Bloom captures HDR, preserves scene depth for later overlays, resizes and restores without leaks', async () => {
   const h = optionalGPU(),
@@ -120,4 +121,70 @@ test('Bloom filters its chain, reads the glow back filtered and dithers the resu
   assert.match(source, /tent\(bloom,bilinear,p\.xy\/vec2f\(textureDimensions\(scene\)\)\)/, 'glow through the sampler');
   assert.doesNotMatch(source, /textureLoad\(bloom,/);
   assert.match(source, /o\+dither\(p\.xy\)/, 'dithered');
+});
+
+test('at the compatibility level each bloom level is its own texture, the size of its mip', () => {
+  const h = optionalGPU(),
+    created = [],
+    createTexture = h.engine.gpu.createTexture,
+    effect = new Bloom();
+  h.engine.gpu.features = new Set();
+  h.engine.gpu.createTexture = (descriptor) => {
+    created.push(descriptor);
+    return createTexture.call(h.engine.gpu, descriptor);
+  };
+  h.engine.use(effect);
+  h.frame();
+  const chain = created.filter((descriptor) => descriptor.usage & GPUTextureUsage.STORAGE_BINDING);
+  assert.equal(chain.length, 6 + 5, 'six levels down, five up');
+  assert.ok(chain.every((descriptor) => descriptor.mipLevelCount === 1));
+  const [width] = chain[0].size;
+  assert.deepEqual(chain.slice(0, 6).map(({ size }) => size[0]), [0, 1, 2, 3, 4, 5].map((i) => width >> i));
+  assert.deepEqual(chain.slice(6).map(({ size }) => size[0]), [0, 1, 2, 3, 4].map((i) => width >> i));
+});
+
+test('the depth copy of a 4x scene takes a masked draw per sample at the compatibility level, no sample_index', () => {
+  const copies = (features) => {
+    const h = optionalGPU(),
+      pipelines = [],
+      createRenderPipeline = h.engine.gpu.createRenderPipeline;
+    h.engine.gpu.features = new Set(features);
+    h.engine.gpu.createRenderPipeline = (descriptor) => {
+      if (/frag_depth/.test(descriptor.fragment?.module?.code ?? '')) pipelines.push(descriptor);
+      return createRenderPipeline.call(h.engine.gpu, descriptor);
+    };
+    const shader = h.engine.gpu.createShaderModule;
+    h.engine.gpu.createShaderModule = (descriptor) => Object.assign(shader.call(h.engine.gpu, descriptor), { code: descriptor.code });
+    const target = new SceneTarget(
+        h.engine.gpu,
+        h.engine.gpu.createTexture({ size: [4, 4], format: 'rgba16float', usage: 0 }),
+        h.engine.gpu.createTexture({ size: [4, 4], format: 'depth32float', usage: 0 }),
+      ),
+      draws = [];
+    target.copyDepth(
+      {
+        beginRenderPass: () => ({
+          setPipeline() {},
+          setBindGroup() {},
+          draw: (count) => draws.push(count),
+          end() {},
+        }),
+      },
+      {},
+      4,
+    );
+    return { pipelines: pipelines.filter(({ multisample }) => multisample.count === 4), draws };
+  };
+  const level = copies([]),
+    full = copies(['core-features-and-limits']);
+  assert.deepEqual(level.pipelines.map(({ multisample }) => multisample.mask), [1, 2, 4, 8]);
+  assert.deepEqual(level.draws, [3, 3, 3, 3]);
+  level.pipelines.forEach(({ fragment }, i) => {
+    assert.doesNotMatch(fragment.module.code, /sample_index/);
+    assert.match(fragment.module.code, new RegExp(`return textureLoad\\(source,q,${i}\\);`));
+  });
+  assert.equal(full.pipelines.length, 1);
+  assert.equal(full.pipelines[0].multisample.mask, undefined);
+  assert.deepEqual(full.draws, [3]);
+  assert.match(full.pipelines[0].fragment.module.code, /@builtin\(sample_index\) sample:u32/);
 });

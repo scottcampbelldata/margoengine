@@ -23,7 +23,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import { shadowSampling, shadowDepth, nearestDepth, type ShadowFilter } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { compatibilityLevel, loadCompatRoute } from '../../shared/compat.js';
 import { hypot, hypotOf, hypotTerms } from '../../shared/hypot.js';
 import {
   casterBuffers,
@@ -674,7 +674,7 @@ export class Shadows implements EnginePlugin {
         'unsupported',
         "Shadows require the standard PBR lighting shader; remove the plugin that replaced core's shader",
       );
-    const output = shadowSampling(group, filter, anisotropic, this.colored) + code;
+    const output = shadowSampling(group, filter, anisotropic, this.colored, compatibilityLevel(this.device)) + code;
     if (!cache) {
       cache = new Map();
       this.shaders.set(key, cache);
@@ -691,7 +691,7 @@ export class Shadows implements EnginePlugin {
       this.hooks.set(
         key,
         (hooks = {
-          declarations: shadowSampling(group, filter, anisotropic, this.colored),
+          declarations: shadowSampling(group, filter, anisotropic, this.colored, compatibilityLevel(this.device)),
           direct: (d) => `shadowLit(${d},i.position,s.n)`,
         }),
       );
@@ -798,6 +798,8 @@ export class Shadows implements EnginePlugin {
       { binding: 2, resource: (this.combinedView = this.combined!.createView({ dimension: '2d-array' })) },
       { binding: 3, resource: this.sampler! },
     ];
+    if ((this.options.filter ?? 'soft') === 'soft' && compatibilityLevel(this.device))
+      this.entries.push({ binding: 30, resource: this.combinedView });
     if (this.colored) {
       this.tintSampler ??= this.device!.createSampler({ magFilter: 'linear', minFilter: 'linear' });
       this.entries.push(
@@ -824,6 +826,7 @@ export class Shadows implements EnginePlugin {
             .replace('@binding(1) var<uniform> shadowFrame', `@binding(${base}) var<uniform> shadowFrame`)
             .replace('@binding(2) var shadowMap', `@binding(${base + 1}) var shadowMap`)
             .replace('@binding(3) var shadowSampler', `@binding(${base + 2}) var shadowSampler`)
+            .replace('@binding(30) var shadowDepth', `@binding(${base + 29}) var shadowDepth`)
             .replace('@binding(27) var shadowTintMap', `@binding(${base + 26}) var shadowTintMap`)
             .replace('@binding(28) var shadowTintDepth', `@binding(${base + 27}) var shadowTintDepth`)
             .replace('@binding(29) var shadowTintSampler', `@binding(${base + 28}) var shadowTintSampler`);

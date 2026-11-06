@@ -15,9 +15,10 @@ const contract = [
   'fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return direct*shadowVisibility(position,normal);}',
 ];
 
-async function harness(options) {
-  const gpu = mockGPU(),
-    store = await TransformStore.create(4),
+async function harness(options, features) {
+  const gpu = mockGPU();
+  if (features) gpu.device.features = new Set(features);
+  const store = await TransformStore.create(4),
     engine = new Engine(
       { width: 128, height: 96, clientWidth: 128, clientHeight: 96 },
       store,
@@ -250,4 +251,24 @@ test('the last tenth of each cascade dithers into the next; the last cascade and
   assert.ok(Math.abs(share([50, 100, 100, 100], 49, 0) - 0.8) <= 0.02, 'two cascades');
   assert.equal(share([50, 100, 100, 100], 99.9, 1), 0, 'unused cascades are never selected');
   assert.equal(share([40, 40, 40, 40], 39.9, 0), 0, 'bounds mode keeps layer zero');
+});
+
+test('at the compatibility level the blocker search loads a float binding of the same map', () => {
+  const full = shadowSampling(1, 'soft'),
+    level = shadowSampling(1, 'soft', true, false, true);
+  assert.match(full, /textureLoad\(shadowMap,/);
+  assert.doesNotMatch(full, /shadowDepth/);
+  assert.doesNotMatch(level, /textureLoad\(shadowMap,/);
+  assert.match(level, /@group\(1\) @binding\(30\) var shadowDepth:texture_2d_array<f32>;/);
+  assert.match(level, /let d=textureLoad\(shadowDepth,coord,i32\(layer\),0\)\.x;/);
+  assert.match(level, /clamp\(penumbra,texel,vec2f\(0\.1\)\)/, 'the anisotropic text still applies');
+  for (const filter of ['pcf', 'hard']) assert.equal(shadowSampling(1, filter, false, false, true), shadowSampling(1, filter));
+});
+
+test('Shadows binds the second view only for a soft filter at the compatibility level', async () => {
+  const has30 = async (filter, features) =>
+    (await harness({ filter }, features)).shadows.bindings().some((entry) => entry.binding === 30);
+  assert.equal(await has30('soft', []), true);
+  assert.equal(await has30('pcf', []), false);
+  assert.equal(await has30('soft', ['core-features-and-limits']), false);
 });

@@ -18,7 +18,7 @@ export function optionalGPU() {
     maxBufferSize: 256 * 1024 * 1024,
     maxComputeWorkgroupsPerDimension: 65535,
   };
-  engine.gpu.features = new Set();
+  engine.gpu.features = new Set(['core-features-and-limits']);
   const create = engine.gpu.createBuffer;
   engine.gpu.createBuffer = (descriptor) => {
     const b = create(descriptor);

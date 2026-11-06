@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { SceneTarget } from '../../shared/msaa.js';
+import { compatibilityLevel } from '../../shared/compat.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -177,6 +178,8 @@ export class Bloom implements EnginePlugin {
   /** The view the chain was built over. */
   private source?: GPUTextureView;
   private textures: GPUTexture[] = [];
+  /** Down and up chains (`allocate`); their textures are also in `textures`. */
+  private lists: GPUTexture[][] = [[], []];
   private group?: GPUBindGroup;
   private present?: GPURenderPipeline;
   private capture?: SceneTarget;
@@ -399,21 +402,29 @@ export class Bloom implements EnginePlugin {
     this.capture = new SceneTarget(device, this.textures[0], this.textures[1], c.descriptor.multisample?.count ?? 4);
   }
   /**
-   * The chain's two textures, each pushed as soon as it exists so a failed allocation is still released. Mip i of the
-   * first is level i going down; mip i of the second is level i plus every level below it.
+   * The chain's textures, each pushed as soon as it exists so a failed allocation is still released. Level i of the
+   * first list is level i going down; level i of the second is level i plus every level below it. A list is one texture
+   * whose mips are the levels, except at WebGPU's compatibility level, where a dispatch cannot read one view of a
+   * texture and write another: there each level is its own texture, the size of that mip.
    */
   private allocate(device: GPUDevice, width: number, height: number): void {
     // Six levels (1/2 to 1/64 of the viewport) where the viewport allows, none smaller than a pixel.
     this.levels = Math.min(6, 32 - Math.clz32(Math.min(width, height)));
-    for (const mipLevelCount of [this.levels, Math.max(1, this.levels - 1)])
-      this.textures.push(
-        device.createTexture({
-          size: [width, height],
-          mipLevelCount,
+    const separate = compatibilityLevel(device);
+    this.lists = [this.levels, Math.max(1, this.levels - 1)].map((levels) => {
+      const list: GPUTexture[] = [];
+      for (let i = 0; i < (separate ? levels : 1); i++) {
+        const texture = device.createTexture({
+          size: [Math.max(1, width >> i), Math.max(1, height >> i)],
+          mipLevelCount: separate ? 1 : levels,
           format: 'rgba16float',
           usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-        }),
-      );
+        });
+        this.textures.push(texture);
+        list.push(texture);
+      }
+      return list;
+    });
   }
   /** The chain over `source` and the presentation bind group that reads it, weighted when the radius asks for it. */
   private link(device: GPUDevice, source: GPUTextureView): void {
@@ -438,13 +449,15 @@ export class Bloom implements EnginePlugin {
         compute: { module: device.createShaderModule({ code: weighted }), entryPoint: 'up' },
       });
     }
-    const [down, up] = this.textures.slice(-2),
+    const [downList, upList] = this.lists,
+      down = downList[0],
       [prefilter, reduce] = this.passes,
       expand = this.weighted ? this.weightedUp! : this.passes[2],
       levels = this.levels,
-      mip = (texture: GPUTexture, baseMipLevel: number) => texture.createView({ baseMipLevel, mipLevelCount: 1 }),
-      downs = Array.from({ length: levels }, (_, i) => mip(down, i)),
-      ups = Array.from({ length: levels - 1 }, (_, i) => mip(up, i)),
+      mip = (list: GPUTexture[], i: number) =>
+        list[1] ? list[i].createView() : list[0].createView({ baseMipLevel: i, mipLevelCount: 1 }),
+      downs = Array.from({ length: levels }, (_, i) => mip(downList, i)),
+      ups = Array.from({ length: levels - 1 }, (_, i) => mip(upList, i)),
       steps: Step[] = [],
       step = (pipeline: GPUComputePipeline, level: number, resources: (GPUBindingResource | undefined)[]) =>
         steps.push([
@@ -486,7 +499,7 @@ export class Bloom implements EnginePlugin {
       width = Math.max(1, Math.ceil(c.width / 2)),
       height = Math.max(1, Math.ceil(c.height / 2)),
       key = output.format + output.multisample.count + output.hdr;
-    if (this.textures[1]?.width !== width || this.textures[1].height !== height) {
+    if (this.lists[0][0]?.width !== width || this.lists[0][0].height !== height) {
       for (const texture of this.textures) texture.destroy();
       this.textures = [];
       this.source = undefined;
@@ -548,6 +561,7 @@ export class Bloom implements EnginePlugin {
     this.passes = [];
     this.steps = [];
     this.textures = [];
+    this.lists = [[], []];
     this.scene = this.depth = this.original = this.originalDepth = undefined;
     this.originalFormat = undefined;
     this.sourceShader = this.linearShader = this.key = '';

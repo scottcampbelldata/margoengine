@@ -214,20 +214,20 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   in the same file fires on the same test.
 - **Needed to close:** both tests also ask `engine.plugins.has('webgl-pick')`, with a test in the React package.
 
-### Three packages fail on a WebGPU compatibility-level device
+### Five shaders still break WebGPU compatibility-level rules
 
-- **What:** with `allowCompatibilityAdapters` from `@margoengine/webgl2-compat/adapter`, core and `@margoengine/materials`
-  run, but `Shadows`, `CulledInstances` and a `PostStack` with HDR effects stop at their first frame with a validation
-  error. A page can use the WebGL2 layer instead, where all three work.
-- **Repro:** `npm run build:packages`, then `node scripts/gpu-lock.mjs run --owner=<you> -- node
+- **What:** with `allowCompatibilityAdapters` from `@margoengine/webgl2-compat/adapter`, these use something the level
+  forbids, found by reading the code and not yet run there: `FogPass` in `@margoengine/sky`, the volumetric pass in
+  `@margoengine/environment`, `@margoengine/points` (plugin and surfels) and the spray in `@margoengine/water` take
+  `@builtin(sample_index)` at 4x; `VirtualShadows` with the `'soft'` filter loads its depth pool in a shader that also
+  samples it. A page can use the WebGL2 layer instead.
+- **Repro:** `npm run build:packages`, add the package to `PACKAGES` in
+  `packages/webgl2-compat/test/adapter-browser.js`, then `node scripts/gpu-lock.mjs run --owner=<you> -- node
   packages/webgl2-compat/test/adapter-browser.mjs`, and read `packages` in `test-results/compat-adapter.json`.
-- **Cause:** the level forbids two things these use. `textureLoad` of a depth texture in a compute shader: Shadows'
-  `nearestDepth` (`packages/shadows/src/shader.ts`) and the culling depth pyramid's `depth0`
-  (`packages/culling/src/shaders.ts`). Multisampled `rgba16float`: the HDR scene capture in
-  `packages/post/src/stack.ts`.
-- **Needed to close:** each package takes a route for the level, as they do on the WebGL2 layer: a render pass that copies
-  depth to `r32float` before the compute step, and for post a resolve into a 1x capture from a format the level can
-  multisample. Then add the three names to the list `adapter-browser.mjs` asserts.
+- **Cause:** the level has no `sample_index` in a fragment shader, and no `textureLoad` of a depth texture type.
+- **Needed to close:** the routes `Shadows` and `SceneTarget` took: a masked draw per sample (`packages/shared/msaa.js`
+  `copyDepth`), and the map bound a second time as float (`packages/shadows/src/shader.ts`, `level`). Then add the names
+  to the list `adapter-browser.mjs` asserts.
 
 ### Native glass on a display-encoded target adds its lit draw in encoded values
 

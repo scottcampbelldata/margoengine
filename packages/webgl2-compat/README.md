@@ -132,14 +132,17 @@ engine.render();
 that finds nothing does it ask again with `featureLevel: 'compatibility'`. Device restore goes through the same call and
 comes back at the same level. To use the WebGL2 layer below it, call this first and test `requestAdapter` for `null`
 before `install()`. A compatibility device takes every limit its adapter has, because core and the packages ask for
-none, and its shaders' `@interpolate(flat)` becomes `@interpolate(flat, either)`, which is all the level allows.
+none, and its shaders' `@interpolate(flat)` becomes `@interpolate(flat, either)`, which is all the level allows. A depth
+texture a shader only loads becomes its float type there, for the same reason.
 `{ force: true }` asks for compatibility level first, to try a scene against that validation on any GPU. `dispose()`
 (or `using`) puts the browser's method back; a second call before that throws MargoError `state`, and a page with no
 `navigator.gpu` gets `unsupported`.
 
-Core, picking, device restore and `@margoengine/materials` run on the level. `Shadows`, `CulledInstances` occlusion and
-an HDR `PostStack` do not yet: the table is in [limits.md](../../docs/limits.md) and the causes are in
-[known-bugs.md](../../docs/known-bugs.md). The check is `test/adapter-browser.mjs`, in `test:gpu`.
+Core, picking, device restore, `@margoengine/materials`, `Shadows`, `CulledInstances` and an HDR `PostStack` run on the
+level. `Shadows` draw the same pixels as at the full level; a 4x `PostStack` captures in `rg11b10ufloat`, with less
+precision and no alpha, within 2 of 255 on the Bloom and Tonemap test frame. The table is in
+[limits.md](../../docs/limits.md), and what does not run yet is in [known-bugs.md](../../docs/known-bugs.md). The check is
+`test/adapter-browser.mjs`, in `test:gpu`.
 
 ### XR (`margoengine/webgl2-compat/xr`)
 

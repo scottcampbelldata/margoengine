@@ -357,8 +357,15 @@ when the full level finds nothing. Core changes by 0 bytes: it calls `requestAda
 so answering there covers both. Compatibility devices take the adapter's limits and rewrite `@interpolate(flat)` to
 `either`, which core's pick needs. Evidence: `packages/webgl2-compat/test/adapter-browser.mjs` on a forced device on the
 RTX A6000 (D3D12, Chromium): same pixels as the full level, pick hits and misses, restore keeps the level. Missing: a run
-on a real OpenGL ES or Direct3D 11 class device, so forced runs prove the validation, not the older GPU's limits;
-`Shadows`, occlusion culling and HDR `PostStack` fail there (known-bugs.md).
+on a real OpenGL ES or Direct3D 11 class device, so forced runs prove the validation, not the older GPU's limits.
+Packages on the level (2026-11-06): the adapter's `createShaderModule` turns a depth texture that is only loaded into its
+float type with `.x` on each load, and default layouts then bind it `unfilterable-float`, so culling's pyramid and
+Shadows' nearest depth run unchanged. `compatibilityLevel` in `packages/shared/compat.js` names the rest: Shadows binds
+its map a second time as float for the blocker search (a depth texture takes no plain sampler there), `SceneTarget`
+copies 4x depth with one masked draw per sample (no `sample_index`), Bloom keeps each level in its own texture (no two
+views of one texture in a dispatch) and `PostStack` captures 4x in `rg11b10ufloat`. Evidence in the same check: Shadows
+0 bytes apart from the full level with a real shadow on the floor, four depth samples read back as written, the post
+frame within 2 of 255. Missing: fog, volumetrics, points, water spray and soft `VirtualShadows` (known-bugs.md).
 
 `@margoengine/headless` is outside this ladder: it takes a WebGPU implementation through `installGPU` and a stand-in canvas, so a stage
 runs with no page. Stages alive at once share one `gpu`, because `installGPU` changes globals, and `engine.start()` needs

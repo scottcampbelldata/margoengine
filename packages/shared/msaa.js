@@ -1,5 +1,6 @@
 import { applyView, viewLoadOp } from './view-rect.js';
 import { retire } from './frame-resources.js';
+import { compatibilityLevel } from './compat.js';
 const fullscreen = `@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}`;
 const group = (device, pipeline, view) =>
   device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: view }] });
@@ -91,23 +92,26 @@ export class SceneTarget {
     let cached = formats.get(format);
     if (!cached) {
       // Preserve each reversed-Z coverage sample when returning to an outer scene.
-      const code =
-        count === 4
-          ? depthShader
-              .replace('p:vec4f)', 'p:vec4f,@builtin(sample_index) sample:u32)')
-              .replace(/return max[^;]+;/, 'return textureLoad(source,q,i32(sample));')
-          : depthShader;
-      const module = this.device.createShaderModule({ code });
-      const pipeline = this.device.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module, entryPoint: 'vertex' },
-        fragment: { module, entryPoint: 'fragment', targets: [] },
-        depthStencil: { format, depthWriteEnabled: true, depthCompare: 'always' },
-        multisample: { count },
-      });
+      const load = (sample) => depthShader.replace(/return max[^;]+;/, `return textureLoad(source,q,${sample});`),
+        draw = (code, multisample) => {
+          const module = this.device.createShaderModule({ code }),
+            pipeline = this.device.createRenderPipeline({
+              layout: 'auto',
+              vertex: { module, entryPoint: 'vertex' },
+              fragment: { module, entryPoint: 'fragment', targets: [] },
+              depthStencil: { format, depthWriteEnabled: true, depthCompare: 'always' },
+              multisample,
+            });
+          return { pipeline, group: group(this.device, pipeline, this.depthSource) };
+        };
       cached = {
-        pipeline,
-        group: group(this.device, pipeline, this.depthSource),
+        // The compatibility level has no sample_index: one draw per sample, the pipeline's mask writing that sample alone.
+        draws:
+          count !== 4
+            ? [draw(depthShader, { count })]
+            : compatibilityLevel(this.device)
+              ? [0, 1, 2, 3].map((sample) => draw(load(sample), { count, mask: 1 << sample }))
+              : [draw(load('i32(sample)').replace('p:vec4f)', 'p:vec4f,@builtin(sample_index) sample:u32)'), { count })],
         descriptor: {
           colorAttachments: [],
           depthStencilAttachment: {
@@ -124,10 +128,12 @@ export class SceneTarget {
     cached.descriptor.depthStencilAttachment.view = view;
     cached.descriptor.depthStencilAttachment.depthLoadOp = this.viewContext?.view ? 'load' : 'clear';
     const pass = encoder.beginRenderPass(cached.descriptor);
-    pass.setPipeline(cached.pipeline);
-    pass.setBindGroup(0, cached.group);
     if (this.viewContext) applyView(pass, this.viewContext);
-    pass.draw(3);
+    for (const { pipeline, group } of cached.draws) {
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, group);
+      pass.draw(3);
+    }
     pass.end();
   }
   resolve(encoder, final = false) {

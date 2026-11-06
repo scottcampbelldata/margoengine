@@ -112,7 +112,7 @@ export function mockGPU() {
       maxColorAttachments: 8,
       maxBindGroups: 4,
     },
-    features: new Set(),
+    features: new Set(['core-features-and-limits']),
     createBuffer: create('buffer', (d) => ({ size: d.size, usage: d.usage, destroy })),
     createTexture: create('texture', (d) => ({
       ...size(d.size),

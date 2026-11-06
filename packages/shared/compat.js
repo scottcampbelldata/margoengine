@@ -11,6 +11,14 @@ export function compatTier(device) {
 }
 
 /**
+ * Whether `device` is a browser's own WebGPU device at the compatibility feature level (`featureLevel: 'compatibility'`):
+ * one that lacks `core-features-and-limits`. The WebGL2 layer's devices lack it too, and take their own routes.
+ */
+export function compatibilityLevel(device) {
+  return compatTier(device) === 'native' && device?.features?.has('core-features-and-limits') === false;
+}
+
+/**
  * On the WebGL2 layer, starts loading a package's compatibility route (`load`, a dynamic import, so WebGPU pages never
  * download it) and resolves what it resolves; on native WebGPU returns undefined and loads nothing. Until it resolves
  * the package keeps its WebGPU route, which the layer also runs (more slowly), so no frame is drawn differently.

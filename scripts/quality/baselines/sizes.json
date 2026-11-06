@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7412863,
+  "total": 7413755,
   "history": [
     {
       "date": "2026-10-24",
@@ -2600,6 +2600,12 @@
       "commit": "fa44286ac",
       "reason": "hair, eye and skin models are three new entries of materials",
       "grew": 4
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "039af31a3",
+      "reason": "WebGPU compatibility level routes in post, shadows, shared and webgl2-compat adapter",
+      "grew": 2
     }
   ],
   "items": {
@@ -3073,7 +3079,7 @@
     "@margoengine/shader/readback": 8876,
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/utils": 7295,
-    "@margoengine/shadows": 17321,
+    "@margoengine/shadows": 17879,
     "@margoengine/shadows/virtual": 14601,
     "@margoengine/sky": 16975,
     "@margoengine/sky/base": 7004,
@@ -3191,7 +3197,7 @@
     "@margoengine/webgl2-compat": 102814,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 72383,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 31741,
-    "@margoengine/webgl2-compat/adapter": 880,
+    "@margoengine/webgl2-compat/adapter": 1214,
     "@margoengine/webgl2-compat/compute": 49684,
     "@margoengine/webgl2-compat/device": 102935,
     "@margoengine/webgl2-compat/glsl": 43584,

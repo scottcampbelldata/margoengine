@@ -63,24 +63,34 @@ const filters: Record<ShadowFilter, string> = {
 // receiver-plane slope and the PCSS radii take each axis's own row length and texel; otherwise the text is unchanged.
 // `colored`: the tint map of Shadows' `colored` option. The map's depth tells a receiver behind the tinting casters
 // from one in front; it adds three bindings past the other lighting effects' (27 to 29) and changes shadowLit.
+// `level`: a device at the compatibility level, which forbids textureLoad of a depth texture, and a plain sampler on
+// one. The blocker search reads the same map bound a second time as float (binding 30), which only `'soft'` needs.
 export function shadowSampling(
   group: number,
   filter: ShadowFilter = 'soft',
   anisotropic = false,
   colored = false,
+  level = false,
 ): string {
-  const body = anisotropic
-    ? filters[filter]
-        .replaceAll('length(rowX)*0.5', 'vec2f(length(rowX),length(rowY))*0.5')
-        .replace('max(texel.x,', 'max(texel,')
-        .replace('clamp(penumbra,texel.x,0.1)', 'clamp(penumbra,texel,vec2f(0.1))')
-    : filters[filter];
+  const search = level && filter === 'soft',
+    chosen = search
+      ? filters.soft.replace(
+          'textureLoad(shadowMap,coord,i32(layer),0)',
+          'textureLoad(shadowDepth,coord,i32(layer),0).x',
+        )
+      : filters[filter],
+    body = anisotropic
+      ? chosen
+          .replaceAll('length(rowX)*0.5', 'vec2f(length(rowX),length(rowY))*0.5')
+          .replace('max(texel.x,', 'max(texel,')
+          .replace('clamp(penumbra,texel.x,0.1)', 'clamp(penumbra,texel,vec2f(0.1))')
+      : chosen;
   return /* wgsl */ `
 struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f,nearest:vec4f}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
 @group(${group}) @binding(2) var shadowMap:texture_depth_2d_array;
 @group(${group}) @binding(3) var shadowSampler:sampler_comparison;
-${filter === 'soft' ? 'const shadowGolden=mat2x2f(-0.737368878,0.675490294,-0.675490294,-0.737368878);\n' : ''}fn shadowNoise(position:vec3f)->vec2f {
+${search ? `@group(${group}) @binding(30) var shadowDepth:texture_2d_array<f32>;\n` : ''}${filter === 'soft' ? 'const shadowGolden=mat2x2f(-0.737368878,0.675490294,-0.675490294,-0.737368878);\n' : ''}fn shadowNoise(position:vec3f)->vec2f {
   let eye=shadowFrame.view*vec4f(position,1);let pixel=eye.xy/max(-eye.z,0.000001)*shadowFrame.settings.w;
   let magic=vec2f(0.06711056,0.00583715);
   return fract(52.9829189*fract(vec2f(dot(pixel,magic),dot(pixel.yx,magic))));

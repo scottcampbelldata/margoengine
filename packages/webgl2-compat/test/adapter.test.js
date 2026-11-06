@@ -153,3 +153,46 @@ test('a second call while one is active says so, and no WebGPU says so', () => {
   Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true });
   assert.throws(() => allowCompatibilityAdapters(), (error) => error.code === 'unsupported');
 });
+
+/** A device from a fake adapter, through allowCompatibilityAdapters; `features` are the device's. */
+const device = async (features, adapterFeatures = []) => {
+  browser(() => ({
+    features: new Set(adapterFeatures),
+    limits: {},
+    requestDevice: async (descriptor) => ({
+      descriptor,
+      features: new Set(features),
+      createShaderModule: ({ code }) => code,
+    }),
+  }));
+  allow({ force: true });
+  return (await navigator.gpu.requestAdapter()).requestDevice();
+};
+
+test('at the level a depth texture only loaded becomes float, each load taking .x', async () => {
+  const { createShaderModule } = await device([]);
+  assert.equal(
+    createShaderModule({
+      code: 'var a:texture_depth_2d;var b:texture_depth_multisampled_2d;var c : texture_depth_2d_array;fn f(){max(textureLoad(a,g(p,1),0),textureLoad(b,q,0)+textureLoad( c ,q,i,0));textureDimensions(a);}',
+    }),
+    'var a:texture_2d<f32>;var b:texture_multisampled_2d<f32>;var c : texture_2d_array<f32>;fn f(){max(textureLoad(a,g(p,1),0).x,textureLoad(b,q,0).x+textureLoad( c ,q,i,0).x);textureDimensions(a);}',
+  );
+});
+
+test('at the level a depth texture a sampler reads, or nothing loads, stays as written', async () => {
+  const { createShaderModule } = await device([]),
+    code = 'var a:texture_depth_2d;var b:texture_depth_2d;fn f(){textureSampleCompareLevel(a,s,u,0.5);textureLoad(a,q,0);textureDimensions(b);}';
+  assert.equal(createShaderModule({ code }), code);
+});
+
+test('a device at the full level keeps its shaders', async () => {
+  const code = 'var a:texture_depth_2d;fn f(){textureLoad(a,q,0);}',
+    { createShaderModule } = await device(['core-features-and-limits']);
+  assert.equal(createShaderModule({ code }), code);
+});
+
+test('a device asks for rg11b10ufloat-renderable when the adapter has it, for PostStack', async () => {
+  assert.deepEqual((await device([], ['rg11b10ufloat-renderable'])).descriptor.requiredFeatures, ['rg11b10ufloat-renderable']);
+  for (const handle of open.splice(0)) handle.dispose();
+  assert.deepEqual((await device([])).descriptor.requiredFeatures, []);
+});
