@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5157656,
+  "total": 5158675,
   "history": [
     {
       "date": "2026-10-24",
@@ -2318,6 +2318,12 @@
       "commit": "6d4ed02e9",
       "reason": "perf(animation): cloneModel copies run no engine tick",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8be384257",
+      "reason": "4D simplex and Worley nodes in @margoengine/shader/noise",
+      "grew": 1
     }
   ],
   "items": {
@@ -2746,7 +2752,7 @@
     "@margoengine/shader/effects": 8306,
     "@margoengine/shader/graph": 13977,
     "@margoengine/shader/lighting": 9827,
-    "@margoengine/shader/noise": 4753,
+    "@margoengine/shader/noise": 5772,
     "@margoengine/shader/pass": 11323,
     "@margoengine/shader/raw": 10429,
     "@margoengine/shader/readback": 8876,

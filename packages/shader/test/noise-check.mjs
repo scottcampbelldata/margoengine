@@ -11,12 +11,19 @@ const limits = {
     simplex2: 1e-4,
     simplex3: 1e-4,
     perlin3: 1e-4,
+    simplex4: 1e-4,
+    fbm4: 2e-3,
+    worley3: 1e-4,
+    worley2: 1e-4,
+    second2: 1e-4,
+    second3: 1e-4,
     fbm3: 2e-3,
     ridged2: 2e-3,
     warp3: 2e-3,
     warpFbm2: 2e-3,
   },
   seam = 1e-3;
+const count = 4096;
 const context = await openBrowser({ startPath: '/packages/shader/test/noise-check.html', port: 5211 }),
   { page, hardware } = context,
   pageErrors = [];
@@ -48,6 +55,9 @@ try {
     assert.ok(c.maxError <= seam, `${name}: max error ${c.maxError} at ${c.worst}`);
     assert.ok(c.range[1] - c.range[0] > 0.3, `${name}: the field is not flat`);
   }
+  const { same, compared } = await page.evaluate(() => window.cellIds());
+  assert.ok(compared > count * 0.9 && same === compared, `cell ids: ${same} of ${compared} match`);
+  console.log('cell ids', same, 'of', compared);
   assert.deepEqual(pageErrors, []);
   console.log('noise CPU/GPU agreement passed');
 } finally {

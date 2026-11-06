@@ -182,8 +182,35 @@ matches `.perlin`, and `fbm`, `ridged`, `domainWarp` match the CPU combinators, 
 the same field the GPU displaces. Agreement is to float rounding, not bits (f32 on the GPU, f64 on the CPU), measured on a
 real adapter by `node packages/shader/test/noise-check.mjs` (under the GPU lock); on an Intel Arc 140V (Edge, 4096 points per field) the largest absolute difference was 2e-5 for single simplex and Perlin samples and 1.1e-4 for warped fBm (values span about [-1, 1]). Simplex seeds are compile-time
 (each seed's 256-byte permutation is a private array, declared once per shader); `perlin3` takes a u32 node, so a uniform
-reseeds without recompiling. Fractal sums unroll at graph build time (`octaves` 1..16). Not included: 4D simplex and
-Worley on the GPU. Example: `examples/noise.html` (terrain with CPU-placed markers resting on the GPU surface).
+reseeds without recompiling. Fractal sums unroll at graph build time (`octaves` 1..16). Example: `examples/noise.html` (terrain with CPU-placed markers resting on the GPU surface).
+
+Cellular noise and 4D simplex, for cracks, cells, caustics and animation that loops:
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {NodeMaterial, cos, mix, sin, smoothstep, time, uv, vec3, vec4} from 'margoengine/shader';
+import {simplex4, voronoi2, worley3} from 'margoengine/shader/noise';
+const stage = await createStage('#app');
+const cell = voronoi2(uv().mul(8), 5);                                                   // x nearest, y second, z cell id
+const crack = smoothstep(0, 0.05, cell.y.sub(cell.x));                                   // 0 on every border
+const turn = time.mul((Math.PI * 2) / 4);                                                // one circle in 4 seconds
+const loop = simplex4(vec4(uv().mul(3), cos(turn), sin(turn)), 7);                       // repeats exactly every 4 seconds
+createMesh(stage.engine, planeGeometry(4, 4), new NodeMaterial({
+  colorNode: mix(vec3(0.1), vec3(cell.z, 0.5, loop.mul(0.5).add(0.5)), crack),
+  emissiveNode: worley3(vec3(uv().mul(6), time)).oneMinus().pow(8).xxx,                  // caustic-like light
+}));
+```
+
+| Node | Returns | CPU twin |
+| --- | --- | --- |
+| `simplex4(p, seed)` | `f32`, about -1 to 1 | `new Noise(seed).simplex4(x, y, z, w)` |
+| `worley3(p, seed)` | `f32`, distance from 0 | `new Noise(seed).worley(x, y, z)` |
+| `worley2(p, seed)` | `f32`, distance from 0 | none |
+| `voronoi2(p, seed)`, `voronoi3(p, seed)` | `vec3f`: nearest distance, second nearest, cell id 0 to 1 | `.x` of `voronoi3` is `worley` |
+
+`seed` of the cellular nodes may be a u32 node, as for `perlin3`; `simplex4` seeds are compile-time, like the other simplex nodes. `fbm`, `ridged` and `domainWarp` take `vec4f` fields too. The cellular search visits two cells each side, which is exact for both distances: 25 cells in 2D, 125 in 3D with three hashes each, so `voronoi3` and `worley3` are costly per pixel and suit a bake, a compute pass or a low-resolution texture better than a full-screen fragment.
 
 ## Utility nodes (`@margoengine/shader/utils`)
 

@@ -1,7 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ComputePass, storage, uniform, vec2, vec3 } from '../dist/index.js';
-import { simplex2, simplex3, perlin3, fbm, ridged, domainWarp } from '../dist/noise.js';
+import { ComputePass, storage, uniform, vec2, vec3, vec4 } from '../dist/index.js';
+import {
+  simplex2,
+  simplex3,
+  simplex4,
+  perlin3,
+  worley2,
+  worley3,
+  voronoi2,
+  voronoi3,
+  fbm,
+  ridged,
+  domainWarp,
+} from '../dist/noise.js';
 
 const count = (text, part) => text.split(part).length - 1;
 const compute = (body) =>
@@ -34,6 +46,32 @@ test('noise nodes declare each seed table and helper once per shader', () => {
     .map((v) => parseInt(v));
   assert.equal(table.length, 64);
   assert.deepEqual(new Set(new Uint8Array(Uint32Array.from(table).buffer)).size, 256);
+});
+
+test('4D simplex shares the seed table and folds like the other fields', () => {
+  const code = compute((p) => simplex4(vec4(p, 0.5), 7).add(simplex3(p, 7)));
+  assert.equal(count(code, 'var<private> noisePerm7Table'), 1);
+  assert.equal(count(code, 'fn noisePerm7Simplex4('), 1);
+  assert.equal(count(code, 'fn noiseCorner4('), 1);
+  assert.equal(fbm((q) => simplex4(q, 3), vec4(1), { octaves: 2 }).type, 'f32');
+  assert.equal(ridged((q) => simplex4(q, 3), vec4(1), { octaves: 2 }).type, 'f32');
+  assert.match(
+    compute((p) => domainWarp((q) => simplex4(q, 3), vec4(p, 1))),
+    /noisePerm3Simplex4/,
+  );
+  assert.throws(() => simplex4(vec3(1), 1), /simplex4 position must be vec4f/);
+  assert.throws(() => simplex4(vec4(1), 1.5), RangeError);
+});
+
+test('cellular nodes hash once per shader, take live seeds and share one search', () => {
+  const seed = uniform(3, { type: 'u32', name: 'seed' }),
+    code = compute((p) => worley3(p, seed).add(voronoi3(p, seed).y).add(perlin3(p, 1)).add(worley2(p.xy)));
+  assert.equal(count(code, 'fn noiseHash('), 1);
+  assert.equal(count(code, 'fn noiseVoronoi3('), 1);
+  assert.equal(count(code, 'noiseVoronoi3(p'), 1);
+  assert.equal(voronoi2(vec2(0)).type, 'vec3f');
+  assert.equal(worley3(vec3(0)).type, 'f32');
+  assert.throws(() => worley2(vec2(0), 0.5), RangeError);
 });
 
 test('perlin takes a constant or a live u32 seed; fractal sums unroll', () => {

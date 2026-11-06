@@ -3,39 +3,59 @@
 // Evaluates every WGSL noise node on the GPU for 4096 positions and compares with the CPU twins in @margoengine/procedural/noise.
 import {createStage} from '/packages/stage/dist/index.js';
 import {ComputePass, storage} from '/packages/shader/dist/index.js';
-import {simplex2, simplex3, perlin3, fbm, ridged, domainWarp} from '/packages/shader/dist/noise.js';
+import {simplex2, simplex3, simplex4, perlin3, worley2, worley3, voronoi2, voronoi3, fbm, ridged, domainWarp} from '/packages/shader/dist/noise.js';
 import {Noise, fbm as cpuFbm, ridged as cpuRidged, domainWarp as cpuWarp} from '/packages/procedural/dist/noise.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false});
 const engine=stage.engine,device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const count=4096,points=new Float32Array(count*4);let s=12345;const random=()=>{s^=s<<13;s^=s>>>17;s^=s<<5;return (s>>>0)/4294967296;};
 // Coordinates up to +-40 (fbm octaves reach +-640); every 64th point sits on an integer lattice corner.
 for(let i=0;i<count;i++)for(let k=0;k<3;k++)points[i*4+k]=i%64===0?Math.round((random()-0.5)*20):(random()-0.5)*80;
+for(let i=0;i<count;i++)points[i*4+3]=i%64===0?Math.round((random()-0.5)*20):(random()-0.5)*80;
+// The cellular reference: every feature point within three cells, written out from the hash, so the search radius is proved too.
+const hash=(x,y,z,seed)=>{let h=Math.imul(x,374761393)^Math.imul(y,668265263)^Math.imul(z,1442695041)^seed;h=Math.imul(h^(h>>>13),1274126177);return (h^(h>>>16))>>>0;};
+const cells=(p,seed)=>{const n=p.length,c=p.map(Math.floor),found=[];const reach=(k,o)=>{if(k<n){for(let a=-3;a<=3;a++)reach(k+1,[...o,a]);return;}const q=[0,0,0];o.forEach((v,j)=>q[j]=c[j]+v);const salts=[0,0x9e3779b9,0x85ebca6b];let e=0;for(let j=0;j<n;j++){const d=q[j]+hash(q[0],q[1],q[2],seed^salts[j])/4294967296-p[j];e+=d*d;}found.push([e,hash(q[0],q[1],q[2],seed^0xc2b2ae35)]);};reach(0,[]);found.sort((a,b)=>a[0]-b[0]);return [Math.sqrt(found[0][0]),Math.sqrt(found[1][0]),(found[0][1]>>>8)/16777216];};
 const input=storage(points,'vec4f'),n7=new Noise(7),n3=new Noise(3),n11=new Noise(11);
 const cases={
   simplex2:[p=>simplex2(p.xy,7),(x,y)=>n7.simplex2(x,y)],
   simplex3:[p=>simplex3(p.xyz,7),(x,y,z)=>n7.simplex(x,y,z)],
   perlin3:[p=>perlin3(p.xyz,7),(x,y,z)=>n7.perlin(x,y,z)],
+  simplex4:[p=>simplex4(p,7),(x,y,z,w)=>n7.simplex4(x,y,z,w)],
+  fbm4:[p=>fbm(q=>simplex4(q,3),p,{octaves:3}),cpuFbm((x,y,z,w)=>n3.simplex4(x,y,z,w),{octaves:3})],
+  worley3:[p=>worley3(p.xyz,7),(x,y,z)=>n7.worley(x,y,z)],
+  worley2:[p=>worley2(p.xy,7),(x,y)=>cells([x,y],7)[0]],
+  second2:[p=>voronoi2(p.xy,7).y,(x,y)=>cells([x,y],7)[1]],
+  second3:[p=>voronoi3(p.xyz,7).y,(x,y,z)=>cells([x,y,z],7)[1]],
   fbm3:[p=>fbm(q=>simplex3(q,7),p.xyz,{octaves:5}),cpuFbm((x,y,z)=>n7.simplex(x,y,z),{octaves:5})],
   ridged2:[p=>ridged(q=>simplex2(q,3),p.xy,{octaves:4}),cpuRidged((x,y)=>n3.simplex2(x,y),{octaves:4})],
   warp3:[p=>domainWarp(q=>simplex3(q,11),p.xyz,{strength:0.5}),cpuWarp((x,y,z)=>n11.simplex(x,y,z),{strength:0.5,dimensions:3})],
   warpFbm2:[p=>domainWarp(q=>fbm(r=>simplex2(r,3),q,{octaves:3}),p.xy,{strength:0.75}),cpuWarp(cpuFbm((x,y)=>n3.simplex2(x,y),{octaves:3}),{strength:0.75,dimensions:2})],
 };
 const outputs=Object.fromEntries(Object.keys(cases).map(k=>[k,storage(count,'f32')]));
-const pass=new ComputePass(count,i=>{const p=input.element(i);return Object.entries(cases).map(([k,[gpu]])=>outputs[k].store(i,gpu(p)));});
+// A stage binds 8 storage buffers by default: the input and six outputs a pass.
+const entries=Object.entries(cases),passes=[];
+for(let at=0;at<entries.length;at+=6)passes.push(new ComputePass(count,i=>{const p=input.element(i);return entries.slice(at,at+6).map(([k,[gpu]])=>outputs[k].store(i,gpu(p)));},{name:'noise:'+at}));
 async function readBack(buffer){
   const size=buffer.data.byteLength,read=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
   encoder.copyBufferToBuffer(buffer.buffer(device),0,read,0,size);device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);
   const values=new Float32Array(read.getMappedRange().slice(0));read.unmap();read.destroy();return values;
 }
 window.run=async()=>{
-  device.pushErrorScope('validation');engine.use(pass);engine.render();await device.queue.onSubmittedWorkDone();
+  device.pushErrorScope('validation');for(const pass of passes)engine.use(pass);engine.render();await device.queue.onSubmittedWorkDone();
   const error=(await device.popErrorScope())?.message??null,result={error,errors,adapter:engine.gpu.adapterInfo??null,cases:{}};
   for(const [name,[,cpu]] of Object.entries(cases)){
     const gpu=await readBack(outputs[name]),errors=new Float64Array(count);let max=0,sum=0,worst=-1,lo=Infinity,hi=-Infinity;
-    for(let i=0;i<count;i++){const c=cpu(points[i*4],points[i*4+1],points[i*4+2]),d=errors[i]=Math.abs(gpu[i]-c);sum+=d;if(d>max){max=d;worst=i;}lo=Math.min(lo,c);hi=Math.max(hi,c);}
+    for(let i=0;i<count;i++){const c=cpu(points[i*4],points[i*4+1],points[i*4+2],points[i*4+3]),d=errors[i]=Math.abs(gpu[i]-c);sum+=d;if(d>max){max=d;worst=i;}lo=Math.min(lo,c);hi=Math.max(hi,c);}
     result.cases[name]={maxError:max,p999:errors.sort()[Math.floor(count*0.999)],meanError:sum/count,range:[lo,hi],worst:worst<0?null:[...points.subarray(worst*4,worst*4+3)]};
   }
   return result;
+};
+// A point near a border can pick either cell on f32, so ids are compared where the two nearest distances clearly differ.
+const ids=storage(count,'f32'),idPass=new ComputePass(count,i=>ids.store(i,voronoi3(input.element(i).xyz,7).z),{name:"noise:ids"});
+window.cellIds=async()=>{
+  engine.use(idPass);engine.render();await device.queue.onSubmittedWorkDone();
+  const gpu=await readBack(ids);let same=0,compared=0;
+  for(let i=0;i<count;i++){const c=cells([points[i*4],points[i*4+1],points[i*4+2]],7);if(c[1]-c[0]<1e-3)continue;compared++;if(Math.abs(gpu[i]-c[2])<1e-6)same++;}
+  return {same,compared};
 };
 window.ready=true;
 </script></body></html>

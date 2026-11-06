@@ -5,7 +5,7 @@ import { fractalOptions, type FractalOptions } from '../../shared/fractal.js';
 // each contribution is zero on the faces of its simplex and the field has no seams (the often used 0.6 in 3D/4D leaves
 // small jumps there). Gradients are the 8 compass directions (2D), the 12 cube-edge midpoints (3D) and the 32
 // tesseract-edge midpoints (4D), picked by nested lookups in a seeded permutation. `@margoengine/shader/noise` has WGSL
-// twins of simplex2/simplex3/perlin and of fbm/ridged/domainWarp.
+// twins of simplex2/simplex3/simplex4/perlin/worley and of fbm/ridged/domainWarp.
 
 /** A field of 2, 3 or 4 coordinates; a 2D field ignores `z` and `w`. */
 export type NoiseFunction = (x: number, y: number, z?: number, w?: number) => number;
