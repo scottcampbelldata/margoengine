@@ -1020,7 +1020,9 @@ export class Replayer {
 
   /**
    * Copies texels between an sRGB format and its unorm twin as raw bytes: through a pixel buffer, on the GPU (a blit
-   * would decode and encode the colour).
+   * would decode and encode the colour). Bytes for an sRGB texture go through client memory instead, which waits for the
+   * GPU: ANGLE on Metal encodes what reaches an sRGB texture from PIXEL_UNPACK_BUFFER (64 samples as 0.25, not 0.05),
+   * and copyTexSubImage2D refuses a unorm source.
    */
   private rawCopy(
     from: Sub,
@@ -1031,17 +1033,24 @@ export class Replayer {
     [dx, dy]: readonly number[],
   ): void {
     const gl = this.gl,
-      s = this.device.state;
+      s = this.device.state,
+      bytes = to.info.srgb ? new Uint8Array(w * h * 4) : null,
+      pbo = bytes ? null : (gl.createBuffer() as WebGLBuffer),
+      // texSubImage takes either the client bytes or an offset into the bound pixel buffer.
+      pixels = (bytes ?? 0) as number;
     s.bindReadFramebuffer(this.single(from));
     gl.readBuffer(gl.COLOR_ATTACHMENT0);
-    const pbo = gl.createBuffer() as WebGLBuffer;
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
-    gl.bufferData(gl.PIXEL_PACK_BUFFER, w * h * 4, gl.STREAM_COPY);
-    gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-    gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, pbo);
+    if (bytes) gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+    else {
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, w * h * 4, gl.STREAM_COPY);
+      gl.readPixels(x, y, w, h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, pbo);
+    }
     s.scratch(to.target, to.gl);
-    if (to.target === gl.TEXTURE_2D) gl.texSubImage2D(gl.TEXTURE_2D, level, dx, dy, w, h, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+    if (to.target === gl.TEXTURE_2D)
+      gl.texSubImage2D(gl.TEXTURE_2D, level, dx, dy, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     else if (to.target === gl.TEXTURE_CUBE_MAP)
       gl.texSubImage2D(
         gl.TEXTURE_CUBE_MAP_POSITIVE_X + layer - to.layer,
@@ -1052,7 +1061,7 @@ export class Replayer {
         h,
         gl.RGBA,
         gl.UNSIGNED_BYTE,
-        0,
+        pixels,
       );
     else
       gl.texSubImage3D(
@@ -1066,10 +1075,12 @@ export class Replayer {
         1,
         gl.RGBA,
         gl.UNSIGNED_BYTE,
-        0,
+        pixels,
       );
-    gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
-    gl.deleteBuffer(pbo);
+    if (pbo) {
+      gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, null);
+      gl.deleteBuffer(pbo);
+    }
   }
 
   /** Brings one subresource of storage `to` up to date from storage `from` (a texture's copies, see TextureStorage). */

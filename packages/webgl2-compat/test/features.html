@@ -348,7 +348,9 @@ const D = array<vec3f, 8>(vec3f(1,0,0), vec3f(-1,0,0), vec3f(0,1,0), vec3f(0,-1,
         colorAttachments: [],
         depthStencilAttachment: {
           view: t.createView(),
-          ...(depth ? { depthLoadOp: 'clear', depthStoreOp: 'store', depthClearValue: 0.375 } : {}),
+          // 0.375 falls between two depth16unorm levels, and which one a clear picks is the driver's choice: Metal's clear
+          // truncates and WebKit's WebGPU rounds, so a value a quarter above level 24576 reads the same everywhere.
+          ...(depth ? { depthLoadOp: 'clear', depthStoreOp: 'store', depthClearValue: format === 'depth16unorm' ? 24576.25 / 65535 : 0.375 } : {}),
           ...(stencil ? { stencilLoadOp: 'clear', stencilStoreOp: 'store', stencilClearValue: 0xa5 } : {}),
         },
       });
