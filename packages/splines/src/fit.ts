@@ -1,7 +1,7 @@
 import { Spline } from './index.js';
 
 /** Options for {@link fitSpline}. */
-export interface FitOptions {
+export interface SplineFitOptions {
   /** Largest distance allowed between any input point and the fitted curve, above 0, in the points' own units. */
   tolerance: number;
   /** Newton refinements of each point's curve parameter before a piece is split, an integer 0..20. Default 4. */
@@ -10,7 +10,7 @@ export interface FitOptions {
   divisions?: number;
 }
 /** Result of {@link fitSpline}. */
-export interface FitResult {
+export interface SplineFit {
   /** The cubic Bezier control points, 3 numbers each: `3 * pieces + 1` points. */
   points: Float64Array;
   /** The fitted curve as a `kind: 'bezier'` spline. */
@@ -92,7 +92,13 @@ function generate(pts: Float64Array, first: number, last: number, params: Float6
   return c;
 }
 /** Largest point-to-curve distance (at the given parameters) and the index it happens at. */
-function worst(pts: Float64Array, first: number, last: number, c: Float64Array, params: Float64Array): [number, number] {
+function worst(
+  pts: Float64Array,
+  first: number,
+  last: number,
+  c: Float64Array,
+  params: Float64Array,
+): [number, number] {
   let max = 0,
     at = Math.floor((first + last) / 2);
   for (let i = first + 1; i < last; i++) {
@@ -125,7 +131,10 @@ function refine(pts: Float64Array, first: number, last: number, c: Float64Array,
  * halves are fitted again. Repeated points are dropped. Pieces join with matching tangents except at cuts forced by
  * sharp corners, where the cut tangent is shared and the curve stays smooth.
  */
-export function fitSpline(points: readonly ArrayLike<number>[], { tolerance, refinements = 4, divisions = 256 }: FitOptions): FitResult {
+export function fitSpline(
+  points: readonly ArrayLike<number>[],
+  { tolerance, refinements = 4, divisions = 256 }: SplineFitOptions,
+): SplineFit {
   if (!(Number.isFinite(tolerance) && tolerance > 0)) throw new RangeError('tolerance must be above 0');
   if (!Number.isInteger(refinements) || refinements < 0 || refinements > 20)
     throw new RangeError('refinements must be an integer from 0 to 20');
@@ -135,7 +144,8 @@ export function fitSpline(points: readonly ArrayLike<number>[], { tolerance, ref
     if (p.length !== 3 || !(Number.isFinite(p[0]) && Number.isFinite(p[1]) && Number.isFinite(p[2])))
       throw new TypeError('Every point must be a finite 3D point');
     const n = kept.length;
-    if (!n || Math.hypot(p[0] - kept[n - 3], p[1] - kept[n - 2], p[2] - kept[n - 1]) > 1e-12) kept.push(p[0], p[1], p[2]);
+    if (!n || Math.hypot(p[0] - kept[n - 3], p[1] - kept[n - 2], p[2] - kept[n - 1]) > 1e-12)
+      kept.push(p[0], p[1], p[2]);
   }
   const pts = Float64Array.from(kept),
     count = pts.length / 3;

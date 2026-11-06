@@ -1772,7 +1772,7 @@
     "package": "@margoengine/splines",
     "version": "1.0.0",
     "published": false,
-    "description": "3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup.",
+    "description": "3D Catmull-Rom, Bezier, Hermite, B-spline and Kochanek-Bartels curves with arc-length lookup, closest point, stable frames and knot editing.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "splines",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/splines@1.0.0",

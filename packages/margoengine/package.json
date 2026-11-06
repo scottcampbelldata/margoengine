@@ -1502,6 +1502,26 @@
       "types": "./dist/splines.d.ts",
       "import": "./dist/splines.js"
     },
+    "./splines/closest": {
+      "types": "./dist/splines/closest.d.ts",
+      "import": "./dist/splines/closest.js"
+    },
+    "./splines/frames": {
+      "types": "./dist/splines/frames.d.ts",
+      "import": "./dist/splines/frames.js"
+    },
+    "./splines/knots": {
+      "types": "./dist/splines/knots.d.ts",
+      "import": "./dist/splines/knots.js"
+    },
+    "./splines/mesh": {
+      "types": "./dist/splines/mesh.d.ts",
+      "import": "./dist/splines/mesh.js"
+    },
+    "./splines/fit": {
+      "types": "./dist/splines/fit.d.ts",
+      "import": "./dist/splines/fit.js"
+    },
     "./sprites": {
       "types": "./dist/sprites.d.ts",
       "import": "./dist/sprites.js"

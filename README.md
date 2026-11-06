@@ -392,7 +392,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/creative`](packages/creative/README.md) | WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine. |
 | [`@margoengine/procedural`](packages/procedural/README.md) | Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language. |
 | [`@margoengine/wfc`](packages/wfc/README.md) | Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking. |
-| [`@margoengine/splines`](packages/splines/README.md) | 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup. |
+| [`@margoengine/splines`](packages/splines/README.md) | 3D Catmull-Rom, Bezier, Hermite, B-spline and Kochanek-Bartels curves with arc-length lookup, closest point, stable frames and knot editing. |
 
 ### Animation and interaction (15)
 

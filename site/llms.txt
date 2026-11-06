@@ -106,7 +106,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/creative](https://margoengine.com/llms/packages/creative.md): WebGPU particles, atmosphere, toon shading and post-processing for Margo Engine.
 - [@margoengine/procedural](https://margoengine.com/llms/packages/procedural.md): Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.
 - [@margoengine/wfc](https://margoengine.com/llms/packages/wfc.md): Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking.
-- [@margoengine/splines](https://margoengine.com/llms/packages/splines.md): 3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup.
+- [@margoengine/splines](https://margoengine.com/llms/packages/splines.md): 3D Catmull-Rom, Bezier, Hermite, B-spline and Kochanek-Bartels curves with arc-length lookup, closest point, stable frames and knot editing.
 
 ## Packages: Animation and interaction
 
@@ -227,7 +227,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 8 entry points
 - [@margoengine/procedural API](https://margoengine.com/llms/api/procedural.md): 6 entry points
 - [@margoengine/wfc API](https://margoengine.com/llms/api/wfc.md): 2 entry points
-- [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 1 entry point
+- [@margoengine/splines API](https://margoengine.com/llms/api/splines.md): 6 entry points
 - [@margoengine/animation API](https://margoengine.com/llms/api/animation.md): 5 entry points
 - [@margoengine/animator API](https://margoengine.com/llms/api/animator.md): 2 entry points
 - [@margoengine/kinematics-constraints API](https://margoengine.com/llms/api/kinematics-constraints.md): 1 entry point

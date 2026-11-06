@@ -2,13 +2,13 @@ import { distanceAt } from './closest.js';
 import type { Spline } from './index.js';
 
 /** Number of cubic segments in a spline (the parameter range 0..1 is split evenly across them). */
-export function segmentCount(spline: Spline): number {
+export function splineSegmentCount(spline: Spline): number {
   const count = spline.points.length / 3;
   return spline.kind === 'bezier' ? (count - 1) / 3 : spline.closed ? count : count - 1;
 }
 /** Number of knots a per-knot array needs: one per segment boundary, and a closed curve's last knot is its first. */
 export function knotCount(spline: Spline): number {
-  const segments = segmentCount(spline);
+  const segments = splineSegmentCount(spline);
   return spline.closed ? segments : segments + 1;
 }
 /** Curve parameter at an arc-length position (the inverse of {@link distanceAt}). */
@@ -201,7 +201,7 @@ export class SplineFrames {
     const roll = this.roll;
     if (!roll) return 0;
     if (typeof roll === 'function') return roll(t);
-    const segments = segmentCount(this.spline),
+    const segments = splineSegmentCount(this.spline),
       scaled = t * segments,
       k = Math.min(segments - 1, Math.floor(scaled)),
       w = scaled - k;

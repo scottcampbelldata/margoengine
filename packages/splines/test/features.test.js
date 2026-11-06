@@ -1,14 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  Spline,
-  KnotPath,
-  SplineFrames,
-  closestPointOnSpline,
-  distanceAt,
-  knotCount,
-  parameterAt,
-} from '../dist/index.js';
+import { Spline } from '../dist/index.js';
+import { KnotPath } from '../dist/knots.js';
+import { SplineFrames, knotCount, parameterAt } from '../dist/frames.js';
+import { closestPointOnSpline, distanceAt } from '../dist/closest.js';
 import { placeAlongSpline, deformAlongSpline } from '../dist/mesh.js';
 import { fitSpline } from '../dist/fit.js';
 
@@ -119,7 +114,8 @@ test('frames on a helix keep a constant angle to the curve; roll turns the frame
 
 test('closed loops meet their own start frame once the twist is spread out', () => {
   const ring = [];
-  for (let i = 0; i < 8; i++) ring.push([Math.cos((i * Math.PI) / 4) * 4, Math.sin((i * Math.PI) / 2) * 1.5, Math.sin((i * Math.PI) / 4) * 4]);
+  for (let i = 0; i < 8; i++)
+    ring.push([Math.cos((i * Math.PI) / 4) * 4, Math.sin((i * Math.PI) / 2) * 1.5, Math.sin((i * Math.PI) / 4) * 4]);
   const loop = new Spline(ring, { closed: true, divisions: 2000 });
   const frames = new SplineFrames(loop, { samples: 800 });
   const a = frames.frameAt(0),
@@ -193,12 +189,7 @@ test('knot paths: insertAt keeps the curve, remove and split behave, modes shape
 
 test('closed knot paths wrap, insert across the closing segment and split into one open path', () => {
   const ring = new KnotPath(
-    [
-      { position: [0, 0, 0] },
-      { position: [4, 0, 0] },
-      { position: [4, 0, 4] },
-      { position: [0, 0, 4] },
-    ],
+    [{ position: [0, 0, 0] }, { position: [4, 0, 0] }, { position: [4, 0, 4] }, { position: [0, 0, 4] }],
     { closed: true },
   );
   const spline = ring.toSpline();
@@ -237,7 +228,8 @@ test('B-splines stay inside the control hull and clamp at the ends; Kochanek-Bar
   assert.ok(dist3(left, right) < 1e-4);
   const cr = new Spline(pts),
     kb = new Spline(pts, { kind: 'kochanek-bartels' });
-  for (let i = 0; i <= 20; i++) assert.ok(dist3(cr.at(i / 20, new Float64Array(3)), kb.at(i / 20, new Float64Array(3))) < 1e-12);
+  for (let i = 0; i <= 20; i++)
+    assert.ok(dist3(cr.at(i / 20, new Float64Array(3)), kb.at(i / 20, new Float64Array(3))) < 1e-12);
   // The curve still passes through every point at any setting.
   const tight = new Spline(pts, { kind: 'kochanek-bartels', tension: 1, continuity: 0.5, bias: -0.5 });
   for (let k = 0; k < pts.length; k++) assert.ok(dist3(tight.at(k / 4, out), pts[k]) < 1e-12);
@@ -269,7 +261,14 @@ test('placeAlongSpline spaces instances by arc length with orthonormal right-han
   }
   const fitted = placeAlongSpline(curve, { spacing: 3, fit: true });
   assert.ok(Math.abs(fitted.distances[fitted.count - 1] - curve.length) < 1e-9);
-  const counted = placeAlongSpline(curve, { count: 5, start: 2, end: 10, forward: 'x', scale: [1, 2, 3], align: false });
+  const counted = placeAlongSpline(curve, {
+    count: 5,
+    start: 2,
+    end: 10,
+    forward: 'x',
+    scale: [1, 2, 3],
+    align: false,
+  });
   assert.equal(counted.count, 5);
   assert.equal(counted.matrices[0], 1);
   assert.equal(counted.matrices[5], 2);
@@ -300,7 +299,14 @@ test('deformAlongSpline bends a bar onto a quarter circle, keeps radius and stre
   const verts = [],
     N = 60,
     L = curve.length;
-  for (let i = 0; i <= N; i++) for (const [x, y] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) verts.push(x, y, (i / N) * L);
+  for (let i = 0; i <= N; i++)
+    for (const [x, y] of [
+      [0.5, 0],
+      [-0.5, 0],
+      [0, 0.5],
+      [0, -0.5],
+    ])
+      verts.push(x, y, (i / N) * L);
   const bent = deformAlongSpline(curve, new Float32Array(verts), { frames: { up: [0, 1, 0] } });
   const out = bent.positions;
   assert.ok(out instanceof Float32Array);
@@ -319,7 +325,9 @@ test('deformAlongSpline bends a bar onto a quarter circle, keeps radius and stre
   assert.ok(Math.abs(dist3(past.positions.subarray(3), arc[32]) - 5) < 1e-3);
   const held = deformAlongSpline(curve, new Float64Array([0, 0, 0, 0, 0, L + 5]), { overflow: 'clamp' });
   assert.ok(dist3(held.positions.subarray(3), arc[32]) < 1e-3);
-  const normals = deformAlongSpline(curve, new Float64Array([0, 0, L, 0, 0, L]), { normals: new Float64Array([0, 0, 1, 1, 0, 0]) });
+  const normals = deformAlongSpline(curve, new Float64Array([0, 0, L, 0, 0, L]), {
+    normals: new Float64Array([0, 0, 1, 1, 0, 0]),
+  });
   assert.ok(Math.abs(Math.hypot(...normals.normals.subarray(3)) - 1) < 1e-9);
   assert.throws(() => deformAlongSpline(curve, new Float32Array(4)), /3 numbers/);
   assert.throws(() => deformAlongSpline(curve, new Float32Array([NaN, 0, 0])), /finite/);
@@ -341,7 +349,15 @@ test('fitSpline reduces a dense stroke to a few pieces within tolerance of every
   const fit = fitSpline(dense, { tolerance });
   assert.ok(fit.pieces <= 6, `pieces ${fit.pieces}`);
   assert.ok(fitSpline(dense, { tolerance: 0.5 }).pieces < fit.pieces, 'a looser tolerance needs fewer pieces');
-  const one = new Spline([[0, 0, 0], [2, 5, 1], [6, -4, 2], [9, 1, 0]], { kind: 'bezier', divisions: 2000 }),
+  const one = new Spline(
+      [
+        [0, 0, 0],
+        [2, 5, 1],
+        [6, -4, 2],
+        [9, 1, 0],
+      ],
+      { kind: 'bezier', divisions: 2000 },
+    ),
     onePts = [];
   for (let i = 0; i <= 300; i++) onePts.push([...one.at(i / 300, new Float64Array(3))]);
   assert.equal(fitSpline(onePts, { tolerance: 0.01 }).pieces, 1, 'one cubic in, one cubic out');
@@ -354,9 +370,10 @@ test('fitSpline reduces a dense stroke to a few pieces within tolerance of every
 
 test('fitSpline follows a noisy circle and a sharp corner, and a looser tolerance gives fewer pieces', () => {
   let seed = 3;
-  const noise = () => (((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32) - 0.5) * 0.01;
+  const noise = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32 - 0.5) * 0.01;
   const circle = [];
-  for (let i = 0; i <= 400; i++) circle.push([Math.cos(i * 0.0157) * 5 + noise(), Math.sin(i * 0.0157) * 5 + noise(), noise()]);
+  for (let i = 0; i <= 400; i++)
+    circle.push([Math.cos(i * 0.0157) * 5 + noise(), Math.sin(i * 0.0157) * 5 + noise(), noise()]);
   const fine = fitSpline(circle, { tolerance: 0.05 }),
     coarse = fitSpline(circle, { tolerance: 0.3 });
   assert.ok(coarse.pieces <= fine.pieces);
@@ -368,9 +385,35 @@ test('fitSpline follows a noisy circle and a sharp corner, and a looser toleranc
   for (const p of corner) assert.ok(closestPointOnSpline(cf.spline, p, { samples: 4000 }).distance <= 0.05 + 1e-6);
   assert.throws(() => fitSpline(corner, { tolerance: 0 }), /tolerance/);
   assert.throws(() => fitSpline([[0, 0, 0]], { tolerance: 1 }), /2 to/);
-  assert.throws(() => fitSpline([[0, 0, 0], [0, 0, 0]], { tolerance: 1 }), /distinct/);
-  assert.throws(() => fitSpline([[0, 0, 0], [1, NaN, 0]], { tolerance: 1 }), /finite/);
-  const two = fitSpline([[0, 0, 0], [3, 0, 0]], { tolerance: 0.1 });
+  assert.throws(
+    () =>
+      fitSpline(
+        [
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
+        { tolerance: 1 },
+      ),
+    /distinct/,
+  );
+  assert.throws(
+    () =>
+      fitSpline(
+        [
+          [0, 0, 0],
+          [1, NaN, 0],
+        ],
+        { tolerance: 1 },
+      ),
+    /finite/,
+  );
+  const two = fitSpline(
+    [
+      [0, 0, 0],
+      [3, 0, 0],
+    ],
+    { tolerance: 0.1 },
+  );
   assert.equal(two.pieces, 1);
   assert.ok(Math.abs(two.spline.length - 3) < 1e-9);
 });

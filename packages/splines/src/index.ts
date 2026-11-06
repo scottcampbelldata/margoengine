@@ -45,7 +45,15 @@ export class Spline {
   private readonly count: number;
   constructor(
     points: readonly ArrayLike<number>[],
-    { kind = 'catmull-rom', closed = false, tangents, divisions = 256, tension = 0, continuity = 0, bias = 0 }: SplineOptions = {},
+    {
+      kind = 'catmull-rom',
+      closed = false,
+      tangents,
+      divisions = 256,
+      tension = 0,
+      continuity = 0,
+      bias = 0,
+    }: SplineOptions = {},
   ) {
     if (
       !KINDS.includes(kind) ||
@@ -208,6 +216,3 @@ export class Spline {
   }
 }
 
-export * from './closest.js';
-export * from './frames.js';
-export * from './knots.js';

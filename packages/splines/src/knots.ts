@@ -6,15 +6,15 @@ import { Spline, type SplineOptions } from './index.js';
  * `tangentIn` and `tangentOut` exactly as stored, so a corner can point any way.
  */
 export type TangentMode = 'auto' | 'linear' | 'broken';
-type Vec3 = [number, number, number];
+type KnotVec = [number, number, number];
 /** One editable control point of a {@link KnotPath}. */
 export interface Knot {
-  position: Vec3;
+  position: KnotVec;
   mode: TangentMode;
   /** Handle offset from `position` toward the previous knot; read for 'broken' knots only. */
-  tangentIn: Vec3;
+  tangentIn: KnotVec;
   /** Handle offset from `position` toward the next knot; read for 'broken' knots only. */
-  tangentOut: Vec3;
+  tangentOut: KnotVec;
   /** Numbers attached to the knot (width, colour channel, speed...), blended linearly along each segment. */
   data: number[];
 }
@@ -33,18 +33,22 @@ export interface KnotPathOptions {
 }
 
 const MODES: readonly string[] = ['auto', 'linear', 'broken'];
-const vec = (value: ArrayLike<number> | undefined, what: string): Vec3 => {
-  if (!value || value.length !== 3 || !(Number.isFinite(value[0]) && Number.isFinite(value[1]) && Number.isFinite(value[2])))
+const vec = (value: ArrayLike<number> | undefined, what: string): KnotVec => {
+  if (
+    !value ||
+    value.length !== 3 ||
+    !(Number.isFinite(value[0]) && Number.isFinite(value[1]) && Number.isFinite(value[2]))
+  )
     throw new TypeError(`${what} must be a finite 3D vector`);
   return [value[0], value[1], value[2]];
 };
-const lerp3 = (a: Vec3, b: Vec3, u: number): Vec3 => [
+const lerp3 = (a: KnotVec, b: KnotVec, u: number): KnotVec => [
   a[0] + (b[0] - a[0]) * u,
   a[1] + (b[1] - a[1]) * u,
   a[2] + (b[2] - a[2]) * u,
 ];
-const add3 = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
-const sub3 = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const add3 = (a: KnotVec, b: KnotVec): KnotVec => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub3 = (a: KnotVec, b: KnotVec): KnotVec => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
 /**
  * An editable chain of knots that builds a cubic Bezier {@link Spline}: insert, remove and split knots, set how each
@@ -79,7 +83,8 @@ export class KnotPath {
   }
   private checkData(): void {
     const width = this.knots[0].data.length;
-    for (const knot of this.knots) if (knot.data.length !== width) throw new RangeError('Every knot needs the same number of data values');
+    for (const knot of this.knots)
+      if (knot.data.length !== width) throw new RangeError('Every knot needs the same number of data values');
   }
   /** A 'broken' knot given without a handle takes the handle 'auto' would make, once all knots are known. */
   private freezeBroken(from: number, to: number): void {
@@ -104,27 +109,36 @@ export class KnotPath {
     return this.closed ? this.knots[(j + n) % n] : this.knots[j];
   }
   /** The handle offsets a knot builds with, whatever its mode (for 'broken' knots, as stored). */
-  handles(index: number, ignoreStored = false): { tangentIn: Vec3; tangentOut: Vec3 } {
+  handles(index: number, ignoreStored = false): { tangentIn: KnotVec; tangentOut: KnotVec } {
     const knot = this.knots[index];
-    if (!knot) throw new RangeError('No knot at that index');
-    if (knot.mode === 'broken' && !ignoreStored) return { tangentIn: [...knot.tangentIn], tangentOut: [...knot.tangentOut] };
+    if (!knot) throw new RangeError('No knot at that index; pass 0 to count - 1');
+    if (knot.mode === 'broken' && !ignoreStored)
+      return { tangentIn: [...knot.tangentIn], tangentOut: [...knot.tangentOut] };
     const p = knot.position,
       prev = this.neighbor(index, -1)?.position,
       next = this.neighbor(index, 1)?.position;
     if (knot.mode === 'linear' || !prev || !next) {
       // Linear knots, and the free end of an open path, point straight at the neighbor they have.
-      const toward = (q: Vec3 | undefined, other: Vec3 | undefined): Vec3 =>
-        q ? [(q[0] - p[0]) / 3, (q[1] - p[1]) / 3, (q[2] - p[2]) / 3] : other ? [-(other[0] - p[0]) / 3, -(other[1] - p[1]) / 3, -(other[2] - p[2]) / 3] : [0, 0, 0];
+      const toward = (q: KnotVec | undefined, other: KnotVec | undefined): KnotVec =>
+        q
+          ? [(q[0] - p[0]) / 3, (q[1] - p[1]) / 3, (q[2] - p[2]) / 3]
+          : other
+            ? [-(other[0] - p[0]) / 3, -(other[1] - p[1]) / 3, -(other[2] - p[2]) / 3]
+            : [0, 0, 0];
       return { tangentIn: toward(prev, next), tangentOut: toward(next, prev) };
     }
     // Smooth: handle length is a sixth of the neighbors' span, the Bezier form of a Catmull-Rom tangent.
-    const out: Vec3 = [(next[0] - prev[0]) / 6, (next[1] - prev[1]) / 6, (next[2] - prev[2]) / 6];
+    const out: KnotVec = [(next[0] - prev[0]) / 6, (next[1] - prev[1]) / 6, (next[2] - prev[2]) / 6];
     return { tangentIn: [-out[0], -out[1], -out[2]], tangentOut: out };
   }
   /** Change a knot's mode; 'broken' freezes the handles it currently builds with unless new ones are given. */
-  setMode(index: number, mode: TangentMode, handles: { tangentIn?: ArrayLike<number>; tangentOut?: ArrayLike<number> } = {}): void {
+  setMode(
+    index: number,
+    mode: TangentMode,
+    handles: { tangentIn?: ArrayLike<number>; tangentOut?: ArrayLike<number> } = {},
+  ): void {
     const knot = this.knots[index];
-    if (!knot) throw new RangeError('No knot at that index');
+    if (!knot) throw new RangeError('No knot at that index; pass 0 to count - 1');
     if (!MODES.includes(mode)) throw new RangeError("mode must be 'auto', 'linear' or 'broken'");
     const current = this.handles(index);
     knot.mode = mode;
@@ -135,7 +149,8 @@ export class KnotPath {
   }
   /** Insert a knot before `index` (0..count; `count` appends). Returns the index it took. */
   insert(index: number, input: KnotInput): number {
-    if (!Number.isInteger(index) || index < 0 || index > this.knots.length) throw new RangeError('index must be from 0 to count');
+    if (!Number.isInteger(index) || index < 0 || index > this.knots.length)
+      throw new RangeError('index must be from 0 to count');
     if (this.knots.length >= 1_000_000) throw new RangeError('A path holds at most 1,000,000 knots');
     const knot = this.make(input);
     if (this.knots.length && knot.data.length !== this.knots[0].data.length)
@@ -151,7 +166,8 @@ export class KnotPath {
    * new knot is 'auto' and neighbors keep their modes, so the curve reshapes around it.
    */
   insertAt(segment: number, u: number, preserveShape = true): number {
-    if (!Number.isInteger(segment) || segment < 0 || segment >= this.segments) throw new RangeError('No segment at that index');
+    if (!Number.isInteger(segment) || segment < 0 || segment >= this.segments)
+      throw new RangeError('No segment at that index; pass 0 to segments - 1');
     if (!Number.isFinite(u) || u <= 0 || u >= 1) throw new RangeError('u must be between 0 and 1, exclusive');
     const n = this.knots.length,
       a = this.knots[segment],
@@ -189,8 +205,10 @@ export class KnotPath {
   /** Remove a knot. Its neighbors keep their modes; 'broken' handles stay as they are. */
   remove(index: number): void {
     const min = this.closed ? 3 : 2;
-    if (!Number.isInteger(index) || index < 0 || index >= this.knots.length) throw new RangeError('No knot at that index');
-    if (this.knots.length <= min) throw new RangeError(`A ${this.closed ? 'closed' : 'open'} path keeps at least ${min} knots`);
+    if (!Number.isInteger(index) || index < 0 || index >= this.knots.length)
+      throw new RangeError('No knot at that index; pass 0 to count - 1');
+    if (this.knots.length <= min)
+      throw new RangeError(`A ${this.closed ? 'closed' : 'open'} path needs at least ${min} knots`);
     this.knots.splice(index, 1);
   }
   /**
@@ -199,7 +217,8 @@ export class KnotPath {
    */
   split(index: number): KnotPath[] {
     const n = this.knots.length;
-    if (!Number.isInteger(index) || index < 0 || index >= n) throw new RangeError('No knot at that index');
+    if (!Number.isInteger(index) || index < 0 || index >= n)
+      throw new RangeError('No knot at that index; pass 0 to count - 1');
     // Freeze every knot so each piece keeps the handles it had inside the whole path.
     const snapshot = (k: number): KnotInput => {
       const knot = this.knots[k];
@@ -211,7 +230,8 @@ export class KnotPath {
       for (let i = 0; i <= n; i++) ids.push((index + i) % n);
       return [open(ids)];
     }
-    if (index === 0 || index === n - 1) throw new RangeError('An open path splits at an interior knot');
+    if (index === 0 || index === n - 1)
+      throw new RangeError('An open path can only be split at an interior knot; pass 1 to count - 2');
     const first: number[] = [],
       second: number[] = [];
     for (let i = 0; i <= index; i++) first.push(i);
@@ -234,11 +254,15 @@ export class KnotPath {
   /** Build the Bezier spline (3 control points per segment, plus the last knot). */
   toSpline(options: Omit<SplineOptions, 'kind' | 'closed' | 'tangents'> = {}): Spline {
     const n = this.knots.length,
-      points: Vec3[] = [];
+      points: KnotVec[] = [];
     for (let k = 0; k < this.segments; k++) {
       const a = this.knots[k],
         b = this.knots[(k + 1) % n];
-      points.push(a.position, add3(a.position, this.handles(k).tangentOut), add3(b.position, this.handles((k + 1) % n).tangentIn));
+      points.push(
+        a.position,
+        add3(a.position, this.handles(k).tangentOut),
+        add3(b.position, this.handles((k + 1) % n).tangentIn),
+      );
     }
     points.push(this.knots[this.closed ? 0 : n - 1].position);
     return new Spline(points, { ...options, kind: 'bezier' });

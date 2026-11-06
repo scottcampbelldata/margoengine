@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4524920,
+  "total": 4538181,
   "history": [
     {
       "date": "2026-10-24",
@@ -1688,6 +1688,12 @@
       "commit": "4ddb214ea",
       "reason": "New ecs entry ./growable: GrowableWorld; World gains stride, allocate, release and grow",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d90dee3ab",
+      "reason": "splines: root gains the bspline and kochanek-bartels curve kinds (+42 B); new entries closest, frames, knots, mesh, fit",
+      "grew": 6
     }
   ],
   "items": {
@@ -2062,7 +2068,12 @@
     "@margoengine/sky/weather": 5843,
     "@margoengine/splats": 24851,
     "@margoengine/splats/data": 17665,
-    "@margoengine/splines": 1555,
+    "@margoengine/splines": 1853,
+    "@margoengine/splines/closest": 983,
+    "@margoengine/splines/fit": 3250,
+    "@margoengine/splines/frames": 2039,
+    "@margoengine/splines/knots": 3478,
+    "@margoengine/splines/mesh": 3213,
     "@margoengine/sprites": 5059,
     "@margoengine/sprites/animation": 1387,
     "@margoengine/sprites/aseprite": 4595,

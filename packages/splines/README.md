@@ -23,20 +23,20 @@ const camera = new Spline(waypoints, {kind: 'kochanek-bartels', tension: 0.3, bi
 const smooth = new Spline(waypoints, {kind: 'bspline', closed: true});
 ```
 
-## Closest point
+## Closest point (`@margoengine/splines/closest`)
 
 ```ts
-import {closestPointOnSpline} from 'margoengine/splines';
+import {closestPointOnSpline} from 'margoengine/splines/closest';
 const hit = closestPointOnSpline(curve, [3, 1, 4]);
 // hit.t (0..1), hit.arc (world units along the curve), hit.point, hit.distance
 ```
 
 It samples the curve (`samples`, default the spline's `divisions`), then bisects on the slope of the distance around the best sample. A curve that passes close to itself (a tight spiral) needs `samples` high enough to tell the passes apart. `distanceAt(spline, t)` and `parameterAt(spline, distance)` convert between `t` and arc length.
 
-## Stable frames and roll
+## Stable frames and roll (`@margoengine/splines/frames`)
 
 ```ts
-import {SplineFrames} from 'margoengine/splines';
+import {SplineFrames} from 'margoengine/splines/frames';
 const frames = new SplineFrames(curve, {up: [0, 1, 0], roll: (t) => t * 0.5});
 const frame = frames.frameAt(curve.length * 0.25);
 // frame.position, frame.tangent, frame.normal, frame.binormal (binormal = tangent x normal)
@@ -44,10 +44,10 @@ const frame = frames.frameAt(curve.length * 0.25);
 
 Frames are carried along the curve by double reflection (rotation-minimising), so they do not flip where a fixed up vector would (a curve passing through the up direction). `roll` is radians about the tangent: a function of `t`, or one value per knot (`knotCount(curve)`, blended linearly). A closed curve's twist is spread over its length so the last frame meets the first (`closeLoop: false` turns that off). Frames are sampled at `samples` (default 256) steps and blended in between.
 
-## Knot editing
+## Knot editing (`@margoengine/splines/knots`)
 
 ```ts
-import {KnotPath} from 'margoengine/splines';
+import {KnotPath} from 'margoengine/splines/knots';
 const path = new KnotPath([
   {position: [0, 0, 0], data: [1]},
   {position: [4, 3, 0], data: [2]},

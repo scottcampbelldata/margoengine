@@ -26,6 +26,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./closest": {
+      "types": "./dist/closest.d.ts",
+      "import": "./dist/closest.js"
+    },
+    "./frames": {
+      "types": "./dist/frames.d.ts",
+      "import": "./dist/frames.js"
+    },
+    "./knots": {
+      "types": "./dist/knots.d.ts",
+      "import": "./dist/knots.js"
+    },
     "./mesh": {
       "types": "./dist/mesh.d.ts",
       "import": "./dist/mesh.js"

@@ -1,7 +1,7 @@
 import type { Spline } from './index.js';
 
 /** Where a point lands on a spline: see {@link closestPointOnSpline}. */
-export interface ClosestPoint {
+export interface SplineClosestPoint {
   /** Curve parameter, 0..1, the value `spline.at` takes. */
   t: number;
   /** Arc-length position in world units, the value `spline.atDistance` takes. */
@@ -12,7 +12,7 @@ export interface ClosestPoint {
   distance: number;
 }
 /** Options for {@link closestPointOnSpline}. */
-export interface ClosestPointOptions {
+export interface SplineClosestOptions {
   /** Coarse samples tried before refining, an integer 2..1,000,000. Default: the spline's own `divisions`. */
   samples?: number;
   /** Bisection steps that refine the best sample, an integer 0..200. Default 52 (to full double precision). */
@@ -44,9 +44,9 @@ const squared = (spline: Spline, t: number, scratch: Float64Array, x: number, y:
 export function closestPointOnSpline(
   spline: Spline,
   query: ArrayLike<number>,
-  { samples = spline.arcLengths.length - 1, iterations = 52 }: ClosestPointOptions = {},
-  output: ClosestPoint = { t: 0, arc: 0, point: new Float64Array(3), distance: 0 },
-): ClosestPoint {
+  { samples = spline.arcLengths.length - 1, iterations = 52 }: SplineClosestOptions = {},
+  output: SplineClosestPoint = { t: 0, arc: 0, point: new Float64Array(3), distance: 0 },
+): SplineClosestPoint {
   if (query.length !== 3 || !(Number.isFinite(query[0]) && Number.isFinite(query[1]) && Number.isFinite(query[2])))
     throw new TypeError('Query must be a finite 3D point');
   if (!Number.isInteger(samples) || samples < 2 || samples > 1_000_000)
