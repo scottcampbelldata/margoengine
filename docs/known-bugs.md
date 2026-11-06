@@ -609,19 +609,6 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 - **Still open:** one `engine.pick` per point keeps its round trip. Starting queued picks early would break its documented
   turn order, so code that picks many points should call `pickMany`.
 
-### SciFiHelmet: default soft shadows cost the GPU time
-
-- **What:** `helmet`: 0.78 ms GPU a frame against three's WebGL 0.09 (CPU 0.11 against 0.07).
-- **Cause (measured, timestamps per pass with each feature switched off, entry 30):** image-based lighting costs
-  nothing measurable. `Shadows`' default `'soft'` filter (PCSS: 16 blocker reads and 32 comparison taps per lit pixel,
-  spread over a penumbra up to a tenth of the map) is 0.68 of the 0.78 ms; with
-  `'pcf'` the same frame takes 0.12 ms, and with `'pcf'` and one cascade, the setup closest to three's one
-  PCFSoftShadowMap, 0.08 ms (`helmet-filterpcf-cascades1`, same image: SSIM 0.984). The CPU gap (0.11 against 0.07)
-  is spread over the frame's four passes.
-- **Plan:** a cheaper soft filter with the same look: blocker search with `textureGather` on fewer, nearer taps and a
-  penumbra radius capped in texels rather than map fractions. It changes the image, so the shadow views of the
-  visual check are re-recorded with it.
-
 The entries below are speed-matrix rows diagnosed on 2026-10-27 (item 47 phase 2, round 4; busy machine, RTX A6000,
 diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.json` and perf-history entry 36.
 

@@ -23,6 +23,8 @@ engine.start();
 
 `filter` picks the edge: `'soft'` (default) is the PCSS above; `'pcf'` takes four hardware comparison taps half a texel apart (each is the sampler's own 2x2 bilinear comparison, together a smooth edge about three texels wide) with no blocker search and no spiral, for phones and light tiers; `'hard'` takes one tap. `cascades` (1-4, default 4) renders fewer layers: fewer depth passes per frame, coarser texels over the same `distance`; `bounds` always uses one map. `@margoengine/quality` sets `filter:'pcf'` on its light and phone tiers and `cascades:2` on phones when the app leaves them unset.
 
+The defaults cost more than one fixed-filter map: SciFiHelmet takes 0.33 ms of GPU time a frame with them and 0.074 ms with `Shadows.attach(engine, {filter:'pcf', cascades:1})` (RTX A6000, diagnostic). [docs/limits.md](../../docs/limits.md#rendering) has the split.
+
 Map size and an explicit shadow camera, as Crocotile's per-light Shadow Map Width/Height and shadow camera
 Near/Far/Left/Right/Top/Bottom:
 

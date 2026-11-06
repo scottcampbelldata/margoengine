@@ -560,7 +560,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   0.04. So the cost is the default `'soft'` filter (PCSS: 16 blocker reads and 32 comparison taps per lit pixel),
   where three's side draws one PCFSoftShadowMap. Trade-off: PCSS penumbrae widen with blocker distance; PCF edges do
   not.
-- **Fix:** none in the engine yet (plan in [known-bugs.md](../known-bugs.md#scifihelmet-default-soft-shadows-cost-the-gpu-time)).
+- **Fix:** none in the engine yet (plan in entry 63, which closed it as an accepted difference).
   The `helmet` scene takes `filter` and `cascades` parameters (defaults unchanged: `'soft'`, 4), and row 9.3 also
   runs `helmet-filterpcf-cascades1`, Margo's setup closest to three's.
 - **After** (diagnostic, busy machine; run `20261026-194330` (5 runs; marked invalid for the CPU spread of three's
@@ -1603,6 +1603,21 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/compute-subgroups.mjs`.
 - **Guard:** `packages/compute/tests/compute-subgroups-browser.js`.
 
+### 63. `helmet`: where the default shadows' time goes (accepted difference in work)
+
+- **Loss:** `helmet` 0.33 ms GPU a frame against three's WebGL 0.08 and WebGPU 0.07 (`--no-gate`, other jobs running,
+  diagnostic). It was 0.78 ms in entry 30, before the PCSS search stopped at each layer's nearest caster.
+- **Split (same run conditions, shader patched for measurement only):** `'pcf'` with four cascades 0.125 ms; `'soft'`
+  with the filter returning at once 0.22, and 0.12 with the nearest-depth dispatch removed too, so that pass is 0.10 ms;
+  16 blocker reads about 0.07 and 32 comparison taps about 0.03. `'soft'` with 2 cascades 0.24, with 1 cascade 0.20.
+- **Decision:** no change. three's side draws one map with one fixed filter, and Margo's default does more. The plan in
+  known-bugs (fewer taps, a capped radius) changes the image, so it was not taken. Like for like,
+  `helmet-filterpcf-cascades1` is 0.074 ms against 0.085 and 0.068.
+- **Not done:** limiting the nearest-depth pass to the texels casters reach would keep the output, but needs bounds on
+  `ShadowPrimitive`, which gltf-pro models do not give today.
+- **Rerun:** `node bench/cli.mjs parity --cases=helmet --engines=margo,three-webgl-parity,three-webgpu-parity --runs=5`.
+  A quiet run is still owed.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1652,5 +1667,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 8. `p-morph` first frame (entries 49 and 56): a quiet run.
 9. `GrowableWorld` loop cost (entry 61): a quiet run.
 10. Subgroup kernels (entry 62): a quiet run, and a GPU with another subgroup size.
+11. `helmet` split (entry 63): a quiet run.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.
