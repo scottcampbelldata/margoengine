@@ -358,6 +358,8 @@ by the loader. `parseGLTF` stays synchronous; `loadGLTF` retains its existing
 Promise-based loading API.
 
 ```ts
+import {type MaterialExtension, type PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
 const tint: MaterialExtension = {
   factors: new Float32Array([1, 0.5, 0.25, 1]),
   wgsl: 's.base *= materialFactors[0];'
