@@ -43,6 +43,8 @@ export function uploadTexture(device: GPUDevice, file: TextureFile, options?: Up
 
 // Not exported from this entry, but used by the exports above:
 
+type HDRTranscodeTarget = 'bc6h' | 'astc-hdr-4x4' | 'rgba16float' | 'rgb9e5';
+
 interface KTX2DecodeOptions {
     signal?: AbortSignal;
     transfer?: boolean;
@@ -54,7 +56,7 @@ class KTX2Decoder {
     readonly device?: GPUDevice;
     constructor(options?: KTX2Options);
     transcode(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions): Promise<TranscodedKTX2Result>;
-    protected job<T>(type: 'ktx2' | 'ktx2-layers', target: TranscodeTarget, data: ArrayBuffer | ArrayBufferView, options: KTX2DecodeOptions): Promise<T>;
+    protected job<T>(type: 'ktx2' | 'ktx2-layers' | 'ktx2-hdr', target: TranscodeTarget | HDRTranscodeTarget, data: ArrayBuffer | ArrayBufferView, options: KTX2DecodeOptions): Promise<T>;
     createTexture(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions & KTX2TextureOptions): Promise<GPUTexture>;
     dispose(): void;
     [Symbol.dispose]: () => void;

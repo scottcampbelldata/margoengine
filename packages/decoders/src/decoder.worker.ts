@@ -8,10 +8,12 @@ import {
   initDraco,
   isDecoderCrash,
   transcodeKTX2,
+  transcodeKTX2HDR,
   transcodeKTX2Layers,
   type ScriptLoader,
 } from './codec.js';
-import type { WorkerRequest } from './protocol.js';
+import type { HDRTranscodeTarget } from './formats.js';
+import type { TranscodeTarget, WorkerRequest } from './protocol.js';
 
 declare const self: {
   onmessage: ((event: MessageEvent<WorkerRequest>) => void) | null;
@@ -33,13 +35,17 @@ self.onmessage = async ({ data }) => {
       });
       const result = decodeDraco((await draco).module, new Uint8Array(data.buffer), data.request);
       self.postMessage({ id, result }, dracoTransferables(result));
-    } else if (data.type === 'ktx2' || data.type === 'ktx2-layers') {
+    } else if (data.type === 'ktx2' || data.type === 'ktx2-layers' || data.type === 'ktx2-hdr') {
       basis ??= initBasis(data.transcoderURL, data.wasmURL, load).catch((error) => {
         basis = undefined;
         throw error;
       });
-      const transcode = data.type === 'ktx2' ? transcodeKTX2 : transcodeKTX2Layers,
-        result = transcode((await basis).module, new Uint8Array(data.buffer), data.target);
+      const { module } = await basis,
+        bytes = new Uint8Array(data.buffer),
+        result =
+          data.type === 'ktx2-hdr'
+            ? transcodeKTX2HDR(module, bytes, data.target as HDRTranscodeTarget)
+            : (data.type === 'ktx2' ? transcodeKTX2 : transcodeKTX2Layers)(module, bytes, data.target as TranscodeTarget);
       self.postMessage({ id, result }, [result.mipmaps[0].data.buffer as ArrayBuffer]);
     } else throw new TypeError('Unknown decoder job; post a job made by the decoders package');
   } catch (error) {

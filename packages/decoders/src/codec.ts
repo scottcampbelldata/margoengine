@@ -1,6 +1,6 @@
 // Worker-side decode functions. Kept free of worker globals so unit tests can drive them with real or mock modules.
 import { decodeFailed } from './errors.js';
-import { transcodeFormats } from './formats.js';
+import { hdrFormats, transcodeFormats, type HDRTranscodeTarget } from './formats.js';
 import { readKTX2Index, type KTX2Index } from './ktx2-file.js';
 import { formatBlock, type TextureFile } from './texture-file.js';
 import type { DecodedDracoGeometry, DracoRequest, KTX2Mip, TranscodeTarget, TranscodedKTX2Result } from './protocol.js';
@@ -503,5 +503,23 @@ export function transcodeKTX2Layers(basis: BasisModule, bytes: Uint8Array, targe
       srgb,
       !!file.getHasAlpha(),
     );
+  });
+}
+
+/**
+ * Transcode every level, array layer and cube face of a UASTC HDR file. BC6H falls back to half float when level 0 is
+ * not a multiple of 4, as WebGPU needs of block formats. Checks, handle release and trap handling as in {@link transcodeKTX2}.
+ */
+export function transcodeKTX2HDR(basis: BasisModule, bytes: Uint8Array, target: HDRTranscodeTarget): TextureFile {
+  if (!hdrFormats[target])
+    throw new TypeError(`Unknown HDR target ${target}; use bc6h, astc-hdr-4x4, rgba16float or rgb9e5`);
+  const index = readKTX2Index(bytes);
+  return withKTX2(basis, bytes, (file) => {
+    if (!file.isHDR?.()) throw decodeFailed('KTX2: this file is not HDR; read it with KTX2LayerDecoder or KTX2Decoder');
+    const chosen = target === 'bc6h' && (index.width % 4 || index.height % 4) ? 'rgba16float' : target,
+      format = hdrFormats[chosen];
+    const result = transcodeImages(file, index, { basis: format.basis, gpu: format.gpu, name: chosen }, false, false);
+    // WebGPU has no ASTC HDR format, so no device feature can stand for it.
+    return chosen === 'astc-hdr-4x4' ? { ...result, feature: undefined } : result;
   });
 }

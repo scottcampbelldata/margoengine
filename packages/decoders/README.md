@@ -147,6 +147,36 @@ binds it on a map. 3D textures are refused. `KTX2Decoder` stays 2D and points he
 `tests/ktx2-layers.test.js` checks every image of eight real files against `ktx extract`; `scripts/ktx2-oracle.mjs`
 rewrites those records.
 
+## HDR KTX2 (`@margoengine/decoders/ktx2-hdr`)
+
+`KTX2HDRDecoder` reads UASTC HDR 4x4 files, 2D, array or cube, so HDR environments ship at a fraction of EXR size: two
+real EXR files came to 20.6 and 29.2 percent of theirs, mips included (`memorial.exr` 2,371,897 B, `Desk.exr` 2,424,523 B).
+It uses the same Basis worker and Wasm as the 8-bit files, and transcodes to BC6H where the device has
+`texture-compression-bc`, otherwise to half float. Pass `target` for `'rgba16float'`, `'rgb9e5'`, or `'astc-hdr-4x4'`,
+which gives ASTC HDR blocks for tools: WebGPU has no ASTC HDR format, so `createTexture` refuses that target. BC6H falls
+back to half float when level 0 is not a multiple of 4. UASTC HDR holds no alpha, so `hasAlpha` is false and half-float
+alpha is 1.
+
+```ts
+import {Environment} from 'margoengine/environment';
+import {KTX2HDRDecoder, toEnvironmentImage} from 'margoengine/decoders/ktx2-hdr';
+
+declare const engine: {gpu: GPUDevice} & Parameters<typeof Environment.create>[0];
+declare const bytes: Uint8Array;
+
+// As a texture: BC6H on a desktop GPU.
+const decoder = new KTX2HDRDecoder({device: engine.gpu});
+const texture = await decoder.createTexture(bytes);
+
+// As image-based lighting: an equirect or a cube, as floats.
+const floats = new KTX2HDRDecoder({target: 'rgba16float'});
+const environment = await Environment.create(engine, toEnvironmentImage(await floats.decode(bytes)));
+```
+
+Files come from the `basisu` tool or encoder (`-hdr`). The bundled transcoder is Basis Universal 1.50, so it reads UASTC
+HDR 4x4 and refuses the later 6x6 HDR formats with `MargoError` `failed`. `tests/ktx2-hdr.test.js` checks real files
+against pixels of the EXR files they were made from.
+
 ## How it works
 
 - **Workers, not the main thread.** Each decoder owns a lazily grown pool of classic workers, by default `Math.min(navigator.hardwareConcurrency || 4, 4)`. Jobs go to an idle worker, then a new one while under the limit, then the least loaded. A crashed worker rejects only its own jobs and is replaced on the next call.
@@ -194,7 +224,7 @@ until it ends or times out, so no new decode queues behind it unknowingly.
 
 ## Limits
 
-`KTX2Decoder` reads one 2D texture; cube maps and arrays go through `@margoengine/decoders/ktx2-layers`. HDR (UASTC HDR) files are rejected. Draco point clouds return no `indices`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
+`KTX2Decoder` reads one 2D texture; cube maps and arrays go through `@margoengine/decoders/ktx2-layers`. HDR files go through `@margoengine/decoders/ktx2-hdr`. Draco point clouds return no `indices`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
 
 ## Tests
 

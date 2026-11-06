@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5647466,
+  "total": 6025711,
   "history": [
     {
       "date": "2026-10-24",
@@ -2444,6 +2444,12 @@
       "commit": "368d5c069",
       "reason": "loadKTX2Texture reads cube and array files",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "98a9c94d4",
+      "reason": "ktx2-hdr entry and its worker job",
+      "grew": 1
     }
   ],
   "items": {
@@ -2571,6 +2577,7 @@
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/ktx": 2851,
+    "@margoengine/decoders/ktx2-hdr": 378245,
     "@margoengine/decoders/ktx2-layers": 385718,
     "@margoengine/decoders/meshopt": 3309,
     "@margoengine/decoders/png": 3813,

@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import { transcodeFormats } from './formats.js';
+import { transcodeFormats, type HDRTranscodeTarget } from './formats.js';
 import { WorkerPool, jobTimeout, payload, requireWorkers, timeLimit, workerLimit } from './pool.js';
 import type { TranscodeTarget, TranscodedKTX2Result } from './protocol.js';
 import { createKTX2Texture, getSupportedTranscodeFormat, type KTX2TextureOptions } from './texture.js';
@@ -58,8 +58,8 @@ export class KTX2Decoder {
 
   /** Runs one worker job of `type`; the entries built on this decoder add their job types through it. */
   protected job<T>(
-    type: 'ktx2' | 'ktx2-layers',
-    target: TranscodeTarget,
+    type: 'ktx2' | 'ktx2-layers' | 'ktx2-hdr',
+    target: TranscodeTarget | HDRTranscodeTarget,
     data: ArrayBuffer | ArrayBufferView,
     options: KTX2DecodeOptions,
   ): Promise<T> {

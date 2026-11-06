@@ -4,7 +4,7 @@
 // zlib code loads on first use, so neither costs anything until a file needs it.
 import { decodeFailed } from './errors.js';
 import { KTX2Decoder, type KTX2DecodeOptions } from './ktx2.js';
-import { readKTX2Index, type KTX2Index } from './ktx2-file.js';
+import { ASTC_4X4_SFLOAT, readKTX2Index, type KTX2Index } from './ktx2-file.js';
 import { formatBlock, levelBytes, uploadTexture, type TextureFile, type UploadTextureOptions } from './texture-file.js';
 
 export type { TextureFile, TextureFileLevel, UploadTextureOptions } from './texture-file.js';
@@ -116,6 +116,8 @@ export async function parseKTX2(bytes: Uint8Array, options: { signal?: AbortSign
   const index = readKTX2Index(bytes),
     { width, height, layerCount, faceCount, vkFormat } = index;
   if (!vkFormat) throw decodeFailed('KTX2 holds a Basis Universal payload; read it with KTX2LayerDecoder.decode');
+  if (vkFormat === ASTC_4X4_SFLOAT)
+    throw decodeFailed('KTX2 holds ASTC HDR blocks; read it with KTX2HDRDecoder from @margoengine/decoders/ktx2-hdr');
   const rgb = RGB[vkFormat],
     format = VK[vkFormat] ?? rgb?.[0];
   if (!format) throw refuse(`vkFormat ${vkFormat}`);

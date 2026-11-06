@@ -1,3 +1,5 @@
+import type { HDRTranscodeTarget } from './formats.js';
+
 /** Hardware-negotiated KTX2 transcode target. */
 export type TranscodeTarget = 'bc7' | 'astc-4x4' | 'etc2' | 'rgba8';
 
@@ -106,9 +108,9 @@ export type WorkerRequest =
   | { id: number; type: 'draco'; buffer: ArrayBuffer; request: DracoRequest; wrapperURL: string; wasmURL: string }
   | {
       id: number;
-      type: 'ktx2' | 'ktx2-layers';
+      type: 'ktx2' | 'ktx2-layers' | 'ktx2-hdr';
       buffer: ArrayBuffer;
-      target: TranscodeTarget;
+      target: TranscodeTarget | HDRTranscodeTarget;
       transcoderURL: string;
       wasmURL: string;
     };

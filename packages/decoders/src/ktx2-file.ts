@@ -29,6 +29,9 @@ export interface KTX2Index {
   levels: KTX2Level[];
 }
 
+/** VK_FORMAT_ASTC_4x4_SFLOAT_BLOCK, the vkFormat of UASTC HDR 4x4 files. */
+export const ASTC_4X4_SFLOAT = 1000066000;
+
 const IDENTIFIER = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a];
 
 /**
@@ -60,7 +63,7 @@ export function readKTX2Index(bytes: Uint8Array, fileLength = bytes.length): KTX
   }
   // Zstandard-supercompressed levels (UASTC) inflate to the level's 16-byte 4x4 blocks: a larger declared size made the
   // transcoder read past its buffer (a Wasm trap, or stale memory read as texels).
-  if (u32(44) === 2 && !u32(12))
+  if (u32(44) === 2 && (!u32(12) || u32(12) === ASTC_4X4_SFLOAT))
     for (let i = 0; i < count; i++) {
       const blocks =
         Math.ceil(Math.max(1, u32(20) >> i) / 4) *

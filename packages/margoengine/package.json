@@ -554,6 +554,10 @@
       "types": "./dist/decoders/ktx2-layers.d.ts",
       "import": "./dist/decoders/ktx2-layers.js"
     },
+    "./decoders/ktx2-hdr": {
+      "types": "./dist/decoders/ktx2-hdr.d.ts",
+      "import": "./dist/decoders/ktx2-hdr.js"
+    },
     "./dof": {
       "types": "./dist/dof.d.ts",
       "import": "./dist/dof.js"

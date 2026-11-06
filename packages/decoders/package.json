@@ -69,6 +69,10 @@
     "./ktx2-layers": {
       "types": "./dist/ktx2-layers.d.ts",
       "import": "./dist/ktx2-layers.js"
+    },
+    "./ktx2-hdr": {
+      "types": "./dist/ktx2-hdr.d.ts",
+      "import": "./dist/ktx2-hdr.js"
     }
   },
   "files": [

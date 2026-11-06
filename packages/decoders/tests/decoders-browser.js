@@ -1,4 +1,5 @@
 import { DracoDecoder, KTX2Decoder, createKTX2Texture, getSupportedTranscodeFormat } from '@margoengine/decoders';
+import { KTX2HDRDecoder } from '../dist/ktx2-hdr.js';
 import { KTX2LayerDecoder } from '../dist/ktx2-layers.js';
 
 const fixture = async (name) =>
@@ -217,6 +218,29 @@ window.runDecoderTests = async () => {
   plain.dispose();
   packed.dispose();
   checks.push(`KTX2 cube map transcodes to ${packed.target} in workers and each face reads back on the GPU`);
+
+  // UASTC HDR: BC6H on the real device decodes to the same light as the half-float texels, values over 1 included. BC6H is
+  // a second lossy step after UASTC: the worst face channel of this real file measured 1.46 percent, so the bound is 2.
+  const hdrFile = await (await fetch('/tests/fixtures/ktx2-hdr/cube-uastc-hdr.ktx2')).arrayBuffer(),
+    half = new KTX2HDRDecoder({ device, target: 'rgba16float', workerLimit: 1 }),
+    native = new KTX2HDRDecoder({ device, workerLimit: 1 }),
+    halfCube = await half.createTexture(hdrFile);
+  device.pushErrorScope('validation');
+  const nativeCube = await native.createTexture(hdrFile),
+    hdrError = await device.popErrorScope(),
+    halfMeans = await layerMeans(device, halfCube, 96, 6),
+    nativeMeans = await layerMeans(device, nativeCube, 96, 6);
+  check(!hdrError, `HDR cube validation: ${hdrError?.message}`);
+  check(halfCube.format === 'rgba16float' && halfCube.depthOrArrayLayers === 6, 'half-float HDR cube');
+  check(nativeCube.format === (native.hdrTarget === 'bc6h' ? 'bc6h-rgb-ufloat' : 'rgba16float'), nativeCube.format);
+  check(
+    nativeMeans.every((v, i) => Math.abs(v - halfMeans[i]) <= 0.02 * Math.max(halfMeans[i], 0.05)),
+    `${native.hdrTarget} faces match the half-float faces: ${[...nativeMeans]} vs ${[...halfMeans]}`,
+  );
+  report.hdr = { target: native.hdrTarget, means: [...nativeMeans], halfMeans: [...halfMeans] };
+  half.dispose();
+  native.dispose();
+  checks.push(`UASTC HDR cube transcodes to ${native.hdrTarget} in workers and reads back on the GPU`);
   rgba.dispose();
   negotiated.dispose();
   device.destroy();
