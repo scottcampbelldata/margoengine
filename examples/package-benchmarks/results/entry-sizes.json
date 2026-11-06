@@ -1,5 +1,5 @@
 {
-  "commit": "cb6403f78",
+  "commit": "0d6268659",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -820,8 +820,12 @@
         "gzip": 983923
       },
       "./meshopt": {
-        "raw": 21008,
-        "gzip": 8146
+        "raw": 21037,
+        "gzip": 8143
+      },
+      "./optimize": {
+        "raw": 24070,
+        "gzip": 9262
       }
     },
     "@margoengine/fbx": {

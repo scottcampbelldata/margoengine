@@ -655,7 +655,7 @@ before it, outside these limits). `exportGLTF` and `exportModel` take no limits.
 
 ## Compressed GLB files
 
-Each of these takes GLB bytes and returns smaller GLB bytes, so it follows any writer here and any GLB from elsewhere. Materials, images, skins, animations, extensions and extras stay as they were.
+Each of these takes GLB bytes and returns smaller GLB bytes, so it follows any writer here and any GLB from elsewhere. Materials, images, skins, animations, extensions and extras stay as they were, apart from the duplicates `optimizeGLB` merges.
 
 ### Draco (`@margoengine/exporters/draco`)
 
@@ -762,6 +762,50 @@ console.log(`${source.length} -> ${glb.length} bytes, ${compressed} streams, ${q
 A position lands within half a step of a grid of 65,534 steps across the mesh's widest axis, and the grid goes into the node's transform, so the file stays where it was. A node that something else depends on (an animation target, a joint, a parent, a camera) keeps its transform, and a new child node holds the mesh and the grid. Skinned meshes, instanced meshes and meshes with morph targets keep float positions: a skin ignores its node's transform, and morph targets add to positions as stored. Texture coordinates outside 0 to 1 stay floats. Skin weights still add up to 1 after rounding.
 
 Triangles that repeat a vertex and vertices no triangle uses go, and each primitive's vertices are renumbered, which the triangle codec requires. Primitives that keep Draco are listed in `skipped`. A very small file can grow, because each stream adds JSON and a fixed tail: compare the lengths when that matters. `encodeVertexBuffer` and `encodeTriangles` are the two codecs on their own.
+
+### Optimize (`@margoengine/exporters/optimize`)
+
+`optimizeGLB(glb, options)` is the clean-up a file needs before it ships, so no separate tool chain is needed: duplicate data merges, identical vertices weld, and meshes simplify or gain `MSFT_lod` levels. By default it does only the first two, which change nothing a viewer shows. Run it before `compressDraco` or `compressMeshopt`. `compressTextures` can run on either side of it.
+
+```ts
+import { exportGLB } from 'margoengine/exporters';
+import { optimizeGLB } from 'margoengine/exporters/optimize';
+
+const positions = [];
+const normals = [];
+const indices = [];
+// A bumpy sheet with four vertices of its own in each cell.
+for (let y = 0; y < 16; y++)
+  for (let x = 0; x < 16; x++) {
+    const at = positions.length / 3;
+    for (const [dx, dy] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
+      positions.push(x + dx, y + dy, Math.sin((x + dx) * 0.7) * Math.cos((y + dy) * 0.5));
+      normals.push(0, 0, 1);
+    }
+    indices.push(at, at + 1, at + 2, at, at + 2, at + 3);
+  }
+const source = exportGLB({
+  nodes: [{ geometry: { positions: new Float32Array(positions), normals: new Float32Array(normals), indices } }],
+});
+
+const { glb, stats, skipped } = await optimizeGLB(source, { lods: [0.5, 0.25] });
+console.log(`${stats.verticesBefore} -> ${stats.verticesAfter} vertices, ${stats.levels} level nodes, ${skipped.length} left as they were`);
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `dedupe` | true | Merges images with the same bytes, then the samplers, textures, materials, accessors and meshes that makes equal |
+| `weld` | true | Merges vertices equal in every attribute and morph target, drops triangles with no area and vertices no triangle uses. Off, only unused vertices go |
+| `simplify` | none | Fraction of each primitive's triangles to keep, above 0 and below 1 |
+| `lods` | `[]` | Fractions of the triangles each further level keeps, decreasing, written as `MSFT_lod`. With `simplify`, fractions of what that leaves |
+| `screenCoverage` | none | `MSFT_screencoverage`, decreasing, at most one more than `lods`. Without it the reader picks its own switches |
+| `signal` | none | Stops between primitives |
+
+Every level is a subset of the vertices it came from, so UVs, skin weights and morph targets stay the source's own and seams and hard edges stay closed. Vertices at one position that move differently, such as closed lips, stay two vertices. A flat-shaded mesh is the one case with new values: a triangle a level keeps takes its own normal. A collapse removes one or two triangles, so a level lands within two of its fraction, and a part too small to reach it keeps its last triangles.
+
+Level nodes sit outside the scene, copy their node's transform and skin, and follow its animation, so a reader without `MSFT_lod` draws the finest level and nothing else changes. A node with an extension of its own, such as `EXT_mesh_gpu_instancing`, gets no levels, and a file that already has `MSFT_lod` refuses `lods`. Materials with different names stay apart, because code finds them by name. When `KHR_animation_pointer`, `KHR_interactivity` or `MSFT_lod` is in the file, textures, materials and meshes keep their indices, and `EXT_lights_image_based` keeps images in place, because those name them by number.
+
+`skipped` lists the primitives left as they were: Draco ones, ones with no position, points, lines, strips and fans, and, with `reason: 'too-large'`, a primitive past the simplifier's 200,000 vertices or faces, which is welded but not simplified. Meshopt buffers are refused: optimize first, then compress. `weldVertices(arrays, indices, vertexCount)` is the weld on its own, and `margo-convert` uses it.
 
 ## Limits
 

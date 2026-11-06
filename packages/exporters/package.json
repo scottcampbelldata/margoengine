@@ -180,6 +180,10 @@
     "./meshopt": {
       "types": "./dist/meshopt.d.ts",
       "import": "./dist/meshopt.js"
+    },
+    "./optimize": {
+      "types": "./dist/optimize.d.ts",
+      "import": "./dist/optimize.js"
     }
   },
   "files": [
@@ -200,6 +204,8 @@
     }
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/lod": "^1.0.0",
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/mesh-edit": "^1.0.0"
   }
 }

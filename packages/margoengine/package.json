@@ -806,6 +806,10 @@
       "types": "./dist/exporters/meshopt.d.ts",
       "import": "./dist/exporters/meshopt.js"
     },
+    "./exporters/optimize": {
+      "types": "./dist/exporters/optimize.d.ts",
+      "import": "./dist/exporters/optimize.js"
+    },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
       "import": "./dist/fbx.js"

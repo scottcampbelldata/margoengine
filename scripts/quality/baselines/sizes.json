@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8997589,
+  "total": 9007126,
   "history": [
     {
       "date": "2026-10-24",
@@ -2744,6 +2744,12 @@
       "commit": "88caabcf1",
       "reason": "gltf-pro reads TEXCOORD_2 and 3 through a second vertex buffer",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "0d6268659",
+      "reason": "exporters: new optimize entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2920,8 +2926,9 @@
     "@margoengine/exporters/hash": 1717,
     "@margoengine/exporters/import-names": 1038,
     "@margoengine/exporters/ktx2": 1013431,
-    "@margoengine/exporters/meshopt": 8402,
+    "@margoengine/exporters/meshopt": 8399,
     "@margoengine/exporters/model": 9536,
+    "@margoengine/exporters/optimize": 9540,
     "@margoengine/exporters/roblox": 18377,
     "@margoengine/exporters/roblox-chunks": 9679,
     "@margoengine/exporters/roblox-runtime": 21053,

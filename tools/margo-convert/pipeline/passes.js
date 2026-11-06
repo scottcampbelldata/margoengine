@@ -3,6 +3,7 @@
 // quantise vertex attributes (KHR_mesh_quantization). Each pass edits a Model from gltf-io.js in place and adds to the
 // counts in `stats`. Written from the glTF 2.0 specification and the KHR_mesh_quantization extension text.
 import { createHash } from 'node:crypto';
+import { weldVertices } from '@margoengine/exporters/optimize';
 import { countOf, withoutDegenerate } from './gltf-io.js';
 
 /** @typedef {import('./gltf-io.js').Model} Model */
@@ -444,8 +445,6 @@ export function dedupe(model, stats) {
  * @param {Model} model @param {ModelStats} stats
  */
 export function weld(model, stats) {
-  const scratch = new Float32Array(1),
-    bits = new Uint32Array(scratch.buffer);
   for (const prim of primitives(model)) {
     if ((prim.mode ?? 4) !== 4) continue;
     const geo = /** @type {Geo} */ (prim.$geo);
@@ -459,68 +458,7 @@ export function weld(model, stats) {
       indices = flat;
     }
     const attrs = [...Object.values(geo.attributes), ...geo.targets.flatMap((t) => Object.values(t))];
-    const hashOf = (/** @type {number} */ v) => {
-      let h = 2166136261;
-      for (const a of attrs) {
-        const w = a.width;
-        for (let k = 0; k < w; k++) {
-          let x = a.values[v * w + k];
-          if (a.componentType === 5126) {
-            scratch[0] = x === 0 ? 0 : x;
-            x = bits[0];
-          }
-          h = Math.imul(h ^ (x | 0), 16777619);
-        }
-      }
-      return h >>> 0;
-    };
-    const same = (/** @type {number} */ p, /** @type {number} */ q) => {
-      for (const a of attrs) {
-        const w = a.width;
-        for (let k = 0; k < w; k++) if (a.values[p * w + k] !== a.values[q * w + k]) return false;
-      }
-      return true;
-    };
-    const newOf = new Int32Array(n).fill(-1);
-    /** @type {Map<number, number[]>} */ const buckets = new Map();
-    /** @type {number[]} */ const source = [];
-    const out = new Uint32Array(indices.length);
-    for (let i = 0; i < indices.length; i++) {
-      const v = indices[i];
-      let id = newOf[v];
-      if (id < 0) {
-        const h = hashOf(v);
-        const bucket = buckets.get(h);
-        let found = -1;
-        if (bucket)
-          for (const s of bucket)
-            if (same(source[s], v)) {
-              found = s;
-              break;
-            }
-        if (found < 0) {
-          found = source.length;
-          source.push(v);
-          if (bucket) bucket.push(found);
-          else buckets.set(h, [found]);
-        }
-        newOf[v] = id = found;
-      }
-      out[i] = id;
-    }
-    // A merge can turn a triangle into a line; drop those too.
-    const clean = /** @type {Uint32Array} */ (withoutDegenerate(out));
-    // Vertices only degenerate triangles used stay; unused ones are removed by a final compaction.
-    const used = new Uint8Array(source.length);
-    for (const i of clean) used[i] = 1;
-    /** @type {Uint32Array} */ let finalIndices = clean;
-    let keep = source;
-    if (used.some((u) => !u)) {
-      const renum = new Int32Array(source.length).fill(-1);
-      keep = [];
-      for (let i = 0; i < source.length; i++) if (used[i]) renum[i] = keep.push(source[i]) - 1;
-      finalIndices = clean.map((i) => renum[i]);
-    }
+    const { keep, indices: finalIndices } = weldVertices(attrs, indices, n);
     const gatherFrom = (/** @type {Attr} */ a) => {
       const w = a.width,
         values = new /** @type {any} */ (a.values.constructor)(keep.length * w);
