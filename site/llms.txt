@@ -120,7 +120,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/cutscene](https://margoengine.com/llms/packages/cutscene.md): Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing and a player that fires events in order.
 - [@margoengine/controls](https://margoengine.com/llms/packages/controls.md): Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo…
 - [@margoengine/cameras](https://margoengine.com/llms/packages/cameras.md): Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking.
-- [@margoengine/input](https://margoengine.com/llms/packages/input.md): Semantic keyboard, pointer, gamepad and touch actions with haptics.
+- [@margoengine/input](https://margoengine.com/llms/packages/input.md): Semantic keyboard, pointer, gamepad and touch actions with haptics, and tap, hold, slow tap and double press rules.
 - [@margoengine/ui](https://margoengine.com/llms/packages/ui.md): Game UI drawn in the engine: menus, HUDs, health bars, inventories, dialogs and toasts with flex layout, theming, keyboard, gamepad and touch navigation, screen reader…
 - [@margoengine/viewcube](https://margoengine.com/llms/packages/viewcube.md): CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle.
 - [@margoengine/selection](https://margoengine.com/llms/packages/selection.md): GPU picking and visible mesh selection outlines.
@@ -240,7 +240,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/cutscene API](https://margoengine.com/llms/api/cutscene.md): 1 entry point
 - [@margoengine/controls API](https://margoengine.com/llms/api/controls.md): 10 entry points
 - [@margoengine/cameras API](https://margoengine.com/llms/api/cameras.md): 6 entry points
-- [@margoengine/input API](https://margoengine.com/llms/api/input.md): 1 entry point
+- [@margoengine/input API](https://margoengine.com/llms/api/input.md): 2 entry points
 - [@margoengine/ui API](https://margoengine.com/llms/api/ui.md): 2 entry points
 - [@margoengine/viewcube API](https://margoengine.com/llms/api/viewcube.md): 1 entry point
 - [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 1 entry point

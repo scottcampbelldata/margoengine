@@ -72,6 +72,7 @@ export class Input {
     get actions(): Readonly<Record<string, readonly Binding[]>>;
     constructor(actions: Readonly<Record<string, readonly Binding[]>>, { target, gamepads, deadzone, contexts }?: InputOptions);
     state(action: string): Readonly<ActionState>;
+    bindingValue(action: string, binding: number): number;
     update(): void;
     createStick(parent: HTMLElement, id: string): HTMLDivElement;
     bindTouchButton(element: HTMLElement, id: string): void;

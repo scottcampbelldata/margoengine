@@ -414,7 +414,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/cutscene`](packages/cutscene/README.md) | Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing and a player that fires events in order. |
 | [`@margoengine/controls`](packages/controls/README.md) | Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine. |
 | [`@margoengine/cameras`](packages/cameras/README.md) | Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking. |
-| [`@margoengine/input`](packages/input/README.md) | Semantic keyboard, pointer, gamepad and touch actions with haptics. |
+| [`@margoengine/input`](packages/input/README.md) | Semantic keyboard, pointer, gamepad and touch actions with haptics, and tap, hold, slow tap and double press rules. |
 | [`@margoengine/ui`](packages/ui/README.md) | Game UI drawn in the engine: menus, HUDs, health bars, inventories, dialogs and toasts with flex layout, theming, keyboard, gamepad and touch navigation, screen reader support and React components. |
 | [`@margoengine/viewcube`](packages/viewcube/README.md) | CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle. |
 | [`@margoengine/selection`](packages/selection/README.md) | GPU picking and visible mesh selection outlines. |
@@ -2565,7 +2565,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-126). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-127). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2705,6 +2705,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | `DragControls` rotate mode, groups and children (2026-11-05) | By method: a turn goes about the grabbed object's origin, not the grab point or the group's centre. `recursive` and `transformGroup` follow core mesh children; a model is always dragged whole. | A model's nodes are not meshes the control can list. | A group with a far-off grabbed member swings wide. | Grab a member near the middle, or use `TransformControls`. |
 | Orbit target radius and `orthoZoom` (2026-11-05) | By method: `minTargetRadius` and `maxTargetRadius` act on the target and move the camera by the same step, after `targetBounds`, so the sphere wins when the two disagree. A target exactly on `cursor` leaves along +X. `orthoZoom` needs a `CameraProjection` or a `projection` with a numeric `zoom`. | The shell has no way to slide past its centre, and a plain camera has no zoom. | With `minTargetRadius` above 0, the target cannot pass through `cursor`. | Set `minTargetRadius` to 0, or keep the shell thick. |
 | Several objects on `TransformControls` (`attachMany`, `pivot`, 2026-11-05) | By method: an object's size has only its own axes, so a non-uniform stretch along another frame gives each axis its share instead of a shear, exact when the axes line up or the factors match. A mesh with an attached ancestor follows that ancestor. | Meshes store position, rotation and scale, with no shear. | A turned object scaled unevenly in `world` space keeps its shape family, not the sheared shape a matrix would give. | Scale evenly, or scale in the object's own axes with `individual` and `local`. |
+| Interactions (`@margoengine/input/interactions`, 2026-11-05) | By method: time is read once per update, so a rule is exact to one tick, and a 500 ms frame can turn a tap into a canceled tap. Rules do not arbitrate: a tap and a double press on one action both run. A gamepad press shorter than one update is unseen (gamepads are polled); keys, mouse and touch buttons keep it for one update. | Rules run on the sampled action, so they work on every device and on replayed input. Waiting for one rule to fail before another fires would add `gap` of delay to every press. | A single tap beside a double press fires on the first press too. | Use the double press's `canceled` as the single press. Run input on a fixed tick. |
 | `ArcballGizmo`, double-click focus and arcball keys (2026-11-05) | By method: the gizmo draws and takes no input, so the rings cannot be grabbed one at a time. Focus moves the view centre and keeps the turn and distance; with no `pick` the point lies on the plane through the target. Touch has no double-tap gesture of its own: focus needs the browser's `dblclick`. | Picking the scene needs @margoengine/bvh, which `/arcball` does not load. | A double-click on a far object without `pick` centres the plane point, not the object. | Set `pick` with a `Raycaster` and `rayAt`, as the README shows. |
 | Moving platforms for `WalkControls` (`carry`, 2026-11-05) | By method: only the floor carries. A moving wall pushes the walker out but gives it no speed, a tilting floor turns the heading about +Y and leaves the pitch, and one more transform pass runs per update so colliders are this frame's. | A wall has no contact the walker keeps between frames, and a walker stays upright by design. | The pass costs a little on scenes with no moving floor. | `carry: false` skips the pass and keeps last frame's matrices. |
 
@@ -3464,6 +3465,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
 | `npm run verify` ended with `ENOENT` in `ResultStore.candidates` while another lane ran it | Lanes share one result cache and every `put` prunes its step, so a file could go between the listing and its read | A file gone after the listing counts as not stored, in `get`, `candidates` and the prune; any other read error still throws | `tests/result-cache.test.js`, "an entry another run prunes after the listing counts as not stored" |
+<<<<<<< HEAD
 | `precisePow` 97 ulp out (bound 5) and `preciseTan` 2.70 ulp (bound 2.5) on an Apple M6, in Chrome and WebKit | Apple's compiler lost the unhidden last product of `pmProductError`: the result equalled the sum without it | Every product there goes through `pmHide` | `tests/precise-math.test.js`, `test:browser:sweep` on the M6 |
 | `precisePow` over its bound on every GPU near the top of the range: 5.66 ulp on an RTX A6000, 5.99 on an M6 (bound 5) | `pmLog2Pair` held `s R` in one float, good to about 1.5e-9, and `y` multiplies that. The sweep never drew those inputs | `s R` is a pair, from the series of `R`; `f - sd` is hidden for Apple's compiler. Worst now 1.2 ulp on the A6000, 1.03 on the M6 | The sweep has a new input class that fails on the old maths (A6000), `tests/precise-math.test.js`, `tests/precise-math-reference.js` |
 | `preciseLog2` 1.77 ulp off on an M6 (bound 1.5), and `preciseSinh` and `preciseCosh` infinite at 89 | Apple's compiler spread the unhidden tail over the large part, rounding twice, and regrouped `(0.5 t) t` as `0.5 (t t)`, which overflows. Both were behind `preciseTan`, where the test stopped | `pmHide` on the tail and on `0.5 t` | `tests/precise-math.test.js`, `test:browser` on the M6 |
@@ -3476,6 +3478,9 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 | Tests that assumed Chromium: `creative` (CDP pinch), `exporters` capture (`repetitionCount`, GIF durations, opaque frames), `kinematics-constraints` (mouse positions in whole pixels), `materials` (`captureStream` sends no frame until the canvas changes, 600 s timeout), `react` extras (JSC tail calls drop `return <Mesh>` frames) | Each was a harness reading one browser's behaviour as the rule | Each test reads what the browser delivers; the tolerances are unchanged. The React difference is in the package README and `docs/limits.md` | The suites themselves, on WebKit |
 | `voxel-pathtracer` ground precision control: 280 dim pixels on the M6, the check wants over 1,000 | The control puts the old point `o.y + d.y t` back, and Apple's compile fuses that sum (65,536 of 65,536; an A6000 none), so the rounding the control exists to show mostly went away | The control keeps the product out of the fuse with a bitcast the compiler cannot see through; threshold unchanged. M6 5,309, A6000 4,763 | `packages/voxel-pathtracer/tests/browser-check.html` |
 | `webgl2-compat` `features`: depth16unorm 24,575 against 24,576 on WebKit | 0.375 falls between two levels, and which one a clear picks is the driver's: Metal's clear truncates, WebKit's WebGPU rounds | The test clears to a value a quarter above level 24,576, which reads the same everywhere; the comparison stays exact | `packages/webgl2-compat/test/features.html` |
+=======
+| `npm run verify` ended with `EPERM` in `ResultStore.put` while another lane ran it | Every `put` prunes its step, and Windows refuses a delete while another lane reads or deletes the same file | A refused delete leaves the entry for the next `put`; any other error still throws | `tests/result-cache.test.js`, "a prune another run blocks leaves the entry for the next put; other errors still throw" |
+>>>>>>> e679f33f5 (fix(scripts): a result cache prune another run blocks no longer ends verify)
 | Light tier: 50 FPS on a 100 Hz display, in every browser (a Dell S2725HS, which macOS runs at 100 Hz by default; 90 Hz gave 45, 165 Hz gave 55, and 75 Hz about 58 with 1 ms of jitter) | `capFrameRate` skipped every refresh sooner than 12.67 ms after the last frame, so on a display with no multiple near 60 it dropped every other refresh. Phones are not paced, so a phone on the same page showed 60 | `@margoengine/quality`: each frame spans the most whole refreshes that still reach the rate, counted from a median of the last 16 callback gaps, so no display falls below it and jitter cannot move it. Real page, simulated 100 Hz clock, Apple M6: 50.0 before and 100 after, in Chrome 157 and Playwright WebKit 27.2 | `packages/quality/test/quality.test.js`: "the cap never renders below its rate, at any refresh rate", "the cap holds its rate through callback jitter and whole-millisecond timestamps" |
 | Light tier: an Apple M6 read 19 to 32 ms of GPU time a frame while holding 60 FPS, so its reading was over the limit by four times | The reading added up each pass's time, and an M6 runs a frame's 11 passes side by side: 31.9 ms of passes in 8.5 ms of GPU time (Chrome, 90th percentile) | `@margoengine/quality`: a frame reads the time its passes cover, so passes that overlap count once. Passes that run in turn read as before (an RTX A6000 reads 4.33 ms either way). An M6 now reads 8.4 to 9.1 ms at 60 FPS, which is still over `FAST_GPU_MS` (8), so this scene stays on the light tier there | `packages/quality/test/quality.test.js`: "passes that run at the same time count once" |
 | `cloneModel`: every copy uploaded and mipped its own textures (`p-morph`: 700 textures, 300 bitmap copies, 300 submits, about 560 MB of texture memory for 100 copies; the first frame waited 200 ms for it) | the copies held separate `createImageBitmap` copies, so nothing could tell they were one image, and gltf-pro's texture cache was per model | copies hold the source's images (`PBRModel.shareImages`, counted) and gltf-pro shares textures per device, image and format, each freed with its last holder | `packages/gltf-pro/tests/model-runs.test.js` ("copies of one image share its GPU texture"), `packages/animation/tests/clone.test.js` ("cloneModel holds the source image") |
@@ -8095,23 +8100,48 @@ input.resetBindings();
 - `contexts` (option) group actions; an action owned by contexts reads 0 unless one is enabled. Unlisted actions are always active.
 - `captureBinding` resolves with the next key (with held modifiers), mouse button or gamepad button; Escape or the signal rejects with `AbortError`.
 
-## Gestures
+## Tap, hold, slow tap and double press
+
+`@margoengine/input/interactions` turns a press into what the player meant. Rules are named, like actions, and read any action, or one binding of it:
 
 ```ts
-import {Gestures} from 'margoengine/input';
-declare const canvas: HTMLCanvasElement;
-let zoom = 1;
-using gestures = new Gestures(canvas, {swipeDistance: 60});
-gestures.on('pinch', (e) => (zoom *= e.scale!));
-gestures.on('swipe', (e) => console.log(e.direction, e.velocity));
-gestures.on('doubletap', () => (zoom = 1));
+import {Input} from 'margoengine/input';
+import {Interactions} from 'margoengine/input/interactions';
+
+const input = new Input({
+  use: [{type: 'key', code: 'KeyE'}, {type: 'gamepad-button', index: 2}],
+  dodge: [{type: 'key', code: 'KeyD'}],
+  fire: [{type: 'gamepad-button', index: 7}],
+});
+const rules = new Interactions(input, {
+  open: {type: 'tap', action: 'use'},
+  inspect: {type: 'hold', action: 'use', time: 600},
+  dash: {type: 'double-press', action: 'dodge'},
+  heavy: {type: 'slow-tap', action: 'fire', threshold: 0.8},
+  padOnly: {type: 'hold', action: 'use', binding: 1},
+});
+function tick() {
+  input.update();
+  rules.update();
+  if (rules.state('open').performed) console.log('open');
+  if (rules.state('dash').performed) console.log('dash');
+  const charge = rules.state('heavy').progress; // 0 to 1, for a charge bar
+  console.log(charge);
+}
+tick();
 ```
 
-Touch and pen only (mouse never triggers them, so they never fight orbit controls): `tap`, `doubletap`, `swipe` (direction and px/s), two-finger `pinch` (scale since the last event) and `rotate` (radians). Thresholds are options with defaults. Set `touch-action: none` on the element.
+- `tap`: pressed and released within `time` (default 200 ms). Performed on release.
+- `hold`: held for `time` (default 400 ms). Performed while still held.
+- `slow-tap`: held for at least `time` (default 500 ms), then released. Performed on release.
+- `double-press`: `count` presses (default 2), each shorter than `time` (default 200 ms), each within `gap` (default 300 ms) of the last release. Performed on the last press.
+- `binding` (default: the whole action): an index into `input.actions[action]`, so a rule can read one device; after a rebind it reads what is bound there.
+- `threshold` (default 0.5): magnitude that counts as pressed, for triggers and sticks. The press ends at three quarters of it, so noise at the press point cannot flicker.
+- Option `now` (default `performance.now`): the clock in milliseconds.
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+`state(rule)` gives `started`, `performed` and `canceled` (each true for one update), `active`, `progress` and `duration`. `reset()` drops every press in progress. Rules do not wait for each other, so one press can start a tap and a hold and each ends by its own rule. To tell a single press from a double, act on the double press's `canceled`, which comes `gap` after a lone press. Time is read once per update, so a rule is as exact as your tick. `input.bindingValue(action, index)` reads one binding yourself.
 
-Build and unit tests: npm test --workspace @margoengine/input
+[README continues: https://margoengine.com/llms/packages/input.md]
 
 === @margoengine/ui (packages/ui/README.md) ===
 

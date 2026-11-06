@@ -88,11 +88,17 @@ function validateBinding(binding: Binding): void {
 /** Semantic action state is reused; sample once per simulation tick. */
 export class Input {
   private readonly states = new Map<string, ActionState>();
-  private readonly samples: { name: string; state: ActionState }[] = [];
+  private readonly samples: { name: string; state: ActionState; values: number[] }[] = [];
   private readonly keys = new Set<string>();
   private buttons = 0;
+  // Pressed since the last update, so a press and release between two updates still counts for one update.
+  private readonly tapped = new Set<string>();
+  private tappedButtons = 0;
   private readonly motion = { x: 0, y: 0, wheel: 0 };
-  private readonly touch = new Map<string, { x: number; y: number; down: boolean; reset?: () => void }>();
+  private readonly touch = new Map<
+    string,
+    { x: number; y: number; down: boolean; tapped?: boolean; reset?: () => void }
+  >();
   private readonly cleanups: (() => void)[] = [];
   private readonly gamepads: () => readonly (Gamepad | null)[];
   private readonly deadzone: number;
@@ -132,7 +138,7 @@ export class Input {
         throw new TypeError('Actions need names and bindings; give every action at least one binding');
       for (const binding of bindings) validateBinding(binding);
       this.states.set(name, { value: 0, down: false, pressed: false, released: false });
-      this.samples.push({ name, state: this.states.get(name)! });
+      this.samples.push({ name, state: this.states.get(name)!, values: [] });
     }
     for (const [context, names] of Object.entries(contexts)) {
       if (!context || !Array.isArray(names))
@@ -148,11 +154,18 @@ export class Input {
       this.listen(target, 'keydown', (event) => {
         const e = event as KeyboardEvent,
           node = e.composedPath()[0] as Element;
-        if (!node?.closest?.('input,textarea,select,[contenteditable=true]')) this.keys.add(e.code);
+        // A repeat is no new press: after a blur reset it would press a key the player never pressed again.
+        if (!e.repeat && !node?.closest?.('input,textarea,select,[contenteditable=true]')) {
+          this.keys.add(e.code);
+          this.tapped.add(e.code);
+        }
       });
       this.listen(target, 'keyup', (event) => this.keys.delete((event as KeyboardEvent).code));
       this.listen(target, 'pointerdown', (event) => {
-        if ((event as PointerEvent).pointerType !== 'touch') this.buttons |= 1 << (event as PointerEvent).button;
+        if ((event as PointerEvent).pointerType !== 'touch') {
+          this.buttons |= 1 << (event as PointerEvent).button;
+          this.tappedButtons |= 1 << (event as PointerEvent).button;
+        }
       });
       this.listen(target, 'pointerup', (event) => {
         if ((event as PointerEvent).pointerType !== 'touch') this.buttons &= ~(1 << (event as PointerEvent).button);
@@ -188,6 +201,15 @@ export class Input {
     return state;
   }
   /**
+   * What one binding of `action` gave at the last {@link Input.update}, with its `scale` applied and before the action
+   * sums and clamps. Reads 0 for an index past the end, and while the action's contexts are off.
+   * @throws TypeError for an unknown action.
+   */
+  bindingValue(action: string, binding: number): number {
+    if (!this.states.has(action)) throw new TypeError('Unknown input action; add it to the actions option first');
+    return this.samples.find((sample) => sample.name === action)!.values[binding] ?? 0;
+  }
+  /**
    * Sample every binding into its action state and clear the accumulated pointer motion. Call once per tick.
    * @throws MargoError `'disposed'` after {@link Input.dispose}.
    */
@@ -197,7 +219,8 @@ export class Input {
     for (let i = 0; i < this.samples.length; i++) {
       const sample = this.samples[i],
         name = sample.name,
-        state = sample.state;
+        state = sample.state,
+        values = sample.values;
       let value = 0;
       const bindings = this.bindingsByAction[name],
         owners = this.owners.get(name);
@@ -210,25 +233,27 @@ export class Input {
             break;
           }
       }
+      values.length = bindings.length;
+      values.fill(0);
       for (let j = 0; active && j < bindings.length; j++) {
         const binding = bindings[j];
         let sample = 0;
         switch (binding.type) {
           case 'key':
-            sample = +this.keys.has(binding.code);
+            sample = +this.held(binding.code);
             if (sample && binding.modifiers)
               for (const modifier of binding.modifiers)
-                if (!MODIFIER_CODES[modifier].some((code) => this.keys.has(code))) sample = 0;
+                if (!MODIFIER_CODES[modifier].some((code) => this.held(code))) sample = 0;
             break;
           case 'mouse':
-            sample = +!!(this.buttons & (1 << binding.button));
+            sample = +!!((this.buttons | this.tappedButtons) & (1 << binding.button));
             break;
           case 'pointer':
             sample = this.motion[binding.axis];
             break;
           case 'touch': {
             const stick = this.touch.get(binding.id);
-            sample = binding.axis ? (stick?.[binding.axis] ?? 0) : +(stick?.down ?? false);
+            sample = binding.axis ? (stick?.[binding.axis] ?? 0) : +!!(stick?.down || stick?.tapped);
             break;
           }
           case 'gamepad-button':
@@ -243,7 +268,7 @@ export class Input {
             break;
           }
         }
-        if (Number.isFinite(sample)) value += sample * (binding.scale ?? 1);
+        if (Number.isFinite(sample)) value += values[j] = sample * (binding.scale ?? 1);
       }
       value = Math.max(-1, Math.min(1, value));
       const down = Math.abs(value) > 1e-6;
@@ -253,6 +278,15 @@ export class Input {
       state.value = value;
     }
     this.motion.x = this.motion.y = this.motion.wheel = 0;
+    this.clearTapped();
+  }
+  private held(code: string): boolean {
+    return this.keys.has(code) || this.tapped.has(code);
+  }
+  private clearTapped(): void {
+    this.tapped.clear();
+    this.tappedButtons = 0;
+    for (const state of this.touch.values()) state.tapped = false;
   }
   /**
    * Append a 120 px on-screen touch stick to `parent`, readable through `touch` bindings with this `id`.
@@ -267,7 +301,7 @@ export class Input {
     const doc = parent.ownerDocument,
       element = doc.createElement('div'),
       knob = doc.createElement('div'),
-      state = { x: 0, y: 0, down: false };
+      state = { x: 0, y: 0, down: false, tapped: false };
     let pointer: number | null = null;
     element.setAttribute('role', 'group');
     element.setAttribute('aria-label', `${id} touch stick`);
@@ -295,7 +329,7 @@ export class Input {
       if (pointer !== null) return;
       const e = event as PointerEvent;
       pointer = e.pointerId;
-      state.down = true;
+      state.down = state.tapped = true;
       element.setPointerCapture?.(pointer);
       move(event);
     });
@@ -329,7 +363,7 @@ export class Input {
       throw new TypeError(
         'Invalid or duplicate touch control; give each touch control a unique name and a finite radius',
       );
-    const state = { x: 0, y: 0, down: false };
+    const state = { x: 0, y: 0, down: false, tapped: false };
     this.touch.set(id, state);
     let pointer: number | null = null,
       key = false;
@@ -342,7 +376,7 @@ export class Input {
     this.listen(element, 'pointerdown', (event) => {
       if (pointer !== null) return;
       pointer = (event as PointerEvent).pointerId;
-      state.down = true;
+      state.down = state.tapped = true;
       element.setPointerCapture?.(pointer);
     });
     const release = (event: Event) => {
@@ -357,7 +391,7 @@ export class Input {
       if ((event as KeyboardEvent).key === ' ' || (event as KeyboardEvent).key === 'Enter') {
         event.preventDefault();
         key = true;
-        state.down = true;
+        state.down = state.tapped = true;
       }
     });
     this.listen(element, 'keyup', (event) => {
@@ -511,6 +545,7 @@ export class Input {
     this.keys.clear();
     this.buttons = 0;
     this.motion.x = this.motion.y = this.motion.wheel = 0;
+    this.clearTapped();
     for (const state of this.touch.values()) {
       state.reset?.();
       state.down = false;

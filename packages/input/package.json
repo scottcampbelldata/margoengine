@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/input",
   "version": "1.0.0",
-  "description": "Semantic keyboard, pointer, gamepad and touch actions with haptics.",
+  "description": "Semantic keyboard, pointer, gamepad and touch actions with haptics, and tap, hold, slow tap and double press rules.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./interactions": {
+      "types": "./dist/interactions.d.ts",
+      "import": "./dist/interactions.js"
     }
   },
   "files": [

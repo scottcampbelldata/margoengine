@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4730232,
+  "total": 4731846,
   "history": [
     {
       "date": "2026-10-24",
@@ -1934,6 +1934,12 @@
       "commit": "0ae101b83",
       "reason": "New optional entry bvh/inside.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "926187e1f",
+      "reason": "New input entry ./interactions: tap, hold, slow tap and double press rules. Input root keeps presses between updates and adds bindingValue. Core and core + stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -2142,6 +2148,7 @@
     "@margoengine/ifc dist/workers/ifc.js": 3443,
     "@margoengine/ifc/worker": 1470,
     "@margoengine/input": 5132,
+    "@margoengine/input/interactions": 1614,
     "@margoengine/inspector": 9302,
     "@margoengine/inspector/frame": 8897,
     "@margoengine/inspector/history": 1101,
