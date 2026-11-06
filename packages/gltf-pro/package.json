@@ -68,6 +68,10 @@
       "types": "./dist/lights.d.ts",
       "import": "./dist/lights.js"
     },
+    "./physics": {
+      "types": "./dist/physics.d.ts",
+      "import": "./dist/physics.js"
+    },
     "./coordinates": {
       "types": "./dist/coordinates.d.ts",
       "import": "./dist/coordinates.js"
@@ -88,6 +92,7 @@
     "@margoengine/clustered": "^1.0.0",
     "@margoengine/core": "^1.0.0",
     "@margoengine/environment": "^1.0.0",
+    "@margoengine/physics": "^1.0.0",
     "@margoengine/splats": "^1.0.0"
   },
   "peerDependenciesMeta": {
@@ -95,6 +100,9 @@
       "optional": true
     },
     "@margoengine/environment": {
+      "optional": true
+    },
+    "@margoengine/physics": {
       "optional": true
     },
     "@margoengine/splats": {
@@ -105,6 +113,7 @@
     "@margoengine/clustered": "^1.0.0",
     "@margoengine/environment": "^1.0.0",
     "@margoengine/math": "^1.0.0",
+    "@margoengine/physics": "^1.0.0",
     "@margoengine/splats": "^1.0.0"
   }
 }

@@ -465,6 +465,39 @@ const settle = (camera) =>
   }, camera);
 
 const checks = {
+  // The bob's node starts 0.6 rad out on a 2 m arm from a pivot at (0, 3, 0), and its drawn mesh is what the body moves.
+  async 'physics: the real JointPendulum swings its loaded node on the engine loop, the arm held at 2 m'() {
+    await open();
+    const result = await page.evaluate(async () => {
+      const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+        { applyGLTFPhysics } = await import('/packages/gltf-pro/dist/physics.js'),
+        { default: RAPIER } = await import('/node_modules/@dimforge/rapier3d-compat/dist/rapier.mjs'),
+        { engine } = window.check;
+      await RAPIER.init();
+      const model = await loadGLTF(engine, '/packages/gltf-pro/tests/fixtures/physics/JointPendulum.gltf'),
+        world = await applyGLTFPhysics(model, { rapier: RAPIER }),
+        node = model.nodes[1],
+        start = node.matrix[12],
+        arm = () => Math.hypot(node.matrix[12], node.matrix[13] - 3, node.matrix[14]),
+        end = performance.now() + 20000;
+      engine.start();
+      let longest = 0,
+        shortest = Infinity;
+      // Past the bottom of the swing, on the frames the engine draws.
+      while (node.matrix[12] > -0.5 && performance.now() < end) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        longest = Math.max(longest, arm());
+        shortest = Math.min(shortest, arm());
+      }
+      const reached = node.matrix[12];
+      world.dispose();
+      return { start, reached, longest, shortest };
+    });
+    assert.ok(result.start > 1 && result.reached <= -0.5, `the node swung: ${result.start} to ${result.reached}`);
+    // Frames interpolate between steps along a chord, which sags under 1 mm; 1 cm leaves the joint solver's error.
+    assert.ok(result.longest < 2.01 && result.shortest > 1.99, `the arm held: ${result.shortest} to ${result.longest}`);
+    await close();
+  },
   // A real Khronos KTX2 file on a quad. levelForPixels asks for the coarsest level at least as wide as the texture is on
   // screen, so the file's width over a power of two must lie at or above the on-screen width, and below twice it.
   async 'streaming: a real KTX2 texture loads the levels its size on screen needs, over HTTP Range'() {

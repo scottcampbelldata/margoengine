@@ -140,6 +140,8 @@ export interface Hit {
     collider: Collider;
 }
 
+export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
+
 export type JointOptions = (JointBase & {
     type: 'fixed';
     frameA?: Quat;
@@ -161,6 +163,14 @@ export type JointOptions = (JointBase & {
     axis: Vec3;
     limits?: readonly [number, number];
     motor?: MotorOptions;
+})
+ | (JointBase & {
+    type: 'generic';
+    frameA?: Quat;
+    frameB?: Quat;
+    locked?: readonly JointDof[];
+    limits?: Readonly<Partial<Record<JointDof, readonly [number, number]>>>;
+    motors?: Readonly<Partial<Record<JointDof, MotorOptions>>>;
 });
 
 export type JointType = JointOptions['type'];
@@ -332,6 +342,8 @@ export class PhysicsJoint {
     get limits(): [number, number] | null;
     setMotor(motor: MotorOptions): this;
     setRotationMotor(rotation: Quat, motor?: RotationMotorOptions): this;
+    setAxisLimits(dof: JointDof, min: number, max: number): this;
+    setAxisMotor(dof: JointDof, motor: MotorOptions): this;
     clearMotor(): this;
     set contactsEnabled(value: boolean);
     get contactsEnabled(): boolean;
@@ -378,7 +390,9 @@ export interface RapierModule {
     World: new (gravity: Vector) => World;
     EventQueue: new (autoDrain: boolean) => EventQueue;
     Ray: new (origin: Vector, direction: Vector) => Ray;
+    HalfSpace: new (normal: Vector) => Shape;
     ColliderDesc: {
+        new (shape: never): ColliderDesc;
         cuboid(x: number, y: number, z: number): ColliderDesc;
         ball(radius: number): ColliderDesc;
         capsule(halfHeight: number, radius: number): ColliderDesc;
@@ -403,6 +417,7 @@ export interface RapierModule {
         prismatic(anchorA: Vector, anchorB: Vector, axis: Vector): JointData;
         rope?(length: number, anchorA: Vector, anchorB: Vector): JointData;
         spring?(restLength: number, stiffness: number, damping: number, anchorA: Vector, anchorB: Vector): JointData;
+        generic?(anchorA: Vector, anchorB: Vector, axis: Vector, lockedAxes: number): JointData;
     };
     RigidBodyType: Record<'Dynamic' | 'Fixed' | 'KinematicPositionBased' | 'KinematicVelocityBased', number>;
     QueryFilterFlags: Record<'EXCLUDE_SENSORS' | 'EXCLUDE_FIXED' | 'EXCLUDE_KINEMATIC' | 'EXCLUDE_DYNAMIC', number>;
@@ -622,6 +637,7 @@ interface Collider {
     vertices(): Float32Array;
     indices(): Uint32Array | undefined;
     density(): number;
+    setDensity(density: number): void;
     mass(): number;
     friction(): number;
     restitution(): number;
@@ -691,6 +707,8 @@ interface ImpulseJoint {
     isValid(): boolean;
     contactsEnabled(): boolean;
     setContactsEnabled(enabled: boolean): void;
+    setLocalFrame1(anchor: Vector, rotation: Rotation): void;
+    setLocalFrame2(anchor: Vector, rotation: Rotation): void;
 }
 
 interface JointBase {
@@ -784,6 +802,8 @@ interface RigidBody {
     mass(): number;
     gravityScale(): number;
     localCom(): Vector;
+    principalInertia(): Vector;
+    principalInertiaLocalFrame(): Rotation;
     setAdditionalMassProperties(mass: number, com: Vector, inertia: Vector, frame: Rotation, wakeUp: boolean): void;
     recomputeMassPropertiesFromColliders(): void;
     setGravityScale(scale: number, wakeUp: boolean): void;
@@ -825,7 +845,6 @@ interface Shape {
 
 interface SphericalImpulseJoint extends ImpulseJoint {
     anchor1(): Vector;
-    setLocalFrame1(anchor: Vector, rotation: Rotation): void;
     configureMotorModel(axis: number, model: number): void;
     setMotorMaxForce(axis: number, force: number): void;
     configureMotor(axis: number, position: number, velocity: number, stiffness: number, damping: number): void;

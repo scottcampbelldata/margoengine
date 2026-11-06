@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9020430,
+  "total": 9029690,
   "history": [
     {
       "date": "2026-10-24",
@@ -2852,6 +2852,12 @@
       "commit": "28d8c3d01",
       "reason": "new entry @margoengine/fbx/scene-extras, batch 43 job 1",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "a2742c9be",
+      "reason": "gltf-pro gains the physics entry, physics gains the generic joint",
+      "grew": 1
     }
   ],
   "items": {
@@ -3083,6 +3089,7 @@
     "@margoengine/gltf-pro/extended": 8224,
     "@margoengine/gltf-pro/instancing": 3350,
     "@margoengine/gltf-pro/lights": 3470,
+    "@margoengine/gltf-pro/physics": 9260,
     "@margoengine/gltf-pro/prepare": 21088,
     "@margoengine/gltf-pro/progressive": 75015,
     "@margoengine/gltf-pro/scene": 1471,

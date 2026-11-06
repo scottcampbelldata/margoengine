@@ -131,7 +131,7 @@ The root-level mesh requirement still applies. A skinned or morphed primitive re
 | --- | --- |
 | `Physics` | The world and engine plugin: `update`, `step`, `sync`, `addBody`, `addJoint`, `createCharacterController`, `raycast`, `raycastAll`, `shapeCast`, `projectPoint`, `intersectPoint`, `intersectShape`, `touching`, `on`, `debugRender`, `dispose`; `world` and `rapier` for anything not wrapped |
 | `PhysicsBody` | Pose, teleport (`setPosition`, `setRotation`), kinematic targets (`setNextPosition`, `setNextRotation`), velocities, `addForce`, `applyImpulse` (optionally at a point), `addTorque`, `applyTorqueImpulse`, `resetForces`, `setAdditionalMass`, sleep and wake, `gravityScale`, `ccd`, locks, `addCollider`, `removeCollider`, `remove`; `raw` is the Rapier `RigidBody` |
-| `PhysicsJoint` | `setLimits`, `setMotor`, `setRotationMotor` (spherical joints: a spring toward a rotation), `clearMotor`, `contactsEnabled`, `remove`; `raw` is the Rapier `ImpulseJoint` |
+| `PhysicsJoint` | `setLimits`, `setMotor`, `setRotationMotor` (spherical joints: a spring toward a rotation), `setAxisLimits` and `setAxisMotor` (generic joints: one axis), `clearMotor`, `contactsEnabled`, `remove`; `raw` is the Rapier `ImpulseJoint` |
 | `CharacterController` | `move(desired)` per fixed step, `grounded`, `dispose`; `raw` is Rapier's `KinematicCharacterController` |
 | `Rope` | `new Rope(physics, options)`: `segments`, `joints`, `segmentLength`, `points(out?)`, `remove`, `valid` |
 | `Vehicle` | `new Vehicle(physics, chassis, options)`: `engineForce`, `steering`, `brake`, `setInput`, `speed`, `wheel(i)`, `wheelLocalPose(i)`, `wheelCount`, `dispose`; `raw` is Rapier's `DynamicRayCastVehicleController` |
@@ -160,7 +160,26 @@ The root-level mesh requirement still applies. A skinned or morphed primitive re
 
 Colliders: `shape` is `'box'` (`halfExtents`), `'sphere'` (`radius`), `'capsule'`, `'cylinder'` and `'cone'` (`halfHeight`, `radius`, Y axis), `'convexHull'` (`geometry` or `points`), `'trimesh'` (`geometry` or `vertices` and `indices`), `'heightfield'` (`rows`, `columns`, `(rows + 1) * (columns + 1)` column-major `heights`, `scale` as the total size, centered on the body), `'compound'` (`parts`), `'convexDecomposition'` (`geometry` or `vertices` and `indices`) or `'custom'` (`desc`: a Rapier `ColliderDesc` you built, for shapes and flags this wrapper does not cover, such as voxels or `TriMeshFlags`; it keeps its own translation unless `offset` is given, and its contacts raise the same events as any other collider of the body). Plus `offset`, `rotation`, `friction`, `restitution`, `frictionCombine` and `restitutionCombine` (`'average'`, `'min'`, `'multiply'`, `'max'`), `density` or `mass`, `sensor`, `collisionGroups`, `solverGroups`, `events`, `enabled`.
 
-Joints, `physics.addJoint(bodyA, bodyB, options)`: `type` `'fixed'` (`frameA`, `frameB` rotations), `'spherical'`, `'revolute'` or `'prismatic'` (`axis`, `limits`, `motor`), `'rope'` (`length`) or `'spring'` (`restLength`, `stiffness`, `damping` default 0). All take `anchorA` and `anchorB` in each body's local frame and `contactsEnabled`. Motors take `targetVelocity`, `targetPosition`, `stiffness`, `damping` and `model` (`'acceleration'` or `'force'`).
+Joints, `physics.addJoint(bodyA, bodyB, options)`: `type` `'fixed'` (`frameA`, `frameB` rotations), `'spherical'`, `'revolute'` or `'prismatic'` (`axis`, `limits`, `motor`), `'rope'` (`length`), `'spring'` (`restLength`, `stiffness`, `damping` default 0) or `'generic'` (below). All take `anchorA` and `anchorB` in each body's local frame and `contactsEnabled`. Motors take `targetVelocity`, `targetPosition`, `stiffness`, `damping` and `model` (`'acceleration'` or `'force'`).
+
+A `'generic'` joint picks its six degrees of freedom, named `linX`, `linY`, `linZ`, `angX`, `angY` and `angZ` along and about the axes of its frame on body A: `locked` lists axes that do not move, `limits` gives an axis a `[min, max]`, `motors` gives one a motor, and any other axis is free. `frameA` and `frameB` turn the joint's frame on each body (default identity). Positions are measured from frame A to frame B. `joint.setAxisLimits(dof, min, max)` and `joint.setAxisMotor(dof, motor)` change them later. Rapier 0.20 or later.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import RAPIER from '@dimforge/rapier3d-compat';
+await RAPIER.init();
+const physics = new Physics(null, {rapier: RAPIER});
+const wall = physics.addBody(null, {type: 'fixed', colliders: []});
+const door = physics.addBody(null, {position: [1, 0, 0], colliders: {shape: 'box', halfExtents: [1, 1, 0.05]}});
+// A door hinge, opened by a spring toward 0.6 rad.
+physics.addJoint(wall, door, {
+  type: 'generic',
+  anchorB: [-1, 0, 0],
+  locked: ['linX', 'linY', 'linZ', 'angX', 'angZ'],
+  limits: {angY: [-1.5, 1.5]},
+  motors: {angY: {targetPosition: 0.6, stiffness: 40, damping: 8}},
+});
+```
 
 `joint.setRotationMotor(rotation, {stiffness, damping, model, maxForce, targetVelocity})` turns body B toward a rotation in body A's frame, on a spherical joint. With `model: 'force'`, a body of inertia I about the joint moves like a spring of frequency w and damping ratio z for `stiffness` I w² and `damping` 2 z I w; `maxForce` caps the torque in N m, on every motor; `targetVelocity` is the target's own spin. It moves the joint's frame on body A onto the target, because the solver cannot tell rotations apart near half a turn by their vector part. Rapier 0.20 or later.
 

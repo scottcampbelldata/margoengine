@@ -1455,6 +1455,81 @@ rtest('additional mass and inertia add to what the colliders give, and 0 takes t
   physics.dispose();
 });
 
+rtest('a generic joint locks, limits and frees the axes of its frame on body A', () => {
+  const physics = create(),
+    anchor = physics.addBody(null, { type: 'fixed', position: [0, 5, 0], colliders: [] }),
+    slider = physics.addBody(null, { position: [0, 5, 0], colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1] } }),
+    // A quarter turn about Z puts the frame's X along world Y: the only free axis is vertical.
+    turn = [0, 0, Math.SQRT1_2, Math.SQRT1_2],
+    joint = physics.addJoint(anchor, slider, {
+      type: 'generic',
+      frameA: turn,
+      frameB: turn,
+      locked: ['linY', 'linZ', 'angX', 'angY', 'angZ'],
+      limits: { linX: [-2, 2] },
+    });
+  assert.equal(joint.type, 'generic');
+  for (let i = 0; i < 180; i++) physics.step();
+  near(slider.position[1], 3, 0.02, 'it falls to the end of its range');
+  near(slider.position[0], 0, 1e-3, 'X is locked');
+  physics.dispose();
+});
+
+rtest('a generic joint with an open axis swings there and holds the others', () => {
+  const physics = create(),
+    anchor = physics.addBody(null, { type: 'fixed', position: [0, 5, 0], colliders: [] }),
+    arm = physics.addBody(null, { position: [1, 5, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.1, 0.1] } });
+  physics.addJoint(anchor, arm, {
+    type: 'generic',
+    anchorB: [-1, 0, 0],
+    locked: ['linX', 'linY', 'linZ', 'angX', 'angY'],
+    limits: { angZ: [-0.5, 0.5] },
+  });
+  for (let i = 0; i < 180; i++) physics.step();
+  near(angleAbout(arm.rotation, [0, 0, 1]), -0.5, 0.02, 'it hangs at the lower limit');
+  const angle = angleAbout(arm.rotation, [0, 0, 1]);
+  near(arm.position[0], Math.cos(angle), 0.01, 'the anchor holds');
+  physics.dispose();
+});
+
+rtest('a motor on a generic axis reaches its target and its range', () => {
+  const physics = create({ gravity: [0, 0, 0] }),
+    anchor = physics.addBody(null, { type: 'fixed', colliders: [] }),
+    wheel = physics.addBody(null, { colliders: { shape: 'cylinder', halfHeight: 0.1, radius: 1 } }),
+    joint = physics.addJoint(anchor, wheel, {
+      type: 'generic',
+      locked: ['linX', 'linY', 'linZ', 'angX', 'angZ'],
+      motors: { angY: { targetPosition: 0.6, stiffness: 100, damping: 20 } },
+    });
+  for (let i = 0; i < 240; i++) physics.step();
+  // Measured from frame A to frame B, so a target of 0.6 turns body B by 0.6.
+  near(angleAbout(wheel.rotation, [0, 1, 0]), 0.6, 0.01, 'position target');
+  joint.setAxisLimits('angY', -0.2, 0.2);
+  for (let i = 0; i < 120; i++) physics.step();
+  near(angleAbout(wheel.rotation, [0, 1, 0]), 0.2, 0.02, 'a limit set later stops the motor');
+  joint.setAxisMotor('angY', { targetVelocity: -1, damping: 50, maxForce: 0 });
+  wheel.setAngularVelocity([0, 0, 0]);
+  for (let i = 0; i < 30; i++) physics.step();
+  near(angleAbout(wheel.rotation, [0, 1, 0]), 0.2, 0.02, 'a cap of 0 moves nothing');
+  physics.dispose();
+});
+
+rtest('generic joint calls are refused where they do not fit, with what to use', () => {
+  const physics = create(),
+    a = physics.addBody(null, { type: 'fixed', colliders: [] }),
+    b = physics.addBody(null, { position: [0, 1, 0], colliders: [] }),
+    c = physics.addBody(null, { position: [0, 2, 0], colliders: [] }),
+    generic = physics.addJoint(a, b, { type: 'generic' }),
+    hinge = physics.addJoint(a, c, { type: 'revolute', axis: [0, 1, 0] });
+  assert.throws(() => generic.setLimits(0, 1), /revolute or prismatic/);
+  assert.throws(() => hinge.setAxisLimits('angY', 0, 1), /generic joint/);
+  assert.throws(() => hinge.setAxisMotor('angY', {}), /generic joint/);
+  assert.throws(() => generic.setAxisLimits('twist', 0, 1), /Unknown joint axis twist/);
+  assert.throws(() => generic.setAxisLimits('angY', 1, 0), RangeError);
+  assert.throws(() => physics.addJoint(a, c, { type: 'generic', locked: ['spin'] }), /Unknown joint axis spin/);
+  physics.dispose();
+});
+
 rtest('clearMotor frees a hinge: a motor at gains of 0 still held it still', () => {
   const physics = create({ gravity: [0, 0, 0] }),
     anchor = physics.addBody(null, { type: 'fixed', colliders: [] }),

@@ -349,6 +349,41 @@ Read against the two extensions' READMEs on the Khronos glTF repository as of 20
 
 Limits are in [docs/limits.md](../../docs/limits.md): lights stay where their nodes were when applied, and at most 16 fixtures differ in profile or aim.
 
+### Rigid bodies in glTF (`/physics`, draft)
+
+`KHR_physics_rigid_bodies` carries colliders, mass, joints and trigger volumes on a file's nodes, and `KHR_implicit_shapes` its boxes, spheres, cylinders, capsules and planes. Every loader reads a file that uses them, even as required extensions, and keeps them as data; `applyGLTFPhysics` builds them in `@margoengine/physics`, which it loads on first use, so authored physics survives export.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {applyGLTFPhysics} from 'margoengine/gltf-pro/physics';
+import RAPIER from '@dimforge/rapier3d-compat';
+await RAPIER.init();
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/door.gltf');
+const world = await applyGLTFPhysics(model, {rapier: RAPIER});
+world.onTrigger(({entered, nodeIndex, motionNodeIndex}) => console.log(entered, nodeIndex, motionNodeIndex));
+console.log(world.bodies.size, world.joints.size, world.notes);
+// world.dispose() removes all of it.
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `physics` | one attached here | The `Physics` world to add to. |
+| `rapier` | none | The initialized Rapier module, for a world made here. Pass this or `physics`. |
+
+Read against pull request 2424 (`KHR_physics_rigid_bodies`, status Draft) and pull request 2370 (`KHR_implicit_shapes`, status Release Candidate) on the Khronos glTF repository as of 2026-11-06. Both can still change.
+
+- A node with a `motion` is a body that moves it, with the colliders of its descendants on it; a descendant with its own `motion` is its own body. A collider with no `motion` above it is fixed. A `mass` or `inertiaDiagonal` of 0 is infinite, as the draft says, and values the file leaves out come from the colliders.
+- A node the file animates is kinematic and follows its animation, its scale included. `KHR_animation_pointer` channels on joint drives play on the world's clock from when `applyGLTFPhysics` ran, looping.
+- A joint is a `generic` joint of `@margoengine/physics` between the two attachment frames. Limits and drives are measured from the joint node to `connectedNode`, so a drive with a target of 0.7 puts the connected node at +0.7 in the joint node's frame. A body on a joint with a drive never sleeps, because a slow body would stop short of its target.
+- Collision filters compare whole filters pair by pair, each side having to let the other in.
+- `geometry.node` reads that node's mesh and its children's, and `geometry.mesh`, which the extension's own sample files write in place of `node`, reads that mesh.
+- `world.bodyOf(node)` finds the body that moves a node. `world.setPointer(pointer, value)` writes a joint drive's `maxForce`, `positionTarget`, `velocityTarget`, `stiffness` or `damping`, or a motion's `linearVelocity`, `angularVelocity` or `gravityFactor`, and returns false for anything else.
+- `world.notes` lists what this file asks for that the world holds only approximately, by node. Empty means the file is represented as written.
+
+Limits are in [docs/limits.md](../../docs/limits.md): Rapier's order of combine rules differs from the draft's, soft limits are held hard, ranges on several axes are boxes, finite planes are thin boxes, and a file can have 15 distinct collision filters.
+
 ### Texture mip streaming (`textures` of `/progressive`)
 
 KTX 2.0 keeps the smallest mip first, so a texture can start from a small read of the head of its file. With `textures` set, `loadGLTFProgressive` opens each KTX2 image from those smallest levels and loads finer ones only as the texture's size on screen calls for them, inside a memory budget. Levels nothing needs leave when the budget runs out. It reuses `KTX2Streamer` of `@margoengine/decoders/ktx2-stream`, loaded only with this option.

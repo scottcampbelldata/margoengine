@@ -970,6 +970,10 @@
       "types": "./dist/gltf-pro/lights.d.ts",
       "import": "./dist/gltf-pro/lights.js"
     },
+    "./gltf-pro/physics": {
+      "types": "./dist/gltf-pro/physics.d.ts",
+      "import": "./dist/gltf-pro/physics.js"
+    },
     "./gltf-pro/coordinates": {
       "types": "./dist/gltf-pro/coordinates.d.ts",
       "import": "./dist/gltf-pro/coordinates.js"

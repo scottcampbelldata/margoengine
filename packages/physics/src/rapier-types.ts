@@ -40,6 +40,7 @@ export interface Collider {
   vertices(): Float32Array;
   indices(): Uint32Array | undefined;
   density(): number;
+  setDensity(density: number): void;
   mass(): number;
   friction(): number;
   restitution(): number;
@@ -94,6 +95,8 @@ export interface RigidBody {
   mass(): number;
   gravityScale(): number;
   localCom(): Vector;
+  principalInertia(): Vector;
+  principalInertiaLocalFrame(): Rotation;
   setAdditionalMassProperties(mass: number, com: Vector, inertia: Vector, frame: Rotation, wakeUp: boolean): void;
   recomputeMassPropertiesFromColliders(): void;
   setGravityScale(scale: number, wakeUp: boolean): void;
@@ -131,6 +134,10 @@ export interface ImpulseJoint {
   isValid(): boolean;
   contactsEnabled(): boolean;
   setContactsEnabled(enabled: boolean): void;
+  /** Rapier 0.20 and later. */
+  setLocalFrame1(anchor: Vector, rotation: Rotation): void;
+  /** Rapier 0.20 and later. */
+  setLocalFrame2(anchor: Vector, rotation: Rotation): void;
 }
 export interface UnitImpulseJoint extends ImpulseJoint {
   limitsEnabled(): boolean;
@@ -145,7 +152,6 @@ export interface UnitImpulseJoint extends ImpulseJoint {
 /** Rapier 0.20 and later: a motor per axis of a spherical joint. */
 export interface SphericalImpulseJoint extends ImpulseJoint {
   anchor1(): Vector;
-  setLocalFrame1(anchor: Vector, rotation: Rotation): void;
   configureMotorModel(axis: number, model: number): void;
   setMotorMaxForce(axis: number, force: number): void;
   configureMotor(axis: number, position: number, velocity: number, stiffness: number, damping: number): void;
@@ -290,7 +296,10 @@ export interface RapierModule {
   World: new (gravity: Vector) => World;
   EventQueue: new (autoDrain: boolean) => EventQueue;
   Ray: new (origin: Vector, direction: Vector) => Ray;
+  HalfSpace: new (normal: Vector) => Shape;
   ColliderDesc: {
+    // Takes Rapier's own Shape class, wider than Shape here: `never` keeps the real module assignable to this type.
+    new (shape: never): ColliderDesc;
     cuboid(x: number, y: number, z: number): ColliderDesc;
     ball(radius: number): ColliderDesc;
     capsule(halfHeight: number, radius: number): ColliderDesc;
@@ -319,6 +328,8 @@ export interface RapierModule {
     rope?(length: number, anchorA: Vector, anchorB: Vector): JointData;
     /** Rapier 0.12 and later. */
     spring?(restLength: number, stiffness: number, damping: number, anchorA: Vector, anchorB: Vector): JointData;
+    /** `lockedAxes` is a mask: 1 LinX, 2 LinY, 4 LinZ, 8 AngX, 16 AngY, 32 AngZ. */
+    generic?(anchorA: Vector, anchorB: Vector, axis: Vector, lockedAxes: number): JointData;
   };
   RigidBodyType: Record<'Dynamic' | 'Fixed' | 'KinematicPositionBased' | 'KinematicVelocityBased', number>;
   QueryFilterFlags: Record<'EXCLUDE_SENSORS' | 'EXCLUDE_FIXED' | 'EXCLUDE_KINEMATIC' | 'EXCLUDE_DYNAMIC', number>;

@@ -190,6 +190,9 @@ const supported = new Set([
   // Data until @margoengine/gltf-pro/lights applies them.
   'EXT_lights_ies',
   'EXT_lights_image_based',
+  // Data until @margoengine/gltf-pro/physics builds them.
+  'KHR_physics_rigid_bodies',
+  'KHR_implicit_shapes',
   // Played by @margoengine/animation (Animation); gltf-pro loads the channels as data.
   'KHR_animation_pointer',
 ]);

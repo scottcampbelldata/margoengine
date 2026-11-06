@@ -182,6 +182,7 @@ async function buildPackage(name) {
           /^@margoengine\/(sky|vfx)\//,
           /^@margoengine\/splats(\/|$)/,
           /^@margoengine\/environment$/,
+          /^@margoengine\/physics$/,
           '@margoengine/clustered/ies',
           '@margoengine/decoders/png',
         ],

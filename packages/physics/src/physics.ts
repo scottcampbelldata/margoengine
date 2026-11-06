@@ -6,7 +6,7 @@ import { meshRuntime, Mesh as CoreMesh } from '@margoengine/core/extension';
 import { meshTriangles, mergePrimitives } from '../../shared/mesh-source.js';
 import { PhysicsBody, type BodyOptions, type BodyOwner, type BodyType } from './body.js';
 import { CharacterController, type CharacterControllerOptions } from './character.js';
-import { PhysicsJoint, createJointData, type JointOptions } from './joints.js';
+import { PhysicsJoint, createJointData, type JointDof, type JointOptions } from './joints.js';
 import { checkVec, eulerToQuat, quat, tuple, vec, type Quat, type Vec3 } from './math.js';
 import {
   configureCollider,
@@ -766,7 +766,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     body.markRemoved();
   }
 
-  /** Connects two bodies with a fixed, spherical, revolute, prismatic, rope or spring joint. Anchors are in each body's local frame. */
+  /** Connects two bodies with a fixed, spherical, revolute, prismatic, rope, spring or generic joint. Anchors are in each body's local frame. */
   addJoint(bodyA: PhysicsBody, bodyB: PhysicsBody, options: JointOptions): PhysicsJoint {
     if (!this.bodies.has(bodyA) || !this.bodies.has(bodyB))
       throw new MargoError(
@@ -782,6 +782,15 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.type === 'revolute' || options.type === 'prismatic') {
       if (options.limits) joint.setLimits(options.limits[0], options.limits[1]);
       if (options.motor) joint.setMotor(options.motor);
+    }
+    if (options.type === 'generic') {
+      // Rapier's descriptor takes one axis, not two frames: the frames go on the made joint.
+      const { anchorA = [0, 0, 0], anchorB = [0, 0, 0], frameA, frameB } = options;
+      if (frameA) raw.setLocalFrame1(vec(anchorA), quat(frameA));
+      if (frameB) raw.setLocalFrame2(vec(anchorB), quat(frameB));
+      for (const [dof, range] of Object.entries(options.limits ?? {}))
+        joint.setAxisLimits(dof as JointDof, range[0], range[1]);
+      for (const [dof, motor] of Object.entries(options.motors ?? {})) joint.setAxisMotor(dof as JointDof, motor);
     }
     return joint;
   }

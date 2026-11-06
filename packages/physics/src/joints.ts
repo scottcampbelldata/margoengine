@@ -25,6 +25,10 @@ export type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 
   targetVelocity?: Vec3;
 };
 
+/** The part of Rapier's joint set a generic joint's limits go through: its class has no method for them. */
+interface AxisLimits {
+  jointSetLimits(handle: number, axis: number, min: number, max: number): void;
+}
 const maxForce = (motor: { maxForce?: number }): number => {
   const cap = motor.maxForce ?? Infinity;
   if (!(cap >= 0)) throw new RangeError('Motor maxForce must be 0 or more; pass newtons or newton metres.');
@@ -39,6 +43,10 @@ interface JointBase {
   /** Let the two bodies collide with each other (default false, as in Rapier). */
   contactsEnabled?: boolean;
 }
+/** One degree of freedom of a generic joint: along or about an axis of its frame on body A. */
+export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
+const DOFS: readonly JointDof[] = ['linX', 'linY', 'linZ', 'angX', 'angY', 'angZ'];
+
 /** Options for adding a joint between two bodies. */
 export type JointOptions =
   | (JointBase & { type: 'fixed'; frameA?: Quat; frameB?: Quat })
@@ -52,6 +60,19 @@ export type JointOptions =
       axis: Vec3;
       limits?: readonly [number, number];
       motor?: MotorOptions;
+    })
+  /**
+   * Six degrees of freedom you choose from, measured from the joint's frame on body A to its frame on body B: `locked`
+   * axes do not move, a `limits` axis stays in its range, any other axis is free. `frameA` and `frameB` turn each frame
+   * on its body (default identity). Rapier 0.20 or later.
+   */
+  | (JointBase & {
+      type: 'generic';
+      frameA?: Quat;
+      frameB?: Quat;
+      locked?: readonly JointDof[];
+      limits?: Readonly<Partial<Record<JointDof, readonly [number, number]>>>;
+      motors?: Readonly<Partial<Record<JointDof, MotorOptions>>>;
     });
 
 /** Kind of joint, the `type` of {@link JointOptions}. */
@@ -82,19 +103,29 @@ export class PhysicsJoint {
     return this.raw as UnitImpulseJoint;
   }
   private motors?: SphericalImpulseJoint;
-  private spherical(): SphericalImpulseJoint {
-    if (!this.valid) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
-    if (this.type !== 'spherical') throw new TypeError('Rotation motors need a spherical joint; use setMotor on a hinge.');
+  private axes(): SphericalImpulseJoint {
     if (this.motors) return this.motors;
     const R = this.owner.rapier;
     if (!R.SphericalImpulseJoint || !R.JointAxis)
       throw new MargoError(
         'unsupported',
-        'Spherical joint motors need Rapier 0.20 or later; upgrade @dimforge/rapier3d-compat.',
+        'Motors per axis need Rapier 0.20 or later; upgrade @dimforge/rapier3d-compat.',
       );
     // Rapier hands a spherical joint back as a generic one, whose class has no motors: view the same joint as what it is.
     const raw = this.raw as ImpulseJoint & { rawSet: never; bodySet: never };
     return (this.motors = new R.SphericalImpulseJoint(raw.rawSet, raw.bodySet, raw.handle));
+  }
+  private spherical(): SphericalImpulseJoint {
+    if (!this.valid) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.type !== 'spherical') throw new TypeError('Rotation motors need a spherical joint; use setMotor on a hinge.');
+    return this.axes();
+  }
+  private generic(dof: JointDof): number {
+    if (!this.valid) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.type !== 'generic') throw new TypeError('Axis limits and motors need a generic joint; use setLimits or setMotor.');
+    const axis = DOFS.indexOf(dof);
+    if (axis < 0) throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
+    return axis;
   }
   /** Angle (revolute, radians) or translation (prismatic) limits. */
   setLimits(min: number, max: number): this {
@@ -149,6 +180,29 @@ export class PhysicsJoint {
       raw.setMotorMaxForce(axis, cap);
       raw.configureMotor(axis, 0, spin?.[k] ?? 0, stiffness, damping);
     });
+    this.wake();
+    return this;
+  }
+  /** Generic joints: keeps one free axis between `min` and `max`, in radians or units, from frame A to frame B. */
+  setAxisLimits(dof: JointDof, min: number, max: number): this {
+    const axis = this.generic(dof);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min > max)
+      throw new RangeError('Joint limits need finite min <= max');
+    (this.raw as unknown as { rawSet: AxisLimits }).rawSet.jointSetLimits(this.raw.handle, axis, min, max);
+    this.wake();
+    return this;
+  }
+  /** Generic joints: a motor on one axis, its target in the same measure as {@link PhysicsJoint.setAxisLimits}. */
+  setAxisMotor(dof: JointDof, motor: MotorOptions): this {
+    const axis = this.generic(dof),
+      raw = this.axes(),
+      R = this.owner.rapier,
+      velocity = motor.targetVelocity ?? 0;
+    raw.configureMotorModel(axis, motor.model === 'force' ? R.MotorModel.ForceBased : R.MotorModel.AccelerationBased);
+    raw.setMotorMaxForce(axis, maxForce(motor));
+    if (motor.targetPosition !== undefined)
+      raw.configureMotor(axis, motor.targetPosition, velocity, motor.stiffness ?? 1, motor.damping ?? 0);
+    else raw.configureMotor(axis, 0, velocity, 0, motor.damping ?? 1);
     this.wake();
     return this;
   }
@@ -212,6 +266,17 @@ export function createJointData(R: RapierModule, options: JointOptions): JointDa
         ? R.JointData.revolute(vec(anchorA), vec(anchorB), axis)
         : R.JointData.prismatic(vec(anchorA), vec(anchorB), axis);
     }
+    case 'generic': {
+      if (!R.JointData.generic || !R.JointAxis)
+        throw new MargoError('unsupported', 'Generic joints need Rapier 0.20 or later; upgrade @dimforge/rapier3d-compat.');
+      let locked = 0;
+      for (const dof of options.locked ?? []) {
+        const axis = DOFS.indexOf(dof);
+        if (axis < 0) throw new TypeError(`Unknown joint axis ${String(dof)}; use linX, linY, linZ, angX, angY or angZ.`);
+        locked |= 1 << axis;
+      }
+      return R.JointData.generic(vec(anchorA), vec(anchorB), vec([1, 0, 0]), locked);
+    }
     case 'rope': {
       if (!(options.length > 0) || !Number.isFinite(options.length))
         throw new RangeError('Rope joint length must be a positive finite number; pass the longest anchor distance.');
@@ -237,7 +302,7 @@ export function createJointData(R: RapierModule, options: JointOptions): JointDa
     }
     default:
       throw new TypeError(
-        `Unknown joint type ${(options as { type: string }).type}; use fixed, spherical, revolute, prismatic, rope or spring.`,
+        `Unknown joint type ${(options as { type: string }).type}; use fixed, spherical, revolute, prismatic, rope, spring or generic.`,
       );
   }
 }
