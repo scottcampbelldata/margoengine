@@ -34,6 +34,10 @@
     "./boolean-exact": {
       "types": "./dist/boolean-exact.d.ts",
       "import": "./dist/boolean-exact.js"
+    },
+    "./modifiers": {
+      "types": "./dist/modifiers.d.ts",
+      "import": "./dist/modifiers.js"
     }
   },
   "files": [

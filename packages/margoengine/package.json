@@ -1014,6 +1014,10 @@
       "types": "./dist/mesh-edit/boolean-exact.d.ts",
       "import": "./dist/mesh-edit/boolean-exact.js"
     },
+    "./mesh-edit/modifiers": {
+      "types": "./dist/mesh-edit/modifiers.d.ts",
+      "import": "./dist/mesh-edit/modifiers.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"

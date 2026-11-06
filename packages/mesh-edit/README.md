@@ -211,6 +211,46 @@ console.log(result.mesh.faces.length, result.collapsedFaces, result.nonManifoldE
 - Only at the end are corners rounded to float64. A face of the exact result too thin to be a valid face (about 4e-9 of its length, or a few float64 steps) is folded away, keeping every edge matched by its reverse; `collapsedFaces` counts these. The returned mesh is always closed and passes the mesh-edit checks, so it can feed the next boolean.
 - Inputs must be closed, outward facing and free of self-intersection: one that crosses itself throws `MargoError` code `failed` when the crossing breaks the result. Faces that are not quite planar count as the triangles an exact ear clip gives them.
 - Speed: about 0.8 s for one operation on 1,728 faces, 40 to 75 s on 10,368. Work grows with faces squared. Use `booleanMeshes` for large clean inputs and pass `signal` to stop a long run.
+## Modifier stack
+
+Mirror, array, solidify, screw and lattice deform that never touch the base mesh. Change the base or any modifier and the stack re-runs from the first stage that is out of date:
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { latticePoints, MeshModifierStack } from 'margoengine/mesh-edit/modifiers';
+
+const box = createPrimitiveMesh('cube', 'box');
+const stack = new MeshModifierStack(box, [
+  { type: 'solidify', thickness: 0.05 },
+  { type: 'array', count: 3, offset: [2, 0, 0] },
+]);
+console.log(stack.evaluate().mesh.faces.length);
+
+// Edit the base: the next evaluate re-runs everything.
+stack.base = createPrimitiveMesh('wedge', 'ramp');
+// Change one modifier: earlier stages are reused.
+stack.update(1, { count: 5 });
+
+// Bend the top of the box with a lattice.
+const min: [number, number, number] = [-0.5, -0.5, -0.5];
+const max: [number, number, number] = [0.5, 0.5, 0.5];
+const points = latticePoints(min, max, [2, 2, 2]).map(([x, y, z]): [number, number, number] =>
+  y > 0 ? [x * 2, y, z * 2] : [x, y, z],
+);
+stack.add({ type: 'lattice', min, max, resolution: [2, 2, 2], points });
+const { mesh, faceMap } = stack.evaluate();
+console.log(mesh.vertices.length, Object.keys(faceMap).length);
+```
+
+- `new MeshModifierStack(base, modifiers)` copies the base. Set `stack.base` to a new mesh after an edit. `add(modifier, index)`, `update(index, changes)`, `remove(index)` and `move(from, to)` change the list; `evaluate()` returns a `MeshEditResult` whose `vertexMap` and `faceMap` lead back to the base; `apply()` bakes the result into the base and empties the list. `applyMeshModifiers(mesh, modifiers)` is the same as a one-off call.
+- Face IDs are built from base IDs (`id~m`, `id~a2`, `id~s`), so a re-run names each face the same way and selections survive. Any modifier takes `enabled: false` to switch off without being removed.
+- `{type: 'mirror', axis = 'x', origin = 0, merge = 1e-6}`: reflects across the plane, reversing the copy's winding so it faces out. Vertices within `merge` of the plane move onto it and join both halves; faces wholly on it are dropped, so an open half closes. `merge: 0` keeps the halves apart.
+- `{type: 'array', count = 2, offset, relativeOffset, merge = 0}`: `count` copies, the original included, each `offset` plus `relativeOffset` times the bounding box size further on. With neither given the step is one box width along X. `merge` welds touching neighbors with `weldMeshVertices`.
+- `{type: 'solidify', thickness = 0.1, offset = -1, even = true}`: a second shell with reversed winding, and rim faces along open edges. `offset` -1 puts the wall behind the surface, 0 centers it, 1 puts it in front. `even` keeps the thickness at corners. Walls thicker than a concave part's radius fold over themselves: nothing detects that.
+- `{type: 'screw', axis = 'y', origin = [0, 0, 0], angle = 2 pi, steps = 16, height = 0}`: sweeps a surface profile around the axis, climbing `height` over the whole sweep. Open edges make the walls; a sweep that does not close gets the profile as its end caps; a full turn with no `height` closes on itself and leaves no caps. Vertices on the axis stay shared. `PolygonMesh` has no loose edges, so the profile is a surface, not a wire.
+- `{type: 'lattice', min, max, resolution, points}`: free-form deformation (Sederberg and Parry, 1986) with Bernstein weights. Start from `latticePoints(min, max, resolution)`, which changes nothing, and move points. Vertices outside the box stay where they are.
+- A modifier that warps a face splits it into valid convex pieces (`id~t1`, ...) and says so in `diagnostics`.
+
 
 ## Simplification and levels of detail
 
