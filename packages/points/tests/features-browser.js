@@ -337,8 +337,55 @@ async function hdrColors() {
   return `HDR colours pass the 0..1 clamp on a real GPU, in points and surfels (${float} and ${disc} against ${clamped})`;
 }
 
+/** A fine checker on a small point: with mips its average, without them one texel. Same for a world-sized sprite. */
+async function mipmaps() {
+  const { PointCloud, SpriteBatch } = await import('@margoengine/points');
+  const size = 64,
+    data = new Uint8ClampedArray(size * size * 4);
+  for (let i = 0; i < size * size; i++) {
+    const v = ((i % size) + Math.floor(i / size)) % 2 ? 255 : 0;
+    data.set([v, v, v, 255], i * 4);
+  }
+  const map = new ImageData(data, size, size),
+    { engine, frame, end } = await rig(),
+    points = PointsPlugin.attach(engine),
+    x = (v) => Math.round(128 + (v * 221.7) / 10),
+    y = 128;
+  // 7 pixels, so samples drift across the texels: at 8 each lands where four texels meet and reads as grey anyway.
+  const smooth = { map, size: 7, mapFilter: 'linear' };
+  points.add(new PointCloud({ positions: [-3, 0, 0], material: smooth }));
+  points.add(new PointCloud({ positions: [-1, 0, 0], material: { ...smooth, mipmaps: false } }));
+  points.add(new SpriteBatch({ material: { map, mipmaps: true, transparent: false }, sprites: [{ position: [1, 0, 0], size: 0.4 }] }));
+  points.add(new SpriteBatch({ material: { map, transparent: false }, sprites: [{ position: [3, 0, 0], size: 0.4 }] }));
+  const image = await frame(),
+    // The spread of brightness across a point: small for an even grey, large for raw texels.
+    spread = (at) => {
+      let low = 255,
+        high = 0;
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const v = image.at(at + dx, y + dy)[0];
+          low = Math.min(low, v);
+          high = Math.max(high, v);
+        }
+      return { low, high, range: high - low };
+    },
+    pointMips = spread(x(-3)),
+    pointRaw = spread(x(-1)),
+    spriteMips = spread(x(1)),
+    spriteRaw = spread(x(3));
+  assert(pointMips.range < 10, `a point with mips is even: ${JSON.stringify(pointMips)}`);
+  // Linear grey: the average of black and white is 50 percent light, about 188 in sRGB.
+  assert(Math.abs(pointMips.low - 188) < 12, `the average is taken in linear light: ${pointMips.low}`);
+  assert(spriteMips.range < 10, `a sprite with mips is even: ${JSON.stringify(spriteMips)}`);
+  assert(pointRaw.range > 40 || Math.abs(pointRaw.low - 188) > 12, `without mips it aliases: ${JSON.stringify(pointRaw)}`);
+  assert(spriteRaw.range > 40 || Math.abs(spriteRaw.low - 188) > 12, `without mips it aliases: ${JSON.stringify(spriteRaw)}`);
+  await end();
+  return `Mips smooth a fine map on small points and sprites (spread ${pointMips.range} and ${spriteMips.range} against ${pointRaw.range} and ${spriteRaw.range})`;
+}
+
 window.runFeatures = async () => {
   const checks = [];
-  for (const check of [adaptiveSize, surfels, surfelDepth, potree, octreeTransform, gpuPicking, hdrColors]) checks.push(await check());
+  for (const check of [adaptiveSize, surfels, surfelDepth, potree, octreeTransform, gpuPicking, hdrColors, mipmaps]) checks.push(await check());
   return checks;
 };

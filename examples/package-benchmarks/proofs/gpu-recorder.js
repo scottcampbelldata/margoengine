@@ -149,6 +149,7 @@ export function mockGPU() {
     },
   });
   const encoder = made('encoder', {
+    finish: call('finish'),
     beginRenderPass: begin('beginRenderPass'),
     beginComputePass: begin('beginComputePass'),
     clearBuffer: call('clearBuffer'),

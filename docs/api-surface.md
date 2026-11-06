@@ -65,7 +65,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/physics | `.` 43 | 22 |  | 15,748 |
 | @margoengine/physics2d | `.` 29 | 16 |  | 7,664 |
 | @margoengine/pixel | `.` 13, `./palette` 15, `./render3d` 8 |  |  | 4,408 |
-| @margoengine/points | `.` 55, `./las` 16, `./laz` 7, `./e57` 13, `./copc` 4, `./octree` 11, `./surfels` 4, `./potree` 2, `./pick` 5 | 75 |  | 20,951 |
+| @margoengine/points | `.` 55, `./las` 16, `./laz` 7, `./e57` 13, `./copc` 4, `./octree` 11, `./surfels` 4, `./potree` 2, `./pick` 5 | 75 |  | 21,320 |
 | @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./outline` 2, `./mrt` 4, `./depth` 2, `./contact-shadows` 2 | 21 |  | 38,941 |
 | @margoengine/procedural | `.` 40, `./standin` 1, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 12,594 |
 | @margoengine/quality | `.` 25, `./warm` 3 |  | 2 | 3,554 |

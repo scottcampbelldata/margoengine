@@ -100,7 +100,9 @@ struct Surface{color:vec4f,nz:f32}
 fn surface(i:VOut)->Surface{
   let r=max(i.info.x,1e-4);
   let uv=vec2f(0.5+0.5*i.quad.x/r,0.5-0.5*i.quad.y/r);
-  let texel=textureSampleLevel(map,mapSampler,clamp(uv,vec2f(0.0),vec2f(1.0)),0.0);
+  // The map spans the point's diameter: one mip per halving of texels per pixel. A map without mips stays at level 0.
+  let dims=vec2f(textureDimensions(map));
+  let texel=textureSampleLevel(map,mapSampler,clamp(uv,vec2f(0.0),vec2f(1.0)),max(log2(max(dims.x,dims.y)/(2.0*r)),0.0));
   var color=i.color;
   if(has(${FLAG.map}u)){color*=texel;}
   if(color.a<cloud.size.w){discard;}
@@ -183,7 +185,10 @@ struct VOut{@builtin(position) clip:vec4f,@location(0) color:vec4f,@location(1) 
   return out;
 }
 @fragment fn fragment(i:VOut)->@location(0) vec4f{
-  let texel=textureSampleLevel(map,mapSampler,i.uv,0.0);
+  // The texel footprint of this pixel, for sprites in any atlas rectangle. A map without mips stays at level 0.
+  let dims=vec2f(textureDimensions(map));
+  let dx=dpdx(i.uv)*dims;let dy=dpdy(i.uv)*dims;
+  let texel=textureSampleLevel(map,mapSampler,i.uv,max(0.5*log2(max(max(dot(dx,dx),dot(dy,dy)),1e-12)),0.0));
   let color=i.color*texel;
   if(color.a<batch.params.y||color.a<=0.0){discard;}
   // Clipping planes (abs(params.w) of them; negative: cut only behind every plane) at this fragment's world point.

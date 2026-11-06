@@ -42,10 +42,12 @@ export function optionalGPU() {
     new Uint8Array(b.data).set(new Uint8Array(value.buffer ?? value, start, bytes), offset);
     bufferWrites.push({ buffer: b, offset, bytes });
   };
-  // A standalone encoder (buffer copies run at once) and queue completion, as animation's shared buffers use them.
+  // A standalone encoder (buffer copies run at once, passes record like the frame's) and queue completion, as animation's
+  // shared buffers and mip generation use them.
   engine.gpu.createCommandEncoder ??= () => ({
     copyBufferToBuffer: (source, from, target, to, size) =>
       new Uint8Array(target.data, to, size).set(new Uint8Array(source.data, from, size)),
+    beginRenderPass: () => pass,
     finish: () => ({}),
   });
   engine.gpu.queue.submit ??= () => {};

@@ -106,6 +106,7 @@ Float colors default to `colorSpace: 'linear'`. Byte arrays are still read as 0.
 | --- | --- | --- |
 | `color`, `opacity` | white, 1 | |
 | `map`, `mapFilter` | null, `'linear'` | GPUTexture or image source |
+| `mipmaps` | true (sprites: false) | Generate mips of an uploaded map |
 | `alphaTest` | 0 | |
 | `transparent`, `blending` | false (sprites: true), `'normal'` | `'additive'` also available |
 | `depthTest`, `depthWrite` | true, `!transparent` | |
@@ -119,6 +120,23 @@ Float colors default to `colorSpace: 'linear'`. Byte arrays are still read as 0.
 | `fog` | true | Fogged by the plugin's `setFog` (sprites too); false keeps the material clear |
 
 Sprites: `add({position, size, rotation, center, color, opacity, uv})`, `set(index, ...)`, `remove(index)` (moves the last sprite into the slot), `clear()`. `SpriteMaterial.rotation` adds to every sprite.
+
+## Mipmaps
+
+A map drawn on a small point shimmers, as each pixel lands on one texel of a large image. Points generate a full mip chain of an uploaded map by default and pick the level from their size on screen, so a 256 px map on a 4 px point reads as its average. `mapFilter: 'nearest'` still blends nothing between levels. Sprites keep `mipmaps: false` by default, as mips bleed between the cells of an atlas; set it to true for a batch that draws one image per sprite, or leave a gutter around atlas cells.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PointsPlugin, PointCloud, SpriteBatch} from 'margoengine/points';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+const map = await createImageBitmap(new ImageData(new Uint8ClampedArray(64 * 64 * 4).fill(255), 64, 64));
+points.add(new PointCloud({positions: new Float32Array([0, 0, 0]), material: {map, size: 6}}));
+points.add(new SpriteBatch({material: {map, mipmaps: true}})).add({position: [1, 0, 0], size: 0.1});
+```
+
+A `GPUTexture` you pass keeps the mips it has, and they are used. A map with `alphaTest` tests the filtered alpha, so holes in a map soften as a point shrinks. Every upload, including `needsUpdate()` on a video or canvas, makes the chain again.
 
 ## Fog
 
@@ -464,7 +482,7 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 - `points.pick` is CPU-side over the points drawn in the latest frame; meshes do not occlude it, and clipping planes do not apply to it. `PointPicking` does both on the GPU, but answers later, through a promise.
 - Block bounds only grow on updates; call `rebuild()` to tighten them or to include points that turned finite. Non-finite points are never drawn. A `reorder`ed cloud cannot be rebuilt.
 - Per-point colors are stored as RGBA8 by default, so HDR vertex colors are clamped to 0..1; `colorFormat: 'float'` keeps them, at four times the color memory. A float color must be finite and 0 or more.
-- No mipmaps on maps. A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.
+- A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.
 - Transparent points and sprites are not sorted per point. Use `alphaTest` or additive blending for order-independent results. Round antialiased edges of opaque points write depth.
 - A plain `PointCloud` does not grow its points when the budget subsamples its blocks; `OctreeCloud` does with `adaptiveSize`. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own; it reads COPC and Potree.
 

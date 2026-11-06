@@ -29,6 +29,7 @@ import {
 } from './shaders.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
+import { generateMipmaps } from '../../shared/mipmaps.js';
 import { alphaBlend } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
@@ -90,6 +91,7 @@ interface BatchGpu {
 interface OwnedTexture {
   source: PointsTextureSource;
   version: number;
+  mipmaps: boolean;
   texture: GPUTexture;
   view: GPUTextureView;
 }
@@ -188,6 +190,7 @@ export class PointsPlugin implements EnginePlugin {
   private readonly owned = new Map<AnyMaterial, OwnedTexture>();
   private readonly borrowed = new WeakMap<GPUTexture, { device: GPUDevice; view: GPUTextureView }>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
+  private readonly mipCache = new Map<string, GPURenderPipeline>();
   /** Told when clouds come and go (`@margoengine/points/pick`). */
   private readonly watchers = new Set<{ added(cloud: PointCloud): void; removed(cloud: PointCloud): void }>();
   private engine?: Engine;
@@ -424,7 +427,7 @@ export class PointsPlugin implements EnginePlugin {
         dummy: buffer(16, GPUBufferUsage.STORAGE),
         white,
         whiteView: white.createView(),
-        linear: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }),
+        linear: device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' }),
         nearest: device.createSampler({ magFilter: 'nearest', minFilter: 'nearest' }),
         edlParams: buffer(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
       };
@@ -573,7 +576,8 @@ export class PointsPlugin implements EnginePlugin {
       return entry.view;
     }
     let owned = this.owned.get(material);
-    if (owned && owned.source === source && owned.version === material.mapVersion) return owned.view;
+    if (owned && owned.source === source && owned.version === material.mapVersion && owned.mipmaps === material.mipmaps)
+      return owned.view;
     if (owned) {
       owned.texture.destroy();
       this.owned.delete(material);
@@ -592,11 +596,13 @@ export class PointsPlugin implements EnginePlugin {
       throw new RangeError(
         'The texture source has no size yet; wait until the image or video has loaded before using it.',
       );
-    const texture = device.createTexture({
-      size: [width, height],
-      format: 'rgba8unorm-srgb',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+    const levels = material.mipmaps ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1,
+      texture = device.createTexture({
+        size: [width, height],
+        mipLevelCount: levels,
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
     try {
       if (typeof ImageData !== 'undefined' && source instanceof ImageData)
         device.queue.writeTexture({ texture }, source.data, { bytesPerRow: width * 4 }, [width, height]);
@@ -605,7 +611,14 @@ export class PointsPlugin implements EnginePlugin {
           width,
           height,
         ]);
-      owned = { source, version: material.mapVersion, texture, view: texture.createView() };
+      generateMipmaps(device, texture, levels, this.mipCache, this.gpu!.linear);
+      owned = {
+        source,
+        version: material.mapVersion,
+        mipmaps: material.mipmaps,
+        texture,
+        view: texture.createView(),
+      };
     } catch (error) {
       texture.destroy();
       throw error;
@@ -788,6 +801,7 @@ export class PointsPlugin implements EnginePlugin {
     this.pickViews.clear();
     this.pickView = undefined;
     this.pipelines.clear();
+    this.mipCache.clear();
   }
 
   private blend(blending: 'normal' | 'additive'): GPUBlendState {

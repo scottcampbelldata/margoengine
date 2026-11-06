@@ -52,6 +52,7 @@ abstract class BaseMaterial {
     readonly color: Float32Array<ArrayBuffer>;
     opacity: number;
     mapFilter: 'linear' | 'nearest';
+    mipmaps: boolean;
     alphaTest: number;
     transparent: boolean;
     blending: PointsBlending;
@@ -59,7 +60,7 @@ abstract class BaseMaterial {
     depthWrite: boolean | null;
     fog: boolean;
     mapVersion: number;
-    protected constructor(transparent: boolean);
+    protected constructor(transparent: boolean, mipmaps: boolean);
     get map(): PointsTextureSource | null;
     set map(value: PointsTextureSource | null);
     get clippingPlanes(): number[][];
@@ -78,6 +79,7 @@ interface BaseMaterialOptions {
     opacity?: number;
     map?: PointsTextureSource | null;
     mapFilter?: 'linear' | 'nearest';
+    mipmaps?: boolean;
     alphaTest?: number;
     transparent?: boolean;
     blending?: PointsBlending;

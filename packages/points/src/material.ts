@@ -30,6 +30,11 @@ export interface BaseMaterialOptions {
   map?: PointsTextureSource | null;
   /** Texture filtering. Default 'linear'. */
   mapFilter?: 'linear' | 'nearest';
+  /**
+   * Generates mips of an uploaded image source so a map stays smooth when drawn small. Default true for points, false
+   * for sprites, as mips bleed between the cells of an atlas. A `GPUTexture` keeps the mips it has.
+   */
+  mipmaps?: boolean;
   /** Fragments whose alpha (before edge antialiasing) is below this are discarded. Default 0. */
   alphaTest?: number;
   /** Blend without writing depth. Default false for points, true for sprites. */
@@ -80,6 +85,7 @@ abstract class BaseMaterial {
   readonly color = new Float32Array([1, 1, 1]);
   opacity = 1;
   mapFilter: 'linear' | 'nearest' = 'linear';
+  mipmaps: boolean;
   alphaTest = 0;
   transparent: boolean;
   blending: PointsBlending = 'normal';
@@ -94,8 +100,9 @@ abstract class BaseMaterial {
   private clipping: number[] = [];
   private clipAll = false;
 
-  protected constructor(transparent: boolean) {
+  protected constructor(transparent: boolean, mipmaps: boolean) {
     this.transparent = transparent;
+    this.mipmaps = mipmaps;
   }
 
   get map(): PointsTextureSource | null {
@@ -155,6 +162,7 @@ abstract class BaseMaterial {
     if (options.opacity !== undefined) this.opacity = options.opacity;
     if (options.map !== undefined) this.map = options.map;
     if (options.mapFilter !== undefined) this.mapFilter = options.mapFilter;
+    if (options.mipmaps !== undefined) this.mipmaps = options.mipmaps;
     if (options.alphaTest !== undefined) this.alphaTest = options.alphaTest;
     if (options.transparent !== undefined) this.transparent = options.transparent;
     if (options.blending !== undefined) this.blending = options.blending;
@@ -176,9 +184,10 @@ abstract class BaseMaterial {
       typeof this.transparent !== 'boolean' ||
       typeof this.depthTest !== 'boolean' ||
       typeof this.fog !== 'boolean' ||
+      typeof this.mipmaps !== 'boolean' ||
       (this.depthWrite !== null && typeof this.depthWrite !== 'boolean')
     )
-      throw new TypeError('transparent, depthTest, depthWrite and fog must be booleans');
+      throw new TypeError('transparent, depthTest, depthWrite, fog and mipmaps must be booleans');
     for (const v of this.color)
       if (!Number.isFinite(v) || v < 0) throw new RangeError('color must be finite and non-negative');
   }
@@ -226,7 +235,7 @@ export class PointsMaterial extends BaseMaterial {
   edl = false;
 
   constructor(options: PointsMaterialOptions = {}) {
-    super(false);
+    super(false, true);
     this.set(options);
   }
 
@@ -281,7 +290,7 @@ export class SpriteMaterial extends BaseMaterial {
   sizeUnits: 'world' | 'pixels' = 'world';
 
   constructor(options: SpriteMaterialOptions = {}) {
-    super(true);
+    super(true, false);
     this.set(options);
   }
 

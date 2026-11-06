@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4656211,
+  "total": 4658176,
   "history": [
     {
       "date": "2026-10-24",
@@ -1868,6 +1868,12 @@
       "commit": "172c641e1",
       "reason": "webgl2-compat adapter entry: compatibility level adapters",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "2153152b8",
+      "reason": "mipmaps in the root entry",
+      "grew": 3
     }
   ],
   "items": {
@@ -2162,15 +2168,15 @@
     "@margoengine/pixel": 4664,
     "@margoengine/pixel/palette": 4341,
     "@margoengine/pixel/render3d": 3866,
-    "@margoengine/points": 21492,
+    "@margoengine/points": 22649,
     "@margoengine/points/copc": 11717,
     "@margoengine/points/e57": 6537,
     "@margoengine/points/las": 5116,
     "@margoengine/points/laz": 8046,
-    "@margoengine/points/octree": 8978,
+    "@margoengine/points/octree": 9267,
     "@margoengine/points/pick": 5274,
     "@margoengine/points/potree": 3670,
-    "@margoengine/points/surfels": 14337,
+    "@margoengine/points/surfels": 14856,
     "@margoengine/post": 40110,
     "@margoengine/post/afterimage": 5619,
     "@margoengine/post/bloom": 6716,
