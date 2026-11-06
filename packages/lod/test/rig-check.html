@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>LOD: skinned and morphed levels</title><style>body{margin:0;background:#000}canvas{width:256px;height:256px}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Fox.glb and MorphStressTest.glb, real files: each level's deformed vertices against the same vertices of the source at
+// the same pose, read back from the GPU.
+import {Engine} from '/packages/core/dist/index.js';
+import {LODSystem} from '/packages/lod/dist/index.js';
+import {autoLOD} from '/packages/lod/dist/auto.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Animation} from '/packages/animation/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,10],target:[0,0,0],fov:50}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const system=LODSystem.attach(engine);
+const frame=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+const size=(b)=>Math.hypot(b[3]-b[0],b[4]-b[1],b[5]-b[2]);
+// Every bind-pose vertex record of the source, to find what a level's vertex is. Normals can differ on a flat-shaded level.
+const key=(v,o)=>[...v.subarray(o,o+4),...v.subarray(o+12,o+20)].join();
+const records=(model)=>model.primitives.map((p)=>{const m=new Map();for(let o=0;o<p.vertices.length;o+=20)m.set(key(p.vertices,o),o/20);return m;});
+const view=async(model,distance)=>{const b=model.bounds,c=[0,1,2].map((k)=>(b[k]+b[k+3])/2);engine.camera.target=c;engine.camera.position=[c[0],c[1],c[2]+distance];await frame();await frame();};
+const snapshots=async(model)=>{const list=await model.readPickingGeometry(),out=new Map();for(const s of list)out.set(s.primitiveIndex,s.vertices);return out;};
+async function walk(url,pose,poses){
+  const model=await loadGLTF(engine,url),animation=Animation.attach(model);
+  animation.playing=false;
+  const scale=size(model.bounds),lod=await autoLOD(system,model,{ratios:[0.5,0.25],screens:[0.3,0.08]}),maps=records(model),out={before:model.primitives.reduce((n,p)=>n+p.indices.length/3,0),levels:[],worst:0,moved:0};
+  const distances=[scale*1.5,scale*5,scale*30];
+  for(const part of poses){
+    pose(animation,part);
+    await view(model,distances[0]);
+    if(lod.level!==0)throw new Error('near is not level 0: '+lod.level);
+    const source=await snapshots(model);
+    for(const k of [1,2]){
+      await view(model,distances[k]);
+      if(lod.level!==k)throw new Error(`level ${lod.level}, wanted ${k}`);
+      const level=lod.levels[k].object,shot=await snapshots(level);
+      let worst=0,count=0,mapped=0;
+      level.primitives.forEach((p,i)=>{
+        const from=model.primitives.findIndex((s)=>s.nodeIndex===p.nodeIndex&&s.material===p.material),now=shot.get(i),then=source.get(from);
+        if(!now||!then)return;
+        for(let o=0;o<p.vertices.length;o+=20){
+          const id=maps[from].get(key(p.vertices,o));
+          if(id===undefined)continue;
+          mapped++;
+          for(let c=0;c<3;c++){
+            worst=Math.max(worst,Math.abs(now[o+c]-then[id*20+c]));
+            out.moved=Math.max(out.moved,Math.abs(now[o+c]-p.vertices[o+c]));
+          }
+        }
+        count+=p.vertices.length/20;
+      });
+      out.worst=Math.max(out.worst,worst/scale);
+      out.levels[k-1]={triangles:level.primitives.reduce((n,p)=>n+p.indices.length/3,0),vertices:count,mapped,followers:level.primitives.filter((p)=>p.deformed).length};
+    }
+  }
+  // Hidden: the source holds its last pose while a level shows, and picks up again when it comes back.
+  await view(model,distances[1]);
+  const held=await snapshots(model);
+  pose(animation,poses[0]+0.37);
+  await frame();await frame();
+  const after=await snapshots(model);
+  let same=true;
+  for(const [i,v] of held)if(!v.every((x,j)=>x===after.get(i)[j]))same=false;
+  out.hiddenHeld=same;
+  await view(model,distances[0]);
+  const back=await snapshots(model);
+  let differs=false;
+  for(const [i,v] of held)if(!v.every((x,j)=>x===back.get(i)[j]))differs=true;
+  out.backMoved=differs;
+  model.dispose();
+  await frame();
+  return out;
+}
+window.check={async run(){
+  const fox=await walk('/examples/assets/khronos/Fox/Fox.glb',(a,part)=>a.seek(a.clips[0].duration*part),[0.1,0.45,0.8]);
+  const morph=await walk('/examples/assets/khronos/MorphStressTest/MorphStressTest.glb',(a,part)=>{
+    for(const p of a.model.primitives){const n=p.weights.length,at=Math.floor(part*n)%n;p.weights.fill(0);p.weights[at]=1;p.weights[(at+2)%n]=0.5;}
+  },[0.1,0.45,0.8]);
+  return {fox,morph,errors};
+}};
+window.ready=true;
+</script></body></html>

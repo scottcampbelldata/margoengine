@@ -298,6 +298,25 @@ const helmet = await loadGLTF(stage.engine, '/helmet.glb');
 const lod = await autoLOD(lods, helmet); // ratios 0.5, 0.25, 0.125
 ```
 
-Skinned and morphed models are refused, since their levels would need a skeleton each: give the file `MSFT_lod` levels (`LOD.fromModel`) or bake an `Imposter`. A level copies the node transforms at the call and then stands still, so a node animated afterwards moves on level 0 only. Points and lines stay on level 0, and `hierarchicalLOD` leaves them out of the far model. A part too small to reach a ratio keeps its last triangles. A level's vertices are its own compact copy: three levels at the default ratios cost about 0.875 of the source's vertex memory. `selectVariant` on the source does not reach its levels.
+Skinned and morphed models get levels too. Attach the model's `Animation` first:
+
+```ts
+import { Animation } from '@margoengine/animation';
+import { loadGLTF } from '@margoengine/gltf-pro';
+import { LODSystem } from '@margoengine/lod';
+import { autoLOD } from '@margoengine/lod/auto';
+
+const lods = LODSystem.attach(stage.engine);
+const fox = await loadGLTF(stage.engine, '/fox.glb');
+const animation = Animation.attach(fox);
+const lod = await autoLOD(lods, fox, { ratios: [0.5, 0.25] }); // 576 triangles, then 288 and 144
+animation.play('Run'); // every level runs with it
+```
+
+A level keeps the skin weights and morph deltas of the vertices it keeps, reads its joints from the source's nodes and shares the source's morph weights, so it follows whatever moves the source: clips, a mixer, your own code. Only the shown level deforms: a hidden source holds its last deformed vertices until it shows again, while its clips keep running. This loads `@margoengine/animation`, so these levels need WebGPU. Vertices at one position that deform differently, such as closed lips, are not welded. `hierarchicalLOD` still refuses a model that deforms, since its far mesh stands still.
+
+When the file has animations, the shown level's drawing nodes follow the source's each frame, in plugin order: an `Animation` attached after `autoLOD` shows a frame late on a level. A file with no animations keeps the node transforms of the call, so a node you move by hand afterwards moves on level 0 only.
+
+A flat-shaded mesh, Fox.glb and RobotExpressive among them, has a hard edge everywhere, which would keep any edge from collapsing. When a level misses its ratio by half on a part of 64 triangles or more with nine in ten triangles flat, normals stop counting as seams, and each kept triangle takes its own new normal. Points and lines stay on level 0, and `hierarchicalLOD` leaves them out of the far model. A part too small to reach a ratio keeps its last triangles. A level's vertices are its own compact copy: three levels at the default ratios cost about 0.875 of the source's vertex memory. `selectVariant` on the source does not reach its levels.
 
 The levels are materials meshes of their own: pass each of `lod.levels.slice(1)` to `shadows.add` and the like as you do the source. `simplifyAttributes(geometry, ratios)` does the simplifying alone, on any packed `{vertices, indices}` such as a model's `primitive`. A material swapped on the source later does not reach its levels. A mesh with instances is refused: use `LodInstances` from `margoengine/culling/lod`. Faces mesh-edit cannot take (a third face on an edge, a flipped neighbour) simplify as separate sheets. mesh-edit's limit of 200,000 vertices or faces applies per primitive.

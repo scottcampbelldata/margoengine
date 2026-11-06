@@ -479,6 +479,8 @@ export const entries = [
       'Give at least one source vertex',
       'autotune needs at least one candidate size',
       'autotune measures WGSL kernels, which need a GPU',
+      'tuneCompute measures WGSL kernels, which need a GPU',
+      'tuneCompute measures the default kernels; call it before useSubgroups',
       'autotune needs a name',
       'autotune needs a source and a run function',
       'GpuArray disposed; create a new array with gpu.array()',

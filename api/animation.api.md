@@ -79,6 +79,7 @@ export interface AnimationOptions {
     speed?: number;
     pointers?: PointerChannels;
     skinning?: SkinningMode;
+    skeleton?: PBRModel;
 }
 
 export interface BakedChannel<N> {

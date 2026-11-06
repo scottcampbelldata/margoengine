@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
+import { hiddenInTree } from '../../shared/visibility.js';
 import type { PBRModel, PBRPrimitive, PBRDeformationContext } from '@margoengine/gltf-pro';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
@@ -120,6 +121,11 @@ export interface AnimationOptions {
    * `@margoengine/animation/dqs`. Unset blends matrices linearly. Fixed for the Animation's life.
    */
   skinning?: SkinningMode;
+  /**
+   * Another model of the same file whose nodes are the joints, so this model's skin follows that model's pose, whatever
+   * moves it. This Animation then has no clips of its own. Default: the model's own nodes.
+   */
+  skeleton?: PBRModel;
 }
 // Without the pointer entry: keep ordinary channels, skip and report pointer channels.
 function skipPointers(model: PBRModel, def: ReturnType<typeof animationDefinition>, clip: string): PointerPlan {
@@ -292,6 +298,8 @@ export class Animation implements EnginePlugin {
   private readonly quaternion: number[] = [0, 0, 0, 1];
   private disposed = false;
   private unsubscribe?: () => void;
+  /** The model whose nodes are the joints: this one, or `options.skeleton`. */
+  private readonly joints: PBRModel;
   private readonly prepareDeformation = (context: PBRDeformationContext) => this.deform(context);
   /** The deformation group of the frame graph this Animation's pass is in. */
   private group?: DeformGroup;
@@ -317,6 +325,7 @@ export class Animation implements EnginePlugin {
   ) {
     this.name = 'animation:' + model.name;
     this.validate();
+    this.joints = options.skeleton ?? model;
     this.rest = model.nodes.map((node) => {
       const t = node.engine.store.transforms,
         id = node.id;
@@ -328,7 +337,8 @@ export class Animation implements EnginePlugin {
     });
     const doc = animationDocument(model.asset.doc),
       warnings: string[] = [];
-    this.clips = doc.animations.map((value, id) => {
+    // A model on another's skeleton plays nothing itself: that model's player moves the joints.
+    this.clips = (options.skeleton ? [] : doc.animations).map((value, id) => {
       const def = animationDefinition(value);
       const label = def.name ?? String(id),
         plan = options.pointers ? options.pointers(model, def, label) : skipPointers(model, def, label);
@@ -425,6 +435,9 @@ export class Animation implements EnginePlugin {
       (this.options.speed ?? 1) < 0
     )
       throw new RangeError('Invalid animation options; loop must be a boolean and speed a finite number >= 0');
+    const skeleton = this.options.skeleton;
+    if (skeleton !== undefined && skeleton.nodes?.length !== this.model.nodes.length)
+      throw new TypeError('Invalid skeleton option; pass a model of the same file, with the same nodes');
     const skinning = this.options.skinning;
     if (skinning !== undefined && (typeof skinning?.shader !== 'function' || typeof skinning.encode !== 'function'))
       throw new TypeError('Invalid skinning option; pass dualQuaternionSkinning from @margoengine/animation/dqs');
@@ -721,6 +734,9 @@ export class Animation implements EnginePlugin {
     context: PassContext | PBRDeformationContext,
   ): context is Extract<PassContext, { backend: 'webgpu' }> | PBRDeformationContext {
     if (context.backend !== 'webgpu' || this.model.disposed) return false;
+    // A level of detail not on show, or another hidden model: no draw reads its vertices, so they wait until it shows.
+    const { store } = this.model.root.engine;
+    if (this.resources.every((r) => hiddenInTree(store, r.primitive.node.id))) return false;
     for (const r of this.resources) {
       const weights = r.primitive.weights;
       for (let i = 0; i < weights.length; i++)
@@ -730,7 +746,7 @@ export class Animation implements EnginePlugin {
         if (!invertMatrixStable(r.primitive.node.matrix, this.inverse, this.workspace))
           throw new RangeError('Singular skinned mesh transform; give the skinned node a non-zero scale');
         for (let i = 0; i < r.joints.length; i++) {
-          multiplyMatrices(this.model.nodes[r.joints[i]].matrix, r.inverseBind[i], this.joint);
+          multiplyMatrices(this.joints.nodes[r.joints[i]].matrix, r.inverseBind[i], this.joint);
           multiplyMatrices(this.inverse, this.joint, this.product);
           r.palette.set(this.product, i * 16);
         }

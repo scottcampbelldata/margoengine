@@ -152,6 +152,7 @@ interface AnimationOptions {
     speed?: number;
     pointers?: PointerChannels;
     skinning?: SkinningMode;
+    skeleton?: PBRModel;
 }
 
 type AnimationPath = 'translation' | 'rotation' | 'scale' | 'weights';

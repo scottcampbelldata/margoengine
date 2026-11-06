@@ -3,6 +3,7 @@
 // @margoengine/materials makes the levels of its own meshes, loaded the same way.
 import { Geometry, type Mesh } from '@margoengine/core';
 import { meshRuntime } from '@margoengine/core/extension';
+import type { Animation } from '@margoengine/animation';
 import type { GLTFDocument, PBRModel, PBRPrimitive, PreparedGeometry } from '@margoengine/gltf-pro';
 import type { createMesh, Material, MaterialMesh, MeshGeometry } from '@margoengine/materials';
 import { MargoError } from '@margoengine/math/errors';
@@ -166,16 +167,18 @@ async function materialsPackage(signal?: AbortSignal): Promise<{ createMesh: typ
 /**
  * Simplifies packed triangles (`primitive.vertices` and `primitive.indices` of a gltf-pro model or materials mesh) and
  * returns one geometry per ratio. Every level is a subset of the source's vertices, so normals, tangents, both UV sets
- * and colours are the source's own, and seams and hard edges stay closed. Loads `@margoengine/mesh-edit` on first use.
+ * and colours are the source's own, and seams and hard edges stay closed. Each level's `sources` names the source vertex
+ * of each of its vertices. `apart` names how a vertex deforms: vertices at one position it tells apart are not welded.
+ * Loads `@margoengine/mesh-edit` on first use.
  * @throws RangeError for ratios that do not decrease within 0 to 1, or past 200,000 vertices or faces; the `signal`'s
  * reason when it aborts.
  */
 export async function simplifyAttributes(
   geometry: PackedGeometry,
   ratios: readonly number[] = [0.5, 0.25, 0.125],
-  { signal }: { signal?: AbortSignal } = {},
+  { signal, apart }: { signal?: AbortSignal; apart?: (vertex: number) => string } = {},
 ): Promise<PackedGeometry[]> {
-  return simplifyPacked(await modeling(signal), geometry, ratios, signal);
+  return simplifyPacked(await modeling(signal), geometry, ratios, signal, apart);
 }
 /** Packed vertices back into the arrays `createMesh` takes; `colors` stays RGBA, UV1 stays separate from UV0. */
 function meshGeometry(parts: readonly PackedGeometry[], slots?: readonly number[]): MeshGeometry {
@@ -234,19 +237,53 @@ function ownNodes(model: PBRModel): LODObject {
     },
   } as unknown as LODObject;
 }
-function check(model: PBRModel): void {
+const live = (model: PBRModel): void => {
   if (model.disposed) throw new MargoError('disposed', 'autoLOD needs a live model; load the model again');
-  if (
-    model.primitives.some(
-      (p) =>
-        p.definition.targets?.length ||
-        p.definition.attributes?.JOINTS_0 !== undefined ||
-        model.asset.doc.nodes?.[p.nodeIndex]?.skin !== undefined,
-    )
-  )
+};
+/** True for a primitive that deforms: morph targets, or skin attributes, or a node with a skin. */
+const rigged = (model: PBRModel, p: PBRPrimitive): boolean =>
+  !!p.definition.targets?.length ||
+  p.definition.attributes?.JOINTS_0 !== undefined ||
+  model.asset.doc.nodes?.[p.nodeIndex]?.skin !== undefined;
+/** A far mesh of `hierarchicalLOD` stands still, so a model that deforms cannot merge into one. */
+function still(model: PBRModel): void {
+  live(model);
+  if (model.primitives.some((p) => rigged(model, p)))
     throw new TypeError(
-      'autoLOD needs a model without skins or morph targets; give the file MSFT_lod levels, or bake an Imposter',
+      'hierarchicalLOD needs a model without skins or morph targets; give it autoLOD levels, or bake an Imposter',
     );
+}
+/** Morph attributes a level carries, and the skin attributes of the two sets `@margoengine/animation` plays. */
+const MORPHS = ['POSITION', 'NORMAL', 'TANGENT'] as const,
+  SKINS = ['JOINTS_0', 'WEIGHTS_0', 'JOINTS_1', 'WEIGHTS_1'] as const,
+  /** Weights closer than this count as the same when telling vertices apart. */
+  WEIGHT_STEP = 32;
+/**
+ * Names how vertex `i` of `p` deforms. Exporters write a seam's two sides with the same skin and morphs, up to rounding,
+ * so values are compared in steps: a seam stays welded, a closed mouth's lips do not.
+ */
+function deformation(model: PBRModel, p: PBRPrimitive): (vertex: number) => string {
+  const { asset } = model,
+    { attributes = {}, targets = [] } = p.definition,
+    b = model.bounds,
+    step = 1024 / (Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) || 1),
+    joints = SKINS.filter((name) => attributes[name] !== undefined && name[0] === 'J').map((name) => ({
+      ids: asset.accessor(attributes[name], 'VEC4'),
+      weights: asset.accessor(attributes[name.replace('JOINTS', 'WEIGHTS')], 'VEC4'),
+    })),
+    deltas = targets.flatMap((target) =>
+      target.POSITION === undefined ? [] : [asset.accessor(target.POSITION, 'VEC3')],
+    );
+  return (i) => {
+    const parts: number[] = [];
+    for (const { ids, weights } of joints)
+      for (let k = i * 4; k < i * 4 + 4; k++) {
+        const weight = Math.round(weights[k] * WEIGHT_STEP);
+        if (weight) parts.push(ids[k], weight);
+      }
+    for (const delta of deltas) for (let k = i * 3; k < i * 3 + 3; k++) parts.push(Math.round(delta[k] * step));
+    return parts.join();
+  };
 }
 /**
  * A new model of `source`'s asset drawing `prepared` instead of its accessors, on the materials `source` draws with now
@@ -301,8 +338,174 @@ async function gltfLevel(
       node.mesh !== undefined && !meshes[node.mesh]?.primitives.length ? { ...node, mesh: undefined } : node,
     ),
     records = model.primitives.filter((p) => simplified.has(p.definition)),
-    made = await modelFrom(model, { ...doc, nodes, meshes }, prepared, records, signal),
-    t = model.root.engine.store.transforms;
+    made = await modelFrom(model, { ...doc, nodes, meshes }, prepared, records, signal);
+  placeNodes(model, made);
+  return made;
+}
+/** Writes typed arrays into one new buffer of a level's document, as accessors. */
+class LevelBuffer {
+  readonly accessors;
+  readonly bufferViews;
+  readonly buffers;
+  readonly chunks: Uint8Array[] = [];
+  length = 0;
+  constructor(doc: GLTFDocument) {
+    this.accessors = [...(doc.accessors ?? [])];
+    this.bufferViews = [...(doc.bufferViews ?? [])];
+    this.buffers = [...(doc.buffers ?? [])];
+  }
+  add(data: Float32Array | Uint16Array | Uint32Array, width: number, type: string, componentType: number): number {
+    this.bufferViews.push({ buffer: this.buffers.length, byteOffset: this.length, byteLength: data.byteLength });
+    this.chunks.push(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+    this.length += data.byteLength;
+    return (
+      this.accessors.push({
+        bufferView: this.bufferViews.length - 1,
+        componentType,
+        count: data.length / width,
+        type,
+      }) - 1
+    );
+  }
+  /** Rows `order` of `data`, as floats. */
+  rows(data: Float32Array, width: number, type: string, order: Uint32Array): number {
+    const out = new Float32Array(order.length * width);
+    order.forEach((from, i) => out.set(data.subarray(from * width, from * width + width), i * width));
+    return this.add(out, width, type, 5126);
+  }
+  /** Floats `first` and on of each packed vertex. */
+  packed({ vertices }: PackedGeometry, first: number, width: number, type: string): number {
+    const count = vertices.length / 20,
+      out = new Float32Array(count * width);
+    for (let i = 0; i < count; i++)
+      for (let k = 0; k < width; k++) out[i * width + k] = vertices[i * 20 + first + k];
+    return this.add(out, width, type, 5126);
+  }
+  bytes(): Uint8Array {
+    const out = new Uint8Array(this.length);
+    let at = 0;
+    for (const chunk of this.chunks) {
+      out.set(chunk, at);
+      at += chunk.length;
+    }
+    return out;
+  }
+}
+/** A level's primitive as real glTF: its packed vertices and, by the vertex map, the source's skin and morph data. */
+function rigPrimitive(model: PBRModel, p: PBRPrimitive['definition'], level: PackedGeometry, out: LevelBuffer) {
+  const { attributes = {}, targets, material } = p,
+    { asset } = model,
+    count = level.vertices.length / 20,
+    order = level.sources ?? Uint32Array.from({ length: count }, (_, i) => i),
+    made: Record<string, number> = {
+      POSITION: out.packed(level, 0, 3, 'VEC3'),
+      ...(attributes.NORMAL === undefined ? {} : { NORMAL: out.packed(level, 4, 3, 'VEC3') }),
+      ...(attributes.TANGENT === undefined ? {} : { TANGENT: out.packed(level, 8, 4, 'VEC4') }),
+      ...(attributes.TEXCOORD_0 === undefined ? {} : { TEXCOORD_0: out.packed(level, 12, 2, 'VEC2') }),
+      ...(attributes.TEXCOORD_1 === undefined ? {} : { TEXCOORD_1: out.packed(level, 14, 2, 'VEC2') }),
+      ...(attributes.COLOR_0 === undefined ? {} : { COLOR_0: out.packed(level, 16, 4, 'VEC4') }),
+    };
+  const position = out.accessors[made.POSITION],
+    min = [Infinity, Infinity, Infinity],
+    max = [-Infinity, -Infinity, -Infinity];
+  for (let o = 0; o < level.vertices.length; o += 20)
+    for (let k = 0; k < 3; k++) {
+      min[k] = Math.min(min[k], level.vertices[o + k]);
+      max[k] = Math.max(max[k], level.vertices[o + k]);
+    }
+  Object.assign(position, { min, max });
+  for (const name of SKINS) {
+    if (attributes[name] === undefined) continue;
+    const data = asset.accessor(attributes[name], 'VEC4');
+    if (name[0] === 'W') {
+      made[name] = out.rows(data, 4, 'VEC4', order);
+      continue;
+    }
+    const ids = new Uint16Array(count * 4);
+    order.forEach((from, i) => {
+      for (let k = 0; k < 4; k++) ids[i * 4 + k] = data[from * 4 + k];
+    });
+    made[name] = out.add(ids, 4, 'VEC4', 5123);
+  }
+  return {
+    attributes: made,
+    indices: out.add(level.indices, 1, 'SCALAR', 5125),
+    material,
+    ...(targets?.length
+      ? {
+          targets: targets.map((target) => {
+            const deltas: Record<string, number> = {};
+            for (const name of MORPHS)
+              if (target[name] !== undefined)
+                deltas[name] = out.rows(asset.accessor(target[name], 'VEC3'), 3, 'VEC3', order);
+            return deltas;
+          }),
+        }
+      : {}),
+  };
+}
+/**
+ * One level of a model that deforms: a glTF of its own, with the skin's weights and the morph deltas of the vertices it
+ * kept, so `@margoengine/animation` plays it as it plays the source. It keeps the file's skins and nodes; the joints it
+ * follows are the source's, and its morph weights are the source's own array.
+ */
+async function riggedLevel(
+  model: PBRModel,
+  simplified: ReadonlyMap<PBRPrimitive['definition'], PackedGeometry[]>,
+  level: number,
+  signal?: AbortSignal,
+): Promise<PBRModel> {
+  const { GLTFAsset, PBRModel: Model, closeImages } = await import('@margoengine/gltf-pro');
+  signal?.throwIfAborted();
+  const { asset } = model,
+    doc = asset.doc,
+    out = new LevelBuffer(doc),
+    meshes = (doc.meshes ?? []).map((mesh) => {
+      const { primitives, ...rest } = mesh;
+      return {
+        ...rest,
+        primitives: primitives
+          .filter((p) => simplified.has(p))
+          .map((p) => rigPrimitive(model, p, simplified.get(p)![level], out)),
+      };
+    }),
+    nodes = doc.nodes?.map((node) =>
+      node.mesh !== undefined && !meshes[node.mesh]?.primitives.length ? { ...node, mesh: undefined } : node,
+    ),
+    bytes = out.bytes(),
+    levelDoc: GLTFDocument = {
+      ...doc,
+      nodes,
+      meshes,
+      accessors: out.accessors,
+      bufferViews: out.bufferViews,
+      buffers: [...out.buffers, { byteLength: bytes.byteLength }],
+    },
+    records = model.primitives.filter((p) => simplified.has(p.definition)),
+    images = model.shareImages();
+  let made: PBRModel;
+  try {
+    made = new Model(
+      model.root.engine,
+      new GLTFAsset(levelDoc, [...asset.buffers, bytes], undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
+      images,
+    );
+  } catch (error) {
+    closeImages(images);
+    throw error;
+  }
+  made.primitives.forEach((p, i) => {
+    p.material = records[i].material;
+    p.extension = records[i].extension;
+    p.weights = records[i].weights;
+  });
+  model.root.engine.use(made);
+  placeNodes(model, made);
+  return made;
+}
+/** Gives `made` the local transforms and visibility of the same nodes of `model`. */
+function placeNodes(model: PBRModel, made: PBRModel): void {
+  const t = model.root.engine.store.transforms;
   model.nodes.forEach((from, i) => {
     const a = from.id,
       to = made.nodes[i];
@@ -311,7 +514,44 @@ async function gltfLevel(
       .setQuaternion([t.qx[a], t.qy[a], t.qz[a], t.qw[a]]);
     to.visible = from.visible;
   });
-  return made;
+}
+/**
+ * Keeps the shown level's nodes where the source's are: only nodes that draw and their parents matter, since joints are
+ * read from the source. Runs in plugin order, so attach `Animation` before calling `autoLOD`.
+ */
+function followNodes(model: PBRModel, made: readonly PBRModel[], lod: LOD): void {
+  const doc = model.asset.doc,
+    nodes = doc.nodes ?? [];
+  if (!doc.animations?.length) return;
+  const parents = new Map<number, number>();
+  nodes.forEach((node, i) => node.children?.forEach((child) => parents.set(child, i)));
+  const ids = new Set<number>();
+  nodes.forEach((node, i) => {
+    if (node.mesh === undefined) return;
+    for (let at: number | undefined = i; at !== undefined && !ids.has(at); at = parents.get(at)) ids.add(at);
+  });
+  const list = [...ids],
+    engine = model.root.engine,
+    name = 'lod-nodes:' + following++,
+    t = engine.store.transforms,
+    fields = [t.x, t.y, t.z, t.sx, t.sy, t.sz, t.qx, t.qy, t.qz, t.qw];
+  engine.use({
+    name,
+    setup() {},
+    onPreUpdate() {
+      const level = made[lod.level - 1];
+      if (!level) return;
+      for (const i of list) {
+        const a = model.nodes[i].id,
+          to = level.nodes[i];
+        if (fields.every((field) => field[a] === field[to.id])) continue;
+        to.setPosition([t.x[a], t.y[a], t.z[a]])
+          .setScale([t.sx[a], t.sy[a], t.sz[a]])
+          .setQuaternion([t.qx[a], t.qy[a], t.qz[a], t.qw[a]]);
+      }
+    },
+  });
+  model.onDispose(() => engine.removePlugin(name));
 }
 /** Radius of a model's bounds around their centre, in its root's units. */
 function modelRadius(model: PBRModel): number {
@@ -332,9 +572,17 @@ async function modelLevels(
 ): Promise<PBRModel[]> {
   const made: PBRModel[] = [];
   if (!isMaterialMesh(model)) {
+    const deforms = model.primitives.some((p) => rigged(model, p));
+    let play: typeof Animation | undefined;
+    if (deforms) {
+      ({ Animation: play } = await import('@margoengine/animation'));
+      signal?.throwIfAborted();
+    }
+    const source = model.root.engine.plugins.get('animation:' + model.name) as Animation | undefined;
     for (let level = 0; level < count; level++) {
-      const next = await gltfLevel(model, simplified, level, signal);
+      const next = await (deforms ? riggedLevel : gltfLevel)(model, simplified, level, signal);
       next.root.setParent(model.root);
+      play?.attach(next, { skeleton: model, skinning: source?.options.skinning });
       model.onDispose(() => next.dispose());
       made.push(next);
     }
@@ -361,16 +609,21 @@ async function autoModelLOD(
   screens: readonly number[],
   signal?: AbortSignal,
 ): Promise<LOD> {
-  check(model);
+  live(model);
   const simplify = await modeling(signal),
     simplified = new Map<PBRPrimitive['definition'], PackedGeometry[]>();
   for (const p of model.primitives)
     if (!p.topology && !simplified.has(p.definition))
-      simplified.set(p.definition, simplifyPacked(simplify, p, ratios, signal));
+      simplified.set(
+        p.definition,
+        simplifyPacked(simplify, p, ratios, signal, rigged(model, p) ? deformation(model, p) : undefined),
+      );
   const made = await modelLevels(model, simplified, ratios.length, signal),
     levels: LODLevel[] = [{ object: ownNodes(model) }];
   made.forEach((object, i) => levels.push({ object, screen: screens[i] }));
-  return system.add(model.root, levels, { radius: modelRadius(model) });
+  const lod = system.add(model.root, levels, { radius: modelRadius(model) });
+  if (!isMaterialMesh(model)) followNodes(model, made, lod);
+  return lod;
 }
 const positionsOf = (geometry: Geometry, out = new Float32Array(geometry.vertices.length / 2)) => {
   for (let i = 0; i < out.length / 3; i++) for (let a = 0; a < 3; a++) out[i * 3 + a] = geometry.vertices[i * 6 + a];
@@ -383,8 +636,11 @@ const positionsOf = (geometry: Geometry, out = new Float32Array(geometry.vertice
  * A materials mesh's or loaded model's levels are the same kind of object on the same materials, keeping its UVs,
  * tangents and colours; they hang under its `root` and are disposed with it, a level of a model shares the source's GPU
  * textures, and `shadows.add` and the like take each one like the source. Points and lines stay on level 0.
- * @throws TypeError for a mesh with no core geometry, or one with skins or morph targets, or a materials mesh with
- * instances; RangeError for ratios or screens that do not fit; the `signal`'s reason when it aborts.
+ * A skinned or morphed model's levels keep the skin weights and morph deltas of the vertices they keep and follow the
+ * source: its joints, morph weights and animated nodes, whatever moves them. Only the shown level deforms. This loads
+ * `@margoengine/animation` and needs WebGPU. Attach the model's `Animation` first.
+ * @throws TypeError for a mesh with no core geometry, or a materials mesh with instances; RangeError for ratios or
+ * screens that do not fit; the `signal`'s reason when it aborts.
  */
 export async function autoLOD(system: LODSystem, mesh: LODSource, options: AutoLODOptions = {}): Promise<LOD> {
   const { ratios = [0.5, 0.25, 0.125], crease = 60, signal } = options,
@@ -480,7 +736,7 @@ export async function hierarchicalLOD(
   };
   for (const mesh of meshes) {
     if (isModel(mesh)) {
-      check(mesh);
+      still(mesh);
       if ((mesh as { instances?: unknown }).instances || mesh.primitives.some((p) => p.instances))
         throw new TypeError('hierarchicalLOD merges single meshes; pass models and meshes without instances');
       const b = mesh.bounds;

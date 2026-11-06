@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8913965,
+  "total": 8916022,
   "history": [
     {
       "date": "2026-10-24",
@@ -2696,6 +2696,12 @@
       "commit": "8eaaf29dd",
       "reason": "tuneCompute and the tuned table: the compute kernels take their thread count, autotune gains the own-kernel measuring",
       "grew": 3
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "2f6f46df4",
+      "reason": "autoLOD builds skinned and morphed levels and simplifies flat shading: level documents, rig carrying, node following",
+      "grew": 1
     }
   ],
   "items": {
@@ -2997,7 +3003,7 @@
     "@margoengine/loaders/vtk-xml": 6937,
     "@margoengine/loaders/worker": 8571,
     "@margoengine/lod": 14316,
-    "@margoengine/lod/auto": 5831,
+    "@margoengine/lod/auto": 7888,
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/stream": 1778,
     "@margoengine/materials": 63050,

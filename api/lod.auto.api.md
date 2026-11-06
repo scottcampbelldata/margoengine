@@ -37,6 +37,7 @@ export type LODSource = Mesh | MaterialMesh<Material | readonly Material[]> | PB
 export interface PackedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
+    sources?: Uint32Array;
 }
 
 export function autoLOD(system: LODSystem, mesh: LODSource, options?: AutoLODOptions): Promise<LOD>;
@@ -45,8 +46,9 @@ export function creased(vertices: readonly ArrayLike<number>[], triangles: reado
 
 export function hierarchicalLOD(system: LODSystem, meshes: readonly LODSource[], options: HierarchicalLODOptions): Promise<HierarchicalLOD>;
 
-export function simplifyAttributes(geometry: PackedGeometry, ratios?: readonly number[], { signal }?: {
+export function simplifyAttributes(geometry: PackedGeometry, ratios?: readonly number[], { signal, apart }?: {
     signal?: AbortSignal;
+    apart?: (vertex: number) => string;
 }): Promise<PackedGeometry[]>;
 
 // Not exported from this entry, but used by the exports above:

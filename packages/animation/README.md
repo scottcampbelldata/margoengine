@@ -46,6 +46,24 @@ The demo leaves facial weights under the sliders' control by removing weight tra
 
 After building the packages, run `node --test packages/animation/tests/*.test.js` for influence validation, packed formats, lifecycle, and allocation checks. `node scripts/animation-influences-browser-tests.js` checks real WebGPU deformation against an independent CPU reference, four-influence parity, eight active influences with morphs, a 1,001-joint palette, and device restoration. Its Margo-made [rig fixture](tests/fixtures/README.md) (`scripts/make-rig-fixture.js`) has 273 vertices, 8 joints, two clips, and 247 vertices with secondary skin weights (up to eight influences); it is committed in the repository and not bundled with the package.
 
+## Hidden models and shared skeletons
+
+A model whose primitives are all hidden skips its GPU deformation: its clips keep running, its joints keep moving, and its deformed vertices wait at the last pose shown. They catch up in the first frame it shows, before anything draws it. `GPUDynamicBVH` and `readPickingGeometry` on a hidden model read that last pose.
+
+`skeleton` plays a model on the joints of another model of the same file, so the two can never drift apart. It has no clips of its own, and `@margoengine/lod/auto` uses it for the levels of a skinned model:
+
+```ts
+import { Animation } from '@margoengine/animation';
+import { cloneModel } from '@margoengine/animation/skeleton-utils';
+import { loadGLTF } from '@margoengine/gltf-pro';
+
+const hero = await loadGLTF(engine, '/hero.glb');
+const animation = Animation.attach(hero);
+const copy = await cloneModel(hero);
+Animation.attach(copy, { skeleton: hero }); // moves with hero, whatever moves hero
+animation.play(0);
+```
+
 ## Skeletons and skins from raw data
 
 `Skeleton` and `Skin` rig a mesh from plain arrays, for editors that author bones and weights themselves (no glTF

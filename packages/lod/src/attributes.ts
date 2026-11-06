@@ -8,6 +8,8 @@ import type { meshLODChain } from '@margoengine/mesh-edit/modeling';
 export interface PackedGeometry {
   vertices: Float32Array;
   indices: Uint32Array;
+  /** On a simplified level: the source vertex each vertex is. Absent when the level is the source itself. */
+  sources?: Uint32Array;
 }
 /** What the simplifying needs from `@margoengine/mesh-edit/modeling`. */
 export interface Modeling {
@@ -39,7 +41,13 @@ const STRIDE = 20,
   /** Sheets of coincident faces welded apart from each other before a triangle stands alone. */
   SHEETS = 4,
   /** Separates vertices that share a position and UV but differ elsewhere; far below any texel. */
-  NUDGE = 2 ** -36;
+  NUDGE = 2 ** -36,
+  /** A level this far over its ratio missed it. */
+  MISSED = 1.5,
+  /** Share of a mesh's triangles that must be flat for it to count as flat shaded. */
+  FLAT_SHARE = 0.9,
+  /** Below this a flat-shaded part keeps its hard edges: a box is its corners. */
+  FLAT_FACES = 64;
 
 /** The simplifier refuses faces with no area, on its own scale-free test: corners within a hair, or nearly in line. */
 function solid(p: readonly number[], q: readonly number[], r: readonly number[]): boolean {
@@ -63,23 +71,98 @@ function solid(p: readonly number[], q: readonly number[], r: readonly number[])
     Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / (extent * extent) > tolerance
   );
 }
-const sameRecord = (v: Float32Array, a: number, b: number) => {
-  for (let k = 4; k < STRIDE; k++) if (v[a * STRIDE + k] !== v[b * STRIDE + k]) return false;
+const sameRecord = (v: Float32Array, a: number, b: number, from: number) => {
+  for (let k = from; k < STRIDE; k++) if (v[a * STRIDE + k] !== v[b * STRIDE + k]) return false;
   return true;
 };
+/** True when nearly every triangle has one normal on all its corners: flat shading, where every edge is a hard one. */
+function faceted(v: Float32Array, indices: Uint32Array): boolean {
+  let flat = 0;
+  for (let t = 0; t < indices.length; t += 3) {
+    const [a, b, c] = [indices[t] * STRIDE, indices[t + 1] * STRIDE, indices[t + 2] * STRIDE];
+    let same = true;
+    for (let k = 4; k < 7; k++) same &&= Math.abs(v[a + k] - v[b + k]) < 1e-3 && Math.abs(v[a + k] - v[c + k]) < 1e-3;
+    if (same) flat++;
+  }
+  return flat >= (indices.length / 3) * FLAT_SHARE;
+}
+/** A level's triangles as flat shading has them: three vertices each, on the triangle's own normal. */
+function flatLevel(
+  v: Float32Array,
+  faces: readonly (readonly [number, number, number])[],
+): Pick<PackedGeometry, 'vertices' | 'indices' | 'sources'> {
+  const vertices = new Float32Array(faces.length * 3 * STRIDE),
+    sources = new Uint32Array(faces.length * 3);
+  faces.forEach((corners, f) => {
+    const [a, b, c] = corners.map((i) => i * STRIDE),
+      ux = v[b] - v[a],
+      uy = v[b + 1] - v[a + 1],
+      uz = v[b + 2] - v[a + 2],
+      wx = v[c] - v[a],
+      wy = v[c + 1] - v[a + 1],
+      wz = v[c + 2] - v[a + 2],
+      nx = uy * wz - uz * wy,
+      ny = uz * wx - ux * wz,
+      nz = ux * wy - uy * wx,
+      size = Math.hypot(nx, ny, nz);
+    corners.forEach((from, k) => {
+      const o = (f * 3 + k) * STRIDE;
+      sources[f * 3 + k] = from;
+      vertices.set(v.subarray(from * STRIDE, (from + 1) * STRIDE), o);
+      if (!size) return;
+      const x = nx / size,
+        y = ny / size,
+        z = nz / size;
+      vertices[o + 4] = x;
+      vertices[o + 5] = y;
+      vertices[o + 6] = z;
+      // The tangent stays in the new face's plane.
+      const along = vertices[o + 8] * x + vertices[o + 9] * y + vertices[o + 10] * z,
+        tx = vertices[o + 8] - along * x,
+        ty = vertices[o + 9] - along * y,
+        tz = vertices[o + 10] - along * z,
+        length = Math.hypot(tx, ty, tz);
+      if (!length) return;
+      vertices[o + 8] = tx / length;
+      vertices[o + 9] = ty / length;
+      vertices[o + 10] = tz / length;
+    });
+  });
+  return { vertices, indices: Uint32Array.from(sources, (_, i) => i), sources };
+}
 
 /**
  * Levels of one packed primitive, one per ratio, each with only the vertices it uses. Vertices that share a position
  * are welded, so UV seams and hard edges cannot open: mesh-edit treats two corners with different UVs as a seam, and
  * a corner that differs in any other attribute gets a UV a hair away, which makes that edge a seam too. Faces that
  * would break the manifold the simplifier needs (a third face on an edge, a flipped neighbour) go on a separate sheet.
+ * `apart` names how a vertex deforms: two vertices at one position it tells apart stay apart, as a closed mouth's lips do.
+ * A flat-shaded mesh has only hard edges, so nothing could collapse: when a level misses its ratio on one, normals stop
+ * counting as a seam and each kept triangle takes its own normal, the one thing in such a level that is not the source's.
  * @throws RangeError past mesh-edit's 200,000 vertices or faces; the `signal`'s reason when it aborts.
  */
 export function simplifyPacked(
   modeling: Modeling,
-  { vertices: v, indices }: PackedGeometry,
+  geometry: PackedGeometry,
   ratios: readonly number[],
   signal?: AbortSignal,
+  apart?: (vertex: number) => string,
+): PackedGeometry[] {
+  const levels = levelChain(modeling, geometry, ratios, false, signal, apart),
+    { vertices, indices } = geometry,
+    faces = indices.length / 3,
+    missed = levels.some((level, i) => level.indices.length / 3 > faces * ratios[i] * MISSED);
+  return missed && faces >= FLAT_FACES && faceted(vertices, indices)
+    ? levelChain(modeling, geometry, ratios, true, signal, apart)
+    : levels;
+}
+function levelChain(
+  modeling: Modeling,
+  { vertices: v, indices }: PackedGeometry,
+  ratios: readonly number[],
+  flat: boolean,
+  signal?: AbortSignal,
+  apart?: (vertex: number) => string,
 ): PackedGeometry[] {
   let minU = Infinity,
     minV = Infinity,
@@ -117,7 +200,7 @@ export function simplifyPacked(
       key = `${welded}|${v[o + 12]}|${v[o + 13]}`;
     let list = records.get(key);
     if (!list) records.set(key, (list = []));
-    let k = list.findIndex((other) => sameRecord(v, other, i));
+    let k = list.findIndex((other) => sameRecord(v, other, i, flat ? 12 : 4));
     if (k < 0) k = list.push(i) - 1;
     const uv: MutableVec2 = [(v[o + 12] - minU) * su + k * NUDGE, (v[o + 13] - minV) * sv];
     corners.set(`${welded}|${uv[0]}|${uv[1]}`, list[k]);
@@ -127,7 +210,7 @@ export function simplifyPacked(
     const source = [indices[t], indices[t + 1], indices[t + 2]],
       [p, q, r] = source.map(point);
     if (!solid(p, q, r)) continue;
-    const keys = [p, q, r].map((c) => c.join());
+    const keys = [p, q, r].map((c, k) => (apart ? `${c.join()}|${apart(source[k])}` : c.join()));
     let ids: number[] | undefined;
     for (const sheet of sheets) {
       const trial = keys.map((key) => sheet.get(key) ?? -1 - keys.indexOf(key));
@@ -159,6 +242,14 @@ export function simplifyPacked(
       welded = ids;
       // A part too small to reach the ratio keeps its last triangles, so no level loses it.
       if (!mesh.faces.length) return last;
+      if (flat)
+        return (last = flatLevel(
+          v,
+          mesh.faces.map((face) => {
+            const corner = (k: number) => corners.get(`${ids[face.vertices[k]]}|${face.uv[k][0]}|${face.uv[k][1]}`)!;
+            return [corner(0), corner(1), corner(2)] as const;
+          }),
+        ));
       const remap = new Map<number, number>(),
         order: number[] = [],
         out = new Uint32Array(mesh.faces.length * 3);
@@ -176,6 +267,6 @@ export function simplifyPacked(
       );
       const kept = new Float32Array(order.length * STRIDE);
       order.forEach((from, i) => kept.set(v.subarray(from * STRIDE, (from + 1) * STRIDE), i * STRIDE));
-      return (last = { vertices: kept, indices: out });
+      return (last = { vertices: kept, indices: out, sources: Uint32Array.from(order) });
     });
 }

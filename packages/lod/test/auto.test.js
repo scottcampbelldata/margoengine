@@ -1,9 +1,11 @@
 // autoLOD, hierarchicalLOD, LOD.fromModel and gltf-pro's MSFT_lod reading. Draw counts on a real GPU: auto-check.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { box } from '../../core/dist/extension.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLB_BIN, GLB_JSON, glbChunks } from '../../shared/glb.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { ImposterFrames, LOD, LODSystem, normalMatrix } from '@margoengine/lod';
 import { autoLOD, creased, hierarchicalLOD, simplifyAttributes } from '@margoengine/lod/auto';
@@ -217,21 +219,6 @@ test('simplifyAttributes honours an aborted signal and refuses bad ratios', asyn
   await assert.rejects(simplifyAttributes(source, [0.5, 0.6]), RangeError);
 });
 
-test('autoLOD refuses skinned and morphed models', async () => {
-  const model = {
-    root: {},
-    disposed: false,
-    asset: { doc: { nodes: [{ skin: 0 }] } },
-    primitives: [{ nodeIndex: 0, definition: { attributes: {} } }],
-  };
-  await assert.rejects(autoLOD({}, model), /without skins or morph targets/);
-  model.asset.doc.nodes = [{}];
-  model.primitives[0].definition.targets = [{}];
-  await assert.rejects(autoLOD({}, model), /without skins or morph targets/);
-  model.disposed = true;
-  await assert.rejects(autoLOD({}, model), /live model/);
-});
-
 const headless = async () =>
   new Engine({ width: 64, height: 64, clientWidth: 64, clientHeight: 64 }, await TransformStore.create(256), {
     backend: 'webgpu',
@@ -242,7 +229,7 @@ const headless = async () =>
     dispose() {},
   });
 /** A file of two nodes sharing one sphere, a lone triangle on a second material, and a points primitive. */
-const loadedModel = (engine) => {
+const loadedModel = (engine, extra = {}) => {
   const { positions, normals, indices } = sphere(12),
     buffers = [],
     bufferViews = [],
@@ -279,11 +266,208 @@ const loadedModel = (engine) => {
       accessors,
       bufferViews,
       buffers: buffers.map((b) => ({ byteLength: b.byteLength })),
+      ...extra,
     };
   const model = new PBRModel(engine, new GLTFAsset(doc, buffers));
   engine.use(model);
   return model;
 };
+
+test('hierarchicalLOD refuses a model that deforms, and both refuse a disposed one', async () => {
+  const model = {
+      root: {},
+      disposed: false,
+      asset: { doc: { nodes: [{ skin: 0 }] } },
+      primitives: [{ nodeIndex: 0, definition: { attributes: {} } }],
+    },
+    options = { cell: 1 };
+  await assert.rejects(hierarchicalLOD({}, [model], options), /without skins or morph targets/);
+  model.asset.doc.nodes = [{}];
+  model.primitives[0].definition.targets = [{}];
+  await assert.rejects(hierarchicalLOD({}, [model], options), /without skins or morph targets/);
+  model.disposed = true;
+  await assert.rejects(hierarchicalLOD({}, [model], options), /live model/);
+  await assert.rejects(autoLOD({}, model), /live model/);
+});
+
+test('simplifyAttributes keeps vertices apart that deform apart, as a closed mouth has them', async () => {
+  // Two sheets meeting along y = 0, each with its own row of vertices there at the same position and UV.
+  const n = 12,
+    vertices = [],
+    indices = [],
+    sheet = (from) => {
+      const base = vertices.length / 20;
+      for (let y = 0; y <= n; y++)
+        for (let x = 0; x <= n; x++) {
+          const v = new Array(20).fill(0);
+          v[0] = x / n;
+          v[1] = (from + y) / n;
+          v[3] = v[6] = 1;
+          v[12] = x / n;
+          v[13] = (from + y + n) / (2 * n);
+          v[16] = v[17] = v[18] = v[19] = 1;
+          vertices.push(...v);
+        }
+      for (let y = 0; y < n; y++)
+        for (let x = 0; x < n; x++) {
+          const a = base + y * (n + 1) + x,
+            b = a + n + 1;
+          indices.push(a, a + 1, b, a + 1, b + 1, b);
+        }
+      return vertices.length / 20;
+    },
+    lower = sheet(-n);
+  sheet(0);
+  const geometry = { vertices: new Float32Array(vertices), indices: new Uint32Array(indices) },
+    crossing = ({ indices: list, sources }) => {
+      let count = 0;
+      for (let t = 0; t < list.length; t += 3) {
+        const sides = [0, 1, 2].map((k) => sources[list[t + k]] < lower);
+        if (sides[0] !== sides[1] || sides[1] !== sides[2]) count++;
+      }
+      return count;
+    },
+    [welded] = await simplifyAttributes(geometry, [0.25]),
+    [apart] = await simplifyAttributes(geometry, [0.25], { apart: (i) => (i < lower ? 'lower' : 'upper') });
+  assert.ok(crossing(welded) > 0, 'without it the two rows weld, and a triangle spans both sheets');
+  assert.equal(crossing(apart), 0, 'with it no triangle has corners of both');
+  assert.ok(apart.indices.length < indices.length * 0.4, `it still simplifies: ${apart.indices.length / 3}`);
+});
+
+/** Fox.glb, a real skinned file, as a model of `engine`. */
+const realFox = (engine) => {
+  const chunks = glbChunks(new Uint8Array(readFileSync(new URL('../../../examples/assets/khronos/Fox/Fox.glb', import.meta.url)))),
+    doc = JSON.parse(new TextDecoder().decode(chunks.find((c) => c.type === GLB_JSON).data)),
+    bin = chunks.find((c) => c.type === GLB_BIN).data;
+  doc.images = undefined;
+  doc.textures = undefined;
+  for (const material of doc.materials ?? []) material.pbrMetallicRoughness = {};
+  const model = new PBRModel(engine, new GLTFAsset(doc, [bin]));
+  engine.use(model);
+  return model;
+};
+
+test('a flat-shaded mesh simplifies, a box stays a box, and each kept triangle takes its own normal', async () => {
+  // A bumpy sheet as loose triangles, one normal each.
+  const n = 16,
+    height = (x, y) => Math.sin(x * 1.3) * Math.cos(y * 0.9) * 0.4,
+    vertices = [],
+    corner = (x, y, normal) => {
+      vertices.push(x, y, height(x, y), 1, ...normal, 0, 1, 0, 0, 1, x / n, y / n, x / n, y / n, 1, 1, 1, 1);
+    },
+    triangle = (a, b, c) => {
+      const p = [a, b, c].map(([x, y]) => [x, y, height(x, y)]),
+        u = p[1].map((v, k) => v - p[0][k]),
+        w = p[2].map((v, k) => v - p[0][k]),
+        m = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]],
+        size = Math.hypot(...m);
+      for (const [x, y] of [a, b, c]) corner(x, y, m.map((v) => v / size));
+    };
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      triangle([x, y], [x + 1, y], [x, y + 1]);
+      triangle([x + 1, y], [x + 1, y + 1], [x, y + 1]);
+    }
+  const count = vertices.length / 20,
+    [level] = await simplifyAttributes(
+      { vertices: new Float32Array(vertices), indices: Uint32Array.from({ length: count }, (_, i) => i) },
+      [0.25],
+    );
+  assert.ok(level.indices.length / 3 < (count / 3) * 0.3, `flat shading simplifies: ${level.indices.length / 3}`);
+  for (let t = 0; t < level.indices.length; t += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => level.vertices.subarray(level.indices[t + k] * 20, level.indices[t + k] * 20 + 3)),
+      u = b.map((v, k) => v - a[k]),
+      w = c.map((v, k) => v - a[k]),
+      m = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]],
+      size = Math.hypot(...m),
+      normal = level.vertices.subarray(level.indices[t] * 20 + 4, level.indices[t] * 20 + 7);
+    for (let k = 0; k < 3; k++) assert.ok(Math.abs(normal[k] - m[k] / size) < 1e-5, 'the normal of the triangle kept');
+  }
+  // Twelve loose triangles of a box: too few to lose any.
+  const faces = [[0, 1, 2], [0, 2, 3]],
+    boxVertices = [],
+    sides = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  for (const side of sides) {
+    const axis = side.findIndex((v) => v),
+      other = [(axis + 1) % 3, (axis + 2) % 3],
+      quad = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => {
+        const p = [...side];
+        p[other[0]] = a * side[axis];
+        p[other[1]] = b;
+        return p;
+      });
+    for (const face of faces)
+      for (const i of face) boxVertices.push(...quad[i], 1, ...side, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1);
+  }
+  const [box2] = await simplifyAttributes(
+    { vertices: new Float32Array(boxVertices), indices: Uint32Array.from({ length: 36 }, (_, i) => i) },
+    [0.5],
+  );
+  assert.equal(box2.indices.length, 36);
+});
+
+test('a real Fox: each level holds the skin of the vertices it kept, and follows the source', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      model = realFox(engine),
+      lod = await autoLOD(system, model, { ratios: [0.5, 0.25], screens: [0.5, 0.25] }),
+      source = model.primitives[0],
+      attributes = source.definition.attributes,
+      records = new Map();
+    // Flat shaded: a level's triangles take their own normals, so a vertex is known by the rest of it.
+    const key = (v, o) => [...v.subarray(o, o + 4), ...v.subarray(o + 12, o + 20)].join();
+    for (let o = 0; o < source.vertices.length; o += 20) records.set(key(source.vertices, o), o / 20);
+    const joints = model.asset.accessor(attributes.JOINTS_0, 'VEC4'),
+      weights = model.asset.accessor(attributes.WEIGHTS_0, 'VEC4');
+    for (const { object: level } of lod.levels.slice(1)) {
+      const [primitive] = level.primitives,
+        kept = primitive.definition.attributes,
+        ids = level.asset.accessor(kept.JOINTS_0, 'VEC4'),
+        amounts = level.asset.accessor(kept.WEIGHTS_0, 'VEC4');
+      assert.ok(primitive.indices.length < source.indices.length * 0.6);
+      assert.equal(ids.length, (primitive.vertices.length / 20) * 4);
+      for (let i = 0; i < ids.length / 4; i++) {
+        const from = records.get(key(primitive.vertices, i * 20));
+        assert.notEqual(from, undefined, 'a vertex of the source');
+        assert.deepEqual([...ids.subarray(i * 4, i * 4 + 4)], [...joints.subarray(from * 4, from * 4 + 4)]);
+        assert.deepEqual([...amounts.subarray(i * 4, i * 4 + 4)], [...weights.subarray(from * 4, from * 4 + 4)]);
+      }
+      assert.equal(primitive.weights, source.weights, 'morph weights are the source\'s own array');
+      assert.ok(engine.plugins.has('animation:' + level.name), 'the level plays');
+    }
+    model.dispose();
+    assert.equal(lod.levels[1].object.disposed, true, 'levels go with the model');
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('a level follows the animated nodes of the source, on show only', async () => {
+  const engine = await headless(),
+    system = LODSystem.attach(engine),
+    model = loadedModel(engine, { animations: [{ channels: [], samplers: [] }] });
+  engine.store.tick(false);
+  const lod = await autoLOD(system, model, { ratios: [0.5], screens: [0.2] }),
+    [, { object: level }] = lod.levels,
+    plugin = engine.plugins.get([...engine.plugins.keys()].find((name) => name.startsWith('lod-nodes'))),
+    x = () => engine.store.transforms.x[level.nodes[1].id];
+  assert.ok(plugin, 'a file with animations follows');
+  model.nodes[1].setPosition([5, 0, 0]);
+  engine.camera.position = [0, 0, 4];
+  system.update();
+  assert.equal(lod.level, 0);
+  plugin.onPreUpdate();
+  assert.equal(x(), 0, 'not on show: nothing to copy');
+  engine.camera.position = [0, 0, 500];
+  system.update();
+  assert.equal(lod.level, 1);
+  plugin.onPreUpdate();
+  assert.equal(x(), 5, 'on show, it stands where the source stands');
+  model.dispose();
+  assert.equal(engine.plugins.has(plugin.name), false, 'the follower goes with the model');
+  engine.dispose();
+});
 
 test('autoLOD levels a loaded model: its nodes, materials and transforms, points left on level 0', async () => {
   const engine = await headless();

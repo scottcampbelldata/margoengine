@@ -48,12 +48,16 @@
     "access": "public"
   },
   "peerDependencies": {
+    "@margoengine/animation": "^1.0.0",
     "@margoengine/core": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
     "@margoengine/mesh-edit": "^1.0.0"
   },
   "peerDependenciesMeta": {
+    "@margoengine/animation": {
+      "optional": true
+    },
     "@margoengine/materials": {
       "optional": true
     },
@@ -68,6 +72,6 @@
     "build": "node ../../scripts/build-optional.js lod",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/lod/test/browser-check.mjs && node packages/lod/test/imposter-check.mjs && node packages/lod/test/auto-check.mjs && node packages/lod/test/fade-check.mjs && node packages/lod/test/imposter-full-check.mjs && node packages/lod/test/stream-check.mjs && node packages/lod/test/imposter-outline-check.mjs"
+    "test:gpu": "cd ../.. && node packages/lod/test/browser-check.mjs && node packages/lod/test/imposter-check.mjs && node packages/lod/test/auto-check.mjs && node packages/lod/test/rig-check.mjs && node packages/lod/test/fade-check.mjs && node packages/lod/test/imposter-full-check.mjs && node packages/lod/test/stream-check.mjs && node packages/lod/test/imposter-outline-check.mjs"
   }
 }
