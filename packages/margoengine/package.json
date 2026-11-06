@@ -1006,6 +1006,10 @@
       "types": "./dist/lod/fade.d.ts",
       "import": "./dist/lod/fade.js"
     },
+    "./lod/stream": {
+      "types": "./dist/lod/stream.d.ts",
+      "import": "./dist/lod/stream.js"
+    },
     "./materials": {
       "types": "./dist/materials.d.ts",
       "import": "./dist/materials.js"

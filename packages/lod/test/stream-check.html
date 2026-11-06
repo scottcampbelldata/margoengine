@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>LOD: streamed levels</title><style>body{margin:0;background:#000}canvas{width:256px;height:256px;display:block}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// A red box as the coarse level, a real GLB as the fine one, fetched over this page's own server.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {LODSystem} from '/packages/lod/dist/index.js';
+import {LevelStream} from '/packages/lod/dist/stream.js';
+const canvas=document.querySelector('canvas'),errors=[],W=256,file='/examples/assets/flight-helmet-mobile.glb';
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,60],target:[0,0,0],fov:40,far:400}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const system=LODSystem.attach(engine),stream=LevelStream.attach(engine);
+const copy=new OffscreenCanvas(W,W),g=copy.getContext('2d',{willReadFrequently:true});
+const image=()=>{engine.render();g.clearRect(0,0,W,W);g.drawImage(canvas,0,0);return g.getImageData(0,0,W,W).data;};
+// What the anchor's levels add to the picture: pixels that change when it hides, and of those the pure red ones.
+const look=anchor=>{
+  const d=image();anchor.visible=false;const empty=image();anchor.visible=true;let pixels=0,red=0;
+  for(let i=0;i<d.length;i+=4)if(Math.abs(d[i]-empty[i])+Math.abs(d[i+1]-empty[i+1])+Math.abs(d[i+2]-empty[i+2])>12){pixels++;if(d[i]>d[i+1]+60&&d[i]>d[i+2]+60)red++;}
+  return {pixels,red};
+};
+const requests=()=>performance.getEntriesByType('resource').filter(e=>e.name.endsWith(file)).length;
+const until=async test=>{for(let i=0;i<600&&!test();i++){engine.render();await new Promise(r=>setTimeout(r,10));}};
+const coarse=()=>engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color:[0.9,0.02,0.02],roughness:1}));
+window.check={
+  errors,
+  async run(){
+    const out={};
+    const anchor=engine.createMesh();
+    const fine=stream.level(file,{parent:anchor}),far=coarse().setParent(anchor);
+    const lod=system.add(anchor,[{object:fine},{object:far,distance:10}],{radius:1});
+    engine.render();engine.render();
+    out.far={level:lod.level,requests:requests(),...look(anchor)};
+    engine.camera.position=[0,0,1.5];
+    await until(()=>lod.level===0);
+    engine.render();
+    out.near={level:lod.level,requests:requests(),bytes:fine.bytes,...look(anchor)};
+    lod.remove();anchor.visible=false;
+    // A file that is not there.
+    const other=engine.createMesh(),keep=coarse().setParent(other);
+    const bad=stream.level('/examples/assets/no-such-file.glb',{parent:other});
+    const held=system.add(other,[{object:bad},{object:keep,distance:10}],{radius:1});
+    engine.camera.position=[0,0,60];engine.render();engine.render();
+    engine.camera.position=[0,0,1.5];
+    await until(()=>bad.state==='failed');
+    out.bad={state:bad.state,level:held.level};
+    held.remove();other.visible=false;
+    // Fetching, then the camera leaves.
+    const third=engine.createMesh(),gone=coarse().setParent(third);
+    const left=stream.level(async signal=>{await new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason)));},{parent:third});
+    const walked=system.add(third,[{object:left},{object:gone,distance:10}],{radius:1});
+    engine.render();
+    engine.camera.position=[0,0,60];
+    await until(()=>left.state==='idle'&&!stream.active);
+    out.aborted={state:left.state,active:stream.active};
+    walked.remove();
+    stream.dispose();
+    await device.queue.onSubmittedWorkDone();
+    return out;
+  },
+};
+window.ready=true;
+</script></body></html>

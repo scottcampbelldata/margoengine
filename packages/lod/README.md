@@ -150,6 +150,30 @@ shadows.add(lods); // every imposter casts and receives; {castShadow: false} or 
 
 Each frame of `ImposterFrames` is an atlas of its own, so the memory is `count` atlases, and objects on the same frame share a draw: a forest on 8 frames is 8 draws. `shadows` sees an imposter as a card facing the light with the surface of the view nearest the light, standing back from itself by a tile's angle over its radius so that it does not shadow its own surface: an imposter's self-shadowing below that depth is lost, and the shadow it throws on other objects stays in place. Of a lighting effect only the `direct` hook reaches imposters, which is what `Shadows` gives; clustered lights and environment light do not. Casters are not culled against the cascades. The emissive atlas is RGBA8, so baked emissive stops at 1; add more through `lod.emissive`.
 
+## Streamed levels: `margoengine/lod/stream`
+
+For a city too big to load, a `LevelStream` fetches a fine level only when the camera comes near it. While a level is on its way the object keeps the level it has, so give every object a coarse level that needs no fetch.
+
+```ts
+import {createStage} from 'margoengine';
+import {box} from 'margoengine/core';
+import {LODSystem} from 'margoengine/lod';
+import {LevelStream} from 'margoengine/lod/stream';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const engine = stage.engine;
+const lods = LODSystem.attach(engine);
+const stream = LevelStream.attach(engine, {
+  maxBytes: 512 * 1024 * 1024, // default 256 MiB: past it the longest unused levels are freed
+  concurrency: 4, // default 4: levels fetched at once
+});
+const anchor = engine.createMesh().setPosition([500, 0, 200]);
+const block = engine.createMesh().setGeometry(box(40, 80, 40)).setParent(anchor);
+const fine = stream.level('/city/block-12.glb', {parent: anchor}); // fetched with loadGLTF when wanted
+lods.add(anchor, [{object: fine}, {object: block, distance: 300}], {radius: 60});
+```
+
+A URL goes through `loadGLTF`; a function `(signal) => Promise<object>` loads anything else and must honour `signal`. `bytes` sets what a level counts for against `maxBytes`, by default the vertices and indices it holds. A fetch nobody has asked for over two frames is aborted, and a freed or aborted level fetches again when wanted, so a camera that sweeps past starts little and finishes nothing. Textures are not in the default count. A level on show is never freed, so `resident` can pass `maxBytes` when more than that is on show. A failed level stays `'failed'` with its `error`, listed in `stream.failed`, until `level.retry()`: nothing retries by itself. Levels can be chained: a wish for a level that is not there asks each level from it towards the one on show, and shows the first that can.
+
 ## Dithered cross-fade: `margoengine/lod/fade`
 
 `LODFade` makes level switches dissolve instead of pop. For `duration` seconds both levels draw, each pixel from exactly one of them by a fixed noise threshold, so the fade costs no blending and no sorting, and the depth buffer stays right. Mesh, model, materials mesh and Geometry levels fade, as does a `null` level, which dissolves the object away.

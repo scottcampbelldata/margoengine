@@ -43,6 +43,11 @@ type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
+interface DeferredLevel {
+    visible: boolean;
+    request(): boolean;
+}
+
 class Imposter {
     readonly frames: number;
     readonly frameSize: number;
@@ -146,7 +151,7 @@ interface LODModelEntry {
 
 type LODObject = Mesh | {
     readonly root: Mesh;
-} | Geometry | Imposter | ImposterFrames | null;
+} | Geometry | Imposter | ImposterFrames | DeferredLevel | null;
 
 interface LODOptions {
     radius?: number;

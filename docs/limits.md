@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-156). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-157). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -107,6 +107,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Generated levels of loaded models (`autoLOD`, `hierarchicalLOD` on a `loadGLTF` model) | Skinned and morphed models are refused. Per primitive: mesh-edit's 200,000 vertices or faces. Vertex memory of the default three levels: about 0.875 of the source's, on top of it; GPU textures are shared. | A level is a model of the same file, so shadows, picking and materials work as on any model, at the cost of a model per level. | Node transforms are copied at the call: a node animated afterwards moves on level 0 only. Points and lines stay on level 0, and out of a far model. `selectVariant` on the source does not reach its levels. | `MSFT_lod` levels in the file (`LOD.fromModel`), or an `Imposter`, for skinned models. |
 | Dithered level cross-fade (`LODFade`, `@margoengine/lod/fade`) | WebGPU only: instant on WebGL2. Instant to or from an `Imposter` and for `hierarchicalLOD`. One transition per `LODSystem`. | Each pixel comes from one level by a fixed noise threshold: no blending, no sorting, depth stays right, at the cost of both levels drawing for `duration` (default 0.25 s) and a storage read per core-mesh pixel while attached. | Shadows see both levels during a fade. A model's first fade compiles its pipelines unless `prepare` ran. | Default of `LODFade` off: levels pop. |
 | Fuller imposters (`LODOptions.color`, `emissive`, `frame`; `ImposterOptions.emissive`, `pose`, `margin`; `ImposterFrames`; `shadows.add(lods)`) | Instance record 96 bytes (was 64). `ImposterFrames`: `count` atlases, at least 2, a draw per frame in use. Baked emissive stops at 1 (RGBA8). Lighting effects: the `direct` hook only. | Colour and emissive ride on the one instanced draw, and shadows use the atlas instead of a mesh. | An imposter loses self-shadow within `r*(2/(frames-1)+4/frameSize)`. Casters are not culled per cascade. A skinned source needs `margin` for poses past its bind-pose bounds. | Keep a mesh level at the range where these matter. |
+| Streamed levels (`LevelStream`, `@margoengine/lod/stream`) | Default 4 fetches at once and 256 MiB kept; a level on show is never freed, so `resident` can pass `maxBytes`. The default count holds vertices and indices, not textures. | A wish for a level that is not there holds the level on show, so nothing pops out, at the cost of a coarse level per object. | A fetch unasked for over two frames is aborted and starts over when wanted: partial bytes are not kept. No automatic retry: a failed level waits for `retry()`. | `bytes` per level to count textures; load up front for scenes that fit. |
 
 ## Geometry
 

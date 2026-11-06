@@ -32,7 +32,13 @@ declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: numb
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** What a level shows: a core Mesh or a model with a `root` Mesh (gltf-pro, materials), toggled through `visible`; a core Geometry swapped onto the anchor; an Imposter or ImposterFrames; or null (nothing). */
-export type LODObject = Mesh | { readonly root: Mesh } | Geometry | Imposter | ImposterFrames | null;
+export type LODObject = Mesh | { readonly root: Mesh } | Geometry | Imposter | ImposterFrames | DeferredLevel | null;
+/** A level that is not always there (`@margoengine/lod/stream`): while `request` says no, the system keeps showing what it has. */
+export interface DeferredLevel {
+  visible: boolean;
+  /** Asked each frame the level is wanted. True when it can show now. */
+  request(): boolean;
+}
 /** `distance` (world units from the camera to the anchor) or `screen` (bounding-sphere height as a fraction of the viewport height); every level of one LOD uses the same one. Level 0's value is ignored. */
 export interface LODLevel {
   object: LODObject;
@@ -149,7 +155,7 @@ interface Atlas {
 const STRIDE = 24;
 const isImposter = (o: LODObject): o is Imposter | ImposterFrames =>
   o instanceof Imposter || o instanceof ImposterFrames;
-const target = (o: Mesh | { readonly root: Mesh }) => ('root' in o ? o.root : o);
+const target = (o: Mesh | { readonly root: Mesh } | DeferredLevel) => ('root' in o ? o.root : o);
 let serial = 0;
 
 /**
@@ -489,8 +495,22 @@ export class LODSystem implements EnginePlugin {
       let next = 0;
       while (next + 1 < n && v >= thresholds[b + next + 1]) next++;
       if (next < shown && v >= thresholds[b + shown] * (1 - bands[b + shown])) next = shown;
+      if (next !== shown) next = this.reachable(i, next, shown);
       if (next !== shown) this.show(i, shown, next);
     }
+  }
+  /**
+   * The level to show for a wish of `next`: the first that can show, walking from it towards the level on show, or
+   * towards coarser levels when none is yet. A level that needs no fetch always can.
+   */
+  private reachable(i: number, next: number, shown: number): number {
+    const objects = this.objects[i],
+      step = shown < 0 || next < shown ? 1 : -1;
+    for (let l = next; l >= 0 && l < objects.length && l !== shown; l += step) {
+      const object = objects[l] as Partial<DeferredLevel> | null;
+      if (!object?.request || object.request()) return l;
+    }
+    return shown;
   }
   private show(i: number, from: number, to: number): void {
     if (from >= 0 && this.transition?.(this.handles[i], from, to)) {

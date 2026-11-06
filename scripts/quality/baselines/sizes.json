@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4982404,
+  "total": 4984182,
   "history": [
     {
       "date": "2026-10-24",
@@ -2102,6 +2102,12 @@
       "commit": "4e48d1dc0",
       "reason": "New stats entry ./phases: CPU time per frame phase. Core and core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "041de7643",
+      "reason": "lod: deferred levels in the root; new entry lod/stream",
+      "grew": 1
     }
   ],
   "items": {
@@ -2353,6 +2359,7 @@
     "@margoengine/lod": 13629,
     "@margoengine/lod/auto": 5498,
     "@margoengine/lod/fade": 2542,
+    "@margoengine/lod/stream": 1778,
     "@margoengine/materials": 61113,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,

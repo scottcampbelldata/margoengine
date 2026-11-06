@@ -8,6 +8,11 @@ import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core
 import { PBRModel } from "@margoengine/gltf-pro";
 import { MutableVec3 } from "@margoengine/math";
 
+export interface DeferredLevel {
+    visible: boolean;
+    request(): boolean;
+}
+
 export class Imposter {
     readonly frames: number;
     readonly frameSize: number;
@@ -111,7 +116,7 @@ export interface LODModelEntry {
 
 export type LODObject = Mesh | {
     readonly root: Mesh;
-} | Geometry | Imposter | ImposterFrames | null;
+} | Geometry | Imposter | ImposterFrames | DeferredLevel | null;
 
 export interface LODOptions {
     radius?: number;

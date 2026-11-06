@@ -33,6 +33,10 @@
     "./fade": {
       "types": "./dist/fade.d.ts",
       "import": "./dist/fade.js"
+    },
+    "./stream": {
+      "types": "./dist/stream.d.ts",
+      "import": "./dist/stream.js"
     }
   },
   "files": [
@@ -64,6 +68,6 @@
     "build": "node ../../scripts/build-optional.js lod",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/lod/test/browser-check.mjs && node packages/lod/test/imposter-check.mjs && node packages/lod/test/auto-check.mjs && node packages/lod/test/fade-check.mjs && node packages/lod/test/imposter-full-check.mjs"
+    "test:gpu": "cd ../.. && node packages/lod/test/browser-check.mjs && node packages/lod/test/imposter-check.mjs && node packages/lod/test/auto-check.mjs && node packages/lod/test/fade-check.mjs && node packages/lod/test/imposter-full-check.mjs && node packages/lod/test/stream-check.mjs"
   }
 }
