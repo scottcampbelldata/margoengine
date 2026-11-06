@@ -194,8 +194,42 @@ async function potree() {
   return `A Potree 2.0 and a 1.x folder stream through OctreeCloud and draw the same square (${drawn.map((v) => v.toFixed(2))})`;
 }
 
+/** An octree following a mesh: it moves, turns and hides with it, and picks answer in world positions. */
+async function octreeTransform() {
+  const { buildOctree, OctreeCloud } = await import('../dist/octree.js');
+  const { engine, frame, end } = await rig(),
+    points = PointsPlugin.attach(engine),
+    octree = OctreeCloud.attach(engine, points, buildOctree({ positions: square(200) }, { maxPointsPerNode: 5000 }), {
+      adaptiveSize: true,
+      material: { size: 2 },
+    }),
+    mesh = engine.createMesh();
+  octree.attach(mesh);
+  const left = [20, 100, 60, 156],
+    right = [196, 100, 236, 156];
+  mesh.setPosition([-5, 0, 0]);
+  mesh.setScale([0.5, 0.5, 0.5]);
+  await settled(octree, frame);
+  let image = await settled(octree, frame);
+  assert(fraction(image, lit, left) > 0.9, `follows the mesh left: ${fraction(image, lit, left)}`);
+  assert(fraction(image, lit, right) === 0, 'and leaves the right empty');
+  mesh.setPosition([5, 0, 0]);
+  await frame();
+  image = await settled(octree, frame);
+  assert(fraction(image, lit, right) > 0.9, `follows the mesh right: ${fraction(image, lit, right)}`);
+  assert(fraction(image, lit, left) === 0, 'and leaves the left empty');
+  const hit = points.pick(216, 128);
+  assert(hit && hit.position[0] > 2, `picks in world positions: ${hit?.position}`);
+  mesh.visible = false;
+  image = await frame();
+  assert(fraction(image, lit, right) === 0, 'a hidden mesh hides the octree');
+  octree.dispose();
+  await end();
+  return 'An octree follows a mesh across the view, picks in world positions and hides with it';
+}
+
 window.runFeatures = async () => {
   const checks = [];
-  for (const check of [adaptiveSize, surfels, surfelDepth, potree]) checks.push(await check());
+  for (const check of [adaptiveSize, surfels, surfelDepth, potree, octreeTransform]) checks.push(await check());
   return checks;
 };

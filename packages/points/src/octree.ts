@@ -4,9 +4,10 @@
 // nodes the camera needs, largest on screen first, under a point budget, loading them from any `OctreeSource` (the
 // built octree, or your own streamed one) and evicting the least recently used past a memory budget. The octree is
 // additive: a parent's points stay drawn under its children, so detail only ever adds and nothing leaves a hole.
-import type { EngineKernel } from '@margoengine/core';
+import type { EngineKernel, Mesh } from '@margoengine/core';
 import type { EnginePlugin } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { PointCloud, type PointCloudOptions } from './cloud.js';
 import { PointsMaterial, type PointsMaterialOptions } from './material.js';
 
@@ -213,7 +214,7 @@ export function buildOctree(
   return new MemoryOctree(root, indices, positions, cloud.colors, components as 3 | 4);
 }
 
-/** The camera, in the cloud's coordinates, for `OctreeCloud.select`. */
+/** The camera in world coordinates, for `OctreeCloud.select`. */
 export interface OctreeView {
   readonly position: ArrayLike<number>;
   /** 24 numbers, 6 planes (a x + b y + c z + d >= 0 inside); omit to keep every node. */
@@ -238,7 +239,8 @@ export interface OctreeCloudOptions {
   /**
    * Grows each point to fill the gaps of the nodes drawn around it, so a subsampled part of a scan looks solid. The
    * material then measures in world units with `size` 1 and takes its size from each point; the size it had stays the
-   * smallest a point draws, and `maxPixelSize` the largest. Default false.
+   * smallest a point draws, and `maxPixelSize` the largest. Under a transform `size` follows its longest axis, and a
+   * world size counts in the cloud's own units. Default false.
    */
   adaptiveSize?: boolean | OctreeAdaptiveSize;
   /** Other `PointCloud` options for every node (colour space, block size). */
@@ -291,6 +293,8 @@ export class OctreeCloud implements EnginePlugin {
   readonly source: OctreeSource;
   /** The material every node draws with. */
   readonly material: PointsMaterial;
+  /** Column-major model matrix of the whole octree, used when it is not attached to a mesh. Write to it freely. */
+  readonly matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   pointBudget: number;
   minNodePixels: number;
   maxLoadedPoints: number;
@@ -300,6 +304,8 @@ export class OctreeCloud implements EnginePlugin {
   stats = { drawn: 0, loaded: 0, loading: 0, failed: 0 };
   disposed = false;
   private engine?: EngineKernel;
+  private mesh: Mesh | null = null;
+  private readonly localPlanes = new Float64Array(24);
   private frame = 0;
   private readonly loaded = new Map<OctreeNode, Loaded>();
   private readonly failed = new Set<OctreeNode>();
@@ -355,6 +361,19 @@ export class OctreeCloud implements EnginePlugin {
   setup(engine: EngineKernel): void {
     this.engine = engine;
   }
+  /** The mesh whose world matrix the octree follows, or null. */
+  get attachedMesh(): Mesh | null {
+    return this.mesh;
+  }
+  /**
+   * Follows a core mesh's world matrix and its visibility, so a scan can be placed, rotated and animated in the scene;
+   * pass null to use `matrix` again. A hidden mesh hides the octree and stops its loading.
+   */
+  attach(mesh: Mesh | null): this {
+    this.mesh = mesh;
+    for (const entry of this.loaded.values()) entry.cloud?.attach(mesh);
+    return this;
+  }
   /** Called with the node and error when a node fails to load (it is then skipped until `retry()`). */
   onError(listener: (node: OctreeNode, error: unknown) => void): void {
     this.errorListener = listener;
@@ -378,17 +397,29 @@ export class OctreeCloud implements EnginePlugin {
   /** Chooses, shows and loads the nodes for a view; returns the nodes drawn. */
   select(view: OctreeView): OctreeNode[] {
     if (this.disposed) throw new MargoError('disposed', 'OctreeCloud is disposed; create a new one');
+    const m = this.mesh && this.engine ? meshWorldMatrix(this.engine, this.mesh) : this.matrix;
+    if (!m) return this.visible;
     this.frame++;
+    // The longest axis of the transform: a node's sphere stays inside this radius under it.
+    const stretch = Math.max(Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10]));
+    if (this.sizeScale) this.material.size = stretch;
     const k = view.screenHeight / (2 * Math.tan(((view.fov ?? 60) * Math.PI) / 180 / 2)),
-      p = view.position;
+      p = view.position,
+      pl = view.planes && this.planesInCloud(view.planes, m);
     const size = (node: OctreeNode) => {
       const b = node.bounds,
-        r = Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) / 2,
-        d = Math.hypot((b[0] + b[3]) / 2 - p[0], (b[1] + b[4]) / 2 - p[1], (b[2] + b[5]) / 2 - p[2]);
+        r = (Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) / 2) * stretch,
+        x = (b[0] + b[3]) / 2,
+        y = (b[1] + b[4]) / 2,
+        z = (b[2] + b[5]) / 2,
+        d = Math.hypot(
+          m[0] * x + m[4] * y + m[8] * z + m[12] - p[0],
+          m[1] * x + m[5] * y + m[9] * z + m[13] - p[1],
+          m[2] * x + m[6] * y + m[10] * z + m[14] - p[2],
+        );
       return d <= r ? Infinity : (r * k) / (d - r);
     };
     const inside = (node: OctreeNode) => {
-      const pl = view.planes;
       if (!pl) return true;
       const b = node.bounds;
       for (let i = 0; i < 6; i++) {
@@ -436,7 +467,22 @@ export class OctreeCloud implements EnginePlugin {
     return chosen;
   }
 
-  /** World diameter of a point in a place of this many points per square unit. */
+  /** World planes in the cloud's own coordinates: a plane times the matrix tests the local point it maps to. */
+  private planesInCloud(planes: ArrayLike<number>, m: ArrayLike<number>): Float64Array {
+    const out = this.localPlanes;
+    for (let i = 0; i < 24; i += 4) {
+      const a = planes[i],
+        b = planes[i + 1],
+        c = planes[i + 2];
+      out[i] = a * m[0] + b * m[1] + c * m[2];
+      out[i + 1] = a * m[4] + b * m[5] + c * m[6];
+      out[i + 2] = a * m[8] + b * m[9] + c * m[10];
+      out[i + 3] = a * m[12] + b * m[13] + c * m[14] + planes[i + 3];
+    }
+    return out;
+  }
+
+  /** Diameter in the cloud's own units of a point in a place of this many points per square unit. */
   private pointSize(density: number): number {
     return Math.max(this.sizeFloor, this.sizeScale / Math.sqrt(density));
   }
@@ -525,12 +571,14 @@ export class OctreeCloud implements EnginePlugin {
         ...this.cloudOptions,
         ...data,
         material: this.material,
+        matrix: this.matrix,
         // Until the first selection that draws it, a node has no drawn children.
         sizes: this.sizeScale
           ? new Float32Array(data.positions.length / 3).fill(this.pointSize(chainDensity(node)))
           : undefined,
       });
       cloud.visible = false;
+      cloud.attach(this.mesh);
       this.points.add(cloud);
       entry.cloud = cloud;
       entry.points = cloud.count;

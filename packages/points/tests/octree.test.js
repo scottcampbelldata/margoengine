@@ -65,7 +65,7 @@ const settle = async () => {
   for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
 };
 async function converge(octreeCloud, view) {
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 400; i++) {
     octreeCloud.select(view);
     if (octreeCloud.stats.loading === 0) {
       octreeCloud.select(view);
@@ -157,4 +157,114 @@ test('colours: ASPRS classes, ramps, 16-bit RGB; measures: distance, path, area,
   );
   assert.equal(measureHeight([0, 1, 0], [5, 4, 2]), 3);
   assert.ok(Math.abs(measureAngle([1, 0, 0], [0, 0, 0], [0, 0, 1]) - 90) < 1e-12);
+});
+
+const multiply = (m, x, y, z) => [
+  m[0] * x + m[4] * y + m[8] * z + m[12],
+  m[1] * x + m[5] * y + m[9] * z + m[13],
+  m[2] * x + m[6] * y + m[10] * z + m[14],
+];
+/** Rotation about y, a uniform scale and a move, as a column-major matrix, with its inverse. */
+function placed(angle, scale, [tx, ty, tz]) {
+  const c = Math.cos(angle) * scale,
+    s = Math.sin(angle) * scale,
+    matrix = [c, 0, -s, 0, 0, scale, 0, 0, s, 0, c, 0, tx, ty, tz, 1],
+    q = 1 / (scale * scale),
+    r = [c * q, 0, s * q, 0, 0, scale * q, 0, 0, -s * q, 0, c * q, 0];
+  const t = multiply([...r, 0, 0, 0, 1], tx, ty, tz);
+  r.push(-t[0], -t[1], -t[2], 1);
+  return { matrix, inverse: r };
+}
+/** Half-spaces of a box around a world point, as `planes` takes them. */
+function boxPlanes([x, y, z], h) {
+  return [1, 0, 0, h - x, -1, 0, 0, h + x, 0, 1, 0, h - y, 0, -1, 0, h + y, 0, 0, 1, h - z, 0, 0, -1, h + z];
+}
+
+test('OctreeCloud under a transform selects the nodes the same camera sees of the moved cloud', async () => {
+  const tree = buildOctree(cloud(50_000), { maxPointsPerNode: 3000, grid: 16 });
+  for (const [angle, scale, move] of [
+    [0.7, 1, [2000, 0, -900]],
+    [2.1, 0.25, [-300, 40, 800]],
+    [-1.3, 3, [0, -500, 0]],
+  ]) {
+    const { matrix, inverse } = placed(angle, scale, move),
+      world = multiply(matrix, -300, 10, -200),
+      moved = new OctreeCloud(host(), tree, { minNodePixels: 80 }),
+      still = new OctreeCloud(host(), tree, { minNodePixels: 80 });
+    moved.matrix.set(matrix);
+    const eye = multiply(matrix, -450, 300, -450),
+      a = await converge(moved, { position: eye, screenHeight: 800, planes: boxPlanes(world, 260 * scale) }),
+      // The same view, carried into the cloud's own coordinates by hand.
+      local = multiply(inverse, ...world);
+    assert.ok(Math.hypot(local[0] + 300, local[1] - 10, local[2] + 200) < 1e-6, 'the inverse is right');
+    const corner = (i, sign) => {
+        const p = [...world];
+        p[i] += sign * 260 * scale;
+        return multiply(inverse, ...p);
+      },
+      planes = [];
+    for (let i = 0; i < 3; i++)
+      for (const sign of [1, -1]) {
+        const onFace = corner(i, sign),
+          n = [matrix[i], matrix[i + 4], matrix[i + 8]].map((v) => -sign * v);
+        planes.push(...n, -(n[0] * onFace[0] + n[1] * onFace[1] + n[2] * onFace[2]));
+      }
+    const b = await converge(still, { position: [-450, 300, -450], screenHeight: 800, planes });
+    assert.deepEqual(a.map((n) => n.id).sort(), b.map((n) => n.id).sort());
+    assert.ok(a.length > 1 && a.length < [...tree.nodes()].length, `a part of the tree: ${a.length}`);
+    moved.dispose();
+    still.dispose();
+  }
+});
+
+test('OctreeCloud: moving the cloud away and back drops and returns its nodes; every node shares the matrix', async () => {
+  const tree = buildOctree(cloud(30_000), { maxPointsPerNode: 3000, grid: 16 }),
+    h = host(),
+    oc = new OctreeCloud(h, tree, { minNodePixels: 50 }),
+    view = { position: [0, 300, 900], screenHeight: 800, planes: boxPlanes([0, 0, 0], 600) },
+    here = await converge(oc, view);
+  assert.ok(here.length > 1);
+  for (const c of h.clouds) assert.equal(c.matrix, oc.matrix);
+  oc.matrix[12] = 5000;
+  assert.deepEqual(await converge(oc, view), []);
+  assert.ok([...h.clouds].every((c) => !c.visible));
+  oc.matrix[12] = 0;
+  assert.deepEqual((await converge(oc, view)).map((n) => n.id).sort(), here.map((n) => n.id).sort());
+});
+
+test('OctreeCloud: refinement follows the camera distance in world units, not local ones', async () => {
+  const tree = buildOctree(cloud(50_000), { maxPointsPerNode: 3000, grid: 16 }),
+    view = { position: [0, 0, 1500], screenHeight: 800 },
+    big = new OctreeCloud(host(), tree, { minNodePixels: 100 }),
+    small = new OctreeCloud(host(), tree, { minNodePixels: 100 });
+  big.matrix[0] = big.matrix[5] = big.matrix[10] = 2;
+  small.matrix[0] = small.matrix[5] = small.matrix[10] = 0.1;
+  const a = await converge(big, view),
+    b = await converge(small, view);
+  assert.ok(a.length > b.length, `a larger cloud refines further: ${a.length} against ${b.length}`);
+});
+
+test('adaptive size follows the transform through the material; the sizes stay', async () => {
+  const tree = buildOctree(cloud(30_000), { maxPointsPerNode: 3000, grid: 16 }),
+    h = host(),
+    oc = new OctreeCloud(h, tree, { adaptiveSize: true, minNodePixels: 1e9 }),
+    view = { position: [0, 0, 900], screenHeight: 800 };
+  await converge(oc, view);
+  const [root] = h.clouds,
+    before = Float32Array.from(root.sizes);
+  root.dirty.sizes.length = 0;
+  oc.matrix[0] = oc.matrix[5] = oc.matrix[10] = 4;
+  oc.select(view);
+  assert.equal(oc.material.size, 4);
+  assert.deepEqual(root.sizes, before);
+  assert.equal(root.dirty.sizes.length, 0, 'scaling rewrites no point');
+});
+
+test('PointCloud takes a shared matrix and refuses a wrong one', async () => {
+  const { PointCloud } = await import('../dist/index.js'),
+    matrix = new Float32Array(16),
+    positions = [0, 0, 0];
+  assert.equal(new PointCloud({ positions, matrix }).matrix, matrix);
+  assert.throws(() => new PointCloud({ positions, matrix: new Float32Array(3) }), TypeError);
+  assert.throws(() => new PointCloud({ positions, matrix: [1] }), TypeError);
 });

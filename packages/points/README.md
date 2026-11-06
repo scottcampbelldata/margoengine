@@ -275,6 +275,28 @@ OctreeCloud.attach(engine, points, octree, { pointBudget: 1_000_000, material: {
 | `cloud` | defaults | `PointCloud` options of every node. |
 | `adaptiveSize` | `false` | Grow points to fill the gaps left by subsampled nodes; `true` or `{scale}`. |
 
+### Placing an octree in a scene
+
+An `OctreeCloud` has a `matrix`, or follows a mesh with `attach(mesh)`, including the mesh's visibility. Culling, level of detail and point sizes all work through the transform, and `points.pick` answers in world positions, so a scan can be placed, rotated and animated like any object.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PointsPlugin } from 'margoengine/points';
+import { OctreeCloud, buildOctree } from 'margoengine/points/octree';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+const positions = new Float32Array(300_000).map(() => Math.random() * 10);
+const scan = OctreeCloud.attach(engine, points, buildOctree({ positions }));
+scan.matrix[12] = 20; // move it 20 units along x; takes effect next frame
+
+const turntable = engine.createMesh();
+scan.attach(turntable); // or follow a mesh
+turntable.setPosition([0, 1, 0]);
+```
+
+All nodes share the matrix, so moving a scan writes nothing but 16 floats. Node choice runs before the frame's update, so it lags a moving transform by one frame while the points themselves do not. `select` takes the camera in world coordinates.
+
 A failing node is reported to `onError(listener)` (or `engine.onError`) and skipped until `retry()`.
 
 ### Adaptive point size
@@ -391,7 +413,6 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 - No mipmaps on maps. A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.
 - Transparent points and sprites are not sorted per point. Use `alphaTest` or additive blending for order-independent results. Round antialiased edges of opaque points write depth.
 - A plain `PointCloud` does not grow its points when the budget subsamples its blocks; `OctreeCloud` does with `adaptiveSize`. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own; it reads COPC and Potree.
-- `OctreeCloud` culls in world space and does not follow a mesh transform; place the points in world coordinates.
 
 ## Tests
 

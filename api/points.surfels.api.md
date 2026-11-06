@@ -113,7 +113,7 @@ type PointChannel = 'positions' | 'colors' | 'sizes';
 class PointCloud {
     name: string;
     visible: boolean;
-    readonly matrix: Float32Array<ArrayBuffer>;
+    readonly matrix: Float32Array;
     readonly material: PointsMaterial;
     readonly count: number;
     readonly positions: Float32Array;
@@ -164,6 +164,7 @@ interface PointCloudOptions extends PointCloudData {
     seed?: number;
     colorSpace?: 'srgb' | 'linear';
     reorder?: boolean;
+    matrix?: Float32Array;
     cullMargin?: number;
     name?: string;
 }

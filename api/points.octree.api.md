@@ -23,6 +23,7 @@ export class OctreeCloud implements EnginePlugin {
     readonly name: string;
     readonly source: OctreeSource;
     readonly material: PointsMaterial;
+    readonly matrix: Float32Array<ArrayBuffer>;
     pointBudget: number;
     minNodePixels: number;
     maxLoadedPoints: number;
@@ -37,6 +38,8 @@ export class OctreeCloud implements EnginePlugin {
     static attach(engine: EngineKernel, points: OctreePointsHost, source: OctreeSource, options?: OctreeCloudOptions): OctreeCloud;
     constructor(points: OctreePointsHost, source: OctreeSource, options?: OctreeCloudOptions);
     setup(engine: EngineKernel): void;
+    get attachedMesh(): Mesh | null;
+    attach(mesh: Mesh | null): this;
     onError(listener: (node: OctreeNode, error: unknown) => void): void;
     retry(): void;
     onPreUpdate(): void;
@@ -158,7 +161,7 @@ type PointChannel = 'positions' | 'colors' | 'sizes';
 class PointCloud {
     name: string;
     visible: boolean;
-    readonly matrix: Float32Array<ArrayBuffer>;
+    readonly matrix: Float32Array;
     readonly material: PointsMaterial;
     readonly count: number;
     readonly positions: Float32Array;
@@ -209,6 +212,7 @@ interface PointCloudOptions extends PointCloudData {
     seed?: number;
     colorSpace?: 'srgb' | 'linear';
     reorder?: boolean;
+    matrix?: Float32Array;
     cullMargin?: number;
     name?: string;
 }

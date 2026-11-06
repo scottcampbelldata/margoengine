@@ -40,6 +40,8 @@ export interface PointCloudOptions extends PointCloudData {
    * Default false.
    */
   reorder?: boolean;
+  /** Column-major model matrix, 16 floats, used in place, so clouds can share one. Default a new identity. */
+  matrix?: Float32Array;
   /** World-unit margin added to every frustum plane test, for large points at block edges. Default 0. */
   cullMargin?: number;
   /** Label for debugging. Default ''. */
@@ -63,7 +65,7 @@ export class PointCloud {
   /** Hidden clouds are skipped entirely. */
   visible = true;
   /** Column-major model matrix, used when the cloud is not attached to a mesh. */
-  readonly matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  readonly matrix: Float32Array;
   readonly material: PointsMaterial;
   readonly count: number;
   readonly positions: Float32Array;
@@ -99,6 +101,9 @@ export class PointCloud {
     const { positions } = options;
     if (positions.length % 3) throw new RangeError('positions length must be a multiple of 3');
     this.name = options.name ?? '';
+    this.matrix = options.matrix ?? new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    if (!(this.matrix instanceof Float32Array) || this.matrix.length !== 16)
+      throw new TypeError('PointCloud matrix must be a Float32Array of 16 numbers');
     this.count = positions.length / 3;
     this.blockSize = options.blockSize ?? 16384;
     this.seed = options.seed ?? 1;
