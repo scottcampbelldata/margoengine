@@ -1666,6 +1666,10 @@
       "types": "./dist/ragdoll/profile.d.ts",
       "import": "./dist/ragdoll/profile.js"
     },
+    "./ragdoll/balance": {
+      "types": "./dist/ragdoll/balance.d.ts",
+      "import": "./dist/ragdoll/balance.js"
+    },
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"

@@ -28,6 +28,7 @@ export class RagdollMotors {
     get root(): number;
     set root(value: number);
     fade(to: number, seconds: number): this;
+    setTarget(bone: Mesh | RagdollPart, rotation: readonly number[] | null): this;
     setStrength(bone: Mesh | RagdollPart, value: number): this;
     hit(bone: Mesh | RagdollPart, impulse: readonly [number, number, number], options?: RagdollHitOptions): this;
     dispose(): void;

@@ -129,6 +129,8 @@ export class RagdollMotors {
   private readonly waited: Float64Array;
   private readonly gap: Float64Array;
   private readonly seen: Uint8Array;
+  /** Targets set by {@link setTarget}, by bone index, in place of the animation's pose. */
+  private readonly targets = new Map<number, ArrayLike<number>>();
   private readonly off: () => void;
   private disposed = false;
 
@@ -242,6 +244,18 @@ export class RagdollMotors {
     } else this.rate = Math.abs(to - this.global) / seconds;
     return this;
   }
+  /**
+   * Drives `bone` to `rotation`, relative to its parent bone, in place of the pose the animation gives it: a controller
+   * sets a leg from where its foot must go. Pass `null` to go back to the animation.
+   * @throws RangeError for a node that is not a bone of this ragdoll.
+   */
+  setTarget(bone: Mesh | RagdollPart, rotation: readonly number[] | null): this {
+    const index = this.index(bone);
+    if (rotation) this.targets.set(index, rotation);
+    else this.targets.delete(index);
+    return this;
+  }
+
   /** Sets the strength share of `bone` and every bone under it, 0 to 1: a limp arm on a powered body. */
   setStrength(bone: Mesh | RagdollPart, value: number): this {
     this.live();
@@ -293,7 +307,8 @@ export class RagdollMotors {
       }
       running[i] = 1;
       const a = part.animated,
-        rotation = [a[3], a[4], a[5], a[6]],
+        set = this.targets.get(i),
+        rotation = set ? [set[0], set[1], set[2], set[3]] : [a[3], a[4], a[5], a[6]],
         // Force based, with gains from the whole limb's inertia: an acceleration based motor sees only the two bodies at
         // the joint, not what hangs from them.
         motor = {

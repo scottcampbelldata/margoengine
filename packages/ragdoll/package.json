@@ -44,6 +44,10 @@
     "./profile": {
       "types": "./dist/profile.d.ts",
       "import": "./dist/profile.js"
+    },
+    "./balance": {
+      "types": "./dist/balance.d.ts",
+      "import": "./dist/balance.js"
     }
   },
   "files": [

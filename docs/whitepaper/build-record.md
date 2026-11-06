@@ -1084,3 +1084,25 @@ Batch 39 built a second LAS reader with a hook and said no decoder existed, whil
 - **Limits:** formats 4, 5 and 9 and the channel samples are real points that LASzip compressed, because no public file was found: LASzip wrote them, Margo did not. Compressor 0, compressor 1 with version 2 items and chunk size 0 are stand-in proof, on the test encoder, because no tool here writes them. LAZ item version 1 stays refused: neither the LAZ specification 1.4 R1 nor the LASzip paper describes it, and real samples of it exist. The LAStools sample files matched too but have no clear licence, so they are not committed.
 - **Unmeasured:** no speed was measured, and no file larger than the 697,721 points of `las_with_several_extra_byte_bloc.laz` was read.
 - **Gate:** lint, hygiene, verify, the points and loaders tests and browser tests and `tests/claims-file.test.js`, the push from one script gated on exit codes. Verify failed three times first, each fixed before the push: the `sizes` and `duplicates` gates, which led to dropping two value re-exports from `loaders/las` and holding `points/las` as a base and a lazy part; `tests/dist-dynamic-imports.test.js`, as `points/copc` imported the decoder statically, now `import()`; and the `points/copc` budget after that move. Budgets of `points/las`, `/laz` and `/copc` grew, with the reason in `scripts/quality/baselines/sizes.json` and the figures in `docs/limits.md`. Nothing failed reached `main`.
+
+## Batch 84: ragdoll
+
+Six jobs took `@margoengine/ragdoll` from a limp body to a character that stays on its feet: motors that follow the animation, one limb at a time, getting up, hit shapes from the mesh, saved tuning, and balance. Each is an optional entry; core and stage did not change and stay at 22,859 bytes.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Powered ragdoll | DONE | b750b4549 | `/powered` | LIM-241 |
+| 2 | Partial ragdoll per limb | DONE | cf66cd230 | root | LIM-242 |
+| 3 | Get-up selection | DONE | 5cbdd7cc8 | `/getup` | LIM-244 |
+| 4 | Body shapes from skin | DONE | 527b83f2d | `/hulls` | LIM-245 |
+| 5 | Saved ragdoll profiles | DONE | 50776aa2c | `/profile` | LIM-247 |
+| 6 | Balance controller | DONE, as an assist | this commit | `/balance` | LIM-248 |
+
+- **Bugs fixed, each with a regression test:** `clearMotor` left a hinge held at speed 0, because motor gains of 0 still damp (`packages/physics/tests/physics.test.js`). With `root`, a chest whose children centre on it dropped the arms and the head, because reach was measured to that centre (`packages/ragdoll/tests/ragdoll.test.js`). A body read the mass of a removed and an added collider together until the next step, which would have given motors twice the mass (`packages/physics/tests/physics.test.js`).
+- **Bug found and left open:** a limb that a floor holds past its cone limit never rests, listed in `docs/known-bugs.md` with what was tried. Three fixes were built and measured; each traded the motion for a broken pose, so none shipped. Its effect on job 4 is in `docs/limits.md`.
+- **Physics gained:** `setRotationMotor`, `maxForce` on motors and `setAdditionalMass`, for job 1.
+- **Proved:** in a stepping Rapier world, on real rigs. Job 1 tracks KayKit's Walking_A at about 0.1 rad mean at 6 Hz. Job 2 leaves every other bone equal to a run with no ragdoll, exactly. Job 3 picks the right clip with no facing setting, on the rig's back and front. Job 4 measures ray silhouettes against the mesh itself: 0.93 for hulls, 0.65 for boxes, 0.13 for capsules on Knight.glb, and 0.78 against 0.43 on Fox.glb. Job 5 loads a profile twice and gets the same fall to the last bit. Job 6 stands where motors alone fold up, and takes a 1.5 m/s push in four directions.
+- **Stand-ins:** no asset in the repository has a get-up clip, so job 3 plays the rig's own Death clips backward. Job 5's Mixamo names are the Knight rig renamed.
+- **Limits:** job 6 is an assist, not balance on joint torques alone: an outside force carries about half the body's weight and an outside torque holds it upright, both capped and reported. It takes up to five settling steps at the start, has no turning or walking, and is proved on one rig. Job 5's preset needs a T or A pose. Seed-san was not used, because of the open bone scale bug. Each entry has its row in `docs/limits.md`.
+- **Unmeasured:** no speed was measured; no job has a timed number. Behaviour on an authored get-up clip, on stairs or slopes, and with a second character in contact is untested.
+- **Gate:** lint, hygiene, verify, the ragdoll tests (and the physics tests where physics changed), and `tests/claims-file.test.js`, the push from one script that stops at the first failing step. One landing was stopped by hand before verify, after a docs step failed in the same command line; the error messages it had missed were fixed and it landed clean.

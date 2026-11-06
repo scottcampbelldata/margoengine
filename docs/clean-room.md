@@ -939,6 +939,7 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 | Getting up (`ragdoll/getup`) | Our own design from the public description of the technique (choose a clip by how the body lies, align the character to the body, blend from the ragdoll's pose); turn extraction is the swing-twist decomposition above |
 | Body shapes from the skin (`ragdoll/hulls`) | Reuses `rigging/hulls`, which is quickhull as already cited; the box is a plain search over turns about the bone, of our own design |
 | Saved profiles (`ragdoll/profile`) | Our own format. Mass shares from P. de Leva, J. Biomechanics 1996; segment lengths from Drillis and Contini, 1966; joint ranges from common published ranges of motion |
+| Balance (`ragdoll/balance`) | Capture point from J. Pratt et al., Humanoids 2006; foot placement in the manner of SIMBICON, K. Yin, K. Loken, M. van de Panne, SIGGRAPH 2007; leg angles by the law of cosines |
 
 ## 2D sprites: `@margoengine/sprites`
 

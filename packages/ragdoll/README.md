@@ -173,7 +173,7 @@ motors.fade(0, 1.5); // weaken over a second and a half: a slow collapse
 | `error` | Largest angle, radians, between a powered bone and its target at the last step. |
 | `dispose()` | Takes the motors and the added mass off. `using` works. |
 
-Joint motors are equal and opposite torques on two bodies, so they keep a pose but cannot hold a character up. With `root: 0` a powered character falls over stiff. `root` above 0 keeps it up, and that spring is an outside force, not a muscle: it acts on every bone by its motor's share, so a limp limb still hangs. To stand on its own feet, use a balance controller.
+Joint motors are equal and opposite torques on two bodies, so they keep a pose but cannot hold a character up. With `root: 0` a powered character falls over stiff. `root` above 0 keeps it up, and that spring is an outside force, not a muscle: it acts on every bone by its motor's share, so a limp limb still hangs. To stand on its feet and step, use `margoengine/ragdoll/balance`.
 
 A motor's target stops at the joint's limits, so it never pulls against a limit it would have to pass. The default cone of π/4 is tighter than most clips: give a ragdoll that follows a clip wider limits, or `{type: 'free'}`, or the clip is clipped. The target's own spin is fed to the motor, so a moving pose is tracked without the lag a spring alone has.
 
@@ -263,6 +263,40 @@ const again = Ragdoll.attach(otherPhysics, ragdollOptions(JSON.parse(saved), oth
 | `humanoidProfile(nodes, {mass, bones})` | A profile for a humanoid in a T or A pose. `mass` defaults to 70 kg. |
 
 `humanoidProfile` finds bones by the names `detectSkeleton` knows (Mixamo, Godot, Roblox, humanoid). For other names, pass `bones: {hips: node, leftUpperLeg: node, ...}`; it needs hips, a head, and upper and lower arms and legs. Every node between two named bones joins the lower one's mass, with a small cone. `ragdoll.settings` reads the shared settings a profile saves.
+
+## Balance (`margoengine/ragdoll/balance`)
+
+`addRagdollBalance(ragdoll, motors, {feet})` keeps a powered character on its feet. It watches the capture point of the centre of mass, the spot a step must reach to stop the fall, and swings a foot there; two-bone maths sets each leg from where the hips should be to where its foot is, and the joint motors do the rest.
+
+```ts
+import { Ragdoll } from 'margoengine/ragdoll';
+import { addRagdollBalance } from 'margoengine/ragdoll/balance';
+import { addRagdollMotors } from 'margoengine/ragdoll/powered';
+import { humanoidProfile, ragdollOptions } from 'margoengine/ragdoll/profile';
+
+const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes), model.nodes));
+const motors = addRagdollMotors(ragdoll, { frequency: 8 });
+const balance = addRagdollBalance(ragdoll, motors, { feet: [leftFoot, rightFoot] });
+ragdoll.activate();
+
+motors.hit(chest, [0, 0, -40]); // it stumbles, steps and catches itself
+if (balance.state === 'fallen') motors.fade(0, 0.5);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `feet` | none | The two foot bones. Each needs a knee hinge above it, as `humanoidProfile` builds. |
+| `stepTime` | `0.28` | Seconds a step takes. |
+| `stepHeight` | `0.15` | How high a foot lifts, as a share of the leg's length. |
+| `stepTrigger` | `0.2` | How far the capture point may leave the feet before a step, as a share of the leg's length. |
+| `stance` | `0.97` | Hip height held, as a share of the height when added. |
+| `carry` | `0.6` | Share of the upper body's weight an outside force carries, 0 to 1. |
+| `upright` | `10` | Frequency in rad/s of the outside torque that holds the hips upright. |
+| `maxUpright` | `40` | Largest turn that torque gives, in rad/s². A harder blow knocks the character over. |
+| `fallTilt` | `0.8` | Radians of lean past which it has fallen and every assist stops. |
+| `gravity` | `9.81` | World gravity along up, in m/s². |
+
+This is an assist, and it says so: `carry` and `upright` are outside forces, not muscles, and both have caps. `balance.carried` reads the share of the body's weight the force gave at the last step, `steps` counts steps, `capture` is the capture point, `tilt` the lean, and `state` is `standing`, `stepping` or `fallen`. Add it with the character standing still, before `activate`. After a fall, get up with `margoengine/ragdoll/getup` and call `reset()`. `motors.setTarget(bone, rotation)` is what it drives the legs with, and is open to any controller: a rotation relative to the parent bone, or `null` for the animation's pose.
 
 ## Clean room
 

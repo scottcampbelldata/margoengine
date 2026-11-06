@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7868938,
+  "total": 7872097,
   "history": [
     {
       "date": "2026-10-24",
@@ -2648,6 +2648,12 @@
       "commit": "527b83f2d",
       "reason": "new entry ragdoll/profile: saved profiles and a humanoid preset",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "50776aa2c",
+      "reason": "new entry ragdoll/balance: capture point stepping on powered motors, with a capped assist",
+      "grew": 1
     }
   ],
   "items": {
@@ -3062,6 +3068,7 @@
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 7368,
+    "@margoengine/ragdoll/balance": 3159,
     "@margoengine/ragdoll/getup": 1994,
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
