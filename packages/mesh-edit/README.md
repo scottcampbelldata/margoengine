@@ -172,6 +172,27 @@ console.log(mesh.faces.length, part.mesh.faces.length);
 - `iterations` is 1 to 10000 (default 10). `factor` is above 0 and at most 1 (default 0.5). `passBand` is between 0 and 1 (default 0.1): details below that frequency survive, so a larger value smooths harder.
 - `vertices` limits the moves to a selection. `pinBoundary` (default true) holds open edges still, so a surface keeps its outline.
 - Neighbors weigh equally, so a mesh with uneven triangles drifts a little along its surface. Run `remeshMesh` first on very uneven scans. Corner UVs stay, and a face the move warps is split into valid convex pieces (`id~t1`, ...).
+## Hole filling
+
+Close open borders in imports and scans, with triangles or a quad grid that follows the surrounding curvature:
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { fillMeshHoles, meshBoundaryLoops } from 'margoengine/mesh-edit/modeling';
+
+const box = createPrimitiveMesh('cube', 'box');
+const open = { ...box, faces: box.faces.slice(1) };
+console.log(meshBoundaryLoops(open).length); // 1
+const { mesh, holes } = fillMeshHoles(open, { mode: 'grid' });
+console.log(mesh.faces.length, holes[0].faces);
+```
+
+- `meshBoundaryLoops(mesh)` lists open borders as vertex loops, wound the way a filling face would be. A border that touches itself at a vertex comes back as separate loops.
+- `fillMeshHoles(mesh, {mode, maxEdges, refine, fair, createId, signal})` returns a `MeshEditResult` plus `holes`, each with its border `vertices` and the `faces` added. The faces around a hole do not change.
+- `mode: 'triangles'` (default) finds the lowest-cost triangulation of the border (Liepa, 2003), favoring compact triangles that fold little against the faces around them. Holes above 256 edges start from a fan around their center instead, because that search costs edges cubed.
+- `mode: 'grid'` lays a quad grid over a hole with an even edge count, by Coons interpolation between four sides whose corners are the border's sharpest turns. Holes with an odd edge count use triangles. A grid quad that ends up warped is stored as two triangles, because faces must be planar.
+- `refine` (default true) splits fill triangles until they match the border's edges, flipping toward Delaunay. Border edges never split, so nothing changes outside the hole. `fair` (default true) then moves the added vertices to minimize bending, with the surrounding mesh held still, so the fill continues the curvature around it.
+- `maxEdges` leaves larger holes open and says so in `diagnostics`. New faces take UVs from the hole's own plane, scaled to the unit square.
 
 
 ## Booleans

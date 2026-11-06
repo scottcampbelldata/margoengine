@@ -39,6 +39,23 @@ export interface EdgeSlideOptions extends MeshEditOptions {
     correctUV?: boolean;
 }
 
+export interface FillHolesOptions extends MeshEditOptions {
+    mode?: 'triangles' | 'grid';
+    maxEdges?: number;
+    refine?: boolean;
+    fair?: boolean;
+    signal?: AbortSignal;
+}
+
+export interface FillHolesResult extends MeshEditResult {
+    holes: FilledHole[];
+}
+
+export interface FilledHole {
+    vertices: number[];
+    faces: string[];
+}
+
 export interface ImportMeshOptions {
     weld?: number;
     mergeFlat?: boolean;
@@ -226,9 +243,13 @@ export function convexPolygonPieces(points: readonly Vec3[]): number[][];
 
 export function dissolveMeshComponents(mesh: PolygonMesh, selection: DissolveSelection, options?: MeshEditOptions): ComponentEditResult;
 
+export function fillMeshHoles(mesh: PolygonMesh, options?: FillHolesOptions): FillHolesResult;
+
 export function knifeMeshFaces(mesh: PolygonMesh, points: readonly Vec3[], direction: Vec3, options?: KnifeOptions): KnifeResult;
 
 export function mergeFlatFaces(mesh: PolygonMesh, options?: MergeFlatOptions): MergeFlatResult;
+
+export function meshBoundaryLoops(mesh: PolygonMesh): number[][];
 
 export function meshLODChain(mesh: PolygonMesh, options?: LODChainOptions): SimplifyResult[];
 

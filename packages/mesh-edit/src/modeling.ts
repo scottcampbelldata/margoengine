@@ -1,6 +1,6 @@
 // @margoengine/mesh-edit/modeling: topology modelling on the same editable polygon meshes as the root entry. Edge
 // bevel, edge slide, dissolve, merge by distance, bridge, concave faces, knife, subdivision, booleans,
-// smoothing, simplification, UV unwrap, lightmap UVs, flat-tile merging and import from triangles; its own entry so editors that only paint or move components never
+// smoothing, hole filling, simplification, UV unwrap, lightmap UVs, flat-tile merging and import from triangles; its own entry so editors that only paint or move components never
 // load it.
 export type {
   PolygonFace,
@@ -25,6 +25,13 @@ export {
   type MeshBooleanFaceSource,
 } from './boolean.js';
 export { smoothMesh, type SmoothOptions } from './smooth.js';
+export {
+  fillMeshHoles,
+  meshBoundaryLoops,
+  type FillHolesOptions,
+  type FillHolesResult,
+  type FilledHole,
+} from './holes.js';
 export {
   simplifyMesh,
   meshLODChain,
