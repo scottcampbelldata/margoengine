@@ -1655,6 +1655,30 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node bench/cli.mjs parity --cases=p-custom-shader --engines=margo,three-webgl-parity --runs=3`.
 - **Guard:** `packages/shader/test/raw.test.js`, `packages/shader/test/browser-check.mjs` (`rawShared`).
 
+### 67. Rect area lights: a quad with nothing to clip skips the clip (accepted difference in work)
+
+- **Loss:** `p-rect-area`, 4 lights on the 1,000-box yard: 0.47 ms GPU against three's WebGL 0.16, 0.41 of it the light loop
+  (`--no-gate`, other jobs running, diagnostic; RTX A6000, Edge 156).
+- **Split, by patching the built shader as a measurement:** no light loop 0.06 ms; Lambert integral only 0.30; horizon clip
+  removed 0.42; `atan2` removed 0.38. So the clip was never the main cost: the edge term is. Each of the 8 integrals a
+  fragment runs makes each corner unit twice, once per edge that shares it.
+- **Fix:** `areaIntegral` returns early when no corner is below the horizon (the four edges, each corner made unit once)
+  and when all are below (zero). Same operations in the same order: all 11 frames of `area-lights-gpu.mjs` are byte-equal
+  before and after.
+- **After:** 0.38 ms GPU, 0.09 ms CPU, against three's WebGL 0.15 and 0.61 and WebGPU 0.35 and 0.83, same conditions; image
+  SSIM 0.993 and delta E 0.6 against three.
+- **Difference:** the rest is the exact edge term, `atan2` with its scale guard, held to 1e-5 relative by
+  `ltc-edge.test.js`. The fitted term of Hill and Heitz 2016 with no clip is the cheapest published form, and takes 0.26 ms:
+  that is the like-for-like figure, patched in as a measurement. It is 1.5e-4 off above the horizon, and with no clip a
+  quad crossing it reads 0.069 where the true form factor is 0.006. Taking it would loosen that test and change the image.
+  The 0.26 against 0.15 is not split yet, and three's shader was not read (clean room).
+- **Also found:** `area-lights-gpu.mjs` had failed since core moved to PBR Neutral on 2026-10-17, because its mirror still
+  applied Reinhard, and nothing ran it. It now uses the current curve (GPU within 1/255 of the mirror, brute force within
+  1.2%) and runs as the package's `test:gpu:area`.
+- **Rerun:** `node bench/cli.mjs parity --cases=p-rect-area --engines=margo,three-webgl-parity,three-webgpu-parity --runs=5`.
+  A quiet run is still owed.
+- **Guard:** `packages/clustered/test/ltc-edge.test.js`, `examples/package-benchmarks/area-lights-gpu.mjs`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1705,5 +1729,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 9. `GrowableWorld` loop cost (entry 61): a quiet run.
 10. Subgroup kernels (entry 62): a quiet run, and a GPU with another subgroup size.
 11. `helmet` split (entry 63): a quiet run.
+12. Rect area lights (entry 67): a quiet run, and the 0.26 against 0.15 ms left like for like.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

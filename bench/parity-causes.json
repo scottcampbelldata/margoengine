@@ -248,8 +248,7 @@
     "knownBug": "motion-blur-needs-taa-for-velocity"
   },
   "7.6": {
-    "cause": "CPU faster (0.1 against three-webgl's 0.62 ms). GPU 0.49 against 0.16 ms: all of it is the main pass (the light-culling compute pass is 0.003 ms), where clustered lighting integrates each of the 4 quads under the GGX LTC and the cosine with exact per-edge clipping to the surface's horizon. Not isolated further yet (known-bugs)",
-    "knownBug": "rect-area-lights-main-pass-gpu-time"
+    "cause": "CPU faster (0.09 against three-webgl's 0.61 ms). GPU 0.38 against 0.15 ms (three-webgpu 0.35): an accepted difference in work. The loop over the 4 lights is about 0.32 ms of it; the light-culling compute pass is 0.003 ms. A quad with nothing to clip now skips the clip with the same bytes (0.47 -> 0.38, entry 67); the horizon clip no longer costs measurable time. What is left is the exact arc-tangent edge term, held to 1e-5 relative by its test; the published fitted term, unclipped, draws this frame in 0.26 ms (the like-for-like figure) but is 1.5e-4 off"
   },
   "17.1": {
     "cause": "measured by margo-bench (docs/whitepaper/boxes-vs-threejs.md); moving instances against InstancedMesh at 10,000 to 250,000: \"Moving instances on the GPU (item 53.2)\", DynamicInstances in @margoengine/culling/dynamic, GPU loss open in known-bugs.md"

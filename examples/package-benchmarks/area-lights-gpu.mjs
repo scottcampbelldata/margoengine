@@ -10,17 +10,16 @@
 //    equals an empty one.
 // 3. Two-sided: a light facing away from the floor leaves it black; twoSided lights it exactly like the light turned down.
 // 4. --bench: GPU pass time (timestamp queries, median) at 1280x720 with no AreaLights, an empty one, and 1/4/16 lights.
-// Writes results/area-lights-gpu.json and the frames to test-results/area-lights-*.png.
+// Writes the frames to test-results/area-lights-*.png, and with --bench results/area-lights-gpu.json.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
-import { cpuLoad } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { pbrNeutral } from '../../packages/shared/display.js';
 import { AreaLights } from '../../packages/clustered/dist/area.js';
 import { ltc, bruteForce } from '../../packages/clustered/test/ltc-reference.js';
-import { powerOnlineText as ac } from './parts/power.mjs';
+import { cpuLoad, powerOnlineText as ac } from './parts/power.mjs';
 
 const bench = process.argv.includes('--bench'),
   benchOnly = process.argv.includes('--bench-only');
@@ -36,10 +35,21 @@ const linear = (byte) => {
   const c = byte / 255;
   return c >= 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92;
 };
-// Output transforms: core (Reinhard, packages/core/src/shaders.ts) and gltf-pro (Khronos PBR Neutral, packages/shared/display.js).
+// Output transform: core and gltf-pro both end in Khronos PBR Neutral (packages/shared/display.js).
 const output = {
-  core: (rgb) => rgb.map((c) => srgb(c / (1 + c))),
+  core: (rgb) => pbrNeutral(rgb.map((c) => Math.max(c, 0))).map(srgb),
   materials: (rgb) => pbrNeutral(rgb.map((c) => Math.max(c, 0))).map(srgb),
+};
+// The grey radiance whose displayed value is `m`: the curve rises with its input, so bisection finds it.
+const inverseNeutral = (m) => {
+  let low = 0,
+    high = 1000;
+  for (let i = 0; i < 60; i++) {
+    const middle = (low + high) / 2;
+    if (pbrNeutral([middle, middle, middle])[1] < m) low = middle;
+    else high = middle;
+  }
+  return low;
 };
 const pixel = (image, [x, y]) => {
   const i = (y * image.width + x) * 4;
@@ -125,8 +135,7 @@ try {
             const p = floorPoints[i],
               v = eye.map((e, k) => e - p[k]),
               length = Math.hypot(...v),
-              m = linear(pixel(image, grid[i])[1]),
-              gpu = m / (1 - m);
+              gpu = inverseNeutral(linear(pixel(image, grid[i])[1]));
             const truth = bruteForce(
               light,
               p,
@@ -175,10 +184,7 @@ try {
       const half = finePoints.filter((p, i) => linear(luma[i]) >= 0.5 * linear(peak)),
         span = (k) => Math.max(...half.map((p) => p[k])) - Math.min(...half.map((p) => p[k]));
       // Sharpness: largest radiance step between vertically adjacent samples (4 px), from the inverted core tone map.
-      const radiance = luma.map((b) => {
-          const m = linear(b);
-          return m / (1 - m);
-        }),
+      const radiance = luma.map((b) => inverseNeutral(linear(b))),
         across = 880 / 4;
       let step = 0;
       for (let i = 0; i + across < radiance.length; i++)
@@ -240,6 +246,6 @@ try {
 }
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
-if (!benchOnly)
+if (bench)
   await writeFile(resolve(import.meta.dirname, 'results/area-lights-gpu.json'), JSON.stringify(report, null, 2) + '\n');
 console.log('area lights GPU check passed');

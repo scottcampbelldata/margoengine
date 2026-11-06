@@ -30,3 +30,20 @@ export function powerOnlineText() {
   const power = acPower();
   return power === true ? 'True' : power === false ? 'False' : 'Unknown';
 }
+
+const ps = (script) =>
+  execFileSync('powershell', ['-NoProfile', '-Command', script], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+// The processor-time performance counter, as Task Manager shows it. Win32_Processor.LoadPercentage misreads on some
+// machines: 18-97% from one call to the next on an idle 32-thread desktop whose counter read 4-8% (2026-10-19); it
+// stays as the fallback where the counter class is missing.
+export const cpuLoad = () => {
+  const counter = ps(
+    '(Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name=\'_Total\'").PercentProcessorTime',
+  );
+  return counter !== '' && Number.isFinite(Number(counter))
+    ? Number(counter)
+    : Number(ps('(Get-CimInstance Win32_Processor | Measure-Object LoadPercentage -Average).Average')) || 0;
+};

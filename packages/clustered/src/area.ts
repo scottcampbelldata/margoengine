@@ -54,8 +54,14 @@ fn areaClip(s0:vec3f,e0:vec3f,leave:ptr<function,vec3f>,enter:ptr<function,vec3f
 }
 // Cosine-weighted integral (form factor) of the quad seen through m, clipped to z>=0: its edges plus the horizon chord
 // (zero when nothing was clipped: both points stay at the origin). Unrolled: no dynamically indexed private array.
+// The two early returns are the clipped sum's own result when no edge crosses z=0: same operations in the same order,
+// each corner made unit once where the edges would do it twice. On p-rect-area they cut the main pass by a fifth.
 fn areaIntegral(m:mat3x3f,a:vec3f,b:vec3f,c:vec3f,d:vec3f)->f32 {
-  let p0=m*a;let p1=m*b;let p2=m*c;let p3=m*d;var leave=vec3f(0);var enter=vec3f(0);
+  let p0=m*a;let p1=m*b;let p2=m*c;let p3=m*d;
+  if(min(min(p0.z,p1.z),min(p2.z,p3.z))>=0.0){let u0=areaUnit(p0);let u1=areaUnit(p1);let u2=areaUnit(p2);let u3=areaUnit(p3);
+    return areaEdge(u0,u1)+areaEdge(u1,u2)+areaEdge(u2,u3)+areaEdge(u3,u0);}
+  if(max(max(p0.z,p1.z),max(p2.z,p3.z))<0.0){return 0.0;}
+  var leave=vec3f(0);var enter=vec3f(0);
   let sum=areaClip(p0,p1,&leave,&enter)+areaClip(p1,p2,&leave,&enter)+areaClip(p2,p3,&leave,&enter)+areaClip(p3,p0,&leave,&enter);
   return sum+areaEdge(areaUnit(leave),areaUnit(enter));
 }

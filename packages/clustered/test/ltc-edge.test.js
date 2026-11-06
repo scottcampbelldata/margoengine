@@ -70,6 +70,62 @@ test('float32 shader edge stays within 1e-5 relative of float64 for a.b from 1 d
   assert.ok(Number.isFinite(shaderEdge([1, 0, 0], [-1, 1e-30, 0])));
 });
 
+// The WGSL areaIntegral in float32: the general path of areaClip plus the horizon chord, and the early returns.
+const unit32 = (p) => {
+  const scale = f(1 / Math.sqrt(Math.max(f(f(f(p[0] * p[0]) + f(p[1] * p[1])) + f(p[2] * p[2])), 1e-20)));
+  return p.map((v) => f(v * scale));
+};
+function clippedSum(p) {
+  let leave = [0, 0, 0],
+    enter = [0, 0, 0],
+    sum = 0;
+  p.forEach((s0, i) => {
+    const e0 = p[(i + 1) % 4];
+    if (s0[2] < 0 && e0[2] < 0) return;
+    const t = f(s0[2] / f(s0[2] - e0[2])),
+      cut = s0.map((v, k) => f(v + f(f(e0[k] - v) * t)));
+    let s = s0,
+      e = e0;
+    if (s0[2] < 0) enter = s = cut;
+    else if (e0[2] < 0) leave = e = cut;
+    sum = f(sum + shaderEdge(unit32(s), unit32(e)));
+  });
+  return f(sum + shaderEdge(unit32(leave), unit32(enter)));
+}
+const earlySum = (p) => {
+  const u = p.map(unit32);
+  return f(f(f(shaderEdge(u[0], u[1]) + shaderEdge(u[1], u[2])) + shaderEdge(u[2], u[3])) + shaderEdge(u[3], u[0]));
+};
+
+test('areaIntegral: a quad with nothing to clip returns the clipped sum, bit for bit', () => {
+  assert.ok(source.includes('if(min(min(p0.z,p1.z),min(p2.z,p3.z))>=0.0){'));
+  assert.ok(source.includes('if(max(max(p0.z,p1.z),max(p2.z,p3.z))<0.0){return 0.0;}'));
+  let seed = 12345;
+  const random = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296,
+    quad = (low, high) =>
+      Array.from({ length: 4 }, () => [random() * 6 - 3, random() * 6 - 3, low + random() * (high - low)].map(f));
+  for (let i = 0; i < 2000; i++) {
+    const above = quad(0, 3);
+    assert.equal(earlySum(above), clippedSum(above), JSON.stringify(above));
+    assert.equal(clippedSum(quad(-3, -1e-3)), 0, 'all below the horizon');
+  }
+  // A corner exactly on the horizon counts as above, and a crossing quad is left to the clip.
+  const touching = [
+    [1, 0, 0],
+    [0, 1, 1],
+    [-1, 0, 1],
+    [0, -1, 1],
+  ];
+  assert.equal(earlySum(touching), clippedSum(touching));
+  const crossing = [
+    [1.5, -1, -0.7],
+    [1.5, 1, -0.7],
+    [1.5, 1, 0.9],
+    [1.5, -1, 0.9],
+  ];
+  assert.notEqual(earlySum(crossing), clippedSum(crossing));
+});
+
 // Independent reference: (1/pi) * integral over the planar polygon of max(cos, 0) * cos_light / r^2, midpoint rule.
 function quadrature(points, k = 1200) {
   // Polygons here are planar quads given as corner, edge u, edge v (a parallelogram).

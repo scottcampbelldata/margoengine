@@ -625,15 +625,6 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   a quiet run. three has no `p-motion-blur-velocity` scene yet, so that row compares with `p-motion-blur`'s three column.
   `p-motion-blur`'s image has not matched three's since its first run (SSIM 0.656, delta E 13.2); the cause is not known.
 
-### Rect area lights: main pass GPU time
-
-- **What:** `p-rect-area`, 4 area lights on the 1,000-box yard: GPU 0.49 ms against three's WebGL 0.16 (CPU faster).
-- **Cause (timestamps per pass):** all of it is the main pass; the clustered culling pass is 0.003 ms. Clustered
-  lighting integrates each quad under the GGX LTC and the cosine with exact per-edge clipping to the horizon. Which
-  part costs the time is not isolated yet.
-- **Plan:** time the main pass with the area lights off and with the horizon clip replaced by the unclipped integral
-  (a measurement only), then decide between a cheaper equal-looking integral and an accepted difference.
-
 ### Environment.create does work three's PMREM does not, and recomputes its BRDF LUT
 
 - **What:** `p-pmrem`: 10.9 ms a call against three's 5.0 (run `20261027-105122`; 14.6 before the half-float fix).

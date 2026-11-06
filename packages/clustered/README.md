@@ -150,6 +150,10 @@ local.add(table);
   filter can band on very wide penumbrae. Without `LocalShadows` the lights stay unshadowed. `ShadowCatcherMaterial`
   does not yet count these shadows. A receiver added with `receiveShadow: false`, or a core mesh with
   `mesh.receiveShadow = false`, is not darkened.
+- Cost: every fragment evaluates every area light, two integrals each (GGX and Lambert), with an exact arc tangent per
+  edge. A quad wholly above or below the surface's horizon skips the clip with the same result. At 1,000 boxes and four
+  lights that is 0.38 ms of GPU a frame on an RTX A6000, about 0.32 of it the lights
+  ([accepted difference](../../docs/limits.md#rendering)).
 - Off is exact: while no directional or area light casts, the shaders, bindings, buffers and uploads are byte for byte
   what they were before these shadows existed (unit-tested by hash; images and probe radiance compared on a real GPU).
 

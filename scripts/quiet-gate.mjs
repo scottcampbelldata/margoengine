@@ -3,7 +3,9 @@
 // Whole-machine CPU threshold, not per-process attribution; good enough to wait out other builds.
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { acPower } from '../examples/package-benchmarks/parts/power.mjs';
+import { acPower, cpuLoad } from '../examples/package-benchmarks/parts/power.mjs';
+
+export { cpuLoad };
 
 const ps = (script) =>
   execFileSync('powershell', ['-NoProfile', '-Command', script], {
@@ -13,17 +15,6 @@ const ps = (script) =>
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const onAC = () => acPower() !== false;
-// The processor-time performance counter, as Task Manager shows it. Win32_Processor.LoadPercentage misreads on some
-// machines: 18-97% from one call to the next on an idle 32-thread desktop whose counter read 4-8% (2026-10-19); it
-// stays as the fallback where the counter class is missing.
-export const cpuLoad = () => {
-  const counter = ps(
-    '(Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name=\'_Total\'").PercentProcessorTime',
-  );
-  return counter !== '' && Number.isFinite(Number(counter))
-    ? Number(counter)
-    : Number(ps('(Get-CimInstance Win32_Processor | Measure-Object LoadPercentage -Average).Average')) || 0;
-};
 const topProcesses = () =>
   ps(
     `Get-Process | Sort-Object CPU -Descending | Select-Object -First 8 Name,Id,@{n='cpuSeconds';e={[int]$_.CPU}} | ConvertTo-Json -Compress`,
