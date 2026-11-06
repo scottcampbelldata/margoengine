@@ -181,7 +181,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/decoders API](https://margoengine.com/llms/api/decoders.md): 17 entry points
 - [@margoengine/fbx API](https://margoengine.com/llms/api/fbx.md): 3 entry points
 - [@margoengine/usdz API](https://margoengine.com/llms/api/usdz.md): 2 entry points
-- [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 38 entry points
+- [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 39 entry points
 - [@margoengine/ifc API](https://margoengine.com/llms/api/ifc.md): 2 entry points
 - [@margoengine/blender API](https://margoengine.com/llms/api/blender.md): 1 entry point
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 3 entry points

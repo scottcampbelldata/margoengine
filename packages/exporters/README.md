@@ -2,7 +2,7 @@
 
 Import `margoengine/exporters` from the `margoengine` package, or `@margoengine/exporters` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static USDZ and static COLLADA 1.4.1 (`.dae`) export for Margo Engine scenes
+glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static and [animated USDZ](#animated-usdz-margoengineexportersusdz-anim) and static COLLADA 1.4.1 (`.dae`) export for Margo Engine scenes
 and plain geometry data, plus SHA-256 for checking exported files. [Compressed GLB files](#compressed-glb-files) are optional entries.
 
 Build from source with `npm run build` in `packages/exporters`.
@@ -896,6 +896,44 @@ const usdz = exportUSDZ({
 });
 // usdz holds scene.usda and textures/albedo.png.
 ``` Quick Look on a Mac draws the textured kit as intended, apart from `normalScale`, which it ignores; no iPhone or iPad has opened it yet. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the eight small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with rotation and repeat and mirror wrapping, and rotation +30 and -30 degrees alone) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
+
+### Animated USDZ (`@margoengine/exporters/usdz-anim`)
+
+`exportAnimatedUSDZ(source, options)` writes one clip of a data scene or of GLB bytes as USDZ, so a character plays in AR Quick Look. Skins become UsdSkel: a `SkelRoot` holding a `Skeleton`, its `SkelAnimation` and the meshes it moves, with `primvars:skel:jointIndices` and `primvars:skel:jointWeights` on each mesh. Any other node a clip moves, or a mesh on a joint, becomes an `Xform` with time samples, in the file's own tree. Materials and shared meshes are the ones `exportUSDZ` writes.
+
+```ts
+import { exportAnimatedUSDZ } from 'margoengine/exporters/usdz-anim';
+
+const box = {
+  name: 'Box',
+  geometry: {
+    positions: new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]),
+    normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+    indices: [0, 1, 2, 0, 2, 3],
+  },
+};
+
+const { usdz, clip, frames, skipped } = await exportAnimatedUSDZ({
+  nodes: [box],
+  animations: [{ name: 'Slide', channels: [{ node: box, path: 'translation', times: [0, 2], values: [0, 0, 0, 3, 0, 0] }] }],
+});
+console.log(`${clip}: ${usdz.length} bytes, ${frames} frames, ${skipped.length} left out`);
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `clip` | 0 | Which animation, by index or name. USD has one timeline, so a file holds one clip: write one file for each |
+| `fps` | 30 | Samples per second, and the file's `timeCodesPerSecond` |
+| `signal` | none | Stops between frames and nodes |
+| `texturePrefix` and the collector's options | as `exportUSDZ` | Where images go in the archive, and what the scene collects |
+
+A GLB goes in as it is, with its nodes, skins, clips and PBR materials. Decode Draco and meshopt first: run this before `compressDraco` or `compressMeshopt`, or on the uncompressed file. A file with a second set of joints is refused; bake it down to four influences.
+
+Tracks are sampled at `fps`, as USD stores them, and the viewer blends between frames: a STEP key turns over one frame instead of at once, and a clip that ends between two frames holds its last pose on the frame after, so it runs up to one frame longer. `SkelAnimation` keeps scales as half floats, 11 bits, so a joint's scale rounds to about 0.05%.
+
+`skipped` lists what the file does not carry: `'morph-weights'` channels, as the mesh stays in its base shape, `'not-exported'` channels of a node the scene left out, and for GLB input `'primitive'` not triangles, `'texture'` not PNG or JPEG, `'colors'` under a base colour texture and `'channel'` with no node, such as one of `KHR_animation_pointer`.
+
+A joint under nodes that are not joints takes their motion, and a joint scaled to zero, as a clip that makes a character appear does, keeps its rotation. What cannot be held is refused: a shear in the nodes above a joint, since a joint is a translation, rotation and scale. A mirrored node draws a reflected shape as in `exportUSDZ`, chosen at frame 0, so a clip that turns a scale negative part way keeps the winding it started with.
 
 ## Collision and UV animation per engine
 

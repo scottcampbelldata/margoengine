@@ -41,6 +41,10 @@
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"
     },
+    "./usdz-anim": {
+      "types": "./dist/usdz-anim.d.ts",
+      "import": "./dist/usdz-anim.js"
+    },
     "./model": {
       "types": "./dist/model.d.ts",
       "import": "./dist/model.js"
@@ -204,6 +208,7 @@
     }
   },
   "dependencies": {
+    "@margoengine/animation": "^1.0.0",
     "@margoengine/lod": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/mesh-edit": "^1.0.0"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9046575,
+  "total": 9064391,
   "history": [
     {
       "date": "2026-10-24",
@@ -2792,6 +2792,12 @@
       "commit": "053eebfd0",
       "reason": "live shadow cascades, and resolution, cascades and fog knobs in featureKnobs",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "04c8e5212",
+      "reason": "exporters/usdz-anim: new entry for skins and clips in USDZ",
+      "grew": 1
     }
   ],
   "items": {
@@ -2988,6 +2994,7 @@
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
     "@margoengine/exporters/usdz": 11717,
+    "@margoengine/exporters/usdz-anim": 17816,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 18653,
     "@margoengine/fbx dist/workers/fbx.js": 55486,

@@ -666,6 +666,10 @@
       "types": "./dist/exporters/usdz.d.ts",
       "import": "./dist/exporters/usdz.js"
     },
+    "./exporters/usdz-anim": {
+      "types": "./dist/exporters/usdz-anim.d.ts",
+      "import": "./dist/exporters/usdz-anim.js"
+    },
     "./exporters/model": {
       "types": "./dist/exporters/model.d.ts",
       "import": "./dist/exporters/model.js"

@@ -1,5 +1,5 @@
 {
-  "commit": "bbb2459dd",
+  "commit": "04c8e5212",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -654,8 +654,8 @@
         "gzip": 14778
       },
       "./volumetric": {
-        "raw": 21376,
-        "gzip": 8187
+        "raw": 21403,
+        "gzip": 8194
       },
       "./reflector": {
         "raw": 29611,
@@ -680,8 +680,12 @@
         "gzip": 33654
       },
       "./usdz": {
-        "raw": 31713,
-        "gzip": 11375
+        "raw": 32103,
+        "gzip": 11530
+      },
+      "./usdz-anim": {
+        "raw": 48490,
+        "gzip": 17297
       },
       "./model": {
         "raw": 24235,
@@ -1800,8 +1804,8 @@
         "gzip": 1985
       },
       "./features": {
-        "raw": 4221,
-        "gzip": 1891
+        "raw": 4807,
+        "gzip": 2156
       },
       "./power": {
         "raw": 5176,
@@ -1836,8 +1840,8 @@
     },
     "@margoengine/react": {
       ".": {
-        "raw": 20448,
-        "gzip": 8084
+        "raw": 20716,
+        "gzip": 8193
       },
       "./controls": {
         "raw": 10863,
@@ -2040,8 +2044,8 @@
     },
     "@margoengine/selection": {
       ".": {
-        "raw": 65919,
-        "gzip": 20526
+        "raw": 66314,
+        "gzip": 20712
       }
     },
     "@margoengine/shader": {
@@ -2100,8 +2104,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 53811,
-        "gzip": 17733
+        "raw": 53677,
+        "gzip": 17703
       },
       "./virtual": {
         "raw": 42335,
@@ -2604,8 +2608,8 @@
         "gzip": 3407
       },
       "./pick": {
-        "raw": 4942,
-        "gzip": 2169
+        "raw": 11955,
+        "gzip": 4754
       },
       "./restore": {
         "raw": 1802,
@@ -2700,9 +2704,9 @@
       "brotli": 26250
     },
     "packages/shadows/dist/index.js": {
-      "raw": 53811,
-      "gzip": 17733,
-      "brotli": 15693
+      "raw": 53677,
+      "gzip": 17703,
+      "brotli": 15628
     },
     "packages/xr/dist/index.js": {
       "raw": 19428,
