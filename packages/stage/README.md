@@ -4,7 +4,7 @@ You normally use this package as [`margoengine`](../margoengine/README.md): `imp
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging`, `@margoengine/shadows`, `@margoengine/tonemap`, `@margoengine/xr`, `@margoengine/physics` and `@dimforge/rapier3d-compat` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging`, `@margoengine/shadows`, `@margoengine/tonemap`, `@margoengine/xr`, `@margoengine/physics`, `@dimforge/rapier3d-compat` and `@margoengine/save` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
@@ -50,6 +50,7 @@ the ones it imports. With `margoengine` the entries are `margoengine/stage/<entr
 | `@margoengine/stage/shadows` | `await addShadows(app, options)`: cascaded shadows; the meshes present now cast | `@margoengine/shadows` |
 | `@margoengine/stage/xr` | `await addXRButton(app, options)`: an accessible Enter VR or Enter AR button that starts an XR session | `@margoengine/xr` |
 | `@margoengine/stage/physics` | `await addBody(app, mesh, options)`: a rigid body and a fitted collider, loading physics on first use; `await addPhysics(app, options)` for the world | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
+| `@margoengine/stage/scene` | `await addScene(app, source, options)`: loads a save or prefab document, one mesh per entity, all or nothing | `@margoengine/save`, and `@margoengine/gltf-pro` when an entity names a model |
 | `@margoengine/stage/viewer` | `await addViewer(app, url, options)`: a product viewer: model, image-based light, backdrop, shadow, tone mapping, fit and turntable tuned together | `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging` or `@margoengine/shadows`, `@margoengine/tonemap` |
 
 ```ts
@@ -193,6 +194,48 @@ Without `colliders` the shape comes from the geometry: a box, a sphere (uniforml
 
 The convex hull of a concave dynamic mesh fills its hollows: pass `colliders: {shape: 'convexDecomposition'}` to keep them. A world you dispose yourself is replaced on the next call.
 
+## Saved scenes
+
+`addScene` opens a `@margoengine/save` document in one line, so a level made in a tool loads straight into the stage. `source` is a URL, a document, its JSON text or its bytes, gzipped or not. Each entity becomes a mesh with its transform and parent; prefabs expand and `migrations` run first. Either everything loads or nothing stays.
+
+```ts
+import {createStage} from 'margoengine';
+import {addScene} from 'margoengine/stage/scene';
+
+const app = await createStage('#scene');
+const level = await addScene(app, {
+  format: 'margo-save',
+  version: 1,
+  entities: [
+    {id: 'floor', components: {mesh: {shape: 'box', size: [10, 1, 10]}, material: {color: '#808080'}}},
+    {id: 'ball', parent: 'floor', transform: {position: [0, 2, 0]}, components: {mesh: {shape: 'sphere', radius: 0.5}}},
+    {id: 'spawn', transform: {position: [2, 1, 0]}, components: {team: {side: 1}}},
+  ],
+}, {
+  onEntity(mesh, entity) {
+    if (entity.components.team) console.log('spawn at', mesh.position.x);
+  },
+});
+level.meshes.get('ball')!.position.y = 3;
+level.dispose(); // removes every mesh and model of the scene
+```
+
+Two components are built in. `mesh` is a glTF URL, relative to the document (loaded with `@margoengine/gltf-pro`), or `{shape: 'box', size}` or `{shape: 'sphere', radius, segments}`. `material` is the PBR options, such as `{color, roughness, metalness}`, and cannot move the mesh. `onEntity` takes every other component.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `prefab` | the document's entities | Loads only this prefab of the document, as one instance |
+| `parent` | none | Mesh the top-level entities go under |
+| `base` | the document's URL, or the page's | Base of relative model URLs |
+| `fit` | `true` | Frames the camera on what loaded; a scene with no geometry leaves it alone |
+| `onEntity` | none | Called for each entity once all exist: `(mesh, entity, get)`, where `get(id)` gives another entity's mesh for `{"$ref": id}` values. A throw undoes the load |
+| `migrations` | none | A `Migrations` that brings an older document to the current version |
+| `components`, `strictComponents` | none | Validation, as `parseSave` |
+| `gltf` | none | `loadGLTF` options, such as a shared `draco` decoder |
+| `signal` | none | Cancels the load; the stage's disposal cancels it too |
+
+An invalid document rejects with a TypeError naming its first problem, and a step that fails rejects with `failed` and the `cause`. Each entity with a model loads its own copy, in parallel, before the first mesh is made: a level that repeats one model many times pays for each copy (docs/limits.md).
+
 All core exports are also available from this package. React applications can use the existing `@margoengine/react` components or wrap the engine received by Canvas `onCreated` with `new Stage(engine)`. The existing Canvas component retains ownership of rendering and teardown in that case.
 
-Run `npm run modern:dev` and open `/quickstart.html` for the five-line demo. Verification: `npm test` and `npm run modern:test:wrapper` after building packages; `npm run test:gpu --workspace packages/stage` runs the model viewer on real WebGPU.
+Run `npm run modern:dev` and open `/quickstart.html` for the five-line demo. Verification: `npm test` and `npm run modern:test:wrapper` after building packages; `npm run test:gpu --workspace packages/stage` runs the model viewer and a saved scene with a real model on real WebGPU.

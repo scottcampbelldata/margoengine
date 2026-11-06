@@ -70,6 +70,10 @@
     "./physics": {
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"
+    },
+    "./scene": {
+      "types": "./dist/scene.d.ts",
+      "import": "./dist/scene.js"
     }
   },
   "files": [
@@ -90,7 +94,8 @@
     "@margoengine/staging": "^1.0.0",
     "@margoengine/tonemap": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
-    "@dimforge/rapier3d-compat": ">=0.14.0 <1"
+    "@dimforge/rapier3d-compat": ">=0.14.0 <1",
+    "@margoengine/save": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -124,6 +129,9 @@
       "optional": true
     },
     "@dimforge/rapier3d-compat": {
+      "optional": true
+    },
+    "@margoengine/save": {
       "optional": true
     }
   }

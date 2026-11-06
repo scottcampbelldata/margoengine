@@ -1706,6 +1706,10 @@
       "types": "./dist/stage/physics.d.ts",
       "import": "./dist/stage/physics.js"
     },
+    "./stage/scene": {
+      "types": "./dist/stage/scene.d.ts",
+      "import": "./dist/stage/scene.js"
+    },
     "./staging": {
       "types": "./dist/staging.d.ts",
       "import": "./dist/staging.js"

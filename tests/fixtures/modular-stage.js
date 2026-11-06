@@ -9,6 +9,7 @@ import { addShadows } from 'margoengine/stage/shadows';
 import { addXRButton } from 'margoengine/stage/xr';
 import { addViewer } from 'margoengine/stage/viewer';
 import { addBody, addPhysics } from 'margoengine/stage/physics';
+import { addScene } from 'margoengine/stage/scene';
 
 // Observable exports retain the real facade and every stage feature entry (each imports its package on call).
 globalThis.modularStage = {
@@ -16,5 +17,5 @@ globalThis.modularStage = {
   createStage,
   Geometry,
   DirectGeometry,
-  features: { addGLTF, addSky, addParticles, addEffects, addEnvironment, addShadows, addXRButton, addViewer, addPhysics, addBody },
+  features: { addGLTF, addSky, addParticles, addEffects, addEnvironment, addShadows, addXRButton, addViewer, addPhysics, addBody, addScene },
 };

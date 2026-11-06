@@ -81,6 +81,13 @@ try {
   assert.ok(results.cascaded.floor.shadowed < results.cascaded.floor.plain - 0.5, 'no cast shadow on the floor');
   assert.deepEqual((await close()).gpuErrors, []);
 
+  const scene = await page.evaluate(() => window.viewerPage.scene());
+  results.scene = scene;
+  assert.ok(scene.bounds[0] > 4 && scene.bounds[3] < 6, `the model is not under its parent: ${scene.bounds}`);
+  assert.ok(scene.bounds[1] >= 0.99, `the model is not 1 above its parent: ${scene.bounds}`);
+  assert.equal(scene.left, 0, 'addScene left meshes behind');
+  assert.deepEqual(scene.gpuErrors, []);
+
   await writeFile('test-results/stage-viewer.json', JSON.stringify({ hardware: browser.hardware, ...results }, null, 2));
   console.log('Stage viewer passed on real WebGPU', JSON.stringify(results));
 } finally {

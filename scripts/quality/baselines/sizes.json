@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4768081,
+  "total": 4770079,
   "history": [
     {
       "date": "2026-10-24",
@@ -1958,6 +1958,12 @@
       "commit": "3ba83cf00",
       "reason": "New optional entry bvh/alpha.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "7d92428d3",
+      "reason": "New stage scene entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2381,6 +2387,7 @@
     "@margoengine/stage/gltf": 1621,
     "@margoengine/stage/particles": 724,
     "@margoengine/stage/physics": 1458,
+    "@margoengine/stage/scene": 1998,
     "@margoengine/stage/shadows": 750,
     "@margoengine/stage/sky": 719,
     "@margoengine/stage/viewer": 2480,

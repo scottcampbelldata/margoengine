@@ -1,4 +1,5 @@
 import { createStage } from '@margoengine/stage';
+import { addScene } from '@margoengine/stage/scene';
 import { addViewer, type Viewer, type ViewerOptions } from '@margoengine/stage/viewer';
 
 // Real WebGPU check of addViewer (scripts/stage-viewer-gpu-check.js): each mode loads a real model, and the page hands
@@ -10,6 +11,7 @@ type Page = {
   look(position: [number, number, number]): Promise<void>;
   dropShadow(): Promise<void>;
   close(): Promise<{ plugins: string[]; meshes: number; gpuErrors: string[] }>;
+  scene(): Promise<{ bounds: number[]; meshes: number; left: number; gpuErrors: string[] }>;
 };
 const gpuErrors: string[] = [],
   url = '/examples/assets/flight-helmet-mobile.glb';
@@ -43,6 +45,27 @@ const page: Page = {
   async dropShadow() {
     viewer.shadows!.dispose();
     await page.frames(30);
+  },
+  // A saved scene with a real model under a moved parent: addScene's parenting on a real gltf-pro model.
+  async scene() {
+    app = await createStage('#scene', { backend: 'webgpu', onError: (error) => gpuErrors.push(String(error)) });
+    const level = await addScene(app, {
+        format: 'margo-save',
+        version: 1,
+        entities: [
+          { id: 'plinth', transform: { position: [5, 0, 0] }, components: { mesh: { shape: 'box', size: [1, 0.1, 1] } } },
+          { id: 'helmet', parent: 'plinth', transform: { position: [0, 1, 0] }, components: { mesh: url } },
+        ],
+      }, { base: location.href }),
+      model = level.models.get('helmet')!;
+    await page.frames(10);
+    const bounds = [...model.bounds],
+      meshes = app.engine.scene.meshes.size;
+    level.dispose();
+    await page.frames(3);
+    const left = app.engine.scene.meshes.size;
+    app.dispose();
+    return { bounds, meshes, left, gpuErrors: [...gpuErrors] };
   },
   async close() {
     viewer.dispose();

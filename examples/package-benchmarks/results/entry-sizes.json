@@ -1,5 +1,5 @@
 {
-  "commit": "9d230c248",
+  "commit": "7d92428d3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -208,6 +208,10 @@
       "./gpu-build": {
         "raw": 51485,
         "gzip": 18346
+      },
+      "./alpha": {
+        "raw": 40895,
+        "gzip": 15417
       }
     },
     "@margoengine/cache": {
@@ -1848,6 +1852,10 @@
       "./physics": {
         "raw": 2262,
         "gzip": 1202
+      },
+      "./scene": {
+        "raw": 3535,
+        "gzip": 1742
       }
     },
     "@margoengine/staging": {
@@ -2292,6 +2300,11 @@
       "raw": 46775,
       "gzip": 15748,
       "brotli": 14004
+    },
+    "packages/save/dist/index.js": {
+      "raw": 19849,
+      "gzip": 6733,
+      "brotli": 6071
     },
     "packages/decoders/dist/decoder.worker.js": {
       "raw": 10691,
