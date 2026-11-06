@@ -1,5 +1,5 @@
 {
-  "commit": "af3533679",
+  "commit": "28d8c3d01",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -555,6 +555,10 @@
         "raw": 2565,
         "gzip": 1358
       },
+      "./pcx": {
+        "raw": 2253,
+        "gzip": 1204
+      },
       "./dds": {
         "raw": 5792,
         "gzip": 2782
@@ -838,20 +842,24 @@
     },
     "@margoengine/fbx": {
       ".": {
-        "raw": 58092,
-        "gzip": 18220
+        "raw": 58161,
+        "gzip": 18253
       },
       "./worker": {
-        "raw": 60648,
-        "gzip": 19103
+        "raw": 60797,
+        "gzip": 19160
       },
       "./export": {
         "raw": 19132,
         "gzip": 7659
       },
+      "./scene-extras": {
+        "raw": 5289,
+        "gzip": 2479
+      },
       "dist/workers/fbx.js": {
-        "raw": 176914,
-        "gzip": 55197
+        "raw": 179917,
+        "gzip": 56400
       }
     },
     "@margoengine/fsm": {
@@ -1092,16 +1100,16 @@
     },
     "@margoengine/kinematics-constraints": {
       ".": {
-        "raw": 35812,
-        "gzip": 11566
+        "raw": 35815,
+        "gzip": 11567
       },
       "./swept": {
-        "raw": 25757,
-        "gzip": 9427
+        "raw": 25076,
+        "gzip": 9214
       },
       "./sdf": {
-        "raw": 19465,
-        "gzip": 7220
+        "raw": 18842,
+        "gzip": 6973
       }
     },
     "@margoengine/labels": {
@@ -1201,6 +1209,10 @@
         "raw": 3733,
         "gzip": 1706
       },
+      "./textures": {
+        "raw": 704,
+        "gzip": 446
+      },
       "./nrrd": {
         "raw": 11795,
         "gzip": 4722
@@ -1222,12 +1234,12 @@
         "gzip": 2020
       },
       "./3ds": {
-        "raw": 5935,
-        "gzip": 2428
+        "raw": 8708,
+        "gzip": 3386
       },
       "./lwo": {
-        "raw": 7047,
-        "gzip": 2859
+        "raw": 10138,
+        "gzip": 4138
       },
       "./amf": {
         "raw": 13298,
@@ -1242,12 +1254,12 @@
         "gzip": 2208
       },
       "./tds": {
-        "raw": 5935,
-        "gzip": 2429
+        "raw": 8708,
+        "gzip": 3386
       },
       "./kmz": {
-        "raw": 45915,
-        "gzip": 16436
+        "raw": 47349,
+        "gzip": 17068
       },
       "./nurbs": {
         "raw": 6021,
@@ -2338,8 +2350,8 @@
     },
     "@margoengine/tween": {
       ".": {
-        "raw": 13424,
-        "gzip": 5210
+        "raw": 14007,
+        "gzip": 5422
       },
       "./stagger": {
         "raw": 2328,
@@ -2352,6 +2364,10 @@
       "./scroll": {
         "raw": 1823,
         "gzip": 942
+      },
+      "./custom-ease": {
+        "raw": 3632,
+        "gzip": 1746
       }
     },
     "@margoengine/ui": {
@@ -2810,9 +2826,9 @@
       "brotli": 14067
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 175613,
-      "gzip": 55100,
-      "brotli": 47978
+      "raw": 178616,
+      "gzip": 56301,
+      "brotli": 48960
     },
     "packages/usdz/dist/workers/usdz.js": {
       "raw": 214737,

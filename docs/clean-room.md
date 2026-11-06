@@ -205,6 +205,7 @@ carry the same citation as a one-line comment in the code.
 | EX9 | Unreal UCX_, UBX_, USP_ collision names and Python material graph | exporters/src/unreal-import.ts | Unreal's public collision naming documentation and Python API reference |
 | EX10 | Unity AnimationClip curves on a material property, Roblox TextureID and CollisionFidelity | exporters/src/unity-uv.ts, exporters/src/roblox-uv.ts | Unity's and Roblox's public API references |
 | EX3 | FBX 7.4 writer: node records, typed and deflated arrays, object and connection layout | fbx/src/export.ts | The Blender Foundation's public description of the binary format and the public ASCII structure; no exporter source read. Header, FileId, footer constants and record names checked against the bytes of the repository's own `packages/fbx/test/fixtures/blender-rig.fbx` (CC0) |
+| EX11 | FBX camera and light properties: names, defaults, enum values, film and lens to field of view, cone angles | fbx/src/scene-extras.ts | The public FBX SDK class reference (FbxCamera, FbxLight), the pinhole relation tan(fov / 2) = film / (2 x focal length), and the values Blender writes in the repository's own `packages/fbx/test/fixtures/blender-shot.fbx` (CC0); no reader source read |
 | EX4 | Euler XYZ to and from quaternion, slerp, Hermite sampling of glTF cubic keys | fbx/src/export.ts | Textbook rotation algebra (Shoemake 1985 for slerp); glTF 2.0 specification, appendix C, for the cubic spline |
 
 ### gltf-pro

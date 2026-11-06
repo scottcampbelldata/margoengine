@@ -6,14 +6,19 @@
 import { EngineKernel } from "@margoengine/core";
 import { PBRModel } from "@margoengine/gltf-pro";
 
+export interface FBXExtension {
+    readonly name: string;
+}
+
 export interface FBXOptions {
     resourcePath?: string;
     signal?: AbortSignal;
     fetch?: typeof fetch;
     allowedURLs?: readonly string[];
+    extensions?: readonly FBXExtension[];
 }
 
-export function convertFBX(input: ArrayBuffer | ArrayBufferView, { resourcePath, signal, fetch: get, allowedURLs }?: FBXOptions): Promise<ArrayBuffer>;
+export function convertFBX(input: ArrayBuffer | ArrayBufferView, { resourcePath, signal, fetch: get, allowedURLs, extensions }?: FBXOptions): Promise<ArrayBuffer>;
 
 export function loadFBX(engine: EngineKernel, url: string | URL, options?: FBXOptions): Promise<PBRModel>;
 

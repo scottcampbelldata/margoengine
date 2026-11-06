@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8985404,
+  "total": 9020430,
   "history": [
     {
       "date": "2026-10-24",
@@ -2846,6 +2846,12 @@
       "commit": "2ed2c3c59",
       "reason": "B19: 3DS reads cameras, lights and keyframes; LWO reads every map, bones and images; KMZ places models; new entries pcx and textures",
       "grew": 6
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "28d8c3d01",
+      "reason": "new entry @margoengine/fbx/scene-extras, batch 43 job 1",
+      "grew": 2
     }
   ],
   "items": {
@@ -2983,6 +2989,7 @@
     "@margoengine/decoders/ktx2-stream": 389637,
     "@margoengine/decoders/meshopt": 3309,
     "@margoengine/decoders/meshopt-simd": 19391,
+    "@margoengine/decoders/pcx": 1460,
     "@margoengine/decoders/png": 3813,
     "@margoengine/decoders/pvr": 3259,
     "@margoengine/decoders/texture": 914,
@@ -3046,8 +3053,9 @@
     "@margoengine/exporters/usdz-anim": 17816,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 18653,
-    "@margoengine/fbx dist/workers/fbx.js": 55486,
+    "@margoengine/fbx dist/workers/fbx.js": 58092,
     "@margoengine/fbx/export": 7915,
+    "@margoengine/fbx/scene-extras": 2735,
     "@margoengine/fbx/worker": 19547,
     "@margoengine/fsm": 1131,
     "@margoengine/geometry": 24691,
@@ -3141,6 +3149,7 @@
     "@margoengine/loaders/render": 3148,
     "@margoengine/loaders/svg": 11621,
     "@margoengine/loaders/tds": 3642,
+    "@margoengine/loaders/textures": 702,
     "@margoengine/loaders/threemf-materials": 7917,
     "@margoengine/loaders/usd": 7778,
     "@margoengine/loaders/vdb": 6406,
@@ -3519,8 +3528,6 @@
     "margoengine": 308,
     "margoengine/game": 1030,
     "margoengine/viz": 800,
-    "margoengine/web": 599,
-    "@margoengine/decoders/pcx": 1460,
-    "@margoengine/loaders/textures": 702
+    "margoengine/web": 599
   }
 }

@@ -33,6 +33,10 @@
     "./export": {
       "types": "./dist/export.d.ts",
       "import": "./dist/export.js"
+    },
+    "./scene-extras": {
+      "types": "./dist/scene-extras.d.ts",
+      "import": "./dist/scene-extras.js"
     }
   },
   "files": [

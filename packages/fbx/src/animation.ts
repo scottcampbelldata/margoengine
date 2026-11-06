@@ -9,7 +9,8 @@ interface Curve {
   interpolation: 'LINEAR' | 'STEP';
 }
 const ticksPerSecond = 46186158000,
-  maxKeys = 1_000_000;
+  maxKeys = 1_000_000,
+  animated = ['Lcl Translation', 'Lcl Rotation', 'Lcl Scaling', 'DeformPercent'];
 function curve(node: FBXNode): Curve {
   const raw = findChild(node, 'KeyTime')?.properties[0] as ArrayLike<number | bigint> | undefined,
     values = array(node, 'KeyValueFloat');
@@ -253,10 +254,14 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
       if (Number(property(layer, 'BlendMode', 0)) !== 0)
         throw new TypeError('Unsupported FBX animation layer mode; bake or remove it in your 3D tool before export');
       for (const track of children(ctx, id(layer.properties[0])).filter((n) => n.name === 'AnimationCurveNode')) {
+        // Curves on anything else (a lens, a light, a tool's own bookkeeping) have no glTF node channel and are left out.
+        const targets = (ctx.outgoing.get(id(track.properties[0])) ?? []).filter(
+          (c) => c.kind === 'OP' && animated.includes(c.property ?? ''),
+        );
+        if (!targets.length) continue;
         const tracks = axes(ctx, track, cache);
         if (!tracks.some(Boolean)) continue;
-        for (const target of ctx.outgoing.get(id(track.properties[0])) ?? []) {
-          if (target.kind !== 'OP') continue;
+        for (const target of targets) {
           const path = target.property ?? '';
           if (path === 'DeformPercent') {
             if (tracks.filter(Boolean).length !== 1 || !tracks[0])
@@ -266,10 +271,6 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
             weights.set(target.parent, tracks[0]);
             continue;
           }
-          if (!['Lcl Translation', 'Lcl Rotation', 'Lcl Scaling'].includes(path))
-            throw new TypeError(
-              `Unsupported FBX animated property: ${path}; bake or remove it in your 3D tool before export`,
-            );
           if (!ctx.models.has(target.parent))
             throw new TypeError('FBX animation target is not a model; animate a model node');
           const record = models.get(target.parent) ?? new Map<string, Axes>();

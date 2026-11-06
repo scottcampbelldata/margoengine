@@ -834,6 +834,10 @@
       "types": "./dist/fbx/export.d.ts",
       "import": "./dist/fbx/export.js"
     },
+    "./fbx/scene-extras": {
+      "types": "./dist/fbx/scene-extras.d.ts",
+      "import": "./dist/fbx/scene-extras.js"
+    },
     "./fsm": {
       "types": "./dist/fsm.d.ts",
       "import": "./dist/fsm.js"

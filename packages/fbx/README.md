@@ -27,6 +27,31 @@ animation.play('Walking');
 - Lambert/Phong dielectric materials, diffuse/emissive colors, opacity/transparency, shininess-derived roughness, and embedded or external PNG/JPEG diffuse and normal textures.
 - Multiple animation stacks, one layer per stack, STEP and LINEAR curves, missing-axis rest values, and interpolation at common key times. LINEAR transform tracks are adaptively baked for Euler motion and moving pivots, with sampled translation/scale tolerance `1e-5 * max(1, magnitude)` and angular tolerance `1e-4` radians. These are sampling criteria, not a proof of continuous error bounds. Rotation segments are subdivided to preserve full turns.
 
+## Cameras and lights
+
+`sceneExtras` from `margoengine/fbx/scene-extras` keeps the file's cameras and lights: pass it in `extensions` and they load as `model.cameras` and `model.lights`, with the file's lens, clip planes and cone angles, so the shot opens as authored.
+
+```ts
+import {loadFBX} from 'margoengine/fbx';
+import {sceneExtras} from 'margoengine/fbx/scene-extras';
+import {viewGLTFCamera} from 'margoengine/gltf-pro';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadFBX(engine, '/assets/shot.fbx', {extensions: [sceneExtras]});
+viewGLTFCamera(model);
+console.log(model.cameras.length, model.lights.length);
+```
+
+`extensions` default none, and works the same in `convertFBX`, `parseFBX`, `loadFBX` and the worker entry. Without `sceneExtras`, cameras and lights stay plain empty nodes.
+
+Each camera or light sits on a child of its FBX node (`Hero camera`, `Bulb light`) that turns it to glTF's -Z, so curves on the node move it. A perspective camera's vertical field of view follows `ApertureMode` and `GateFit`: with a focal length, from the film and the lens; otherwise from `FieldOfView`, `FieldOfViewY` or a horizontal angle over the aspect. Near and far planes convert with the file's unit. A far plane at or before the near plane means no far plane. An orthographic camera's `OrthoZoom` is the view's full width. The camera that `GlobalSettings` names as `DefaultCamera` carries `extras.defaultCamera`.
+
+Light intensity is FBX's percentage over 100: a value of 100 becomes 1 candela (point, spot) or 1 lux (directional). FBX has no physical unit, so a tool's scale comes through: Blender writes watts x 100, and a 250 W lamp arrives as 250. Change `model.lights[i].intensity` to suit. Area and volume lights become point lights, with the FBX kind in `extras.fbxLightType` and the falloff in `extras.fbxDecayType`, since glTF lights always fall off with the square of distance. `FarAttenuationEnd` becomes `range` when `EnableFarAttenuation` is on.
+
+Not read: curves on camera or light properties (lens, colour, intensity), which are left out and do not stop the import; `LookAtProperty` aim targets; camera switchers. A file holding only cameras and lights converts to a GLB, but `parseFBX` refuses it, as a gltf-pro model needs a mesh.
+
+Proof: two scenes from Blender's own exporter (`test/fixtures/blender-shot.py`), Y up and Z up, match Blender's reported camera and light positions and directions, field of view, clip planes, cone angles, colours and energies. `OrthoZoom` and the `GateFit` rule are proved on Blender's files only.
+
 ## Export
 
 `exportFBX` from `margoengine/fbx/export` writes a scene as FBX 7.4, binary by default or ASCII with `ascii: true`. It takes what the other scene exporters take: an engine or a plain data scene.
@@ -58,7 +83,7 @@ Children of a node with an uneven scale get `InheritType` 1, the plain parent x 
 
 Input is capped at 64 MiB, converted GLB at 128 MiB, expanded position vertices at 1,000,000 across mesh instances, and decoded texture pixels at 16,000,000. Parsing also bounds cumulative decoded arrays to 64 MiB, allocation accounting to 128 MiB, node/property counts, hierarchy depth, and work. Geometry, deformation, and animation have additional work/output limits. These are import budgets, not a zero-allocation or peak-heap guarantee. The downstream glTF runtime separately limits GLB/buffer bytes to 64 MiB, so a larger `convertFBX` result may be exportable but cannot be attached by `parseFBX`.
 
-Unsupported data rejects explicitly: InheritType other than 0, nonuniform ancestor scales (including animated parent scales), unrepresentable shear, spherical rotation order, Additive/TotalOne or nonlinear skinning, progressive morphs, layered textures, cubic/mixed/constant-next animation interpolation, and animation-layer blending. Cameras/lights and non-mesh geometry do not produce renderable output. Extra UV/layer sets and unsupported material maps are omitted. Arbitrary shader graphs are outside the supported material subset.
+Unsupported data rejects explicitly: InheritType other than 0, nonuniform ancestor scales (including animated parent scales), unrepresentable shear, spherical rotation order, Additive/TotalOne or nonlinear skinning, progressive morphs, layered textures, cubic/mixed/constant-next animation interpolation, and animation-layer blending. Cameras and lights stay empty nodes without `sceneExtras`. Non-mesh geometry does not produce renderable output. Curves on anything but a node's transform or a blend channel's weight are left out. Extra UV/layer sets and unsupported material maps are omitted. Arbitrary shader graphs are outside the supported material subset.
 
 Array decompression requires platform `DecompressionStream('deflate')`. Image decoding in `parseFBX` requires `createImageBitmap`; `convertFBX` can run headlessly without image decoding. Cancellation is checked during fetch, decompression, parsing, baking, and image decoding; synchronous CPU sections cannot process a newly dispatched abort until the JavaScript event loop resumes.
 

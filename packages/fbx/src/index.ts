@@ -2,6 +2,8 @@ import type { EngineKernel } from '@margoengine/core';
 import { parseGLTF, type PBRModel } from '@margoengine/gltf-pro';
 import { readResponse } from '../../shared/loading.js';
 import { convert } from './convert.js';
+import type { FBXExtension } from './extension.js';
+export type { FBXExtension } from './extension.js';
 /**
  * Options of the FBX functions: where to resolve texture paths, an AbortSignal, a custom fetch and an allow-list of URLs the file may reference.
  */
@@ -10,13 +12,15 @@ export interface FBXOptions {
   signal?: AbortSignal;
   fetch?: typeof fetch;
   allowedURLs?: readonly string[];
+  /** Optional parts of the import, from this package's entries, such as `sceneExtras`. Default none. */
+  extensions?: readonly FBXExtension[];
 }
 const budget = 64 * 1024 * 1024;
 
 /** Converts native binary or ASCII FBX through Margo's first-party glTF writer. */
 export async function convertFBX(
   input: ArrayBuffer | ArrayBufferView,
-  { resourcePath = '', signal, fetch: get, allowedURLs }: FBXOptions = {},
+  { resourcePath = '', signal, fetch: get, allowedURLs, extensions }: FBXOptions = {},
 ): Promise<ArrayBuffer> {
   signal?.throwIfAborted();
   if (
@@ -27,7 +31,7 @@ export async function convertFBX(
     throw new RangeError('Invalid FBX byte budget; pass a 32 byte to 64 MiB FBX file');
   if (resourcePath && !['http:', 'https:'].includes(new URL(resourcePath, globalThis.location?.href).protocol))
     throw new TypeError('FBX resources need HTTP(S)');
-  return convert(input, resourcePath, signal, { fetch: get, allowedURLs });
+  return convert(input, resourcePath, signal, { fetch: get, allowedURLs, extensions });
 }
 
 /**

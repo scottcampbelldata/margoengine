@@ -18,6 +18,7 @@ import {
   determinant3,
 } from './math.js';
 import { buildGeometry, type BuiltGeometry } from './geometry.js';
+import type { ExtensionHooks } from './extension.js';
 
 /** Cumulative import allocations and work, including repeated mesh instances. */
 export class SceneBudget {
@@ -73,9 +74,14 @@ export interface SceneContext {
   basisInverse: Float64Array;
   signal?: AbortSignal;
   budget: SceneBudget;
+  extensions: readonly ExtensionHooks[];
 }
 
-export function context(document: FBXDocument, signal?: AbortSignal): SceneContext {
+export function context(
+  document: FBXDocument,
+  signal?: AbortSignal,
+  extensions: readonly ExtensionHooks[] = [],
+): SceneContext {
   const budget = new SceneBudget(signal);
   budget.work(document.connections.length + document.roots.length);
   budget.reserve(document.connections.length * 64 + 512);
@@ -127,6 +133,7 @@ export function context(document: FBXDocument, signal?: AbortSignal): SceneConte
     basisInverse: inverse(basis),
     signal,
     budget,
+    extensions,
   };
 }
 
@@ -369,5 +376,7 @@ export function buildScene(ctx: SceneContext): void {
       }
     }
   }
-  if (!vertices) throw new RangeError('FBX has no mesh geometry; clean up the source model before export');
+  let kept = vertices > 0;
+  for (const extension of ctx.extensions) if (extension.scene?.(ctx)) kept = true;
+  if (!kept) throw new RangeError('FBX has no mesh geometry; clean up the source model before export');
 }

@@ -31,6 +31,21 @@ update the recorded hash if deliberately regenerating it. The Blender
 and [exporter source](https://github.com/blender/blender-addons/blob/main/io_scene_fbx/export_fbx_bin.py)
 describe the native exporter and its linear baked-key representation.
 
+## Blender shot fixture
+
+`blender-shot.fbx` and `blender-shot-zup.fbx` are one original scene of a cube, two cameras and four lights, exported
+through Blender's FBX exporter with Y up and with Z up. `blender-shot.py` authors them and writes
+`blender-shot.json`, the positions, directions, lens, colours and energies as Blender reports them, which the test
+compares against. They are CC0 like the rig, were exported on 2026-11-06 by the same Blender build, and have these
+SHA-256 sums:
+
+```text
+fd118cbc1e40d5d5de5a049e963c7648104ff41cec277e4866dae107991027c2  blender-shot.fbx
+24c4b94b41762e8748dfbd618593be72b906c69bc3f148fde877bf00d4d51498  blender-shot-zup.fbx
+```
+
+Regenerate them with `blender --background --factory-startup --python blender-shot.py -- /absolute/folder`.
+
 ## Exported subset
 
 The fan has three closed tapered blades, 24 control points, 18 quad faces, and

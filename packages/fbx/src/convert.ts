@@ -5,15 +5,16 @@ import { attachMaterials } from './material.js';
 import { attachSkin } from './skin.js';
 import { attachMorphs, type MorphBinding } from './morph.js';
 import { buildAnimations } from './animation.js';
+import type { ExtensionHooks, FBXExtension } from './extension.js';
 
 export async function convert(
   input: ArrayBuffer | ArrayBufferView,
   resourcePath: string,
   signal?: AbortSignal,
-  options: { fetch?: typeof fetch; allowedURLs?: readonly string[] } = {},
+  options: { fetch?: typeof fetch; allowedURLs?: readonly string[]; extensions?: readonly FBXExtension[] } = {},
 ): Promise<ArrayBuffer> {
   const document = await parseDocument(input, signal),
-    ctx = context(document, signal);
+    ctx = context(document, signal, options.extensions as readonly ExtensionHooks[] | undefined);
   buildScene(ctx);
   const morphs: MorphBinding[] = [];
   for (const mesh of ctx.meshes) {

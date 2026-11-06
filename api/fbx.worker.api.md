@@ -12,10 +12,15 @@ export function parseFBXInWorker(engine: EngineKernel, input: ArrayBuffer | Arra
 
 // Not exported from this entry, but used by the exports above:
 
+interface FBXExtension {
+    readonly name: string;
+}
+
 interface FBXOptions {
     resourcePath?: string;
     signal?: AbortSignal;
     fetch?: typeof fetch;
     allowedURLs?: readonly string[];
+    extensions?: readonly FBXExtension[];
 }
 ```
