@@ -1822,6 +1822,18 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `npm run build --workspace packages/decoders`, then `node packages/decoders/scripts/meshopt-simd-bench.mjs <file.glb>`.
 - **Guard:** `packages/decoders/tests/meshopt-simd.test.js`, equal bytes and errors on real files and damaged streams.
 
+### 76. Sculpting follows the brush, not the mesh (diagnostic)
+
+- **Before:** `MeshSculptSession` tested every triangle per pick, visited every vertex per dab and copied the whole surface per stroke.
+- **Change:** faces around each vertex and two hash grids (`packages/mesh-edit/src/sculpt-index.ts`), topology passes over the
+  faces in reach, undo steps that hold only what changed. Output is the same: old and new compared byte for byte over random
+  strokes, picks, undo and dynamic topology, 1,273 checks.
+- **After:** diagnostic, other lanes running (Node 26, 199,712 triangles, fixed topology): a pick 10.09 to 0.010 ms, a dab of
+  radius 0.08 on a unit sheet 20.93 to 1.44 ms, a whole stroke 90.6 to 1.64 ms, an undo and redo 79.6 to 0.52 ms. Nothing changed
+  in the work done, so no row in the three.js comparison: three has no sculpting.
+- **Rerun:** no committed script.
+- **Guard:** `packages/mesh-edit/tests/sculpt-scale.test.js` counts what a pick, a dab and an undo step visit, so it needs no clock.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1882,5 +1894,6 @@ These entries lack a recorded number, a named machine or a quiet run:
     row in `perf-vs-threejs.json` yet: `npm run bench:parity` adds them. Every row's after number in
     [perf-vs-threejs.md](perf-vs-threejs.md) since 2026-10-27 is in its cause text, not in the ledger.
 20. meshopt on Wasm SIMD (entry 75): a quiet run, including the first compile.
+21. Sculpting (entry 76): a quiet run, and a committed timing script.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

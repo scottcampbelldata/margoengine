@@ -1418,6 +1418,10 @@
       "types": "./dist/mesh-edit/sculpt.d.ts",
       "import": "./dist/mesh-edit/sculpt.js"
     },
+    "./mesh-edit/sculpt-view": {
+      "types": "./dist/mesh-edit/sculpt-view.d.ts",
+      "import": "./dist/mesh-edit/sculpt-view.js"
+    },
     "./mesh-edit/bake": {
       "types": "./dist/mesh-edit/bake.d.ts",
       "import": "./dist/mesh-edit/bake.js"

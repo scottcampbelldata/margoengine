@@ -47,6 +47,10 @@
       "types": "./dist/sculpt.d.ts",
       "import": "./dist/sculpt.js"
     },
+    "./sculpt-view": {
+      "types": "./dist/sculpt-view.d.ts",
+      "import": "./dist/sculpt-view.js"
+    },
     "./bake": {
       "types": "./dist/bake.d.ts",
       "import": "./dist/bake.js"
@@ -68,9 +72,22 @@
     "@margoengine/bvh": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/gltf-pro": {
+      "optional": true
+    }
+  },
   "scripts": {
     "build": "node ../../scripts/build-optional.js mesh-edit",
     "test": "npm run build && node --test tests/*.test.js",
+    "test:browser": "npm run build && node scripts/test-browser.js",
     "prepack": "npm run build"
   }
 }

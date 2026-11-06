@@ -11,6 +11,8 @@ export class MeshSculptSession {
     get triangleCount(): number;
     get undoSteps(): number;
     get redoSteps(): number;
+    get stats(): SculptStats;
+    drawing(): SculptDrawing;
     pick(origin: Vec3, direction: Vec3): SculptHit | null;
     beginStroke(options?: SculptBrushOptions): void;
     dab(point: Vec3): void;
@@ -31,6 +33,20 @@ export interface SculptBrushOptions {
     symmetry?: 'x' | 'y' | 'z';
 }
 
+export interface SculptDrawRange {
+    start: number;
+    count: number;
+}
+
+export class SculptDrawing {
+    vertices: Float32Array<ArrayBuffer>;
+    indices: Uint32Array<ArrayBuffer>;
+    constructor(surface: TriSurface, index: SculptIndex);
+    moved(v: number): void;
+    rebuild(): void;
+    update(): readonly SculptDrawRange[] | 'all';
+}
+
 export type SculptFalloff = 'smooth' | 'linear' | 'sharp' | 'constant';
 
 export interface SculptHit {
@@ -46,6 +62,12 @@ export interface SculptSessionOptions extends SculptBrushOptions {
     createId?: () => string;
 }
 
+export interface SculptStats {
+    pickTriangles: number;
+    dabVertices: number;
+    undoEntries: number;
+}
+
 // Not exported from this entry, but used by the exports above:
 
 interface PolygonFace {
@@ -57,5 +79,30 @@ interface PolygonFace {
 interface PolygonMesh {
     vertices: MutableVec3[];
     faces: PolygonFace[];
+}
+
+class SculptIndex {
+    readonly around: number[][];
+    tested: number;
+    live: number;
+    constructor(surface: TriSurface, size: number);
+    get large(): ReadonlySet<number>;
+    moved(v: number): void;
+    refresh(faces: Iterable<number>, vertices: Iterable<number>): void;
+    within(center: Vec3, reach: number): number[];
+    facesOf(vertices: Iterable<number>): number[];
+    walk(origin: Vec3, d: Vec3, visit: (f: number) => void, limit: () => number): boolean;
+}
+
+interface SurfaceTri {
+    v: [number, number, number];
+    uv: [MutableVec2, MutableVec2, MutableVec2];
+    source: string;
+}
+
+interface TriSurface {
+    points: MutableVec3[];
+    tris: SurfaceTri[];
+    sharp: Set<string>;
 }
 ```

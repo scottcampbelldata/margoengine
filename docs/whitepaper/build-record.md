@@ -1107,6 +1107,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B4 | Shadows, CulledInstances and HDR PostStack run at the WebGPU compatibility level | DONE | `49b220668` | LIM-109 |
 | B6 | Potree BROTLI, 1.4, attributes, pages | DONE | `28b40e8da` | LIM-100 |
 | B5 | ANGLE Direct3D 11 measured and parked with C11: 50 minutes on three variants, split into passes needed | PARKED | this commit | LIM-162 |
+| B7 | Sculpting follows the brush: grids, local topology passes, delta undo, SculptView with ranged uploads, browser check (closes C13) | DONE | this commit | LIM-064 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

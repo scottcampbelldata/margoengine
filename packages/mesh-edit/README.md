@@ -369,9 +369,37 @@ console.log(session.mesh().faces.length);
 - `new MeshSculptSession(mesh, {brush, radius, strength, falloff, invert, symmetry, dynamicTopology, detailSize, undoLimit, createId})` copies the mesh into a triangle surface. `mesh()` returns it as a new polygon mesh.
 - `brush`: `'draw'` (default) pushes along the brush's average normal, `'inflate'` along each vertex's own normal, `'smooth'` toward neighbors, `'crease'` sinks and pinches toward the center, and `'grab'` holds the vertices under its first dab and drags them with the pointer. `invert` pushes the other way.
 - `radius` (default 0.25), `strength` 0 to 1 (default 0.5), `falloff` `'smooth'` (default), `'linear'`, `'sharp'` or `'constant'`, and `symmetry` `'x'`, `'y'` or `'z'` to repeat each dab across that plane through the origin. All can be set per stroke in `beginStroke`.
-- `pick(origin, direction)` returns the nearest `{point, normal, distance}`. It tests every triangle, and a dab visits every vertex, so one call costs time in proportion to the mesh.
+- `pick(origin, direction)` returns the nearest `{point, normal, distance}`. A hash grid finds the triangles along the ray and the vertices under a brush, so a pick and a dab cost what the ray and the brush touch, whatever the size of the mesh. `session.stats` says how much the last pick and dab visited.
 - `dynamicTopology` splits and collapses edges under the brush to hold `detailSize` (default the mean edge length), so a long pull does not stretch triangles. Corner UVs interpolate. For `grab` this runs once at the end of the stroke, since it holds fixed vertices.
-- Each stroke is one undo step, `undoLimit` of them (default 32). A step stores the whole surface, because dynamic topology changes more than positions: memory grows with mesh size times `undoLimit`.
+- Each stroke is one undo step, `undoLimit` of them (default 32). A step stores only what the stroke changed: vertices, triangles and sharp edges.
+- A session takes up to 200,000 vertices and faces, like every mesh-edit mesh.
+
+Draw it while it changes with `@margoengine/mesh-edit/sculpt-view`, which needs `@margoengine/core` and `@margoengine/gltf-pro`. Each frame uploads only the vertices the brush moved; when triangles change (dynamic topology, or undoing it) the whole mesh is rewritten.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { subdivideMesh } from 'margoengine/mesh-edit/modeling';
+import { MeshSculptSession } from 'margoengine/mesh-edit/sculpt';
+import { SculptView } from 'margoengine/mesh-edit/sculpt-view';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { camera: { position: [0, 0, 4], target: [0, 0, 0] } });
+const session = new MeshSculptSession(subdivideMesh(createPrimitiveMesh('cube', 'box'), { levels: 3 }).mesh, { radius: 0.3 });
+const view = SculptView.attach(engine, session);
+
+const hit = session.pick([0, 0, 4], [0, 0, -1]);
+if (hit) {
+  session.beginStroke({ brush: 'draw' });
+  session.dab(hit.point); // the next frame shows it
+  session.endStroke();
+}
+console.log(view.stats.uploadedVertices);
+```
+
+- `SculptView.attach(engine, session, {material})` draws the session as `view.model`, a gltf-pro model, with a matte clay material by default (`material` takes a glTF material). The view owns the model; `dispose()` removes it and leaves the session usable. Normals are smooth, area-weighted over each vertex's faces.
+- `view.stats` counts `uploadedVertices` and whole-mesh `rewrites`.
+- `session.drawing()` gives the same buffers without gltf-pro: `vertices` (20 floats a vertex, gltf-pro's prepared layout) and `indices`, and `update()` returns the vertex ranges that changed, or `'all'` when triangles did.
 ## Baking maps from a detailed mesh
 
 Keep the look of a detailed mesh on a simplified one: bake its normals, ambient occlusion and colour into textures laid out by the low mesh's UVs.

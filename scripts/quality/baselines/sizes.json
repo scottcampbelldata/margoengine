@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8906453,
+  "total": 7870088,
   "history": [
     {
       "date": "2026-10-24",
@@ -2672,6 +2672,12 @@
       "commit": "eddde5ca1",
       "reason": "feat(kinematics-constraints): swept collision between frames (new entries @margoengine/kinematics-constraints/swept and /robot)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "e31809e2d",
+      "reason": "New mesh-edit entry ./sculpt-view; sculpt carries a spatial index and draw buffers (Lane G B7)",
+      "grew": 3
     }
   ],
   "items": {
@@ -3026,7 +3032,7 @@
     "@margoengine/mesh-edit/modeling": 35469,
     "@margoengine/mesh-edit/modifiers": 8566,
     "@margoengine/mesh-edit/remesh": 8715,
-    "@margoengine/mesh-edit/sculpt": 6286,
+    "@margoengine/mesh-edit/sculpt": 9049,
     "@margoengine/mesh-edit/weights": 4033,
     "@margoengine/mixer": 6926,
     "@margoengine/navmesh": 7120,
@@ -3334,6 +3340,8 @@
     "margoengine": 308,
     "margoengine/game": 1030,
     "margoengine/viz": 800,
-    "margoengine/web": 599
+    "margoengine/web": 599,
+    "@margoengine/mesh-edit/sculpt-view": 790,
+    "leak @margoengine/mesh-edit/sculpt-view -> @margoengine/gltf-pro": 1
   }
 }

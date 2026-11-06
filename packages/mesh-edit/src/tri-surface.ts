@@ -23,6 +23,23 @@ export interface TriSurface {
 /** Which edges a pass may touch: both ends are checked. Default every edge. */
 export type EdgeFilter = (a: number, b: number) => boolean;
 
+/**
+ * Runs a pass on part of a big surface, for sculpting: the pass reads only `faces`, leaves a removed triangle's slot
+ * `null` so ids stay stable, and reports what it changes. Output is the same as a whole-surface pass.
+ */
+export interface SurfaceWatch {
+  /** The triangles to read, ascending. Every face of every edge the filter allows must be here. */
+  readonly faces: readonly number[];
+  /** Faces around each vertex, as they stood when the pass began. */
+  readonly around: readonly (readonly number[])[];
+  /** Called before `points[v]` is replaced, and after a new point is added. */
+  point(v: number): void;
+  /** Called before `tris[f]` changes, and after a new triangle is added. */
+  face(f: number): void;
+  /** Called before an edge joins or leaves `sharp`. */
+  edge(key: string): void;
+}
+
 export const edgeKey = (a: number, b: number): string => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
 const sub = (p: Vec3, q: Vec3): MutableVec3 => [p[0] - q[0], p[1] - q[1], p[2] - q[2]];
@@ -57,18 +74,20 @@ export function triSurfaceOf(mesh: PolygonMesh): TriSurface {
   return { points, tris, sharp: new Set() };
 }
 
-/** Faces around each edge. */
-export function edgeFaces(tris: readonly (SurfaceTri | null)[]): Map<string, number[]> {
-  const out = new Map<string, number[]>();
-  tris.forEach((tri, f) => {
-    if (!tri) return;
-    for (let c = 0; c < 3; c++) {
-      const key = edgeKey(tri.v[c], tri.v[(c + 1) % 3]),
-        list = out.get(key);
-      if (list) list.push(f);
-      else out.set(key, [f]);
-    }
-  });
+/** Faces around each edge, of the faces in `only` when given. */
+export function edgeFaces(tris: readonly (SurfaceTri | null)[], only?: readonly number[]): Map<string, number[]> {
+  const out = new Map<string, number[]>(),
+    add = (tri: SurfaceTri | null, f: number): void => {
+      if (!tri) return;
+      for (let c = 0; c < 3; c++) {
+        const key = edgeKey(tri.v[c], tri.v[(c + 1) % 3]),
+          list = out.get(key);
+        if (list) list.push(f);
+        else out.set(key, [f]);
+      }
+    };
+  if (only) for (const f of only) add(tris[f], f);
+  else tris.forEach(add);
   return out;
 }
 
@@ -108,6 +127,18 @@ export function markSharpEdges(surface: TriSurface, sharpAngle: number, seams: b
   }
 }
 
+const classOfCount = (count: number): number => (count === 0 ? 0 : count === 2 ? 1 : 2);
+
+/** The class of one vertex from the faces around it, for a pass that must not visit the whole surface. */
+function vertexClass(surface: TriSurface, around: readonly number[], v: number): number {
+  if (!surface.sharp.size) return 0;
+  const seen = new Set<number>();
+  for (const f of around) for (const w of surface.tris[f]?.v ?? []) if (w !== v) seen.add(w);
+  let count = 0;
+  for (const w of seen) if (surface.sharp.has(edgeKey(v, w))) count++;
+  return classOfCount(count);
+}
+
 /** 0 for a free vertex, 1 on a line of sharp edges, 2 at a corner of them or the end of one. */
 function vertexClasses(surface: TriSurface): Uint8Array {
   const count = new Uint16Array(surface.points.length),
@@ -117,7 +148,7 @@ function vertexClasses(surface: TriSurface): Uint8Array {
     count[a]++;
     count[b]++;
   }
-  for (let v = 0; v < out.length; v++) out[v] = count[v] === 0 ? 0 : count[v] === 2 ? 1 : 2;
+  for (let v = 0; v < out.length; v++) out[v] = classOfCount(count[v]);
   return out;
 }
 
@@ -127,9 +158,14 @@ const lerpUV = (p: readonly number[], q: readonly number[], t: number): MutableV
 ];
 
 /** Split every edge longer than `limit` at its middle, longest first. Returns how many were split. */
-export function splitLongEdges(surface: TriSurface, limit: number, allow?: EdgeFilter): number {
+export function splitLongEdges(
+  surface: TriSurface,
+  limit: number,
+  allow?: EdgeFilter,
+  watch?: SurfaceWatch,
+): number {
   const { points, tris, sharp } = surface,
-    faces = edgeFaces(tris),
+    faces = edgeFaces(tris, watch?.faces),
     used = new Set<number>(),
     long: { a: number; b: number; key: string; size: number; around: number[] }[] = [];
   for (const [key, around] of faces) {
@@ -145,12 +181,14 @@ export function splitLongEdges(surface: TriSurface, limit: number, allow?: EdgeF
     if (around.some((f) => used.has(f))) continue;
     const m = points.length;
     points.push([0, 1, 2].map((k) => (points[a][k] + points[b][k]) / 2) as MutableVec3);
+    watch?.point(m);
     for (const f of around) {
       const tri = tris[f],
         i = tri.v.findIndex((v, c) => (v === a && tri.v[(c + 1) % 3] === b) || (v === b && tri.v[(c + 1) % 3] === a)),
         j = (i + 1) % 3,
         k = (i + 2) % 3,
         mid = lerpUV(tri.uv[i], tri.uv[j], 0.5);
+      watch?.face(f);
       tris[f] = { v: [tri.v[i], m, tri.v[k]], uv: [tri.uv[i], mid, tri.uv[k]], source: tri.source };
       used.add(f);
       used.add(tris.length);
@@ -159,8 +197,11 @@ export function splitLongEdges(surface: TriSurface, limit: number, allow?: EdgeF
         uv: [[mid[0], mid[1]], tri.uv[j], [tri.uv[k][0], tri.uv[k][1]]],
         source: tri.source,
       });
+      watch?.face(tris.length - 1);
     }
-    if (sharp.delete(key)) {
+    if (sharp.has(key)) {
+      for (const changed of [key, edgeKey(a, m), edgeKey(m, b)]) watch?.edge(changed);
+      sharp.delete(key);
       sharp.add(edgeKey(a, m));
       sharp.add(edgeKey(m, b));
     }
@@ -173,11 +214,18 @@ export function splitLongEdges(surface: TriSurface, limit: number, allow?: EdgeF
  * Collapse every edge shorter than `low` where that keeps the surface sound: the two ends share only the vertices the
  * edge's own faces give them, no new edge passes `high`, and no triangle turns over. Returns how many collapsed.
  */
-export function collapseShortEdges(surface: TriSurface, low: number, high: number, allow?: EdgeFilter): number {
+export function collapseShortEdges(
+  surface: TriSurface,
+  low: number,
+  high: number,
+  allow?: EdgeFilter,
+  watch?: SurfaceWatch,
+): number {
   const { points, sharp } = surface,
-    classes = vertexClasses(surface),
-    around = vertexFaces(surface),
-    faces = edgeFaces(surface.tris),
+    around = watch ? watch.around : vertexFaces(surface),
+    classes = watch ? null : vertexClasses(surface),
+    classOf = (v: number): number => (classes ? classes[v] : vertexClass(surface, around[v], v)),
+    faces = edgeFaces(surface.tris, watch?.faces),
     tris: (SurfaceTri | null)[] = surface.tris,
     used = new Set<number>(),
     short: { a: number; b: number; key: string; size: number }[] = [];
@@ -190,12 +238,17 @@ export function collapseShortEdges(surface: TriSurface, low: number, high: numbe
   short.sort((p, q) => p.size - q.size);
   let collapsed = 0;
   for (const edge of short) {
-    let { a, b } = edge;
+    let { a, b } = edge,
+      classA = classOf(a),
+      classB = classOf(b);
     // `a` goes away; the vertex with more constraints stays.
-    if (classes[a] > classes[b]) [a, b] = [b, a];
-    if (classes[a] === 2) continue;
-    if (classes[a] === 1 && !sharp.has(edge.key)) continue;
-    if (classes[a] === 0 && classes[b] === 0 && sharp.has(edge.key)) continue;
+    if (classA > classB) {
+      [a, b] = [b, a];
+      [classA, classB] = [classB, classA];
+    }
+    if (classA === 2) continue;
+    if (classA === 1 && !sharp.has(edge.key)) continue;
+    if (classA === 0 && classB === 0 && sharp.has(edge.key)) continue;
     const shared = faces.get(edge.key)!;
     if (shared.length > 2) continue;
     const ring = [...new Set([...around[a], ...around[b]])];
@@ -206,7 +259,7 @@ export function collapseShortEdges(surface: TriSurface, low: number, high: numbe
       common = [...na].filter((x) => nb.has(x));
     if (common.length !== shared.length) continue;
     const target: MutableVec3 =
-        classes[a] === 0 && classes[b] === 0
+        classA === 0 && classB === 0
           ? ([0, 1, 2].map((k) => (points[a][k] + points[b][k]) / 2) as MutableVec3)
           : [points[b][0], points[b][1], points[b][2]],
       moved = (v: number): Vec3 => (v === a || v === b ? target : points[v]);
@@ -220,9 +273,11 @@ export function collapseShortEdges(surface: TriSurface, low: number, high: numbe
       return !(size > 0) || dot(before, after) / size < 0.2;
     });
     if (turned) continue;
+    watch?.point(b);
     points[b] = target;
     for (const f of ring) {
       const tri = tris[f]!;
+      watch?.face(f);
       used.add(f);
       if (tri.v.includes(a) && tri.v.includes(b)) {
         tris[f] = null;
@@ -230,16 +285,19 @@ export function collapseShortEdges(surface: TriSurface, low: number, high: numbe
       }
       tri.v = tri.v.map((v) => (v === a ? b : v)) as SurfaceTri['v'];
     }
-    for (const key of [...sharp]) {
-      const [p, q] = key.split(':').map(Number);
-      if (p !== a && q !== a) continue;
+    // Every sharp edge at `a` ends at one of its neighbors.
+    for (const other of na) {
+      const key = edgeKey(a, other);
+      if (!sharp.has(key)) continue;
+      watch?.edge(key);
       sharp.delete(key);
-      const other = p === a ? q : p;
-      if (other !== b) sharp.add(edgeKey(other, b));
+      if (other === b) continue;
+      watch?.edge(edgeKey(other, b));
+      sharp.add(edgeKey(other, b));
     }
     collapsed++;
   }
-  surface.tris = tris.filter((tri): tri is SurfaceTri => tri !== null);
+  if (!watch) surface.tris = tris.filter((tri): tri is SurfaceTri => tri !== null);
   return collapsed;
 }
 
