@@ -2010,6 +2010,7 @@
     "exports": [
       "AUTOCAD",
       "ArcballControls",
+      "ArcballGizmo",
       "BLENDER",
       "Controls",
       "DragControls",

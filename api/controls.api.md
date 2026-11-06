@@ -23,6 +23,21 @@ export class ArcballControls extends Controls {
     maxDistance: number;
     minZoom: number;
     maxZoom: number;
+    enableFocus: boolean;
+    pick: ArcballPick | null;
+    keyRotateStep: number;
+    keyPanStep: number;
+    keys: {
+        left: string;
+        right: string;
+        up: string;
+        down: string;
+        rollLeft: string;
+        rollRight: string;
+        zoomIn: string;
+        zoomOut: string;
+        reset: string;
+    };
     mouseButtons: {
         LEFT: number | null;
         MIDDLE: number | null;
@@ -33,6 +48,14 @@ export class ArcballControls extends Controls {
     protected get kind(): string;
     protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
+    dispose(): void;
+    listenToKeyEvents(target: KeySource): this;
+    stopListenToKeyEvents(): void;
+    focus(point: readonly number[]): void;
+    rayAt(x: number, y: number): {
+        origin: V3;
+        direction: V3;
+    };
     get projection(): ArcballProjection | null;
     saveState(): void;
     reset(): void;
@@ -46,7 +69,31 @@ export class ArcballControls extends Controls {
 
 export interface ArcballControlsOptions {
     projection?: ArcballProjection | null;
+    pick?: ArcballPick | null;
 }
+
+export class ArcballGizmo {
+    visible: boolean;
+    autoHide: boolean;
+    lineWidth: number;
+    readonly overlay: OverlayRenderer;
+    readonly controls: ArcballGizmoTarget;
+    readonly pluginName: string;
+    static attach(controls: ArcballGizmoTarget, options?: ArcballGizmoOptions): ArcballGizmo;
+    constructor(controls: ArcballGizmoTarget, options?: ArcballGizmoOptions);
+    radius(): number;
+    prims(): Prim[];
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface ArcballGizmoOptions {
+    autoHide?: boolean;
+    lineWidth?: number;
+    order?: number;
+}
+
+export type ArcballPick = (x: number, y: number) => readonly number[] | null;
 
 export interface ArcballProjection {
     zoom: number;
@@ -354,6 +401,13 @@ export class OrbitControls extends Controls {
         min: readonly number[];
         max: readonly number[];
     } | null;
+    cursor: readonly [number, number, number];
+    minTargetRadius: number;
+    maxTargetRadius: number;
+    orthoZoom: boolean;
+    minZoom: number;
+    maxZoom: number;
+    projection: OrbitProjection | null;
     minAzimuthAngle: number;
     maxAzimuthAngle: number;
     keys: {
@@ -383,6 +437,8 @@ export class OrbitControls extends Controls {
     getPolarAngle(): number;
     getAzimuthalAngle(): number;
     getDistance(): number;
+    get zoom(): number;
+    set zoom(value: number);
     get target(): V3;
     set target(value: readonly number[]);
     saveState(): void;
@@ -393,6 +449,10 @@ export class OrbitControls extends Controls {
     dollyIn(factor: number): void;
     dollyOut(factor: number): void;
     update(delta?: number): boolean;
+}
+
+export interface OrbitProjection {
+    zoom: number;
 }
 
 export const PROFILES: {
@@ -491,6 +551,7 @@ export class TransformControls extends EventDispatcher {
     visible: boolean;
     mode: TransformMode;
     space: TransformSpace;
+    pivot: TransformPivot;
     size: number;
     translationSnap: number | null;
     rotationSnap: number | null;
@@ -511,10 +572,13 @@ export class TransformControls extends EventDispatcher {
     connect(element: ControlElement): void;
     disconnect(): void;
     attach(object: Mesh): this;
+    attachMany(objects: Iterable<Mesh>, active?: Mesh): this;
+    get objects(): readonly Mesh[];
     detach(): this;
     getMode(): TransformMode;
     setMode(mode: TransformMode): void;
     setSpace(space: TransformSpace): void;
+    setPivot(pivot: TransformPivot): void;
     setSize(size: number): void;
     heldSnap: {
         translation: number | null;
@@ -552,6 +616,7 @@ export class TransformControls extends EventDispatcher {
 export interface TransformControlsOptions {
     mode?: TransformMode;
     space?: TransformSpace;
+    pivot?: TransformPivot;
     size?: number;
     translationSnap?: number | null;
     rotationSnap?: number | null;
@@ -568,6 +633,8 @@ export interface TransformControlsOptions {
 }
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';
+
+export type TransformPivot = 'median' | 'active' | 'individual';
 
 export type TransformSpace = 'world' | 'local';
 
@@ -586,6 +653,16 @@ export function stepLocomotion(state: Float32Array, actions: Float32Array, delta
 export function tessellate(prims: Prim[], matrix: ArrayLike<number>, width: number, height: number, pixelRatio?: number): Float32Array;
 
 // Not exported from this entry, but used by the exports above:
+
+interface ArcballGizmoTarget {
+    readonly engine: EngineKernel | null;
+    readonly element: {
+        clientWidth?: number;
+        clientHeight?: number;
+    } | null;
+    readonly camera: EngineKernel['camera'];
+    readonly state: string;
+}
 
 interface Basis {
     position: V3;
@@ -607,6 +684,11 @@ interface ControlDocument extends EventTargetLike {
 type InputEventListener = {
     handleEvent(event: Event): void;
 }['handleEvent'];
+
+interface KeySource {
+    addEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
+    removeEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
+}
 
 interface LinePrim {
     kind: 'lines';

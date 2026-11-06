@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4674379,
+  "total": 4683229,
   "history": [
     {
       "date": "2026-10-24",
@@ -1886,6 +1886,12 @@
       "commit": "672630937",
       "reason": "fly, trackball and third-person entries; gizmo and drag features",
       "grew": 7
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "dd6c556dd",
+      "reason": "orbit, transform, arcball and walk features",
+      "grew": 5
     }
   ],
   "items": {
@@ -1962,16 +1968,16 @@
     "@margoengine/compute/sparse": 7283,
     "@margoengine/compute/stream": 1422,
     "@margoengine/compute/subgroups": 2537,
-    "@margoengine/controls": 25331,
-    "@margoengine/controls/arcball": 4582,
+    "@margoengine/controls": 27517,
+    "@margoengine/controls/arcball": 8177,
     "@margoengine/controls/drag": 3905,
     "@margoengine/controls/fly": 3051,
-    "@margoengine/controls/orbit": 5726,
+    "@margoengine/controls/orbit": 6412,
     "@margoengine/controls/profiles": 960,
     "@margoengine/controls/third-person": 3378,
     "@margoengine/controls/trackball": 4269,
-    "@margoengine/controls/transform": 11060,
-    "@margoengine/controls/walk": 13027,
+    "@margoengine/controls/transform": 12121,
+    "@margoengine/controls/walk": 14349,
     "@margoengine/core": 21630,
     "@margoengine/core/extension": 20735,
     "@margoengine/creative": 19177,

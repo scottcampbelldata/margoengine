@@ -136,7 +136,8 @@ engine.start();
 - **Work per frame** is in `walk.stats` (sub-steps, rays, collider candidates, triangles tested). Sizes and CPU cost are
   measured in [walk-size.json](../../examples/package-benchmarks/results/walk-size.json) and
   [walk-cpu.json](../../examples/package-benchmarks/results/walk-cpu.json).
-- **Limits.** Static levels (colliders use the last frame's matrices; moving platforms do not carry the walker);
+- **Moving platforms.** With `carry` (the default) the walker rides what it stands on: lifts, conveyors and turntables carry its feet, a turn carries its heading, and stepping or jumping off keeps the platform's speed until the next landing. Colliders are read at this frame's transforms, at the cost of one more transform pass per update. Move a platform before the frame starts, like any mesh; `carry: false` keeps the last frame's matrices.
+- **Limits.** Only the floor carries: a moving wall pushes the walker out but gives it no speed, and a tilting floor turns the heading about +Y and leaves the pitch;
   skinned meshes collide in their bind pose; on slopes the ring can hold the eye up to 0.9 × radius × the slope's
   tangent higher; a primitive's tree is built synchronously the first time the walker comes near it
   (`computePrimitiveBVHAsync` builds them in a worker beforehand). For rigid bodies, joints and vehicles use

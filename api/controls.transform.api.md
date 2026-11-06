@@ -16,6 +16,7 @@ export class TransformControls extends EventDispatcher {
     visible: boolean;
     mode: TransformMode;
     space: TransformSpace;
+    pivot: TransformPivot;
     size: number;
     translationSnap: number | null;
     rotationSnap: number | null;
@@ -36,10 +37,13 @@ export class TransformControls extends EventDispatcher {
     connect(element: ControlElement): void;
     disconnect(): void;
     attach(object: Mesh): this;
+    attachMany(objects: Iterable<Mesh>, active?: Mesh): this;
+    get objects(): readonly Mesh[];
     detach(): this;
     getMode(): TransformMode;
     setMode(mode: TransformMode): void;
     setSpace(space: TransformSpace): void;
+    setPivot(pivot: TransformPivot): void;
     setSize(size: number): void;
     heldSnap: {
         translation: number | null;
@@ -77,6 +81,7 @@ export class TransformControls extends EventDispatcher {
 export interface TransformControlsOptions {
     mode?: TransformMode;
     space?: TransformSpace;
+    pivot?: TransformPivot;
     size?: number;
     translationSnap?: number | null;
     rotationSnap?: number | null;
@@ -93,6 +98,8 @@ export interface TransformControlsOptions {
 }
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';
+
+export type TransformPivot = 'median' | 'active' | 'individual';
 
 export type TransformSpace = 'world' | 'local';
 

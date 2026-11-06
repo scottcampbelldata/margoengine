@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-118). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-119). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -150,6 +150,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Orbit target radius and `orthoZoom` (2026-11-05) | By method: `minTargetRadius` and `maxTargetRadius` act on the target and move the camera by the same step, after `targetBounds`, so the sphere wins when the two disagree. A target exactly on `cursor` leaves along +X. `orthoZoom` needs a `CameraProjection` or a `projection` with a numeric `zoom`. | The shell has no way to slide past its centre, and a plain camera has no zoom. | With `minTargetRadius` above 0, the target cannot pass through `cursor`. | Set `minTargetRadius` to 0, or keep the shell thick. |
 | Several objects on `TransformControls` (`attachMany`, `pivot`, 2026-11-05) | By method: an object's size has only its own axes, so a non-uniform stretch along another frame gives each axis its share instead of a shear, exact when the axes line up or the factors match. A mesh with an attached ancestor follows that ancestor. | Meshes store position, rotation and scale, with no shear. | A turned object scaled unevenly in `world` space keeps its shape family, not the sheared shape a matrix would give. | Scale evenly, or scale in the object's own axes with `individual` and `local`. |
 | `ArcballGizmo`, double-click focus and arcball keys (2026-11-05) | By method: the gizmo draws and takes no input, so the rings cannot be grabbed one at a time. Focus moves the view centre and keeps the turn and distance; with no `pick` the point lies on the plane through the target. Touch has no double-tap gesture of its own: focus needs the browser's `dblclick`. | Picking the scene needs @margoengine/bvh, which `/arcball` does not load. | A double-click on a far object without `pick` centres the plane point, not the object. | Set `pick` with a `Raycaster` and `rayAt`, as the README shows. |
+| Moving platforms for `WalkControls` (`carry`, 2026-11-05) | By method: only the floor carries. A moving wall pushes the walker out but gives it no speed, a tilting floor turns the heading about +Y and leaves the pitch, and one more transform pass runs per update so colliders are this frame's. | A wall has no contact the walker keeps between frames, and a walker stays upright by design. | The pass costs a little on scenes with no moving floor. | `carry: false` skips the pass and keeps last frame's matrices. |
 
 ## Copies of a model
 

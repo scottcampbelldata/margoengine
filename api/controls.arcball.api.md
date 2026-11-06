@@ -4,6 +4,7 @@
 
 ```ts
 import { Camera, EngineKernel } from "@margoengine/core";
+import { PassContext } from "@margoengine/core/extension";
 
 export class ArcballControls extends Controls {
     enableRotate: boolean;
@@ -19,6 +20,21 @@ export class ArcballControls extends Controls {
     maxDistance: number;
     minZoom: number;
     maxZoom: number;
+    enableFocus: boolean;
+    pick: ArcballPick | null;
+    keyRotateStep: number;
+    keyPanStep: number;
+    keys: {
+        left: string;
+        right: string;
+        up: string;
+        down: string;
+        rollLeft: string;
+        rollRight: string;
+        zoomIn: string;
+        zoomOut: string;
+        reset: string;
+    };
     mouseButtons: {
         LEFT: number | null;
         MIDDLE: number | null;
@@ -29,6 +45,14 @@ export class ArcballControls extends Controls {
     protected get kind(): string;
     protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
     protected onDisconnect(): void;
+    dispose(): void;
+    listenToKeyEvents(target: KeySource): this;
+    stopListenToKeyEvents(): void;
+    focus(point: readonly number[]): void;
+    rayAt(x: number, y: number): {
+        origin: V3;
+        direction: V3;
+    };
     get projection(): ArcballProjection | null;
     saveState(): void;
     reset(): void;
@@ -42,7 +66,41 @@ export class ArcballControls extends Controls {
 
 export interface ArcballControlsOptions {
     projection?: ArcballProjection | null;
+    pick?: ArcballPick | null;
 }
+
+export class ArcballGizmo {
+    visible: boolean;
+    autoHide: boolean;
+    lineWidth: number;
+    readonly overlay: OverlayRenderer;
+    readonly controls: ArcballGizmoTarget;
+    readonly pluginName: string;
+    static attach(controls: ArcballGizmoTarget, options?: ArcballGizmoOptions): ArcballGizmo;
+    constructor(controls: ArcballGizmoTarget, options?: ArcballGizmoOptions);
+    radius(): number;
+    prims(): Prim[];
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface ArcballGizmoOptions {
+    autoHide?: boolean;
+    lineWidth?: number;
+    order?: number;
+}
+
+export interface ArcballGizmoTarget {
+    readonly engine: EngineKernel | null;
+    readonly element: {
+        clientWidth?: number;
+        clientHeight?: number;
+    } | null;
+    readonly camera: EngineKernel['camera'];
+    readonly state: string;
+}
+
+export type ArcballPick = (x: number, y: number) => readonly number[] | null;
 
 export interface ArcballProjection {
     zoom: number;
@@ -131,6 +189,34 @@ interface EventTargetLike {
 type InputEventListener = {
     handleEvent(event: Event): void;
 }['handleEvent'];
+
+interface KeySource {
+    addEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
+    removeEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
+}
+
+interface LinePrim {
+    kind: 'lines';
+    points: V3[];
+    width: number;
+    colors: RGBA[];
+}
+
+class OverlayRenderer {
+    lastTriangles: number;
+    draw(ctx: PassContext, vertices: Float32Array, occlude?: boolean): void;
+    release(): void;
+}
+
+type Prim = LinePrim | TrianglePrim;
+
+type RGBA = readonly [number, number, number, number];
+
+interface TrianglePrim {
+    kind: 'triangles';
+    points: V3[];
+    color: RGBA;
+}
 
 type V3 = [number, number, number];
 ```

@@ -70,6 +70,13 @@ export class OrbitControls extends Controls {
         min: readonly number[];
         max: readonly number[];
     } | null;
+    cursor: readonly [number, number, number];
+    minTargetRadius: number;
+    maxTargetRadius: number;
+    orthoZoom: boolean;
+    minZoom: number;
+    maxZoom: number;
+    projection: OrbitProjection | null;
     minAzimuthAngle: number;
     maxAzimuthAngle: number;
     keys: {
@@ -99,6 +106,8 @@ export class OrbitControls extends Controls {
     getPolarAngle(): number;
     getAzimuthalAngle(): number;
     getDistance(): number;
+    get zoom(): number;
+    set zoom(value: number);
     get target(): V3;
     set target(value: readonly number[]);
     saveState(): void;
@@ -109,6 +118,10 @@ export class OrbitControls extends Controls {
     dollyIn(factor: number): void;
     dollyOut(factor: number): void;
     update(delta?: number): boolean;
+}
+
+export interface OrbitProjection {
+    zoom: number;
 }
 
 export const TOUCH: {

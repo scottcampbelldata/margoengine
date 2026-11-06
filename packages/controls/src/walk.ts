@@ -42,6 +42,8 @@ export interface WalkControlsOptions {
   keyTarget?: EventTargetLike | null;
   /** What the walker collides with. Default: every visible core mesh and every attached gltf-pro model. */
   colliders?: readonly WalkCollider[] | null;
+  /** Ride whatever the walker stands on as it moves and turns, and collide with this frame's transforms. Default true. */
+  carry?: boolean;
   /** An @margoengine/cameras `FloatingOrigin`, so the saved walk pose survives a rebase. */
   origin?: { onRebase(listener: (shift: readonly number[]) => void): () => void } | null;
   /** An @margoengine/cameras `CameraProjection`: the dollhouse view becomes orthographic. */
@@ -59,6 +61,9 @@ interface Candidate {
   primitive: ModelPrimitiveLike | null;
   m: Float64Array;
   inv: Float64Array;
+  /** The mesh or model node the matrix comes from, and the instance within it (-1 for none). */
+  mesh: RuntimeMesh | null;
+  instance: number;
 }
 
 const HEAD = 0.1; // top of the head above the eye
@@ -132,6 +137,11 @@ export class WalkControls extends Controls {
   dollhouseBounds: ArrayLike<number> | null = null;
   /** What the walker collides with; null (default) is every visible core mesh and attached gltf-pro model. */
   colliders: readonly WalkCollider[] | null;
+  /**
+   * Ride whatever the walker stands on: its move and turn since the last update carry the feet and the heading, and a
+   * step or jump off keeps its speed until the next landing. Costs one more transform pass per update. Default true.
+   */
+  carry: boolean;
   /** A `CameraProjection` switched to orthographic in the dollhouse view, or null for a perspective dollhouse. */
   projection: { mode: 'perspective' | 'orthographic' } | null;
   /** Extra analog input, stick convention (x right, y down = back), e.g. from @margoengine/input; look in stick units (2.2 rad/s at 1). */
@@ -178,17 +188,39 @@ export class WalkControls extends Controls {
   private ceiling = false;
   private cosSlope = 0;
   private pushed = false;
+  // What the walker stood on at the last update, as it was then (no allocation per frame).
+  private visiting = 0;
+  private floor = -1;
+  private holding = false;
+  private readonly held: Candidate = {
+    bvh: null,
+    geometry: null,
+    primitive: null,
+    m: new Float64Array(16),
+    inv: new Float64Array(16),
+    mesh: null,
+    instance: -1,
+  };
+  private readonly rideSpeed: V3 = [0, 0, 0];
+  private readonly drift: V3 = [0, 0, 0];
+  private wasGrounded = false;
 
   constructor(engine: EngineKernel, options: WalkControlsOptions = {}) {
     super(engine, options.element);
     if (!this.engine) throw new TypeError('WalkControls needs an Engine');
     this.keyTarget = options.keyTarget ?? null;
     this.colliders = options.colliders ?? null;
+    this.carry = options.carry ?? true;
     this.projection = options.projection ?? null;
     this.unsubscribe =
       options.origin?.onRebase((shift) => {
         for (const p of [this.saved, this.anim?.from, this.anim?.to])
           if (p) for (let i = 0; i < 3; i++) p.p[i] -= shift[i];
+        // The world moved, not the floor: the camera shifted with it, so the held floor shifts too.
+        if (this.holding) {
+          for (let i = 0; i < 3; i++) this.held.m[12 + i] -= shift[i];
+          invertMatrix(this.held.m, this.held.inv);
+        }
       }) ?? null;
     this.orbit = new OrbitControls(engine, options.element);
     this.orbit.enabled = false;
@@ -295,10 +327,14 @@ export class WalkControls extends Controls {
     const runtime = engineRuntime(this.engine!);
     if (runtime.disposed) return false;
     this.check();
+    if (this.anim || this.modeValue !== 'walk') {
+      this.holding = this.wasGrounded = false;
+      this.drift.fill(0);
+    }
     if (this.anim) return this.animate(delta);
     if (this.modeValue !== 'walk') return false;
     this.fresh = !this.ticked;
-    if (!this.ticked) {
+    if (!this.ticked || this.carry) {
       runtime.store.tick(false);
       this.ticked = true;
     }
@@ -307,6 +343,7 @@ export class WalkControls extends Controls {
       keys = this.pressed,
       r = this.radius;
     const before = [...c.position, ...c.target];
+    this.ride(dt);
     // Look: pointer deltas collected since the last frame, then stick rates.
     const pads = this.gamepad ? (globalThis.navigator as Navigator | undefined)?.getGamepads?.() : null;
     let pad: Gamepad | null = null;
@@ -368,8 +405,8 @@ export class WalkControls extends Controls {
       z0 = c.position[2],
       standing = crouching ? this.crouchHeight : this.eyeHeight;
     let feet = c.position[1] - this.height - this.smooth,
-      dx = v[0] * dt,
-      dz = v[2] * dt;
+      dx = (v[0] + this.drift[0]) * dt,
+      dz = (v[2] + this.drift[2]) * dt;
     const steps = Math.min(32, Math.max(1, Math.ceil(Math.hypot(dx, dz) / (0.5 * r))));
     if (steps === 32) {
       const s = (16 * r) / Math.hypot(dx, dz);
@@ -409,9 +446,10 @@ export class WalkControls extends Controls {
     } else this.height += (standing - this.height) * (1 - Math.exp(-10 * dt));
     this.smooth = clamp(this.smooth * Math.exp(-12 * dt), -0.5, 0.5);
     if (dt) {
-      v[0] = (x - x0) / dt;
-      v[2] = (z - z0) / dt;
+      v[0] = (x - x0) / dt - this.drift[0];
+      v[2] = (z - z0) / dt - this.drift[2];
     }
+    this.hold();
     const eye = feet + this.height + this.smooth,
       ox = x - c.position[0],
       oy = eye - c.position[1],
@@ -422,6 +460,87 @@ export class WalkControls extends Controls {
       moved = before.some((value, i) => Math.abs(value - after[i]) > 1e-9);
     if (moved) this.dispatchEvent({ type: 'change' });
     return moved;
+  }
+
+  /** Carries the feet and heading by what the held floor did since the last update. */
+  private ride(dt: number): void {
+    const speed = this.rideSpeed,
+      held = this.held;
+    if (!this.holding || !this.carry || !this.alive(held.mesh!)) {
+      this.holding = false;
+      speed.fill(0);
+      return;
+    }
+    const M = engineRuntime(this.engine!).store.matrices,
+      o = held.mesh!.id * 16,
+      instances = held.primitive?.instances;
+    let now: ArrayLike<number> = M.subarray(o, o + 16);
+    if (held.instance >= 0) {
+      if (!instances || held.instance >= instances.count) {
+        this.holding = false;
+        speed.fill(0);
+        return;
+      }
+      multiplyMatrices(
+        now as Float32Array,
+        instances.data.subarray(held.instance * 24, held.instance * 24 + 16),
+        INSTANCE,
+      );
+      now = INSTANCE;
+    }
+    let same = true;
+    for (let i = 0; i < 16 && same; i++) same = now[i] === held.m[i];
+    if (same) {
+      speed.fill(0);
+      return;
+    }
+    // Through the floor's old frame into its new one, which cancels any scale it has.
+    const c = this.camera,
+      p = c.position,
+      t = c.target,
+      feet = p[1] - this.height - this.smooth,
+      a = held.inv,
+      lx = a[0] * p[0] + a[4] * feet + a[8] * p[2] + a[12],
+      ly = a[1] * p[0] + a[5] * feet + a[9] * p[2] + a[13],
+      lz = a[2] * p[0] + a[6] * feet + a[10] * p[2] + a[14],
+      ox = now[0] * lx + now[4] * ly + now[8] * lz + now[12] - p[0],
+      oy = now[1] * lx + now[5] * ly + now[9] * lz + now[13] - feet,
+      oz = now[2] * lx + now[6] * ly + now[10] * lz + now[14] - p[2],
+      // World +Z through the same two frames gives the turn about +Y.
+      zx = a[8],
+      zy = a[9],
+      zz = a[10],
+      heading = Math.atan2(now[0] * zx + now[4] * zy + now[8] * zz, now[2] * zx + now[6] * zy + now[10] * zz);
+    c.position = [p[0] + ox, p[1] + oy, p[2] + oz];
+    c.target = [t[0] + ox, t[1] + oy, t[2] + oz];
+    if (heading) turn(c, heading, 0);
+    if (dt) {
+      speed[0] = ox / dt;
+      speed[1] = oy / dt;
+      speed[2] = oz / dt;
+    }
+  }
+  /** Remembers the floor under the walker; leaving one keeps its speed until the next landing. */
+  private hold(): void {
+    const grounded = this.grounded_ && this.floor >= 0,
+      drift = this.drift;
+    this.holding = grounded && this.carry;
+    if (this.holding) {
+      const slot = this.pool[this.floor],
+        held = this.held;
+      held.m.set(slot.m);
+      held.inv.set(slot.inv);
+      held.mesh = slot.mesh;
+      held.primitive = slot.primitive;
+      held.instance = slot.instance;
+    }
+    if (this.grounded_) drift.fill(0);
+    else if (this.wasGrounded) {
+      drift[0] = this.rideSpeed[0];
+      drift[2] = this.rideSpeed[2];
+      this.velocity[1] += this.rideSpeed[1];
+    }
+    this.wasGrounded = this.grounded_;
   }
 
   private check(): void {
@@ -511,7 +630,7 @@ export class WalkControls extends Controls {
     const store = engineRuntime(this.engine!).store,
       local = localBounds(geometry, geometry.vertices, 6, 1);
     if (overlaps(store.matrices, mesh.id * 16, local, 0, box) && this.alive(mesh))
-      this.accept(store.matrices, mesh.id * 16, geometry, null);
+      this.accept(store.matrices, mesh.id * 16, geometry, null, mesh, -1);
   }
   private addModel(model: ModelLike, box: Float64Array): void {
     if (model.disposed) return;
@@ -526,7 +645,7 @@ export class WalkControls extends Controls {
         instances = primitive.instances;
       if (!instances) {
         if (overlaps(M, node.id * 16, locals, i * 6, box) && this.alive(node))
-          this.accept(M, node.id * 16, null, primitive);
+          this.accept(M, node.id * 16, null, primitive, node, -1);
         continue;
       }
       if (!this.alive(node)) continue;
@@ -536,7 +655,7 @@ export class WalkControls extends Controls {
           instances.data.subarray(k * 24, k * 24 + 16),
           INSTANCE,
         );
-        if (overlaps(INSTANCE, 0, locals, i * 6, box)) this.accept(INSTANCE, 0, null, primitive);
+        if (overlaps(INSTANCE, 0, locals, i * 6, box)) this.accept(INSTANCE, 0, null, primitive, node, k);
       }
     }
   }
@@ -550,6 +669,8 @@ export class WalkControls extends Controls {
     o: number,
     geometry: GeometryLike | null,
     primitive: ModelPrimitiveLike | null,
+    mesh: RuntimeMesh,
+    instance: number,
   ): void {
     const slot = (this.pool[this.count] ??= {
       bvh: null,
@@ -557,6 +678,8 @@ export class WalkControls extends Controls {
       primitive: null,
       m: new Float64Array(16),
       inv: new Float64Array(16),
+      mesh: null,
+      instance: -1,
     });
     for (let i = 0; i < 16; i++) slot.m[i] = matrices[o + i];
     if (!invertMatrix(slot.m, slot.inv)) return;
@@ -566,6 +689,8 @@ export class WalkControls extends Controls {
     }
     slot.geometry = geometry;
     slot.primitive = primitive;
+    slot.mesh = mesh;
+    slot.instance = instance;
     slot.bvh = null;
     this.count++;
   } /** World bounds of every collider, or null when there are none. */
@@ -578,6 +703,7 @@ export class WalkControls extends Controls {
   /** Calls `visit` for each candidate triangle (world space in T) whose box touches the world box. */
   private triangles(box: Float64Array, visit: () => void): void {
     for (let n = 0; n < this.count; n++) {
+      this.visiting = n;
       const slot = this.pool[n],
         { m, inv } = slot,
         bvh = (slot.bvh ??= slot.primitive ? getPrimitiveBVH(slot.primitive) : getGeometryBVH(slot.geometry!)),
@@ -770,6 +896,7 @@ export class WalkControls extends Controls {
     this.hi = hi;
     this.ceiling = ceiling;
     this.best = ceiling ? Infinity : -Infinity;
+    if (!ceiling) this.floor = -1;
     this.cosSlope = Math.cos(this.maxSlope) - 1e-9;
     BOX[0] = x - reach;
     BOX[1] = lo;
@@ -795,7 +922,10 @@ export class WalkControls extends Controls {
     const reach = this.radius * RING;
     for (let i = 0; i < 9; i++) {
       const y = planeHeight(this.px + RX[i] * reach, this.pz + RZ[i] * reach);
-      if (y >= this.lo && y <= this.hi && (this.ceiling ? y < this.best : y > this.best)) this.best = y;
+      if (y >= this.lo && y <= this.hi && (this.ceiling ? y < this.best : y > this.best)) {
+        this.best = y;
+        if (!this.ceiling) this.floor = this.visiting;
+      }
     }
   };
 
