@@ -2032,6 +2032,7 @@
       "TrackballControls",
       "TransformControls",
       "arcballPoint",
+      "buildDelta",
       "buildGizmo",
       "cadControls",
       "pickHandle",

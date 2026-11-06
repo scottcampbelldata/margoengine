@@ -14,10 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-116). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-116). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-116). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-116). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-115). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -149,6 +146,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Roll in `FlyControls` and `TrackballControls` (`enableRoll`, 2026-11-05) | By method: off by default, so the horizon stays level. With it on, the control owns `camera.up`. Orbit, map, first-person, pointer-lock and walk controls do not roll. Not checked: an engine `CameraProjection` answers `camera.up` with its own `up` for an exactly vertical view, so a roll is not kept at that one orientation. | The level controls read their frame from world +Y; a roll would fight it. | Turning `enableRoll` off leaves the camera rolled, and `camera.up = [0, 1, 0]` throws at an exact vertical view. | Level the horizon with the view off the vertical, or use `ArcballControls`. |
 | Gizmo occlusion (`occlude` on `TransformControls`, 2026-11-05) | By method: only the drawing is hidden, through the scene's depth buffer. Picking is on the CPU and has no scene depth, so a hidden handle can still be grabbed. | Reading depth back to the CPU would stall the frame on every pointer move. | The part of each arrow inside the object is hidden as well, and a handle behind a wall still takes the pointer. | Leave `occlude` off (the default), or filter grabs in the app. |
 | Third-person camera (`ThirdPersonControls` in `@margoengine/controls/third-person`, 2026-11-05) | By method: the arm is swept with nine rays a frame, not a true sphere, so an object thinner than the gaps between the rays can slip through the sweep. Skinned models collide in their bind pose, as for the bvh Raycaster. Not checked: the camera has no collider of its own, so it does not stop for something that moves into it from the side beyond the rim rays. | Nine rays against cached trees is cheap on the CPU and needs no physics package. | A pole near the camera may graze the view for a frame. | Raise `probeRadius`, or drive the camera from `@margoengine/physics` shape casts. |
+| `DragControls` rotate mode, groups and children (2026-11-05) | By method: a turn goes about the grabbed object's origin, not the grab point or the group's centre. `recursive` and `transformGroup` follow core mesh children; a model is always dragged whole. | A model's nodes are not meshes the control can list. | A group with a far-off grabbed member swings wide. | Grab a member near the middle, or use `TransformControls`. |
 
 ## Copies of a model
 

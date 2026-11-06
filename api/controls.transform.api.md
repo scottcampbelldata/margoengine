@@ -23,6 +23,9 @@ export class TransformControls extends EventDispatcher {
     showX: boolean;
     showY: boolean;
     showZ: boolean;
+    flipAxes: boolean;
+    showDelta: boolean;
+    occlude: boolean;
     object: Mesh | null;
     axis: HandleName | null;
     dragging: boolean;
@@ -81,6 +84,9 @@ export interface TransformControlsOptions {
     showX?: boolean;
     showY?: boolean;
     showZ?: boolean;
+    flipAxes?: boolean;
+    showDelta?: boolean;
+    occlude?: boolean;
     element?: ControlElement;
     view?: RenderView;
     order?: number;
@@ -141,6 +147,18 @@ interface EventTargetLike {
     removeEventListener(type: string, listener: InputEventListener, options?: EventListenerOptions | boolean): void;
 }
 
+type GizmoDelta = {
+    kind: 'line';
+    from: V3;
+    to: V3;
+} | {
+    kind: 'arc';
+    axis: V3;
+    spoke: V3;
+    angle: number;
+    view: boolean;
+};
+
 interface GizmoFrame {
     mode: TransformMode;
     origin: V3;
@@ -155,6 +173,8 @@ interface GizmoFrame {
     };
     axis: HandleName | null;
     dragging: boolean;
+    flip?: readonly [number, number, number];
+    delta?: GizmoDelta | null;
 }
 
 interface Handle {
@@ -176,7 +196,7 @@ interface LinePrim {
 
 class OverlayRenderer {
     lastTriangles: number;
-    draw(ctx: PassContext, vertices: Float32Array): void;
+    draw(ctx: PassContext, vertices: Float32Array, occlude?: boolean): void;
     release(): void;
 }
 

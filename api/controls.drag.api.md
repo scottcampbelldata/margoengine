@@ -14,6 +14,11 @@ export class DragControls extends EventDispatcher {
     objects: DragObject[];
     plane: 'view' | readonly [number, number, number];
     axis: readonly [number, number, number] | null;
+    mode: DragMode;
+    rotateSpeed: number;
+    group: readonly DragObject[];
+    recursive: boolean;
+    transformGroup: boolean;
     hovered: DragObject | null;
     static attach(engine: EngineKernel, objects?: DragObject[], options?: DragControlsOptions): DragControls;
     constructor(engine: EngineKernel, objects?: DragObject[], options?: DragControlsOptions);
@@ -33,9 +38,16 @@ export class DragControls extends EventDispatcher {
 export interface DragControlsOptions {
     plane?: 'view' | readonly [number, number, number];
     axis?: readonly [number, number, number] | null;
+    mode?: DragMode;
+    rotateSpeed?: number;
+    group?: readonly DragObject[];
+    recursive?: boolean;
+    transformGroup?: boolean;
     element?: ControlElement;
     raycaster?: Raycaster;
 }
+
+export type DragMode = 'translate' | 'rotate';
 
 export type DragObject = Mesh | ModelLike;
 

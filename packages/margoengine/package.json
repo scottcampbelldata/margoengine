@@ -358,6 +358,10 @@
       "types": "./dist/controls/profiles.d.ts",
       "import": "./dist/controls/profiles.js"
     },
+    "./controls/third-person": {
+      "types": "./dist/controls/third-person.d.ts",
+      "import": "./dist/controls/third-person.js"
+    },
     "./controls/walk": {
       "types": "./dist/controls/walk.d.ts",
       "import": "./dist/controls/walk.js"

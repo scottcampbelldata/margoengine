@@ -123,6 +123,11 @@ export class DragControls extends EventDispatcher {
     objects: DragObject[];
     plane: 'view' | readonly [number, number, number];
     axis: readonly [number, number, number] | null;
+    mode: DragMode;
+    rotateSpeed: number;
+    group: readonly DragObject[];
+    recursive: boolean;
+    transformGroup: boolean;
     hovered: DragObject | null;
     static attach(engine: EngineKernel, objects?: DragObject[], options?: DragControlsOptions): DragControls;
     constructor(engine: EngineKernel, objects?: DragObject[], options?: DragControlsOptions);
@@ -142,9 +147,16 @@ export class DragControls extends EventDispatcher {
 export interface DragControlsOptions {
     plane?: 'view' | readonly [number, number, number];
     axis?: readonly [number, number, number] | null;
+    mode?: DragMode;
+    rotateSpeed?: number;
+    group?: readonly DragObject[];
+    recursive?: boolean;
+    transformGroup?: boolean;
     element?: ControlElement;
     raycaster?: Raycaster;
 }
+
+export type DragMode = 'translate' | 'rotate';
 
 export type DragObject = Mesh | ModelLike;
 
@@ -231,6 +243,18 @@ export class FlyControls extends Controls {
     update(delta?: number): boolean;
 }
 
+export type GizmoDelta = {
+    kind: 'line';
+    from: V3;
+    to: V3;
+} | {
+    kind: 'arc';
+    axis: V3;
+    spoke: V3;
+    angle: number;
+    view: boolean;
+};
+
 export interface GizmoFrame {
     mode: TransformMode;
     origin: V3;
@@ -245,6 +269,8 @@ export interface GizmoFrame {
     };
     axis: HandleName | null;
     dragging: boolean;
+    flip?: readonly [number, number, number];
+    delta?: GizmoDelta | null;
 }
 
 export interface Handle {
@@ -472,6 +498,9 @@ export class TransformControls extends EventDispatcher {
     showX: boolean;
     showY: boolean;
     showZ: boolean;
+    flipAxes: boolean;
+    showDelta: boolean;
+    occlude: boolean;
     object: Mesh | null;
     axis: HandleName | null;
     dragging: boolean;
@@ -530,6 +559,9 @@ export interface TransformControlsOptions {
     showX?: boolean;
     showY?: boolean;
     showZ?: boolean;
+    flipAxes?: boolean;
+    showDelta?: boolean;
+    occlude?: boolean;
     element?: ControlElement;
     view?: RenderView;
     order?: number;
@@ -540,6 +572,8 @@ export type TransformMode = 'translate' | 'rotate' | 'scale';
 export type TransformSpace = 'world' | 'local';
 
 export function arcballPoint(x: number, y: number): V3;
+
+export function buildDelta(f: GizmoFrame): Prim[];
 
 export function buildGizmo(f: GizmoFrame): Handle[];
 
@@ -583,7 +617,7 @@ interface LinePrim {
 
 class OverlayRenderer {
     lastTriangles: number;
-    draw(ctx: PassContext, vertices: Float32Array): void;
+    draw(ctx: PassContext, vertices: Float32Array, occlude?: boolean): void;
     release(): void;
 }
 
