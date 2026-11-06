@@ -56,6 +56,8 @@ A model whose primitives are all hidden skips its GPU deformation: its clips kee
 import { Animation } from '@margoengine/animation';
 import { cloneModel } from '@margoengine/animation/skeleton-utils';
 import { loadGLTF } from '@margoengine/gltf-pro';
+import {Engine} from '@margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const hero = await loadGLTF(engine, '/hero.glb');
 const animation = Animation.attach(hero);
@@ -482,7 +484,6 @@ import {createStage} from 'margoengine';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {Animation} from 'margoengine/animation';
 import {dualQuaternionSkinning} from 'margoengine/animation/dqs';
-
 const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
 const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
 const animation = Animation.attach(model, {skinning: dualQuaternionSkinning});
@@ -512,7 +513,6 @@ import {createStage} from 'margoengine';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {Animation} from 'margoengine/animation';
 import {SkinnedCrowd, bakeBones} from 'margoengine/animation/instanced-skin';
-
 const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
 const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
 const bake = bakeBones(new Animation(model), {fps: 30, clips: ['Walking', 'Running']});
@@ -547,7 +547,6 @@ chunk carries its own triangles, so a fluid can change vertex count as it plays.
 ```ts
 import {createStage} from 'margoengine';
 import {GeometryCachePlayer} from 'margoengine/animation/geometry-cache';
-
 const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
 const flag = await GeometryCachePlayer.attach(stage.engine, '/flag.mgc', {ahead: 3});
 flag.seek(2.5);

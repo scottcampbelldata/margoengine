@@ -27,6 +27,8 @@ candidate; [docs/limits.md](../../docs/limits.md) ("Scatter cull in candidate or
 
 ```ts
 import {Scatter} from 'margoengine/scatter';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const scatter = Scatter.attach(engine, [nearGeometry, midGeometry, farGeometry], {
   count: 10000, area: [50,50], density: 0.8, maxSlope: 45, lod: [25,60,120], lodFade: 2
 });
@@ -55,6 +57,8 @@ distribute shader stays the same text.
 
 ```ts
 import { Scatter } from '@margoengine/scatter';
+import {Engine} from '@margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const farTrees = Scatter.attach(engine, standIn, {
   count: 100_000,
@@ -130,7 +134,6 @@ still help. The lists cost 4 bytes per ring slot per cascade.
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { Scatter } from '@margoengine/scatter';
 import { Shadows } from '@margoengine/shadows';
-
 const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
 const shadows = Shadows.attach(engine);
 const rocks = Scatter.attach(engine, box(1, 1, 1), {
@@ -159,7 +162,6 @@ RangeError. Both work on `ScatterTiles` too.
 ```ts
 import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { Scatter } from '@margoengine/scatter';
-
 const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
 const canopy = box(2, 2, 2);
 const trees = Scatter.attach(engine, canopy, {
@@ -197,6 +199,8 @@ separate `ScatterInstances` export:
 
 ```ts
 import {ScatterInstances} from 'margoengine/scatter';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const instances = ScatterInstances.attach(engine, () => generateBatches());
 shadows.add(instances, {static: true});
 ```
@@ -221,6 +225,8 @@ packing transforms:
 ```ts
 import {PlacementLayout, Scatter} from 'margoengine/scatter';
 import {footprintRadius} from 'margoengine/geometry';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const layout = new PlacementLayout(buildingFootprints);
 const rocks = layout.place(rockCandidates, footprintRadius(rockMesh));
 const ferns = layout.place(fernCandidates, footprintRadius(fernMesh));
@@ -298,6 +304,8 @@ ordered cull, also pinned).
 
 ```ts
 import { Scatter } from '@margoengine/scatter';
+import {Engine} from '@margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const grass = Scatter.attach(engine, blade, {
   count: 200_000,
@@ -316,7 +324,6 @@ const grass = Scatter.attach(engine, blade, {
 import {Engine, box} from 'margoengine/core';
 import {Scatter} from 'margoengine/scatter';
 import {DensityBrush} from 'margoengine/scatter/paint';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const bounds = [-50, -50, 50, 50] as const;
 const brush = new DensityBrush({bounds, resolution: 512});
@@ -339,6 +346,8 @@ culling and rings.
 
 ```ts
 import { ScatterTiles } from '@margoengine/scatter/tiles';
+import {Engine} from '@margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const oaks = ScatterTiles.attach(engine, [near, middle, far], {
   bounds: [-2048, -2048, 2048, 2048],

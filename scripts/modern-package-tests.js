@@ -26,6 +26,7 @@ import { cpus, tmpdir } from 'node:os';
 import { openBrowser } from './browser.js';
 import { waitForPageReady } from './support/page-ready.js';
 import { pages } from './support/doc-snippets.mjs';
+import { packageMarkdown, readmeExamples, README_OPTIONS } from './support/readme-types.mjs';
 import { BUNDLED } from './supply-chain.mjs';
 
 const names = [
@@ -121,6 +122,7 @@ const dependencies = {
   'react-dom': '18.3.1',
   '@types/react': '^18.3.0',
   '@types/react-dom': '^18.3.0',
+  '@types/node': JSON.parse(await readFile('node_modules/@types/node/package.json', 'utf8')).version,
   '@testing-library/react': '16.3.3',
   jsdom: '26.1.0',
   vite: JSON.parse(await readFile('package.json', 'utf8')).devDependencies.vite,
@@ -346,28 +348,16 @@ try {
     if (!inScope(name)) continue;
     // The README, then the package's guides (packages/<name>/docs/*.md, kept in the repository, not packed): each
     // guide's `ts` blocks are checked like the README's, so moving a section out of a README keeps its check.
-    const guides = existsSync(`packages/${name}/docs`)
-      ? (await readdir(`packages/${name}/docs`)).filter((file) => file.endsWith('.md')).sort()
-      : [];
     const documents = [
-      ['readme', await readFile(join(fixture, `node_modules/${packageName(name)}/README.md`), 'utf8')],
-      ...(await Promise.all(
-        guides.map(async (file) => [
-          `docs-${basename(file, '.md')}`,
-          await readFile(`packages/${name}/docs/${file}`, 'utf8'),
-        ]),
-      )),
+      {
+        document: 'readme',
+        markdown: await readFile(join(fixture, `node_modules/${packageName(name)}/README.md`), 'utf8'),
+      },
+      ...packageMarkdown(`packages/${name}`).filter(({ document }) => document !== 'readme'),
     ];
-    for (const [document, markdown] of documents) {
-      // Standalone examples have imports; continuation blocks retain the preceding setup.
-      const examples = [];
-      for (const [, code] of markdown.matchAll(/```tsx?\r?\n([\s\S]*?)```/g)) {
-        if (!examples.length || /^\s*(?:import\s|const\s+\{[^}]+\}\s*=\s*await\s+import\s*\()/m.test(code))
-          examples.push(code);
-        else examples[examples.length - 1] += '\n' + code;
-      }
+    for (const { document, markdown } of documents) {
       const prefix = document === 'readme' ? name : `${name}-${document}`;
-      for (const [index, code] of examples.entries())
+      for (const [index, code] of readmeExamples(markdown).entries())
         await writeFile(join(fixture, `${prefix}-${index}-readme.tsx`), code);
     }
   }
@@ -428,7 +418,7 @@ try {
   for (const [shard, include] of shards.entries())
     await writeFile(
       join(fixture, `tsconfig.readme-${shard}.json`),
-      JSON.stringify({ compilerOptions: { ...consumerOptions, noEmit: true }, include }),
+      JSON.stringify({ compilerOptions: README_OPTIONS, include }),
     );
   await writeFile(
     join(fixture, 'consumer.tsx'),

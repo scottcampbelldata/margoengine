@@ -18,6 +18,7 @@ Build from source with `npm run build` in `packages/geometry`.
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
 import {CatmullRomCurve3, Path, Shape, computeTangents, extrudeGeometry, sphereGeometry, toGeometry, tubeGeometry} from 'margoengine/geometry';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 // Radius, width segments, height segments.
 const sphere = computeTangents(sphereGeometry(1, 48, 24));
@@ -351,12 +352,12 @@ import {extrudeGeometry, Shape} from 'margoengine/geometry';
 import {delaunayTriangulate, triangulateConstrained} from 'margoengine/geometry/delaunay';
 
 // Terrain from scattered samples, keeping a ridge line as an edge.
-const samples = [[0, 0], [10, 0], [10, 10], [0, 10], [4, 5], [6, 5]];
+const samples: [number, number][] = [[0, 0], [10, 0], [10, 10], [0, 10], [4, 5], [6, 5]];
 const terrain = delaunayTriangulate(samples, {edges: [[4, 5]]});
 
 // A polygon with a hole, plus inner points and edges to hold.
-const outline = [[0, 0], [5, 0], [10, 0], [10, 10], [0, 10]];
-const hole = [[4, 4], [6, 4], [6, 6], [4, 6]];
+const outline: [number, number][] = [[0, 0], [5, 0], [10, 0], [10, 10], [0, 10]];
+const hole: [number, number][] = [[4, 4], [6, 4], [6, 6], [4, 6]];
 const fill = triangulateConstrained(outline, [hole], {points: [[2, 2], [8, 8]]});
 // fill.indices address outline, then hole, then points.
 
@@ -382,9 +383,9 @@ and bevels before extrusion.
 import {Shape, extrudeGeometry} from 'margoengine/geometry';
 import {polygonArea, polygonDifference, polygonOffset, polygonShapes, polygonStroke, polygonUnion} from 'margoengine/geometry/polygon';
 
-const room = [[0, 0], [6, 0], [6, 4], [0, 4]];
-const annexe = [[5, 1], [9, 1], [9, 3], [5, 3]];
-const column = [[2, 1.5], [2.5, 1.5], [2.5, 2], [2, 2]];
+const room: [number, number][] = [[0, 0], [6, 0], [6, 4], [0, 4]];
+const annexe: [number, number][] = [[5, 1], [9, 1], [9, 3], [5, 3]];
+const column: [number, number][] = [[2, 1.5], [2.5, 1.5], [2.5, 2], [2, 2]];
 
 // A floor plan: two rooms, less a column. Each result is {contour, holes}.
 const floor = polygonDifference(polygonUnion(room, annexe), column);
@@ -432,12 +433,12 @@ with scale and twist that change along it. A loft skins a surface over several d
 import {CatmullRomCurve3} from 'margoengine/geometry';
 import {loftGeometry, sweepGeometry} from 'margoengine/geometry/sweep';
 
-const circle = (radius, corners = 32) =>
-  Array.from({length: corners}, (_, i) => {
+const circle = (radius: number, corners = 32): [number, number][] =>
+  Array.from({length: corners}, (_, i): [number, number] => {
     const angle = (i / corners) * Math.PI * 2;
     return [Math.cos(angle) * radius, Math.sin(angle) * radius];
   });
-const square = (half) => [[-half, -half], [half, -half], [half, half], [-half, half]];
+const square = (half: number): [number, number][] => [[-half, -half], [half, -half], [half, half], [-half, half]];
 const path = new CatmullRomCurve3([[0, 0, 0], [2, 1, 0], [4, 1, 2], [6, 2, 2]]);
 
 // A handrail that stays level as it climbs. Corners sharper than 40 degrees get hard edges.
@@ -527,7 +528,6 @@ sheets. No vertices are uploaded; each item sends 64 bytes of settings a frame. 
 ```ts
 import {Engine, PbrMaterial} from 'margoengine';
 import {GeometryGenerator} from 'margoengine/geometry/gpu';
-
 const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 2, 8], target: [0, 0, 0]}});
 const generator = GeometryGenerator.attach(engine);
 const material = new PbrMaterial({color: '#d08030'});

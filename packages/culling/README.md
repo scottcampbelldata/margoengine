@@ -10,6 +10,7 @@ however many parts there are. WebGPU only.
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
 import {CulledInstances} from 'margoengine/culling';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const parts = CulledInstances.attach(engine, [
@@ -35,7 +36,6 @@ download them:
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {CulledParts} from 'margoengine/culling/parts';
 import {Shadows} from 'margoengine/shadows';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const parts = CulledParts.attach(engine, [
   // capacity reserves slots for addParts; transforms may start empty.
@@ -49,7 +49,7 @@ const [arm, hand] = parts.addParts(0, new Float32Array([...at(0), ...at(2)]));
 // Hierarchy: hand's matrix is now relative to arm, and moving arm moves hand too.
 parts.setParent(0, hand, {batch: 0, index: arm});
 parts.setTransform(0, arm, at(0, 3));
-console.log(parts.getWorldMatrix(0, hand)[13]);   // 3
+console.log(parts.getWorldMatrix(0, hand)![13]);   // 3
 
 // Shadows: casts every shown part, inside the camera view or not; receiving works as on core meshes.
 Shadows.attach(engine, {resolution: 2048}).add(parts);
@@ -75,7 +75,6 @@ of items into those batches and says where each item went:
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {CulledParts, groupParts} from 'margoengine/culling/parts';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const bolt = box(0.2, 0.2, 1);
 const items = Array.from({length: 500}, (_, n) => ({
@@ -107,6 +106,8 @@ console.log(parts.getMaterial(batch, index).roughness);      // 0.2
 
 ```ts
 import {CulledMeshes} from 'margoengine/culling';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const culled = CulledMeshes.attach(engine);   // {minRadius: 2} also drops parts under 2 CSS px in radius
 // Let the GPU do the frustum test, so the kept set (and core's instance lists) stay stable while orbiting.
 engine.start({culling: false});   // or engine.render({culling: false}) from your own loop
@@ -130,7 +131,6 @@ part is still recognisable.
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {CulledMeshes} from 'margoengine/culling';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const material = new PbrMaterial({color: '#8d99a6'});
 engine.createMesh().setGeometry(box(40, 20, 1)).setMaterial(material).setPosition([0, 0, 5]);   // a wall
@@ -168,7 +168,6 @@ import {Engine} from 'margoengine/core';
 import {boxGeometry} from 'margoengine/geometry';
 import {Material, createInstancedMesh, createMesh} from 'margoengine/materials';
 import {CulledModels} from 'margoengine/culling/models';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const trees = createInstancedMesh(engine, boxGeometry(1, 4, 1), new Material({color: '#3f7a4a'}), 50_000);
 for (let i = 0; i < 50_000; i++)
@@ -213,8 +212,7 @@ on the GPU, so a cascade draws only what reaches it. The shadow map is the same:
 import { Engine, box, PbrMaterial } from 'margoengine';
 import { Shadows } from 'margoengine/shadows';
 import { CascadeParts } from 'margoengine/culling/shadows';
-
-const engine = await Engine.create(document.querySelector('canvas'));
+const engine = await Engine.create(document.querySelector('canvas')!);
 const transforms = new Float32Array(16 * 1000);
 for (let i = 0; i < 1000; i++) transforms.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i * 3, 0, 0, 1], i * 16);
 const parts = CascadeParts.attach(engine, [{ geometry: box(), material: new PbrMaterial(), transforms }]);
@@ -235,8 +233,7 @@ frame has no CPU loop over instances. Core then draws each list with its own sha
 ```js
 import { Engine, box, PbrMaterial } from 'margoengine';
 import { LodInstances } from 'margoengine/culling/lod';
-
-const engine = await Engine.create(document.querySelector('canvas'));
+const engine = await Engine.create(document.querySelector('canvas')!);
 const transforms = new Float32Array(16 * 1000);
 for (let i = 0; i < 1000; i++) transforms.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i * 3, 0, 0, 1], i * 16);
 const trees = LodInstances.attach(engine, {
@@ -269,8 +266,7 @@ perspective camera, no mirroring. The image does not change.
 ```js
 import { Engine, box, PbrMaterial } from 'margoengine';
 import { MeshletMesh } from 'margoengine/culling/meshlets';
-
-const engine = await Engine.create(document.querySelector('canvas'));
+const engine = await Engine.create(document.querySelector('canvas')!);
 const mesh = MeshletMesh.attach(engine, [
   {
     geometry: box(4, 4, 4),
@@ -304,7 +300,6 @@ pages that use only `CulledInstances` or `CulledMeshes` do not download it.
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {DynamicInstances} from 'margoengine/culling/dynamic';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const crowd = DynamicInstances.attach(engine, {
   geometry: box(0.5, 0.5, 0.5),
@@ -376,7 +371,6 @@ matrix, for assemblies of long or thin parts, whose spheres reach far past them:
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {CulledInstances} from 'margoengine/culling';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const at = (x: number, y: number, z: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
 const rods = new Float32Array(16 * 400);
@@ -403,7 +397,6 @@ materials mesh or a `Terrain`, so a building hides the parts behind it even thou
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {CulledParts} from 'margoengine/culling/parts';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const transforms = new Float32Array(16 * 1000);
 for (let i = 0; i < 1000; i++)

@@ -146,7 +146,7 @@ import { elbowEvaluator } from 'margoengine/rigging/ik';
 const torso = new CapsuleVolume({ start: [0, 0.9, 0], end: [0, 1.5, 0], radius: 0.18 });
 const avoid = new AvoidanceSolver([torso], { minClearance: 0.01, targetRadius: 0.04 });
 const evaluate = elbowEvaluator(0.3, 0.28, [0.2, 1.2, -0.5]); // upper arm, forearm, pole
-const shoulder = [0.2, 1.4, 0], hand = new Float32Array([0.5, 1.2, 0.2]);
+const shoulder = new Float32Array([0.2, 1.4, 0]), hand = new Float32Array([0.5, 1.2, 0.2]);
 const solved = avoid.solve(shoulder, hand, [-0.1, 1.2, 0.35], 0.3, 0.28, 0.05, 0.04, 1 / 60, evaluate);
 console.log(solved.status, solved.elbow, solved.target);
 ```
@@ -212,7 +212,6 @@ On a character, joints and collider nodes are glTF node indices:
 ```ts
 import type { Animator } from 'margoengine/animator';
 import { addSpringBones } from 'margoengine/rigging/springs';
-
 declare const animator: Animator; // of a loaded model
 const hair = addSpringBones(animator, {
   chains: [
@@ -267,7 +266,6 @@ import { loadGLTF } from 'margoengine/gltf-pro';
 import { Animation } from 'margoengine/animation';
 import { addVRM, readVRM } from 'margoengine/rigging/vrm';
 import type { Engine } from 'margoengine';
-
 declare const engine: Engine;
 const url = 'Seed-san.vrm';
 const avatar = readVRM(new Uint8Array(await (await fetch(url)).arrayBuffer()));
@@ -288,7 +286,6 @@ Pass an `Animator` from `margoengine/animator` as `animator` and the avatar runs
 
 ```ts
 import { createVRM, readVRM, writeVRM } from 'margoengine/rigging/vrm';
-
 declare const rigged: Uint8Array; // any .glb with a skin
 const out = writeVRM(
   rigged,
@@ -359,7 +356,6 @@ Linear skinning collapses elbows, knees and shoulders. A corrective is a blend s
 ```ts
 import type { Animator } from 'margoengine/animator';
 import { addCorrectives } from 'margoengine/rigging/correctives';
-
 declare const animator: Animator; // on a model with an elbow at node 12 and a morph target 3 on the mesh at node 2
 const s = Math.sin(1);
 const elbow = addCorrectives(animator, {
@@ -445,7 +441,6 @@ import { loadGLTF } from 'margoengine/gltf-pro';
 import { Animation } from 'margoengine/animation';
 import { addFace } from 'margoengine/rigging/face';
 import type { Engine } from 'margoengine';
-
 declare const engine: Engine;
 const animation = new Animation(await loadGLTF(engine, 'character.glb'));
 const face = addFace(animation, { mirror: true }); // a selfie camera: swap sides
@@ -463,7 +458,6 @@ A frame is a record of names to values, or a list of `{ categoryName, score }`, 
 import { addFace } from 'margoengine/rigging/face';
 import type { VRMHandle } from 'margoengine/rigging/vrm';
 import type { Animator } from 'margoengine/animator';
-
 declare const animation: Animator['animation'];
 declare const avatar: VRMHandle;
 addFace(animation, { map: { jawOpen: 'Mouth_Open', eyeBlinkLeft: ['Blink_L', 'Lash_L'] } });
@@ -493,7 +487,6 @@ import { Retarget, retargetRig } from 'margoengine/animation/skeleton-utils';
 import { createStage } from 'margoengine';
 import { loadGLTF } from 'margoengine/gltf-pro';
 import { detectSkeleton, prepareRetarget } from 'margoengine/rigging/retarget';
-
 const stage = await createStage('#viewport', { backend: 'webgpu' });
 const [mixamoModel, godotHero] = await Promise.all(
   ['/mixamo-walk.glb', '/godot-hero.glb'].map((url) => loadGLTF(stage.engine, url)),

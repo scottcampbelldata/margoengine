@@ -192,7 +192,6 @@ import {createStage} from 'margoengine';
 import {box} from 'margoengine/core';
 import {loadGLTF, type MaterialExtension} from 'margoengine/gltf-pro';
 import {getSceneBounds, fitScene, gatherSceneBuffers} from 'margoengine/gltf-pro/scene';
-
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/SciFiHelmet.glb');
 const coreMesh = stage.engine.createMesh().setGeometry(box());
@@ -301,6 +300,7 @@ A file with `KHR_gaussian_splatting` primitives loads through plain `loadGLTF` o
 ```ts
 import {createStage} from 'margoengine';
 import {loadGLTF} from 'margoengine/gltf-pro';
+import {type MaterialExtension} from 'margoengine/gltf-pro';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/capture.glb', {maxDownloadBytes: 2 ** 28});
 const b = model.bounds; // takes in the splat centres
@@ -369,6 +369,8 @@ them instead of uploading and mipping its own. Each image and texture goes with 
 
 ```ts
 import {PBRModel, loadGLTF} from 'margoengine/gltf-pro';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const first = await loadGLTF(engine, 'robot.glb');
 const second = new PBRModel(engine, first.asset, first.shareImages());
@@ -390,6 +392,8 @@ wait moves rather than disappears: `p-morph`'s first frame fell by 83 ms and its
 
 ```ts
 import {loadGLTF} from 'margoengine/gltf-pro';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const model = await loadGLTF(engine, 'robot.glb');
 const compiled = model.compile();

@@ -7,6 +7,8 @@ Native binary and ASCII FBX import through Margo's first-party glTF exporter and
 ```ts
 import {loadFBX} from 'margoengine/fbx';
 import {Animation} from 'margoengine/animation';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const model = await loadFBX(engine, '/assets/character.fbx');
 const animation = Animation.attach(model);
 animation.play('Walking');

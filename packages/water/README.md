@@ -6,6 +6,8 @@ A separate WebGPU water grid evaluates up to eight swell trains with analytical 
 
 ```ts
 import {Water} from 'margoengine/water';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0});
 ```
 
@@ -23,6 +25,8 @@ surfaces. Use a size that keeps the shoreline and terrain map within 37.5% of
 
 ```ts
 import {Water} from 'margoengine/water';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 // A 4 km sea on 8 m cells: the swell follows the camera to the horizon.
 const sea = Water.attach(engine, {
   size: [4096, 4096],
@@ -90,7 +94,6 @@ and no flow pass runs after the first frame, so a river costs only its draw. Wit
 ```ts
 import { Engine } from '@margoengine/core';
 import { Water } from '@margoengine/water';
-
 const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
 // A channel 12 m wide along z, its bed rising 2 m per 100 m, on banks 30 m higher.
 const side = 128;
@@ -175,6 +178,8 @@ same colour. Water does not import environment. `fog.enabled = false` clears it 
 
 ```ts
 import {Fog} from 'margoengine/environment';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const fog = Fog.attach(engine, {color: '#8090a0', density: 0.02});
 water.setFog(fog);
 ```

@@ -10,6 +10,8 @@ A virtual camera with analytically integrated critically damped follow and look-
 
 ```ts
 import {Cinematic} from 'margoengine/cinematic';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const rig = Cinematic.attach(engine, {offset: [0,3,6], damping: 6});
 rig.follow(player);
 rig.shake(0.2, 0.4);
@@ -21,6 +23,8 @@ Scope the rig with `using` (it calls `dispose()` and returns the camera to your 
 
 ```ts
 import {Cinematic} from 'margoengine/cinematic';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 {
   using rig = Cinematic.attach(engine, {offset: [0, 3, 6]});
   rig.follow([0, 1.6, 0]);

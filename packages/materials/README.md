@@ -8,7 +8,6 @@ Optional glTF clearcoat, sheen, specular color, anisotropy, iridescence, transmi
 import {createStage} from 'margoengine';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import * as materials from 'margoengine/materials';
-
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/glass.glb');
 const installation = materials.install(model);
@@ -178,7 +177,6 @@ vertex's tile index.
 
 ```ts
 import {padTileGrid, remapTileUVs} from 'margoengine/materials/atlas';
-
 declare const tileset: {data: Uint8Array; width: number; height: number};
 declare const uvs: Float32Array, tileOfVertex: Uint32Array;
 const grid = padTileGrid(tileset, {tileWidth: 16, tileHeight: 16, padding: 2});
@@ -277,6 +275,8 @@ Everything is live on a `createMesh` mesh, from the next frame:
 
 ```ts
 import {PbrMaterial, PhongMaterial, createMesh, loadTexture} from 'margoengine/materials';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const tiles = await loadTexture('/tiles.png', {magFilter: 'nearest'});
 const paint = new PhongMaterial({color: 0x84d6bd, map: tiles});
@@ -315,6 +315,8 @@ contain two finite values per vertex. UV0 defaults to zero; omitted UV1 copies U
 
 ```ts
 import {Material, createMesh, loadTexture} from 'margoengine/materials';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const surface = new Material({aoMap: await loadTexture('/occlusion.png')});
 surface.setUVTransform({texCoord: 1}, 'aoMap');
@@ -371,10 +373,10 @@ its groups are retired.
 
 ```ts
 const geometry = {positions, normals, uvs, indices};
-const mesh = createMesh(engine, geometry, tiles);
+const tiled = createMesh(engine, geometry, tiles);
 geometry.uvs.set([0.5, 0, 0.75, 0, 0.75, 0.25, 0.5, 0.25], 8); // vertices 4-7
-mesh.setGeometry(geometry, {start: 4, count: 4}); // uploads 320 bytes
-mesh.setGeometry({positions: more, normals: moreNormals, uvs: moreUvs, indices: moreIndices}); // resize
+tiled.setGeometry(geometry, {start: 4, count: 4}); // uploads 320 bytes
+tiled.setGeometry({positions: more, normals: moreNormals, uvs: moreUvs, indices: moreIndices}); // resize
 ```
 
 `mesh.dispose()` releases model resources; textures
@@ -398,7 +400,6 @@ rows at once:
 import { Engine } from 'margoengine/core';
 import { Material, createInstancedMesh } from 'margoengine/materials';
 import { boxGeometry } from 'margoengine/geometry';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const boxes = createInstancedMesh(engine, boxGeometry(1, 1, 1), new Material({ color: '#4080c0' }), 1000);
@@ -422,6 +423,9 @@ application's job.
 
 ```ts
 import {createMesh, tileAnimator} from 'margoengine/materials';
+import {Engine} from 'margoengine/core';
+import {Texture} from 'margoengine/materials';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const water = {frames: [
   {duration: 0.2, uvs: [0, 0, 0.25, 0, 0.25, 0.25, 0, 0.25]},
@@ -490,6 +494,9 @@ alone keeps its pipeline (the reference is set per draw).
 
 ```ts
 import {Material, StencilBuffer, createMesh} from 'margoengine/materials';
+import {Engine} from 'margoengine/core';
+import {loadTexture} from 'margoengine/materials';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 StencilBuffer.attach(engine);
 const mask = new Material({
@@ -676,6 +683,10 @@ Directional (cascaded and virtual), spot and point shadows, contact shadows, TAA
 import { Picking } from '@margoengine/selection';
 import { ContactShadows } from '@margoengine/staging';
 import { PbrMaterial, createMesh } from '@margoengine/materials';
+import {Engine} from '@margoengine/core';
+declare const x: number;
+declare const y: number;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 Picking.attach(engine);
 const contact = ContactShadows.attach(engine);
@@ -705,7 +716,6 @@ import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
 import { alphaHash } from 'margoengine/materials/alpha-hash';
 import { planeGeometry } from 'margoengine/geometry';
 import { TAA } from 'margoengine/taa';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const hair = new PbrMaterial({ map: await loadTexture('/strands.png'), side: 'double', features: [alphaHash()] });
@@ -740,7 +750,6 @@ import { Engine } from 'margoengine/core';
 import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
 import { stochasticTiling } from 'margoengine/materials/stochastic';
 import { planeGeometry } from 'margoengine/geometry';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const repeat = { wrapS: 'repeat', wrapT: 'repeat' } as const;
@@ -783,7 +792,6 @@ import { eye } from 'margoengine/materials/eye';
 import { hair } from 'margoengine/materials/hair';
 import { skin } from 'margoengine/materials/skin';
 import { sphereGeometry } from 'margoengine/geometry';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const ball = sphereGeometry(0.012, 64, 48); // an eyeball 24 mm across
@@ -858,13 +866,12 @@ import { Engine } from 'margoengine/core';
 import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
 import { objectNormal } from 'margoengine/materials/object-normal';
 import { sphereGeometry } from 'margoengine/geometry';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const normalMap = await loadTexture('/scan-normals.png', { colorSpace: 'linear' });
 const scan = new PbrMaterial({ normalMap, features: [objectNormal({ up: 'z' })] });
 const statue = createMesh(engine, sphereGeometry(1), scan);
-statue.root.setRotation([0, 0.38, 0, 0.92]); // the lighting turns with the statue
+statue.root.setQuaternion([0, 0.38, 0, 0.92]); // the lighting turns with the statue
 ```
 
 `up: 'z'` reads a map baked in Z-up axes (Blender, 3ds Max, most photogrammetry tools) on a mesh exported Y-up, as glTF
@@ -993,7 +1000,7 @@ them.
 import { Engine } from 'margoengine/core';
 import { LambertMaterial, PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
 import { boxGeometry, planeGeometry, sphereGeometry } from 'margoengine/geometry';
-
+import {WgslMaterial} from 'margoengine/materials';
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const [bricks, bricksHeight, rock] = await Promise.all(
@@ -1103,6 +1110,8 @@ rough dielectric. There is no highlight. Use `magFilter: 'nearest'` on a gradien
 
 ```ts
 import {ToonMaterial, Texture, createMesh, toonModel} from 'margoengine/materials';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const bands = new Texture({data: new Uint8Array([40, 40, 40, 255, 140, 140, 140, 255, 255, 255, 255, 255]), width: 3, height: 1},
   {colorSpace: 'linear', magFilter: 'nearest', minFilter: 'nearest', mipmaps: false});
 createMesh(engine, geometry, new ToonMaterial({color: '#e07040', gradientMap: bands}));
@@ -1140,6 +1149,7 @@ face averages and never across a cube edge; an `Environment` is GGX prefiltered,
 
 ```ts
 import {CubeTexture, PbrMaterial, UnlitMaterial, loadCubeTexture} from 'margoengine/materials';
+import {Texture, WgslMaterial} from 'margoengine/materials';
 const sky = await loadCubeTexture(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg']);
 const chrome = new PbrMaterial({metalness: 1, roughness: 0.1, envMap: sky});
 const glass = new UnlitMaterial({envMap: sky, envMapMode: 'refraction', refractionRatio: 0.66, combine: 'mix'});
@@ -1201,7 +1211,6 @@ import { Engine } from 'margoengine/core';
 import { Material } from 'margoengine/materials';
 import { BatchedMesh } from 'margoengine/materials/batched';
 import { boxGeometry, sphereGeometry } from 'margoengine/geometry';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const batch = BatchedMesh.attach(engine, new Material({ roughness: 0.5 }), { maxItems: 1000, maxVertices: 200_000 });
@@ -1235,7 +1244,6 @@ contact shadows, local shadows).
 import { Engine } from 'margoengine/core';
 import { Material, createMesh } from 'margoengine/materials';
 import { torusKnotGeometry } from 'margoengine/geometry';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas, { features: ['clip-distances'] }); // where the adapter has it
 const material = new Material({ color: '#e0a040', doubleSided: true, clippingPlanes: [[0, -1, 0, 0.5]] });
@@ -1276,6 +1284,9 @@ export const chrome = new PbrMaterial({metalness: 1, roughness: 0.1, envMap: sky
 
 ```ts
 import {KTX2Decoder} from 'margoengine/decoders';
+import {Engine} from 'margoengine/core';
+import {loadKTX2Texture, createMesh, PbrMaterial, Texture} from 'margoengine/materials';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const decoder = new KTX2Decoder({device: engine.gpu});
 const albedo = await loadKTX2Texture('/textures/albedo.ktx2', {decoder});
 createMesh(engine, geometry, new PbrMaterial({map: albedo}));

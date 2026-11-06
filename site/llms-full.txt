@@ -3097,6 +3097,23 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### 329 errors in the package README examples
+
+- **What:** `npm run check:readmes` (a step of `verify`) type-checks all 719 examples of the 100 packages. When the check was built it found 715 errors in 181 examples; 388 were fixed in the same commit, and with two more from a selection example that landed the same day 329 remain, in 42 packages (voxel 56, materials 40, scatter 29, shader 23, bvh 20, cameras 17, ragdoll 16, the rest 10 or fewer). `scripts/support/readme-types-known.json` lists each by package and message. A new error fails `verify`, and so does an entry that has been fixed and not removed, so the list only shrinks.
+- **Repro:** empty the known list to `{}`, then `npm run build:packages` and `npm run check:readmes`.
+- **Cause:** 285 are names an example uses and never sets up, reader data such as `physics`, `textures` or `candidates`. The README says "runs as written" and these do not. The other 42 are mostly real faults in published types, below. Six of them are `GPUTextureUsage` and `GPUBufferUsage`, which need `@webgpu/types` in the reader's project and in the check.
+- **The published types that are wrong, each shown by a README example written the way the API is meant to be used:**
+  - `Lines`, `AnimationGroup`, `PBRModel` and `Shadows` type `setup` against the internal `Engine`, so `engine.use(x)` on an `EngineKernel` does not compile. `@margoengine/core` also declares `EnginePlugin` twice, in `dist/plugin` and `dist/api`, and the two differ (webgl README).
+  - `Picking` does not satisfy `LinePickHost`, `PointPickHost`, `HoverPicker` or `RawPickHost`.
+  - `EngineKernel` has no `gpu` in its types (decoders, stats, materials, scatter, water READMEs), no `renderTarget` (core README), no `lighting` for sky's `LightingTarget`, and does not fit `PrefilterTarget`.
+  - Two `Mesh` types: `(Mesh | Mesh)[]` is refused by `Iterable<Mesh>` (gltf-pro), `Mesh[]` by `Iterable<Mesh | ModelLike>` (selection), and core's `Mesh` by `addOccluder` (culling).
+  - `PBRModel` is refused as `AlphaMaskedModel` (bvh), by `LOD.fromModel` (lod), and its primitive as `SkinnedPrimitive` (shader).
+  - `Skeleton` is refused as `IKSkeleton` (rigging).
+  - `storage(n, 'u32', {atomic: true}).atomicAdd` refuses the buffer it is called on, and `Var(vec3)` gives a node `colorNode` refuses (shader).
+  - `video.bytes` and the loaders' bytes are `Uint8Array<ArrayBufferLike>`, which is not a `BlobPart`.
+- **Also open:** `modern:test:packages` checks the same examples against the tarballs with no known list, so check:merge fails on these until the list is empty. That is deliberate: the list is for landing, and nothing is released on it.
+- **Needed to close:** fix each type in its package, give each fragment its setup, and run `npm run check:readmes -- --shrink` until the file is `{}`. This list must be empty before release.
+
 ### A limp ragdoll keeps moving on a floor when a limit and a contact cannot both hold
 
 - **What:** a ragdoll lying where a floor holds a limb past its cone limit never comes to rest: Knight.glb with the humanoid preset and fitted hulls, pushed over, still has a hand at 0.7 to 1 m/s after 20 s, with the limb up to 0.8 rad past its limit. Capsules settle under default limits (0.05 m/s) because they are thin enough to meet the limits on the floor. Limits a body can meet lying down settle hulls as well (`swing` 2.5, under 0.05 m/s).
@@ -4089,6 +4106,10 @@ Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB
 
 ```ts
 import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
+import {Engine} from 'margoengine/core';
+import type {Mesh} from 'margoengine/core';
+declare const mesh: Mesh;
+const engine = await Engine.create(document.querySelector('canvas')!);
 const position = new Vector3(0, 1, 0).addScaledVector(new Vector3(1, 0, 0), 2);
 mesh.setPosition(position.toArray()).setQuaternion(new Quaternion().setFromEuler(new Euler(0, Math.PI / 4, 0)).toArray());
 engine.camera.position = new Vector3().copy(mesh.position).add(new Vector3(0, 2, 5)).toArray();
@@ -4098,8 +4119,6 @@ new Color('#ff8800').toArray(mesh.material.data); // linear RGB, recolors in pla
 Each type is its own module: `import {Vector3} from '@margoengine/math/vector3'` (or from the root, which tree-shakes the same) ships about 1.3 kB min+gzip. The whole package is about 10.4 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)).
 
 Array helpers: the other Margo packages work on plain arrays (`number[]`, `Float32Array`, `Float64Array`) rather than these classes, and share one copy of those helpers from here, each bundled into the package that uses it. `@margoengine/math/mat4`: `multiplyMatrices(a, b, out)`, `invertMatrix(m, out)` (cofactors), `invertMatrixStable(m, out, workspace?)` (pivoted, rejects non-finite input and Float32 overflow; `out` may be `m`) and `composeMatrix(t, q, s, out)`, column-major like `camera.matrix`, float64 arithmetic; the inverses return null (`out` untouched) when they fail. `@margoengine/math/quat`: `eulerToQuaternion(x, y, z)` (XYZ, like `Mesh.setRotation`), `multiplyQuaternions(a, b)`, `axisAngleToQuaternion(axis, angle)`, `conjugateQuaternion(q)`, `normalizeQuaternion(q)` and `rotateByQuaternion(v, q)`, returning new arrays, and `rotationToQuaternion(m, out?, sx?, sy?, sz?)`: the rotation of a column-major 3x3 or 4x4 (columns divided by the given scales; a negative `sx` undoes a mirror), the one conversion every package uses.
-
-Checked contracts for saved data (each reproduces Margo Voxel Studio's saved arithmetic bit for bit, `test/checked.test.js`; nothing else changes): `@margoengine/math/quat` `interpolateQuaternions(a, b, t, linearAbove)` interpolates along the shorter arc, linearly above dot `linearAbove` (0.9995 is Studio's saved curve) and spherically below, always normalized; `Quaternion.slerp` keeps its own switch. `@margoengine/math/mat4` `transformPointChecked(m, p, minW = 1e-12)` divides by w like `Vector3.applyMatrix4` but returns `{ok: false, reason, w}` for a non-finite w, |w| below `minW` or a non-finite point instead of a NaN or huge point. `@margoengine/math/affine` `decomposeAffine(matrix, tolerance = 1e-5)` returns `Matrix4.decompose`'s translation, rotation (normalized) and scale with what that reading drops: Gram-Schmidt `shear` factors, `handedness` (`'right'`, `'left'` for a reflection, `'degenerate'`), `projective`, and the recomposition `error` with `lossless` (error <= tolerance). `Matrix4.decompose` always returns parts, even for a sheared matrix; check `lossless` before treating them as the whole transform. `@margoengine/math/color` also has `parseColor(value, out?, offset?)` for the packages' `ColorInput` (`'#rrggbb'`, `'#rgb'`, `0xrrggbb` decoded from sRGB, CSS `color(display-p3 r g b)` and the `srgb`, `srgb-linear` and `display-p3-linear` spaces, or linear `[r, g, b]`). Display P3 input: `ColorSpace` has `'display-p3'` and `'display-p3-linear'` (`Color.setRGB/setHex/setHSL/setStyle/getRGB/getHex/getHSL` take them), `P3_TO_SRGB`/`SRGB_TO_P3` are the linear matrices derived from the two sets of primaries (D65), `linearP3ToLinearSRGB` and `linearSRGBToLinearP3` apply them, and colours outside sRGB keep their negative linear sRGB channels for the shaders that carry them to a wide-gamut canvas (tonemap's excess output with environment's `ColorOutput`). `clipToSRGB(rgb)` desaturates such a colour toward its luminance until no channel is negative, for inputs that take sRGB only, such as core's sun. `@margoengine/math/vec3`: `add`, `sub`, `scale`, `dot`, `cross`, `length`, `normalize` on `[x, y, z]` (new arrays). `@margoengine/math/validate`: `finiteVector(v, size, name)` throws unless `v` is `size` Float32-finite numbers. These are kept bit-for-bit identical to the package copies they replaced (`examples/package-benchmarks/proofs/math-consolidation.proof.js`), so their operand order is fixed. Bit for bit means on the same JavaScript engine: the sRGB curves use `**`, and `length`, `normalize`
 
 [README continues: https://margoengine.com/llms/packages/math.md]
 
@@ -4117,6 +4136,7 @@ the GPU), and no rule based on device names is involved.
 ```ts
 import {applyQualityTier, paceEngine, watchQuality} from 'margoengine/quality';
 import {Engine} from 'margoengine/core';
+const canvas = document.querySelector('canvas')!;
 
 applyQualityTier();                       // before creating the engine
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
@@ -4185,6 +4205,7 @@ optional packages that need WebGPU stay unavailable on this path. Picking is the
 ```ts
 import {Engine} from 'margoengine/core';
 import {webglRenderer} from 'margoengine/webgl';
+const canvas = document.querySelector('canvas')!;
 
 // WebGPU when available, otherwise WebGL2.
 const engine = await Engine.create(canvas, {backend: 'auto', fallback: webglRenderer});
@@ -4200,6 +4221,7 @@ this package, because the dynamic import is a separate chunk that never runs for
 
 ```ts
 import {Engine} from 'margoengine/core';
+const canvas = document.querySelector('canvas')!;
 
 const fallback = navigator.gpu ? undefined : (await import('margoengine/webgl')).webglRenderer;
 const engine = await Engine.create(canvas, {fallback});
@@ -4223,7 +4245,6 @@ already runs, so load it only on the preview:
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {webglRenderer} from 'margoengine/webgl';
-
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgl2', fallback: webglRenderer});
 const crate = engine.createMesh().setGeometry(box());
@@ -4252,19 +4273,6 @@ A browser can take a WebGL context away (a driver reset, too many contexts, a la
 next frame throws `failed`, and `engine.rebootDevice()` refuses. `webglRestore` from `margoengine/webgl/restore` keeps a
 long session alive: frames pass without drawing and new geometry waits, then every program and buffer is made again and
 each scene's plugins hear `onDeviceRestored`. Like `webglPicking`, it does nothing on WebGPU or the compatibility layer.
-
-```ts
-import {Engine, box} from 'margoengine/core';
-import {webglRenderer} from 'margoengine/webgl';
-import {webglRestore} from 'margoengine/webgl/restore';
-
-const canvas = document.querySelector('canvas')!;
-const engine = await Engine.create(canvas, {backend: 'webgl2', fallback: webglRenderer});
-engine.createMesh().setGeometry(box());
-engine.use(webglRestore({timeout: 30_000}));
-engine.onError = (error) => console.error(error);
-engine.start();
-```
 
 [README continues: https://margoengine.com/llms/packages/webgl.md]
 
@@ -4738,6 +4746,10 @@ Build from source with `npm run build` in `packages/loaders`.
 ```ts
 import {Engine} from 'margoengine/core';
 import {load, parse3MF, parsePLY, createMeshes, toGeometry} from 'margoengine/loaders';
+import type {Mesh} from 'margoengine/core';
+declare const signal: AbortSignal;
+declare const mesh: Mesh;
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 
@@ -4752,7 +4764,7 @@ mesh.setGeometry(toGeometry(scan, {normals: 'smooth'}));
 
 Every parser returns the same `LoadedGeometry`:
 
-```ts
+```text
 {kind: 'mesh' | 'points', positions: Float32Array, normals?, colors? /* sRGB 0..1 */, uvs?, indices?: Uint32Array,
  groups?: {start, count, name?, objectId?, color?: [r, g, b, a]}[], attributes?: Record<string, Float32Array>}
 ```
@@ -4779,9 +4791,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
 | `parseLottie` (`/lottie`) | See [Lottie](#lottie) |
 | `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
-| `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
-| `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
-| `parseVTK
+| `parseLDraw` (`/ldraw`, async) | Se
 
 [README continues: https://margoengine.com/llms/packages/loaders.md]
 
@@ -4797,6 +4807,9 @@ Build from source with `npm run build` in `packages/decoders`.
 
 ```ts
 import {DracoDecoder, KTX2Decoder} from 'margoengine/decoders';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+declare const bytes: Uint8Array;
 
 const draco = new DracoDecoder({workerLimit: 4});
 const ktx2 = new KTX2Decoder({device: engine.gpu, workerLimit: 4});
@@ -4829,7 +4842,6 @@ stream the module will not read, the TypeScript decoder runs instead.
 
 ```ts
 import {MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD} from 'margoengine/decoders/meshopt-simd';
-
 declare const bytes: Uint8Array;
 
 await MeshoptSIMDDecoder.ready;
@@ -4848,7 +4860,6 @@ needs it. `jxlTextureFile` turns the result into a `TextureFile`.
 
 ```ts
 import {JXLDecoder, jxlTextureFile, uploadTexture} from 'margoengine/decoders/jxl';
-
 declare const device: GPUDevice;
 declare const file: ArrayBuffer;
 
@@ -4877,6 +4888,8 @@ Native binary and ASCII FBX import through Margo's first-party glTF exporter and
 ```ts
 import {loadFBX} from 'margoengine/fbx';
 import {Animation} from 'margoengine/animation';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const model = await loadFBX(engine, '/assets/character.fbx');
 const animation = Animation.attach(model);
 animation.play('Walking');
@@ -5068,6 +5081,7 @@ For files from users, use the worker entry: web-ifc 0.0.78 can loop forever insi
 
 ```js
 import {parseIFCInWorker} from 'margoengine/ifc/worker';
+declare const bytes: Uint8Array;
 const model=await parseIFCInWorker(bytes,{webIfc:'/ifc/web-ifc-api-iife.js',wasmPath:'/ifc/',timeoutMs:30_000});
 ```
 
@@ -5154,6 +5168,8 @@ min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and s
 ```ts
 import {AssetCache} from 'margoengine/cache';
 import {loadGLTF} from 'margoengine/gltf-pro';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const cache = new AssetCache({
   name: 'plant-viewer',    // IndexedDB database name
@@ -5210,7 +5226,6 @@ import {AssetCache} from 'margoengine/cache';
 import {LoadingManager} from 'margoengine/cache/manager';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {loadOBJ} from 'margoengine/loaders/mtl';
-
 declare const engine: EngineKernel;
 declare const dropped: Map<string, File>; // files dropped on the page, by name
 ```
@@ -5320,7 +5335,6 @@ Optional glTF clearcoat, sheen, specular color, anisotropy, iridescence, transmi
 import {createStage} from 'margoengine';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import * as materials from 'margoengine/materials';
-
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/glass.glb');
 const installation = materials.install(model);
@@ -5369,6 +5383,8 @@ Typed shader nodes that compile to readable WGSL. One graph API drives three hos
 import {createMesh, loadTexture} from 'margoengine/materials';
 import {sphereGeometry} from 'margoengine/geometry';
 import {NodeMaterial, uniform, texture, mix, color, uv, sin, time, positionLocal, normalLocal} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const tint = uniform('#ff8800', {name: 'tint'});                      // live: tint.value = '#00ff00' never recompiles
 const wave = sin(time.add(uv().y.mul(10))).mul(0.5).add(0.5);
 const map = await loadTexture('/rock.jpg', {wrapS: 'repeat', wrapT: 'repeat'});
@@ -5385,6 +5401,8 @@ createMesh(stage.engine, sphereGeometry(1, 64, 32), material);
 import {PostStack} from 'margoengine/post';
 import {Tonemap} from 'margoengine/tonemap';
 import {NodePass, inputColor, inputDepth, screenUV, smoothstep, mix, vec3, uniform} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const strength = uniform(0.8);
 const vignette = new NodePass(inputColor().rgb.mul(smoothstep(0.8, 0.2, screenUV.sub(0.5).length()).mul(strength)));
 const fog = new NodePass(mix(inputColor().rgb, vec3(0.6, 0.7, 0.8), inputDepth().mul(-40).add(1).saturate()), {kind: 'hdr'});
@@ -5393,6 +5411,8 @@ PostStack.attach(stage.engine, [fog, new Tonemap(), vignette]);      // hdr pass
 
 ```ts
 import {ComputePass, NodeMaterial, storage, vec4, deltaTime} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const field = storage(new Float32Array(4 * 1024), 'vec4f');          // or storage(1024, 'vec4f') for zeros
 ComputePass.attach(stage.engine, 1024, i => field.store(i, field.element(i).add(vec4(0, deltaTime, 0, 0))));
 new NodeMaterial({colorNode: field.element(3).xyz});                 // any node reads it; field.buffer(device) hands it to other passes
@@ -5402,6 +5422,9 @@ Cut-outs and slicing with `discard(condition, value)`, GPU counters and compacti
 
 ```ts
 import {NodeMaterial, ComputePass, storage, discard, texture, materialColor, positionWorld, uniform, select, uint} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+declare const n: number;
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const slice = uniform(1.5);
 new NodeMaterial({colorNode: discard(texture(leaf).a.lessThan(0.5), texture(leaf))});          // alpha cut-out
 new NodeMaterial({colorNode: discard(positionWorld.y.greaterThan(slice), materialColor)});   // section the part at y = slice
@@ -5416,21 +5439,6 @@ ComputePass.attach(stage.engine, n, i => {
 ```
 
 Statements: variables that change, branches that run one side only, loops that leave early:
-
-```ts
-import {block, If, Loop, Break, Var, NodeMaterial, ComputePass, storage, texture, uv, vec3, uint} from 'margoengine/shader';
-const march = block(() => {
-  const light = Var(vec3(0)), depth = Var(0);                          // Var(0, 'u32') for other types
-  Loop(64, () => {
-    const density = texture(fog, uv().add(depth), 0).r;                 // an explicit level: see Limits
-    If(density.greaterThan(0.95), () => Break());                       // stops this pixel's loop here
-    light.addAssign(vec3(density).mul(0.02));
-    depth.addAssign(0.01);
-  });
-  return light;
-});
-new NodeMaterial({colorNode: march});
-```
 
 [README continues: https://margoengine.com/llms/packages/shader.md]
 
@@ -5799,6 +5807,8 @@ Stepped diffuse ramps reuse creative/ToonShading. A second front-culled pass exp
 
 ```ts
 import {Toon} from 'margoengine/toon';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const toon = Toon.attach(engine, {bands: 4, rim: 0.15, outline: 0.025});
 ```
 
@@ -5808,6 +5818,8 @@ For toon shading per material, on materials meshes (plain, instanced, skinned) a
 
 ```ts
 import {ToonMaterial, createMesh, toonModel} from 'margoengine/materials';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 createMesh(engine, geometry, new ToonMaterial({color: '#e07040', steps: 3}));
 toonModel(character, {steps: 4});
 ```
@@ -5831,6 +5843,8 @@ meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through
 import {OIT} from 'margoengine/oit';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {Material, createMesh} from 'margoengine/materials';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const oit = OIT.attach(engine);                           // or OIT.attach(engine, {depthScale: 2})
 oit.add(await loadGLTF(engine, '/gearbox.glb'));          // its BLEND primitives
@@ -5850,7 +5864,6 @@ root entry. Core and the stage are unchanged.
 import {Engine, box, PbrMaterial} from 'margoengine/core';
 import {OIT} from 'margoengine/oit';
 import {addMesh} from 'margoengine/oit/meshes';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const oit = OIT.attach(engine);
 const mesh = engine.createMesh().setGeometry(box(1, 1, 1)).setMaterial(new PbrMaterial({color: '#9cc3e6'}));
@@ -5893,9 +5906,6 @@ orthographic.
 | 2 | 4.6 | 0.3 | 0.4 |
 | 4 | 8.7 | 0.6 | 0.8 |
 
-Over a `TransparentCanvas` the recovered alpha is within 0.002 of 1 − Π(1 − alpha) and the premultiplied colour within
-1.1 for 1, 2 and 4 layers. Inside a `PostStack` (Bloom + FXAA, HDR capture) one layer equals the sorted path exactly.
-
 [README continues: https://margoengine.com/llms/packages/oit.md]
 
 === @margoengine/lod (packages/lod/README.md) ===
@@ -5910,6 +5920,8 @@ GPU-baked octahedral imposters for the farthest level. Core is unchanged.
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
 import {LODSystem, Imposter} from 'margoengine/lod';
+import {loadGLTF} from 'margoengine/gltf-pro';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const lods = LODSystem.attach(engine, {hysteresis: 0.1});
 const imposter = Imposter.bake(engine, highGeometry, {material, frames: 12, frameSize: 128}); // once, at load
@@ -5951,8 +5963,7 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   correctly. Where the views still disagree (silhouettes), coverage cross-fades over blended alpha 0.25-0.75
   (alpha-to-coverage under MSAA, a fixed per-pixel dither at 1x) instead of a hard cut at 0.5. Each tile is sampled
   with its mip level computed from the smooth coordinate and clamped half a texel of the coarser level read, so
-  trilinear filtering never reaches a neighbouring view. Bounding-sphere frustum culling on the CPU, hidden anchors (or hidden
-  ancestors) are skipped, and all instances of one atlas are one instanced draw (order 1.5, after opaque meshe
+  trilinear filtering never reaches a neighbouring view. Bounding-sphere frustum culling on the CPU, hidden anchors (or
 
 [README continues: https://margoengine.com/llms/packages/lod.md]
 
@@ -5970,6 +5981,7 @@ however many parts there are. WebGPU only.
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
 import {CulledInstances} from 'margoengine/culling';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const parts = CulledInstances.attach(engine, [
@@ -5995,7 +6007,6 @@ download them:
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {CulledParts} from 'margoengine/culling/parts';
 import {Shadows} from 'margoengine/shadows';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const parts = CulledParts.attach(engine, [
   // capacity reserves slots for addParts; transforms may start empty.
@@ -6009,7 +6020,7 @@ const [arm, hand] = parts.addParts(0, new Float32Array([...at(0), ...at(2)]));
 // Hierarchy: hand's matrix is now relative to arm, and moving arm moves hand too.
 parts.setParent(0, hand, {batch: 0, index: arm});
 parts.setTransform(0, arm, at(0, 3));
-console.log(parts.getWorldMatrix(0, hand)[13]);   // 3
+console.log(parts.getWorldMatrix(0, hand)![13]);   // 3
 
 // Shadows: casts every shown part, inside the camera view or not; receiving works as on core meshes.
 Shadows.attach(engine, {resolution: 2048}).add(parts);
@@ -6035,7 +6046,6 @@ of items into those batches and says where each item went:
 ```ts
 import {Engine, PbrMaterial, box} from 'margoengine/core';
 import {CulledParts, groupParts} from 'margoengine/culling/parts';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const bolt = box(0.2, 0.2, 1);
 const items = Array.from({length: 500}, (_, n) => ({
@@ -6063,6 +6073,9 @@ Build from source with `npm run build` in `packages/points`.
 ```ts
 import {Engine} from 'margoengine/core';
 import {PointsPlugin, PointCloud, SpriteBatch, atlasRect} from 'margoengine/points';
+import type {Mesh} from 'margoengine/core';
+declare const mesh: Mesh;
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
@@ -6098,7 +6111,7 @@ canvas.addEventListener('click', event => {
 - **Depth.** Points test against the scene with reversed-Z `greater-equal` and opaque points write depth, so they hide behind meshes and occlude each other. Transparent materials blend without writing depth.
 - **Engine views.** Point sizes and level of detail follow the view being drawn. `pick(x, y)` picks through the canvas view under the point with that view's camera; `pick(x, y, {view: id})` through a named one (`RenderView.id`). A view not drawn for a frame is forgotten.
 - **Orthographic cameras.** Everything is read from `camera.matrix`, so any projection whose clip w is constant (such as `CameraProjection` from `@margoengine/cameras`) works without a dependency on it: world-unit sizes use the matrix's pixels per world unit and stay the same at every depth, sphere impostors write linear depth, eye-dome lighting shades linear depth steps (scaled like the log steps a perspective camera with the same zoom would give), block budgets ignore distance, and picking breaks ties by distance from the near plane (`depth` is then measured from the near plane).
-- **Sprites.** A `SpriteBatch` keeps 16 floats per sprite (position, rotation, size, pivot, atlas UV rectangle, color) in one
+- **S
 
 [README continues: https://margoengine.com/llms/packages/points.md]
 
@@ -6206,6 +6219,7 @@ Exports `Line` and `LineMaterial`, and `GridHelper`, `PolarGridHelper`, `AxesHel
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {Lines, Line, LineMaterial, GridHelper, AxesHelper, BoxHelper} from 'margoengine/lines';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const lines = new Lines();
@@ -6244,9 +6258,7 @@ dashed.dashOffset += 0.01;
 - **Color.** Colors are linear RGB (`'#rrggbb'` and `0xrrggbb` are sRGB and converted, like `PbrMaterial`). Output is sRGB-encoded for unorm canvas formats and left linear for `-srgb` and float targets such as the `rgba16float` target of the post-processing packages. Blending is straight alpha (`src-alpha, one-minus-src-alpha`).
 - **Plugin lifecycle.** The pass is `lines:draw` at frame-graph order 20, after the scene, sky and particles and before post-processing resolves at 30. GPU buffers are created lazily per line and rebuilt from the CPU copies in `onDeviceRestored`. `dispose()` (and `engine.removePlugin`) destroys every buffer and the pass; the lines stay registered with the plugin object, so it can be attached again.
 - **Mesh attachment.** `mesh` or `line.attach(mesh)` reads the mesh's world matrix from `engineRuntime(engine).store.matrices` each frame. A hidden or disposed mesh hides its lines. Unattached lines use `line.matrix` (identity by default).
-- **SSR safety.** Nothing touches `window`, `navigator` or GPU globals at import or construction time.
-
-## Options
+- **SSR safety.** Nothing touches `window`, `navigator` or GPU globals
 
 [README continues: https://margoengine.com/llms/packages/lines.md]
 
@@ -6265,6 +6277,7 @@ SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew, Arabic, Indic scripts and em
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {TextRenderer, Text, Font} from 'margoengine/text';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const text = TextRenderer.attach(engine);
@@ -6304,8 +6317,6 @@ title.layout.bounds;                  // {left, right, top, bottom}
 - **Blending and depth.** Premultiplied alpha blending, reversed-Z depth test (`greater-equal`) without depth writes, so overlapping glyph quads never z-fight. Blocks are sorted back to front; `onTop` blocks draw last with the depth test off.
 - **Placement.** World-oriented text uses its local matrix, times the attached mesh's world matrix from `engineRuntime(engine).store.matrices`. Billboard text keeps the model's origin and scale and spans the camera's right and up vectors. Text attached to a hidden or disposed mesh is skipped.
 - **Lifecycle.** `onDeviceRestored` rebuilds pipelines, buffers and atlases; `dispose` (via `removePlugin`) releases them. Texts stay registered.
-
-## Options
 
 [README continues: https://margoengine.com/llms/packages/text.md]
 
@@ -6491,6 +6502,13 @@ Build from source with `npm run build` in `packages/labels`.
 
 ```ts
 import {LabelRenderer} from 'margoengine/labels';
+import {Engine} from 'margoengine/core';
+import type {Mesh} from 'margoengine/core';
+declare const pump: Mesh;
+declare const screen: Mesh;
+declare const makeButton: () => HTMLElement;
+declare const isBlocked: (from: readonly number[], to: readonly number[]) => boolean;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const labels = LabelRenderer.attach(engine);
 
@@ -6503,7 +6521,7 @@ const label = labels.add(name, {mesh: pump, offset: [0, 0.8, 0], anchor: [0.5, 1
 const button = labels.add(makeButton(), {position: [2, 1, 0], pointerEvents: 'auto'});
 
 // A CSS 3D panel that rotates and scales with its mesh: 1 CSS pixel = 0.01 world units.
-const panel = labels.add3D(document.querySelector('#manual'), {mesh: screen, pixelScale: 0.005});
+const panel = labels.add3D(document.querySelector<HTMLElement>('#manual')!, {mesh: screen, pixelScale: 0.005});
 
 // Custom occlusion, for example a BVH raycast from the camera.
 labels.occlude = (label, info) => isBlocked(engine.camera.position, info.world); // your own test
@@ -6538,6 +6556,11 @@ World-space DOM anchors reuse labels' projection, frustum clipping, inherited vi
 
 ```ts
 import {HTML} from 'margoengine/html';
+import {Engine} from 'margoengine/core';
+import type {Mesh} from 'margoengine/core';
+declare const mesh: Mesh;
+const engine = await Engine.create(document.querySelector('canvas')!);
+declare const element: HTMLElement;
 const html = HTML.attach(engine);
 html.add(element, {mesh, offset: [0,1,0]});
 ```
@@ -6558,6 +6581,10 @@ WebGPU external video textures from HTMLVideoElement or VideoFrame, imported wit
 
 ```ts
 import {Video} from 'margoengine/video';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+declare const videoElement: HTMLVideoElement;
+declare const audioContext: AudioContext;
 const surface = Video.attach(engine, videoElement, {rect: [0.1,0.1,0.8,0.8], audio: audioContext});
 const bins = surface.sampleFrequency();
 ```
@@ -6718,6 +6745,7 @@ background, nothing). No light direction and no shadow map, so it works with or 
 import {Engine} from 'margoengine/core';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {ContactShadows} from 'margoengine/staging';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const model = await loadGLTF(engine, '/shoe.glb');
@@ -6775,6 +6803,12 @@ its offscreen PNGs, so exports match what is on screen.
 
 ```js
 import { ImagePost } from 'margoengine/post/image';
+import {Engine} from 'margoengine/core';
+declare const width: number;
+declare const height: number;
+declare const samples: number;
+declare const signal: AbortSignal;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const post = ImagePost.attach(engine, { bloom: { strength: 0.8, threshold: 1, radius: 0.5 } });
 const png = await post.capture(await tracer.renderImage({ width, height, samples }), { signal });
@@ -6814,25 +6848,6 @@ const stack = PostStack.attach(stage.engine, [new SSAO(), new DOF({focalDistance
 // TAA wraps the stack: TAA.attach(stage.engine, {depth: () => stack.depthTexture});
 stack.dispose(); // also disposes its effects
 ```
-
-- Order is HDR effects (`SSAO`, `SSR`, `DOF`, `Bloom`, `Afterimage`), then at most one display effect (`Tonemap` or
-  creative `PostProcessing`), then LDR effects (`SMAA` or `FXAA`, then `Glitch`). Anything else throws, and so does a
-  stack holding both `SMAA` and `FXAA` (`TypeError`: keep one anti-aliasing effect). Put SSAO first: it
-  darkens the captured ambient light. Put SSR before DOF and Bloom so reflections are blurred and glow too.
-- HDR effects hand linear light to the next effect. Without a display effect, the last HDR effect
-  tonemaps exactly as it does alone, with Margo's display curve (Khronos PBR Neutral, then sRGB), as core does.
-- The stack attaches its effects; keep references to change their options. Effects given to a stack
-  belong to it and cannot also be attached alone. Disposing one effect drops it from the chain.
-- Standalone Bloom, SSAO, DOF, Tonemap or PostProcessing on the same engine are refused.
-  `stack.depthTexture` (and each member's `depthTexture`) is the shared resolved depth. A stack with
-  only LDR effects keeps the core shader's own display mapping.
-- `stack.sceneTexture` is the shared 1x linear HDR capture (`rgba16float`) when the stack has an HDR or
-  display effect (undefined otherwise). It is what `@margoengine/water` refracts, so water refraction works
-  together with SSAO: `Water.attach(engine, {depth: () => stack.depthTexture, sceneColor: () => stack.sceneTexture})`.
-  Water draws into the capture before the stack's effects run. Real-GPU check:
-  `packages/water/test/stack.browser.mjs` (refraction shows an underwater block, SSAO active in the same frame).
-- Intermediate targets are two `rgba16float` and up to two canvas-format textures, created on first
-  use and kept until resize or device restoration. Steady frames create no GPU objects.
 
 [README continues: https://margoengine.com/llms/packages/post.md]
 
@@ -6988,6 +7003,8 @@ WebGPU scene-to-scene wipes, seeded pixel-noise dissolves, radial clock wipes an
 
 ```ts
 import {Transitions} from 'margoengine/transitions';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const transitions = Transitions.attach(engine);
 engine.render(); // establishes the outgoing image
 transitions.start('dissolve', 0.75);
@@ -7220,6 +7237,10 @@ equations or images.
 
 ```ts
 import { VoxelPathTracer, type VoxelTraceScene } from 'margoengine/voxel-pathtracer';
+import {Engine} from 'margoengine/core';
+declare const voxels: Uint8Array;
+declare const signal: AbortSignal;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const scene: VoxelTraceScene = {
   revision: 1,
@@ -7244,30 +7265,6 @@ tracer.dispose();
 
 Everything is in Margo's **Y-up** world. Convert MagicaVoxel's Z-up `.vox` data at your boundary.
 
-- **Models** are dense arrays of palette indices (`Uint8Array`, 0 empty, 1-255 occupied), sizes 1-256 per axis, indexed
-  `x + size[0] * (z + size[2] * y)` (x fastest, then z, then y). In model space voxel `(x, y, z)` fills the unit cube
-  from `(x, y, z)` to `(x + 1, y + 1, z + 1)`, so the model spans `[0, size]`. Put pivots in the instance matrix.
-- **Instances** place a model with a column-major model-to-world `matrix` (16 finite numbers, affine, invertible:
-  translation, rotation, non-uniform scale, shear and mirroring all work). Any number of instances share one model's
-  data; each keeps its id (`raycast`, AOVs). `visible: false` hides one.
-- **Materials** are keyed by palette index. Every index any model uses needs one.
-- **Large and sparse models** (addition). A model may be up to 2048 cells per axis, and may give its contents as
-  `blocks` instead of `voxels`: dense windows (`origin`, `size`, `voxels`) inside it, cells no block covers empty,
-  later blocks winning where they overlap. Only the bricks a block touches are read: a 2048 x 64 x 2048 world with
-  two small blocks attaches in 9 ms (RTX A6000 machine) and holds its 2 MiB brick grid plus those bricks. One model
-  instead of tiles also keeps volumes whole: glass or media cut into tiles get an interface wherever two tiles meet
-  (measured: a 400-cell glass bar as one model renders exactly like a 200-cell bar stretched 2x; as two 200-cell tiles
-  the image differs by RMS 0.85). Dense `voxels` and the same cells as `blocks` pack identically.
-- **Half-block shapes** (addition). A model's `shapes` (and each block's, with `blocks`) gives one byte per cell in
-  `voxels` order: 0 or 255 for a whole cell, else an octant mask, bit `x + 2y + 4z` for the half cell at (x, y, z) (0
-  the low half on that axis, 1 the high), as `shapeOctants` of `@margoengine/voxel` gives for slabs and stairs. A
-  shaped cell is hit, shadowed, entered and left as its filled half blocks only; `raycast` reports the box face hit and
-  its point. Bricks holding a shaped cell carry 512 more bytes for the masks. A cut-out shaped cell is cut per run
-  through its filled half blocks (the texel where the ray enters them, else the one where it leaves), and an emissive
-  one is light-sampled as quarter faces, mid-cell ones included.
-- **Model material tables** (addition). A model's own `materials` replace `scene.materials` for its voxels, so a scene
-  holds any number of distinct materials (255 per table), as model banks of an editor do: two models may give pale
-
 [README continues: https://margoengine.com/llms/packages/voxel-pathtracer.md]
 
 === @margoengine/voxel-edit (packages/voxel-edit/README.md) ===
@@ -7285,6 +7282,10 @@ import { combineGrids, mergePalettes, rotateGrid, type VoxelGrid } from 'margoen
 import { sphereCells, connectedCells } from 'margoengine/voxel-edit/edit';
 import { pickRay, raycastGrid } from 'margoengine/voxel-edit/pick';
 import { meshGrid } from 'margoengine/voxel-edit/mesh';
+import {Engine} from 'margoengine/core';
+declare const ndcX: number;
+declare const ndcY: number;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const model: VoxelGrid = { size: [32, 32, 32], voxels: new Uint8Array(32 * 32 * 32) };
 const { grid } = rotateGrid(model, { axis: 'y', degrees: 90 }); // a new grid; `model` is unchanged
@@ -7334,6 +7335,8 @@ A separate WebGPU water grid evaluates up to eight swell trains with analytical 
 
 ```ts
 import {Water} from 'margoengine/water';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const water = Water.attach(engine, {size: [100,100], segments: 128, height: 0});
 ```
 
@@ -7351,6 +7354,8 @@ surfaces. Use a size that keeps the shoreline and terrain map within 37.5% of
 
 ```ts
 import {Water} from 'margoengine/water';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 // A 4 km sea on 8 m cells: the swell follows the camera to the horizon.
 const sea = Water.attach(engine, {
   size: [4096, 4096],
@@ -7464,6 +7469,8 @@ candidate; [docs/limits.md](../../docs/limits.md) ("Scatter cull in candidate or
 
 ```ts
 import {Scatter} from 'margoengine/scatter';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const scatter = Scatter.attach(engine, [nearGeometry, midGeometry, farGeometry], {
   count: 10000, area: [50,50], density: 0.8, maxSlope: 45, lod: [25,60,120], lodFade: 2
 });
@@ -7492,6 +7499,8 @@ distribute shader stays the same text.
 
 ```ts
 import { Scatter } from '@margoengine/scatter';
+import {Engine} from '@margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const farTrees = Scatter.attach(engine, standIn, {
   count: 100_000,
@@ -7515,6 +7524,8 @@ Arc-length spline sweeps generate a road surface, raised curbs, hard cross-secti
 
 ```ts
 import {road} from 'margoengine/road';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const {geometry, uvs} = road(curve, {width: 6, curbWidth: 0.2, curbHeight: 0.15, uvMeters: 5});
 engine.createMesh().setGeometry(geometry);
 ```
@@ -7772,7 +7783,7 @@ invalid level throws a `RangeError`.
 
 ```ts
 import {generateTreeMesh} from 'margoengine/procedural';
-const rings = [2, 1, 0].map((detail) => generateTreeMesh('broadleaf', {detail})); // near, middle, far
+const rings = ([2, 1, 0] as const).map((detail) => generateTreeMesh('broadleaf', {detail})); // near, middle, far
 ```
 
 For a cove scene there are two waterfront props, each one `GeometryData` mesh with UVs, tangents and unit normals,
@@ -8222,6 +8233,8 @@ A virtual camera with analytically integrated critically damped follow and look-
 
 ```ts
 import {Cinematic} from 'margoengine/cinematic';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const rig = Cinematic.attach(engine, {offset: [0,3,6], damping: 6});
 rig.follow(player);
 rig.shake(0.2, 0.4);
@@ -8233,6 +8246,8 @@ Scope the rig with `using` (it calls `dispose()` and returns the camera to your 
 
 ```ts
 import {Cinematic} from 'margoengine/cinematic';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 {
   using rig = Cinematic.attach(engine, {offset: [0, 3, 6]});
   rig.follow([0, 1.6, 0]);
@@ -8466,6 +8481,9 @@ same view. It uses core's `camera.project` and `camera.up` hooks.
 ```ts
 import {Engine} from 'margoengine/core';
 import {CameraProjection} from 'margoengine/cameras';
+import type {PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas, {camera: {position: [0, 40, 0], target: [0, 0, 0]}}); // straight down
 const projection = CameraProjection.attach(engine); // orthographic, framed like the perspective view at the target
@@ -8707,6 +8725,7 @@ import {Engine} from 'margoengine/core';
 import {CameraProjection} from 'margoengine/cameras';
 import {OrbitControls} from 'margoengine/controls';
 import {ViewCube} from 'margoengine/viewcube';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);           // the canvas needs a parent element; the cube is placed in it
 const projection = CameraProjection.attach(engine, {mode: 'perspective'});
@@ -8766,6 +8785,10 @@ Visible core and PBR selection outlines using Jump Flood Algorithm distance fiel
 
 ```ts
 import {Selection} from 'margoengine/selection';
+import {Engine} from 'margoengine/core';
+import type {Mesh} from 'margoengine/core';
+declare const mesh: Mesh;
+const engine = await Engine.create(document.querySelector('canvas')!);
 const selection = Selection.attach(engine, {algorithm: 'jfa', width: 3, color: [1,0.5,0]});
 selection.set([mesh]);
 ```
@@ -8774,6 +8797,10 @@ selection.set([mesh]);
 
 ```ts
 import {Picking} from 'margoengine/selection';
+import {Engine} from 'margoengine/core';
+declare const x: number;
+declare const y: number;
+const engine = await Engine.create(document.querySelector('canvas')!);
 const picking = Picking.attach(engine);
 const mesh = await engine.pick(x, y);
 ```
@@ -8794,6 +8821,8 @@ point's view are picked one at a time.
 
 ```ts
 import {Picking} from 'margoengine/selection';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const picking = Picking.attach(engine);
 const hits = await picking.pickMany([[10, 20], [64, 64], [120, 40]]);
 const meshes = hits.map((hit) => hit?.mesh ?? null);
@@ -8806,18 +8835,6 @@ const meshes = hits.map((hit) => hit?.mesh ?? null);
 `picking.addOverlay(overlay)` is the hook it uses: an overlay draws into the 3 x 3 pick tile after every mesh, with IDs from `firstId`, and `pickHit(index)` turns an ID back into a hit. Up to 8 overlays; each owns 2^28 IDs. While one is registered, picks use the 3 x 3 pass rather than the cached ID texture.
 
 ## Marquee, lasso, hover and face/edge/vertex picking
-
-`SelectionTool` drags a rubber band (or, with `shape: 'lasso'`, a free-form outline) over the canvas: Shift + drag replaces
-the selection, Shift + Ctrl adds, Shift + Alt removes. It stops a matching press from reaching later listeners, so create it
-before the camera controls. `HoverHighlight` outlines the mesh under the mouse with its own `Selection`. `selectInRect` and
-`selectInPolygon` are the same tests as plain functions, and `pickElement` returns the face, nearest vertex and nearest edge
-under a pixel. Both selection modes test each mesh's projected bounding sphere: `mode: 'center'` (default), `'overlap'` (a
-crossing window) or `'contain'` (a window).
-
-```ts
-import {Picking, Selection, SelectionTool, HoverHighlight, pickElement} from 'margoengine/selection';
-import type {EngineKernel} from 'margoengine/core';
-```
 
 [README continues: https://margoengine.com/llms/packages/selection.md]
 
@@ -8833,6 +8850,15 @@ Build from source with `npm run build` in `packages/audio`.
 
 ```ts
 import {AudioListener, Audio, PositionalAudio, AudioVoicePool, AudioAnalyser} from 'margoengine/audio';
+import {Engine} from 'margoengine/core';
+import type {Mesh} from 'margoengine/core';
+declare const truck: Mesh;
+declare const timeline: {seconds: number; playing: boolean; speed: number};
+declare const meter: HTMLElement;
+declare const x: number;
+declare const y: number;
+declare const z: number;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const listener = AudioListener.attach(engine, {volume: 0.8}); // follows engine.camera every frame; resumes on the first click or key press
 
@@ -8845,7 +8871,7 @@ engineSound.loop = true;
 engineSound.fadeIn(0.5);
 
 const music = new Audio(listener, {volume: 0.4});
-music.setMediaElementSource(document.querySelector('audio')).play();
+music.setMediaElementSource(document.querySelector('audio')!).play();
 
 // A sound on an editor timeline: starts at timeline second 4, follows play, pause, scrubbing and timeline speed.
 const cue = new Audio(listener, {volume: 0.6, loop: false, timelineStart: 4});
@@ -9495,6 +9521,7 @@ Bounded snapshot interpolation for position, quaternion and velocity, with cappe
 
 ```ts
 import {SnapshotBuffer, createSnapshot} from 'margoengine/net';
+declare const renderTimeSeconds: number;
 const buffer = new SnapshotBuffer(32);
 const output = createSnapshot();
 // buffer.push(timeSeconds, position, quaternion, velocity)
@@ -9592,6 +9619,13 @@ await server.listen(8787, '0.0.0.0');
 
 // Client (browser): the world fills from the server; lighting and the renderer follow world.onChunk as usual.
 import { connectVoxelNet, Keys } from 'margoengine/voxel-net';
+import {Engine} from 'margoengine/core';
+declare const yaw: number;
+declare const pitch: number;
+declare const x: number;
+declare const y: number;
+declare const z: number;
+const engine = await Engine.create(document.querySelector('canvas')!);
 const client = connectVoxelNet('ws://127.0.0.1:8787', world, { name: 'Ada', view: 6 });
 engine.onFrame((_, dt) => {
   client.update(dt, { keys: Keys.forward | Keys.jump, yaw, pitch }); // moves client.player at 1/120 s steps
@@ -9655,6 +9689,8 @@ query correctness and traversal cost without changing mesh data, public signatur
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {MeshBVH, Raycaster, buildAsync, computeGeometryBVHAsync} from 'margoengine/bvh';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
 
 // Engine picking: canvas CSS pixels in, sorted hits out.
 const raycaster = new Raycaster();
@@ -9727,6 +9763,7 @@ Build from source with `npm run build` in `packages/geometry`.
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
 import {CatmullRomCurve3, Path, Shape, computeTangents, extrudeGeometry, sphereGeometry, toGeometry, tubeGeometry} from 'margoengine/geometry';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 // Radius, width segments, height segments.
 const sphere = computeTangents(sphereGeometry(1, 48, 24));

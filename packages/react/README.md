@@ -130,6 +130,8 @@ the explicit form.
 import { BoxGeometry, Mesh } from '@margoengine/react';
 import { Box } from '@margoengine/react/geometry';
 import { MeshTransmissionMaterial } from '@margoengine/react/materials';
+declare const x: number;
+declare const y: number;
 
 export function Both() {
   return (
@@ -174,7 +176,7 @@ In a Playwright test, click and then wait for the state:
 
 ```js
 await page.mouse.click(x, y);
-await page.waitForFunction(() => document.querySelector('#selected').textContent === 'crate');
+await page.waitForFunction(() => document.querySelector('#selected')!.textContent === 'crate');
 ```
 
 ## Models and environment

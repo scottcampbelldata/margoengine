@@ -8,6 +8,8 @@ GPU-baked octahedral imposters for the farthest level. Core is unchanged.
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
 import {LODSystem, Imposter} from 'margoengine/lod';
+import {loadGLTF} from 'margoengine/gltf-pro';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const lods = LODSystem.attach(engine, {hysteresis: 0.1});
 const imposter = Imposter.bake(engine, highGeometry, {material, frames: 12, frameSize: 128}); // once, at load
@@ -279,7 +281,7 @@ const stage = await createStage('#viewport', {backend: 'webgpu'});
 const lods = LODSystem.attach(stage.engine);
 const data = new Uint8Array(4 * 4 * 4).fill(200);
 const map = new Texture({data, width: 4, height: 4});
-const mesh = createMesh(stage.engine, sphereGeometry({radius: 1}), new PbrMaterial({map}));
+const mesh = createMesh(stage.engine, sphereGeometry(1), new PbrMaterial({map}));
 const lod = await autoLOD(lods, mesh, {ratios: [0.5, 0.25]}); // levels hang under mesh.root and go with the mesh
 ```
 
@@ -305,6 +307,8 @@ import { Animation } from '@margoengine/animation';
 import { loadGLTF } from '@margoengine/gltf-pro';
 import { LODSystem } from '@margoengine/lod';
 import { autoLOD } from '@margoengine/lod/auto';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 
 const lods = LODSystem.attach(stage.engine);
 const fox = await loadGLTF(stage.engine, '/fox.glb');

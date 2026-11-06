@@ -6,6 +6,10 @@ Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB
 
 ```ts
 import {Vector3, Quaternion, Euler, Color} from 'margoengine/math';
+import {Engine} from 'margoengine/core';
+import type {Mesh} from 'margoengine/core';
+declare const mesh: Mesh;
+const engine = await Engine.create(document.querySelector('canvas')!);
 const position = new Vector3(0, 1, 0).addScaledVector(new Vector3(1, 0, 0), 2);
 mesh.setPosition(position.toArray()).setQuaternion(new Quaternion().setFromEuler(new Euler(0, Math.PI / 4, 0)).toArray());
 engine.camera.position = new Vector3().copy(mesh.position).add(new Vector3(0, 2, 5)).toArray();
@@ -76,6 +80,9 @@ a camera that has not drawn yet. Orthographic views from `@margoengine/cameras` 
 
 ```ts
 import {Vector3, screenToWorld, worldToScreen} from 'margoengine/math';
+import {Engine} from 'margoengine/core';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
 const {clientWidth: width, clientHeight: height} = canvas;
 const spot = worldToScreen(new Vector3(0, 2, 0), engine.camera, width, height, new Vector3());
 if (spot) label.style.transform = `translate(${spot.x}px, ${spot.y}px)`; // null: behind the camera, hide the label
@@ -147,11 +154,13 @@ an animation has. Per frame, for unparented meshes:
 ```ts
 import {Matrix4, Vector3} from 'margoengine/math';
 import {billboardDirection, billboardRotation} from 'margoengine/math/billboard';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const c = engine.camera,
   eye = new Vector3(...c.position),
   cameraWorld = new Matrix4().lookAt(eye, new Vector3(...c.target), new Vector3(...c.up)).setPosition(eye).elements;
 for (const mesh of billboards) {
-  const p = [mesh.position.x, mesh.position.y, mesh.position.z];
+  const p: [number, number, number] = [mesh.position.x, mesh.position.y, mesh.position.z];
   mesh.setQuaternion(billboardRotation(cameraWorld, p, {lockY: true, snap: 45}));
   play(`walk_${billboardDirection(heading, [eye.x - p[0], eye.y - p[1], eye.z - p[2]])}`);
 }

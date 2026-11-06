@@ -16,6 +16,13 @@ await server.listen(8787, '0.0.0.0');
 
 // Client (browser): the world fills from the server; lighting and the renderer follow world.onChunk as usual.
 import { connectVoxelNet, Keys } from 'margoengine/voxel-net';
+import {Engine} from 'margoengine/core';
+declare const yaw: number;
+declare const pitch: number;
+declare const x: number;
+declare const y: number;
+declare const z: number;
+const engine = await Engine.create(document.querySelector('canvas')!);
 const client = connectVoxelNet('ws://127.0.0.1:8787', world, { name: 'Ada', view: 6 });
 engine.onFrame((_, dt) => {
   client.update(dt, { keys: Keys.forward | Keys.jump, yaw, pitch }); // moves client.player at 1/120 s steps

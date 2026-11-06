@@ -40,6 +40,8 @@ picture after TAA must not write `resolved`: TAA reads it as history next frame.
 import {TAA} from 'margoengine/taa';
 import {PostStack} from 'margoengine/post';
 import {MotionBlur} from 'margoengine/post/motion-blur';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 let taa;
 const stack = PostStack.attach(stage.engine, [new MotionBlur({velocity: () => taa?.velocity})]);
 taa = TAA.attach(stage.engine, {velocityOnly: true, depth: () => stack.depthTexture});

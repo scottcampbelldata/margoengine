@@ -16,6 +16,10 @@ equations or images.
 
 ```ts
 import { VoxelPathTracer, type VoxelTraceScene } from 'margoengine/voxel-pathtracer';
+import {Engine} from 'margoengine/core';
+declare const voxels: Uint8Array;
+declare const signal: AbortSignal;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const scene: VoxelTraceScene = {
   revision: 1,
@@ -313,7 +317,6 @@ picks and device restores, with the same options.
 import { Engine } from 'margoengine/core';
 import { install } from 'margoengine/webgl2-compat';
 import { VoxelPathTracer, type VoxelTraceScene } from 'margoengine/voxel-pathtracer';
-
 const canvas = document.querySelector('canvas')!;
 const scene: VoxelTraceScene = {
   revision: 1,

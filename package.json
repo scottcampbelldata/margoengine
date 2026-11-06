@@ -172,6 +172,7 @@
     "check:gpu-packages": "node scripts/gpu-package-tests.mjs",
     "check:depth": "node scripts/test-depth-browser.mjs",
     "check:merge": "node scripts/check-merge.mjs",
+    "check:readmes": "node scripts/check-readme-types.mjs",
     "check:engines": "node scripts/check-engines.mjs",
     "check:node-apis": "node scripts/check-node-apis.mjs",
     "test:node22": "node scripts/node22-tests.mjs",

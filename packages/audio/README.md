@@ -8,6 +8,15 @@ Build from source with `npm run build` in `packages/audio`.
 
 ```ts
 import {AudioListener, Audio, PositionalAudio, AudioVoicePool, AudioAnalyser} from 'margoengine/audio';
+import {Engine} from 'margoengine/core';
+import type {Mesh} from 'margoengine/core';
+declare const truck: Mesh;
+declare const timeline: {seconds: number; playing: boolean; speed: number};
+declare const meter: HTMLElement;
+declare const x: number;
+declare const y: number;
+declare const z: number;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const listener = AudioListener.attach(engine, {volume: 0.8}); // follows engine.camera every frame; resumes on the first click or key press
 
@@ -20,7 +29,7 @@ engineSound.loop = true;
 engineSound.fadeIn(0.5);
 
 const music = new Audio(listener, {volume: 0.4});
-music.setMediaElementSource(document.querySelector('audio')).play();
+music.setMediaElementSource(document.querySelector('audio')!).play();
 
 // A sound on an editor timeline: starts at timeline second 4, follows play, pause, scrubbing and timeline speed.
 const cue = new Audio(listener, {volume: 0.6, loop: false, timelineStart: 4});

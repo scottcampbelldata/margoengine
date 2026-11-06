@@ -8,6 +8,8 @@ Typed shader nodes that compile to readable WGSL. One graph API drives three hos
 import {createMesh, loadTexture} from 'margoengine/materials';
 import {sphereGeometry} from 'margoengine/geometry';
 import {NodeMaterial, uniform, texture, mix, color, uv, sin, time, positionLocal, normalLocal} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const tint = uniform('#ff8800', {name: 'tint'});                      // live: tint.value = '#00ff00' never recompiles
 const wave = sin(time.add(uv().y.mul(10))).mul(0.5).add(0.5);
 const map = await loadTexture('/rock.jpg', {wrapS: 'repeat', wrapT: 'repeat'});
@@ -24,6 +26,8 @@ createMesh(stage.engine, sphereGeometry(1, 64, 32), material);
 import {PostStack} from 'margoengine/post';
 import {Tonemap} from 'margoengine/tonemap';
 import {NodePass, inputColor, inputDepth, screenUV, smoothstep, mix, vec3, uniform} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const strength = uniform(0.8);
 const vignette = new NodePass(inputColor().rgb.mul(smoothstep(0.8, 0.2, screenUV.sub(0.5).length()).mul(strength)));
 const fog = new NodePass(mix(inputColor().rgb, vec3(0.6, 0.7, 0.8), inputDepth().mul(-40).add(1).saturate()), {kind: 'hdr'});
@@ -32,6 +36,8 @@ PostStack.attach(stage.engine, [fog, new Tonemap(), vignette]);      // hdr pass
 
 ```ts
 import {ComputePass, NodeMaterial, storage, vec4, deltaTime} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const field = storage(new Float32Array(4 * 1024), 'vec4f');          // or storage(1024, 'vec4f') for zeros
 ComputePass.attach(stage.engine, 1024, i => field.store(i, field.element(i).add(vec4(0, deltaTime, 0, 0))));
 new NodeMaterial({colorNode: field.element(3).xyz});                 // any node reads it; field.buffer(device) hands it to other passes
@@ -41,6 +47,9 @@ Cut-outs and slicing with `discard(condition, value)`, GPU counters and compacti
 
 ```ts
 import {NodeMaterial, ComputePass, storage, discard, texture, materialColor, positionWorld, uniform, select, uint} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+declare const n: number;
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const slice = uniform(1.5);
 new NodeMaterial({colorNode: discard(texture(leaf).a.lessThan(0.5), texture(leaf))});          // alpha cut-out
 new NodeMaterial({colorNode: discard(positionWorld.y.greaterThan(slice), materialColor)});   // section the part at y = slice
@@ -58,6 +67,9 @@ Statements: variables that change, branches that run one side only, loops that l
 
 ```ts
 import {block, If, Loop, Break, Var, NodeMaterial, ComputePass, storage, texture, uv, vec3, uint} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+declare const n: number;
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const march = block(() => {
   const light = Var(vec3(0)), depth = Var(0);                          // Var(0, 'u32') for other types
   Loop(64, () => {
@@ -266,6 +278,8 @@ createMesh(stage.engine, planeGeometry(2, 2), rock);
 ```ts
 import {storage, uint} from 'margoengine/shader';
 import {computeReadback} from 'margoengine/shader/readback';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const source = storage(Uint32Array.from(cells), 'u32'), output = storage(cells.length, 'u32');
 const controller = new AbortController();
 const {data} = await computeReadback(stage.engine, cells.length, i => output.store(i, source.element(i).add(uint(1))), output, {
@@ -378,7 +392,6 @@ import {loadGLTF} from 'margoengine/gltf-pro';
 import {Animation} from 'margoengine/animation';
 import {NodeMaterial, positionWorld, sin, time, vec3} from 'margoengine/shader';
 import {skinningFromModel, worldNormal} from 'margoengine/shader/deform';
-
 const stage = await createStage('#app', {autoStart: false});
 const {engine} = stage;
 const model = await loadGLTF(engine, '/fox.glb');
@@ -556,6 +569,8 @@ In `lightingNode`, `normalWorld` is the shading normal, after normal maps and `n
 
 ```ts
 import {ComputePass, Loop, If, Var, globalId, localIndex, storage, uint, workgroup, workgroupBarrier} from 'margoengine/shader';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const input = storage(Uint32Array.from(values), 'u32'), sums = storage(values.length, 'u32');
 const tile = workgroup(256, 'u32');
 ComputePass.attach(stage.engine, values.length, i => {         // values.length: a multiple of 256, as it has barriers
@@ -674,6 +689,8 @@ scene's colour and depth. Raw meshes also cast shadows, write SSAO's G-buffer, a
 
 ```ts
 import {RawShaders, RawShaderMaterial, RawMesh} from 'margoengine/shader/raw';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const raw = RawShaders.attach(stage.engine);
 const material = new RawShaderMaterial({
   vertexShader: `
@@ -818,6 +835,8 @@ default (after tonemapping, on display colour); `{kind: 'hdr'}` runs one on line
 import {PostStack} from 'margoengine/post';
 import {Tonemap} from 'margoengine/tonemap';
 import {vignette, rgbShift} from 'margoengine/shader/effects';
+import {createStage} from 'margoengine';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
 const look = vignette({darkness: 0.6}), shift = rgbShift({amount: 0.004});
 PostStack.attach(stage.engine, [new Tonemap(), shift, look]);
 look.uniforms.darkness.value = 0.9;                   // live

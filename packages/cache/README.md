@@ -10,6 +10,8 @@ min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and s
 ```ts
 import {AssetCache} from 'margoengine/cache';
 import {loadGLTF} from 'margoengine/gltf-pro';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const cache = new AssetCache({
   name: 'plant-viewer',    // IndexedDB database name
@@ -66,7 +68,6 @@ import {AssetCache} from 'margoengine/cache';
 import {LoadingManager} from 'margoengine/cache/manager';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {loadOBJ} from 'margoengine/loaders/mtl';
-
 declare const engine: EngineKernel;
 declare const dropped: Map<string, File>; // files dropped on the page, by name
 
@@ -147,7 +148,9 @@ then also covers loads made inside workers:
 // sw.js (module service worker)
 import {AssetCache} from 'margoengine/cache';
 const cache = new AssetCache({name: 'plant-viewer', version: '2026.10', maxBytes: 2 ** 30});
-self.addEventListener('fetch', event => {
+type FetchEvent = Event & {request: Request; respondWith(response: Promise<Response>): void};
+self.addEventListener('fetch', e => {
+  const event = e as FetchEvent;
   if (/\.(glb|gltf|bin|ktx2|png|jpg|webp|stl|wasm|js)$/i.test(new URL(event.request.url).pathname))
     event.respondWith(cache.fetch(event.request));
 });

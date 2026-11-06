@@ -10,6 +10,7 @@ optional packages that need WebGPU stay unavailable on this path. Picking is the
 ```ts
 import {Engine} from 'margoengine/core';
 import {webglRenderer} from 'margoengine/webgl';
+const canvas = document.querySelector('canvas')!;
 
 // WebGPU when available, otherwise WebGL2.
 const engine = await Engine.create(canvas, {backend: 'auto', fallback: webglRenderer});
@@ -25,6 +26,7 @@ this package, because the dynamic import is a separate chunk that never runs for
 
 ```ts
 import {Engine} from 'margoengine/core';
+const canvas = document.querySelector('canvas')!;
 
 const fallback = navigator.gpu ? undefined : (await import('margoengine/webgl')).webglRenderer;
 const engine = await Engine.create(canvas, {fallback});
@@ -48,7 +50,6 @@ already runs, so load it only on the preview:
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {webglRenderer} from 'margoengine/webgl';
-
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgl2', fallback: webglRenderer});
 const crate = engine.createMesh().setGeometry(box());
@@ -82,7 +83,6 @@ each scene's plugins hear `onDeviceRestored`. Like `webglPicking`, it does nothi
 import {Engine, box} from 'margoengine/core';
 import {webglRenderer} from 'margoengine/webgl';
 import {webglRestore} from 'margoengine/webgl/restore';
-
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgl2', fallback: webglRenderer});
 engine.createMesh().setGeometry(box());

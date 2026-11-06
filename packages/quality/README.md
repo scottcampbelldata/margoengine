@@ -10,6 +10,7 @@ the GPU), and no rule based on device names is involved.
 ```ts
 import {applyQualityTier, paceEngine, watchQuality} from 'margoengine/quality';
 import {Engine} from 'margoengine/core';
+const canvas = document.querySelector('canvas')!;
 
 applyQualityTier();                       // before creating the engine
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
@@ -191,6 +192,8 @@ without `discard`: tile-based phone GPUs then keep early depth rejection under d
 ```ts
 import {applyQualityTier, qualityPreset} from 'margoengine/quality';
 import {Shadows} from 'margoengine/shadows';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 applyQualityTier();                                  // light tier: margoPreset.shadows = {resolution: 1024}
 const shadows = Shadows.attach(engine, {distance: 120});              // 1024 on light, 2048 on the full tier
@@ -217,6 +220,8 @@ const particles = qualityPreset().vfx?.capacity ?? 1_000_000;          // read a
 ```ts
 import {warmUp} from 'margoengine/quality/warm';
 import {redrawAfterRestore} from 'margoengine/quality';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 // ...attach features and build the scene, then, still behind the loading screen:
 const report = await warmUp(engine);      // {pipelines, fallbacks, rounds, rebooted}

@@ -158,6 +158,23 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### 329 errors in the package README examples
+
+- **What:** `npm run check:readmes` (a step of `verify`) type-checks all 719 examples of the 100 packages. When the check was built it found 715 errors in 181 examples; 388 were fixed in the same commit, and with two more from a selection example that landed the same day 329 remain, in 42 packages (voxel 56, materials 40, scatter 29, shader 23, bvh 20, cameras 17, ragdoll 16, the rest 10 or fewer). `scripts/support/readme-types-known.json` lists each by package and message. A new error fails `verify`, and so does an entry that has been fixed and not removed, so the list only shrinks.
+- **Repro:** empty the known list to `{}`, then `npm run build:packages` and `npm run check:readmes`.
+- **Cause:** 285 are names an example uses and never sets up, reader data such as `physics`, `textures` or `candidates`. The README says "runs as written" and these do not. The other 42 are mostly real faults in published types, below. Six of them are `GPUTextureUsage` and `GPUBufferUsage`, which need `@webgpu/types` in the reader's project and in the check.
+- **The published types that are wrong, each shown by a README example written the way the API is meant to be used:**
+  - `Lines`, `AnimationGroup`, `PBRModel` and `Shadows` type `setup` against the internal `Engine`, so `engine.use(x)` on an `EngineKernel` does not compile. `@margoengine/core` also declares `EnginePlugin` twice, in `dist/plugin` and `dist/api`, and the two differ (webgl README).
+  - `Picking` does not satisfy `LinePickHost`, `PointPickHost`, `HoverPicker` or `RawPickHost`.
+  - `EngineKernel` has no `gpu` in its types (decoders, stats, materials, scatter, water READMEs), no `renderTarget` (core README), no `lighting` for sky's `LightingTarget`, and does not fit `PrefilterTarget`.
+  - Two `Mesh` types: `(Mesh | Mesh)[]` is refused by `Iterable<Mesh>` (gltf-pro), `Mesh[]` by `Iterable<Mesh | ModelLike>` (selection), and core's `Mesh` by `addOccluder` (culling).
+  - `PBRModel` is refused as `AlphaMaskedModel` (bvh), by `LOD.fromModel` (lod), and its primitive as `SkinnedPrimitive` (shader).
+  - `Skeleton` is refused as `IKSkeleton` (rigging).
+  - `storage(n, 'u32', {atomic: true}).atomicAdd` refuses the buffer it is called on, and `Var(vec3)` gives a node `colorNode` refuses (shader).
+  - `video.bytes` and the loaders' bytes are `Uint8Array<ArrayBufferLike>`, which is not a `BlobPart`.
+- **Also open:** `modern:test:packages` checks the same examples against the tarballs with no known list, so check:merge fails on these until the list is empty. That is deliberate: the list is for landing, and nothing is released on it.
+- **Needed to close:** fix each type in its package, give each fragment its setup, and run `npm run check:readmes -- --shrink` until the file is `{}`. This list must be empty before release.
+
 ### A limp ragdoll keeps moving on a floor when a limit and a contact cannot both hold
 
 - **What:** a ragdoll lying where a floor holds a limb past its cone limit never comes to rest: Knight.glb with the humanoid preset and fitted hulls, pushed over, still has a hand at 0.7 to 1 m/s after 20 s, with the limb up to 0.8 rad past its limit. Capsules settle under default limits (0.05 m/s) because they are thin enough to meet the limits on the floor. Limits a body can meet lying down settle hulls as well (`swing` 2.5, under 0.05 m/s).

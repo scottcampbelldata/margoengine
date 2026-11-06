@@ -28,6 +28,7 @@ For files from users, use the worker entry: web-ifc 0.0.78 can loop forever insi
 
 ```js
 import {parseIFCInWorker} from 'margoengine/ifc/worker';
+declare const bytes: Uint8Array;
 const model=await parseIFCInWorker(bytes,{webIfc:'/ifc/web-ifc-api-iife.js',wasmPath:'/ifc/',timeoutMs:30_000});
 ```
 

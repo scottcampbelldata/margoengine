@@ -11,6 +11,8 @@ meshes are opaque; `addMesh` from `margoengine/oit/meshes` draws one see-through
 import {OIT} from 'margoengine/oit';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {Material, createMesh} from 'margoengine/materials';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const oit = OIT.attach(engine);                           // or OIT.attach(engine, {depthScale: 2})
 oit.add(await loadGLTF(engine, '/gearbox.glb'));          // its BLEND primitives
@@ -30,7 +32,6 @@ root entry. Core and the stage are unchanged.
 import {Engine, box, PbrMaterial} from 'margoengine/core';
 import {OIT} from 'margoengine/oit';
 import {addMesh} from 'margoengine/oit/meshes';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const oit = OIT.attach(engine);
 const mesh = engine.createMesh().setGeometry(box(1, 1, 1)).setMaterial(new PbrMaterial({color: '#9cc3e6'}));

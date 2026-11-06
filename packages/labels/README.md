@@ -8,6 +8,13 @@ Build from source with `npm run build` in `packages/labels`.
 
 ```ts
 import {LabelRenderer} from 'margoengine/labels';
+import {Engine} from 'margoengine/core';
+import type {Mesh} from 'margoengine/core';
+declare const pump: Mesh;
+declare const screen: Mesh;
+declare const makeButton: () => HTMLElement;
+declare const isBlocked: (from: readonly number[], to: readonly number[]) => boolean;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const labels = LabelRenderer.attach(engine);
 
@@ -20,7 +27,7 @@ const label = labels.add(name, {mesh: pump, offset: [0, 0.8, 0], anchor: [0.5, 1
 const button = labels.add(makeButton(), {position: [2, 1, 0], pointerEvents: 'auto'});
 
 // A CSS 3D panel that rotates and scales with its mesh: 1 CSS pixel = 0.01 world units.
-const panel = labels.add3D(document.querySelector('#manual'), {mesh: screen, pixelScale: 0.005});
+const panel = labels.add3D(document.querySelector<HTMLElement>('#manual')!, {mesh: screen, pixelScale: 0.005});
 
 // Custom occlusion, for example a BVH raycast from the camera.
 labels.occlude = (label, info) => isBlocked(engine.camera.position, info.world); // your own test

@@ -48,7 +48,7 @@ invalid level throws a `RangeError`.
 
 ```ts
 import {generateTreeMesh} from 'margoengine/procedural';
-const rings = [2, 1, 0].map((detail) => generateTreeMesh('broadleaf', {detail})); // near, middle, far
+const rings = ([2, 1, 0] as const).map((detail) => generateTreeMesh('broadleaf', {detail})); // near, middle, far
 ```
 
 For a cove scene there are two waterfront props, each one `GeometryData` mesh with UVs, tangents and unit normals,
@@ -198,6 +198,7 @@ JavaScript runtime: it evaluates only its own syntax tree, with no host access.
 
 ```ts
 import {runVoxelExpression, VoxelExpressionError} from 'margoengine/procedural/expression';
+declare const signal: AbortSignal;
 const {voxels} = runVoxelExpression({
   source: 'noise(x * f, y * f, z * f) > 0.5 ? tone : color', // one expression per cell
   size: [64, 32, 64], voxels: grid.voxels,                    // voxel-edit layout: x + sx * (z + sz * y), Y up

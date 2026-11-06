@@ -722,11 +722,12 @@ Known rendering gaps:
 | API and parity | `npm run api:check`, `npm run check:parity` | Generated API and parity contracts remain current. |
 | Unit tests | root and package tests | Functional and regression evidence. |
 | Documentation | `npm run docs:links`, generated-site checks | Links and generated public material remain coherent. |
+| README examples | `npm run check:readmes`, a step of `verify` | Every `ts`, `tsx` and `js` example of every package README and guide compiles against the built packages, each as its own module. An error off `scripts/support/readme-types-known.json` fails, and so does a fixed entry left on it; the list only shrinks and must be empty before release. |
 | Current proofs | `npm run proofs -- --current` | Ongoing golden-output guarantees match stored outputs. |
 | Fresh checkout | `npm run check:fresh-clone` | Validation and current proofs do not depend on local history or artifacts. |
 | Site and visual checks | site build, `visual:check`, compatibility visual budget | Built demos render against the correct per-hardware evidence. |
 | GPU/package checks | `check:views`, `check:gpu-packages`, `check:depth`, `check:wgsl`, `check:no-webgpu` | Scoped rendering, shader, package, depth, fallback, and view behavior. |
-| Consumer packaging | `modern:test:packages`, bundler matrix, quickstart | Packed declarations, docs examples, browser packages, bundlers, licenses, and documented first use work. |
+| Consumer packaging | `modern:test:packages`, bundler matrix, quickstart | Packed declarations, docs examples (the same examples as `check:readmes`, against the tarballs, with no known list), browser packages, bundlers, licenses, and documented first use work. |
 | Release rehearsal | `publish:rehearsal` (in `publish:dry-run` and the publish workflow) | Every tarball audited, then the one-line install, every entry imported and type-checked, and every template built, from a stand-in registry that refuses writes. |
 | Public truth | `tests/public-truth.test.js` | Structured license and package-count statements match their canonical sources. |
 | Timing-test hygiene | fixed-wait and wall-budget tests | Tests wait for readiness; code speed uses CPU time; justified real-time bounds are marked. Both read tracked files only (`git ls-files`), so git-ignored scratch builds cannot fail them. |
@@ -920,6 +921,8 @@ The following remain technical gaps, not permission to weaken a check:
 13. Only the upper core-stage bound is enforced; there is intentionally no lower bound.
 14. Public-truth checks cover license and package count, not every size or performance number, so a size figure in a guide or
     package README can go stale with no check failing (section 4.7).
+    README examples are held by `check:readmes` in `verify` since 2026-11-06, but 329 known errors remain (docs/known-bugs.md), so
+    those examples are not yet evidence that their package's types are right.
 15. Remote workflow configuration is not proof that a workflow actually ran.
 16. The quality classifier must keep a conservative full-mode fallback for genuinely unclassifiable or shared
     changes, while ordinary package changes remain affected-only.

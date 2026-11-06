@@ -9,6 +9,9 @@ Build from source with `npm run build` in `packages/points`.
 ```ts
 import {Engine} from 'margoengine/core';
 import {PointsPlugin, PointCloud, SpriteBatch, atlasRect} from 'margoengine/points';
+import type {Mesh} from 'margoengine/core';
+declare const mesh: Mesh;
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const points = PointsPlugin.attach(engine, {pointBudget: 2_000_000});
@@ -56,7 +59,6 @@ By default per-point colors are bytes, clamped to 0..1. With `colorFormat: 'floa
 ```ts
 import {Engine} from 'margoengine/core';
 import {PointsPlugin, PointCloud} from 'margoengine/points';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine);
 const sparks = points.add(new PointCloud({
@@ -128,7 +130,6 @@ A map drawn on a small point shimmers, as each pixel lands on one texel of a lar
 ```ts
 import {Engine} from 'margoengine/core';
 import {PointsPlugin, PointCloud, SpriteBatch} from 'margoengine/points';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine);
 const map = await createImageBitmap(new ImageData(new Uint8ClampedArray(64 * 64 * 4).fill(255), 64, 64));
@@ -149,6 +150,8 @@ painting it in the fog colour. Points does not import environment. `fog.enabled 
 
 ```ts
 import {Fog} from 'margoengine/environment';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 points.setFog(Fog.attach(engine, {color: '#8090a0', density: 0.03}));
 labels.material.fog = false; // keep this batch clear
 ```
@@ -166,7 +169,6 @@ frame, no recompile). More than 6 planes throw a RangeError, a malformed plane o
 ```ts
 import {Engine} from 'margoengine/core';
 import {PointsPlugin, PointCloud} from 'margoengine/points';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const points = PointsPlugin.attach(engine);
@@ -189,7 +191,6 @@ origin keeps millimetres. LAS is z-up; the engine is y-up, so swap axes when you
 import { Engine } from 'margoengine/core';
 import { PointCloud, PointsPlugin, classificationColors } from 'margoengine/points';
 import { loadLAS } from 'margoengine/points/las';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine);
 const las = await loadLAS('/scans/site.las', { stride: 1 });
@@ -276,7 +277,6 @@ All scans land in one world frame, float32 relative to `origin`.
 import { Engine } from 'margoengine/core';
 import { PointCloud, PointsPlugin } from 'margoengine/points';
 import { loadE57 } from 'margoengine/points/e57';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine);
 const e57 = await loadE57('/scans/plant-room.e57');
@@ -312,7 +312,6 @@ nothing ever leaves a hole.
 import { Engine } from 'margoengine/core';
 import { PointsPlugin } from 'margoengine/points';
 import { OctreeCloud, buildOctree } from 'margoengine/points/octree';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine, { pointBudget: 3_000_000 });
 const positions = new Float32Array(3_000_000).map(() => Math.random() * 100);
@@ -338,7 +337,6 @@ An `OctreeCloud` has a `matrix`, or follows a mesh with `attach(mesh)`, includin
 import { Engine } from 'margoengine/core';
 import { PointsPlugin } from 'margoengine/points';
 import { OctreeCloud, buildOctree } from 'margoengine/points/octree';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine);
 const positions = new Float32Array(300_000).map(() => Math.random() * 10);
@@ -366,7 +364,6 @@ children load around it and stays large in the octants that have none, and a cha
 import { Engine } from 'margoengine/core';
 import { PointsPlugin } from 'margoengine/points';
 import { OctreeCloud, buildOctree } from 'margoengine/points/octree';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine, { pointBudget: 500_000 });
 const positions = new Float32Array(3_000_000).map(() => Math.random() * 100);
@@ -406,7 +403,6 @@ import { Engine, box } from 'margoengine/core';
 import { PointCloud, PointsPlugin } from 'margoengine/points';
 import { PointPicking } from 'margoengine/points/pick';
 import { Picking } from 'margoengine/selection';
-
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 const points = PointsPlugin.attach(engine);
@@ -437,7 +433,6 @@ import { Engine } from 'margoengine/core';
 import { PointsPlugin } from 'margoengine/points';
 import { OctreeCloud } from 'margoengine/points/octree';
 import { PotreeSource } from 'margoengine/points/potree';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine, { pointBudget: 2_000_000 });
 const source = await PotreeSource.open('/scans/site/'); // options below
@@ -467,7 +462,7 @@ import { PotreeSource } from 'margoengine/points/potree';
 
 const source = await PotreeSource.open('/scans/site/', { attributes: 'all', colorBy: 'classification' });
 const { positions, attributes } = await source.load(source.root, new AbortController().signal);
-console.log(positions.length / 3, attributes.classification, attributes.gps_time);
+console.log(positions.length / 3, attributes?.classification, attributes?.gps_time);
 ```
 
 A 1.7 hierarchy file lists leaves with 0 points in real folders, so a leaf's `count` comes from its file once `load` has read it. Other encodings and versions before 1.4 throw a `MargoError` with code `unsupported`. The reader is checked on real PotreeConverter output: see `tests/potree-check.mjs`.
@@ -480,7 +475,6 @@ A 1.7 hierarchy file lists leaves with 0 points in real folders, so a leaf's `co
 import { Engine } from 'margoengine/core';
 import { PointCloud } from 'margoengine/points';
 import { SurfelPlugin } from 'margoengine/points/surfels';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const surfels = SurfelPlugin.attach(engine, { pointBudget: 2_000_000, overlap: 2 });
 const positions = new Float32Array(300_000).map(() => Math.random() * 10);

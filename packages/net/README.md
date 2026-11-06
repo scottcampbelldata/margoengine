@@ -6,6 +6,7 @@ Bounded snapshot interpolation for position, quaternion and velocity, with cappe
 
 ```ts
 import {SnapshotBuffer, createSnapshot} from 'margoengine/net';
+declare const renderTimeSeconds: number;
 const buffer = new SnapshotBuffer(32);
 const output = createSnapshot();
 // buffer.push(timeSeconds, position, quaternion, velocity)

@@ -527,6 +527,7 @@ test('verify runs the same checks as before plus the parity count, hygiene first
       'npm run test --workspace examples/voxel-sandbox',
       `node --experimental-test-module-mocks --test --test-concurrency=${TEST_CONCURRENCY} --test-timeout=${TEST_TIMEOUT_MS} --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/support/test-watch.mjs --test-reporter-destination=stderr tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js`,
       'npm run docs:links',
+      'npm run check:readmes',
       'npm run measure:size',
       'npm run proofs -- --current',
     ].sort(),

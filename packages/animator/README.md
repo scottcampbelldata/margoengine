@@ -350,6 +350,8 @@ One walk cycle has to serve every speed and direction a game asks for. `addWarpi
 ```ts
 import {Animator, addRootMotion} from 'margoengine/animator';
 import {addDistanceWarp, addWarping} from 'margoengine/animator/warping';
+import type {PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
 
 const animator = Animator.attach(animation, {initial: 'walk', states: {walk: 'Walk', stop: 'Stop'}});
 const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
@@ -478,6 +480,8 @@ Partners come from node names: `LeftArm` and `RightArm`, `arm.L` and `arm.R`, `l
 ```ts
 import {Animator} from 'margoengine/animator';
 import {addSplineIK, type SplineIKChain} from 'margoengine/animator/spline-ik';
+import type {PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
 
 const animator = Animator.attach(animation, {initial: 'idle', states: {idle: 'Idle'}});
 const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);

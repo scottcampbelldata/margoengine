@@ -12,6 +12,7 @@ import {Engine} from 'margoengine/core';
 import {CameraProjection} from 'margoengine/cameras';
 import {OrbitControls} from 'margoengine/controls';
 import {ViewCube} from 'margoengine/viewcube';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);           // the canvas needs a parent element; the cube is placed in it
 const projection = CameraProjection.attach(engine, {mode: 'perspective'});

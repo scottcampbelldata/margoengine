@@ -9,6 +9,9 @@ same view. It uses core's `camera.project` and `camera.up` hooks.
 ```ts
 import {Engine} from 'margoengine/core';
 import {CameraProjection} from 'margoengine/cameras';
+import type {PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas, {camera: {position: [0, 40, 0], target: [0, 0, 0]}}); // straight down
 const projection = CameraProjection.attach(engine); // orthographic, framed like the perspective view at the target
@@ -68,6 +71,10 @@ of jitter at any distance up to 6,000 km ([docs/large-coordinates.md](../../docs
 
 ```ts
 import {FloatingOrigin} from 'margoengine/cameras/origin';
+import {Engine} from 'margoengine/core';
+declare const x: number;
+declare const y: number;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const origin = FloatingOrigin.attach(engine);          // default ratio 1000
 origin.place(flange, [2_880_000.12, 3_600_000.65, 3_840_000.31]); // float64 world metres; root meshes or model.root
@@ -105,6 +112,9 @@ mask shares a bit with its own. Core does the filtering while it collects instan
 
 ```ts
 import {ALL_LAYERS, layerMask, setCameraLayers, setRenderLayers, withLayers} from 'margoengine/cameras/layers';
+import {Engine, type Camera} from 'margoengine/core';
+declare const top: Camera;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 setRenderLayers(helpers.root, layerMask(1));      // a model by its root: children without a mask follow it
 setCameraLayers(engine.camera, layerMask(0));     // the engine camera now skips the helpers
@@ -138,6 +148,9 @@ the rectangle, in both modes, with any `zoom`, `height` or bounds. 0 core bytes.
 
 ```ts
 import {CameraProjection, tileOffsets} from 'margoengine/cameras';
+import {Engine} from 'margoengine/core';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
 
 const projection = CameraProjection.attach(engine, {mode: 'perspective'});
 // A 8192 x 4608 screenshot from 2048 x 1152 tiles: size the canvas to a tile, then render each rectangle.
@@ -166,6 +179,8 @@ Set the view the way photographers and Blender users do: a lens in millimetres o
 
 ```ts
 import {CameraProjection, fovToLens, lensToFov} from 'margoengine/cameras';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const projection = CameraProjection.attach(engine, {mode: 'perspective', focalLength: 50}); // 50 mm on a 36 mm sensor
 projection.focalLength = 85;            // portrait lens; camera.fov follows each frame
@@ -189,10 +204,12 @@ fovToLens(40, 16 / 9, {filmGauge: 36}); // the focal length that gives a 40 degr
 Head-tracked displays, CAVE walls and portals need a frustum that is not centred on the view axis. 0 core bytes.
 
 ```ts
-import {ObliqueNearPlane, OffAxisProjection, offAxisFrustum} from 'margoengine/cameras/offaxis';
+import {ObliqueNearPlane, OffAxisProjection, offAxisFrustum, type Screen} from 'margoengine/cameras/offaxis';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 // A 1.2 x 0.7 m monitor standing on the desk at the origin, facing +z; corners counter clockwise from the viewer.
-const screen = {lowerLeft: [-0.6, 0, 0], lowerRight: [0.6, 0, 0], upperLeft: [-0.6, 0.7, 0]};
+const screen: Screen = {lowerLeft: [-0.6, 0, 0], lowerRight: [0.6, 0, 0], upperLeft: [-0.6, 0.7, 0]};
 const window = OffAxisProjection.attach(engine, screen, [0, 0.4, 0.8]);
 tracker.onmove = (head) => window.setEye(head);     // world metres; the screen stays a window onto the scene
 
@@ -225,6 +242,8 @@ import {DOF} from 'margoengine/dof';
 import {MotionBlur} from 'margoengine/post';
 import {Tonemap} from 'margoengine/tonemap';
 import {PhysicalCamera} from 'margoengine/cameras/physical';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const camera = new PhysicalCamera({focalLength: 85, aperture: 1.8, shutter: 1 / 120, iso: 200, focusDistance: 3});
 camera.apply({dof, motionBlur, exposure: tonemap, camera: engine.camera, aspect: 16 / 9}); // your DOF, MotionBlur and Tonemap effects
@@ -259,6 +278,11 @@ and resamples it as a Panini or a fisheye picture, in a `PostStack`. WebGPU, per
 ```ts
 import {PostStack} from 'margoengine/post';
 import {WideAngle} from 'margoengine/cameras/panini';
+import {Engine} from 'margoengine/core';
+declare const px: number;
+declare const py: number;
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
 
 engine.camera.fov = 100;                                   // the rectilinear picture the stage resamples
 const wide = new WideAngle({mode: 'panini', distance: 1}); // 'panini' | 'equidistant' | 'equisolid' | 'stereographic' | 'orthographic'
@@ -269,7 +293,7 @@ wide.enabled = false;                                      // the plain picture
 
 // Where a click on the projected picture lands on the source picture, for engine.pick or overlays:
 const map = wide.map(engine.camera.fov, canvas.width / canvas.height);
-const [x, y] = map.toSource(2 * px / canvas.width - 1, 1 - 2 * py / canvas.height); // normalised, y up; null outside
+const [x, y] = map.toSource(2 * px / canvas.width - 1, 1 - 2 * py / canvas.height)!; // normalised, y up; null outside
 map.toOutput(x, y);                                        // and back
 ```
 

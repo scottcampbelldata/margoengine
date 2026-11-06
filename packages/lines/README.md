@@ -11,6 +11,7 @@ Exports `Line` and `LineMaterial`, and `GridHelper`, `PolarGridHelper`, `AxesHel
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {Lines, Line, LineMaterial, GridHelper, AxesHelper, BoxHelper} from 'margoengine/lines';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const lines = new Lines();
@@ -110,7 +111,6 @@ helper; animation deformation is not reflected in these synchronous helpers.
 ```ts
 import {Engine} from 'margoengine/core';
 import {Lines, Line} from 'margoengine/lines';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
@@ -128,7 +128,6 @@ A depth-writing line takes two draws, so its edge stays smooth: the part at leas
 import {Engine, box} from 'margoengine/core';
 import {Lines} from 'margoengine/lines';
 import {Trail} from 'margoengine/lines/trail';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
@@ -168,7 +167,6 @@ Any `LineMaterial` option applies too. The far end is cut exactly at the limit, 
 ```ts
 import {Engine} from 'margoengine/core';
 import {LineBatch, LineBatches} from 'margoengine/lines/batch';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const batches = LineBatches.attach(engine);
@@ -213,7 +211,6 @@ Segments are independent: square ends, so those that share a point overlap at th
 ```ts
 import {Engine} from 'margoengine/core';
 import {Line, Lines} from 'margoengine/lines';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
@@ -237,7 +234,6 @@ lines.add(new Line({
 ```ts
 import {Engine} from 'margoengine/core';
 import {Line, Lines} from 'margoengine/lines';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
@@ -262,7 +258,6 @@ import {Engine, box} from 'margoengine/core';
 import {Lines} from 'margoengine/lines';
 import {EdgesHelper} from 'margoengine/lines/edges';
 import {HiddenLine} from 'margoengine/lines/hidden';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
@@ -285,7 +280,6 @@ Underneath it is a line with `behind: true`, which turns the depth test around. 
 ```ts
 import {Engine} from 'margoengine/core';
 import {ArrowHelper, Lines, PlaneHelper} from 'margoengine/lines';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
@@ -307,6 +301,8 @@ before.
 
 ```ts
 import {Fog} from 'margoengine/environment';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const fog = Fog.attach(engine, {color: '#8090a0', near: 5, far: 40});
 lines.setFog(fog);
 ```
@@ -323,7 +319,6 @@ intersection) instead of any. Lines cast no shadows, so there is no `clipShadows
 ```ts
 import {Engine} from 'margoengine/core';
 import {Lines, Line, LineMaterial} from 'margoengine/lines';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
@@ -344,6 +339,8 @@ Lines does not import animation. Colours run from `parentColor` (default green) 
 
 ```ts
 import {Lines, SkeletonHelper} from 'margoengine/lines';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const lines = Lines.attach(engine);
 // An @margoengine/animation Skeleton, placed by the skinned mesh it deforms:
 const bones = lines.add(new SkeletonHelper(skeleton, {mesh: model.primitives[0].node, width: 2}));
@@ -364,7 +361,6 @@ import {Engine, box} from 'margoengine/core';
 import {Lines, Line} from 'margoengine/lines';
 import {LinePicking} from 'margoengine/lines/pick';
 import {Picking} from 'margoengine/selection';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const lines = Lines.attach(engine);
@@ -399,6 +395,7 @@ import {Engine} from 'margoengine/core';
 import {Lines, Line} from 'margoengine/lines';
 import {Raycaster} from 'margoengine/bvh';
 import {intersectLines} from 'margoengine/bvh/lines';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const lines = new Lines();

@@ -8,6 +8,9 @@ Build from source with `npm run build` in `packages/decoders`.
 
 ```ts
 import {DracoDecoder, KTX2Decoder} from 'margoengine/decoders';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+declare const bytes: Uint8Array;
 
 const draco = new DracoDecoder({workerLimit: 4});
 const ktx2 = new KTX2Decoder({device: engine.gpu, workerLimit: 4});
@@ -40,7 +43,6 @@ stream the module will not read, the TypeScript decoder runs instead.
 
 ```ts
 import {MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD} from 'margoengine/decoders/meshopt-simd';
-
 declare const bytes: Uint8Array;
 
 await MeshoptSIMDDecoder.ready;
@@ -59,7 +61,6 @@ needs it. `jxlTextureFile` turns the result into a `TextureFile`.
 
 ```ts
 import {JXLDecoder, jxlTextureFile, uploadTexture} from 'margoengine/decoders/jxl';
-
 declare const device: GPUDevice;
 declare const file: ArrayBuffer;
 
@@ -81,7 +82,6 @@ bytes a texel on the GPU and a pass on the calling thread, so ship KTX2 for anyt
 
 ```ts
 import {parsePVR, uploadTexture} from 'margoengine/decoders/pvr';
-
 declare const device: GPUDevice;
 declare const bytes: Uint8Array;
 
@@ -99,7 +99,6 @@ this entry brings Google's full build, in its own worker pool; nothing loads it 
 
 ```ts
 import {DracoPointsDecoder} from 'margoengine/decoders/draco-points';
-
 declare const file: ArrayBuffer;
 
 using decoder = new DracoPointsDecoder();
@@ -149,6 +148,7 @@ inflater (the one EXR uses); it does not load the Draco or Basis decoders.
 
 ```ts
 import {decodePNG} from 'margoengine/decoders/png';
+declare const pngBytes: Uint8Array;
 
 const {width, height, data} = decodePNG(pngBytes);
 ```
@@ -191,7 +191,6 @@ Broken files throw `MargoError` `failed` naming the problem; a non-`Uint8Array` 
 import {parseTGA} from 'margoengine/decoders/tga';
 import {parseTIFF} from 'margoengine/decoders/tiff';
 import {parseDDS, uploadTexture} from 'margoengine/decoders/dds';
-
 declare const device: GPUDevice;
 declare const tgaBytes: Uint8Array, tiffBytes: Uint8Array, ddsBytes: Uint8Array;
 
@@ -222,7 +221,6 @@ Zstandard, and adds an opaque alpha to 8-, 16- and 32-bit RGB files, because Web
 
 ```ts
 import {KTX2LayerDecoder} from 'margoengine/decoders/ktx2-layers';
-
 declare const device: GPUDevice;
 declare const skyBytes: Uint8Array, terrainBytes: Uint8Array;
 
@@ -260,7 +258,6 @@ alpha is 1.
 ```ts
 import {Environment} from 'margoengine/environment';
 import {KTX2HDRDecoder, toEnvironmentImage} from 'margoengine/decoders/ktx2-hdr';
-
 declare const engine: {gpu: GPUDevice} & Parameters<typeof Environment.create>[0];
 declare const bytes: Uint8Array;
 
@@ -287,7 +284,6 @@ worker transcode as a whole file, so its bytes are that level's bytes in the who
 
 ```ts
 import {KTX2Streamer} from 'margoengine/decoders/ktx2-stream';
-
 declare const device: GPUDevice;
 declare function useTexture(texture: GPUTexture): void;
 declare const pixelsOnScreen: number;
@@ -318,7 +314,6 @@ the CPU reads them to codebook indices and the GPU expands those.
 
 ```ts
 import {KTX2GPUDecoder} from 'margoengine/decoders/ktx2-gpu';
-
 declare const device: GPUDevice;
 declare const file: ArrayBuffer;
 

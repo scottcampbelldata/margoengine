@@ -8,6 +8,10 @@ Visible core and PBR selection outlines using Jump Flood Algorithm distance fiel
 
 ```ts
 import {Selection} from 'margoengine/selection';
+import {Engine} from 'margoengine/core';
+import type {Mesh} from 'margoengine/core';
+declare const mesh: Mesh;
+const engine = await Engine.create(document.querySelector('canvas')!);
 const selection = Selection.attach(engine, {algorithm: 'jfa', width: 3, color: [1,0.5,0]});
 selection.set([mesh]);
 ```
@@ -16,6 +20,10 @@ selection.set([mesh]);
 
 ```ts
 import {Picking} from 'margoengine/selection';
+import {Engine} from 'margoengine/core';
+declare const x: number;
+declare const y: number;
+const engine = await Engine.create(document.querySelector('canvas')!);
 const picking = Picking.attach(engine);
 const mesh = await engine.pick(x, y);
 ```
@@ -36,6 +44,8 @@ point's view are picked one at a time.
 
 ```ts
 import {Picking} from 'margoengine/selection';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const picking = Picking.attach(engine);
 const hits = await picking.pickMany([[10, 20], [64, 64], [120, 40]]);
 const meshes = hits.map((hit) => hit?.mesh ?? null);

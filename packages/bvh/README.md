@@ -15,6 +15,8 @@ query correctness and traversal cost without changing mesh data, public signatur
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {MeshBVH, Raycaster, buildAsync, computeGeometryBVHAsync} from 'margoengine/bvh';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
 
 // Engine picking: canvas CSS pixels in, sorted hits out.
 const raycaster = new Raycaster();
@@ -103,6 +105,8 @@ occluder BVH; use `creasedNormals` from `@margoengine/geometry` for flat or smoo
 ```ts
 import {MeshBVH, worldTriangles} from 'margoengine/bvh';
 import {bakeVertexColors, limitPalette} from 'margoengine/bvh/bake';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const cast = worldTriangles(engine, castAgainst); // Cast Against: the meshes that occlude
 const occluder = MeshBVH.build({positions: cast.vertices, indices: cast.indices});
 const colors = bakeVertexColors({positions, normals, colors: existing}, occluder, {
@@ -151,7 +155,6 @@ one laptop core).
 import {box, Engine} from 'margoengine/core';
 import {Raycaster} from 'margoengine/bvh';
 import {SceneBVH} from 'margoengine/bvh/scene';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const geometry = box(1, 1, 1);
 for (let i = 0; i < 10000; i++) engine.createMesh().setGeometry(geometry).setPosition([(i % 100) * 3, 0, Math.floor(i / 100) * 3]);
@@ -183,7 +186,6 @@ for (let x = 0; x < 100; x++) {
 import {Engine} from 'margoengine/core';
 import {PointRaycaster} from 'margoengine/bvh/points';
 import {PointCloud, PointsPlugin} from 'margoengine/points';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const points = PointsPlugin.attach(engine);
 const cloud = points.add(new PointCloud({positions: new Float32Array([0, 0, 0, 1, 0, 0]), material: {size: 4}}));
@@ -311,7 +313,6 @@ import {engineRuntime} from 'margoengine/core/extension';
 import {Animation} from 'margoengine/animation';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {GPUDynamicBVH} from 'margoengine/bvh/gpu-build';
-
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const model = await loadGLTF(engine, '/fox.glb');
 Animation.attach(model);
@@ -337,7 +338,6 @@ Rays and hits are in the space `model.readPickingGeometry()` gives its vertices.
 import {Engine} from 'margoengine/core';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {AlphaRaycaster, modelAlphaMasks} from 'margoengine/bvh/alpha';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const model = await loadGLTF(engine, '/fence.glb');
 
@@ -353,7 +353,6 @@ console.log(ray.intersectEngine(engine)[0]?.mesh);
 ```ts
 import {Engine} from 'margoengine/core';
 import {AlphaRaycaster} from 'margoengine/bvh/alpha';
-
 const engine = await Engine.create(document.querySelector('canvas')!);
 const image = new OffscreenCanvas(64, 64).getContext('2d')!.getImageData(0, 0, 64, 64);
 

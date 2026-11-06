@@ -13,6 +13,10 @@ Build from source with `npm run build` in `packages/loaders`.
 ```ts
 import {Engine} from 'margoengine/core';
 import {load, parse3MF, parsePLY, createMeshes, toGeometry} from 'margoengine/loaders';
+import type {Mesh} from 'margoengine/core';
+declare const signal: AbortSignal;
+declare const mesh: Mesh;
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 
@@ -27,7 +31,7 @@ mesh.setGeometry(toGeometry(scan, {normals: 'smooth'}));
 
 Every parser returns the same `LoadedGeometry`:
 
-```ts
+```text
 {kind: 'mesh' | 'points', positions: Float32Array, normals?, colors? /* sRGB 0..1 */, uvs?, indices?: Uint32Array,
  groups?: {start, count, name?, objectId?, color?: [r, g, b, a]}[], attributes?: Record<string, Float32Array>}
 ```
@@ -106,6 +110,7 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 
 ```ts
 import {parseSTL, toGeometry} from 'margoengine/loaders';
+declare const signal: AbortSignal;
 
 const bytes = await (await fetch('/parts/bracket.stl', {signal})).arrayBuffer();
 const mesh = parseSTL(bytes, {signal});          // weld: true shares corners that have equal positions
@@ -167,7 +172,14 @@ Install `@margoengine/gltf-pro` alongside loaders to use this entry. The decode/
 ```ts
 import {parseUSDZ} from 'margoengine/loaders';
 import {createPBRMeshes} from 'margoengine/loaders/render';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+declare const bytes: Uint8Array;
 
+import fs from 'node:fs';
+import {dirname, join} from 'node:path';
+declare const file: string;
+declare const modelUrl: string;
 const source = await parseUSDZ(bytes);
 const model = createPBRMeshes(engine, source, {
   baseColorFactor: [1, 1, 1, 1], // linear material multiplier; default white
@@ -191,7 +203,7 @@ Parsers stay pure and return plain data. Files a model refers to come through a 
 
 ```ts
 // Electron (main or preload): read next to the model.
-const resolve = (path) => fs.promises.readFile(join(dirname(file), path));
+const resolveFromDisk = (path) => fs.promises.readFile(join(dirname(file), path));
 // Browser: fetch next to the model.
 const resolve = async (path) => new Uint8Array(await (await fetch(new URL(path, modelUrl))).arrayBuffer());
 ```
@@ -215,6 +227,9 @@ Pass `fetch: manager.fetch` from `@margoengine/cache/manager`'s `LoadingManager`
 
 ```ts
 import {loadOBJ} from 'margoengine/loaders/mtl';
+import {Engine} from 'margoengine/core';
+declare const signal: AbortSignal;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const {mesh, warnings, dispose} = await loadOBJ(engine, 'https://example.com/models/chair.obj', {signal});
 // mesh is a materials mesh (a gltf-pro model): move it with mesh.root, add it to shadows, clustered, ...
@@ -226,6 +241,9 @@ Or step by step, with your own bytes and texture loader:
 ```ts
 import {parseMTL, parseOBJ} from 'margoengine/loaders';
 import {createMTLMaterials, createOBJMesh} from 'margoengine/loaders/mtl';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+declare const bytes: Uint8Array;
 
 const obj = await parseOBJ(bytes, {resolve});
 const set = await createMTLMaterials(obj.materials, {baseUrl: objUrl, bump: 'normal'});
@@ -246,6 +264,8 @@ const mesh = createOBJMesh(engine, obj, set); // one mesh, one material slot per
 ```ts
 import {parseTTF, textGeometry} from 'margoengine/loaders/font';
 import {createMesh, Material} from 'margoengine/materials';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const font = parseTTF(await (await fetch('/fonts/Inter.ttf')).arrayBuffer());
 const geometry = textGeometry('Margo\nEngine', {font, size: 1, depth: 0.2, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.01});
@@ -267,6 +287,9 @@ const shapes = font.generateShapes('Logo', 10, {letterSpacing: 0.05, align: 'cen
 import {parseSVG} from 'margoengine/loaders/svg';
 import {extrudeGeometry} from 'margoengine/geometry';
 import {SRGBToLinear} from 'margoengine/math/color';
+import {Engine} from 'margoengine/core';
+import {createMesh, Material} from 'margoengine/materials';
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const {paths, viewBox, warnings} = parseSVG(await (await fetch('/logo.svg')).text());
 for (const path of paths) {
@@ -309,7 +332,6 @@ for (const path of paths) {
 import {parseDAE, daeCameraView, daeEngineLights} from 'margoengine/loaders';
 import {Clustered} from 'margoengine/clustered';
 import type {EngineKernel} from 'margoengine/core';
-
 declare const engine: EngineKernel, text: string;
 const dae = parseDAE(text);
 if (dae.cameras.length) Object.assign(engine.camera, daeCameraView(dae, 0, {aspect: 16 / 9}));
@@ -342,7 +364,6 @@ import {parseDAE, bindDAESkin, daeKeyframeClip, morphDAE, poseDAE} from 'margoen
 import {Skeleton, Skin, createKeyframeClip, applyKeyframeClip, segmentTime} from 'margoengine/animation';
 import {Material, createMesh} from 'margoengine/materials';
 import type {EngineKernel} from 'margoengine/core';
-
 declare const engine: EngineKernel, text: string;
 const dae = parseDAE(text);
 const binding = bindDAESkin(dae); // the first skinned instance
@@ -679,6 +700,8 @@ for (const item of animation.frame(12.5)) // fractions blend between keyframes
 
 ```ts
 import { readXMLTree } from 'margoengine/loaders/xml';
+import {parseTMX, tmxLayerQuads} from 'margoengine/loaders';
+declare const bytes: Uint8Array;
 
 const root = readXMLTree('<robot name="arm"><link name="base"/></robot>', 'URDF');
 const robot = root.children[0];

@@ -11,6 +11,7 @@ SDF `Text` for Latin, Greek, Cyrillic, CJK, Hebrew, Arabic, Indic scripts and em
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {TextRenderer, Text, Font} from 'margoengine/text';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const text = TextRenderer.attach(engine);

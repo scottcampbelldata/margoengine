@@ -35,11 +35,11 @@ import { BiomeWorld, defineBiome } from '@margoengine/biomes';
 import { BiomeEditor } from '@margoengine/biomes/editor';
 import { BiomePlacement } from '@margoengine/biomes/placement';
 import { presets } from '@margoengine/biomes/presets';
-import { carvePaths, paintPaths, pathExclusions } from '@margoengine/biomes/splines';
+import { carvePaths, paintPaths, pathExclusions, type PathOptions } from '@margoengine/biomes/splines';
 
 // A road biome no climate picks: a gravel ground and no plants.
 const road = defineBiome({ id: 'road', climate: { custom: { 'mask/road-only': [0.5, null] } }, ground: [{ material: 'gravel' }] });
-const paths = [
+const paths: PathOptions[] = [
   { points: [[-400, -80], [-100, 40], [150, -20], [420, 60]], curve: 'catmull-rom', width: 6, edge: 4, biome: 'road', mask: 'roads', carve: { grade: 40 } },
   { points: [[-50, 300], [20, -300]], curve: 'b-spline', width: 2, edge: 1, mask: 'roads', carve: { mode: 'cut', depth: 0.4 } },
 ];

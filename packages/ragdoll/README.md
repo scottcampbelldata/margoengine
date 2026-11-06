@@ -186,6 +186,10 @@ Skeletons put small bodies between big limbs, and a solver cannot hold a strong 
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
 import { addGetUp } from 'margoengine/ragdoll/getup';
+import { Animation } from 'margoengine/animation';
+import { Animator } from 'margoengine/animator';
+import type {PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
 
 const animator = Animator.attach(Animation.attach(model), {
   initial: 'idle',
@@ -223,6 +227,8 @@ No facing convention is needed: only the turn about the up axis is free, and wha
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
 import { fitRagdollShapes } from 'margoengine/ragdoll/hulls';
+import type {PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
 
 const ragdoll = Ragdoll.attach(physics, { root: hips });
 const fitted = fitRagdollShapes(ragdoll, model);
@@ -248,6 +254,9 @@ A profile is a ragdoll as plain JSON: bones by name, joints and limits, sizes, m
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
 import { humanoidProfile, ragdollOptions, saveRagdollProfile } from 'margoengine/ragdoll/profile';
+import type {PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
+declare const otherModel: PBRModel;
 
 // Anatomical ranges, hinged knees and elbows, published mass shares.
 const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes, { mass: 82 }), model.nodes));
@@ -273,6 +282,8 @@ import { Ragdoll } from 'margoengine/ragdoll';
 import { addRagdollBalance } from 'margoengine/ragdoll/balance';
 import { addRagdollMotors } from 'margoengine/ragdoll/powered';
 import { humanoidProfile, ragdollOptions } from 'margoengine/ragdoll/profile';
+import type {PBRModel} from 'margoengine/gltf-pro';
+declare const model: PBRModel;
 
 const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes), model.nodes));
 const motors = addRagdollMotors(ragdoll, { frequency: 8 });

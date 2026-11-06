@@ -12,6 +12,7 @@ background, nothing). No light direction and no shadow map, so it works with or 
 import {Engine} from 'margoengine/core';
 import {loadGLTF} from 'margoengine/gltf-pro';
 import {ContactShadows} from 'margoengine/staging';
+const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas);
 const model = await loadGLTF(engine, '/shoe.glb');

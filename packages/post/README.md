@@ -11,6 +11,12 @@ its offscreen PNGs, so exports match what is on screen.
 
 ```js
 import { ImagePost } from 'margoengine/post/image';
+import {Engine} from 'margoengine/core';
+declare const width: number;
+declare const height: number;
+declare const samples: number;
+declare const signal: AbortSignal;
+const engine = await Engine.create(document.querySelector('canvas')!);
 
 const post = ImagePost.attach(engine, { bloom: { strength: 0.8, threshold: 1, radius: 0.5 } });
 const png = await post.capture(await tracer.renderImage({ width, height, samples }), { signal });
@@ -562,7 +568,6 @@ the drawing size and are replaced on resize (`onResize`). WebGPU only.
 ```ts
 import { Engine } from 'margoengine/core';
 import { SceneTargets } from 'margoengine/post/mrt';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const targets = SceneTargets.attach(engine, {
@@ -587,7 +592,6 @@ into it; add gltf-pro models and materials meshes with `depth.add(model)`, but n
 import { Engine } from 'margoengine/core';
 import { Texture, WgslMaterial } from 'margoengine/materials';
 import { DepthTexture } from 'margoengine/post/depth';
-
 declare const canvas: HTMLCanvasElement;
 const engine = await Engine.create(canvas);
 const depth = DepthTexture.attach(engine);

@@ -6,6 +6,8 @@ WebGPU scene-to-scene wipes, seeded pixel-noise dissolves, radial clock wipes an
 
 ```ts
 import {Transitions} from 'margoengine/transitions';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
 const transitions = Transitions.attach(engine);
 engine.render(); // establishes the outgoing image
 transitions.start('dissolve', 0.75);
