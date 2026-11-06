@@ -196,3 +196,92 @@ test('bad input and abort', () => {
     message: 'stop',
   });
 });
+
+test('regression: only the overlap box goes through the trees, and the answer stays the exact one', () => {
+  const box = createPrimitiveMesh('cube', 'a'),
+    // Far apart, touching along a face, and with one box wholly inside the other: every way the box filter can go.
+    far = shifted(box, 'b', [5, 0, 0]),
+    touching = shifted(box, 'b', [1, 0, 0]),
+    inner = moved(box, 'b', (p) => p.map((v) => v * 0.5)),
+    size = volume(box),
+    createId = ids();
+  for (const [other, union, difference, intersection] of [
+    [far, 2 * size, size, 0],
+    [touching, 2 * size, size, 0],
+    [inner, size, size - size / 8, size / 8],
+  ]) {
+    const u = booleanMeshesExact(box, other, 'union', { createId }),
+      d = booleanMeshesExact(box, other, 'difference', { createId });
+    assertClosed(u.mesh);
+    assertClosed(d.mesh);
+    assert.ok(Math.abs(volume(u.mesh) - union) < 1e-12);
+    assert.ok(Math.abs(volume(d.mesh) - difference) < 1e-12);
+    if (intersection) assert.ok(Math.abs(volume(booleanMeshesExact(box, other, 'intersection', { createId }).mesh) - intersection) < 1e-12);
+    else assert.equal(booleanMeshesExact(box, other, 'intersection', { createId }).mesh.faces.length, 0);
+  }
+});
+
+test('regression: a small cut in a large mesh costs the faces near it', () => {
+  const sphere = (n, prefix, [x, y, z], s) => {
+      const vertices = [[x, y + s, z]],
+        faces = [];
+      for (let r = 1; r < n; r++)
+        for (let c = 0; c < n; c++) {
+          const t = (Math.PI * r) / n,
+            p = (2 * Math.PI * c) / n;
+          vertices.push([x + s * Math.sin(t) * Math.cos(p), y + s * Math.cos(t), z + s * Math.sin(t) * Math.sin(p)]);
+        }
+      vertices.push([x, y - s, z]);
+      const at = (r, c) => 1 + (r - 1) * n + (c % n),
+        bottom = vertices.length - 1,
+        add = (...v) => faces.push({ id: prefix + faces.length, vertices: v, uv: v.map(() => [0, 0]) });
+      for (let c = 0; c < n; c++) {
+        add(0, at(1, c + 1), at(1, c));
+        add(bottom, at(n - 1, c), at(n - 1, c + 1));
+        for (let r = 1; r < n - 1; r++) {
+          add(at(r, c), at(r, c + 1), at(r + 1, c + 1));
+          add(at(r, c), at(r + 1, c + 1), at(r + 1, c));
+        }
+      }
+      return { vertices, faces };
+    },
+    large = sphere(40, 'a', [0, 0, 0], 1),
+    // The first and last face of the large sphere lie outside the cut's box: their IDs and corners stay as they were.
+    cut = sphere(8, 'b', [1, 0, 0], 0.2),
+    { mesh, faceMap } = booleanMeshesExact(large, cut, 'difference', { createId: ids() });
+  assertClosed(mesh);
+  assert.ok(volume(mesh) < volume(large) && volume(mesh) > volume(large) - 0.04);
+  const untouched = large.faces.filter((face) => faceMap.a[face.id].length === 1).length;
+  assert.ok(untouched > large.faces.length * 0.9, `${untouched} of ${large.faces.length} faces stay whole`);
+});
+
+test('regression: overlapping shells of one input are joined first', () => {
+  const box = createPrimitiveMesh('cube', 'p'),
+    side = shifted(box, 'q', [0.5, 0, 0]),
+    // One mesh of two boxes that overlap by half: a real asset of parts pushed into each other.
+    both = {
+      vertices: [...box.vertices, ...side.vertices],
+      faces: [...box.faces, ...side.faces.map((f) => ({ ...f, vertices: f.vertices.map((v) => v + box.vertices.length) }))],
+    },
+    cutter = shifted(createPrimitiveMesh('cube', 'c'), 'd', [0, 0, 0.5]),
+    size = volume(box),
+    joined = booleanMeshesExact(box, side, 'union', { createId: ids() }).mesh,
+    expected = volume(booleanMeshesExact(joined, cutter, 'difference', { createId: ids() }).mesh),
+    result = booleanMeshesExact(both, cutter, 'difference', { createId: ids() });
+  assertClosed(result.mesh);
+  assert.ok(Math.abs(volume(joined) - size * 1.5) < 1e-12, 'the union of the shells');
+  assert.ok(Math.abs(volume(result.mesh) - expected) < 1e-12);
+  const inputs = new Set(both.faces.map((f) => f.id));
+  for (const [id, { input, face }] of Object.entries(result.sources))
+    if (input === 'a') assert.ok(inputs.has(face), `${id} names input face ${face}`);
+  assert.ok(Object.keys(result.faceMap.a).every((id) => inputs.has(id)));
+  assert.equal(Object.values(result.faceMap.a).flat().length + Object.values(result.faceMap.b).flat().length, result.mesh.faces.length);
+  assert.ok(result.diagnostics.some((line) => line.includes('shells of input a')));
+  // Apart, nothing is joined, so a mesh of parts that do not meet keeps its own faces.
+  const apart = shifted(box, 'r', [5, 0, 0]),
+    parts = {
+      vertices: [...box.vertices, ...apart.vertices],
+      faces: [...box.faces, ...apart.faces.map((f) => ({ ...f, vertices: f.vertices.map((v) => v + box.vertices.length) }))],
+    };
+  assert.ok(!booleanMeshesExact(parts, cutter, 'union', { createId: ids() }).diagnostics.some((line) => line.includes('shells')));
+});

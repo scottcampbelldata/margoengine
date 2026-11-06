@@ -476,6 +476,43 @@ function polysOf(space: Space, mesh: PolygonMesh, ints: bigint[][], input: 0 | 1
   return polys;
 }
 
+/** The box both vertex lists reach, as six planes with the box in front; null when the two boxes do not meet. */
+function overlapPlanes(space: Space, a: bigint[][], b: bigint[][]): Plane[] | null {
+  const planes: Plane[] = [],
+    range = (points: bigint[][], k: number) => {
+      let low = points[0][k],
+        high = low;
+      for (const p of points) {
+        if (p[k] < low) low = p[k];
+        if (p[k] > high) high = p[k];
+      }
+      return [low, high];
+    };
+  for (let k = 0; k < 3; k++) {
+    const [lowA, highA] = range(a, k),
+      [lowB, highB] = range(b, k),
+      low = lowA > lowB ? lowA : lowB,
+      high = highA < highB ? highA : highB;
+    if (low > high) return null;
+    const n = [0n, 0n, 0n];
+    n[k] = 1n;
+    planes.push(space.plane(n[0], n[1], n[2], -low), space.plane(-n[0], -n[1], -n[2], high));
+  }
+  return planes;
+}
+
+/** `polys` cut along `planes`: the pieces inside all of them, and the rest. */
+function sortByBox(space: Space, polys: Poly[], planes: readonly Plane[]): { inside: Poly[]; outside: Poly[] } {
+  const outside: Poly[] = [];
+  let inside = polys;
+  for (const h of planes) {
+    const front: Poly[] = [];
+    for (const poly of inside) space.split(h, poly, front, outside, front, outside);
+    inside = front;
+  }
+  return { inside, outside };
+}
+
 /** Each undirected edge's count of uses one way minus the other; zero counts are left out. */
 function edgeBalance(loops: readonly ExactLoop[]): Map<string, number> {
   const counts = new Map<string, number>();
@@ -872,10 +909,12 @@ function clipTrees(space: Space, A: Tree, B: Tree, operation: MeshBooleanOperati
  * valid face (about 1e-9 of their length) fold away and are counted in `collapsedFaces`. The returned mesh is always
  * closed and passes every mesh-edit check.
  *
- * Inputs must be closed, consistently wound, outward facing and free of self-intersection. Output faces keep source
- * IDs and interpolate UVs as `booleanMeshes` does.
+ * Only what lies in the box where the two bounds overlap goes through the exact trees, so a small cut in a large mesh
+ * costs the faces near it. Inputs must be closed, consistently wound and outward facing. Separate shells of one input
+ * that overlap are joined first, and `sources` and `faceMap` still name the input's faces; a single surface that crosses
+ * itself is refused. Output faces keep source IDs and interpolate UVs as `booleanMeshes` does.
  * @throws TypeError for an input that is not a closed, outward, consistently wound mesh, or bad options; MargoError
- * `failed` when an input intersects itself; the signal's reason when aborted.
+ * `failed` when a single surface of an input crosses itself; the signal's reason when aborted.
  */
 export function booleanMeshesExact(
   a: PolygonMesh,
@@ -892,18 +931,149 @@ export function booleanMeshesExact(
     throw new TypeError('Exact boolean createId must be a function; supply a generator or omit it.');
   if (options.signal !== undefined && !(options.signal instanceof AbortSignal))
     throw new TypeError('Exact boolean signal must be an AbortSignal; pass controller.signal or omit it.');
+  options.signal?.throwIfAborted();
+  const left = joinShells(a, options),
+    right = joinShells(b, options),
+    result = exactBoolean(left.mesh, right.mesh, operation, options);
+  if (!left.origin && !right.origin) return result;
+  const faceMap = {
+      a: Object.fromEntries(a.faces.map((face) => [face.id, [] as string[]])),
+      b: Object.fromEntries(b.faces.map((face) => [face.id, [] as string[]])),
+    },
+    sources: Record<string, MeshBooleanFaceSource> = {};
+  for (const [id, { input, face }] of Object.entries(result.sources)) {
+    const named = (input === 'a' ? left : right).origin?.get(face) ?? face;
+    sources[id] = { input, face: named };
+    faceMap[input][named].push(id);
+  }
+  for (const [label, { origin }] of [
+    ['a', left],
+    ['b', right],
+  ] as const)
+    if (origin) result.diagnostics.push(`Overlapping shells of input ${label} were joined first.`);
+  return { ...result, sources, faceMap };
+}
+
+/** The connected shells of a closed mesh, each with only its own vertices. */
+function shellsOf(mesh: PolygonMesh): PolygonMesh[] {
+  const parent = mesh.vertices.map((_, i) => i),
+    find = (v: number): number => {
+      while (parent[v] !== v) v = parent[v] = parent[parent[v]];
+      return v;
+    };
+  for (const face of mesh.faces) for (const v of face.vertices) parent[find(v)] = find(face.vertices[0]);
+  const shells = new Map<number, { faces: PolygonMesh['faces'][number][]; remap: Map<number, number> }>();
+  for (const face of mesh.faces) {
+    const root = find(face.vertices[0]);
+    let shell = shells.get(root);
+    if (!shell) shells.set(root, (shell = { faces: [], remap: new Map() }));
+    const { remap } = shell;
+    shell.faces.push({
+      ...face,
+      vertices: face.vertices.map((v) => {
+        if (!remap.has(v)) remap.set(v, remap.size);
+        return remap.get(v)!;
+      }),
+    });
+  }
+  return [...shells.values()].map(({ faces, remap }) => ({
+    vertices: [...remap.keys()].map((v) => [...mesh.vertices[v]] as MutableVec3),
+    faces,
+  }));
+}
+
+/** Six times the signed volume, about the mesh's first vertex. */
+function signedVolume({ vertices, faces }: PolygonMesh): number {
+  const o = vertices[0];
+  let sum = 0;
+  for (const face of faces) {
+    const [ax, ay, az] = vertices[face.vertices[0]].map((v, k) => v - o[k]);
+    for (let i = 1; i < face.vertices.length - 1; i++) {
+      const [bx, by, bz] = vertices[face.vertices[i]].map((v, k) => v - o[k]),
+        [cx, cy, cz] = vertices[face.vertices[i + 1]].map((v, k) => v - o[k]);
+      sum += ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx);
+    }
+  }
+  return sum;
+}
+
+/** Whether the bounding boxes of two meshes meet. */
+function boundsMeet(p: PolygonMesh, q: PolygonMesh): boolean {
+  for (let k = 0; k < 3; k++) {
+    const of = (m: PolygonMesh) => m.vertices.map((v) => v[k]);
+    if (Math.max(...of(p)) < Math.min(...of(q)) || Math.max(...of(q)) < Math.min(...of(p))) return false;
+  }
+  return true;
+}
+
+/**
+ * Unions the shells of `mesh` whose bounds meet, so an input made of overlapping parts is a solid the trees can read.
+ * `origin` maps each new face to the input face it came from. A shell facing inward is a cavity: the mesh stays as it is.
+ */
+function joinShells(
+  mesh: PolygonMesh,
+  options: ExactBooleanOptions,
+): { mesh: PolygonMesh; origin?: Map<string, string> } {
+  const shells = shellsOf(mesh);
+  if (shells.length < 2 || shells.some((shell) => signedVolume(shell) <= 0)) return { mesh };
+  let origin: Map<string, string> | undefined;
+  for (let i = 0; i < shells.length; i++)
+    for (let j = i + 1; j < shells.length; j++) {
+      if (!boundsMeet(shells[i], shells[j])) continue;
+      const { mesh: joined, sources } = exactBoolean(shells[i], shells[j], 'union', options),
+        next = new Map<string, string>();
+      for (const [id, { face }] of Object.entries(sources)) next.set(id, origin?.get(face) ?? face);
+      origin = new Map([...(origin ?? []), ...next]);
+      shells[i] = joined;
+      shells.splice(j, 1);
+      j = i;
+    }
+  if (!origin) return { mesh };
+  let at = 0;
+  const vertices: MutableVec3[] = [],
+    faces: PolygonMesh['faces'][number][] = [];
+  for (const shell of shells) {
+    vertices.push(...shell.vertices);
+    for (const face of shell.faces) faces.push({ ...face, vertices: face.vertices.map((v) => v + at) });
+    at = vertices.length;
+  }
+  return { mesh: { vertices, faces }, origin };
+}
+
+/** The boolean itself, on inputs already checked. */
+function exactBoolean(
+  a: PolygonMesh,
+  b: PolygonMesh,
+  operation: MeshBooleanOperation,
+  options: ExactBooleanOptions,
+): ExactBooleanResult {
   const signal = options.signal;
   let ticks = 0;
   const tick = () => {
     if (signal && ++ticks % 256 === 0) signal.throwIfAborted();
   };
-  signal?.throwIfAborted();
   const { ints, exponent } = integerCoordinates([a, b]),
     space = new Space(exponent),
     A = new Tree(),
-    B = new Tree();
-  A.build(space, polysOf(space, a, ints[0], 0), tick);
-  B.build(space, polysOf(space, b, ints[1], 1), tick);
+    B = new Tree(),
+    polysA = polysOf(space, a, ints[0], 0),
+    polysB = polysOf(space, b, ints[1], 1),
+    box = overlapPlanes(space, ints[0], ints[1]),
+    nearA = box ? sortByBox(space, polysA, box) : { inside: [], outside: polysA },
+    nearB = box ? sortByBox(space, polysB, box) : { inside: [], outside: polysB },
+    // Only what lies in the box where the bounds overlap goes through the trees: a surface outside it is outside the
+    // other solid, and a tree of the surface inside it still labels that box rightly, as each cell touches a polygon of
+    // the plane that closed it. A surface with nothing in the box cannot say whether the box is inside it, so then both
+    // go through whole.
+    whole = !nearA.inside.length !== !nearB.inside.length;
+  A.build(space, whole ? polysA : nearA.inside, tick);
+  B.build(space, whole ? polysB : nearB.inside, tick);
+  const clear =
+    whole || operation === 'intersection'
+      ? []
+      : operation === 'union'
+        ? [...nearA.outside, ...nearB.outside]
+        : nearA.outside;
   // Number the distinct exact points: reduced homogeneous coordinates are one string per point.
   const exact: bigint[][] = [],
     ids = new Map<string, number>(),
@@ -921,7 +1091,7 @@ export function booleanMeshesExact(
       p.id = id;
       return id;
     },
-    exactLoops: ExactLoop[] = clipTrees(space, A, B, operation, tick).map((poly) => ({
+    exactLoops: ExactLoop[] = [...clipTrees(space, A, B, operation, tick), ...clear].map((poly) => ({
       ids: poly.points.map(idOf),
       source: poly.source,
     }));

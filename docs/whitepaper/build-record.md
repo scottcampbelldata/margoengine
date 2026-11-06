@@ -1015,6 +1015,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | A7 | modelAlphaMasks reads a loaded model's masks, with wrap per axis and KHR_texture_transform, against the GPU pick on AlphaBlendModeTest.glb | DONE | `343481d21` | LIM-130 |
 | A6 | skinningFromModel reads a loaded glTF skin; checked on the real Fox.glb against the compute deformer (closes C8 too) | DONE | `45c5adf57` | LIM-188 |
 | B1 | Primitives without instances culled through indirect records, Hi-Z with addOccluder for them and instance rows; real NodePerformanceTest.glb | DONE | this commit | LIM-136 |
+| B2 | Only the overlap box goes through the exact trees (40 to 75 s to 7 to 11 s on 10,000 faces), overlapping shells joined first | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 
