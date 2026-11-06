@@ -1619,19 +1619,6 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node bench/cli.mjs parity --cases=helmet --engines=margo,three-webgl-parity,three-webgpu-parity --runs=5`.
   A quiet run is still owed.
 
-### 64. Raw meshes with equal bytes share their buffers
-
-- **Loss:** `p-custom-shader`, 10,000 `RawMesh`es of one geometry: 22.5 ms CPU and 2.07 ms GPU a frame against three's WebGL
-  6.3 and 3.4 (`--no-gate`, other jobs running, diagnostic). Each mesh uploaded and bound its own vertex and index buffers.
-- **Fix:** `@margoengine/shader/raw` holds one buffer for meshes whose packed bytes are equal, counted per device, with
-  copy on write, and a pass binds a buffer only when the next draw needs another. Draw order and draw count are unchanged.
-- **After:** 3.4 ms CPU and 0.14 ms GPU against three's WebGL 5.9 and 3.4, same conditions; 10,000 draws, image SSIM 0.997
-  and delta E 0.42 against three. The drop is larger than the two calls saved per draw explain, and why is not measured.
-- **Not done:** the pooled object blocks with dynamic offsets in the old plan. They save no call per draw, and the row no
-  longer loses.
-- **Rerun:** `node bench/cli.mjs parity --cases=p-custom-shader --engines=margo,three-webgl-parity --runs=3`.
-- **Guard:** `packages/shader/test/raw.test.js`, `packages/shader/test/browser-check.mjs` (`rawShared`).
-
 ### 64. Light tier: 50 FPS on a 100 Hz display
 
 - **Loss:** the voxel sandbox ran at 50 FPS on an Apple M6 Mac mini in Safari and Chrome, on a monitor that gives 60 on Windows. macOS runs that monitor (Dell S2725HS) at 100 Hz by default: all 18 mode changes in a week of WindowServer logs set 1920 x 1080 at 100 Hz.
@@ -1654,6 +1641,19 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Open:** three's WebGPU took 0.66 ms in this run against 0.25 in the ledger, so the verdict needs a quiet run.
 - **Rerun:** `node bench/cli.mjs parity --cases=p-motion-blur --engines=margo,three-webgpu-parity --runs=3`.
 - **Guard:** `packages/taa/test/velocity.test.js`, `packages/taa/test/velocity-only-browser.mjs`.
+
+### 66. Raw meshes with equal bytes share their buffers
+
+- **Loss:** `p-custom-shader`, 10,000 `RawMesh`es of one geometry: 22.5 ms CPU and 2.07 ms GPU a frame against three's WebGL
+  6.3 and 3.4 (`--no-gate`, other jobs running, diagnostic). Each mesh uploaded and bound its own vertex and index buffers.
+- **Fix:** `@margoengine/shader/raw` holds one buffer for meshes whose packed bytes are equal, counted per device, with
+  copy on write, and a pass binds a buffer only when the next draw needs another. Draw order and draw count are unchanged.
+- **After:** 3.4 ms CPU and 0.14 ms GPU against three's WebGL 5.9 and 3.4, same conditions; 10,000 draws, image SSIM 0.997
+  and delta E 0.42 against three. The drop is larger than the two calls saved per draw explain, and why is not measured.
+- **Not done:** the pooled object blocks with dynamic offsets in the old plan. They save no call per draw, and the row no
+  longer loses.
+- **Rerun:** `node bench/cli.mjs parity --cases=p-custom-shader --engines=margo,three-webgl-parity --runs=3`.
+- **Guard:** `packages/shader/test/raw.test.js`, `packages/shader/test/browser-check.mjs` (`rawShared`).
 
 ## Open losses
 

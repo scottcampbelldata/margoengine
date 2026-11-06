@@ -1,5 +1,6 @@
 // Bugs 54 and 55: the licence in the site's JSON-LD and every stated package count must match their source.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   jsonLdLicenses,
@@ -20,6 +21,20 @@ const run = (html, licenseText = apache) =>
 
 test('the repository states its licence and package counts truthfully', () => {
   assert.deepEqual(publicTruthProblems(), []);
+});
+
+test('every perf-history entry and every claim has a number of its own', () => {
+  const repeats = (file, pattern) => {
+    const seen = new Set(),
+      twice = [];
+    for (const [, id] of readFileSync(new URL(`../docs/whitepaper/${file}`, import.meta.url), 'utf8').matchAll(pattern))
+      if (seen.has(id)) twice.push(id);
+      else seen.add(id);
+    assert.ok(seen.size > 50, `${file}: the pattern found ${seen.size} numbers`);
+    return twice;
+  };
+  assert.deepEqual(repeats('perf-history.md', /^### (\d+)\. /gm), []);
+  assert.deepEqual(repeats('claims.md', /^\| (LIM-\d+) \|/gm), []);
 });
 
 test('a JSON-LD licence that differs from package.json fails, and the right URL passes', () => {
