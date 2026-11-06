@@ -60,7 +60,13 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/scene": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/scene": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"

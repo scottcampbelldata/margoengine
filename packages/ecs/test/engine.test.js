@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '@margoengine/core/extension';
+import { TransformWriter } from '@margoengine/scene/bulk';
 import { World } from '../dist/index.js';
 import { MeshBridge, transformSchema } from '../dist/engine.js';
 
@@ -75,6 +76,142 @@ test('rows already equal to the mesh are left alone', async () => {
   };
   bridge.sync();
   assert.equal(writes, 0);
+});
+
+const counted = (t) => {
+  const { write } = TransformWriter.prototype,
+    calls = [];
+  TransformWriter.prototype.write = function (rows, range) {
+    calls.push({ fields: Object.keys(rows), ...range });
+    return write.call(this, rows, range);
+  };
+  t.after(() => {
+    TransformWriter.prototype.write = write;
+  });
+  return calls;
+};
+const linked = async (count) => {
+  const made = await scene(count),
+    links = Array.from({ length: count }, () => {
+      const entity = made.world.create(),
+        mesh = made.engine.createMesh();
+      made.bridge.link(entity, mesh);
+      return { entity, mesh };
+    });
+  return { ...made, links };
+};
+
+test('a world that moves everything costs one bulk write a group', async (t) => {
+  const { transform, bridge, links } = await linked(60),
+    calls = counted(t);
+  bridge.sync();
+  assert.equal(calls.length, 0, 'nothing moved, nothing written');
+  for (const { entity } of links) {
+    const row = transform.index(entity);
+    transform.fields.x[row] = row + 1;
+    transform.fields.qz[row] = 1;
+    transform.fields.qw[row] = 1;
+    transform.fields.sy[row] = 2;
+  }
+  assert.equal(bridge.sync(), 60);
+  assert.deepEqual(calls.map(({ fields, from, count }) => [fields[0], from, count]), [
+    ['positions', 0, 60],
+    ['quaternions', 0, 60],
+    ['scales', 0, 60],
+  ]);
+});
+
+test('only the runs of rows that moved are written', async (t) => {
+  const { transform, bridge, links } = await linked(8),
+    calls = counted(t);
+  for (const i of [1, 2, 6]) transform.fields.y[transform.index(links[i].entity)] = i;
+  bridge.sync();
+  assert.deepEqual(calls.map(({ from, count }) => [from, count]), [
+    [1, 2],
+    [6, 1],
+  ]);
+  links.forEach(({ mesh }, i) => assert.equal(mesh.position.y, [1, 2, 6].includes(i) ? i : 0));
+});
+
+test('the bulk result is what the setters give, bit for bit', async () => {
+  const { transform, bridge, links, engine } = await linked(60);
+  let seed = 7;
+  const next = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x40000000 - 1;
+  for (const { entity, mesh } of links) {
+    const row = transform.index(entity),
+      f = transform.fields,
+      values = { x: next() * 9, y: next() * 9, z: next() * 9, q: [next(), next(), next(), next() + 2], s: [next() + 2, next() + 2, next() + 2] };
+    [f.x[row], f.y[row], f.z[row]] = [values.x, values.y, values.z];
+    [f.qx[row], f.qy[row], f.qz[row], f.qw[row]] = values.q;
+    [f.sx[row], f.sy[row], f.sz[row]] = values.s;
+    const twin = engine.createMesh();
+    twin.position.set(f.x[row], f.y[row], f.z[row]);
+    twin.setQuaternion([f.qx[row], f.qy[row], f.qz[row], f.qw[row]]);
+    twin.scale.set(f.sx[row], f.sy[row], f.sz[row]);
+    mesh.twin = twin;
+  }
+  bridge.sync();
+  for (const { mesh } of links) {
+    const { twin } = mesh;
+    assert.deepEqual([mesh.position.x, mesh.position.y, mesh.position.z], [twin.position.x, twin.position.y, twin.position.z]);
+    assert.deepEqual([mesh.rotation.x, mesh.rotation.y, mesh.rotation.z], [twin.rotation.x, twin.rotation.y, twin.rotation.z]);
+    assert.deepEqual([mesh.scale.x, mesh.scale.y, mesh.scale.z], [twin.scale.x, twin.scale.y, twin.scale.z]);
+  }
+});
+
+test('a rotation the row did not change keeps its Euler angles while a neighbour turns', async () => {
+  const { transform, bridge, links } = await linked(3),
+    [first, middle, last] = links;
+  middle.mesh.rotation.set(0, 4, 0);
+  bridge.unlink(middle.entity);
+  transform.remove(middle.entity);
+  bridge.link(middle.entity, middle.mesh);
+  bridge.sync();
+  for (const { entity } of [first, last]) {
+    const row = transform.index(entity);
+    transform.fields.qz[row] = 1;
+    transform.fields.qw[row] = 1;
+  }
+  bridge.sync();
+  assert.equal(middle.mesh.rotation.y, 4);
+});
+
+test('links made or ended between syncs are picked up', async () => {
+  const { engine, world, transform, bridge, links } = await linked(3);
+  bridge.sync();
+  const entity = world.create(),
+    mesh = engine.createMesh();
+  bridge.link(entity, mesh);
+  transform.fields.x[transform.index(entity)] = 5;
+  assert.equal(bridge.sync(), 4);
+  assert.equal(mesh.position.x, 5);
+  bridge.unlink(links[0].entity);
+  transform.fields.x[transform.index(links[0].entity)] = 9;
+  transform.fields.x[transform.index(links[1].entity)] = 3;
+  assert.equal(bridge.sync(), 3);
+  assert.equal(links[0].mesh.position.x, 0);
+  assert.equal(links[1].mesh.position.x, 3);
+});
+
+test('one bridge can feed the meshes of two engines', async () => {
+  const { engine, world, transform, bridge } = await scene(),
+    { engine: other } = await scene(),
+    near = world.create(),
+    far = world.create(),
+    here = engine.createMesh(),
+    there = other.createMesh();
+  bridge.link(near, here).link(far, there);
+  transform.fields.x[transform.index(near)] = 1;
+  transform.fields.x[transform.index(far)] = 2;
+  assert.equal(bridge.sync(), 2);
+  assert.equal(here.position.x, 1);
+  assert.equal(there.position.x, 2);
+});
+
+test('the bridge shares scene/bulk, it does not carry a copy', async () => {
+  const { readFile } = await import('node:fs/promises'),
+    code = await readFile(new URL('../dist/engine.js', import.meta.url), 'utf8');
+  assert.match(code, /from\s*["`]@margoengine\/scene\/bulk["`]/);
 });
 
 test('a component with one group leaves the others to the mesh; a partial group or none is refused', async () => {

@@ -170,7 +170,7 @@ console.log(world.alive(barrel), owns.size); // false 0
 
 ## Engine bridge
 
-`MeshBridge` (from `margoengine/ecs/engine`) copies a transform component to core meshes in one call a frame, so systems work on packed arrays and never touch a mesh.
+`MeshBridge` (from `margoengine/ecs/engine`) copies a transform component to core meshes in one bulk step a frame, so systems work on packed arrays and never touch a mesh. It writes through `TransformWriter` from `@margoengine/scene/bulk`, an optional peer of this entry: `margoengine` includes it, and with the `@margoengine/*` packages install `@margoengine/scene` beside `@margoengine/ecs`.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -192,7 +192,7 @@ stage.onTick((delta) => {
 | --- | --- | --- |
 | `disposeMeshes` | `false` | Dispose a linked mesh when its entity loses the component or is destroyed |
 
-`transformSchema` is position `x y z`, quaternion `qx qy qz qw` and scale `sx sy sz`. A component may hold any of those three groups, whole; a mesh keeps its own values for a group the component lacks. `link(entity, mesh)` fills a new row from the mesh, so nothing jumps; a row made by hand needs `qw: 1` and a scale, or `sync` throws the mesh's RangeError. `sync()` goes through the mesh's setters, so the checks are the same as a hand write and `mesh.rotation` stays correct, and it leaves a group alone when the mesh already holds those values. A link ends with `unlink(entity)`, when the entity loses the component or is destroyed, or with `stop()`. A mesh disposed behind the bridge makes `sync` throw MargoError `'disposed'` rather than write to whichever mesh reuses its slot. Transforms are local to the mesh's parent; set hierarchies on the meshes with `setParent`.
+`transformSchema` is position `x y z`, quaternion `qx qy qz qw` and scale `sx sy sz`. A component may hold any of those three groups, whole; a mesh keeps its own values for a group the component lacks. `link(entity, mesh)` fills a new row from the mesh, so nothing jumps; a row made by hand needs `qw: 1` and a scale, or `sync` throws the mesh's RangeError. `sync()` makes one `TransformWriter` write per group for each run of rows that changed, so a world where everything moves costs three writes. The checks and the result are those of the mesh's setters, `mesh.rotation` included, and a group the mesh already holds is left alone. The first `sync` after a link or unlink builds the writer again, about one pass over the links. A link ends with `unlink(entity)`, when the entity loses the component or is destroyed, or with `stop()`. A mesh disposed behind the bridge makes `sync` throw MargoError `'disposed'` rather than write to whichever mesh reuses its slot. Transforms are local to the mesh's parent; set hierarchies on the meshes with `setParent`.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

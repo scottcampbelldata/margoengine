@@ -935,7 +935,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 
 | Gap | Job | Status | Commit | Claim |
 | --- | --- | --- | --- | --- |
-| C20 | Claims read PROVEN on stand-in proof: seven now read PROVEN (STAND-IN) and say what stood in; LIM-193 and LIM-197 name the real run in LIM-208 | DONE | this commit | LIM-091, 109, 120, 129, 134, 149, 151, 193, 197 |
+| C20 | Claims read PROVEN on stand-in proof: seven now read PROVEN (STAND-IN) and say what stood in; LIM-193 and LIM-197 name the real run in LIM-208 | DONE | `28bf8fb66` | LIM-091, 109, 120, 129, 134, 149, 151, 193, 197 |
+| B9 | MeshBridge.sync writes through TransformWriter, one write per group for each run of changed rows | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

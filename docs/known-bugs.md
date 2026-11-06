@@ -158,6 +158,13 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### npm run verify hung once in its unit test step
+
+- **What:** on 2026-11-06 one `npm run verify` run in a worktree passed every other step and then sat in the unit test step until its 1,500 s limit, where the same tree took 166 s minutes before and the next run passed in 380 s. Nothing named the test, because the step prints only when it ends.
+- **Repro:** none yet. Other lanes were running their own checks on the machine at the time.
+- **Cause:** not found. Only a test with no time limit of its own could do this, so `--test-timeout` on that step would name it the next time.
+- **Needed to close:** give the step a per-test limit, then fix the test it names.
+
 ### Apple M6 sweep, 2026-11-05 (Chrome 157 and Playwright WebKit; Safari not run)
 
 Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6, macOS 27.2). Repro for each: on a Mac,

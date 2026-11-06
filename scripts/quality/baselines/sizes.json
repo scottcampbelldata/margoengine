@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5250632,
+  "total": 5238117,
   "history": [
     {
       "date": "2026-10-24",
@@ -2408,6 +2408,12 @@
       "commit": "8d4394bf8",
       "reason": "motion matching entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "24190aa76",
+      "reason": "ecs/engine: MeshBridge.sync gathers rows for TransformWriter and groups links per engine, the bulk step its job asked for (gap B9)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2543,7 +2549,7 @@
     "@margoengine/dof/lens": 1506,
     "@margoengine/ecs": 4554,
     "@margoengine/ecs/changes": 882,
-    "@margoengine/ecs/engine": 1436,
+    "@margoengine/ecs/engine": 1792,
     "@margoengine/ecs/growable": 2237,
     "@margoengine/ecs/query": 1021,
     "@margoengine/ecs/relations": 1209,
