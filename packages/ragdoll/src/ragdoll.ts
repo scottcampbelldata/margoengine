@@ -99,7 +99,14 @@ export interface RagdollPart {
   readonly spec: RagdollJoint | null;
   /** The local pose the animation last gave the bone, xyz then xyzw: what motors drive toward. */
   readonly animated: ArrayLike<number>;
+  /** True while physics drives this bone. */
+  readonly limp: boolean;
+  /** How much of this bone's drawn pose is the ragdoll's, 0 (the animation) to 1 (physics). */
+  readonly weight: number;
 }
+
+/** One bone or several, as nodes or parts: each stands for itself and every bone under it. */
+export type RagdollLimb = Mesh | RagdollPart | readonly (Mesh | RagdollPart)[];
 
 interface Cone {
   swing: number;
@@ -124,6 +131,12 @@ interface Bone extends RagdollPart {
   readonly world: Float64Array;
   /** Kinematic target, xyz then xyzw. */
   readonly target: [number, number, number, number, number, number, number];
+  limp: boolean;
+  weight: number;
+  /** Weight lost per second while blending back. */
+  fade: number;
+  /** The next kinematic target is a jump, not a sweep. */
+  jump: boolean;
 }
 
 const DEFAULT_JOINT: RagdollJoint = { type: 'cone', swing: Math.PI / 4, twist: [-Math.PI / 6, Math.PI / 6] };
@@ -240,10 +253,8 @@ export class Ragdoll implements EnginePlugin {
   private readonly engine: Engine;
   private readonly stiffness: number;
   private readonly unsubscribe: Array<() => void> = [];
-  private dynamic = false;
-  private blend = 0;
-  private fadeRate = 0;
-  private teleport = true;
+  /** How many bones are limp. */
+  private loose = 0;
   private stepped = 0;
   private attached?: Engine;
   private disposed = false;
@@ -461,6 +472,10 @@ export class Ragdoll implements EnginePlugin {
           local: new Float64Array(7),
           world,
           target: [world[0], world[1], world[2], world[3], world[4], world[5], world[6]],
+          limp: !!options.active,
+          weight: options.active ? 1 : 0,
+          fade: 0,
+          jump: !options.active,
         };
         this.readLocal(node, bone.animated);
         bone.local.set(bone.animated);
@@ -475,9 +490,7 @@ export class Ragdoll implements EnginePlugin {
     this.parts = parts;
     this.bones = parts;
     this.omega = new Float64Array(parts.length * 3);
-    this.dynamic = options.active ?? false;
-    this.blend = this.dynamic ? 1 : 0;
-    this.teleport = !this.dynamic;
+    this.loose = options.active ? parts.length : 0;
     this.unsubscribe.push(
       physics.on('beforestep', () => this.beforeStep()),
       physics.on('afterstep', () => this.afterStep()),
@@ -604,21 +617,26 @@ export class Ragdoll implements EnginePlugin {
     return { joint, cone: null, spec: { type: 'hinge', axis: [unit[0], unit[1], unit[2]], limits: [min, max] } };
   }
 
-  /** True while physics drives the bones (after `activate()`, until `deactivate()`). */
+  /** True while physics drives any bone (after `activate()`, until `deactivate()`). */
   get active(): boolean {
-    return this.dynamic;
+    return this.loose > 0;
   }
   /**
-   * How much of the drawn pose is the ragdoll's, 0 (the animation) to 1 (physics). `activate()` sets 1 and
-   * `deactivate(seconds)` fades it to 0; set it yourself for a partial blend while active.
+   * How much of the drawn pose is the ragdoll's, 0 (the animation) to 1 (physics): the largest of any bone's.
+   * `activate()` sets 1 and `deactivate(seconds)` fades it to 0; set it yourself for a partial blend of the limp bones.
    */
   get weight(): number {
-    return this.blend;
+    let most = 0;
+    for (const bone of this.parts) most = Math.max(most, bone.weight);
+    return most;
   }
   set weight(value: number) {
     if (!(value >= 0 && value <= 1)) throw new RangeError('Ragdoll weight must be from 0 to 1.');
-    this.blend = value;
-    this.fadeRate = 0;
+    for (const bone of this.parts)
+      if (bone.limp || !this.loose) {
+        bone.weight = value;
+        bone.fade = 0;
+      }
   }
   /** World position of the root bone's body (the hips) at the last physics step: where to put a character that gets up. */
   get rootPosition(): [number, number, number] {
@@ -626,16 +644,38 @@ export class Ragdoll implements EnginePlugin {
     return [cur[0], cur[1], cur[2]];
   }
 
+  /** The bones `limb` names and every bone under them; every bone without a `limb`. */
+  private limbBones(limb: RagdollLimb | undefined): Bone[] {
+    if (limb === undefined) return this.parts;
+    const picked = new Set<Bone>();
+    for (const item of Array.isArray(limb) ? (limb as readonly (Mesh | RagdollPart)[]) : [limb as Mesh | RagdollPart]) {
+      const node = item && 'body' in item ? item.node : item,
+        top = this.parts.find((bone) => bone.node === node);
+      if (!top) throw new RangeError('That node is not a bone of this ragdoll; pass nodes or parts of ragdoll.bones.');
+      picked.add(top);
+    }
+    // Parents come first, so one pass reaches every bone under the ones picked.
+    for (const bone of this.parts) if (bone.parent !== -1 && picked.has(this.parts[bone.parent])) picked.add(bone);
+    return [...picked];
+  }
+
   /**
-   * Goes limp: every body becomes dynamic, keeps the velocity the animation gave it, and drives its bone. Does nothing
-   * when already active.
+   * Goes limp: each body becomes dynamic, keeps the velocity the animation gave it, and drives its bone. Bones that are
+   * limp already stay as they are.
+   * @param limb With a bone or a list of bones, only they and the bones under them go limp, hanging from the bones that
+   * keep animating: one arm for a hit, the spine for the whole upper body. Without it, every bone.
+   * @throws RangeError for a node that is not a bone of this ragdoll.
    */
-  activate(): this {
+  activate(limb?: RagdollLimb): this {
     this.live();
-    if (this.dynamic) return this;
     const dt = this.physics.fixedTimestep,
       moved = this.stepped >= 2;
-    for (const bone of this.parts) {
+    for (const bone of this.limbBones(limb)) {
+      if (bone.limp) continue;
+      bone.limp = true;
+      bone.weight = 1;
+      bone.fade = 0;
+      this.loose++;
       bone.body.setType('dynamic');
       const { prev, cur } = bone;
       if (!moved) continue;
@@ -648,28 +688,32 @@ export class Ragdoll implements EnginePlugin {
         scale = sin > 1e-9 ? angle / sin / dt : 0;
       bone.body.setAngularVelocity([this.r[0] * scale, this.r[1] * scale, this.r[2] * scale]);
     }
-    this.dynamic = true;
-    this.blend = 1;
-    this.fadeRate = 0;
     return this;
   }
 
   /**
-   * Hands the bones back to the animation: the bodies become kinematic again (following the animation), and the drawn
-   * pose blends from the ragdoll's last pose to the animation over `duration` seconds (default 0.3; 0 snaps). Does
-   * nothing when not active.
+   * Hands bones back to the animation: the bodies become kinematic again (following the animation), and the drawn
+   * pose blends from the ragdoll's last pose to the animation over `duration` seconds (default 0.3; 0 snaps). Bones that
+   * are not limp stay as they are.
+   * @param limb With a bone or a list of bones, only they and the bones under them. Without it, every bone.
+   * @throws RangeError for a node that is not a bone of this ragdoll.
    */
-  deactivate(duration = 0.3): this {
+  deactivate(duration = 0.3, limb?: RagdollLimb): this {
     this.live();
     if (!(duration >= 0) || duration === Infinity)
       throw new RangeError('Ragdoll blend duration must be a finite number of seconds, 0 or more.');
-    if (!this.dynamic) return this;
+    const bones = this.limbBones(limb);
+    if (!this.loose) return this;
     this.physicsLocals();
-    for (const bone of this.parts) bone.body.setType('kinematicPosition');
-    this.dynamic = false;
-    this.teleport = true;
-    this.fadeRate = duration > 0 ? this.blend / duration : 0;
-    if (!duration) this.blend = 0;
+    for (const bone of bones) {
+      if (!bone.limp) continue;
+      bone.body.setType('kinematicPosition');
+      bone.limp = false;
+      bone.jump = true;
+      bone.fade = duration > 0 ? bone.weight / duration : 0;
+      if (!duration) bone.weight = 0;
+      this.loose--;
+    }
     return this;
   }
 
@@ -699,29 +743,29 @@ export class Ragdoll implements EnginePlugin {
       throw new RangeError('Invalid ragdoll delta; pass a finite delta of 0 or more seconds.');
     const store = this.engine.store;
     store.tick(false);
-    for (const bone of this.parts) this.track(bone);
-    if (!this.dynamic) {
+    for (const bone of this.parts) {
+      this.track(bone);
+      if (bone.limp) continue;
       // Kinematic: the animated world pose is the next target.
-      for (const bone of this.parts) {
-        const m = bone.node.matrix,
-          sx = Math.hypot(m[0], m[1], m[2]),
-          t = bone.target;
-        rotationToQuaternion(m, this.q, sx, sx, sx);
-        normalizeQuaternion(this.q, this.q);
-        t[0] = m[12];
-        t[1] = m[13];
-        t[2] = m[14];
-        t[3] = this.q[0];
-        t[4] = this.q[1];
-        t[5] = this.q[2];
-        t[6] = this.q[3];
+      const m = bone.node.matrix,
+        sx = Math.hypot(m[0], m[1], m[2]),
+        t = bone.target;
+      rotationToQuaternion(m, this.q, sx, sx, sx);
+      normalizeQuaternion(this.q, this.q);
+      t[0] = m[12];
+      t[1] = m[13];
+      t[2] = m[14];
+      t[3] = this.q[0];
+      t[4] = this.q[1];
+      t[5] = this.q[2];
+      t[6] = this.q[3];
+      if (bone.fade > 0) {
+        bone.weight = Math.max(0, bone.weight - bone.fade * delta);
+        if (!bone.weight) bone.fade = 0;
       }
-      if (this.fadeRate > 0) {
-        this.blend = Math.max(0, this.blend - this.fadeRate * delta);
-        if (!this.blend) this.fadeRate = 0;
-      }
-    } else this.physicsLocals();
-    if (this.blend > 0) this.write();
+    }
+    if (this.loose) this.physicsLocals();
+    this.write();
   }
 
   /** Reads `node`'s local transform into `out`, xyz then xyzw. */
@@ -751,13 +795,17 @@ export class Ragdoll implements EnginePlugin {
       }
   }
 
-  /** The physics pose of every bone, interpolated to the frame, as world poses and as local transforms. */
+  /**
+   * The physics pose of every bone, interpolated to the frame, as world poses, and of every limp bone as a local
+   * transform. A bone blending back keeps the local transform it left physics with.
+   */
   private physicsLocals(): void {
     const alpha = this.physics.alpha;
     for (const bone of this.parts) {
       const { prev, cur, world, local } = bone;
       for (let k = 0; k < 3; k++) world[k] = prev[k] + (cur[k] - prev[k]) * alpha;
       slerp(prev, 3, cur, 3, alpha, world, 3);
+      if (!bone.limp) continue;
       local[0] = bone.animated[0];
       local[1] = bone.animated[1];
       local[2] = bone.animated[2];
@@ -791,11 +839,11 @@ export class Ragdoll implements EnginePlugin {
     }
   }
 
-  /** Writes base blended toward the physics pose by `weight` into every bone. */
+  /** Writes the animated pose blended toward the physics pose by its `weight` into every bone that has one. */
   private write(): void {
-    const weight = this.blend;
     for (const bone of this.parts) {
-      const { animated, local, written, node } = bone;
+      const { animated, local, written, node, weight } = bone;
+      if (!weight) continue;
       slerp(animated, 3, local, 3, weight, written, 3);
       if (bone.parent === -1) for (let k = 0; k < 3; k++) written[k] = animated[k] + (local[k] - animated[k]) * weight;
       else for (let k = 0; k < 3; k++) written[k] = animated[k];
@@ -816,24 +864,21 @@ export class Ragdoll implements EnginePlugin {
 
   private beforeStep(): void {
     if (this.disposed || !this.parts[0].body.valid) return;
-    if (!this.dynamic) {
-      const teleport = this.teleport;
-      this.teleport = false;
-      for (const bone of this.parts) {
-        const t = bone.target,
-          position: Vec3 = [t[0], t[1], t[2]],
-          rotation: [number, number, number, number] = [t[3], t[4], t[5], t[6]];
-        if (teleport) {
-          bone.body.setPosition(position);
-          bone.body.setRotation(rotation);
-          bone.cur.set(t);
-        }
-        bone.body.setNextPosition(position);
-        bone.body.setNextRotation(rotation);
+    for (const bone of this.parts) {
+      if (bone.limp) continue;
+      const t = bone.target,
+        position: Vec3 = [t[0], t[1], t[2]],
+        rotation: [number, number, number, number] = [t[3], t[4], t[5], t[6]];
+      if (bone.jump) {
+        bone.jump = false;
+        bone.body.setPosition(position);
+        bone.body.setRotation(rotation);
+        bone.cur.set(t);
       }
-      return;
+      bone.body.setNextPosition(position);
+      bone.body.setNextRotation(rotation);
     }
-    this.limits();
+    if (this.loose) this.limits();
   }
 
   /**
@@ -859,7 +904,7 @@ export class Ragdoll implements EnginePlugin {
     for (let i = 1; i < parts.length; i++) {
       const bone = parts[i],
         cone = bone.cone;
-      if (!cone) continue;
+      if (!cone || !bone.limp) continue;
       const up = parts[bone.parent],
         upRotation = up.body.rotation,
         rotation = bone.body.rotation;
@@ -883,8 +928,7 @@ export class Ragdoll implements EnginePlugin {
       mul(r, q, r);
       const sl = Math.hypot(r[0], r[1], r[2]),
         swing = 2 * Math.atan2(sl, Math.abs(r[3]));
-      const parentInverse = up.body.type === 'dynamic',
-        childInverse = bone.body.type === 'dynamic';
+      const parentInverse = up.limp;
       if (swing > cone.swing && sl > 1e-9) {
         // World swing axis: the local swing axis turned by R.
         const sign = r[3] < 0 ? -1 : 1;
@@ -892,8 +936,8 @@ export class Ragdoll implements EnginePlugin {
         v[1] = (r[1] / sl) * sign;
         v[2] = (r[2] / sl) * sign;
         rotateByQuaternion(v, s, v);
-        any = this.push(i, bone.parent, v, childInverse, parentInverse) || any;
-        if (childInverse) this.turn(bone, v, -(swing - cone.swing) * share);
+        any = this.push(i, bone.parent, v, parentInverse) || any;
+        this.turn(bone, v, -(swing - cone.swing) * share);
       }
       if (twist > cone.max || twist < cone.min) {
         // World twist axis: the bone axis turned by the child's rotation.
@@ -905,13 +949,13 @@ export class Ragdoll implements EnginePlugin {
           w[1] = -w[1];
           w[2] = -w[2];
         }
-        any = this.push(i, bone.parent, w, childInverse, parentInverse) || any;
-        if (childInverse) this.turn(bone, w, -error * share);
+        any = this.push(i, bone.parent, w, parentInverse) || any;
+        this.turn(bone, w, -error * share);
       }
     }
     if (!any) return;
     for (let i = 0; i < parts.length; i++)
-      if (parts[i].body.type === 'dynamic')
+      if (parts[i].limp)
         parts[i].body.setAngularVelocity([omega[i * 3], omega[i * 3 + 1], omega[i * 3 + 2]]);
   }
 
@@ -932,7 +976,7 @@ export class Ragdoll implements EnginePlugin {
    * One limit impulse about world `axis` (the direction that grows the error) between bone `i` and its parent `p`:
    * it removes their relative spin along the axis when that spin drives the error up. Returns whether it acted.
    */
-  private push(i: number, p: number, axis: Float64Array, child: boolean, parent: boolean): boolean {
+  private push(i: number, p: number, axis: Float64Array, parent: boolean): boolean {
     const omega = this.omega,
       a = i * 3,
       b = p * 3,
@@ -942,7 +986,7 @@ export class Ragdoll implements EnginePlugin {
         (omega[a + 2] - omega[b + 2]) * axis[2],
       target = 0;
     if (relative <= target) return false;
-    const inverseChild = child ? this.inverseInertia(this.parts[i], axis) : 0,
+    const inverseChild = this.inverseInertia(this.parts[i], axis),
       inverseParent = parent ? this.inverseInertia(this.parts[p], axis) : 0,
       total = inverseChild + inverseParent;
     if (!(total > 0)) return false;

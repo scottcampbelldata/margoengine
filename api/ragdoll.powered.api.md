@@ -48,8 +48,8 @@ class Ragdoll implements EnginePlugin {
     get weight(): number;
     set weight(value: number);
     get rootPosition(): [number, number, number];
-    activate(): this;
-    deactivate(duration?: number): this;
+    activate(limb?: RagdollLimb): this;
+    deactivate(duration?: number, limb?: RagdollLimb): this;
     part(node: Mesh): RagdollPart | undefined;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
@@ -77,6 +77,8 @@ type RagdollJoint = {
     type: 'free';
 };
 
+type RagdollLimb = Mesh | RagdollPart | readonly (Mesh | RagdollPart)[];
+
 interface RagdollOptions {
     root?: Mesh;
     bones?: readonly (Mesh | RagdollBone)[];
@@ -103,6 +105,8 @@ interface RagdollPart {
     readonly rest: ArrayLike<number>;
     readonly spec: RagdollJoint | null;
     readonly animated: ArrayLike<number>;
+    readonly limp: boolean;
+    readonly weight: number;
 }
 
 type Vec3 = readonly [number, number, number];

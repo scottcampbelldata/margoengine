@@ -86,10 +86,10 @@ limit does not bounce, and turning about the joint never pulls the joint apart.
 
 | Member | Meaning |
 | --- | --- |
-| `activate()` | Goes limp: every body becomes dynamic with the velocity its bone had in the last physics step, and physics drives the bones. |
-| `deactivate(duration = 0.3)` | The bodies follow the animation again (they jump to it, without sweeping through the world), and the drawn pose blends from the ragdoll's last pose to the animation over `duration` seconds. |
-| `active` | True while physics drives the bones. |
-| `weight` | How much of the drawn pose is the ragdoll's, 0 to 1. Set it while active for a partial blend. |
+| `activate(limb?)` | Goes limp: each body becomes dynamic with the velocity its bone had in the last physics step, and physics drives the bones. With a bone or a list, only those limbs. |
+| `deactivate(duration = 0.3, limb?)` | The bodies follow the animation again (they jump to it, without sweeping through the world), and the drawn pose blends from the ragdoll's last pose to the animation over `duration` seconds. With a bone or a list, only those limbs. |
+| `active` | True while physics drives any bone. |
+| `weight` | How much of the drawn pose is the ragdoll's, 0 to 1 (the largest of any bone's). Set it while active for a partial blend of the limp bones. |
 | `rootPosition` | World position of the root bone's body: where to move a character before it gets up. |
 | `part(node)` | The part of a node, or undefined. |
 | `dispose()` | Removes the bodies and joints and the plugin; the bones keep their last pose. `using` works. |
@@ -98,6 +98,22 @@ The ragdoll is an engine plugin that runs each frame after the plugins attached 
 Animator. It reads the bones' animated pose, sets the kinematic targets, and writes the blended pose. A bone's pose
 blends in its parent's frame (rotations for every bone, position for the root bone only), so limbs keep their lengths.
 Without an animation, blending back returns to the pose the bones had before the ragdoll moved them.
+
+## Partial ragdolls
+
+`activate(limb)` makes one limb physical while the rest keeps animating: pass a bone (a node or a part), or a list. That bone and every bone under it go limp and hang from the bones that keep animating, so a hit swings one arm while the character walks on. `deactivate(seconds, limb)` blends that limb back alone. The spine takes the whole upper body, with the legs still walking.
+
+```ts
+const arm = model.nodes.find((node) => node.name === 'LeftArm')!;
+ragdoll.activate(arm);
+ragdoll.part(arm)?.body.applyImpulse([0, 2, -20]);
+setTimeout(() => ragdoll.deactivate(0.4, arm), 800);
+
+ragdoll.activate([arm, rightArm]); // a list: both arms
+ragdoll.activate(spine); // the upper body; `activate()` with no bone is all of them
+```
+
+Each part has its own `limp` and `weight`, so a second limb can go limp while the first is still blending back. `ragdoll.active` is true while any bone is limp, and `ragdoll.weight` reads the largest weight. Bones that are not limp and have no weight are not written at all, so their animation reaches the screen unchanged. A limb stays attached to the drawn body to within a physics step: the bones above it are kinematic, and a kinematic body reaches a frame's pose at that frame's step.
 
 ## Options
 

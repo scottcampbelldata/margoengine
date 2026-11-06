@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-241). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-242). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -231,6 +231,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Weight transfer (`@margoengine/rigging/transfer`, 2026-11-06) | By method: the two meshes must be in one pose and space. Either facing passes the angle test, so a layer with its surface parallel to the wrong limb's and inside `maxDistance` takes that limb. The fill is a weighted average, so it blends and never sharpens. A target with nothing of the source around it gets the nearest weights, which can be far from an author's: 41% to 69% agreement on parts of the Twist sample with no surface around them. Not measured: speed in a quiet run. |
 | Face tracking (`@margoengine/rigging/face`, 2026-11-06) | By method: morph targets and VRM expressions only, so a jaw or eye moved by a bone is not driven; the VRM presets are a fixed reading of the 52, and no value stands for `relaxed`. A clip's track on a driven target is overwritten. Not proven: no real model named with these shapes was found and no live tracker has been run; the name matching is proven on stand-in targets, the avatar path on a real VRM avatar with frames the test wrote. Not measured: speed. |
 | Powered ragdolls (`@margoengine/ragdoll/powered`, 2026-11-06) | By method: joint motors keep a pose and cannot lift a character, so standing needs the `root` spring, which is an outside force. Motors add mass and inertia to small bodies (up to an eighth of the heaviest neighbour, a tenth of the heaviest limb), so a powered ragdoll is a little heavier than a limp one. A joint's torque cap comes from the pose motors were added in. The default cone clips most clips. Measured on the Rig_Medium walk at 6 Hz: mean 0.1 rad behind the clip, the worst bones (hands, feet) 0.5 rad at peak. Not proven: Rapier 0.21 is the only version run; no timing yet. |
+| Partial ragdolls (`Ragdoll.activate(limb)`, 2026-11-06) | By method: a limb is a bone and everything under it, so a hand without its fingers takes a list of parts of `ragdoll.bones` instead. A limb hangs from bodies that reach each frame's pose at that frame's physics step, so it is drawn up to one step behind a fast parent. A bone of the limb under a limp parent that is handed back alone follows its parent's drawn pose a frame late. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 
