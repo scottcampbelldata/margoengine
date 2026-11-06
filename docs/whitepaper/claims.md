@@ -1,3 +1,5 @@
+# Claims and evidence
+
 This page lists the numbers and capability statements in the docs, the script or test that backs each one, and a
 status. If a number in the README, on margoengine.com or in `docs/` is not here or in a committed result file,
 treat it as unverified and open an issue.
@@ -176,10 +178,8 @@ backs them yet:
 | LIM-075 | Raw mesh buffers: meshes with equal bytes hold one buffer and a run binds it once; a write copies it for that mesh only, the other meshes keep drawing the old bytes, and it is freed with its last mesh (docs/limits.md, Rendering) | `packages/shader/test/raw.test.js`, `packages/shader/test/browser-check.mjs` | `npm run test:gpu --workspace packages/shader` | PROVEN | RTX A6000 only |
 | LIM-076 | Depth-writing lines: the nearer of two crossing lines wins in either draw order, dash gaps and clipped parts write nothing, a later pass respects the depth and the edge keeps its ramp (docs/limits.md, Rendering) | `packages/lines/tests/depth-write.test.js`, `packages/lines/tests/features-browser.js` | `npm test --workspace @margoengine/lines`, `npm run test:browser --workspace @margoengine/lines` | PROVEN | |
 | LIM-077 | Light-tier pace: an even rate of at least 60 FPS on every display from 60 to 240 Hz, through jitter and whole-millisecond timestamps (docs/limits.md, Platform) | `packages/quality/test/quality.test.js` | `npm test --workspace @margoengine/quality` | PROVEN | A physical 100 Hz panel is not yet measured |
-| LIM-075 | Neural networks: every layer's values match its definition and its gradients match central differences on the CPU backend, a convolutional network and a causal attention block give the same outputs and gradients on WebGPU within 1e-4, convolution gradients repeat exactly, and a training step leaves nothing allocated (docs/limits.md, Rendering) | `packages/compute/tests/nn.test.js`, `packages/compute/tests/compute-nn-browser.js` | `npm test --workspace packages/compute`; `node scripts/gpu-lock.mjs run --owner=<id> -- node packages/compute/tests/compute-browser.mjs` | PROVEN | Speed is not measured. |
-
-# Claims and evidence
 | LIM-078 | TAA velocityOnly: a moving box blurs through MotionBlur at 4x MSAA, stays sharp with the blur off, and a still view keeps its bytes from frame to frame; no history textures or resolve pass exist (docs/limits.md, Rendering) | `packages/taa/test/velocity.test.js`, `packages/taa/test/velocity-only-browser.mjs` | `npm run test:gpu --workspace packages/taa` | PROVEN | RTX A6000 only |
+| LIM-079 | Neural networks: every layer's values match its definition and its gradients match central differences on the CPU backend, a convolutional network and a causal attention block give the same outputs and gradients on WebGPU within 1e-4, convolution gradients repeat exactly, and a training step leaves nothing allocated (docs/limits.md, Rendering) | `packages/compute/tests/nn.test.js`, `packages/compute/tests/compute-nn-browser.js` | `npm test --workspace packages/compute`; `node scripts/gpu-lock.mjs run --owner=<id> -- node packages/compute/tests/compute-browser.mjs` | PROVEN | Speed is not measured. |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 
