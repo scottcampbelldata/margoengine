@@ -17,7 +17,7 @@ export interface PointCloudData {
   colorComponents?: 3 | 4;
   /** Per-point size multiplier of `material.size`. A Float32Array is used in place. */
   sizes?: Float32Array | ArrayLike<number> | null;
-  /** Accepted for loader interop and kept on the cloud; not used for shading. */
+  /** Accepted for loader interop and kept on the cloud; `SurfelPlugin` lays each disc flat on its normal. */
   normals?: Float32Array | null;
 }
 
@@ -72,6 +72,7 @@ export class PointCloud {
   /** Component count of the colors last given (3 or 4). */
   colorComponents: 3 | 4 = 3;
   sizes: Float32Array | null = null;
+  /** xyz per point, in the same order as `positions`, or null. */
   readonly normals: Float32Array | null;
   readonly colorSpace: 'srgb' | 'linear';
   readonly blockSize: number;
@@ -109,10 +110,10 @@ export class PointCloud {
       throw new RangeError('cullMargin must be finite and non-negative');
     this.material =
       options.material instanceof PointsMaterial ? options.material : new PointsMaterial(options.material);
-    let stored = positions instanceof Float32Array ? positions : Float32Array.from(positions);
+    let stored = positions instanceof Float32Array ? positions : Float32Array.from(positions),
+      normals = options.normals ?? null;
     if (options.colors) this.setColors(options.colors, options.colorComponents, false);
     if (options.sizes) this.setSizes(options.sizes, false);
-    this.normals = options.normals ?? null;
     const blocks = buildBlocks(stored, this.count, this.blockSize, this.seed);
     this.direct = options.reorder === true;
     if (this.direct) {
@@ -130,6 +131,7 @@ export class PointCloud {
       stored = permute(stored, 3);
       if (this.colors) this.colors = permute(this.colors, 1);
       if (this.sizes) this.sizes = permute(this.sizes, 1);
+      normals = normals && permute(normals, 3);
       const blockOf = new Uint32Array(this.count).fill(NO_BLOCK);
       for (let b = 0; b < blocks.length; b++) blockOf.fill(b, blocks.starts[b], blocks.starts[b] + blocks.counts[b]);
       const order = new Uint32Array(this.count);
@@ -141,6 +143,7 @@ export class PointCloud {
       this.sourceIndex = null;
     }
     this.positions = stored;
+    this.normals = normals;
   }
 
   /** The mesh whose world matrix this cloud follows, or null. */

@@ -96,8 +96,81 @@ async function adaptiveSize() {
   return `Adaptive point size closes the holes of a sparse octree sample: ${plain.covered.toFixed(3)} to ${grown.covered.toFixed(3)} of the pixels covered`;
 }
 
+/** A surface of opaque points in two colours that meet at x = 0: surfels blend across the line, plain points do not. */
+async function surfels() {
+  const { PointCloud } = await import('@margoengine/points');
+  const { SurfelPlugin } = await import('../dist/surfels.js');
+  const n = 120,
+    positions = square(n),
+    colors = new Uint8Array(n * n * 3);
+  for (let i = 0; i < n * n; i++) colors.set(positions[i * 3] < 0 ? [255, 0, 0] : [0, 0, 255], i * 3);
+  const material = { size: 8 / n, sizeUnits: 'world', minPixelSize: 0 },
+    area = [80, 80, 176, 176],
+    filled = ([r, , b]) => r + b > 100,
+    between = ([r, , b]) => r > 40 && b > 40;
+  const draw = async (make) => {
+    const { engine, frame, end } = await rig(),
+      value = make(engine),
+      image = await frame();
+    return { value, image, end };
+  };
+  const plain = await draw((engine) =>
+    PointsPlugin.attach(engine).add(new PointCloud({ positions, colors, material: { ...material, shape: 'round' } })),
+  );
+  const blended = await draw((engine) => {
+    const plugin = SurfelPlugin.attach(engine, { overlap: 2 });
+    plugin.add(new PointCloud({ positions, colors, colorSpace: 'linear', material }));
+    return plugin;
+  });
+  const holes = 1 - fraction(blended.image, filled, area),
+    plainHoles = 1 - fraction(plain.image, filled, area),
+    mixed = fraction(blended.image, between, [120, 80, 136, 176]),
+    plainMixed = fraction(plain.image, between, [120, 80, 136, 176]),
+    far = blended.image.at(90, 128),
+    near = blended.image.at(166, 128);
+  assert(holes < 0.001, `surfels leave no holes: ${holes}`);
+  assert(plainHoles > holes, `plain points show more holes: ${plainHoles}`);
+  assert(mixed > plainMixed * 3, `colours blend across the seam: ${mixed} against ${plainMixed}`);
+  assert(far[0] > 200 && far[2] < 30 && near[2] > 200 && near[0] < 30, `each side keeps its colour: ${far} ${near}`);
+  await plain.end();
+  await blended.end();
+  return `Surfels close a jittered surface (${holes.toFixed(4)} holes against ${plainHoles.toFixed(3)}) and blend colours across a seam (${mixed.toFixed(2)} against ${plainMixed.toFixed(2)})`;
+}
+
+/** A red surface in front of a blue one, nearer than the disc size, and a mesh in front of surfels. */
+async function surfelDepth() {
+  const { PointCloud } = await import('@margoengine/points');
+  const { SurfelPlugin } = await import('../dist/surfels.js');
+  const { box, PbrMaterial } = await import('@margoengine/core');
+  const { engine, frame, end } = await rig(),
+    plugin = SurfelPlugin.attach(engine, { overlap: 2 }),
+    n = 60,
+    positions = square(n),
+    material = { size: 8 / n, sizeUnits: 'world' };
+  const back = plugin.add(new PointCloud({ positions: positions.map((v, i) => (i % 3 === 2 ? v - 1 : v)), material: { ...material, color: [0, 0, 1] } }));
+  const front = plugin.add(new PointCloud({ positions, material: { ...material, color: [1, 0, 0] } }));
+  const hidden = (await frame()).at(128, 128);
+  assert(hidden[0] > 200 && hidden[2] < 30, `the front surface hides the back one: ${hidden}`);
+  front.material.clippingPlanes = [[-1, 0, 0, 0]];
+  const cut = await frame();
+  assert(cut.at(100, 128)[0] > 200, `the kept half stays: ${cut.at(100, 128)}`);
+  assert(cut.at(156, 128)[2] > 200, `the cut half shows the surface behind: ${cut.at(156, 128)}`);
+  front.material.clippingPlanes = [];
+  back.visible = false;
+  engine
+    .createMesh()
+    .setGeometry(box(1, 1, 1))
+    .setMaterial(new PbrMaterial({ color: '#000000', roughness: 1 }))
+    .setPosition([0, 0, 2]);
+  const shown = await frame();
+  assert(shown.at(128, 128)[0] < 100, `a mesh in front hides surfels: ${shown.at(128, 128)}`);
+  assert(shown.at(70, 128)[0] > 200, `beside it they still show: ${shown.at(70, 128)}`);
+  await end();
+  return 'Surfels keep a near surface in front of a far one, honour clipping planes and share depth with meshes';
+}
+
 window.runFeatures = async () => {
   const checks = [];
-  for (const check of [adaptiveSize]) checks.push(await check());
+  for (const check of [adaptiveSize, surfels, surfelDepth]) checks.push(await check());
   return checks;
 };

@@ -1190,6 +1190,10 @@
       "types": "./dist/points/octree.d.ts",
       "import": "./dist/points/octree.js"
     },
+    "./points/surfels": {
+      "types": "./dist/points/surfels.d.ts",
+      "import": "./dist/points/surfels.js"
+    },
     "./post": {
       "types": "./dist/post.d.ts",
       "import": "./dist/post.js"

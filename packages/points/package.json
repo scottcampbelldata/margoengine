@@ -54,6 +54,10 @@
     "./octree": {
       "types": "./dist/octree.d.ts",
       "import": "./dist/octree.js"
+    },
+    "./surfels": {
+      "types": "./dist/surfels.d.ts",
+      "import": "./dist/surfels.js"
     }
   },
   "files": [

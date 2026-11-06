@@ -2,8 +2,8 @@
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
-import { viewMatrix } from '../../shared/view.js';
 import { PointCloud } from './cloud.js';
+import { fillFrame } from './frame.js';
 import { SpriteBatch, SPRITE_STRIDE } from './sprites.js';
 import type { PointsMaterial, SpriteMaterial, PointsTextureSource } from './material.js';
 import {
@@ -963,48 +963,10 @@ export class PointsPlugin implements EnginePlugin {
   // ---- Frame --------------------------------------------------------------------------------------------
 
   private writeFrame(context: GpuContext): void {
-    const camera = context.camera,
-      f = this.frameData,
-      c = camera.matrix;
-    f.set(c, 0);
-    // Orthographic clip matrix (w independent of position, e.g. @margoengine/cameras): pixels per world unit come
-    // from the y row's length, and depth is linear: depth.y is NDC per world unit and the EDL/sphere value is
-    // 1 + distance from the near plane.
-    this.orthographic = !(c[3] || c[7] || c[11]);
-    // Point sizes are pixels of the view being drawn: its camera projects onto its rectangle.
-    const [width, height] = viewSize(context),
-      projScale = this.orthographic
-        ? 0.5 * height * Math.hypot(c[1], c[5], c[9])
-        : (0.5 * height) / Math.tan((camera.fov * Math.PI) / 360);
-    f[16] = width;
-    f[17] = height;
-    f[18] = projScale;
-    f[19] = context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1;
-    if (this.orthographic) {
-      f[20] = 0;
-      f[21] = Math.hypot(c[2], c[6], c[10]);
-      f[22] = 1;
-      f[23] = 1;
-    } else {
-      f[20] = camera.near / (camera.far - camera.near);
-      f[21] = (camera.far * camera.near) / (camera.far - camera.near);
-      f[22] = camera.near;
-      f[23] = 0;
-    }
-    // Camera basis (right, up, back), matching Camera.update including camera.up.
-    const v = viewMatrix(this.view, camera);
-    f[24] = v[0];
-    f[25] = v[4];
-    f[26] = v[8];
-    f[27] = 0;
-    f[28] = v[1];
-    f[29] = v[5];
-    f[30] = v[9];
-    f[31] = 0;
-    f[32] = v[2];
-    f[33] = v[6];
-    f[34] = v[10];
-    f[35] = 0;
+    const f = this.frameData,
+      c = context.camera.matrix,
+      [width, height] = viewSize(context);
+    this.orthographic = fillFrame(f, this.view, context);
     this.device!.queue.writeBuffer(this.gpu!.frame, 0, f);
     const picked = (this.pickView = this.pickViews.get(context));
     picked.viewProj.set(c);

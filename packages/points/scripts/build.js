@@ -19,7 +19,7 @@ await build({
     target: 'es2022',
     lib: {
       entry: Object.fromEntries(
-        ['index', 'las', 'laz', 'e57', 'octree', 'copc'].map((name) => [name, resolve(root, `src/${name}.ts`)]),
+        ['index', 'las', 'laz', 'e57', 'octree', 'copc', 'surfels'].map((name) => [name, resolve(root, `src/${name}.ts`)]),
       ),
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`,

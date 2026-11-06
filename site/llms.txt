@@ -196,7 +196,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/oit API](https://margoengine.com/llms/api/oit.md): 2 entry points
 - [@margoengine/lod API](https://margoengine.com/llms/api/lod.md): 2 entry points
 - [@margoengine/culling API](https://margoengine.com/llms/api/culling.md): 3 entry points
-- [@margoengine/points API](https://margoengine.com/llms/api/points.md): 6 entry points
+- [@margoengine/points API](https://margoengine.com/llms/api/points.md): 7 entry points
 - [@margoengine/sprites API](https://margoengine.com/llms/api/sprites.md): 4 entry points
 - [@margoengine/lines API](https://margoengine.com/llms/api/lines.md): 6 entry points
 - [@margoengine/text API](https://margoengine.com/llms/api/text.md): 3 entry points

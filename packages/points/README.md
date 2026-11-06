@@ -320,6 +320,32 @@ OctreeCloud.attach(engine, PointsPlugin.attach(engine, { pointBudget: 2_000_000 
 
 Positions and bounds are relative to `source.origin`, the cube's centre, which keeps float32 positions exact for a scan far from zero. Reads only: there is no COPC writer. It reads point formats 6 to 8, as the specification requires. Tested against files written here from the public specification with the package's own test encoder, not yet against files from another tool.
 
+## Surfels (`margoengine/points/surfels`)
+
+`SurfelPlugin` draws clouds as small blended discs, so a scan reads as one continuous surface instead of overlapping dots. It runs three passes: every disc writes depth pushed back a little, discs within that push of the front add colour and weight into a float target, and a full-screen pass divides one by the other and draws it over the scene. The weight is Gaussian across the disc and falls with depth behind the front surface, so a wall does not bleed through the floor in front of it. Discs share the scene's depth, so meshes and surfels hide each other.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PointCloud } from 'margoengine/points';
+import { SurfelPlugin } from 'margoengine/points/surfels';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const surfels = SurfelPlugin.attach(engine, { pointBudget: 2_000_000, overlap: 2 });
+const positions = new Float32Array(300_000).map(() => Math.random() * 10);
+surfels.add(new PointCloud({ positions, material: { size: 0.1, sizeUnits: 'world', color: '#c0a080' } }));
+```
+
+| `SurfelPlugin` option | Default | Meaning |
+| --- | --- | --- |
+| `pointBudget` | 1,000,000 | Most points drawn per frame, shared as in `PointsPlugin`. |
+| `overlap` | 1.5 | Disc diameter as a multiple of the point's size. Discs must overlap to blend. |
+| `blendDepth` | 1 | Depth behind the front surface that still blends, as a multiple of the disc's radius. |
+| `order`, `name` | 10, `'surfels'` | As `PointsPlugin`. |
+
+Pass `normals` on the cloud and each disc lies flat on its surface; without them discs face the camera. For large scans give `OctreeCloud` this plugin in place of `PointsPlugin`, with `adaptiveSize` so each disc fits the spacing around it: `OctreeCloud.attach(engine, surfels, source, {adaptiveSize: {scale: 2}})`.
+
+`setFog` works as on `PointsPlugin`, a disc taking the fog at its centre. A cloud belongs to one plugin. From `PointsMaterial` a surfel reads `color`, `size`, `sizeUnits`, `minPixelSize`, `maxPixelSize`, `vertexColors`, `alphaTest` (a point's alpha also weighs it, so alpha 0 hides it), `fog`, `clippingPlanes` and `clipIntersection`. Surfels are opaque and always test and write depth: `opacity`, `transparent`, `blending`, `map`, `shape`, `shading`, `edl`, `depthTest` and `depthWrite` have no effect. `PointsPlugin.pick` does not see them. It costs two draws of every point plus a full-screen pass, and its extra targets take about 100 MB at 1920 x 1080 with 4x MSAA.
+
 ## Colours and measures
 
 `classificationColors(classes, {palette, hidden})` colours by ASPRS class (`ASPRS_CLASSES` names them; hidden classes

@@ -21,7 +21,8 @@ export const FRAME_BYTES = 144,
   CLOUD_BYTES = 224,
   SPRITE_BYTES = 192;
 
-const common = /* wgsl */ `
+/** The frame uniform at group 0 with colour helpers and the quad corners, shared by the point, sprite and surfel shaders. */
+export const frameWgsl: string = /* wgsl */ `
 struct Frame{viewProj:mat4x4f,viewport:vec4f,depth:vec4f,right:vec4f,up:vec4f,back:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 fn toLinear(c:vec3f)->vec3f{return select(pow((c+0.055)/1.055,vec3f(2.4)),c/12.92,c<=vec3f(0.04045));}
@@ -39,7 +40,7 @@ const CORNERS=array<vec2f,4>(vec2f(-1.0,-1.0),vec2f(1.0,-1.0),vec2f(-1.0,1.0),ve
 // sphere depth is linear in it. The EDL pass shades linear depth steps times params.z when params.z > 0.
 /** Point cloud shader: one instanced quad per point, read from storage buffers through the shuffled slot order. */
 export const pointShader: string =
-  common +
+  frameWgsl +
   /* wgsl */ `
 struct Cloud{model:mat4x4f,color:vec4f,size:vec4f,flags:vec4u,pad:vec4f,planes:array<vec4f,6>}
 @group(1) @binding(0) var<uniform> cloud:Cloud;
@@ -139,7 +140,7 @@ struct SphereEdlOut{@location(0) color:vec4f,@location(1) edl:f32,@builtin(frag_
 
 /** Sprite shader: camera-facing instanced quads. */
 export const spriteShader: string =
-  common +
+  frameWgsl +
   /* wgsl */ `
 struct Batch{model:mat4x4f,color:vec4f,params:vec4f,planes:array<vec4f,6>}
 @group(1) @binding(0) var<uniform> batch:Batch;

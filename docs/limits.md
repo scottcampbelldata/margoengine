@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-096). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-097). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -84,6 +84,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Vertices per primitive | Enforced: gltf-pro takes up to 1,000,000 vertices per primitive (index accessors are bounded only by the decoded budget); the light `@margoengine/gltf` loader up to 1,000,000 vertices in total ([accessors.test.js](../packages/gltf-pro/tests/accessors.test.js): 1,000,002 indices decode, 1,000,002 vertices are refused). | Vertex buffers are also bound as storage buffers, and indices pass through float32, exact up to 2^24. | gltf-pro names the location: `glTF mesh 0 "part" primitive 0: Expected bounded triangle geometry`; the light loader: `RangeError: glTF exceeds one million vertices`. | gltf-pro instead of the light loader lifts the total; a primitive over 1,000,000 vertices must be split at export (for CAD, a coarser `margo-convert --linear-deflection`). |
 | Dash caps (`dashCap` on `LineMaterial`) | By method: a cap reaches half the line width past its dash in pixels while dashes stay in world units, so a gap narrower than the width closes up. A cap stops at the line's own ends, and picks count gaps as line. | Ends are drawn in the fragment, with no extra geometry per dash. | Dotted lines keep the dot width on screen while their spacing follows perspective. | Widen `gapSize`, or use `worldUnits` widths. |
 | Adaptive point size (`adaptiveSize` on `OctreeCloud` in `@margoengine/points/octree`) | By method: density is per node and assumes a surface (points per cube face), so a volume of points gets smaller points than its gaps need. Sizes are written on the CPU, at most 500,000 points a selection, when the nodes drawn under a node change. A random sample still leaves gaps: 98 percent of the pixels covered at the default `scale` of 1.5 in the browser check. | Point sizes already have a channel, so this needs no second shader. | Far parts look solid, with larger and softer points. A big camera jump takes a few frames to settle sizes. | Raise `scale`; set `maxPixelSize` to cap the growth. |
+| Surfels (`SurfelPlugin` in `@margoengine/points/surfels`) | Enforced by method: opaque, always tests and writes depth, no textures, no `PointsPlugin.pick`; WebGPU only. Scene depth holds each disc pushed back by up to `blendDepth` radii. Each point draws twice, plus one full-screen pass. Extra targets take 12 bytes a sample: about 100 MB at 1920 x 1080 with 4x MSAA. Speed is not measured. | Weighted colour needs a sum and a divide, so it cannot be one blended draw; pushing the scene's own depth keeps meshes in the same test. | About twice the point cost of `PointsPlugin`. Something drawn later that lies within the push of a surface can show through it. | `PointsPlugin` where speed matters more; a smaller `blendDepth` for thin layers close together. |
 
 ## Geometry
 

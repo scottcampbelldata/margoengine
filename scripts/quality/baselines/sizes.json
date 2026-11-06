@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4615951,
+  "total": 4630288,
   "history": [
     {
       "date": "2026-10-24",
@@ -1796,6 +1796,12 @@
       "commit": "91e3bddec",
       "reason": "points: adaptive point size in /octree (batch 27 job 1)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "0943bf4ea",
+      "reason": "points: surfels entry (batch 27 job 2)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2093,6 +2099,7 @@
     "@margoengine/points/las": 5116,
     "@margoengine/points/laz": 8046,
     "@margoengine/points/octree": 8486,
+    "@margoengine/points/surfels": 14337,
     "@margoengine/post": 40110,
     "@margoengine/post/afterimage": 5619,
     "@margoengine/post/bloom": 6716,
