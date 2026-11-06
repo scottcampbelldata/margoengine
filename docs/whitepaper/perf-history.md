@@ -1618,7 +1618,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node bench/cli.mjs parity --cases=helmet --engines=margo,three-webgl-parity,three-webgpu-parity --runs=5`.
   A quiet run is still owed.
 
-### 63. Raw meshes with equal bytes share their buffers
+### 64. Raw meshes with equal bytes share their buffers
 
 - **Loss:** `p-custom-shader`, 10,000 `RawMesh`es of one geometry: 22.5 ms CPU and 2.07 ms GPU a frame against three's WebGL
   6.3 and 3.4 (`--no-gate`, other jobs running, diagnostic). Each mesh uploaded and bound its own vertex and index buffers.
