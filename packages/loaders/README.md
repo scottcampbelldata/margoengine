@@ -37,7 +37,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parsePLY` | ASCII, binary little and big endian; x y z, nx ny nz, red green blue (uchar, ushort or float), s/t, u/v, texture_u/texture_v; polygon faces fan-triangulated; files without faces become point clouds; unknown elements and properties skipped |
 | `parseSTL` | See [STL](#stl) |
 | `parse3MF` (async) | Own ZIP reader (stored and deflate through `DecompressionStream('deflate-raw')`, CRC-32 checked); objects, meshes, components, build items, 3x4 transforms; `basematerials` and materials-extension `colorgroup` colors; production-extension `p:path` parts; unit conversion to meters |
-| `parseDXF` | ASCII and binary (R13 on) DXF: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), in each entity's object coordinate system; POINT, TEXT and MTEXT (formatting removed); 3DSOLID, BODY and REGION ACIS data decoded to SAT text. Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
+| `parseDXF` | ASCII and binary DXF, every version: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), in each entity's object coordinate system; POINT, TEXT and MTEXT (formatting removed); 3DSOLID, BODY and REGION ACIS data decoded to SAT text. Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
 | `parsePCD` | `DATA ascii`, `binary`, `binary_compressed` (own LZF decompressor); x y z, normal_x/y/z, packed `rgb`/`rgba`, `intensity`, any other field skipped |
 | `parseOFF` | `OFF` with `ST`, `C`, `N` prefixes (texture coordinates, colors 0..1 or 0..255, normals) |
 | `parseXYZ` | xyz, xyz+rgb, xyz+normal, xyz+normal+rgb, xyz+intensity, PTS (xyz+intensity+rgb), chemistry XYZ |
@@ -123,6 +123,26 @@ const geometry = toGeometry(mesh, {normals: 'flat'}); // a core Geometry, if the
 Options (defaults): `weld: false`, `maxTriangles: 16,000,000`, `maxVertices: 8,000,000` (checked before allocating, so a short file cannot claim millions), `signal` (aborts with a `LoaderError` of code `'aborted'`, checked every 16,384 triangles). A binary file is recognised by its length (`84 + 50 * triangles`), so binary files whose header starts with `solid` still work; otherwise text starting with `solid` is read as ASCII, several solids in one file are concatenated, and keywords are case-insensitive. Errors are `LoaderError`s: `'truncated'` (data shorter than the header says; pass the whole file), `'syntax'`, `'limit'` (raise `maxTriangles` or `maxVertices`), `'header'`, `'aborted'`. The Materialise Magics color variant and per-facet colors in ASCII files are not read.
 
 The repository's speed matrix (`docs/whitepaper`, row 10.11) measures this loader.
+
+## Real files
+
+`tests/real-files/manifest.json` names 82 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
+
+```sh
+npm run test:real-files -w @margoengine/loaders
+```
+
+The script downloads each file by URL into `test-results/real-files`, refuses one whose hash differs, opens it and compares it with something independent: the counts in its own header, a second reader written in the script, or a published fact. It exits 1 on a failure and 2 when a file could not be run, such as a site refusing the download.
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `REAL_FILES_DIR` | `test-results/real-files` | Where files are kept between runs. |
+| `REAL_FILES_ONLY` | every row | Comma-separated formats or row ids. |
+| `REAL_FILES_RUNTIMES` | unset | A folder whose `node_modules` holds `rhino3dm` and `laz-perf`. Without it the 3DM rows read NOT RUN, and LAZ rows use Margo's own `createLazDecoder` with no comparison. |
+| `REAL_FILES_RENDER` | unset | `1` draws every geometry through the real engine on the GPU and fails a blank picture. |
+| `REAL_FILES_TRACE` | unset | Prints the stack of a failure. |
+
+Neither runtime is a dependency of this package. Install them in a folder of your own.
 
 ## Tests
 
@@ -502,7 +522,7 @@ export async function loadChair(rhino: RhinoRuntime) {
 - **Units.** Metres by the file's unit system; `units: 'file'` keeps the file's own numbers. A file with no known unit keeps them too, and `metersPerUnit` is left unset.
 - **Hidden.** Hidden objects and objects on hidden layers stay out unless `hidden: true`.
 - **Memory.** Every handle the runtime gives out is freed before `parse3DM` returns, failures included.
-- **Tested.** Against a stand-in with rhino3dm's shape, not yet against the real runtime: see [known bugs](../../docs/known-bugs.md).
+- **Tested.** Against a stand-in with rhino3dm's shape in `npm test`, and against the real rhino3dm 8.35 on McNeel's sample files in `npm run test:real-files`.
 
 ## 3DS, LWO, AMF, MD2, PDB and KMZ
 

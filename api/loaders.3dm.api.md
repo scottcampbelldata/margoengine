@@ -28,6 +28,7 @@ export interface RhinoDocument extends Disposable {
 
 export interface RhinoGeometry extends Disposable {
     vertices?: RhinoMesh['vertices'];
+    vertexColors?: RhinoMesh['vertexColors'];
     getMesh?(type: unknown): RhinoMesh | null | undefined;
     faces?(): IndexedList<{
         getMesh(type: unknown): RhinoMesh | null | undefined;

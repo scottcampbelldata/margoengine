@@ -123,6 +123,10 @@ const ASSETS = [
   ['tools/create-margo/templates/game/public/pete-LICENSE.txt', 'game starter character (Kay Lousberg, KayKit, CC0)'],
   ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
   [
+    'packages/loaders/tests/real-files/manifest.json',
+    'real-file test: 82 public sample files, downloaded by URL and never in the repository or a tarball; each one\'s source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices)',
+  ],
+  [
     'packages/loaders/tests/fixtures/SOURCES.txt',
     'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan), libigl tutorial data cube.off and decimated-knight.off, PyVista vtk-data fran_cut.vtk and polyEx.vtk',
   ],

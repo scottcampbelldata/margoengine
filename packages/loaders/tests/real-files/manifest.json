@@ -1,0 +1,1697 @@
+{
+ "about": "Real public files for packages/loaders/scripts/test-real-files.mjs. The files are downloaded by URL and checked by SHA-256, never committed.",
+ "files": [
+  {
+   "id": "ply-ascii-blender",
+   "format": "ply",
+   "check": "ply",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "Wuson.ply",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/PLY/Wuson.ply",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 915754,
+   "sha256": "c7911cc2f592eed7096cf3b6ff4fb6d7fb543a74b3d7e1f0d21a9ca507b3cee8"
+  },
+  {
+   "id": "ply-ascii-fsu",
+   "format": "ply",
+   "check": "ply",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "stratocaster.ply",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/fsu/stratocaster.ply",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 282088,
+   "sha256": "f6124e5460a08c769903af8474ea8fc154bbd1f379e40d1c81cf58558e9e11c5"
+  },
+  {
+   "id": "ply-binary-vtk",
+   "format": "ply",
+   "check": "ply",
+   "variant": "binary little endian",
+   "entry": "@margoengine/loaders",
+   "file": "turbineblade.ply",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/turbineblade.ply",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 3781928,
+   "sha256": "c2850452c86e3076e0d70f77859bee942c096153f687c66b85549f3e52d809cb"
+  },
+  {
+   "id": "stl-binary-blender",
+   "format": "stl",
+   "check": "stl",
+   "variant": "binary",
+   "entry": "@margoengine/loaders",
+   "file": "top.stl",
+   "url": "https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Printing/Saturn%20V%20-%20Stage%202/top.stl",
+   "licence": "Public domain (NASA: free and without copyright)",
+   "author": "NASA",
+   "size": 512684,
+   "sha256": "960845bca0c2e04f7714f5298881bc421fb8bdf7ec9d37904a25206437e2ebae"
+  },
+  {
+   "id": "stl-binary-3dsmax",
+   "format": "stl",
+   "check": "stl",
+   "variant": "binary",
+   "entry": "@margoengine/loaders",
+   "file": "3DSMaxExport.STL",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/STL/3DSMaxExport.STL",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 100084,
+   "sha256": "b80c5ac1898400777ae1b064f53189e27b018dacedecfe625963a0c15517b8c9"
+  },
+  {
+   "id": "stl-ascii",
+   "format": "stl",
+   "check": "stl",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "Spider_ascii.stl",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/STL/Spider_ascii.stl",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 281457,
+   "sha256": "58d0b3af7e8a790467bd0c3a7edc2ffa0265ac52ac04b2c4207d21c6c05c5628"
+  },
+  {
+   "id": "3mf-components",
+   "format": "3mf",
+   "check": "threemf",
+   "variant": "core",
+   "entry": "@margoengine/loaders",
+   "file": "cube_gears.3mf",
+   "url": "https://raw.githubusercontent.com/3MFConsortium/3mf-samples/master/examples/core/cube_gears.3mf",
+   "licence": "BSD-2-Clause",
+   "author": "3MF Consortium",
+   "size": 263230,
+   "sha256": "5694dd00fec4b1ec118c33840a1984be5ca01494930fd1bdef102b9b70a2d2c2"
+  },
+  {
+   "id": "3mf-production",
+   "format": "3mf",
+   "check": "threemf",
+   "variant": "production extension",
+   "entry": "@margoengine/loaders",
+   "file": "box_prod.3mf",
+   "url": "https://raw.githubusercontent.com/3MFConsortium/3mf-samples/master/examples/production/box_prod.3mf",
+   "licence": "BSD-2-Clause",
+   "author": "3MF Consortium",
+   "size": 10017,
+   "sha256": "66c24c97b58a32a45b33c5e6537b03c981c4ad4a23623f5bbf344d8fcdfc612e"
+  },
+  {
+   "id": "3mf-colour",
+   "format": "3mf",
+   "check": "threemf",
+   "variant": "colour groups",
+   "entry": "@margoengine/loaders",
+   "file": "dodeca_chain_loop_color.3mf",
+   "url": "https://raw.githubusercontent.com/3MFConsortium/3mf-samples/master/examples/material/dodeca_chain_loop_color.3mf",
+   "licence": "BSD-2-Clause",
+   "author": "3MF Consortium",
+   "size": 69587,
+   "sha256": "fe4bdcd667044547faf50ce29d0af7c6f2ea39c11caa8c4b26e841d888863cc0"
+  },
+  {
+   "id": "3mf-textures",
+   "format": "3mf-materials",
+   "check": "threemfMaterials",
+   "variant": "textures",
+   "entry": "@margoengine/loaders/threemf-materials",
+   "file": "multipletextures.3mf",
+   "url": "https://raw.githubusercontent.com/3MFConsortium/3mf-samples/master/examples/material/multipletextures.3mf",
+   "licence": "BSD-2-Clause",
+   "author": "3MF Consortium",
+   "size": 3093233,
+   "sha256": "1024c33276043c5ef25bf111496056d87bf5a816ae2f6eb6a6804d75ced02d59"
+  },
+  {
+   "id": "3mf-multiprop",
+   "format": "3mf-materials",
+   "check": "threemfMaterials",
+   "variant": "multiproperties",
+   "entry": "@margoengine/loaders/threemf-materials",
+   "file": "multiprop-opaque.3mf",
+   "url": "https://raw.githubusercontent.com/3MFConsortium/3mf-samples/master/examples/material/multiprop-opaque.3mf",
+   "licence": "BSD-2-Clause",
+   "author": "3MF Consortium",
+   "size": 238490,
+   "sha256": "63bb8a8be03ed48e36422d3845d2a35388798a21f71da1c22a46aa409da5f375"
+  },
+  {
+   "id": "dxf-ascii-autocad-3d",
+   "format": "dxf",
+   "check": "dxf",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "3Dboxes.dxf",
+   "url": "https://raw.githubusercontent.com/jscad/sample-files/master/dxf/autocad2017/3Dboxes.dxf",
+   "licence": "MIT",
+   "author": "JSCAD sample-files",
+   "size": 124192,
+   "sha256": "0a6f00da9e14e1a69f80bdb71c60cc99a652aff7b20625ba79f3a1a30c33953b"
+  },
+  {
+   "id": "dxf-ascii-autocad-mesh",
+   "format": "dxf",
+   "check": "dxf",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "3Dmesh01.dxf",
+   "url": "https://raw.githubusercontent.com/jscad/sample-files/master/dxf/autocad2017/3Dmesh01.dxf",
+   "licence": "MIT",
+   "author": "JSCAD sample-files",
+   "size": 142157,
+   "sha256": "280e9d4c1111f9e9283416fc9011c832adda97f60c51b3be6c2a83ef4f2b3684"
+  },
+  {
+   "id": "dxf-ascii-autocad-2d",
+   "format": "dxf",
+   "check": "dxf",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "2Dhatch.dxf",
+   "url": "https://raw.githubusercontent.com/jscad/sample-files/master/dxf/autocad2017/2Dhatch.dxf",
+   "licence": "MIT",
+   "author": "JSCAD sample-files",
+   "size": 91351,
+   "sha256": "7cbda11ff86caa8b46de61f0bab03ce3d0b6ff9bc36f5711e9cd54fda383fb4a"
+  },
+  {
+   "id": "dxf-ascii-lightwave",
+   "format": "dxf",
+   "check": "dxf",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "PinkEggFromLW.dxf",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/DXF/PinkEggFromLW.dxf",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 48343,
+   "sha256": "65734e4d5772274f1f3bf419fc1238565495ab9e7974edf801fd561c24469d39"
+  },
+  {
+   "id": "dxf-binary-r2000",
+   "format": "dxf",
+   "check": "dxf",
+   "variant": "binary",
+   "entry": "@margoengine/loaders",
+   "file": "bin_dxf_r2000.dxf",
+   "url": "https://raw.githubusercontent.com/mozman/ezdxf/master/integration_tests/data/bin_dxf_r2000.dxf",
+   "licence": "MIT",
+   "author": "ezdxf",
+   "size": 11564,
+   "sha256": "bdbe44e042bc6f56fbf5bd4fde0053fa1b82dcf90305f21a521a7b70d2c37320"
+  },
+  {
+   "id": "dxf-binary-r12",
+   "format": "dxf",
+   "check": "dxf",
+   "variant": "binary",
+   "entry": "@margoengine/loaders",
+   "file": "bin_dxf_r12.dxf",
+   "url": "https://raw.githubusercontent.com/mozman/ezdxf/master/integration_tests/data/bin_dxf_r12.dxf",
+   "licence": "MIT",
+   "author": "ezdxf",
+   "size": 3761,
+   "sha256": "1e7a904d67bc7036bd3f78a6273cdf28124ba7e8b731604c0593288182f2aa0e"
+  },
+  {
+   "id": "pcd-ascii",
+   "format": "pcd",
+   "check": "pcd",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "ism_train_lioness.pcd",
+   "url": "https://raw.githubusercontent.com/PointCloudLibrary/data/master/tutorials/ism_train_lioness.pcd",
+   "licence": "BSD-3-Clause",
+   "author": "Point Cloud Library",
+   "size": 128802,
+   "sha256": "5d15fd95797f6401adb99b0140996ac8f2e8d6c07da13ea5a534eb0f1c4ba930"
+  },
+  {
+   "id": "pcd-binary",
+   "format": "pcd",
+   "check": "pcd",
+   "variant": "binary",
+   "entry": "@margoengine/loaders",
+   "file": "colored_cloud.pcd",
+   "url": "https://raw.githubusercontent.com/PointCloudLibrary/pcl/master/test/colored_cloud.pcd",
+   "licence": "BSD-3-Clause",
+   "author": "Point Cloud Library",
+   "size": 32241,
+   "sha256": "30e3a4937388c65990681b907213f235556e13d51808fe0450ad6751914b94e6"
+  },
+  {
+   "id": "pcd-compressed-rgb",
+   "format": "pcd",
+   "check": "pcd",
+   "variant": "binary_compressed",
+   "entry": "@margoengine/loaders",
+   "file": "pcl_logo.pcd",
+   "url": "https://raw.githubusercontent.com/PointCloudLibrary/pcl/master/test/pcl_logo.pcd",
+   "licence": "BSD-3-Clause",
+   "author": "Point Cloud Library",
+   "size": 29714,
+   "sha256": "2ce168facd97d70cac3c3a3c0f0035d4eb29a886447c04274b778414860e93d4"
+  },
+  {
+   "id": "pcd-compressed-organized",
+   "format": "pcd",
+   "check": "pcd",
+   "variant": "binary_compressed",
+   "entry": "@margoengine/loaders",
+   "file": "capture0003.pcd",
+   "url": "https://raw.githubusercontent.com/PointCloudLibrary/data/master/tutorials/pairwise/capture0003.pcd",
+   "licence": "BSD-3-Clause",
+   "author": "Point Cloud Library",
+   "size": 978555,
+   "sha256": "0f0b017ac0c43649383eeb5fc4580d4e589a313f7a087c7a7612f46b7bc12c29"
+  },
+  {
+   "id": "off-wuson",
+   "format": "off",
+   "check": "off",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "Wuson.off",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/OFF/Wuson.off",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 149571,
+   "sha256": "d373a4777bd0420b1ba5200256dd5b7dc77cba4ab378b4748080ef91c644c387"
+  },
+  {
+   "id": "xyz-swissalti3d",
+   "format": "xyz",
+   "check": "xyz",
+   "variant": "elevation grid",
+   "entry": "@margoengine/loaders",
+   "file": "swissalti3d_2019_2600-1199_2_2056_5728.xyz.zip",
+   "url": "https://data.geo.admin.ch/ch.swisstopo.swissalti3d/swissalti3d_2019_2600-1199/swissalti3d_2019_2600-1199_2_2056_5728.xyz.zip",
+   "licence": "Open Government Data, free use with attribution",
+   "author": "Federal Office of Topography swisstopo, swissALTI3D",
+   "size": 1060182,
+   "sha256": "390ef86cc1ddc188d8a529bc2d6e26ddc8415de5423198ca29911a3ca95ebfb5",
+   "extract": "SWISSALTI3D_2_XYZ_CHLV95_LN02_2600_1199.xyz"
+  },
+  {
+   "id": "xyz-pts",
+   "format": "xyz",
+   "check": "xyz",
+   "variant": "count line then points",
+   "entry": "@margoengine/loaders",
+   "file": "samplePTS.pts",
+   "url": "https://media.githubusercontent.com/media/f3d-app/f3d/master/testing/data/samplePTS.pts",
+   "licence": "BSD-3-Clause",
+   "author": "VTK data, through F3D test data",
+   "size": 9807,
+   "sha256": "6398891fe700a452bb08194471caee545fe5ade8be450332335018d6b9594db7"
+  },
+  {
+   "id": "obj-mtl-doorman",
+   "format": "obj",
+   "check": "obj",
+   "variant": "textured",
+   "entry": "@margoengine/loaders/mtl",
+   "file": "doorman.obj",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/doorman/doorman.obj",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 592090,
+   "sha256": "ed9c6240ca823bb2cdf25f5806601ebe531bddfd93538af24fd1fee500e51dd0",
+   "companions": [
+    {
+     "file": "doorman.mtl",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/doorman/doorman.mtl",
+     "size": 930,
+     "sha256": "8889cee2e45a9292e15e6e02801d60e77e22de9d5bb1e3d731895c191072d3ac"
+    }
+   ]
+  },
+  {
+   "id": "obj-mtl-cornell",
+   "format": "obj",
+   "check": "obj",
+   "variant": "colours",
+   "entry": "@margoengine/loaders",
+   "file": "CornellBox.zip",
+   "url": "https://casual-effects.com/g3d/data10/common/model/CornellBox/CornellBox.zip",
+   "licence": "CC-BY-3.0",
+   "author": "Morgan McGuire, Computer Graphics Archive",
+   "size": 224880,
+   "sha256": "f27eaf47afec74b5236ce3095ac02d4256e8ac8610bfdb5a53560c67c2e0d8f1",
+   "extract": "CornellBox-Original.obj",
+   "extractMtl": "CornellBox-Original.mtl"
+  },
+  {
+   "id": "dae-maya-skin",
+   "format": "dae",
+   "check": "dae",
+   "variant": "skin",
+   "entry": "@margoengine/loaders",
+   "file": "library_controllers_skin.dae",
+   "url": "https://raw.githubusercontent.com/KhronosGroup/COLLADA-CTS/main/StandardDataSets/collada/choices_of_libraries/multiple/library_controllers_skin/library_controllers_skin.dae",
+   "licence": "MIT-style Khronos licence",
+   "author": "Khronos COLLADA conformance suite",
+   "size": 1332543,
+   "sha256": "a12ca6e1f51e477a89f0af7de955a846a2019742539320ef9b24216af5f76c2d",
+   "facts": {
+    "triangles": 2000
+   }
+  },
+  {
+   "id": "dae-maya-cube",
+   "format": "dae",
+   "check": "dae",
+   "variant": "static",
+   "entry": "@margoengine/loaders",
+   "file": "order1.dae",
+   "url": "https://raw.githubusercontent.com/KhronosGroup/COLLADA-CTS/main/StandardDataSets/collada/choices_of_libraries/cube/order1/order1.dae",
+   "licence": "MIT-style Khronos licence",
+   "author": "Khronos COLLADA conformance suite",
+   "size": 7865,
+   "sha256": "7ef33646ae5da1a4103ea972d372a1ede2398d3247d8cfb3da2860b7c740bbaa",
+   "facts": {
+    "triangles": 12
+   }
+  },
+  {
+   "id": "tmx-objects",
+   "format": "tmx",
+   "check": "tmx",
+   "variant": "object layers",
+   "entry": "@margoengine/loaders",
+   "file": "sandbox.tmx",
+   "url": "https://raw.githubusercontent.com/mapeditor/tiled/master/examples/sticker-knight/map/sandbox.tmx",
+   "licence": "Public domain",
+   "author": "Tiled examples",
+   "size": 12437,
+   "sha256": "0f9de90191f8618caceb9bfacf50d9625ff73ba2eb8a1285aff698252c00aae7",
+   "companions": [
+    {
+     "file": "objs.tsx",
+     "url": "https://raw.githubusercontent.com/mapeditor/tiled/master/examples/sticker-knight/map/objs.tsx",
+     "size": 5396,
+     "sha256": "60f14d0e46eaa880ec976ad4ff62192b22935fb223bcb861c20283c287df47af"
+    }
+   ]
+  },
+  {
+   "id": "tmx-tiles",
+   "format": "tmx",
+   "check": "tmx",
+   "variant": "tile layers",
+   "entry": "@margoengine/loaders",
+   "file": "forest.tmx",
+   "url": "https://raw.githubusercontent.com/mapeditor/tiled/master/examples/forest/forest.tmx",
+   "licence": "Public domain",
+   "author": "Tiled examples",
+   "size": 2919,
+   "sha256": "289224ce67af0577e77e3006cbf6c744a090539f3ca0ad3e16a34383e5087876",
+   "companions": [
+    {
+     "file": "forest.tsx",
+     "url": "https://raw.githubusercontent.com/mapeditor/tiled/master/examples/forest/forest.tsx",
+     "size": 1192,
+     "sha256": "df4afb4a5beb936d73a8d8b50a01c94bec4fcbf4b3a4f99e2dfe7146436d7b1f"
+    }
+   ]
+  },
+  {
+   "id": "vtk-ascii",
+   "format": "vtk",
+   "check": "vtk",
+   "variant": "ascii",
+   "entry": "@margoengine/loaders",
+   "file": "fran_cut.vtk",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/fran_cut.vtk",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 174933,
+   "sha256": "499c170dd475725f47de4e436f080bd18d1a2cc315411f9c490ba42b6dffbc6d"
+  },
+  {
+   "id": "vtk-binary",
+   "format": "vtk",
+   "check": "vtk",
+   "variant": "binary",
+   "entry": "@margoengine/loaders",
+   "file": "opal_mound_fault.vtk",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/opal_mound_fault.vtk",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 171567,
+   "sha256": "ec1ecf9d007365df332dc5c110e497a0d82bcd043683b6651d153cc8461dfc08"
+  },
+  {
+   "id": "usda-teapot",
+   "format": "usd",
+   "check": "usda",
+   "variant": "text",
+   "entry": "@margoengine/loaders/usd",
+   "file": "teapot.usda",
+   "url": "https://raw.githubusercontent.com/usd-wg/assets/main/test_assets/_common/teapot.usda",
+   "licence": "Apache-2.0",
+   "author": "USD Working Group assets",
+   "size": 1747675,
+   "sha256": "92915fe259cb7f895a74dae0bbb6375e8a5843c3f9e24fa4b38607f2aa39431c"
+  },
+  {
+   "id": "usda-sedan",
+   "format": "usd",
+   "check": "usdRefused",
+   "variant": "GeomSubset",
+   "entry": "@margoengine/loaders/usd",
+   "file": "sedanGeo.usda",
+   "url": "https://raw.githubusercontent.com/usd-wg/assets/main/full_assets/Vehicles/USD_Mini_Car_Kit/assets/vehicles/sedan/geo/sedanGeo.usda",
+   "licence": "Apache-2.0",
+   "author": "USD Working Group assets",
+   "size": 56011,
+   "sha256": "c1c2c8f6d9b2d62563bfd5fb90dcc89c7a886f9d6728a95e7e25f9b9f1a878eb",
+   "note": "GeomSubset prims; @margoengine/usdz is the reader for such files"
+  },
+  {
+   "id": "usda-subdivision",
+   "format": "usd",
+   "check": "usdaSubdivision",
+   "variant": "subdivision surface",
+   "entry": "@margoengine/loaders/usd",
+   "file": "UtahTeapot.usd",
+   "url": "https://raw.githubusercontent.com/usd-wg/assets/main/full_assets/Teapot/geo/UtahTeapot.usd",
+   "licence": "Apache-2.0",
+   "author": "USD Working Group assets",
+   "size": 259621,
+   "sha256": "7f64b77cd959e8c2b6760bb63ef40a880b6d5daa0f501251294069839ec9f4d4"
+  },
+  {
+   "id": "usdz-usda",
+   "format": "usd",
+   "check": "usdRefused",
+   "variant": "USDA in USDZ, textured",
+   "entry": "@margoengine/loaders/usd",
+   "file": "NormalsTextureBiasAndScale.usdz",
+   "url": "https://raw.githubusercontent.com/usd-wg/assets/main/test_assets/NormalsTextureBiasAndScale/NormalsTextureBiasAndScale.usdz",
+   "licence": "Apache-2.0",
+   "author": "USD Working Group assets",
+   "size": 116373,
+   "sha256": "946a05dd4108cea0286217500f319540d36f1eee891175bd4ff871d96aedc653",
+   "note": "textures; @margoengine/usdz is the reader for such files"
+  },
+  {
+   "id": "usdz-usdc",
+   "format": "usd",
+   "check": "usdzBinary",
+   "variant": "binary USDC in USDZ",
+   "entry": "@margoengine/loaders/usd",
+   "file": "BoxAnimated.usdz",
+   "url": "https://raw.githubusercontent.com/usd-wg/assets/main/test_assets/USDZ/BoxAnimated/BoxAnimated.usdz",
+   "licence": "Apache-2.0",
+   "author": "USD Working Group assets",
+   "size": 11002,
+   "sha256": "49104424591a280e2752b43abcc2ae7270d48baea90f57820ca02bf4e723da6f"
+  },
+  {
+   "id": "font-ttf",
+   "format": "font",
+   "check": "font",
+   "variant": "TrueType",
+   "entry": "@margoengine/loaders/font",
+   "file": "Lato-Regular.ttf",
+   "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/lato/Lato-Regular.ttf",
+   "licence": "OFL-1.1",
+   "author": "Lato, Lukasz Dziedzic",
+   "size": 656568,
+   "sha256": "d636e4683231f931eda222d588e944d082bfd3bdba02f928bee461c0f185b251"
+  },
+  {
+   "id": "font-otf",
+   "format": "font",
+   "check": "fontCff",
+   "variant": "OpenType CFF",
+   "entry": "@margoengine/loaders/font",
+   "file": "SourceSans3-Regular.otf",
+   "url": "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/OTF/SourceSans3-Regular.otf",
+   "licence": "OFL-1.1",
+   "author": "Adobe Source Sans",
+   "size": 334924,
+   "sha256": "08df266400933d3178d081a45f94a08814c3e55b4b7dd2e0ff69cb1329f13ab6"
+  },
+  {
+   "id": "svg-w3c",
+   "format": "svg",
+   "check": "svg",
+   "variant": "W3C test",
+   "entry": "@margoengine/loaders/svg",
+   "file": "paths-data-01-t.svg",
+   "url": "https://www.w3.org/Graphics/SVG/Test/20110816/svg/paths-data-01-t.svg",
+   "licence": "W3C Test Suite licence (3-clause BSD option)",
+   "author": "W3C SVG 1.1 test suite",
+   "size": 11078,
+   "sha256": "f33ffa2e22037943add890d492f66d92b1ff6ab9d42125255d5efe58165fa13c"
+  },
+  {
+   "id": "svg-inkscape",
+   "format": "svg",
+   "check": "svg",
+   "variant": "Inkscape file",
+   "entry": "@margoengine/loaders/svg",
+   "file": "Example.svg",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/8/84/Example.svg",
+   "licence": "Public domain",
+   "author": "Wikimedia Commons",
+   "size": 10009,
+   "sha256": "e1b9b9f45649d704fda479b8f240ae30115c4b1343aad112ea97d39deb57092f"
+  },
+  {
+   "id": "svg-flag",
+   "format": "svg",
+   "check": "svg",
+   "variant": "editor file",
+   "entry": "@margoengine/loaders/svg",
+   "file": "Flag_of_the_United_States.svg",
+   "url": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Flag_of_the_United_States.svg",
+   "licence": "Public domain",
+   "author": "Wikimedia Commons",
+   "size": 823,
+   "sha256": "48f0d3e4a7bf2d5c0c8d09cd975696acb2f3af601aaca80c537933ad9ec166ec"
+  },
+  {
+   "id": "bvh-cmu",
+   "format": "bvh",
+   "check": "bvh",
+   "variant": "motion capture",
+   "entry": "@margoengine/loaders/mocap",
+   "file": "01_01.bvh",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/BVH/01_01.bvh",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 2070355,
+   "sha256": "1d9ee909452ee62784306545cf1fcd634243db1173e0c90cecbed793e50361a8"
+  },
+  {
+   "id": "vrml-bot",
+   "format": "vrml",
+   "check": "vrml",
+   "variant": "VRML97",
+   "entry": "@margoengine/loaders/vrml",
+   "file": "bot2.wrl",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/bot2.wrl",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 51875,
+   "sha256": "64408cf9e3284c3ce5bd5e383a8e6610d53556568e3cc9fc6b7ea1abb888f24d"
+  },
+  {
+   "id": "vrml-catia",
+   "format": "vrml",
+   "check": "vrml",
+   "variant": "VRML97 from CATIA",
+   "entry": "@margoengine/loaders/vrml",
+   "file": "CatiaHubAssemblyCombined.wrl",
+   "url": "https://www.web3d.org/x3d/content/examples/Basic/CAD/CatiaHubAssemblyCombined.wrl",
+   "licence": "Web3D Consortium open-source licence (BSD style)",
+   "author": "Web3D Consortium X3D examples",
+   "size": 114599,
+   "sha256": "173673e317cc8ca1d6d4cb1d7ac764de6e8f37fc5447ceab719050ad1e9e61bd"
+  },
+  {
+   "id": "x3d-catia",
+   "format": "x3d",
+   "check": "x3d",
+   "variant": "X3D from CATIA",
+   "entry": "@margoengine/loaders/vrml",
+   "file": "CatiaHubAssemblyCombined.x3d",
+   "url": "https://www.web3d.org/x3d/content/examples/Basic/CAD/CatiaHubAssemblyCombined.x3d",
+   "licence": "Web3D Consortium open-source licence (BSD style)",
+   "author": "Web3D Consortium X3D examples",
+   "size": 90781,
+   "sha256": "f559a082a618abc204e808fce2be654ffc04d528153ead47e251f880e3f85c76"
+  },
+  {
+   "id": "x3d-teapot",
+   "format": "x3d",
+   "check": "x3d",
+   "variant": "X3D CAD teapot",
+   "entry": "@margoengine/loaders/vrml",
+   "file": "CadTeapot.x3d",
+   "url": "https://www.web3d.org/x3d/content/examples/Basic/CAD/CadTeapot.x3d",
+   "licence": "Web3D Consortium open-source licence (BSD style)",
+   "author": "Web3D Consortium X3D examples",
+   "size": 26365,
+   "sha256": "f90b298cd032b05cae499dd72a4ab436538c774f3a637e0365fd2ed7038b313b"
+  },
+  {
+   "id": "gcode-prusaslicer",
+   "format": "gcode",
+   "check": "gcode",
+   "variant": "slicer",
+   "entry": "@margoengine/loaders/gcode",
+   "file": "Gcode.zip",
+   "url": "https://zenodo.org/api/records/8370228/files/Gcode.zip/content",
+   "licence": "CC-BY-4.0",
+   "author": "Zenodo record 8370228, Recycled_Material_printability",
+   "size": 2804851,
+   "sha256": "54c3644c655d43d4aca68bf39abc15a0d2289748eb5a95f81f1af95049603019",
+   "extract": "Gcode/Gcode BL-0.25/velocity 210.gcode"
+  },
+  {
+   "id": "nrrd-raw-rgb",
+   "format": "nrrd",
+   "check": "nrrd",
+   "variant": "raw RGB",
+   "entry": "@margoengine/loaders/nrrd",
+   "file": "beach.nrrd",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/beach.nrrd",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 30167,
+   "sha256": "cbd88cff9964795ab97af018fcb9245f265a4b56f30edf003274fdc28a0c0e49"
+  },
+  {
+   "id": "nrrd-detached-ascii",
+   "format": "nrrd",
+   "check": "nrrd",
+   "variant": "detached ascii",
+   "entry": "@margoengine/loaders/nrrd",
+   "file": "beach.ascii.nhdr",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/beach.ascii.nhdr",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 181,
+   "sha256": "4f4cb61a331066bdaba650134ce98cf062ec5187bf5be3537cdb1ecf57076e52",
+   "companions": [
+    {
+     "file": "beach.ascii",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/beach.ascii",
+     "size": 55129,
+     "sha256": "512ac48311507cfee65e1dcea3c91119cf4d6357df52551614e38b97f510455e"
+    }
+   ]
+  },
+  {
+   "id": "nrrd-detached-series",
+   "format": "nrrd",
+   "check": "nrrd",
+   "variant": "detached series",
+   "entry": "@margoengine/loaders/nrrd",
+   "file": "quarter.nhdr",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.nhdr",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 152,
+   "sha256": "43430dd3b3db25bd535a2583be16110ca31c1dee4310e3c3e2134cc270739afb",
+   "companions": [
+    {
+     "file": "quarter.1",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.1",
+     "size": 8192,
+     "sha256": "d274caa86f844ccefc99ed4ee4050b89d0807831675554e2ce3d6a1115af04fe"
+    },
+    {
+     "file": "quarter.2",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.2",
+     "size": 8192,
+     "sha256": "ea4c76e8a1314536e5d5d88e83a83b7137e9e40607b3b1bb691697f2f5cfa00a"
+    },
+    {
+     "file": "quarter.3",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.3",
+     "size": 8192,
+     "sha256": "16ae310283e10eab4bbf629fc7d092c5d8b4b169925126c12d2943fca6bb9f96"
+    },
+    {
+     "file": "quarter.4",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.4",
+     "size": 8192,
+     "sha256": "d796e067300deeb0517e60c29a85b00636d9468c21ed5123c7758003ddae2528"
+    },
+    {
+     "file": "quarter.5",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.5",
+     "size": 8192,
+     "sha256": "11fb825ef8efc5be44c0fb89570db4387f75549d44710b914356494e275fba49"
+    },
+    {
+     "file": "quarter.6",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.6",
+     "size": 8192,
+     "sha256": "cd5e5b58213abb95f31c62159e5ca68509048dd9e099ab026bdfc7ef089a26f6"
+    },
+    {
+     "file": "quarter.7",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.7",
+     "size": 8192,
+     "sha256": "287fdff445218727aa9a2fea56f9af1e5635e6fa997ed6d0b46fe9fe8367a232"
+    },
+    {
+     "file": "quarter.8",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.8",
+     "size": 8192,
+     "sha256": "63239131d977710b49d21c234260dd09182a18ae535d31a1d0893e57342218e8"
+    },
+    {
+     "file": "quarter.9",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.9",
+     "size": 8192,
+     "sha256": "774f06f8b43774f4ca591ae11922e63294ddec7dc56d112b5b0d850ab3f3b80d"
+    },
+    {
+     "file": "quarter.10",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.10",
+     "size": 8192,
+     "sha256": "62b4399c186359d0d030bd4d5955fe4ca2fdeef4eba7697db9f21c8ac7cc050d"
+    },
+    {
+     "file": "quarter.11",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.11",
+     "size": 8192,
+     "sha256": "dca25e46f7df3be09bab385445c4f97449a0b37e2fdd6e1e2dbc15abb3bae6b2"
+    },
+    {
+     "file": "quarter.12",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.12",
+     "size": 8192,
+     "sha256": "e6910a26104f7187786827afa12e00161013c7d55c318267871e7de499ab180e"
+    },
+    {
+     "file": "quarter.13",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.13",
+     "size": 8192,
+     "sha256": "02f0fe8ffba357b6a8c3aa3dd08f946803addc3c6f0124ae23a4859dbc81c40d"
+    },
+    {
+     "file": "quarter.14",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.14",
+     "size": 8192,
+     "sha256": "9fc26aa61ff3fe9fb07b88a8381b2ac8acce83ade5c04cd94280ee68617bb1b3"
+    },
+    {
+     "file": "quarter.15",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.15",
+     "size": 8192,
+     "sha256": "b2fef0d491d1219e3d74bbd35527a991f019652bff4e493a8372ebe8c9b9c873"
+    },
+    {
+     "file": "quarter.16",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.16",
+     "size": 8192,
+     "sha256": "db7a49e2d56e8917558448f4836155381d493506312cf4ceb0417fb98c0164d4"
+    },
+    {
+     "file": "quarter.17",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.17",
+     "size": 8192,
+     "sha256": "1292be33c3b9c4a344fa80ae55911bc0889c45ac212064d829cd17d9346119c9"
+    },
+    {
+     "file": "quarter.18",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.18",
+     "size": 8192,
+     "sha256": "1f1f413d12f7f9bd7ec2d124a2e4cbe512c4a912ac2fc82812e34b2f801e2944"
+    },
+    {
+     "file": "quarter.19",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.19",
+     "size": 8192,
+     "sha256": "6d609442cbcaf1bb6b46a8367ff7fa1e78f5a73c08900ff9c94538d59637d179"
+    },
+    {
+     "file": "quarter.20",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.20",
+     "size": 8192,
+     "sha256": "21b975b6a287e4bc614ced1a37cefe2e132995b10feb91746fe85c284d7a206f"
+    },
+    {
+     "file": "quarter.21",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.21",
+     "size": 8192,
+     "sha256": "aacab7d0190a8049a7eef07be1a0c9c892e1df71c5e5583ab576ac8d3f10c4c8"
+    },
+    {
+     "file": "quarter.22",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.22",
+     "size": 8192,
+     "sha256": "053f1fdd3906caf7ee24284f9f3898fe53557249be01fe4704d2f77b187356be"
+    },
+    {
+     "file": "quarter.23",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.23",
+     "size": 8192,
+     "sha256": "4eebc3f19525be62225e4a16788ddabc6609f054e47f332bb6626935b3ee2276"
+    },
+    {
+     "file": "quarter.24",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.24",
+     "size": 8192,
+     "sha256": "95cea53665e9fb81a63b159009d6bddc97631291bc5f985a705c2312735bba83"
+    },
+    {
+     "file": "quarter.25",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.25",
+     "size": 8192,
+     "sha256": "fa6f322d95c0080138db16feb9ced5fbff9f992134b9efb82bf9219f5b336be5"
+    },
+    {
+     "file": "quarter.26",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.26",
+     "size": 8192,
+     "sha256": "4eb7f41176da50f750283fd83948d3def21de2fbe4061e1402b5e9d93eb08a59"
+    },
+    {
+     "file": "quarter.27",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.27",
+     "size": 8192,
+     "sha256": "8a6f30fd392a85ab7ce4384bddaa90cfc2df2cc2c2e2c95127375a38e1cccf2e"
+    },
+    {
+     "file": "quarter.28",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.28",
+     "size": 8192,
+     "sha256": "74570b8863ecc6a293cd452295555157dbdf083e1d916ea3d7fd9e6d8a7fb044"
+    },
+    {
+     "file": "quarter.29",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.29",
+     "size": 8192,
+     "sha256": "c7358075aa85d78187d810b28a60eaf671e92cd84609ee136cb7479cb5b8fafb"
+    },
+    {
+     "file": "quarter.30",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.30",
+     "size": 8192,
+     "sha256": "7546ea14aaff628653580dae9419703222daa27ba80106decb514a92e325775d"
+    },
+    {
+     "file": "quarter.31",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.31",
+     "size": 8192,
+     "sha256": "e7205a43df7b0dd2972c84a04f74a71313d9b447593a29b5ec054f03eae894f3"
+    },
+    {
+     "file": "quarter.32",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.32",
+     "size": 8192,
+     "sha256": "048e678048e7b1882ba40829371a94e686279e2cbbf3f0bb754deb00861b7cc0"
+    },
+    {
+     "file": "quarter.33",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.33",
+     "size": 8192,
+     "sha256": "130bec4de0668a765559329bc33f67330220ab0b2c3388db984d23d5f721d7ca"
+    },
+    {
+     "file": "quarter.34",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.34",
+     "size": 8192,
+     "sha256": "d15ac4fc3171c8e88c4224f056736e797a54424b43776a6e1278421a2fed9dbd"
+    },
+    {
+     "file": "quarter.35",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.35",
+     "size": 8192,
+     "sha256": "9ab7e10998dc9899d65e8186d7a4afc1eb2fbee302f53e7c78ba8134821fe6f2"
+    },
+    {
+     "file": "quarter.36",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.36",
+     "size": 8192,
+     "sha256": "211e82381d939331adb3da46a46b453efd630470f990bd88c3a926bc223c6883"
+    },
+    {
+     "file": "quarter.37",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.37",
+     "size": 8192,
+     "sha256": "0f3b302e76a40ceed395ce2fdc99b0cf9311a33569449e21a740ad885eef2d0a"
+    },
+    {
+     "file": "quarter.38",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.38",
+     "size": 8192,
+     "sha256": "e91c75787fe38d1d63e6147fe1fc0e672738066ba5f98fb138be2f125beea392"
+    },
+    {
+     "file": "quarter.39",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.39",
+     "size": 8192,
+     "sha256": "7caaa822f6ae12e2f57ad261f031e3f7fdd2a295033c5cd6ca6cb6f8783b3e38"
+    },
+    {
+     "file": "quarter.40",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.40",
+     "size": 8192,
+     "sha256": "bb96d9e78cc4d4576722d8608b1c536af7d4532aebc4fa95925b4678a17591c0"
+    },
+    {
+     "file": "quarter.41",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.41",
+     "size": 8192,
+     "sha256": "a696eb462997cba0f21f26618ed163e6d8c6270a68d64d97ee937874ecfca851"
+    },
+    {
+     "file": "quarter.42",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.42",
+     "size": 8192,
+     "sha256": "7c8c4556b2fe8d6f1def51d7405aaa1638a137bdf11dc63aa4d7eb3b8556df8a"
+    },
+    {
+     "file": "quarter.43",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.43",
+     "size": 8192,
+     "sha256": "0e60aacb6035c4541ece96fcdaf9b250f639e6c5174a4a6f536ad6fcbb57b421"
+    },
+    {
+     "file": "quarter.44",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.44",
+     "size": 8192,
+     "sha256": "7a5d2282b8521a8bcc17756c01e1595d9e99ea0deb1416a594500c242834363e"
+    },
+    {
+     "file": "quarter.45",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.45",
+     "size": 8192,
+     "sha256": "4b085eda2da6a8f724f88feb7ce2fdbbf17a8b3f7f8cb0c455ff25f345b699e2"
+    },
+    {
+     "file": "quarter.46",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.46",
+     "size": 8192,
+     "sha256": "356ac390b8b11471e89f226072923ef56bb120ec96f113a1237a022a534b8003"
+    },
+    {
+     "file": "quarter.47",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.47",
+     "size": 8192,
+     "sha256": "fe6a82787746189f7daf5ad9fdbd6d38ca3525e695bc992fb4e93e9646585fce"
+    },
+    {
+     "file": "quarter.48",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.48",
+     "size": 8192,
+     "sha256": "9123cd85dd2188a53e2bae8325a66c0160fdfc3054cb8442973389de076faf4d"
+    },
+    {
+     "file": "quarter.49",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.49",
+     "size": 8192,
+     "sha256": "9887f7fa336dd68336cef02cab9b5e1c4ce5726d28a8779e12e04ae06f9d178e"
+    },
+    {
+     "file": "quarter.50",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.50",
+     "size": 8192,
+     "sha256": "3a386c86de73689b15ae54fdddd7a29c161c7a813cc9a62e34e60db81adb0961"
+    },
+    {
+     "file": "quarter.51",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.51",
+     "size": 8192,
+     "sha256": "371c547b4c465bec310206739024cf9ebbf4320da7bc2ff9a935a4dd9bf25a4e"
+    },
+    {
+     "file": "quarter.52",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.52",
+     "size": 8192,
+     "sha256": "eef94b636c69971657ff3ccd085aa63c0f148e8f143939dcf9a5dce0763c9c84"
+    },
+    {
+     "file": "quarter.53",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.53",
+     "size": 8192,
+     "sha256": "4d9eacf7103fe42b50edfc7c57f4c16860c9a4d783744983019ab9fee4e9a439"
+    },
+    {
+     "file": "quarter.54",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.54",
+     "size": 8192,
+     "sha256": "be5ad0efbe8cb448d2315799c2a45f48efad301827d516be6072ae83ab963275"
+    },
+    {
+     "file": "quarter.55",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.55",
+     "size": 8192,
+     "sha256": "98e3745ee9633cc72e4966fd058fb6298ad833bbd609669b6ad19bfcf54ef1a2"
+    },
+    {
+     "file": "quarter.56",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.56",
+     "size": 8192,
+     "sha256": "c6b92b4b645348ea9b7f460588e6eae11679936cfa3305d2fb51a82af18fe249"
+    },
+    {
+     "file": "quarter.57",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.57",
+     "size": 8192,
+     "sha256": "472f525dfea1a9de2b5a1c0dc263ea25d80c3042cc8195eb950df2bcceae8f2e"
+    },
+    {
+     "file": "quarter.58",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.58",
+     "size": 8192,
+     "sha256": "b576f1060abda164ea3f7960bf902e102789939576dc90fbc5bb98abf580cbe5"
+    },
+    {
+     "file": "quarter.59",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.59",
+     "size": 8192,
+     "sha256": "470f06d6a23049d5cb858cfe9ce2929aab38339021e105ac57756ed3b11ed2eb"
+    },
+    {
+     "file": "quarter.60",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.60",
+     "size": 8192,
+     "sha256": "d50f874c22229cd302cfd289e064f1bdd7946970755c6789f26a059c2298549f"
+    },
+    {
+     "file": "quarter.61",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.61",
+     "size": 8192,
+     "sha256": "6f3949bb764163daab8468f51452116435b5499668eb3c7cd4a7ce6fb0af67ec"
+    },
+    {
+     "file": "quarter.62",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.62",
+     "size": 8192,
+     "sha256": "f8cf78335a73e344f435bdb56f0871bdc02d4b346edaf9111ddc04b5853481f1"
+    },
+    {
+     "file": "quarter.63",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.63",
+     "size": 8192,
+     "sha256": "aec7ce078f496626a93a98dcbec9abbdd7ac5dc436351c185335d6794f58f0eb"
+    },
+    {
+     "file": "quarter.64",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.64",
+     "size": 8192,
+     "sha256": "ae929c41d24172e94ff4135acf2b74d4fe2ccbc0386d5340dde3e4cfec2ae78d"
+    },
+    {
+     "file": "quarter.65",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.65",
+     "size": 8192,
+     "sha256": "2f15a49165bac411d20ead6d43cb29ea25d55bf077698cb6645d4b4b7841c7ff"
+    },
+    {
+     "file": "quarter.66",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.66",
+     "size": 8192,
+     "sha256": "6f15f6e96a1396e67951894941fec903143bf019567546609274b24b20639df1"
+    },
+    {
+     "file": "quarter.67",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.67",
+     "size": 8192,
+     "sha256": "827084a776017b3c6438bad15f2af33084c1d8b133ca7728c38ccffa14849313"
+    },
+    {
+     "file": "quarter.68",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.68",
+     "size": 8192,
+     "sha256": "97f2bf73645d8a906d5c7c8888f16c15edbd3ee8b1fa9c4594a3729856ac3b7c"
+    },
+    {
+     "file": "quarter.69",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.69",
+     "size": 8192,
+     "sha256": "61b80c64d0418a3f6c119689648739385464422fca932e5071f284e4b223d5a1"
+    },
+    {
+     "file": "quarter.70",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.70",
+     "size": 8192,
+     "sha256": "640f09eaab7c1ddedc031ed1de38005b92ce10f0158ffdb92f0c010f361cb3c8"
+    },
+    {
+     "file": "quarter.71",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.71",
+     "size": 8192,
+     "sha256": "97e9c61268c0181a0e8576f938bf4251840f0f862ea5c4f4ceff061bd101c33d"
+    },
+    {
+     "file": "quarter.72",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.72",
+     "size": 8192,
+     "sha256": "e96bd308c3ebca9472cf0d4567fb347bd9cec39a4937fadd90d5260c513f976f"
+    },
+    {
+     "file": "quarter.73",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.73",
+     "size": 8192,
+     "sha256": "ff93a58c8ed023e574521e21ac19cc610af2fe560b118cafab8a9809df81b463"
+    },
+    {
+     "file": "quarter.74",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.74",
+     "size": 8192,
+     "sha256": "1d6949704deb5d1fdc22304654044d23b49fdb1988b809513e18c595d1eb40ba"
+    },
+    {
+     "file": "quarter.75",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.75",
+     "size": 8192,
+     "sha256": "f5c8ff8e90791499f837b3de88fbb0c6c8eb40431dfd4dec1503bd0d32bc98dd"
+    },
+    {
+     "file": "quarter.76",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.76",
+     "size": 8192,
+     "sha256": "137f61e136695d933114129475307265e495942f106c21c7acd596ac2cf08dfd"
+    },
+    {
+     "file": "quarter.77",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.77",
+     "size": 8192,
+     "sha256": "424e6533fb3fbda2a181340369164f57255a1e31d0aba071c79a7625e494bd92"
+    },
+    {
+     "file": "quarter.78",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.78",
+     "size": 8192,
+     "sha256": "c23dea7c5e7b5f5010f024e83c4b8e37190445f76881796baeda80796c187f2c"
+    },
+    {
+     "file": "quarter.79",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.79",
+     "size": 8192,
+     "sha256": "8299fd00ee0c370686195dc17f519715542483def359cda5777e2dff7ac94cf7"
+    },
+    {
+     "file": "quarter.80",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.80",
+     "size": 8192,
+     "sha256": "d2fdfda3a3f62a2c025f19948945f3248b25abe94ea1f0132dac6d92d7b88af2"
+    },
+    {
+     "file": "quarter.81",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.81",
+     "size": 8192,
+     "sha256": "41117899f4c078b4d1a0950389e6bb452f61389a6ec78c9f2f0ceeb45d8ae1e7"
+    },
+    {
+     "file": "quarter.82",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.82",
+     "size": 8192,
+     "sha256": "adaafd1a69de193eaf5eb5e8ddf5c9529cb52525cccdfc3dc58ffb1d4369fd7c"
+    },
+    {
+     "file": "quarter.83",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.83",
+     "size": 8192,
+     "sha256": "d31e9cbf2a9cdfc11faad2ded94aac7d37fe3168550ee3f1879f340494181f1f"
+    },
+    {
+     "file": "quarter.84",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.84",
+     "size": 8192,
+     "sha256": "458e1d6a09b5054b95540084328ed60164ce7e47e79a494b922c81348b61349b"
+    },
+    {
+     "file": "quarter.85",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.85",
+     "size": 8192,
+     "sha256": "ec142457ef1cb4126a3cc5b0dada59b45e836974b9ca3e7186f6ac53910a1fe7"
+    },
+    {
+     "file": "quarter.86",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.86",
+     "size": 8192,
+     "sha256": "eec124d9ca3e3cc5c3a22d4d2e3887e29aa689e6316b06160161788bb8eb01e0"
+    },
+    {
+     "file": "quarter.87",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.87",
+     "size": 8192,
+     "sha256": "909423c4e93cc17aaa50412bbfc4e063925dbe64cc812e472f40df2437196084"
+    },
+    {
+     "file": "quarter.88",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.88",
+     "size": 8192,
+     "sha256": "2b5e4ce9d06b4fc5e393dbf7b70a6db8bab127f61c7c01a0a4216e175f8ba456"
+    },
+    {
+     "file": "quarter.89",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.89",
+     "size": 8192,
+     "sha256": "eaeb2ab76398608c1797e6d63fb0500449f7772c001a67538c8ca08897d5e6b2"
+    },
+    {
+     "file": "quarter.90",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.90",
+     "size": 8192,
+     "sha256": "7f5ffbb232c2baff406c3a82d8b291dc2bc6d1745296d9c4e4c3fc42d29df04a"
+    },
+    {
+     "file": "quarter.91",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.91",
+     "size": 8192,
+     "sha256": "ee8a2ca033ed36086df1b86e4dae4a759d8a5a16d99858f48d2bb4f9d472f912"
+    },
+    {
+     "file": "quarter.92",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.92",
+     "size": 8192,
+     "sha256": "08a1a8950b66a76ae9247181566943aa0319bac8211c816c2c0b988a1db98128"
+    },
+    {
+     "file": "quarter.93",
+     "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/headsq/quarter.93",
+     "size": 8192,
+     "sha256": "ae82ca217a9bf1fae260b5787360b664e5f8189c5ff13e604db6a2b18ea2ee8f"
+    }
+   ]
+  },
+  {
+   "id": "ldraw-car",
+   "format": "ldraw",
+   "check": "ldraw",
+   "variant": "official model",
+   "entry": "@margoengine/loaders/ldraw",
+   "file": "complete.zip",
+   "url": "https://library.ldraw.org/library/updates/complete.zip",
+   "licence": "CC-BY-2.0 (CCAL 2.0)",
+   "author": "LDraw.org parts library",
+   "size": 146853687,
+   "sha256": "023083918da2d3697c794fb4267975509584f3611b993095874206a803fa610f",
+   "extract": "models/car.ldr"
+  },
+  {
+   "id": "vtp-compressed",
+   "format": "vtk-xml",
+   "check": "vtkXml",
+   "variant": "PolyData zlib appended",
+   "entry": "@margoengine/loaders/vtk-xml",
+   "file": "disk_out_ref_surface.vtp",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/disk_out_ref_surface.vtp",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 81097,
+   "sha256": "f1292bd8e26b8ef920dd27d6ac409ab63c2c2e3feae7c6f4f9d7e8b80c2a2464"
+  },
+  {
+   "id": "vtp-raw",
+   "format": "vtk-xml",
+   "check": "vtkXml",
+   "variant": "PolyData appended",
+   "entry": "@margoengine/loaders/vtk-xml",
+   "file": "SuperQuadric.vtp",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/SuperQuadric.vtp",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 40714,
+   "sha256": "2819cdbb8d704fd2daf595e173f8cad1ceaa242d807950b055b0b59c4893d0a9"
+  },
+  {
+   "id": "vtu-appended",
+   "format": "vtk-xml",
+   "check": "vtkXml",
+   "variant": "UnstructuredGrid appended",
+   "entry": "@margoengine/loaders/vtk-xml",
+   "file": "ex-blow_5_1_1.vtu",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/ex-blow_5/ex-blow_5_1_1.vtu",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 5397,
+   "sha256": "1dc054db8bcf2dd982d027b7167cd9b7425e8b034b6d0719ae3caabcb193c7b7"
+  },
+  {
+   "id": "vtu-ascii",
+   "format": "vtk-xml",
+   "check": "vtkXml",
+   "variant": "UnstructuredGrid ascii",
+   "entry": "@margoengine/loaders/vtk-xml",
+   "file": "tetra.vtu",
+   "url": "https://raw.githubusercontent.com/pyvista/vtk-data/master/Data/tetra.vtu",
+   "licence": "Apache-2.0",
+   "author": "PyVista vtk-data (VTK test data)",
+   "size": 1471,
+   "sha256": "6bebfc84f0c342a867e6c50f849aa532f075d99b6ea980c0140966fb96d520ad"
+  },
+  {
+   "id": "3dm-rhinologo",
+   "format": "3dm",
+   "check": "threedm",
+   "variant": "Rhino logo",
+   "entry": "@margoengine/loaders/3dm",
+   "file": "RhinoLogo.3dm",
+   "url": "https://files.mcneel.com/rhino3dm/models/RhinoLogo.3dm",
+   "licence": "McNeel sample file",
+   "author": "Robert McNeel and Associates",
+   "size": 928347,
+   "sha256": "34c8d808e8ae3887545d55928240e180572b7dadda8005648b79a72967229758"
+  },
+  {
+   "id": "3dm-v8",
+   "format": "3dm",
+   "check": "threedm",
+   "variant": "Rhino 8",
+   "entry": "@margoengine/loaders/3dm",
+   "file": "v8_caps_and_joins.3dm",
+   "url": "https://raw.githubusercontent.com/mcneel/opennurbs/8.x/example_files/V8/v8_caps_and_joins.3dm",
+   "licence": "openNURBS licence",
+   "author": "Robert McNeel and Associates",
+   "size": 30896,
+   "sha256": "5f4f8d98be42f790ae4eb296ea478a9c861be723b16e86fc98a2aef5ce521ba1"
+  },
+  {
+   "id": "3dm-mesh",
+   "format": "3dm",
+   "check": "threedm",
+   "variant": "mesh",
+   "entry": "@margoengine/loaders/3dm",
+   "file": "mesh.3dm",
+   "url": "https://raw.githubusercontent.com/mcneel/rhino3dm/9.x/tests/models/mesh.3dm",
+   "licence": "MIT",
+   "author": "rhino3dm tests",
+   "size": 111350,
+   "sha256": "59e78629c5c19a5e04a195d746cd6b3981c504fcdcd76423ba507ec9e58e69b7"
+  },
+  {
+   "id": "3ds-nasa",
+   "format": "3ds",
+   "check": "threeds",
+   "variant": "large",
+   "entry": "@margoengine/loaders/3ds and @margoengine/loaders/tds",
+   "file": "Shuttle Carrier - SLIC.3ds",
+   "url": "https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/Hubble%20SM4%20Carriers/Shuttle%20Carrier%20-%20SLIC.3ds",
+   "licence": "Public domain (NASA: free and without copyright)",
+   "author": "NASA",
+   "size": 11945248,
+   "sha256": "b9591f74e3780d6f0d701aac61da35e8e7c303d519945e6ed53636e7dbee0811"
+  },
+  {
+   "id": "3ds-fels",
+   "format": "3ds",
+   "check": "threeds",
+   "variant": "small",
+   "entry": "@margoengine/loaders/3ds and @margoengine/loaders/tds",
+   "file": "fels.3ds",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/3DS/fels.3ds",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 13326,
+   "sha256": "9ca9e930b40d04273925d87d6683f766421b94b4bb1ad1934f2d7a0c2e190f04"
+  },
+  {
+   "id": "lwo-nasa",
+   "format": "lwo",
+   "check": "lwo",
+   "variant": "LightWave",
+   "entry": "@margoengine/loaders/lwo",
+   "file": "TOPEX-Poseidon.lwo",
+   "url": "https://raw.githubusercontent.com/nasa/NASA-3D-Resources/master/3D%20Models/TOPEX-Poseidon/TOPEX-Poseidon.lwo",
+   "licence": "Public domain (NASA: free and without copyright)",
+   "author": "NASA",
+   "size": 338480,
+   "sha256": "0c3197411b7311938310e9f38aa5d4f65bfe8eaf5aebdbc8cee6a00a28417240"
+  },
+  {
+   "id": "lwo-modo",
+   "format": "lwo",
+   "check": "lwo",
+   "variant": "Modo export",
+   "entry": "@margoengine/loaders/lwo",
+   "file": "ModoExport_vertNormals.lwo",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/LWO/LWO2/ModoExport_vertNormals.lwo",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 24626,
+   "sha256": "ed9b58ac24c5d427922eb5fa0f077b0572a09df00d2b0322c110c717da63e3c8"
+  },
+  {
+   "id": "amf-rook",
+   "format": "amf",
+   "check": "amf",
+   "variant": "plain",
+   "entry": "@margoengine/loaders/amf",
+   "file": "Rook.amf",
+   "url": "https://raw.githubusercontent.com/jscad/sample-files/master/amf/Rook.amf",
+   "licence": "MIT",
+   "author": "JSCAD sample-files",
+   "size": 739617,
+   "sha256": "9ab2740acb849bcebd6ec7417d40278237a6fd9777a390d096bc9b554242e8e5"
+  },
+  {
+   "id": "amf-colours",
+   "format": "amf",
+   "check": "amf",
+   "variant": "colours",
+   "entry": "@margoengine/loaders/amf",
+   "file": "colorsByTriangle.amf",
+   "url": "https://raw.githubusercontent.com/jscad/sample-files/master/amf/colorsByTriangle.amf",
+   "licence": "MIT",
+   "author": "JSCAD sample-files",
+   "size": 25215,
+   "sha256": "74f627fc8b48a2087e43bb01daa1aa07f80d2931aacfb771be4862b3e930d95a"
+  },
+  {
+   "id": "md2-dolphin",
+   "format": "md2",
+   "check": "md2",
+   "variant": "animated",
+   "entry": "@margoengine/loaders/md2",
+   "file": "dolphin.md2",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models-nonbsd/MD2/dolphin.md2",
+   "licence": "Free for any use (notice in the source folder)",
+   "author": "Elias Tsiantas",
+   "size": 95268,
+   "sha256": "865405c4b73d197a6a27090dcecf9796dc03fafba0084f1003fb615d7ad37363"
+  },
+  {
+   "id": "pdb-crambin",
+   "format": "pdb",
+   "check": "pdb",
+   "variant": "one chain",
+   "entry": "@margoengine/loaders/pdb",
+   "file": "1CRN.pdb",
+   "url": "https://files.rcsb.org/download/1CRN.pdb",
+   "licence": "CC0-1.0",
+   "author": "wwPDB, RCSB PDB",
+   "size": 49491,
+   "sha256": "42199a30a0701864a2a5cc76cd7f35cc544cd0e65fbcf63e03c166543249b811",
+   "facts": {
+    "atoms": 327
+   }
+  },
+  {
+   "id": "pdb-haemoglobin",
+   "format": "pdb",
+   "check": "pdb",
+   "variant": "four chains",
+   "entry": "@margoengine/loaders/pdb",
+   "file": "4HHB.pdb",
+   "url": "https://files.rcsb.org/download/4HHB.pdb",
+   "licence": "CC0-1.0",
+   "author": "wwPDB, RCSB PDB",
+   "size": 473850,
+   "sha256": "abf382e0fd84b53bd4c08b373d37c0d7fe9fbe1a9a9c3851b2f5f2fbbe627101"
+  },
+  {
+   "id": "kmz-macky",
+   "format": "kmz",
+   "check": "kmz",
+   "variant": "COLLADA model",
+   "entry": "@margoengine/loaders/kmz",
+   "file": "MackyBldg.kmz",
+   "url": "https://developers.google.com/kml/documentation/MackyBldg.kmz",
+   "licence": "CC-BY-4.0",
+   "author": "Google KML documentation",
+   "size": 224565,
+   "sha256": "7c937a58ee10fa13c21a14b3f71dd2d20fff8b1c29bacfa3f04b354af5aedc03"
+  },
+  {
+   "id": "las-format0",
+   "format": "las",
+   "check": "las",
+   "variant": "1.2 format 0",
+   "entry": "@margoengine/loaders/las",
+   "file": "epsg_4326.las",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/epsg_4326.las",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 108453,
+   "sha256": "0a20717e692a510864f79e0f069d28a17655333823fa5282aa08a566dfafedfe"
+  },
+  {
+   "id": "las-format1",
+   "format": "las",
+   "check": "las",
+   "variant": "1.2 format 1",
+   "entry": "@margoengine/loaders/las",
+   "file": "mvk-thin.las",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/mvk-thin.las",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 179154,
+   "sha256": "c3707f90cc153b4a7a4ff679115b5f4435119b5cb7324dddeb6fd3f055efd2e6"
+  },
+  {
+   "id": "las-format2",
+   "format": "las",
+   "check": "las",
+   "variant": "1.2 format 2",
+   "entry": "@margoengine/loaders/las",
+   "file": "1.2_2.las",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/permutations/1.2_2.las",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 1031,
+   "sha256": "af293e6c15d26a7aa5fdd58a3d7e1adc6618326925314a1f52d5a04ee33ed6e4"
+  },
+  {
+   "id": "las-format6",
+   "format": "las",
+   "check": "las",
+   "variant": "1.4 format 6",
+   "entry": "@margoengine/loaders/las",
+   "file": "4_6.las",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/4_6.las",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 5971566,
+   "sha256": "bc45fd1a72fa37ddc02fdfd2e30cda0e4cfe80111d1e0ac98d9bb0969268c65b"
+  },
+  {
+   "id": "las-extra-bytes",
+   "format": "las",
+   "check": "las",
+   "variant": "1.4 format 3 extra bytes",
+   "entry": "@margoengine/loaders/las",
+   "file": "extrabytes.las",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/extrabytes.las",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 66354,
+   "sha256": "b8daf5a96114ac86c42fff13e07abdc736e00e1eb34188506a6895b1126ed75b"
+  },
+  {
+   "id": "las-simple",
+   "format": "las",
+   "check": "las",
+   "variant": "1.2",
+   "entry": "@margoengine/loaders/las",
+   "file": "simple.las",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/simple.las",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 36437,
+   "sha256": "a0570ef57b685b77a6d3e3992cbdfeecdb2c3065d3780bbeaba490818258b734"
+  },
+  {
+   "id": "las-autzen",
+   "format": "las",
+   "check": "las",
+   "variant": "1.2 larger",
+   "entry": "@margoengine/loaders/las",
+   "file": "autzen_trim.las",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/autzen_trim.las",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 3742038,
+   "sha256": "3d351885f3aa03d5ac92358037ba0b850ea4f56f644ffcc56d57cd5d830aaf75"
+  },
+  {
+   "id": "las-format7",
+   "format": "las",
+   "check": "las",
+   "variant": "1.4 format 7",
+   "entry": "@margoengine/loaders/las",
+   "file": "autzen_trim_7.las",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/autzen_trim_7.las",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 3961679,
+   "sha256": "73df3c251cb3a7504e13557fd6cba87a533815cc6c27c233638c905f6deb40a3"
+  },
+  {
+   "id": "laz-simple",
+   "format": "laz",
+   "check": "laz",
+   "variant": "pair of las-simple",
+   "entry": "@margoengine/loaders/las",
+   "file": "simple.laz",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/laz/simple.laz",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 18217,
+   "sha256": "ad3c65e06e9093b05b3181ee14ffb864a73a22363cb4fa9b7b8021e4d86cfb9d",
+   "companions": [
+    {
+     "file": "simple.las",
+     "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/simple.las",
+     "size": 36437,
+     "sha256": "a0570ef57b685b77a6d3e3992cbdfeecdb2c3065d3780bbeaba490818258b734"
+    }
+   ]
+  },
+  {
+   "id": "laz-format8",
+   "format": "laz",
+   "check": "laz",
+   "variant": "1.4 format 8",
+   "entry": "@margoengine/loaders/las",
+   "file": "las_with_several_extra_byte_bloc.laz",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/laz/las_with_several_extra_byte_bloc.laz",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 3240041,
+   "sha256": "4acb579c77e2b8eb07136d55857481122d87991490aa7c875893341005e043e7"
+  },
+  {
+   "id": "laz-laszip12",
+   "format": "laz",
+   "check": "lazRefused",
+   "variant": "LASzip 1.2 compressor",
+   "entry": "@margoengine/loaders/las",
+   "file": "simple-laszip-compressor-version-1.2r0.laz",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/laz/simple-laszip-compressor-version-1.2r0.laz",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 22149,
+   "sha256": "91a7f42d5d9b8fc4bc55fb71647ecfa9624177bcb8f8a5310238c64250d57741",
+   "note": "the unchunked compressor of LASzip 1.x, as packages/points documents"
+  },
+  {
+   "id": "laz-usgs-format6",
+   "format": "laz",
+   "check": "laz",
+   "variant": "1.4 format 6, USGS 3DEP",
+   "entry": "@margoengine/loaders/las",
+   "file": "USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz",
+   "url": "https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/LPC/Projects/MT_Statewide_Phase3_2021_B21/MT_Statewide_P3_4_B21/LAZ/USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz",
+   "licence": "Public domain (USGS 3DEP)",
+   "author": "U.S. Geological Survey",
+   "size": 609938,
+   "sha256": "c2804c3827fd6104acf657803f55ed4e5fa9ba83b4ec481888510385a14e31ae",
+   "repo": "packages/points/tests/fixtures/USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz"
+  },
+  {
+   "id": "laz-autzen",
+   "format": "laz",
+   "check": "laz",
+   "variant": "pair of las-autzen",
+   "entry": "@margoengine/loaders/las",
+   "file": "autzen_trim.laz",
+   "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/laz/autzen_trim.laz",
+   "licence": "BSD-3-Clause",
+   "author": "PDAL test data",
+   "size": 603353,
+   "sha256": "75867b3e75cfc3c2e96da9f753c04c9fbaa6a59468dea13e2859f3109b38bd66",
+   "companions": [
+    {
+     "file": "autzen_trim.las",
+     "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/las/autzen_trim.las",
+     "size": 3742038,
+     "sha256": "3d351885f3aa03d5ac92358037ba0b850ea4f56f644ffcc56d57cd5d830aaf75"
+    }
+   ]
+  }
+ ]
+}

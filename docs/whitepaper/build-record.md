@@ -913,3 +913,17 @@ Crowds of animated characters got cheaper and more varied, and baked simulations
   lane was hit. It leaked 467 `tail` processes from a wait loop and killed them after checking their folder. It ran
   `npx --no-install` once in a worktree, which fetched nothing. Job 5's commit carries an 845 line diff in
   `packages/gltf-pro/README.md` from normalized line endings.
+
+## Real files: every loader on a file from a real tool
+
+Batch 39 proved its formats on files the tests built. A file built by the same mind as the reader repeats its mistakes, so Scott approved downloading a public file for every loader (2026-11-06).
+
+| # | Job | Status | Commit | Claim |
+| --- | --- | --- | --- | --- |
+| 1 | Manifest of 82 files, opt-in runner, GPU pictures | DONE | this commit | LIM-208 |
+| 2 | Ten bugs the files found | DONE | one `fix` commit each, just before this one | LIM-208 |
+
+- **Bugs:** 10 fixes, in `docs/known-bugs.md` under Fixed 2026-11-06. Two were in Margo's own LAZ decoder, whose test encoder held the same mistakes, so its round trips could never see them: only real files could. Two were in `parse3DM`, whose stand-in lacked what the real runtime has. One test had pinned a wrong value: G-code filament, 9 where the net length is 6.
+- **Proved:** 82 files, 82 passed: 76 read and checked, 6 refused as documented. Every file with more than one point of geometry was drawn on the GPU with no blank picture, 65 pictures, 2 of them through `/render`. LAZ records equal laz-perf byte for byte in formats 3, 6 and 8, and equal their LAS twins in format 3. NURBS curves equal rhino3dm, difference 0, on 3 curves. Each regression test was run against the old source and failed.
+- **Limits:** one or two files a format is a sample, not a survey. Variants with no real file, and every refusal, are in `docs/limits.md`. LASzip 1.x's compressor is refused. The licences are mostly BSD, MIT and Apache files from test folders, treated as explicit permission; one, McNeel's `RhinoLogo.3dm`, has only a sample-file statement. The third-party runtimes stayed in a scratch folder, through the caller-owned hooks, with their source unread.
+- **Gate:** lint, hygiene, verify, the loaders and points tests and `tests/claims-file.test.js`, from one script gated on exit codes. The run itself is opt-in, as it needs the network and a GPU.

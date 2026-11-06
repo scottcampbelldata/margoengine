@@ -28,6 +28,7 @@
     "test": "npm run build && node --experimental-test-module-mocks --test tests/*.test.js",
     "test:browser": "npm run build && node scripts/test-browser.js",
     "test:render:browser": "npm run build && node scripts/test-render-browser.mjs",
+    "test:real-files": "npm run build && node scripts/test-real-files.mjs",
     "fixtures": "node scripts/fetch-fixtures.js",
     "prepack": "npm run build"
   },
