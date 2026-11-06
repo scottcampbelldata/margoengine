@@ -193,6 +193,7 @@ interface DrawResource {
     primitive: PBRPrimitive;
     device: GPUDevice;
     vertex: GPUBuffer;
+    uvs?: GPUBuffer;
     index: GPUBuffer;
     wireframe?: {
         index: GPUBuffer;
@@ -963,6 +964,7 @@ interface PBRPrimitive {
     nodeIndex: number;
     vertices: Float32Array;
     indices: Uint32Array;
+    uvs?: Float32Array;
     definition: GLTFPrimitive;
     material: PBRMaterial;
     weights: Float32Array;
@@ -1024,6 +1026,7 @@ interface PassBindings {
     vertex?: GPUBuffer;
     vertexOffset?: number;
     instances?: GPUBuffer;
+    uvs?: GPUBuffer;
     index?: GPUBuffer;
 }
 
@@ -1046,6 +1049,7 @@ interface PendingBatch {
 interface PreparedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
+    uvs?: Float32Array;
     topology?: 'point-list' | 'line-list';
 }
 
@@ -1115,8 +1119,10 @@ interface TextureTransform {
     offset?: readonly [number, number];
     rotation?: number;
     scale?: readonly [number, number];
-    texCoord?: 0 | 1;
+    texCoord?: UVSet;
 }
+
+type UVSet = 0 | 1 | 2 | 3;
 
 class UniformSlot {
     readonly chunk: Chunk;

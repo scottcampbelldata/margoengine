@@ -1,16 +1,18 @@
 import type { GLTFTextureInfo } from '../../shared/gltf.js';
 import type { MaterialExtension } from './material-extension.js';
 
+/** A glTF UV set a texture may read: TEXCOORD_0 to TEXCOORD_3. */
+export type UVSet = 0 | 1 | 2 | 3;
 /** glTF texture coordinates: scale, then rotation about the origin, then offset. */
 export interface TextureTransform {
   offset?: readonly [number, number];
   rotation?: number;
   scale?: readonly [number, number];
-  texCoord?: 0 | 1;
+  texCoord?: UVSet;
 }
-/** A texture's UV set and, with KHR_texture_transform, its affine rows; throws on invalid values or a third UV set. */
+/** A texture's UV set and, with KHR_texture_transform, its affine rows; throws on invalid values or a fifth UV set. */
 export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'extensions'>): {
-  texCoord: 0 | 1;
+  texCoord: UVSet;
   transform?: Float32Array;
 } {
   if (!info || typeof info !== 'object' || Array.isArray(info))
@@ -23,7 +25,8 @@ export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'ext
       'Invalid KHR_texture_transform; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
     );
   const coord = value?.texCoord !== undefined ? value.texCoord : info.texCoord === undefined ? 0 : info.texCoord;
-  if (coord !== 0 && coord !== 1) throw new RangeError('Texture requires TEXCOORD_0 or TEXCOORD_1');
+  if (coord !== 0 && coord !== 1 && coord !== 2 && coord !== 3)
+    throw new RangeError('Texture requires TEXCOORD_0 to TEXCOORD_3');
   if (value === undefined) return { texCoord: coord };
   const pair = (v: unknown, fallback: number[], label: string): number[] => {
     if (v === undefined) return fallback;

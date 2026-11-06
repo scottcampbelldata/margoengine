@@ -30,9 +30,9 @@ export type { MaterialGraphOutput } from './nodes.js';
 export type * from './node-types.js';
 export { StencilBuffer } from './stencil-buffer.js';
 
-/** A caller-owned GPU texture view for a clearcoat or lobe map: `texCoord` is 0 or 1 (default 0), `scale` scales a normal map (default 1) and `transform` is a KHR_texture_transform. */
+/** A caller-owned GPU texture view for a clearcoat or lobe map: `texCoord` is 0 to 3 (default 0), `scale` scales a normal map (default 1) and `transform` is a KHR_texture_transform. */
 export interface ClearcoatTexture extends MaterialExtensionTexture {
-  texCoord?: 0 | 1;
+  texCoord?: 0 | 1 | 2 | 3;
   scale?: number;
   transform?: TextureTransform;
 }
@@ -58,10 +58,10 @@ function texture(value: ClearcoatTexture): ClearcoatTexture {
     !value ||
     typeof value !== 'object' ||
     !value.view ||
-    (value.texCoord !== undefined && value.texCoord !== 0 && value.texCoord !== 1)
+    (value.texCoord !== undefined && ![0, 1, 2, 3].includes(value.texCoord))
   )
     throw new TypeError(
-      'Invalid clearcoat texture or UV set; pass a texture with a GPUTextureView in view and texCoord 0 or 1.',
+      'Invalid clearcoat texture or UV set; pass a texture with a GPUTextureView in view and texCoord 0 to 3.',
     );
   if (value.sampler !== undefined && !value.sampler)
     throw new TypeError('Invalid clearcoat sampler; pass a GPUSampler or omit it.');
@@ -285,7 +285,9 @@ export class MaterialInstallation implements EnginePlugin {
           if (
             primitives.some(
               (p) =>
-                !p.extension && p.definition.attributes && p.definition.attributes['TEXCOORD_' + coord] === undefined,
+                !p.extension &&
+                ((coord > 1 && !p.uvs) ||
+                  (p.definition.attributes && p.definition.attributes['TEXCOORD_' + coord] === undefined)),
             )
           )
             throw margoError(

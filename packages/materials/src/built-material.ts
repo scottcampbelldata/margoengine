@@ -3326,8 +3326,9 @@ export class Material {
     if (slot !== undefined && f < 0 && g < 0 && i < 0)
       throw new TypeError('Invalid UV transform slot; pass a map name such as map or normalMap, or omit it.');
     const transform: TextureTransform = f === 3 ? { texCoord: 1, ...t } : (t ?? {}),
-      { texCoord } = textureCoordinates({ extensions: { KHR_texture_transform: transform } }),
-      rows = textureTransform(transform, texCoord);
+      { texCoord } = textureCoordinates({ extensions: { KHR_texture_transform: transform } });
+    if (texCoord > 1) throw new RangeError('Material meshes have two UV sets; pass texCoord 0 or 1.');
+    const rows = textureTransform(transform, texCoord);
     if (f >= 0) {
       this.featureValues.splice(4 + f * 8, 8, ...rows);
       return this;

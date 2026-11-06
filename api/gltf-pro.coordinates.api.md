@@ -7,11 +7,13 @@ export interface TextureTransform {
     offset?: readonly [number, number];
     rotation?: number;
     scale?: readonly [number, number];
-    texCoord?: 0 | 1;
+    texCoord?: UVSet;
 }
 
+export type UVSet = 0 | 1 | 2 | 3;
+
 export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'extensions'>): {
-    texCoord: 0 | 1;
+    texCoord: UVSet;
     transform?: Float32Array;
 };
 

@@ -473,7 +473,7 @@ function materialTarget(model: PBRModel, doc: Json, material: number, path: stri
 interface Owned {
   m: PBRMaterial;
   own: TextureTransform;
-  texCoord: 0 | 1;
+  texCoord: number;
 }
 /** Gives each material's map in `slot` its own texture transform, once per binding. */
 function own(mats: PBRMaterial[], slot: number): Owned[] {

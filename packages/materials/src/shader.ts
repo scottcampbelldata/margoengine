@@ -5,7 +5,7 @@ import { ggxD, smithG } from '../../shared/light-terms.js';
 /** Resource index in the extension slot, and the existing vertex UV set. */
 export interface ClearcoatTextureSlot {
   index: number;
-  texCoord: 0 | 1;
+  texCoord: 0 | 1 | 2 | 3;
   sampler?: boolean;
   transformIndex?: number;
 }

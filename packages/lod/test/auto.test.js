@@ -335,16 +335,37 @@ test('simplifyAttributes keeps vertices apart that deform apart, as a closed mou
 });
 
 /** Fox.glb, a real skinned file, as a model of `engine`. */
-const realFox = (engine) => {
+const realFox = (engine, edit = () => {}) => {
   const chunks = glbChunks(new Uint8Array(readFileSync(new URL('../../../examples/assets/khronos/Fox/Fox.glb', import.meta.url)))),
     doc = JSON.parse(new TextDecoder().decode(chunks.find((c) => c.type === GLB_JSON).data)),
     bin = chunks.find((c) => c.type === GLB_BIN).data;
   doc.images = undefined;
   doc.textures = undefined;
   for (const material of doc.materials ?? []) material.pbrMetallicRoughness = {};
-  const model = new PBRModel(engine, new GLTFAsset(doc, [bin]));
+  const images = edit(doc) ?? [],
+    model = new PBRModel(engine, new GLTFAsset(doc, [bin]), images);
   engine.use(model);
   return model;
+};
+/** Puts Fox's base colour on a third UV set, a copy of its first. */
+const onThirdSet = (doc) => {
+  doc.textures = [{ source: 0 }];
+  doc.images = [{}];
+  doc.materials[0].pbrMetallicRoughness = { baseColorTexture: { index: 0, texCoord: 2 } };
+  const { attributes } = doc.meshes[0].primitives[0];
+  attributes.TEXCOORD_1 = attributes.TEXCOORD_2 = attributes.TEXCOORD_0;
+  return [{ width: 1, height: 1, close() {} }];
+};
+/** The same without its skin and clips: a still model. */
+const stillOnThirdSet = (doc) => {
+  const images = onThirdSet(doc),
+    { attributes } = doc.meshes[0].primitives[0];
+  delete attributes.JOINTS_0;
+  delete attributes.WEIGHTS_0;
+  delete doc.skins;
+  delete doc.animations;
+  for (const node of doc.nodes) delete node.skin;
+  return images;
 };
 
 test('a flat-shaded mesh simplifies, a box stays a box, and each kept triangle takes its own normal', async () => {
@@ -490,6 +511,43 @@ test('autoLOD levels a loaded model: its nodes, materials and transforms, points
     assert.equal(near.root.visible, false);
     model.dispose();
     assert.equal(near.disposed, true, 'levels go with the model');
+  } finally {
+    engine.dispose();
+  }
+});
+
+// Later UV sets ride in a buffer of their own, so whatever keeps some vertices has to keep the same rows of it.
+test('a level keeps TEXCOORD_2 on the vertices it kept, skinned or still, and a far mesh on those it merged', async () => {
+  const engine = await headless();
+  try {
+    engine.renderer.gpu.queue.copyExternalImageToTexture = () => {}; // the stand-in image holds no pixels
+    const system = LODSystem.attach(engine),
+      rows = (p) => p.uvs.length / 4,
+      check = (source, level) => {
+        assert.equal(rows(level), level.vertices.length / 20, 'a row for each vertex');
+        for (let i = 0; i < rows(level); i++) {
+          // The third set is a copy of the first, so each row of a level has to equal its own vertex's first set.
+          assert.equal(level.uvs[i * 4], level.vertices[i * 20 + 12], `u of row ${i}`);
+          assert.equal(level.uvs[i * 4 + 1], level.vertices[i * 20 + 13], `v of row ${i}`);
+        }
+      },
+      fox = realFox(engine, onThirdSet),
+      rigged = await autoLOD(system, fox, { ratios: [0.5], screens: [0.5] }),
+      level = rigged.levels[1].object.primitives[0];
+    assert.notEqual(level.definition.attributes.TEXCOORD_2, undefined);
+    assert.ok(level.vertices.length < fox.primitives[0].vertices.length);
+    check(fox.primitives[0], level);
+    const still = realFox(engine, stillOnThirdSet),
+      plain = await autoLOD(system, still, { ratios: [0.5], screens: [0.5] }),
+      kept = plain.levels[1].object.primitives[0];
+    assert.ok(kept.vertices.length < still.primitives[0].vertices.length);
+    check(still.primitives[0], kept);
+    engine.store.tick(false);
+    const used = [],
+      use = engine.use.bind(engine);
+    engine.use = (plugin) => (used.push(plugin), use(plugin));
+    await hierarchicalLOD(system, [realFox(engine, stillOnThirdSet)], { cell: 1000 });
+    check(still.primitives[0], used.at(-1).primitives[0]);
   } finally {
     engine.dispose();
   }

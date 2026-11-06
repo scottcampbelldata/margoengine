@@ -151,7 +151,144 @@ const unit = (x, y, z) => {
   return [x / length, y / length, z / length];
 };
 
+/** GLB bytes of a glTF object and its binary chunk. */
+function glb(json, bin) {
+  const pad = (bytes, fill) => {
+      const out = Buffer.alloc(Math.ceil(bytes.length / 4) * 4, fill);
+      out.set(bytes);
+      return out;
+    },
+    text = pad(Buffer.from(JSON.stringify(json)), 0x20),
+    data = pad(bin, 0),
+    head = Buffer.alloc(12),
+    chunk = (bytes, type) => {
+      const h = Buffer.alloc(8);
+      h.writeUInt32LE(bytes.length, 0);
+      h.write(type, 4, 'latin1');
+      return Buffer.concat([h, bytes]);
+    };
+  head.write('glTF', 0, 'latin1');
+  head.writeUInt32LE(2, 4);
+  head.writeUInt32LE(12 + 8 + text.length + 8 + data.length, 8);
+  return Buffer.concat([head, chunk(text, 'JSON'), chunk(data, 'BIN\0')]);
+}
+/** The canvas pixels of GLB `bytes` from straight ahead, 4 units back. */
+async function drawGLB(bytes, instanced = false) {
+  await open();
+  await page.evaluate(
+    async ({ base64, instanced }) => {
+      const { parseGLTFAsync } = await import('/packages/gltf-pro/dist/index.js'),
+        { instancing } = await import('/packages/gltf-pro/dist/instancing.js'),
+        { engine } = window.check,
+        data = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)),
+        model = await parseGLTFAsync(engine, data, instanced ? { decoders: { instancing } } : {});
+      if (instanced && !model.primitives[0].instances) throw new Error('the node did not instance');
+      engine.camera.position = [0, 0, 4];
+      engine.camera.target = [0, 0, 0];
+    },
+    { base64: bytes.toString('base64'), instanced },
+  );
+  const image = await pixels();
+  await close();
+  return image;
+}
+/** The real file's JSON and binary chunk. */
+function fourUV() {
+  const bytes = readFileSync('packages/gltf-pro/tests/fixtures/uv/FourUV.glb'),
+    length = bytes.readUInt32LE(12);
+  return { json: JSON.parse(bytes.subarray(20, 20 + length)), bin: bytes.subarray(28 + length) };
+}
+/** The same file with TEXCOORD_2 and 3 in the first two sets, and its maps on them: the path every engine build has run. */
+function firstTwoSets({ json, bin }) {
+  const edited = structuredClone(json),
+    p = edited.meshes[0].primitives[0],
+    m = edited.materials[0];
+  p.attributes = { ...p.attributes, TEXCOORD_0: p.attributes.TEXCOORD_2, TEXCOORD_1: p.attributes.TEXCOORD_3 };
+  delete p.attributes.TEXCOORD_2;
+  delete p.attributes.TEXCOORD_3;
+  m.pbrMetallicRoughness.baseColorTexture.texCoord = 0;
+  m.emissiveTexture.texCoord = 1;
+  return { json: edited, bin };
+}
+
 const checks = {
+  // The parse worker and the progressive stream each carry the second vertex buffer's array across a worker.
+  async 'uv: the worker and progressive loaders keep later sets'() {
+    const url = '/packages/gltf-pro/tests/fixtures/uv/FourUV.glb',
+      plain = await drawGLB(readFileSync('packages/gltf-pro/tests/fixtures/uv/FourUV.glb')),
+      through = async (load) => {
+        await open();
+        await page.evaluate(
+          async ({ load, url }) => {
+            const { engine } = window.check;
+            if (load === 'worker') {
+              const { loadGLTFInWorker } = await import('/packages/gltf-pro/dist/worker.js');
+              await loadGLTFInWorker(engine, url);
+            } else {
+              const { loadGLTFProgressive } = await import('/packages/gltf-pro/dist/progressive.js');
+              await loadGLTFProgressive(engine, url).complete;
+            }
+            engine.camera.position = [0, 0, 4];
+            engine.camera.target = [0, 0, 0];
+          },
+          { load, url },
+        );
+        const image = await pixels();
+        await close();
+        return image;
+      };
+    assert.equal(difference(await through('worker'), plain), 0, 'parse worker');
+    assert.equal(difference(await through('progressive'), plain), 0, 'progressive stream');
+  },
+  // Blender's quad: base colour on its third UV map (mirrored left to right), emission on its fourth (mirrored top to
+  // bottom). Set 0 and 1 are plain, so a shader that fell back to them shows red on the left and glow on top.
+  async 'uv: Blender file with four UV sets draws each map on its own set'() {
+    const file = fourUV();
+    assert.equal(file.json.materials[0].pbrMetallicRoughness.baseColorTexture.texCoord, 2);
+    assert.equal(file.json.materials[0].emissiveTexture.texCoord, 3);
+    const shot = await drawGLB(readFileSync('packages/gltf-pro/tests/fixtures/uv/FourUV.glb')),
+      left = 100,
+      right = 156,
+      top = 100,
+      bottom = 156,
+      topLeft = shot.at(left, top),
+      topRight = shot.at(right, top),
+      bottomLeft = shot.at(left, bottom);
+    assert.ok(topLeft[2] > topLeft[0] + 40, `blue on the left: ${topLeft}`);
+    assert.ok(topRight[0] > topRight[2] + 40, `red on the right: ${topRight}`);
+    assert.ok(bottomLeft[1] > topLeft[1] + 80, `glow along the bottom: ${bottomLeft} against ${topLeft}`);
+    // The same maps on sets 0 and 1 give the same picture, bit for bit: nothing but the set's place changed.
+    const moved = firstTwoSets(file),
+      same = await drawGLB(glb(moved.json, moved.bin));
+    assert.equal(difference(shot, same), 0);
+  },
+  // The second vertex buffer sits past the instance buffer, and each instance's copy still reads its own later sets.
+  async 'uv: later sets under EXT_mesh_gpu_instancing and the physical shader'() {
+    const file = fourUV(),
+      physical = (doc) => {
+        const m = doc.json.materials[0];
+        m.extensions = { KHR_materials_clearcoat: { clearcoatFactor: 0.5 } };
+        doc.json.extensionsUsed = ['KHR_materials_clearcoat'];
+        return doc;
+      },
+      instanced = ({ json, bin }) => {
+        const edited = structuredClone(json),
+          row = Buffer.from(new Float32Array([0, 0, 0]).buffer);
+        edited.buffers[0].byteLength = Math.ceil(bin.length / 4) * 4 + row.length;
+        edited.bufferViews.push({ buffer: 0, byteOffset: Math.ceil(bin.length / 4) * 4, byteLength: row.length });
+        edited.accessors.push({ bufferView: edited.bufferViews.length - 1, componentType: 5126, count: 1, type: 'VEC3' });
+        edited.nodes[0].extensions = {
+          EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: edited.accessors.length - 1 } },
+        };
+        edited.extensionsUsed = [...(edited.extensionsUsed ?? []), 'EXT_mesh_gpu_instancing'];
+        return { json: edited, bin: Buffer.concat([Buffer.alloc(Math.ceil(bin.length / 4) * 4, 0).fill(bin, 0, bin.length), row]) };
+      };
+    const draw = (doc, instances) => drawGLB(glb(doc.json, doc.bin), instances);
+    assert.equal(difference(await draw(instanced(file), true), await draw(file)), 0, 'one instance at the origin');
+    const lobes = physical({ json: structuredClone(file.json), bin: file.bin }),
+      moved = firstTwoSets(physical({ json: structuredClone(file.json), bin: file.bin }));
+    assert.equal(difference(await draw(lobes), await draw(moved)), 0, 'the physical shader reads later sets alike');
+  },
   // The file's own triangle under its own height map, against the same file with the extension removed: its 2 x 2 map is
   // not flat, so the normal, and the light, must change wherever the map's gradient is not zero.
   async 'bump: the luma.gl EXT_materials_bump file shades through the default loader'() {

@@ -123,7 +123,7 @@ test('clearcoat validates factor ranges and supplied texture interfaces before d
     for (const value of [NaN, Infinity, -Infinity, -0.01, 1.01, '1', null])
       assert.throws(() => clearcoat({ [key]: value }), /clearcoat|factor|roughness/i, `${key}=${value}`);
   for (const key of ['clearcoatTexture', 'clearcoatRoughnessTexture', 'clearcoatNormalTexture']) {
-    for (const value of [{}, { view: {}, sampler: {}, texCoord: 2 }, { view: {}, sampler: {}, texCoord: -1 }])
+    for (const value of [{}, { view: {}, sampler: {}, texCoord: 4 }, { view: {}, sampler: {}, texCoord: -1 }])
       assert.throws(() => clearcoat({ [key]: value }), /texture|sampler|UV|coordinate|texCoord/i);
   }
   const loaded = clearcoat({ clearcoatTexture: { view: {} } });
@@ -396,6 +396,19 @@ test('a caller-owned clearcoat map validates the UV set selected by its transfor
     assert.equal(s.model.primitives[0].material.extension, undefined);
     assert.equal(s.counts.textures, before.textures);
     assert.equal(s.counts.buffers, before.buffers);
+  } finally {
+    s.engine.dispose();
+  }
+});
+
+// A materials mesh has no attribute list and two UV sets: without this refusal set 2 would quietly draw on set 1.
+test('a caller-owned map on a later set needs the later UV buffer, on any primitive', async () => {
+  const s = await scene();
+  try {
+    delete s.model.primitives[0].definition.attributes;
+    s.model.primitives[0].material.clearcoat = { factor: 1, clearcoatTexture: { view: {}, texCoord: 2 } };
+    assert.throws(() => install(s.model), /TEXCOORD_2/);
+    assert.equal(s.model.primitives[0].material.extension, undefined);
   } finally {
     s.engine.dispose();
   }

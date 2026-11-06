@@ -62,8 +62,9 @@ function determinant(m: ArrayLike<number>): number {
 export function eligible(p: PBRPrimitive): boolean {
   const m = p.material;
   if (p.topology || p.instances || p.deformed) return false;
-  // A height in the node's space reads the node's scale in the shader, and a batch has one node.
-  if (m.extended?.bump) return false;
+  // A height in the node's space reads the node's scale in the shader, and a batch has one node. A later UV set sits in a
+  // second vertex buffer, which a batch does not bake.
+  if (m.extended?.bump || p.uvs) return false;
   if (primitiveAfterOpaque(p)) return false;
   if (p.definition.targets?.length || p.definition.attributes?.JOINTS_0 !== undefined) return false;
   if (m.settings[0] === 2 || (m.tint && !m.extension?.replacesPhysical)) return false;

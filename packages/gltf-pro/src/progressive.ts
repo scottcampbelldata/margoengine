@@ -291,7 +291,7 @@ export function loadGLTFProgressive(
       }
     }
   };
-  const geometry = (key: number, vertices: Float32Array, indices: Uint32Array) => {
+  const geometry = (key: number, vertices: Float32Array, indices: Uint32Array, uvs?: Float32Array) => {
     const uploads = [
       {
         data: vertices,
@@ -300,8 +300,9 @@ export function loadGLTFProgressive(
         buffer: undefined as GPUBuffer | undefined,
       },
       { data: indices, usage: GPUBufferUsage.INDEX, at: 0, buffer: undefined as GPUBuffer | undefined },
+      ...(uvs ? [{ data: uvs, usage: GPUBufferUsage.VERTEX, at: 0, buffer: undefined as GPUBuffer | undefined }] : []),
     ];
-    geometryBytes += vertices.byteLength + indices.byteLength;
+    geometryBytes += vertices.byteLength + indices.byteLength + (uvs?.byteLength ?? 0);
     if (geometryBytes > limit * 4) throw overBudget('Decoded glTF geometry exceeds byte budget', limit * 4);
     // Large buffers upload in 1 MB writes spread over frames; the primitive switches once both are complete.
     return () => {
@@ -334,6 +335,7 @@ export function loadGLTFProgressive(
         old.add(p.indices);
         p.vertices = vertices;
         p.indices = indices;
+        if (uvs) p.uvs = uvs;
       }
       rebuild(byKey[key]);
       // Through the model, which counts buffers other models may share (PBRModel dropBuffer).
@@ -506,7 +508,7 @@ export function loadGLTFProgressive(
       else if (m.type === 'geometry') {
         if (m.error) throw revive(m.error);
         received.add(m.key);
-        jobs.push(geometry(m.key, m.vertices!, m.indices!));
+        jobs.push(geometry(m.key, m.vertices!, m.indices!, m.uvs));
       } else if (m.type === 'image') {
         if (!Number.isInteger(m.index) || m.index < 0 || m.index >= images.length)
           throw new RangeError(

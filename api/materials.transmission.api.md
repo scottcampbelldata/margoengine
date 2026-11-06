@@ -62,7 +62,7 @@ export function validateTransmission(options: TransmissionOptions): {
 // Not exported from this entry, but used by the exports above:
 
 interface ClearcoatTexture extends MaterialExtensionTexture {
-    texCoord?: 0 | 1;
+    texCoord?: 0 | 1 | 2 | 3;
     scale?: number;
     transform?: TextureTransform;
 }

@@ -41,7 +41,7 @@ import {
   type RowsState,
 } from './draw-batch.js';
 import { rowsPerBinding, rowsShader } from './instanced-shader.js';
-import { vertexInputs } from './vertex-inputs.js';
+import { laterUVLayout, laterUVShader, laterUVSlot, vertexInputs } from './vertex-inputs.js';
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
@@ -716,11 +716,12 @@ interface PassBindings {
   vertex?: GPUBuffer;
   vertexOffset?: number;
   instances?: GPUBuffer;
+  uvs?: GPUBuffer;
   index?: GPUBuffer;
 }
 function resetBindings(bound: PassBindings, pass: GPURenderPassEncoder | undefined): void {
   bound.pass = pass;
-  bound.pipeline = bound.vertex = bound.instances = bound.index = undefined;
+  bound.pipeline = bound.vertex = bound.instances = bound.uvs = bound.index = undefined;
   bound.groups.fill(undefined);
 }
 function setPipeline(bound: PassBindings, pipeline: GPURenderPipeline): void {
@@ -728,6 +729,10 @@ function setPipeline(bound: PassBindings, pipeline: GPURenderPipeline): void {
 }
 function setGroup(bound: PassBindings, index: number, group: GPUBindGroup): void {
   if (bound.groups[index] !== group) bound.pass!.setBindGroup(index, (bound.groups[index] = group));
+}
+/** Binds a draw's third and fourth UV sets, for a pipeline that reads them. */
+function setUVs(bound: PassBindings, uvs: GPUBuffer | undefined): void {
+  if (uvs && bound.uvs !== uvs) bound.pass!.setVertexBuffer(laterUVSlot, (bound.uvs = uvs));
 }
 function setBuffers(
   bound: PassBindings,
@@ -1000,6 +1005,8 @@ export interface PBRPrimitive {
   nodeIndex: number;
   vertices: Float32Array;
   indices: Uint32Array;
+  /** TEXCOORD_2 and 3, four floats a vertex, when a material of the primitive reads either: a second vertex buffer. */
+  uvs?: Float32Array;
   definition: GLTFPrimitive;
   material: PBRMaterial;
   weights: Float32Array;
@@ -1035,10 +1042,17 @@ export interface PBRPrimitive {
   /** Set for glTF POINTS (`point-list`) and LINES, LINE_LOOP, LINE_STRIP (`line-list`, as index pairs); absent for triangles. */
   topology?: 'point-list' | 'line-list';
 }
+/** Refuses a later UV array that does not have four floats for each vertex. */
+function checkLaterUVs({ vertices, uvs }: PreparedGeometry): void {
+  if (!(uvs instanceof Float32Array) || uvs.length !== vertices.length / 5)
+    throw new RangeError('Prepared uvs need four floats a vertex; pass TEXCOORD_2 then TEXCOORD_3 for each vertex');
+}
 /** Packed geometry: 20 floats per vertex and uint32 indices; `topology` as on PBRPrimitive (absent: a triangle list). */
 export interface PreparedGeometry {
   vertices: Float32Array;
   indices: Uint32Array;
+  /** TEXCOORD_2 and 3, four floats a vertex, when a material of the primitive reads either. */
+  uvs?: Float32Array;
   topology?: 'point-list' | 'line-list';
 }
 /**
@@ -1088,14 +1102,17 @@ function preparedPrimitive(
   if (!m) throw new TypeError('Missing prepared PBR material; this is a loader bug, report it with the file');
   for (const map of m.maps)
     if (map) {
-      if (integer(map.texCoord ?? 0, 'texture coordinate') > 1) throw new RangeError('Invalid prepared PBR UV set');
+      if (integer(map.texCoord ?? 0, 'texture coordinate') > (data.uvs ? 3 : 1))
+        throw new RangeError('Invalid prepared PBR UV set');
       entry(asset.doc.textures, map.index, 'texture');
     }
+  if (data.uvs) checkLaterUVs(data);
   return {
     node,
     nodeIndex,
     vertices,
     indices,
+    ...(data.uvs ? { uvs: data.uvs } : {}),
     definition: p,
     material: m,
     weights: new Float32Array(0),
@@ -1106,6 +1123,7 @@ interface DrawResource {
   primitive: PBRPrimitive;
   device: GPUDevice;
   vertex: GPUBuffer;
+  uvs?: GPUBuffer;
   index: GPUBuffer;
   wireframe?: { index: GPUBuffer; count: number };
   /** This draw's uniform block: a window of the device's uniform arena (`uniform-arena.ts`). */
@@ -1254,8 +1272,10 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   value.alphaTexture = mask ? mask.view : r.views[0];
   value.alphaSampler = mask ? mask.sampler : r.samplers[0];
   value.alpha = m.base[3];
-  value.cutoff = m.settings[0] === 1 ? m.settings[1] : 0;
-  value.texCoord = mask ? mask.texCoord : m.maps[0] ? textureCoordinates(m.maps[0]).texCoord : 0;
+  // A depth pass reads the 80-byte vertex alone, so a base map on a later UV set casts uncut (docs/limits.md).
+  const set = mask ? mask.texCoord : m.maps[0] ? textureCoordinates(m.maps[0]).texCoord : 0;
+  value.cutoff = m.settings[0] === 1 && set < 2 ? m.settings[1] : 0;
+  value.texCoord = set < 2 ? (set as 0 | 1) : 0;
   if (mask) value.alphaTransform = mask.transform;
   else if (m.maps[0]?.extensions?.KHR_texture_transform) value.alphaTransform = coordinates?.transform;
   else delete value.alphaTransform;
@@ -1858,6 +1878,7 @@ function primitive(
     ),
   };
   if (g.topology) made.topology = g.topology;
+  if (g.uvs) made.uvs = g.uvs;
   return made;
 }
 // Material `m` as primitive `p` draws it: every map must name a texture and a UV set the primitive has. glTF 2.0 3.9.2:
@@ -1871,10 +1892,10 @@ function fit(asset: GLTFAsset, p: GLTFPrimitive, m: PBRMaterial, pointsOrLines: 
   for (const map of m.maps)
     if (map) {
       const set = integer(map.texCoord ?? 0, 'texture coordinate');
-      if (set > 1 || a[set === 0 ? 'TEXCOORD_0' : 'TEXCOORD_1'] === undefined)
+      if (set > 3 || a['TEXCOORD_' + set] === undefined)
         throw margoError(
           'failed',
-          'Material requires available TEXCOORD_0 or TEXCOORD_1; add the attribute or remove the texture',
+          `Material requires available TEXCOORD_${set}, and at most TEXCOORD_3; add the attribute or remove the texture`,
         );
       entry(asset.doc.textures, map.index, 'texture');
     }
@@ -2325,6 +2346,7 @@ export class PBRModel implements EnginePlugin {
       const from = this.bufferSources?.get(p) ?? p;
       r.vertex = upload(from.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
       r.index = upload(from.indices, GPUBufferUsage.INDEX);
+      if (from.uvs) r.uvs = upload(from.uvs, GPUBufferUsage.VERTEX);
       p.buffers = { vertex: r.vertex, index: r.index };
       this.bindMaterial(r, device, mipSampler);
     }
@@ -2417,6 +2439,10 @@ export class PBRModel implements EnginePlugin {
         g.indices.length !== p.indices.length
       )
         throw new RangeError('A ranged PBR geometry write keeps the vertex and index counts; omit the range to resize');
+      if (g.uvs) checkLaterUVs(g);
+      if (g.uvs && !p.uvs) throw new TypeError('This primitive has no TEXCOORD_2 or 3 buffer; remove uvs from the write');
+      if (p.uvs && !g.uvs && g.vertices.length !== p.vertices.length)
+        throw new RangeError('A primitive with TEXCOORD_2 or 3 keeps its vertex count; pass uvs with the write to resize it');
       if (g.topology) throw new TypeError('PBR geometry writes take triangle lists; remove topology');
       if (g.vertices.byteLength > max || g.indices.byteLength > max)
         throw new RangeError('PBR buffer exceeds device limit; split the geometry into smaller meshes');
@@ -2443,7 +2469,7 @@ export class PBRModel implements EnginePlugin {
       dropped = new Set<GPUBuffer>();
     // Points and lines may share a triangle primitive's buffers; they keep their contents.
     for (const r of this.resources)
-      if (!list.includes(r.primitive)) for (const b of [r.vertex, r.index]) claimed.add(b);
+      if (!list.includes(r.primitive)) for (const b of [r.vertex, r.index, r.uvs]) if (b) claimed.add(b);
     // Each new array gets one buffer: its own old one when it fits and no other array took it, else a larger one.
     const device = this.resources[0]?.device,
       midFrame = !!device && recording(device);
@@ -2490,6 +2516,7 @@ export class PBRModel implements EnginePlugin {
         range && [range.start * 20, range.count * 20],
       );
       r.index = place(r, r.index, g.indices, GPUBufferUsage.INDEX, range && [0, 0]);
+      if (g.uvs) r.uvs = place(r, r.uvs!, g.uvs, GPUBufferUsage.VERTEX);
       if (!range && r.wireframe) {
         dropped.add(r.wireframe.index);
         r.wireframe = undefined;
@@ -2498,11 +2525,15 @@ export class PBRModel implements EnginePlugin {
       r.edited = true;
     }
     for (const buffer of dropped)
-      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer)) dropBuffer(device!, buffer);
+      if (!this.resources.some((r) => r.vertex === buffer || r.index === buffer || r.uvs === buffer))
+        dropBuffer(device!, buffer);
     for (let i = 0; i < list.length; i++) {
-      for (const data of [list[i].vertices, list[i].indices]) if (!written.has(data)) this.gpuCache.delete(data);
+      const { uvs } = geometry[i];
+      for (const data of [list[i].vertices, list[i].indices, ...(uvs ? [list[i].uvs!] : [])])
+        if (!written.has(data)) this.gpuCache.delete(data);
       list[i].vertices = geometry[i].vertices;
       list[i].indices = geometry[i].indices;
+      if (uvs) list[i].uvs = uvs;
     }
     for (const [data, buffer] of written) this.gpuCache.set(data, buffer);
   }
@@ -3087,7 +3118,9 @@ export class PBRModel implements EnginePlugin {
       .map((r) => {
         const m = r.primitive.material,
           mask = m.pickMask,
-          cutoff = m.settings[0] === 1 ? m.settings[1] : m.settings[0] === 2 ? 0.001 : 0;
+          set = mask ? mask.texCoord : m.maps[0] ? textureCoordinates(m.maps[0]).texCoord : 0,
+          // As for shadow casters, a base map on a later UV set does not cut.
+          cutoff = set > 1 ? 0 : m.settings[0] === 1 ? m.settings[1] : m.settings[0] === 2 ? 0.001 : 0;
         return {
           primitive: r.primitive,
           node: r.primitive.node,
@@ -3102,7 +3135,7 @@ export class PBRModel implements EnginePlugin {
           cutoff,
           side: sideOf(m),
           doubleSided: sideOf(m) === 'double',
-          texCoord: (mask ? mask.texCoord : m.maps[0] ? textureCoordinates(m.maps[0]).texCoord : 0) as 0 | 1,
+          texCoord: (set > 1 ? 0 : set) as 0 | 1,
           ...(mask
             ? { alphaTransform: mask.transform }
             : m.maps[0]?.extensions?.KHR_texture_transform
@@ -3556,6 +3589,7 @@ export class PBRModel implements EnginePlugin {
             }
           }
           setBuffers(bound, vertex, instances, index, vertexOffset);
+          setUVs(bound, r.uvs);
           applyStencilReference(target, state);
           if (redirect) target.drawIndexedIndirect(redirect.args, 0);
           else if (inst) target.drawIndexed(count, inst.count);
@@ -3571,6 +3605,7 @@ export class PBRModel implements EnginePlugin {
           bound.groups[2] = bound.groups[3] = undefined;
         }
         setBuffers(bound, vertex, instances, index, vertexOffset);
+        setUVs(bound, r.uvs);
         // A preceding material may have changed the reference on this shared pass.
         applyStencilReference(target, state);
         if (redirect) target.drawIndexedIndirect(redirect.args, 0);
@@ -4179,6 +4214,7 @@ export class PBRModel implements EnginePlugin {
     setGroup(bound, 1, groups[1]);
     if (d.effect) setGroup(bound, 2, d.effect.group);
     setBuffers(bound, r.vertex, undefined, wireframe?.index ?? r.index);
+    setUVs(bound, r.uvs);
     applyStencilReference(pass, d.state);
     if (p.culled && !wireframe) pass.drawIndexedIndirect(p.culled.args, p.culled.offset);
     else pass.drawIndexed(wireframe?.count ?? p.indices.length);
@@ -4243,7 +4279,9 @@ export class PBRModel implements EnginePlugin {
     }
     const compact =
       !!(p.extension ?? m.extension)?.replacesPhysical || (!m.extendedFrame && !m.physical && !m.ext?.[0]);
-    const floatCount = compact ? 100 : m.extended ? 284 : 220;
+    const floatCount = compact ? 100 : m.extended ? 284 : 220,
+      // A third or fourth UV set, which a material of the primitive reads; loading progressively, a placeholder has none.
+      laterUV = !!p.uvs;
     if (r.values.length !== floatCount || r.replacesTextures !== !!m.shading?.replacesTextures)
       this.bindMaterial(r, c.device, c.device.createSampler({ minFilter: 'linear', magFilter: 'linear' }));
     const v = r.values;
@@ -4283,7 +4321,7 @@ export class PBRModel implements EnginePlugin {
       tangent =
         !compact &&
         !!(m.maps[2]
-          ? textureCoordinates(m.maps[2]).texCoord === 1 || textureCoordinates(m.maps[2]).transform
+          ? textureCoordinates(m.maps[2]).texCoord !== 0 || textureCoordinates(m.maps[2]).transform
           : m.extendedFrame &&
             (v[123] > 0.5 ||
               v[120] !== 1 ||
@@ -4301,6 +4339,7 @@ export class PBRModel implements EnginePlugin {
         !!m.physical && m.maps.length > 5,
         !!shading?.texturedTint,
         !!shading?.replacesTextures,
+        laterUV,
       ),
       revision = shading?.shaderRevision,
       // A compact record with no hook has no revision: `plainShape` names all that composes its shader instead. Instances
@@ -4382,7 +4421,7 @@ export class PBRModel implements EnginePlugin {
     if (compact) code = compactTests(code);
     if (compact) {
       r.coordinates = coordinateExtension(m.maps, source, r.coordinates);
-      code = coordinateShader(code, r.coordinates, !!m.maps[2] && v[94] === 1);
+      code = coordinateShader(code, r.coordinates, !!m.maps[2] && v[94] >= 1);
     } else if (tangent) code = code.replace('if(abs(i.tangent.w)<0.5)', 'if(true)');
     const extension = compact ? (r.coordinates?.extension ?? source) : source;
     if (extension) {
@@ -4532,6 +4571,7 @@ export class PBRModel implements EnginePlugin {
       stateKey +
       (inst ? ':i' + face + ':' + objectId(inst.layout) : '') +
       (topology ? ':' + topology : '') +
+      (laterUV ? ':uv' : '') +
       (through || capture ? ':o' + objectId((through ? oit! : hook!).targets) : '') +
       (tinted && (shading?.texturedTint || surfaceTint(m)) ? ':t' : '');
     let pipeline = draws.pipelines.get(key);
@@ -4540,7 +4580,9 @@ export class PBRModel implements EnginePlugin {
     if (!pipeline && build) {
       checkDrawLimits(c.device, code, m, transmission, this.lighting);
       const inputs = vertexInputs(code),
-        module = c.device.createShaderModule({ code: markedClipDistances(inputs.code) }),
+        module = c.device.createShaderModule({
+          code: markedClipDistances(laterUV ? laterUVShader(inputs.code) : inputs.code),
+        }),
         format = mode === 'beauty' ? c.format : 'rgba16float';
       const descriptor: GPURenderPipelineDescriptor = {
         layout: 'auto',
@@ -4556,7 +4598,8 @@ export class PBRModel implements EnginePlugin {
                 format: 'float32x4' as const,
               })),
             },
-            ...(inst ? [inst.layout] : []),
+            ...(inst ? [inst.layout] : laterUV ? [null] : []),
+            ...(laterUV ? [laterUVLayout] : []),
           ],
         },
         fragment: {
@@ -5024,7 +5067,7 @@ export class PBRModel implements EnginePlugin {
           }
       r.rowStates = undefined;
       for (const b of [r.wireframe?.index, r.uniform, r.extension?.uniform, r.volume]) if (b) buffers.set(b, r.device);
-      for (const b of [r.vertex, r.index]) if (b) counted.set(b, r.device);
+      for (const b of [r.vertex, r.index, r.uvs]) if (b) counted.set(b, r.device);
     }
     for (const [b, owner] of buffers) cleanup.run(() => retire(owner, b));
     // Each of this model's vertex and index buffers once, however many of its primitives draw from it.

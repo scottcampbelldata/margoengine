@@ -46,6 +46,30 @@ function dropOutput(code: string, field: string): string {
   return (head + written + code.slice(end)).replace(field === 'uv' ? coordinates : '', '');
 }
 
+/** Vertex buffer slot of the third and fourth UV sets, past the instance buffer's: unused slots between stay empty. */
+export const laterUVSlot = 2;
+/** Their layout: one vec4 a vertex, TEXCOORD_2 then TEXCOORD_3. */
+export const laterUVLayout: GPUVertexBufferLayout = {
+  arrayStride: 16,
+  attributes: [{ shaderLocation: 11, offset: 0, format: 'float32x4' }],
+};
+/**
+ * `code`, as trimmed by `vertexInputs`, reading TEXCOORD_2 and 3 as well: a second vertex buffer feeds `Out.uvs`, and every
+ * choice between the two sets of `Out.uv` becomes a choice among four. Only a draw whose material reads a later set
+ * compiles this. Output location 15 is free of every patch that adds outputs.
+ */
+export function laterUVShader(code: string): string {
+  if (!/\bo\.uv=/.test(code)) return code;
+  return (
+    code
+      .replaceAll(/select\(i\.uv\.xy,i\.uv\.zw,([^;)]*?)>0\.5\)/g, 'margoUVSet(i,$1)')
+      .replace(/struct Input \{([^}]*?)\s*\}/, 'struct Input {$1, @location(11) uvs:vec4f}')
+      .replace(/(struct Out \{[^}]*?)\n\}/, '$1, @location(15) uvs:vec4f\n}')
+      .replace(/\bo\.uv=([^;]*);/, (write, value: string) => `${write} o.uvs=${value.replace(/\bi\.uv\b/g, 'i.uvs')};`) +
+    '\nfn margoUVSet(i:Out,k:f32)->vec2f {return select(select(i.uv.xy,i.uv.zw,k>0.5),select(i.uvs.xy,i.uvs.zw,k>2.5),k>1.5);}\n'
+  );
+}
+
 /** Trims finished shader `source` to the vertex inputs it reads. Called once per pipeline built. */
 export function vertexInputs(source: string): VertexInputs {
   const unchanged = { code: source, locations: ALL };

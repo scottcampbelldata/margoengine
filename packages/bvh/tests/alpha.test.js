@@ -130,6 +130,12 @@ test('a MASK material with no map is its factor, everywhere', async () => {
   assert.ok(alpha(1) >= 0.5);
 });
 
+test('a mask on a later UV set is listed under the set it reads', async () => {
+  const later = material({ maps: [{ index: 0, texCoord: 3 }] }),
+    source = await modelAlphaMasks(loaded([later], { textures: [{ source: 0 }] }, [halves()]), { pixels: raw });
+  assert.match(source.skipped[0].reason, /TEXCOORD_3/);
+});
+
 test('what cannot be read picks solid and is listed with why', async () => {
   const second = material({ maps: [{ index: 0, texCoord: 1 }] }),
     moved = material({ maps: [{ index: 0, extensions: { KHR_texture_transform: { texCoord: 1 } } }] }),

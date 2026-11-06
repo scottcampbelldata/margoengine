@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8994587,
+  "total": 8997589,
   "history": [
     {
       "date": "2026-10-24",
@@ -2738,6 +2738,12 @@
       "commit": "dbecac7f4",
       "reason": "URDF import: new optional entry; /xml in loaders",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "88caabcf1",
+      "reason": "gltf-pro reads TEXCOORD_2 and 3 through a second vertex buffer",
+      "grew": 2
     }
   ],
   "items": {
@@ -2963,7 +2969,7 @@
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/extended": 7640,
     "@margoengine/gltf-pro/instancing": 3350,
-    "@margoengine/gltf-pro/prepare": 19822,
+    "@margoengine/gltf-pro/prepare": 20459,
     "@margoengine/gltf-pro/progressive": 70098,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/splats": 2100,
@@ -3290,7 +3296,7 @@
     "@margoengine/ui": 28221,
     "@margoengine/ui/react": 28301,
     "@margoengine/usdz": 9314,
-    "@margoengine/usdz dist/workers/usdz.js": 70174,
+    "@margoengine/usdz dist/workers/usdz.js": 72539,
     "@margoengine/usdz/worker": 10380,
     "@margoengine/vfx": 16613,
     "@margoengine/vfx/base": 10476,

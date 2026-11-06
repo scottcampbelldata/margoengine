@@ -38,6 +38,7 @@ export interface PackedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
     sources?: Uint32Array;
+    uvs?: Float32Array;
 }
 
 export function autoLOD(system: LODSystem, mesh: LODSource, options?: AutoLODOptions): Promise<LOD>;

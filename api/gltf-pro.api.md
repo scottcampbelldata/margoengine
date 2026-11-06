@@ -432,6 +432,7 @@ export interface PBRPrimitive {
     nodeIndex: number;
     vertices: Float32Array;
     indices: Uint32Array;
+    uvs?: Float32Array;
     definition: GLTFPrimitive;
     material: PBRMaterial;
     weights: Float32Array;
@@ -489,6 +490,7 @@ export interface PBRTransparency {
 export interface PreparedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
+    uvs?: Float32Array;
     topology?: 'point-list' | 'line-list';
 }
 
@@ -496,7 +498,7 @@ export interface TextureTransform {
     offset?: readonly [number, number];
     rotation?: number;
     scale?: readonly [number, number];
-    texCoord?: 0 | 1;
+    texCoord?: UVSet;
 }
 
 export function applyGLTFLights(model: PBRModel, { clustered, exposure }?: {
@@ -515,7 +517,7 @@ export function parseGLTFAsync(instance: EngineKernel, input: string | object | 
 export function parsePreparedPBR(instance: EngineKernel, doc: GLTFAsset['doc'], geometry: readonly (readonly PreparedGeometry[])[], images?: readonly GLTFImage[], { maxNodes }?: Pick<AssetOptions, 'maxNodes'>): PBRModel;
 
 export function textureCoordinates(info: Pick<GLTFTextureInfo, 'texCoord' | 'extensions'>): {
-    texCoord: 0 | 1;
+    texCoord: UVSet;
     transform?: Float32Array;
 };
 
@@ -691,6 +693,7 @@ interface DrawResource {
     primitive: PBRPrimitive;
     device: GPUDevice;
     vertex: GPUBuffer;
+    uvs?: GPUBuffer;
     index: GPUBuffer;
     wireframe?: {
         index: GPUBuffer;
@@ -1049,6 +1052,7 @@ interface PassBindings {
     vertex?: GPUBuffer;
     vertexOffset?: number;
     instances?: GPUBuffer;
+    uvs?: GPUBuffer;
     index?: GPUBuffer;
 }
 
@@ -1129,6 +1133,8 @@ interface StaticBatch {
     primitive: PBRPrimitive;
     parts: BatchPart[];
 }
+
+type UVSet = 0 | 1 | 2 | 3;
 
 class UniformSlot {
     readonly chunk: Chunk;

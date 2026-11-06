@@ -44,7 +44,7 @@ stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
 
 `KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. `@margoengine/animation/pointer` plays animated visibility (`KHR_animation_pointer`).
 
-Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0/1, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses ACES Filmic tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
+Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses ACES Filmic tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains and honor glTF filtering and wrapping.
 
 Loaded triangle materials expose live `side: 'front' | 'back' | 'double'`, initialized from glTF's `doubleSided`.
 For example, `model.primitives[0].material.side = 'back'` switches to back-only rendering next frame. Mirrored
@@ -242,6 +242,21 @@ same-device renderers can reuse it. Its optional `lit(code)` rewrites the shader
 after the `addLighting()` effects are composed in (materials' Lambert and Phong
 put their own BRDF in clustered's light loop there); returning `code` changes
 nothing.
+
+### More than two UV sets
+
+A texture may read `TEXCOORD_0` to `TEXCOORD_3`, as Blender writes them for a material on its third or fourth UV map. Only a primitive whose material (or a `KHR_materials_variants` mapping) reads set 2 or 3 pays: it gets a second vertex buffer, `primitive.uvs`, four floats a vertex, and its own shader. A file that merely carries those attributes loads as before. The 80-byte vertex stays as it is.
+
+```ts
+import {loadGLTF} from 'margoengine/gltf-pro';
+import type {Engine} from 'margoengine';
+declare const engine: Engine;
+const model = await loadGLTF(engine, '/models/FourUV.glb');
+// TEXCOORD_2 then TEXCOORD_3 of each vertex, present only when a material reads either.
+console.log(model.primitives[0].uvs);
+```
+
+`loadGLTFInWorker`, `loadGLTFProgressive`, Draco, `EXT_mesh_gpu_instancing`, `@margoengine/lod` levels and far meshes, and `@margoengine/exporters` all keep the later sets. `writeGeometry` keeps them too: a write that changes the vertex count passes its own `uvs`. Such primitives stay out of static batches. A `MASK` or `BLEND` base map on set 2 or 3 casts and picks uncut, as the depth passes read the first two sets only, and a `.margo` file holds two sets. A fifth set is refused by name.
 
 ### Bump maps in glTF (`EXT_materials_bump`, draft)
 
@@ -456,7 +471,7 @@ material lobes, passes or attributes.
 Run `node scripts/material-extension-tests.js` for the material slot's WebGPU
 checks, also included in `npm run modern:test:extensions`.
 
-Limits: triangle primitives; at most eight skin influences in the animation package; UV sets 0/1. Unknown required extensions still reject. Ambient fill uses fixed sky/ground colors; image-based lighting is a separate optional package. Bounds describe the bind pose with current node transforms; GPU picking requires the optional selection package.
+Limits: triangle primitives; at most eight skin influences in the animation package; UV sets 0 to 3. Unknown required extensions still reject. Ambient fill uses fixed sky/ground colors; image-based lighting is a separate optional package. Bounds describe the bind pose with current node transforms; GPU picking requires the optional selection package.
 
 `npm run modern:test:gltf-parity` checks texture-coordinate and alpha-shadow pixel
 parity, KTX2 mip upload and worker disposal in a production Vite build, complete

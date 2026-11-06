@@ -405,6 +405,13 @@ function rigPrimitive(model: PBRModel, p: PBRPrimitive['definition'], level: Pac
       ...(attributes.TEXCOORD_1 === undefined ? {} : { TEXCOORD_1: out.packed(level, 14, 2, 'VEC2') }),
       ...(attributes.COLOR_0 === undefined ? {} : { COLOR_0: out.packed(level, 16, 4, 'VEC4') }),
     };
+  if (level.uvs)
+    ['TEXCOORD_2', 'TEXCOORD_3'].forEach((name, set) => {
+      if (attributes[name] === undefined) return;
+      const rows = new Float32Array(count * 2);
+      for (let i = 0; i < count; i++) rows.set(level.uvs!.subarray(i * 4 + set * 2, i * 4 + set * 2 + 2), i * 2);
+      made[name] = out.add(rows, 2, 'VEC2', 5126);
+    });
   const position = out.accessors[made.POSITION],
     min = [Infinity, Infinity, Infinity],
     max = [-Infinity, -Infinity, -Infinity];
@@ -678,7 +685,8 @@ function mergePacked(
     count += primitive.indices.length;
   }
   const vertices = new Float32Array(floats),
-    indices = new Uint32Array(count);
+    indices = new Uint32Array(count),
+    uvs = parts.some(({ primitive }) => primitive.uvs) ? new Float32Array(floats / 5) : undefined;
   let at = 0,
     next = 0;
   for (const { primitive, matrix: m } of parts) {
@@ -686,6 +694,7 @@ function mergePacked(
       v = primitive.vertices,
       base = at / 20,
       source = primitive.indices;
+    if (primitive.uvs) uvs!.set(primitive.uvs, base * 4);
     for (let o = 0; o < v.length; o += 20, at += 20) {
       vertices.set(v.subarray(o, o + 20), at);
       for (let r = 0; r < 3; r++) {
@@ -705,7 +714,7 @@ function mergePacked(
       indices[next++] = source[i + (flip ? 1 : 2)] + base;
     }
   }
-  return { vertices, indices };
+  return uvs ? { vertices, indices, uvs } : { vertices, indices };
 }
 
 /**

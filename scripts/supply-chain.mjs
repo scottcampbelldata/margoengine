@@ -174,6 +174,8 @@ const ASSETS = [
   [
     'packages/kinematics-constraints/tests/fixtures/NOTICE.md',
     'test fixtures: Franka Emika Panda description from Gepetto example-robot-data, commit 6249cab1 (Apache-2.0)',
+    'packages/gltf-pro/tests/fixtures/uv/NOTICE.md',
+    'test fixture: FourUV.glb, exported for this project by Blender 5.3 from fixtures/uv/four-uv.blender.py (Apache-2.0, as this repository)',
   ],
   [
     'packages/gltf-pro/tests/fixtures/splats/NOTICE.md',

@@ -18,7 +18,7 @@ import {
   overBudget,
   parseJSON,
 } from './asset.js';
-import { decodeExtras, packPrimitive, primitiveDefs } from './pack.js';
+import { decodeExtras, packPrimitive, primitiveDefs, usesLaterUV } from './pack.js';
 import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
 import type { GLTFDocument } from './asset.js';
@@ -27,7 +27,7 @@ export type StreamError = { name: string; message: string };
 export type StreamMessage =
   | { type: 'fallback' }
   | { type: 'doc'; doc: GLTFDocument }
-  | { type: 'geometry'; key: number; vertices?: Float32Array; indices?: Uint32Array; error?: StreamError }
+  | { type: 'geometry'; key: number; vertices?: Float32Array; indices?: Uint32Array; uvs?: Float32Array; error?: StreamError }
   | { type: 'image'; index: number; image?: ImageBitmap }
   | { type: 'bytes'; loaded: number; total: number }
   | { type: 'done'; buffers: Uint8Array[]; accessors: [number, Float32Array][] }
@@ -366,7 +366,8 @@ export class GLTFStream {
       const out: Range[] = [],
         a = p?.attributes ?? {};
       try {
-        for (const id of [a.POSITION, a.NORMAL, a.TANGENT, a.TEXCOORD_0, a.TEXCOORD_1, a.COLOR_0, p.indices])
+        const later = usesLaterUV(doc, p) ? [a.TEXCOORD_2, a.TEXCOORD_3] : [];
+        for (const id of [a.POSITION, a.NORMAL, a.TANGENT, a.TEXCOORD_0, a.TEXCOORD_1, ...later, a.COLOR_0, p.indices])
           if (id !== undefined) this.ranges(doc, id, out);
       } catch {
         for (const [i, b] of this.map.entries())
@@ -459,8 +460,8 @@ export class GLTFStream {
         if (this.ready(key)) {
           this.posted.add(key);
           try {
-            const { vertices, indices } = packPrimitive(this.asset!, defs[key]);
-            this.post({ type: 'geometry', key, vertices, indices });
+            const { vertices, indices, uvs } = packPrimitive(this.asset!, defs[key]);
+            this.post({ type: 'geometry', key, vertices, indices, uvs });
           } catch (e) {
             this.post({ type: 'geometry', key, error: error(e) });
           }

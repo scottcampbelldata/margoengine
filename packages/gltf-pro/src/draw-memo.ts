@@ -123,6 +123,7 @@ export function structureFlags(
   physicalMaps: boolean,
   texturedTint: boolean,
   replacesTextures: boolean,
+  laterUV: boolean,
 ): number {
   return (
     alphaMode +
@@ -132,7 +133,8 @@ export function structureFlags(
     +physical * 64 +
     +physicalMaps * 128 +
     +texturedTint * 256 +
-    +replacesTextures * 512
+    +replacesTextures * 512 +
+    +laterUV * 1024
   );
 }
 

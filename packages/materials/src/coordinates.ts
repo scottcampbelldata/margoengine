@@ -4,7 +4,7 @@ import type { ClearcoatTextureSlot } from './shader.js';
 export const coordinateWGSL =
   'fn materialUV(p:vec2f,a:vec4f,b:vec4f)->vec2f{return vec2f(dot(a.xy,p)+a.z,dot(b.xy,p)+b.z);}\n';
 export function coordinateSlot(
-  value: { texCoord?: 0 | 1; transform?: TextureTransform },
+  value: { texCoord?: 0 | 1 | 2 | 3; transform?: TextureTransform },
   factors: number[],
 ): Pick<ClearcoatTextureSlot, 'texCoord' | 'transformIndex'> {
   const parsed = textureCoordinates({

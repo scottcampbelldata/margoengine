@@ -189,7 +189,7 @@ test('all new maps reject malformed texture interfaces and unsupported UV sets',
     for (const field of maps)
       for (const value of [
         {},
-        { view: {}, texCoord: 2 },
+        { view: {}, texCoord: 4 },
         { view: {}, sampler: null },
         { view: {}, transform: { rotation: null } },
       ])

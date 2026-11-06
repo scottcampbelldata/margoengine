@@ -59,7 +59,7 @@ export interface ClearcoatOptions {
 }
 
 export interface ClearcoatTexture extends MaterialExtensionTexture {
-    texCoord?: 0 | 1;
+    texCoord?: 0 | 1 | 2 | 3;
     scale?: number;
     transform?: TextureTransform;
 }

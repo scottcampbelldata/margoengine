@@ -73,7 +73,7 @@ function validateMap(map: ClearcoatTexture): void {
     !map ||
     typeof map !== 'object' ||
     !map.view ||
-    (map.texCoord !== undefined && map.texCoord !== 0 && map.texCoord !== 1) ||
+    (map.texCoord !== undefined && ![0, 1, 2, 3].includes(map.texCoord)) ||
     (map.sampler !== undefined && !map.sampler)
   )
     throw new TypeError('Invalid transmission texture or UV set');

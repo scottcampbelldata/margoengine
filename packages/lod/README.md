@@ -267,7 +267,7 @@ A rebuild is the merge over again, and the simplifying too with a `ratio` below 
 
 ### Textured meshes
 
-A `createMesh` mesh of `@margoengine/materials` keeps everything: UVs, UV1, tangents, vertex colours and its materials, in `autoLOD` levels and in `hierarchicalLOD` far meshes, one per cell and material. Each collapse keeps one end of an edge, so every vertex of a level is one of the source's, unchanged. Corners that share a position stay welded, and an edge where a UV or any other attribute jumps is held as a seam, so seams and hard edges stay closed.
+A loaded model's `TEXCOORD_2` and `TEXCOORD_3` stay with the vertices a level or far mesh keeps. A `createMesh` mesh of `@margoengine/materials` keeps everything: UVs, UV1, tangents, vertex colours and its materials, in `autoLOD` levels and in `hierarchicalLOD` far meshes, one per cell and material. Each collapse keeps one end of an edge, so every vertex of a level is one of the source's, unchanged. Corners that share a position stay welded, and an edge where a UV or any other attribute jumps is held as a seam, so seams and hard edges stay closed.
 
 ```ts
 import {createStage} from 'margoengine';

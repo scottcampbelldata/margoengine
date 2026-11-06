@@ -9,7 +9,7 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; REND
 
 export interface TextureInfo {
   index: number;
-  texCoord?: 0 | 1;
+  texCoord?: 0 | 1 | 2 | 3;
   scale?: number;
   transform?: TextureTransform;
 }

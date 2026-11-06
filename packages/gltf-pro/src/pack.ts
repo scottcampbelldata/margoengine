@@ -1,7 +1,23 @@
-import type { GLTFPrimitive } from '../../shared/gltf.js';
+import type { GLTFDocument, GLTFPrimitive } from '../../shared/gltf.js';
 import { compressedIndices } from './draco-state.js';
 import { entry, type GLTFAsset } from './asset.js';
 import type { PreparedGeometry } from './index.js';
+/** True for an object holding a `texCoord` above 1 anywhere: the texture infos of a material, extensions included. */
+function readsLaterUV(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  for (const [key, item] of Object.entries(value))
+    if (key === 'texCoord' ? (item as number) > 1 : readsLaterUV(item)) return true;
+  return false;
+}
+/**
+ * True when a material of primitive `p`, its own or a KHR_materials_variants one, reads TEXCOORD_2 or 3: only then do those
+ * sets cost a read, a buffer and a shader, so files that merely carry them (common in exports) pay nothing.
+ */
+export function usesLaterUV(doc: GLTFDocument, p: GLTFPrimitive): boolean {
+  const variants = p.extensions?.KHR_materials_variants as { mappings?: { material?: number }[] } | undefined,
+    ids = [p.material, ...(variants?.mappings ?? []).map((mapping) => mapping?.material)];
+  return ids.some((id) => id !== undefined && readsLaterUV(doc.materials?.[id]));
+}
 /** Geometry already packed by a parse worker, keyed by primitive definition; PBRModel then skips decoding it. */
 export const packed = new WeakMap<object, PreparedGeometry>();
 /** Decode one triangle primitive's accessors into gltf-pro's 80-byte vertices and uint32 indices (main thread or worker). */
@@ -76,7 +92,7 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
       const def = entry(asset.doc.accessors, a[key], 'attribute');
       if (def.componentType !== 5126 || def.normalized) throw new TypeError('Expected Float32 ' + key);
     }
-  for (const key of ['TEXCOORD_0', 'TEXCOORD_1', 'COLOR_0'])
+  for (const key of ['TEXCOORD_0', 'TEXCOORD_1', 'TEXCOORD_2', 'TEXCOORD_3', 'COLOR_0'])
     if (a[key] !== undefined && !(quantized && key !== 'COLOR_0')) {
       const def = entry(asset.doc.accessors, a[key], 'attribute');
       if (![5126, 5121, 5123].includes(def.componentType) || (def.componentType !== 5126 && !def.normalized))
@@ -133,7 +149,10 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
       normals[z + 2] += nz;
     }
   const uv0 = a.TEXCOORD_0 === undefined ? null : read('TEXCOORD_0', a.TEXCOORD_0, 'VEC2'),
-    uv1 = a.TEXCOORD_1 === undefined ? null : read('TEXCOORD_1', a.TEXCOORD_1, 'VEC2');
+    uv1 = a.TEXCOORD_1 === undefined ? null : read('TEXCOORD_1', a.TEXCOORD_1, 'VEC2'),
+    later = usesLaterUV(asset.doc, p),
+    uv2 = !later || a.TEXCOORD_2 === undefined ? null : read('TEXCOORD_2', a.TEXCOORD_2, 'VEC2'),
+    uv3 = !later || a.TEXCOORD_3 === undefined ? null : read('TEXCOORD_3', a.TEXCOORD_3, 'VEC2');
   const tangent = a.TANGENT === undefined ? null : read('TANGENT', a.TANGENT, 'VEC4'),
     colors = a.COLOR_0 === undefined ? null : read('COLOR_0', a.COLOR_0);
   const colorWidth = colors ? colors.length / count : 0;
@@ -141,6 +160,8 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
     normals.length !== count * 3 ||
     (uv0 && uv0.length !== count * 2) ||
     (uv1 && uv1.length !== count * 2) ||
+    (uv2 && uv2.length !== count * 2) ||
+    (uv3 && uv3.length !== count * 2) ||
     (tangent && tangent.length !== count * 4) ||
     (colors && ![3, 4].includes(colorWidth))
   )
@@ -206,7 +227,18 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
       vertices[o + 19] = 1;
     }
   }
-  return per < 3 ? { vertices, indices, topology: per === 1 ? 'point-list' : 'line-list' } : { vertices, indices };
+  const uvs = uv2 || uv3 ? new Float32Array(count * 4) : undefined;
+  if (uvs)
+    for (let i = 0; i < count; i++) {
+      if (uv2) uvs.set(uv2.subarray(i * 2, i * 2 + 2), i * 4);
+      if (uv3) uvs.set(uv3.subarray(i * 2, i * 2 + 2), i * 4 + 2);
+    }
+  return {
+    vertices,
+    indices,
+    ...(per < 3 ? { topology: per === 1 ? ('point-list' as const) : ('line-list' as const) } : {}),
+    ...(uvs ? { uvs } : {}),
+  };
 }
 /** Decode the accessors read besides packed geometry (skins, morph targets, animation samplers, GPU instancing); failures are left for the reader. */
 export function decodeExtras(asset: GLTFAsset): [number, Float32Array][] {

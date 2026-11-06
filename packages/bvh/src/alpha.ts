@@ -141,7 +141,8 @@ async function readMask(
     map = maps[0];
   if (!map) return { width: 1, height: 1, data: [255, 255, 255, 255], cutoff, factor };
   const transform = map.extensions?.KHR_texture_transform;
-  if ((transform?.texCoord ?? map.texCoord ?? 0) !== 0) return 'its base colour map reads TEXCOORD_1, and a hit carries TEXCOORD_0';
+  const set = transform?.texCoord ?? map.texCoord ?? 0;
+  if (set !== 0) return `its base colour map reads TEXCOORD_${set}, and a hit carries TEXCOORD_0`;
   const { textures = [], samplers = [] } = model.asset.doc,
     texture = textures[map.index],
     sampler = samplers[texture?.sampler ?? -1],

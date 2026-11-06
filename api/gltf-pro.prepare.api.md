@@ -403,6 +403,7 @@ class PBRInstances {
 interface PreparedGeometry {
     vertices: Float32Array;
     indices: Uint32Array;
+    uvs?: Float32Array;
     topology?: 'point-list' | 'line-list';
 }
 
@@ -410,6 +411,8 @@ interface TextureTransform {
     offset?: readonly [number, number];
     rotation?: number;
     scale?: readonly [number, number];
-    texCoord?: 0 | 1;
+    texCoord?: UVSet;
 }
+
+type UVSet = 0 | 1 | 2 | 3;
 ```

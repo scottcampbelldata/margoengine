@@ -10,6 +10,8 @@ export interface PackedGeometry {
   indices: Uint32Array;
   /** On a simplified level: the source vertex each vertex is. Absent when the level is the source itself. */
   sources?: Uint32Array;
+  /** TEXCOORD_2 and 3, four floats a vertex, as gltf-pro keeps them when a material reads either. */
+  uvs?: Float32Array;
 }
 /** What the simplifying needs from `@margoengine/mesh-edit/modeling`. */
 export interface Modeling {
@@ -149,12 +151,22 @@ export function simplifyPacked(
   apart?: (vertex: number) => string,
 ): PackedGeometry[] {
   const levels = levelChain(modeling, geometry, ratios, false, signal, apart),
-    { vertices, indices } = geometry,
+    { vertices, indices, uvs } = geometry,
     faces = indices.length / 3,
-    missed = levels.some((level, i) => level.indices.length / 3 > faces * ratios[i] * MISSED);
-  return missed && faces >= FLAT_FACES && faceted(vertices, indices)
-    ? levelChain(modeling, geometry, ratios, true, signal, apart)
-    : levels;
+    missed = levels.some((level, i) => level.indices.length / 3 > faces * ratios[i] * MISSED),
+    made =
+      missed && faces >= FLAT_FACES && faceted(vertices, indices)
+        ? levelChain(modeling, geometry, ratios, true, signal, apart)
+        : levels;
+  return uvs ? made.map((level) => withLaterUVs(level, uvs)) : made;
+}
+/** `level` with the later UV rows of the vertices it kept. */
+function withLaterUVs(level: PackedGeometry, uvs: Float32Array): PackedGeometry {
+  const { sources } = level;
+  if (!sources) return { ...level, uvs };
+  const kept = new Float32Array(sources.length * 4);
+  sources.forEach((from, i) => kept.set(uvs.subarray(from * 4, from * 4 + 4), i * 4));
+  return { ...level, uvs: kept };
 }
 function levelChain(
   modeling: Modeling,
