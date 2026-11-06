@@ -4,7 +4,7 @@
 // with a custom renderState, a text-patching lighting effect added and removed, a hidden blended node, an HDR and a
 // canvas target, MSAA 1x/4x, beauty/SSAO-ambient/G-buffer draws through the frame graph and directly. They must be identical.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/oit-detached.proof.js [ref] [pin] [--current]
-// Pinned: b803d56 against 0e02ead, the commit that made this claim. --current: 641246d3 against the working tree (b953071e before views and samplers were cached; 57250a49 before the materials draw work);
+// Pinned: b803d56 against 0e02ead, the commit that made this claim. --current: 67d95b8c against the working tree (b953071e before views and samplers were cached; 57250a49 before the materials draw work);
 // this includes the approved cotangent frame, compact discard guards and PBR Neutral output (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, golden } from './compare.js';
@@ -12,7 +12,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
 
-const { ref, pin } = refs('b803d56', '0e02ead', '641246d3');
+const { ref, pin } = refs('b803d56', '0e02ead', '67d95b8c');
 const { baseline, candidate } = await versions('gltf-pro', ref, undefined, pin);
 const materials = [
   {},
