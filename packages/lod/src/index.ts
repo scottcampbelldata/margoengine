@@ -8,9 +8,10 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import { Imposter, imposterShader } from './imposter.js';
+import { Imposter, ImposterFrames, imposterShader, imposterShadowShader } from './imposter.js';
 export {
   Imposter,
+  ImposterFrames,
   octEncode,
   octDecode,
   frameDirection,
@@ -18,6 +19,7 @@ export {
   frameMatrix,
   bakeShader,
   type ImposterData,
+  type ImposterFramesOptions,
   type ImposterOptions,
   type ImposterSource,
 } from './imposter.js';
@@ -29,8 +31,8 @@ import { meshTriangles } from '../../shared/mesh-source.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
-/** What a level shows: a core Mesh or a model with a `root` Mesh (gltf-pro, materials), toggled through `visible`; a core Geometry swapped onto the anchor; an Imposter; or null (nothing). */
-export type LODObject = Mesh | { readonly root: Mesh } | Geometry | Imposter | null;
+/** What a level shows: a core Mesh or a model with a `root` Mesh (gltf-pro, materials), toggled through `visible`; a core Geometry swapped onto the anchor; an Imposter or ImposterFrames; or null (nothing). */
+export type LODObject = Mesh | { readonly root: Mesh } | Geometry | Imposter | ImposterFrames | null;
 /** `distance` (world units from the camera to the anchor) or `screen` (bounding-sphere height as a fraction of the viewport height); every level of one LOD uses the same one. Level 0's value is ignored. */
 export interface LODLevel {
   object: LODObject;
@@ -42,6 +44,17 @@ export interface LODLevel {
 /** Per-object settings of `LODSystem.add`. */
 export interface LODOptions {
   /** Local bounding radius for `screen` levels and imposter culling. Default: from a Geometry, Mesh or Imposter level. */ radius?: number;
+  /** Linear RGB, multiplies the albedo while an imposter level shows. Default white. */
+  color?: readonly number[];
+  /** Linear RGB added to the lit colour while an imposter level shows. Default black. */
+  emissive?: readonly number[];
+  /** First frame of an `ImposterFrames` level, whole or not, as an offset so copies do not move in step. Default 0. */
+  frame?: number;
+}
+/** Hooks of a lighting effect an imposter takes, as `Shadows` gives them; only `direct` applies. */
+export interface ImposterLighting {
+  pbr?(group: number): { declarations: string; direct?(direct: string): string } | undefined;
+  bindings(): GPUBindGroupEntry[];
 }
 /** `LODSystem` settings shared by every object it manages. */
 export interface LODSystemOptions {
@@ -64,6 +77,12 @@ export class LOD {
   readonly sphere = new Float64Array(4);
   /** The first gltf-pro model among the levels, reported with approximate pick hits; null without one. */
   readonly model: { readonly root: Mesh } | null;
+  /** Live {@link LODOptions.color}, read each frame an imposter level shows. */
+  readonly color = new Float32Array([1, 1, 1]);
+  /** Live {@link LODOptions.emissive}. */
+  readonly emissive = new Float32Array(3);
+  /** Live {@link LODOptions.frame}. */
+  frame = 0;
   /** @internal */ constructor(
     private readonly system: LODSystem,
     /** @internal */ public index: number,
@@ -110,6 +129,8 @@ export class LOD {
 }
 interface Atlas {
   imposter: Imposter;
+  /** Set on the first atlas of an ImposterFrames level; its other frames are the next atlases. */
+  frames?: ImposterFrames;
   users: number;
   data: Float32Array;
   count: number;
@@ -117,7 +138,17 @@ interface Atlas {
   group?: GPUBindGroup;
   texture?: GPUTexture;
   pipeline?: GPURenderPipeline;
+  /** Casters: the instances the camera culled too, since they can still shadow what it sees. */
+  cast: Float32Array;
+  castCount: number;
+  castBuffer?: GPUBuffer;
+  castGroups: GPUBindGroup[];
+  castTexture?: GPUTexture;
 }
+/** Floats per instance: matrix, colour, emissive. */
+const STRIDE = 24;
+const isImposter = (o: LODObject): o is Imposter | ImposterFrames =>
+  o instanceof Imposter || o instanceof ImposterFrames;
 const target = (o: Mesh | { readonly root: Mesh }) => ('root' in o ? o.root : o);
 let serial = 0;
 
@@ -158,6 +189,13 @@ export class LODSystem implements EnginePlugin {
   private samples = 0;
   private depthFormat?: string;
   private readonly frame = new Float32Array(32);
+  private time = 0;
+  private readonly effects = new Set<ImposterLighting>();
+  private code = imposterShader;
+  private lit?: GPUBindGroup;
+  private castPipeline?: GPURenderPipeline;
+  private castUniform?: GPUBuffer;
+  private readonly castValues = new Float32Array(20);
   private transition?: (lod: LOD, from: number, to: number) => boolean;
   private readonly descriptor = overlayDepthPass();
   private readonly color = this.descriptor.colorAttachments[0];
@@ -186,7 +224,8 @@ export class LODSystem implements EnginePlugin {
       },
     });
   }
-  onPreUpdate(): void {
+  onPreUpdate(delta = 0): void {
+    this.time += delta;
     this.update();
   }
   get size(): number {
@@ -194,7 +233,7 @@ export class LODSystem implements EnginePlugin {
   }
 
   /** Registers an object. `anchor` gives the world transform (and receives Geometry levels); level objects are usually its children. */
-  add(anchor: Mesh, levels: readonly LODLevel[], { radius }: LODOptions = {}): LOD {
+  add(anchor: Mesh, levels: readonly LODLevel[], { radius, color, emissive, frame = 0 }: LODOptions = {}): LOD {
     const e = this.engine;
     if (!e) throw new MargoError('state', 'Use the LOD system on an engine first');
     const mesh = meshRuntime(anchor);
@@ -214,7 +253,7 @@ export class LODSystem implements EnginePlugin {
         !(
           object === null ||
           object instanceof Geometry ||
-          object instanceof Imposter ||
+          isImposter(object) ||
           typeof (object as Mesh)?.visible === 'boolean' ||
           typeof (object as { root: Mesh })?.root?.visible === 'boolean'
         )
@@ -233,7 +272,7 @@ export class LODSystem implements EnginePlugin {
       previous = value;
       this.thresholds[b + l] = value;
       this.bands[b + l] = hysteresis;
-      this.levelSlots[b + l] = object instanceof Imposter ? this.atlas(object) : -1;
+      this.levelSlots[b + l] = isImposter(object) ? this.atlas(object) : -1;
       if (object instanceof Geometry) {
         swap = true;
         if (!this.keepers.has(object)) {
@@ -241,17 +280,17 @@ export class LODSystem implements EnginePlugin {
           keeper.visible = false;
           this.keepers.set(object, keeper);
         }
-      } else if (object && !(object instanceof Imposter)) target(object).visible = false;
+      } else if (object && !isImposter(object)) target(object as Mesh).visible = false;
     }
     const sized = levels.find(
       (l) =>
         l.object instanceof Geometry ||
-        l.object instanceof Imposter ||
+        isImposter(l.object) ||
         (l.object as { geometry?: Geometry } | null)?.geometry instanceof Geometry,
-    )?.object as Geometry | Imposter | { geometry?: Geometry } | undefined;
+    )?.object as Geometry | Imposter | ImposterFrames | { geometry?: Geometry } | undefined;
     const r =
       radius ??
-      (sized instanceof Imposter
+      (sized instanceof Imposter || sized instanceof ImposterFrames
         ? sized.radius
         : sized instanceof Geometry
           ? sized.bounds[3]
@@ -265,6 +304,9 @@ export class LODSystem implements EnginePlugin {
     this.radius[i] = r;
     this.slots[i] = -1;
     const handle = new LOD(this, i, anchor, [...levels]);
+    if (color) handle.color.set(color);
+    if (emissive) handle.emissive.set(emissive);
+    handle.frame = frame;
     this.anchors[i] = anchor;
     this.objects[i] = handle.levels.map((l) => l.object);
     this.handles[i] = handle;
@@ -304,8 +346,11 @@ export class LODSystem implements EnginePlugin {
     const last = --this.count,
       b = i * MAX_LEVELS,
       lb = last * MAX_LEVELS;
-    for (let l = 0; l < this.counts[i]; l++)
-      if (this.levelSlots[b + l] >= 0) this.atlases[this.levelSlots[b + l]].users--;
+    for (let l = 0; l < this.counts[i]; l++) {
+      const slot = this.levelSlots[b + l];
+      if (slot >= 0)
+        for (let k = this.atlases[slot].frames?.imposters.length ?? 1; k-- > 0; ) this.atlases[slot + k].users--;
+    }
     for (const a of [this.ids, this.counts, this.current, this.screen, this.swaps, this.radius, this.slots])
       a[i] = a[last];
     for (const a of [this.thresholds, this.bands, this.levelSlots]) a.copyWithin(b, lb, lb + MAX_LEVELS);
@@ -333,19 +378,53 @@ export class LODSystem implements EnginePlugin {
     this.bands = copy(this.bands, MAX_LEVELS);
     this.levelSlots = copy(this.levelSlots, MAX_LEVELS);
   }
-  private atlas(imposter: Imposter): number {
-    let s = this.atlases.findIndex((a) => a.imposter === imposter);
+  private atlas(object: Imposter | ImposterFrames): number {
+    const list = object instanceof Imposter ? [object] : object.imposters;
+    let s = this.atlases.findIndex((a) => a.imposter === list[0]);
     if (s < 0) {
       s = this.atlases.length;
-      this.atlases.push({ imposter, users: 0, data: new Float32Array(0), count: 0 });
+      for (const imposter of list)
+        this.atlases.push({
+          imposter,
+          users: 0,
+          data: new Float32Array(0),
+          count: 0,
+          cast: new Float32Array(0),
+          castCount: 0,
+          castGroups: [],
+        });
+      if (object instanceof ImposterFrames) this.atlases[s].frames = object;
     }
-    const a = this.atlases[s];
-    if (++a.users * 16 > a.data.length) {
-      const data = new Float32Array(Math.max(256, a.data.length * 2));
-      data.set(a.data);
-      a.data = data;
+    for (let k = 0; k < list.length; k++) {
+      const a = this.atlases[s + k];
+      if (++a.users * STRIDE > a.data.length) {
+        const size = Math.max(a.users * STRIDE, a.data.length * 2),
+          data = new Float32Array(size),
+          cast = new Float32Array(size);
+        data.set(a.data);
+        a.data = data;
+        a.cast = cast;
+      }
     }
     return s;
+  }
+  /** The atlas object `i` draws from now: its level's, or for ImposterFrames the frame its time has reached. */
+  private slotOf(i: number): number {
+    const s = this.slots[i],
+      frames = this.atlases[s].frames;
+    if (!frames) return s;
+    const n = frames.imposters.length,
+      at = Math.floor(this.handles[i].frame + this.time * frames.fps);
+    return s + (((at % n) + n) % n);
+  }
+  /** Writes object `i`'s instance record: world matrix `m` at `o`, then its colour and emissive. */
+  private record(data: Float32Array, at: number, m: Float32Array, o: number, i: number): void {
+    const h = this.handles[i];
+    for (let j = 0; j < 16; j++) data[at + j] = m[o + j];
+    for (let j = 0; j < 3; j++) {
+      data[at + 16 + j] = h.color[j];
+      data[at + 20 + j] = h.emissive[j];
+    }
   }
 
   /**
@@ -423,11 +502,11 @@ export class LODSystem implements EnginePlugin {
       a = from < 0 ? null : objects[from],
       b = objects[to],
       anchor = this.anchors[i];
-    if (a && !(a instanceof Geometry) && !(a instanceof Imposter)) target(a).visible = false;
+    if (a && !(a instanceof Geometry) && !isImposter(a)) target(a).visible = false;
     if (b instanceof Geometry) anchor.setGeometry(b);
     else {
       if (this.swaps[i] && anchor.geometry) anchor.setGeometry(null);
-      if (b && !(b instanceof Imposter)) target(b).visible = true;
+      if (b && !isImposter(b)) target(b).visible = true;
     }
     this.current[i] = to;
     this.slots[i] = this.levelSlots[i * MAX_LEVELS + to];
@@ -453,7 +532,7 @@ export class LODSystem implements EnginePlugin {
           break;
         }
       if (!shown) continue;
-      const a = atlases[s],
+      const a = atlases[this.slotOf(i)],
         imp = a.imposter,
         o = this.ids[i] * 16,
         k = imp.center;
@@ -470,9 +549,7 @@ export class LODSystem implements EnginePlugin {
           break;
         }
       if (!inside) continue;
-      const d = a.count++ * 16,
-        data = a.data;
-      for (let j = 0; j < 16; j++) data[d + j] = m[o + j];
+      this.record(a.data, a.count++ * STRIDE, m, o, i);
       total++;
     }
     if (!total) return;
@@ -490,9 +567,17 @@ export class LODSystem implements EnginePlugin {
     f[28] = +(c.format === 'rgba16float');
     f[29] = +(samples > 1);
     device.queue.writeBuffer(this.uniform, 0, f);
-    const depthFormat = c.descriptor.depthStencil!.format;
-    if (!this.pipeline || c.format !== this.format || samples !== this.samples || depthFormat !== this.depthFormat) {
-      const module = device.createShaderModule({ code: imposterShader });
+    const depthFormat = c.descriptor.depthStencil!.format,
+      code = this.lightingCode();
+    if (
+      !this.pipeline ||
+      c.format !== this.format ||
+      samples !== this.samples ||
+      depthFormat !== this.depthFormat ||
+      code !== this.code
+    ) {
+      const module = device.createShaderModule({ code });
+      this.code = code;
       this.format = c.format;
       this.samples = samples;
       this.depthFormat = depthFormat;
@@ -509,6 +594,13 @@ export class LODSystem implements EnginePlugin {
     this.depth.view = c.depth;
     const pass = c.encoder.beginRenderPass(this.descriptor);
     pass.setPipeline(this.pipeline!);
+    if (code !== imposterShader) {
+      this.lit = device.createBindGroup({
+        layout: this.pipeline!.getBindGroupLayout(1),
+        entries: [...this.effects].flatMap((effect) => effect.bindings()),
+      });
+      pass.setBindGroup(1, this.lit);
+    }
     for (let s = 0; s < atlases.length; s++) {
       const a = atlases[s],
         imp = a.imposter;
@@ -534,22 +626,132 @@ export class LODSystem implements EnginePlugin {
             { binding: 3, resource: imp.normal!.createView() },
             { binding: 4, resource: this.sampler! },
             { binding: 5, resource: { buffer: imp.uniform! } },
+            { binding: 6, resource: imp.glow!.createView() },
           ],
         });
       }
-      device.queue.writeBuffer(a.buffer, 0, a.data, 0, a.count * 16);
+      device.queue.writeBuffer(a.buffer, 0, a.data, 0, a.count * STRIDE);
       pass.setBindGroup(0, a.group);
       pass.draw(4, a.count);
     }
     pass.end();
   }
+  /** The beauty shader with the lighting effects' hooks in, at group 1. */
+  private lightingCode(): string {
+    let declarations = '',
+      direct = '';
+    for (const effect of this.effects) {
+      const hooks = effect.pbr?.(1);
+      if (!hooks) continue;
+      declarations += hooks.declarations + '\n';
+      if (hooks.direct) direct += `direct=${hooks.direct('direct').replaceAll('i.position', 'world').replaceAll('s.n', 'nn')};`;
+    }
+    return direct ? declarations + imposterShader.replace('/*lod:direct*/', direct) : imposterShader;
+  }
+  /** Lets `@margoengine/shadows` shade imposters: `shadows.add(lods)` calls it. Returns the remover. */
+  addLighting(effect: ImposterLighting): () => void {
+    if (typeof effect?.bindings !== 'function')
+      throw new TypeError('Imposter lighting needs an effect with bindings(); pass a Shadows');
+    this.effects.add(effect);
+    return () => {
+      this.effects.delete(effect);
+    };
+  }
+  /** Lists the casters once per shadow frame, past the camera's cull: `shadows.add(lods)` drives it. */
+  prepareShadow({ context: c }: { context: Context }): void {
+    const atlases = this.atlases,
+      e = this.engine;
+    if (!e || !atlases.length) return;
+    const m = e.store.matrices,
+      hidden = e.store.hidden,
+      parents = e.store.parents,
+      device = c.device;
+    for (const a of atlases) a.castCount = 0;
+    for (let i = 0; i < this.count; i++) {
+      if (this.slots[i] < 0) continue;
+      let shown = true;
+      for (let p = this.ids[i]; p >= 0 && shown; p = parents[p]) shown = !hidden[p];
+      if (!shown) continue;
+      const a = atlases[this.slotOf(i)];
+      this.record(a.cast, a.castCount++ * STRIDE, m, this.ids[i] * 16, i);
+    }
+    for (const a of atlases) {
+      if (!a.castCount) continue;
+      if (!a.castBuffer || a.castBuffer.size < a.cast.byteLength) {
+        a.castBuffer?.destroy();
+        a.castBuffer = device.createBuffer({
+          size: a.cast.byteLength,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        a.castGroups = [];
+      }
+      device.queue.writeBuffer(a.castBuffer, 0, a.cast, 0, a.castCount * STRIDE);
+    }
+  }
+  /** Draws the imposters into one cascade's depth map. */
+  drawShadow({
+    context: c,
+    pass,
+    matrix,
+    cascade,
+  }: {
+    context: Context;
+    pass: GPURenderPassEncoder;
+    matrix: Float32Array;
+    cascade: number;
+  }): void {
+    const device = c.device;
+    if (!this.atlases.some((a) => a.castCount)) return;
+    if (!this.castPipeline) {
+      const module = device.createShaderModule({ code: imposterShadowShader });
+      this.castPipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: { module, entryPoint: 'fragment', targets: [] },
+        primitive: { topology: 'triangle-strip' },
+        depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
+      });
+      this.castUniform = device.createBuffer({ size: 1024, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    }
+    this.sampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear', mipmapFilter: 'linear' });
+    const v = this.castValues;
+    v.set(matrix);
+    v.set(this.engine!.lighting.direction, 16);
+    device.queue.writeBuffer(this.castUniform!, cascade * 256, v);
+    pass.setPipeline(this.castPipeline);
+    for (const a of this.atlases) {
+      const imp = a.imposter;
+      if (!a.castCount || !imp.ready()) continue;
+      if (a.castTexture !== imp.color) {
+        a.castTexture = imp.color;
+        a.castGroups = [];
+      }
+      const group = (a.castGroups[cascade] ??= device.createBindGroup({
+        layout: this.castPipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.castUniform!, offset: cascade * 256, size: 80 } },
+          { binding: 1, resource: { buffer: a.castBuffer! } },
+          { binding: 2, resource: imp.color!.createView() },
+          { binding: 3, resource: imp.normal!.createView() },
+          { binding: 4, resource: this.sampler },
+          { binding: 5, resource: { buffer: imp.uniform! } },
+        ],
+      }));
+      pass.setBindGroup(0, group);
+      pass.draw(4, a.castCount);
+    }
+  }
   private release(): void {
     this.uniform?.destroy();
+    this.castUniform?.destroy();
     for (const a of this.atlases) {
       a.buffer?.destroy();
-      a.buffer = a.group = a.texture = a.pipeline = undefined;
+      a.castBuffer?.destroy();
+      a.buffer = a.group = a.texture = a.pipeline = a.castBuffer = a.castTexture = undefined;
+      a.castGroups = [];
+      a.castCount = 0;
     }
-    this.uniform = this.sampler = this.pipeline = undefined;
+    this.uniform = this.sampler = this.pipeline = this.castPipeline = this.castUniform = undefined;
   }
   onDeviceRestored(): void {
     this.release();

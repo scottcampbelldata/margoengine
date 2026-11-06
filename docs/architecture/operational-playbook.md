@@ -422,6 +422,11 @@ clips away in that pass, so the map is unchanged. The draw reads rows through an
 list is a plain vertex buffer offset. Evidence: `packages/culling/test/gpu/shadows-cull-check.mjs`, 0 differing pixels against
 every caster drawn in every cascade, RTX A6000. Still missing: a timed run.
 
+Imposters (`@margoengine/lod`) draw 96 bytes an instance: world matrix, colour, emissive. As a shadow source a `LODSystem`
+draws, per cascade, a card facing the light per object, reprojecting the ray along the light onto the nearest atlas view with
+one parallax step, and stands the depth back by `r*(2/(frames-1)+4/frameSize)` so an imposter does not shadow itself. Evidence:
+`packages/lod/test/imposter-full-check.mjs` on the RTX A6000. Missing: other GPUs, and a measure of the cost per cascade.
+
 `LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
 the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by
 atomic add, and the counts are copied to each level's indirect arguments, so core draws each list through `Batch.redirect`. On

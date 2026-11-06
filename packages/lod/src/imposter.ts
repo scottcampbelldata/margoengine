@@ -28,6 +28,21 @@ export interface ImposterOptions {
   frameSize?: number;
   /** Material for a Geometry source. Default core's PbrMaterial. */
   material?: PbrMaterial;
+  /** Also bakes the source's emissive colour, in an atlas of its own (RGBA8, so it stops at 1). Default false. */
+  emissive?: boolean;
+  /** Sets the source's pose just before each bake, the first and any after a device restore: a gltf-pro model only. */
+  pose?: () => void;
+  /** Multiplies the bounding sphere, for a pose reaching past the bind-pose bounds a skinned model reports. Default 1. */
+  margin?: number;
+}
+/** What {@link ImposterFrames.bake} takes: an imposter's options and the frames of the animation. */
+export interface ImposterFramesOptions extends Omit<ImposterOptions, 'pose'> {
+  /** Animation frames, 2 or more. */
+  count: number;
+  /** Puts the source in frame `index`, as `animation.seek` does. */
+  pose(index: number): void;
+  /** Frames a second an instance plays at; 0 holds `lod.frame`. Default 0. */
+  fps?: number;
 }
 /** CPU copy of an atlas for caching: `color` is RGBA8 sRGB albedo with coverage alpha, `normal` raw float16 RGBA (octahedral normal, depth, packed roughness/metalness). */
 export interface ImposterData {
@@ -38,6 +53,8 @@ export interface ImposterData {
   shading: 'core' | 'gltf';
   color: Uint8Array;
   normal: Uint16Array;
+  /** RGBA8 sRGB emissive, when baked with `emissive`. */
+  emissive?: Uint8Array;
 }
 
 // Octahedral directions with +y at the grid centre and -y at the corners; the sign helper keeps zero on the positive side.
@@ -94,12 +111,12 @@ export function frameMatrix(d: Vec3, c: Vec3, r: number, out = new Float32Array(
   out[15] = 1;
   return out;
 }
-/** Early return added to gltf-pro's beauty fragment: albedo (mode 0) or octahedral normal, depth and roughness*32+metalness in 31 steps each (mode 1, exact in float16). */
+/** Early return added to gltf-pro's beauty fragment: albedo (mode 0), octahedral normal, depth and roughness*32+metalness in 31 steps each (mode 1, exact in float16), or emissive (mode 2). */
 export function bakeShader(code: string, group: number): string {
   let found = false;
   const out = code.replace(/@fragment fn fragment\([\s\S]*?let s=surface\(i,front\);/, (head) => {
     found = true;
-    return head + '\n  if(lod_bake.x<2.0){return lod_bake_out(s,i.clip.z);}';
+    return head + '\n  if(lod_bake.x<3.0){return lod_bake_out(s,i.clip.z);}';
   });
   if (!found)
     throw new MargoError(
@@ -107,7 +124,7 @@ export function bakeShader(code: string, group: number): string {
       'Imposter baking requires the gltf-pro PBR shader; pass the shader of a gltf-pro PBRModel',
     );
   return (
-    `@group(${group}) @binding(96) var<uniform> lod_bake:vec4f;\n${octWGSL}\nfn lod_bake_out(s:Surface,z:f32)->vec4f {if(lod_bake.x<0.5){return vec4f(s.base.rgb,1.0);}return vec4f(lod_encode(normalize(s.n)),z*2.0-1.0,round(s.roughness*31.0)*32.0+round(s.metal*31.0));}\n` +
+    `@group(${group}) @binding(96) var<uniform> lod_bake:vec4f;\n${octWGSL}\nfn lod_bake_out(s:Surface,z:f32)->vec4f {if(lod_bake.x<0.5){return vec4f(s.base.rgb,1.0);}if(lod_bake.x>1.5){return vec4f(s.emissive,1.0);}return vec4f(lod_encode(normalize(s.n)),z*2.0-1.0,round(s.roughness*31.0)*32.0+round(s.metal*31.0));}\n` +
     out
   );
 }
@@ -284,15 +301,19 @@ export class Imposter {
   disposed = false;
   /** @internal */ color?: GPUTexture; /** @internal */
   normal?: GPUTexture; /** @internal */
+  glow?: GPUTexture; /** @internal */
   uniform?: GPUBuffer; /** @internal */
   device?: GPUDevice;
   private source?: Part[] | PBRModel;
   private data?: ImposterData;
+  private readonly emissive: boolean;
+  private readonly pose?: () => void;
+  private readonly margin: number;
   private constructor(
     private readonly engine: Engine,
     source: ImposterSource | undefined,
     data: ImposterData | undefined,
-    { frames = 12, frameSize = 128, material }: ImposterOptions,
+    { frames = 12, frameSize = 128, material, emissive = false, pose, margin = 1 }: ImposterOptions,
   ) {
     if (
       !Number.isInteger(frames) ||
@@ -306,6 +327,12 @@ export class Imposter {
         'Imposter frames 4-32, frameSize a power of two 16-1024; use 4 to 32 frames and a power-of-two frame size from 16 to 1024',
       );
     if (material !== undefined && !(material instanceof PbrMaterial)) throw new TypeError('Expected a PbrMaterial');
+    if (!(margin >= 1 && margin < Infinity)) throw new RangeError('Imposter margin must be 1 or more; pass a finite scale');
+    if (pose !== undefined && typeof pose !== 'function')
+      throw new TypeError('Imposter pose must be a function; pass one that poses the source');
+    this.emissive = !!emissive || !!data?.emissive;
+    this.pose = pose;
+    this.margin = margin;
     this.frames = frames;
     this.frameSize = frameSize;
     this.data = data;
@@ -332,12 +359,14 @@ export class Imposter {
         data.normal instanceof Uint16Array &&
         data.color.length === size * size * 4 &&
         data.normal.length === size * size * 4 &&
+        (data.emissive === undefined ||
+          (data.emissive instanceof Uint8Array && data.emissive.length === size * size * 4)) &&
         ['core', 'gltf'].includes(data.shading) &&
         data.radius > 0 &&
         data.center?.length === 3 &&
         data.center.every(Number.isFinite);
     if (!ok) throw new TypeError('Invalid imposter data; pass the result of Imposter.export()');
-    const i = new Imposter(engineRuntime(engine), undefined, data, data);
+    const i = new Imposter(engineRuntime(engine), undefined, data, { frames: data.frames, frameSize: data.frameSize });
     i.center.splice(0, 3, ...data.center);
     i.radius = data.radius;
     i.ready();
@@ -374,6 +403,19 @@ export class Imposter {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
     });
     this.uniform = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    // Without an emissive atlas the shader reads one black texel.
+    this.glow = device.createTexture({
+      size: this.emissive ? [size, size] : [1, 1],
+      format: 'rgba8unorm-srgb',
+      mipLevelCount: this.emissive ? this.color.mipLevelCount : 1,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.COPY_SRC |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    if (!this.emissive)
+      device.queue.writeTexture({ texture: this.glow }, new Uint8Array(4), { bytesPerRow: 4 }, [1, 1]);
     if (this.data) {
       device.queue.writeTexture(
         { texture: this.color },
@@ -387,8 +429,16 @@ export class Imposter {
         { bytesPerRow: size * 8 },
         [size, size],
       );
+      if (this.data.emissive)
+        device.queue.writeTexture(
+          { texture: this.glow },
+          this.data.emissive as Uint8Array<ArrayBuffer>,
+          { bytesPerRow: size * 4 },
+          [size, size],
+        );
     } else this.bake(device, this.source!);
     mipmaps(device, this.color);
+    if (this.emissive) mipmaps(device, this.glow);
     device.queue.writeBuffer(
       this.uniform,
       0,
@@ -417,7 +467,13 @@ export class Imposter {
       });
       store.parents[id] = -1;
       store.hidden[id] = 0;
+      if (this.pose) this.pose();
       store.tick(false);
+      if (model.prepareDeformation) {
+        const encoder = device.createCommandEncoder();
+        model.prepareDeformation({ backend: 'webgpu', device, encoder });
+        device.queue.submit([encoder.finish()]);
+      }
       const min = [Infinity, Infinity, Infinity],
         max = [-Infinity, -Infinity, -Infinity],
         points: number[] = [];
@@ -437,7 +493,7 @@ export class Imposter {
       let radius = 0;
       for (let i = 0; i < points.length; i += 3)
         radius = Math.max(radius, Math.hypot(points[i] - c[0], points[i + 1] - c[1], points[i + 2] - c[2]));
-      this.radius = radius * 1.01 || 1e-3;
+      this.radius = radius * 1.01 * this.margin || 1e-3;
       const target = (format: GPUTextureFormat) => {
         const texture = device.createTexture({
           size: [fs, fs],
@@ -450,8 +506,10 @@ export class Imposter {
       const albedo = target('rgba8unorm-srgb'),
         normal = target('rgba16float'),
         depth = target('depth32float'),
-        views = [albedo, normal, depth].map((texture) => texture.createView());
-      const modes = [0, 1].map((mode) => {
+        glow = this.emissive ? target('rgba8unorm-srgb') : undefined,
+        views = [albedo, normal, depth].map((texture) => texture.createView()),
+        glowView = glow?.createView();
+      const modes = [0, 1, 2].map((mode) => {
         const buffer = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         scratch.push(buffer);
         device.queue.writeBuffer(buffer, 0, new Float32Array([mode, 0, 0, 0]));
@@ -495,9 +553,21 @@ export class Imposter {
           mode = 1;
           context.format = 'rgba16float';
           model.draw(context, 'beauty', views[1], views[2]);
+          if (glowView) {
+            encoder
+              .beginRenderPass({
+                colorAttachments: [{ view: glowView, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
+                depthStencilAttachment: clearDepth,
+              })
+              .end();
+            mode = 2;
+            context.format = 'rgba8unorm-srgb';
+            model.draw(context, 'beauty', glowView, views[2]);
+          }
           for (const [from, to] of [
             [albedo, this.color!],
             [normal, this.normal!],
+            ...(glow ? [[glow, this.glow!]] : []),
           ])
             encoder.copyTextureToTexture({ texture: from }, { texture: to, origin: [i * fs, j * fs] }, [fs, fs]);
           device.queue.submit([encoder.finish()]);
@@ -541,7 +611,8 @@ export class Imposter {
       }
     };
     const color = await read(this.color!, 4),
-      normal = await read(this.normal!, 8);
+      normal = await read(this.normal!, 8),
+      emissive = this.emissive ? await read(this.glow!, 4) : undefined;
     return {
       frames: this.frames,
       frameSize: this.frameSize,
@@ -550,19 +621,61 @@ export class Imposter {
       shading: this.shading,
       color,
       normal: new Uint16Array(normal.buffer),
+      ...(emissive ? { emissive } : {}),
     };
   }
   private release(): void {
     this.color?.destroy();
     this.normal?.destroy();
+    this.glow?.destroy();
     this.uniform?.destroy();
-    this.color = this.normal = this.uniform = undefined;
+    this.color = this.normal = this.glow = this.uniform = undefined;
     this.device = undefined;
   }
   dispose(): void {
     this.disposed = true;
     this.release();
     this.source = this.data = undefined;
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
+}
+
+/**
+ * An animation as imposters: one atlas per frame, baked from a source posed by `pose(index)`. As a level, each instance
+ * plays it from `lod.frame` at `fps`; instances on one frame draw together, so a forest on 8 frames is 8 draws.
+ * @throws RangeError for a `count` below 2 or an `fps` below 0; as {@link Imposter.bake} otherwise.
+ */
+export class ImposterFrames {
+  fps: number;
+  constructor(
+    readonly imposters: readonly Imposter[],
+    fps = 0,
+  ) {
+    if (!(imposters?.length >= 2) || imposters.some((i) => !(i instanceof Imposter)))
+      throw new RangeError('ImposterFrames needs 2 or more imposters; pass one per frame');
+    if (!(fps >= 0 && fps < Infinity)) throw new RangeError('ImposterFrames fps must be 0 or more; pass frames a second');
+    this.fps = fps;
+  }
+  /** Bakes `count` atlases now (WebGPU). Keep the source alive if the device may be lost: the atlases rebake from it. */
+  static bake(engine: EngineKernel, source: ImposterSource, options: ImposterFramesOptions): ImposterFrames {
+    const { count, pose, fps = 0, ...rest } = options ?? ({} as ImposterFramesOptions);
+    if (!Number.isInteger(count) || count < 2) throw new RangeError('ImposterFrames needs a count of 2 or more');
+    if (typeof pose !== 'function')
+      throw new TypeError('ImposterFrames needs a pose function; pass one that puts the source in a frame');
+    return new ImposterFrames(
+      Array.from({ length: count }, (_, i) => Imposter.bake(engine, source, { ...rest, pose: () => pose(i) })),
+      fps,
+    );
+  }
+  /** Local bounding radius: the largest frame's. */
+  get radius(): number {
+    return Math.max(...this.imposters.map((i) => i.radius));
+  }
+  dispose(): void {
+    for (const imposter of this.imposters) imposter.dispose();
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
@@ -579,17 +692,19 @@ ${octWGSL}
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,options:vec4f}
 struct Atlas {center:vec4f,grid:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
-@group(0) @binding(1) var<storage,read> instances:array<mat4x4f>;
+struct Instance {m:mat4x4f,color:vec4f,emissive:vec4f}
+@group(0) @binding(1) var<storage,read> instances:array<Instance>;
 @group(0) @binding(2) var colorMap:texture_2d<f32>;
 @group(0) @binding(3) var normalMap:texture_2d<f32>;
 @group(0) @binding(4) var colorSampler:sampler;
 @group(0) @binding(5) var<uniform> atlas:Atlas;
+@group(0) @binding(6) var glowMap:texture_2d<f32>;
 struct Out {@builtin(position) clip:vec4f,@location(0) p:vec3f,@location(1) @interpolate(flat) eye:vec3f,@location(2) @interpolate(flat) a:vec4f,@location(3) @interpolate(flat) b:vec2f,@location(4) @interpolate(flat) w:vec3f,@location(5) @interpolate(flat) id:u32}
 struct Pixel {@location(0) color:vec4f,@builtin(frag_depth) depth:f32}
 fn lod_cell(p:vec3f,c:vec3f,r:f32,b:mat3x3f)->vec2f {let l=(p-c)/r;return vec2f(dot(l,b[0]),-dot(l,b[1]))*0.5+0.5;}
 fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}
 @vertex fn vertex(@builtin(vertex_index) v:u32,@builtin(instance_index) id:u32)->Out {
- let m=instances[id];let c=atlas.center.xyz;let r=atlas.center.w;let n=atlas.grid.x;
+ let m=instances[id].m;let c=atlas.center.xyz;let r=atlas.center.w;let n=atlas.grid.x;
  let c0=cross(m[1].xyz,m[2].xyz);let eye=transpose(mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz)))*(frame.eye.xyz-m[3].xyz)/dot(m[0].xyz,c0);
  // Quad on the sphere's camera-side tangent plane, half-size r: covers the projected sphere for any distance beyond it.
  let view=normalize(eye-c);let basis=lod_basis(view);let corner=vec2f(f32(v&1u),f32(v>>1u))*2.0-1.0;let p=c+view*r+(basis[0]*corner.x+basis[1]*corner.y)*r;
@@ -603,7 +718,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  let c=atlas.center.xyz;let r=atlas.center.w;let n=atlas.grid.x;let size=vec2f(textureDimensions(normalMap));let ray=i.p-i.eye;
  let tiles=array<vec2f,3>(i.a.xy,i.a.zw,i.b);let weights=array<f32,3>(i.w.x,i.w.y,i.w.z);let levels=f32(textureNumLevels(colorMap))-1.0;
  // Everything is blended by the view weights (no single "best" view), so nothing switches abruptly while the camera turns.
- var acc=vec4f(0.0);var normal=vec3f(0.0,1e-5,0.0);var along=0.0;var surface=vec2f(0.0);
+ var acc=vec4f(0.0);var emit=vec3f(0.0);var normal=vec3f(0.0,1e-5,0.0);var along=0.0;var surface=vec2f(0.0);
  for(var k=0;k<3;k++){
   // Reproject the pixel's ray onto view k's plane through the centre.
   let d=lod_decode(tiles[k]/(n-1.0)*2.0-1.0);let basis=lod_basis(d);let denom=select(dot(ray,d),-0.000001,abs(dot(ray,d))<0.000001);
@@ -615,7 +730,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
   let first=textureLoad(normalMap,vec2i(clamp((tiles[k]+clamp(centre,vec2f(half),vec2f(1.0-half)))/n*size,vec2f(0.0),size-1.0)),0);
   let cell=lod_cell(i.eye+ray*(start+first.z*r/denom),c,r,basis);let at=(tiles[k]+clamp(cell,vec2f(half),vec2f(1.0-half)))/n;
   let sample=textureSampleLevel(colorMap,colorSampler,at,lod)*f32(all(abs(cell-0.5)<vec2f(0.5)));let nd=textureLoad(normalMap,vec2i(clamp(at*size,vec2f(0.0),size-1.0)),0);
-  let weight=weights[k]*sample.a;acc+=weights[k]*sample;normal+=lod_decode(nd.xy)*weight;
+  let weight=weights[k]*sample.a;acc+=weights[k]*sample;normal+=lod_decode(nd.xy)*weight;emit+=weights[k]*textureSampleLevel(glowMap,colorSampler,at,lod).rgb*f32(all(abs(cell-0.5)<vec2f(0.5)));
   // View k's surface point on this pixel's ray (depth nd.z in radius units along d); the weights sum to alpha.
   let packed=floor(nd.w/32.0);along+=(start+nd.z*r/denom)*weight;surface+=vec2f(packed,nd.w-packed*32.0)*weight;
  }
@@ -623,17 +738,60 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  // would switch at once as the weights pass it: alpha-to-coverage under MSAA, a per-pixel dither threshold at 1x.
  let alpha=acc.a;let coverage=clamp((alpha-0.5)/max(fwidth(alpha),0.5)+0.5,0.0,1.0);
  if(coverage<=select(fract(52.9829189*fract(dot(i.clip.xy,vec2f(0.06711056,0.00583715)))),0.0,frame.options.y>0.5)){discard;}
- let m=instances[i.id];let world=(m*vec4f(i.eye+ray*(along/max(alpha,0.000001)),1.0)).xyz;let clip=frame.camera*vec4f(world,1.0);
- let albedo=acc.rgb/max(alpha,0.0001);let rm=surface/max(alpha,0.000001)/31.0;let rough=clamp(rm.x,0.045,1.0);let metal=clamp(rm.y,0.0,1.0);
+ let instance=instances[i.id];let m=instance.m;let world=(m*vec4f(i.eye+ray*(along/max(alpha,0.000001)),1.0)).xyz;let clip=frame.camera*vec4f(world,1.0);
+ let albedo=acc.rgb/max(alpha,0.0001)*instance.color.rgb;let glow=emit/max(alpha,0.0001)+instance.emissive.rgb;let rm=surface/max(alpha,0.000001)/31.0;let rough=clamp(rm.x,0.045,1.0);let metal=clamp(rm.y,0.0,1.0);
  let nn=normalize(mat3x3f(cross(m[1].xyz,m[2].xyz),cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*normalize(normal)*sign(dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))));
  let v=normalize(frame.eye.xyz-world);let l=normalize(frame.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(nn,l),0.0,1.0);let nv=clamp(dot(nn,v),0.0001,1.0);let nh=clamp(dot(nn,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=rough*rough;let a2=a*a;let d=${ggxDFloat};let g=${smithGFloat};
  let f0=mix(vec3f(0.04),albedo,metal);let fresnel=f0+(1.0-f0)*pow(1.0-vh,5.0);
- let direct=((1.0-fresnel)*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*frame.radiance.rgb*frame.light.w;
+ var direct=((1.0-fresnel)*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*frame.radiance.rgb*frame.light.w;
+ /*lod:direct*/
  var color:vec3f;
  // Match the source's renderer: gltf-pro (hemisphere fill) or core (flat ambient), both Khronos PBR Neutral.
- if(atlas.grid.z>0.5){color=direct+(albedo*(1.0-metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(nn.y*0.5+0.5,0.0,1.0))*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
- else{color=direct+albedo*(1.0-metal)*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
+ if(atlas.grid.z>0.5){color=glow+direct+(albedo*(1.0-metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(nn.y*0.5+0.5,0.0,1.0))*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
+ else{color=glow+direct+albedo*(1.0-metal)*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
  return Pixel(vec4f(color,coverage),clamp(clip.z/clip.w,0.0,1.0));
+}`;
+
+/**
+ * Draws one atlas into a cascade's depth map: a card facing the light per instance, each pixel's ray along the light
+ * reprojected onto the view nearest the light with one parallax step, as `imposterShader` does for the eye, cut by
+ * coverage, at the surface that view holds there.
+ */
+export const imposterShadowShader = `${octWGSL}
+struct Cast {matrix:mat4x4f,light:vec4f}
+struct Atlas {center:vec4f,grid:vec4f}
+struct Instance {m:mat4x4f,color:vec4f,emissive:vec4f}
+@group(0) @binding(0) var<uniform> lod_cast:Cast;
+@group(0) @binding(1) var<storage,read> instances:array<Instance>;
+@group(0) @binding(2) var colorMap:texture_2d<f32>;
+@group(0) @binding(3) var normalMap:texture_2d<f32>;
+@group(0) @binding(4) var colorSampler:sampler;
+@group(0) @binding(5) var<uniform> atlas:Atlas;
+struct Out {@builtin(position) clip:vec4f,@location(0) p:vec3f,@location(1) @interpolate(flat) tile:vec2f,@location(2) @interpolate(flat) ray:vec3f,@location(3) @interpolate(flat) id:u32}
+struct Pixel {@builtin(frag_depth) depth:f32}
+fn lod_cell(p:vec3f,c:vec3f,r:f32,b:mat3x3f)->vec2f {let l=(p-c)/r;return vec2f(dot(l,b[0]),-dot(l,b[1]))*0.5+0.5;}
+@vertex fn vertex(@builtin(vertex_index) v:u32,@builtin(instance_index) id:u32)->Out {
+ let m=instances[id].m;let c=atlas.center.xyz;let r=atlas.center.w;let n=atlas.grid.x;
+ let c0=cross(m[1].xyz,m[2].xyz);let toward=normalize(transpose(mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz)))*lod_cast.light.xyz/dot(m[0].xyz,c0));
+ let basis=lod_basis(toward);let corner=vec2f(f32(v&1u),f32(v>>1u))*2.0-1.0;let p=c+toward*r+(basis[0]*corner.x+basis[1]*corner.y)*r;
+ var o:Out;o.clip=lod_cast.matrix*(m*vec4f(p,1.0));o.p=p;o.ray=-toward;o.id=id;
+ o.tile=round(clamp((lod_encode(toward)*0.5+0.5)*(n-1.0),vec2f(0.0),vec2f(n-1.0)));return o;
+}
+@fragment fn fragment(i:Out)->Pixel {
+ let c=atlas.center.xyz;let r=atlas.center.w;let n=atlas.grid.x;let size=vec2f(textureDimensions(normalMap));
+ let d=lod_decode(i.tile/(n-1.0)*2.0-1.0);let basis=lod_basis(d);let denom=min(dot(i.ray,d),-0.000001);let start=dot(c-i.p,d)/denom;
+ let first=textureLoad(normalMap,vec2i(clamp((i.tile+clamp(lod_cell(i.p+i.ray*start,c,r,basis),vec2f(0.0),vec2f(1.0)))/n*size,vec2f(0.0),size-1.0)),0);
+ let cell=lod_cell(i.p+i.ray*(start+first.z*r/denom),c,r,basis);
+ if(any(abs(cell-0.5)>=vec2f(0.5))){discard;}
+ let at=(i.tile+cell)/n;
+ if(textureSampleLevel(colorMap,colorSampler,at,0.0).a<0.5){discard;}
+ let nd=textureLoad(normalMap,vec2i(clamp(at*size,vec2f(0.0),size-1.0)),0);
+ // Atlas depth comes from views a tile apart, here and in what the eye sees, so the two disagree by up to about a tile's
+ // angle over the radius, plus texels. The caster stands back that far, or the imposter would shadow its own surface;
+ // only depth moves, so the shadow it throws on anything else stays where it was.
+ let back=r*(2.0/(n-1.0)+4.0/atlas.grid.w);
+ let clip=lod_cast.matrix*(instances[i.id].m*vec4f(i.p+i.ray*(start+nd.z*r/denom+back),1.0));
+ return Pixel(clamp(clip.z/clip.w,0.0,1.0));
 }`;

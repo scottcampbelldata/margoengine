@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4945817,
+  "total": 4948222,
   "history": [
     {
       "date": "2026-10-24",
@@ -2084,6 +2084,12 @@
       "commit": "cca5a2a8a",
       "reason": "New stats entry ./compile: pipeline compile tracking linked to slow frames. Core and core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "4e42e904e",
+      "reason": "lod: imposter colour, emissive, frames and shadow source in the root",
+      "grew": 1
     }
   ],
   "items": {
@@ -2332,7 +2338,7 @@
     "@margoengine/loaders/usd": 7778,
     "@margoengine/loaders/vrml": 5087,
     "@margoengine/loaders/worker": 8571,
-    "@margoengine/lod": 11224,
+    "@margoengine/lod": 13629,
     "@margoengine/lod/auto": 5498,
     "@margoengine/lod/fade": 2542,
     "@margoengine/materials": 61113,

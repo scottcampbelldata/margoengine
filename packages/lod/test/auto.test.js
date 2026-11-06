@@ -5,7 +5,7 @@ import { box } from '../../core/dist/extension.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
-import { LOD, LODSystem, normalMatrix } from '@margoengine/lod';
+import { ImposterFrames, LOD, LODSystem, normalMatrix } from '@margoengine/lod';
 import { autoLOD, creased, hierarchicalLOD, simplifyAttributes } from '@margoengine/lod/auto';
 
 const sphere = (segments) => {
@@ -309,6 +309,12 @@ test('autoLOD levels a loaded model: its nodes, materials and transforms, points
   } finally {
     engine.dispose();
   }
+});
+
+test('ImposterFrames refuses too few frames and a bad fps or pose', () => {
+  assert.throws(() => new ImposterFrames([]), RangeError);
+  assert.throws(() => ImposterFrames.bake({}, {}, { count: 1, pose() {} }), RangeError);
+  assert.throws(() => ImposterFrames.bake({}, {}, { count: 2 }), TypeError);
 });
 
 test('setTransition takes switches after the first frame, one at a time, and hands them back', async () => {

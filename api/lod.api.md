@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Geometry, Mesh, PbrMaterial, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { PBRModel } from "@margoengine/gltf-pro";
 import { MutableVec3 } from "@margoengine/math";
 
@@ -17,6 +17,7 @@ export class Imposter {
     disposed: boolean;
     color?: GPUTexture;
     normal?: GPUTexture;
+    glow?: GPUTexture;
     uniform?: GPUBuffer;
     device?: GPUDevice;
     private constructor();
@@ -37,12 +38,40 @@ export interface ImposterData {
     shading: 'core' | 'gltf';
     color: Uint8Array;
     normal: Uint16Array;
+    emissive?: Uint8Array;
+}
+
+export class ImposterFrames {
+    readonly imposters: readonly Imposter[];
+    fps: number;
+    constructor(imposters: readonly Imposter[], fps?: number);
+    static bake(engine: EngineKernel, source: ImposterSource, options: ImposterFramesOptions): ImposterFrames;
+    get radius(): number;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface ImposterFramesOptions extends Omit<ImposterOptions, 'pose'> {
+    count: number;
+    pose(index: number): void;
+    fps?: number;
+}
+
+export interface ImposterLighting {
+    pbr?(group: number): {
+        declarations: string;
+        direct?(direct: string): string;
+    } | undefined;
+    bindings(): GPUBindGroupEntry[];
 }
 
 export interface ImposterOptions {
     frames?: number;
     frameSize?: number;
     material?: PbrMaterial;
+    emissive?: boolean;
+    pose?: () => void;
+    margin?: number;
 }
 
 export type ImposterSource = Geometry | Mesh | PBRModel;
@@ -55,6 +84,9 @@ export class LOD {
     readonly model: {
         readonly root: Mesh;
     } | null;
+    readonly color: Float32Array<ArrayBuffer>;
+    readonly emissive: Float32Array<ArrayBuffer>;
+    frame: number;
     constructor(system: LODSystem,
     index: number, anchor: Mesh, levels: readonly LODLevel[]);
     get level(): number;
@@ -79,10 +111,13 @@ export interface LODModelEntry {
 
 export type LODObject = Mesh | {
     readonly root: Mesh;
-} | Geometry | Imposter | null;
+} | Geometry | Imposter | ImposterFrames | null;
 
 export interface LODOptions {
     radius?: number;
+    color?: readonly number[];
+    emissive?: readonly number[];
+    frame?: number;
 }
 
 export class LODSystem implements EnginePlugin {
@@ -93,14 +128,24 @@ export class LODSystem implements EnginePlugin {
     constructor({ hysteresis, bias }?: LODSystemOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
-    onPreUpdate(): void;
+    onPreUpdate(delta?: number): void;
     get size(): number;
-    add(anchor: Mesh, levels: readonly LODLevel[], { radius }?: LODOptions): LOD;
+    add(anchor: Mesh, levels: readonly LODLevel[], { radius, color, emissive, frame }?: LODOptions): LOD;
     levelOf(lod: LOD): number;
     pickProxies(): readonly LOD[];
     remove(lod: LOD): void;
     setTransition(transition: (lod: LOD, from: number, to: number) => boolean): () => void;
     update(): void;
+    addLighting(effect: ImposterLighting): () => void;
+    prepareShadow({ context: c }: {
+        context: Context;
+    }): void;
+    drawShadow({ context: c, pass, matrix, cascade }: {
+        context: Context;
+        pass: GPURenderPassEncoder;
+        matrix: Float32Array;
+        cascade: number;
+    }): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -129,4 +174,10 @@ export function normalMatrix(m: ArrayLike<number>): {
 export function octDecode(x: number, y: number): MutableVec3;
 
 export function octEncode(d: Vec3): [number, number];
+
+// Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 ```

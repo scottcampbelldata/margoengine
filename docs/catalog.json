@@ -993,6 +993,7 @@
     "imports": "import { Imposter } from '@margoengine/lod';",
     "exports": [
       "Imposter",
+      "ImposterFrames",
       "LOD",
       "LODSystem",
       "MAX_LEVELS",

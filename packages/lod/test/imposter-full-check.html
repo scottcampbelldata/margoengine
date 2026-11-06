@@ -1,0 +1,103 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>LOD: fuller imposters</title><style>body{margin:0;background:#000}canvas{width:256px;height:256px;display:block}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Per-instance colour and emissive, baked emissive, animation frames, and shadows cast and received, each by pixels.
+import {Engine,PbrMaterial as CoreMaterial,box} from '/packages/core/dist/index.js';
+import {LODSystem,Imposter,ImposterFrames} from '/packages/lod/dist/index.js';
+import {createMesh,PbrMaterial} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[],W=256;
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,12],target:[0,0,0],fov:40,far:400}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const copy=new OffscreenCanvas(W,W),g=copy.getContext('2d',{willReadFrequently:true});
+const grab=()=>{engine.render();g.clearRect(0,0,W,W);g.drawImage(canvas,0,0);return g.getImageData(0,0,W,W).data;};
+// Mean colour of a square of the picture around (x, y), in pixels from the top left.
+const mean=(d,x,y,size=6)=>{
+  const out=[0,0,0];let n=0;
+  for(let j=y-size;j<=y+size;j++)for(let i=x-size;i<=x+size;i++){const o=(j*W+i)*4;out[0]+=d[o];out[1]+=d[o+1];out[2]+=d[o+2];n++;}
+  return out.map(v=>Math.round(v/n));
+};
+const settle=async()=>{engine.render();await device.queue.onSubmittedWorkDone();};
+const lods=LODSystem.attach(engine);
+const white=new CoreMaterial({color:[0.8,0.8,0.8],roughness:0.9});
+const base=Imposter.bake(engine,box(2,2,2),{material:white,frames:8,frameSize:64});
+window.check={
+  errors,
+  async run(){
+    const out={};
+    // Colour and emissive per instance, one atlas.
+    const left=engine.createMesh().setPosition([-2.5,0,0]),right=engine.createMesh().setPosition([2.5,0,0]);
+    const a=lods.add(left,[{object:base}],{color:[1,0.1,0.1]}),b=lods.add(right,[{object:base}],{color:[0.1,1,0.1]});
+    await settle();
+    let d=grab();
+    out.tinted={left:mean(d,76,128),right:mean(d,180,128)};
+    b.color.set([1,1,1]);b.emissive.set([0,0,0.8]);
+    await settle();d=grab();
+    out.live={right:mean(d,180,128)};
+    a.remove();b.remove();
+    // Baked emissive: glows in the dark, through export and fromData too.
+    const glowing=createMesh(engine,{positions:[-1,-1,0,1,-1,0,1,1,0,-1,1,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],indices:[0,1,2,0,2,3]},new PbrMaterial({color:[0,0,0],emissive:[0,1,0],emissiveIntensity:1,doubleSided:true}));
+    glowing.root.visible=false;
+    const glow=Imposter.bake(engine,glowing,{emissive:true,frames:8,frameSize:64});
+    const data=await glow.export(),again=Imposter.fromData(engine,data);
+    const plain=Imposter.bake(engine,glowing,{frames:8,frameSize:64});
+    const saved=[...engine.lighting.radiance],saved0=engine.lighting.direction[3];
+    engine.lighting.radiance.set([0,0,0,0]);
+    const stand=engine.createMesh();
+    let one=lods.add(stand,[{object:glow}]);await settle();d=grab();
+    out.glow=mean(d,128,128);one.remove();
+    one=lods.add(stand,[{object:again}]);await settle();d=grab();
+    out.again=mean(d,128,128);one.remove();
+    one=lods.add(stand,[{object:plain}]);await settle();d=grab();
+    out.plain=mean(d,128,128);one.remove();
+    out.exported=data.emissive?.length===data.color.length;
+    engine.lighting.radiance.set(saved);
+    // Frames: a source posed red then green, an instance on each, then one playing.
+    const paint=new PbrMaterial({color:[1,0,0],doubleSided:true,roughness:1});
+    const posed=createMesh(engine,{positions:[-1,-1,0,1,-1,0,1,1,0,-1,1,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],indices:[0,1,2,0,2,3]},paint);
+    posed.root.visible=false;
+    const frames=ImposterFrames.bake(engine,posed,{count:2,fps:2,frames:8,frameSize:64,pose:i=>{paint.color=i?[0,1,0]:[1,0,0];}});
+    frames.fps=0;
+    const first=lods.add(left,[{object:frames}]),second=lods.add(right,[{object:frames}],{frame:1});
+    await settle();d=grab();
+    out.frames={left:mean(d,76,128),right:mean(d,180,128)};
+    frames.fps=2;
+    lods.onPreUpdate(0.5);await settle();d=grab();
+    out.played={left:mean(d,76,128),right:mean(d,180,128)};
+    frames.fps=0;
+    first.remove();second.remove();
+    frames.dispose();
+    // Shadows: cast onto a floor, received from a blocker above.
+    engine.camera.position=[0,12,14];engine.camera.target=[0,0,0];
+    engine.lighting.direction.set([0,1,0,saved0]);
+    const floor=engine.createMesh().setGeometry(box(40,0.2,40)).setPosition([0,-2,0]).setMaterial(white);
+    const shadows=Shadows.attach(engine,{resolution:1024,distance:60,filter:'pcf'});
+    shadows.add(floor);
+    const remove=shadows.add(lods);
+    const tree=engine.createMesh().setPosition([0,1,0]);
+    const held=lods.add(tree,[{object:base}]);
+    const camera=engine.camera;
+    // The picture of a world point.
+    const pixel=p=>{
+      const m=camera.matrix,x=m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],y=m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],w=m[3]*p[0]+m[7]*p[1]+m[11]*p[2]+m[15];
+      return [Math.round((x/w*0.5+0.5)*W),Math.round((0.5-y/w*0.5)*W)];
+    };
+    await settle();await settle();await settle();
+    const under=[0,-1.9,0],beside=[5,-1.9,0];
+    d=grab();
+    out.cast={under:mean(d,...pixel(under),3),beside:mean(d,...pixel(beside),3)};
+    // A roof over the object: its top goes dark.
+    const top=[0,2,0.4];
+    const open=mean(grab(),...pixel(top),3);
+    const roof=engine.createMesh().setGeometry(box(8,0.2,8)).setPosition([0,6,0]).setMaterial(white);
+    shadows.add(roof);
+    await settle();await settle();await settle();
+    out.received={open,covered:mean(grab(),...pixel(top),3)};
+    remove();
+    held.remove();
+    await settle();
+    return out;
+  },
+};
+window.ready=true;
+</script></body></html>

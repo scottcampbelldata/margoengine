@@ -114,6 +114,12 @@ for (const [file, target, anchor] of contracts) {
   });
 }
 
+test('lod imposters take the direct hook of shadows, with the names they rewrite', () => {
+  assert.ok(source('shadows/src/index.ts').includes('`shadowLit(${d},i.position,s.n)`'));
+  assert.ok(source('lod/src/index.ts').includes(".replaceAll('i.position', 'world').replaceAll('s.n', 'nn')"));
+  assert.ok(source('lod/src/imposter.ts').includes('/*lod:direct*/'));
+});
+
 test('lod fade guards all three surface entries of the gltf-pro shader', () => {
   const anchor = 'let s=surface(i,front);';
   assert.equal(count(pbrShader, anchor), 3);
