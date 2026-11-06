@@ -1009,7 +1009,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | A9 | resolveFromURL reads LDraw parts from a hosted library, and the README says where to get it | DONE | `69ad9dc6d` | - |
 | A8 | The headless README opens with the ffmpeg need for video in Node | DONE | `22b5cdaa7` | - |
 | B9 | MeshBridge.sync pays one pass when nothing moved (regression of e1daa8a3e) | DONE | `71d56976e` | - |
-| verify | The unit test step names a hung test: 300 s a test, a watch in the runner for a silent file | DONE | this commit | - |
+| verify | The unit test step names a hung test: 300 s a test, a watch in the runner for a silent file | DONE | `93f59a87e` | - |
+| A4 | GPUDynamicBVH.fromPrimitive and fromModel follow a real skinned model, proved on Fox.glb at three poses (also closes C7) | DONE | this commit | LIM-128 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

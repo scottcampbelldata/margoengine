@@ -299,9 +299,35 @@ using refit = await GPUDynamicBVH.create(device, {
 | Option | Default |
 | --- | --- |
 | `mode` | `'build'` |
-| `bvh` | none; required by `'refit'`, a MeshBVH of the same triangles |
+| `bvh` | none; required by `'refit'` in `create`, a MeshBVH of the same triangles |
 | `stride` | 3 floats from one vertex to the next |
 | `offset` | 0 floats before the first position |
+
+A loaded character needs no buffer plumbing. `fromModel` makes one tree for each deforming primitive of a `PBRModel`, and `fromPrimitive` makes one for a single entry of `model.primitives`. Both read the stride and offset of gltf-pro's deformed output, take `mode` and `bvh`, and in `'refit'` mode default `bvh` to the bind pose.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {engineRuntime} from 'margoengine/core/extension';
+import {Animation} from 'margoengine/animation';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {GPUDynamicBVH} from 'margoengine/bvh/gpu-build';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const model = await loadGLTF(engine, '/fox.glb');
+Animation.attach(model);
+const device = engineRuntime(engine).gpu!;
+const trees = await GPUDynamicBVH.fromModel(device, model);
+
+// After each frame that moves the skin:
+engine.render();
+const encoder = device.createCommandEncoder();
+for (const tree of trees) tree.encode(encoder);
+device.queue.submit([encoder.finish()]);
+const hits = await trees[0].tree.raycast([{origin: [0, 50, 200], direction: [0, 0, -1]}]);
+console.log(hits.distance[0]);
+```
+
+Rays and hits are in the space `model.readPickingGeometry()` gives its vertices. If the deformer moves the primitive, because a shared arena grew or compacted, `encode` throws MargoError `'state'` instead of reading stale memory: make a new tree.
 
 ## Alpha-masked picking
 

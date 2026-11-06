@@ -2,6 +2,11 @@
 // rays through them are compared with a float64 CPU tree of the same pose.
 import { MeshBVH } from '@margoengine/bvh';
 import { GPUDynamicBVH } from '@margoengine/bvh/gpu-build';
+import { Animation } from '@margoengine/animation';
+import { Engine } from '@margoengine/core';
+import { engineRuntime } from '@margoengine/core/extension';
+import { loadGLTF } from '@margoengine/gltf-pro';
+import foxURL from '../../../examples/assets/khronos/Fox/Fox.glb?url';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -168,6 +173,61 @@ const storage = (device, data, extra = 0) => {
 };
 
 /** Runs every check on one device; pushes a line per check into `report.checks`. */
+// A real skin: Fox.glb through gltf-pro and Animation, the tree on the deformed output, against a CPU tree of the same
+// pose read back from the GPU, at three times of the clip.
+async function skinnedChecks() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const engine = await Engine.create(canvas, { backend: 'webgpu' }),
+    device = engineRuntime(engine).gpu,
+    model = await loadGLTF(engine, foxURL),
+    animation = Animation.attach(model);
+  animation.playing = false;
+  engine.render({ culling: false });
+  const trees = await GPUDynamicBVH.fromModel(device, model);
+  assert(trees.length > 0, 'the Fox has a deforming primitive');
+  const clip = animation.clips[0],
+    poses = [];
+  let agreed = 0;
+  for (const part of [0.1, 0.45, 0.8]) {
+    animation.seek(clip.duration * part);
+    engine.render({ culling: false });
+    const encoder = device.createCommandEncoder();
+    for (const tree of trees) tree.encode(encoder);
+    device.queue.submit([encoder.finish()]);
+    const snapshots = await model.readPickingGeometry();
+    for (const tree of trees) {
+      const snapshot = snapshots.find((s) => model.primitives[s.primitiveIndex] === tree.primitive),
+        count = snapshot.vertices.length / 20,
+        positions = new Float32Array(count * 3),
+        low = [Infinity, Infinity, Infinity],
+        high = [-Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < count; i++)
+        for (let k = 0; k < 3; k++) {
+          const value = (positions[i * 3 + k] = snapshot.vertices[i * 20 + k]);
+          low[k] = Math.min(low[k], value);
+          high[k] = Math.max(high[k], value);
+        }
+      poses.push(positions[0]);
+      const next = random(17),
+        rays = Array.from({ length: 4000 }, () => {
+          const within = () => low.map((v, k) => v + next() * (high[k] - v)),
+            target = within(),
+            origin = within().map((v, k) => v + (next() - 0.5) * 4 * (high[k] - low[k]));
+          return { origin, direction: target.map((v, k) => v - origin[k]) };
+        }),
+        cpu = MeshBVH.build({ positions, indices: tree.primitive.indices });
+      agreed += await compare(tree, cpu, rays, `Fox at ${part}`);
+    }
+  }
+  assert(new Set(poses).size === poses.length, `the three poses differ: ${poses}`);
+  for (const tree of trees) tree.dispose();
+  animation.dispose?.();
+  model.dispose();
+  engine.dispose();
+  return { trees: trees.length, agreed };
+}
+
 export async function gpuBuildChecks(report) {
   const adapter = await navigator.gpu.requestAdapter();
   assert(adapter, 'no WebGPU adapter');
@@ -277,5 +337,7 @@ export async function gpuBuildChecks(report) {
   assert(!errors.length, `GPU errors: ${errors.join('; ')}`);
   vertices.destroy();
   device.destroy();
+  const skinned = await skinnedChecks();
+  report.checks.push(`gpu build: Fox.glb skinned by Animation, ${skinned.trees} tree, ${skinned.agreed} rays agree with the pose read back`);
   return true;
 }

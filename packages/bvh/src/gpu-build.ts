@@ -29,6 +29,30 @@ export interface GPUDynamicBVHOptions {
   bvh?: MeshBVH;
 }
 
+/**
+ * What {@link GPUDynamicBVH.fromPrimitive} reads of a primitive: an entry of `model.primitives` from
+ * `@margoengine/gltf-pro`, once a deformer such as `Animation` from `@margoengine/animation` is attached.
+ */
+export interface DeformedPrimitive {
+  /** The buffer the deformer writes, set when it attaches. */
+  readonly deformed?: GPUBuffer;
+  /** Bytes before the primitive's first vertex in `deformed`. Default 0. */
+  readonly deformedOffset?: number;
+  /** The bind pose, 20 floats a vertex, position first. */
+  readonly vertices: Float32Array;
+  /** Triangles, three vertex indices each. */
+  readonly indices: Uint32Array;
+}
+/** Options of {@link GPUDynamicBVH.fromPrimitive} and {@link GPUDynamicBVH.fromModel}. */
+export interface GPUDeformedBVHOptions {
+  /** As {@link GPUDynamicBVHOptions.mode}. Default 'build'. */
+  mode?: 'build' | 'refit';
+  /** With 'refit': a MeshBVH of the same triangles. Default a tree of the primitive's bind pose. */
+  bvh?: MeshBVH;
+}
+
+/** Floats per vertex in gltf-pro's deformed output. */
+const PRIMITIVE_STRIDE = 20;
 const GROUP = 64;
 /** The tree's depth bound: 30 Morton bits, then at most 32 more from the index tie-break. */
 const PASSES = 62;
@@ -291,6 +315,13 @@ interface Step {
   y: number;
 }
 
+function bindPose({ vertices, indices }: DeformedPrimitive): MeshBVH {
+  const positions = new Float32Array((vertices.length / PRIMITIVE_STRIDE) * 3);
+  for (let i = 0, o = 0; o < vertices.length; i += 3, o += PRIMITIVE_STRIDE)
+    positions.set(vertices.subarray(o, o + 3), i);
+  return MeshBVH.build({ positions, indices });
+}
+
 /**
  * A BVH that follows a GPU vertex buffer. Each frame, after whatever writes the vertices, `encode(encoder)` updates the
  * tree; `tree` then traces as any {@link GPUMeshBVH} does, in the same encoder, with no readback.
@@ -300,6 +331,9 @@ export class GPUDynamicBVH {
   /** The tree on the GPU: `raycast`, `encodeTrace`, `bindings` and the WGSL of `@margoengine/bvh/gpu` all work on it. */
   readonly tree: GPUMeshBVH;
   readonly mode: 'build' | 'refit';
+  /** The primitive this tree follows, when made by `fromPrimitive` or `fromModel`. */
+  primitive?: DeformedPrimitive;
+  #followed?: { buffer: GPUBuffer; offset: number };
   #steps: Step[] = [];
   #owned: GPUBuffer[] = [];
   #ranges!: GPUBuffer;
@@ -337,6 +371,51 @@ export class GPUDynamicBVH {
     return self;
   }
 
+  /**
+   * Follows one deforming primitive of a loaded model, so a raycast sees the pose with no readback. Positions and hits
+   * are in the space `model.readPickingGeometry()` gives its vertices. Call `encode` after the frame that deforms it.
+   * @throws MargoError `'state'` when the primitive has no deformed buffer: attach `Animation` first.
+   */
+  static async fromPrimitive(
+    target: GPUTarget,
+    primitive: DeformedPrimitive,
+    { mode = 'build', bvh }: GPUDeformedBVHOptions = {},
+  ): Promise<GPUDynamicBVH> {
+    const buffer = primitive?.deformed;
+    if (!buffer)
+      throw new MargoError('state', 'The primitive has no deformed buffer; attach a deformer such as Animation first.');
+    const { indices, deformedOffset: bytes = 0 } = primitive,
+      offset = bytes / 4,
+      self = await GPUDynamicBVH.create(target, {
+        vertices: buffer,
+        indices,
+        stride: PRIMITIVE_STRIDE,
+        offset,
+        mode,
+        bvh: mode === 'refit' ? (bvh ?? bindPose(primitive)) : undefined,
+      });
+    self.primitive = primitive;
+    self.#followed = { buffer, offset: bytes };
+    return self;
+  }
+
+  /** A tree for each deforming primitive of `model`, in the order of `model.primitives`; see {@link fromPrimitive}. */
+  static async fromModel(
+    target: GPUTarget,
+    model: { readonly primitives: readonly DeformedPrimitive[] },
+    options?: GPUDeformedBVHOptions,
+  ): Promise<GPUDynamicBVH[]> {
+    const trees: GPUDynamicBVH[] = [];
+    try {
+      for (const primitive of model.primitives)
+        if (primitive.deformed) trees.push(await GPUDynamicBVH.fromPrimitive(target, primitive, options));
+    } catch (error) {
+      for (const tree of trees) tree.dispose();
+      throw error;
+    }
+    return trees;
+  }
+
   private constructor(tree: GPUMeshBVH, mode: 'build' | 'refit') {
     this.device = tree.device;
     this.tree = tree;
@@ -350,6 +429,9 @@ export class GPUDynamicBVH {
   /** Adds the passes that bring the tree up to the vertices' current contents, once they are written in this encoder. */
   encode(encoder: GPUCommandEncoder): void {
     if (this.#disposed) throw new MargoError('disposed', 'GPUDynamicBVH is disposed; create a new one to follow a mesh.');
+    const { primitive } = this;
+    if (primitive && (primitive.deformed !== this.#followed?.buffer || (primitive.deformedOffset ?? 0) !== this.#followed?.offset))
+      throw new MargoError('state', 'The primitive moved to another deformed buffer or offset; make a new GPUDynamicBVH.');
     const pass = encoder.beginComputePass({ label: 'bvh follow' });
     for (const { pipeline, groups, slot, x, y } of this.#steps) {
       pass.setPipeline(pipeline);

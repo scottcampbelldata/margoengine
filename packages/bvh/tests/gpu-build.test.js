@@ -6,6 +6,14 @@ import { GPUDynamicBVH } from '../dist/gpu-build.js';
 
 globalThis.GPUBufferUsage ??= { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, UNIFORM: 64, STORAGE: 128 };
 
+const primitiveOf = (extra = {}) => ({
+  vertices: new Float32Array(60).map((_, i) => (i % 20 < 3 ? (i * 7) % 5 : 9)),
+  indices: new Uint32Array([0, 1, 2]),
+  deformed: { size: 4096 + 240 },
+  deformedOffset: 4096,
+  ...extra,
+});
+
 function fakeDevice({ limit = 1 << 27 } = {}) {
   const dispatches = [],
     writes = [],
@@ -107,4 +115,46 @@ test('bad options say what to pass', async () => {
   await assert.rejects(create({ vertices: { size: 12 } }), RangeError);
   await assert.rejects(GPUDynamicBVH.create(fakeDevice({ limit: 64 }), { vertices: { size: 48 }, indices: mesh.indices }), RangeError);
   await assert.rejects(GPUDynamicBVH.create({}, { vertices: vertices(), indices: mesh.indices }), { code: 'unsupported' });
+});
+
+test('fromPrimitive reads the stride and offset of a deformed primitive, and needs a deformer', async () => {
+  const device = fakeDevice(),
+    primitive = primitiveOf(),
+    dynamic = await GPUDynamicBVH.fromPrimitive(device, primitive);
+  assert.equal(dynamic.primitive, primitive);
+  const mesh = device.writes.map(({ data }) => new Uint32Array(data.buffer ?? data)).find((words) => words[0] === 20);
+  assert.ok(mesh, 'the mesh uniform holds a stride of 20 floats');
+  assert.equal(mesh[1], 1024, 'and the offset in floats');
+  await assert.rejects(GPUDynamicBVH.fromPrimitive(device, primitiveOf({ deformed: undefined })), { code: 'state' });
+  dynamic.dispose();
+});
+
+test('refit defaults to a tree of the bind pose', async () => {
+  const dynamic = await GPUDynamicBVH.fromPrimitive(fakeDevice(), primitiveOf(), { mode: 'refit' });
+  assert.equal(dynamic.mode, 'refit');
+  dynamic.dispose();
+});
+
+test('fromModel makes a tree per deforming primitive, in order, and leaves the rest', async () => {
+  const device = fakeDevice(),
+    first = primitiveOf(),
+    last = primitiveOf({ deformedOffset: 0 }),
+    trees = await GPUDynamicBVH.fromModel(device, { primitives: [first, primitiveOf({ deformed: undefined }), last] });
+  assert.deepEqual(trees.map((tree) => tree.primitive), [first, last]);
+  for (const tree of trees) tree.dispose();
+});
+
+test('a primitive moved to another buffer or offset is an error, not a tree of stale memory', async () => {
+  const device = fakeDevice(),
+    primitive = primitiveOf(),
+    dynamic = await GPUDynamicBVH.fromPrimitive(device, primitive),
+    encoder = { beginComputePass: () => ({ setPipeline() {}, setBindGroup() {}, dispatchWorkgroups() {}, end() {} }) };
+  dynamic.encode(encoder);
+  primitive.deformedOffset = 8192;
+  assert.throws(() => dynamic.encode(encoder), { code: 'state' });
+  primitive.deformedOffset = 4096;
+  dynamic.encode(encoder);
+  primitive.deformed = { size: 8192 };
+  assert.throws(() => dynamic.encode(encoder), { code: 'state' });
+  dynamic.dispose();
 });

@@ -5,11 +5,28 @@
 ```ts
 import { MutableVec3, RayLike } from "@margoengine/math";
 
+export interface DeformedPrimitive {
+    readonly deformed?: GPUBuffer;
+    readonly deformedOffset?: number;
+    readonly vertices: Float32Array;
+    readonly indices: Uint32Array;
+}
+
+export interface GPUDeformedBVHOptions {
+    mode?: 'build' | 'refit';
+    bvh?: MeshBVH;
+}
+
 export class GPUDynamicBVH {
     readonly device: GPUDevice;
     readonly tree: GPUMeshBVH;
     readonly mode: 'build' | 'refit';
+    primitive?: DeformedPrimitive;
     static create(target: GPUTarget, options: GPUDynamicBVHOptions): Promise<GPUDynamicBVH>;
+    static fromPrimitive(target: GPUTarget, primitive: DeformedPrimitive, { mode, bvh }?: GPUDeformedBVHOptions): Promise<GPUDynamicBVH>;
+    static fromModel(target: GPUTarget, model: {
+        readonly primitives: readonly DeformedPrimitive[];
+    }, options?: GPUDeformedBVHOptions): Promise<GPUDynamicBVH[]>;
     private constructor();
     get disposed(): boolean;
     encode(encoder: GPUCommandEncoder): void;
