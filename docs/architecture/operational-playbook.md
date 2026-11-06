@@ -543,8 +543,10 @@ nodes (`If`, `Loop`, `While`, `Switch`) leave graphs without statements byte for
 code path serves both, and `/nn` gathers through an inverse table so it needs no atomics and its gradients repeat exactly. `/autotune`
 times candidate workgroup sizes in interleaved rounds, keeps the median-fastest and caches per adapter, name, signature, source and
 candidates; `createCompute` now asks for the adapter's workgroup limits so sizes above 256 can be tried. Evidence: `npm test` and
-`compute-browser.mjs` in `packages/compute`, LIM-079, LIM-080 and LIM-082. Speed is not measured for `/nn` or `/graph`, and `/autotune`
-makes no claim about how much a tuned size gains.
+`compute-browser.mjs` in `packages/compute`, LIM-079, LIM-080 and LIM-082. `tuneCompute` runs the same timing on the context's own
+reduce, scan and radix sort, whose kernels now take their thread count as a parameter (`createCompute({ tuned })`); a sort block is one
+workgroup, so the block count follows the table, and another route's kernels keep 256. Speed is not measured for `/nn` or `/graph`.
+Tuned sizes have diagnostic numbers on one Apple M6 and one RTX A6000 only (perf-history entry 77); no AMD or Intel GPU is measured.
 
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and

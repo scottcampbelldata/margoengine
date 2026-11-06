@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCompute } from '@margoengine/compute';
-import { autotune } from '@margoengine/compute/autotune';
+import { autotune, tuneCompute } from '@margoengine/compute/autotune';
 
 // A context whose GPU takes the time `cost(size)` says, so which size wins is known. tests/compute-autotune-browser.js
 // runs the real thing.
@@ -216,4 +216,61 @@ test('wrong input is refused by name', async (t) => {
   const cpu = await createCompute({ backend: 'cpu' });
   t.after(() => cpu.dispose());
   await assert.rejects(autotune(cpu, job(gpu)), (error) => error.code === 'unsupported');
+});
+
+test('createCompute refuses a tuning table it cannot run, before any device exists', async () => {
+  await assert.rejects(createCompute({ backend: 'cpu', tuned: { reduce: 100 } }), RangeError);
+  await assert.rejects(createCompute({ backend: 'cpu', tuned: { scan: 2048 } }), RangeError);
+  await assert.rejects(createCompute({ backend: 'cpu', tuned: { fft: 256 } }), TypeError);
+  const cpu = await createCompute({ backend: 'cpu', tuned: { reduce: 128, scan: 64, sort: 512 } });
+  assert.equal(await cpu.array(new Float32Array([1, 2, 3])).sum().item(), 6);
+  cpu.dispose();
+});
+
+test('a table over the device limit is refused, and an owned device goes with it', async () => {
+  let destroyed = 0;
+  const device = {
+      limits: { maxComputeInvocationsPerWorkgroup: 256 },
+      lost: new Promise(() => {}),
+      features: new Set(),
+      destroy: () => destroyed++,
+    };
+  await assert.rejects(createCompute({ device, tuned: { sort: 512 } }), /limit of 256/);
+  assert.equal(destroyed, 0, 'a device the caller passed stays open');
+});
+
+test('tuneCompute needs a GPU and the default kernels', async () => {
+  const cpu = await createCompute({ backend: 'cpu' });
+  await assert.rejects(tuneCompute(cpu), (error) => error.code === 'unsupported');
+  cpu.dispose();
+  const gpu = stubGpu(fastest128);
+  gpu.kernelRoute = {};
+  await assert.rejects(tuneCompute(gpu), /before useSubgroups/);
+});
+
+test('tuneCompute keeps the fastest of each kernel, and the table sticks', async () => {
+  const gpu = stubGpu(([x]) => x);
+  gpu.tuned = {};
+  const run = (name) => {
+    const size = gpu.tuned[name];
+    gpu.runs.push([size, 1, 1]);
+    return { dispose() {} };
+  };
+  Object.assign(gpu, {
+    arange: () => ({ dispose() {}, sum: () => run('reduce') }),
+    array: () => ({ dispose() {} }),
+    cumsum: () => run('scan'),
+    sort: () => run('sort'),
+  });
+  const store = memoryStore(),
+    first = await tuneCompute(gpu, { count: 8, store, trials: 3, warmup: 1 });
+  assert.deepEqual(first.tuned, { reduce: 64, scan: 64, sort: 64 });
+  assert.deepEqual(gpu.tuned, first.tuned);
+  assert.equal(first.cached, false);
+  assert.deepEqual(first.timings.reduce.map((t) => t.workgroupSize[0]), [256, 128, 64]);
+  const runs = gpu.runs.length,
+    second = await tuneCompute(gpu, { count: 8, store });
+  assert.equal(second.cached, true);
+  assert.equal(gpu.runs.length, runs, 'a known result runs nothing');
+  assert.deepEqual(second.tuned, first.tuned);
 });

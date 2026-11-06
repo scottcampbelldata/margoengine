@@ -514,8 +514,32 @@ it depends on in `signature` (default `''`). `run` runs many times, so write it 
 Times are GPU time from timestamp queries, or wall clock up to `gpu.done()` on a device without them. Browsers round GPU
 timestamps (steps of 0.066 ms in the Chrome tested), so sizes of a short kernel can tie: have `run` dispatch it several times.
 Equal medians go to the better mean, then to the earlier candidate. A result is kept per
-adapter, `name`, `signature`, WGSL source and candidate list, so changing any of them measures again. The package's own
-kernels keep their fixed sizes; this is for yours.
+adapter, `name`, `signature`, WGSL source and candidate list, so changing any of them measures again.
+
+`tuneCompute` does the same for the package's own `reduce`, `scan` and `sort` kernels. It times each at 64 to 1024 threads and
+the context uses the winners from then on. Keep the table and pass it to `createCompute({ tuned })` to skip measuring.
+
+```ts
+import { createCompute } from '@margoengine/compute';
+import { tuneCompute } from '@margoengine/compute/autotune';
+
+using gpu = await createCompute();
+if (gpu.backend === 'webgpu') {
+  const { tuned, timings } = await tuneCompute(gpu, { count: 1 << 20 }); // the array size your work has
+  console.log(tuned, timings.sort); // { reduce: 128, scan: 128, sort: 64 } on an Apple M6
+}
+const keys = gpu.array(new Uint32Array([5, 3, 9, 1]));
+console.log(await gpu.sort(keys).read()); // [1, 3, 5, 9]
+```
+
+Options are `count` (default 4,194,304), `trials`, `warmup`, `store`, `refresh` and `signal`, as above. `createCompute({ tuned })`
+takes `reduce`, `scan` and `sort`, each 64, 128, 256, 512 or 1024 and within the device's limit, and refuses anything else.
+Default 256 for all three. Integer results and sort orders stay the same; float sums round in another order. Other operations
+keep their fixed sizes: `sum(axis)`, segmented scans, the fused element-wise kernels. The CPU backend, `useSubgroups` and the
+WebGL2 layer's sort use kernels of their own and ignore the table; call `tuneCompute` before `useSubgroups`.
+
+The gain depends on the GPU. On an Apple M6 a million-key sort went from 3.55 ms at the default 256 to 3.09 ms at 64, and 16.8
+million keys from 60.2 to 55.6 ms at 128. On an RTX A6000 256 was already the best for all three, so tuning changes nothing there.
 
 ## CPU fallback
 

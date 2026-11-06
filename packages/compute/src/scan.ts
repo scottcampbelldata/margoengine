@@ -45,7 +45,7 @@ function flatPasses(
   temporary.push(sums);
   passes.push({
     program: ctx.program(
-      ctx.kernelRoute?.scan(src, combine, identity) ?? scanShader(src, combine, identity),
+      ctx.kernelRoute?.scan(src, combine, identity) ?? scanShader(src, combine, identity, ctx.tuned.scan),
       undefined,
       'scan',
     ),

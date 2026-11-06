@@ -2,7 +2,7 @@
 // is the one measured fastest, and the result comes back from the cache and a store. tests/autotune.test.js covers the
 // choosing with a scripted GPU.
 import { createCompute } from '@margoengine/compute';
-import { autotune } from '@margoengine/compute/autotune';
+import { autotune, tuneCompute } from '@margoengine/compute/autotune';
 
 const checks = [];
 const assert = (condition, message) => {
@@ -83,7 +83,48 @@ window.runAutotuneTests = async () => {
       assert(out[side * 3 + 5] === 8 && out[side * side - 1] === 2 * side - 2, 'wrong grid');
       grid.dispose();
     });
-    return { checks, measured };
+    let own;
+    await check('every size of the context\'s own kernels gives the same integers and order', async () => {
+      const count = 300_001,
+        data = Int32Array.from({ length: count }, (_, i) => (Math.imul(i, 2654435761) >> 12) % 1000),
+        keys = Uint32Array.from({ length: count }, (_, i) => Math.imul(i, 2654435761) >>> 0),
+        sorted = keys.slice().sort(),
+        running = data.reduce((list, v, i) => ((list[i] = (list[i - 1] ?? 0) + v), list), new Int32Array(count)),
+        total = running[count - 1];
+      for (const threads of [64, 128, 256, 512, 1024]) {
+        const other = await createCompute({ backend: 'webgpu', tuned: { reduce: threads, scan: threads, sort: threads } });
+        try {
+          assert((await other.array(data).sum().item()) === total, `reduce at ${threads}`);
+          const scanned = await other.cumsum(other.array(data)).read();
+          assert(scanned.every((v, i) => v === running[i]), `scan at ${threads}`);
+          const order = await other.sort(other.array(keys)).read();
+          assert(order.every((v, i) => v === sorted[i]), `sort at ${threads}`);
+          const paired = other.sortByKey(other.array(keys), other.arange(0, count, 1, 'u32')),
+            ids = await paired.values.read();
+          assert(ids.every((id, i) => keys[id] === sorted[i]), `sortByKey at ${threads}`);
+        } finally {
+          other.dispose();
+        }
+      }
+    });
+    await check('tuneCompute measures the kernels on this GPU and uses the winners', async () => {
+      const other = await createCompute({ backend: 'webgpu' });
+      try {
+        const result = await tuneCompute(other, { count: 1 << 24 });
+        own = { tuned: result.tuned, timings: result.timings };
+        for (const name of ['reduce', 'scan', 'sort']) {
+          const times = result.timings[name],
+            best = Math.min(...times.map((t) => t.ms));
+          assert(times.length >= 3 && best > 0, name);
+          assert(times.find((t) => t.workgroupSize[0] === result.tuned[name]).ms === best, `${name} is not the fastest`);
+        }
+        assert(other.tuned === result.tuned || other.tuned.sort === result.tuned.sort, 'table not in use');
+        assert((await other.array(new Uint32Array(5000).fill(3)).sum().item()) === 15000, 'sum after tuning');
+      } finally {
+        other.dispose();
+      }
+    });
+    return { checks, measured, own };
   } finally {
     gpu.dispose();
   }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8930599,
+  "total": 8913965,
   "history": [
     {
       "date": "2026-10-24",
@@ -2690,6 +2690,12 @@
       "commit": "a7176fed3",
       "reason": "feat(kinematics-constraints): concave and distance-field obstacles (new entry @margoengine/kinematics-constraints/sdf)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8eaaf29dd",
+      "reason": "tuneCompute and the tuned table: the compute kernels take their thread count, autotune gains the own-kernel measuring",
+      "grew": 3
     }
   ],
   "items": {
@@ -2774,18 +2780,18 @@
     "@margoengine/clustered/projector": 2871,
     "@margoengine/clustered/shadows": 11769,
     "@margoengine/clustered/units": 1089,
-    "@margoengine/compute": 38960,
+    "@margoengine/compute": 40233,
     "@margoengine/compute/autodiff": 5845,
-    "@margoengine/compute/autotune": 1872,
+    "@margoengine/compute/autotune": 3791,
     "@margoengine/compute/fft": 6037,
-    "@margoengine/compute/frame": 31457,
-    "@margoengine/compute/graph": 7525,
+    "@margoengine/compute/frame": 32440,
+    "@margoengine/compute/graph": 7451,
     "@margoengine/compute/linalg": 5745,
     "@margoengine/compute/nn": 19137,
     "@margoengine/compute/random": 8328,
     "@margoengine/compute/signal": 7496,
-    "@margoengine/compute/sparse": 7283,
-    "@margoengine/compute/stream": 1422,
+    "@margoengine/compute/sparse": 7238,
+    "@margoengine/compute/stream": 1324,
     "@margoengine/compute/subgroups": 2537,
     "@margoengine/controls": 27517,
     "@margoengine/controls/arcball": 8177,

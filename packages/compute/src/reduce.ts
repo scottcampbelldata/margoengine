@@ -5,7 +5,7 @@ import { rangeError, typeError } from '../../shared/errors.js';
 import { axisOf, type GpuArray } from './array.js';
 import { isFloat, type DType } from './dtype.js';
 import { Operand, fuse, where, type AxisOptions, type Fused } from './expr.js';
-import { BLOCK, operator, type Operator } from './shaders.js';
+import { BLOCK, operator, WG, type Operator } from './shaders.js';
 import type { ComputeContext } from './context.js';
 
 const params = /* wgsl */ `struct Params { n: u32, inf: u32, len: u32, inner: u32 }`;
@@ -25,27 +25,28 @@ const shapeAfter = (shape: readonly number[], axes: readonly number[], keepdims:
   keepdims ? shape.map((d, k) => (axes.includes(k) ? 1 : d)) : shape.filter((_, k) => !axes.includes(k));
 
 /** WGSL for one tree level over 1,024-element blocks of `src`'s values. */
-export function levelShader(src: Fused, combine: string, identity: string): string {
-  const t = src.dtype;
+export function levelShader(src: Fused, combine: string, identity: string, threads = WG): string {
+  const t = src.dtype,
+    per = BLOCK / threads;
   return /* wgsl */ `${src.enables}${src.declarations}${params}
 ${index}
 @group(0) @binding(${src.next}) var<storage, read_write> dst: array<${t}>;
 @group(0) @binding(${src.next + 1}) var<uniform> params: Params;
-var<workgroup> partial: array<${t}, 256>;
+var<workgroup> partial: array<${t}, ${threads}>;
 ${src.fn}
 fn combine(a: ${t}, b: ${t}) -> ${t} { return ${combine}; }
-@compute @workgroup_size(256)
+@compute @workgroup_size(${threads})
 fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, @builtin(local_invocation_index) lid: u32) {
   let g = blockIndex(wid, nwg);
   if (g * 1024u >= params.n) { return; }
   var acc: ${t} = ${identity};
-  for (var k = 0u; k < 4u; k++) {
-    let i = g * 1024u + lid * 4u + k;
+  for (var k = 0u; k < ${per}u; k++) {
+    let i = g * 1024u + lid * ${per}u + k;
     if (i < params.n) { acc = combine(acc, value(i)); }
   }
   partial[lid] = acc;
   workgroupBarrier();
-  for (var offset = 128u; offset > 0u; offset >>= 1u) {
+  for (var offset = ${threads / 2}u; offset > 0u; offset >>= 1u) {
     if (lid < offset) { partial[lid] = combine(partial[lid], partial[lid + offset]); }
     workgroupBarrier();
   }
@@ -162,7 +163,7 @@ function full(
     out = ctx.empty(groups === 1 ? shape : [groups], input.dtype);
     passes.push({
       program: ctx.program(
-        ctx.kernelRoute?.level(src, combine, identity) ?? levelShader(src, combine, identity),
+        ctx.kernelRoute?.level(src, combine, identity) ?? levelShader(src, combine, identity, ctx.tuned.reduce),
         undefined,
         'reduce',
       ),

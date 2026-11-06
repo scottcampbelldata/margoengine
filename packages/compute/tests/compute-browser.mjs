@@ -45,6 +45,7 @@ try {
   const graph = await page.evaluate(() => window.runGraphTests());
   const autotune = await page.evaluate(() => window.runAutotuneTests());
   console.log('autotune saxpy, 2M f32:', JSON.stringify(autotune.measured));
+  console.log('tuneCompute, 16M elements:', JSON.stringify(autotune.own));
   const report = {
     checks: [...precise.checks, ...core.checks, ...extras.checks, ...cpu.checks, ...subgroups.checks, ...nn.checks, ...graph.checks, ...autotune.checks],
     timings: { ...core.timings, ...extras.timings, ...cpu.timings },

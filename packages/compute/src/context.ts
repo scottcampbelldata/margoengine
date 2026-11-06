@@ -27,6 +27,18 @@ declare const GPUBufferUsage: {
 declare const GPUShaderStage: { COMPUTE: number };
 declare const GPUMapMode: { READ: number };
 
+/** @internal Refuses a tuning table this device cannot run. */
+export function checkTuning(table: ComputeTuning, limit: number): void {
+  for (const [name, threads] of Object.entries(table)) {
+    if (!['reduce', 'scan', 'sort'].includes(name))
+      throw typeError(`createCompute tuned takes reduce, scan and sort, got ${name}`, 'compute');
+    if (![64, 128, 256, 512, 1024].includes(threads))
+      throw rangeError(`Tuned ${name} must be 64, 128, 256, 512 or 1024 threads, got ${String(threads)}`, 'compute');
+    if (threads > limit)
+      throw rangeError(`Tuned ${name} of ${threads} threads is over this device's limit of ${limit}; measure again on it`, 'compute');
+  }
+}
+
 /** Options for {@link createCompute}. */
 export interface CreateComputeOptions {
   /** Reuse this engine's GPU device (WebGPU backend). Default: a headless device of the context's own. */
@@ -51,6 +63,23 @@ export interface CreateComputeOptions {
    * undefined for negative bases) and differ from GPU to GPU. The CPU backend ignores it.
    */
   readonly fastMath?: boolean;
+  /**
+   * Threads per workgroup for the context's own `reduce`, `scan` and `sort` kernels, usually what `tuneCompute` from
+   * `@margoengine/compute/autotune` measured. Each is 64, 128, 256, 512 or 1024 and within the device's limit. Default
+   * 256 for all three. Integer results and sort orders stay the same; float sums round in another order. The CPU
+   * backend, `useSubgroups` and the WebGL2 layer's sort use their own kernels and ignore it.
+   */
+  readonly tuned?: ComputeTuning;
+}
+
+/** Threads per workgroup of the context's own kernels. See {@link CreateComputeOptions.tuned}. */
+export interface ComputeTuning {
+  /** Full reductions: `sum`, `min`, `max`, and whatever is built on them. */
+  readonly reduce?: number;
+  /** Flat scans: `cumsum` and whatever is built on it. */
+  readonly scan?: number;
+  /** Radix sorts: `sort`, `argsort`, `sortByKey`. */
+  readonly sort?: number;
 }
 
 /** Waiting options: an AbortSignal. */
@@ -183,6 +212,8 @@ export class ComputeContext {
 
   /** True when element-wise functions use the WGSL builtins (`createCompute({ fastMath })`). */
   readonly fastMath: boolean;
+  /** Threads per workgroup of the context's own kernels. `tuneCompute` sets it, and so does `createCompute({ tuned })`. */
+  tuned: ComputeTuning = {};
 
   /** @internal The sort kernel of the WebGL2 layer's route (./compat.ts), once loaded; only on the layer. */
   sortRoute: string | undefined;
@@ -1031,8 +1062,21 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
     throw typeError(`createCompute backend must be 'auto', 'webgpu' or 'cpu', got ${String(backend)}`, 'compute');
   if (options.fastMath !== undefined && typeof options.fastMath !== 'boolean')
     throw typeError(`createCompute fastMath must be true or false, got ${String(options.fastMath)}`, 'compute');
+  const tuned = options.tuned ?? {};
+  checkTuning(tuned, 1024);
   const fast = options.fastMath === true;
-  if (options.device) return ready(new ComputeContext(options.device, false, fast));
+  const make = (device: GPUDevice, owns: boolean): ComputeContext => {
+    try {
+      checkTuning(tuned, device.limits.maxComputeInvocationsPerWorkgroup);
+    } catch (error) {
+      if (owns) device.destroy();
+      throw error;
+    }
+    const context = new ComputeContext(device, owns, fast);
+    context.tuned = tuned;
+    return context;
+  };
+  if (options.device) return ready(make(options.device, false));
   if (options.engine) {
     const device = (options.engine as unknown as { gpu: GPUDevice | null }).gpu;
     if (!device)
@@ -1041,7 +1085,7 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
         'Engine has no WebGPU device (WebGL2 fallback); create the context without an engine',
         'compute',
       );
-    return ready(new ComputeContext(device, false, fast));
+    return ready(make(device, false));
   }
   if (backend === 'cpu') return cpu(options.signal);
   const nav = globalThis.navigator as Navigator | undefined,
@@ -1080,5 +1124,5 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
     device.destroy();
     throw options.signal.reason;
   }
-  return ready(new ComputeContext(device, true, fast));
+  return ready(make(device, true));
 }

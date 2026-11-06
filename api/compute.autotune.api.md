@@ -33,9 +33,25 @@ export interface AutotuneTiming {
     readonly ms: number;
 }
 
+export interface TuneComputeOptions extends WaitOptions, Measuring {
+    readonly count?: number;
+    readonly store?: AutotuneStore;
+    readonly refresh?: boolean;
+}
+
+export interface TuneComputeResult {
+    readonly tuned: Required<ComputeTuning>;
+    readonly timings: {
+        readonly [K in keyof ComputeTuning]-?: readonly AutotuneTiming[];
+    };
+    readonly cached: boolean;
+}
+
 export type WorkgroupSize = readonly [number, number, number];
 
 export function autotune(gpu: ComputeContext, options: AutotuneOptions): Promise<AutotuneResult>;
+
+export function tuneCompute(gpu: ComputeContext, options?: TuneComputeOptions): Promise<TuneComputeResult>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -82,6 +98,7 @@ class ComputeContext {
     readonly ownsDevice: boolean;
     readonly lost: Promise<GPUDeviceLostInfo>;
     readonly fastMath: boolean;
+    tuned: ComputeTuning;
     sortRoute: string | undefined;
     kernelRoute: KernelRoute | undefined;
     readonly routeReady: Promise<void>;
@@ -207,6 +224,12 @@ class ComputeContext {
     [Symbol.dispose](): void;
 }
 
+interface ComputeTuning {
+    readonly reduce?: number;
+    readonly scan?: number;
+    readonly sort?: number;
+}
+
 type Copy = readonly [GPUBuffer, number, GPUBuffer, number, number];
 
 type DType = 'f32' | 'f16' | 'i32' | 'u32';
@@ -312,6 +335,8 @@ interface KernelRoute {
     scan(src: Fused, combine: string, identity: string): string | undefined;
     readonly radixLocal: string;
 }
+
+type Measuring = Pick<AutotuneOptions, 'trials' | 'warmup' | 'signal'>;
 
 interface ModuleInfo {
     readonly bindings: readonly BindingInfo[];

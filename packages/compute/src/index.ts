@@ -2,7 +2,14 @@
 // @margoengine/compute: GPU compute without the WebGPU boilerplate, NumPy style. Optional and tree-shakable; adds
 // nothing to core. Shares an engine's device when given one, otherwise opens a headless device of its own.
 export { createCompute, ComputeContext } from './context.js';
-export type { ArrayOptions, BindingResource, CreateComputeOptions, PassTiming, WaitOptions } from './context.js';
+export type {
+  ArrayOptions,
+  BindingResource,
+  ComputeTuning,
+  CreateComputeOptions,
+  PassTiming,
+  WaitOptions,
+} from './context.js';
 export { GpuArray } from './array.js';
 export type { ReadOptions, SliceSpec } from './array.js';
 export { Expr, Operand, where, broadcastShapes } from './expr.js';

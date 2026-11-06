@@ -2,8 +2,10 @@
 // on the GPU (its wave width, registers and caches) and on the kernel, so it is measured rather than guessed, once per
 // adapter, kernel and problem, then remembered for the context and, given a `store`, across sessions.
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import { aborted, type ComputeContext, type WaitOptions } from './context.js';
+import { aborted, type ComputeContext, type ComputeTuning, type WaitOptions } from './context.js';
 import type { Kernel } from './kernel.js';
+import { levelShader } from './reduce.js';
+import { radixLocal, radixScatter, scanShader } from './shaders.js';
 
 /** A workgroup size as WGSL declares it: x, y, z. In a template string it reads `64,1,1`. */
 export type WorkgroupSize = readonly [number, number, number];
@@ -77,7 +79,7 @@ const whole = (value: number, least: number, name: string): number => {
   return value;
 };
 
-function candidatesOf(gpu: ComputeContext, options: AutotuneOptions): WorkgroupSize[] {
+function candidatesOf(gpu: ComputeContext, options: Pick<AutotuneOptions, 'candidates'>): WorkgroupSize[] {
   const limits = gpu.device.limits,
     list = options.candidates ?? [256, 128, 64, 32, 512, 1024],
     sizes: WorkgroupSize[] = [];
@@ -112,7 +114,7 @@ const median = (values: number[]): number => {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 };
 
-async function timeOnce(gpu: ComputeContext, work: () => unknown, options: AutotuneOptions): Promise<number> {
+async function timeOnce(gpu: ComputeContext, work: () => unknown, options: WaitOptions): Promise<number> {
   if (gpu.device.features.has('timestamp-query')) {
     const passes = await gpu.profile(work, options);
     return passes.reduce((sum, pass) => sum + pass.ms, 0);
@@ -124,14 +126,51 @@ async function timeOnce(gpu: ComputeContext, work: () => unknown, options: Autot
   return performance.now() - start;
 }
 
+type Measuring = Pick<AutotuneOptions, 'trials' | 'warmup' | 'signal'>;
+
+/** Times `work` at each size, sizes taking turns. Returns every median and the index of the fastest. */
+async function measure(
+  gpu: ComputeContext,
+  sizes: readonly WorkgroupSize[],
+  options: Measuring,
+  work: (k: number) => unknown,
+): Promise<{ timings: AutotuneTiming[]; best: number }> {
+  const { trials = 7, warmup = 2 } = options,
+    times = sizes.map((): number[] => []);
+  for (let round = 0; round < warmup; round++)
+    for (let k = 0; k < sizes.length; k++) {
+      aborted(options.signal);
+      await work(k);
+      await gpu.done(options);
+    }
+  // Sizes take turns within each round, so a GPU warming up or clocking down is not charged to whichever ran last.
+  for (let round = 0; round < trials; round++)
+    for (let k = 0; k < sizes.length; k++) {
+      aborted(options.signal);
+      times[k].push(await timeOnce(gpu, () => work(k), options));
+    }
+  const timings = sizes.map((workgroupSize, k) => ({ workgroupSize, ms: median(times[k]) }));
+  // Browsers round GPU timestamps, so short kernels can share a median; their means still differ below the step.
+  let best = 0;
+  timings.forEach((timing, k) => {
+    const gain = timings[best].ms - timing.ms;
+    if (gain > 0 || (gain === 0 && mean(times[k]) < mean(times[best]))) best = k;
+  });
+  return { timings, best };
+}
+
+// Browsers without device.adapterInfo give no names, so adapters there share entries: a slower size at worst.
+const adapterKey = (gpu: ComputeContext): string => {
+  const { vendor, architecture, device, description } = gpu.device.adapterInfo ?? ({} as Partial<GPUAdapterInfo>);
+  return [vendor, architecture, device, description].join('/');
+};
+
 async function tune(gpu: ComputeContext, tuner: Tuner, options: AutotuneOptions): Promise<AutotuneResult> {
   if (gpu.backend === 'cpu') throw fault('unsupported', 'autotune measures WGSL kernels, which need a GPU', 'compute');
   const { source, run, store, entryPoint, signature = '', trials = 7, warmup = 2 } = options,
     sizes = candidatesOf(gpu, options),
     compile = (size: WorkgroupSize) => gpu.kernel(source(size), { entryPoint, label: options.name }),
-    // Browsers without device.adapterInfo give no names, so adapters there share entries: a slower size at worst.
-    { vendor, architecture, device, description } = gpu.device.adapterInfo ?? ({} as Partial<GPUAdapterInfo>),
-    key = `margoengine/autotune/1/${[vendor, architecture, device, description].join('/')}/${options.name}/${signature}/${hash(source([1, 1, 1]))}/${sizes.join(' ')}`;
+    key = `margoengine/autotune/1/${adapterKey(gpu)}/${options.name}/${signature}/${hash(source([1, 1, 1]))}/${sizes.join(' ')}`;
   whole(trials, 1, 'trials');
   whole(warmup, 0, 'warmup');
   if (!options.refresh) {
@@ -143,26 +182,7 @@ async function tune(gpu: ComputeContext, tuner: Tuner, options: AutotuneOptions)
     }
   }
   const kernels = sizes.map(compile),
-    times = sizes.map((): number[] => []);
-  for (let round = 0; round < warmup; round++)
-    for (let k = 0; k < sizes.length; k++) {
-      aborted(options.signal);
-      await run(kernels[k], sizes[k]);
-      await gpu.done(options);
-    }
-  // Sizes take turns within each round, so a GPU warming up or clocking down is not charged to whichever ran last.
-  for (let round = 0; round < trials; round++)
-    for (let k = 0; k < sizes.length; k++) {
-      aborted(options.signal);
-      times[k].push(await timeOnce(gpu, () => run(kernels[k], sizes[k]), options));
-    }
-  const timings = sizes.map((workgroupSize, k) => ({ workgroupSize, ms: median(times[k]) }));
-  // Browsers round GPU timestamps, so short kernels can share a median; their means still differ below the step.
-  let best = 0;
-  timings.forEach((timing, k) => {
-    const gain = timings[best].ms - timing.ms;
-    if (gain > 0 || (gain === 0 && mean(times[k]) < mean(times[best]))) best = k;
-  });
+    { timings, best } = await measure(gpu, sizes, options, (k) => run(kernels[k], sizes[k]));
   tuner.known.set(key, sizes[best]);
   await store?.setItem(key, sizes[best].join());
   return { workgroupSize: sizes[best], kernel: kernels[best], timings, cached: false };
@@ -188,6 +208,104 @@ export async function autotune(gpu: ComputeContext, options: AutotuneOptions): P
   if (!tuner) tuners.set(gpu, (tuner = { known: new Map(), tail: Promise.resolve() }));
   const turn = tuner.tail.then(() => tune(gpu, tuner, options));
   // The next call waits for this one to end either way; this call's caller receives its failure from `turn`.
+  tuner.tail = turn.catch(() => undefined);
+  return turn;
+}
+
+/** What {@link tuneCompute} measures. */
+export interface TuneComputeOptions extends WaitOptions, Measuring {
+  /** Elements in the arrays measured: make it the size the real work has. Default 4,194,304. */
+  readonly count?: number;
+  /** Remembers results across sessions. Default none: they last as long as the context. */
+  readonly store?: AutotuneStore;
+  /** Measures again even if a result is known. Default false. */
+  readonly refresh?: boolean;
+}
+
+/** What {@link tuneCompute} resolves. */
+export interface TuneComputeResult {
+  /** The fastest size of each kernel. Pass it to `createCompute({ tuned })` to skip measuring next time. */
+  readonly tuned: Required<ComputeTuning>;
+  /** Every size's time for each kernel measured; a kernel whose result was known has none. */
+  readonly timings: { readonly [K in keyof ComputeTuning]-?: readonly AutotuneTiming[] };
+  /** True when every result came from the cache and nothing ran. */
+  readonly cached: boolean;
+}
+
+const OWN_SIZES = [256, 128, 64, 512, 1024];
+
+async function tuneOwn(gpu: ComputeContext, tuner: Tuner, options: TuneComputeOptions): Promise<TuneComputeResult> {
+  const { count = 1 << 22, store } = options;
+  whole(count, 1, 'count');
+  const sizes = candidatesOf(gpu, { candidates: OWN_SIZES }),
+    kernels = hash([levelShader, scanShader, radixLocal, radixScatter].join()),
+    values = gpu.arange(0, count, 1, 'f32'),
+    keys = gpu.array(Uint32Array.from({ length: count }, (_, i) => Math.imul(i, 2654435761) >>> 0)),
+    tuned: Record<string, number> = {},
+    timings: Record<string, readonly AutotuneTiming[]> = {},
+    work = {
+      reduce: () => values.sum(),
+      scan: () => gpu.cumsum(values),
+      sort: () => gpu.sort(keys),
+    };
+  const before = gpu.tuned;
+  try {
+    for (const name of ['reduce', 'scan', 'sort'] as const) {
+      const key = `margoengine/autotune/1/${adapterKey(gpu)}/compute.${name}/${count}/${kernels}`,
+        stored = options.refresh ? undefined : (tuner.known.get(key) ?? (await store?.getItem(key))),
+        known = sizes.find((s) => s.join() === String(stored));
+      if (known) {
+        tuned[name] = known[0];
+        timings[name] = [];
+        continue;
+      }
+      // Each run ends before the next starts, so the last output can go then.
+      let last: { dispose(): void } | undefined;
+      const result = await measure(gpu, sizes, options, (k) => {
+        last?.dispose();
+        gpu.tuned = { ...before, [name]: sizes[k][0] };
+        last = work[name]();
+      });
+      last?.dispose();
+      const best = sizes[result.best];
+      tuned[name] = best[0];
+      timings[name] = result.timings;
+      tuner.known.set(key, best);
+      await store?.setItem(key, best.join());
+    }
+    gpu.tuned = { ...before, ...tuned };
+  } catch (error) {
+    gpu.tuned = before;
+    throw error;
+  } finally {
+    values.dispose();
+    keys.dispose();
+  }
+  return {
+    tuned: tuned as unknown as Required<ComputeTuning>,
+    timings: timings as unknown as TuneComputeResult['timings'],
+    cached: Object.values(timings).every((list) => !list.length),
+  };
+}
+
+/**
+ * Measures the context's own reduce, scan and sort kernels at each workgroup size this device allows, and uses the
+ * fastest from then on. Integer results and sort orders stay the same; float sums round in another order. Call it before
+ * `useSubgroups`, whose kernels replace these. Known results are reused without running anything. Needs a GPU: the CPU
+ * backend throws a MargoError (`unsupported`), and so do subgroup kernels already in use.
+ * @example
+ * using gpu = await createCompute();
+ * const { tuned } = await tuneCompute(gpu, { store: localStorage });
+ * console.log(tuned); // { reduce: 128, scan: 256, sort: 256 } on one GPU
+ */
+export async function tuneCompute(gpu: ComputeContext, options: TuneComputeOptions = {}): Promise<TuneComputeResult> {
+  gpu.check();
+  if (gpu.backend === 'cpu') throw fault('unsupported', 'tuneCompute measures WGSL kernels, which need a GPU', 'compute');
+  if (gpu.kernelRoute)
+    throw fault('unsupported', 'tuneCompute measures the default kernels; call it before useSubgroups', 'compute');
+  let tuner = tuners.get(gpu);
+  if (!tuner) tuners.set(gpu, (tuner = { known: new Map(), tail: Promise.resolve() }));
+  const turn = tuner.tail.then(() => tuneOwn(gpu, tuner, options));
   tuner.tail = turn.catch(() => undefined);
   return turn;
 }

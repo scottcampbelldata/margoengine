@@ -78,6 +78,7 @@ class ComputeContext {
     readonly ownsDevice: boolean;
     readonly lost: Promise<GPUDeviceLostInfo>;
     readonly fastMath: boolean;
+    tuned: ComputeTuning;
     sortRoute: string | undefined;
     kernelRoute: KernelRoute | undefined;
     readonly routeReady: Promise<void>;
@@ -201,6 +202,12 @@ class ComputeContext {
     histogram(input: Operand, options?: HistogramOptions): Histogram;
     dispose(): void;
     [Symbol.dispose](): void;
+}
+
+interface ComputeTuning {
+    readonly reduce?: number;
+    readonly scan?: number;
+    readonly sort?: number;
 }
 
 type Copy = readonly [GPUBuffer, number, GPUBuffer, number, number];

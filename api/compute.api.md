@@ -48,6 +48,7 @@ export class ComputeContext {
     readonly ownsDevice: boolean;
     readonly lost: Promise<GPUDeviceLostInfo>;
     readonly fastMath: boolean;
+    tuned: ComputeTuning;
     sortRoute: string | undefined;
     kernelRoute: KernelRoute | undefined;
     readonly routeReady: Promise<void>;
@@ -173,6 +174,12 @@ export class ComputeContext {
     [Symbol.dispose](): void;
 }
 
+export interface ComputeTuning {
+    readonly reduce?: number;
+    readonly scan?: number;
+    readonly sort?: number;
+}
+
 export interface CreateComputeOptions {
     readonly engine?: EngineKernel;
     readonly device?: GPUDevice;
@@ -180,6 +187,7 @@ export interface CreateComputeOptions {
     readonly signal?: AbortSignal;
     readonly backend?: 'auto' | 'webgpu' | 'cpu';
     readonly fastMath?: boolean;
+    readonly tuned?: ComputeTuning;
 }
 
 export type DType = 'f32' | 'f16' | 'i32' | 'u32';

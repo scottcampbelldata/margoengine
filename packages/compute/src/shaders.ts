@@ -74,24 +74,25 @@ export function operator(op: Operator, type: DType): { combine: string; identity
  * One scan level: each workgroup scans 1,024 values into `dst` (inclusive, or exclusive when `params.a` is 1) and
  * writes its total to `sums[group]`.
  */
-export function scanShader(src: Fused, combine: string, identity: string): string {
-  const t = src.dtype;
+export function scanShader(src: Fused, combine: string, identity: string, threads = WG): string {
+  const t = src.dtype,
+    per = BLOCK / threads;
   return /* wgsl */ `${src.enables}${src.declarations}${params}
 ${index}
 @group(0) @binding(${src.next}) var<storage, read_write> dst: array<${t}>;
 @group(0) @binding(${src.next + 1}) var<storage, read_write> sums: array<${t}>;
 @group(0) @binding(${src.next + 2}) var<uniform> params: Params;
-var<workgroup> partial: array<${t}, 256>;
+var<workgroup> partial: array<${t}, ${threads}>;
 ${src.fn}
 fn combine(a: ${t}, b: ${t}) -> ${t} { return ${combine}; }
-@compute @workgroup_size(256)
+@compute @workgroup_size(${threads})
 fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, @builtin(local_invocation_index) lid: u32) {
   let g = blockIndex(wid, nwg);
   if (g * 1024u >= params.n) { return; }
-  let base = g * 1024u + lid * 4u;
-  var item: array<${t}, 4>;
+  let base = g * 1024u + lid * ${per}u;
+  var item: array<${t}, ${per}>;
   var acc: ${t} = ${identity};
-  for (var k = 0u; k < 4u; k++) {
+  for (var k = 0u; k < ${per}u; k++) {
     var v: ${t} = ${identity};
     if (base + k < params.n) { v = value(base + k); }
     acc = combine(acc, v);
@@ -99,7 +100,7 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
   }
   partial[lid] = acc;
   workgroupBarrier();
-  for (var offset = 1u; offset < 256u; offset <<= 1u) {
+  for (var offset = 1u; offset < ${threads}u; offset <<= 1u) {
     var v = partial[lid];
     if (lid >= offset) { v = combine(partial[lid - offset], v); }
     workgroupBarrier();
@@ -108,7 +109,7 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
   }
   var before: ${t} = ${identity};
   if (lid > 0u) { before = partial[lid - 1u]; }
-  for (var k = 0u; k < 4u; k++) {
+  for (var k = 0u; k < ${per}u; k++) {
     if (base + k < params.n) {
       if (params.a == 1u) {
         var previous = before;
@@ -119,7 +120,7 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
       }
     }
   }
-  if (lid == 255u) { sums[g] = partial[255]; }
+  if (lid == ${threads - 1}u) { sums[g] = partial[${threads - 1}]; }
 }`;
 }
 
@@ -336,11 +337,11 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
 const radixParams = /* wgsl */ `struct Radix { n: u32, shift: u32, blocks: u32, values: u32 }`;
 
 /**
- * Radix pass, step 1: each 256-key block sorts itself on the 4-bit digit at `shift` (four stable one-bit splits),
+ * Radix pass, step 1: each block of `threads` keys sorts itself on the 4-bit digit at `shift` (four stable one-bit splits),
  * writes the sorted block, its digit counts (`counts[digit * blocks + block]`) and digit starts
  * (`starts[block * 16 + digit]`). Slots past `n` hold 0xffffffff keys, which sort after every real key of the block.
  */
-export const radixLocalShader = /* wgsl */ `${radixParams}
+export const radixLocal = (threads: number): string => /* wgsl */ `${radixParams}
 ${index}
 @group(0) @binding(0) var<storage, read> keysIn: array<u32>;
 @group(0) @binding(1) var<storage, read> valuesIn: array<u32>;
@@ -349,15 +350,15 @@ ${index}
 @group(0) @binding(4) var<storage, read_write> counts: array<u32>;
 @group(0) @binding(5) var<storage, read_write> starts: array<u32>;
 @group(0) @binding(6) var<uniform> radix: Radix;
-var<workgroup> sharedKeys: array<u32, 256>;
-var<workgroup> sharedValues: array<u32, 256>;
-var<workgroup> scan: array<u32, 256>;
+var<workgroup> sharedKeys: array<u32, ${threads}>;
+var<workgroup> sharedValues: array<u32, ${threads}>;
+var<workgroup> scan: array<u32, ${threads}>;
 var<workgroup> histogram: array<atomic<u32>, 16>;
-@compute @workgroup_size(256)
+@compute @workgroup_size(${threads})
 fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, @builtin(local_invocation_index) lid: u32) {
   let g = blockIndex(wid, nwg);
   if (g >= radix.blocks) { return; }
-  let i = g * 256u + lid;
+  let i = g * ${threads}u + lid;
   var key = 0xffffffffu;
   var value = 0u;
   if (i < radix.n) {
@@ -369,14 +370,14 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
     let bit = (key >> (radix.shift + b)) & 1u;
     scan[lid] = 1u - bit;
     workgroupBarrier();
-    for (var offset = 1u; offset < 256u; offset <<= 1u) {
+    for (var offset = 1u; offset < ${threads}u; offset <<= 1u) {
       var v = scan[lid];
       if (lid >= offset) { v += scan[lid - offset]; }
       workgroupBarrier();
       scan[lid] = v;
       workgroupBarrier();
     }
-    let zeros = scan[255];
+    let zeros = scan[${threads - 1}];
     let zerosBefore = scan[lid] - (1u - bit);
     var dest = zerosBefore;
     if (bit == 1u) { dest = zeros + lid - zerosBefore; }
@@ -388,7 +389,7 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
     value = sharedValues[lid];
     workgroupBarrier();
   }
-  let valid = min(256u, radix.n - g * 256u);
+  let valid = min(${threads}u, radix.n - g * ${threads}u);
   let digit = (key >> radix.shift) & 15u;
   if (lid < valid) { atomicAdd(&histogram[digit], 1u); }
   keysLocal[i] = key;
@@ -403,7 +404,7 @@ fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, 
 }`;
 
 /** Radix pass, step 2 (after the counts are scanned into offsets): moves each key of a sorted block to its place. */
-export const radixScatterShader = /* wgsl */ `${radixParams}
+export const radixScatter = (threads: number): string => /* wgsl */ `${radixParams}
 ${index}
 @group(0) @binding(0) var<storage, read> keysLocal: array<u32>;
 @group(0) @binding(1) var<storage, read> valuesLocal: array<u32>;
@@ -412,15 +413,15 @@ ${index}
 @group(0) @binding(4) var<storage, read_write> keysOut: array<u32>;
 @group(0) @binding(5) var<storage, read_write> valuesOut: array<u32>;
 @group(0) @binding(6) var<uniform> radix: Radix;
-@compute @workgroup_size(256)
+@compute @workgroup_size(${threads})
 fn main(@builtin(workgroup_id) wid: vec3u, @builtin(num_workgroups) nwg: vec3u, @builtin(local_invocation_index) lid: u32) {
   let g = blockIndex(wid, nwg);
-  if (g >= radix.blocks || lid >= min(256u, radix.n - g * 256u)) { return; }
-  let key = keysLocal[g * 256u + lid];
+  if (g >= radix.blocks || lid >= min(${threads}u, radix.n - g * ${threads}u)) { return; }
+  let key = keysLocal[g * ${threads}u + lid];
   let digit = (key >> radix.shift) & 15u;
   let dest = offsets[digit * radix.blocks + g] + lid - starts[g * 16u + digit];
   keysOut[dest] = key;
-  if (radix.values == 1u) { valuesOut[dest] = valuesLocal[g * 256u + lid]; }
+  if (radix.values == 1u) { valuesOut[dest] = valuesLocal[g * ${threads}u + lid]; }
 }`;
 
 /** Most bins counted in workgroup memory (16 KB); more bins count straight into the global array. */

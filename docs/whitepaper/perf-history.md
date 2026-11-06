@@ -1834,6 +1834,14 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** no committed script.
 - **Guard:** `packages/mesh-edit/tests/sculpt-scale.test.js` counts what a pick, a dab and an undo step visit, so it needs no clock.
 
+### 77. `tuneCompute`: the package's own kernels at the size each GPU likes (diagnostic)
+
+- **Before:** `reduce`, `scan` and `sort` ran at 256 threads on every GPU; `@margoengine/compute/autotune` tuned only a caller's kernel.
+- **Change:** those kernels take their thread count as a parameter. `tuneCompute` times them and the context keeps the winners. Same work, same integer results and sort order at every size.
+- **Apple M6, Metal, Chrome 157 headless, nine rounds, medians, ms at 256 and at the winner:** sort of 16,777,216 keys 60.24 and 55.60 (128, 7.7 percent); sort of 1,048,576 keys 3.547 and 3.086 (64, 13 percent); reduce of 1,048,576 0.022 and 0.018 (128); scan of 1,048,576 0.076 and 0.071 (128). At 16,777,216, reduce and scan stay at 256.
+- **RTX A6000, Chromium, seven rounds, ms at 256, 16,777,216 elements:** reduce 2.69, scan 0.59, sort 12.06. No size beat 256 beyond one timestamp step. 1024 threads cost 56 to 72 percent more on all three, so the size does matter, and the default is good on this card.
+- **How:** the `tuneCompute` check of `packages/compute/tests/compute-autotune-browser.js` prints every timing. Diagnostic: lanes shared the A6000, the M6 ran alone but timestamps are rounded.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1895,5 +1903,6 @@ These entries lack a recorded number, a named machine or a quiet run:
     [perf-vs-threejs.md](perf-vs-threejs.md) since 2026-10-27 is in its cause text, not in the ledger.
 20. meshopt on Wasm SIMD (entry 75): a quiet run, including the first compile.
 21. Sculpting (entry 76): a quiet run, and a committed timing script.
+22. `tuneCompute` (entry 77): a quiet run on the A6000 and the M6, and an AMD and an Intel GPU.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

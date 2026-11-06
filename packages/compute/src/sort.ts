@@ -4,7 +4,7 @@ import { rangeError, typeError } from '../../shared/errors.js';
 import type { GpuArray } from './array.js';
 import { bytesOf } from './dtype.js';
 import { Operand, fuse } from './expr.js';
-import { WG, fromKeyShader, keyShader, radixLocalShader, radixScatterShader } from './shaders.js';
+import { WG, fromKeyShader, keyShader, radixLocal, radixScatter } from './shaders.js';
 import { compactInto, readCount } from './select.js';
 import { exclusiveSumPasses } from './scan.js';
 import type { ComputeContext, Copy, Pass, WaitOptions } from './context.js';
@@ -49,8 +49,10 @@ function radix(
     throw rangeError(`Sort bits must be a whole number from 1 to 32, got ${bits}`, 'compute');
   if (bits < 32 && input.dtype !== 'u32')
     throw rangeError('Sort bits below 32 apply to u32 keys only; drop bits for other types', 'compute');
-  const blocks = Math.max(1, Math.ceil(n / WG)),
-    padded = blocks * WG,
+  // Another route's local kernel has blocks of WG keys, and the scatter must match it.
+  const threads = ctx.kernelRoute || ctx.sortRoute ? WG : (ctx.tuned.sort ?? WG),
+    blocks = Math.max(1, Math.ceil(n / threads)),
+    padded = blocks * threads,
     hasValues = payload !== undefined,
     scratch: GpuArray[] = [];
   const temp = (length: number) => {
@@ -107,8 +109,8 @@ function radix(
     counts = temp(16 * blocks),
     offsets = temp(16 * blocks),
     starts = temp(16 * blocks);
-  const localProgram = ctx.program(ctx.kernelRoute?.radixLocal ?? radixLocalShader, undefined, 'sort.local'),
-    scatterProgram = ctx.program(radixScatterShader, undefined, 'sort.scatter'),
+  const localProgram = ctx.program(ctx.kernelRoute?.radixLocal ?? radixLocal(threads), undefined, 'sort.local'),
+    scatterProgram = ctx.program(radixScatter(threads), undefined, 'sort.scatter'),
     grid = ctx.grid(blocks);
   for (let shift = 0; shift < bits; shift += 4) {
     const params = new Uint32Array([n, shift, blocks, hasValues ? 1 : 0]);
