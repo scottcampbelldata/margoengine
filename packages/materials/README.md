@@ -813,6 +813,35 @@ map's mips do not thin it out by the test alone. Shadows, picking, contact shado
 `alphaTest`. A hashed alpha keeps its own test. Covered samples write the sharpened alpha, so a canvas with
 `alphaMode: 'premultiplied'` shows those edge pixels part transparent.
 
+### Prefiltered cube maps
+
+`@margoengine/materials/prefilter` filters a plain `CubeTexture` by roughness on the GPU, for rough metal that looks right
+with a sky you already have as six images, one equirectangular image or a KTX2 cube. It returns an `Environment`
+(`@margoengine/environment`, an optional peer, loaded only when this runs) to pass as `envMap`.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { CubeTexture, PbrMaterial } from '@margoengine/materials';
+import { prefilterCube } from '@margoengine/materials/prefilter';
+
+const face = (r: number, g: number, b: number) => ({
+  data: new Uint8Array(Array.from({ length: 16 * 16 }, () => [r, g, b, 255]).flat()),
+  width: 16,
+  height: 16,
+});
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const sky = new CubeTexture([face(200, 210, 255), face(200, 210, 255), face(255, 255, 255), face(60, 50, 40), face(200, 210, 255), face(200, 210, 255)]);
+const envMap = await prefilterCube(engine, sky, { samples: 128 });
+export const brushed = new PbrMaterial({ metalness: 1, roughness: 0.4, envMap });
+```
+
+Options: `size` (edge of the float copy that is filtered, a power of two from 16 to 2048; default the cube's edge rounded
+up, at most 1024), `signal`, and `Environment.create`'s `specularSize`, `specularMips`, `samples`, `rotation`,
+`intensity` and `keepSource`. The cube's pixels are read in linear light and kept as float faces (`size * size * 96`
+bytes on the CPU) so the Environment survives a lost device; `keepSource: false` frees them. The result does not follow
+later changes to the cube: prefilter again. Dispose the Environment when done. A 32-bit float cube, which an `envMap`
+refuses on a device without `float32-filterable`, goes through here as it is and keeps values over 1.
+
 ## Parallax, triplanar and subsurface
 
 Three more surface options, live like the others. Each compiles into a material's shader only while it is in use:
@@ -964,8 +993,9 @@ instead of the mirrored one.
 - **Basic, Lambert and Phong** combine the sharp reflection with their colour by `combine` (`'multiply'`, default:
   colour x reflection; `'mix'`: toward the reflection; `'add'`) and `reflectivity` (0-1, default 1).
 
-Other shadings refuse an envMap. A `CubeTexture`'s mips are box filtered per face, not GGX prefiltered: rough
-surfaces blur toward the face averages; an `Environment` is prefiltered. Bindings 188-190 of the material's group.
+Other shadings refuse an envMap. A `CubeTexture`'s mips are box filtered per face, so rough surfaces blur toward the
+face averages and never across a cube edge; an `Environment` is GGX prefiltered, and `prefilterCube` below turns a
+`CubeTexture` into one. Bindings 188-190 of the material's group.
 
 ```ts
 import {CubeTexture, PbrMaterial, UnlitMaterial, loadCubeTexture} from 'margoengine/materials';

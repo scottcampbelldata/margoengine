@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6459491,
+  "total": 6461424,
   "history": [
     {
       "date": "2026-10-24",
@@ -2492,6 +2492,12 @@
       "commit": "eb1ba1f7f",
       "reason": "ktx2-gpu entry, compute shaders and ETC1S reader",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "6e83fd4e5",
+      "reason": "materials/prefilter entry, envMap float guard",
+      "grew": 1
     }
   ],
   "items": {
@@ -2791,6 +2797,7 @@
     "@margoengine/materials/layered": 3230,
     "@margoengine/materials/mips": 10731,
     "@margoengine/materials/object-normal": 950,
+    "@margoengine/materials/prefilter": 1933,
     "@margoengine/materials/transmission": 7416,
     "@margoengine/math": 20105,
     "@margoengine/math/affine": 3936,

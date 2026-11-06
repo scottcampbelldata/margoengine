@@ -1190,6 +1190,10 @@
       "types": "./dist/materials/mips.d.ts",
       "import": "./dist/materials/mips.js"
     },
+    "./materials/prefilter": {
+      "types": "./dist/materials/prefilter.d.ts",
+      "import": "./dist/materials/prefilter.js"
+    },
     "./materials/layered": {
       "types": "./dist/materials/layered.d.ts",
       "import": "./dist/materials/layered.js"

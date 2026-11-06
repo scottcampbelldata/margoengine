@@ -55,6 +55,10 @@
       "types": "./dist/mips.d.ts",
       "import": "./dist/mips.js"
     },
+    "./prefilter": {
+      "types": "./dist/prefilter.d.ts",
+      "import": "./dist/prefilter.js"
+    },
     "./layered": {
       "types": "./dist/layered.d.ts",
       "import": "./dist/layered.js"
@@ -77,6 +81,12 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/environment": {
+      "optional": true
+    }
   }
 }

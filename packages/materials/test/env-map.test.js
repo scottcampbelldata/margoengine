@@ -86,6 +86,16 @@ test('envMap takes cube sources on standard, basic, Lambert and Phong shading, w
   assert.equal(copy.envMap, cube, 'and share the map');
 });
 
+test('an envMap of 32-bit floats is refused without float32-filterable, instead of failing WebGPU validation', async () => {
+  const face = { data: new Float32Array(4), width: 1, height: 1, format: 'rgba32float' },
+    cube = new CubeTexture([face, face, face, face, face, face]),
+    s = await scene();
+  createMesh(s.engine, quad, new PbrMaterial({ envMap: cube }));
+  assert.throws(() => s.frame(), /float32-filterable.*prefilterCube/);
+  s.gpu.device.features = new Set(['float32-filterable']);
+  assert.ok(groups(s.frame()).some((b) => b.includes(188)));
+});
+
 test('standard envMap replaces the ambient light, also over a scene IBL, and binds the cube and uniform', async () => {
   const s = await scene(),
     own = s.gpu.device.createTexture({ size: [8, 8, 6], format: 'rgba16float', mipLevelCount: 4 }),

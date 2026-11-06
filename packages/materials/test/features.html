@@ -6,6 +6,7 @@ import {Engine} from '/packages/core/dist/index.js';
 import {KTX2LayerDecoder} from '/packages/decoders/dist/ktx2-layers.js';
 import {CubeTexture,NormalMaterial,PbrMaterial,UnlitMaterial,Texture,WgslMaterial,createMesh,createInstancedMesh,loadKTX2Texture} from '/packages/materials/dist/index.js';
 import {alphaHash} from '/packages/materials/dist/alpha-hash.js';
+import {prefilterCube} from '/packages/materials/dist/prefilter.js';
 import {mipTexture} from '/packages/materials/dist/mips.js';
 import {layered} from '/packages/materials/dist/layered.js';
 import {objectNormal} from '/packages/materials/dist/object-normal.js';
@@ -57,7 +58,67 @@ const tiled=(repeats)=>({...quad(),uvs:[0,0,repeats,0,repeats,repeats,0,repeats]
 const mipOptions={wrapS:'repeat',wrapT:'repeat',minFilter:'nearest',magFilter:'nearest',colorSpace:'linear'};
 // A disc in the alpha of a 128 x 128 map.
 const disc=()=>{const n=128,d=new Uint8Array(n*n*4);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const r=Math.hypot(x+0.5-n/2,y+0.5-n/2)/(n/2),k=(y*n+x)*4;d.set([255,255,255,Math.round(Math.min(1,Math.max(0,(1.2-r*1.4)))*255)],k);}return new Texture({data:d,width:n,height:n});};
+// A face of one colour, or of two: top and bottom halves, or left and right.
+const cubeFace=(a,b=a,split='top')=>{const n=32,d=new Uint8Array(n*n*4);for(let y=0;y<n;y++)for(let x=0;x<n;x++)d.set((split==='top'?y<n/2:x<n/2)?a:b,(y*n+x)*4);return {data:d,width:n,height:n};};
+const black=[0,0,0,255],white=[255,255,255,255];
+const cubeOf=(faces)=>new CubeTexture([0,1,2,3,4,5].map(k=>faces[k]??cubeFace(black)));
+// Red at the middle of a face of an Environment's specular level, as stored: four half floats per texel.
+const specularRed=async(device,env,level,face=4)=>{
+  const edge=env.specularTexture.width>>level,row=Math.ceil(edge*8/256)*256,buffer=device.createBuffer({size:row*edge,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+  encoder.copyTextureToBuffer({texture:env.specularTexture,mipLevel:level,origin:[0,0,face]},{buffer,bytesPerRow:row},[edge,edge,1]);
+  device.queue.submit([encoder.finish()]);await buffer.mapAsync(GPUMapMode.READ);
+  const half=new Uint16Array(buffer.getMappedRange().slice(0));buffer.destroy();
+  const float=h=>{const e=(h>>10)&31,m=h&1023;return e?(1+m/1024)*2**(e-15):m/1024*2**-14;};
+  return float(half[(edge/2)*row/2+(edge/2)*4]);
+};
 window.check={
+  // Other kinds of cube, seen as a mirror through the cube itself and through what prefilterCube made of it.
+  async prefilterSource(kind){
+    const made=await scene(front,compression),{engine,errors,render}=made,device=engine.gpu;
+    const decoder=kind==='ktx2'?new KTX2LayerDecoder({device,workerLimit:1}):undefined;
+    const ramp=()=>{const w=64,h=32,d=new Uint8Array(w*h*4);for(let y=0;y<h;y++)for(let x=0;x<w;x++)d.set([x*4,y*8,128,255],(y*w+x)*4);return {data:d,width:w,height:h};};
+    const hdr=()=>{const n=16,d=new Float32Array(n*n*4);for(let k=0;k<n*n;k++)d.set([4,0.5,0.25,1],k*4);return {data:d,width:n,height:n,format:'rgba32float'};};
+    const cube=kind==='ktx2'?await loadKTX2Texture(ktx2File('cube-uastc-zstd'),{decoder}):kind==='equirect'?new CubeTexture(new Texture(ramp(),{wrapS:'repeat'}),{size:32}):new CubeTexture([0,1,2,3,4,5].map(hdr));
+    const env=await prefilterCube(engine,cube,{samples:32}),red=await specularRed(device,env,0);
+    // A float cube cannot be sampled by a material here, which is why it comes through this function.
+    if(kind==='float'){const out={red,errors};engine.dispose();return out;}
+    const mirror=new UnlitMaterial({envMap:cube,combine:'mix'});
+    createMesh(engine,quad(),mirror);
+    // Four turns of the map, so the four side faces all pass in front of the quad.
+    let difference=0,spread=0,n=0,middle;
+    for(const turn of [0,1,2,3]){
+      mirror.envMapRotation=turn*Math.PI/2;mirror.envMap=cube;await render();
+      const raw=await pixels(made);mirror.envMap=env;await render();
+      const seen=await pixels(made);middle??=at(raw,128,128);
+      for(let y=64;y<192;y+=4)for(let x=64;x<192;x+=4){const a=at(raw,x,y),b=at(seen,x,y);a.forEach((v,c)=>{difference+=Math.abs(v-b[c]);spread+=Math.abs(v-middle[c]);n++;});}
+    }
+    const out={difference:difference/n,spread:spread/n,format:cube.gpuTexture(device).format,size:env.size,errors};
+    decoder?.dispose();engine.dispose();return out;
+  },
+  // What a metal quad facing the camera shows at its middle, for each map and roughness, and which way the faces lie.
+  async prefilter(){
+    const made=await scene(front),{engine,errors,render}=made,chrome=new PbrMaterial({metalness:1,roughness:0,color:[1,1,1,1]});
+    // Only the map lights the surface, so a pixel's ratio between two maps is the ratio of what they hold.
+    engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([1,1,1,0]);
+    const lit=cubeOf({4:cubeFace(white)}),flat=cubeOf([0,1,2,3,4,5].map(()=>cubeFace(white)));
+    const seen=async(envMap,roughness)=>{chrome.envMap=envMap;chrome.roughness=roughness;await render();const d=await pixels(made);return light(d[(128*size+128)*4]);};
+    const filtered=await prefilterCube(engine,lit,{samples:256}),flatFiltered=await prefilterCube(engine,flat,{samples:64});
+    const left=await prefilterCube(engine,cubeOf({0:cubeFace(white,black,'left')}),{samples:32}),top=await prefilterCube(engine,cubeOf({4:cubeFace(white,black,'top')}),{samples:32});
+    const sided=await prefilterCube(engine,new CubeTexture([[255,0,0,255],[0,255,0,255],[0,0,255,255],[255,255,0,255],black,black].map(c=>cubeFace(c))),{samples:32});
+    createMesh(engine,quad(),chrome);
+    const out={
+      boxMirror:await seen(lit,0),filteredMirror:await seen(filtered,0),
+      boxHalf:await seen(lit,0.5),filteredHalf:await seen(filtered,0.5),
+      boxFull:await seen(lit,1),filteredFull:await seen(filtered,1),
+      flatBox:await seen(flat,0.5),flatFiltered:await seen(flatFiltered,0.5),
+      levels:[await specularRed(engine.gpu,filtered,1),await specularRed(engine.gpu,filtered,2)],
+      left:[...left.sh.irradiance],top:[...top.sh.irradiance],sided:[...sided.sh.irradiance],
+      size:filtered.size,mips:filtered.specularMips,
+    };
+    await filtered.restore(engine.gpu);
+    out.restored=await seen(filtered,0);
+    engine.dispose();return {...out,errors};
+  },
   // Pixels part way between black and white, and the lit share, of a white disc cut out on black.
   async coverage({on,kind='unlit',exact=false,transparent=false}){
     const made=await scene(front,exact?{exactSize:true}:{}),{engine,errors,render}=made;

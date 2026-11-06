@@ -17,6 +17,60 @@ const check = (name, ...args) => page.evaluate(([n, a]) => window.check[n](...a)
 const near = (a, b, label, tolerance = 0.02) =>
   a.forEach((v, k) => assert.ok(Math.abs(v - b[k]) <= tolerance, `${label}: ${a} should be ${b}`));
 const jobs = {
+  async prefilter() {
+    const r = await page.evaluate(() => window.check.prefilter());
+    assert.deepEqual(r.errors, []);
+    assert.ok(Math.abs(r.boxMirror - r.filteredMirror) < 0.02, `mirror: ${r.boxMirror} against ${r.filteredMirror}`);
+    // Only +Z is lit, so a box filter stays at 1 while GGX reads the lobe's share on that face, integrated here apart
+    // from the shader. With three mips, roughness 0.5 and 1 land exactly on a level.
+    const faceShare = (roughness) => {
+      const a2 = roughness ** 4;
+      let onFace = 0,
+        all = 0;
+      for (let i = 0; i < 1000; i++)
+        for (let j = 0; j < 200; j++) {
+          const u = (i + 0.5) / 1000,
+            phi = ((j + 0.5) / 200) * 2 * Math.PI,
+            c = Math.sqrt((1 - u) / (1 + (a2 - 1) * u)),
+            s = Math.sqrt(1 - c * c),
+            l = [2 * c * s * Math.cos(phi), 2 * c * s * Math.sin(phi), 2 * c * c - 1];
+          if (l[2] <= 0) continue;
+          all += l[2];
+          if (Math.abs(l[0]) <= l[2] && Math.abs(l[1]) <= l[2]) onFace += l[2];
+        }
+      return onFace / all;
+    };
+    for (const [level, roughness, box, filtered] of [[0, 0.5, r.boxHalf, r.filteredHalf], [1, 1, r.boxFull, r.filteredFull]]) {
+      const share = faceShare(roughness);
+      assert.ok(Math.abs(r.levels[level] - share) < 0.02, `level of roughness ${roughness}: ${r.levels[level]}, GGX share ${share}`);
+      // PBR Neutral takes 0.04 off every value in this range before the canvas; the pixels must agree with the level.
+      const seen = (filtered + 0.04) / (box + 0.04);
+      assert.ok(Math.abs(seen - r.levels[level]) < 0.02, `drawn at roughness ${roughness}: ${seen} against ${r.levels[level]}`);
+    }
+    assert.ok(Math.abs(r.flatBox - r.flatFiltered) < 0.02, `a flat sky keeps its light: ${r.flatBox} against ${r.flatFiltered}`);
+    assert.equal(r.size, 32);
+    assert.ok(r.mips >= 2);
+    assert.ok(Math.abs(r.restored - r.filteredMirror) < 0.02, `restored: ${r.restored}`);
+    // Harmonic rows 1, 2 and 3 are y, z and x, three numbers each: each lit half must land on its own side.
+    const row = (sh, k, c) => sh[k * 3 + c];
+    assert.ok(row(r.left, 2, 0) > 0, 'the left half of +X lies towards +Z');
+    assert.ok(row(r.top, 1, 0) > 0, 'the top half of +Z lies towards +Y');
+    assert.ok(row(r.sided, 3, 0) > 0 && row(r.sided, 3, 1) < 0, 'red +X, green -X');
+    assert.ok(row(r.sided, 1, 2) > 0 && row(r.sided, 1, 1) < 0, 'blue +Y, yellow -Y');
+    console.log(`prefilter: levels hold ${r.levels} of the bright face at roughness 0.5, 1; ${r.mips} mips`);
+    const source = (kind) => page.evaluate((k) => window.check.prefilterSource(k), kind);
+    // A real sky from one KTX2 file, transcoded to a compressed format; an equirectangular image; float faces over 1.
+    const sky = await source('ktx2'),
+      ramp = await source('equirect'),
+      hdr = await source('float');
+    assert.deepEqual([...sky.errors, ...ramp.errors, ...hdr.errors], []);
+    assert.notEqual(sky.format, 'rgba8unorm');
+    assert.ok(sky.spread > 0.02 && ramp.spread > 0.02, `the views vary: ${sky.spread}, ${ramp.spread}`);
+    assert.ok(sky.difference < 0.01, `the KTX2 sky stays itself: ${sky.difference}`);
+    assert.ok(ramp.difference < 0.01, `the equirectangular image stays itself: ${ramp.difference}`);
+    assert.equal(hdr.red, 4, 'float faces keep values over 1');
+    console.log(`prefilter sources: KTX2 ${sky.format} ${sky.difference} of ${sky.spread}, equirect ${ramp.difference} of ${ramp.spread}`);
+  },
   async coverage() {
     const run = (o) => page.evaluate((v) => window.check.coverage(v), o);
     for (const kind of ['unlit', 'lit']) {

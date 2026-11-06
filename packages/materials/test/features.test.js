@@ -208,3 +208,16 @@ test('alphaToCoverage: a material asks for it through the render state, and only
   assert.equal(new UnlitMaterial().customState, false);
   assert.throws(() => new UnlitMaterial({ alphaToCoverage: 1 }), TypeError);
 });
+
+test('prefilterCube: refuses anything but a cube, a bad size and an aborted signal', async () => {
+  const { prefilterCube } = await import('../dist/prefilter.js');
+  const { CubeTexture, Texture } = await import('../dist/index.js');
+  const device = { createBuffer() {} };
+  const face = { data: new Uint8Array(4), width: 1, height: 1 };
+  const cube = new CubeTexture([face, face, face, face, face, face]);
+  await assert.rejects(prefilterCube(device, new Texture(face)), /needs a CubeTexture/);
+  await assert.rejects(prefilterCube(device, cube, { size: 24 }), /power of two from 16 to 2048/);
+  await assert.rejects(prefilterCube(device, cube, { size: 8 }), /power of two from 16 to 2048/);
+  await assert.rejects(prefilterCube({ gpu: null }, cube), /needs WebGPU/);
+  await assert.rejects(prefilterCube(device, cube, { signal: AbortSignal.abort() }), /abort/i);
+});

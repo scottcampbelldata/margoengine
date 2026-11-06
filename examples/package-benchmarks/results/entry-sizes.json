@@ -1,5 +1,5 @@
 {
-  "commit": "8741b2465",
+  "commit": "6e83fd4e5",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -560,16 +560,20 @@
         "gzip": 3873
       },
       "./ktx2-layers": {
-        "raw": 809376,
-        "gzip": 374585
+        "raw": 809402,
+        "gzip": 374592
       },
       "./ktx2-hdr": {
         "raw": 790761,
         "gzip": 367257
       },
+      "./ktx2-gpu": {
+        "raw": 35624,
+        "gzip": 13897
+      },
       "./ktx2-stream": {
-        "raw": 819042,
-        "gzip": 378288
+        "raw": 819068,
+        "gzip": 378298
       }
     },
     "@margoengine/dof": {
@@ -1246,8 +1250,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 197077,
-        "gzip": 61288
+        "raw": 197363,
+        "gzip": 61398
       },
       "./atlas": {
         "raw": 4025,
@@ -1258,12 +1262,16 @@
         "gzip": 7399
       },
       "./batched": {
-        "raw": 117859,
-        "gzip": 36290
+        "raw": 118145,
+        "gzip": 36389
       },
       "./mips": {
         "raw": 31740,
         "gzip": 10418
+      },
+      "./prefilter": {
+        "raw": 3364,
+        "gzip": 1677
       },
       "./layered": {
         "raw": 7158,
@@ -1818,8 +1826,12 @@
         "gzip": 2508
       },
       "./springs": {
-        "raw": 11524,
-        "gzip": 4813
+        "raw": 11705,
+        "gzip": 4910
+      },
+      "./vrm": {
+        "raw": 26092,
+        "gzip": 10219
       }
     },
     "@margoengine/road": {
