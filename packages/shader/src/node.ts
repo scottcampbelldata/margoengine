@@ -597,6 +597,28 @@ export const positionLocal = /*@__PURE__*/ builtin('positionLocal', 'vec3f'),
 /** Surface normal in model space and world space (unit length). NodeMaterial stages only. */
 export const normalLocal = /*@__PURE__*/ builtin('normalLocal', 'vec3f'),
   normalWorld = /*@__PURE__*/ builtin('normalWorld', 'vec3f');
+/** Position and unit normal in view space: x right, y up, the camera looks along -z. NodeMaterial stages only. */
+export const positionView = /*@__PURE__*/ builtin('positionView', 'vec3f'),
+  normalView = /*@__PURE__*/ builtin('normalView', 'vec3f');
+/** Unit tangent in model and world space, and the unit world bitangent with the mesh's handedness. NodeMaterial stages only. */
+export const tangentLocal = /*@__PURE__*/ builtin('tangentLocal', 'vec3f'),
+  tangentWorld = /*@__PURE__*/ builtin('tangentWorld', 'vec3f'),
+  bitangentWorld = /*@__PURE__*/ builtin('bitangentWorld', 'vec3f');
+/** Distance from the camera plane to the surface in world units, positive in front of the camera. NodeMaterial stages only. */
+export const linearDepth = /*@__PURE__*/ builtin('linearDepth', 'f32');
+/** The camera's near and far planes in world units, read back from its projection. NodeMaterial stages only. */
+export const cameraNear = /*@__PURE__*/ builtin('cameraNear', 'f32'),
+  cameraFar = /*@__PURE__*/ builtin('cameraFar', 'f32');
+/** The mesh's model matrix (the node's, without an instance's), the camera's view and projection. NodeMaterial stages only. */
+export const modelMatrix = /*@__PURE__*/ builtin('modelMatrix', 'mat4x4f'),
+  viewMatrix = /*@__PURE__*/ builtin('viewMatrix', 'mat4x4f'),
+  projectionMatrix = /*@__PURE__*/ builtin('projectionMatrix', 'mat4x4f');
+/** The vertex's index in its buffer; in a fragment, the provoking vertex's. NodeMaterial stages only. */
+export const vertexIndex = /*@__PURE__*/ builtin('vertexIndex', 'u32');
+/** This instance's matrix (node space), tint and UV scale (xy) and offset (zw): identity, white and (1, 1, 0, 0) without instances. NodeMaterial stages only. */
+export const instanceMatrix = /*@__PURE__*/ builtin('instanceMatrix', 'mat4x4f'),
+  instanceColor = /*@__PURE__*/ builtin('instanceColor', 'vec4f'),
+  instanceUV = /*@__PURE__*/ builtin('instanceUV', 'vec4f');
 /** Unit vector from the surface to the camera. */
 export const viewDirection = /*@__PURE__*/ builtin('viewDirection', 'vec3f'),
   cameraPosition = /*@__PURE__*/ builtin('cameraPosition', 'vec3f');

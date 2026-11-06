@@ -70,3 +70,12 @@ test('a vertex stage that reads an input keeps it, and one that passes the input
   const whole = bare(pbrShader).replace('let p=f.model*vec4f(i.position.xyz,1);', 'let p=f.model*margoMove(i);');
   assert.deepEqual(vertexInputs(whole).locations, [0, 1, 2, 3, 4]);
 });
+
+test('a built-in a node graph added to the input stays when attributes are trimmed', () => {
+  const source = bare(pbrShader)
+      .replace(/(struct Input \{[^}]*?)\n\}/, '$1,\n  @builtin(vertex_index) ndVertex:u32\n}')
+      .replace('o.color=i.color;', 'o.color=i.color*f32(i.ndVertex);'),
+    { code, locations } = vertexInputs(source);
+  assert.deepEqual(locations, [0, 1, 4]);
+  assert.match(code, /struct Input \{[^}]*@builtin\(vertex_index\) ndVertex:u32\s*\}/);
+});

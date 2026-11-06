@@ -97,7 +97,7 @@ Mistakes fail when the material or pass is built, with a message that says what 
 - Constructors: `float int uint bool vec2 vec3 vec4 ivec2-4 uvec2-4 mat3 mat4`, `color('#rrggbb' | 0xrrggbb | [r, g, b])` (linear), conversions `.toFloat() .toInt() .toUint()`.
 - Arithmetic and logic: `add sub mul div mod negate` (matrix times vector works), `lessThan lessThanEqual greaterThan greaterThanEqual equal notEqual and or not`, swizzles `.x .xy .rgb .zyx` (and `.xxx` on a scalar), `.element(i)`.
 - Built-ins, as functions and methods: `abs sign floor ceil round trunc fract sin cos tan asin acos atan atan2 tanh exp exp2 log log2 sqrt inverseSqrt saturate normalize radians degrees dpdx dpdy fwidth min max pow clamp step smoothstep mix reflect refract cross length distance dot oneMinus`.
-- Inputs: `uv()`, `vertexColor()`, `positionLocal`, `positionWorld`, `normalLocal`, `normalWorld`, `viewDirection`, `cameraPosition`, `screenUV`, `screenCoordinate`, `varying(node)`; frame uniforms `time`, `deltaTime`, `resolution`; `uniform(value, {type, name})` with `.value` live; `texture(materialsTexture, uv?, level?)`.
+- Inputs: `uv()`, `vertexColor()`, `positionLocal`, `positionWorld`, `normalLocal`, `normalWorld`, `viewDirection`, `cameraPosition`, `screenUV`, `screenCoordinate`, `varying(node)`; in a NodeMaterial also `positionView`, `normalView`, `tangentLocal`, `tangentWorld`, `bitangentWorld`, `linearDepth`, `cameraNear`, `cameraFar`, `modelMatrix`, `viewMatrix`, `projectionMatrix`, `vertexIndex`, `instanceIndex`, `instanceMatrix`, `instanceColor`, `instanceUV` (see [Input nodes](#input-nodes)); frame uniforms `time`, `deltaTime`, `resolution`; `uniform(value, {type, name})` with `.value` live; `texture(materialsTexture, uv?, level?)`, `textureCube(cube, direction, level?)`, `texture3D(volume, uvw, level?)`.
 - Material inputs (fragment): `materialColor`, `materialNormal`, `materialRoughness`, `materialMetalness`, `materialEmissive` (what the Material computed before nodes ran), `frontFacing`. Post inputs: `inputColor(uv?)`, `inputDepth(uv?)`. Compute input: `instanceIndex`.
 - Control: `select(cond, ifTrue, ifFalse)`, `loop(count, init, (i, acc) => next)` (a bounded fold), `Fn(body, name)` (one WGSL function per argument-type signature) and `wgslFn(code)` for hand-written WGSL. `discard(cond, value)` drops the fragment where `cond` holds and is `value` elsewhere (NodeMaterial fragment nodes and NodePass nodes; a vertex or compute use throws). Statement-level `If`, `Loop` and the rest are under [Statements](#statements).
 - Atomics: `storage(data, 'u32' | 'i32', {atomic: true})` gives `atomicAdd(i, v)`, `atomicMax`, `atomicMin` (each returns the previous value), `atomicLoad(i)` and `atomicStore(i, v)` (a write like `store`), in ComputePass nodes only; TypeScript refuses them on other storage types. They run in the order they are made, before the body's writes, even when their result is unused (inside `loop` or `Fn` bodies only where the result is used); equal calls are never merged. `element(i)` on an atomic buffer is an `atomicLoad` in compute and a plain read in materials and post.
@@ -223,6 +223,37 @@ scripted device; `node packages/shader/test/readback-check.mjs` (under the GPU l
 read back exactly (65 ms on an NVIDIA Ampere GPU in Edge), a job on an engine that never rendered, abort right after
 submit and while mapping, engine disposal and `device.destroy()` at both points, and a pipeline over the storage-binding
 limit; every job destroyed its buffers and no GPU error escaped.
+
+## Input nodes
+
+What a vertex or fragment knows, as nodes in the shader root. Each one tree-shakes, and the shader only reads what the graph uses.
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+import {NodeMaterial, cameraFar, cameraNear, linearDepth, normalView, saturate, vec3} from 'margoengine/shader';
+const stage = await createStage('#app');
+const rim = saturate(normalView.z.negate().add(1)),                                  // bright where the surface turns away
+  fog = linearDepth.sub(cameraNear).div(cameraFar.sub(cameraNear));                  // 0 at the near plane, 1 at the far one
+createMesh(stage.engine, boxGeometry(1, 1, 1), new NodeMaterial({emissiveNode: vec3(rim, fog, 0)}));
+```
+
+| Node | Value | Notes |
+| --- | --- | --- |
+| `positionView`, `normalView` | view space: x right, y up, the camera looks along -z | |
+| `linearDepth` | distance from the camera plane in world units, positive in front | |
+| `tangentLocal`, `tangentWorld`, `bitangentWorld` | the mesh's tangent frame, unit length, with its handedness | a mesh without tangents gets a fixed frame around its normal, not lined up with its UVs: `computeTangents` from `@margoengine/geometry` gives real ones |
+| `cameraNear`, `cameraFar` | the camera's planes, read back from its projection | perspective and orthographic |
+| `modelMatrix`, `viewMatrix`, `projectionMatrix` | `mat4x4f` | `modelMatrix` is the mesh's, without an instance's |
+| `vertexIndex`, `instanceIndex` | `u32` | in a fragment, the first vertex of the triangle |
+| `instanceMatrix`, `instanceColor`, `instanceUV` | this instance's matrix, tint and UV scale (xy) and offset (zw) | identity, white and (1, 1, 0, 0) without instances |
+| `textureCube(cube, direction, level?)` | a `CubeTexture` sampled along a direction | refuses a texture of another dimension |
+| `texture3D(volume, uvw, level?)` | a `Texture` made with `{dimension: '3d'}` | refuses a texture of another dimension |
+
+`NodePass` and `ComputePass` have no mesh, so these are NodeMaterial nodes. A depth pass reads `vertexIndex` and `instanceIndex`, and nothing tied to the camera or to tangents: a `positionNode` that reads those casts the mesh unmoved, as [Node output in every pass](#node-output-in-every-pass) describes.
+
+`node packages/shader/test/inputs-check.mjs` (real GPU, under the GPU lock) reads each input back as a pixel on a wall the camera faces, with and without tangents, and compiles the instance inputs plain, instanced and in uniform rows.
 
 ## Node output in every pass
 
@@ -496,7 +527,7 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 - ComputePass dispatches at most 65,535 workgroups per axis (an indirect dispatch is checked by the GPU only) and runs every frame while attached (`computeReadback` runs once; an atomic counter keeps counting unless `update()` resets it). Workgroup memory has no struct elements, and all of a pass's must fit the device's 16,384 bytes. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
 - No GLSL/WebGL2 output, no skinning or morph nodes, no MRT outputs.
 
-Size (min + gzip, Rolldown, peers external): whole package 16.8 kB (11.8 kB before statements, 13.9 kB before the compute model, 15.2 kB before node output in every pass); `NodeMaterial` with colour nodes only, 7.7 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
+Size (min + gzip, Rolldown, peers external): whole package 17.9 kB (11.8 kB before statements, 13.9 kB before the compute model, 15.2 kB before node output in every pass, 16.8 kB before the input nodes); `NodeMaterial` with colour nodes only, 8.4 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
 
 Apache-2.0. Optional, tree-shakable package; peers `@margoengine/core`, `@margoengine/materials` and `@margoengine/gltf-pro` (^0.1.0 || ^1.0.0).
 

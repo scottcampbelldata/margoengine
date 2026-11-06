@@ -416,6 +416,8 @@ export const atan: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const atan2: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
+export const bitangentWorld: Node<"vec3f">;
+
 export function block<T extends Type>(body: () => Node<T>): Node<T>;
 
 export const bool: (x: Part) => Node<'bool'>;
@@ -423,6 +425,10 @@ export const bool: (x: Part) => Node<'bool'>;
 export const builtin: <T extends Type>(name: string, type: T) => Node<T>;
 
 export function call<T extends Type>(name: string, args: Node[], type: T, wgsl?: string): Node<T>;
+
+export const cameraFar: Node<"f32">;
+
+export const cameraNear: Node<"f32">;
 
 export const cameraPosition: Node<"vec3f">;
 
@@ -476,7 +482,13 @@ export function inputColor(coord?: NodeInput<'vec2f'>): Node<'vec4f'>;
 
 export function inputDepth(coord?: NodeInput<'vec2f'>): Node<'f32'>;
 
+export const instanceColor: Node<"vec4f">;
+
 export const instanceIndex: Node<"u32">;
+
+export const instanceMatrix: Node<"mat4x4f">;
+
+export const instanceUV: Node<"vec4f">;
 
 export const int: (x: Part) => Node<'i32'>;
 
@@ -493,6 +505,8 @@ export const ivec4: (...p: Part[]) => Node<'vec4i'>;
 export const length: <A extends NodeInput[]>(...a: A) => Node<ScalarOf<Widest<A>>>;
 
 export function linearColor(c: ColorValue): number[];
+
+export const linearDepth: Node<"f32">;
 
 export const localId: Node<"vec3u">;
 
@@ -526,11 +540,15 @@ export const mix: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const mod: <A extends NodeInput, B extends NodeInput>(a: A, b: B) => Node<BinaryResult<A, B>>;
 
+export const modelMatrix: Node<"mat4x4f">;
+
 export const mul: <A extends NodeInput, B extends NodeInput>(a: A, b: B) => Node<BinaryResult<A, B>>;
 
 export const negate: <T extends Type>(x: Node<T>) => Node<T>;
 
 export const normalLocal: Node<"vec3f">;
+
+export const normalView: Node<"vec3f">;
 
 export const normalWorld: Node<"vec3f">;
 
@@ -542,9 +560,13 @@ export const oneMinus: <T extends Type>(x: Node<T>) => Node<T>;
 
 export const positionLocal: Node<"vec3f">;
 
+export const positionView: Node<"vec3f">;
+
 export const positionWorld: Node<"vec3f">;
 
 export const pow: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
+
+export const projectionMatrix: Node<"mat4x4f">;
 
 export const radians: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
@@ -590,11 +612,19 @@ export const sub: <A extends NodeInput, B extends NodeInput>(a: A, b: B) => Node
 
 export const tan: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
+export const tangentLocal: Node<"vec3f">;
+
+export const tangentWorld: Node<"vec3f">;
+
 export const tanh: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export function texture(source: BindableTexture, coord?: NodeInput<'vec2f'>, level?: NodeInput<'f32'>): Node<'vec4f'>;
 
+export function texture3D(source: BindableTexture, coord: NodeInput<'vec3f'>, level?: NodeInput<'f32'>): Node<'vec4f'>;
+
 export function textureBarrier(): void;
+
+export function textureCube(source: BindableTexture, direction: NodeInput<'vec3f'>, level?: NodeInput<'f32'>): Node<'vec4f'>;
 
 export const time: Node<"f32">;
 
@@ -648,7 +678,11 @@ export const vecOf: (s: Scalar, n: number) => Type;
 
 export const vertexColor: () => Node<'vec4f'>;
 
+export const vertexIndex: Node<"u32">;
+
 export const viewDirection: Node<"vec3f">;
+
+export const viewMatrix: Node<"mat4x4f">;
 
 export function wgslFn<R extends Type = Type>(code: string): (...args: NodeInput[]) => Node<R>;
 

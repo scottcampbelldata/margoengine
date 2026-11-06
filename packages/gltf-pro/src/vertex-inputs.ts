@@ -63,7 +63,11 @@ export function vertexInputs(source: string): VertexInputs {
     kept = fields.filter((field) => body.includes('i.' + field[2]));
   if (fields.length !== 5) return unchanged;
   return {
-    code: kept.length < 5 ? code.replace(declared[1], kept.map((field) => field[0]).join(', ')) : code,
+    // A built-in such as a node graph's vertex index costs no fetch, so it stays beside the kept attributes.
+    code:
+      kept.length < 5
+        ? code.replace(declared[1], [...kept, ...declared[1].matchAll(/@builtin\(\w+\) \w+:\w+/g)].map((field) => field[0]).join(', '))
+        : code,
     locations: kept.map((field) => +field[1]),
   };
 }

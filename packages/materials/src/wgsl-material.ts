@@ -1,5 +1,6 @@
 // A Material whose surface is the caller's WGSL, spliced into gltf-pro's PBR shader through Material.shader() as
 // @margoengine/shader's NodeMaterial is (same sites), with the caller's uniforms and textures in group 2.
+import { whiteTexture } from '../../shared/white-texture.js';
 import type { Engine } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { Material, Texture, type MaterialOptions, type TextureDimension } from './built-material.js';
@@ -30,7 +31,6 @@ const identifier = /^[A-Za-z][A-Za-z0-9_]*$/,
     /^(?:f|uv|surface|ambient|hemisphere_ambient|direct_light|layers|ggx|uniforms|shade|displace|fragment|gbuffer|vertex|(?:base|mr|normal|ao|emissive)(?:Map|Sampler)|margo\w*|mat_\w*|nd\w*|cluster\w*|shadow\w*)$/,
   fragmentSite = /if\((?:margoFaceTest&&)?!facing&&f\.settings\.z<0\.5\)\{discard;\}/,
   vertexSite = /let p=f\.model\*vec4f\(([^;]*),1\);/;
-const whites = new WeakMap<GPUDevice, Map<TextureDimension, [GPUTextureView, GPUSampler]>>();
 /** WGSL texture type of each dimension. */
 const types: Record<TextureDimension, string> = {
   '2d': 'texture_2d<f32>',
@@ -38,37 +38,6 @@ const types: Record<TextureDimension, string> = {
   '3d': 'texture_3d<f32>',
   cube: 'texture_cube<f32>',
 };
-/** Opaque white of `dimension` until a texture source has pixels (an unloaded image, video or cube face). */
-function white(device: GPUDevice, dimension: TextureDimension = '2d'): [GPUTextureView, GPUSampler] {
-  let cache = whites.get(device);
-  if (!cache) whites.set(device, (cache = new Map()));
-  let w = cache.get(dimension);
-  if (!w && dimension === '2d') {
-    const texture = device.createTexture({
-      size: [1, 1],
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
-    device.queue.writeTexture({ texture }, new Uint8Array([255, 255, 255, 255]), { bytesPerRow: 4 }, [1, 1]);
-    cache.set(dimension, (w = [texture.createView(), device.createSampler()]));
-  }
-  if (!w) {
-    const layers = dimension === 'cube' ? 6 : 1,
-      texture = device.createTexture({
-        size: [1, 1, layers],
-        dimension: dimension === '3d' ? '3d' : '2d',
-        format: 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      });
-    device.queue.writeTexture({ texture }, new Uint8Array(4 * layers).fill(255), { bytesPerRow: 4, rowsPerImage: 1 }, [
-      1,
-      1,
-      layers,
-    ]);
-    cache.set(dimension, (w = [texture.createView({ dimension }), device.createSampler()]));
-  }
-  return w;
-}
 function name(label: string, key: string): string {
   if (!identifier.test(key) || taken.test(key))
     throw new TypeError(
@@ -232,7 +201,7 @@ export class WgslMaterial extends Material {
       entries.push({ binding: 48, resource: { buffer } });
     }
     Object.values(this.textures).forEach((texture, k) => {
-      const [view, sampler] = texture.bind(device, true) ?? white(device, texture.dimension);
+      const [view, sampler] = texture.bind(device, true) ?? whiteTexture(device, texture.dimension);
       entries.push({ binding: 50 + k * 2, resource: view }, { binding: 51 + k * 2, resource: sampler });
     });
     return entries;

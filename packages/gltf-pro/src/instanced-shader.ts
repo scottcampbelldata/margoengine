@@ -22,7 +22,8 @@ export function instancedShader(code: string): string {
     '@vertex fn vertex(i:Input)->Out {',
     `struct Instance {@location(5) m0:vec4f, @location(6) m1:vec4f, @location(7) m2:vec4f, @location(8) m3:vec4f, @location(9) tint:vec4f, @location(10) uvt:vec4f}
 @vertex fn vertex(i:Input,k:Instance)->Out {
-  let margoI=f.model*mat4x4f(k.m0,k.m1,k.m2,k.m3); let margoS=select(-1.0,1.0,dot(margoI[0].xyz,cross(margoI[1].xyz,margoI[2].xyz))>0);`,
+  let margoInstanceMatrix=mat4x4f(k.m0,k.m1,k.m2,k.m3);${code.includes('margoInstanceColor') ? ' let margoInstanceColor=k.tint;' : ''}${code.includes('margoInstanceUV') ? ' let margoInstanceUV=k.uvt;' : ''}
+  let margoI=f.model*margoInstanceMatrix; let margoS=select(-1.0,1.0,dot(margoI[0].xyz,cross(margoI[1].xyz,margoI[2].xyz))>0);`,
   );
   edit('let p=f.model*vec4f(', 'let p=margoI*vec4f(');
   edit(
@@ -85,7 +86,10 @@ export function rowsShader(code: string, count: number): string | undefined {
     });
     edit(
       '@vertex fn vertex(i:Input,k:Instance)->Out {',
-      `@vertex fn vertex(i:Input,k:Instance,@builtin(instance_index) margoN:u32)->Out {margoK=margoN%${count}u;`,
+      // A graph that reads instanceIndex already holds this built-in, which an entry point may name once.
+      out!.includes('ndInstance:u32')
+        ? `@vertex fn vertex(i:Input,k:Instance)->Out {margoK=i.ndInstance%${count}u;`
+        : `@vertex fn vertex(i:Input,k:Instance,@builtin(instance_index) margoN:u32)->Out {margoK=margoN%${count}u;`,
     );
     edit('o.mirror=margoS;', 'o.mirror=margoS; o.margoK=margoK;');
     edit(/@fragment fn \w+\(i:Out[^)]*\)[^{]*\{/g, (head: string) => head + 'margoK=i.margoK;');

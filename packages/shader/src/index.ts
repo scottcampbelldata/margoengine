@@ -1,5 +1,5 @@
 export * from './node.js';
-export { texture, type BindableTexture } from './texture.js';
+export { texture, textureCube, texture3D, type BindableTexture } from './texture.js';
 export {
   block,
   If,

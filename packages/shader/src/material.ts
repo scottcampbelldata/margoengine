@@ -48,10 +48,63 @@ export const materialRoughness = /*@__PURE__*/ builtin('materialRoughness', 'f32
   materialEmissive = /*@__PURE__*/ builtin('materialEmissive', 'vec3f');
 /** True when the fragment belongs to a front face (fragment only). */
 export const frontFacing = /*@__PURE__*/ builtin('frontFacing', 'bool');
-const maxVaryings = 8;
+const maxVaryings = 8,
+  // The unit tangent around unit normal `n`. A mesh without tangents carries zeros, so it gets the fixed frame the
+  // PBR shaders fall back to for a degenerate tangent: no derivatives, so both stages and any branch can read it.
+  tangent = (b: Builder, n: string, t: string) => {
+    b.declare(
+      'margoTangent',
+      `fn margoTangent(n:vec3f,t:vec3f)->vec3f {
+  let a=select(vec3f(1,0,0),vec3f(0,0,1),abs(n.x)>0.5);
+  let s=t-n*dot(n,t);
+  return normalize(select(a-n*dot(n,a),s,dot(s,s)>0.000000000001));
+}`,
+    );
+    return `margoTangent(${n}, ${t})`;
+  },
+  // Meshes without tangents have w = 0: the fixed frame is right-handed.
+  bitangent = (b: Builder, n: string, t: string, w: string) =>
+    `(cross(${n}, ${tangent(b, n, t)}) * select(1.0, ${w}, abs(${w}) > 0.5))`,
+  // Camera values both stages read from the frame. The view matrix is rigid, so its inverse is its transpose and -R^T t.
+  projection = (b: Builder) => {
+    b.declare(
+      'margoProjection',
+      `fn margoProjection()->mat4x4f {
+  let r=transpose(mat3x3f(f.view[0].xyz,f.view[1].xyz,f.view[2].xyz));
+  return f.camera*mat4x4f(vec4f(r[0],0),vec4f(r[1],0),vec4f(r[2],0),vec4f(-(r*f.view[3].xyz),1));
+}`,
+    );
+    return 'margoProjection()';
+  },
+  // Reversed depth: 1 at the near plane, 0 at the far plane, for a perspective (w = -z) or orthographic (w = 1) projection.
+  camera = {
+    modelMatrix: 'f.model',
+    viewMatrix: 'f.view',
+    projectionMatrix: projection,
+    cameraNear: (b: Builder) => {
+      const p = projection(b);
+      return `select(${p}[3].z/(${p}[2].z+1.0),(${p}[3].z-1.0)/${p}[2].z,${p}[3].w>0.5)`;
+    },
+    cameraFar: (b: Builder) => {
+      const p = projection(b);
+      return `(${p}[3].z/${p}[2].z)`;
+    },
+  },
+  // gltf-pro's instanced vertex stage shadows these with `let`s of the instance's values.
+  instanceInput = (name: string, type: string, value: string) => (b: Builder) => {
+    b.declare(name, `const ${name}:${type}=${value};`);
+    return name;
+  },
+  instance = {
+    instanceMatrix: instanceInput('margoInstanceMatrix', 'mat4x4f', 'mat4x4f(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)'),
+    instanceColor: instanceInput('margoInstanceColor', 'vec4f', 'vec4f(1)'),
+    instanceUV: instanceInput('margoInstanceUV', 'vec4f', 'vec4f(1,1,0,0)'),
+  };
 /** The vertex stage with `positionLocal` at `position`: the vertex itself, or a neighbour of it. */
 const vertexAt = (position: string): ShaderStage => {
-  const world = `(f.model * vec4f(${position}, 1.0)).xyz`;
+  const world = `(f.model * vec4f(${position}, 1.0)).xyz`,
+    worldNormal = 'normalize((f.normalMatrix * vec4f(i.normal.xyz, 0.0)).xyz)',
+    worldTangent = '(f.model * vec4f(i.tangent.xyz, 0.0)).xyz';
   return {
     kind: 'vertex',
     builtins: {
@@ -60,9 +113,19 @@ const vertexAt = (position: string): ShaderStage => {
       positionLocal: position,
       normalLocal: 'i.normal.xyz',
       positionWorld: world,
-      normalWorld: 'normalize((f.normalMatrix * vec4f(i.normal.xyz, 0.0)).xyz)',
+      normalWorld: worldNormal,
       cameraPosition: 'f.eye.xyz',
       viewDirection: `normalize(f.eye.xyz - ${world})`,
+      positionView: `(f.view * vec4f(${world}, 1.0)).xyz`,
+      normalView: 'normalize((f.view * vec4f((f.normalMatrix * vec4f(i.normal.xyz, 0.0)).xyz, 0.0)).xyz)',
+      tangentLocal: (b) => tangent(b, 'normalize(i.normal.xyz)', 'i.tangent.xyz'),
+      tangentWorld: (b) => tangent(b, worldNormal, worldTangent),
+      bitangentWorld: (b) => bitangent(b, worldNormal, worldTangent, '(i.tangent.w * f.coordsB.y)'),
+      linearDepth: `(-(f.view * vec4f(${world}, 1.0)).z)`,
+      vertexIndex: 'i.ndVertex',
+      instanceIndex: 'i.ndInstance',
+      ...camera,
+      ...instance,
     },
   };
 };
@@ -81,6 +144,17 @@ export const fragmentStage: ShaderStage = {
     screenUV: (b) => `(${b.local('i.clip.xy')} / ${b.frame('resolution', 'vec2f')})`,
     positionLocal: (b) => b.stage.varying!(b, positionLocal),
     normalLocal: (b) => b.stage.varying!(b, normalLocal),
+    positionView: '(f.view * vec4f(i.position, 1.0)).xyz',
+    normalView: 'normalize((f.view * vec4f(normalize(i.normal), 0.0)).xyz)',
+    tangentLocal: (b) => b.stage.varying!(b, builtin('tangentLocal', 'vec3f')),
+    tangentWorld: (b) => tangent(b, 'normalize(i.normal)', 'i.tangent.xyz'),
+    bitangentWorld: (b) => bitangent(b, 'normalize(i.normal)', 'i.tangent.xyz', 'i.tangent.w'),
+    linearDepth: '(-(f.view * vec4f(i.position, 1.0)).z)',
+    vertexIndex: (b) => b.stage.varying!(b, builtin('vertexIndex', 'u32')),
+    instanceIndex: (b) => b.stage.varying!(b, builtin('instanceIndex', 'u32')),
+    instanceColor: (b) => b.stage.varying!(b, builtin('instanceColor', 'vec4f')),
+    instanceUV: (b) => b.stage.varying!(b, builtin('instanceUV', 'vec4f')),
+    ...camera,
     materialColor: 's.base',
     materialNormal: 's.n',
     materialRoughness: 's.roughness',
@@ -119,40 +193,40 @@ function depthStages(varyings: Node[], cut: { vertex: boolean; fragment: boolean
       cut[part] = true;
       return 'vec3f(0)';
     },
-    camera = { cameraPosition: away('vertex'), viewDirection: away('vertex') },
+    // A depth pass has none of the frame's camera values or a surface: every input is out unless named below.
+    all = (stage: ShaderStage, part: 'vertex' | 'fragment') =>
+      Object.fromEntries(Object.keys(stage.builtins).map((name) => [name, away(part)])),
     through = (x: Node) => (b: Builder) => b.stage.varying!(b, x);
   return [
     {
       kind: 'vertex',
       builtins: {
+        ...all(vertex, 'vertex'),
         uv: 'i.uv.xy',
         vertexColor: 'i.color',
         positionLocal: 'i.position.xyz',
         normalLocal: 'i.normal.xyz',
         positionWorld: 'margoWorld',
         normalWorld: 'margoWorldNormal',
-        ...camera,
+        vertexIndex: 'i.ndVertex',
+        instanceIndex: 'i.ndInstance',
       },
     },
     {
       kind: 'fragment',
       builtins: {
+        ...all(fragmentStage, 'fragment'),
         uv: through(builtin('uv', 'vec2f')),
         vertexColor: through(builtin('vertexColor', 'vec4f')),
         positionWorld: through(builtin('positionWorld', 'vec3f')),
         normalWorld: (b) => `normalize(${b.stage.varying!(b, builtin('normalWorld', 'vec3f'))})`,
         positionLocal: through(positionLocal),
         normalLocal: through(normalLocal),
+        vertexIndex: through(builtin('vertexIndex', 'u32')),
+        instanceIndex: through(builtin('instanceIndex', 'u32')),
         screenCoordinate: fragmentStage.builtins.screenCoordinate,
         screenUV: fragmentStage.builtins.screenUV,
         frontFacing: 'front',
-        cameraPosition: away('fragment'),
-        viewDirection: away('fragment'),
-        materialColor: away('fragment'),
-        materialNormal: away('fragment'),
-        materialRoughness: away('fragment'),
-        materialMetalness: away('fragment'),
-        materialEmissive: away('fragment'),
       },
       varying(b, x) {
         const c = b.program.canon(x);
@@ -167,6 +241,10 @@ function depthStages(varyings: Node[], cut: { vertex: boolean; fragment: boolean
     },
   ];
 }
+/** The vertex stage's built-in inputs that `code` reads, as struct fields. */
+const inputFields = (code: string) =>
+  (code.includes('i.ndVertex') ? ',\n  @builtin(vertex_index) ndVertex:u32' : '') +
+  (code.includes('i.ndInstance') ? ',\n  @builtin(instance_index) ndInstance:u32' : '');
 const varyingCode = (list: readonly Node[]) =>
   list
     .map(
@@ -226,8 +304,8 @@ export class NodeMaterial extends Material {
   private readonly patched = new Map<string, string>();
   private readonly rederived: boolean;
   private readonly depthVertex: string;
-  private readonly depthFragment: string;
-  private readonly depthFields: string;
+  private depthFragment: string;
+  private depthFields: string;
   private depthRecord?: { device: GPUDevice; record: CasterDisplacement };
   /** `extra` is for subclasses: it compiles nodes of its own after the fragment stage and before the vertex stage. */
   constructor(options: NodeMaterialOptions = {}, extra?: (program: Program) => void) {
@@ -315,18 +393,20 @@ export class NodeMaterial extends Material {
       keeps = !cut.fragment && fragmentLines.includes('discard;');
     this.depthFragment = keeps ? fragmentLines : '';
     if (!keeps) list.length = 0;
-    const place = this.program.stage(depthVertex, [...(position ? [position] : []), ...list]),
-      placed = [...place.values],
-      moved = position && !cut.vertex ? placed.shift()! : (position && placed.shift(), undefined);
+    const place = position && this.program.stage(depthVertex, [position]),
+      moved = place && !cut.vertex ? [...place.lines, `margoPosition=${place.values[0]};`] : [];
+    cut.vertex = false;
+    const passed = this.program.stage(depthVertex, list);
+    // A varying a depth pass cannot compute takes the cut with it.
+    if (cut.vertex) {
+      this.depthFragment = '';
+      list.length = 0;
+    }
     this.depthFields = varyingCode(list);
     this.depthVertex =
-      moved === undefined && !keeps
-        ? ''
-        : [
-            ...place.lines,
-            ...(moved === undefined ? [] : [`margoPosition=${moved};`]),
-            ...placed.map((x, i) => `o.ndv${i}=${x};`),
-          ].join('\n');
+      moved.length || list.length
+        ? `{\n${moved.join('\n')}\n}\n{\n${[...(list.length ? passed.lines : []), ...(list.length ? passed.values.map((x, i) => `o.ndv${i}=${x};`) : [])].join('\n')}\n}`
+        : '';
   }
   override shader(source: string, group: number): string {
     // Material maps can change their sparse resource layout while the native PBR source stays identical.
@@ -349,12 +429,18 @@ export class NodeMaterial extends Material {
         count++;
         return 'o.normal=(f.normalMatrix*vec4f(margoNormal,0)).xyz;';
       });
+    const inputs = inputFields(this.vertexCode);
+    if (inputs)
+      code = code.replace(/(struct Input \{[^}]*?)\n\}/, (_, body) => {
+        count++;
+        return body + inputs + '\n}';
+      });
     if (this.varyingFields)
       code = code.replace(/(struct Out \{[^}]*?)\n\}/, (_, body) => {
         count++;
         return body + this.varyingFields + '\n}';
       });
-    if (count !== 2 + (this.varyingFields ? 1 : 0) + (this.rederived ? 1 : 0))
+    if (count !== 2 + (inputs ? 1 : 0) + (this.varyingFields ? 1 : 0) + (this.rederived ? 1 : 0))
       throw new MargoError(
         'unsupported',
         'NodeMaterial requires the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and shader versions',
@@ -366,8 +452,9 @@ export class NodeMaterial extends Material {
   /** `code`, a caster depth shader with the mesh normal in its input, drawing this graph's position and discards. */
   private depthShader(code: string, group: number): string {
     const out = /var o:(\w+);/.exec(code)?.[1],
-      model = /(\w+\.model)\*vec4f\(i\.position\.xyz,1\)/.exec(code)?.[1];
-    if (!out || !model)
+      model = /(\w+\.model)\*vec4f\(i\.position\.xyz,1\)/.exec(code)?.[1],
+      input = /@vertex fn vertex\(i:(\w+)\)/.exec(code)?.[1];
+    if (!out || !model || !input)
       throw new MargoError(
         'unsupported',
         'NodeMaterial requires a standard caster depth shader; use matching @margoengine/shader and effect package versions',
@@ -384,6 +471,7 @@ export class NodeMaterial extends Material {
             `var margoPosition=i.position.xyz;{\n${this.depthVertex}\n}`,
         )
         .replace(new RegExp(`(struct ${out} \\{[^}]*)\\}`), (_, body) => body + this.depthFields + '}')
+        .replace(new RegExp(`(struct ${input} \\{[^}]*)\\}`), (_, body) => body + inputFields(this.depthVertex) + '}')
         .replace(
           /@fragment fn fragment\((i:\w+)\)([^{]*)\{/,
           (_, input, result) =>

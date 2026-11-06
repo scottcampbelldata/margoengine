@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Input nodes check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/stage/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {Texture,CubeTexture,createMesh} from '/packages/materials/dist/index.js';
+import {NodeMaterial,positionLocal,positionView,normalView,positionWorld,tangentWorld,bitangentWorld,normalWorld,linearDepth,cameraNear,cameraFar,modelMatrix,viewMatrix,projectionMatrix,vertexIndex,instanceIndex,instanceColor,instanceUV,instanceMatrix,textureCube,texture3D,uv,vec3,vec4,varying} from '/packages/shader/dist/index.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0],near:0.5,far:50}});
+const engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0;
+// Each node as a colour on an unlit black wall, toneMapped off, so a pixel reads the value through sRGB.
+const show=(emissiveNode,extra={},geometry=planeGeometry(2,2))=>createMesh(engine,geometry,new NodeMaterial({color:[0,0,0],toneMapped:false,emissiveNode,...extra}));
+const face=(r,g,b)=>({data:new Uint8Array([r,g,b,255]),width:1,height:1});
+const cube=new CubeTexture([face(255,0,0),face(0,255,0),face(0,0,255),face(255,255,0),face(0,255,255),face(255,0,255)],{colorSpace:'linear'});
+const slices=new Uint8Array(2*2*2*4);for(let z=0;z<2;z++)for(let i=0;i<4;i++)slices.set([z?255:0,0,0,255],(z*4+i)*4);
+const volume=new Texture({data:slices,width:2,height:2,depth:2,format:'rgba8unorm'},{dimension:'3d',colorSpace:'linear',magFilter:'nearest',minFilter:'nearest',mipmaps:false});
+// Tangents along +y, so the bitangent N x T runs along -x; w = -1 mirrors it.
+const tangents=(w=1)=>({...planeGeometry(2,2),tangents:new Float32Array(Array.from({length:4},()=>[0,1,0,w]).flat())});
+const scenarios={
+  // The wall at z = 0, camera at z = 3: view z is -3, linear depth 3, the normal faces the camera.
+  positionView:()=>show(positionView.z.negate().div(6).xxx),
+  normalView:()=>show(normalView.mul(0.5).add(0.5)),
+  linearDepth:()=>show(linearDepth.div(6).xxx),
+  linearDepthVertex:()=>show(varying(linearDepth).div(6).xxx),
+  planes:()=>show(vec3(cameraNear,cameraFar.div(100),0)),
+  // Rebuilding the clip position from the matrices must equal the camera's own: world to clip and back to view z.
+  matrices:()=>{const clip=projectionMatrix.mul(viewMatrix).mul(vec4(positionWorld,1));return show(clip.w.div(6).xxx);},
+  model:()=>{const m=show(modelMatrix.mul(vec4(0,0,0,1)).xyz);m.root.setPosition([0.25,0.5,0]);return m;},
+  // A mesh with tangents reads them; one without gets the fixed frame around its normal, never a NaN from a zero tangent.
+  tangent:()=>show(tangentWorld.mul(0.5).add(0.5),{},tangents()),
+  tangentVertex:()=>show(varying(tangentWorld).mul(0.5).add(0.5),{},tangents()),
+  bitangent:()=>show(bitangentWorld.mul(0.5).add(0.5),{},tangents()),
+  bitangentMirrored:()=>show(bitangentWorld.mul(0.5).add(0.5),{},tangents(-1)),
+  bitangentMirroredVertex:()=>show(varying(bitangentWorld).mul(0.5).add(0.5),{},tangents(-1)),
+  frame:()=>show(tangentWorld.cross(bitangentWorld).dot(normalWorld).xxx,{},tangents()),
+  noTangent:()=>show(tangentWorld.mul(0.5).add(0.5)),
+  noTangentVertex:()=>show(varying(tangentWorld).mul(0.5).add(0.5)),
+  noBitangent:()=>show(bitangentWorld.mul(0.5).add(0.5)),
+  // Read in the vertex stage and interpolated, the quad's four indices spread over the wall. In a fragment it is flat.
+  vertexIndex:()=>show(varying(vertexIndex.toFloat().div(3)).xxx),
+  vertexIndexFlat:()=>show(vertexIndex.toFloat().div(3).xxx),
+  // The left and right of the wall in +x and -x directions of a cube, from the surface position.
+  cubeRight:()=>show(textureCube(cube,vec3(1,0,0)).rgb),
+  cubeUp:()=>show(textureCube(cube,vec3(0,1,0),0).rgb),
+  volumeNear:()=>show(texture3D(volume,vec3(0.5,0.5,0.25),0).rgb),
+  volumeFar:()=>show(texture3D(volume,vec3(0.5,0.5,0.75),0).rgb),
+};
+window.check={
+  async run(name){device.pushErrorScope('validation');const model=await scenarios[name]();window.current=model;engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {errors:[...(e?[e.message]:[]),...errors.splice(0)]};},
+  clear(){window.current?.destroy();window.current=null;engine.render();},
+  // Instanced draws: the same graph without instances, then through gltf-pro's instancing.
+  async instanced(){
+    const {instancedShader,rowsShader}=await import('/packages/gltf-pro/src/instanced-shader.ts'),{pbrShader}=await import('/packages/gltf-pro/src/shader.ts');
+    const m=new NodeMaterial({emissiveNode:instanceColor.rgb.mul(instanceUV.x).add(instanceIndex.toFloat()),positionNode:instanceMatrix.mul(vec4(positionLocal,1)).xyz});
+    const out=[],code=m.shader(pbrShader,2);
+    for(const text of [code,instancedShader(code),rowsShader(instancedShader(code),64)]){const info=await device.createShaderModule({code:text}).getCompilationInfo();out.push(info.messages.filter(x=>x.type==='error').map(x=>x.message));}
+    return out;
+  },
+};
+window.ready=true;
+</script></body></html>
