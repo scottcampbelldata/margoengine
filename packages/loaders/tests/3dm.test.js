@@ -33,6 +33,8 @@ function runtime({ objects = [], layers = [], unit = { value: 2 } } = {}) {
       });
     if (source.faces)
       return handle({
+        // Like a real solid: vertices of its own kind, which are not a mesh's triples.
+        vertices: () => table([{ location: [0, 0, 0] }]),
         faces: () => table(source.faces, (face) => handle({ getMesh: () => face && mesh(face) })),
       });
     return handle({});

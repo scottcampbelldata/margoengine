@@ -42,6 +42,7 @@ export interface RhinoMesh extends Disposable {
 /** What an object's geometry may offer. Anything with no mesh is counted in `skipped`. */
 export interface RhinoGeometry extends Disposable {
   vertices?: RhinoMesh['vertices'];
+  vertexColors?: RhinoMesh['vertexColors'];
   getMesh?(type: unknown): RhinoMesh | null | undefined;
   faces?(): IndexedList<{ getMesh(type: unknown): RhinoMesh | null | undefined } & Disposable>;
 }
@@ -257,7 +258,8 @@ function read(
 
   /** Adds the object's meshes and says whether it had any. */
   const addGeometry = (geometry: RhinoGeometry): boolean => {
-    if (geometry.vertices) {
+    // A solid has `vertices` and `faces` too, of another kind; only a mesh has vertex colours.
+    if (geometry.vertices && geometry.vertexColors) {
       addMesh(geometry as unknown as RhinoMesh);
       return true;
     }
