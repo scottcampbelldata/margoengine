@@ -918,6 +918,33 @@ The last two jobs on the loaders list, each in its own optional entry, and one f
 - **Proved:** CPU tests on files and documents the tests write. The MaterialX test compiles a graph with every lobe through `nodeMaterial()`, and one real ambientCG `.mtlx` kept outside the repository converted with only its opacity skipped. The loaders browser test draws a Lottie frame on a real canvas, checks two pixels and uploads it as a texture on real WebGPU.
 - **Limits:** no `.vdb` from OpenVDB was read, and no public byte-level specification exists, so the reader and the test's writer share one reading of the format. NanoVDB is not read, which the job allowed. No Lottie file from After Effects was read, and no output was compared with a reference player or MaterialX viewer. The three gaps are in known-bugs.md. The format details came from the agent's general knowledge, with no other project's source open (clean-room.md, LF26, LF29, LF30, LF32).
 - **Gate:** every commit passed `lint`, `hygiene`, `verify`, the loaders tests and both loaders browser tests before its push. Job 2 failed `verify` once, because Lottie carried its own hex colour parser; it now uses `hexColor` from `@margoengine/math/color`, and MaterialX uses `SRGBToLinear` from the same entry. Nothing failed reached `main`. No speed was measured.
+## Batch 41: decoders
+
+Eight jobs, each in its own optional entry of `@margoengine/decoders`. Nothing touched core or stage. Every GPU result here comes from one card, an RTX A6000.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | KTX2 cube maps and arrays | DONE | `76ee20d3a` | `@margoengine/decoders/ktx2-layers` | LIM-215 |
+| 2 | UASTC HDR KTX2 | DONE | `66c19dc85` | `/ktx2-hdr` | LIM-220 |
+| 3 | Streaming mip levels | DONE, SLIPPED | `7688d54c9`, `7439d930e` | `/ktx2-stream` | LIM-222 |
+| 4 | Basis on compute shaders | DONE, LOAD TIME UNPROVEN | `5bfde4ecf` | `/ktx2-gpu` | LIM-227 |
+| 5 | Meshopt on Wasm SIMD | DONE | `9251dc434` | `/meshopt-simd` | LIM-228 |
+| 6 | JPEG XL | DONE | `4415e20eb` | `/jxl` | LIM-233 |
+| 7 | PVRTC fallback decode | DONE | `dc7fcbed0` | `/pvr` | LIM-236 |
+| 8 | Draco point clouds | DONE | this commit | `/draco-points` | LIM-237 |
+
+- **The job 3 slip:** `7688d54c9` is the `ktx2-stream` code, but it reached `main` with job 2's commit message and no docs. The docs script had crashed and was chained with `;`, so the landing went on without it. `7439d930e` carries the docs and says so in its body; nothing was force-pushed to tidy the history. The landing script now refuses a stale message and a commit with no docs staged.
+- **The job 2 BC6H bound:** the GPU check in `tests/decoders-browser.js` allows 2 percent. It was a new test, first set at 1 percent, and real crops measured 1.46, because BC6H is a second lossy step on data UASTC HDR already rounded. The bound covers that second step. No existing tolerance was raised. HDR files fell to 20.6 percent of `memorial.exr` and 29.2 percent of `Desk.exr`, with mips.
+- **Job 4's load time is unproven:** the job's aim was a faster load, and that is not shown. Output equals the Wasm transcoder byte for byte on 11 fixtures plus `yokohama` and `goldengate`, and the entry is 13,579 B gzip against 260,468 B for the Wasm transcoder, but a warm Wasm worker beat it on small files: 0.5 ms against 3.6 ms on a 128 pixel file. Against a cold Wasm transcoder nothing is measured.
+- **Job 5:** the Wasm and the TypeScript decoder agreed on 640,000 offline fuzz cases, and a seeded damaged stream test stays in the package. A diagnostic run, not a quiet one, took 41.26 ms in TypeScript and 6.05 ms in SIMD on ABeautifulGame after `gltfpack -cc`.
+- **Job 6, the decoder:** `@jsquash/jxl` was tried and rejected, because it divides premultiplied files by alpha twice and clamps, which cannot be undone. The entry ships `jxl-oxide-wasm` 0.12.6 under the AGENTS.md exception for prebuilt decoders, recorded in `scripts/supply-chain.mjs` and `vendor/NOTICE.md`. It is 1,698,491 B of Wasm, 609,588 B gzip, fetched only on a decode.
+- **Job 6, the two samples that differed from `djxl`:** both are explained from the conformance suite's `reference_image.npy`, checked against its sha256. `blendmodes` holds samples from -0.67 to 5.91, and the decoder equals that array clipped, within 0.002 of a level; the suite's 8-bit `ref.png` is the one that differs, by up to 92 levels. `alpha_premultiplied` holds premultiplied samples, which the decoder equals within 0.032 of a level, and `ref.png` holds the straight form. On all 27 conformance cases: 22 within 1 level of `djxl` 0.12, 3 within 2.01 (`djxl` wrote linear data under an ICC profile), `alpha_premultiplied` by the reference files, `cmyk_layers` refused. These are Measured, never PROVEN.
+- **Job 6, the browser path:** Chromium 156 has no JPEG XL, so the path that uses the browser's own decoder ran only on a stand-in `createImageBitmap`. The real browsers' output is untested.
+- **Job 7:** PVRTC decodes on the CPU because WebGPU has no such format. Levels under 8 texels wide differ from `texture2ddecoder` in 111 of 2,621,456 channels and which side is right is unknown; no real cube or array file was found, so that layout is tested on no real file. Both are in `docs/limits.md`.
+- **Job 8:** a bug and a feature. Draco's glTF build rejects every point cloud with "Unsupported geometry type.", which `decodeDraco` reported as a damaged file, while its docs implied support. It now raises a coded error naming this entry, with a regression test that fails without the fix. The new entry brings Google's full 1.5.6 build. The real files come from Draco's `testdata`, and their attributes equal draco3d 1.5.7's own decoder; no public file has generic attributes, so those are proved on files written by Draco's own encoder.
+- **Other bugs:** bare class fields in `packages/shared/zstd.js` (job 1), with a regression test.
+- **Gate:** every commit passed `lint`, `hygiene`, `verify`, the decoders and splats tests and the decoders browser tests before its push, job 3's missing docs apart. Failures caught before a push: job 5's error message had no fix clause in the `quality` gate, job 6's new parity row left the summary counts stale in `check:parity`, and job 6's worker and Wasm were missing from `scripts/lazy-files.js`, which `tests/sizes-page.test.js` caught. All were fixed, and nothing failed reached `main`. All timings here are diagnostic.
+
 ## Batch 81: animation
 
 Crowds of animated characters got cheaper and more varied, and baked simulations from DCC tools can now play as they stream.

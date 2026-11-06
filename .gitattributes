@@ -30,6 +30,7 @@ packages/gltf-pro/tests/fixtures/*.wgsl text eol=lf
 packages/decoders/vendor/draco/* -text
 packages/decoders/vendor/basis/* -text
 packages/decoders/vendor/jxl/* -text
+packages/decoders/vendor/draco-full/* -text
 examples/assets/parity-clip.webm filter=lfs diff=lfs merge=lfs -text
 
 # WGSL corpus of @margoengine/webgl2-compat: the manifest pins the SHA-256 of the decompressed sources

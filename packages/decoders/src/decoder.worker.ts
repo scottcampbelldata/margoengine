@@ -3,6 +3,8 @@
 // Wasm module initializes on its first job.
 import {
   decodeDraco,
+  decodeDracoPoints,
+  dracoPointsTransferables,
   dracoTransferables,
   initBasis,
   initDraco,
@@ -21,7 +23,9 @@ declare const self: {
   importScripts(...urls: string[]): void;
 };
 const load: ScriptLoader = async (url) => self.importScripts(url);
-let draco: ReturnType<typeof initDraco> | undefined, basis: ReturnType<typeof initBasis> | undefined;
+let draco: ReturnType<typeof initDraco> | undefined,
+  dracoFull: ReturnType<typeof initDraco> | undefined,
+  basis: ReturnType<typeof initBasis> | undefined;
 
 self.onmessage = async ({ data }) => {
   // Jobs come only from this package's pool; anything that is not a job object is ignored.
@@ -35,6 +39,13 @@ self.onmessage = async ({ data }) => {
       });
       const result = decodeDraco((await draco).module, new Uint8Array(data.buffer), data.request);
       self.postMessage({ id, result }, dracoTransferables(result));
+    } else if (data.type === 'draco-points') {
+      dracoFull ??= initDraco(data.wrapperURL, data.wasmURL, load).catch((error) => {
+        dracoFull = undefined;
+        throw error;
+      });
+      const result = decodeDracoPoints((await dracoFull).module, new Uint8Array(data.buffer), data.request);
+      self.postMessage({ id, result }, dracoPointsTransferables(result));
     } else if (data.type === 'ktx2' || data.type === 'ktx2-layers' || data.type === 'ktx2-hdr') {
       basis ??= initBasis(data.transcoderURL, data.wasmURL, load).catch((error) => {
         basis = undefined;
@@ -54,6 +65,7 @@ self.onmessage = async ({ data }) => {
     // After a Wasm trap the module's memory and stack are undefined: drop it so the next job instantiates a fresh one.
     if (isDecoderCrash(error)) {
       if (data.type === 'draco') draco = undefined;
+      else if (data.type === 'draco-points') dracoFull = undefined;
       else basis = undefined;
     }
     self.postMessage({ id, error: error instanceof Error ? error.message : String(error) });

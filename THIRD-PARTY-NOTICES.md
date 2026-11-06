@@ -30,6 +30,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | Package | Component | Licence | Shipped files | Modified | Notices in the tarball |
 | --- | --- | --- | --- | --- | --- |
 | @margoengine/decoders | Draco 3D decoder (Google) | Apache-2.0 | dist/draco/draco_decoder.wasm, dist/draco/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
+| @margoengine/decoders | Draco 3D full decoder (Google) | Apache-2.0 | dist/draco-full/draco_decoder.wasm, dist/draco-full/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | jxl-oxide JPEG XL decoder (Wonwoo Choi) | MIT OR Apache-2.0 | dist/jxl/jxl_oxide_wasm_bg.wasm, dist/jxl/jxl_oxide_wasm.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt, dist/jxl/LICENSE-MIT |
 | @margoengine/decoders | Basis Universal transcoder (Binomial LLC) | Apache-2.0 | dist/basis/basis_transcoder.wasm, dist/basis/basis_transcoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/post, @margoengine/tonemap | Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES filmic curve (Krzysztof Narkowicz), Khronos PBR Neutral; the ACES 1.x style fit written for Margo | attribution (formulas and constants; agx.test.js re-derives every AgX matrix and constant, aces.test.js measures the own ACES fit against its sample table) | AgX/ACES shader code: AgX and the Narkowicz curve also compiled into post (ImagePost) and voxel-pathtracer from packages/shared; the own ACES fit only into tonemap | re-derived; ACES fit written for Margo | NOTICE.md |
@@ -47,6 +48,9 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     `draco_decoder_gltf.wasm` (sha256 `a680d927bed9cb864ddbd63521868891af2bfbe755092761b4837487618df8ac`) as
     `draco_decoder.wasm`, `draco_wasm_wrapper_gltf.js`
     (`8bb2952d2ba7d67e1414f8df819410cb0434a666be53f671fff75f68843d76f6`) as `draco_wasm_wrapper.js`.
+  - Draco 1.5.6 full decoder, for point clouds, from the same folder (checked 2026-11-06): `draco_decoder.wasm` (sha256
+    `c55a594e8ffd18426d36b27fea9618af3df5e173640a3e56d46f09d76f0574f2`) and `draco_wasm_wrapper.js`
+    (`e8049906ef3f8f75d3456c22a3f31bfdfe5b5b5bd09ccdec613b9e9a49d554d8`).
   - Basis Universal v1_50_0_2 WebGL transcoder from
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/transcoder/build: `basis_transcoder.wasm`
     (`6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`) and `basis_transcoder.js`
@@ -89,7 +93,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/creative` | none | none | LICENSE, NOTICE |
 | `@margoengine/culling` | none | none | LICENSE, NOTICE |
 | `@margoengine/cutscene` | none | none | LICENSE, NOTICE |
-| `@margoengine/decoders` | none | Draco 3D decoder (Apache-2.0); jxl-oxide JPEG XL decoder (MIT); Basis Universal transcoder (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt, dist/jxl/LICENSE-MIT |
+| `@margoengine/decoders` | none | Draco 3D decoder (Apache-2.0); Draco 3D full decoder (Apache-2.0); jxl-oxide JPEG XL decoder (MIT); Basis Universal transcoder (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt, dist/jxl/LICENSE-MIT |
 | `@margoengine/dof` | none | none | LICENSE, NOTICE |
 | `@margoengine/ecs` | none | none | LICENSE, NOTICE |
 | `@margoengine/environment` | none | none | LICENSE, NOTICE |

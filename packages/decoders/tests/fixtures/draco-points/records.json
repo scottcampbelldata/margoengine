@@ -1,0 +1,112 @@
+{
+  "cube_pc.drc": {
+    "pointCount": 24,
+    "attributes": [
+      [
+        "POSITION",
+        "POSITION",
+        0,
+        3,
+        false,
+        "Float32Array",
+        24,
+        "985be8e64fd35b08f3852f62d6c03ab512a757a6e21c4ab7f824b50c0ce785fd"
+      ],
+      [
+        "TEXCOORD_0",
+        "TEX_COORD",
+        0,
+        2,
+        false,
+        "Float32Array",
+        24,
+        "8f9c62cffe4df681d56f7ffb6208ab680f3bd1489427f7c2bb030eb8243de8af"
+      ],
+      [
+        "NORMAL",
+        "NORMAL",
+        0,
+        3,
+        false,
+        "Float32Array",
+        24,
+        "bee23d8cc8b11dd565404e03ba31bf5b6f060bf5f4015426b172db49f56e7948"
+      ]
+    ]
+  },
+  "pc_color.drc": {
+    "pointCount": 7733,
+    "attributes": [
+      [
+        "POSITION",
+        "POSITION",
+        0,
+        3,
+        false,
+        "Float32Array",
+        7733,
+        "7520da83222423278d4783447c0b445ad393c690f201c187f002bd2e3cabd0a4"
+      ],
+      [
+        "COLOR_0",
+        "COLOR",
+        1,
+        3,
+        false,
+        "Uint8Array",
+        7733,
+        "c8053fca2495a8da0b0f8af07bd7076d777361e5400b16fdf56f9987ed467802"
+      ]
+    ]
+  },
+  "pc_kd_color.drc": {
+    "pointCount": 7733,
+    "attributes": [
+      [
+        "POSITION",
+        "POSITION",
+        0,
+        3,
+        false,
+        "Float32Array",
+        7733,
+        "4ff067878f9db9c71cd7aa1dee8145473135453fc62d3e6b831375949719cdcb"
+      ],
+      [
+        "COLOR_0",
+        "COLOR",
+        1,
+        3,
+        false,
+        "Uint8Array",
+        7733,
+        "aeb89a148ca7c35b49b1574a751bc07ae1d82da3ef6b532c3f3f3538971072ab"
+      ]
+    ]
+  },
+  "point_cloud_no_qp.drc": {
+    "pointCount": 21,
+    "attributes": [
+      [
+        "POSITION",
+        "POSITION",
+        0,
+        3,
+        false,
+        "Float32Array",
+        21,
+        "5ec6d5c6820c088a60d28f7b887c9970ba38cb922267aa288ea3619030d270e9"
+      ],
+      [
+        "COLOR_0",
+        "COLOR",
+        1,
+        3,
+        false,
+        "Uint8Array",
+        21,
+        "ba1f6e0bcc3d29f05ee2373881f4015ee7eb8f7c35ccf8c9dfcaaf7226e7256d"
+      ]
+    ]
+  }
+}

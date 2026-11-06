@@ -93,6 +93,10 @@
     "./pvr": {
       "types": "./dist/pvr.d.ts",
       "import": "./dist/pvr.js"
+    },
+    "./draco-points": {
+      "types": "./dist/draco-points.d.ts",
+      "import": "./dist/draco-points.js"
     }
   },
   "files": [

@@ -9,18 +9,30 @@ export type DracoArrayConstructor =
   | Uint32ArrayConstructor
   | Float32ArrayConstructor;
 export type DracoDataType = 'DT_INT8' | 'DT_UINT8' | 'DT_INT16' | 'DT_UINT16' | 'DT_INT32' | 'DT_UINT32' | 'DT_FLOAT32';
+export type PointArrayConstructor = DracoArrayConstructor | Int32ArrayConstructor;
 export type DracoSemantic = 'POSITION' | 'NORMAL' | 'TEX_COORD' | 'COLOR';
 
 export interface DracoGeometry {
   ptr: number;
   num_points(): number;
   num_faces?(): number;
+  num_attributes?(): number;
 }
 export interface DracoPointAttribute {
   ptr: number;
   num_components(): number;
   normalized?(): boolean;
   data_type(): number;
+  attribute_type?(): number;
+  unique_id?(): number;
+}
+/** A handle on one attribute's metadata; `ptr` is 0 when it has none. */
+export interface DracoMetadata {
+  ptr: number;
+}
+interface DracoMetadataQuerier {
+  HasEntry(metadata: DracoMetadata, name: string): boolean;
+  GetStringEntry(metadata: DracoMetadata, name: string): string;
 }
 interface DracoBuffer {
   Init(bytes: Int8Array, length: number): void;
@@ -36,6 +48,7 @@ interface DracoDecoder {
   GetAttributeId(geometry: DracoGeometry, semantic: number): number;
   GetAttributeByUniqueId(geometry: DracoGeometry, id: number): DracoPointAttribute;
   GetAttribute(geometry: DracoGeometry, id: number): DracoPointAttribute;
+  GetAttributeMetadata(geometry: DracoGeometry, id: number): DracoMetadata;
   GetAttributeDataArrayForAllPoints(
     geometry: DracoGeometry,
     attribute: DracoPointAttribute,
@@ -47,9 +60,10 @@ interface DracoDecoder {
   GetTrianglesUInt16Array(geometry: DracoGeometry, bytes: number, pointer: number): boolean;
 }
 /** The Emscripten Draco surface used by the worker, independent of its factory globals. */
-export interface DracoModule extends Record<DracoDataType | DracoSemantic, number> {
+export interface DracoModule extends Record<DracoDataType | DracoSemantic | 'GENERIC', number> {
   Decoder: new () => DracoDecoder;
   DecoderBuffer: new () => DracoBuffer;
+  MetadataQuerier: new () => DracoMetadataQuerier;
   Mesh: new () => DracoGeometry;
   PointCloud: new () => DracoGeometry;
   TRIANGULAR_MESH: number;

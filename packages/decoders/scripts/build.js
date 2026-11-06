@@ -39,7 +39,7 @@ await build({
     },
   },
 });
-for (const folder of ['draco', 'basis', 'jxl']) {
+for (const folder of ['draco', 'draco-full', 'basis', 'jxl']) {
   await mkdir(resolve(dist, folder), { recursive: true });
   for (const file of await readdir(resolve(root, 'vendor', folder)))
     await copyFile(resolve(root, 'vendor', folder, file), resolve(dist, folder, file));

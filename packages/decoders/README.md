@@ -91,6 +91,26 @@ const texture = uploadTexture(device, parsePVR(bytes));
 The result is a `TextureFile` with `target: 'pvr'`, sRGB when the file says so. `decodePVRTC(data, width, height, twoBit)` decodes one
 level of bare PVRTC data. PVRTC 2, 3D textures, big-endian files and sizes that are not powers of two are refused.
 
+## Draco point clouds (`@margoengine/decoders/draco-points`)
+
+`DracoPointsDecoder` returns a whole Draco point cloud: `pointCount`, `indices` (one per point, 32-bit from 65,536 points) and every
+attribute in the type the file stores, generic ones included. The glTF Draco build behind `DracoDecoder` has no point cloud decoder, so
+this entry brings Google's full build, in its own worker pool; nothing loads it until a cloud is decoded.
+
+```ts
+import {DracoPointsDecoder} from 'margoengine/decoders/draco-points';
+
+declare const file: ArrayBuffer;
+
+using decoder = new DracoPointsDecoder();
+const {pointCount, indices, attributes} = await decoder.decode(file);
+const intensity = attributes.find((attribute) => attribute.name === 'intensity');
+```
+
+Each attribute has `name` (the file's `name` metadata, or `POSITION`, `NORMAL`, `COLOR_0`, `TEXCOORD_0`, `GENERIC_0` counting up), `semantic`,
+`uniqueId`, `array`, `itemSize` and `normalized`. `decode` takes `signal`, `transfer` and `limits` (`maxVertices`, `maxDecodedBytes`), which are
+checked before any output is allocated; `decoderPath` names another folder for the two decoder files.
+
 ## Texture upload (`@margoengine/decoders/texture`)
 
 `getSupportedTranscodeFormat`, `getBytesPerRow` and `createKTX2Texture` (also on the root) without the transcoder or the
@@ -338,7 +358,7 @@ until it ends or times out, so no new decode queues behind it unknowingly.
 
 ## Limits
 
-`KTX2Decoder` reads one 2D texture; cube maps and arrays go through `@margoengine/decoders/ktx2-layers`. HDR files go through `@margoengine/decoders/ktx2-hdr`. Draco point clouds return no `indices`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
+`KTX2Decoder` reads one 2D texture; cube maps and arrays go through `@margoengine/decoders/ktx2-layers`. HDR files go through `@margoengine/decoders/ktx2-hdr`. `DracoDecoder` reads meshes; a point cloud goes through `@margoengine/decoders/draco-points`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
 
 ## Tests
 

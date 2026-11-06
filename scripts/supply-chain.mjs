@@ -50,6 +50,16 @@ export const BUNDLED = [
   },
   {
     package: '@margoengine/decoders',
+    component: 'Draco 3D full decoder (Google)',
+    licence: 'Apache-2.0',
+    files: 'dist/draco-full/draco_decoder.wasm, dist/draco-full/draco_wasm_wrapper.js',
+    source:
+      'packages/decoders/vendor/draco-full: Draco 1.5.6 official full decoder, https://www.gstatic.com/draco/versioned/decoders/1.5.6/ (draco_decoder.wasm sha256 c55a594e8ffd18426d36b27fea9618af3df5e173640a3e56d46f09d76f0574f2, draco_wasm_wrapper.js sha256 e8049906ef3f8f75d3456c22a3f31bfdfe5b5b5bd09ccdec613b9e9a49d554d8), byte-identical',
+    modified: 'no',
+    notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt'],
+  },
+  {
+    package: '@margoengine/decoders',
     component: 'jxl-oxide JPEG XL decoder (Wonwoo Choi)',
     licence: 'MIT OR Apache-2.0',
     files: 'dist/jxl/jxl_oxide_wasm_bg.wasm, dist/jxl/jxl_oxide_wasm.js',
@@ -356,6 +366,9 @@ ${table(
     \`draco_decoder_gltf.wasm\` (sha256 \`a680d927bed9cb864ddbd63521868891af2bfbe755092761b4837487618df8ac\`) as
     \`draco_decoder.wasm\`, \`draco_wasm_wrapper_gltf.js\`
     (\`8bb2952d2ba7d67e1414f8df819410cb0434a666be53f671fff75f68843d76f6\`) as \`draco_wasm_wrapper.js\`.
+  - Draco 1.5.6 full decoder, for point clouds, from the same folder (checked 2026-11-06): \`draco_decoder.wasm\` (sha256
+    \`c55a594e8ffd18426d36b27fea9618af3df5e173640a3e56d46f09d76f0574f2\`) and \`draco_wasm_wrapper.js\`
+    (\`e8049906ef3f8f75d3456c22a3f31bfdfe5b5b5bd09ccdec613b9e9a49d554d8\`).
   - Basis Universal v1_50_0_2 WebGL transcoder from
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/transcoder/build: \`basis_transcoder.wasm\`
     (\`6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a\`) and \`basis_transcoder.js\`

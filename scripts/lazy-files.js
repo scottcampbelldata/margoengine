@@ -126,7 +126,7 @@ export const LAZY_FILES = [
     label: 'decoder.worker.js',
     kind: 'Worker',
     measure: 'file',
-    when: 'First `DracoDecoder.decode()` or `KTX2Decoder.decode()`: up to `workerLimit` workers, reused until `dispose()`',
+    when: 'First `DracoDecoder.decode()`, `DracoPointsDecoder.decode()` or `KTX2Decoder.decode()`: up to `workerLimit` workers, reused until `dispose()`',
   },
   {
     package: '@margoengine/decoders',
@@ -143,6 +143,22 @@ export const LAZY_FILES = [
     kind: 'Wasm',
     measure: 'file',
     when: 'With the Draco glue above',
+  },
+  {
+    package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/draco-full/draco_wasm_wrapper.js',
+    label: 'draco-full/draco_wasm_wrapper.js',
+    kind: 'Draco glue',
+    measure: 'file',
+    when: 'First point cloud a `DracoPointsDecoder` worker decodes, once per worker; `decoderPath` serves it from elsewhere',
+  },
+  {
+    package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/draco-full/draco_decoder.wasm',
+    label: 'draco-full/draco_decoder.wasm',
+    kind: 'Wasm',
+    measure: 'file',
+    when: 'With the full Draco glue above',
   },
   {
     package: '@margoengine/decoders',
@@ -341,4 +357,4 @@ export const LAZY_SPLITS = [
 
 /** Built files that load on their own at runtime; each must be in LAZY_FILES. Paths relative to the repository root. */
 export const isLazyBuildFile = (path) =>
-  /^packages\/[^/]+\/dist\/(.*\.wasm|workers\/[^/]+\.js|[^/]*\.worker\.js|(draco|basis|jxl)\/[^/]+\.js)$/.test(path);
+  /^packages\/[^/]+\/dist\/(.*\.wasm|workers\/[^/]+\.js|[^/]*\.worker\.js|(draco|draco-full|basis|jxl)\/[^/]+\.js)$/.test(path);

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7415531,
+  "total": 7569542,
   "history": [
     {
       "date": "2026-10-24",
@@ -2588,6 +2588,12 @@
       "commit": "07802cd7d",
       "reason": "feat(rigging): face tracking (new entry @margoengine/rigging/face)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "27bf48091",
+      "reason": "new entry draco-points ships the 285 KB full Draco Wasm, fetched only on a point cloud decode",
+      "grew": 1
     }
   ],
   "items": {
@@ -2715,6 +2721,7 @@
     "@margoengine/cutscene": 6822,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,
+    "@margoengine/decoders/draco-points": 154011,
     "@margoengine/decoders/jxl": 902155,
     "@margoengine/decoders/ktx": 2851,
     "@margoengine/decoders/ktx2-gpu": 14314,

@@ -16,7 +16,7 @@ export interface DecodedDracoGeometry {
   vertexCount: number;
   /** Empty when an explicit attributeIds map does not request POSITION. */
   positions: Float32Array;
-  /** Uint16Array below 65,536 vertices; otherwise Uint32Array. Absent for Draco point clouds. */
+  /** Uint16Array below 65,536 vertices; otherwise Uint32Array. Absent for a point cloud, which only a full Draco build reads. */
   indices?: Uint16Array | Uint32Array;
   normals?: Float32Array;
   uvs?: Float32Array;
@@ -32,6 +32,33 @@ export interface DracoRequest {
   attributeIds?: Record<string, number>;
   componentTypes?: Record<string, number>;
   limits?: DracoDecodeLimits;
+}
+
+/** One attribute of a Draco point cloud, in the type the file stores. */
+export interface DracoPointsAttribute {
+  /** The file's `name` metadata when it has one; otherwise `POSITION`, `NORMAL`, `COLOR_0`, `TEXCOORD_0`, `GENERIC_0`, counting up. */
+  name: string;
+  semantic: 'POSITION' | 'NORMAL' | 'COLOR' | 'TEX_COORD' | 'GENERIC';
+  /** Draco's id for this attribute, stable across re-encoding. */
+  uniqueId: number;
+  array: Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array | Float32Array;
+  /** Components per point. */
+  itemSize: number;
+  /** True when integer samples stand for 0 to 1. */
+  normalized: boolean;
+}
+
+/** A whole Draco point cloud. Every array owns its buffer and arrives by transfer. */
+export interface DecodedDracoPoints {
+  pointCount: number;
+  /** One per point, in order; Uint16Array below 65,536 points, otherwise Uint32Array. */
+  indices: Uint16Array | Uint32Array;
+  attributes: DracoPointsAttribute[];
+}
+
+/** Output limits of a point cloud decode: `maxVertices` limits points, `maxDecodedBytes` the indices and attributes together. */
+export interface DracoPointsRequest {
+  limits?: Pick<DracoDecodeLimits, 'maxVertices' | 'maxDecodedBytes'>;
 }
 
 /** Output limits checked after Draco reads geometry metadata and before extracting any output arrays. */
@@ -106,6 +133,14 @@ export interface TranscodedKTX2Result {
 
 export type WorkerRequest =
   | { id: number; type: 'draco'; buffer: ArrayBuffer; request: DracoRequest; wrapperURL: string; wasmURL: string }
+  | {
+      id: number;
+      type: 'draco-points';
+      buffer: ArrayBuffer;
+      request: DracoPointsRequest;
+      wrapperURL: string;
+      wasmURL: string;
+    }
   | {
       id: number;
       type: 'ktx2' | 'ktx2-layers' | 'ktx2-hdr';

@@ -7,6 +7,7 @@ import { JXLDecoder, jxlTextureFile, uploadTexture } from '../dist/jxl.js';
 import { decodePNG } from '../dist/png.js';
 import jxlRecords from './fixtures/jxl/records.json';
 import { parsePVR } from '../dist/pvr.js';
+import { DracoPointsDecoder } from '../dist/draco-points.js';
 
 const fixture = async (name) =>
   new Uint8Array(await (await fetch(new URL(`./fixtures/${name}`, import.meta.url))).arrayBuffer());
@@ -448,6 +449,19 @@ window.runDecoderTests = async () => {
   });
   pvrTexture.destroy();
   checks.push(`A real PVRTC file uploads as ${pvr.format}, ${pvr.mipmaps.length} levels, and reads back as decoded`);
+  // Draco point clouds: the full build in a classic worker, with generic attributes and transferred arrays.
+  const points = new DracoPointsDecoder({ workerLimit: 1 }),
+    survey = await points.decode(await (await fetch('/tests/fixtures/draco-points/survey.drc')).arrayBuffer()),
+    intensity = survey.attributes.find(({ name }) => name === 'intensity');
+  check(survey.pointCount === 1000 && survey.indices.length === 1000 && survey.indices[999] === 999, 'survey cloud size');
+  check(intensity?.array instanceof Float32Array && intensity.array[999] === 999 / 4, 'generic attribute through the worker');
+  let pointsRefused;
+  await points
+    .decode(await (await fetch('/tests/fixtures/draco-points/survey.drc')).arrayBuffer(), { limits: { maxVertices: 10 } })
+    .catch((error) => (pointsRefused = error));
+  check(/raise maxVertices/.test(pointsRefused?.message), `limit gave ${pointsRefused}`);
+  points.dispose();
+  checks.push('Draco point clouds decode in a worker with indices, generic attributes and limits');
   rgba.dispose();
   negotiated.dispose();
   device.destroy();

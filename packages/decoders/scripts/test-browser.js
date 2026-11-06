@@ -34,6 +34,12 @@ for (const pattern of [
     `consumer build did not emit ${pattern}: ${emitted.join(', ')}`,
   );
 
+assert.equal(
+  emitted.filter((file) => /^draco_decoder-.*\.wasm$/.test(file)).length,
+  2,
+  `consumer build did not emit both Draco builds: ${emitted.join(', ')}`,
+);
+
 const server = await createServer({ configFile: config, logLevel: 'error', server: { port: 0 } });
 await server.listen();
 const productionServer = await preview({
@@ -66,7 +72,7 @@ try {
   await page.goto(productionServer.resolvedUrls.local[0]);
   await page.waitForFunction(() => typeof window.runConsumer === 'function');
   report.consumer = await page.evaluate(() => window.runConsumer());
-  assert.deepEqual(report.consumer, { vertices: 24, indices: 36, width: 2048, format: 'rgba8unorm', jxlWidth: 200 });
+  assert.deepEqual(report.consumer, { vertices: 24, indices: 36, width: 2048, format: 'rgba8unorm', jxlWidth: 200, points: 24 });
   report.consumer.emitted = emitted;
   report.checks.push('Production Vite consumer emits the worker and decoders as assets and decodes from them');
   report.browser = browser.version();
