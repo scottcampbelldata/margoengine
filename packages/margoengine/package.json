@@ -442,6 +442,10 @@
       "types": "./dist/ecs/query.d.ts",
       "import": "./dist/ecs/query.js"
     },
+    "./ecs/relations": {
+      "types": "./dist/ecs/relations.d.ts",
+      "import": "./dist/ecs/relations.js"
+    },
     "./ecs/schedule": {
       "types": "./dist/ecs/schedule.d.ts",
       "import": "./dist/ecs/schedule.js"

@@ -1,3 +1,4 @@
+/// <reference lib="esnext.disposable" />
 import type { Mesh } from '@margoengine/core';
 import type { TransformStore } from '@margoengine/core/extension';
 import type { Component, ComponentObserver, Entity, NumericArray } from './index.js';
@@ -162,6 +163,10 @@ export class MeshBridge {
     this.entities.length = this.meshes.length = 0;
     this.places.clear();
     this.linked.clear();
+  }
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.stop();
   }
   private fill(entity: Entity, mesh: Mesh): void {
     const { id, engine } = slot(mesh),

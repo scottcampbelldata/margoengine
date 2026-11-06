@@ -38,6 +38,10 @@
       "types": "./dist/query.d.ts",
       "import": "./dist/query.js"
     },
+    "./relations": {
+      "types": "./dist/relations.d.ts",
+      "import": "./dist/relations.js"
+    },
     "./schedule": {
       "types": "./dist/schedule.d.ts",
       "import": "./dist/schedule.js"

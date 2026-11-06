@@ -132,7 +132,7 @@ export class World {
   private readonly generations: Uint32Array;
   private readonly free: Uint32Array;
   private freeCount: number;
-  private readonly components = new Set<Component>();
+  private readonly components = new Set<{ remove(entity: Entity): unknown }>();
   /**
    * @param capacity Maximum live entities, an integer in [1, 1_000_000]. Default 4096.
    * @throws RangeError for an invalid capacity.
@@ -174,18 +174,30 @@ export class World {
   /**
    * Remove `entity` from every component of this world and free its slot (retired instead once
    * its next id would exceed `0xffffffff`); the old id becomes stale.
+   * A call made while the same entity is being destroyed, from a store's `remove`, does nothing.
    * @throws MargoError `'state'` when the entity is already stale or destroyed.
    */
   destroy(entity: Entity): void {
     this.check(entity);
-    for (const component of this.components) component.remove(entity);
     const slot = entity % this.capacity;
+    // A cascade can lead back here while this entity is on its way out; the outer call finishes the job.
+    if (this.live[slot] === 2) return;
+    this.live[slot] = 2;
+    for (const component of this.components) component.remove(entity);
     this.live[slot] = 0;
     // Retire slots before generation IDs would exceed packed Uint32 storage.
     if ((this.generations[slot] + 1) * this.capacity + slot <= 0xffffffff) {
       this.generations[slot]++;
       this.free[this.freeCount++] = slot;
     }
+  }
+  /** Have `store.remove(entity)` called for every entity destroyed, while it is still alive; `Relation` uses this. */
+  attach(store: { remove(entity: Entity): unknown }): void {
+    this.components.add(store);
+  }
+  /** Undo {@link World.attach}. */
+  detach(store: { remove(entity: Entity): unknown }): void {
+    this.components.delete(store);
   }
   /**
    * Create a component store sized to `capacity` and register it with this world.
@@ -249,3 +261,5 @@ export type { ScheduleOptions, ScheduleTime, SystemOptions, SystemRun } from './
 export { ChangeTracker } from './changes.js';
 export { Query } from './query.js';
 export type { QueryTerms } from './query.js';
+export { Relation } from './relations.js';
+export type { RelationOptions } from './relations.js';

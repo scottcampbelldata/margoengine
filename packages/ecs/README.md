@@ -113,6 +113,39 @@ tracker.stop();
 
 `fields` are plain typed arrays, so a direct write cannot be seen: call `component.touch(entity)` after one, or write through `component.add`. Results are net over the window: added then removed reports nothing, removed then added back is `changed`, added then written stays `added`. Each tracker keeps its own window, so systems can read at their own pace; call `clear()` when one is done, for example in a last system of a `Schedule`. `stop()`, or `using`, detaches a tracker. A tracker costs 24 bytes per world slot. To react at once instead of reading a window, push your own `{onAdd, onChange, onRemove}` onto `component.observers`; do not add or remove rows of that component from inside one.
 
+## Relationships
+
+`Relation` (from `margoengine/ecs`, or `margoengine/ecs/relations` alone) holds pairs of entities with a meaning you name. A pair goes from a source to a target and reads both ways.
+
+```ts
+import {Relation, World} from 'margoengine/ecs';
+const world = new World(1024);
+const childOf = new Relation(world, {exclusive: true, cascade: true, acyclic: true});
+const owns = new Relation(world);
+const ship = world.create();
+const turret = world.create();
+const barrel = world.create();
+childOf.add(turret, ship);
+childOf.add(barrel, turret);
+owns.add(ship, barrel);
+owns.add(ship, turret);
+const results = new Uint32Array(world.capacity);
+console.log(childOf.target(barrel) === turret); // true
+console.log(childOf.sources(ship, results)); // 1: the children of ship
+console.log(childOf.descendants(ship, results)); // 2: turret, then barrel
+console.log(owns.targets(ship, results)); // 2
+world.destroy(ship); // turret and barrel go with it; every pair ends
+console.log(world.alive(barrel), owns.size); // false 0
+```
+
+| `new Relation` option | Default | Meaning |
+| --- | --- | --- |
+| `exclusive` | `false` | A source has at most one target; a new pair replaces the old one |
+| `cascade` | `false` | Destroying a target destroys its sources, all the way down |
+| `acyclic` | `false` | `add` throws `TypeError` for a pair that would close a loop |
+
+`has`, `target`, `targets`, `sources`, `descendants` and `forEach` read pairs directly. Results go into your `Uint32Array`, oldest pair first, and `descendants` is breadth first, so parents come before children. Pairs of a destroyed entity always end. An `acyclic` add walks up from the target, so it costs the depth of the hierarchy. `stop()`, or `using`, ends all pairs and detaches from the world. Pairs live in Maps and Sets, not typed arrays: keep per-frame data in components.
+
 ## Engine bridge
 
 `MeshBridge` (from `margoengine/ecs/engine`) copies a transform component to core meshes in one call a frame, so systems work on packed arrays and never touch a mesh.

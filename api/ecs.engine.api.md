@@ -13,6 +13,7 @@ export class MeshBridge {
     meshOf(entity: Entity): Mesh | undefined;
     sync(): number;
     stop(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export interface MeshBridgeOptions {
@@ -73,6 +74,12 @@ class World {
     check(entity: Entity): void;
     create(): Entity;
     destroy(entity: Entity): void;
+    attach(store: {
+        remove(entity: Entity): unknown;
+    }): void;
+    detach(store: {
+        remove(entity: Entity): unknown;
+    }): void;
     component<S extends Schema>(schema: S): Component<S>;
     tag(): Component<Record<never, never>>;
     query(components: readonly Component[], output: Uint32Array): number;

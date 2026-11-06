@@ -57,6 +57,31 @@ export interface QueryTerms {
     optional?: readonly Component[];
 }
 
+export class Relation {
+    readonly world: World;
+    size: number;
+    readonly exclusive: boolean;
+    readonly cascade: boolean;
+    readonly acyclic: boolean;
+    constructor(world: World, { exclusive, cascade, acyclic }?: RelationOptions);
+    add(source: Entity, target: Entity): boolean;
+    remove(source: Entity, target: Entity): boolean;
+    has(source: Entity, target: Entity): boolean;
+    target(source: Entity): Entity | undefined;
+    targets(source: Entity, output: Uint32Array): number;
+    sources(target: Entity, output: Uint32Array): number;
+    descendants(target: Entity, output: Uint32Array): number;
+    forEach(visit: (source: Entity, target: Entity) => void): void;
+    stop(): void;
+    [Symbol.dispose]: () => void;
+}
+
+export interface RelationOptions {
+    exclusive?: boolean;
+    cascade?: boolean;
+    acyclic?: boolean;
+}
+
 export class Schedule {
     readonly step: number;
     readonly maxSteps: number;
@@ -100,6 +125,12 @@ export class World {
     check(entity: Entity): void;
     create(): Entity;
     destroy(entity: Entity): void;
+    attach(store: {
+        remove(entity: Entity): unknown;
+    }): void;
+    detach(store: {
+        remove(entity: Entity): unknown;
+    }): void;
     component<S extends Schema>(schema: S): Component<S>;
     tag(): Component<Record<never, never>>;
     query(components: readonly Component[], output: Uint32Array): number;

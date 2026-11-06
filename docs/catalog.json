@@ -2302,6 +2302,7 @@
       "ChangeTracker",
       "Component",
       "Query",
+      "Relation",
       "Schedule",
       "World"
     ],
