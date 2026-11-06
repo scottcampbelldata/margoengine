@@ -1650,6 +1650,10 @@
       "types": "./dist/ragdoll/powered.d.ts",
       "import": "./dist/ragdoll/powered.js"
     },
+    "./ragdoll/getup": {
+      "types": "./dist/ragdoll/getup.d.ts",
+      "import": "./dist/ragdoll/getup.js"
+    },
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"

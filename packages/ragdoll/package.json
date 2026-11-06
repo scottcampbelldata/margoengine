@@ -32,6 +32,10 @@
     "./powered": {
       "types": "./dist/powered.d.ts",
       "import": "./dist/powered.js"
+    },
+    "./getup": {
+      "types": "./dist/getup.d.ts",
+      "import": "./dist/getup.js"
     }
   },
   "files": [
@@ -46,8 +50,14 @@
     "@margoengine/math": "^1.0.0"
   },
   "peerDependencies": {
+    "@margoengine/animator": "^1.0.0",
     "@margoengine/core": "^1.0.0",
     "@margoengine/physics": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/animator": {
+      "optional": true
+    }
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js ragdoll",

@@ -179,6 +179,43 @@ A motor's target stops at the joint's limits, so it never pulls against a limit 
 
 Skeletons put small bodies between big limbs, and a solver cannot hold a strong motor against a body hundreds of times lighter. `addRagdollMotors` adds mass up to an eighth of each body's heaviest neighbour and inertia up to a tenth of the heaviest limb it carries, and `dispose()` takes it off.
 
+## Getting up (`margoengine/ragdoll/getup`)
+
+`addGetUp(ragdoll, animator, options)` gets a character up from a ragdoll. `start()` compares how the body lies with the first frame of each clip, picks the one that fits, turns and moves the character so that frame lies on the body, on the ground under it, and blends the bones from the ragdoll's pose into the clip. When the clip ends the animator goes on to `then`.
+
+```ts
+import { Ragdoll } from 'margoengine/ragdoll';
+import { addGetUp } from 'margoengine/ragdoll/getup';
+
+const animator = Animator.attach(Animation.attach(model), {
+  initial: 'idle',
+  states: { idle: 'Idle', back: 'GetUpFromBack', front: 'GetUpFromFront' },
+});
+const ragdoll = Ragdoll.attach(physics, { root: hips });
+const getUp = addGetUp(ragdoll, animator, { faceUp: 'back', faceDown: 'front', then: 'idle' });
+
+ragdoll.activate();
+head.body.applyImpulse([0, 2, -30]);
+setTimeout(async () => {
+  const { side, mismatch } = await getUp.start();
+  console.log(`got up ${side}, ${mismatch} radians from the clip at the root`);
+}, 2000);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `faceUp` | none | Animator state of the clip that gets up from lying on the back. |
+| `faceDown` | none | Animator state of the clip that gets up from lying on the front. |
+| `then` | the animator's state now | State to go to when the clip ends. |
+| `blend` | `0.4` | Seconds from the ragdoll's pose into the clip. |
+| `fade` | `0.2` | Seconds from the end of the clip into `then`. |
+| `root` | the model's root | The top node of the character, moved and turned to the body. |
+| `up` | `[0, 1, 0]` | World up. |
+
+`pick()` says which clip fits now, and `mismatch(side)` by how many radians. `start({side, signal})` forces a clip, and an aborted signal rejects the promise while the clip plays on. It throws a `MargoError` with code `state` when no bone is limp or a get-up is running. The promise gives `{side, mismatch}`, where `mismatch` is the radians between the body and the clip's first frame at the root bone.
+
+No facing convention is needed: only the turn about the up axis is free, and what is left over tells the clips apart. `addGetUp` reads each clip's first frame through the animator once, and puts it back as it was; a `statechange` listener sees that visit. The ground is found with a ray down from the hips that ignores moving bodies; with no ground the character keeps its height. The clip should loop off, or be a state with a later transition: the end of its first cycle is what ends the get-up.
+
 ## Clean room
 
 Written from public descriptions only, cited in [docs/clean-room.md](../../docs/clean-room.md); no engine's ragdoll code
