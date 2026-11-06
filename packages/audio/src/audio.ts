@@ -552,27 +552,39 @@ export class Audio implements ListenerSource {
   }
   /**
    * Replaces the live buffer node with a new one that starts at context time `when` from the wrapped playhead.
-   * Buffer source nodes are one-shot, so every play, resume and playing seek needs a fresh node.
+   * Buffer source nodes are one-shot, so every play, resume and playing seek needs a fresh node. A sound with nothing
+   * left to play (at the end of the buffer, or of `duration`) plays one silent frame instead: WebKit never fires
+   * `ended` on a node started with nothing to play, and this way the end arrives through the same `onended` everywhere.
    */
   private startBuffer(when: number): void {
     const buffer = this.buffer!,
       context = this.context;
     this.stopNode();
-    const node = context.createBufferSource();
+    const node = context.createBufferSource(),
+      position = this.playhead(buffer.duration),
+      limit =
+        this.loopValue || this.durationValue === undefined
+          ? undefined
+          : Math.max(0, this.durationValue - Math.max(0, position - this.offsetValue)),
+      spent = !this.loopValue && (position >= buffer.duration || limit === 0);
+    node.connect(this.head);
+    this.progress = position - this.offsetValue;
+    this.startedAt = when;
+    node.onended = () => this.nodeEnded(node);
+    this.source = node;
+    if (spent) {
+      node.buffer = context.createBuffer(1, 1, context.sampleRate);
+      node.start(when);
+      return;
+    }
     node.buffer = buffer;
     node.loop = this.loopValue;
     node.loopStart = this.loopStartValue;
     node.loopEnd = this.loopEndValue;
     smoothParam(node.playbackRate, this.rateValue, context, 0, true);
     smoothParam(node.detune, this.detuneValue, context, 0, true);
-    node.connect(this.head);
-    const position = this.playhead(buffer.duration);
-    this.progress = position - this.offsetValue;
-    this.startedAt = when;
-    node.onended = () => this.nodeEnded(node);
-    this.source = node;
-    if (this.loopValue || this.durationValue === undefined) node.start(when, position);
-    else node.start(when, position, Math.max(0, this.durationValue - Math.max(0, position - this.offsetValue)));
+    if (limit === undefined) node.start(when, position);
+    else node.start(when, position, limit);
   }
   /** The `onended` of a buffer node: a natural end only when it is still the live node of a playing sound. */
   private nodeEnded(node: AudioBufferSourceNode): void {

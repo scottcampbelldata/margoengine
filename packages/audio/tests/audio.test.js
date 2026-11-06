@@ -714,7 +714,10 @@ test('seek moves the playhead on exactly one new source while playing, and only 
   audio.stop().seek(4);
   assert.equal(audio.currentTime, 4);
   audio.play().seek(25);
-  assert.equal(audio.source.started.offset, 10, 'past the end of a non-looping buffer clamps to the end');
+  assert.equal(audio.currentTime, 10, 'past the end of a non-looping buffer clamps to the end');
+  // WebKit never fires `ended` on a node started at the end of its buffer: the end comes from one silent frame.
+  assert.equal(audio.source.buffer.length, 1, 'the end is one silent frame, not a node with nothing to play');
+  assert.equal(audio.source.playbackRate.value, 1, 'at rate 1: WebKit also leaves a rate above the length unended');
   audio.source.end();
   assert.deepEqual([audio.isPlaying, ended], [false, 1], 'and ends there as if played through');
   audio.loop = true;

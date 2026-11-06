@@ -143,6 +143,9 @@ export class FakeAudioContext {
   createBufferSource() {
     return new FakeBufferSource(this);
   }
+  createBuffer(channels, length, sampleRate) {
+    return { numberOfChannels: channels, length, sampleRate, duration: length / sampleRate };
+  }
   createAnalyser() {
     return new FakeAnalyser(this);
   }

@@ -8,7 +8,8 @@ const close = (a, b, epsilon = 1e-9) => Math.abs(a - b) <= epsilon;
 
 // Playhead vectors (audio-pause spec), replayed on the fake context (running, smoothing 0). Each row is
 // [step, isPlaying, currentTime, sourcesCreated, live node or null, onEnded count, error class?], the live node as
-// [start when, start offset, start duration (null when omitted), loop, loopStart, loopEnd, rate].
+// [start when, start offset, start duration (null when omitted), loop, loopStart, loopEnd, rate, spent?]. A spent row is
+// a sound with nothing left to play: its node holds one silent frame at rate 1, so `ended` arrives on WebKit too.
 const runs = [
   {
     label: 'plain pause/resume',
@@ -148,7 +149,7 @@ const runs = [
       [['play'], true, 0, 1, [0, 0, null, false, 0, 0, 1], 0],
       [['time', 5], true, 2, 1, [0, 0, null, false, 0, 0, 1], 0],
       [['pause'], false, 2, 1, null, 0],
-      [['play'], true, 2, 2, [5, 2, null, false, 0, 0, 1], 0],
+      [['play'], true, 2, 2, [5, 0, null, false, 0, 0, 1, 'spent'], 0],
       [['end'], false, 0, 2, null, 1],
       [['play'], true, 0, 3, [5, 0, null, false, 0, 0, 1], 1],
     ],
@@ -197,7 +198,7 @@ const runs = [
       [['stop'], false, 0, 4, null, 0],
       [['seek', 4], false, 4, 4, null, 0],
       [['play'], true, 4, 5, [3, 4, null, false, 0, 0, 2], 0],
-      [['seek', 25], true, 10, 6, [3, 10, null, false, 0, 0, 2], 0],
+      [['seek', 25], true, 10, 6, [3, 0, null, false, 0, 0, 1, 'spent'], 0],
       [['end'], false, 0, 6, null, 1],
       [['set', 'loop', true], false, 0, 6, null, 1],
       [['set', 'loopStart', 2], false, 0, 6, null, 1],
@@ -276,7 +277,8 @@ for (const { label, options, duration, log } of runs)
       assert.equal(ended, endedCount, `${at}: onEnded`);
       if (!live) return assert.equal(audio.source, null, `${at}: no live node`);
       const node = audio.source,
-        [when, offset, length, loop, loopStart, loopEnd, rate] = live;
+        [when, offset, length, loop, loopStart, loopEnd, rate, spent] = live;
+      assert.equal(node.buffer.length, spent ? 1 : duration * 48000, `${at}: buffer`);
       assert.ok(close(node.started.when, when) && close(node.started.offset, offset), `${at}: start`);
       if (length === null) assert.equal(node.started.duration, undefined, `${at}: start without a duration`);
       else assert.ok(close(node.started.duration, length), `${at}: start duration`);
