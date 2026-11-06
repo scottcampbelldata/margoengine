@@ -112,6 +112,40 @@ Each window of samples is cut into quarters and the lowest value of each is take
 
 It needs a full window before it can alert: four minutes by default. After a device loss the old objects stay counted, so make a new `GPUMemory` and `LeakWatch` for the new device.
 
+Field telemetry sends frame time percentiles from real sessions to an endpoint you choose:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {FrameBeacon} from 'margoengine/stats/beacon';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const beacon = FrameBeacon.attach(engine, {
+  endpoint: '/telemetry/frames',
+  sampleRate: 0.1,                              // one session in ten
+  context: {build: '1.2.3', scene: 'menu'},     // read at each send, so change it as you go
+});
+engine.start();
+```
+
+Each report is a POST with this JSON body, sent as `text/plain` so that a cross-origin endpoint needs no preflight:
+
+```json
+{"frames": 1794, "seconds": 30.01, "p50": 16.71, "p90": 17.48, "p95": 18.29, "p99": 33.12, "max": 41.2, "context": {"build": "1.2.3", "scene": "menu"}}
+```
+
+That is all it holds: no identifier, no user agent, no address of its own. Whether to create a `FrameBeacon` at all, and whether to ask users first, is the app's choice.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `endpoint` | required | An http or https URL, relative to the page if relative |
+| `intervalMilliseconds` | 30000 | Time between reports; 0 means only on page hide and `flush()` |
+| `minFrames` | 60 | A report with fewer frames waits for more |
+| `sampleRate` | 1 | Share of sessions that report, decided once; `beacon.active` says which |
+| `context` | `{}` | Strings, numbers and booleans sent with every report |
+| `signal` | none | An `AbortSignal` that stops reporting, as `dispose()` does |
+
+It reports on the interval, when the page hides or closes, and on `dispose()`, through `navigator.sendBeacon`, or `fetch` with `keepalive` where that is missing or refuses. `sendBeacon` sends the page's cookies for the endpoint; the `fetch` route does not. Each report covers the frames since the last one. Paused time is left out. Percentiles use fixed bins, so memory stays at 2 KB however long the session is, and each reads at most 4.6% above the true value; `max` is exact. `sent` and `failed` count reports and `lastError` keeps the reason; nothing is retried. With your own loop, construct it and call `beacon.frame(milliseconds)`.
+
 The engine plugin samples actual frame intervals and counts direct/indirect draw
 and dispatch commands in its frame graph. Render bundle contents and commands
 recorded on other encoders are outside these counters. For a custom encoder,

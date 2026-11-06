@@ -16,6 +16,7 @@ try {
     errors = [];
   assert.equal(hardware.webgpu?.fallback, false);
   page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
+  const posted = page.waitForRequest((request) => request.url().endsWith('/stats-beacon-probe'), { timeout: 120000 });
   const proof = await page.evaluate(async () => {
     const { EngineKernel, box } = await import('/packages/core/dist/index.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
@@ -23,6 +24,7 @@ try {
     const { FramePhases } = await import('/packages/stats/dist/phases.js');
     const { GPUMemory } = await import('/packages/stats/dist/report.js');
     const { LeakWatch } = await import('/packages/stats/dist/leaks.js');
+    const { FrameBeacon } = await import('/packages/stats/dist/beacon.js');
     const ensure = (condition, message) => {
       if (!condition) throw new Error(message);
     };
@@ -135,12 +137,30 @@ try {
     memory.dispose();
     for (const buffer of kept) buffer.destroy();
 
+    // A real sendBeacon from real engine frames; the page's request is read back outside.
+    const beacon = FrameBeacon.attach(instance, {
+      endpoint: '/stats-beacon-probe',
+      intervalMilliseconds: 0,
+      minFrames: 5,
+      context: { probe: true },
+    });
+    await frames(10);
+    ensure(beacon.flush() && beacon.sent === 1, 'The browser took the report');
+    beacon.dispose();
+
     engine.stop();
     await frames(2);
     ensure(gpuErrors.length === 0, 'Native GPU validation errors: ' + gpuErrors.join('; '));
     instance.dispose();
     return result;
   });
+  const request = await posted,
+    report = JSON.parse(request.postData());
+  assert.equal(request.method(), 'POST');
+  assert.match(request.headers()['content-type'], /^text\/plain/);
+  assert.ok(report.frames >= 5 && report.p50 > 0 && report.p99 >= report.p50 && report.max >= report.p99);
+  assert.deepEqual(report.context, { probe: true });
+  proof.beacon = report;
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ hardware: hardware.webgpu, proof }, null, 2));
 } finally {

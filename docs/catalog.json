@@ -226,7 +226,7 @@
     "package": "@margoengine/stats",
     "version": "1.0.0",
     "published": false,
-    "description": "Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling, pipeline compile tracking, a CPU phase breakdown and leak alerts.",
+    "description": "Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling, pipeline compile tracking, a CPU phase breakdown, leak alerts and field telemetry.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "stats",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/stats@1.0.0",

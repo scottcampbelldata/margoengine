@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-159). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-160). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -230,6 +230,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Pipeline compile tracking (`@margoengine/stats/compile`, 2026-11-06) | Sees compiles made after attach, so not the engine's startup pipelines. Times are CPU time around each call: browsers compile in another process, so a blocking call can return quickly and the stall lands later. A hitch means a compile ran in a slow frame or the frame before it, which is evidence, not proof of the cause. Unlabelled compiles show an empty label; the `stacks` option finds them. Keeps the newest 256 records and hitches by default. |
 | CPU phase breakdown (`@margoengine/stats/phases`, 2026-11-06) | CPU time only, with the clock the browser gives: `performance.now()` steps by 5 to 100 microseconds, so a short phase in one frame can read 0 and the averages are the numbers to trust. The frustum test runs inside the one Wasm kernel call, so it is timed in `tick` and cannot be split from world matrices; `cull` is the visible-instance collection after it. `onFrame` callbacks added before attach fall outside the frame. Other scenes in a multi-view frame have no end pass, so time after their submit reads as `encode`. |
 | Leak alerts (`@margoengine/stats/leaks`, 2026-11-06) | Sees what `GPUMemory` sees: objects made after its attach, sized from their descriptors, and a buffer dropped without `destroy()` counts as live. Needs one full window before it can alert, four minutes by default. Growth slower than `minBytes` or `minCount` per window is not reported, and a cycle longer than a quarter of the window can look like growth. After a device loss the old objects stay counted, so make a new `GPUMemory` and `LeakWatch` for the new device. Follows 64 numbers by default; labels past that are not followed, the totals are. |
+| Field telemetry (`@margoengine/stats/beacon`, 2026-11-06) | Percentiles come from 256 logarithmic bins from 0.1 ms to 10 s, so each reads at most 4.6% above the true value; `max` is exact. Frames under 0.1 ms or over 10 s count in the end bins. A failed send is counted, not retried, and with `sendBeacon` or a `no-cors` fetch the endpoint's reply cannot be read, so `sent` means handed to the browser. A report under `minFrames` when the page closes is lost. `sendBeacon` sends the page's cookies for its endpoint; the `fetch` fallback omits them. Asking users for consent is the app's job. |
 
 ### React page
 

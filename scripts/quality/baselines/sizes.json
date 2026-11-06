@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4986436,
+  "total": 4988075,
   "history": [
     {
       "date": "2026-10-24",
@@ -2120,6 +2120,12 @@
       "commit": "683fad9f7",
       "reason": "New stats entry ./leaks: alerts when GPU memory or a count keeps growing; ./report reads ASTC and ETC2 blocks correctly. Core and core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "41fb0c47b",
+      "reason": "New stats entry ./beacon: frame time percentiles from real sessions to an endpoint the app chooses. Core and core + stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -2560,6 +2566,7 @@
     "@margoengine/stage/xr": 1741,
     "@margoengine/staging": 7875,
     "@margoengine/stats": 4934,
+    "@margoengine/stats/beacon": 1639,
     "@margoengine/stats/compile": 1882,
     "@margoengine/stats/leaks": 1921,
     "@margoengine/stats/phases": 1714,

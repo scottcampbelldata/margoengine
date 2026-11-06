@@ -1758,6 +1758,10 @@
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"
     },
+    "./stats/beacon": {
+      "types": "./dist/stats/beacon.d.ts",
+      "import": "./dist/stats/beacon.js"
+    },
     "./stats/compile": {
       "types": "./dist/stats/compile.d.ts",
       "import": "./dist/stats/compile.js"
