@@ -117,12 +117,23 @@ export interface ThreeDMResult extends LoadedGeometry {
 const unit = (color: RhinoColor | undefined): [number, number, number, number] =>
   color ? [color.r / 255, color.g / 255, color.b / 255, color.a === undefined ? 1 : color.a / 255] : [1, 1, 1, 1];
 
+/**
+ * Frees a rhino3dm object. The runtime's tables, such as `File3dmLayerTable`, have a method of their own called `delete`
+ * that removes an entry by id, which hides the handle's `delete`, so the free comes from the handle's base prototype,
+ * the one that owns `isDeleted`. A plain object without that base has only its own `delete`.
+ */
+function free(value: Disposable): void {
+  let owner: object | null = value;
+  while (owner && !Object.hasOwn(owner, 'isDeleted')) owner = Object.getPrototypeOf(owner);
+  ((owner ?? value) as Disposable).delete?.call(value);
+}
+
 /** Runs `use` on a rhino3dm object and frees it, because its memory is outside JavaScript's reach. */
 function using<T extends Disposable, R>(value: T, use: (value: T) => R): R {
   try {
     return use(value);
   } finally {
-    value.delete?.();
+    free(value);
   }
 }
 
@@ -231,7 +242,7 @@ function read(
       for (let i = 0; i < count; i++)
         if (complete) each(table.get(i));
         else fill();
-      table?.delete?.();
+      if (table) free(table);
       return complete;
     };
     if (list(mesh.normals?.(), ([x, y, z]) => normals.push3(x, y, z), () => normals.push3(0, 0, 0))) hasNormals = true;

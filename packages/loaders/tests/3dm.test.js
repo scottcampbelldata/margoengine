@@ -200,3 +200,40 @@ test('bad input is a named error, and a failure still frees every handle', () =>
   assert.equal(big.state.live, 0);
   refuses(() => parse3DM(runtime({ objects: [{ mesh: QUAD }] }), BYTES, { maxTriangles: 1 }), 'limit');
 });
+
+test('regression: a table whose own delete removes an entry is freed through the handle base, as in real rhino3dm', () => {
+  // rhino3dm's File3dmLayerTable.delete(id) hides the handle's delete(): called with no id it throws.
+  let live = 0;
+  class Handle {
+    constructor() {
+      live++;
+    }
+    isDeleted() {
+      return false;
+    }
+    delete() {
+      live--;
+    }
+  }
+  class LayerTable extends Handle {
+    count = 1;
+    get() {
+      return Object.assign(new Handle(), { name: 'Default', visible: true });
+    }
+    delete(id) {
+      assert.equal(arguments.length, 1, 'File3dmLayerTable.delete called with an invalid number of arguments');
+      throw new Error(`layer ${id} removed`);
+    }
+  }
+  class Document extends Handle {
+    objects() {
+      return Object.assign(new Handle(), { count: 0 });
+    }
+    layers() {
+      return new LayerTable();
+    }
+  }
+  const model = parse3DM({ File3dm: { fromByteArray: () => new Document() } }, BYTES);
+  assert.equal(model.layers[0].name, 'Default');
+  assert.equal(live, 0);
+});
