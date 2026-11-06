@@ -172,6 +172,10 @@ const ASSETS = [
     'test fixture: BumpMaterial.gltf, the EXT_materials_bump interoperability file from luma.gl (CC0-1.0, vis.gl contributors)',
   ],
   [
+    'packages/kinematics-constraints/tests/fixtures/NOTICE.md',
+    'test fixtures: Franka Emika Panda description from Gepetto example-robot-data, commit 6249cab1 (Apache-2.0)',
+  ],
+  [
     'packages/gltf-pro/tests/fixtures/splats/NOTICE.md',
     'test fixtures: CesiumJS sh_unit_cube.glb (Apache-2.0, Cesium GS, Inc.) and the godot-gsplat minimal_point sample from luma.gl (MIT, KOGA Mitsuhiro)',
   ],

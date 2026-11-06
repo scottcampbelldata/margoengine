@@ -944,6 +944,7 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 | Kinematics joint limits (`kinematics-constraints/limits`) | Damped least squares from C. Wampler, IEEE SMC 1986 and Y. Nakamura, H. Hanafusa, ASME JDSMC 1986; velocity damper from B. Faverjon, P. Tournassoud, ICRA 1987; row-by-row quadratic programming from C. Hildreth, Naval Research Logistics Quarterly 4, 1957. No robotics library's source was read |
 | Kinematics concave obstacles (`kinematics-constraints/sdf`) | Lipschitz pruning from J. C. Hart, The Visual Computer 12(10), 1996; distances from the repository's own `bvh` and GJK. No other engine's source was read |
 | Kinematics motion planner (`kinematics-constraints/plan`) | RRT from S. M. LaValle, TR 98-11, Iowa State University, 1998; RRT-Connect from J. J. Kuffner, S. M. LaValle, ICRA 2000; PRM from L. E. Kavraki, P. Svestka, J.-C. Latombe, M. H. Overmars, IEEE Trans. Robotics and Automation 12(4), 1996; shortcutting from R. Geraerts, M. H. Overmars, IJRR 26(8), 2007. No planning library's source was read |
+| Kinematics URDF import (`kinematics-constraints/urdf`) | The public URDF specification (ROS wiki pages on the robot, link and joint elements); forward kinematics checked against the modified DH table Franka Emika publishes in its robot documentation. No ROS, MoveIt, Pinocchio or other library's source was read |
 
 ## 2D sprites: `@margoengine/sprites`
 

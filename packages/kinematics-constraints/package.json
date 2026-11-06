@@ -46,6 +46,10 @@
     "./plan": {
       "types": "./dist/plan.d.ts",
       "import": "./dist/plan.js"
+    },
+    "./urdf": {
+      "types": "./dist/urdf.d.ts",
+      "import": "./dist/urdf.js"
     }
   },
   "files": [
@@ -63,10 +67,18 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "@margoengine/bvh": "^1.0.0"
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/bvh": {
+      "optional": true
+    },
+    "@margoengine/geometry": {
+      "optional": true
+    },
+    "@margoengine/loaders": {
       "optional": true
     }
   }

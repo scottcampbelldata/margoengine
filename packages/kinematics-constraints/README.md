@@ -530,8 +530,59 @@ console.log(roadmap.size, roadmap.query([-1], [2]).status, roadmap.query([0], [-
 
 `roadmap.samplePoses(count)` and `roadmap.addPoses(poses, gaps)` split the sampling from the check, so a batch check of your own can sit between them. A continuous joint has no range, so samples stay one turn each way of the start, or of the `around` option on a `Roadmap`. It plans on the line of its value, not on a circle: passing an obstacle the other way round means writing the goal one turn lower, as `goal - 2 * Math.PI`.
 
+## URDF robots (`margoengine/kinematics-constraints/urdf`)
+
+URDF is the format robot arms are published in. `parseURDF` reads one into a `Robot` with its joints, ranges, mimic joints and collision shapes, so every solver, check and planner here works on a real arm.
+
+```ts
+import { parseURDF } from 'margoengine/kinematics-constraints/urdf';
+import { SphereVolume } from 'margoengine/kinematics-constraints';
+
+const { robot, home, links } = parseURDF(`
+  <robot name="pendulum">
+    <link name="base"/>
+    <link name="arm">
+      <collision>
+        <origin xyz="0 0 0.5"/>
+        <geometry><box size="0.1 0.1 1"/></geometry>
+      </collision>
+    </link>
+    <joint name="swing" type="revolute">
+      <parent link="base"/><child link="arm"/>
+      <axis xyz="0 1 0"/><limit lower="-1" upper="1" effort="1" velocity="1"/>
+    </joint>
+  </robot>`);
+console.log(robot.variableNames, links.map((link) => link.name));
+console.log(robot.clearance(home, [new SphereVolume({ center: [1, 0, 0.5], radius: 0.1 })]));
+```
+
+A box, a sphere, a cylinder and a capsule are shapes at once. A cylinder becomes a prism drawn round it (`cylinderSides`, default 16), so it holds the true shape. A mesh needs its file: `loadURDF` fetches the document and every collision mesh it names, reads STL, COLLADA and OBJ with `@margoengine/loaders`, loaded only when a mesh is met, and takes the convex hull with `@margoengine/geometry`. A mesh's hull holds the whole link, so a concave link reads a little fatter than it is. `parseURDF` with no mesh data lists those files in `missingMeshes` and gives those parts no shape. To pass them yourself, use `options.meshes`: flat vertices by the filename in the document.
+
+```ts
+import { loadURDF } from 'margoengine/kinematics-constraints/urdf';
+
+const files: Record<string, string> = {
+  'https://robots.example/arm/urdf/arm.urdf': `
+    <robot name="arm">
+      <link name="body">
+        <collision><geometry><mesh filename="package://arm/meshes/body.obj" scale="0.001 0.001 0.001"/></geometry></collision>
+      </link>
+    </robot>`,
+  'https://robots.example/arm/meshes/body.obj': 'v 0 0 0\nv 100 0 0\nv 0 100 0\nv 0 0 100\nf 1 2 3\nf 1 2 4\nf 1 3 4\nf 2 3 4\n',
+};
+// Leave `fetch` out to use the global one.
+const model = await loadURDF('https://robots.example/arm/urdf/arm.urdf', {
+  fetch: async (url) => new Response(files[url]),
+});
+console.log(model.robot.shapeCount, model.missingMeshes);
+```
+
+`package://name/path` resolves through `options.packages`, a base URL per package name; a package not listed is taken as the folder above the document's own. `signal` stops the requests and the mesh parsing. `fetch` defaults to the global one, so in Node pass your own for a file on disk.
+
+What the model holds besides `robot`: `links` with their `visuals`, `collisions`, `inertial` and the `joint` each rides on (-1 for the root, which is the robot's base), `joints` with `velocity`, `effort`, `damping` and `friction`, `root`, `home` (the pose nearest zero inside every range) and `meshes`. A mimic joint repeats its source and takes no entry in a configuration. A floating joint opens into six plain joints and a planar joint into two; the last of them carries the link, and they sit in `robot.jointNames` with the suffixes `_x`, `_y`, `_z`, `_rx`, `_ry` and `_u`. Self checks on a real arm start with `robot.ignoreContactsAt(home, gap)`, because neighbouring link meshes usually overlap by design.
+
 ## Scope
 
 `Success` describes static analytical proxy clearance at one evaluated instant, within numerical tolerance. It covers neither unsupplied mesh/skinning geometry nor unchecked link portions. Set proxies to enclose the full deformation envelope and any desired padding in your application.
 
-Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. Concave obstacles are in `/sdf`. Planning round them is `/plan`. This package does not implement dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or call `/plan`.
+Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. Concave obstacles are in `/sdf`. Planning round them is `/plan`. Real robots load through `/urdf`. This package does not implement dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or call `/plan`.

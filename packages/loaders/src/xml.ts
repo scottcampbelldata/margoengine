@@ -20,6 +20,7 @@ function decode(value: string, format: string): string {
 // character (quadratic, ReDoS).
 const ATTRIBUTE = /(?<![^\s=/"'])([^\s=/]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 
+/** What `readXML` calls as it walks a document: `open` and `close` per element and `text` per run of text. */
 export interface XMLHandler {
   /** Element names are local names (namespace prefix removed). */
   open(name: string, attributes: Record<string, string>): void;

@@ -1058,6 +1058,10 @@
       "types": "./dist/kinematics-constraints/plan.d.ts",
       "import": "./dist/kinematics-constraints/plan.js"
     },
+    "./kinematics-constraints/urdf": {
+      "types": "./dist/kinematics-constraints/urdf.d.ts",
+      "import": "./dist/kinematics-constraints/urdf.js"
+    },
     "./labels": {
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"
@@ -1213,6 +1217,10 @@
     "./loaders/lottie": {
       "types": "./dist/loaders/lottie.d.ts",
       "import": "./dist/loaders/lottie.js"
+    },
+    "./loaders/xml": {
+      "types": "./dist/loaders/xml.d.ts",
+      "import": "./dist/loaders/xml.js"
     },
     "./lod": {
       "types": "./dist/lod.d.ts",

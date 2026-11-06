@@ -673,6 +673,18 @@ for (const item of animation.frame(12.5)) // fractions blend between keyframes
 - **Clear the canvas yourself.** `draw` paints over what is there, so call `clearRect` between frames.
 - **`unsupported`.** Masks, track mattes, text layers, effects, blend modes, 3D layers, repeaters, merge paths, rounded corners and star roundness are not drawn. Each one the file uses is named in this list, so check it when a file looks wrong. Expressions are ignored and are not listed.
 
+## XML
+
+`margoengine/loaders/xml` is the small reader the XML formats here share, for any other format built on XML. It skips comments, DOCTYPE and CDATA, expands only the five predefined entities, and checks that tags nest. `readXMLTree` gives the elements, with namespace prefixes removed. `readXML` streams them to a handler. `decodeXML` turns bytes into text by their byte order mark.
+
+```ts
+import { readXMLTree } from 'margoengine/loaders/xml';
+
+const root = readXMLTree('<robot name="arm"><link name="base"/></robot>', 'URDF');
+const robot = root.children[0];
+console.log(robot.name, robot.attributes.name, robot.children.length); // robot arm 1
+```
+
 ## Tiled TMX
 
 `await parseTMX(textOrBytes, {resolve, signal})` reads orthogonal Tiled maps (other orientations throw `unsupported`) and returns `{orientation, renderorder, width, height, tilewidth, tileheight, infinite, tilesets, tilesetRefs, layers, properties, warnings}`.

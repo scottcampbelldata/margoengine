@@ -145,6 +145,10 @@
     "./lottie": {
       "types": "./dist/lottie.d.ts",
       "import": "./dist/lottie.js"
+    },
+    "./xml": {
+      "types": "./dist/xml.d.ts",
+      "import": "./dist/xml.js"
     }
   },
   "files": [

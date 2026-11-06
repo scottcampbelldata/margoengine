@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8979427,
+  "total": 8994587,
   "history": [
     {
       "date": "2026-10-24",
@@ -2732,6 +2732,12 @@
       "commit": "3fef4033d",
       "reason": "EXT_materials_bump in the extended entry: one extra shader term, map slot and uniform row",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "dbecac7f4",
+      "reason": "URDF import: new optional entry; /xml in loaders",
+      "grew": 2
     }
   ],
   "items": {
@@ -2995,6 +3001,7 @@
     "@margoengine/kinematics-constraints/robot": 10142,
     "@margoengine/kinematics-constraints/sdf": 7230,
     "@margoengine/kinematics-constraints/swept": 9703,
+    "@margoengine/kinematics-constraints/urdf": 13599,
     "@margoengine/labels": 4756,
     "@margoengine/lighting2d": 4389,
     "@margoengine/lightmap": 4053,
@@ -3035,6 +3042,7 @@
     "@margoengine/loaders/vrml": 5087,
     "@margoengine/loaders/vtk-xml": 6937,
     "@margoengine/loaders/worker": 8571,
+    "@margoengine/loaders/xml": 1561,
     "@margoengine/lod": 14316,
     "@margoengine/lod/auto": 7888,
     "@margoengine/lod/fade": 2542,
