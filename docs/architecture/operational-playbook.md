@@ -375,6 +375,10 @@ culling and shadows. A CPU-tier kernel that reads a GPU-written resource waits f
 kernel can cost a whole frame: the sky projection cost 57 ms that way. Evidence: `routes.test.js` and the frame budget of
 `visual:compat:budget`; the integrated-GPU budget run is still missing.
 
+Texture read-back left the layer's base on 2026-11-06 (`device/readback.ts`, 70,274 B base): the queue holds a submit
+with a `copyTextureToBuffer` until the chunk has loaded, as it does for compute, and the sizes gate measures the chunk in
+the split's lazy number. Evidence: `tests/lazy-boundary.test.js` and `readbackOrder` in `compute-browser.mjs`.
+
 The voxel path tracer has a route too (`packages/voxel-pathtracer/src/compat.ts`): `trace` runs as a fragment shader
 cut from the WebGPU kernel's own text, writing four `rgba32float` targets, and a scatter kernel adds them to the image
 buffers. Evidence: `packages/voxel-pathtracer/tests/browser-check.mjs --compat` on ANGLE Vulkan. Still missing: a run on

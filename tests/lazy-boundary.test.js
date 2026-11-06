@@ -1,4 +1,4 @@
-// The WebGL2 compatibility layer's size is measured as a base and a lazy compute runtime (scripts/lazy-files.js,
+// The WebGL2 compatibility layer's size is measured as a base and a lazy part (scripts/lazy-files.js,
 // LAZY_SPLITS; docs/limits.md). That split is only true while nothing the layer loads without compute imports the
 // runtime: the CPU compute tier (packages/webgl2-compat/src/compute/runtime.ts, js.ts and the rest of compute/) must be
 // reached through one `import()` in device/device.ts, made on the first compute pipeline. This test walks the source
@@ -91,6 +91,15 @@ test('the base entry reaches none of the compute runtime, even through other imp
     );
 });
 
+test('texture read-back is reached only through the import() in device/device.ts', () => {
+  const readback = join(src, 'device/readback.ts'),
+    importers = [];
+  for (const file of reach(join(src, 'index.ts')).keys())
+    for (const next of importsOf(file))
+      if (next.file === readback) importers.push({ file: rel(file), dynamic: next.dynamic });
+  assert.deepEqual(importers, [{ file: 'packages/webgl2-compat/src/device/device.ts', dynamic: true }]);
+});
+
 test('the only import() calls in the layer are index.ts to device.ts and device.ts to the compute runtime', () => {
   // scripts/lazy-files.js picks the lazy chunk by its built file name (split.chunk); any other dynamic import could
   // add or rename a chunk that pattern misses or wrongly catches, so the set of lazy edges is pinned here.
@@ -100,7 +109,9 @@ test('the only import() calls in the layer are index.ts to device.ts and device.
   assert.deepEqual(edges.sort(), [
     'packages/webgl2-compat/src/compute/runtime.ts -> packages/webgl2-compat/src/compute/interpret.ts',
     'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/compute/runtime.ts',
+    'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/device/readback.ts',
     'packages/webgl2-compat/src/index.ts -> packages/webgl2-compat/src/device.ts',
   ]);
   assert.ok(split.chunk.test('runtime-AbC123.js') && !split.chunk.test('device-AbC123.js'));
+  assert.ok(split.chunk.test('readback-AbC123.js'));
 });

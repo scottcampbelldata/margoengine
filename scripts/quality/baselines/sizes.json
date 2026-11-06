@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4990147,
+  "total": 4992431,
   "history": [
     {
       "date": "2026-10-24",
@@ -2138,6 +2138,12 @@
       "commit": "ffd438f78",
       "reason": "New gltf entry ./quantized and the extensions option on the root: KHR_mesh_quantization on the light path. Core and core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "093528f60",
+      "reason": "read-back chunk moved from the base to the lazy part, base falls from 72,354 B to 70,274 B",
+      "grew": 2
     }
   ],
   "items": {
@@ -2657,8 +2663,8 @@
     "@margoengine/webgl/pick": 2385,
     "@margoengine/webgl/restore": 1097,
     "@margoengine/webgl2-compat": 102814,
-    "@margoengine/webgl2-compat base (without compute runtime)": 73000,
-    "@margoengine/webgl2-compat lazy compute runtime": 28843,
+    "@margoengine/webgl2-compat base (without compute runtime and read-back)": 72383,
+    "@margoengine/webgl2-compat lazy compute runtime and read-back": 31744,
     "@margoengine/webgl2-compat/adapter": 880,
     "@margoengine/webgl2-compat/compute": 49684,
     "@margoengine/webgl2-compat/device": 102935,

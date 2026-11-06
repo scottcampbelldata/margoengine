@@ -826,6 +826,8 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   counted both, and the sizes gate now holds each). **Accepted difference (Scott, 2026-10-30):** the base limit is
   73,000 B, not the 60,000 B target, which no gate ever enforced. The base carries the full WGSL to GLSL translator and
   the WGSL checker, both needed on the first frame; native WebGPU always validates shaders, so a build without the
-  checker would behave differently from it. The lazy compute runtime is measured and gated on its own.
+  checker would behave differently from it. The lazy compute runtime is measured and gated on its own. Since
+  2026-11-06 texture read-back (`device/readback.ts`: `copyTextureToBuffer` and its format conversions) is a lazy chunk
+  too, measured with the compute runtime: the base is 70,274 B, 2,726 B under the limit.
 - **Left from M8.** The integrated-GPU budget run. The transform-feedback tier for own-index stores is parked (speed
   only, see the scatter tier above); nothing is built for it.

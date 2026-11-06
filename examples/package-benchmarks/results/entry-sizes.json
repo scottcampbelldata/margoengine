@@ -1,5 +1,5 @@
 {
-  "commit": "fdc0237cf",
+  "commit": "093528f60",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -812,8 +812,12 @@
     },
     "@margoengine/gltf": {
       ".": {
-        "raw": 15742,
-        "gzip": 6039
+        "raw": 16271,
+        "gzip": 6278
+      },
+      "./quantized": {
+        "raw": 2223,
+        "gzip": 1129
       }
     },
     "@margoengine/gltf-pro": {
@@ -2262,8 +2266,8 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 331937,
-        "gzip": 99935
+        "raw": 332508,
+        "gzip": 100514
       },
       "./adapter": {
         "raw": 1123,
@@ -2274,8 +2278,8 @@
         "gzip": 48236
       },
       "./device": {
-        "raw": 331064,
-        "gzip": 100064
+        "raw": 331644,
+        "gzip": 100606
       },
       "./glsl": {
         "raw": 145692,
@@ -2286,8 +2290,8 @@
         "gzip": 26476
       },
       "./xr": {
-        "raw": 334376,
-        "gzip": 101157
+        "raw": 334956,
+        "gzip": 101658
       }
     },
     "@margoengine/wfc": {
@@ -2319,9 +2323,9 @@
   },
   "lazyFiles": {
     "packages/gltf/dist/index.js": {
-      "raw": 15742,
-      "gzip": 6039,
-      "brotli": 5433
+      "raw": 16271,
+      "gzip": 6278,
+      "brotli": 5635
     },
     "packages/scenery/dist/sky.js": {
       "raw": 22771,
@@ -2478,15 +2482,15 @@
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {
-        "raw": 242365,
-        "gzip": 72398,
+        "raw": 235884,
+        "gzip": 70274,
         "target": 73000
       },
       "lazy": {
-        "name": "compute runtime",
-        "raw": 89571,
-        "gzip": 28075,
-        "loadedBy": "the first compute pipeline on the layer (import() of compute/runtime.js in device/device.ts)"
+        "name": "compute runtime and read-back",
+        "raw": 96623,
+        "gzip": 30819,
+        "loadedBy": "the first compute pipeline or texture read-back on the layer (import() in device/device.ts)"
       }
     }
   }

@@ -72,6 +72,7 @@ const WORDS_WIDTH = 4096;
 export async function computeRuntime(device: CompatDevice): Promise<ComputeRuntime> {
   // Only a page that forbids `new Function` downloads the interpreter.
   if (!evalAllowed()) useInterpreter((await import('./interpret.js')).interpretKernel);
+  await device.loadReadback();
   return new Runtime(device);
 }
 
@@ -525,7 +526,16 @@ class Runtime implements ComputeRuntime {
         for (let z = 0; z < layers; z++) {
           const layer = is3d ? z : view.baseArrayLayer + z;
           t.read(p, level, 1, is3d ? 0 : layer, 1, r.sync);
-          const source = r.fetchInto(p, level, layer, 0, 0, w, h);
+          const source = (r.device.readback as NonNullable<CompatDevice['readback']>).fetchInto(
+            r,
+            p,
+            level,
+            layer,
+            0,
+            0,
+            w,
+            h,
+          );
           const slice = data.subarray(z * w * h * 4, (z + 1) * w * h * 4);
           gl.readPixels(0, 0, w, h, source.format, source.type, slice);
           source.free?.();

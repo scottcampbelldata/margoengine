@@ -484,6 +484,24 @@ window.check = {
     device.destroy();
     return first;
   },
+  /** Compat only: the first read-back loads a chunk, and what the queue gets meanwhile stays behind it. */
+  async readbackOrder() {
+    const device = await (await createCompatGPU().requestAdapter()).requestDevice();
+    const t = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: U.COPY_SRC | U.COPY_DST }),
+      write = (v) => device.queue.writeTexture({ texture: t }, new Uint8Array(4).fill(v), { bytesPerRow: 4 }, [1, 1]),
+      out = device.createBuffer({ size: 256, usage: B.MAP_READ | B.COPY_DST }),
+      e = device.createCommandEncoder();
+    write(1);
+    e.copyTextureToBuffer({ texture: t }, { buffer: out, bytesPerRow: 256 }, [1, 1]);
+    const lazy = device.readback === null;
+    device.queue.submit([e.finish()]);
+    write(2);
+    await out.mapAsync(1);
+    const value = new Uint8Array(out.getMappedRange())[0];
+    out.unmap();
+    device.destroy();
+    return { lazy, value };
+  },
   /** Compat only: a refusal must be coded. */
   async refusal() {
     const device = await (await createCompatGPU().requestAdapter()).requestDevice();

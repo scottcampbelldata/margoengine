@@ -295,11 +295,11 @@ export const LAZY_SPLITS = [
     entry: '.',
     specifier: '@margoengine/webgl2-compat',
     dist: 'packages/webgl2-compat/dist/index.js',
-    chunk: /^runtime-/,
-    lazyLabel: 'compute runtime',
+    chunk: /^(runtime|readback)-/,
+    lazyLabel: 'compute runtime and read-back',
     source: 'packages/webgl2-compat/src/compute/runtime.ts',
     baseTarget: 73_000,
-    when: 'the first compute pipeline on the layer (import() of compute/runtime.js in device/device.ts)',
+    when: 'the first compute pipeline or texture read-back on the layer (import() in device/device.ts)',
   },
 ];
 

@@ -118,6 +118,8 @@ async function suite() {
   lines.push('work budget: an endless loop and 64,000 invocations stop at 20,000, coded, nothing stored');
   assert.equal(await page.evaluate(() => window.check.asyncLink()), true, 'an async pipeline polls for the link');
   lines.push('an async compute pipeline leaves the link to the driver');
+  assert.deepEqual(await page.evaluate(() => window.check.readbackOrder()), { lazy: true, value: 1 });
+  lines.push('the first read-back loads its chunk and keeps the queue in order');
   const refusal = await page.evaluate(() => window.check.refusal());
   assert.match(
     refusal,

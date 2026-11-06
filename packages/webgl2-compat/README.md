@@ -89,6 +89,8 @@ What it does:
   lands, and it is reported as a `GPUInternalError` with MargoError code `failed`, so an endless loop cannot hold the
   page. Rendering and the fragment and point-draw tiers never compile JavaScript, and the CPU tier only runs faster
   with `unsafe-eval`. The one refused `new Function` that finds this out is the only violation such a page sees.
+  Reading a texture back is a lazy chunk as well: the first `copyTextureToBuffer` loads it, and the queue stays in order
+  while it does, so a page that never reads back never downloads it.
   `planCompute(stage)` tells which tier an entry point gets and why; `runComputeOnCPU(dispatch)` runs one on the CPU
   with buffers, without a device (`workBudget` stops it past that many invocations plus loop iterations; default no
   limit; on a page without `unsafe-eval`, `await loadInterpreter()` once first). `device.dispatches` counts the dispatches each tier has run, `device.programs` the

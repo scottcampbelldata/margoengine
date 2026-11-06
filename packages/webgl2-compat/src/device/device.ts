@@ -271,6 +271,9 @@ export class CompatDevice extends EventTarget {
   /** The compute runtime, once its entry has loaded (the first compute pipeline loads it). */
   computeRuntime: ComputeRuntime | null = null;
   private computeLoad: Promise<void> | null = null;
+  /** Texture read-back (readback.ts): loaded by the first submit that copies a texture to a buffer, and with compute. */
+  readback: typeof import('./readback.js') | null = null;
+  private readbackLoad: Promise<void> | null = null;
 
   constructor(
     readonly gl: WebGL2RenderingContext,
@@ -510,19 +513,37 @@ export class CompatDevice extends EventTarget {
    * Loads the compute runtime (the compute entry) once. A render-only page never calls this, so it never downloads
    * compute; command buffers with compute passes wait in the queue until it has loaded.
    */
-  loadCompute(): Promise<void> {
-    this.computeLoad ??= import('../compute/runtime.js').then((m) => m.computeRuntime(this)).then(
-      (runtime) => {
-        this.computeRuntime = runtime;
+  loadReadback(): Promise<void> {
+    this.readbackLoad ??= import('./readback.js').then(
+      (m) => {
+        this.readback = m;
       },
       (error) => {
         this.lose(
           'unknown',
-          `The compute part of the WebGL2 compatibility layer did not load: ${(error as Error).message}`,
+          `The read-back part of the WebGL2 compatibility layer did not load: ${(error as Error).message}`,
         );
         throw error;
       },
     );
+    return this.readbackLoad;
+  }
+
+  loadCompute(): Promise<void> {
+    this.computeLoad ??= import('../compute/runtime.js')
+      .then((m) => m.computeRuntime(this))
+      .then(
+        (runtime) => {
+          this.computeRuntime = runtime;
+        },
+        (error) => {
+          this.lose(
+            'unknown',
+            `The compute part of the WebGL2 compatibility layer did not load: ${(error as Error).message}`,
+          );
+          throw error;
+        },
+      );
     return this.computeLoad;
   }
   /**
@@ -591,8 +612,9 @@ export class CompatDevice extends EventTarget {
 /** The GPUQueue: buffer and texture writes run at once; command buffers replay on submit. */
 export class CompatQueue {
   label = '';
-  /** Queue operations waiting for the compute runtime, in submission order; null when nothing waits. */
+  /** Queue operations waiting for a lazy chunk, in submission order; null when nothing waits. */
   private backlog: (() => void)[] | null = null;
+  private readonly loads: Promise<unknown>[] = [];
   /** Resolves when the waiting operations have run. */
   waiting: Promise<void> | null = null;
   constructor(private readonly device: CompatDevice) {}
@@ -603,7 +625,7 @@ export class CompatQueue {
     else op();
   }
   /**
-   * Queues `op` behind the operations waiting for the compute runtime and answers true, or answers false when nothing
+   * Queues `op` behind the operations waiting for a lazy chunk and answers true, or answers false when nothing
    * waits. A resource's destroy() goes through here: WebGPU frees it once the work submitted before is done.
    */
   afterWaiting(op: () => void): boolean {
@@ -611,10 +633,34 @@ export class CompatQueue {
     return !!this.backlog;
   }
 
-  submit(buffers: Iterable<{ ops: readonly ((r: Replayer) => void)[]; used?: boolean; compute?: boolean }>): void {
+  /** Holds everything the queue gets from now on until `load` settles. */
+  private hold(load: Promise<unknown>): void {
+    this.loads.push(load);
+    this.backlog ??= [];
+    this.waiting ??= this.drain();
+  }
+
+  /** Runs the waiting operations once every load has finished; a failed load has lost the device, so they are dropped. */
+  private async drain(): Promise<void> {
+    const backlog = this.backlog as (() => void)[];
+    let loaded = true;
+    while (this.loads.length) await (this.loads.shift() as Promise<unknown>).catch(() => (loaded = false));
+    this.backlog = null;
+    this.waiting = null;
+    if (loaded) for (const op of backlog) op();
+  }
+
+  submit(
+    buffers: Iterable<{
+      ops: readonly ((r: Replayer) => void)[];
+      used?: boolean;
+      compute?: boolean;
+      readback?: boolean;
+    }>,
+  ): void {
     const d = this.device;
     if (d.destroyed) return;
-    const list: { ops: readonly ((r: Replayer) => void)[]; compute?: boolean }[] = [];
+    const list: { ops: readonly ((r: Replayer) => void)[]; compute?: boolean; readback?: boolean }[] = [];
     for (const cb of buffers) {
       if (cb.used) {
         d.validationError('A command buffer can be submitted once');
@@ -623,21 +669,9 @@ export class CompatQueue {
       cb.used = true;
       list.push(cb);
     }
-    if (!this.backlog && !d.computeRuntime && list.some((cb) => cb.compute)) {
-      // The compute runtime loads first; everything the queue gets meanwhile runs after, in order.
-      const backlog: (() => void)[] = (this.backlog = []);
-      this.waiting = d.loadCompute().then(
-        () => {
-          this.backlog = null;
-          this.waiting = null;
-          for (const op of backlog) op();
-        },
-        () => {
-          this.backlog = null;
-          this.waiting = null;
-        },
-      );
-    }
+    // What the commands need loads first; everything the queue gets meanwhile runs after, in order.
+    if (!d.computeRuntime && list.some((cb) => cb.compute)) this.hold(d.loadCompute());
+    if (!d.readback && list.some((cb) => cb.readback)) this.hold(d.loadReadback());
     this.inOrder(() => {
       for (const cb of list) if (!d.destroyed) d.replayer.run(cb.ops);
       d.flushPresents();

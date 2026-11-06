@@ -153,9 +153,10 @@ export class CompatCommandBuffer {
     readonly ops: readonly Op[];
     label: string;
     readonly compute: boolean;
+    readonly readback: boolean;
     used: boolean;
     constructor(ops: readonly Op[], label: string,
-    compute?: boolean);
+    compute?: boolean, readback?: boolean);
 }
 
 export class CompatCommandEncoder {
@@ -212,6 +213,7 @@ export class CompatDevice extends EventTarget {
     }>;
     readonly replayer: Replayer;
     computeRuntime: ComputeRuntime | null;
+    readback: typeof import('./readback.js') | null;
     constructor(gl: WebGL2RenderingContext, adapter: CompatAdapter, features: ReadonlySet<string>);
     enum(name: string): number;
     compare(f: GPUCompareFunction): number;
@@ -240,6 +242,7 @@ export class CompatDevice extends EventTarget {
     createShaderModule(descriptor: GPUShaderModuleDescriptor): CompatShaderModule;
     createRenderPipeline(descriptor: GPURenderPipelineDescriptor): CompatRenderPipeline;
     createRenderPipelineAsync(descriptor: GPURenderPipelineDescriptor): Promise<CompatRenderPipeline>;
+    loadReadback(): Promise<void>;
     loadCompute(): Promise<void>;
     createComputePipeline(descriptor: GPUComputePipelineDescriptor): CompatComputePipeline;
     createComputePipelineAsync(descriptor: GPUComputePipelineDescriptor): Promise<CompatComputePipeline>;
@@ -303,6 +306,7 @@ export class CompatQueue {
         ops: readonly ((r: Replayer) => void)[];
         used?: boolean;
         compute?: boolean;
+        readback?: boolean;
     }>): void;
     writeBuffer(buffer: CompatBuffer, offset: number, data: BufferSource | SharedArrayBuffer, dataOffset?: number, size?: number): void;
     writeTexture(destination: GPUTexelCopyTextureInfo, data: BufferSource | SharedArrayBuffer, layout: GPUTexelCopyBufferLayout, size: GPUExtent3D): void;
@@ -1267,12 +1271,6 @@ interface PassDescriptor {
     readonly queries?: CompatQuerySet;
 }
 
-interface ReadSource {
-    readonly format: number;
-    readonly type: number;
-    readonly free?: () => void;
-}
-
 type Readback = {
     ready(): boolean;
     readonly forcible: boolean;
@@ -1280,10 +1278,15 @@ type Readback = {
 };
 
 class Replayer {
+    readonly device: CompatDevice;
+    readonly gl: WebGL2RenderingContext;
     constructor(device: CompatDevice);
     run(ops: readonly Op[]): void;
+    sub(s: TextureStorage, level: number, layer: number): Sub;
+    single(s: Sub): WebGLFramebuffer;
     framebufferOf(t: CompatTexture): WebGLFramebuffer;
     readonly sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void;
+    rebind(): void;
     beginPass(desc: PassDescriptor): void;
     endPass(): void;
     setPipeline(p: CompatRenderPipeline): void;
@@ -1304,18 +1307,12 @@ class Replayer {
     drawIndexed(count: number, instances: number, firstIndex: number, baseVertex: number, firstInstance: number): void;
     helper(key: string, fragment: string): Helper;
     helperState(h: Helper, w: number, ht: number): void;
-    fetchInto(s: TextureStorage, level: number, layer: number, x: number, y: number, w: number, h: number): ReadSource;
     copyBuffer(src: CompatBuffer, srcOffset: number, dst: CompatBuffer, dstOffset: number, size: number): void;
     copyBufferToTexture(source: GPUTexelCopyBufferInfo & {
         buffer: CompatBuffer;
     }, destination: GPUTexelCopyTextureInfo & {
         texture: CompatTexture;
     }, size: GPUExtent3D): void;
-    copyTextureToBuffer(source: GPUTexelCopyTextureInfo & {
-        texture: CompatTexture;
-    }, destination: GPUTexelCopyBufferInfo & {
-        buffer: CompatBuffer;
-    }, [w, h, depth]: [number, number, number]): void;
     copyTextureToTexture(source: GPUTexelCopyTextureInfo & {
         texture: CompatTexture;
     }, destination: GPUTexelCopyTextureInfo & {
@@ -1331,6 +1328,14 @@ interface StorageSlot {
         readonly location: WebGLUniformLocation;
         readonly binding: number;
     }[];
+}
+
+interface Sub {
+    readonly key: string;
+    readonly owner: CompatTexture;
+    readonly info: FormatInfo;
+    readonly level: number;
+    attach(point: number): void;
 }
 
 interface TargetState {
