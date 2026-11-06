@@ -225,7 +225,27 @@ const city = await hierarchicalLOD(lods, props, {cell: 20}); // defaults: distan
 city.remove(); // frees the far meshes, shows the sources
 ```
 
-A core mesh's levels keep positions and normals, since core geometry holds nothing else. A source moved afterwards does not move its far mesh.
+A core mesh's levels keep positions and normals, since core geometry holds nothing else.
+
+### Moving sources
+
+A far mesh is built from where its sources stood. `update()` rebuilds the far meshes of every cell whose sources moved, and returns how many; `follow: true` does the same each frame for the cells showing their far mesh, a frame behind the sources.
+
+```ts
+import {createStage} from 'margoengine';
+import {box} from 'margoengine/core';
+import {LODSystem} from 'margoengine/lod';
+import {hierarchicalLOD} from 'margoengine/lod/auto';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const lods = LODSystem.attach(stage.engine);
+const boats = Array.from({length: 50}, (_, i) => stage.engine.createMesh().setGeometry(box(1, 1, 3)).setPosition([i * 4, 0, 0]));
+stage.engine.render();
+const fleet = await hierarchicalLOD(lods, boats, {cell: 40, follow: true}); // default false
+boats[0].setPosition([0, 0, 10]); // the far mesh of its cell follows
+fleet.update(); // or, without follow, when you choose
+```
+
+A rebuild is the merge over again, and the simplifying too with a `ratio` below 1, for the whole cell: it suits things that move now and then, not every mesh of a city every frame. Each `update()` compares the matrices of every source. A mesh stays in its cell, however far it goes, and the cell's switch distance stays measured from where the cell began.
 
 ### Textured meshes
 

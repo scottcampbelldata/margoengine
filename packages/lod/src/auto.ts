@@ -31,6 +31,8 @@ export interface HierarchicalLODOptions {
   ratio?: number;
   /** As {@link AutoLODOptions.crease}, for a simplified far mesh. */
   crease?: number;
+  /** Rebuilds a far mesh on show when its sources move, each frame, a frame behind them. Default false: call `update`. */
+  follow?: boolean;
   /** Cancels the wait for the simplifier and the work after it. */
   signal?: AbortSignal;
 }
@@ -42,9 +44,36 @@ export interface HierarchicalLOD {
   readonly lods: readonly LOD[];
   /** The far meshes made, per cell and material; for a materials mesh or model, its `root`. */
   readonly meshes: readonly Mesh[];
+  /**
+   * Rebuilds the far meshes of the cells whose source meshes moved, from their world matrices as of the last frame, and
+   * returns how many. A cell keeps its meshes and its centre, wherever they move to.
+   */
+  update(): number;
   /** Stops managing the cells, frees the far meshes and shows the source meshes again. */
   remove(): void;
 }
+/** A cell's work after the build: its sources' nodes, their matrices when last built, and how to build again. */
+interface FarCell {
+  lod: LOD;
+  nodes: readonly Mesh[];
+  matrices: Float32Array;
+  rebuild: readonly (() => void)[];
+}
+/** Copies `cell`'s node matrices over the last ones; true when any differed. */
+function moved(cell: FarCell): boolean {
+  const { nodes, matrices } = cell;
+  let changed = false;
+  for (let i = 0; i < nodes.length; i++) {
+    const m = meshRuntime(nodes[i]).matrix;
+    for (let j = 0; j < 16; j++)
+      if (matrices[i * 16 + j] !== m[j]) {
+        matrices[i * 16 + j] = m[j];
+        changed = true;
+      }
+  }
+  return changed;
+}
+let following = 0;
 type Simplify = (positions: ArrayLike<number>, indices: ArrayLike<number>, ratios: readonly number[]) => Geometry[];
 
 /** Loads the simplifier: an optional package, so a page without this entry never pays for it. */
@@ -380,6 +409,7 @@ export async function autoLOD(system: LODSystem, mesh: LODSource, options: AutoL
   return system.add(mesh, levels);
 }
 
+const far0 = (meshes: readonly LODSource[]): Mesh => (isModel(meshes[0]) ? meshes[0].root : (meshes[0] as Mesh));
 /** Packed primitives under their node matrices into one geometry around `center`: normals by the cofactor matrix, a mirrored part rewound. */
 function mergePacked(
   parts: readonly { primitive: PackedGeometry; matrix: Float32Array }[],
@@ -426,8 +456,8 @@ function mergePacked(
  * Hierarchical level of detail for still meshes: per cell of a world grid, one far mesh per material holds their
  * triangles in world space, and shows in place of those meshes past `distance`. Materials meshes merge with their UVs,
  * tangents and colours into one materials mesh per cell and material, and loaded models into one model per cell and
- * asset, a primitive per material. Moving a source mesh afterwards does not move its far mesh. The world matrices are
- * read now: call it after a frame has placed the meshes.
+ * asset, a primitive per material. A far mesh stands still when its sources move until `update()` rebuilds it, or `follow`
+ * does. The world matrices are read now: call it after a frame has placed the meshes.
  * @throws TypeError when a mesh has no core geometry, or is a model with skins, morph targets or instances; RangeError
  * for options out of range; MargoError `'state'` for an empty list; the `signal`'s reason when it aborts.
  */
@@ -436,7 +466,7 @@ export async function hierarchicalLOD(
   meshes: readonly LODSource[],
   options: HierarchicalLODOptions,
 ): Promise<HierarchicalLOD> {
-  const { cell, distance = cell * 8, ratio = 1, crease = 60, signal } = options ?? {};
+  const { cell, distance = cell * 8, ratio = 1, crease = 60, follow = false, signal } = options ?? {};
   if (!(cell > 0 && cell < Infinity) || !(distance >= 0 && distance < Infinity) || !(ratio > 0 && ratio <= 1))
     throw new RangeError('Invalid hierarchical LOD options; give cell above 0, distance of 0 or more, ratio up to 1');
   if (!meshes?.length) throw new MargoError('state', 'hierarchicalLOD needs meshes; pass at least one still mesh');
@@ -472,7 +502,16 @@ export async function hierarchicalLOD(
   }
   const lods: LOD[] = [],
     made: Mesh[] = [],
-    models: PBRModel[] = [];
+    models: PBRModel[] = [],
+    built: FarCell[] = [];
+  /** A part list with the matrices of now, and simplified as the build was. */
+  const pack = (parts: readonly { primitive: PBRPrimitive }[], center: readonly number[]) => {
+    const whole = mergePacked(
+      parts.map(({ primitive }) => ({ primitive, matrix: primitive.node.matrix })),
+      center,
+    );
+    return packedSimplify ? simplifyPacked(packedSimplify, whole, [ratio], signal)[0] : whole;
+  };
   for (const { members, models: sources, center, total } of cells.values()) {
     for (let a = 0; a < 3; a++) center[a] /= total;
     // By value: every mesh made without a material has its own default one.
@@ -483,11 +522,12 @@ export async function hierarchicalLOD(
       if (list) list.push(mesh);
       else byMaterial.set(key, [mesh]);
     }
-    const far: Mesh[] = [];
+    const far: Mesh[] = [],
+      rebuild: (() => void)[] = [];
     let radius = 0;
     if (sources.length) {
       const shaded = sources.filter(isMaterialMesh),
-        byPart = new Map<Material, { primitive: PBRPrimitive; matrix: Float32Array }[]>(),
+        byPart = new Map<Material, { primitive: PBRPrimitive }[]>(),
         byAsset = new Map<PBRModel['asset'], PBRModel[]>();
       for (const model of sources)
         if (!isMaterialMesh(model)) {
@@ -497,21 +537,19 @@ export async function hierarchicalLOD(
         }
       // A loaded asset's far model: one primitive per material of the file, the file's textures shared.
       for (const [asset, group] of byAsset) {
-        const parts = new Map<number | undefined, { primitive: PBRPrimitive; matrix: Float32Array }[]>();
+        const parts = new Map<number | undefined, { primitive: PBRPrimitive }[]>();
         for (const model of group)
           for (const primitive of model.primitives) {
             if (primitive.topology) continue;
             const slot = primitive.definition.material,
-              list = parts.get(slot),
-              part = { primitive, matrix: primitive.node.matrix };
-            if (list) list.push(part);
-            else parts.set(slot, [part]);
+              list = parts.get(slot);
+            if (list) list.push({ primitive });
+            else parts.set(slot, [{ primitive }]);
           }
         const prepared: PackedGeometry[] = [],
           records: PBRPrimitive[] = [];
         for (const list of parts.values()) {
-          const whole = mergePacked(list, center),
-            kept = packedSimplify ? simplifyPacked(packedSimplify, whole, [ratio], signal)[0] : whole;
+          const kept = pack(list, center);
           prepared.push(kept);
           records.push(list[0].primitive);
           for (let o = 0; o < kept.vertices.length; o += 20)
@@ -532,31 +570,32 @@ export async function hierarchicalLOD(
         model.root.setPosition(center as [number, number, number]);
         far.push(model.root);
         models.push(model);
+        rebuild.push(() => model.writeGeometry([...parts.values()].map((list) => pack(list, center))));
       }
       for (const model of shaded) {
         const material = model.material,
           list = Array.isArray(material) ? (material as readonly Material[]) : [material as Material];
         for (const primitive of model.primitives) {
           const slot = list[Array.isArray(material) ? primitive.definition.material! : 0],
-            parts = byPart.get(slot),
-            part = { primitive, matrix: primitive.node.matrix };
-          if (parts) parts.push(part);
-          else byPart.set(slot, [part]);
+            parts = byPart.get(slot);
+          if (parts) parts.push({ primitive });
+          else byPart.set(slot, [{ primitive }]);
         }
       }
       const createMesh = shaded.length ? (await materialsPackage(signal)).createMesh : undefined;
       for (const [material, parts] of byPart) {
-        const whole = mergePacked(parts, center),
-          kept = packedSimplify ? simplifyPacked(packedSimplify, whole, [ratio], signal)[0] : whole,
+        const kept = pack(parts, center),
           mesh = createMesh!(sources[0].root.engine, meshGeometry([kept]), material);
         for (let o = 0; o < kept.vertices.length; o += 20)
           radius = Math.max(radius, Math.hypot(kept.vertices[o], kept.vertices[o + 1], kept.vertices[o + 2]));
         mesh.root.setPosition(center as [number, number, number]);
         far.push(mesh.root);
         models.push(mesh);
+        rebuild.push(() => mesh.setGeometry(meshGeometry([pack(parts, center)])));
       }
     }
     for (const group of byMaterial.values()) {
+      const merged = () => {
       let vertexCount = 0,
         indexCount = 0;
       for (const mesh of group) {
@@ -593,15 +632,17 @@ export async function hierarchicalLOD(
         const size = Math.hypot(normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]) || 1;
         for (let a = 0; a < 3; a++) normals[i * 3 + a] /= size;
       }
-      const geometry = simplify ? simplify(positions, indices, [ratio])[0] : new Geometry(positions, normals, indices);
+      return simplify ? simplify(positions, indices, [ratio])[0] : new Geometry(positions, normals, indices);
+      };
       const first = meshRuntime(group[0]),
         mesh = (first.engine as unknown as { createMesh(): Mesh })
           .createMesh()
-          .setGeometry(geometry)
+          .setGeometry(merged())
           .setPosition(center as [number, number, number])
           .setMaterial(first.material);
       far.push(mesh);
       made.push(mesh);
+      rebuild.push(() => mesh.setGeometry(merged()));
     }
     const shown = (list: Mesh[]) => ({
       get visible() {
@@ -611,8 +652,7 @@ export async function hierarchicalLOD(
         for (const mesh of list) mesh.visible = value;
       },
     });
-    lods.push(
-      system.add(
+    const lod = system.add(
         far[0],
         [
           { object: shown([...members, ...sources.map((model) => model.root)]) as unknown as Mesh },
@@ -622,12 +662,31 @@ export async function hierarchicalLOD(
           radius: radius || cell,
         },
       ),
-    );
+      nodes = [...new Set([...members, ...sources.flatMap((model) => model.primitives.map((p) => p.node))])],
+      entry = { lod, nodes, matrices: new Float32Array(nodes.length * 16), rebuild };
+    moved(entry);
+    lods.push(lod);
+    built.push(entry);
   }
+  const refresh = (level?: number) => {
+      let count = 0;
+      for (const entry of built)
+        if ((level === undefined || entry.lod.level === level) && moved(entry)) {
+          for (const build of entry.rebuild) build();
+          count++;
+        }
+      return count;
+    },
+    engine = meshRuntime(far0(meshes)).engine,
+    name = 'lod-follow:' + following++;
+  if (follow) engine.use({ name, setup() {}, onPreUpdate: () => void refresh(1) });
   return {
     lods,
     meshes: [...made, ...models.map((model) => model.root)],
+    update: () => refresh(),
     remove() {
+      if (follow) engine.removePlugin(name);
+      built.length = 0;
       for (const lod of lods) lod.remove();
       for (const mesh of made) mesh.dispose();
       for (const model of models) model.dispose();

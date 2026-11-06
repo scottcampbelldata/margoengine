@@ -366,6 +366,54 @@ test('hierarchicalLOD merges loaded models into one model per cell and file, a p
   }
 });
 
+test('update rebuilds a far mesh whose sources moved, and only those', async () => {
+  const engine = await headless(),
+    system = LODSystem.attach(engine),
+    a = engine.createMesh().setGeometry(box(1, 1, 1)),
+    b = engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([100, 0, 0]);
+  engine.store.tick(false);
+  const built = await hierarchicalLOD(system, [a, b], { cell: 50 }),
+    far = built.meshes[0],
+    x = () => Math.max(...far.geometry.vertices.filter((_, i) => i % 6 === 0));
+  assert.equal(built.update(), 0, 'nothing moved');
+  const before = x();
+  a.setPosition([3, 0, 0]);
+  engine.store.tick(false);
+  assert.equal(built.update(), 1);
+  assert.ok(Math.abs(x() - before - 3) < 1e-5, 'the far mesh went with it');
+  assert.equal(built.update(), 0);
+  built.remove();
+  assert.equal(built.update(), 0);
+  engine.dispose();
+});
+
+test('update reaches the far model of a loaded model, and follow rebuilds a far mesh on show', async () => {
+  const engine = await headless(),
+    system = LODSystem.attach(engine),
+    model = loadedModel(engine);
+  engine.store.tick(false);
+  const built = await hierarchicalLOD(system, [model], { cell: 1000, distance: 10, follow: true }),
+    [lod] = built.lods,
+    far = lod.levels[1].object,
+    primitive = () => built.meshes[0],
+    plugin = [...engine.plugins.keys()].find((name) => name.startsWith('lod-follow')),
+    farModel = [...engine.plugins.values()].find((p) => p.root === primitive()),
+    x = () => Math.max(...farModel.primitives[0].vertices.filter((_, i) => i % 20 === 0));
+  assert.ok(far && plugin);
+  const before = x();
+  model.nodes[0].setPosition([9, 0, 0]);
+  engine.store.tick(false);
+  engine.plugins.get(plugin).onPreUpdate();
+  assert.equal(x(), before, 'near by, the sources show: nothing to rebuild yet');
+  engine.camera.position = [0, 0, 100];
+  system.update();
+  engine.plugins.get(plugin).onPreUpdate();
+  assert.ok(Math.abs(x() - before - 6) < 1e-4, 'the far model follows');
+  built.remove();
+  assert.equal(engine.plugins.has(plugin), false);
+  engine.dispose();
+});
+
 test('normalMatrix turns normals with the object, mirrored ones outward', () => {
   // Regression: an imposter's subassembly parts took the transpose, hierarchicalLOD's far meshes the plain matrix.
   const apply = ({ c }, [a, b, e]) => [0, 1, 2].map((r) => c[r] * a + c[3 + r] * b + c[6 + r] * e);

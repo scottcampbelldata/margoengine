@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4984182,
+  "total": 4984515,
   "history": [
     {
       "date": "2026-10-24",
@@ -2108,6 +2108,12 @@
       "commit": "041de7643",
       "reason": "lod: deferred levels in the root; new entry lod/stream",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "fa132e6e8",
+      "reason": "lod/auto: HierarchicalLOD.update and follow",
+      "grew": 1
     }
   ],
   "items": {
@@ -2357,7 +2363,7 @@
     "@margoengine/loaders/vrml": 5087,
     "@margoengine/loaders/worker": 8571,
     "@margoengine/lod": 13629,
-    "@margoengine/lod/auto": 5498,
+    "@margoengine/lod/auto": 5831,
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/stream": 1778,
     "@margoengine/materials": 61113,

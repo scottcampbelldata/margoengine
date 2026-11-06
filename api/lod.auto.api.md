@@ -19,6 +19,7 @@ export interface AutoLODOptions {
 export interface HierarchicalLOD {
     readonly lods: readonly LOD[];
     readonly meshes: readonly Mesh[];
+    update(): number;
     remove(): void;
 }
 
@@ -27,6 +28,7 @@ export interface HierarchicalLODOptions {
     distance?: number;
     ratio?: number;
     crease?: number;
+    follow?: boolean;
     signal?: AbortSignal;
 }
 

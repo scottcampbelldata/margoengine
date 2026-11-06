@@ -96,6 +96,29 @@ const loaded=async()=>{
   built.remove();second.dispose();model.dispose();await frame();
   return {loaded:out};
 };
+// A source moves past the far distance: the far mesh on screen goes with it.
+const moving=async()=>{
+  const source=engine.createMesh().setGeometry(box(1,1,1));
+  await frame();
+  const built=await hierarchicalLOD(system,[source],{cell:1000,distance:5,follow:true}),far=built.meshes[0];
+  engine.camera.target=[0,0,0];engine.camera.position=[0,0,30];await frame();await frame();
+  const image=()=>{
+    const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d');
+    engine.render();g.drawImage(canvas,0,0);
+    return g.getImageData(0,0,c.width,c.height).data;
+  };
+  // Mean column of what the far mesh adds to the picture.
+  const column=()=>{
+    const d=image();far.visible=false;const empty=image();far.visible=true;let n=0,x=0;
+    for(let i=0;i<d.length;i+=4)if(Math.abs(d[i]-empty[i])+Math.abs(d[i+1]-empty[i+1])+Math.abs(d[i+2]-empty[i+2])>12){n++;x+=(i/4)%canvas.width;}
+    return Math.round(x/(n||1));
+  };
+  const before=column();
+  source.setPosition([4,0,0]);await frame();await frame();
+  const after=column();
+  built.remove();source.dispose();await frame();
+  return {moving:{before,after}};
+};
 window.check={
   errors,
   async run(){
@@ -119,6 +142,7 @@ window.check={
     ball.visible=false;
     Object.assign(result,await textured());
     Object.assign(result,await loaded());
+    Object.assign(result,await moving());
     return result;
   },
 };

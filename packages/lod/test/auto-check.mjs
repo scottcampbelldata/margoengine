@@ -48,6 +48,7 @@ try {
     model.far.meshes === 1 && model.far.pixels > 0 && model.far.spread > 8,
     `the far model draws: ${JSON.stringify(model.far)}`,
   );
+  assert.ok(r.moving.after > r.moving.before + 20, `a far mesh follows its source: ${JSON.stringify(r.moving)}`);
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);
   assert.deepEqual(pageErrors, []);
 } finally {
