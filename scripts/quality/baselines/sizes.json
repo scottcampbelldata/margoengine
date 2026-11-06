@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4814597,
+  "total": 4816080,
   "history": [
     {
       "date": "2026-10-24",
@@ -2024,6 +2024,12 @@
       "commit": "91b038169",
       "reason": "culling: new lod entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8388ca3cb",
+      "reason": "New webgl entry ./restore: lost context recovery and rebootDevice on the WebGL2 preview; the root entry gains the restore step it needs",
+      "grew": 2
     }
   ],
   "items": {
@@ -2528,8 +2534,9 @@
     "@margoengine/water": 20185,
     "@margoengine/weather": 5230,
     "@margoengine/weather/hail": 4278,
-    "@margoengine/webgl": 3277,
+    "@margoengine/webgl": 3663,
     "@margoengine/webgl/pick": 2385,
+    "@margoengine/webgl/restore": 1097,
     "@margoengine/webgl2-compat": 96428,
     "@margoengine/webgl2-compat base (without compute runtime)": 73000,
     "@margoengine/webgl2-compat lazy compute runtime": 22701,

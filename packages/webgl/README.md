@@ -68,6 +68,35 @@ engine back core's answer. Picking covers the core meshes this renderer draws: a
 on the preview, and `Picking` from `margoengine/selection` still needs WebGPU. The React Canvas keeps its pointer
 handlers off on the preview ([known-bugs.md](../../docs/known-bugs.md)).
 
+## Lost contexts
+
+A browser can take a WebGL context away (a driver reset, too many contexts, a laptop switching GPUs). Without help the
+next frame throws `failed`, and `engine.rebootDevice()` refuses. `webglRestore` from `margoengine/webgl/restore` keeps a
+long session alive: frames pass without drawing and new geometry waits, then every program and buffer is made again and
+each scene's plugins hear `onDeviceRestored`. Like `webglPicking`, it does nothing on WebGPU or the compatibility layer.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {webglRenderer} from 'margoengine/webgl';
+import {webglRestore} from 'margoengine/webgl/restore';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgl2', fallback: webglRenderer});
+engine.createMesh().setGeometry(box());
+engine.use(webglRestore({timeout: 30_000}));
+engine.onError = (error) => console.error(error);
+engine.start();
+
+// Rebuilds at once on a live context; on a lost one, resolves when the browser gives it back.
+await engine.rebootDevice();
+```
+
+`timeout` (default 30000) is how many milliseconds to wait for a lost context. Past it `rebootDevice` rejects with code
+`timeout`, and a loss nobody called it for reaches `engine.onError` the same way; a restore after that still recovers. Add
+the plugin before the context can be lost: the browser only gives a context back to a page that asked at the moment of
+the loss. An engine that draws on demand rather than with `engine.start()` should draw again from `onDeviceRestored`.
+`engine.removePlugin('webgl-restore')` gives the engine back core's answers.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/webgl

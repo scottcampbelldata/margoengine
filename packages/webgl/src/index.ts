@@ -69,7 +69,8 @@ export const glRenderer = (canvas: object): GLRenderer | undefined => renderers.
 
 /**
  * The WebGL2 fallback renderer core uses when WebGPU is missing: core meshes with core's PBR material, shaded per pixel
- * (GGX metallic-roughness, one directional light plus ambient; no textures or effects; picking is the `/pick` entry).
+ * (GGX metallic-roughness, one directional light plus ambient; no textures or effects; picking and context restore
+ * are the `/pick` and `/restore` entries).
  * Create it through `webglRenderer` as `Engine.create`'s `fallback`, not directly.
  * @throws MargoError `'unsupported'` when the canvas has no WebGL2 context; `'failed'` when a GL object cannot be
  * created, a shader does not compile or link (the GL info log is the message), or the context is lost.
@@ -79,15 +80,20 @@ export class GLRenderer implements Renderer {
   /** @internal */ readonly gl: WebGL2RenderingContext;
   /** @internal When set, a frame calls this instead of drawing: the frame's state, with the canvas left as it is. */
   intercept?: (camera: Camera, batches: Iterable<Batch>, view?: ViewDraw) => void;
-  private readonly program: WebGLProgram;
-  private readonly camera: WebGLUniformLocation | null;
-  private readonly eye: WebGLUniformLocation | null;
-  private readonly light: WebGLUniformLocation | null;
-  private readonly radiance: WebGLUniformLocation | null;
-  private readonly ambient: WebGLUniformLocation | null;
+  /** @internal True from a context loss until `restore`: frames draw nothing and geometry waits, instead of throwing. */
+  recovering = false;
+  /** @internal Counts lost contexts: GL objects made under an earlier count are gone. */
+  generation = 0;
+  private program!: WebGLProgram;
+  private camera: WebGLUniformLocation | null = null;
+  private eye: WebGLUniformLocation | null = null;
+  private light: WebGLUniformLocation | null = null;
+  private radiance: WebGLUniformLocation | null = null;
+  private ambient: WebGLUniformLocation | null = null;
+  // A geometry added while the context is lost has no GL objects yet: `restore` makes them from its capacity.
   private readonly resources = new Map<
     Geometry,
-    { vao: WebGLVertexArrayObject; buffers: WebGLBuffer[]; instance: WebGLBuffer }
+    { vao: WebGLVertexArrayObject | null; buffers: WebGLBuffer[]; instance: WebGLBuffer | null; capacity: number }
   >();
 
   private readonly clear: readonly number[];
@@ -108,18 +114,46 @@ export class GLRenderer implements Renderer {
         'No WebGL2 canvas; use a browser with WebGL2 and a canvas without another context',
       );
     this.gl = gl;
-    const program = glProgram(gl, glVertex, glFragment);
+    this.link();
+    renderers.set(canvas, this);
+  }
+  private link(): void {
+    const { gl } = this,
+      program = glProgram(gl, glVertex, glFragment);
     this.program = program;
     this.camera = gl.getUniformLocation(program, 'camera');
     this.eye = gl.getUniformLocation(program, 'eye');
     this.light = gl.getUniformLocation(program, 'light');
     this.radiance = gl.getUniformLocation(program, 'radiance');
     this.ambient = gl.getUniformLocation(program, 'ambient');
-    renderers.set(canvas, this);
+  }
+  /**
+   * @internal Makes every GL object again from what the renderer holds: after a restored context, whose objects are
+   * already gone, or on a live context, whose objects go first.
+   */
+  restore(): void {
+    const { gl } = this,
+      kept = [...this.resources];
+    if (this.recovering) {
+      this.generation++;
+      this.resources.clear();
+      // The loss itself sits in the error flag, and `add` reads that flag.
+      gl.getError();
+    } else {
+      for (const [geometry] of kept) this.remove(geometry);
+      gl.deleteProgram(this.program);
+    }
+    this.link();
+    for (const [geometry, { capacity }] of kept) this.add(geometry, capacity);
+    this.recovering = false;
   }
   add(geometry: Geometry, capacity: number): void {
     const gl = this.gl,
       buffers: WebGLBuffer[] = [];
+    if (this.recovering && gl.isContextLost()) {
+      this.resources.set(geometry, { vao: null, buffers, instance: null, capacity });
+      return;
+    }
     const vao = gl.createVertexArray();
     if (!vao) throw new MargoError('failed', 'GL VAO; the WebGL context may be lost');
     try {
@@ -151,7 +185,7 @@ export class GLRenderer implements Renderer {
           'failed',
           `GL buffer failed (error ${error}); use a smaller geometry or check the context`,
         );
-      this.resources.set(geometry, { vao, buffers, instance });
+      this.resources.set(geometry, { vao, buffers, instance, capacity });
     } catch (error) {
       for (const buffer of buffers) gl.deleteBuffer(buffer);
       gl.deleteVertexArray(vao);
@@ -177,7 +211,10 @@ export class GLRenderer implements Renderer {
     view?: ViewDraw,
   ): void {
     const gl = this.gl;
-    if (gl.isContextLost()) throw new MargoError('failed', 'WebGL context lost; create a new engine');
+    if (gl.isContextLost()) {
+      if (this.recovering) return;
+      throw new MargoError('failed', 'WebGL context lost; create a new engine, or add webglRestore from the /restore entry');
+    }
     if (view?.target)
       throw new MargoError(
         'unsupported',

@@ -31,6 +31,10 @@
     "./pick": {
       "types": "./dist/pick.d.ts",
       "import": "./dist/pick.js"
+    },
+    "./restore": {
+      "types": "./dist/restore.d.ts",
+      "import": "./dist/restore.js"
     }
   },
   "files": [

@@ -2010,6 +2010,10 @@
       "types": "./dist/webgl/pick.d.ts",
       "import": "./dist/webgl/pick.js"
     },
+    "./webgl/restore": {
+      "types": "./dist/webgl/restore.d.ts",
+      "import": "./dist/webgl/restore.js"
+    },
     "./webgl2-compat": {
       "types": "./dist/webgl2-compat.d.ts",
       "import": "./dist/webgl2-compat.js"

@@ -24,6 +24,7 @@ class WebGLPicking implements EnginePlugin {
   private program?: WebGLProgram;
   private camera: WebGLUniformLocation | null = null;
   private target?: Target;
+  private generation = 0;
   private readonly matrix = new Float32Array(16);
   private readonly pixel = new Uint32Array(4);
   /** Canvas views of the last `render({views})`, as core keeps them for its own pick. */
@@ -122,6 +123,10 @@ class WebGLPicking implements EnginePlugin {
 
   /** The id program and target, made by the first pick: apps that never pick pay nothing. */
   private ready(gl: WebGL2RenderingContext): Target {
+    const { generation } = this.renderer!;
+    // A lost context took the program and target with it.
+    if (this.generation !== generation) this.program = this.target = undefined;
+    this.generation = generation;
     if (this.target) return this.target;
     const program = (this.program = glProgram(gl, pickVertex, pickFragment));
     this.camera = gl.getUniformLocation(program, 'camera');
@@ -157,7 +162,7 @@ class WebGLPicking implements EnginePlugin {
 
   private release(): void {
     const gl = this.renderer?.gl;
-    if (!gl) return;
+    if (!gl || this.generation !== this.renderer!.generation) return;
     if (this.program) gl.deleteProgram(this.program);
     if (this.target) {
       gl.deleteFramebuffer(this.target.framebuffer);
