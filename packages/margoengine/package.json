@@ -222,6 +222,10 @@
       "types": "./dist/bvh/gpu-build.d.ts",
       "import": "./dist/bvh/gpu-build.js"
     },
+    "./bvh/alpha": {
+      "types": "./dist/bvh/alpha.d.ts",
+      "import": "./dist/bvh/alpha.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"

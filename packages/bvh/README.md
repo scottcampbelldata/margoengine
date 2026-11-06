@@ -303,6 +303,32 @@ using refit = await GPUDynamicBVH.create(device, {
 | `stride` | 3 floats from one vertex to the next |
 | `offset` | 0 floats before the first position |
 
+## Alpha-masked picking
+
+`AlphaRaycaster` from `@margoengine/bvh/alpha` is a `Raycaster` that drops hits on the transparent parts of masked surfaces, so a click through a fence or a leaf card lands on what shows through. Textures live on the GPU, so the caller names each hit's CPU pixels with `alphaMask`, and the hit's `uv` reads them with the filtering a linear sampler gives. Every intersect call works, `SceneBVH.intersect` included.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {AlphaRaycaster} from 'margoengine/bvh/alpha';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const image = new OffscreenCanvas(64, 64).getContext('2d')!.getImageData(0, 0, 64, 64);
+
+const ray = new AlphaRaycaster();
+ray.alphaMask = (hit) => (hit.primitive ? {width: image.width, height: image.height, data: image.data, cutoff: 0.5} : null);
+ray.firstHitOnly = true; // the nearest solid hit
+ray.setFromEngine(engine, 320, 240);
+console.log(ray.intersectEngine(engine)[0]?.mesh);
+```
+
+A hit stays when its alpha is at or above `cutoff`, when `alphaMask` answers null, or when it has no `uv`: core geometry holds none, so masks apply to model primitives and `intersectModel` hits. `uv` is TEXCOORD_0 with no texture transform; `sampleAlpha(mask, u, v)` is the sampler on its own. With a mask set, `firstHitOnly` tests every hit along the ray and then keeps the nearest solid one, since the nearest may be a hole.
+
+| Option | Default |
+| --- | --- |
+| `alphaMask` | `null`: no hit is dropped |
+| `cutoff` (of a mask) | 0.5 |
+| `wrap` (of a mask) | `'repeat'`; or `'clamp'` |
+
 ## GPU traversal
 
 `@margoengine/bvh/gpu` uploads a `MeshBVH` to storage buffers and traces rays in WGSL compute, for picking at scale, baking, path tracing and audio occlusion. `GPUMeshBVH.create` takes a `GPUDevice`, or an `Engine` on WebGPU. The tree is built on the CPU as usual; after `bvh.refit()` call `update()`.
