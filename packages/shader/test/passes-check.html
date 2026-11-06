@@ -8,7 +8,7 @@ import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
 import {Clustered} from '/packages/clustered/dist/index.js';
 import {LocalShadows} from '/packages/clustered/dist/shadows.js';
 import {SSAO} from '/packages/post/dist/index.js';
-import {NodeMaterial,discard,normalLocal,normalWorld,materialNormal,positionLocal,sin,uv,vec3} from '/packages/shader/dist/index.js';
+import {NodeMaterial,cameraPosition,discard,normalLocal,normalWorld,materialNormal,positionLocal,sin,uv,vec3} from '/packages/shader/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -45,6 +45,8 @@ const dense=()=>planeGeometry(2,2,128,128);
 const scenarios={
   plainShadow:()=>withShadows(plainMap,()=>caster(new Material(flat),[0.6,0.5,0.5])),
   movedShadow:()=>withShadows(plainMap,()=>caster(moved())),
+  // The same half unit up, read from the camera: a depth pass sees the main camera, not the light.
+  cameraShadow:()=>withShadows(plainMap,()=>caster(new NodeMaterial({...flat,positionNode:positionLocal.add(vec3(0,cameraPosition.z.mul(0.5/engine.camera.position[2]),0))}))),
   cutShadow:()=>withShadows(plainMap,()=>caster(cut())),
   halfShadow:()=>withShadows(plainMap,()=>caster(new Material({...flat,doubleSided:true}),[0.725,0,0.5],0.25)),
   virtualPlain:()=>withShadows(pages,()=>caster(new Material(flat),[0.6,0.5,0.5])),

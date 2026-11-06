@@ -5,6 +5,7 @@ import type { SurfaceGraph } from './graph.js';
 import type { Engine } from '@margoengine/core/extension';
 import {
   Program,
+  type Host,
   builtin,
   cast,
   positionLocal,
@@ -188,16 +189,48 @@ let margoA=i.position.xyz+margoAcross*0.001;
 let margoB=i.position.xyz+margoAlong*0.001;`;
 const scoped = (name: string, lines: string[], value: string) =>
   `var ${name}=vec3f(0);{\n${lines.join('\n')}\n${name}=${value};\n}`;
-/** Fragment and vertex stages of a depth pass: its shaders have no surface, camera or frame of the beauty pass. */
+/**
+ * The main camera for a depth pass, whose own frame is the light's: a graph that faces the camera casts the shape the camera
+ * sees. Read from the engine's camera, so a multi-view frame casts for that one.
+ */
+const eye = (b: Builder) => b.frame('cameraEye', 'vec3f'),
+  view = (b: Builder) => b.frame('cameraView', 'mat4x4f');
+function cameraFrames(engine: Engine | undefined): Host['frames'] {
+  const camera = engine?.camera as unknown as
+    | { position: ArrayLike<number>; near: number; far: number; view: ArrayLike<number>; projection: ArrayLike<number> }
+    | undefined;
+  return (
+    camera && {
+      cameraEye: camera.position,
+      cameraView: camera.view,
+      cameraProjection: camera.projection,
+      cameraNear: [camera.near],
+      cameraFar: [camera.far],
+    }
+  );
+}
+/** Fragment and vertex stages of a depth pass: its shaders have no surface or frame of the beauty pass. */
 function depthStages(varyings: Node[], cut: { vertex: boolean; fragment: boolean }): [ShaderStage, ShaderStage] {
   const away = (part: 'vertex' | 'fragment') => () => {
       cut[part] = true;
       return 'vec3f(0)';
     },
-    // A depth pass has none of the frame's camera values or a surface: every input is out unless named below.
+    // A depth pass has no surface: every input is out unless named below.
     all = (stage: ShaderStage, part: 'vertex' | 'fragment') =>
       Object.fromEntries(Object.keys(stage.builtins).map((name) => [name, away(part)])),
-    through = (x: Node) => (b: Builder) => b.stage.varying!(b, x);
+    through = (x: Node) => (b: Builder) => b.stage.varying!(b, x),
+    // What both stages read of the main camera, for a world position and a world normal.
+    seen = (world: (b: Builder) => string, normal: (b: Builder) => string) => ({
+      cameraPosition: eye,
+      viewMatrix: view,
+      projectionMatrix: (b: Builder) => b.frame('cameraProjection', 'mat4x4f'),
+      cameraNear: (b: Builder) => b.frame('cameraNear', 'f32'),
+      cameraFar: (b: Builder) => b.frame('cameraFar', 'f32'),
+      viewDirection: (b: Builder) => `normalize(${eye(b)} - ${world(b)})`,
+      positionView: (b: Builder) => `(${view(b)} * vec4f(${world(b)}, 1.0)).xyz`,
+      normalView: (b: Builder) => `normalize((${view(b)} * vec4f(${normal(b)}, 0.0)).xyz)`,
+      linearDepth: (b: Builder) => `(-(${view(b)} * vec4f(${world(b)}, 1.0)).z)`,
+    });
   return [
     {
       kind: 'vertex',
@@ -211,6 +244,10 @@ function depthStages(varyings: Node[], cut: { vertex: boolean; fragment: boolean
         normalWorld: 'margoWorldNormal',
         vertexIndex: 'i.ndVertex',
         instanceIndex: 'i.ndInstance',
+        ...seen(
+          () => 'margoWorld',
+          () => 'margoWorldNormal',
+        ),
       },
     },
     {
@@ -228,6 +265,10 @@ function depthStages(varyings: Node[], cut: { vertex: boolean; fragment: boolean
         screenCoordinate: fragmentStage.builtins.screenCoordinate,
         screenUV: fragmentStage.builtins.screenUV,
         frontFacing: 'front',
+        ...seen(
+          (b) => b.stage.varying!(b, builtin('positionWorld', 'vec3f')),
+          (b) => `normalize(${b.stage.varying!(b, builtin('normalWorld', 'vec3f'))})`,
+        ),
       },
       varying(b, x) {
         const c = b.program.canon(x);
@@ -287,6 +328,16 @@ function layoutEntry(binding: number, access: string | undefined, type: string):
     };
   return { binding, visibility, sampler: { type: type.includes('comparison') ? 'comparison' : 'filtering' } };
 }
+/** The layout entries of the module-scope bindings of `declared` that `body` or another declaration reaches. */
+function reachedBindings(declared: string, body: string): Map<number, GPUBindGroupLayoutEntry> {
+  const reached = new Map<number, GPUBindGroupLayoutEntry>();
+  for (const [, binding, access, name, type] of declared.matchAll(
+    /@binding\((\d+)\) var(<[^>]*>)? (\w+) ?: ?([^;\n]+);/g,
+  ))
+    if ((body + declared).match(new RegExp(`\\b${name}\\b`, 'g'))!.length > 1)
+      reached.set(+binding, layoutEntry(+binding, access, type));
+  return reached;
+}
 /**
  * A `@margoengine/materials` Material whose colour, opacity, roughness, metalness, emissive, normal and vertex position come from
  * shader nodes. Every Material option still applies; nodes are fixed at construction, uniform values stay live.
@@ -308,6 +359,7 @@ export class NodeMaterial extends Material {
   private depthFragment: string;
   private depthFields: string;
   private depthRecord?: { device: GPUDevice; record: CasterDisplacement };
+  private readonly colourBindings: number;
   /** `extra` is for subclasses: it compiles nodes of its own after the fragment stage and before the vertex stage. */
   constructor(options: NodeMaterialOptions = {}, extra?: (program: Program) => void) {
     const {
@@ -382,6 +434,8 @@ export class NodeMaterial extends Material {
       .map((l) => '  ' + l + '\n')
       .join('');
     this.varyingFields = varyingCode(this.program.varyings);
+    // Every stage of the colour pass has compiled, a subclass's too: a binding from here on is read by depth passes alone.
+    this.colourBindings = this.program.next;
     // The depth passes' view of the same graph. Nodes they cannot serve leave that half of the graph out (README).
     const list: Node[] = [],
       cut = { vertex: false, fragment: false },
@@ -480,29 +534,54 @@ export class NodeMaterial extends Material {
         )
     );
   }
+  /**
+   * `code`, TAA's object velocity shader with the mesh normal in its input and `margoPosition` as its vertex, moved and cut by
+   * this graph. A graph that changes between frames adds no velocity of its own: a surface moves as the mesh and camera do.
+   */
+  private velocityShader(code: string, group: number): string {
+    const start = '{var o:Out;';
+    if (!code.includes(start) || !code.includes('@vertex fn vertex(i:Input,@builtin(vertex_index) index:u32)'))
+      throw new MargoError(
+        'unsupported',
+        'NodeMaterial requires the standard velocity shader; use matching @margoengine/shader and @margoengine/taa versions',
+      );
+    return (
+      this.program.declare(group) +
+      '\n' +
+      code
+        .replace(
+          start,
+          () =>
+            `${start}let margoWorld=(f.model*vec4f(i.position.xyz,1)).xyz;let margoWorldNormal=normalize((f.model*vec4f(i.normal.xyz,0)).xyz);` +
+            `var margoPosition=i.position.xyz;{\n${this.depthVertex.replaceAll('i.ndVertex', 'index')}\n}`,
+        )
+        .replace(/(struct Out \{[^}]*)\}/, (_, body) => body + this.depthFields + '}')
+        .replace(/(struct Input \{[^}]*)\}/, (_, body) => body + (this.depthVertex.includes('i.ndInstance') ? inputFields('i.ndInstance') : '') + '}')
+        .replace(
+          /@fragment fn fragment\((i:\w+)\)([^{]*)\{/,
+          (_, input, result) =>
+            `@fragment fn fragment(${input},@builtin(front_facing) front:bool)${result}{\n${this.depthFragment}\n`,
+        )
+    );
+  }
   /** @internal What a depth pass draws: the record of gltf-pro's `displacement`, undefined for an unchanged shape. */
   override caster(device: GPUDevice, engine?: Engine): CasterDisplacement | undefined {
     if (!this.depthVertex) return undefined;
     if (this.depthRecord?.device === device) return this.depthRecord.record;
     const canvas = engine?.canvas,
       body = this.depthVertex + this.depthFragment,
-      declared = this.program.declare(0),
       // Auto layouts hold what the shader reaches, which can be less than the beauty pass binds.
-      reached = new Map<number, GPUBindGroupLayoutEntry>();
-    for (const [, binding, access, name, type] of declared.matchAll(
-      /@binding\((\d+)\) var(<[^>]*>)? (\w+) ?: ?([^;\n]+);/g,
-    ))
-      if ((body + declared).match(new RegExp(`\\b${name}\\b`, 'g'))!.length > 1)
-        reached.set(+binding, layoutEntry(+binding, access, type));
+      reached = reachedBindings(this.program.declare(0), body);
     let layout: GPUBindGroupLayout | undefined;
     const record: CasterDisplacement = {
       key: `n${++depthKeys}`,
       cuts: !!this.depthFragment,
       depth: (code, group) => this.depthShader(code, group),
+      velocity: (code, group) => this.velocityShader(code, group),
       layout: () => (layout ??= device.createBindGroupLayout({ entries: [...reached.values()] })),
       entries: () =>
         this.program
-          .entries(device, { width: canvas?.width ?? 1, height: canvas?.height ?? 1 })
+          .entries(device, { width: canvas?.width ?? 1, height: canvas?.height ?? 1, frames: cameraFrames(engine) })
           .filter((entry) => reached.has(entry.binding)),
     };
     this.depthRecord = { device, record };
@@ -510,9 +589,12 @@ export class NodeMaterial extends Material {
   }
   override bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
     const canvas = engine?.canvas;
+    // The uniforms upload here for every pass, and a block only the depth passes read stays out of the colour pass's group.
     return [
       ...super.bindings(device, engine),
-      ...this.program.entries(device, { width: canvas?.width ?? 1, height: canvas?.height ?? 1 }),
+      ...this.program
+        .entries(device, { width: canvas?.width ?? 1, height: canvas?.height ?? 1, frames: cameraFrames(engine) })
+        .filter((entry) => entry.binding < this.colourBindings),
     ];
   }
 }

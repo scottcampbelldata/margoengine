@@ -47,6 +47,7 @@ try {
 
   for (const [plain, moved] of [
     ['plainShadow', 'movedShadow'],
+    ['plainShadow', 'cameraShadow'],
     ['virtualPlain', 'virtualMoved'],
     ['localPlain', 'localMoved'],
     ['integratedPlain', 'integratedMoved'],

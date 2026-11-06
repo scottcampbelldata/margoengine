@@ -70,7 +70,8 @@ try {
     assert.deepEqual(await page.evaluate(() => window.check.swap()), []);
     measure('contact static swap', await shot(), bare, points, { left: false, right: true });
   }
-  for (const [name, want] of Object.entries(surface)) {
+  const graphs = { graphMoved: { left: false, right: true }, graphCut: { left: false, right: true } };
+  for (const [name, want] of Object.entries({ ...surface, ...graphs })) {
     const row = await page.evaluate((n) => window.check.taa(n), name);
     assert.deepEqual(row.errors, []);
     console.log(JSON.stringify({ label: `taa ${name}`, left: row.left, right: row.right, moved: row.expected }));

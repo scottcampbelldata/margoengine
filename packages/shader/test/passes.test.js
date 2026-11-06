@@ -13,13 +13,19 @@ import {
   uniform,
   uv,
   vec3,
+  vec4,
+  viewDirection,
 } from '../dist/index.js';
+import { LightingMaterial } from '../dist/lighting.js';
+import { PassMaterial } from '../dist/pass.js';
+import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Texture } from '../../materials/dist/index.js';
 import { displacedDepth } from '../../shared/displacement.js';
 import { instancedDepth } from '../../shared/instances.js';
 
 const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf-pro/src/shader.ts');
 const { shadowDepth } = await import('../../shadows/src/shader.ts');
+const { objectVelocity } = await import('../../taa/src/shader.ts');
 const device = { fake: true };
 const depth = (m, code = shadowDepth(true)) => {
   const record = m.caster(device);
@@ -113,8 +119,6 @@ test('a graph with nothing for a depth pass has no caster, so it stays a static 
 });
 
 test('what a depth pass cannot read drops that half of the graph, and only that half', () => {
-  const camera = new NodeMaterial({ positionNode: positionLocal.add(cameraPosition.mul(0.1)) });
-  assert.equal(camera.caster(device), undefined, 'no camera in a shadow pass: the mesh casts unmoved');
   const material = new NodeMaterial({
       positionNode: wave,
       colorNode: discard(materialColor.a.lessThan(0.5), vec3(1, 0, 0)),
@@ -126,4 +130,43 @@ test('what a depth pass cannot read drops that half of the graph, and only that 
 test('a depth shader without the hook points is refused with the fix', () => {
   const m = new NodeMaterial({ positionNode: wave });
   assert.throws(() => m.caster(device).depth('fn other() {}', 1), /caster depth shader/);
+});
+
+test('a depth pass reads the main camera from frame members, in both stages', () => {
+  const moved = depth(new NodeMaterial({ positionNode: positionLocal.add(cameraPosition.mul(0.1)) })).code;
+  assert.match(moved, /cameraEye/);
+  assert.match(moved, /margoPosition=/);
+  const cut = depth(
+    new NodeMaterial({ doubleSided: true, colorNode: discard(viewDirection.z.lessThan(0.5), vec3(1, 0, 0)) }),
+  ).code;
+  assert.match(cut, /normalize\([^;]*cameraEye/);
+  assert.match(cut, /discard;/);
+});
+
+test('the velocity variant moves and cuts the surface, and the previous vertex moves with it', () => {
+  const graph = new NodeMaterial({
+      doubleSided: true,
+      positionNode: positionLocal.add(vec3(0, 1, 0)),
+      colorNode: discard(uv().x.lessThan(0.5), vec3(1, 0, 0)),
+    }),
+    record = graph.caster(device),
+    code = objectVelocity(true, false, false, false, true, false, record.velocity);
+  assert.match(code, /margoPosition=/);
+  assert.match(code, /let shift=margoPosition-i\.position\.xyz/);
+  assert.match(code, /previousVertices\[index\*5\]\.xyz\+shift/);
+  assert.match(code, /@builtin\(front_facing\) front:bool/);
+  assert.match(code, /discard;/);
+  assert.throws(() => record.velocity('not a velocity shader', 1), /standard velocity shader/);
+});
+
+test('the colour group holds what any stage of the colour pass reads, and not a block only depth passes read', () => {
+  globalThis.GPUTextureUsage ??= { TEXTURE_BINDING: 4, COPY_DST: 2 };
+  globalThis.GPUBufferUsage ??= { UNIFORM: 64, COPY_DST: 8 };
+  const gpu = mockGPU().device,
+    held = (material) => material.bindings(gpu).filter((entry) => entry.binding >= 48).length,
+    value = uniform(0.5);
+  assert.equal(held(new PassMaterial({ outputs: { loop: vec4(0, value, 0, 1) } })), 1, 'a uniform only an output reads');
+  assert.equal(held(new LightingMaterial({ lightingNode: vec3(value) })), 1, 'a uniform only the lighting reads');
+  assert.equal(held(new NodeMaterial({ colorNode: vec3(value) })), 1, 'a uniform the colour reads');
+  assert.equal(held(new NodeMaterial({ positionNode: positionLocal.add(cameraPosition.mul(0.1)) })), 0, 'the depth camera');
 });

@@ -834,6 +834,8 @@ export interface Host {
   width: number;
   height: number;
   delta?: number;
+  /** Values of frame members that are neither time nor size, by member name: a depth pass's camera. */
+  frames?: Readonly<Record<string, ArrayLike<number>>>;
   [key: string]: unknown;
 }
 /** A bound GPU resource (texture, buffer, frame input). `declare` writes its WGSL variables; `entries` returns one resource per binding. */
@@ -873,7 +875,7 @@ export class Program {
   private readonly mutable = new Map<Node, boolean>();
   private size = 16;
   private counter = 0;
-  private next: number;
+  /** @internal The binding the next new resource takes: every binding below it is held. */ next: number;
   private block?: { resource: Resource; name: string; binding: number };
   private readonly buffers = new WeakMap<
     GPUDevice,
@@ -943,8 +945,14 @@ export class Program {
         continue;
       }
       const v =
-        m.frame === 'time' ? [now] : m.frame === 'deltaTime' ? [host.delta ?? now - u.last] : [host.width, host.height];
-      v.forEach((x, i) => u.view.setFloat32(m.offset + i * 4, x, true));
+        m.frame === 'time'
+          ? [now]
+          : m.frame === 'deltaTime'
+            ? [host.delta ?? now - u.last]
+            : m.frame === 'resolution'
+              ? [host.width, host.height]
+              : (host.frames?.[m.frame!] ?? []);
+      for (let i = 0; i < v.length; i++) u.view.setFloat32(m.offset + i * 4, v[i], true);
     }
     u.last = now;
     device.queue.writeBuffer(u.buffer, 0, u.bytes as Uint8Array<ArrayBuffer>);

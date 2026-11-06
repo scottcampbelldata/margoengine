@@ -26,6 +26,7 @@ export type CasterDisplacement =
       readonly sampler: GPUSampler;
       readonly key?: undefined;
       readonly depth?: undefined;
+      readonly velocity?: undefined;
       readonly entries?: undefined;
       readonly layout?: undefined;
       readonly cuts?: undefined;
@@ -33,6 +34,8 @@ export type CasterDisplacement =
   | {
       readonly key: string;
       depth(code: string, group: number): string;
+      /** TAA's object velocity shader, moved and cut as `depth` does it. Absent on a patch that does not support it. */
+      velocity?(code: string, group: number): string;
       entries(): GPUBindGroupEntry[];
       /** The group's layout, for passes that build their pipeline layouts by hand. */
       layout(): GPUBindGroupLayout;

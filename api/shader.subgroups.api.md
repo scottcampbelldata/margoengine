@@ -102,6 +102,7 @@ interface Host {
     width: number;
     height: number;
     delta?: number;
+    frames?: Readonly<Record<string, ArrayLike<number>>>;
     [key: string]: unknown;
 }
 
@@ -202,6 +203,7 @@ class Program {
     }[];
     readonly varyings: Node[];
     readonly functions: Map<string, string>;
+    next: number;
     constructor(base?: number, compute?: boolean);
     stage(stage: ShaderStage, outputs: readonly Node[]): {
         lines: string[];

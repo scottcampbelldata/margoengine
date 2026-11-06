@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8956865,
+  "total": 8983315,
   "history": [
     {
       "date": "2026-10-24",
@@ -2762,6 +2762,12 @@
       "commit": "4807240f2",
       "reason": "sceneColor and shared capture hooks, the B14 gap; optional entries of shader and post",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8f026d68a",
+      "reason": "main camera in depth passes and the velocity variant, the B15 gap; NodeMaterial and TAA hold them",
+      "grew": 3
     }
   ],
   "items": {
@@ -3246,10 +3252,10 @@
     "@margoengine/shader/deform": 5535,
     "@margoengine/shader/editor": 24745,
     "@margoengine/shader/effects": 8306,
-    "@margoengine/shader/graph": 13977,
-    "@margoengine/shader/lighting": 9827,
+    "@margoengine/shader/graph": 14462,
+    "@margoengine/shader/lighting": 10314,
     "@margoengine/shader/noise": 5772,
-    "@margoengine/shader/pass": 12364,
+    "@margoengine/shader/pass": 12796,
     "@margoengine/shader/raw": 13652,
     "@margoengine/shader/readback": 8876,
     "@margoengine/shader/subgroups": 3517,

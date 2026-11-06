@@ -582,6 +582,7 @@ test('importing a colour node and NodeMaterial leaves post, compute and textures
   // The whole-package budget follows what the root holds: 12,500 B, then 14,500 B with statements (control.ts, 2.1 kB),
   // then 16,000 B with the compute model (workgroup memory, barriers, grids, atomics, 1.3 kB), then 17,500 B and a minimal
   // 7,800 B (from 6,500 B) with the depth passes' view of a graph and normals after positionNode, which NodeMaterial holds,
-  // then 18,500 B and a minimal 8,700 B with the input table of the stages (view space, tangents, matrices, instances).
-  assert.ok(minimal.gzip < 8700 && all.gzip < 18500, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
+  // then 18,500 B and a minimal 8,700 B with the input table of the stages (view space, tangents, matrices, instances),
+  // then a minimal 9,000 B with the main camera in depth passes and the velocity variant, which NodeMaterial holds.
+  assert.ok(minimal.gzip < 9000 && all.gzip < 18500, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
 });

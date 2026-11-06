@@ -7,6 +7,7 @@ import {PbrMaterial,Texture,createMesh} from '/packages/materials/dist/index.js'
 import {Picking} from '/packages/selection/dist/index.js';
 import {ContactShadows} from '/packages/staging/dist/index.js';
 import {TAA} from '/packages/taa/dist/index.js';
+import {NodeMaterial,discard,positionLocal,uv,vec3} from '/packages/shader/dist/index.js';
 const white=[255,255,255];
 // Texels left, right; nearest, so the edge sits at u = 0.5.
 const split=(left,right,options)=>new Texture({data:new Uint8Array([...left,...right,...left,...right]),width:2,height:2},{magFilter:'nearest',minFilter:'nearest',mipmaps:false,...options});
@@ -27,6 +28,9 @@ const variants={
   vertexOn:()=>({material:new PbrMaterial({alphaTest:0.5}),colors:faint}),
   // Normals along +x and a displacement of 1.2 slide the quad off its left half, which holds no vertex to move.
   displaced:()=>({material:new PbrMaterial({displacementMap:split(white.concat(255),white.concat(255)),displacementScale:1.2}),along:[1,0,0]}),
+  // A node graph in the velocity pass: moved off its left half, and cut on it.
+  graphMoved:()=>({material:new NodeMaterial({positionNode:positionLocal.add(vec3(1.2,0,0))})}),
+  graphCut:()=>({material:new NodeMaterial({doubleSided:true,colorNode:discard(uv().x.lessThan(0.5),vec3(1,1,1))})}),
   // A plane keeps x >= 0. Picking and TAA follow the surface; a contact shadow follows clipShadows.
   clipped:()=>({material:new PbrMaterial({clippingPlanes:[[1,0,0,0]]})}),
   clipFree:()=>({material:new PbrMaterial({clippingPlanes:[[1,0,0,0]],clipShadows:false})}),

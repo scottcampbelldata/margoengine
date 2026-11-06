@@ -324,7 +324,7 @@ createMesh(stage.engine, boxGeometry(1, 1, 1), new NodeMaterial({emissiveNode: v
 | `textureCube(cube, direction, level?)` | a `CubeTexture` sampled along a direction | refuses a texture of another dimension |
 | `texture3D(volume, uvw, level?)` | a `Texture` made with `{dimension: '3d'}` | refuses a texture of another dimension |
 
-`NodePass` and `ComputePass` have no mesh, so these are NodeMaterial nodes. A depth pass reads `vertexIndex` and `instanceIndex`, and nothing tied to the camera or to tangents: a `positionNode` that reads those casts the mesh unmoved, as [Node output in every pass](#node-output-in-every-pass) describes.
+`NodePass` and `ComputePass` have no mesh, so these are NodeMaterial nodes. A depth pass reads `vertexIndex`, `instanceIndex` and the main camera, and nothing tied to tangents: a `positionNode` that reads those casts the mesh unmoved, as [Node output in every pass](#node-output-in-every-pass) describes.
 
 `node packages/shader/test/inputs-check.mjs` (real GPU, under the GPU lock) reads each input back as a pixel on a wall the camera faces, with and without tangents, and compiles the instance inputs plain, instanced and in uniform rows.
 
@@ -491,11 +491,11 @@ shadows.add(mesh);
 | Colour, SSAO's G-buffer and ambient passes | yes | yes | yes |
 | `Shadows`, `VirtualShadows`, `LocalShadows`, `Clustered` integrated shadows | yes | not read | yes |
 | Picking primitives and contact shadows | yes | not read | yes |
-| TAA velocity | no: such a surface keeps camera motion | not read | no |
+| TAA velocity | yes: the surface moves as the mesh and camera do | not read | yes |
 
 **Normals.** After a `positionNode`, normals follow the new shape. `positionNormals: 'neighbours'` evaluates the graph again 0.001 mesh units to two sides of each vertex: smooth, for shapes worked out from `positionLocal`, at three evaluations of the graph per vertex. `'faces'` takes each triangle's normal in the fragment, for graphs that read `uv()`, whose neighbours a vertex cannot know: it shows facets on a coarse mesh and keeps a normal map's detail on top. `'keep'` leaves the mesh's normals. The default is `'faces'` when the graph reads `uv()`, else `'neighbours'`; a `normalNode` wins over `'faces'`.
 
-**What a depth pass cannot read.** A shadow has no view of the camera or of the material's computed values. A `positionNode` that reads `cameraPosition` or `viewDirection` casts the mesh unmoved, and fragment nodes that read those or `materialColor`, `materialNormal`, `materialRoughness`, `materialMetalness` or `materialEmissive` cast without their `discard()`; the colour pass is not affected. A `positionNode` also replaces a `displacementMap` in depth passes. Such a caster counts as moving, so shadow caches redraw it each frame.
+**What a depth pass reads.** `cameraPosition`, `viewDirection`, `viewMatrix`, `projectionMatrix`, `positionView`, `normalView`, `linearDepth`, `cameraNear` and `cameraFar` are the main camera's in every depth pass, not the light's, so a mesh that faces the camera casts the shape the camera sees; in a multi-view frame that is `engine.camera`. A shadow has no surface, so fragment nodes that read `materialColor`, `materialNormal`, `materialRoughness`, `materialMetalness` or `materialEmissive` cast without their `discard()`, and a `positionNode` reading `tangentLocal`, `tangentWorld` or `bitangentWorld` casts the mesh unmoved; the colour pass is not affected. A `positionNode` also replaces a `displacementMap` in depth passes. Such a caster counts as moving, so shadow caches redraw it each frame. In TAA velocity a graph that changes between frames adds no velocity of its own, as a displacement map does not: the surface moves as the mesh and the camera do.
 
 `node packages/shader/test/passes-check.mjs` (real GPU, under the GPU lock) checks these on pixels: a caster moved by a graph against a plain mesh placed there in all four shadow passes, a cut caster against a half-sized one, both normal modes against the analytic normal of a wave, and SSAO's G-buffer pass drawing such a surface.
 

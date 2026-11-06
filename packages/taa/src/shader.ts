@@ -25,6 +25,7 @@ export function objectVelocity(
   solid = false,
   displaced = false,
   clipped = false,
+  graph?: (code: string, group: number) => string,
 ): string {
   let code = `${opacity ? opacityCode(0, 5) : ''}
 struct ObjectCamera {current:mat4x4f,previous:mat4x4f,settings:vec4f}
@@ -43,7 +44,15 @@ ${motion}
   return motion(i.clip.xy/camera.settings.xy,i.previous);}`;
   if (solid) code = solidVertexDepth(code);
   // The previous frame's vertex moves by the same amount: a map or scale changing moves a surface without any velocity.
-  if (displaced)
+  if (graph)
+    code = graph(
+      code
+        .replace(',@location(1) uv:vec4f,', ',@location(3) normal:vec4f,@location(1) uv:vec4f,')
+        .replace('let p=vec4f(i.position.xyz,1);', 'let shift=margoPosition-i.position.xyz;let p=vec4f(margoPosition,1);')
+        .replace('vec4f(previousVertices[index*5].xyz,1)', 'vec4f(previousVertices[index*5].xyz+shift,1)'),
+      1,
+    );
+  else if (displaced)
     code =
       displacementCode(1) +
       code

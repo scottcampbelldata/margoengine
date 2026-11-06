@@ -105,10 +105,11 @@ test('a depth pass reads the vertex index, and inputs it does not have leave tha
     indexed = new NodeMaterial({ positionNode: positionLocal.add(vertexIndex.toFloat()) }),
     code = displacedDepth(shadowDepth(true), 1, indexed.caster(device));
   assert.match(code, /struct In \{[^}]*@builtin\(vertex_index\) ndVertex:u32\}/);
-  for (const node of [positionView, tangentWorld, instanceUV.xyz])
+  for (const node of [tangentWorld, instanceUV.xyz])
     assert.equal(new NodeMaterial({ positionNode: positionLocal.add(node) }).caster(device), undefined);
+  assert.ok(new NodeMaterial({ positionNode: positionLocal.add(positionView) }).caster(device), 'the main camera is there');
   assert.equal(new NodeMaterial({ positionNode: modelMatrix.mul(vec4(positionLocal, 1)).xyz }).caster(device), undefined);
-  assert.equal(new NodeMaterial({ colorNode: discard(linearDepth.lessThan(1), vec3(1)) }).caster(device), undefined);
+  assert.ok(new NodeMaterial({ colorNode: discard(linearDepth.lessThan(1), vec3(1)) }).caster(device).cuts);
   const kept = new NodeMaterial({ colorNode: discard(varying(tangentWorld).x.lessThan(0), vec3(uv(), 1)) });
   assert.equal(kept.caster(device), undefined, 'a varying the depth pass cannot compute takes its cut with it');
 });

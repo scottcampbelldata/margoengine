@@ -28,6 +28,7 @@ type CasterDisplacement =
       readonly sampler: GPUSampler;
       readonly key?: undefined;
       readonly depth?: undefined;
+      readonly velocity?: undefined;
       readonly entries?: undefined;
       readonly layout?: undefined;
       readonly cuts?: undefined;
@@ -35,6 +36,7 @@ type CasterDisplacement =
   | {
       readonly key: string;
       depth(code: string, group: number): string;
+      velocity?(code: string, group: number): string;
       entries(): GPUBindGroupEntry[];
       layout(): GPUBindGroupLayout;
       readonly cuts: boolean;
