@@ -1394,6 +1394,8 @@ export interface MaterialOptions extends PhysicalOptions {
   depthWrite?: boolean;
   depthTest?: boolean;
   colorWrite?: boolean;
+  /** With `alphaTest` on a multisampled target, cut edges by sample coverage, so they come out smooth; defaults to false. */
+  alphaToCoverage?: boolean;
   /** Positive factors/units push polygons away from the camera, including the reverse-Z renderer. */
   polygonOffset?: boolean;
   polygonOffsetFactor?: number;
@@ -1505,6 +1507,7 @@ interface Raster {
   depthWrite: boolean | undefined;
   depthTest: boolean;
   colorWrite: boolean;
+  alphaToCoverage: boolean;
   polygonOffset: boolean;
   polygonOffsetFactor: number;
   polygonOffsetUnits: number;
@@ -1524,6 +1527,7 @@ const rasterDefaults: Raster = {
   depthWrite: undefined,
   depthTest: true,
   colorWrite: true,
+  alphaToCoverage: false,
   polygonOffset: false,
   polygonOffsetFactor: 0,
   polygonOffsetUnits: 0,
@@ -1551,6 +1555,7 @@ const rasterChecks: Record<keyof Raster, (v: never, label: string) => unknown> =
   depthWrite: (v, label) => (v === undefined ? v : flag(v, label)),
   depthTest: flag,
   colorWrite: flag,
+  alphaToCoverage: flag,
   polygonOffset: flag,
   polygonOffsetFactor: rasterFloat,
   polygonOffsetUnits: (v: number) => {
@@ -2745,6 +2750,12 @@ export class Material {
   set depthTest(v: boolean) {
     this.setRaster('depthTest', v);
   }
+  get alphaToCoverage(): boolean {
+    return this.raster.alphaToCoverage;
+  }
+  set alphaToCoverage(v: boolean) {
+    this.setRaster('alphaToCoverage', v);
+  }
   get colorWrite(): boolean {
     return this.raster.colorWrite;
   }
@@ -3314,6 +3325,7 @@ export class Material {
       this.depthWrite !== undefined ||
       !this.depthTest ||
       !this.colorWrite ||
+      this.alphaToCoverage ||
       this.polygonOffset ||
       this.stencilWrite
     );
@@ -3793,6 +3805,7 @@ function renderStateOf(m: Material): PBRRenderState | undefined {
     depthWrite: m.depthWrite,
     depthCompare: m.depthTest ? undefined : 'always',
     ...(m.colorWrite ? {} : { colorWrite: false }),
+    ...(m.alphaToCoverage ? { alphaToCoverage: true } : {}),
     ...(m.polygonOffset
       ? {
           depthBiasMode: 'away' as const,

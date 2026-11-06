@@ -41,6 +41,24 @@ export function asymmetricStencilFaces(state: PBRRenderState | undefined): boole
   );
 }
 
+/**
+ * `code` with its MASK alpha test turned into a coverage alpha for `alphaToCoverage`: the alpha is sharpened to about one
+ * pixel around the cutoff (the distance to it over its screen rate), so the samples of an edge pixel split there and a
+ * mip-blurred map keeps its edge. Coverage zero writes nothing, depth included, so the discard goes. A surface with its
+ * own test (a hashed alpha) keeps that test, at full coverage.
+ */
+export function alphaCoverageShader(code: string): string {
+  return (
+    'var<private> margoCoverage:f32=1.0;\n' +
+    code
+      .replace(
+        /if\((?:margoAlphaTest&&)?f\.settings\.x>0\.5&&f\.settings\.x<1\.5&&s\.base\.a<f\.settings\.y\)\{discard;\}/g,
+        'margoCoverage=clamp((s.base.a-f.settings.y)/max(fwidth(s.base.a),0.0001)+0.5,0.0,1.0);',
+      )
+      .replaceAll('select(1.0,s.base.a,f.settings.x>1.5)', 'margoCoverage')
+  );
+}
+
 /** Validate optional native state before a cached pipeline or a dynamic reference can reach WebGPU. */
 export function validateRenderState(state: PBRRenderState, format: GPUTextureFormat): void {
   if (state.depthBiasMode !== undefined && !['native', 'away'].includes(state.depthBiasMode))
@@ -94,6 +112,8 @@ export function validateRenderState(state: PBRRenderState, format: GPUTextureFor
           'PBR renderState ' + key + '.' + operation + ' is invalid; set one of ' + operations.join(', '),
         );
   }
+  if (state.alphaToCoverage !== undefined && typeof state.alphaToCoverage !== 'boolean')
+    throw new TypeError('PBR renderState alphaToCoverage must be a boolean; set true or false');
   if (state.colorWrite !== undefined && typeof state.colorWrite !== 'boolean')
     throw new TypeError('PBR renderState colorWrite must be a boolean; set true or false');
   if (stencilFields.some((key) => state[key] !== undefined) && !format.includes('stencil'))

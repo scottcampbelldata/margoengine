@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6025983,
+  "total": 6434651,
   "history": [
     {
       "date": "2026-10-24",

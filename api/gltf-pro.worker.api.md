@@ -969,6 +969,7 @@ interface PBRRenderState {
     stencilWriteMask?: number;
     stencilReference?: number;
     colorWrite?: boolean;
+    alphaToCoverage?: boolean;
 }
 
 interface PBRTransmission {

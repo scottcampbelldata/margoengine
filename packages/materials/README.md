@@ -795,6 +795,24 @@ generated past it, so a far surface keeps the last level. `format: 'rgba16float'
 bits for values past 1, always linear. `loadMipTexture(urls, options)` does the same for image URLs, with `signal` and
 `fetch`. Other options are the Texture's own; `mipmaps`, `dimension` and `flipY` are fixed by the chain.
 
+### Alpha to coverage
+
+`alphaToCoverage: true` smooths the edges of an `alphaTest` cut-out on a multisampled target: the alpha sets how many of
+a pixel's samples the surface covers, instead of one yes or no per pixel, and needs no sorting. It is live. A target
+without multisampling (or a blended, `transparent` material) keeps the plain test, so it is safe to leave on.
+
+```ts
+import { LambertMaterial, Texture } from '@margoengine/materials';
+
+const leafCutout = new Texture({ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 });
+export const leaves = new LambertMaterial({ alphaMap: leafCutout, alphaTest: 0.5, alphaToCoverage: true, side: 'double' });
+```
+
+The alpha is sharpened to about one pixel around `alphaTest`, so the edge stays where the plain test puts it and a far
+map's mips do not thin it out by the test alone. Shadows, picking, contact shadows and TAA velocity still cut at
+`alphaTest`. A hashed alpha keeps its own test. Covered samples write the sharpened alpha, so a canvas with
+`alphaMode: 'premultiplied'` shows those edge pixels part transparent.
+
 ## Parallax, triplanar and subsurface
 
 Three more surface options, live like the others. Each compiles into a material's shader only while it is in use:

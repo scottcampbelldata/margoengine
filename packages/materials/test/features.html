@@ -55,7 +55,26 @@ const layerScene=async(material,geometry=quad())=>{
 const flatLevel=(n,c)=>({data:new Uint8Array(Array.from({length:n*n},()=>c).flat()),width:n,height:n});
 const tiled=(repeats)=>({...quad(),uvs:[0,0,repeats,0,repeats,repeats,0,repeats]});
 const mipOptions={wrapS:'repeat',wrapT:'repeat',minFilter:'nearest',magFilter:'nearest',colorSpace:'linear'};
+// A disc in the alpha of a 128 x 128 map.
+const disc=()=>{const n=128,d=new Uint8Array(n*n*4);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const r=Math.hypot(x+0.5-n/2,y+0.5-n/2)/(n/2),k=(y*n+x)*4;d.set([255,255,255,Math.round(Math.min(1,Math.max(0,(1.2-r*1.4)))*255)],k);}return new Texture({data:d,width:n,height:n});};
 window.check={
+  // Pixels part way between black and white, and the lit share, of a white disc cut out on black.
+  async coverage({on,kind='unlit',exact=false,transparent=false}){
+    const made=await scene(front,exact?{exactSize:true}:{}),{engine,errors,render}=made;
+    const Kind=kind==='unlit'?UnlitMaterial:PbrMaterial;
+    createMesh(engine,quad(),new Kind({map:disc(),color:[1,1,1,1],...(transparent?{transparent:true}:{alphaTest:0.5}),alphaToCoverage:on,...(kind==='unlit'?{}:{emissive:[1,1,1],roughness:1})}));
+    await render();
+    const data=await pixels(made);let part=0,lit=0;
+    for(let k=0;k<size*size;k++){const v=data[k*4];part+=v>16&&v<239;lit+=v/255;}
+    const out={part,lit:lit/(size*size),samples:engine.renderer?.descriptor?.multisample?.count,errors};engine.dispose();return out;
+  },
+  async coverageLive(){
+    const made=await scene(front),{engine,errors,render}=made,m=new UnlitMaterial({map:disc(),alphaTest:0.5});
+    createMesh(engine,quad(),m);await render();
+    const count=async()=>{const d=await pixels(made);let part=0;for(let k=0;k<size*size;k++){const v=d[k*4];part+=v>16&&v<239;}return part;};
+    const before=await count();m.alphaToCoverage=true;await render();const after=await count();
+    engine.dispose();return {before,after,errors};
+  },
   // The colour a surface shows when it is `repeats` times as dense as the base level: the level a chain gave it.
   async mips({repeats,levels,format,canvas}){
     const colors=[[255,0,0,255],[0,255,0,255],[0,0,255,255],[255,255,255,255]];

@@ -443,6 +443,7 @@ export interface PBRRenderState {
     stencilWriteMask?: number;
     stencilReference?: number;
     colorWrite?: boolean;
+    alphaToCoverage?: boolean;
 }
 
 export interface PBRTransmission {

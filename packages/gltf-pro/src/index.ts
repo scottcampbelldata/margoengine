@@ -112,6 +112,7 @@ import {
 import { deviceRenderer, type PBRDeviceRenderer, type PBRDeformationRenderer } from './replica.js';
 import { backSideShader } from './side-shader.js';
 import {
+  alphaCoverageShader,
   validateRenderState,
   renderStateKey,
   pipelineDepthState,
@@ -1047,6 +1048,8 @@ export interface PBRRenderState {
   stencilReference?: number;
   /** False disables color writes while depth and stencil still run. */
   colorWrite?: boolean;
+  /** MASK materials on a multisampled target cut by sample coverage instead of a per-pixel test; elsewhere no effect. */
+  alphaToCoverage?: boolean;
 }
 export { validatePreparedGeometry };
 function preparedPrimitive(
@@ -4433,6 +4436,9 @@ export class PBRModel implements EnginePlugin {
     // Shader text enters the key as a small id: the code strings are cached objects, so the lookup hashes them once.
     // Discard only where it can happen: back faces are culled by the pipeline and only MASK materials alpha-test.
     const mask = +(m.settings[0] === 1);
+    // Only a multisampled target has samples to cover, so anywhere else the same pipeline keeps the hard test.
+    const coverage = !!state?.alphaToCoverage && !!mask && (c.descriptor.multisample?.count ?? 1) > 1;
+    if (coverage) code = alphaCoverageShader(code);
     let id = draws.codes.get(code);
     if (id === undefined) {
       if (draws.codes.size >= 256) draws.codes.clear();
@@ -4533,7 +4539,9 @@ export class PBRModel implements EnginePlugin {
                     },
                   ],
         },
-        multisample: c.descriptor.multisample,
+        multisample: coverage
+          ? { ...c.descriptor.multisample, alphaToCoverageEnabled: true }
+          : c.descriptor.multisample,
         primitive: topology ? { topology } : { topology: 'triangle-list', cullMode: cull },
         depthStencil: {
           ...pipelineDepthState(

@@ -61,7 +61,7 @@ wireframe material flag. Directional sources registered with `Shadows.add(source
 existing `Shadows.invalidate()` call after a live toggle; automatically cached casters update themselves.
 
 `primitive.material.renderState` supplies beauty-only blend/depth overrides, polygon bias, stencil face states,
-masks/reference, and `colorWrite`. Bias defaults to literal WebGPU values; `depthBiasMode: 'away'` keeps positive
+masks/reference, `colorWrite` and `alphaToCoverage` (MASK materials on a multisampled target: edges cut by sample coverage). Bias defaults to literal WebGPU values; `depthBiasMode: 'away'` keeps positive
 offsets away from the camera across main reverse-Z and forward-Z device views. `stencilReference` is live per draw
 and reuses pipelines. Native front/back stencil states follow raster winding. Different face operations temporarily
 use the original primitives instead of winding-normalized static batches; symmetric state restores batching.

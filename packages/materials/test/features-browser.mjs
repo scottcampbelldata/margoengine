@@ -17,6 +17,29 @@ const check = (name, ...args) => page.evaluate(([n, a]) => window.check[n](...a)
 const near = (a, b, label, tolerance = 0.02) =>
   a.forEach((v, k) => assert.ok(Math.abs(v - b[k]) <= tolerance, `${label}: ${a} should be ${b}`));
 const jobs = {
+  async coverage() {
+    const run = (o) => page.evaluate((v) => window.check.coverage(v), o);
+    for (const kind of ['unlit', 'lit']) {
+      const hard = await run({ on: false, kind }),
+        soft = await run({ on: true, kind });
+      assert.deepEqual([...hard.errors, ...soft.errors], [], kind);
+      assert.ok(soft.part > 4 * Math.max(1, hard.part), `${kind}: ${soft.part} part-covered pixels against ${hard.part}`);
+      assert.ok(Math.abs(soft.lit - hard.lit) < 0.01, `${kind}: the edge stays put, ${soft.lit} against ${hard.lit}`);
+      console.log(`coverage ${kind}: part-covered pixels ${hard.part} -> ${soft.part}, lit ${hard.lit} -> ${soft.lit}`);
+    }
+    const plain = await run({ on: false, exact: true }),
+      flagged = await run({ on: true, exact: true });
+    assert.deepEqual([...plain.errors, ...flagged.errors], []);
+    assert.equal(flagged.part, plain.part, 'one sample: the plain test');
+    assert.equal(flagged.lit, plain.lit, 'one sample: the plain test');
+    const blended = await run({ on: true, transparent: true }),
+      blendedOff = await run({ on: false, transparent: true });
+    assert.deepEqual([...blended.errors, ...blendedOff.errors], []);
+    assert.equal(blended.lit, blendedOff.lit, 'a blended material ignores it');
+    const live = await page.evaluate(() => window.check.coverageLive());
+    assert.deepEqual(live.errors, []);
+    assert.ok(live.after > 4 * Math.max(1, live.before), `live: ${live.before} -> ${live.after}`);
+  },
   async mips() {
     const run = async (o) => {
       const r = await page.evaluate((v) => window.check.mips(v), o);

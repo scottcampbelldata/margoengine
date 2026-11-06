@@ -198,3 +198,13 @@ test('mipTexture: a chain must halve, hold enough texels and match its format', 
   assert.throws(() => mipTexture([level(4)], { format: 'rgba16float' }), /half-float bits/);
   assert.throws(() => mipTexture([{ data: new Float32Array(64), width: 4, height: 4 }], { format: 'rgba16float', colorSpace: 'srgb' }), /are linear/);
 });
+
+test('alphaToCoverage: a material asks for it through the render state, and only a boolean goes', async () => {
+  const { UnlitMaterial } = await import('../dist/index.js');
+  const m = new UnlitMaterial({ alphaTest: 0.5, alphaToCoverage: true });
+  assert.equal(m.alphaToCoverage, true);
+  assert.equal(m.customState, true);
+  assert.equal(new UnlitMaterial().alphaToCoverage, false);
+  assert.equal(new UnlitMaterial().customState, false);
+  assert.throws(() => new UnlitMaterial({ alphaToCoverage: 1 }), TypeError);
+});

@@ -237,6 +237,8 @@ class Material {
     set depthWrite(v: boolean | undefined);
     get depthTest(): boolean;
     set depthTest(v: boolean);
+    get alphaToCoverage(): boolean;
+    set alphaToCoverage(v: boolean);
     get colorWrite(): boolean;
     set colorWrite(v: boolean);
     get polygonOffset(): boolean;
@@ -467,6 +469,7 @@ interface MaterialOptions extends PhysicalOptions {
     depthWrite?: boolean;
     depthTest?: boolean;
     colorWrite?: boolean;
+    alphaToCoverage?: boolean;
     polygonOffset?: boolean;
     polygonOffsetFactor?: number;
     polygonOffsetUnits?: number;
