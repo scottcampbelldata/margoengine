@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5197983,
+  "total": 5202629,
   "history": [
     {
       "date": "2026-10-24",
@@ -2360,12 +2360,19 @@
       "commit": "99f96c212",
       "reason": "new entry @margoengine/shader/subgroups, f16 in the root types",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "67c543843",
+      "reason": "feat(animation): geometry caches play as they stream (new entry @margoengine/animation/geometry-cache)",
+      "grew": 2
     }
   ],
   "items": {
     "@margoengine/animation": 22595,
     "@margoengine/animation/clip-utils": 5160,
     "@margoengine/animation/dqs": 3473,
+    "@margoengine/animation/geometry-cache": 4645,
     "@margoengine/animation/instanced-skin": 9634,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/morph-gpu": 3265,
@@ -2929,6 +2936,7 @@
     "@margoengine/worker/canvas": 1597,
     "@margoengine/xr": 6748,
     "leak @margoengine/animation -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/animation/geometry-cache -> @margoengine/gltf-pro": 1,
     "leak @margoengine/animation/pointer -> @margoengine/gltf-pro": 1,
     "leak @margoengine/animation/skeleton-utils -> @margoengine/gltf-pro": 1,
     "leak @margoengine/blender -> @margoengine/gltf-pro": 1,

@@ -78,6 +78,10 @@
       "types": "./dist/animation/instanced-skin.d.ts",
       "import": "./dist/animation/instanced-skin.js"
     },
+    "./animation/geometry-cache": {
+      "types": "./dist/animation/geometry-cache.d.ts",
+      "import": "./dist/animation/geometry-cache.js"
+    },
     "./animator": {
       "types": "./dist/animator.d.ts",
       "import": "./dist/animator.js"

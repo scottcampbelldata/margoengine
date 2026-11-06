@@ -871,3 +871,45 @@ The last two jobs on the loaders list, each in its own optional entry, and one f
 - **Proved:** CPU tests on files and documents the tests write. The MaterialX test compiles a graph with every lobe through `nodeMaterial()`, and one real ambientCG `.mtlx` kept outside the repository converted with only its opacity skipped. The loaders browser test draws a Lottie frame on a real canvas, checks two pixels and uploads it as a texture on real WebGPU.
 - **Limits:** no `.vdb` from OpenVDB was read, and no public byte-level specification exists, so the reader and the test's writer share one reading of the format. NanoVDB is not read, which the job allowed. No Lottie file from After Effects was read, and no output was compared with a reference player or MaterialX viewer. The three gaps are in known-bugs.md. The format details came from the agent's general knowledge, with no other project's source open (clean-room.md, LF26, LF29, LF30, LF32).
 - **Gate:** every commit passed `lint`, `hygiene`, `verify`, the loaders tests and both loaders browser tests before its push. Job 2 failed `verify` once, because Lottie carried its own hex colour parser; it now uses `hexColor` from `@margoengine/math/color`, and MaterialX uses `SRGBToLinear` from the same entry. Nothing failed reached `main`. No speed was measured.
+## Batch 81: animation
+
+Crowds of animated characters got cheaper and more varied, and baked simulations from DCC tools can now play as they stream.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Clones share GPU buffers | DONE | `1342d03dc` | none, `skeleton-utils` clone path | LIM-182 |
+| 2 | GPU morph evaluation | DONE | `4bdfaed07` | `@margoengine/animation/morph-gpu` | LIM-189 |
+| 3 | Animation LOD | DONE | `9b6ea1d16` | `/lod` | LIM-191 |
+| 4 | Subclip and make-additive | DONE | `b04f2eea4` | `/clip-utils` | LIM-194 |
+| 5 | Cheaper clone ticks | DONE | `1a61c13b0` | none, `cloneModel` and gltf-pro `adoptStaticBatches` | LIM-199 |
+| 6 | Dual quaternion skinning | DONE | `8a7fce1de` | `/dqs` | LIM-201 |
+| 7 | Bone-texture GPU instancing | DONE | `651cb62ae` | `/instanced-skin` | LIM-203 |
+| 8 | Geometry cache playback | DONE | this commit | `/geometry-cache` | LIM-207 |
+
+- **Bugs:** a shared page held dead assets and arrays (`packages/animation/tests/batch.test.js`). A morph loop wrapped wrongly
+  at an exact lap, off by 0.63 (`scripts/animation-morph-gpu-tests.js`, `tests/morph-gpu.test.js`). `PBRModel.compile()` read a
+  root matrix not yet written as singular and compiled nothing (`packages/gltf-pro/tests/model-runs.test.js`). Caught before
+  landing: unbounded thread counts, a cubic curve cut in its tangent (`tests/clip-utils.test.js`), a bad LOD README example,
+  and in the geometry cache a reader that slept for good after a seek back, because the chunk on show counted against `ahead`,
+  and a loop that waited for the network each lap (`tests/geometry-cache.test.js`).
+- **Proved:** job 1 is bit for bit on a real GPU. Job 2 ran 5,040 GPU checks, worst 1.85e-6. Job 5 counts engine ticks. Job 6
+  ran 28,512 GPU checks, worst 8.8e-7 on position and 2.1e-7 on normal, and a tube twisted 170 degrees keeps its radius at 1.000
+  against 0.087 for the linear path. Job 7 ran the vertex stage's own function over 13,860 checks, worst 3.6e-7, and a member
+  covers the same 829 pixels as the model, in one draw. Job 8 streamed 1,000 byte pieces to a GPU buffer over 18,240 checks,
+  worst 7.5e-9, with one mesh swap as coverage grew from 1,437 to 5,525 pixels. Jobs 3 and 4 are CPU tests. All GPU runs were on
+  the RTX A6000 only.
+- **Limits:** no frame time was measured for jobs 2, 3, 6, 7 or 8, and each has a line in the quiet-pass list; `cloneModel`
+  stays slower than three's clone (`docs/known-bugs.md`). LOD saves CPU only. Clip time is f32, and a cut curve is sampled at the
+  clip's fps. Dual quaternions are for `Animation` only. A crowd has one material and no CPU culling, and its morph targets
+  freeze at bake time. A geometry cache mixes on the CPU, uploads the whole mesh each changed frame, stops at 1,000,000 vertices
+  a chunk, and rereads a URL from the start on a seek back and on each lap. No cache from a real DCC tool was played: the
+  tests write their own files.
+- **Gate:** job 1 failed once on a stale `llms-full.txt`, job 2 once on the heat-containment step, job 4 once on an error with
+  no fix text, and job 5 on a stale anchor in `docs:links` and on kit sizes past `docs/guides/kits.md`, which were updated to the
+  measured figures with the tolerance unchanged. Conflict markers once got amended into a local commit, and the landing stopped
+  before the push. Nothing failed reached `main`. When `main` moved during a landing, the job reran its package and claims tests
+  after the rebase, not `verify` or the GPU checks.
+- **Slips:** the helper twice picked process ids by script name instead of by a recorded id; both were its own and no other
+  lane was hit. It leaked 467 `tail` processes from a wait loop and killed them after checking their folder. It ran
+  `npx --no-install` once in a worktree, which fetched nothing. Job 5's commit carries an 845 line diff in
+  `packages/gltf-pro/README.md` from normalized line endings.

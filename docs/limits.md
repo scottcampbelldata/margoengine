@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-206). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-207). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -204,6 +204,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Engine ticks per `cloneModel` copy (2026-11-06) | None when the copy can take its source's static batches, skinned models included, so a crowd no longer costs a tick of every mesh per copy. One when the source moved since baking, has a parent, or had its geometry rewritten: the copy bakes for itself. A copy's world matrices publish with the next tick; a direct `node.matrix` read before it sees the old value. The time saved is not measured yet. |
 | Dual quaternion skinning (`@margoengine/animation/dqs`, 2026-11-06) | Per `Animation`, fixed when it is created. `Skin` on raw data, `bakeVAT` and bone-texture crowds stay linear. Stretch blends linearly about the mesh origin, so between bones of different scale the result differs from a linear blend. Each bone costs a polar decomposition on the CPU every frame. Frame time is not measured yet. |
 | Bone-texture crowds (`@margoengine/animation/instanced-skin`, 2026-11-06) | One material, opaque, no CPU culling, like `VATCrowd`. Morph targets are frozen at bake time, and bones blend linearly. Two clips a member: more needs another bake. Texture rows cap at 8,192 of 2,048 texels, about 5.5 million bone frames. Each vertex reads up to 96 texels when two clips blend across eight influences (24 for one clip and four). Frame time against `VATCrowd` and `Animation` is not measured yet. |
+| Geometry caches (`@margoengine/animation/geometry-cache`, 2026-11-06) | 3 to 1,000,000 vertices a chunk, one mesh, one material. The CPU interpolates and writes the whole mesh to the GPU every changed frame, so upload bandwidth is the ceiling: 80 bytes a vertex. Vertices are uncompressed. A seek back on a URL rereads from the start of the file, and a loop rereads it every lap unless it is one chunk: no range requests and no index of chunks. A stream source keeps every chunk it read. No mix across a change of mesh: the last frame holds. Motion vectors, frame time and upload cost are not measured yet. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 

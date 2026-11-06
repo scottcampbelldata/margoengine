@@ -29,6 +29,7 @@
     "test:gpu:morph": "cd ../.. && node scripts/animation-morph-gpu-tests.js",
     "test:gpu:dqs": "cd ../.. && node scripts/animation-dqs-tests.js",
     "test:gpu:instanced-skin": "cd ../.. && node scripts/animation-instanced-skin-tests.js",
+    "test:gpu:geometry-cache": "cd ../.. && node scripts/animation-geometry-cache-tests.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -72,6 +73,10 @@
     "./instanced-skin": {
       "types": "./dist/instanced-skin.d.ts",
       "import": "./dist/instanced-skin.js"
+    },
+    "./geometry-cache": {
+      "types": "./dist/geometry-cache.d.ts",
+      "import": "./dist/geometry-cache.js"
     }
   },
   "files": [

@@ -520,6 +520,64 @@ first clip). Clips mix as matrices, and bones blend linearly. Everything else fo
 `shadows.add(crowd)` and `lighting.add(crowd)`, no CPU culling. `poseBones(bake, member, time, out?)` is the shader's CPU
 twin, for bounds and picking. Morph targets stay at the weights they had when baked.
 
+## Geometry caches (`@margoengine/animation/geometry-cache`)
+
+Cloth, destruction and fluid simulations from a DCC tool end up as baked vertices, frame by frame. `GeometryCachePlayer`
+plays such a file while it downloads. It holds a few chunks at a time, so a long cache never has to fit in memory, and each
+chunk carries its own triangles, so a fluid can change vertex count as it plays.
+
+```ts
+import {createStage} from 'margoengine';
+import {GeometryCachePlayer} from 'margoengine/animation/geometry-cache';
+
+const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
+const flag = await GeometryCachePlayer.attach(stage.engine, '/flag.mgc', {ahead: 3});
+flag.seek(2.5);
+flag.speed = 0.5;
+```
+
+`attach(engine, source, options)` resolves once the first chunk is in. `source` is a URL, a `ReadableStream` or other async
+iterable of bytes, one `Uint8Array`, or `(signal) => bytes`. Options: `loop` (default true), `speed` (default 1), `ahead`
+(chunks read past the one playing, default 2), `signal`, `material` (a glTF material, default plain white) and
+`maxChunkBytes` (default 1 GiB). The player owns `player.model`: move it through `player.model.root`, and dispose the player.
+
+The clock waits when the stream falls behind, so playback never jumps; `player.stats.stalls` counts the frames it waited.
+Between two frames of one mesh the vertices interpolate. A chunk with other triangles or another vertex count swaps the mesh
+at its first frame, and the last frame of the chunk before it holds, since there is no mesh to mix towards. A URL, an array
+or a function can start over, so played chunks are let go, a seek back reads again and a loop reads the file once a lap, with
+the first chunk held so the wrap does not wait; a stream cannot, so it keeps every chunk it read. `player.done` settles when the read ends, which follows the clock by `ahead` chunks, so a paused player may
+never get there. A failure rejects it and leaves the last frame up.
+
+`readGeometryCache(bytes, {signal, maxChunkBytes})` is the same reader without a player, an async iterator of chunks, and
+`encodeGeometryCache(rate, chunks)` writes a file, so an exporter is a few lines:
+
+```ts
+import {encodeGeometryCache, readGeometryCache} from 'margoengine/animation/geometry-cache';
+
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 1]);
+const file = encodeGeometryCache(30, [{frameCount: 2, positions, indices: new Uint32Array([0, 1, 2])}]);
+for await (const chunk of readGeometryCache(file)) console.log(chunk.firstFrame, chunk.vertexCount);
+```
+
+The format is little endian. A 16 byte header holds the magic `MGCH`, version 1, frames per second (f32) and the total
+frames (0 if unknown). Chunks follow, each a 64 byte header and its payload.
+
+| Chunk header offset | Field |
+| --- | --- |
+| 0 | magic `CHNK` |
+| 4 | payload bytes |
+| 8 | first frame, which must follow the last chunk's end |
+| 12 | frame count |
+| 16 | vertex count, 3 to 1,000,000 |
+| 20 | index count, 0 to repeat the last chunk's triangles |
+| 24 | flags: 1 normals stored, 2 UVs stored |
+| 32 | bounds over the chunk: min xyz, max xyz (f32) |
+
+The payload is the indices (u32), then UVs (2 floats a vertex), positions (3 floats a vertex, all frames), then normals
+(same shape). A chunk without normals gets smooth ones when it is read; a chunk without UVs repeats the last chunk's if the
+vertex count matches, else zero. A damaged or cut off file rejects with a `failed` error, and a bad chunk header is refused
+before its payload is held.
+
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:
