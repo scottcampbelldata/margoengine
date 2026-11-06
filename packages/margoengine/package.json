@@ -1022,6 +1022,10 @@
       "types": "./dist/loaders/nrrd.d.ts",
       "import": "./dist/loaders/nrrd.js"
     },
+    "./loaders/ldraw": {
+      "types": "./dist/loaders/ldraw.d.ts",
+      "import": "./dist/loaders/ldraw.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"

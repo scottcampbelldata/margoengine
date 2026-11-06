@@ -1,5 +1,5 @@
 {
-  "commit": "476bbe8f1",
+  "commit": "fda25919a",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -10,8 +10,8 @@
   "packages": {
     "@margoengine/animation": {
       ".": {
-        "raw": 69585,
-        "gzip": 22029
+        "raw": 69932,
+        "gzip": 22118
       },
       "./vat": {
         "raw": 20498,
@@ -1086,6 +1086,10 @@
       "./nrrd": {
         "raw": 11795,
         "gzip": 4722
+      },
+      "./ldraw": {
+        "raw": 8829,
+        "gzip": 3870
       },
       "dist/workers/usd.js": {
         "raw": 21673,

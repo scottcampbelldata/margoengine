@@ -51,6 +51,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
+| `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
@@ -406,6 +407,30 @@ console.log(data);
 - `bounds` is the box in true proportions from 0. `matrix` takes a voxel index to the file's `space`, with its origin, rotation and flips: use it to line a scan up with other data.
 - `resolve` gets the path as the header writes it, tidied of `.` and `..`. It is your code: keep it inside the folder you trust.
 - `maxSamples` (default 536,870,912) stops a huge declared size before anything is allocated, and gzip data cannot inflate past what the header declares. `bzip2` data and the `block` type are refused with code `unsupported`.
+
+## LDraw
+
+`parseLDraw` from `@margoengine/loaders/ldraw` reads LDraw brick models, `.ldr`, `.dat` and multi-part `.mpd`, into one mesh with a group per colour, plus the model's edge lines. Parts load through `resolve` from an LDraw library folder you host, and a part nobody can find is listed in `missing` while the rest of the model still loads.
+
+```ts
+import { parseLDraw } from '@margoengine/loaders/ldraw';
+
+const parts: Record<string, string> = { 'parts/plate.dat': '0 BFC CERTIFY CCW\n4 16 0 0 0 20 0 0 20 0 20 0 0 20\n2 24 0 0 0 20 0 0\n' };
+const model = await parseLDraw('1 4 0 0 0 1 0 0 0 1 0 0 0 1 plate.dat\n', {
+  resolve: async (path) => {
+    if (path in parts) return parts[path];
+    throw new Error(`no ${path}`); // in a browser: fetch(`/ldraw/${path}`), and throw on a 404
+  },
+});
+console.log(model.groups[0].name, model.lines.length, model.missing);
+```
+
+- **Colours.** 16 takes the colour of the reference above it and 24 that colour's edge. `0x2RRGGBB` is a direct colour. `0 !COLOUR` lines and `LDConfig.ldr` fill the palette, read through `resolve` or passed as `config`; without one, the 16 classic colours apply and an unknown code draws light grey with a warning.
+- **Parts.** Each reference tries `searchPaths` in order, in lower case with forward slashes. An MPD pack's own files win over the library, and each file is read once.
+- **Winding.** A file with `0 BFC CERTIFY` keeps its winding through mirrors, `CW` and `INVERTNEXT`. Polygons of an uncertified file, or inside `NOCLIP`, are written on both sides, so they draw correctly with back faces culled. Each file's own certification decides, so a certified part inside a plain `.ldr` model still culls.
+- **Units.** By default 1 LDraw unit is 0.4 mm and the model turns Y up. `units: 'file'` keeps LDraw units with -Y up.
+- **Lines.** `lines` and `lineColors` go to `@margoengine/lines` in `segments` mode. `conditionalLines` holds four points each: the two ends, then the two control points that decide whether to draw it. `edges: false` drops them all.
+- **Limits.** `maxDepth` (64), `maxInstances` (4,000,000) and the shared vertex and triangle limits stop a file of doubling references. Texture maps (`!TEXMAP`) are skipped with a warning.
 
 ## Tiled TMX
 

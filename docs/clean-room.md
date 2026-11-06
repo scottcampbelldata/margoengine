@@ -613,6 +613,10 @@ File formats written from their public descriptions; no reader of another projec
 | LF3 | X3D XML encoding, DEF and USE attributes, containerField | loaders/src/vrml.ts | ISO/IEC 19776-1 |
 | LF4 | G0, G1, G90, G91, M82, M83, G92, G20, G21, G28 | loaders/src/gcode.ts | RepRap wiki, "G-code" |
 | LF5 | NRRD header fields, encodings, space directions and kinds | loaders/src/nrrd.ts | Teem project, "Definition of NRRD File Format" |
+| LF6 | LDraw line types 0 to 5, sub-file matrices, colour 16 and 24 | loaders/src/ldraw.ts | LDraw.org, "LDraw File Format Specification" |
+| LF7 | MPD packs, `0 FILE` and `0 NOFILE` | loaders/src/ldraw.ts | LDraw.org, "MPD Language Extension" |
+| LF8 | BFC certification, winding and INVERTNEXT | loaders/src/ldraw.ts | LDraw.org, "Language Extension for Back Face Culling" |
+| LF9 | `!COLOUR` lines and the classic colour values | loaders/src/ldraw.ts | LDraw.org, "Colour Definition Language Extension" and the published LDConfig.ldr values |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 

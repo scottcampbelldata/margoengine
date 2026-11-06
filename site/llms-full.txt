@@ -332,7 +332,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | --- | --- |
 | [`@margoengine/gltf`](packages/gltf/README.md) | Lazy static glTF/GLB loading for Margo Engine. |
 | [`@margoengine/gltf-pro`](packages/gltf-pro/README.md) | Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU. |
-| [`@margoengine/loaders`](packages/loaders/README.md) | PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK, NRRD, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine. |
+| [`@margoengine/loaders`](packages/loaders/README.md) | PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK, NRRD, LDraw, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine. |
 | [`@margoengine/decoders`](packages/decoders/README.md) | Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG, TGA, TIFF, DDS and KTX reading, for Margo Engine. |
 | [`@margoengine/fbx`](packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
@@ -2571,7 +2571,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-184). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-185). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2829,6 +2829,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | One-call glTF loading (`loadAuto` in `@margoengine/gltf/auto`, 2026-11-06) | By method: moves to `@margoengine/gltf-pro` only on an `unsupported` refusal. A file over a light limit (one million vertices, `maxNodes`) rejects with that limit and does not move. The light attempt may reach the point of refusal, so a refused file costs that parse as well; each URL is still downloaded once. | The move is keyed on the `unsupported` code alone, so a limit error reaches the caller and names its fix. | No guessing which loader to pick; a plain file loads no gltf-pro code. | Raise `maxNodes`, or call gltf-pro directly for a file known to need it. |
 | glTF cameras and lights as data (`@margoengine/gltf/scene-data`, 2026-11-06) | By method: values only, nothing is created in the engine; `position`, `direction` and `matrix` are as loaded and do not follow later moves (the `node` handle does). A file with only cameras and lights, and no mesh, is refused. `sceneData` holds nothing for a model gltf-pro loaded. | Core has no scene camera or light object to fill, and which camera wins is the app's choice. | A scene file sets its own view and sun on the light path with no gltf-pro. | gltf-pro's `viewGLTFCamera` and `applyGLTFLights` for a model it loaded. |
 | NRRD volumes (`@margoengine/loaders/nrrd`, 2026-11-06) | By method: raw, ascii, hex and gzip data; `bzip2` data and the `block` type are refused with code `unsupported`. 64-bit integers become `Float64Array`, exact up to 2^53. At most 536,870,912 samples by default (`maxSamples`), and the header at most 1 MiB. `bounds` ignores rotation and origin; `matrix` holds them. | `DecompressionStream` has no bzip2, and sciviz takes numbers, not BigInts. | A bzip2 file must be saved again as raw or gzip. | `unu save -e gzip`, or raise `maxSamples`. |
+| LDraw models (`@margoengine/loaders/ldraw`, 2026-11-06) | By method: at most 4,000,000 sub-file references (`maxInstances`) and 64 levels (`maxDepth`). Texture maps (`!TEXMAP`) are skipped with a warning, the legacy dithered colours 256 to 511 draw light grey, and `0 !COLOUR` lines apply file-wide. Uncertified polygons cost twice the triangles, being written on both sides. | One merged mesh has no per-group double-sided flag, and textured parts are a small share of the library. | Models expand to plain triangles: no instancing of repeated parts. | Certified parts cost one side; `edges: false` drops the lines. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in
@@ -4593,6 +4594,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
+| `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 [README continues: https://margoengine.com/llms/packages/loaders.md]
