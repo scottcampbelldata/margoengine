@@ -172,6 +172,10 @@
     "./draco": {
       "types": "./dist/draco.d.ts",
       "import": "./dist/draco.js"
+    },
+    "./ktx2": {
+      "types": "./dist/ktx2.d.ts",
+      "import": "./dist/ktx2.js"
     }
   },
   "files": [

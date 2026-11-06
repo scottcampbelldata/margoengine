@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7873177,
+  "total": 8886608,
   "history": [
     {
       "date": "2026-10-24",
@@ -2660,6 +2660,12 @@
       "commit": "d725f13cd",
       "reason": "clip distances path in materials, gltf-pro, shadows and shared",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "c431706bf",
+      "reason": "KTX2 export: exporters grows by the new entry, errors keep their type across the worker",
+      "grew": 1
     }
   ],
   "items": {
@@ -2835,6 +2841,7 @@
     "@margoengine/exporters/godot-precision-addon": 5995,
     "@margoengine/exporters/hash": 1717,
     "@margoengine/exporters/import-names": 1038,
+    "@margoengine/exporters/ktx2": 1013431,
     "@margoengine/exporters/model": 9536,
     "@margoengine/exporters/roblox": 18377,
     "@margoengine/exporters/roblox-chunks": 9679,

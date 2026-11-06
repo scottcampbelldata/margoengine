@@ -1,7 +1,7 @@
 # Reading the three.js parity counts
 
 Date: 2026-10-31. The table in [threejs-parity.md](threejs-parity.md) was rewritten by feature group:
-**194 features, 164 COVERED, 5 PARTIAL, 13 MISSING**, plus 12 NOT PLANNED by decision. The earlier table
+**194 features, 165 COVERED, 5 PARTIAL, 13 MISSING**, plus 11 NOT PLANNED by decision. The earlier table
 counted 161 rows (153 / 4 / 4); its coarse rows hid gaps that now have rows of their own. The rows and the
 [to-do table](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
@@ -18,13 +18,12 @@ zero core bytes. The row stays PARTIAL: the layer's base is 70,274 B gzip (limit
 73,000 B, an accepted difference) with lazy compute and read-back chunks of 30,819 B, the voxel path tracer compiles slowly on ANGLE Direct3D, XR needs its `/xr` entry and has not run on a headset, and CPU-tier compute kernels run on a slower interpreter without `unsafe-eval`. Every site demo (27) and Khronos gallery model (32) loads it without WebGPU: 20 demos and all 32 models draw the same pixels as native, 7 demos run with one accepted difference. It is the site's fallback. The small
 `@margoengine/webgl` preview (core meshes only) stays for v1.0; the React Canvas's `loadFallback` loads it and `fallbackContent` replaces the plain message. The layer is installed with `install()` before `Engine.create`.
 
-## The 4 MISSING rows
+## The 3 MISSING rows
 
 | Row | How to treat it |
 | --- | --- |
 | StereoCamera, AnaglyphEffect, ParallaxBarrierEffect | Use `@margoengine/xr` for stereo. Anaglyph is not planned. |
 | Long-tail model loaders (LDraw, VRML, 3DS, LWO, AMF, MD2, PDB, GCode, BVH motion capture, 3DM, KMZ, TDS) | Add one when a project brings that file. |
-| KTX2Exporter | glTF export is `@margoengine/exporters`; this one is not planned (EXR is written by `@margoengine/environment/exr-write`, Draco by `@margoengine/exporters/draco`). |
 | XRControllerModelFactory, XRHandModelFactory | Poses and 25 hand joints exist; models come after a headset test. |
 
 ## The 5 PARTIAL rows

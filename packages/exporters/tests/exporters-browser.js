@@ -195,6 +195,56 @@ window.runExporterTests = async () => {
   );
   checks.push('compressDraco runs in its worker, the Draco decoder reads the stream, and an abort stops it');
 
+  // KTX2 in a real worker: the encoder and its Wasm load from the package and read a JPEG there, and the transcoder reads it.
+  const { compressTextures, encodeKTX2 } = await import('@margoengine/exporters/ktx2'),
+    { KTX2Decoder } = await import('@margoengine/decoders'),
+    jpeg = new Uint8Array(await (await fetch('fixtures/jpeg/progressive-420.jpg')).arrayBuffer()),
+    textured = exportGLB({
+      nodes: [
+        {
+          geometry: {
+            positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+            normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+            uvs: new Float32Array([0, 0, 1, 0, 0, 1]),
+            indices: [0, 1, 2],
+          },
+          material: { baseColorTexture: { image: jpeg, mimeType: 'image/jpeg' } },
+        },
+      ],
+    }),
+    ktx2 = await compressTextures(textured);
+  assert(ktx2.compressed === 1, 'KTX2 compressed nothing');
+  const ktx2At = 20 + new DataView(ktx2.glb.buffer, ktx2.glb.byteOffset).getUint32(12, true),
+    ktx2JSON = JSON.parse(new TextDecoder().decode(ktx2.glb.subarray(20, ktx2At))),
+    ktx2View = ktx2JSON.bufferViews[ktx2JSON.images[0].bufferView],
+    ktx2Bytes = ktx2.glb.subarray(
+      ktx2At + 8 + (ktx2View.byteOffset ?? 0),
+      ktx2At + 8 + (ktx2View.byteOffset ?? 0) + ktx2View.byteLength,
+    ),
+    transcoder = new KTX2Decoder({ target: 'rgba8' }),
+    transcoded = await transcoder.transcode(ktx2Bytes);
+  transcoder.dispose();
+  assert(transcoded.width === 56 && transcoded.height === 40, 'KTX2 size');
+  assert((await encodeKTX2(jpeg)).length > 0 && jpeg.length > 0, 'encodeKTX2 must leave the caller bytes attached');
+  const halted = new AbortController(),
+    running = compressTextures(textured, { signal: halted.signal });
+  halted.abort();
+  assert(
+    await running.then(
+      () => false,
+      (error) => error.name === 'AbortError',
+    ),
+    'KTX2 abort',
+  );
+  // Errors keep their type across the worker, as the same failures have in Node.
+  const refused = await encodeKTX2(new Uint8Array([1, 2, 3, 4])).catch((error) => error);
+  assert(refused instanceof TypeError, `KTX2 bad bytes gave ${refused?.name}`);
+  const cut = await encodeKTX2(jpeg.subarray(0, 40)).catch((error) => error);
+  assert(cut?.name === 'MargoError' && cut.code === 'failed', `KTX2 cut JPEG gave ${cut?.name} ${cut?.code}`);
+  checks.push(
+    'compressTextures reads a JPEG and encodes in its worker, the transcoder reads the file, and an abort stops it',
+  );
+
   if (gpu) report.validationError = (await gpu.popErrorScope())?.message ?? null;
   report.gpuErrors = gpuErrors;
   assert(

@@ -32,6 +32,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | @margoengine/decoders | Draco 3D decoder (Google) | Apache-2.0 | dist/draco/draco_decoder.wasm, dist/draco/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | Draco 3D full decoder (Google) | Apache-2.0 | dist/draco-full/draco_decoder.wasm, dist/draco-full/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/exporters | Draco 3D encoder (Google) | Apache-2.0 | dist/draco-encoder/draco_encoder.wasm, dist/draco-encoder/draco_encoder_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
+| @margoengine/exporters | Basis Universal encoder (Binomial) | Apache-2.0 | dist/basis-encoder/basis_encoder.wasm, dist/basis-encoder/basis_encoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/decoders | jxl-oxide JPEG XL decoder (Wonwoo Choi) | MIT OR Apache-2.0 | dist/jxl/jxl_oxide_wasm_bg.wasm, dist/jxl/jxl_oxide_wasm.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt, dist/jxl/LICENSE-MIT |
 | @margoengine/decoders | Basis Universal transcoder (Binomial LLC) | Apache-2.0 | dist/basis/basis_transcoder.wasm, dist/basis/basis_transcoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/post, @margoengine/tonemap | Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES filmic curve (Krzysztof Narkowicz), Khronos PBR Neutral; the ACES 1.x style fit written for Margo | attribution (formulas and constants; agx.test.js re-derives every AgX matrix and constant, aces.test.js measures the own ACES fit against its sample table) | AgX/ACES shader code: AgX and the Narkowicz curve also compiled into post (ImagePost) and voxel-pathtracer from packages/shared; the own ACES fit only into tonemap | re-derived; ACES fit written for Margo | NOTICE.md |
@@ -60,6 +61,13 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     `jxl_oxide_wasm_bg.wasm` (sha256 `3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69`) and
     `jxl_oxide_wasm.js` (`d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7`). The crates inside it are named in
     `dist/THIRD-PARTY-NOTICE.md`.
+  - Draco 1.5.7 encoder from https://github.com/google/draco/tree/1.5.7/javascript (checked 2026-11-06):
+    `draco_encoder.wasm` (sha256 `d2a3ac80c91980d5d321c116454834ff36264825c6d1794cc84e42288f158958`) and
+    `draco_encoder_wrapper.js` (`8434adecd1446459601763e499be3697546056bca90b286a538ae0483a00845a`).
+  - Basis Universal v1_50_0_2 WebGL encoder from
+    https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/encoder/build (checked 2026-11-06):
+    `basis_encoder.wasm` (`dea2778b6d1705b4fdf12053e94cda0ac1cc4340a7e06911778a003ba785808a`) and
+    `basis_encoder.js` (`2c0aa2a648b6fc6006e116074a1dd075d6aaf1adb34d4bfd9818acd79e96537e`, before the build's static-embind step).
 - **MPL-2.0 (web-ifc, peer of `@margoengine/ifc`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves `web-ifc.wasm` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
@@ -98,7 +106,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/dof` | none | none | LICENSE, NOTICE |
 | `@margoengine/ecs` | none | none | LICENSE, NOTICE |
 | `@margoengine/environment` | none | none | LICENSE, NOTICE |
-| `@margoengine/exporters` | none | Draco 3D encoder (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
+| `@margoengine/exporters` | none | Draco 3D encoder (Apache-2.0); Basis Universal encoder (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | `@margoengine/fbx` | none | none | LICENSE, NOTICE |
 | `@margoengine/fsm` | none | none | LICENSE, NOTICE |
 | `@margoengine/geometry` | none | none | LICENSE, NOTICE |

@@ -798,6 +798,10 @@
       "types": "./dist/exporters/draco.d.ts",
       "import": "./dist/exporters/draco.js"
     },
+    "./exporters/ktx2": {
+      "types": "./dist/exporters/ktx2.d.ts",
+      "import": "./dist/exporters/ktx2.js"
+    },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
       "import": "./dist/fbx.js"

@@ -3,13 +3,15 @@
 // starts on its first job.
 import { margoError } from '../../shared/errors.js';
 import { encodeDracoMesh, type DracoEncoderModule, type DracoJob } from './draco-encode.js';
-import { boxed, type EncoderRequest, type ModuleBox } from './encoder-host.js';
+import { boxed, type EncoderRequest, type Factory, type ModuleBox } from './encoder-host.js';
+import { encodeBasis, type BasisEncoderModule, type BasisJob } from './ktx2-encode.js';
 
 declare const self: {
   onmessage: ((event: MessageEvent<EncoderRequest & { id: number }>) => void) | null;
   postMessage(message: unknown, transfer?: Transferable[]): void;
   importScripts(...urls: string[]): void;
-  DracoEncoderModule?: (options: { wasmBinary: ArrayBuffer }) => PromiseLike<DracoEncoderModule>;
+  DracoEncoderModule?: Factory<DracoEncoderModule>;
+  BASIS?: Factory<BasisEncoderModule>;
 };
 
 async function bytes(url: string): Promise<ArrayBuffer> {
@@ -29,6 +31,14 @@ const startDraco = async ({ wrapperURL, wasmURL }: EncoderRequest): Promise<Modu
   return boxed(self.DracoEncoderModule, await bytes(wasmURL));
 };
 
+let basis: Promise<ModuleBox<BasisEncoderModule>> | undefined;
+const startBasis = async ({ wrapperURL, wasmURL }: EncoderRequest): Promise<ModuleBox<BasisEncoderModule>> => {
+  self.importScripts(wrapperURL);
+  if (!self.BASIS)
+    throw margoError('failed', 'Basis wrapper did not define BASIS; load basis_encoder.js from this package');
+  return boxed(self.BASIS, await bytes(wasmURL), { print() {}, printErr() {} });
+};
+
 self.onmessage = async ({ data }) => {
   // Jobs come only from this package; anything that is not a job object is ignored.
   if (!data || typeof data !== 'object') return;
@@ -39,8 +49,14 @@ self.onmessage = async ({ data }) => {
       const { module } = await draco,
         result = encodeDracoMesh(module, data.job as DracoJob);
       self.postMessage({ id, result }, [result.data.buffer as ArrayBuffer]);
+    } else if (data.kind === 'basis') {
+      basis ??= startBasis(data);
+      const { module } = await basis,
+        result = encodeBasis(module, data.job as BasisJob);
+      self.postMessage({ id, result }, [result.data.buffer as ArrayBuffer]);
     }
   } catch (error) {
-    self.postMessage({ id, error: error instanceof Error ? error.message : String(error) });
+    const { name, message, code } = error as Error & { code?: string };
+    self.postMessage({ id, error: { name, message: message ?? String(error), code } });
   }
 };

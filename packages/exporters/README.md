@@ -689,14 +689,61 @@ Bits of 0 keep a float attribute exact. Integer attributes such as JOINTS_n and 
 
 Draco has no place for morph targets and can reorder vertices, so a primitive with targets stays uncompressed, and so do points, lines, strips and fans. `skipped` names each one with its reason. Primitives that differ only in material share one stream. `compressDraco` refuses a GLB with meshopt buffers, and a file with nothing to compress comes back as the same bytes.
 
+### KTX2 textures (`@margoengine/exporters/ktx2`)
+
+`compressTextures(glb, options)` stores the textures of a GLB as KTX2 with Basis Universal (`KHR_texture_basisu`), so they stay compressed on the GPU as well as on the wire. `encodeKTX2(image, options)` writes one `.ktx2` file from a PNG, a JPEG or RGBA8 pixels. The encoder is Binomial's own, in Wasm, and loads on the first call: in a worker in a browser, in process in Node. Image files are read there too, so a page never decodes a large image on its own frame, and neither needs a browser.
+
+```ts
+import { exportGLB } from 'margoengine/exporters';
+import { encodePNG } from 'margoengine/exporters/capture';
+import { compressTextures, encodeKTX2 } from 'margoengine/exporters/ktx2';
+
+const data = new Uint8Array(64 * 64 * 4).fill(200);
+const image = await encodePNG({ width: 64, height: 64, data });
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0]);
+const normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+const uvs = new Float32Array([0, 0, 1, 0, 1, 1]);
+const source = exportGLB({
+  nodes: [{
+    geometry: { positions, normals, uvs, indices: [0, 1, 2] },
+    material: { baseColorTexture: { image, mimeType: 'image/png' } },
+  }],
+});
+
+const { glb, compressed, skipped } = await compressTextures(source);
+console.log(`${source.length} -> ${glb.length} bytes, ${compressed} textures, ${skipped.length} left as they were`);
+
+const file = await encodeKTX2({ width: 64, height: 64, data }, { mode: 'uastc', colorSpace: 'linear' });
+console.log(`${file.length} bytes of .ktx2`);
+```
+
+`compressTextures` options:
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `color` | `'etc1s'` | Format of colour textures: base colour, emissive, specular colour, sheen colour |
+| `normal` | `'uastc'` | Format of normal maps |
+| `data` | `'uastc'` | Format of the rest: metallic-roughness, occlusion and the like |
+| `quality` | 128 | ETC1S quality, from 1 to 255 |
+| `effort` | 2 | ETC1S encoder effort, from 0 to 6 |
+| `uastcLevel` | 2 | UASTC encoder level, from 0, the fastest, to 4, the closest to the source |
+| `uastcRDO` | 0 | UASTC rate-distortion pass, from 0, off, to 10: smaller on the wire, further from the source, slower |
+| `encoderPath` | the bundled copy | URL of a folder with `basis_encoder.js` and `basis_encoder.wasm` |
+| `signal` | none | Stops the encode: at once in a browser, between images in Node |
+
+`encodeKTX2` takes the last six, plus `mode` (`'etc1s'`, the default, or `'uastc'`), `colorSpace` (`'srgb'`, the default, or `'linear'`), `normalMap` (false) and `mipmaps` (true).
+
+ETC1S is the smallest and the most lossy; UASTC keeps more detail in more bytes. On the GPU a texture takes a byte a pixel from UASTC and half that from opaque ETC1S, where a PNG or JPEG takes four. On the wire the result depends on the source: PNG models here came to as little as 57% of their size, while a model of heavily compressed JPEGs can double. `data: 'etc1s'` and `uastcRDO` trade quality for bytes; `uastcRDO: 1` took Lantern from 57% to 46%, in over twice the time. A material decides each texture's role, so colour is marked sRGB and everything else linear; a texture read in two roles is split in two. Each texture gets a full mip chain and grows to the next multiples of 4, which the extension requires. The PNG and JPEG images leave the file and `KHR_texture_basisu` becomes required, so a reader without it cannot show them.
+
+`skipped` names each texture left as it was: one no material reads, one already in KTX2, one held by WebP, AVIF or DDS, an image in an outside file, an image that is neither PNG nor JPEG. A file with nothing to compress comes back as the same bytes. Images keep their stored samples: EXIF orientation and colour profiles are ignored, as glTF says, and 16-bit PNG samples keep their high byte.
+
 ## Limits
 
 The engine/data-scene `exportGLTF` and `exportGLB` entrypoints write cameras, lights, extras and
 `KHR_materials_unlit`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_emissive_strength`, and
 base-color `KHR_texture_transform` with its `KHR_animation_pointer` clips only from data-scene nodes and materials, and no
 instancing or other KHR material extensions; use `exportModel` for loaded glTF-pro camera/light attachments and PBR
-metadata. Export does not produce Draco or meshopt compression, sparse
-accessors or interleaved buffers. Engine/data-scene skins support four influences per vertex. `exportGLTF` puts images
+metadata. The writers do not produce sparse accessors or interleaved buffers; [compressed GLB files](#compressed-glb-files) come from the passes above. Engine/data-scene skins support four influences per vertex. `exportGLTF` puts images
 in the buffer rather than separate image files. PLY writes every vertex as given; OBJ welds only whole
 corners (`mergeVertices`), never `v`, `vt` and `vn` separately. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from
 an engine, but data-scene exports with deformation, vertex colors or textures need the optional packages described above.

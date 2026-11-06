@@ -1,5 +1,5 @@
 {
-  "commit": "d725f13cd",
+  "commit": "c431706bf",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -812,8 +812,12 @@
         "gzip": 3401
       },
       "./draco": {
-        "raw": 575258,
-        "gzip": 180530
+        "raw": 575441,
+        "gzip": 180639
+      },
+      "./ktx2": {
+        "raw": 2487226,
+        "gzip": 983913
       }
     },
     "@margoengine/fbx": {
@@ -2733,9 +2737,9 @@
       "brotli": 427795
     },
     "packages/exporters/dist/encoder.worker.js": {
-      "raw": 2061,
-      "gzip": 1042,
-      "brotli": 935
+      "raw": 20853,
+      "gzip": 8856,
+      "brotli": 7920
     },
     "packages/exporters/dist/draco-encoder/draco_encoder_wrapper.js": {
       "raw": 49007,
@@ -2746,6 +2750,16 @@
       "raw": 370188,
       "gzip": 110087,
       "brotli": 82436
+    },
+    "packages/exporters/dist/basis-encoder/basis_encoder.js": {
+      "raw": 113970,
+      "gzip": 29986,
+      "brotli": 26347
+    },
+    "packages/exporters/dist/basis-encoder/basis_encoder.wasm": {
+      "raw": 1735264,
+      "gzip": 667572,
+      "brotli": 512349
     },
     "packages/gltf-pro/dist/workers/gltf.js": {
       "raw": 64317,

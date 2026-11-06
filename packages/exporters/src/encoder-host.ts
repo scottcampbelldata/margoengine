@@ -2,18 +2,27 @@
 // stop the page, and in process in Node, where there is no Web Worker and nothing to keep responsive. Both load the
 // vendored file only when an encode starts.
 
+import { MargoError, type MargoErrorCode } from '@margoengine/math/errors';
+
 /** Emscripten modules are thenable, so they travel inside a box to keep promise resolution finite. */
 export interface ModuleBox<T> {
   module: T;
 }
 
+/** What a module may be told besides its Wasm: where its printing goes. */
+export type ModuleOptions = Record<string, unknown>;
+
 /** An Emscripten module factory. */
-export type Factory<T> = (options: { wasmBinary: ArrayBuffer }) => PromiseLike<T>;
+export type Factory<T> = (options: { wasmBinary: ArrayBuffer } & ModuleOptions) => PromiseLike<T>;
 
 /** Calls an Emscripten factory, keeping the module out of promise resolution. */
-export const boxed = <T>(factory: Factory<T>, wasmBinary: ArrayBuffer): Promise<ModuleBox<T>> =>
+export const boxed = <T>(
+  factory: Factory<T>,
+  wasmBinary: ArrayBuffer,
+  options: ModuleOptions = {},
+): Promise<ModuleBox<T>> =>
   new Promise<ModuleBox<T>>((resolve, reject) => {
-    factory({ wasmBinary }).then((module) => resolve({ module }), reject);
+    factory({ ...options, wasmBinary }).then((module) => resolve({ module }), reject);
   });
 
 // A name, not a literal: bundlers for the browser must not try to resolve Node's modules from this file.
@@ -25,7 +34,7 @@ export function encoderFile(folder: string, file: string): URL {
 }
 
 /** Loads a vendored Emscripten factory and its Wasm from disk, in Node. The folder's package.json marks it CommonJS. */
-export async function loadInNode<T>(wrapper: URL, wasm: URL): Promise<ModuleBox<T>> {
+export async function loadInNode<T>(wrapper: URL, wasm: URL, options?: ModuleOptions): Promise<ModuleBox<T>> {
   const [{ createRequire }, { readFile }, { fileURLToPath }] = await Promise.all([
     nodeImport<{ createRequire(from: string): (id: string) => Factory<T> }>('node:module'),
     nodeImport<{ readFile(file: URL): Promise<Uint8Array> }>('node:fs/promises'),
@@ -33,7 +42,11 @@ export async function loadInNode<T>(wrapper: URL, wasm: URL): Promise<ModuleBox<
   ]);
   const factory = createRequire(import.meta.url)(fileURLToPath(wrapper)),
     bytes = await readFile(wasm);
-  return boxed<T>(factory, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
+  return boxed<T>(
+    factory,
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    options,
+  );
 }
 
 /** One message to the encoder worker, without its id. */
@@ -70,16 +83,29 @@ export function inWorker<R>(
     worker.onerror = (event) => {
       event.preventDefault();
       reject(
-        new Error(`Encoder worker failed: ${event.message}; check that encoder.worker.js and the Wasm are served`),
+        new MargoError(
+          'failed',
+          `Encoder worker failed: ${event.message}; check that encoder.worker.js and the Wasm are served`,
+        ),
       );
     };
     worker.onmessage = ({ data }) => {
-      if (data.error) return reject(new Error(data.error));
+      if (data.error) return reject(rebuilt(data.error));
       results.push(data.result);
       next();
     };
     next();
   }).finally(() => worker.terminate());
+}
+
+/**
+ * A worker's error in the type the same failure has in process. Structured clone would turn a MargoError into a plain
+ * Error and drop its code, so the worker sends the parts.
+ */
+function rebuilt({ name, message, code }: { name: string; message: string; code?: MargoErrorCode }): Error {
+  if (name === 'TypeError') return new TypeError(message);
+  if (name === 'RangeError') return new RangeError(message);
+  return new MargoError(code ?? 'failed', message);
 }
 
 /** Runs `run` on each job in process, letting an abort in between. */
