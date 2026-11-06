@@ -694,6 +694,7 @@ Maya, Pinocchio, libigl, three.js, Babylon, Godot, Unity, Unreal and the like) w
 | Retarget presets (`rigging/retarget`) | Bone names from public documentation only: the VRM 1.0 humanoid bone list (VRM Consortium specification, `VRMC_vrm` humanoid), Godot's documented `SkeletonProfileHumanoid` bone names, Roblox's documented R15 body parts, and the bone names visible in Mixamo-exported files; rest-pose alignment is a shortest-arc turn per bone (quaternion algebra above), parents first |
 | Spring bones (`rigging/springs`) | The VRMC_springBone 1.0 specification (VRM Consortium), its fields and its non-normative algorithm section; L. Verlet, "Computer experiments on classical fluids", Physical Review 159, 1967; the time-corrected step and the damped spring are elementary mechanics |
 | VRM avatars (`rigging/vrm`) | The VRMC_vrm 1.0 and VRMC_springBone 1.0 specifications (VRM Consortium) and the glTF 2.0 binary container specification (Khronos); the two sample avatars are data, read and never studied for code |
+| Voxel weights (`rigging/voxel-weights`) | O. Dionne and M. de Lasa, "Geodesic voxel binding for production character meshes", SCA 2013; the fill vote for open meshes is ours |
 
 ## Game AI: `@margoengine/behavior`
 

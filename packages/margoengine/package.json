@@ -1726,6 +1726,10 @@
       "types": "./dist/rigging/vrm.d.ts",
       "import": "./dist/rigging/vrm.js"
     },
+    "./rigging/voxel-weights": {
+      "types": "./dist/rigging/voxel-weights.d.ts",
+      "import": "./dist/rigging/voxel-weights.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

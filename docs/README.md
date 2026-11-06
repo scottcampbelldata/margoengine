@@ -146,7 +146,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/animation`](../packages/animation/README.md) | Storage-buffer skinning and compute morph targets for Margo Engine. |
 | [`@margoengine/animator`](../packages/animator/README.md) | Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints. |
 | [`@margoengine/kinematics-constraints`](../packages/kinematics-constraints/README.md) | Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance. |
-| [`@margoengine/rigging`](../packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars. |
+| [`@margoengine/rigging`](../packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic voxel weights. |
 | [`@margoengine/tween`](../packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
 | [`@margoengine/cinematic`](../packages/cinematic/README.md) | Critically damped camera follow, look-at and screen shake. |
 | [`@margoengine/cutscene`](../packages/cutscene/README.md) | Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing and a player that fires events in order. |

@@ -320,6 +320,38 @@ console.log(readVRM(out).humanoid.humanBones.head?.node); // 3
 
 Expressions drive morph targets, `color` and `emissionColor` of materials, and texture moves. The other colour binds exist only in MToon and land in `unsupported`, because Margo draws MToon materials by their plain glTF fallback: no toon shading or outlines. `VRMC_node_constraint` data stays in the file through `writeVRM` and does not run.
 
+## Voxel weights (`margoengine/rigging/voxel-weights`)
+
+Automatic skin weights for meshes bone heat cannot solve: holes, doubled or flipped faces, non-manifold edges, loose parts, and shells inside shells, such as a coat modelled over a body. The mesh is voxelized, the bones are burned into the grid, and each bone's distance is measured through the solid. Two limbs close together stay apart as long as the grid can see the gap.
+
+```ts
+import type { RigJoint } from 'margoengine/rigging';
+import { voxelWeights } from 'margoengine/rigging/voxel-weights';
+
+const positions = new Float32Array([0, 0, 0.1, 0.1, 0, -0.1, -0.1, 0, -0.1, 0, 2, 0]);
+const joints: RigJoint[] = [
+  { name: 'base', parent: -1, position: [0, 0, 0] },
+  { name: 'tip', parent: 0, position: [0, 2, 0] },
+];
+const { weights, unreached } = await voxelWeights(
+  { positions, indices: [0, 1, 3, 1, 2, 3, 2, 0, 3] }, // the bottom face is missing
+  joints,
+);
+console.log(weights.toInfluences(), unreached); // JOINTS_0 and WEIGHTS_0
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `resolution` | `96` | Voxels along the longest side, 8 to 512. Parts closer than about one voxel join. |
+| `skip` | none | Joints that move no vertices, such as a root at the feet. |
+| `falloff`, `curve` | `4`, `0.75` | The weight of a bone at distance d voxels is `((1 - curve) * d + curve * d * d) ** -falloff`: a larger `falloff` keeps vertices closer to their nearest bone. |
+| `influences` | `4` | Most bones per vertex. |
+| `closing` | `0` | Closes gaps up to this many voxels before filling. Parts closer than twice this fuse. |
+| `weld` | `1e-6` | Welding tolerance as a fraction of the mesh's size. |
+| `signal` | none | Cancels the solve between bones. |
+
+The result also gives `grid`, `voxels` and `unreached`: vertices no bone reached through the solid, such as a hat that floats clear of the head, which take the same falloff from straight-line distances. Where a hole lets the outside into the mesh, the fill grows from the bones through voxels with surface on at least four of the six axis directions. Pick bone heat for clean, closed meshes: it is faster and its weights flow along the surface.
+
 ## Retarget presets (`margoengine/rigging/retarget`)
 
 Clips made for one skeleton play on another: `prepareRetarget(source, target)` recognises each rig's naming (Mixamo with any `mixamorig` prefix, Godot's humanoid profile, Roblox R15, the joints of `@margoengine/exporters/skin`'s `humanoidJoints()`, or the 55 humanoid bone names themselves), maps every target bone to its source bone, and by default turns the target's reference pose so each bone points the way the source's does at rest (an A-pose character driven by T-pose clips). Pass the result to `@margoengine/animation`'s `Retarget`:

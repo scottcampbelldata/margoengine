@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6483562,
+  "total": 6489097,
   "history": [
     {
       "date": "2026-10-24",
@@ -2516,6 +2516,12 @@
       "commit": "dabaeac06",
       "reason": "clustered/physical-lobes entry, lightPBR finish hook, envMap through ambient layers",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8629c17e9",
+      "reason": "feat(rigging): geodesic voxel weights (new entry @margoengine/rigging/voxel-weights)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2948,6 +2954,7 @@
     "@margoengine/rigging/ik": 3740,
     "@margoengine/rigging/retarget": 2862,
     "@margoengine/rigging/springs": 5069,
+    "@margoengine/rigging/voxel-weights": 5535,
     "@margoengine/rigging/vrm": 10526,
     "@margoengine/road": 1171,
     "@margoengine/save": 6952,
