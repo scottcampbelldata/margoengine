@@ -50,6 +50,7 @@ try {
     await page
       .locator('#gallery')
       .screenshot({ path: resolve(results, samples === 4 ? 'lines-gallery.png' : 'lines-gallery-mobile.png') });
+    report.checks.push(...(await page.evaluate(() => window.runLineFeatures())));
     report.browser = browser.version();
     assert.deepEqual(errors, []);
     await writeFile(

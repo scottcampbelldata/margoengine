@@ -29,7 +29,7 @@ const assert = (condition, message) => {
 const SIZE = 256;
 
 // Test-only plugin: redirects the frame into a copyable texture, then copies it to a mappable buffer.
-class Capture {
+export class Capture {
   name = 'capture';
   setup(engine) {
     this.device = engine.gpu;

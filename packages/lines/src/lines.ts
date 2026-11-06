@@ -4,10 +4,10 @@ import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
-import { foggedLineShader, lineShader } from './shader.js';
+import { foggedLineShader, lineShader, phasedShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
-import { overlayPass, alphaBlend } from '../../shared/pass.js';
+import { overlayDepthPass, overlayPass, alphaBlend } from '../../shared/pass.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -33,6 +33,12 @@ let warned = false;
  */
 const STYLE_BYTES = 224;
 
+/** Pipeline variant bits: draw over the scene, fogged, write depth; the draw step (shader.ts) sits above them. */
+const ON_TOP = 1,
+  FOGGED = 2,
+  WRITE = 4,
+  STEP = 8;
+
 /** Options for the `Lines` plugin. An empty name or non-finite order throws a TypeError. */
 export interface LinesOptions {
   /** Plugin name, unique per engine. Default 'lines'. */
@@ -53,23 +59,21 @@ export class Lines implements EnginePlugin {
   private readonly members = new Set<Line>();
   private readonly resources = new Map<Line, Resources>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
+  private readonly modules = new Map<string, GPUShaderModule>();
   private engine?: Engine;
   private device?: GPUDevice;
-  private module?: GPUShaderModule;
   private layouts?: { frame: GPUBindGroupLayout; style: GPUBindGroupLayout; pipeline: GPUPipelineLayout };
   private frameBuffer?: GPUBuffer;
   private frameGroup?: GPUBindGroup;
   private readonly frameData = new Float32Array(24);
-  private readonly depthLines: Array<[Line, Resources]> = [];
-  private readonly topLines: Array<[Line, Resources]> = [];
+  /** This frame's lines in draw order: depth-tested writers, depth-tested, on-top writers, on-top. */
+  private readonly drawLists: Array<Array<[Line, Resources]>> = [[], [], [], []];
   private readonly descriptor = overlayPass();
-  private readonly colorAttachment = this.descriptor.colorAttachments[0];
-  private readonly depthAttachment = this.descriptor.depthStencilAttachment;
+  private readonly writeDescriptor = overlayDepthPass();
   private fogSource: FogLike | null = null;
   private fogGpu?: {
     layout: GPUBindGroupLayout;
     pipeline: GPUPipelineLayout;
-    module: GPUShaderModule;
     buffer: GPUBuffer;
     group: GPUBindGroup;
   };
@@ -153,7 +157,7 @@ export class Lines implements EnginePlugin {
       ],
     });
     this.layouts = { frame, style, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, style] }) };
-    this.module = device.createShaderModule({ code: lineShader });
+    this.module(false, 0);
     this.frameBuffer = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.frameGroup = device.createBindGroup({
       layout: frame,
@@ -165,18 +169,29 @@ export class Lines implements EnginePlugin {
     graph.add({ name: `${this.name}:draw`, order: this.order, execute: this.execute });
   }
 
+  /** The shader module of a variant's fog and draw step, made when first used. */
+  private module(fogged: boolean, phase: number): GPUShaderModule {
+    const key = `${fogged}|${phase}`;
+    let module = this.modules.get(key);
+    if (!module) {
+      module = this.device!.createShaderModule({ code: phasedShader(fogged ? foggedLineShader() : lineShader, phase) });
+      this.modules.set(key, module);
+    }
+    return module;
+  }
+
   private pipeline(
     format: GPUTextureFormat,
     depthFormat: GPUTextureFormat,
-    onTop: boolean,
     count: number,
-    fogged = false,
+    variant: number,
   ): GPURenderPipeline {
-    const key = `${format}|${depthFormat}|${onTop}|${count}${fogged ? '|fog' : ''}`;
+    const key = `${format}|${depthFormat}|${count}|${variant}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      const fog = fogged ? this.fogResources() : undefined,
-        module = fog?.module ?? this.module!;
+      const fogged = (variant & FOGGED) !== 0,
+        fog = fogged ? this.fogResources() : undefined,
+        module = this.module(fogged, Math.floor(variant / STEP));
       pipeline = this.device!.createRenderPipeline({
         layout: fog?.pipeline ?? this.layouts!.pipeline,
         vertex: { module, entryPoint: 'vertex' },
@@ -194,8 +209,8 @@ export class Lines implements EnginePlugin {
         multisample: { count },
         depthStencil: {
           format: depthFormat,
-          depthWriteEnabled: false,
-          depthCompare: onTop ? 'always' : 'greater-equal',
+          depthWriteEnabled: (variant & WRITE) !== 0,
+          depthCompare: variant & ON_TOP ? 'always' : 'greater-equal',
         },
       });
       this.pipelines.set(key, pipeline);
@@ -213,11 +228,9 @@ export class Lines implements EnginePlugin {
           { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform', minBindingSize: FOG_BYTES } },
         ],
       }),
-      module = device.createShaderModule({ code: foggedLineShader() }),
       buffer = device.createBuffer({ size: FOG_BYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     return (this.fogGpu = {
       layout,
-      module,
       buffer,
       pipeline: device.createPipelineLayout({ bindGroupLayouts: [layouts.frame, layouts.style, layout] }),
       group: device.createBindGroup({ layout, entries: [{ binding: 0, resource: { buffer } }] }),
@@ -287,7 +300,8 @@ export class Lines implements EnginePlugin {
     if (context.device !== this.device) return;
     const engine = this.engine as unknown as EngineKernel,
       device = this.device;
-    this.depthLines.length = this.topLines.length = 0;
+    const lists = this.drawLists;
+    for (const list of lists) list.length = 0;
     for (const line of this.members) {
       if (!line.visible || line.update(engine) === false) continue;
       const mesh = line.attachedMesh,
@@ -342,11 +356,11 @@ export class Lines implements EnginePlugin {
         device.queue.writeBuffer(r.uniform, 0, r.style);
         r.written.set(f);
       }
-      (material.onTop ? this.topLines : this.depthLines).push([line, r]);
+      lists[(material.onTop ? 2 : 0) + (material.depthWrite ? 0 : 1)].push([line, r]);
       this.stats.lines++;
       this.stats.segments += segments;
     }
-    if (!this.depthLines.length && !this.topLines.length) return;
+    if (!lists.some((list) => list.length)) return;
     const canvas = engine.canvas,
       data = this.frameData,
       camera = context.camera,
@@ -364,41 +378,53 @@ export class Lines implements EnginePlugin {
     device.queue.writeBuffer(this.frameBuffer!, 0, data);
     const fog = this.fogSource;
     let fogged = false;
-    if (fog)
-      for (const list of [this.depthLines, this.topLines]) for (const [line] of list) fogged ||= line.material.fog;
+    if (fog) for (const list of lists) for (const [line] of list) fogged ||= line.material.fog;
     if (fogged) {
       writeFog(fog!, camera.position, this.fogData);
       device.queue.writeBuffer(this.fogResources().buffer, 0, this.fogData);
     }
-    this.colorAttachment.view = context.color;
-    this.depthAttachment.view = context.depth;
-    const depthFormat = context.descriptor.depthStencil!.format,
-      count = context.descriptor.multisample?.count ?? 1;
-    const pass = context.encoder.beginRenderPass(this.descriptor);
+    // Depth stays read only unless a line writes it.
+    const descriptor = lists[0].length || lists[2].length ? this.writeDescriptor : this.descriptor;
+    descriptor.colorAttachments[0].view = context.color;
+    descriptor.depthStencilAttachment.view = context.depth;
+    const pass = context.encoder.beginRenderPass(descriptor);
     applyView(pass, context);
     pass.setBindGroup(0, this.frameGroup!);
     if (fogged) pass.setBindGroup(2, this.fogGpu!.group);
-    for (const [list, onTop] of [
-      [this.depthLines, false],
-      [this.topLines, true],
-    ] as const) {
-      if (!list.length) continue;
-      const plain = this.pipeline(context.format, depthFormat, onTop, count);
-      let current = plain;
-      pass.setPipeline(plain);
-      for (const [line, r] of list) {
-        if (fogged) {
-          const next = line.material.fog ? this.pipeline(context.format, depthFormat, onTop, count, true) : plain;
-          if (next !== current) pass.setPipeline((current = next));
-        }
-        pass.setBindGroup(1, r.group);
-        pass.draw(VERTICES_PER_SEGMENT, line.segmentCount);
-        this.stats.drawCalls++;
-      }
+    // Writers first, so a line that writes no depth still sorts against them, and their edge ramps after all their
+    // solid parts, so a ramp blends over the line it crosses instead of being cut by it.
+    for (let i = 0; i < 4; i += 2) {
+      const onTop = i ? ON_TOP : 0;
+      this.drawList(pass, context, lists[i], fogged, onTop | WRITE | STEP);
+      this.drawList(pass, context, lists[i], fogged, onTop | (2 * STEP));
+      this.drawList(pass, context, lists[i + 1], fogged, onTop);
     }
     pass.end();
-    this.depthLines.length = this.topLines.length = 0;
+    for (const list of lists) list.length = 0;
   };
+
+  /** Draws `list` with pipeline `variant`, fogged per material. The edge ramp step skips lines that have no ramp. */
+  private drawList(
+    pass: GPURenderPassEncoder,
+    context: PassContext & { backend: 'webgpu' },
+    list: ReadonlyArray<[Line, Resources]>,
+    fogged: boolean,
+    variant: number,
+  ): void {
+    const depthFormat = context.descriptor.depthStencil!.format,
+      count = context.descriptor.multisample?.count ?? 1,
+      edge = variant >= 2 * STEP;
+    let current: GPURenderPipeline | undefined;
+    for (const [line, r] of list) {
+      const { fog, antialias } = line.material;
+      if (edge && !antialias) continue;
+      const next = this.pipeline(context.format, depthFormat, count, variant | (fogged && fog ? FOGGED : 0));
+      if (next !== current) pass.setPipeline((current = next));
+      pass.setBindGroup(1, r.group);
+      pass.draw(VERTICES_PER_SEGMENT, line.segmentCount);
+      this.stats.drawCalls++;
+    }
+  }
 
   onDeviceRestored(engine: Engine): void {
     this.releaseGpu();
@@ -409,8 +435,9 @@ export class Lines implements EnginePlugin {
     for (const line of [...this.resources.keys()]) this.release(line);
     this.frameBuffer?.destroy();
     this.fogGpu?.buffer.destroy();
-    this.frameBuffer = this.frameGroup = this.module = this.layouts = this.device = this.fogGpu = undefined;
+    this.frameBuffer = this.frameGroup = this.layouts = this.device = this.fogGpu = undefined;
     this.pipelines.clear();
+    this.modules.clear();
   }
 
   /** Releases every GPU resource. Lines stay registered, so the plugin can be used again. */

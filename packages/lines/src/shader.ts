@@ -183,6 +183,16 @@ fn encode(c:vec3f)->vec3f{return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.05
 }
 `;
 
+/**
+ * `code` (the line shader, fogged or not) for one draw step of a depth-writing line: 1 the part at least half covered,
+ * which writes depth, 2 the rest of the edge ramp, which blends over it; 0 all of the line. Features are edits of the
+ * text, so a line that uses none compiles exactly `lineShader`.
+ */
+export const phasedShader = (code: string, phase: number): string =>
+  phase
+    ? code.replace('let alpha=i.color.a*cover;', `if(cover${phase === 1 ? '<' : '>='}0.5){discard;}let alpha=i.color.a*cover;`)
+    : code;
+
 const fogEdits: Array<[string, string]> = [
   // Lines blend alpha over the scene, so a fogged line fades toward the fog colour, in linear before any encoding.
   [

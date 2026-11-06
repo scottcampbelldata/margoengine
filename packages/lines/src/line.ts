@@ -46,6 +46,12 @@ export interface LineMaterialOptions {
   vertexColors?: boolean;
   /** Skip the depth test and draw over the scene. Default false. */
   onTop?: boolean;
+  /**
+   * Write depth, so crossing lines occlude each other whatever their draw order and whatever draws after the lines
+   * respects them. Drawn in two steps to keep the antialiased edge: the solid part writes depth, then the edge ramp blends
+   * over it without writing. Dash gaps and clipped parts write nothing. Default false.
+   */
+  depthWrite?: boolean;
   /** One-pixel coverage ramp on edges, caps and dash ends. Default true. */
   antialias?: boolean;
   /** Fogged by the `Lines` plugin's fog (`setFog`); false keeps this material clear. Default true. */
@@ -74,6 +80,7 @@ export class LineMaterial {
   dashOffset = 0;
   vertexColors?: boolean;
   onTop = false;
+  depthWrite = false;
   antialias = true;
   fog = true;
   /** false (default): `clippingPlanes` cut away what is behind any plane; true: only what is behind every plane. */
@@ -121,7 +128,15 @@ export class LineMaterial {
       throw new RangeError('Dash size must be positive and gap size non-negative');
     if (!JOINS.includes(this.join) || !CAPS.includes(this.cap))
       throw new TypeError('Unknown line join or cap; use the values listed in the line options');
-    for (const flag of [this.worldUnits, this.dashed, this.onTop, this.antialias, this.fog, this.clipIntersection])
+    for (const flag of [
+      this.worldUnits,
+      this.dashed,
+      this.onTop,
+      this.depthWrite,
+      this.antialias,
+      this.fog,
+      this.clipIntersection,
+    ])
       if (typeof flag !== 'boolean') throw new TypeError('Line flags must be boolean');
   }
 }

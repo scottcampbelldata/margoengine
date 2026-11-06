@@ -45,7 +45,7 @@ dashed.dashOffset += 0.01;
 - **Widths.** Pixel widths are CSS pixels, scaled by the ratio of the render target to the canvas client size. World-unit widths are converted per endpoint from the camera's focal length and the clip w, so thick lines taper with perspective. Lines thinner than one pixel are drawn one pixel wide with proportionally lower alpha.
 - **Antialiasing.** Geometry grows by one pixel and the fragment shader ramps coverage over the last pixel of every edge, butt or square cap end and dash end (dash ends use `fwidth` of the distance). This coverage ramp works alongside 4× MSAA on the WebGPU canvas path.
 - **Dashes.** Distances accumulate along the line in world space (after the model or mesh matrix) on the CPU, are recomputed only when the points or the matrix change, and are interpolated perspective-correctly. Segment lists accumulate across segments.
-- **Depth.** Lines test against the scene depth with reversed-Z `greater-equal` and do not write depth. `onTop` lines use `always` and draw after the depth-tested ones. Endpoints behind the near plane are clipped in clip space, so a line passing beside the camera is cut, not mirrored.
+- **Depth.** Lines test against the scene depth with reversed-Z `greater-equal` and do not write depth unless `depthWrite` is set (see [Depth writing](#depth-writing)). `onTop` lines use `always` and draw after the depth-tested ones. Endpoints behind the near plane are clipped in clip space, so a line passing beside the camera is cut, not mirrored.
 - **Color.** Colors are linear RGB (`'#rrggbb'` and `0xrrggbb` are sRGB and converted, like `PbrMaterial`). Output is sRGB-encoded for unorm canvas formats and left linear for `-srgb` and float targets such as the `rgba16float` target of the post-processing packages. Blending is straight alpha (`src-alpha, one-minus-src-alpha`).
 - **Plugin lifecycle.** The pass is `lines:draw` at frame-graph order 20, after the scene, sky and particles and before post-processing resolves at 30. GPU buffers are created lazily per line and rebuilt from the CPU copies in `onDeviceRestored`. `dispose()` (and `engine.removePlugin`) destroys every buffer and the pass; the lines stay registered with the plugin object, so it can be attached again.
 - **Mesh attachment.** `mesh` or `line.attach(mesh)` reads the mesh's world matrix from `engineRuntime(engine).store.matrices` each frame. A hidden or disposed mesh hides its lines. Unattached lines use `line.matrix` (identity by default).
@@ -73,6 +73,7 @@ dashed.dashOffset += 0.01;
 | `dashed`, `dashSize`, `gapSize`, `dashOffset` | `false`, `1`, `1`, `0` | World units |
 | `vertexColors` | when colors exist | |
 | `onTop` | `false` | Skip the depth test |
+| `depthWrite` | `false` | Write depth: crossing lines occlude each other and later passes respect them |
 | `antialias` | `true` | |
 | `fog` | `true` | Fogged by the plugin's `setFog`; `false` keeps the line clear |
 
@@ -97,6 +98,23 @@ They combine all primitives on the node and use retained CPU bind-pose positions
 and normals, transformed by the current world matrix. They perform no GPU readback
 and create no core `Geometry`. Hidden ancestors and disposed models suppress the
 helper; animation deformation is not reflected in these synchronous helpers.
+
+## Depth writing
+
+`depthWrite: true` makes a line write depth, so the nearer of two crossing lines wins whichever is drawn first, and anything drawn after the lines (a later `Lines` plugin, particles, transparent passes) respects it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Lines, Line} from 'margoengine/lines';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const lines = Lines.attach(engine);
+lines.add(new Line({positions: [-2, 0, 1, 2, 0, 1], width: 6, color: '#ff4040', depthWrite: true}));
+lines.add(new Line({positions: [0, -2, 0, 0, 2, 0], width: 6, color: '#40ff40', depthWrite: true}));
+```
+
+A depth-writing line takes two draws, so its edge stays smooth: the part at least half covered writes depth, then the rest of the edge ramp blends over it without writing. All writers draw before lines that do not write, so those sort against them. With `antialias: false` it is one draw. Dash gaps and parts cut by clipping planes write nothing. Depth is written at the line's centre, also for a translucent line, which then hides what is drawn behind it after it, as a depth-writing translucent mesh does.
 
 ## Fog
 
@@ -194,7 +212,7 @@ A hit gives the `line`, the `segment` index, the world `point` on the centre lin
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
-- Lines do not write depth, so crossing lines do not occlude each other and are not pickable through `engine.pick` (use [`intersectLines`](#picking)). Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
+- By default lines do not write depth, so crossing lines do not occlude each other unless they set [`depthWrite`](#depth-writing). They are not pickable through `engine.pick` (use [`intersectLines`](#picking)). Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
 - Dashes run continuously through joins, and caps apply to line ends only, not to each dash. World-unit widths ignore the mesh scale.
 - `ArrowHelper` draws its head as a wire cone, and `PlaneHelper` draws an outline with diagonals; there are no filled meshes. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
 
@@ -227,7 +245,7 @@ new pose, gone when removed).
 
 `npm test` in `packages/lines` runs Node checks on the CPU geometry: segment counts and neighbors per mode, dash distances in world space, exact quad areas for every cap, exact join areas with zero overlap for miter, bevel and round in both turn directions, miter-limit fallback, collinear points, loops, buffer reuse on same-size updates, validation, every helper's geometry (including the normal matrix under non-uniform scale and a reversed-Z frustum unprojection), SSR-safe import and the single WebGL2 warning.
 
-`npm run test:browser` drives Chromium or Edge with a real engine and reads pixels back: summed edge coverage in a column equals the width for 10, 4, 2.5, 1 and 0.5 pixels, world-unit width matches the projection, antialiased and hard edges, per-vertex colors and opacity, a line behind a core mesh is hidden while one in front and an `onTop` one are visible, attached lines follow mesh transforms and visibility, dashes produce six dashes with gaps and move with `dashOffset`, same-size updates allocate no buffers, every join, cap and helper renders with zero validation and WGSL errors, `engine.rebootDevice()` keeps lines rendering, `removePlugin` removes the pass and releases the buffers, and a line passing behind the camera is clipped. It also saves `test-results/lines-gallery.png`. In a container run it with:
+`npm run test:browser` drives Chromium or Edge with a real engine and reads pixels back: summed edge coverage in a column equals the width for 10, 4, 2.5, 1 and 0.5 pixels, world-unit width matches the projection, antialiased and hard edges, per-vertex colors and opacity, a line behind a core mesh is hidden while one in front and an `onTop` one are visible, attached lines follow mesh transforms and visibility, dashes produce six dashes with gaps and move with `dashOffset`, depth-writing lines occlude each other in either order with gaps and cut parts writing nothing and a later plugin respecting them, same-size updates allocate no buffers, every join, cap and helper renders with zero validation and WGSL errors, `engine.rebootDevice()` keeps lines rendering, `removePlugin` removes the pass and releases the buffers, and a line passing behind the camera is clipped. It also saves `test-results/lines-gallery.png`. In a container run it with:
 
 ```sh
 BROWSER_CHANNEL=bundled BROWSER_EXECUTABLE=/path/to/chrome BROWSER_ARGS='["--enable-unsafe-webgpu","--use-webgpu-adapter=swiftshader","--no-sandbox"]' npm run test:browser

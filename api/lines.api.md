@@ -181,6 +181,7 @@ export class LineMaterial {
     dashOffset: number;
     vertexColors?: boolean;
     onTop: boolean;
+    depthWrite: boolean;
     antialias: boolean;
     fog: boolean;
     clipIntersection: boolean;
@@ -206,6 +207,7 @@ export interface LineMaterialOptions {
     dashOffset?: number;
     vertexColors?: boolean;
     onTop?: boolean;
+    depthWrite?: boolean;
     antialias?: boolean;
     fog?: boolean;
     clippingPlanes?: readonly (readonly number[])[];
