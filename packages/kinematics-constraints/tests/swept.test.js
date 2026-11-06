@@ -1,10 +1,9 @@
-// @margoengine/kinematics-constraints/swept and /robot: every expected time here is the closed-form contact of the scene,
+// @margoengine/kinematics-constraints/swept: every expected time here is the closed-form contact of the scene,
 // or a dense brute-force scan of the same motion. A check that looked only at the two ends would fail each of them.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AvoidanceSolver, CapsuleVolume, ConvexHullVolume, SolveStatus, SphereVolume } from '../dist/index.js';
-import { Robot } from '../dist/robot.js';
-import { sweepChain, sweepHull, sweepRobot } from '../dist/swept.js';
+import { sweepChain, sweepHull } from '../dist/swept.js';
 
 const translate = (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
 const rotateZ = (angle, x = 0, y = 0, z = 0) => {
@@ -28,107 +27,22 @@ function random(seed) {
   };
 }
 
-test('Robot: forward kinematics of a planar two-link arm is the closed form', () => {
-  const arm = new Robot({
-    joints: [
-      { lower: -4, upper: 4 },
-      { origin: translate(1, 0, 0), lower: -4, upper: 4 },
-      { type: 'fixed', origin: translate(0.5, 0, 0) },
-    ],
-  });
-  assert.equal(arm.dof, 2);
-  assert.equal(arm.jointCount, 3);
-  arm.forward([0.4, -1.1]);
-  const tip = arm.pointOn(2, [0, 0, 0]);
-  assert.ok(Math.abs(tip[0] - (Math.cos(0.4) + 0.5 * Math.cos(0.4 - 1.1))) < 1e-12);
-  assert.ok(Math.abs(tip[1] - (Math.sin(0.4) + 0.5 * Math.sin(0.4 - 1.1))) < 1e-12);
-  const m = arm.frameMatrix(1);
-  assert.ok(Math.abs(m[0] - Math.cos(0.4 - 1.1)) < 1e-12);
-  assert.equal(m[15], 1);
-});
-
-test('Robot: a prismatic joint slides, a mimic joint repeats, ranges are read and enforced', () => {
-  const robot = new Robot({
-    joints: [
-      { name: 'slide', type: 'prismatic', axis: [2, 0, 0], lower: -1, upper: 1 },
-      { name: 'wheel', type: 'continuous', parent: null },
-      { name: 'follow', type: 'prismatic', axis: [0, 1, 0], parent: 'slide', mimic: { joint: 'slide', multiplier: 2, offset: 0.5 } },
-    ],
-  });
-  assert.equal(robot.dof, 2);
-  assert.deepEqual(robot.variableNames, ['slide', 'wheel']);
-  assert.equal(robot.upper[1], Infinity);
-  robot.forward([0.25, 9]);
-  const p = robot.pointOn(2, [0, 0, 0]);
-  assert.deepEqual([...p], [0.25, 1, 0]);
-  assert.equal(robot.within([0.5, 1000]), true);
-  assert.equal(robot.within([1.5, 0]), false);
-  assert.deepEqual([...robot.clamp([1.5, 2])], [1, 2]);
-  assert.throws(() => robot.forward([0]), /2 numbers/);
-  assert.throws(() => new Robot({ joints: [{ lower: 1, upper: 0 }] }), /lower at or below upper/);
-  assert.throws(() => new Robot({ joints: [{ parent: 'nobody', lower: 0, upper: 1 }] }), /earlier joint/);
-});
-
-test('motionBounds: no point of a shape outruns its bound, on revolute, prismatic and mimic chains', () => {
-  const rand = random(7);
-  for (let round = 0; round < 40; round++) {
-    const joints = [],
-      shapes = [];
-    for (let j = 0; j < 6; j++) {
-      const axis = [rand() - 0.5, rand() - 0.5, rand() - 0.5],
-        origin = rotateZ(rand() * 6, rand() - 0.5, rand() - 0.5, rand() - 0.5);
-      if (j === 3) joints.push({ type: 'fixed', origin });
-      else if (j === 2) joints.push({ type: 'prismatic', axis, origin, lower: -1, upper: 1 });
-      else if (j === 5) joints.push({ axis, origin, mimic: { joint: 1, multiplier: -1.5, offset: 0.2 } });
-      else joints.push({ axis, origin, lower: -3, upper: 3 });
-    }
-    shapes.push({ joint: 4, start: [0.1, 0, 0], end: [0.3, 0.4, 0.2], radius: 0.05 });
-    shapes.push({ joint: 5, points: box(0.2), matrix: translate(0.3, -0.1, 0.2) });
-    const robot = new Robot({ joints, shapes }),
-      from = Array.from({ length: robot.dof }, () => rand() * 2 - 1),
-      to = Array.from({ length: robot.dof }, () => rand() * 2 - 1),
-      speed = robot.motionBounds(from, to),
-      probes = [
-        [4, [0.3, 0.4, 0.2], 0],
-        [5, [0.5, 0.1, 0.4], 1],
-        [5, [0.1, -0.3, 0], 1],
-      ];
-    const steps = 400,
-      q = new Float64Array(robot.dof);
-    for (const [joint, point, shape] of probes) {
-      let last = null,
-        fastest = 0;
-      for (let i = 0; i <= steps; i++) {
-        for (let k = 0; k < q.length; k++) q[k] = from[k] + ((to[k] - from[k]) * i) / steps;
-        robot.forward(q);
-        const now = [...robot.pointOn(joint, point)];
-        if (last) fastest = Math.max(fastest, Math.hypot(now[0] - last[0], now[1] - last[1], now[2] - last[2]) * steps);
-        last = now;
-      }
-      assert.ok(fastest > 0);
-      assert.ok(fastest <= speed[shape], `point speed ${fastest} over bound ${speed[shape]}`);
-    }
-  }
-});
-
-test('sweepRobot: a link swung through a thin post stops at the closed-form contact, though both ends are clear', () => {
+test('sweepChain: a link swung through a thin post stops at the closed-form contact, though both ends are clear', () => {
   const r = 0.05,
     rho = 0.01,
     D = 0.8,
     phi = 1,
-    arm = new Robot({
-      joints: [{ lower: -4, upper: 4 }],
-      shapes: [{ joint: 0, end: [1, 0, 0], radius: r }],
-    }),
+    pose = (angle) => [[0, 0, 0], [Math.cos(angle), Math.sin(angle), 0]],
     post = new CapsuleVolume({
       start: [D * Math.cos(phi), D * Math.sin(phi), -1],
       end: [D * Math.cos(phi), D * Math.sin(phi), 1],
       radius: rho,
-    });
-  assert.ok(arm.clearance([0], [post]) > 0.5);
-  assert.ok(arm.clearance([2], [post]) > 0.5);
+    }),
+    gapAt = (angle) => post.segmentClearance(...pose(angle), r);
+  assert.ok(gapAt(0) > 0.5);
+  assert.ok(gapAt(2) > 0.5);
   const tolerance = 1e-6,
-    hit = sweepRobot(arm, [0], [2], [post], { tolerance });
+    hit = sweepChain(pose(0), pose(2), [post], { radius: r, tolerance });
   assert.equal(hit.clear, false);
   assert.equal(hit.exhausted, false);
   assert.equal(hit.shape, 0);
@@ -138,114 +52,29 @@ test('sweepRobot: a link swung through a thin post stops at the closed-form cont
   assert.ok(hit.time <= contact, 'stopped past the contact');
   // Stopped when the gap read `tolerance`: at most that gap, over the slowest closing rate near contact, before it.
   assert.ok(contact - hit.time < (2 * tolerance) / (D * Math.cos(Math.asin((r + rho) / D))) / 2);
-  arm.place([hit.time * 2]);
-  assert.ok(arm.shapeGap(0, post) >= 0, 'the stop pose overlaps');
-  assert.ok(arm.shapeGap(0, post) <= tolerance);
+  assert.ok(gapAt(hit.time * 2) >= 0, 'the stop pose overlaps');
+  assert.ok(gapAt(hit.time * 2) <= tolerance);
 });
 
-test('sweepRobot: however thin the wall and fast the slide, a prismatic joint meets it; minClearance stops it early', () => {
-  const slider = new Robot({
-      joints: [{ type: 'prismatic', axis: [1, 0, 0], lower: -1e6, upper: 1e6 }],
-      shapes: [{ joint: 0, radius: 0.1 }],
-    }),
+test('sweepChain: however thin the wall and fast the slide, a sphere meets it; minClearance stops it early', () => {
+  const at = (x) => [[x, 0, 0], [x, 0, 0]],
     wall = new ConvexHullVolume({ points: [50, -9, -9, 50, 9, -9, 50, -9, 9, 50, 9, 9] }),
     span = 1e3,
-    hit = sweepRobot(slider, [0], [span], [wall], { tolerance: 1e-6 });
+    hit = sweepChain(at(0), at(span), [wall], { radius: 0.1, tolerance: 1e-6 });
   assert.equal(hit.clear, false);
   assert.ok(Math.abs(hit.time * span - (50 - 0.1)) < 2e-6);
-  const shell = sweepRobot(slider, [0], [span], [wall], { tolerance: 1e-6, minClearance: 2 });
+  const shell = sweepChain(at(0), at(span), [wall], { radius: 0.1, tolerance: 1e-6, minClearance: 2 });
   assert.ok(Math.abs(shell.time * span - (50 - 0.1 - 2)) < 2e-6);
-  assert.equal(sweepRobot(slider, [0], [40], [wall]).clear, true);
+  assert.equal(sweepChain(at(0), at(40), [wall], { radius: 0.1 }).clear, true);
 });
 
-test('sweepRobot: a clear result holds on a dense scan, and a contact is the first, across seeded random motions', () => {
-  const rand = random(85),
-    robot = new Robot({
-      joints: [
-        { lower: -3, upper: 3 },
-        { origin: translate(0, 0, 0.4), axis: [0, 1, 0], lower: -3, upper: 3 },
-        { origin: translate(0.6, 0, 0), axis: [0, 1, 0], lower: -3, upper: 3 },
-      ],
-      shapes: [
-        { joint: 1, end: [0.6, 0, 0], radius: 0.04 },
-        { joint: 2, points: box(0.08), matrix: translate(0.4, 0, 0) },
-      ],
-    }),
-    minClearance = 0.01,
-    tolerance = 1e-4;
-  let clear = 0,
-    hits = 0;
-  for (let round = 0; round < 120; round++) {
-    const colliders = [
-      new SphereVolume({ center: [rand() * 2 - 1, rand() * 2 - 1, rand() * 1.6 - 0.2], radius: 0.05 + rand() * 0.1 }),
-      new CapsuleVolume({
-        start: [rand() * 2 - 1, rand() * 2 - 1, rand()],
-        end: [rand() * 2 - 1, rand() * 2 - 1, rand()],
-        radius: 0.02,
-      }),
-      new ConvexHullVolume({ points: box(0.1), matrix: translate(rand() * 2 - 1, rand() * 2 - 1, rand()) }),
-    ];
-    const from = [rand() * 4 - 2, rand() * 4 - 2, rand() * 4 - 2],
-      to = [rand() * 4 - 2, rand() * 4 - 2, rand() * 4 - 2];
-    if (robot.clearance(from, colliders) < minClearance + tolerance) continue;
-    const result = sweepRobot(robot, from, to, colliders, { minClearance, tolerance, maxSteps: 100000 }),
-      q = [0, 0, 0],
-      at = (t) => {
-        for (let k = 0; k < 3; k++) q[k] = from[k] + (to[k] - from[k]) * t;
-        return robot.clearance(q, colliders);
-      };
-    assert.equal(result.exhausted, false);
-    const end = result.clear ? 1 : result.time;
-    for (let i = 0; i <= 1500; i++) {
-      assert.ok(at((end * i) / 1500) >= minClearance - 1e-9, `round ${round}: gap broken before the reported time`);
-    }
-    if (result.clear) clear++;
-    else {
-      hits++;
-      assert.ok(at(result.time) <= minClearance + tolerance + 1e-9);
-    }
-  }
-  assert.ok(clear > 10 && hits > 10, `scene mix: ${clear} clear, ${hits} hit`);
-});
-
-test('sweepRobot: a budget that runs out says so and never reads as clear', () => {
-  const arm = new Robot({ joints: [{ lower: -4, upper: 4 }], shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.01 }] }),
-    near = new SphereVolume({ center: [0, 2, 0], radius: 0.99 }),
-    out = sweepRobot(arm, [0], [Math.PI], [near], { maxSteps: 2 });
+test('sweepChain: a budget that runs out says so and never reads as clear', () => {
+  const near = new SphereVolume({ center: [0, 2, 0], radius: 0.99 }),
+    out = sweepChain([[0, 0, 0], [1, 0, 0]], [[0, 0, 0], [Math.cos(3), Math.sin(3), 0]], [near], { radius: 0.01, maxSteps: 2 });
   assert.equal(out.clear, false);
   assert.equal(out.exhausted, true);
   assert.ok(out.time < 1);
   assert.equal(out.steps, 2);
-});
-
-test('sweepRobot: selfCollision finds a link folding through another, and pairs built to touch can be left out', () => {
-  const folding = () =>
-    new Robot({
-      joints: [
-        { lower: -4, upper: 4 },
-        { origin: translate(1, 0, 0), lower: -4, upper: 4 },
-        { origin: translate(0.2, 0, 0), lower: -4, upper: 4 },
-      ],
-      shapes: [
-        { joint: 0, end: [1, 0, 0], radius: 0.02 },
-        { joint: 2, end: [1, 0, 0], radius: 0.02 },
-      ],
-    });
-  const robot = folding();
-  assert.deepEqual([...robot.selfCollisionPairs], [0, 1]);
-  // The last link sweeps from one side of the first to the other, about its joint at x = 1.2.
-  const from = [0, 0, 2.6],
-    to = [0, 0, 3.7];
-  assert.ok(robot.clearance(from, [], true) > 0.04);
-  assert.ok(robot.clearance(to, [], true) > 0.04);
-  assert.equal(sweepRobot(robot, from, to, []).clear, true);
-  const hit = sweepRobot(robot, from, to, [], { selfCollision: true });
-  assert.equal(hit.clear, false);
-  assert.equal(hit.shape, 0);
-  assert.equal(hit.collider, -3);
-  const free = folding().ignoreContactsAt([0, 0, Math.PI]);
-  assert.equal(free.selfCollisionPairs.length, 0);
-  assert.equal(sweepRobot(free, from, to, [], { selfCollision: true }).clear, true);
 });
 
 test('sweepChain: bones keep their length through the motion and the chain ends on the target pose', () => {
@@ -351,7 +180,6 @@ test('sweepHull: a fast shot through a thin plate is caught; scale and turn coun
 });
 
 test('a collider that gives NaN stops the check instead of reading clear', () => {
-  const arm = new Robot({ joints: [{ lower: -4, upper: 4 }], shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.01 }] }),
-    broken = { evaluate: () => NaN, segmentClearance: () => NaN };
-  assert.throws(() => sweepRobot(arm, [0], [1], [broken]), /finite clearance/);
+  const broken = { evaluate: () => NaN, segmentClearance: () => NaN };
+  assert.throws(() => sweepChain([[0, 0, 0], [1, 0, 0]], [[0, 0, 0], [0, 1, 0]], [broken], { radius: 0.01 }), /finite clearance/);
 });

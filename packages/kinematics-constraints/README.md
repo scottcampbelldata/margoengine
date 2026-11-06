@@ -273,45 +273,6 @@ Measured on one desktop thread (Node 26, Windows), 64-point hulls unless noted:
 | `solve`, no clear pose, all 34 candidates tried, limb-shaped hulls | 0.44 ms (16 points: 0.17 ms) |
 | `solve`, no clear pose, a round hull nested in a round hull, the slowest shape found | 1.9 ms (16 points: 0.27 ms); a lower `searchBudget` limits it |
 
-## Robots (`margoengine/kinematics-constraints/robot`)
-
-`AvoidanceSolver` works on one two-bone chain and a callback. `Robot` is a whole tree of joints: revolute, continuous, prismatic, fixed and mimic joints, each with its range, and collision shapes that ride on the links. The swept check, the joint-limit solver, the planner and the URDF reader below all take one.
-
-```ts
-import { SphereVolume } from 'margoengine/kinematics-constraints';
-import { Robot } from 'margoengine/kinematics-constraints/robot';
-
-// Each joint's origin is its frame in its parent's frame: this one sits one unit along z.
-const up = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1];
-const arm = new Robot({
-  joints: [
-    { name: 'waist', lower: -3, upper: 3 },
-    { name: 'shoulder', origin: up, axis: [0, 1, 0], lower: -2, upper: 2 },
-  ],
-  shapes: [
-    { joint: 'shoulder', end: [0, 0, 1], radius: 0.1 },
-    { joint: 'waist', points: [-0.2, -0.2, 0, 0.2, -0.2, 0, -0.2, 0.2, 0, 0.2, 0.2, 0, 0, 0, 1] },
-  ],
-});
-
-const ball = new SphereVolume({ center: [2, 0, 1], radius: 0.25 });
-const gap = arm.clearance([0, 0.5], [ball]); // smallest gap of any shape, negative when overlapping
-const wrist = arm.frameMatrix(1); // the world matrix of the last pose, for a bone or a mesh
-console.log(gap, wrist);
-```
-
-| `Robot` member | Use |
-| --- | --- |
-| `new Robot({joints, shapes?, base?})` | `joints` in order, each after its parent. Per joint: `name`, `type` (default `'revolute'`), `parent` (index or name, default the joint before, `null` the base), `origin` (16 values, default identity), `axis` (default `[0, 0, 1]`), `lower`, `upper` (required unless continuous or fixed), `mimic: {joint, multiplier?, offset?}`. Per shape: `joint` (`null` the base) and `{start?, end?, radius}` for a capsule or sphere, or `{points, matrix?}` for a convex hull. |
-| `dof`, `lower`, `upper`, `variableNames` | A configuration `q` holds one number per moving joint that repeats no other, in joint order. |
-| `forward(q)`, `frameMatrix(joint)`, `pointOn(joint, point)` | Forward kinematics, and reading it back as a 16-value matrix or a world point. |
-| `within(q)`, `clamp(q, out?)` | Range check and limit. |
-| `clearance(q, colliders, selfCollision?)`, then `nearestShape`, `nearestCollider` | Smallest signed gap at a pose and who it was between. |
-| `place(q)`, `shapeGap(shape, volume)`, `pairGap(a, b)` | The same, one pair at a time. |
-| `selfCollisionPairs`, `ignoreContactsAt(q, gap?)` | The pairs a self check tests: never shapes on one link or on a joint and its parent. `ignoreContactsAt` leaves out those that touch at a safe pose. |
-| `motionBounds(from, to, out?)` | The most any point of each shape moves on the straight joint-space path. |
-| `setBase(matrix)` | Places the whole robot. |
-
 ## Swept collision (`margoengine/kinematics-constraints/swept`)
 
 `solve` and `clearance` look at one instant, so an arm that moves far in one frame can pass straight through a thin wall with both of its poses clear. A swept check looks at the whole motion. Each step measures the gap, and no point of a shape can close that gap faster than its motion bound, so the check can jump that far and no farther (conservative advancement). It never steps past a contact, however thin the obstacle or fast the move.
@@ -351,7 +312,6 @@ if (next.status === SolveStatus.Success) {
 
 | Check | Motion it certifies |
 | --- | --- |
-| `sweepRobot(robot, from, to, colliders, options?)` | The straight line in joint space from one configuration to the other. |
 | `sweepChain(from, to, colliders, {radius, jointRadius?, ...})` | `from` and `to` list joint positions. The root moves on a line, each bone turns on its shortest arc with its length held, so the output of `AvoidanceSolver` goes straight in. `radius` and `jointRadius` are one number or one per link and joint. |
 | `sweepHull(hull, from, to, colliders, options?)` | Two matrices of rotation, positive scale and translation: a line for the translation, the shortest arc about the hull's origin, the scale eased. For a link hull, pass its bone's world matrices. The hull is left at `to`. |
 
@@ -360,68 +320,18 @@ if (next.status === SolveStatus.Success) {
 | `minClearance` | `0` | Gap the motion must keep. |
 | `tolerance` | `1e-4` | A gap this close to `minClearance` counts as reached. It also sets the smallest step. |
 | `maxSteps` | `4096` | Most poses tested. Running out gives `exhausted`, never `clear`. |
-| `selfCollision` | `false` | `sweepRobot` only: also check the robot against itself. |
 
 The result holds `clear`, `exhausted`, `time` (the first contact from 0 to 1, or 1 when clear), `clearance` (the smallest gap at a tested pose, beyond `minClearance`), `steps`, `shape` and `collider`. `time` is never later than the true contact, so the pose there is a safe place to stop. A hull needs colliders with `hullClearanceInto`; every built-in collider has it. Colliders hold still during a check: step a moving obstacle yourself. A motion that starts within the gap stops at time 0.
 
-## Joint limits (`margoengine/kinematics-constraints/limits`)
-
-`AvoidanceSolver` leaves joint ranges to its caller, and a plain IK solve runs a joint past its stop or a link into a wall. `JointLimitSolver` owns both. It moves a robot's tip toward a target and keeps every joint in range and every shape clear, on every step of the way: each step is a small quadratic program, and a swept check proves it before it is taken. When it cannot get there it stops short and says why.
-
-```ts
-import { SphereVolume } from 'margoengine/kinematics-constraints';
-import { armRobot, JointLimitSolver } from 'margoengine/kinematics-constraints/limits';
-
-// A three-axis shoulder and an elbow that only bends one way. q is yaw, pitch, twist, elbow.
-const arm = armRobot({ upperLength: 1, forearmLength: 1, radius: 0.05, elbow: [0, 2.6] });
-const solver = new JointLimitSolver(arm, {
-  tip: 'hand',
-  colliders: [new SphereVolume({ center: [0.5, 1, 0], radius: 0.2 })],
-  minClearance: 0.02,
-});
-
-const result = solver.solve([0, 0, 0, 0.5], { position: [0.8, 0.9, 0.6] });
-if (result.reached) console.log('pose', result.q);
-else if (result.blocked) console.log('an obstacle is in the way, at', result.error, 'from the target');
-else console.log('stopped by joints', result.limited);
-```
-
-`solver.solve(start, {position, rotation?})` starts from a pose you know, so the arm moves from where it is. `rotation` is a unit quaternion for the tip joint's frame. A `start` outside a range is brought inside it first. A `start` inside the gap is pushed out before anything else, and such a step need only not sink deeper.
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `tip` | Required | Joint that carries the end effector, by index or name. |
-| `point` | `[0, 0, 0]` | The end effector in that joint's frame. |
-| `colliders` | `[]` | Any volumes: spheres, capsules, hulls, and the mesh and field volumes below. |
-| `minClearance` | `0.01` | Gap every shape keeps from every collider. |
-| `influence` | `0.1` | How far past `minClearance` an obstacle starts to count. |
-| `selfCollision` | `false` | Also keep the robot's shapes off each other. |
-| `maxIterations` | `100` | Most iterations. |
-| `tolerance`, `angleTolerance` | `1e-4`, `1e-3` | Distance and angle from the target that count as reached. |
-| `damping` | `0.01` | Damping of the least squares step, for poses near a singularity. |
-| `maxStep` | `0.2` | Most any joint moves per iteration. |
-| `rest` | None | A pose to lean toward with whatever freedom the target leaves. The lean never pulls against the target. |
-| `restWeight` | `0.1` | Share of the way to `rest` per iteration. |
-
-| Result field | Meaning |
-| --- | --- |
-| `reached` | The target is met, in range, keeping the gap. |
-| `q`, `error`, `angleError`, `clearance`, `iterations` | The pose, what is left of the target and the gap at the pose. |
-| `limited` | Configuration entries a joint range held back on the last iteration. |
-| `blocked` | An obstacle held the solve back on the last iteration. |
-
-The result is reused by the next `solve`. This is a local method: from a bad start it can stall behind an obstacle with a way round it, and then `blocked` is your cue to call a planner. `armRobot({upperLength, forearmLength, radius, yaw?, pitch?, twist?, elbow?, base?})` builds the two-bone arm as a `Robot`, bones along +Y as in a glTF rig, with a fixed joint named `hand` at the end. `robot.jacobian(joint, point, out?)` gives the tip's Jacobian at the last pose, for a solver of your own.
-
 ## Concave obstacles (`margoengine/kinematics-constraints/sdf`)
 
-A sphere, a capsule or a convex hull cannot have a hole or a hollow: a hull round a ring fills the ring, and a hull round a bowl fills the bowl. `MeshVolume` and `SDFVolume` take the shape itself. They work anywhere a collider does, in `AvoidanceSolver`, the swept checks, `JointLimitSolver`, and for link hulls too.
+A sphere, a capsule or a convex hull cannot have a hole or a hollow: a hull round a ring fills the ring, and a hull round a bowl fills the bowl. `MeshVolume` and `SDFVolume` take the shape itself. They work anywhere a collider does, in `AvoidanceSolver`, the swept checks, and for link hulls too.
 
 ```ts
 import { MeshBVH } from 'margoengine/bvh';
 import { bakeSDF } from 'margoengine/bvh/sdf';
 import { MeshVolume, SDFVolume } from 'margoengine/kinematics-constraints/sdf';
-import { Robot } from 'margoengine/kinematics-constraints/robot';
-import { sweepRobot } from 'margoengine/kinematics-constraints/swept';
+import { sweepChain } from 'margoengine/kinematics-constraints/swept';
 
 // A closed box as a stand-in for your mesh: pass your own positions and indices.
 const positions = new Float32Array([-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1]);
@@ -433,12 +343,11 @@ const bvh = MeshBVH.build({ positions, indices });
 const exact = new MeshVolume({ bvh }); // exact distances, through the tree
 const baked = new SDFVolume({ field: bakeSDF(bvh, { resolution: 32 }) }); // a fixed cost per reading
 
-const slider = new Robot({
-  joints: [{ type: 'prismatic', axis: [1, 0, 0], lower: -5, upper: 5 }],
-  shapes: [{ joint: 0, radius: 0.1 }],
-});
+// A ball on a straight line: both joints of the chain at one point.
+const from = [[-4, 0, 0], [-4, 0, 0]] as const;
+const to = [[4, 0, 0], [4, 0, 0]] as const;
 for (const obstacle of [exact, baked]) {
-  const hit = sweepRobot(slider, [-4], [4], [obstacle]);
+  const hit = sweepChain(from, to, [obstacle], { radius: 0.1 });
   console.log(hit.clear, hit.time);
 }
 ```
@@ -460,165 +369,8 @@ for (const obstacle of [exact, baked]) {
 
 `MeshVolume` is exact and pays for it per query. `SDFVolume` costs the same whatever the mesh, and is only as fine as its grid: a wall thinner than a cell may not be there at all, which is why the margin matters, and a coarse field reads obstacles fatter than they are. A grid field must hold the whole obstacle: past the grid's edge a reading is the distance to the grid. Segment and hull queries on both answer no more than the true gap, so the swept checks keep their promise. A segment that crosses a mesh reads minus its radius, and an overlapping hull reads zero or less: the value ranks poses, it is not a depth. This entry needs `@margoengine/bvh`, an optional peer of this package, and only this entry does.
 
-## Motion planning (`margoengine/kinematics-constraints/plan`)
-
-A solver only ever steps toward the target, so an obstacle it would have to back away from stops it. When `JointLimitSolver` reports `blocked`, plan the way round. `planPath` searches the robot's joint space with random samples and returns a list of configurations, and every straight step between two of them has passed `sweepRobot`, so the gap holds along the whole path, not only at the points on it.
-
-```ts
-import { CapsuleVolume } from 'margoengine/kinematics-constraints';
-import { planPath } from 'margoengine/kinematics-constraints/plan';
-import { Robot } from 'margoengine/kinematics-constraints/robot';
-
-const along = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1]; // one unit along x
-const arm = new Robot({
-  joints: [{ lower: -3.1, upper: 3.1 }, { lower: -3.1, upper: 3.1, origin: along }],
-  shapes: [
-    { joint: 0, end: [1, 0, 0], radius: 0.05 },
-    { joint: 1, end: [1, 0, 0], radius: 0.05 },
-  ],
-});
-const post = new CapsuleVolume({ start: [1.3, 0, -1], end: [1.3, 0, 1], radius: 0.1 });
-const plan = await planPath(arm, [0.9, -1.2], [-0.9, 1.2], { colliders: [post], seed: 7 });
-if (plan.status === 'found') console.log(plan.path.length, 'poses, joint-space length', plan.length);
-```
-
-`plan.status` is `'found'`, `'start-blocked'` or `'goal-blocked'` when an end is out of range or inside an obstacle, or `'no-path'` when the budget ran out, which does not prove there is no path. The same seed and scene give the same path. `planPath` runs in slices of about 8 ms so a page stays alive, and an `AbortSignal` rejects it with the signal's reason. `planPathSync` does the same work in one call.
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `algorithm` | `'rrt-connect'` | `'rrt-connect'` grows a tree from each end, `'rrt'` one tree from the start, `'prm'` a roadmap. |
-| `colliders` | none | Any volume: spheres, capsules, hulls, `MeshVolume`, `SDFVolume`. |
-| `minClearance` | `0.01` | Gap the whole path keeps, in scene units. |
-| `selfCollision` | `false` | Also keep the robot's shapes off each other. |
-| `seed` | `1` | Seed of the random numbers. |
-| `stepSize` | `0.3` | Largest move of a tree edge in joint space. |
-| `maxSamples` | `20000` | Random samples before `'no-path'`. |
-| `goalBias` | `0.1` | Share of samples aimed at the goal, on `'rrt'`. |
-| `neighbors` | `10` | Nodes each roadmap node tries to join, on `'prm'`. |
-| `shortcuts` | `100` | Rounds of random shortcutting on the path found; 0 keeps the raw path. |
-| `tolerance`, `maxSteps` | `1e-4`, `4096` | Passed to the swept check of every edge. An edge that runs out of steps counts as blocked. |
-| `signal` | none | Stops the search. |
-
-`planToPose` takes a tip target instead of a goal configuration. The joint-limit solver looks for a clear pose at the target, ignoring obstacles on the way there, from the start and then from `goalAttempts` (default 32) random restarts, and the planner finds the way to it.
-
-```ts
-import { SphereVolume } from 'margoengine/kinematics-constraints';
-import { armRobot } from 'margoengine/kinematics-constraints/limits';
-import { planToPose } from 'margoengine/kinematics-constraints/plan';
-
-const arm = armRobot({ upperLength: 1, forearmLength: 1, radius: 0.05, elbow: [0.05, 2.8] });
-const ball = new SphereVolume({ center: [0, 1.22, 0], radius: 0.1 });
-const reach = await planToPose(arm, [0, 0, 0, 2], { position: [0, 1.6, 0] }, { tip: 'hand', colliders: [ball], seed: 2 });
-console.log(reach.status);
-```
-
-A scene that holds still can pay for its search once. A `Roadmap` is a graph of clear poses joined by proved edges: grow it, then ask it as many times as you like.
-
-```ts
-import { CapsuleVolume } from 'margoengine/kinematics-constraints';
-import { Roadmap } from 'margoengine/kinematics-constraints/plan';
-import { Robot } from 'margoengine/kinematics-constraints/robot';
-
-const arm = new Robot({
-  joints: [{ lower: -3, upper: 3 }],
-  shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.05 }],
-});
-const post = new CapsuleVolume({ start: [-0.7, -0.7, -1], end: [-0.7, -0.7, 1], radius: 0.05 });
-const roadmap = new Roadmap(arm, { colliders: [post], seed: 3 }).grow(200);
-console.log(roadmap.size, roadmap.query([-1], [2]).status, roadmap.query([0], [-1.5]).status);
-```
-
-`roadmap.samplePoses(count)` and `roadmap.addPoses(poses, gaps)` split the sampling from the check, so a batch check of your own can sit between them. A continuous joint has no range, so samples stay one turn each way of the start, or of the `around` option on a `Roadmap`. It plans on the line of its value, not on a circle: passing an obstacle the other way round means writing the goal one turn lower, as `goal - 2 * Math.PI`.
-
-## URDF robots (`margoengine/kinematics-constraints/urdf`)
-
-URDF is the format robot arms are published in. `parseURDF` reads one into a `Robot` with its joints, ranges, mimic joints and collision shapes, so every solver, check and planner here works on a real arm.
-
-```ts
-import { parseURDF } from 'margoengine/kinematics-constraints/urdf';
-import { SphereVolume } from 'margoengine/kinematics-constraints';
-
-const { robot, home, links } = parseURDF(`
-  <robot name="pendulum">
-    <link name="base"/>
-    <link name="arm">
-      <collision>
-        <origin xyz="0 0 0.5"/>
-        <geometry><box size="0.1 0.1 1"/></geometry>
-      </collision>
-    </link>
-    <joint name="swing" type="revolute">
-      <parent link="base"/><child link="arm"/>
-      <axis xyz="0 1 0"/><limit lower="-1" upper="1" effort="1" velocity="1"/>
-    </joint>
-  </robot>`);
-console.log(robot.variableNames, links.map((link) => link.name));
-console.log(robot.clearance(home, [new SphereVolume({ center: [1, 0, 0.5], radius: 0.1 })]));
-```
-
-A box, a sphere, a cylinder and a capsule are shapes at once. A cylinder becomes a prism drawn round it (`cylinderSides`, default 16), so it holds the true shape. A mesh needs its file: `loadURDF` fetches the document and every collision mesh it names, reads STL, COLLADA and OBJ with `@margoengine/loaders`, loaded only when a mesh is met, and takes the convex hull with `@margoengine/geometry`. A mesh's hull holds the whole link, so a concave link reads a little fatter than it is. `parseURDF` with no mesh data lists those files in `missingMeshes` and gives those parts no shape. To pass them yourself, use `options.meshes`: flat vertices by the filename in the document.
-
-```ts
-import { loadURDF } from 'margoengine/kinematics-constraints/urdf';
-
-const files: Record<string, string> = {
-  'https://robots.example/arm/urdf/arm.urdf': `
-    <robot name="arm">
-      <link name="body">
-        <collision><geometry><mesh filename="package://arm/meshes/body.obj" scale="0.001 0.001 0.001"/></geometry></collision>
-      </link>
-    </robot>`,
-  'https://robots.example/arm/meshes/body.obj': 'v 0 0 0\nv 100 0 0\nv 0 100 0\nv 0 0 100\nf 1 2 3\nf 1 2 4\nf 1 3 4\nf 2 3 4\n',
-};
-// Leave `fetch` out to use the global one.
-const model = await loadURDF('https://robots.example/arm/urdf/arm.urdf', {
-  fetch: async (url) => new Response(files[url]),
-});
-console.log(model.robot.shapeCount, model.missingMeshes);
-```
-
-`package://name/path` resolves through `options.packages`, a base URL per package name; a package not listed is taken as the folder above the document's own. `signal` stops the requests and the mesh parsing. `fetch` defaults to the global one, so in Node pass your own for a file on disk.
-
-What the model holds besides `robot`: `links` with their `visuals`, `collisions`, `inertial` and the `joint` each rides on (-1 for the root, which is the robot's base), `joints` with `velocity`, `effort`, `damping` and `friction`, `root`, `home` (the pose nearest zero inside every range) and `meshes`. A mimic joint repeats its source and takes no entry in a configuration. A floating joint opens into six plain joints and a planar joint into two; the last of them carries the link, and they sit in `robot.jointNames` with the suffixes `_x`, `_y`, `_z`, `_rx`, `_ry` and `_u`. Self checks on a real arm start with `robot.ignoreContactsAt(home, gap)`, because neighbouring link meshes usually overlap by design.
-
-## GPU clearance (`margoengine/kinematics-constraints/gpu`)
-
-A sampling planner spends most of its time asking whether a pose is clear, and most of the answers are no. `GPUClearance` answers thousands at once: one compute invocation per pose runs the forward kinematics and measures every shape against every collider. Sort a batch of candidates on the GPU and hand the survivors to a `Roadmap`, which proves each one on the CPU before it joins the graph, so the f32 answers can only change which poses get looked at, never what the planner trusts.
-
-```ts
-import { CapsuleVolume } from 'margoengine/kinematics-constraints';
-import { GPUClearance } from 'margoengine/kinematics-constraints/gpu';
-import { Roadmap } from 'margoengine/kinematics-constraints/plan';
-import { Robot } from 'margoengine/kinematics-constraints/robot';
-
-const adapter = await navigator.gpu.requestAdapter();
-const device = await adapter!.requestDevice();
-const arm = new Robot({
-  joints: [{ lower: -3, upper: 3 }],
-  shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.05 }],
-});
-const colliders = [new CapsuleVolume({ start: [0, 1, -1], end: [0, 1, 1], radius: 0.05 })];
-
-using clearance = new GPUClearance(device, arm, colliders, { minClearance: 0.01 });
-const roadmap = new Roadmap(arm, { colliders });
-const poses = roadmap.samplePoses(4096);
-const gaps = await clearance.evaluate(poses); // one gap per pose, in scene units
-roadmap.addPoses(poses, gaps); // keeps the poses above the roadmap's minClearance, after a CPU check
-console.log(roadmap.size, roadmap.query([-1], [1]).status);
-```
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `minClearance` | none | A pose stops at the first pair at or below this gap and reads that pair's gap, not its smallest. Leave it out to read every pose's smallest gap. |
-| `selfCollision` | `false` | Also measure the robot's shapes against each other. |
-| `batch` | `16384` | Poses per dispatch. A longer list is split, so no one dispatch holds the GPU for long. |
-
-`evaluate(poses, { signal })` takes `dof` numbers per pose and returns a `Float32Array`. A clear pose reads `Robot.clearance` to f32. An overlap reads zero or less, because there is no depth search on the GPU: compare it with a threshold, do not rank by it. With nothing to test it reads `Infinity`. Calls run one after another, and `signal` is checked between dispatches. `dispose()` or `using` frees the buffers.
-
-Colliders may be spheres, capsules, hulls and an `SDFVolume` on a sampled grid, which goes up to the GPU by its corners and is read by the same branch and bound as on the CPU. A `MeshVolume` is refused, so bake it first with `bakeSDF` from `margoengine/bvh/sdf`. The robot's base, its shapes and the colliders are read once, when you make the object, so make a new one when they move. `robot.describe()` gives the robot as plain numbers, and `SDFVolume.gridData()` the grid, for a kernel of your own.
-
 ## Scope
 
 `Success` describes static analytical proxy clearance at one evaluated instant, within numerical tolerance. It covers neither unsupplied mesh/skinning geometry nor unchecked link portions. Set proxies to enclose the full deformation envelope and any desired padding in your application.
 
-Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. Concave obstacles are in `/sdf`. Planning round them is `/plan`. Real robots load through `/urdf`. Batches of poses are checked on the GPU by `/gpu`. This package does not implement dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or call `/plan`.
+Motion between frames is checked by `/swept` above. Concave obstacles are in `/sdf`. This package does not implement dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, or reposition the target.

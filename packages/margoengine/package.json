@@ -1050,33 +1050,13 @@
       "types": "./dist/kinematics-constraints.d.ts",
       "import": "./dist/kinematics-constraints.js"
     },
-    "./kinematics-constraints/robot": {
-      "types": "./dist/kinematics-constraints/robot.d.ts",
-      "import": "./dist/kinematics-constraints/robot.js"
-    },
     "./kinematics-constraints/swept": {
       "types": "./dist/kinematics-constraints/swept.d.ts",
       "import": "./dist/kinematics-constraints/swept.js"
     },
-    "./kinematics-constraints/limits": {
-      "types": "./dist/kinematics-constraints/limits.d.ts",
-      "import": "./dist/kinematics-constraints/limits.js"
-    },
     "./kinematics-constraints/sdf": {
       "types": "./dist/kinematics-constraints/sdf.d.ts",
       "import": "./dist/kinematics-constraints/sdf.js"
-    },
-    "./kinematics-constraints/plan": {
-      "types": "./dist/kinematics-constraints/plan.d.ts",
-      "import": "./dist/kinematics-constraints/plan.js"
-    },
-    "./kinematics-constraints/urdf": {
-      "types": "./dist/kinematics-constraints/urdf.d.ts",
-      "import": "./dist/kinematics-constraints/urdf.js"
-    },
-    "./kinematics-constraints/gpu": {
-      "types": "./dist/kinematics-constraints/gpu.d.ts",
-      "import": "./dist/kinematics-constraints/gpu.js"
     },
     "./labels": {
       "types": "./dist/labels.d.ts",

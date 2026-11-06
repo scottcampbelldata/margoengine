@@ -42,6 +42,22 @@ test('the removed building-model package and its runtime are reported, and the b
   assert.deepEqual(hitsInLine(`a .${name} file, ${name.toUpperCase()}4 and ${name}`), []);
 });
 
+test('the five entries that moved out of the kinematics package are reported; the kept entries and the bare words are not', () => {
+  const pkg = `${word(107, 105, 110, 101, 109, 97, 116, 105, 99, 115)}-${word(99, 111, 110, 115, 116, 114, 97, 105, 110, 116, 115)}`,
+    gone = [
+      word(114, 111, 98, 111, 116),
+      word(112, 108, 97, 110),
+      word(117, 114, 100, 102),
+      word(103, 112, 117),
+      word(108, 105, 109, 105, 116, 115),
+    ];
+  for (const name of gone) {
+    assert.notDeepEqual(hitsInLine(`import x from 'margoengine/${pkg}/${name}'`), [], name);
+    assert.deepEqual(hitsInLine(`a ${name} in a sentence`), [], name);
+  }
+  for (const name of ['swept', 'sdf']) assert.deepEqual(hitsInLine(`import x from 'margoengine/${pkg}/${name}'`), [], name);
+});
+
 test('ordinary text, IFC files and the kept names pass; binary data is skipped', () => {
   assert.deepEqual(hitsInLine('CAD camera controls, a step function, section planes in prose, featureEdges'), []);
   assert.deepEqual(hitsInLine("ISO-10303-21;\nHEADER;\nFILE_SCHEMA(('IFC4'));"), []);

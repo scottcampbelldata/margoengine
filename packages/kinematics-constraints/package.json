@@ -27,33 +27,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./robot": {
-      "types": "./dist/robot.d.ts",
-      "import": "./dist/robot.js"
-    },
     "./swept": {
       "types": "./dist/swept.d.ts",
       "import": "./dist/swept.js"
     },
-    "./limits": {
-      "types": "./dist/limits.d.ts",
-      "import": "./dist/limits.js"
-    },
     "./sdf": {
       "types": "./dist/sdf.d.ts",
       "import": "./dist/sdf.js"
-    },
-    "./plan": {
-      "types": "./dist/plan.d.ts",
-      "import": "./dist/plan.js"
-    },
-    "./urdf": {
-      "types": "./dist/urdf.d.ts",
-      "import": "./dist/urdf.js"
-    },
-    "./gpu": {
-      "types": "./dist/gpu.d.ts",
-      "import": "./dist/gpu.js"
     }
   },
   "files": [
@@ -68,22 +48,17 @@
     "build": "node ../../scripts/build-optional.js kinematics-constraints",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "node ../../scripts/test-kinematics-constraints-browser.js",
-    "test:gpu": "npm run build && node ../../scripts/test-kinematics-constraints-gpu.js",
     "prepack": "npm run build"
   },
   "peerDependencies": {
     "@margoengine/bvh": "^1.0.0",
-    "@margoengine/geometry": "^1.0.0",
-    "@margoengine/loaders": "^1.0.0"
+    "@margoengine/geometry": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/bvh": {
       "optional": true
     },
     "@margoengine/geometry": {
-      "optional": true
-    },
-    "@margoengine/loaders": {
       "optional": true
     }
   }

@@ -1841,13 +1841,6 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **RTX A6000, Chromium, seven rounds, ms at 256, 16,777,216 elements:** reduce 2.69, scan 0.59, sort 12.06. No size beat 256 beyond one timestamp step. 1024 threads cost 56 to 72 percent more on all three, so the size does matter, and the default is good on this card.
 - **How:** the `tuneCompute` check of `packages/compute/tests/compute-autotune-browser.js` prints every timing. Diagnostic: lanes shared the A6000, the M6 ran alone but timestamps are rounded.
 
-### 78. `GPUClearance`: a batch of robot poses at once (diagnostic)
-
-- **Before:** `Robot.clearance` on the CPU, one pose at a time.
-- **Change:** one compute invocation per pose in `@margoengine/kinematics-constraints/gpu`: same shapes, same colliders, same self check, f32 where the CPU has f64. An overlap reads zero or less with no depth, which the CPU works out, so the GPU does less on those poses; `Roadmap.addPoses` proves on the CPU every pose it keeps.
-- **RTX A6000, Chromium, real Panda with its STL hulls, a hull and a sphere as colliders, self check on, three runs:** 16,384 poses in 107, 108 and 110 ms, readback included. The CPU, in the same page and scaled from 1,024 poses, took about 2,299, 1,949 and 2,923 ms for the same count. 18 to 27 times, and the CPU figure is the one that moved.
-- **How:** the diagnostic line of `npm run test:gpu -w @margoengine/kinematics-constraints`. Diagnostic: lanes shared the A6000 and the machine. The kernel has no broad phase.
-
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1910,6 +1903,5 @@ These entries lack a recorded number, a named machine or a quiet run:
 20. meshopt on Wasm SIMD (entry 75): a quiet run, including the first compile.
 21. Sculpting (entry 76): a quiet run, and a committed timing script.
 22. `tuneCompute` (entry 77): a quiet run on the A6000 and the M6, and an AMD and an Intel GPU.
-23. `GPUClearance` (entry 78): a quiet run, on more than the A6000.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

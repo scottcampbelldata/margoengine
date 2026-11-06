@@ -1143,7 +1143,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B5 | ANGLE Direct3D 11 measured and parked with C11: 50 minutes on three variants, split into passes needed | PARKED | `2ed352804` | LIM-162 |
 | B7 | Sculpting follows the brush: grids, local topology passes, delta undo, SculptView with ranged uploads, browser check (closes C13) | DONE | `8eaaf29dd` | LIM-064 |
 | B10 | Workgroup autotuning for the package's own kernels | DONE | `dd10fafb1` | LIM-082 |
-| B11 | autoLOD levels skinned, morphed and flat-shaded models, node animation follows | DONE | `d34fd6c26` | LIM-147, LIM-252 |
+| B11 | autoLOD levels skinned, morphed and flat-shaded models, node animation follows | DONE | `d34fd6c26` | LIM-147, LIM-255 |
 | B12 | MeshletMesh parts, Hi-Z, shadow clusters | DONE | `e3e3d5958` | LIM-145 |
 | B13 | addScene lights, cameras, one load per URL | DONE | `37b0150f9` | LIM-131 |
 | B14 | sceneColor reads the frame; ScenePass shares models with SSR | DONE | `5d07337d5` | LIM-192 |
@@ -1153,6 +1153,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B18 | Shadow resolution, cascades and fog on or off scale by measured cost | DONE | `75a9990ef` | - |
 | B19 | Long-tail formats: 3DS cameras, lights, keyframes; every LWO map, image map and bone; placed KMZ; loadTextures; parsePCX | DONE | this commit | LIM-195 |
 | IFC | IFC package taken out of this repository, it stays private; 99 public packages | DONE | this commit | - |
+| ROBOT | Robot planning taken out of this repository, it stays private; /swept and /sdf kept | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 
@@ -1195,16 +1196,12 @@ Six jobs took `@margoengine/ragdoll` from a limp body to a character that stays 
 
 ## Batch 85: kinematics-constraints
 
-Six jobs took `@margoengine/kinematics-constraints` from one chain and one instant to a robot that plans: motion checked between frames, a solver that respects joint limits, concave obstacles, three sampling planners, real URDF files, and batches of poses on the GPU. Each is an optional entry; core and stage did not change. `@margoengine/loaders` gained an `./xml` entry for job 5.
+Six jobs took `@margoengine/kinematics-constraints` past one chain and one instant. Motion checked between frames and concave obstacles stay here as optional entries, and `@margoengine/loaders` kept the `./xml` entry the batch added. The other parts moved out of this repository on 2026-11-06. Core and stage did not change.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Swept collision | DONE | 00c215c42 | `/swept`, `/robot` | LIM-251 |
-| 2 | Joint-limit solver | DONE | 031456b6a | `/limits` | LIM-252 |
+| 1 | Swept collision | DONE | 00c215c42 | `/swept` | LIM-251 |
 | 3 | Concave obstacles | DONE | 694f07857 | `/sdf` | LIM-254 |
-| 4 | Motion planner | DONE | 5b41d3e93 | `/plan` | LIM-257 |
-| 5 | URDF import | DONE | 5952a1649 | `/urdf` | LIM-260 |
-| 6 | Batched GPU clearance | DONE | this commit | `/gpu` | LIM-263 |
 
 - **A bug reached main:** job 1's README example gave a `Float64Array` where a `Float32Array` belongs, a type error the landing did not stop on. Job 2 fixed it. The check that caught it lived in the lane's scratch folder and went when that was deleted, so it moved into the repository: `npm run check:readmes`, a step of `verify`, with `tests/readme-types.test.js`. `modern:test:packages` had always type-checked these examples, but only check:merge runs it and no landing does, so the gap covered every package. The new check found 715 errors in 181 examples; 388 were fixed and the rest, 329 with two from a later landing, are listed in `docs/known-bugs.md`.
 - **Landings stopped, nothing failed reached main:** job 3 at verify, on the duplicates gate. Job 5 twice: at verify, on an entry no test imported, which gained `packages/loaders/tests/xml-entry.test.js`, and at a rebase conflict in the supply-chain list, resolved by hand keeping both entries. Job 6 at verify, because the package gained shaders and the WGSL corpus did not cover it; the corpus was recorded again with `--add`. Job 6 stopped again at the claim-number check, `tests/claims-file.test.js`.
@@ -1240,3 +1237,9 @@ Five jobs took `@margoengine/tween` from single tweens to the things a motion de
 - **Limits:** a stagger's offsets are fixed at the call. Motion path rotation keeps no world up, and a `yoyo` pass backs up. Scroll follows the main thread's `scroll` event, so it can trail a compositor scroll by a frame, and `Timeline.call` callbacks do not run. A custom ease's x only moves forward. `bounce` stays between -1 and 1. `docs/limits.md` has them all.
 - **Unmeasured:** no job has a timed number. Touch scrolling has not run on a device.
 - **Gate:** lint, hygiene, verify and the package tests for each job, the splines tests for job 2, and for job 3 `test:browser`, the push from one script that stops at the first failing step. `modern:test:packages` ran once, on labels and the umbrella, for job 0's change to it.
+- **A bug reached main:** job 1's README example gave a `Float64Array` where a `Float32Array` belongs, a type error the landing did not stop on. It was fixed in the next job, and the lane's README check now type-checks an example before a commit.
+- **Landings stopped, nothing failed reached main:** job 3 at verify, on the duplicates gate.
+- **Proved:** job 1 against closed-form contacts and 120 seeded motions. Job 3 on a generated torus and the real Lantern.glb.
+- **Limits:** colliders hold still during a swept check. `docs/limits.md` has them all.
+- **Unmeasured:** neither job has a timed number.
+- **Gate:** lint, hygiene, verify, the package tests, `tests/claims-file.test.js`, the push from one script that stops at the first failing step.

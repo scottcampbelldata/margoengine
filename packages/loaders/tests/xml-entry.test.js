@@ -22,8 +22,8 @@ test('readXML streams in order and a broken document names the format', () => {
     text: (text) => seen.push(text),
   });
   assert.deepEqual(seen, ['open a', 'open b', 'c', 'close b', 'close a']);
-  assert.throws(() => readXMLTree('<a><b></a>', 'URDF'), /URDF/);
-  assert.throws(() => readXMLTree('<a>', 'URDF'), /document ends inside <a>/);
+  assert.throws(() => readXMLTree('<a><b></a>', 'Scene file'), /Scene file/);
+  assert.throws(() => readXMLTree('<a>', 'Scene file'), /document ends inside <a>/);
 });
 
 test('decodeXML reads UTF-8 and follows a UTF-16 byte order mark', () => {

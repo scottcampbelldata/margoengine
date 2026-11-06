@@ -12,20 +12,6 @@ export interface DistanceField {
     spacing?: ArrayLike<number>;
 }
 
-export interface GridColliderData {
-    samples: Float32Array;
-    size: readonly [number, number, number];
-    min: ArrayLike<number>;
-    max: ArrayLike<number>;
-    spacing: ArrayLike<number>;
-    inverse: Float64Array;
-    scale: number;
-    margin: number;
-    precision: number;
-    lipschitz: number;
-    maxCells: number;
-}
-
 export class MeshVolume implements ConstraintVolume {
     constructor(options: MeshVolumeOptions);
     setTransform(matrix: ArrayLike<number>): this;
@@ -45,7 +31,6 @@ export class SDFVolume implements ConstraintVolume {
     readonly precision: number;
     constructor(options: SDFVolumeOptions);
     setTransform(matrix: ArrayLike<number>): this;
-    gridData(): GridColliderData | null;
     evaluate(point: Vec3View, outPoint: MutableVec3View, outDirection: MutableVec3View): number;
     segmentClearance(start: Vec3View, end: Vec3View, radius: number): number;
     hullClearanceInto(hull: ConvexHullVolume, out: Float64Array): void;

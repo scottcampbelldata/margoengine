@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9070398,
+  "total": 8985405,
   "history": [
     {
       "date": "2026-10-24",
@@ -2670,7 +2670,7 @@
     {
       "date": "2026-11-06",
       "commit": "eddde5ca1",
-      "reason": "feat(kinematics-constraints): swept collision between frames (new entries @margoengine/kinematics-constraints/swept and /robot)",
+      "reason": "feat(kinematics-constraints): swept collision between frames (new entry @margoengine/kinematics-constraints/swept)",
       "grew": 2
     },
     {
@@ -2682,7 +2682,7 @@
     {
       "date": "2026-11-06",
       "commit": "11babcfbb",
-      "reason": "feat(kinematics-constraints): joint-limit solver (new entry @margoengine/kinematics-constraints/limits)",
+      "reason": "kinematics-constraints: a new entry, moved out on 2026-11-06",
       "grew": 1
     },
     {
@@ -2718,7 +2718,7 @@
     {
       "date": "2026-11-06",
       "commit": "8e64347df",
-      "reason": "feat(kinematics-constraints): motion planner (new entry @margoengine/kinematics-constraints/plan)",
+      "reason": "kinematics-constraints: a new entry, moved out on 2026-11-06",
       "grew": 1
     },
     {
@@ -2736,7 +2736,7 @@
     {
       "date": "2026-11-06",
       "commit": "dbecac7f4",
-      "reason": "URDF import: new optional entry; /xml in loaders",
+      "reason": "kinematics-constraints: a new entry, moved out on 2026-11-06; /xml in loaders",
       "grew": 2
     },
     {
@@ -2772,7 +2772,7 @@
     {
       "date": "2026-11-06",
       "commit": "b687c84b3",
-      "reason": "feat(kinematics-constraints): batched GPU clearance (new entry @margoengine/kinematics-constraints/gpu)",
+      "reason": "kinematics-constraints: a new entry, moved out on 2026-11-06",
       "grew": 2
     },
     {
@@ -3105,13 +3105,8 @@
     "@margoengine/inspector/resources": 902,
     "@margoengine/inspector/snapshot": 1320,
     "@margoengine/kinematics-constraints": 11751,
-    "@margoengine/kinematics-constraints/gpu": 22976,
-    "@margoengine/kinematics-constraints/limits": 13664,
-    "@margoengine/kinematics-constraints/plan": 16249,
-    "@margoengine/kinematics-constraints/robot": 10561,
     "@margoengine/kinematics-constraints/sdf": 7230,
-    "@margoengine/kinematics-constraints/swept": 9703,
-    "@margoengine/kinematics-constraints/urdf": 13599,
+    "@margoengine/kinematics-constraints/swept": 9491,
     "@margoengine/labels": 4756,
     "@margoengine/lighting2d": 4389,
     "@margoengine/lightmap": 4053,

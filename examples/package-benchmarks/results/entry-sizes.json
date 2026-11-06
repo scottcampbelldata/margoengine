@@ -1095,33 +1095,13 @@
         "raw": 35812,
         "gzip": 11566
       },
-      "./robot": {
-        "raw": 28489,
-        "gzip": 10253
-      },
       "./swept": {
         "raw": 25757,
         "gzip": 9427
       },
-      "./limits": {
-        "raw": 37493,
-        "gzip": 13428
-      },
       "./sdf": {
         "raw": 19465,
         "gzip": 7220
-      },
-      "./plan": {
-        "raw": 45485,
-        "gzip": 15943
-      },
-      "./urdf": {
-        "raw": 37266,
-        "gzip": 13364
-      },
-      "./gpu": {
-        "raw": 65451,
-        "gzip": 22306
       }
     },
     "@margoengine/labels": {

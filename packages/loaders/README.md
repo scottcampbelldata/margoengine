@@ -720,7 +720,7 @@ import { readXMLTree } from 'margoengine/loaders/xml';
 import {parseTMX, tmxLayerQuads} from 'margoengine/loaders';
 declare const bytes: Uint8Array;
 
-const root = readXMLTree('<robot name="arm"><link name="base"/></robot>', 'URDF');
+const root = readXMLTree('<scene name="yard"><item name="crate"/></scene>', 'Scene file');
 const robot = root.children[0];
 console.log(robot.name, robot.attributes.name, robot.children.length); // robot arm 1
 ```

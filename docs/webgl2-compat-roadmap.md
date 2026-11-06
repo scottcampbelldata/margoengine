@@ -334,8 +334,8 @@ budgets and GPU-driven culling on WebGL2.
    sRGB encode is expected and is not a bug; the 0.1% allows depth ties along silhouettes; the mean catches a small
    shift over the whole image (a wrong light colour or exposure), which a share-of-pixels gate alone would miss. M2
    measures the run-to-run noise of both paths first; the tolerance may tighten, and it never loosens without Scott.
-5. **Corpus storage.** The corpus is in the repository: 786 distinct modules with entry points (3,405,543 bytes of
-   WGSL) from 41 packages plus bundled site pages, recorded from `check:wgsl`, every package GPU test, `check:views`,
+5. **Corpus storage.** The corpus is in the repository: 848 distinct modules with entry points (3,710,001 bytes of
+   WGSL) from 50 packages plus bundled site pages, recorded from `check:wgsl`, every package GPU test, `check:views`,
    `check:depth` and the visual check (the path tracer's suite in Chrome, see `docs/known-bugs.md`). It is kept small enough by storing the sources, pipeline layouts and pipelines
    Brotli-compressed (`corpus.json.br`, about 166 KB) beside a plain-text manifest (about 226 KB, one line per
    module); the manifest pins the SHA-256 of the data, and `npm run record:wgsl-corpus` rebuilds both. The corpus test

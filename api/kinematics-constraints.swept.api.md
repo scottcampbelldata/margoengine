@@ -8,10 +8,6 @@ export interface ChainSweepOptions extends SweepOptions {
     jointRadius?: number | readonly number[];
 }
 
-export interface RobotSweepOptions extends SweepOptions {
-    selfCollision?: boolean;
-}
-
 export interface SweepOptions {
     minClearance?: number;
     tolerance?: number;
@@ -31,8 +27,6 @@ export interface SweepResult {
 export function sweepChain(from: readonly Vec3View[], to: readonly Vec3View[], colliders: readonly ConstraintVolume[], options: ChainSweepOptions): SweepResult;
 
 export function sweepHull(hull: ConvexHullVolume, from: ArrayLike<number>, to: ArrayLike<number>, colliders: readonly ConstraintVolume[], options?: SweepOptions): SweepResult;
-
-export function sweepRobot(robot: Robot, from: ArrayLike<number>, to: ArrayLike<number>, colliders: readonly ConstraintVolume[], options?: RobotSweepOptions): SweepResult;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -63,93 +57,6 @@ interface ConvexHullVolumeOptions {
 }
 
 type MutableVec3View = [number, number, number] | Float32Array | Float64Array;
-
-class Robot {
-    readonly dof: number;
-    readonly jointCount: number;
-    readonly shapeCount: number;
-    readonly lower: Float64Array;
-    readonly upper: Float64Array;
-    readonly jointNames: readonly string[];
-    readonly variableNames: readonly string[];
-    readonly parents: Int32Array;
-    readonly shapeJoints: Int32Array;
-    readonly frames: Float64Array;
-    constructor(options: RobotOptions);
-    jointIndex(name: string): number;
-    setBase(matrix: ArrayLike<number>): this;
-    describe(): RobotData;
-    within(q: ArrayLike<number>, slack?: number): boolean;
-    clamp(q: ArrayLike<number>, out?: Float64Array): Float64Array;
-    forward(q: ArrayLike<number>): Float64Array;
-    frameMatrix(joint: number, out?: Float64Array): Float64Array;
-    pointOn(joint: number, point: Vec3View, out?: Float64Array): Float64Array;
-    jacobian(joint: number, point: Vec3View, out?: Float64Array): Float64Array;
-    place(q: ArrayLike<number>): void;
-    shapeGap(shape: number, volume: ConstraintVolume): number;
-    pairGap(a: number, b: number): number;
-    get selfCollisionPairs(): Int32Array;
-    ignoreContactsAt(q: ArrayLike<number>, gap?: number): this;
-    clearance(q: ArrayLike<number>, colliders: readonly ConstraintVolume[], selfCollision?: boolean): number;
-    get nearestShape(): number;
-    get nearestCollider(): number;
-    motionBounds(from: ArrayLike<number>, to: ArrayLike<number>, out?: Float64Array): Float64Array;
-}
-
-interface RobotCapsuleShape {
-    joint: number | string | null;
-    start?: Vec3View;
-    end?: Vec3View;
-    radius: number;
-}
-
-interface RobotData {
-    kinds: Uint8Array;
-    parents: Int32Array;
-    variable: Int32Array;
-    multipliers: Float64Array;
-    offsets: Float64Array;
-    origins: Float64Array;
-    axes: Float64Array;
-    base: Float64Array;
-    shapes: {
-        joint: number;
-        radius: number;
-        points: Float64Array;
-    }[];
-}
-
-interface RobotHullShape {
-    joint: number | string | null;
-    points: ArrayLike<number>;
-    matrix?: ArrayLike<number>;
-    maxPoints?: number;
-}
-
-interface RobotJointOptions {
-    name?: string;
-    type?: RobotJointType;
-    parent?: number | string | null;
-    origin?: ArrayLike<number>;
-    axis?: Vec3View;
-    lower?: number;
-    upper?: number;
-    mimic?: {
-        joint: number | string;
-        multiplier?: number;
-        offset?: number;
-    };
-}
-
-type RobotJointType = 'revolute' | 'continuous' | 'prismatic' | 'fixed';
-
-interface RobotOptions {
-    joints: readonly RobotJointOptions[];
-    shapes?: readonly RobotShapeOptions[];
-    base?: ArrayLike<number>;
-}
-
-type RobotShapeOptions = RobotCapsuleShape | RobotHullShape;
 
 type Vec3View = readonly [number, number, number] | Float32Array | Float64Array;
 ```

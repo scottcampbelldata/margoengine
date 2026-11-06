@@ -7,10 +7,8 @@ import test from 'node:test';
 import { MeshBVH } from '../../bvh/dist/index.js';
 import { bakeSDF } from '../../bvh/dist/sdf.js';
 import { AvoidanceSolver, ConvexHullVolume, SolveStatus } from '../dist/index.js';
-import { JointLimitSolver } from '../dist/limits.js';
-import { Robot } from '../dist/robot.js';
 import { MeshVolume, SDFVolume } from '../dist/sdf.js';
-import { sweepHull, sweepRobot } from '../dist/swept.js';
+import { sweepChain, sweepHull } from '../dist/swept.js';
 
 const translate = (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
 function random(seed) {
@@ -178,23 +176,17 @@ test('a link passes through the hole of a ring; its convex proxy blocks the same
     points = [];
   for (let i = 0; i < ring.positions.length; i += 3 * 37) points.push(ring.positions[i], ring.positions[i + 1], ring.positions[i + 2]);
   const proxy = new ConvexHullVolume({ points, maxPoints: points.length }),
-    slider = new Robot({
-      joints: [{ type: 'prismatic', axis: [0, 0, 1], lower: -5, upper: 5 }],
-      shapes: [{ joint: 0, end: [0, 0, 0.5], radius: 0.1 }],
-    }),
-    from = [-3],
-    to = [3];
-  assert.equal(sweepRobot(slider, from, to, [proxy]).clear, false, 'the proxy fills the hole');
-  assert.equal(sweepRobot(slider, from, to, [new MeshVolume({ bvh })], { minClearance: 0.01 }).clear, true);
+    link = (z) => [[0, 0, z], [0, 0, z + 0.5]],
+    from = link(-3),
+    to = link(3);
+  assert.equal(sweepChain(from, to, [proxy], { radius: 0.1 }).clear, false, 'the proxy fills the hole');
+  assert.equal(sweepChain(from, to, [new MeshVolume({ bvh })], { radius: 0.1, minClearance: 0.01 }).clear, true);
   const field = new SDFVolume({ field: bakeSDF(bvh, { resolution: 40 }) });
-  assert.equal(sweepRobot(slider, from, to, [field], { minClearance: 0.01 }).clear, true);
+  assert.equal(sweepChain(from, to, [field], { radius: 0.1, minClearance: 0.01 }).clear, true);
   // Off the axis by the ring's radius it meets the tube, on the mesh, on the field and at the same height.
-  const off = new Robot({
-      joints: [{ type: 'prismatic', axis: [0, 0, 1], lower: -5, upper: 5, origin: translate(1, 0, 0) }],
-      shapes: [{ joint: 0, radius: 0.1 }],
-    }),
-    onMesh = sweepRobot(off, from, to, [new MeshVolume({ bvh })], { tolerance: 1e-4 }),
-    onField = sweepRobot(off, from, to, [field], { tolerance: 1e-4 });
+  const ball = (z) => [[1, 0, z], [1, 0, z]],
+    onMesh = sweepChain(ball(-3), ball(3), [new MeshVolume({ bvh })], { radius: 0.1, tolerance: 1e-4 }),
+    onField = sweepChain(ball(-3), ball(3), [field], { radius: 0.1, tolerance: 1e-4 });
   assert.equal(onMesh.clear, false);
   assert.equal(onField.clear, false);
   assert.ok(Math.abs(-3 + onMesh.time * 6 - -0.3) < 0.01);
@@ -263,25 +255,11 @@ test('the solvers take them as they are: a target is pushed out of a bowl mesh, 
   assert.equal(solver.targetResult.resolved, true);
   assert.ok(Math.abs(Math.hypot(...resolved) - 1) >= 0.05 - 1e-3, 'projected the shell off the surface');
   assert.equal(SolveStatus.Success, 0);
-  const arm = new Robot({
-      joints: [
-        { type: 'prismatic', axis: [0, 0, 1], lower: -1, upper: 2, origin: translate(0, 0, 0) },
-        { name: 'tip', type: 'fixed', origin: translate(0, 0, 0) },
-      ],
-      shapes: [{ joint: 0, end: [0, 0, 2], radius: 0.05 }],
-    }),
-    reach = new JointLimitSolver(arm, { tip: 'tip', colliders: [bowl], minClearance: 0.02 }).solve([1], {
-      position: [0, 0, -0.8],
-    });
-  // Into the bowl, where a convex proxy would stand in the way.
-  assert.equal(reach.reached, true);
-  const stop = new JointLimitSolver(arm, { tip: 'tip', colliders: [bowl], minClearance: 0.02 }).solve([1], {
-    position: [0, 0, -1],
-  });
-  assert.equal(stop.reached, false);
-  assert.equal(stop.blocked, true);
-  // The capsule's tip stands its radius plus the gap above the bottom of the bowl, facets aside.
-  assert.ok(Math.abs(stop.q[0] - (-1 + 0.07)) < 0.01);
+  // Into the bowl, where a convex proxy would stand in the way: the capsule's tip stops its radius plus the gap above the
+  // bottom, facets aside.
+  const drop = sweepChain([[0, 0, 1], [0, 0, 3]], [[0, 0, -1.5], [0, 0, 0.5]], [bowl], { radius: 0.05, minClearance: 0.02 });
+  assert.equal(drop.clear, false);
+  assert.ok(Math.abs(1 - 2.5 * drop.time - (-1 + 0.07)) < 0.01);
 });
 
 /** Positions and indices of the first primitive of a glb. */

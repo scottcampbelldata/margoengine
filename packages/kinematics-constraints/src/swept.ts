@@ -6,7 +6,6 @@
 // however thin. Written clean room from those publications.
 import { rangeError, typeError } from '../../shared/errors.js';
 import { ConvexHullVolume, hullPoints } from './hull.js';
-import type { Robot } from './robot.js';
 import type { ConstraintVolume, Vec3View } from './types.js';
 import { readVector, validateVector } from './types.js';
 import { segmentVolumeInto, type SegmentDistanceResult } from './volumes.js';
@@ -19,11 +18,6 @@ export interface SweepOptions {
   tolerance?: number;
   /** Most poses tested; a motion that needs more ends `exhausted`, not clear. Default 4,096. */
   maxSteps?: number;
-}
-/** Settings of {@link sweepRobot}. */
-export interface RobotSweepOptions extends SweepOptions {
-  /** Also check the robot's shapes against each other (see `Robot.selfCollisionPairs`). Default false. */
-  selfCollision?: boolean;
 }
 /** Settings of {@link sweepChain}. */
 export interface ChainSweepOptions extends SweepOptions {
@@ -48,9 +42,9 @@ export interface SweepResult {
   clearance: number;
   /** Poses tested. */
   steps: number;
-  /** Moving shape at the contact, or -1: a robot's shape index, a chain's link index, then its joints after its links. */
+  /** Moving shape at the contact, or -1: a chain's link index, then its joints after its links; 0 for a hull. */
   shape: number;
-  /** Index of the collider at the contact; -1 for none, and `-2 - other` for another shape of the same robot. */
+  /** Index of the collider at the contact; -1 for none. */
   collider: number;
 }
 
@@ -63,9 +57,6 @@ interface Motion {
   place(t: number): void;
   /** Signed gap of one shape to one collider. */
   gap(shape: number, volume: ConstraintVolume): number;
-  /** Pairs of shapes that may not meet, two per pair, and their gap. */
-  pairs?: Int32Array;
-  pairGap?(a: number, b: number): number;
 }
 
 function settings(options: SweepOptions | undefined) {
@@ -88,7 +79,6 @@ function advance(
   maxSteps: number,
 ): SweepResult {
   const { count, speed } = motion,
-    pairs = motion.pairs,
     result: SweepResult = {
       clear: false,
       exhausted: false,
@@ -122,24 +112,6 @@ function advance(
       }
       if (moving > 0 && least / moving < step) step = least / moving;
     }
-    if (pairs) {
-      for (let i = 0; i < pairs.length; i += 2) {
-        const a = pairs[i],
-          b = pairs[i + 1],
-          moving = speed[a] + speed[b];
-        if (moving === 0 && t > 0) continue;
-        const gap = motion.pairGap!(a, b) - minClearance;
-        if (Number.isNaN(gap)) throw rangeError('A pair of shapes gave no finite clearance', 'kinematics');
-        if (gap < result.clearance) result.clearance = gap;
-        if (gap <= tolerance) {
-          result.time = t;
-          result.shape = a;
-          result.collider = -2 - b;
-          return result;
-        }
-        if (moving > 0 && gap / moving < step) step = gap / moving;
-      }
-    }
     result.time = t;
     if (t >= 1 || step === Infinity) {
       result.time = 1;
@@ -152,56 +124,6 @@ function advance(
     }
     t = Math.min(1, t + step);
   }
-}
-
-/**
- * Checks a robot's whole motion on the straight path in joint space from `from` to `to`, the path any joint-space
- * interpolation plays. A collider that stands between the ends is found, however fast the motion: the check never
- * steps past a contact. Colliders hold still during the check.
- *
- * @example
- * ```ts
- * import { CapsuleVolume } from 'margoengine/kinematics-constraints';
- * import { Robot } from 'margoengine/kinematics-constraints/robot';
- * import { sweepRobot } from 'margoengine/kinematics-constraints/swept';
- *
- * const arm = new Robot({
- *   joints: [{ lower: -3, upper: 3 }],
- *   shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.05 }],
- * });
- * const wall = new CapsuleVolume({ start: [0.7, 0.7, -1], end: [0.7, 0.7, 1], radius: 0.01 });
- * const hit = sweepRobot(arm, [0], [2], [wall]); // both ends are clear; the motion is not
- * if (!hit.clear) console.log('stop at', hit.time);
- * ```
- */
-export function sweepRobot(
-  robot: Robot,
-  from: ArrayLike<number>,
-  to: ArrayLike<number>,
-  colliders: readonly ConstraintVolume[],
-  options?: RobotSweepOptions,
-): SweepResult {
-  const { minClearance, tolerance, maxSteps } = settings(options),
-    speed = robot.motionBounds(from, to),
-    q = new Float64Array(robot.dof),
-    self = options?.selfCollision === true;
-  return advance(
-    {
-      count: robot.shapeCount,
-      speed,
-      place(t) {
-        for (let i = 0; i < q.length; i++) q[i] = from[i] + (to[i] - from[i]) * t;
-        robot.place(q);
-      },
-      gap: (shape, volume) => robot.shapeGap(shape, volume),
-      pairs: self ? robot.selfCollisionPairs : undefined,
-      pairGap: (a, b) => robot.pairGap(a, b),
-    },
-    colliders,
-    minClearance,
-    tolerance,
-    maxSteps,
-  );
 }
 
 const closest: SegmentDistanceResult = /* @__PURE__ */ (() => ({
@@ -250,7 +172,8 @@ function bone(points: Float64Array, at: number, dirs: Float64Array, lengths: Flo
  * Checks a chain of joints, such as the root, elbow and hand an `AvoidanceSolver` gives, moving between two poses. The
  * root moves on a straight line and each bone turns on the shortest arc from its old direction to its new one, its
  * length held (or eased between the two lengths), which is the motion of bones and not of loose points. `from` and
- * `to` list the joint positions in order. See {@link sweepRobot} for what the check promises.
+ * `to` list the joint positions in order. A collider that stands between the ends is found, however fast the motion:
+ * the check never steps past a contact. Colliders hold still during the check.
  *
  * @example
  * ```ts
@@ -431,7 +354,7 @@ function rigidPose(matrix: ArrayLike<number>, name: string): RigidPose {
 /**
  * Checks a convex hull moving from one matrix to the other, for a link hull or any solid thing: its translation moves
  * on a straight line, its rotation on the shortest arc about the hull's own origin, and its scale eases between the
- * two. Matrices may hold rotation, positive scale and translation. The hull ends at `to`. See {@link sweepRobot} for
+ * two. Matrices may hold rotation, positive scale and translation. The hull ends at `to`. See {@link sweepChain} for
  * what the check promises.
  */
 export function sweepHull(
