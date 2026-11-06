@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Subgroups check</title><style>body{margin:0}#host{width:64px;height:64px}</style></head><body>
+<script type="module">
+// One graph on two devices of the same adapter: with the subgroups and shader-f16 features, and with neither. Each operation runs
+// in a compute pass and is read back with the lanes the hardware gave it, so the page's caller can work out what each lane should see.
+import {createStage} from '/packages/stage/dist/index.js';
+import {If,Let,float,storage,uint,vec2} from '/packages/shader/dist/index.js';
+import {computeReadback} from '/packages/shader/dist/readback.js';
+import {halfFloats,packHalf2,subgroups,unpackHalf2} from '/packages/shader/dist/subgroups.js';
+const N=256;
+let seed=2024;const random=()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;
+// Small whole numbers keep every f32 sum exact. Products use ones and twos: at most 2^128 lanes' worth is far past any subgroup.
+const whole=Float32Array.from({length:N},()=>Math.floor(random()*64)),small=Float32Array.from({length:N},()=>random()<0.1?2:1),bits=Uint32Array.from({length:N},()=>Math.floor(random()*2**32)),real=Float32Array.from({length:N},()=>random()*2-1);
+window.check={
+  inputs:{whole:[...whole],small:[...small],bits:[...bits],real:[...real]},
+  async run(features){
+    const host=document.createElement('div');host.id='host';document.body.append(host);
+    const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,features}),engine=stage.engine,device=engine.gpu,errors=[];
+    device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    const sg=subgroups(engine),h=halfFloats(engine),W=storage(whole.slice(),'f32'),S=storage(small.slice(),'f32'),B=storage(bits.slice(),'u32'),R=storage(real.slice(),'f32');
+    const floats=async f=>{const o=storage(N,'f32'),{data}=await computeReadback(engine,N,i=>o.store(i,f(i)),o);o.dispose();return [...data];};
+    const uints=async f=>{const o=storage(N,'u32'),{data}=await computeReadback(engine,N,i=>o.store(i,f(i)),o);o.dispose();return [...data];};
+    const big=i=>W.element(i).greaterThan(32),one=b=>uint(0).add(b.toUint());
+    const result={supported:sg.supported,half:h.supported,
+      lane:await uints(()=>sg.id),size:await uints(()=>sg.size),key:await uints(i=>sg.broadcastFirst(i)),
+      add:await floats(i=>sg.add(W.element(i))),min:await floats(i=>sg.min(W.element(i))),max:await floats(i=>sg.max(W.element(i))),mul:await floats(i=>sg.mul(S.element(i))),
+      and:await uints(i=>sg.and(B.element(i))),or:await uints(i=>sg.or(B.element(i))),xor:await uints(i=>sg.xor(B.element(i))),
+      inclusiveAdd:await floats(i=>sg.inclusiveAdd(W.element(i))),exclusiveAdd:await floats(i=>sg.exclusiveAdd(W.element(i))),
+      inclusiveMul:await floats(i=>sg.inclusiveMul(S.element(i))),exclusiveMul:await floats(i=>sg.exclusiveMul(S.element(i))),
+      all:await uints(i=>one(sg.all(big(i)))),any:await uints(i=>one(sg.any(big(i)))),ballot:await uints(i=>sg.ballot(big(i)).x),elect:await uints(()=>one(sg.elect())),
+      broadcast:await floats(i=>sg.broadcast(W.element(i),0)),first:await floats(i=>sg.broadcastFirst(W.element(i))),
+      shuffle:await floats(i=>sg.shuffle(W.element(i),sg.id)),shuffleXor:await floats(i=>sg.shuffleXor(W.element(i),sg.size.greaterThan(1).toUint())),
+      shuffleUp:await floats(i=>sg.shuffleUp(W.element(i),1)),shuffleDown:await floats(i=>sg.shuffleDown(W.element(i),1)),
+    };
+    // The real job subgroups do: one atomic per subgroup in place of one per invocation.
+    const total=storage(1,'u32',{atomic:true});
+    result.total=(await computeReadback(engine,N,i=>{const sum=Let(sg.add(B.element(i).mod(1000)));If(sg.elect(),()=>{total.atomicAdd(0,sum);});},total)).data[0];
+    result.product=await floats(i=>{const a=h.half(R.element(i)),b=h.half(float(1).div(3));return h.full(a.mul(b).add(0.25));});
+    const out=storage(N,'vec2f');
+    result.packed=[...(await computeReadback(engine,N,i=>out.store(i,unpackHalf2(packHalf2(vec2(R.element(i),float(0.1))))),out)).data];
+    await device.queue.onSubmittedWorkDone();
+    result.errors=errors;stage.dispose();host.remove();
+    return result;
+  },
+};
+window.ready=true;
+</script></body></html>

@@ -290,9 +290,9 @@ export interface Resource {
 
 export const STMT = 4;
 
-export type Scalar = 'f32' | 'i32' | 'u32' | 'bool';
+export type Scalar = 'f32' | 'f16' | 'i32' | 'u32' | 'bool';
 
-export type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix ? 'f32' : T extends 'i32' | `vec${N}i` ? 'i32' : T extends 'u32' | `vec${N}u` ? 'u32' : 'bool';
+export type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix ? 'f32' : T extends 'f16' | `vec${N}h` ? 'f16' : T extends 'i32' | `vec${N}i` ? 'i32' : T extends 'u32' | `vec${N}u` ? 'u32' : 'bool';
 
 export interface ShaderStage {
     readonly kind: 'vertex' | 'fragment' | 'post' | 'compute';
@@ -369,9 +369,9 @@ export class VarNode<T extends Type = Type> extends Node<T> {
     assignElement(index: NodeInput<'i32' | 'u32'>, value: NodeInput): void;
 }
 
-export type VecOf<S extends Scalar, K extends number> = K extends 1 ? S : S extends 'bool' ? `vec${K & N}<bool>` : `vec${K & N}${S extends 'f32' ? 'f' : S extends 'i32' ? 'i' : 'u'}`;
+export type VecOf<S extends Scalar, K extends number> = K extends 1 ? S : S extends 'bool' ? `vec${K & N}<bool>` : `vec${K & N}${S extends 'f32' ? 'f' : S extends 'f16' ? 'h' : S extends 'i32' ? 'i' : 'u'}`;
 
-export type Vector = `vec${N}${'f' | 'i' | 'u'}` | `vec${N}<bool>`;
+export type Vector = `vec${N}${'f' | 'h' | 'i' | 'u'}` | `vec${N}<bool>`;
 
 export function While(condition: Node<'bool'>, body: Body): void;
 

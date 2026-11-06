@@ -4,9 +4,9 @@ import { hexColor, SRGBToLinear } from '@margoengine/math/color';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type N = 2 | 3 | 4;
 /** WGSL scalar types a node can have. */
-export type Scalar = 'f32' | 'i32' | 'u32' | 'bool';
+export type Scalar = 'f32' | 'f16' | 'i32' | 'u32' | 'bool';
 /** WGSL vector types with 2-4 components (`vec3f`, `vec2u`, `vec4<bool>`, ...). */
-export type Vector = `vec${N}${'f' | 'i' | 'u'}` | `vec${N}<bool>`;
+export type Vector = `vec${N}${'f' | 'h' | 'i' | 'u'}` | `vec${N}<bool>`;
 /** Square f32 matrix types (column-major, as WGSL stores them). */
 export type Matrix = 'mat2x2f' | 'mat3x3f' | 'mat4x4f';
 /** Every WGSL type a {@link Node} can have; `Node<T>` carries it in its TypeScript type and in `node.type`. */
@@ -14,11 +14,13 @@ export type Type = Scalar | Vector | Matrix;
 /** Component scalar of a type: `ScalarOf<'vec3f'>` is `'f32'` (matrices are f32). */
 export type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix
   ? 'f32'
-  : T extends 'i32' | `vec${N}i`
-    ? 'i32'
-    : T extends 'u32' | `vec${N}u`
-      ? 'u32'
-      : 'bool';
+  : T extends 'f16' | `vec${N}h`
+    ? 'f16'
+    : T extends 'i32' | `vec${N}i`
+      ? 'i32'
+      : T extends 'u32' | `vec${N}u`
+        ? 'u32'
+        : 'bool';
 /** Component count of a vector type, 1 for scalars and matrices. */
 export type Size<T extends Type> = T extends `vec${infer K extends number}${string}` ? K : 1;
 /** The type with scalar `S` and `K` components: `VecOf<'f32', 3>` is `'vec3f'`, `VecOf<'u32', 1>` is `'u32'`. */
@@ -26,7 +28,7 @@ export type VecOf<S extends Scalar, K extends number> = K extends 1
   ? S
   : S extends 'bool'
     ? `vec${K & N}<bool>`
-    : `vec${K & N}${S extends 'f32' ? 'f' : S extends 'i32' ? 'i' : 'u'}`;
+    : `vec${K & N}${S extends 'f32' ? 'f' : S extends 'f16' ? 'h' : S extends 'i32' ? 'i' : 'u'}`;
 /** Result of `a op b` for + - * / %: equal types, scalar with vector or matrix, and matrix times vector. */
 export type Arith<A extends Type, B extends Type> = A extends B
   ? A
@@ -172,7 +174,7 @@ export interface Node<T extends Type = Type> extends Swizzles<T> {
   toUint(): Node<VecOf<'u32', Size<T>>>;
 }
 
-const vectorRe = /^vec([234])(f|i|u|<bool>)$/,
+const vectorRe = /^vec([234])(f|h|i|u|<bool>)$/,
   matrixRe = /^mat([234])x\1f$/;
 /** Runtime {@link ScalarOf}: `scalarOf('vec3u')` is `'u32'`. */
 export const scalarOf = (t: Type): Scalar =>
@@ -180,14 +182,14 @@ export const scalarOf = (t: Type): Scalar =>
     ? 'f32'
     : vectorRe.exec(t)?.[2] === '<bool>'
       ? 'bool'
-      : (({ f: 'f32', i: 'i32', u: 'u32' } as Record<string, Scalar>)[vectorRe.exec(t)?.[2] ?? ''] ?? (t as Scalar));
+      : (({ f: 'f32', h: 'f16', i: 'i32', u: 'u32' } as Record<string, Scalar>)[vectorRe.exec(t)?.[2] ?? ''] ?? (t as Scalar));
 /** Runtime {@link Size}: 2-4 for vectors, 1 for scalars and matrices. */
 export const sizeOf = (t: Type): number => +(vectorRe.exec(t)?.[1] ?? 1);
 /** True for `mat2x2f`, `mat3x3f` and `mat4x4f`. */
 export const isMatrix = (t: Type): boolean => matrixRe.test(t);
 /** Runtime {@link VecOf}: the type with scalar `s` and `n` (1-4) components. */
 export const vecOf = (s: Scalar, n: number): Type =>
-  (n === 1 ? s : s === 'bool' ? `vec${n}<bool>` : `vec${n}${s[0]}`) as Type;
+  (n === 1 ? s : s === 'bool' ? `vec${n}<bool>` : `vec${n}${s === 'f16' ? 'h' : s[0]}`) as Type;
 const fail = (message: string): never => {
   throw new TypeError(message);
 };
@@ -196,6 +198,7 @@ function literal(v: number | boolean, t: Scalar): string {
   if (t === 'bool') return String(!!v);
   if (typeof v !== 'number' || !Number.isFinite(v))
     return fail(`Shader constant must be a finite number, got ${String(v)}`);
+  if (t === 'f16') return v + 'h';
   if (t !== 'f32') {
     if (!Number.isInteger(v) || (t === 'u32' && v < 0)) fail(`${v} is not a valid ${t} constant`);
     return v + t[0];
@@ -897,7 +900,10 @@ export class Program {
         );
       else out.push(r.resource.declare(r.name, group, r.binding, this.compute));
     }
-    return [...out, ...this.declarations.values()].join('\n');
+    // An `enable` directive comes before every declaration of a module.
+    const declared = [...this.declarations.values()],
+      enables = declared.filter((d) => d.startsWith('enable '));
+    return [...enables, ...out, ...declared.filter((d) => !enables.includes(d))].join('\n');
   }
   /** Bind group entries; uploads uniforms (and frame values) first. */
   entries(device: GPUDevice, host: Host): GPUBindGroupEntry[] {

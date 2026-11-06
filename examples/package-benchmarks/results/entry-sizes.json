@@ -1,5 +1,5 @@
 {
-  "commit": "c3fced4f3",
+  "commit": "99f96c212",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1163,6 +1163,14 @@
         "raw": 15517,
         "gzip": 6150
       },
+      "./materialx": {
+        "raw": 13119,
+        "gzip": 4826
+      },
+      "./lottie": {
+        "raw": 17385,
+        "gzip": 7335
+      },
       "dist/workers/usd.js": {
         "raw": 21673,
         "gzip": 8348
@@ -1830,52 +1838,56 @@
     },
     "@margoengine/shader": {
       ".": {
-        "raw": 51486,
-        "gzip": 17929
+        "raw": 51712,
+        "gzip": 18012
       },
       "./noise": {
-        "raw": 14582,
-        "gzip": 5516
+        "raw": 14632,
+        "gzip": 5540
       },
       "./graph": {
-        "raw": 37364,
-        "gzip": 13569
+        "raw": 37497,
+        "gzip": 13617
       },
       "./readback": {
-        "raw": 21685,
-        "gzip": 8618
+        "raw": 21911,
+        "gzip": 8706
       },
       "./raw": {
         "raw": 37616,
         "gzip": 13254
       },
       "./effects": {
-        "raw": 19827,
-        "gzip": 8208
+        "raw": 19960,
+        "gzip": 8271
       },
       "./editor": {
-        "raw": 71650,
-        "gzip": 24024
+        "raw": 71783,
+        "gzip": 24074
       },
       "./compute-texture": {
-        "raw": 10804,
-        "gzip": 4505
+        "raw": 10854,
+        "gzip": 4530
       },
       "./lighting": {
-        "raw": 25776,
-        "gzip": 9540
+        "raw": 25909,
+        "gzip": 9599
       },
       "./deform": {
-        "raw": 7732,
-        "gzip": 3330
+        "raw": 7782,
+        "gzip": 3355
       },
       "./pass": {
-        "raw": 29530,
-        "gzip": 10993
+        "raw": 29663,
+        "gzip": 11053
       },
       "./utils": {
-        "raw": 17208,
-        "gzip": 7039
+        "raw": 17258,
+        "gzip": 7063
+      },
+      "./subgroups": {
+        "raw": 7608,
+        "gzip": 3261
       }
     },
     "@margoengine/shadows": {

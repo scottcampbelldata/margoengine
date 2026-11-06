@@ -543,6 +543,54 @@ ComputePass.attach(stage.engine, 1 << 20, i => image.store(i, globalId.toFloat()
 
 `node packages/shader/test/compute-model-check.mjs` (real GPU, under the GPU lock) checks each of these against a CPU result: a 1,024-item scan, 13 x 7 and 5 x 3 x 6 grids with the cells past the count left alone, an indirect dispatch sized by the pass before it, 256 invocations through every atomic including a compare-and-swap maximum, and a workgroup histogram.
 
+## Subgroups and half floats (`@margoengine/shader/subgroups`)
+
+WebGPU's two optional compute features as nodes. Each comes from a function of the engine, which writes the fast WGSL when
+the device has the feature and portable WGSL when it does not, so one graph runs everywhere. Ask for the features when you
+create the engine; an adapter that lacks one simply leaves it out.
+
+```ts
+import {createStage} from 'margoengine';
+import {ComputePass, If, Let, storage} from 'margoengine/shader';
+import {halfFloats, subgroups} from 'margoengine/shader/subgroups';
+const stage = await createStage('#app', {features: ['subgroups', 'shader-f16']});
+const sg = subgroups(stage.engine), h = halfFloats(stage.engine);
+
+const values = storage(new Uint32Array(1024).fill(3), 'u32'), total = storage(1, 'u32', {atomic: true});
+ComputePass.attach(stage.engine, 1024, i => {
+  const sum = Let(sg.add(values.element(i)));            // all lanes at once, kept before any branch
+  If(sg.elect(), () => { total.atomicAdd(0, sum); });    // one atomic per subgroup, not one per invocation
+});
+
+const input = storage(new Float32Array(1024).fill(0.5), 'f32'), output = storage(1024, 'f32');
+ComputePass.attach(stage.engine, 1024, i => output.store(i, h.full(h.half(input.element(i)).mul(0.25).add(1))));
+console.log(sg.supported, h.supported);
+```
+
+| Node | What each lane gets | With no `subgroups` feature |
+| --- | --- | --- |
+| `sg.size`, `sg.id` | lanes in this subgroup, this lane's number | `1`, `0` |
+| `sg.add`, `mul`, `min`, `max`, `and`, `or`, `xor` | the reduction over the lanes | `x` |
+| `sg.inclusiveAdd`, `inclusiveMul` | the reduction up to and including this lane | `x` |
+| `sg.exclusiveAdd`, `exclusiveMul` | the reduction over the lanes before this one | `0`, `1` |
+| `sg.all(b)`, `sg.any(b)` | whether `b` holds on every lane, on any lane | `b` |
+| `sg.ballot(b)` | a bit per lane where `b` holds | `b` as bit 0 |
+| `sg.elect()` | true on one lane | `true` |
+| `sg.broadcast(x, lane)`, `sg.broadcastFirst(x)` | `x` of that lane, a constant, or the first active lane | `x` |
+| `sg.shuffle(x, lane)`, `shuffleUp`, `shuffleDown`, `shuffleXor` | `x` of another lane | `x` |
+
+- **The fallback is a subgroup of one lane.** WebGPU never promises a subgroup size, so code written properly works for any
+  `size`, and one is a size: nothing to branch on, no shared memory, and the same answer at the end. Lanes of a `shuffle`
+  must stay below `size`.
+- **Uniform control flow.** A subgroup call has to run on every lane together, so a ComputePass that uses one runs whole
+  workgroups as a barrier does: its count is a multiple of `workgroupSize`, and WGSL refuses a call under a branch. Keep a
+  result with `Let` before an `If`.
+- **Half floats.** `h.half(x)` gives an f16 node (`'f16'`, `'vec2h'` to `'vec4h'`) and `h.full(x)` turns it back. Numbers join in
+  as `0.25h`, and an f32 node has to go through `half` first, which TypeScript checks. Without `shader-f16` the same graph
+  stays f32, so a value keeps more precision and goes past 65,504 without turning infinite.
+- **Packed storage.** `packHalf2(vec2)` and `unpackHalf2(u32)` hold two floats rounded to f16 in one u32 on every device.
+  Storage buffers have no f16 element type.
+
 ## Compute that writes textures (`@margoengine/shader/compute-texture`)
 
 `storageTexture` is a texture a ComputePass writes; `pingPong` is a pair that a pass reads and writes in steps, for simulations, painting and repeated filters. Both work with `texture()`, so a material, NodePass or later pass reads them like any other texture.
@@ -752,11 +800,12 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 - `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; `If` runs one. A NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `texture(map, uv)`, `dpdx`, `dpdy` and `fwidth` inside an `If`, `Switch` or `While` on a per-pixel value, or a loop with a non-uniform bound or a `Break` on one, are a WGSL uniformity error, reported when the pipeline compiles; pass `texture` an explicit level there or sample before the branch.
 - Raw meshes cast into `Shadows` only: `VirtualShadows` and `LocalShadows` take no custom caster. SSR, GTAO, SSGI, TAA velocity and scene passes do not see them, beyond the depth they write. A raw pick names the mesh, not the instance, and ignores `discard`. Uniform arrays hold 16-byte elements, struct fields are not arrays or structs, and a material has one colour target, 32-bit attribute formats only and at most two extra bind groups.
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
+- Subgroup operations and half floats run in ComputePass nodes only: `enable` has to open a module, and a material's shader is assembled from others. There are no `quad*` operations, and no f16 uniforms, storage or textures.
 - Storage textures are 2D, one mip level, one sample; `@margoengine/shader/compute-texture` has no 3D or array form.
 - ComputePass dispatches at most 65,535 workgroups per axis (an indirect dispatch is checked by the GPU only) and runs every frame while attached (`computeReadback` runs once; an atomic counter keeps counting unless `update()` resets it). Workgroup memory has no struct elements, and all of a pass's must fit the device's 16,384 bytes. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
 - No GLSL/WebGL2 output.
 
-Size (min + gzip, Rolldown, peers external): whole package 17.9 kB (11.8 kB before statements, 13.9 kB before the compute model, 15.2 kB before node output in every pass, 16.8 kB before the input nodes); `NodeMaterial` with colour nodes only, 8.4 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
+Size (min + gzip, Rolldown, peers external): whole package 18.0 kB (11.8 kB before statements, 13.9 kB before the compute model, 15.2 kB before node output in every pass, 16.8 kB before the input nodes); `NodeMaterial` with colour nodes only, 8.4 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
 
 Apache-2.0. Optional, tree-shakable package; peers `@margoengine/core`, `@margoengine/materials` and `@margoengine/gltf-pro` (^0.1.0 || ^1.0.0).
 

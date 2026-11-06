@@ -65,8 +65,9 @@ Batches 1 to 3 are phase 1. Batches 19 and 21 are partly done, each with one job
 | [29](#batch-29-culling) | culling | 8 | 8 | 0 | 0 | 0 |
 | [30](#batch-30-lod) | lod | 7 | 7 | 0 | 0 | 0 |
 | [31](#batch-31-shader-part-1-of-2) | shader | 8 | 8 | 0 | 0 | 0 |
+| [32](#batch-32-shader-part-2-of-2) | shader | 4 | 4 | 0 | 0 | 0 |
 | [38](#batch-38-gltf) | gltf | 6 | 6 | 0 | 0 | 0 |
-| Total | | 171 | 163 | 2 | 4 | 2 |
+| Total | | 175 | 167 | 2 | 4 | 2 |
 
 ## Batch 1: fixes (part 1 of 3)
 
@@ -772,7 +773,44 @@ outputs.
   are new entries. Job 6's first ship was stopped after a wrong `EXTRA_GPU`, and its next failed on quality duplicates, fixed
   by `packages/shared/white-texture.js`, now used by materials too. Job 8's first ship failed `verify` on a `ScenePass` with no
   `[Symbol.dispose]()`. Nothing failed reached `main`. A job whose last rebase
-  moved `main` reran the package, API, quality, claims and quick GPU checks, not `verify`; job 7 was one.
+  moved `main` reran the package, API, quality, claims and quick GPU checks, not `verify`; jobs 7 and 8 were two.
+
+## Batch 32: shader (part 2 of 2)
+
+The node library reaches what shader authors reach for first, raw WGSL joins the rest of the engine, and compute graphs can use
+the hardware's optional features.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Utility node library | DONE | `4fcb44bab` | `@margoengine/shader/utils` | LIM-198 |
+| 2 | Worley and 4D noise on the GPU | DONE | `1bff33a73` | none (`/noise`) | LIM-200 |
+| 3 | Raw meshes as full citizens | DONE | `b5a22bb16` | none (`/raw`, with `RawPicking`) | LIM-204 |
+| 4 | Subgroups and f16 fast paths | DONE | this commit | `/subgroups` | LIM-206 |
+
+- **Bugs:** all caught before landing, so each sits in its job's `feat` commit. Job 1: `parallaxUV` first took its derivatives
+  inside the loop, which WGSL refuses as non-uniform (`parallaxRamp` in `packages/shader/test/utils-check.mjs`), and
+  `equirectUV` gave `atan2(0, 0)` at the poles, now the middle column (`utils.test.js`). Job 3: a shadow pipeline that kept the
+  material's back-face cull lost a caster the light saw from behind (`raw.test.js`, `shadow` in `raw-check.mjs`).
+- **Proved:** a real GPU check per job. Job 1 runs the maths nodes over random inputs against formulas written out in
+  JavaScript and reads surface nodes back against slopes worked out by hand. Job 2 compares each noise with its CPU twin and
+  with a brute-force search of every cell within three, so the search radius is proved too. Job 3 reads pixels, buffers, picks
+  and counters back; a normal turned into the wall darkens SSAO's open wall from 240 to 217, which shows the shader's normals
+  are what SSAO reads. Job 4 runs one graph on two devices of one adapter, checks every operation against the lanes the hardware
+  reported, and proves the one-lane form gives the same totals.
+- **Limits:** raw meshes cast into `Shadows` only, a raw pick names the mesh and ignores `discard`, and SSR, GTAO, SSGI, TAA
+  velocity and scene passes see only their depth. `frustumCulled` is on by default, so a vertex shader that moves points outside
+  the sphere of `position` needs `bounds` or `frustumCulled: false`. Subgroups and f16 run in compute passes only, a pass using
+  subgroups runs whole workgroups, and the f32 fallback keeps more precision than f16.
+- **Unmeasured:** no timing was taken in this batch, so the speed of subgroup reductions and f16 against the plain forms is
+  unknown and no speed is claimed. `voronoi3` walks all 27 cells per pixel; its cost is queued for the quiet speed pass. Only an
+  RTX A6000 has run these, so subgroup sizes other than 32 are unproved in this package.
+- **Gate:** the whole-package budget in `shader.test.js` stayed at 18,500 B and the minimal one at 8,700 B (18,012 and 8,485 B
+  measured at job 4): jobs 1 and 4 are new entries, and job 4 added a few lines to the root (`f16` in the type tables, two
+  compute inputs). The raw entry grew from
+  10.1 to 13.2 kB, recorded with its reason in the size gate. `noise-check` split its passes when job 2 took it past the 8
+  storage buffers a stage binds by default. Job 3's first ship failed `verify`: `tests/compilation-info-at-creation.test.js`
+  wants the request a few lines from `createShaderModule`, and the new module call had pushed it away. Nothing failed reached
+  `main`.
 
 ## Batch 38: gltf
 

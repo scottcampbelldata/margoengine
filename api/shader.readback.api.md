@@ -207,9 +207,9 @@ interface Resource {
     finish?(): void;
 }
 
-type Scalar = 'f32' | 'i32' | 'u32' | 'bool';
+type Scalar = 'f32' | 'f16' | 'i32' | 'u32' | 'bool';
 
-type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix ? 'f32' : T extends 'i32' | `vec${N}i` ? 'i32' : T extends 'u32' | `vec${N}u` ? 'u32' : 'bool';
+type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix ? 'f32' : T extends 'f16' | `vec${N}h` ? 'f16' : T extends 'i32' | `vec${N}i` ? 'i32' : T extends 'u32' | `vec${N}u` ? 'u32' : 'bool';
 
 interface ShaderStage {
     readonly kind: 'vertex' | 'fragment' | 'post' | 'compute';
@@ -279,7 +279,7 @@ class UniformNode<T extends Type = Type> extends Node<T> {
     write(out: DataView, offset: number): void;
 }
 
-type VecOf<S extends Scalar, K extends number> = K extends 1 ? S : S extends 'bool' ? `vec${K & N}<bool>` : `vec${K & N}${S extends 'f32' ? 'f' : S extends 'i32' ? 'i' : 'u'}`;
+type VecOf<S extends Scalar, K extends number> = K extends 1 ? S : S extends 'bool' ? `vec${K & N}<bool>` : `vec${K & N}${S extends 'f32' ? 'f' : S extends 'f16' ? 'h' : S extends 'i32' ? 'i' : 'u'}`;
 
-type Vector = `vec${N}${'f' | 'i' | 'u'}` | `vec${N}<bool>`;
+type Vector = `vec${N}${'f' | 'h' | 'i' | 'u'}` | `vec${N}<bool>`;
 ```

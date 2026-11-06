@@ -293,9 +293,13 @@ const inputs: Record<string, [string, string, string]> = {
   localIndex: ['lix', 'local_invocation_index', 'u32'],
   workgroupId: ['wid', 'workgroup_id', 'vec3u'],
   workgroupCount: ['nwg', 'num_workgroups', 'vec3u'],
+  subgroupSize: ['sgs', 'subgroup_size', 'u32'],
+  subgroupId: ['sgi', 'subgroup_invocation_id', 'u32'],
 };
 // Passes that hold a barrier: every invocation of a workgroup has to reach it, so they have no early return.
 const barriers = new WeakSet<Program>();
+/** @internal Marks a pass as running whole workgroups: subgroup operations need the uniform control flow a barrier does. */
+export const wholeGroups = (program: Program): void => void barriers.add(program);
 const barrier = (name: string) =>
   push(
     statement([], (b) => {

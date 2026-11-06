@@ -70,6 +70,10 @@
     "./utils": {
       "types": "./dist/utils.d.ts",
       "import": "./dist/utils.js"
+    },
+    "./subgroups": {
+      "types": "./dist/subgroups.d.ts",
+      "import": "./dist/subgroups.js"
     }
   },
   "files": [
@@ -92,6 +96,6 @@
     "build": "node ../../scripts/build-optional.js shader",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/shader/test/browser-check.mjs && node packages/shader/test/noise-check.mjs && node packages/shader/test/readback-check.mjs && node packages/shader/test/editor-check.mjs && node packages/shader/test/compute-texture-check.mjs && node packages/shader/test/compute-model-check.mjs && node packages/shader/test/lighting-check.mjs && node packages/shader/test/passes-check.mjs && node packages/shader/test/inputs-check.mjs && node packages/shader/test/deform-check.mjs && node packages/shader/test/pass-check.mjs && node packages/shader/test/utils-check.mjs && node packages/shader/test/raw-check.mjs"
+    "test:gpu": "cd ../.. && node packages/shader/test/browser-check.mjs && node packages/shader/test/noise-check.mjs && node packages/shader/test/readback-check.mjs && node packages/shader/test/editor-check.mjs && node packages/shader/test/compute-texture-check.mjs && node packages/shader/test/compute-model-check.mjs && node packages/shader/test/lighting-check.mjs && node packages/shader/test/passes-check.mjs && node packages/shader/test/inputs-check.mjs && node packages/shader/test/deform-check.mjs && node packages/shader/test/pass-check.mjs && node packages/shader/test/utils-check.mjs && node packages/shader/test/raw-check.mjs && node packages/shader/test/subgroups-check.mjs"
   }
 }

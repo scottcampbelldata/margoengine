@@ -1754,6 +1754,10 @@
       "types": "./dist/shader/utils.d.ts",
       "import": "./dist/shader/utils.js"
     },
+    "./shader/subgroups": {
+      "types": "./dist/shader/subgroups.d.ts",
+      "import": "./dist/shader/subgroups.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"
