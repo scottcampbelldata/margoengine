@@ -840,6 +840,34 @@ Import `exportUSDZ` from `@margoengine/exporters/usdz`; it loads only USDZ seria
 
 Save as `.usdz`. A supported Apple device can open `<a rel="ar" href="model.usdz"><img src="preview.png" alt="View the model in AR"></a>`. No headset is required to generate or validate the file.
 
+AR Quick Look shows a file at real size, and glTF numbers are metres, so a model authored in other units stands as tall as its numbers say: Fox.glb is 79 metres. `measureUSDZ(source, options)` returns `{ size, bounds, scale }` in metres before you send a file anywhere, `height` sets the rest pose's height in metres and `ground` stands its lowest point on the floor. Both go in one transform on the root prim, so proportions, meshes and animation data stay as they are. With neither, the file holds the model's true size and no root transform.
+
+```ts
+import { exportUSDZ, measureUSDZ } from 'margoengine/exporters/usdz';
+
+const scene = {
+  nodes: [
+    {
+      name: 'Marker',
+      geometry: {
+        positions: new Float32Array([0, -40, 0, 30, -40, 0, 30, 40, 0, 0, 40, 0]),
+        normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+        indices: [0, 1, 2, 0, 2, 3],
+      },
+    },
+  ],
+};
+
+const [, height] = measureUSDZ(scene).size; // 80: this model would stand 80 metres tall.
+const usdz = exportUSDZ(scene, { height: 1.2, ground: true });
+console.log(`${height} m as authored, ${usdz.length} bytes at 1.2 m`);
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `height` | the source's own size | The rest pose's height in metres. The whole model scales evenly from the origin |
+| `ground` | `false` | Moves the model so the rest pose's lowest point is at y = 0 |
+
 Every mesh is written in its own space, with the node's world matrix as `xformOp:transform`, so its points are the ones you gave. A geometry object two or more nodes draw is written once as a class prim, and each node references it with its own transform, name and material, so a thousand copies of a box cost a thousand short nodes. A node with a reflection in its matrix draws a reflected copy of the geometry, written once for all the nodes that mirror it, with the reflection taken out of the node's matrix and the winding reversed in the file: no matrix in the file has a negative determinant, so nothing depends on how a viewer treats a negative scale. Parents are folded into each node's matrix; the file holds no Xform tree.
 
 ```ts
@@ -913,11 +941,15 @@ const box = {
   },
 };
 
-const { usdz, clip, frames, skipped } = await exportAnimatedUSDZ({
-  nodes: [box],
-  animations: [{ name: 'Slide', channels: [{ node: box, path: 'translation', times: [0, 2], values: [0, 0, 0, 3, 0, 0] }] }],
-});
+const { usdz, clip, frames, size, bounds, skipped } = await exportAnimatedUSDZ(
+  {
+    nodes: [box],
+    animations: [{ name: 'Slide', channels: [{ node: box, path: 'translation', times: [0, 2], values: [0, 0, 0, 3, 0, 0] }] }],
+  },
+  { height: 0.5, ground: true },
+);
 console.log(`${clip}: ${usdz.length} bytes, ${frames} frames, ${skipped.length} left out`);
+console.log(`${size[1]} m tall, reaching x = ${bounds.max[0]} m`);
 ```
 
 | Option | Default | What it does |
@@ -925,7 +957,13 @@ console.log(`${clip}: ${usdz.length} bytes, ${frames} frames, ${skipped.length} 
 | `clip` | 0 | Which animation, by index or name. USD has one timeline, so a file holds one clip: write one file for each |
 | `fps` | 30 | Samples per second, and the file's `timeCodesPerSecond` |
 | `signal` | none | Stops between frames and nodes |
+| `height` | the source's own size | The rest pose's height in metres, as `exportUSDZ` |
+| `ground` | `false` | Stands the rest pose's lowest point on the floor, as `exportUSDZ` |
 | `texturePrefix` and the collector's options | as `exportUSDZ` | Where images go in the archive, and what the scene collects |
+
+The result says what a phone will show: `size` is the rest pose's width, height and depth in metres, `bounds` is everywhere the clip reaches, skinned, at every frame, and `scale` is what `height` asked for. Read them before you send a file: Fox.glb's `size` is about 25 by 79 by 155 until you pass `height`, and a clip can reach well past the rest pose, as robot-expressive's Jump does at 1.3 times its height. A model that fits a room at a couple of metres is under about 1.5 metres across and 2 metres tall in `bounds`.
+
+A skin's points are written where the mesh rests in the world, with that move taken back out of `bindTransforms`, as a glTF skin's vertices can sit in any space. So a model stored lying down or in millimetres reads the right size in a tool that does not run the skeleton, and it plays exactly as before. Each `SkelRoot` has an `extent` for every frame.
 
 A GLB goes in as it is, with its nodes, skins, clips and PBR materials. Decode Draco and meshopt first: run this before `compressDraco` or `compressMeshopt`, or on the uncompressed file. A file with a second set of joints is refused; bake it down to four influences.
 

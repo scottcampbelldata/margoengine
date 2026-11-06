@@ -11,7 +11,94 @@ export interface USDZOptions extends SceneOptions {
    * `.`, `-` and `/` only. Default 'textures/'.
    */
   texturePrefix?: string;
+  /**
+   * The model's height in metres in its rest pose. AR Quick Look shows a file at real size, so a model authored in other
+   * units needs this: Fox.glb is 79 metres tall as written. It scales the whole model evenly from the origin with one
+   * transform on the root prim, so proportions and animation data stay as they are. Default: the size the source says,
+   * which glTF defines as metres.
+   */
+  height?: number;
+  /** Moves the model up or down so its rest pose's lowest point is on the floor, y = 0. Default false. */
+  ground?: boolean;
 }
+
+/** An axis-aligned box in metres. */
+export interface USDZBox {
+  min: [number, number, number];
+  max: [number, number, number];
+}
+
+/** How to place a model on the stage: the even scale and the lift of {@link USDZOptions}. */
+export interface Placement {
+  scale: number;
+  lift: number;
+}
+
+/** A box holding nothing. */
+export const emptyBox = (): USDZBox => ({ min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] });
+
+/** Grows `box` to hold a point. */
+export function growBox({ min, max }: USDZBox, x: number, y: number, z: number): void {
+  if (x < min[0]) min[0] = x;
+  if (x > max[0]) max[0] = x;
+  if (y < min[1]) min[1] = y;
+  if (y > max[1]) max[1] = y;
+  if (z < min[2]) min[2] = z;
+  if (z > max[2]) max[2] = z;
+}
+
+/** Grows `box` to hold `positions` through the column-major matrix `m`. */
+export function growBoxWith(box: USDZBox, positions: ArrayLike<number>, m: ArrayLike<number>): void {
+  for (let v = 0; v < positions.length; v += 3) {
+    const x = positions[v],
+      y = positions[v + 1],
+      z = positions[v + 2];
+    growBox(
+      box,
+      m[0] * x + m[4] * y + m[8] * z + m[12],
+      m[1] * x + m[5] * y + m[9] * z + m[13],
+      m[2] * x + m[6] * y + m[10] * z + m[14],
+    );
+  }
+}
+
+/** The three side lengths of `box`. */
+export const boxSize = ({ min, max }: USDZBox): [number, number, number] => [
+  max[0] - min[0],
+  max[1] - min[1],
+  max[2] - min[2],
+];
+
+/** `box` after `placement`. */
+export const placedBox = ({ min, max }: USDZBox, { scale, lift }: Placement): USDZBox => ({
+  min: [min[0] * scale, min[1] * scale + lift, min[2] * scale],
+  max: [max[0] * scale, max[1] * scale + lift, max[2] * scale],
+});
+
+/** Refuses a bad `height` or `ground` before any work is done. */
+export function checkPlacement({ height, ground }: USDZOptions): void {
+  if (height !== undefined && !(typeof height === 'number' && height > 0 && Number.isFinite(height)))
+    throw new RangeError(`USDZ height is ${String(height)}; pass the model's height in metres, above 0`);
+  if (ground !== undefined && typeof ground !== 'boolean') throw new TypeError('USDZ ground must be boolean');
+}
+
+/** The placement `options` ask of a model whose rest pose fills `rest`. */
+export function placementOf(rest: USDZBox, { height, ground }: USDZOptions): Placement {
+  const tall = rest.max[1] - rest.min[1];
+  if (height !== undefined && !(tall > 0))
+    throw new RangeError('USDZ height needs a model with some height; this one is flat in Y, so leave height out');
+  const scale = height === undefined ? 1 : height / tall;
+  return { scale, lift: ground ? -rest.min[1] * scale : 0 };
+}
+
+/** The transform lines of the root prim: none for a model left as it is, so such a file does not change. */
+export const rootTransform = ({ scale, lift }: Placement): string[] =>
+  scale === 1 && lift === 0
+    ? []
+    : [
+        `    matrix4d xformOp:transform = ((${num(scale)}, 0, 0, 0), (0, ${num(scale)}, 0, 0), (0, 0, ${num(scale)}, 0), (0, ${num(lift)}, 0, 1))`,
+        '    uniform token[] xformOpOrder = ["xformOp:transform"]',
+      ];
 
 export const tuples = (values: ArrayLike<number>, size: number): string => {
   const result: string[] = [];

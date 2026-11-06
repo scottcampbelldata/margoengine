@@ -6,7 +6,7 @@ import { exportDAE } from '@margoengine/exporters';
 
 test('USDZ lives only in its subpath, which loads only its serializer', async () => {
   const isolated = await import('@margoengine/exporters/usdz');
-  assert.deepEqual(Object.keys(isolated), ['exportUSDZ']);
+  assert.deepEqual(Object.keys(isolated), ['exportUSDZ', 'measureUSDZ']);
   assert.equal(typeof isolated.exportUSDZ, 'function');
   assert.equal('exportUSDZ' in root, false);
   const entry = await readFile(new URL('../dist/usdz.js', import.meta.url), 'utf8');

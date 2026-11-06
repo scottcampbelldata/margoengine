@@ -268,6 +268,7 @@ function skinnedByUSD(text, frame, geometry) {
       samples(text, 'float3[] translations')?.[frame] ?? numbers(/float3\[\] translations = (.*)/.exec(text)[1]),
     rotations = samples(text, 'quatf[] rotations')?.[frame] ?? numbers(/quatf\[\] rotations = (.*)/.exec(text)[1]),
     scales = samples(text, 'half3[] scales')?.[frame] ?? numbers(/half3\[\] scales = (.*)/.exec(text)[1]),
+    points = numbers(/point3f\[\] points = (.*)/.exec(text)[1]),
     indices = numbers(/primvars:skel:jointIndices = \[([^\]]*)\]/.exec(text)[1]),
     weights = numbers(/primvars:skel:jointWeights = \[([^\]]*)\]/.exec(text)[1]),
     world = [],
@@ -290,7 +291,7 @@ function skinnedByUSD(text, frame, geometry) {
   });
   const out = [];
   for (let v = 0; v < geometry.positions.length / 3; v++) {
-    const p = [...geometry.positions.subarray(v * 3, v * 3 + 3)],
+    const p = points.slice(v * 3, v * 3 + 3),
       sum = [0, 0, 0];
     for (let k = 0; k < 4; k++) {
       const at = v * 4 + k,
@@ -367,6 +368,33 @@ test('a joint under a node that is no joint takes that node`s motion', async () 
     got = skinnedByUSD(text, 1, geometry);
   want.forEach((point, v) => point.forEach((value, r) => near(got[v][r], value, 1e-5, `vertex ${v}`)));
   assert.equal(count(text, /def Xform "Node_/g), 0, 'nothing rigid to place, so no Xform');
+});
+
+test('a skin in another space than the world rests in the world and still moves as glTF says', async () => {
+  // As robot-expressive and RiggedFigure do: the joints sit under a scale and a turn the mesh's own numbers know nothing of.
+  const { lower, upper, mesh, geometry, inverses } = arm(),
+    quarter = [Math.SQRT1_2, 0, 0, Math.SQRT1_2],
+    rig = { name: 'rig', rotation: quarter, scale: [100, 100, 100], children: [upper] },
+    bent = [0, 0, Math.SQRT1_2, Math.SQRT1_2],
+    text = await usda(
+      await exportAnimatedUSDZ(
+        {
+          nodes: [rig, mesh],
+          animations: [{ channels: [{ node: lower, path: 'rotation', times: [0, 1], values: [0, 0, 0, 1, ...bent] }] }],
+        },
+        { fps: 1 },
+      ),
+    ),
+    rigWorld = trs([0, 0, 0], quarter, [100, 100, 100]),
+    lowerWorld = multiply(rigWorld, trs(lower.translation, bent, [1, 1, 1])),
+    want = skinnedByGLTF(geometry, inverses, [lowerWorld, rigWorld]),
+    got = skinnedByUSD(text, 1, geometry),
+    points = numbers(/point3f\[\] points = (.*)/.exec(text)[1]),
+    normal = numbers(/normal3f\[\] normals = (\[[^\]]*\])/.exec(text)[1]);
+  // Sizes here are up to 400, so a Float32 step is about 3e-5, over a few steps.
+  want.forEach((point, v) => point.forEach((value, r) => near(got[v][r], value, 2e-3, `vertex ${v}`)));
+  apply(rigWorld, [...geometry.positions.subarray(6, 9)]).forEach((value, r) => near(points[6 + r], value, 1e-3, 'rest'));
+  [0, -1, 0].forEach((value, r) => near(normal[r], value, 1e-6, 'normal turned with the points'));
 });
 
 test('a mesh on a joint rides as an Xform beside the skin', async () => {

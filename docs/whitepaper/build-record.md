@@ -1247,3 +1247,17 @@ Five jobs took `@margoengine/tween` from single tweens to the things a motion de
 - **Limits:** colliders hold still during a swept check. `docs/limits.md` has them all.
 - **Unmeasured:** neither job has a timed number.
 - **Gate:** lint, hygiene, verify, the package tests, `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
+## Lane U: first iPhone failure of animated USDZ
+
+Scott placed Fox-Run in AR Quick Look on an iPhone and stood between the legs of a 79 metre fox; robot-expressive ran off the screen. This one-off lane found why and fixed it in `@margoengine/exporters`.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Real size in USDZ export | DONE, DEVICE RETEST OPEN | this commit | `/usdz`, `/usdz-anim` | LIM-265 |
+
+- **Cause:** the files held true size, which Quick Look shows. No factor of 2 exists in any file.
+- **Also wrong:** skin points in mesh space, so Apple's bounds read RiggedFigure lying down and robot-expressive's hands as 6 cm, and no extent past the rest pose.
+- **Proved:** all 76 clips against an independent measure at every frame, RealityKit bounds and `usdrecord` renders on a Mac.
+- **Not proved:** placement, clipping and moving, which only a phone shows.
+- **Unmeasured:** no speed number. Anchoring metadata was left out and not tried on a device.
+- **Gate:** lint, hygiene, verify, the exporters tests and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.

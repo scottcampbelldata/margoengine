@@ -19,16 +19,27 @@ import {
   type SkinData,
 } from './scene.js';
 import {
+  boxSize,
+  checkPlacement,
+  emptyBox,
+  growBox,
+  growBoxWith,
   meshPrim,
+  placedBox,
+  placementOf,
   reflected,
+  rootTransform,
   shapeOf,
   storedZIP,
   tuple,
   tuples,
   USDMaterials,
   type Shape,
+  type USDZBox,
   type USDZOptions,
 } from './usdz-write.js';
+
+export type { USDZBox } from './usdz-write.js';
 
 /** Past this many frames a file stops being practical to open; a longer clip wants a lower rate or a cut. */
 const MAX_FRAMES = 100_000;
@@ -63,6 +74,15 @@ export interface AnimatedUSDZResult {
   clip?: string;
   /** Time samples per animated attribute: `frames - 1` over `fps` covers the clip. */
   frames: number;
+  /**
+   * Width, height and depth of the rest pose in metres, as written: what AR Quick Look shows, as it draws a file at real
+   * size. Fox.glb reads about 25 by 79 by 155 without `height`, so check this before sending a file to a phone.
+   */
+  size: [number, number, number];
+  /** Everywhere the clip reaches in metres, as written, with skinning applied at every frame. */
+  bounds: USDZBox;
+  /** The even scale `height` asked for; 1 without it. */
+  scale: number;
   skipped: AnimatedUSDZSkip[];
 }
 
@@ -218,6 +238,81 @@ function skeleton(
   return { joints, remap };
 }
 
+/** A skin's inverse bind matrix for joint `index`. */
+const inverseBind = ({ inverseBindMatrices }: SkinData, index: number): number[] =>
+  Array.from({ length: 16 }, (_, k) => inverseBindMatrices[index * 16 + k]);
+
+/**
+ * The matrix from a skin's mesh space to the world in the rest pose, or undefined when they are one space. A glTF skin ignores
+ * the mesh's node, so its vertices can sit in any space: RiggedFigure's lie along Z and robot-expressive's are millimetres.
+ * USD's meshes hold points in the place they rest, and Apple's loader sizes a model from those points without its skeleton.
+ */
+function restSpace(skin: SkinData, byExport: Map<ExportNode, Node>, rest: Poses): Float64Array | undefined {
+  rest.at(0);
+  for (const [index, joint] of skin.joints.entries()) {
+    const node = byExport.get(joint);
+    if (!node) return undefined;
+    const space = multiplyMatrices(rest.world(node), inverseBind(skin, index));
+    if (!invertMatrix(space)) continue;
+    return space.every((v, i) => Math.abs(v - (i % 5 ? 0 : 1)) <= 1e-6) ? undefined : space;
+  }
+  return undefined;
+}
+
+/** The shape of a skinned geometry with `space` applied, which the skeleton's bind transforms take back out. */
+function shapeIn(space: Float64Array | undefined, { positions, normals, indices }: Geo): Shape {
+  if (!space) return shapeOf(positions, normals, indices);
+  const inverse = invertMatrix(space)!,
+    points = new Float32Array(positions.length),
+    turned = new Float32Array(normals.length);
+  for (let v = 0; v < positions.length; v += 3) {
+    const x = positions[v],
+      y = positions[v + 1],
+      z = positions[v + 2],
+      a = normals[v],
+      b = normals[v + 1],
+      c = normals[v + 2];
+    // Normals go through the inverse transpose: column r of the transpose is row r of the inverse.
+    const n = [0, 1, 2].map((r) => inverse[r * 4] * a + inverse[r * 4 + 1] * b + inverse[r * 4 + 2] * c),
+      length = Math.hypot(n[0], n[1], n[2]) || 1;
+    for (let r = 0; r < 3; r++) {
+      points[v + r] = space[r] * x + space[4 + r] * y + space[8 + r] * z + space[12 + r];
+      turned[v + r] = n[r] / length;
+    }
+  }
+  return shapeOf(points, turned, indices);
+}
+
+/** Grows `box` to hold a skinned geometry under `palette`, by glTF's own skinning sum. */
+function growBoxSkinned(box: USDZBox, geometry: Geo, palette: readonly Float64Array[]): void {
+  const { positions } = geometry,
+    joints = geometry.joints!,
+    weights = geometry.weights!,
+    m = new Float64Array(12);
+  for (let v = 0; v < positions.length / 3; v++) {
+    m.fill(0);
+    for (let k = 0; k < 4; k++) {
+      const weight = weights[v * 4 + k];
+      if (!weight) continue;
+      const joint = palette[joints[v * 4 + k]];
+      for (let c = 0; c < 4; c++) for (let r = 0; r < 3; r++) m[c * 3 + r] += weight * joint[c * 4 + r];
+    }
+    const x = positions[v * 3],
+      y = positions[v * 3 + 1],
+      z = positions[v * 3 + 2];
+    growBox(
+      box,
+      m[0] * x + m[3] * y + m[6] * z + m[9],
+      m[1] * x + m[4] * y + m[7] * z + m[10],
+      m[2] * x + m[5] * y + m[8] * z + m[11],
+    );
+  }
+}
+
+/** Each joint of `skin` from mesh space to the world at the frame `poses` is on. */
+const paletteOf = (skin: SkinData, byExport: Map<ExportNode, Node>, poses: Poses): Float64Array[] =>
+  skin.joints.map((joint, index) => multiplyMatrices(poses.world(byExport.get(joint)!), inverseBind(skin, index)));
+
 /** True for a scale the same on every axis, to the tolerance {@link decompose} reads a matrix with. */
 const even = ([x, y, z]: readonly number[]): boolean =>
   Math.abs(x - y) <= 1e-6 * Math.abs(x) && Math.abs(x - z) <= 1e-6 * Math.abs(x);
@@ -271,17 +366,18 @@ function skelRoot(
   rest: Poses,
   parents: Map<Node, Node | undefined>,
   meshes: readonly string[],
+  space: Float64Array | undefined,
+  extents: readonly string[],
   signal: AbortSignal | undefined,
 ): string[] {
   const root = `/Margo/Skin_${index}`,
     tokens = `[${joints.map(({ path }) => JSON.stringify(path)).join(', ')}]`,
     binds: string[] = new Array(joints.length),
-    rests: string[] = [],
-    { inverseBindMatrices: inverses } = skin;
+    rests: string[] = [];
   skin.joints.forEach((_, source) => {
-    const bind = invertMatrix(Array.from({ length: 16 }, (__, k) => inverses[source * 16 + k]));
+    const bind = invertMatrix(inverseBind(skin, source));
     if (!bind) throw new RangeError('A skin inverse bind matrix has no inverse; give the joint a nonzero scale');
-    binds[remap[source]] = matrix(bind);
+    binds[remap[source]] = matrix(space ? multiplyMatrices(space, bind) : bind);
   });
   const translations: string[] = [],
     rotations: string[] = [],
@@ -326,6 +422,8 @@ function skelRoot(
   }
   return [
     `def SkelRoot "Skin_${index}" {`,
+    // A mesh's own extent holds its rest pose, so what a skin reaches frame by frame is said here, where UsdSkel looks for it.
+    ...attribute('float3[]', 'extent', extents),
     '    def Skeleton "Skeleton" (',
     '        prepend apiSchemas = ["SkelBindingAPI"]',
     '    ) {',
@@ -373,16 +471,56 @@ function xformOps(node: Node, tracks: Tracks | undefined, frames: number, poses:
   ];
 }
 
+/** What a clip fills: the rest pose, every frame together, and each skin's box frame by frame as USD text. */
+function reachOf(
+  frames: number,
+  poses: Poses,
+  rest: Poses,
+  placed: Map<Node, { geometry: Geo }[]>,
+  skins: Map<SkinData, Node[]>,
+  byExport: Map<ExportNode, Node>,
+  signal: AbortSignal | undefined,
+): { rest: USDZBox; clip: USDZBox; extents: Map<SkinData, string[]> } {
+  const fill = (at: Poses, box: USDZBox, each?: (skin: SkinData, skinBox: USDZBox) => void): void => {
+    for (const [node, list] of placed)
+      for (const { geometry } of list) growBoxWith(box, geometry.positions, at.world(node));
+    for (const [skin, users] of skins) {
+      const palette = paletteOf(skin, byExport, at),
+        skinBox = emptyBox();
+      for (const node of users)
+        for (const { geometry } of drawn(node)) if (skinned(node, geometry)) growBoxSkinned(skinBox, geometry, palette);
+      growBox(box, ...skinBox.min);
+      growBox(box, ...skinBox.max);
+      each?.(skin, skinBox);
+    }
+  };
+  const restBox = emptyBox(),
+    clip = emptyBox(),
+    extents = new Map([...skins.keys()].map((skin) => [skin, [] as string[]]));
+  rest.at(0);
+  fill(rest, restBox);
+  for (let frame = 0; frame < frames; frame++) {
+    signal?.throwIfAborted();
+    poses.at(frame);
+    fill(poses, clip, (skin, { min, max }) => extents.get(skin)!.push(tuples([...min, ...max], 3)));
+  }
+  return { rest: restBox, clip, extents };
+}
+
 /**
  * Writes one clip of a scene or a GLB as USDZ: skins as UsdSkel with a `SkelAnimation`, and animated nodes as `Xform` prims
  * with time samples, so the model plays in AR Quick Look. Materials and shared meshes are as {@link exportUSDZ} writes them.
+ *
+ * Quick Look shows a file at real size, and glTF numbers are metres: `size` in the result says what that is, and `height` and
+ * `ground` set it. A skin's points are written where they rest in the world and its `SkelRoot` carries an `extent` for every
+ * frame, so a tool that sizes a model without running its skeleton reads the right box.
  *
  * @example
  * ```ts
  * import { exportAnimatedUSDZ } from '@margoengine/exporters/usdz-anim';
  *
  * declare const glb: Uint8Array;
- * const { usdz, clip, frames, skipped } = await exportAnimatedUSDZ(glb, { clip: 'Walk', fps: 30 });
+ * const { usdz, clip, frames, size, skipped } = await exportAnimatedUSDZ(glb, { clip: 'Walk', height: 0.45, ground: true });
  * ```
  *
  * @throws TypeError for bytes that are not a GLB or that need decompressing, or a bad option; RangeError for a scene with no
@@ -396,6 +534,7 @@ export async function exportAnimatedUSDZ(
   const { clip = 0, fps = 30, signal } = options;
   if (!(typeof fps === 'number' && fps > 0 && Number.isFinite(fps)))
     throw new RangeError(`USDZ fps is ${String(fps)}; pass a rate above 0, such as 30`);
+  checkPlacement(options);
   signal?.throwIfAborted();
   const read = source instanceof Uint8Array ? sceneOfGLB(source) : { scene: source, skipped: [] },
     { scene } = read,
@@ -500,16 +639,19 @@ export async function exportAnimatedUSDZ(
       if (!skins.has(node.skin)) skins.set(node.skin, []);
       skins.get(node.skin)!.push(node);
     }
+  for (const skin of skins.keys()) skeleton(skin, order, byExport, parents);
+  const reach = reachOf(frames, poses, rest, placed, skins, byExport, signal);
   let skinIndex = 0;
   for (const [skin, users] of skins) {
     const shape = skeleton(skin, order, byExport, parents),
+      space = restSpace(skin, byExport, rest),
       index = skinIndex++,
       lines: string[] = [];
     for (const node of users)
       for (const { geometry, material = fallback } of drawn(node)) {
         if (!skinned(node, geometry)) continue;
         const i = meshes++,
-          geometryShape = shapeOf(geometry.positions, geometry.normals, geometry.indices);
+          geometryShape = shapeIn(space, geometry);
         geometryShape.users = 1;
         materials.note(geometryShape, material);
         const bound = materials.bind(i, geometry, material),
@@ -524,10 +666,13 @@ export async function exportAnimatedUSDZ(
           ],
         });
       }
-    body.push(...skelRoot(index, shape, skin, frames, poses, rest, parents, lines, signal));
+    body.push(
+      ...skelRoot(index, shape, skin, frames, poses, rest, parents, lines, space, reach.extents.get(skin)!, signal),
+    );
   }
   if (!meshes) throw new RangeError('USDZ requires at least one mesh');
 
+  const placement = placementOf(reach.rest, options);
   const lines = [
     '#usda 1.0',
     '(',
@@ -539,6 +684,7 @@ export async function exportAnimatedUSDZ(
     '    upAxis = "Y"',
     ')',
     'def Xform "Margo" {',
+    ...rootTransform(placement),
     ...body,
     ...tail,
     '}',
@@ -547,6 +693,9 @@ export async function exportAnimatedUSDZ(
     usdz: storedZIP([['scene.usda', new TextEncoder().encode(lines.join('\n') + '\n')], ...materials.files]),
     ...(animation.name === undefined ? {} : { clip: animation.name }),
     frames,
+    size: boxSize(placedBox(reach.rest, placement)),
+    bounds: placedBox(reach.clip, placement),
+    scale: placement.scale,
     skipped,
   };
 }

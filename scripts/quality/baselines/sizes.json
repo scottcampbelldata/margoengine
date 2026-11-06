@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9016965,
+  "total": 9033444,
   "history": [
     {
       "date": "2026-10-24",
@@ -2864,6 +2864,12 @@
       "commit": "cc64e08ec",
       "reason": "3dm entry: surfaces saved with no render mesh tessellate through the shared NURBS evaluator (gap B3), which brings geometry/nurbs into the entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "b7372dfef",
+      "reason": "USDZ real size: height, ground, measureUSDZ, size and bounds in the result, skin points at rest in the world, extent per frame on SkelRoot. A real iPhone showed a 79 metre fox.",
+      "grew": 2
     }
   ],
   "items": {
@@ -3061,8 +3067,8 @@
     "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
-    "@margoengine/exporters/usdz": 11717,
-    "@margoengine/exporters/usdz-anim": 17816,
+    "@margoengine/exporters/usdz": 12446,
+    "@margoengine/exporters/usdz-anim": 18965,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 18653,
     "@margoengine/fbx dist/workers/fbx.js": 58092,

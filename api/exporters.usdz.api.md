@@ -6,11 +6,26 @@
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { Vec2 } from "@margoengine/math";
 
+export interface USDZBox {
+    min: [number, number, number];
+    max: [number, number, number];
+}
+
+export interface USDZMeasure {
+    size: [number, number, number];
+    bounds: USDZBox;
+    scale: number;
+}
+
 export interface USDZOptions extends SceneOptions {
     texturePrefix?: string;
+    height?: number;
+    ground?: boolean;
 }
 
 export function exportUSDZ(source: ExportSource, options?: USDZOptions): Uint8Array;
+
+export function measureUSDZ(source: ExportSource, options?: USDZOptions): USDZMeasure;
 
 // Not exported from this entry, but used by the exports above:
 

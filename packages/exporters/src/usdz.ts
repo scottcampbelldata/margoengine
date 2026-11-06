@@ -9,17 +9,68 @@ import {
   type Mat,
 } from './scene.js';
 import {
+  boxSize,
+  checkPlacement,
+  emptyBox,
+  growBoxWith,
   meshPrim,
+  placedBox,
+  placementOf,
   reflected,
+  rootTransform,
   shapeOf,
   storedZIP,
   tuple,
   USDMaterials,
   type Shape,
+  type USDZBox,
   type USDZOptions,
 } from './usdz-write.js';
 
-export type { USDZOptions } from './usdz-write.js';
+export type { USDZBox, USDZOptions } from './usdz-write.js';
+
+/** What {@link measureUSDZ} returns. */
+export interface USDZMeasure {
+  /** Width, height and depth in metres: what AR Quick Look shows, as it draws a file at real size. */
+  size: [number, number, number];
+  /** Where the model sits in metres. */
+  bounds: USDZBox;
+  /** The even scale `height` asked for; 1 without it. */
+  scale: number;
+}
+
+/** The world box of what `items` draw. */
+function worldBox(items: readonly Drawable[]): USDZBox {
+  const box = emptyBox();
+  for (const { geometry, world } of items) growBoxWith(box, geometry.positions, world);
+  return box;
+}
+
+/**
+ * The size {@link exportUSDZ} writes the same source and options at, so a caller can see a 79 metre fox before it reaches a
+ * phone.
+ *
+ * @example
+ * ```ts
+ * import { exportUSDZ, measureUSDZ } from '@margoengine/exporters/usdz';
+ * import type { ExportSource } from '@margoengine/exporters';
+ *
+ * declare const scene: ExportSource;
+ * const [, height] = measureUSDZ(scene).size;
+ * const usdz = exportUSDZ(scene, height > 3 ? { height: 1.7, ground: true } : {});
+ * ```
+ *
+ * @throws RangeError for an empty scene or a bad `height`; TypeError for a bad `ground`.
+ */
+export function measureUSDZ(source: ExportSource, options: USDZOptions = {}): USDZMeasure {
+  checkPlacement(options);
+  const items = drawables(collect(source, options));
+  if (!items.length) throw new RangeError('USDZ requires at least one mesh');
+  const rest = worldBox(items),
+    placement = placementOf(rest, options),
+    bounds = placedBox(rest, placement);
+  return { size: boxSize(bounds), bounds, scale: placement.scale };
+}
 
 /**
  * The shape each node draws. A node with a reflection in its matrix draws the geometry's reflected shape through
@@ -70,12 +121,18 @@ const OUTSIDE_FLOAT32 =
  * glTF's counter-clockwise-with-v-down into USD's counter-clockwise-with-t-up), the translation re-expressed in st.
  * @throws TypeError when a textured material's geometry lacks the UV set it samples, or when vertex colors meet a
  * base color texture (USD Preview Surface cannot multiply them); RangeError for an empty scene, a world position
- * outside Float32 range or an archive over 4 GiB.
+ * outside Float32 range, a bad `height` or an archive over 4 GiB.
+ *
+ * AR Quick Look shows the file at real size. `height` sets that size in metres and `ground` stands the model on the floor,
+ * both through one transform on the root prim; {@link measureUSDZ} says what size the file will be.
  */
 export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uint8Array {
+  checkPlacement(options);
   const items = drawables(collect(source, options));
   if (!items.length) throw new RangeError('USDZ requires at least one mesh');
-  const materials = new USDMaterials(options.texturePrefix),
+  const placement =
+      options.height === undefined && !options.ground ? { scale: 1, lift: 0 } : placementOf(worldBox(items), options),
+    materials = new USDMaterials(options.texturePrefix),
     fallback = normalizeMaterial({}),
     shapes = localShapes(items, fallback, materials);
   const lines = [
@@ -86,6 +143,7 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
     '    upAxis = "Y"',
     ')',
     'def Xform "Margo" {',
+    ...rootTransform(placement),
   ];
   for (let i = 0; i < items.length; i++) {
     const item = items[i],

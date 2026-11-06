@@ -16,12 +16,20 @@ export interface AnimatedUSDZResult {
     usdz: Uint8Array;
     clip?: string;
     frames: number;
+    size: [number, number, number];
+    bounds: USDZBox;
+    scale: number;
     skipped: AnimatedUSDZSkip[];
 }
 
 export interface AnimatedUSDZSkip {
     kind: 'morph-weights' | 'not-exported' | 'primitive' | 'texture' | 'colors' | 'channel';
     target?: string | number;
+}
+
+export interface USDZBox {
+    min: [number, number, number];
+    max: [number, number, number];
 }
 
 export function exportAnimatedUSDZ(source: ExportScene | Uint8Array, options?: AnimatedUSDZOptions): Promise<AnimatedUSDZResult>;
@@ -235,5 +243,7 @@ interface TextureData {
 
 interface USDZOptions extends SceneOptions {
     texturePrefix?: string;
+    height?: number;
+    ground?: boolean;
 }
 ```

@@ -43,6 +43,18 @@ does not own. Each entry says exactly what is needed to close it.
   Open them on an iPhone or iPad on iOS 17 or later, compare each with the same scene drawn by Margo, and record the
   result here and in `docs/threejs-parity.md` (USDZExporter row).
 
+### Animated USDZ: the fix for the first iPhone failure awaits a retest
+
+- **What:** Fox-Run in AR Quick Look on an iPhone (2026-11-06) went past the top of the screen, showed the bottom of two legs,
+  clipped, and could not be moved. robot-expressive ran half off the screen.
+- **Cause:** the file held the true size glTF gives, 79 m and 4.46 m, and Quick Look shows real size. No factor of 2 exists:
+  RealityKit's bounds on all 76 files read 1.00 times glTF's, robot-expressive's posed parts aside.
+- **Fixed in the exporter:** `height`, `ground`, `size` and `bounds`, skin points at rest in the world, `extent` on each
+  `SkelRoot`. `packages/exporters/tests/usdz-size.test.js`.
+- **Not known:** whether the clipping and the failed move had a cause beyond standing inside a huge model.
+- **Needed to close:** on an iPhone, open `Fox-Run.usdz` and `RobotExpressive-Dance.usdz` at the new sizes: each stands on the
+  floor in view at about 2 m and a drag moves it.
+
 ### USDZ vertex colours draw grey in Quick Look
 
 - **What:** a painted mesh from `exportUSDZ` is flat grey in Quick Look (macOS 27.2 thumbnail, 2026-11-05). `usdchecker
@@ -768,6 +780,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| Apple's loader read RiggedFigure's USDZ lying on its back and robot-expressive's hands as 6 cm | A glTF skin's vertices were written in mesh space, and that loader sizes a model without its skeleton | Points rest in the world, with the move taken out of `bindTransforms` | `packages/exporters/tests/usdz-size.test.js`, `packages/exporters/tests/usdz-anim.test.js` |
 | The result cache shadow report said "same inputs built different bytes" for `build:package:fbx` and `build:package:usdz` after a rebase | The builds are deterministic (two builds of each gave the same hash). The key was short: a worker bundle and any subpath outside the external list take in the dist of another package, which the bundler reads natively, and a package build declared only its own sources and `packages/shared`. A rebase that changed only `gltf-pro` changed `dist/workers/fbx.js` on an equal key. Changing one string in `gltf-pro`'s dist and building the two packages alone moved both hashes, and restoring it moved them back | A package build now keys on the dist of every package the build order puts before it, near and far (`packageClosure`), so a dependency's change is a changed input. Key version 3, so old entries miss | `tests/result-cache.test.js` |
 | `PotreeSource` lost about 70% of a real 1.7 folder: `lion_takanawa_normals` read 101,456 of 341,989 points | PotreeConverter writes 0 points in the `.hrc` record of a leaf. The reader took that as an empty node and dropped it; the test writer never wrote such a record, so only a real folder showed it | A listed leaf of 0 points takes its count from its file when `load` reads it | `packages/points/tests/potree-real.test.js`, `packages/points/tests/potree.test.js` ("a leaf whose record says 0 points") |
 | `solvePoseIK`, `addIKChain`, `addCCDChain`, `addLookAt`, `addFootIK` and the shared pose tools (foot placement, warping, full-body IK, spline IK) threw on scales such as 0.9995, 1, 0.9986, which real exporters write | Each compared the three scales with a 1e-5 limit, because it read one scale for all axes | Each axis keeps its own scale; only flat and mirrored matrices are refused | The "off uniform" tests in `packages/rigging/tests/ik.test.js`, `packages/rigging/tests/ik-animator.test.js`, `tests/modern-animator-ccd.test.js`, `tests/modern-animator-look-at.test.js`, `tests/modern-animator-depth.test.js` |
