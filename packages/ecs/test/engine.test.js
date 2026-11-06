@@ -133,6 +133,48 @@ test('only the runs of rows that moved are written', async (t) => {
   links.forEach(({ mesh }, i) => assert.equal(mesh.position.y, [1, 2, 6].includes(i) ? i : 0));
 });
 
+test('one pass finds what moved: a group nobody moved is not walked again', async (t) => {
+  // Each group used to get its own pass over the links every sync, whether it changed or not, so a world with nothing
+  // moving paid four walks where the setter loop paid one.
+  const { transform, bridge, links } = await linked(8),
+    walks = [],
+    write = MeshBridge.prototype.write;
+  MeshBridge.prototype.write = function (batch, field, ...rest) {
+    walks.push(field);
+    return write.call(this, batch, field, ...rest);
+  };
+  t.after(() => {
+    MeshBridge.prototype.write = write;
+  });
+  bridge.sync();
+  assert.deepEqual(walks, [], 'nothing moved, no group is walked');
+  transform.fields.x[transform.index(links[3].entity)] = 5;
+  bridge.sync();
+  assert.deepEqual(walks, ['positions'], 'only the group that moved is walked');
+  assert.equal(links[3].mesh.position.x, 5);
+  walks.length = 0;
+  transform.fields.qz[transform.index(links[7].entity)] = 1;
+  transform.fields.sy[transform.index(links[0].entity)] = 3;
+  bridge.sync();
+  assert.deepEqual(walks, ['quaternions', 'scales']);
+  assert.equal(links[0].mesh.scale.y, 3);
+  assert.ok(links[7].mesh.rotation.z !== 0, 'a run that ends on the last row is written');
+});
+
+test('a mesh disposed in the second engine stops the sync before the first engine is written', async () => {
+  const one = await scene(),
+    two = await scene(),
+    first = one.world.create(),
+    second = one.world.create(),
+    gone = two.engine.createMesh(),
+    kept = one.engine.createMesh();
+  one.bridge.link(first, kept).link(second, gone);
+  one.transform.fields.x[one.transform.index(first)] = 9;
+  gone.dispose();
+  assert.throws(() => one.bridge.sync(), { code: 'disposed' });
+  assert.equal(kept.position.x, 0);
+});
+
 test('the bulk result is what the setters give, bit for bit', async () => {
   const { transform, bridge, links, engine } = await linked(60);
   let seed = 7;

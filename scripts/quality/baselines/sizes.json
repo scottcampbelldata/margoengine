@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6434379,
+  "total": 6025983,
   "history": [
     {
       "date": "2026-10-24",
@@ -2474,6 +2474,12 @@
       "commit": "d594fec97",
       "reason": "mips entry and half float uploads",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "9c87cfae4",
+      "reason": "ecs/engine: MeshBridge.sync one pass over the links, so a world with nothing moving pays what the setter loop paid (perf-history entry 74)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2614,7 +2620,7 @@
     "@margoengine/dof/lens": 1506,
     "@margoengine/ecs": 4554,
     "@margoengine/ecs/changes": 882,
-    "@margoengine/ecs/engine": 1792,
+    "@margoengine/ecs/engine": 2064,
     "@margoengine/ecs/growable": 2237,
     "@margoengine/ecs/query": 1021,
     "@margoengine/ecs/relations": 1209,

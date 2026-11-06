@@ -1793,6 +1793,23 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   repeats the correctness checks.
 - **Guard:** that check, and `compute-browser.mjs` for the polling `createComputePipelineAsync`.
 
+### 74. `MeshBridge.sync`: a world with nothing moving pays one pass again
+
+- **Loss:** the bulk bridge (`e1daa8a3e`) walked the links once for the mesh checks and then once for each group, whether the
+  group had moved or not, so a still world paid four walks where the setter loop paid one. Its last row also read one past the
+  end of the row arrays to end a run.
+- **Fix:** one pass checks each mesh, reads its slot and row and marks the groups that differ. A group nobody moved gets no
+  second walk, and a group already marked is not compared again, so a world that moves everything keeps its bulk win. Same
+  checks, same writes, same output: the bit for bit test against the setters is unchanged.
+- **After:** diagnostic, other lanes running (Node 26, Ryzen 9 9950X, CPU only, 20,000 links, median of 300 calls, one process
+  per case). Setter loop, bulk before this fix, this fix: nothing moving 0.72, 0.85, 0.72 ms; nothing moving after a moving
+  stretch 1.43, 1.9, 1.38 ms; 1% moving 0.74, 0.9, 0.70 ms; all moving 2.49, 2.33, 1.64 ms.
+- **The earlier figure:** 3.3 against 1.5 ms came from a loop in the bench script whose arrays were module constants, which
+  V8 can fold into the code, on a busy machine. The real setter class gives the numbers above: the loss was real, at about 20%
+  to 35%, and not double.
+- **Rerun:** `npm run build --workspace packages/ecs`, then `node packages/ecs/scripts/bridge-bench.mjs`.
+- **Guard:** `packages/ecs/test/engine.test.js`, "one pass finds what moved".
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1848,7 +1865,8 @@ These entries lack a recorded number, a named machine or a quiet run:
     a committed timing script.
 16. The voxel path tracer on the layer (entry 73): a quiet run, and a committed timing script.
 17. `Spring` after the shared tsconfig change (entry 55): a committed script and a quiet run.
-18. Parity scenes added since the last ledger run, `p-morph-compiled`, `p-motion-blur-velocity` and `p-pmrem-refresh`, have no
+18. `MeshBridge.sync` (entry 74): a quiet run.
+19. Parity scenes added since the last ledger run, `p-morph-compiled`, `p-motion-blur-velocity` and `p-pmrem-refresh`, have no
     row in `perf-vs-threejs.json` yet: `npm run bench:parity` adds them. Every row's after number in
     [perf-vs-threejs.md](perf-vs-threejs.md) since 2026-10-27 is in its cause text, not in the ledger.
 

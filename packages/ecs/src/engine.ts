@@ -36,6 +36,11 @@ interface Batch {
   readonly rows: Int32Array;
 }
 
+/** Bits of the three groups, for the mask `scan` returns. */
+const POSITION = 1,
+  ROTATION = 2,
+  SCALE = 4;
+
 /**
  * Copies a transform component to core meshes in one bulk step a frame, through `TransformWriter` from
  * `@margoengine/scene/bulk`. The component may hold any of the three groups of {@link transformSchema}: position,
@@ -129,32 +134,33 @@ export class MeshBridge {
   }
   /**
    * Copy every linked entity's transform to its mesh; returns how many links were copied. Call it once a frame, after
-   * the systems that move things. Each group goes to `TransformWriter` in one write per run of rows that changed, so a
-   * world that moves everything costs one write a group. The result is what the mesh's setters give, `mesh.rotation`
-   * included, and a group equal to what the mesh already holds is left alone. The first sync after a link changes builds
-   * the writer again, about one pass over the links.
+   * the systems that move things. One pass over the links finds which groups changed, so a world with nothing moving
+   * costs that pass and no write. A changed group goes to `TransformWriter` in one write per run of rows that changed,
+   * so a world that moves everything costs one write a group. The result is what the mesh's setters give,
+   * `mesh.rotation` included, and a group equal to what the mesh already holds is left alone. The first sync after a
+   * link changes builds the writer again, about one pass over the links.
    * @throws MargoError `'disposed'` when a linked mesh was disposed, before anything is written; `unlink` it when you dispose it yourself.
    * @throws RangeError for a value the mesh refuses: not finite, a zero scale or a zero quaternion. Writes before it stay copied.
    */
   sync(): number {
-    const { entities, meshes, component, position, rotation, scale } = this,
-      count = entities.length;
-    const batches = (this.batches ??= this.group());
-    for (const { links, ids, rows } of batches)
-      for (let i = 0; i < links.length; i++) {
-        const link = links[i],
-          mesh = meshes[link];
-        mesh.check();
-        ids[i] = slot(mesh).id;
-        rows[i] = component.index(entities[link]);
-      }
-    for (const batch of batches) {
-      const t = slot(meshes[batch.links[0]]).engine.store.transforms;
-      if (position) this.write(batch, 'positions', position, [t.x, t.y, t.z]);
-      if (rotation) this.write(batch, 'quaternions', rotation, [t.qx, t.qy, t.qz, t.qw]);
-      if (scale) this.write(batch, 'scales', scale, [t.sx, t.sy, t.sz]);
-    }
-    return count;
+    const { entities, meshes, position, rotation, scale } = this,
+      batches = (this.batches ??= this.group());
+    // Every batch is scanned before any write, so a disposed mesh of a later engine stops the sync with nothing written.
+    let moved = 0;
+    const changed = batches.map((batch) => {
+      const groups = this.scan(batch);
+      moved |= groups;
+      return groups;
+    });
+    if (!moved) return entities.length;
+    batches.forEach((batch, i) => {
+      const t = slot(meshes[batch.links[0]]).engine.store.transforms,
+        groups = changed[i];
+      if (groups & POSITION) this.write(batch, 'positions', position!, [t.x, t.y, t.z]);
+      if (groups & ROTATION) this.write(batch, 'quaternions', rotation!, [t.qx, t.qy, t.qz, t.qw]);
+      if (groups & SCALE) this.write(batch, 'scales', scale!, [t.sx, t.sy, t.sz]);
+    });
+    return entities.length;
   }
   /** End every link and stop watching the component. Safe to call twice. */
   stop(): void {
@@ -187,6 +193,44 @@ export class MeshBridge {
       rows: new Int32Array(links.length),
     }));
   }
+  /**
+   * The one pass of a sync: checks each mesh, reads its slot and component row, and returns a mask of the groups where
+   * some row differs from what the mesh holds. A group already known to differ is not compared again, so a world that
+   * moves everything pays the compare for its first row only.
+   */
+  private scan({ links, ids, rows }: Batch): number {
+    const { entities, meshes, component, position, rotation, scale } = this,
+      t = slot(meshes[links[0]]).engine.store.transforms,
+      { x, y, z, qx, qy, qz, qw, sx, sy, sz } = t,
+      [px, py, pz] = position ?? [x, y, z],
+      [rx, ry, rz, rw] = rotation ?? [qx, qy, qz, qw],
+      [cx, cy, cz] = scale ?? [sx, sy, sz];
+    let unknown = (position ? POSITION : 0) | (rotation ? ROTATION : 0) | (scale ? SCALE : 0),
+      changed = 0;
+    for (let i = 0, size = links.length; i < size; i++) {
+      const link = links[i],
+        mesh = meshes[link];
+      mesh.check();
+      const id = slot(mesh).id,
+        row = component.index(entities[link]);
+      ids[i] = id;
+      rows[i] = row;
+      if (!unknown) continue;
+      if (unknown & POSITION && (x[id] !== px[row] || y[id] !== py[row] || z[id] !== pz[row])) {
+        unknown &= ~POSITION;
+        changed |= POSITION;
+      }
+      if (unknown & ROTATION && (qx[id] !== rx[row] || qy[id] !== ry[row] || qz[id] !== rz[row] || qw[id] !== rw[row])) {
+        unknown &= ~ROTATION;
+        changed |= ROTATION;
+      }
+      if (unknown & SCALE && (sx[id] !== cx[row] || sy[id] !== cy[row] || sz[id] !== cz[row])) {
+        unknown &= ~SCALE;
+        changed |= SCALE;
+      }
+    }
+    return changed;
+  }
   /** Writes one group of `batch`: one `TransformWriter` call per run of rows that differ from what the meshes hold. */
   private write(
     { writer, ids, rows }: Batch,
@@ -201,12 +245,11 @@ export class MeshBridge {
     if (this.scratch.length < size * 4) this.scratch = new Float64Array(size * 4);
     const scratch = this.scratch;
     let from = -1;
-    for (let i = 0; i <= size; i++) {
+    for (let i = 0; i < size; i++) {
       // `d` and `s` repeat the third column when a group has three, so one compare serves both widths.
       const row = rows[i],
-        id = ids[i],
-        differs = i < size && (p[id] !== a[row] || q[id] !== b[row] || r[id] !== c[row] || s[id] !== d[row]);
-      if (differs) {
+        id = ids[i];
+      if (p[id] !== a[row] || q[id] !== b[row] || r[id] !== c[row] || s[id] !== d[row]) {
         if (from < 0) from = i;
         const at = (i - from) * width;
         scratch[at] = a[row];
@@ -218,6 +261,7 @@ export class MeshBridge {
         from = -1;
       }
     }
+    if (from >= 0) writer.write({ [field]: scratch }, { from, count: size - from });
   }
   private fill(entity: Entity, mesh: Mesh): void {
     const { id, engine } = slot(mesh),
