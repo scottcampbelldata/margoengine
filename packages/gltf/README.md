@@ -68,6 +68,28 @@ Images decode asynchronously, so for bytes already in memory use `parseGLTFAsync
 place of `parseGLTF`. WebGPU only: a WebGL engine refuses the file. The meshes stay core meshes, so they move, pick and
 dispose as usual, and packages that patch core's shader apply to them. A cut-out picks and casts shadows as solid.
 
+### Meshopt compression
+
+`@margoengine/gltf/meshopt` reads `EXT_meshopt_compression` and `KHR_meshopt_compression`, every mode and filter.
+`@margoengine/decoders/meshopt` is imported on the first file that uses them, so install `@margoengine/decoders` beside
+this package; a file with no compressed views never loads it. A fallback buffer is not downloaded. Optimizers usually
+quantize as well, so pass both.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf';
+import { meshopt } from 'margoengine/gltf/meshopt';
+import { quantized } from 'margoengine/gltf/quantized';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
+const model = await loadGLTF(engine, '/small.glb', { extensions: [meshopt, quantized] });
+engine.start();
+// On teardown: model.dispose(); engine.dispose();
+```
+
+Decoded data may reach 64 MiB per file. For bytes in memory use `parseGLTFAsync`.
+
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 
 Apache-2.0 licensed.

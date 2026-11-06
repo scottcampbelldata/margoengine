@@ -786,6 +786,10 @@
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"
     },
+    "./gltf/meshopt": {
+      "types": "./dist/gltf/meshopt.d.ts",
+      "import": "./dist/gltf/meshopt.js"
+    },
     "./gltf/quantized": {
       "types": "./dist/gltf/quantized.d.ts",
       "import": "./dist/gltf/quantized.js"

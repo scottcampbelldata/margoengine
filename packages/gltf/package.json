@@ -36,6 +36,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./meshopt": {
+      "types": "./dist/meshopt.d.ts",
+      "import": "./dist/meshopt.js"
+    },
     "./quantized": {
       "types": "./dist/quantized.d.ts",
       "import": "./dist/quantized.js"
@@ -50,9 +54,16 @@
     "NOTICE"
   ],
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/decoders": {
+      "optional": true
+    }
   },
   "devDependencies": {
+    "@margoengine/decoders": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   }
 }
