@@ -2728,6 +2728,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Closest point and frames (`closestPointOnSpline` in `@margoengine/splines/closest`, `SplineFrames` in `@margoengine/splines/frames`) | By method: the search samples the curve (`samples`, default the spline's `divisions`) and refines the best sample only, so passes closer together than one sample can be confused; frames are stored at `samples` steps (default 256) and blended between them; the tangent is a finite difference. | Sampling plus bisection keeps a query at `samples` curve evaluations with no per-curve setup. | A tight spiral can return a nearby pass instead of the nearest; frames drift from true rotation-minimising by less than the step size. | Raise `samples`. |
 | Knot paths (`KnotPath` in `@margoengine/splines/knots`) | Enforced: 2 to 1,000,000 knots (3 minimum when closed); every knot carries the same number of data values. By method: a closed path builds an open Bezier whose last point is its first; a segment is straight only when both its knots are `linear`. | Bezier handles express auto, linear and broken tangents in one form. | `Spline.closed` is false for a closed path, so frames do not spread loop twist. | Build the curve with `Spline` and `closed: true` when you do not need broken tangents. |
 | Place and deform along splines (`@margoengine/splines/mesh`) | Enforced: at most 1,000,000 instances. By method: a mesh bends in straight chords between its own vertices; normals are rotated with the frame, not re-derived; one frame lookup per distinct position along the axis. | Rotating normals needs no mesh connectivity. | A coarse mesh facets on a tight bend and a very sharp bend leaves normals slightly off. | Subdivide the mesh along its axis first. |
+| Stagger (`@margoengine/tween/stagger`, 2026-11-06) | By method: a target's offset is fixed when the call is made, so targets added later are not in it. An easing that returns below 0 counts as 0. `from: 'random'` is the same on every run unless `seed` changes. `staggerTimeline` takes an offset from a label to nine decimal places, a nanosecond. |
 | Fitting (`fitSpline` in `@margoengine/splines/fit`) | Enforced: 2 to 10,000,000 points, a `tolerance` above 0. By method: the error is measured at each point's own curve parameter (an upper bound on the true nearest distance); pieces are cut at the worst point, so a curve can use a piece or two more than the fewest possible. | Cutting at the worst point is the usual way to keep fitting linear in the points. | Output may have more control points than a hand-placed curve. | Raise `tolerance`, or run the result through `KnotPath` and remove knots. |
 | GPU BVH traversal (`GPUMeshBVH` in `@margoengine/bvh/gpu`) | Enforced: the tree, the rays and the hits each fit `maxStorageBufferBindingSize`, a tree at most 64 deep, `far` finite. By method: float32 queries, so a float64 source rounds on upload; `any` answers a hit, not the nearest; the tree is built on the CPU. | WGSL has no doubles, and the stack is a fixed array per thread. | Past those sizes the call throws a RangeError; distances differ from the CPU tree by float32 rounding. | Request a higher limit or split the mesh and the rays; use the CPU tree where float64 matters. |
 | Scene BVH (`SceneBVH` in `@margoengine/bvh/scene`) | Enforced: `rebuildThreshold` at least 1; a mesh under active GPU deformation throws, as `intersectEngine` does. By method: `update()` reads every object's world matrix once, so its cost grows with the object count; with `{refresh: false}` objects moved since the last update are found at their old place; instances cost one tree entry each. | Picks work as with `intersectEngine`, with fewer objects visited per ray; a stale tree misses a moved object until the next update. | Leave `refresh` on, or call `update()` once a frame; use `intersectModel` for a deforming mesh. |
@@ -3098,9 +3099,9 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
-### 329 errors in the package README examples
+### 328 errors in the package README examples
 
-- **What:** `npm run check:readmes` (a step of `verify`) type-checks all 719 examples of the 100 packages. When the check was built it found 715 errors in 181 examples; 388 were fixed in the same commit, and with two more from a selection example that landed the same day 329 remain, in 42 packages (voxel 56, materials 40, scatter 29, shader 23, bvh 20, cameras 17, ragdoll 16, the rest 10 or fewer). `scripts/support/readme-types-known.json` lists each by package and message. A new error fails `verify`, and so does an entry that has been fixed and not removed, so the list only shrinks.
+- **What:** `npm run check:readmes` (a step of `verify`) type-checks all 719 examples of the 100 packages. When the check was built it found 715 errors in 181 examples; 388 were fixed in the same commit, and with two more from a selection example that landed the same day 329 remained, and 328 now, in 41 packages (voxel 56, materials 40, scatter 29, shader 23, bvh 20, cameras 17, ragdoll 16, the rest 10 or fewer). `scripts/support/readme-types-known.json` lists each by package and message. A new error fails `verify`, and so does an entry that has been fixed and not removed, so the list only shrinks.
 - **Repro:** empty the known list to `{}`, then `npm run build:packages` and `npm run check:readmes`.
 - **Cause:** 285 are names an example uses and never sets up, reader data such as `physics`, `textures` or `candidates`. The README says "runs as written" and these do not. The other 42 are mostly real faults in published types, below. Six of them are `GPUTextureUsage` and `GPUBufferUsage`, which need `@webgpu/types` in the reader's project and in the check.
 - **The published types that are wrong, each shown by a README example written the way the API is meant to be used:**
@@ -8153,6 +8154,7 @@ Numeric property interpolation and easing; `update` steps the existing tracks in
 
 ```ts
 import {Tween, easeInOutCubic} from 'margoengine/tween';
+declare const object: {opacity: number};
 const timeline = new Tween();
 const cancel = timeline.to(object, 'opacity', 1, {duration: 0.5, easing: easeInOutCubic});
 timeline.update(1 / 60);
@@ -8206,16 +8208,13 @@ frame(1 / 60);
 - Each component matches a `Spring` with stiffness `(2 / smoothTime)^2` and damping `4 / smoothTime`, so a velocity heading toward the target can overshoot once, as the spring does.
 - `dt` 0 copies `current` to `out` and leaves `velocity` alone; a negative, NaN or infinite `dt`, a non-finite value or mismatched lengths throw `RangeError`. A very long `dt` arrives at rest instead of producing NaN.
 
-Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
+## Stagger: one tween across many targets
 
-Build and unit tests: npm test --workspace @margoengine/tween
-
-## Speed
-
-10,000 `spring.update(dt)` calls take 0.28 ms in Node on the development PC, with no allocation per call, so a spring per object is fine:
+`stagger` from `margoengine/tween/stagger` starts the same tween on every target, each a little later than the one before:
 
 ```ts
-import {Spring} from 'margoengine/tween';
+import {Tween, Timeline, easeOutBack, easeInQuad} from 'margoengine/tween';
+import {stagger, staggerTimeline} from 'margoengine/tween/stagger';
 ```
 
 [README continues: https://margoengine.com/llms/packages/tween.md]

@@ -923,7 +923,7 @@ The following remain technical gaps, not permission to weaken a check:
 13. Only the upper core-stage bound is enforced; there is intentionally no lower bound.
 14. Public-truth checks cover license and package count, not every size or performance number, so a size figure in a guide or
     package README can go stale with no check failing (section 4.7).
-    README examples are held by `check:readmes` in `verify` since 2026-11-06, but 329 known errors remain (docs/known-bugs.md), so
+    README examples are held by `check:readmes` in `verify` since 2026-11-06, but 328 known errors remain (docs/known-bugs.md), so
     those examples are not yet evidence that their package's types are right.
 15. Remote workflow configuration is not proof that a workflow actually ran.
 16. The quality classifier must keep a conservative full-mode fallback for genuinely unclassifiable or shared

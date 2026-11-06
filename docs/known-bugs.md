@@ -158,9 +158,9 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
-### 329 errors in the package README examples
+### 328 errors in the package README examples
 
-- **What:** `npm run check:readmes` (a step of `verify`) type-checks all 719 examples of the 100 packages. When the check was built it found 715 errors in 181 examples; 388 were fixed in the same commit, and with two more from a selection example that landed the same day 329 remain, in 42 packages (voxel 56, materials 40, scatter 29, shader 23, bvh 20, cameras 17, ragdoll 16, the rest 10 or fewer). `scripts/support/readme-types-known.json` lists each by package and message. A new error fails `verify`, and so does an entry that has been fixed and not removed, so the list only shrinks.
+- **What:** `npm run check:readmes` (a step of `verify`) type-checks all 719 examples of the 100 packages. When the check was built it found 715 errors in 181 examples; 388 were fixed in the same commit, and with two more from a selection example that landed the same day 329 remained, and 328 now, in 41 packages (voxel 56, materials 40, scatter 29, shader 23, bvh 20, cameras 17, ragdoll 16, the rest 10 or fewer). `scripts/support/readme-types-known.json` lists each by package and message. A new error fails `verify`, and so does an entry that has been fixed and not removed, so the list only shrinks.
 - **Repro:** empty the known list to `{}`, then `npm run build:packages` and `npm run check:readmes`.
 - **Cause:** 285 are names an example uses and never sets up, reader data such as `physics`, `textures` or `candidates`. The README says "runs as written" and these do not. The other 42 are mostly real faults in published types, below. Six of them are `GPUTextureUsage` and `GPUBufferUsage`, which need `@webgpu/types` in the reader's project and in the check.
 - **The published types that are wrong, each shown by a README example written the way the API is meant to be used:**

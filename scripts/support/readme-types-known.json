@@ -255,9 +255,6 @@
     "TS2304: Cannot find name 'character'.": 1,
     "TS2304: Cannot find name 'geometry'.": 1
   },
-  "tween": {
-    "TS2552: Cannot find name 'object'. Did you mean 'Object'?": 1
-  },
   "voxel": {
     "TS18004: No value exists in scope for the shorthand property 'descend'. Either declare one or provide an initializer.": 1,
     "TS18004: No value exists in scope for the shorthand property 'jump'. Either declare one or provide an initializer.": 1,

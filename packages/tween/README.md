@@ -6,6 +6,7 @@ Numeric property interpolation and easing; `update` steps the existing tracks in
 
 ```ts
 import {Tween, easeInOutCubic} from 'margoengine/tween';
+declare const object: {opacity: number};
 const timeline = new Tween();
 const cancel = timeline.to(object, 'opacity', 1, {duration: 0.5, easing: easeInOutCubic});
 timeline.update(1 / 60);
@@ -58,6 +59,47 @@ frame(1 / 60);
 - `maxSpeed` limits the length of the whole velocity vector (units per second), so the direction of travel is kept. Pass `Infinity` for no limit; 0 holds the point still.
 - Each component matches a `Spring` with stiffness `(2 / smoothTime)^2` and damping `4 / smoothTime`, so a velocity heading toward the target can overshoot once, as the spring does.
 - `dt` 0 copies `current` to `out` and leaves `velocity` alone; a negative, NaN or infinite `dt`, a non-finite value or mismatched lengths throw `RangeError`. A very long `dt` arrives at rest instead of producing NaN.
+
+## Stagger: one tween across many targets
+
+`stagger` from `margoengine/tween/stagger` starts the same tween on every target, each a little later than the one before:
+
+```ts
+import {Tween, Timeline, easeOutBack, easeInQuad} from 'margoengine/tween';
+import {stagger, staggerTimeline} from 'margoengine/tween/stagger';
+
+const lamps = Array.from({length: 12}, () => ({intensity: 0}));
+const tween = new Tween();
+
+// 0.05 s between neighbours, from the middle of the row outwards.
+const cancel = stagger(tween, lamps, 'intensity', 3, {
+  duration: 0.5,
+  easing: easeOutBack,
+  stagger: {each: 0.05, from: 'center'},
+  onComplete: () => console.log('all lit'),
+});
+tween.update(1 / 60);
+
+// The same on a timeline, with the whole spread given as 0.6 s and the starts bunched towards the end.
+const cards = Array.from({length: 8}, () => ({opacity: 0}));
+const timeline = new Timeline().label('in');
+staggerTimeline(timeline, cards, 'opacity', 1, {duration: 0.4, at: 'in', stagger: {amount: 0.6, easing: easeInQuad}});
+timeline.play();
+```
+
+| `stagger` option | Meaning | Default |
+| --- | --- | --- |
+| `each` | Seconds between neighbours. A bare number, `stagger: 0.05`, means this. | 0.1 |
+| `amount` | Seconds from the first start to the last, shared across the targets. Give this or `each`. | |
+| `from` | `'start'`, `'end'`, `'center'`, `'edges'`, `'random'` or a target's index. | `'start'` |
+| `easing` | Bends the spread: the order in, a share of the total out. A result below 0 counts as 0. | even |
+| `grid` | `[columns, rows]`: targets read row by row, and the spread goes by distance from a cell. | none |
+| `seed` | Seed of `from: 'random'`; the same seed gives the same order. | 1 |
+
+- `to` can be a function, `(target, index) => number`, for a different end value each.
+- `delay` is added to every target, and `repeat`, `yoyo` and `onRepeat` reach each one. `onComplete` runs once, after the last to finish, or at once with no targets.
+- The function returned cancels them all. If `Tween.to` refuses one target, none is left running.
+- `staggerDelays(count, options)` returns just the offsets as a `Float64Array`.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

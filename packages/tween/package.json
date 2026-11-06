@@ -25,6 +25,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./stagger": {
+      "types": "./dist/stagger.d.ts",
+      "import": "./dist/stagger.js"
     }
   },
   "files": [

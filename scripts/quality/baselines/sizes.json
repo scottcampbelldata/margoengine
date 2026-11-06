@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9068176,
+  "total": 9069611,
   "history": [
     {
       "date": "2026-10-24",
@@ -2804,6 +2804,12 @@
       "commit": "007bee857",
       "reason": "gltf-pro gains the lights entry; clustered parseIES gains type B",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "abb941674",
+      "reason": "new optional entry @margoengine/tween/stagger",
+      "grew": 1
     }
   ],
   "items": {
@@ -3357,6 +3363,7 @@
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4303,
     "@margoengine/tween": 5466,
+    "@margoengine/tween/stagger": 1435,
     "@margoengine/ui": 28221,
     "@margoengine/ui/react": 28301,
     "@margoengine/usdz": 9314,
