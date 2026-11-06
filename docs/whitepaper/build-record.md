@@ -958,7 +958,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | C20 | Claims read PROVEN on stand-in proof: seven now read PROVEN (STAND-IN) and say what stood in; LIM-193 and LIM-197 name the real run in LIM-208 | DONE | `28bf8fb66` | LIM-091, 109, 120, 129, 134, 149, 151, 193, 197 |
 | B9 | MeshBridge.sync writes through TransformWriter, one write per group for each run of changed rows | DONE | `e1daa8a3e` | - |
 | B17 | engine.onFrame callbacks run on a headless stage's step | DONE | `8fdc212d4` | - |
-| A9 | resolveFromURL reads LDraw parts from a hosted library, and the README says where to get it | DONE | this commit | - |
+| A9 | resolveFromURL reads LDraw parts from a hosted library, and the README says where to get it | DONE | `69ad9dc6d` | - |
+| A8 | The headless README opens with the ffmpeg need for video in Node | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

@@ -6533,6 +6533,8 @@ Run `npx vite --host 127.0.0.1` at the root and open `/examples/webxr-orbit/`. P
 Render a scene with no page and get PNG bytes back: server thumbnails, an asset pipeline, automated tests. Core draws to
 a stand-in canvas, and the frame stays readable because nothing presents it.
 
+Margo has no video encoder of its own. Video uses WebCodecs in a browser or worker, and in Node the `ffmpeg` you have installed, so rendering to MP4 in Node means installing ffmpeg first.
+
 This package ships no WebGPU binding, because one is a large download that runs code when installed. Your app chooses
 one and passes its `gpu` in. It can be any object with `requestAdapter`: `create([])` from a Node binding such as
 [`webgpu`](https://www.npmjs.com/package/webgpu), or `navigator.gpu` in a browser or worker.
