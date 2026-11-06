@@ -23,6 +23,65 @@ export interface ProjectionOptions {
   up?: Vec3;
   /** Render only a sub-rectangle of a larger frustum; see `ViewOffset`. Default: none, the whole frustum. */
   viewOffset?: ViewOffset;
+  /** Lens focal length in millimetres. Replaces `camera.fov` with the field of view of this lens on `filmGauge`. Default: none, `camera.fov` rules. */
+  focalLength?: number;
+  /** Sensor size in millimetres along the fitted axis (see `sensorFit`). Default 36, a full-frame sensor's width. */
+  filmGauge?: number;
+  /** Which image axis `filmGauge` spans: 'horizontal', 'vertical', or 'auto' (the longer side, Blender's default). */
+  sensorFit?: SensorFit;
+}
+
+/** The image axis a sensor size spans. */
+export type SensorFit = 'horizontal' | 'vertical' | 'auto';
+
+/** Options of `lensToFov` and `fovToLens`. */
+export interface LensOptions {
+  /** Sensor size in millimetres along the fitted axis. Default 36. */
+  filmGauge?: number;
+  /** Default 'auto': `filmGauge` spans the longer image side. */
+  sensorFit?: SensorFit;
+}
+
+const lensCheck = (value: number, aspect: number, filmGauge: number, sensorFit: SensorFit): void => {
+  if (
+    ![value, aspect, filmGauge].every(Number.isFinite) ||
+    value <= 0 ||
+    aspect <= 0 ||
+    filmGauge <= 0 ||
+    !['horizontal', 'vertical', 'auto'].includes(sensorFit)
+  )
+    throw new RangeError(
+      "Invalid projection lens; pass finite focal length or fov, aspect and film gauge above 0 and sensorFit 'horizontal', 'vertical' or 'auto'",
+    );
+};
+const spansHorizontal = (aspect: number, fit: SensorFit): boolean =>
+  fit === 'horizontal' || (fit === 'auto' && aspect >= 1);
+
+/**
+ * Vertical field of view in degrees of a lens of `focalLength` mm for an image of `aspect` (width / height) on a sensor
+ * `filmGauge` mm along `sensorFit`: 2·atan(sensor / 2f) on that axis, converted to the vertical axis.
+ * A 50 mm lens on a 36 mm wide sensor is 39.6° horizontally and 26.99° vertically at 3:2.
+ */
+export function lensToFov(
+  focalLength: number,
+  aspect: number,
+  { filmGauge = 36, sensorFit = 'auto' }: LensOptions = {},
+): number {
+  lensCheck(focalLength, aspect, filmGauge, sensorFit);
+  const half = filmGauge / (2 * focalLength);
+  return (360 / Math.PI) * Math.atan(spansHorizontal(aspect, sensorFit) ? half / aspect : half);
+}
+
+/** The focal length in millimetres that gives vertical field of view `fov` degrees; the inverse of `lensToFov`. */
+export function fovToLens(
+  fov: number,
+  aspect: number,
+  { filmGauge = 36, sensorFit = 'auto' }: LensOptions = {},
+): number {
+  lensCheck(fov, aspect, filmGauge, sensorFit);
+  if (fov >= 180) throw new RangeError('Invalid projection lens; pass a field of view below 180 degrees');
+  const half = Math.tan((fov * Math.PI) / 360);
+  return filmGauge / (2 * (spansHorizontal(aspect, sensorFit) ? half * aspect : half));
 }
 
 /**
@@ -102,6 +161,9 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
   far?: number;
   up: Vec3 = [0, 0, -1];
   viewOffset?: ViewOffset;
+  focalLength?: number;
+  filmGauge = 36;
+  sensorFit: SensorFit = 'auto';
   private camera?: Camera;
   private worldUp: Vec3 = [0, 1, 0];
   private canvas?: { width: number; height: number };
@@ -149,6 +211,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     )
       throw new RangeError('Invalid fit; pass min <= max, aspect > 0, duration >= 0 and padding >= 1, all finite');
     this.animation = undefined;
+    this.applyLens(aspect);
     if (this.mode === 'perspective') {
       camera.fitToBoundingBox(min, max, { aspect, duration, padding });
       return;
@@ -178,7 +241,10 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       offset = [(rt + l) / 2, (top + bottom) / 2];
     } else
       zoom =
-        (this.height ?? 2 * length * Math.tan((camera.fov * Math.PI) / 360)) / 2 / Math.max(ey, ex / aspect) / padding;
+        (this.height ?? 2 * length * Math.tan((this.vfov(camera, aspect) * Math.PI) / 360)) /
+        2 /
+        Math.max(ey, ex / aspect) /
+        padding;
     if (!(zoom > 0 && zoom < Infinity) || !side)
       throw new RangeError('Invalid fit; the bounds are empty or flat along the view, pass a box with volume');
     if (this.near === undefined && this.far === undefined && Math.hypot(...half) >= camera.far / 2)
@@ -201,6 +267,12 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
   onPreUpdate(delta: number): void {
     const a = this.animation,
       camera = this.camera;
+    if (this.canvas)
+      this.applyLens(
+        this.viewOffset
+          ? this.viewOffset.fullWidth / this.viewOffset.fullHeight
+          : this.canvas.width / this.canvas.height,
+      );
     if (!a || !camera) return;
     const k = a.duration ? Math.min(1, (a.elapsed += delta) / a.duration) : 1,
       s = k * k * (3 - 2 * k),
@@ -216,6 +288,17 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
    */
   setViewOffset(fullWidth: number, fullHeight: number, x: number, y: number, width: number, height: number): void {
     this.viewOffset = { fullWidth, fullHeight, x, y, width, height };
+  }
+  /**
+   * With a `focalLength`, writes the lens's vertical field of view for `aspect` to `camera.fov`, so passes and controls
+   * that read `camera.fov` agree with the projection, and returns it; else returns `camera.fov`. The engine does this
+   * each frame (`onPreUpdate`); call it yourself without an engine.
+   */
+  applyLens(aspect: number): number {
+    const camera = this.camera;
+    if (!camera)
+      throw margoError('state', 'Projection is not attached; call attach(camera) or engine.use(projection) first');
+    return (camera.fov = this.vfov(camera, aspect));
   }
   /** Goes back to the whole frustum. */
   clearViewOffset(): void {
@@ -275,6 +358,10 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       throw new RangeError('Invalid vertical up; set up to a finite vector that is not parallel to the Y axis');
     return u;
   }
+  private vfov(camera: Camera, aspect: number): number {
+    if (this.focalLength === undefined) return camera.fov;
+    return lensToFov(this.focalLength, aspect, { filmGauge: this.filmGauge, sensorFit: this.sensorFit });
+  }
   private project(camera: Camera, P: Float64Array, aspect: number, webgpu: boolean): void {
     const o = this.viewOffset;
     if (!o) return this.build(camera, P, aspect, webgpu);
@@ -301,7 +388,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       f = camera.far;
     if (this.mode === 'perspective') {
       const d = n - f,
-        k = 1 / Math.tan((camera.fov * Math.PI) / 360);
+        k = 1 / Math.tan((this.vfov(camera, aspect) * Math.PI) / 360);
       P[0] = k / aspect;
       P[5] = k;
       P[10] = webgpu ? -n / d : (f + n) / d;
@@ -315,7 +402,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       t = camera.target,
       length = Math.hypot(p[0] - t[0], p[1] - t[1], p[2] - t[2]);
     const bounds = [this.left, this.right, this.top, this.bottom],
-      half = (this.height ?? 2 * length * Math.tan((camera.fov * Math.PI) / 360)) / 2;
+      half = (this.height ?? 2 * length * Math.tan((this.vfov(camera, aspect) * Math.PI) / 360)) / 2;
     let [l, r, top, b] = bounds.every((v) => v !== undefined)
       ? (bounds as number[])
       : [-half * aspect, half * aspect, half, -half];

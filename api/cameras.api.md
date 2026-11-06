@@ -19,6 +19,9 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     far?: number;
     up: Vec3;
     viewOffset?: ViewOffset;
+    focalLength?: number;
+    filmGauge: number;
+    sensorFit: SensorFit;
     static attach(engine: EngineKernel, options?: ProjectionOptions): CameraProjection;
     constructor(options?: ProjectionOptions);
     setup(engine: Pick<Engine, 'camera'> & {
@@ -30,6 +33,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     fit(bounds: ArrayLike<number>, { aspect, duration, padding }?: FitOptions): void;
     onPreUpdate(delta: number): void;
     setViewOffset(fullWidth: number, fullHeight: number, x: number, y: number, width: number, height: number): void;
+    applyLens(aspect: number): number;
     clearViewOffset(): void;
     attach(camera: Camera): void;
     dispose(): void;
@@ -41,6 +45,11 @@ export interface FitOptions {
     aspect?: number;
     duration?: number;
     padding?: number;
+}
+
+export interface LensOptions {
+    filmGauge?: number;
+    sensorFit?: SensorFit;
 }
 
 export interface ProjectionOptions {
@@ -55,7 +64,12 @@ export interface ProjectionOptions {
     far?: number;
     up?: Vec3;
     viewOffset?: ViewOffset;
+    focalLength?: number;
+    filmGauge?: number;
+    sensorFit?: SensorFit;
 }
+
+export type SensorFit = 'horizontal' | 'vertical' | 'auto';
 
 export interface ViewOffset {
     fullWidth: number;
@@ -65,6 +79,10 @@ export interface ViewOffset {
     width: number;
     height: number;
 }
+
+export function fovToLens(fov: number, aspect: number, { filmGauge, sensorFit }?: LensOptions): number;
+
+export function lensToFov(focalLength: number, aspect: number, { filmGauge, sensorFit }?: LensOptions): number;
 
 export function tileOffsets(fullWidth: number, fullHeight: number, tileWidth: number, tileHeight?: number): ViewOffset[];
 ```

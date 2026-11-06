@@ -160,6 +160,30 @@ projection.clearViewOffset();
 - **Limit**: passes that read neighbouring pixels (bloom, SSAO, DOF, TAA history) see only the tile, so seams can
   show; render tiles with overlap and crop. See [limits](../../docs/limits.md).
 
+## Focal length and film gauge
+
+Set the view the way photographers and Blender users do: a lens in millimetres on a sensor size, not a field of view.
+
+```ts
+import {CameraProjection, fovToLens, lensToFov} from 'margoengine/cameras';
+
+const projection = CameraProjection.attach(engine, {mode: 'perspective', focalLength: 50}); // 50 mm on a 36 mm sensor
+projection.focalLength = 85;            // portrait lens; camera.fov follows each frame
+projection.filmGauge = 24;              // sensor size in mm along sensorFit
+projection.sensorFit = 'vertical';      // 'auto' (default: the longer image side), 'horizontal' or 'vertical'
+lensToFov(35, 16 / 9);                  // vertical field of view in degrees for a 35 mm lens at 16:9
+fovToLens(40, 16 / 9, {filmGauge: 36}); // the focal length that gives a 40 degree vertical field of view
+```
+
+- **Maths**: the field of view along the sensor axis is `2·atan(filmGauge / (2·focalLength))`, converted to the vertical
+  axis by the image aspect. 50 mm on 36 mm is 39.6 degrees across the sensor's long side.
+- **Sync**: with a `focalLength` set, the projection uses the lens in both modes (the default orthographic height too)
+  and writes the vertical field of view to `camera.fov` every frame (`applyLens(aspect)` does it on demand), so
+  shadows, controls and `fit` agree with it. Without one, `camera.fov` rules as before. With a view offset the lens
+  is applied at the full image's aspect.
+- **Errors**: `Invalid projection lens; ...` for a focal length, gauge or aspect that is not above 0 or an unknown
+  `sensorFit`.
+
 Apache-2.0. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras

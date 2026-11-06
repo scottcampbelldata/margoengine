@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4630834,
+  "total": 4631203,
   "history": [
     {
       "date": "2026-10-24",
@@ -1808,6 +1808,12 @@
       "commit": "9d4a927e1",
       "reason": "cameras gains view offset (setViewOffset, tileOffsets)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "9850d0f39",
+      "reason": "cameras gains focal length and film gauge (lensToFov, fovToLens, focalLength)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1855,7 +1861,7 @@
     "@margoengine/cache": 2663,
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
-    "@margoengine/cameras": 2639,
+    "@margoengine/cameras": 3008,
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/origin": 1514,
     "@margoengine/cinematic": 2076,
