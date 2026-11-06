@@ -379,6 +379,43 @@ drives are overwritten every frame, so `setMorph` has no effect on them, and `pr
 follow them. `scripts/animation-morph-gpu-tests.js` reads the weights back on real WebGPU and matches `sampleTrack`
 within 1e-5 on 70 copies, looping and held.
 
+## Animation LOD (`@margoengine/animation/lod`)
+
+`AnimationLOD` updates each character as often as its distance and visibility call for, so a big crowd spends its CPU
+on the characters people can see. Time keeps running for every copy, so one that is updated again lands exactly where
+it would have been.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {AnimationLOD} from 'margoengine/animation/lod';
+import {cloneModel} from 'margoengine/animation/skeleton-utils';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const source = await loadGLTF(stage.engine, '/RobotExpressive.glb');
+const models = [source, ...(await Promise.all(Array.from({length: 199}, () => cloneModel(source))))];
+const lod = AnimationLOD.attach(stage.engine, {
+  tiers: [
+    {distance: 0, interval: 1}, // the default tiers are these three
+    {distance: 15, interval: 2}, // every second frame from 15 units
+    {distance: 40, interval: 4, depth: 4}, // every fourth frame, and nodes below level 4 hold
+  ],
+  hidden: {distance: 0, interval: 16, depth: 1}, // off screen, at any distance
+});
+const walkers = models.map((model, i) => {
+  model.root.setPosition([(i % 20) * 3, 0, -Math.floor(i / 20) * 6]);
+  return Animation.attach(model).play('Walking');
+});
+for (const walker of walkers) lod.add(walker, {radius: 1.5}); // the sphere tested against the view; default 2
+stage.onTick(() => console.log(lod.stats)); // {updated, skipped, hidden} of the last frame
+lod.remove(walkers[0]); // hands a copy back, fully posed, playing as it was
+```
+
+`add` takes over a copy's playback; its clip, `speed` and `loop` still come from its `Animation`. A copy takes the last
+tier whose `distance` it has reached, and copies on one interval take turns, so no frame carries them all. `depth`
+counts node levels from the scene roots, so what level 4 means depends on the rig: pick it per character. Weight tracks
+always play. Distance and visibility use the root's position from the previous frame.
+
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:

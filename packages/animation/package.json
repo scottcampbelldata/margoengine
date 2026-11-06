@@ -54,6 +54,10 @@
     "./morph-gpu": {
       "types": "./dist/morph-gpu.d.ts",
       "import": "./dist/morph-gpu.js"
+    },
+    "./lod": {
+      "types": "./dist/lod.d.ts",
+      "import": "./dist/lod.js"
     }
   },
   "files": [
