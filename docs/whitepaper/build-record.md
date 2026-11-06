@@ -931,7 +931,7 @@ Eight jobs, each in its own optional entry of `@margoengine/decoders`. Nothing t
 | 5 | Meshopt on Wasm SIMD | DONE | `9251dc434` | `/meshopt-simd` | LIM-228 |
 | 6 | JPEG XL | DONE | `4415e20eb` | `/jxl` | LIM-233 |
 | 7 | PVRTC fallback decode | DONE | `dc7fcbed0` | `/pvr` | LIM-236 |
-| 8 | Draco point clouds | DONE | this commit | `/draco-points` | LIM-237 |
+| 8 | Draco point clouds | DONE | `dfb604e90` | `/draco-points` | LIM-238 |
 
 - **The job 3 slip:** `7688d54c9` is the `ktx2-stream` code, but it reached `main` with job 2's commit message and no docs. The docs script had crashed and was chained with `;`, so the landing went on without it. `7439d930e` carries the docs and says so in its body; nothing was force-pushed to tidy the history. The landing script now refuses a stale message and a commit with no docs staged.
 - **The job 2 BC6H bound:** the GPU check in `tests/decoders-browser.js` allows 2 percent. It was a new test, first set at 1 percent, and real crops measured 1.46, because BC6H is a second lossy step on data UASTC HDR already rounded. The bound covers that second step. No existing tolerance was raised. HDR files fell to 20.6 percent of `memorial.exr` and 29.2 percent of `Desk.exr`, with mips.
