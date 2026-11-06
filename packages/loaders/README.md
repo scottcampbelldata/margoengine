@@ -55,6 +55,9 @@ Every parser returns the same `LoadedGeometry`:
 | `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
 | `parseVTKXML` (`/vtk-xml`, async) | See [VTK XML](#vtk-xml) |
 | `parse3DM` (`/3dm`) | See [Rhino 3DM](#rhino-3dm) |
+| `parse3DS` (`/3ds`), `parseTDS` (`/tds`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
+| `parseLWO` (`/lwo`), `parseAMF` (`/amf`, async), `parseMD2` (`/md2`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
+| `parsePDB` (`/pdb`), `parseKMZ` (`/kmz`, async) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
@@ -495,6 +498,34 @@ export async function loadChair(rhino: RhinoRuntime) {
 - **Hidden.** Hidden objects and objects on hidden layers stay out unless `hidden: true`.
 - **Memory.** Every handle the runtime gives out is freed before `parse3DM` returns, failures included.
 - **Tested.** Against a stand-in with rhino3dm's shape, not yet against the real runtime: see [known bugs](../../docs/known-bugs.md).
+
+## 3DS, LWO, AMF, MD2, PDB and KMZ
+
+Older and specialist formats, one small entry each, so an app pays only for the one it imports.
+
+```ts
+import { parse3DS } from '@margoengine/loaders/3ds';
+import { parseLWO } from '@margoengine/loaders/lwo';
+import { parseAMF } from '@margoengine/loaders/amf';
+import { parseMD2 } from '@margoengine/loaders/md2';
+import { parsePDB } from '@margoengine/loaders/pdb';
+import { parseKMZ } from '@margoengine/loaders/kmz';
+
+const bytes = async (url: string) => (await fetch(url)).arrayBuffer();
+console.log(parse3DS(await bytes('/models/teapot.3ds')).materials[0]?.texture);
+console.log(parseLWO(await bytes('/models/ship.lwo')).groups[0].name);
+console.log((await parseAMF(await bytes('/prints/bracket.amf'))).unit);
+console.log(parseMD2(await bytes('/models/knight.md2')).clips);
+console.log(parsePDB(await (await fetch('/molecules/1crn.pdb')).text()).bonds.length);
+console.log((await parseKMZ(await bytes('/maps/tower.kmz'))).models[0]?.location);
+```
+
+- **3DS.** `parse3DS` reads every triangle mesh with UVs, one group per object and material, and each material's colour, transparency and diffuse map name. Vertices are saved in world space. Cameras, lights and keyframes are skipped. `parseTDS` from `/tds` is the same reader: a `.tds` file is the same 3D Studio format under another extension.
+- **LWO.** `parseLWO` reads LWO2 and the older LWOB: every layer's points and face polygons, `SURF` colours, and the first `TXUV` map with its `VMAD` values, which split a vertex along a seam. There is one group per layer and surface, and z changes sign to make the left-handed file right-handed. Curves, patches, bones and image maps are skipped with a warning.
+- **AMF.** `parseAMF` reads plain or zipped files: objects, volumes, material, object and vertex colours, and constellations, nested ones included. Positions are in metres unless `units: 'file'`. Curved edges and colour formulas are skipped with a warning.
+- **MD2.** `parseMD2` gives the first frame as a mesh with every frame beside it in one layout, so frames blend as morph targets. Frames named `run1`, `run2` form the clip `run`. Normals are computed from each frame's triangles.
+- **PDB.** `parsePDB` returns atoms as a point cloud with element colours, radii and labels, plus `bonds` as index pairs from CONECT rows and from distance, which `guessBonds: false` turns off. Only the first MODEL loads, and an atom with alternate locations keeps its first.
+- **KMZ.** `parseKMZ` reads the KML document's `<Model>` elements and their COLLADA files, one mesh each, and an archive with no document gives every `.dae` it holds. `location` and `orientation` are returned, not applied, because the map projection is your app's choice. Placemark points, lines and polygons are not read. `read(path)` returns any other file in the archive.
 
 ## Tiled TMX
 

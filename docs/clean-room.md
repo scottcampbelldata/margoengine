@@ -622,6 +622,13 @@ File formats written from their public descriptions; no reader of another projec
 | LF12 | Cell type numbers and point order | loaders/src/vtk-xml.ts | Kitware, "VTK File Formats" cell diagrams |
 | LF13 | LZ4 block decoding | loaders/src/vtk-xml.ts | "LZ4 Block Format Description" |
 | LF14 | Unit system numbers, the object, layer and mesh tables a 3DM file exposes | loaders/src/3dm.ts | Robert McNeel & Associates, published rhino3dm API reference |
+| LF15 | 3DS chunk ids and the mesh, face and material chunks | loaders/src/3ds.ts | Public 3DS file format descriptions, such as the Autodesk 3D Studio file format summary |
+| LF16 | LWO2 and LWOB chunks, `VMAP` and `VMAD` | loaders/src/lwo.ts | NewTek, "LightWave Object File Format" (LWO2) public SDK document |
+| LF17 | AMF elements, units and constellations | loaders/src/amf.ts | ISO/ASTM 52915, "Additive manufacturing file format" |
+| LF18 | MD2 header, frame and triangle layout | loaders/src/md2.ts | Public Quake II MD2 format descriptions |
+| LF19 | PDB ATOM, HETATM, CONECT and MODEL columns | loaders/src/pdb.ts | wwPDB, "Protein Data Bank Contents Guide", format version 3.3 |
+| LF20 | Element colours and covalent radii | loaders/src/pdb.ts | Published CPK colour values; Cordero et al., "Covalent radii revisited", Dalton Trans. 2008 |
+| LF21 | KML `Model`, `Location`, `Orientation` and `Scale`, and the KMZ layout | loaders/src/kmz.ts | OGC, "KML 2.3" standard |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 

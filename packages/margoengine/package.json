@@ -1050,6 +1050,34 @@
       "types": "./dist/loaders/3dm.d.ts",
       "import": "./dist/loaders/3dm.js"
     },
+    "./loaders/3ds": {
+      "types": "./dist/loaders/3ds.d.ts",
+      "import": "./dist/loaders/3ds.js"
+    },
+    "./loaders/lwo": {
+      "types": "./dist/loaders/lwo.d.ts",
+      "import": "./dist/loaders/lwo.js"
+    },
+    "./loaders/amf": {
+      "types": "./dist/loaders/amf.d.ts",
+      "import": "./dist/loaders/amf.js"
+    },
+    "./loaders/md2": {
+      "types": "./dist/loaders/md2.d.ts",
+      "import": "./dist/loaders/md2.js"
+    },
+    "./loaders/pdb": {
+      "types": "./dist/loaders/pdb.d.ts",
+      "import": "./dist/loaders/pdb.js"
+    },
+    "./loaders/tds": {
+      "types": "./dist/loaders/tds.d.ts",
+      "import": "./dist/loaders/tds.js"
+    },
+    "./loaders/kmz": {
+      "types": "./dist/loaders/kmz.d.ts",
+      "import": "./dist/loaders/kmz.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"

@@ -45,7 +45,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 
 - [@margoengine/gltf](https://margoengine.com/llms/packages/gltf.md): Lazy static glTF/GLB loading for Margo Engine.
 - [@margoengine/gltf-pro](https://margoengine.com/llms/packages/gltf-pro.md): Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU.
-- [@margoengine/loaders](https://margoengine.com/llms/packages/loaders.md): PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.
+- [@margoengine/loaders](https://margoengine.com/llms/packages/loaders.md): PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, 3DS, LWO, AMF, MD2, PDB, KMZ, static USDA/USDZ, SVG and TrueType font loaders…
 - [@margoengine/decoders](https://margoengine.com/llms/packages/decoders.md): Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG, TGA, TIFF, DDS and KTX reading, for Margo Engine.
 - [@margoengine/fbx](https://margoengine.com/llms/packages/fbx.md): Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline.
 - [@margoengine/usdz](https://margoengine.com/llms/packages/usdz.md): Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR.
@@ -177,7 +177,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/inspector API](https://margoengine.com/llms/api/inspector.md): 5 entry points
 - [@margoengine/gltf API](https://margoengine.com/llms/api/gltf.md): 7 entry points
 - [@margoengine/gltf-pro API](https://margoengine.com/llms/api/gltf-pro.md): 9 entry points
-- [@margoengine/loaders API](https://margoengine.com/llms/api/loaders.md): 16 entry points
+- [@margoengine/loaders API](https://margoengine.com/llms/api/loaders.md): 23 entry points
 - [@margoengine/decoders API](https://margoengine.com/llms/api/decoders.md): 8 entry points
 - [@margoengine/fbx API](https://margoengine.com/llms/api/fbx.md): 3 entry points
 - [@margoengine/usdz API](https://margoengine.com/llms/api/usdz.md): 2 entry points
