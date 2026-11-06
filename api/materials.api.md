@@ -955,6 +955,8 @@ export function loadTexture(url: string | URL, { signal, fetch: get, ...options 
     fetch?: typeof fetch;
 }): Promise<Texture>;
 
+export const mapSlots: readonly ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'transmissionMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'thicknessMap'];
+
 export function materialGraphOutput(graph: MaterialGraph, options?: NodeMaterialOptions): MaterialGraphOutput;
 
 export function materialLobes(options?: MaterialLobeOptions, base?: MaterialExtension): MaterialExtension;
@@ -1040,8 +1042,6 @@ interface TransmissionPassOptions {
 }
 
 const featureMaps: readonly ['alphaMap', 'bumpMap', 'displacementMap', 'lightMap'];
-
-const mapSlots: readonly ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'transmissionMap', 'sheenColorMap', 'sheenRoughnessMap', 'specularIntensityMap', 'specularColorMap', 'iridescenceMap', 'iridescenceThicknessMap', 'anisotropyMap', 'thicknessMap'];
 
 const surfaceMaps: readonly ['parallaxMap', 'subsurfaceThicknessMap'];
 ```

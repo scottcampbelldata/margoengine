@@ -640,6 +640,7 @@
       "loadCubeTexture",
       "loadKTX2Texture",
       "loadTexture",
+      "mapSlots",
       "materialGraphOutput",
       "materialLobes",
       "materialShader",

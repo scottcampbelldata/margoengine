@@ -706,6 +706,49 @@ Shadow maps, picking, contact shadows and TAA velocity cut at `cutoff`, not by n
 once and a surface moving under TAA with opacity below `cutoff` writes no velocity. SSAO's depth and normals see the
 noise. Overlapping copies of a mesh share one pattern, and a material drawn `transparent` blends and ignores the feature.
 
+### Stochastic tiling (`@margoengine/materials/stochastic`)
+
+`stochasticTiling()` takes the repeat out of a tiled texture with no extra art, for large floors, walls and landscapes. The
+UV plane is cut into triangles, each corner shifts the texture by a random offset, and each pixel blends its triangle's
+three reads (Heitz and Neyret 2018; Mikkelsen 2022). Plain blending would wash the contrast out, so the blend is scaled
+back up about the texture's mean, which is its 1 x 1 mip.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
+import { stochasticTiling } from 'margoengine/materials/stochastic';
+import { planeGeometry } from 'margoengine/geometry';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const repeat = { wrapS: 'repeat', wrapT: 'repeat' } as const;
+const floor = new PbrMaterial({
+  map: await loadTexture('/concrete.jpg', repeat),
+  normalMap: await loadTexture('/concrete-normal.jpg', { ...repeat, colorSpace: 'linear' }),
+  uvTransform: { scale: [40, 40] },
+  features: [stochasticTiling()],
+});
+createMesh(engine, planeGeometry(100, 100), floor);
+floor.features = []; // live: back to plain tiling
+```
+
+| Option | Meaning |
+| --- | --- |
+| `cellSize` | Side of a grid triangle in texture repeats, above 0 (default 0.5): small mixes more, large keeps more of the texture whole |
+| `blend` | Share of a triangle given to blending, above 0, at most 1 (default 0.3): 1 blends across all of it, small makes hard patches |
+| `maps` | The maps read this way (default every map the material has). They must repeat, or the first draw throws; leave out a map baked on its own unwrap, such as an `aoMap` on UV1 |
+
+Maps on one UV set share offsets and weights, so colour, normal and roughness stay in register. A `layered()` material's
+tiled layer maps and detail go the same way when `stochasticTiling()` comes after it in `features`; masks stay as they
+are, and each layer map must repeat. On an RTX A6000 a real floor texture tiled four times correlates with itself one
+repeat over at 1.00 plain and 0.004 with the feature, and real wood keeps 0.98 of its contrast.
+
+Offsets only, no rotation, so grain and planks keep their direction, and what is large in the texture (a plank wider than
+`cellSize`) gets cut at patch edges: raise `cellSize` for those. Each map costs three reads in place of one. Passes that
+do not run the colour shader (shadow maps, picking, contact shadows, TAA velocity) read `alphaMap` and `map` alpha
+plainly, and `displacementMap` is read plainly in the vertex stage, so a cut-out or displaced surface should leave those
+out of `maps`. A texture with no 1 x 1 mip (`mipmaps: false`, a short `mipTexture` chain) blends without the contrast gain.
+
 ### Object-space normal maps (`@margoengine/materials/object-normal`)
 
 `objectNormal()` reads `normalMap` as an object-space map: RGB is the normal in the mesh's own axes (0.5 at zero), the

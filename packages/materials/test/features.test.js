@@ -8,6 +8,8 @@ import { wgsl } from '../../core/dist/shaders.js';
 import { LambertMaterial, Material, PbrMaterial, Texture, createInstancedMesh, createMesh } from '../dist/index.js';
 import { alphaHash } from '../dist/alpha-hash.js';
 import { objectNormal } from '../dist/object-normal.js';
+import { stochasticTiling } from '../dist/stochastic.js';
+import { layered } from '../dist/layered.js';
 
 async function scene() {
   const gpu = mockGPU(),
@@ -220,4 +222,67 @@ test('prefilterCube: refuses anything but a cube, a bad size and an aborted sign
   await assert.rejects(prefilterCube(device, cube, { size: 8 }), /power of two from 16 to 2048/);
   await assert.rejects(prefilterCube({ gpu: null }, cube), /needs WebGPU/);
   await assert.rejects(prefilterCube(device, cube, { signal: AbortSignal.abort() }), /abort/i);
+});
+
+const pixel = (options) => new Texture({ data: new Uint8Array(4), width: 1, height: 1 }, options);
+const repeats = { wrapS: 'repeat', wrapT: 'repeat' };
+test('stochasticTiling compiles in only while listed and reads the maps it names', async () => {
+  const { engine, frame } = await scene(),
+    material = new PbrMaterial({ map: pixel(repeats), normalMap: pixel(repeats) });
+  createMesh(engine, quad, material);
+  const plain = modules(frame()).filter((c) => c.includes('fn surface('));
+  assert.ok(plain.length && plain.every((c) => !c.includes('margoTile')));
+  material.features = [stochasticTiling({ maps: ['map'] })];
+  const code = modules(frame()).find((c) => c.includes('fn surface('));
+  assert.match(code, /margoTile_mat_baseMap\(uv\(i,f\.coordsA\.x\)\)/);
+  assert.doesNotMatch(code, /margoTile_mat_normalMap/);
+  assert.match(code, /textureSample\(mat_normalMap,mat_normalMapS/);
+  material.features = [stochasticTiling()];
+  const all = modules(frame()).find((c) => c.includes('fn surface('));
+  assert.match(all, /let sampledNormal=margoTile_mat_normalMap\(/);
+  assert.match(all, /margoTile_mat_mrMap\(/);
+  material.features = [];
+  assert.ok(modules(frame()).every((c) => !c.includes('margoTile')));
+});
+
+test('stochasticTiling reads the maps of a physical material by their slot', async () => {
+  const { engine, frame } = await scene(),
+    material = new PbrMaterial({
+      map: pixel(repeats),
+      metalRoughnessMap: pixel(repeats),
+      clearcoat: 1,
+      clearcoatMap: pixel(repeats),
+      features: [stochasticTiling({ maps: ['map', 'clearcoatMap'] })],
+    });
+  createMesh(engine, quad, material);
+  const code = modules(frame()).find((c) => c.includes('fn surface('));
+  assert.match(code, /s\.base=margoTile_margoPhysicalMap0\(margoPhysicalUV\(i,0\)\)/);
+  assert.match(code, /s\.cc=f\.coat\.x\*margoTile_margoPhysicalMap\d\(margoPhysicalUV\(i,5\)\)/);
+  assert.match(code, /let mr=textureSample\(margoPhysicalMap1,/);
+});
+
+test('stochasticTiling refuses clamped maps and a layered feature after it, and checks its options', async () => {
+  const { engine, frame } = await scene(),
+    material = new PbrMaterial({ map: pixel(), features: [stochasticTiling()] });
+  createMesh(engine, quad, material);
+  assert.throws(() => frame(), { name: 'TypeError', message: /make map with \{wrapS: 'repeat'/ });
+  material.features = [stochasticTiling({ maps: ['normalMap'] })];
+  frame();
+  material.features = [stochasticTiling({ maps: ['normalMap'] }), layered({ detail: { map: pixel(repeats) } })];
+  assert.throws(() => frame(), { name: 'TypeError', message: /list layered\(\) ahead of it/ });
+  assert.throws(() => stochasticTiling({ cellSize: 0 }), RangeError);
+  assert.throws(() => stochasticTiling({ blend: 1.5 }), RangeError);
+  assert.throws(() => stochasticTiling({ maps: ['lightMap'] }), TypeError);
+  assert.throws(() => stochasticTiling({ maps: [] }), TypeError);
+});
+
+test('stochasticTiling reads a layer through the grid and leaves its mask alone', async () => {
+  const { engine, frame } = await scene(),
+    material = new PbrMaterial({
+      features: [layered({ layers: [{ map: pixel(repeats), mask: pixel(repeats) }] }), stochasticTiling()],
+    });
+  createMesh(engine, quad, material);
+  const code = modules(frame()).find((c) => c.includes('fn surface('));
+  assert.match(code, /margoTile_margoLayerMap\d\(margoLayerUV0\)/);
+  assert.match(code, /textureSample\(margoLayerMap\d,margoLayerSampler\d,i\.uv\.xy\)\.r/);
 });

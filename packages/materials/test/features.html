@@ -14,6 +14,7 @@ import {prefilterCube} from '/packages/materials/dist/prefilter.js';
 import {mipTexture} from '/packages/materials/dist/mips.js';
 import {layered} from '/packages/materials/dist/layered.js';
 import {objectNormal} from '/packages/materials/dist/object-normal.js';
+import {stochasticTiling} from '/packages/materials/dist/stochastic.js';
 import {TAA} from '/packages/taa/dist/index.js';
 const size=256;
 const scene=async(camera,options={})=>{
@@ -88,6 +89,50 @@ const lobeSurfaces={
 // quad's middle. Each surface gets enough of it to stay above the tone curve's dark end.
 const toward=[0.3,0.2,1],lobePower={coat:16,sheen:64,film:2,grain:1};
 window.check={
+  // A real floor texture tiled four times across the whole canvas, so one repeat is 64 pixels exactly.
+  async stochastic(kind){
+    const url='/examples/assets/source/skinning_ik/textures/polyhaven/concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.jpg',
+      floorMap=async()=>new Texture(await createImageBitmap(await (await fetch(url)).blob()),{wrapS:'repeat',wrapT:'repeat'}),
+      half=5*Math.tan(Math.PI/6),repeats=4,floor=tiled(repeats);
+    floor.positions=quad(half).positions;
+    const draw=async(material)=>{const made=await scene(front),{engine,errors,render}=made;createMesh(engine,floor,material);await render();const data=await pixels(made);engine.dispose();return {data,errors};};
+    const luma=(data)=>Float64Array.from({length:size*size},(_,k)=>0.2126*data[k*4]+0.7152*data[k*4+1]+0.0722*data[k*4+2]);
+    const moments=(v)=>{let m=0;for(const x of v)m+=x;m/=v.length;let q=0;for(const x of v)q+=(x-m)**2;return {mean:m,deviation:Math.sqrt(q/v.length)};};
+    // The correlation of the picture with itself one repeat over: 1 for a repeat, about 0 for independent patches.
+    const correlation=(v,lag)=>{let n=0,sa=0,sb=0,sab=0,saa=0,sbb=0;for(let y=0;y<size;y++)for(let x=0;x<size-lag;x++){const p=v[y*size+x],q=v[y*size+x+lag];n++;sa+=p;sb+=q;sab+=p*q;saa+=p*p;sbb+=q*q;}return (sab/n-sa/n*sb/n)/Math.sqrt((saa/n-(sa/n)**2)*(sbb/n-(sb/n)**2));};
+    // Off the pixel grid, where plain tiling blurs as much as shifted reads do: the same contrast, measured on real wood.
+    if(kind==='contrast'){
+      const u='/examples/assets/source/skinning_ik/textures/polyhaven/wood_table_worn/wood_table_worn_diff_1k.jpg';
+      const wood=async()=>new Texture(await createImageBitmap(await (await fetch(u)).blob()),{wrapS:'repeat',wrapT:'repeat'});
+      floor.uvs=tiled(3.7).uvs;
+      const plain=await draw(new UnlitMaterial({map:await wood()})),soft=await draw(new UnlitMaterial({map:await wood(),features:[stochasticTiling()]}));
+      return {errors:[...plain.errors,...soft.errors],plain:moments(luma(plain.data)),soft:moments(luma(soft.data))};
+    }
+    if(kind==='repeat'){
+      const plain=await draw(new UnlitMaterial({map:await floorMap()})),soft=await draw(new UnlitMaterial({map:await floorMap(),features:[stochasticTiling()]}));
+      const a=luma(plain.data),b=luma(soft.data);
+      return {errors:[...plain.errors,...soft.errors],plain:{...moments(a),period:correlation(a,size/repeats)},soft:{...moments(b),period:correlation(b,size/repeats)}};
+    }
+    // Two maps on one UV set: the same texture as colour and as glow reads alike at every pixel.
+    if(kind==='register'){
+      const map=await floorMap(),{data,errors}=await draw(new UnlitMaterial({map,emissiveMap:map,emissive:[1,1,1],features:[stochasticTiling(),peek('abs(s.base.rgb-s.emissive)-s.emissive')]}));
+      let worst=0;for(let k=0;k<size*size;k++)worst=Math.max(worst,data[k*4]);
+      return {worst,errors};
+    }
+    // Every mip level a solid colour: the level shown must be the plain read's at every pixel, so a triangle edge choosing
+    // another mip shows as a pixel off.
+    if(kind==='mips'){
+      const levels=[],colours=[[255,0,0,255],[0,255,0,255],[0,0,255,255]];
+      for(let n=256,k=0;n>=1;n>>=1,k++)levels.push(flatLevel(n,colours[k%3]));
+      const map=()=>mipTexture(levels,{...mipOptions,minFilter:'linear',magFilter:'linear'}),plain=await draw(new UnlitMaterial({map:map()})),soft=await draw(new UnlitMaterial({map:map(),features:[stochasticTiling()]}));
+      let off=0;for(let k=0;k<size*size*4;k++)if(Math.abs(plain.data[k]-soft.data[k])>1)off++;
+      return {off,errors:[...plain.errors,...soft.errors]};
+    }
+    if(kind==='layered'){
+      const map=await floorMap(),one=await draw(new UnlitMaterial({features:[layered({layers:[{map}]}),stochasticTiling()]}));
+      const v=luma(one.data);return {...moments(v),period:correlation(v,size/repeats),errors:one.errors};
+    }
+  },
   // The linear colour at the quad's middle under one kind of light.
   async lobe({surface,light,lobes}){
     const made=await scene(front),{engine,errors,render}=made;

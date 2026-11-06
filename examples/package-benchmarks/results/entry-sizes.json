@@ -1,5 +1,5 @@
 {
-  "commit": "a5367fedd",
+  "commit": "0cd600605",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1262,8 +1262,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 198047,
-        "gzip": 61532
+        "raw": 198061,
+        "gzip": 61542
       },
       "./atlas": {
         "raw": 4025,
@@ -1296,6 +1296,10 @@
       "./object-normal": {
         "raw": 1529,
         "gzip": 694
+      },
+      "./stochastic": {
+        "raw": 4527,
+        "gzip": 2146
       }
     },
     "@margoengine/math": {
@@ -1852,6 +1856,10 @@
       "./correctives": {
         "raw": 4452,
         "gzip": 1986
+      },
+      "./transfer": {
+        "raw": 8534,
+        "gzip": 3424
       }
     },
     "@margoengine/road": {

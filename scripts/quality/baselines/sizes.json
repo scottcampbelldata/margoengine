@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7400510,
+  "total": 7402913,
   "history": [
     {
       "date": "2026-10-24",
@@ -2558,6 +2558,12 @@
       "commit": "5cd082ccd",
       "reason": "feat(rigging): weight transfer (new entry @margoengine/rigging/transfer)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "0cd600605",
+      "reason": "materials/stochastic entry; built-material exports mapSlots",
+      "grew": 2
     }
   ],
   "items": {
@@ -2861,6 +2867,7 @@
     "@margoengine/materials/mips": 10731,
     "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/prefilter": 1933,
+    "@margoengine/materials/stochastic": 2402,
     "@margoengine/materials/transmission": 7416,
     "@margoengine/math": 20105,
     "@margoengine/math/affine": 3936,
@@ -3179,6 +3186,7 @@
     "leak @margoengine/materials -> @margoengine/gltf-pro": 1,
     "leak @margoengine/materials/batched -> @margoengine/gltf-pro": 1,
     "leak @margoengine/materials/mips -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/materials/stochastic -> @margoengine/gltf-pro": 1,
     "leak @margoengine/mesh-edit -> @margoengine/bvh/tree": 1,
     "leak @margoengine/mesh-edit/bake -> @margoengine/bvh/tree": 1,
     "leak @margoengine/mesh-edit/remesh -> @margoengine/bvh/tree": 1,

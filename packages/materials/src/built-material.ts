@@ -1413,7 +1413,8 @@ export interface MaterialOptions extends PhysicalOptions {
   /** UV offset/scale/rotation for every map but `matcap` (KHR_texture_transform semantics), e.g. an atlas region. */
   uvTransform?: TextureTransform;
 }
-const mapSlots = [
+/** Every map slot of a material, in the order its physical maps are numbered. */
+export const mapSlots = [
   'map',
   'metalRoughnessMap',
   'normalMap',

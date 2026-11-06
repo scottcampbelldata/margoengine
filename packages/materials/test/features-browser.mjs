@@ -17,6 +17,37 @@ const check = (name, ...args) => page.evaluate(([n, a]) => window.check[n](...a)
 const near = (a, b, label, tolerance = 0.02) =>
   a.forEach((v, k) => assert.ok(Math.abs(v - b[k]) <= tolerance, `${label}: ${a} should be ${b}`));
 const jobs = {
+  async stochastic() {
+    // A real polyhaven floor texture tiled four times. Independent patches correlate at the repeat by the texture's own
+    // autocorrelation at a random shift, whose mean over all shifts is 0 once the mean is taken off; the 75 or so patches
+    // on screen leave a sampling error near 1 / sqrt(75) = 0.12, and 0.35 allows three of those. Plain tiling is periodic.
+    const repeat = await check('stochastic', 'repeat');
+    console.log('stochastic', JSON.stringify(repeat));
+    assert.deepEqual(repeat.errors, []);
+    assert.ok(repeat.plain.period > 0.99, `plain tiling repeats: ${repeat.plain.period}`);
+    assert.ok(Math.abs(repeat.soft.period) < 0.35, `the repeat is gone: ${repeat.soft.period}`);
+    // The blend keeps the mean: allow the error of a mean of 75 patches, deviation / sqrt(75), three times over.
+    const error = (3 * repeat.plain.deviation) / Math.sqrt(75);
+    assert.ok(Math.abs(repeat.soft.mean - repeat.plain.mean) < error, `mean kept: ${repeat.soft.mean} ${repeat.plain.mean}`);
+    // Contrast on real wood. Blending three independent reads with these weights keeps 0.88 of the deviation, and the
+    // variance-preserving gain brings it back to 1, less what holding the result inside the three reads takes.
+    const wood = await check('stochastic', 'contrast');
+    console.log('stochastic wood', JSON.stringify(wood));
+    assert.deepEqual(wood.errors, []);
+    const contrast = wood.soft.deviation / wood.plain.deviation;
+    assert.ok(contrast > 0.95 && contrast < 1.05, `contrast kept: ${contrast}`);
+    const register = await check('stochastic', 'register');
+    assert.deepEqual(register.errors, []);
+    assert.ok(register.worst <= 1, `maps on one UV set stay in register: ${register.worst}`);
+    // Solid levels: no pixel may differ from the plain read but by rounding.
+    const mips = await check('stochastic', 'mips');
+    assert.deepEqual(mips.errors, []);
+    assert.equal(mips.off, 0, 'a triangle edge chose another mip');
+    const layer = await check('stochastic', 'layered');
+    console.log('stochastic layer', JSON.stringify(layer));
+    assert.deepEqual(layer.errors, []);
+    assert.ok(Math.abs(layer.period) < 0.2, `a layer's repeat is gone: ${layer.period}`);
+  },
   async lobes() {
     const run = async (o) => {
       const r = await page.evaluate((v) => window.check.lobe(v), o);

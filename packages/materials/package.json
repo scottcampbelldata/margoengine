@@ -70,6 +70,10 @@
     "./object-normal": {
       "types": "./dist/object-normal.d.ts",
       "import": "./dist/object-normal.js"
+    },
+    "./stochastic": {
+      "types": "./dist/stochastic.d.ts",
+      "import": "./dist/stochastic.js"
     }
   },
   "files": [
