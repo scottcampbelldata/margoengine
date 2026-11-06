@@ -82,7 +82,7 @@ export interface CubeTarget {
 }
 
 export class CubeTexture extends Texture {
-    constructor(source: readonly (ImageSource | ImageData | RawImage | DataImage)[] | Texture, options?: CubeTextureOptions, owned?: boolean);
+    constructor(source: readonly (ImageSource | ImageData | RawImage | DataImage)[] | Texture | TranscodedTexture, options?: CubeTextureOptions, owned?: boolean);
     dispose(): void;
 }
 
@@ -154,6 +154,15 @@ export interface IridescenceOptions {
     thicknessMaximum?: number;
     iridescenceTexture?: ClearcoatTexture;
     iridescenceThicknessTexture?: ClearcoatTexture;
+}
+
+export interface KTX2LayerReader {
+    decode(data: ArrayBuffer | ArrayBufferView, options?: {
+        signal?: AbortSignal;
+    }): Promise<TranscodedTexture>;
+    upload(device: GPUDevice, file: never, options?: {
+        usage?: number;
+    }): GPUTexture;
 }
 
 export interface KTX2Transcoder {
@@ -856,6 +865,9 @@ export interface TranscodedTexture {
     target: string;
     srgb: boolean;
     hasAlpha?: boolean;
+    layers?: number;
+    dimension?: string;
+    upload?(device: GPUDevice): GPUTexture;
 }
 
 export interface TransmissionNode {
@@ -929,7 +941,7 @@ export function loadCubeTexture(urls: string | URL | readonly (string | URL)[], 
 }): Promise<CubeTexture>;
 
 export function loadKTX2Texture(url: string | URL, { decoder, signal, fetch: get, ...options }: TextureOptions & {
-    decoder: KTX2Transcoder;
+    decoder: KTX2Transcoder | KTX2LayerReader;
     signal?: AbortSignal;
     fetch?: typeof fetch;
 }): Promise<Texture>;

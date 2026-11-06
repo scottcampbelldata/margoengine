@@ -1,5 +1,5 @@
 {
-  "commit": "b263a8d9e",
+  "commit": "8df61017d",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -56,12 +56,12 @@
     },
     "@margoengine/animator": {
       ".": {
-        "raw": 52449,
-        "gzip": 18564
+        "raw": 52809,
+        "gzip": 18633
       },
       "./graph": {
-        "raw": 25570,
-        "gzip": 8320
+        "raw": 25912,
+        "gzip": 8379
       },
       "./inertialize": {
         "raw": 4187,
@@ -82,6 +82,14 @@
       "./motion-matching": {
         "raw": 17048,
         "gzip": 6997
+      },
+      "./mirror": {
+        "raw": 3490,
+        "gzip": 1774
+      },
+      "./spline-ik": {
+        "raw": 8644,
+        "gzip": 3838
       }
     },
     "@margoengine/audio": {
@@ -552,8 +560,8 @@
         "gzip": 3873
       },
       "./ktx2-layers": {
-        "raw": 809139,
-        "gzip": 374483
+        "raw": 809169,
+        "gzip": 374493
       }
     },
     "@margoengine/dof": {
@@ -1136,8 +1144,8 @@
         "gzip": 4722
       },
       "./ldraw": {
-        "raw": 8829,
-        "gzip": 3870
+        "raw": 9138,
+        "gzip": 4011
       },
       "./threemf-materials": {
         "raw": 20071,
@@ -1230,8 +1238,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 195892,
-        "gzip": 60956
+        "raw": 196749,
+        "gzip": 61213
       },
       "./atlas": {
         "raw": 4025,
@@ -1242,8 +1250,8 @@
         "gzip": 7399
       },
       "./batched": {
-        "raw": 117039,
-        "gzip": 36026
+        "raw": 117531,
+        "gzip": 36209
       },
       "./alpha-hash": {
         "raw": 1938,

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5645529,
+  "total": 5647466,
   "history": [
     {
       "date": "2026-10-24",
@@ -2438,6 +2438,12 @@
       "commit": "cd0773559",
       "reason": "feat(animator): spline IK (new entry @margoengine/animator/spline-ik)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "368d5c069",
+      "reason": "loadKTX2Texture reads cube and array files",
+      "grew": 1
     }
   ],
   "items": {
@@ -2727,7 +2733,7 @@
     "@margoengine/lod/auto": 5831,
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/stream": 1778,
-    "@margoengine/materials": 61113,
+    "@margoengine/materials": 63050,
     "@margoengine/materials/alpha-hash": 1309,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,

@@ -68,7 +68,7 @@ export type {
   TranscodedMip,
   TranscodedTexture,
 } from './texture-kinds.js';
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; COPY_SRC: number; RENDER_ATTACHMENT: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 /** Raw pixels for `new Texture({ data, width, height })`: tightly packed RGBA8 rows, top row first. */
 export type RawImage = { data: Uint8Array | Uint8ClampedArray; width: number; height: number };
@@ -168,7 +168,7 @@ interface Slot {
 type Kind =
   | { type: 'data'; format: DataFormat; dimension: '2d' | '2d-array' | '3d' }
   | { type: 'gpu'; texture: GPUTexture; view?: GPUTextureView; dimension: TextureDimension }
-  | { type: 'ktx2'; base: string }
+  | { type: 'ktx2'; base: string; dimension: '2d' | '2d-array' | 'cube'; own: boolean }
   | { type: 'faces'; format?: DataFormat }
   | { type: 'equirect'; source: Texture; size: number };
 const wraps = { repeat: 'repeat', clamp: 'clamp-to-edge', mirror: 'mirror-repeat' } as const,
@@ -290,9 +290,16 @@ function kindOf(source: TextureSource, o: TextureOptions): Kind | undefined {
     return { type: 'gpu', texture: s.texture, view: s.view, dimension: 'cube' };
   }
   if (Array.isArray(s.mipmaps) && typeof s.target === 'string') {
-    if (o.dimension !== undefined && o.dimension !== '2d')
-      throw new TypeError("Texture KTX2 results are 2D; omit dimension or pass '2d'");
-    return { type: 'ktx2', base: validateTranscoded(source as TranscodedTexture) };
+    const result = source as TranscodedTexture,
+      own = typeof result.upload === 'function',
+      dimension = (own ? (result.dimension ?? '2d') : '2d') as '2d' | '2d-array' | 'cube';
+    if ((dimension as string) === 'cube-array')
+      throw new TypeError(
+        'Texture KTX2 cube arrays have no material slot; use KTX2LayerDecoder.createTexture and a view of your own',
+      );
+    if (o.dimension !== undefined && o.dimension !== dimension)
+      throw new TypeError(`Texture KTX2 result is ${dimension}; omit dimension or pass '${dimension}'`);
+    return { type: 'ktx2', base: own ? result.format : validateTranscoded(result), dimension, own };
   }
   if (Array.isArray(s.faces)) {
     const faces = s.faces as unknown[],
@@ -346,6 +353,8 @@ function kindOf(source: TextureSource, o: TextureOptions): Kind | undefined {
 function kindOption(kind: Kind | undefined, key: keyof TextureOptions, v: unknown): string | undefined {
   if (key === 'colorSpace' && v === 'display-p3' && kind)
     return "Texture colorSpace 'display-p3' needs an 8-bit RGBA image or raw RGBA8 data; convert other data to linear sRGB with @margoengine/math linearP3ToLinearSRGB";
+  if (key === 'colorSpace' && v !== undefined && kind?.type === 'ktx2' && kind.own)
+    return "Texture colorSpace of a KTX2LayerDecoder file comes from the file's format; omit colorSpace";
   if (key === 'colorSpace' && v === 'srgb') {
     const format = kind?.type === 'data' || kind?.type === 'faces' ? kind.format : undefined;
     if (format && format !== 'rgba8unorm')
@@ -428,6 +437,7 @@ export class Texture {
     if (k.type === 'gpu') return [k.texture.width, k.texture.height, k.texture.depthOrArrayLayers];
     if (k.type === 'faces') return [...dimensions(s.faces[0]), 6];
     if (k.type === 'equirect') return [k.size, k.size, 6];
+    if (k.type === 'ktx2') return [s.width, s.height, (s as unknown as TranscodedTexture).layers ?? 1];
     return [s.width, s.height, k.type === 'data' ? (s.depth ?? 1) : 1];
   }
   get width(): number {
@@ -443,14 +453,16 @@ export class Texture {
   /** How shaders sample it (`'2d'` unless constructed as an array, 3D or cube texture). */
   get dimension(): TextureDimension {
     const k = this.kind;
-    return !k || k.type === 'ktx2' ? '2d' : k.type === 'faces' || k.type === 'equirect' ? 'cube' : k.dimension;
+    return !k ? '2d' : k.type === 'faces' || k.type === 'equirect' ? 'cube' : k.dimension;
   }
   /** @internal True for 32-bit float texels, which filter only on devices with the `float32-filterable` feature. */
   get unfilterable(): boolean {
     const k = this.kind;
     return k?.type === 'data' || k?.type === 'faces'
       ? unfilterable(k.format ?? '')
-      : k?.type === 'gpu' && unfilterable(k.texture.format);
+      : k?.type === 'ktx2'
+        ? unfilterable(k.base)
+        : k?.type === 'gpu' && unfilterable(k.texture.format);
   }
   get isVideo(): boolean {
     return typeof (this.source as HTMLVideoElement).videoWidth === 'number';
@@ -684,14 +696,15 @@ export class Texture {
     if (k.type === 'ktx2') {
       if (!slot.texture || slot.version !== this.version) {
         slot.texture?.destroy();
-        slot.texture = uploadTranscoded(device, this.source as TranscodedTexture, k.base);
+        const file = this.source as TranscodedTexture;
+        slot.texture = k.own ? file.upload!(device) : uploadTranscoded(device, file, k.base);
         slot.mips = mips;
         slot.views.clear();
         slot.version = this.version;
         refit();
       }
-      const format = (sRGB ? k.base + '-srgb' : k.base) as GPUTextureFormat;
-      return [this.viewOf(slot, slot.texture, format, '2d'), slot.sampler];
+      const format = (sRGB && !k.own ? k.base + '-srgb' : k.base) as GPUTextureFormat;
+      return [this.viewOf(slot, slot.texture, format, k.dimension), slot.sampler];
     }
     if (k.type === 'equirect') {
       const source = k.source.sampled(device, true, 'equirect source');
@@ -1038,10 +1051,16 @@ export async function loadTexture(
 export interface KTX2Transcoder {
   transcode(data: ArrayBuffer | ArrayBufferView, options?: { signal?: AbortSignal }): Promise<TranscodedTexture>;
 }
+/** What `loadKTX2Texture` needs of `@margoengine/decoders/ktx2-layers`' `KTX2LayerDecoder`. */
+export interface KTX2LayerReader {
+  decode(data: ArrayBuffer | ArrayBufferView, options?: { signal?: AbortSignal }): Promise<TranscodedTexture>;
+  upload(device: GPUDevice, file: never, options?: { usage?: number }): GPUTexture;
+}
 /**
  * Fetches a `.ktx2` file (64 MiB at most) and transcodes it with `decoder` (a `KTX2Decoder` from
  * `@margoengine/decoders`, created with the engine's device so it picks a compressed format the device has) into a
- * Texture for any material map. 2D only: the decoder rejects cube maps, arrays and UASTC HDR files.
+ * Texture for any material map. With a `KTX2LayerDecoder` from `@margoengine/decoders/ktx2-layers` the file may also be a
+ * cube map, which comes back as a CubeTexture for `envMap`, or an array, a `'2d-array'` Texture for a layer slot.
  * `fetch`: default `globalThis.fetch`, e.g. a LoadingManager's or AssetCache's `fetch`.
  * @throws TypeError without a decoder; the decoder's own errors for unsupported or corrupt files.
  */
@@ -1052,14 +1071,29 @@ export async function loadKTX2Texture(
     signal,
     fetch: get,
     ...options
-  }: TextureOptions & { decoder: KTX2Transcoder; signal?: AbortSignal; fetch?: typeof fetch },
+  }: TextureOptions & { decoder: KTX2Transcoder | KTX2LayerReader; signal?: AbortSignal; fetch?: typeof fetch },
 ): Promise<Texture> {
-  if (typeof decoder?.transcode !== 'function')
+  const layers = decoder as KTX2LayerReader,
+    plain = decoder as KTX2Transcoder;
+  if (typeof layers?.decode !== 'function' && typeof plain?.transcode !== 'function')
     throw new TypeError('loadKTX2Texture needs a decoder; pass {decoder: new KTX2Decoder({device: engine.gpu})}');
-  const [bytes] = await download(url, signal, get),
-    result = await decoder.transcode(bytes, { signal });
+  const [bytes] = await download(url, signal, get);
+  if (typeof layers.decode !== 'function') {
+    const result = await plain.transcode(bytes, { signal });
+    signal?.throwIfAborted();
+    return new Texture(result, options);
+  }
+  const file = await layers.decode(bytes, { signal });
   signal?.throwIfAborted();
-  return new Texture(result, options);
+  // The file stays on the CPU, so a restored device gets its upload too.
+  const source = {
+    ...file,
+    upload: (device: GPUDevice) =>
+      layers.upload(device, file as never, {
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
+      }),
+  };
+  return file.dimension === 'cube' ? new CubeTexture(source, options) : new Texture(source, options);
 }
 /** `CubeTexture` options: those of `Texture` (the dimension is always `'cube'`) and an equirect source's face size. */
 export interface CubeTextureOptions extends Omit<TextureOptions, 'dimension'> {
@@ -1076,15 +1110,22 @@ export interface CubeTextureOptions extends Omit<TextureOptions, 'dimension'> {
  */
 export class CubeTexture extends Texture {
   constructor(
-    source: readonly (ImageSource | ImageData | RawImage | DataImage)[] | Texture,
+    source: readonly (ImageSource | ImageData | RawImage | DataImage)[] | Texture | TranscodedTexture,
     options: CubeTextureOptions = {},
     owned = false,
   ) {
-    if (!(source instanceof Texture) && !Array.isArray(source))
-      throw new TypeError('CubeTexture needs six face images or an equirectangular Texture; pass one of those');
+    const file = (source as Partial<TranscodedTexture> | null)?.dimension === 'cube';
+    if (!(source instanceof Texture) && !Array.isArray(source) && !file)
+      throw new TypeError(
+        'CubeTexture needs six face images, an equirectangular Texture or a KTX2 cube map; pass one of those',
+      );
     const { size, ...rest } = options ?? {};
     super(
-      source instanceof Texture ? { equirect: source, ...(size !== undefined ? { size } : {}) } : { faces: source },
+      file
+        ? (source as TranscodedTexture)
+        : source instanceof Texture
+          ? { equirect: source, ...(size !== undefined ? { size } : {}) }
+          : { faces: source as readonly (ImageSource | ImageData | RawImage | DataImage)[] },
       { ...rest, dimension: 'cube' },
       owned,
     );

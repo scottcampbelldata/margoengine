@@ -3,7 +3,8 @@
 // Real-adapter checks of the optional material features; features-browser.mjs reads the answers. Each check draws a
 // small scene and returns numbers, read back from a copy of the frame.
 import {Engine} from '/packages/core/dist/index.js';
-import {NormalMaterial,PbrMaterial,UnlitMaterial,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {KTX2LayerDecoder} from '/packages/decoders/dist/ktx2-layers.js';
+import {CubeTexture,NormalMaterial,PbrMaterial,UnlitMaterial,Texture,WgslMaterial,createMesh,createInstancedMesh,loadKTX2Texture} from '/packages/materials/dist/index.js';
 import {alphaHash} from '/packages/materials/dist/alpha-hash.js';
 import {objectNormal} from '/packages/materials/dist/object-normal.js';
 import {TAA} from '/packages/taa/dist/index.js';
@@ -32,7 +33,59 @@ const stats=(data,box=64)=>{
   for(let y=size/2-box;y<size/2+box;y++)for(let x=size/2-box;x<size/2+box;x++){const v=data[(y*size+x)*4];covered+=v>127;sum+=v/255;n++;}
   return {coverage:covered/n,mean:sum/n};
 };
+// Real KTX-Software files of packages/decoders/tests/fixtures/ktx2-layers.
+const ktx2File=name=>`/packages/decoders/tests/fixtures/ktx2-layers/${name}.ktx2`;
+const compression={features:['texture-compression-bc','texture-compression-astc','texture-compression-etc2']};
 window.check={
+  // A KTX2 file with several images per level: the GPU copy's texels against the decoder's, the drawn result against the
+  // texel it should show, and a compressed upload.
+  async ktx2(name,kind){
+    const made=await scene(front,compression),{engine,errors,render}=made,device=engine.gpu,url=ktx2File(name);
+    const exact=new KTX2LayerDecoder({device,target:'rgba8',workerLimit:1}),native=new KTX2LayerDecoder({device,workerLimit:1});
+    const file=await exact.decode(new Uint8Array(await (await fetch(url)).arrayBuffer()));
+    const texture=await loadKTX2Texture(url,{decoder:exact}),compressed=await loadKTX2Texture(url,{decoder:native});
+    const images=file.layers,edge=file.width,base=file.mipmaps[0].data,srgb=file.format.endsWith('-srgb'),shown=[];
+    const encode=v=>v<=0.0031308?v*12.92:1.055*v**(1/2.4)-0.055;
+    const decode=v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;
+    // The byte a read of image k's middle should put on the canvas: the middle is a corner of four texels, mixed in linear light.
+    const middle=k=>[0,1,2].map(c=>{let sum=0;for(const y of [file.height/2-1,file.height/2])for(const x of [edge/2-1,edge/2]){const v=base[((k*file.height+y)*edge+x)*4+c]/255;sum+=srgb?decode(v):v;}return Math.round(encode(sum/4)*255);});
+    const material=kind==='cube'?new UnlitMaterial({envMap:texture,combine:'mix'}):new WgslMaterial({shading:'basic',wgsl:`fn shade(i:Out,s:Surface)->Surface{var o=s;o.base=vec4f(textureSampleLevel(slices,slicesSampler,vec2f(0.5),i32(uniforms.layer),0.0).rgb,1.0);return o;}`,uniforms:{layer:0},textures:{slices:texture}});
+    createMesh(engine,quad(),material);
+    await render();
+    const o=(size/2*size+size/2)*4;
+    for(let k=kind==='cube'?4:0;k<(kind==='cube'?5:images);k++){
+      if(kind!=='cube')material.uniforms.layer=k;
+      await render();
+      const data=await pixels(made);
+      shown.push({k,got:[0,1,2].map(c=>data[o+c]),want:middle(k)});
+    }
+    // Every level of every image, read back from the GPU copy.
+    const gpu=texture.gpuTexture(device);let same=true;
+    for(let level=0;level<file.mipmaps.length;level++){
+      const mip=file.mipmaps[level],row=Math.ceil(mip.width*4/256)*256,read=device.createBuffer({size:row*mip.height*images,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+      encoder.copyTextureToBuffer({texture:gpu,mipLevel:level},{buffer:read,bytesPerRow:row,rowsPerImage:mip.height},[mip.width,mip.height,images]);
+      device.queue.submit([encoder.finish()]);await read.mapAsync(GPUMapMode.READ);
+      const data=new Uint8Array(read.getMappedRange());
+      for(let k=0;k<images;k++)for(let y=0;y<mip.height;y++)for(let x=0;x<mip.width*4;x++)same&&=data[(k*mip.height+y)*row+x]===mip.data[(k*mip.height+y)*mip.width*4+x];
+      read.unmap();read.destroy();
+    }
+    if(kind==='cube'){createMesh(engine,quad(0.5,1),new UnlitMaterial({envMap:compressed,combine:'mix'}));await render();}
+    else{material.textures.slices=compressed;await render();}
+    const out={instance:kind==='cube'?texture instanceof CubeTexture:texture.dimension==='2d-array',dimension:texture.dimension,depth:texture.depth,images,levels:file.mipmaps.length,same,shown,format:compressed.gpuTexture(device).format,compressedLayers:compressed.gpuTexture(device).depthOrArrayLayers,errors};
+    exact.dispose();native.dispose();engine.dispose();return out;
+  },
+  // A file that stores a GPU format (no transcoding) on an envMap, and a cube array, which has no material slot.
+  async ktx2Native(){
+    const made=await scene(front,compression),{engine,errors,render}=made,decoder=new KTX2LayerDecoder({device:engine.gpu,workerLimit:1});
+    const sky=await loadKTX2Texture(ktx2File('cube-native-zstd'),{decoder});
+    createMesh(engine,quad(),new PbrMaterial({metalness:1,roughness:0.2,color:[1,1,1,1],envMap:sky}));
+    await render();
+    const data=await pixels(made),o=(size/2*size+size/2)*4;
+    let refused='';
+    try{await loadKTX2Texture(ktx2File('valid_R16G16B16A16_SFLOAT_CUBE_ARRAY_MIP'),{decoder});}catch(e){refused=e.message;}
+    const out={instance:sky instanceof CubeTexture,format:sky.gpuTexture(engine.gpu).format,centre:[data[o],data[o+1],data[o+2]],refused,errors};
+    decoder.dispose();engine.dispose();return out;
+  },
   // Coverage of a white unlit quad at each opacity over a black background.
   async hashCoverage(alpha,instanced){
     const made=await scene(front),{engine,errors,render}=made,material=new UnlitMaterial({color:[1,1,1,alpha],features:[alphaHash()]});

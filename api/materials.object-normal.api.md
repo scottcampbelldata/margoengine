@@ -549,6 +549,9 @@ interface TranscodedTexture {
     target: string;
     srgb: boolean;
     hasAlpha?: boolean;
+    layers?: number;
+    dimension?: string;
+    upload?(device: GPUDevice): GPUTexture;
 }
 
 type Wrap = 'repeat' | 'clamp' | 'mirror';

@@ -993,7 +993,27 @@ fetches and transcodes it, and `new Texture(await decoder.transcode(bytes))` tak
 its own upload of every mip level, in the compressed format the decoder chose (BC7, ASTC 4x4, ETC2 or RGBA8); a device
 without that format's feature throws `MargoError('unsupported')`, so create the decoder with the engine's device. Colour
 slots decode sRGB unless `colorSpace` says otherwise. `new Texture(await decoder.createTexture(bytes))` borrows the
-decoder's GPUTexture instead (one device, its own format). The decoder rejects KTX2 cube maps, arrays and UASTC HDR; `KTX2LayerDecoder` from `@margoengine/decoders/ktx2-layers` reads cube maps and arrays, and its six-layer GPUTexture goes on `Material.envMap`.
+decoder's GPUTexture instead (one device, its own format). The decoder rejects KTX2 cube maps, arrays and UASTC HDR.
+
+Pass a `KTX2LayerDecoder` from `@margoengine/decoders/ktx2-layers` and the file may be a cube map or an array as well:
+`loadKTX2Texture` returns a `CubeTexture` for a cube file, for `envMap`, `prefilterCube` or a WgslMaterial, and a
+`'2d-array'` Texture for an array, for a layered material or a WgslMaterial `texture_2d_array<f32>`. It also takes files
+that store a GPU format, float ones included. The file's format sets the colour space, so `colorSpace` is refused, and a
+cube array is refused because no material slot samples one. The decoded file stays on the CPU, so a restored device
+gets its upload too.
+
+```ts
+import {KTX2LayerDecoder} from 'margoengine/decoders/ktx2-layers';
+import {Engine} from 'margoengine/core';
+import {PbrMaterial, loadKTX2Texture} from 'margoengine/materials';
+
+// Without these features the decoder falls back to RGBA8, four or more times the GPU memory.
+const features: GPUFeatureName[] = ['texture-compression-bc', 'texture-compression-astc', 'texture-compression-etc2'];
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu', features});
+const decoder = new KTX2LayerDecoder({device: engine.gpu!});
+const sky = await loadKTX2Texture('/textures/sky-cube.ktx2', {decoder}); // a CubeTexture, BC7 on a desktop GPU
+export const chrome = new PbrMaterial({metalness: 1, roughness: 0.1, envMap: sky});
+```
 
 ```ts
 import {KTX2Decoder} from 'margoengine/decoders';

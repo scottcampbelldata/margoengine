@@ -5,6 +5,7 @@
 ```ts
 export class KTX2LayerDecoder extends KTX2Decoder {
     decode(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions): Promise<TextureFile>;
+    upload(device: GPUDevice, file: TextureFile, options?: UploadTextureOptions): GPUTexture;
     createTexture(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions & UploadTextureOptions): Promise<GPUTexture>;
 }
 

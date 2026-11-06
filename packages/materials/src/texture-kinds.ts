@@ -53,6 +53,12 @@ export interface TranscodedTexture {
   target: string;
   srgb: boolean;
   hasAlpha?: boolean;
+  /** Images per level in a `KTX2LayerDecoder.decode` result, counting cube faces. */
+  layers?: number;
+  /** The view a `KTX2LayerDecoder.decode` result makes. */
+  dimension?: string;
+  /** Makes the GPU texture of a `KTX2LayerDecoder.decode` result, whose format is any the file stored. */
+  upload?(device: GPUDevice): GPUTexture;
 }
 
 /** Bytes per texel and the typed arrays each data format accepts. */

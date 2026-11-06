@@ -140,19 +140,20 @@ decoder.dispose();
 ```
 
 The result is the `TextureFile` the DDS and KTX readers return, with `target: 'ktx2'`; each level holds its images back to
-back in WebGPU layer order, so `uploadTexture` writes one level in one call. A six-layer GPUTexture goes straight on
-`Material.envMap` in `@margoengine/materials`, and `new Texture(gpuTexture, {dimension: 'cube'})` or `'2d-array'`
+back in WebGPU layer order, so `uploadTexture` writes one level in one call. `loadKTX2Texture(url, {decoder})` in `@margoengine/materials`
+takes this decoder and gives a CubeTexture or an array Texture that survives a lost device. A six-layer GPUTexture goes
+straight on `Material.envMap` too, and `new Texture(gpuTexture, {dimension: 'cube'})` or `'2d-array'`
 binds it on a map. 3D textures are refused. `KTX2Decoder` stays 2D and points here if it is given layers.
 `tests/ktx2-layers.test.js` checks every image of eight real files against `ktx extract`; `scripts/ktx2-oracle.mjs`
 rewrites those records.
 
 ## How it works
 
-- **Workers, not the main thread.** Each decoder owns a lazily grown pool of module workers, by default `Math.min(navigator.hardwareConcurrency || 4, 4)`. Jobs go to an idle worker, then a new one while under the limit, then the least loaded. A crashed worker rejects only its own jobs and is replaced on the next call.
+- **Workers, not the main thread.** Each decoder owns a lazily grown pool of classic workers, by default `Math.min(navigator.hardwareConcurrency || 4, 4)`. Jobs go to an idle worker, then a new one while under the limit, then the least loaded. A crashed worker rejects only its own jobs and is replaced on the next call.
 - **Zero-copy results.** Every decoded array owns its own buffer and returns through `postMessage` transfer lists. KTX2 mip levels are views into one transferred buffer and go straight to `device.queue.writeTexture`. Inputs are copied by default so the caller keeps its buffer; pass `{transfer: true}` to move a whole `ArrayBuffer` instead.
 - **Memory release.** The worker destroys every Draco decoder, buffer and mesh handle and frees every heap allocation after each decode, including on errors. KTX2 files are closed and deleted the same way.
 - **Hardware format negotiation.** `getSupportedTranscodeFormat(device)` checks `texture-compression-bc`, then `-astc`, then `-etc2`, and falls back to `rgba8`. A device only reports these features when they were requested in `requestDevice`, so an engine that requests none always gets RGBA8. Compressed targets fall back to RGBA8 when level 0 is not a multiple of 4 pixels. sRGB files get the `-srgb` format variant.
-- **Bundler and SSR safety.** Workers are created with `new Worker(new URL('./decoder.worker.js', import.meta.url), {type: 'module'})`, and the Wasm decoders are referenced the same way. Vite, webpack 5 and Next.js therefore emit them as assets. Nothing touches `window`, `Worker` or `navigator` at import time, so construction is safe during SSR. Decoding on the server rejects with a clear error.
+- **Bundler and SSR safety.** Workers run the prebuilt classic script `decoder.worker.js`, found by `new URL('./decoder.worker.js?no-inline', import.meta.url)`, and the Wasm decoders are referenced the same way. Vite, webpack 5 and Next.js therefore emit them as assets. Nothing touches `window`, `Worker` or `navigator` at import time, so construction is safe during SSR. Decoding on the server rejects with a clear error.
 
 ## Options
 

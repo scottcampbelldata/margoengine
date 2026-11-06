@@ -37,6 +37,32 @@ const jobs = {
     assert.ok(Math.abs(on.mean - off.mean) < 0.05, 'TAA keeps the mean');
     assert.ok(on.pixelSpread < off.pixelSpread * 0.7, `TAA leaves grain ${on.pixelSpread} of ${off.pixelSpread}`);
   },
+  async ktx2() {
+    for (const [name, kind, images] of [
+      ['cube-uastc-zstd', 'cube', 6],
+      ['array-uastc', 'array', 3],
+      ['cube-etc1s', 'cube', 6],
+    ]) {
+      const got = await check('ktx2', name, kind);
+      console.log(JSON.stringify({ label: `ktx2 ${name}`, ...got }));
+      assert.deepEqual(got.errors, []);
+      assert.equal(got.instance, true);
+      assert.equal(got.images, images);
+      assert.equal(got.depth, images);
+      assert.equal(got.same, true, 'the GPU copy holds the decoded texels of every level');
+      assert.equal(got.compressedLayers, images);
+      assert.notEqual(got.format.replace('-srgb', ''), 'rgba8unorm');
+      // The drawn colour against the four middle texels, mixed (8-bit output, 8-bit interpolation weights).
+      for (const { got: shown, want } of got.shown)
+        shown.forEach((v, c) => assert.ok(Math.abs(v - want[c]) <= 3, `${name}: drew ${shown}, texels mix to ${want}`));
+    }
+    const native = await check('ktx2Native');
+    console.log(JSON.stringify({ label: 'ktx2 native', ...native }));
+    assert.deepEqual(native.errors, []);
+    assert.equal(native.instance, true);
+    assert.ok(native.centre.some((v) => v > 0), 'the stored file lights the surface');
+    assert.match(native.refused, /cube arrays have no material slot/);
+  },
   async objectNormal() {
     const s = Math.SQRT1_2,
       wide = Math.hypot(0.5, 1);

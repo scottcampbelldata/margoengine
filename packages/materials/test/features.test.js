@@ -110,3 +110,35 @@ test('objectNormal replaces the tangent frame only while a normalMap is set, and
   assert.match(instanced, /sampledNormal\.xzy\*vec3f\(1,1,-1\)/);
   assert.throws(() => objectNormal({ up: 'x' }), TypeError);
 });
+
+test('loadKTX2Texture: a layer decoder brings a cube, an array or a refusal for a cube array', async () => {
+  const { CubeTexture, Texture, loadKTX2Texture } = await import('../dist/index.js');
+  const made = (dimension, layers) => ({
+    width: 2,
+    height: 2,
+    layers,
+    dimension,
+    mipmaps: [{ data: new Uint8Array(16 * layers), width: 2, height: 2, byteLength: 16 * layers }],
+    format: 'rgba8unorm',
+    target: 'ktx2',
+    srgb: false,
+    hasAlpha: true,
+  });
+  const decoder = (file) => ({ decode: async () => file, upload: () => ({}) }),
+    fetch = async () => new Response(new Uint8Array(4));
+  const cube = await loadKTX2Texture('https://a.test/a.ktx2', { decoder: decoder(made('cube', 6)), fetch });
+  assert.ok(cube instanceof CubeTexture);
+  assert.equal(cube.dimension, 'cube');
+  assert.equal(cube.depth, 6);
+  const array = await loadKTX2Texture('https://a.test/a.ktx2', { decoder: decoder(made('2d-array', 3)), fetch });
+  assert.ok(array instanceof Texture);
+  assert.equal(array.dimension, '2d-array');
+  assert.equal(array.depth, 3);
+  await assert.rejects(loadKTX2Texture('https://a.test/a.ktx2', { decoder: decoder(made('cube-array', 12)), fetch }), /no material slot/);
+  await assert.rejects(
+    loadKTX2Texture('https://a.test/a.ktx2', { decoder: decoder(made('cube', 6)), fetch, colorSpace: 'linear' }),
+    /comes from the file's format/,
+  );
+  await assert.rejects(loadKTX2Texture('https://a.test/a.ktx2', { decoder: {}, fetch }), /needs a decoder/);
+  assert.throws(() => new CubeTexture(made('2d-array', 3)), /KTX2 cube map/);
+});

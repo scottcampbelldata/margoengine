@@ -176,6 +176,11 @@ export class KTX2LayerDecoder extends KTX2Decoder {
     return this.job<TextureFile>('ktx2-layers', this.target, data, options);
   }
 
+  /** Uploads a {@link KTX2LayerDecoder.decode} result to `device`, as {@link uploadTexture} does, for any device. */
+  upload(device: GPUDevice, file: TextureFile, options?: UploadTextureOptions): GPUTexture {
+    return uploadTexture(device, file, options);
+  }
+
   /** Decodes and uploads to a GPUTexture on the decoder's device; see {@link uploadTexture}. */
   override async createTexture(
     data: ArrayBuffer | ArrayBufferView,
