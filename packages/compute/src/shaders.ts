@@ -23,6 +23,18 @@ export const WG = 256;
 /** Elements each reduce or scan workgroup covers (four per thread). */
 export const BLOCK = 1024;
 
+/** @internal Kernels an optional entry puts in place of the default ones, with the same bindings. */
+export interface KernelRoute {
+  /** A tree level of a full reduction, or undefined to keep the default kernel. */
+  level(src: Fused, combine: string, identity: string): string | undefined;
+  /** One workgroup per output along an axis, or undefined. */
+  axis(src: Fused, combine: string, identity: string): string | undefined;
+  /** One level of a flat scan, or undefined. */
+  scan(src: Fused, combine: string, identity: string): string | undefined;
+  /** The radix sort's local pass. */
+  readonly radixLocal: string;
+}
+
 /** A binary operator: a built-in name or WGSL for `combine(a, b)` with its identity value. */
 export type Operator = 'sum' | 'product' | 'min' | 'max' | { readonly combine: string; readonly identity: string };
 

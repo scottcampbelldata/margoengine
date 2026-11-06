@@ -243,6 +243,12 @@ Measured on the RTX A6000 only (`docs/whitepaper/perf-history.md` entry 48): one
 1.8 times the builtin, `tan` 2.3, `pow` 3.0, and the path tracer's panorama and fisheye rays 1% to 7% of a traced sample.
 Unmeasured: that cost on other GPUs, one kernel rotation-sync call, and cross-machine kernel bit equality.
 
+`@margoengine/compute/subgroups` is opt-in for the same reason: its float sums follow the GPU's subgroup size, so they
+do not repeat across GPUs, while integers, orders and sorts equal the default kernels. WGSL promises no subgroup size or
+layout, so kernels order work by seats taken with one workgroup atomic, never by `local_invocation_index`. Checked at
+sizes 32 (RTX A6000) and 4 (SwiftShader, `BROWSER_ARGS` with `--enable-unsafe-swiftshader` and
+`--use-webgpu-adapter=swiftshader`).
+
 ## 3. Rendering backends and hardware tiers
 
 gltf-pro trims each pipeline to the vertex inputs its finished shader reads (`packages/gltf-pro/src/vertex-inputs.ts`), after
@@ -619,3 +625,4 @@ The following remain technical gaps, not permission to weaken a check:
     and `packages/biomes/tests/shadows-check.mjs --msaa` have passed on the RTX A6000 and the M6 only, run by hand;
     no gate runs either one on Apple GPUs, and other GPUs are not checked. Its shadow lists still append atomically
     (depth only, so the same depth in any order).
+17. Subgroup kernels have run at subgroup sizes 32 and 4 only, and no gate runs size 4.

@@ -44,7 +44,11 @@ function flatPasses(
     src = fuse(source, 0, ctx.maxStorage(2), temporary);
   temporary.push(sums);
   passes.push({
-    program: ctx.program(scanShader(src, combine, identity), undefined, 'scan'),
+    program: ctx.program(
+      ctx.kernelRoute?.scan(src, combine, identity) ?? scanShader(src, combine, identity),
+      undefined,
+      'scan',
+    ),
     resources: { ...src.resources, dst, sums, params: new Uint32Array([n, INF, exclusive ? 1 : 0, 0]) },
     workgroups: ctx.grid(groups),
   });

@@ -107,7 +107,7 @@ function radix(
     counts = temp(16 * blocks),
     offsets = temp(16 * blocks),
     starts = temp(16 * blocks);
-  const localProgram = ctx.program(radixLocalShader, undefined, 'sort.local'),
+  const localProgram = ctx.program(ctx.kernelRoute?.radixLocal ?? radixLocalShader, undefined, 'sort.local'),
     scatterProgram = ctx.program(radixScatterShader, undefined, 'sort.scatter'),
     grid = ctx.grid(blocks);
   for (let shift = 0; shift < bits; shift += 4) {

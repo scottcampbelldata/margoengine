@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4538181,
+  "total": 4540718,
   "history": [
     {
       "date": "2026-10-24",
@@ -1694,6 +1694,12 @@
       "commit": "d90dee3ab",
       "reason": "splines: root gains the bspline and kochanek-bartels curve kinds (+42 B); new entries closest, frames, knots, mesh, fit",
       "grew": 6
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8521bbfa2",
+      "reason": "New compute entry ./subgroups: subgroup kernels for reductions, scans and the radix sort; root gains the kernel route hook and the subgroups feature request",
+      "grew": 1
     }
   ],
   "items": {
@@ -1763,6 +1769,7 @@
     "@margoengine/compute/signal": 7496,
     "@margoengine/compute/sparse": 7283,
     "@margoengine/compute/stream": 1422,
+    "@margoengine/compute/subgroups": 2537,
     "@margoengine/controls": 23713,
     "@margoengine/controls/arcball": 4582,
     "@margoengine/controls/drag": 2633,

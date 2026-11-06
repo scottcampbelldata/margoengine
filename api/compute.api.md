@@ -49,11 +49,13 @@ export class ComputeContext {
     readonly lost: Promise<GPUDeviceLostInfo>;
     readonly fastMath: boolean;
     sortRoute: string | undefined;
+    kernelRoute: KernelRoute | undefined;
     readonly routeReady: Promise<void>;
     constructor(device: GPUDevice, ownsDevice: boolean, fastMath?: boolean);
     get disposed(): boolean;
     get backend(): 'webgpu' | 'cpu';
     get f16(): boolean;
+    get subgroups(): boolean;
     check(): void;
     allocate(size: number, usage: number, _dtype: DType): GPUBuffer;
     empty<T extends DType>(shape: readonly number[], dtype: T, usage?: number): GpuArray<T>;
@@ -452,6 +454,24 @@ export function where(condition: Operand, a: OperandLike, b: OperandLike): Expr;
 // Not exported from this entry, but used by the exports above:
 
 type Copy = readonly [GPUBuffer, number, GPUBuffer, number, number];
+
+interface Fused {
+    readonly enables: string;
+    readonly declarations: string;
+    readonly fn: string;
+    readonly resources: Record<string, GPUBufferBinding | Uint32Array<ArrayBuffer>>;
+    readonly next: number;
+    readonly dtype: DType;
+    readonly shape: readonly number[];
+    readonly key: string;
+}
+
+interface KernelRoute {
+    level(src: Fused, combine: string, identity: string): string | undefined;
+    axis(src: Fused, combine: string, identity: string): string | undefined;
+    scan(src: Fused, combine: string, identity: string): string | undefined;
+    readonly radixLocal: string;
+}
 
 type Node = {
     readonly kind: 'leaf';

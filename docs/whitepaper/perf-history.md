@@ -1595,6 +1595,14 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node examples/package-benchmarks/ecs-growable.mjs` after a build.
 - **Guard:** `packages/ecs/test/growable.test.js`, "growing keeps ids, rows and every array reference, including ones taken before it".
 
+### 62. Subgroup kernels: sorts gain, memory-bound sums and scans barely move
+
+- **Measured:** `useSubgroups` against the default kernels, 16,777,216 f32 values, RTX A6000, Edge, GPU timestamps, 3 alternating rounds, other jobs running, diagnostic: sort 11.93 to 7.00 ms, argsort 13.62 to 8.85 ms, sum 0.087 to 0.066 ms, sum along an axis 0.59 ms both, cumsum 0.546 to 0.557 ms.
+- **Cause:** the radix sort's local pass ranked a digit with four one-bit splits of 19 barriers each; four ballots and one exchange replace them. A sum or a scan moves the same bytes either way, and memory is its limit on this GPU, so fewer barriers buy little. Cumsum is not faster: treat it as no gain until the quiet run.
+- **Tried and dropped:** neighbouring threads reading neighbouring elements along an axis made a 16-output sum 2.2 times slower (1.32 against 0.59 ms) with only 16 workgroups in flight, so the axis kernel keeps the default kernel's runs.
+- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/compute-subgroups.mjs`.
+- **Guard:** `packages/compute/tests/compute-subgroups-browser.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1643,5 +1651,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 7. Galaxy S23 Ultra island (open loss): an after number, which needs the device.
 8. `p-morph` first frame (entries 49 and 56): a quiet run.
 9. `GrowableWorld` loop cost (entry 61): a quiet run.
+10. Subgroup kernels (entry 62): a quiet run, and a GPU with another subgroup size.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

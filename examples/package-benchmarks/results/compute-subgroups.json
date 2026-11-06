@@ -1,0 +1,47 @@
+{
+  "benchmark": "compute-subgroups",
+  "recordedAt": "2026-11-06T00:49:12.227Z",
+  "commit": "f1d096012",
+  "rounds": 3,
+  "count": 16777216,
+  "quietGate": {
+    "passed": false,
+    "timingsAreDiagnostic": true,
+    "reason": "Machine not quiet after 5 s (last CPU load 11%)"
+  },
+  "hardware": {
+    "vendor": "nvidia",
+    "architecture": "ampere",
+    "device": "",
+    "description": "",
+    "fallback": false
+  },
+  "browser": "chromium 156.0.4314.58",
+  "rows": {
+    "sum": {
+      "plainMs": 0.087,
+      "subgroupsMs": 0.066,
+      "speedup": 1.333
+    },
+    "sum axis": {
+      "plainMs": 0.59,
+      "subgroupsMs": 0.59,
+      "speedup": 1
+    },
+    "cumsum": {
+      "plainMs": 0.546,
+      "subgroupsMs": 0.557,
+      "speedup": 0.98
+    },
+    "sort": {
+      "plainMs": 11.928,
+      "subgroupsMs": 7.001,
+      "speedup": 1.704
+    },
+    "argsort": {
+      "plainMs": 13.621,
+      "subgroupsMs": 8.847,
+      "speedup": 1.54
+    }
+  }
+}

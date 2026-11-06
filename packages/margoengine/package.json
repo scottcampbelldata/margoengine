@@ -298,6 +298,10 @@
       "types": "./dist/compute/frame.d.ts",
       "import": "./dist/compute/frame.js"
     },
+    "./compute/subgroups": {
+      "types": "./dist/compute/subgroups.d.ts",
+      "import": "./dist/compute/subgroups.js"
+    },
     "./controls": {
       "types": "./dist/controls.d.ts",
       "import": "./dist/controls.js"

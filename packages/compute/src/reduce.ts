@@ -161,7 +161,11 @@ function full(
     temporaries.push(...fusedTemps);
     out = ctx.empty(groups === 1 ? shape : [groups], input.dtype);
     passes.push({
-      program: ctx.program(levelShader(src, combine, identity), undefined, 'reduce'),
+      program: ctx.program(
+        ctx.kernelRoute?.level(src, combine, identity) ?? levelShader(src, combine, identity),
+        undefined,
+        'reduce',
+      ),
       resources: { ...src.resources, dst: out, params: new Uint32Array([count, INF, 0, 0]) },
       workgroups: ctx.grid(groups),
     });
@@ -192,7 +196,12 @@ function alongAxis(
   const perThread = outputs >= THREAD_PER_OUTPUT || len <= 64;
   ctx.submit([
     {
-      program: ctx.program(axisShader(src, combine, identity, perThread), undefined, 'reduce.axis'),
+      program: ctx.program(
+        (perThread ? undefined : ctx.kernelRoute?.axis(src, combine, identity)) ??
+          axisShader(src, combine, identity, perThread),
+        undefined,
+        'reduce.axis',
+      ),
       resources: { ...src.resources, dst: out, params: new Uint32Array([outputs, INF, len, inner]) },
       workgroups: ctx.grid(perThread ? Math.ceil(outputs / 256) : outputs),
     },

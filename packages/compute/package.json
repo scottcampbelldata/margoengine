@@ -59,6 +59,10 @@
     "./frame": {
       "types": "./dist/frame.d.ts",
       "import": "./dist/frame.js"
+    },
+    "./subgroups": {
+      "types": "./dist/subgroups.d.ts",
+      "import": "./dist/subgroups.js"
     }
   },
   "files": [

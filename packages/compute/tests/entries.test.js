@@ -7,6 +7,13 @@ import { convolve1dShader, convolve2dShader, convolve } from '@margoengine/compu
 import { Random, randomShader } from '@margoengine/compute/random';
 import { chunks, stream } from '@margoengine/compute/stream';
 import { ComputeFrame } from '@margoengine/compute/frame';
+import {
+  subgroupAxisShader,
+  subgroupLevelShader,
+  subgroupRadixLocalShader,
+  subgroupScanShader,
+  useSubgroups,
+} from '@margoengine/compute/subgroups';
 
 // The entries' GPU behaviour is checked in tests/compute-browser.mjs; here, what runs without a GPU.
 
@@ -86,6 +93,69 @@ test('entry functions reject bad arguments before touching the GPU', async () =>
   frame.dispose();
   assert.throws(
     () => frame.gpu,
+    (e) => e.code === 'disposed',
+  );
+});
+
+// A kernel route must bind by the names the host code passes.
+const fused = (dtype = 'f32') => ({
+  dtype,
+  enables: '',
+  declarations: `@group(0) @binding(0) var<storage, read> in0: array<${dtype}>;\n`,
+  fn: `fn value(i: u32) -> ${dtype} { return in0[i]; }`,
+  next: 1,
+});
+
+test('the subgroup kernels keep the bindings of the kernels they replace', () => {
+  const names = (code) => reflectWGSL(code).bindings.map((b) => b.name);
+  assert.deepEqual(names(subgroupLevelShader(fused(), 'a + b', 'f32(0)')), ['in0', 'dst', 'params']);
+  assert.deepEqual(names(subgroupAxisShader(fused(), 'a + b', 'f32(0)')), ['in0', 'dst', 'params']);
+  assert.deepEqual(names(subgroupScanShader(fused(), 'a + b', 'f32(0)')), ['in0', 'dst', 'sums', 'params']);
+  assert.deepEqual(names(subgroupRadixLocalShader), [
+    'keysIn',
+    'valuesIn',
+    'keysLocal',
+    'valuesLocal',
+    'counts',
+    'starts',
+    'radix',
+  ]);
+});
+
+test('every subgroup kernel enables the feature first and orders work by seats, not invocation indices', () => {
+  const kernels = [
+    subgroupLevelShader(fused(), 'a + b', 'f32(0)'),
+    subgroupLevelShader(fused('u32'), 'custom(a, b)', '0u'),
+    subgroupAxisShader(fused(), 'min(a, b)', 'f32(0)'),
+    subgroupScanShader(fused(), 'a + b', 'f32(0)'),
+    subgroupRadixLocalShader,
+  ];
+  for (const code of kernels) {
+    assert.match(code, /^enable subgroups;/);
+    assert.match(code, /atomicAdd\(&seats, size \| 0x10000u\)/);
+  }
+  // Only the radix pass reads the invocation index, for work that has no order.
+  for (const code of kernels.slice(0, 4)) assert.doesNotMatch(code, /local_invocation_index/);
+});
+
+test('built-in operators use the hardware fold; a custom operator keeps runs and folds by shuffles', () => {
+  const add = subgroupLevelShader(fused(), 'a + b', 'f32(0)'),
+    custom = subgroupLevelShader(fused('u32'), 'custom(a, b)', '0u');
+  assert.match(add, /subgroupAdd\(acc\)/);
+  assert.match(add, /k \* 256u \+ lane/);
+  assert.match(custom, /subgroupShuffleDown/);
+  assert.match(custom, /lane \* 4u \+ k/);
+});
+
+test('useSubgroups changes nothing without the feature, and throws after dispose', async () => {
+  const gpu = await createCompute({ backend: 'cpu' });
+  assert.equal(gpu.subgroups, false);
+  assert.equal(useSubgroups(gpu), false);
+  assert.equal(gpu.kernelRoute, undefined);
+  assert.deepEqual([...(await gpu.sort(gpu.array([3, 1, 2])).read())], [1, 2, 3]);
+  gpu.dispose();
+  assert.throws(
+    () => useSubgroups(gpu),
     (e) => e.code === 'disposed',
   );
 });

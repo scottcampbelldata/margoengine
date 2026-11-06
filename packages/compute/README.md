@@ -7,7 +7,8 @@ typed arrays with views and broadcasting, element-wise expressions that fuse int
 statistics along axes, scans, sorting, selection and histograms. It also runs your own WGSL kernels, with bindings
 read from the source. Optional entries add matrix products (`/linalg`), Fourier transforms (`/fft`), convolution
 (`/signal`), reproducible random numbers (`/random`), sparse matrices and solvers (`/sparse`), gradients
-(`/autodiff`), data larger than GPU memory (`/stream`) and kernels inside an engine's frame (`/frame`).
+(`/autodiff`), data larger than GPU memory (`/stream`), kernels inside an engine's frame (`/frame`) and subgroup
+kernels for reductions, scans and sorts (`/subgroups`).
 
 The package is optional and tree-shakable, adds nothing to core, and needs no engine: without one it opens a
 headless device of its own. Without WebGPU (Node, an older browser, a blocklisted GPU) the same code runs on the CPU.
@@ -328,6 +329,37 @@ const step = frame.gpu
   .bind({ positions, p: { dt: 0 } });
 frame.add(step, (dt) => (step.set('p', { dt }), { count: 4096 }));
 engine.start();
+```
+
+## Subgroups
+
+`@margoengine/compute/subgroups` runs a context's reductions, flat scans and radix sorts on WebGPU subgroups.
+`useSubgroups(gpu)` swaps the kernels; every call keeps its API, and so does what is built on them (`compact`, `filter`,
+`unique`, `topk`, `quantile`).
+
+- It returns true when the subgroup kernels are in use. It returns false and changes nothing on a device without the
+  `subgroups` feature: the CPU backend, the WebGL2 layer, or a shared device made without it. `gpu.subgroups` says
+  which you have. `createCompute()` asks for the feature on a device of its own; a device you pass in must have it.
+- Integers, orders, sorts and stable ties are exactly what the default kernels give. Custom `{ combine, identity }`
+  operators keep their left-to-right order.
+- Float sums round in another order, which depends on the GPU's subgroup size. That is why it is a choice: the default
+  kernels sum in the same order on every GPU. On one GPU a sum repeats exactly from run to run.
+- It works at every subgroup size WebGPU allows, without assuming which invocations share a subgroup. Checked at 32
+  (RTX A6000) and 4 (SwiftShader).
+- Not swapped: `f16` arrays, `argmin` and `argmax`, `segmentedScan` and scans along an axis, and axis reductions with
+  one thread per output (many outputs or short lines). Those run the default kernels.
+
+Sorts gain the most, since a digit is ranked in one step instead of four. Sums and scans are limited by memory, so they
+gain little on a big GPU: [docs/limits.md](../../docs/limits.md#rendering) has the measured rows.
+
+```ts
+import { createCompute } from '@margoengine/compute';
+import { useSubgroups } from '@margoengine/compute/subgroups';
+
+using gpu = await createCompute();
+const active = useSubgroups(gpu); // false on the CPU backend, and everything below still works
+const keys = gpu.array(new Uint32Array([5, 3, 9, 1]));
+console.log(active, await gpu.sort(keys).read(), await keys.sum().item()); // [1, 3, 5, 9] 18
 ```
 
 ## CPU fallback

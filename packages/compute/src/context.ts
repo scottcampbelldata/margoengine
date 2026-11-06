@@ -6,7 +6,7 @@ import { GpuArray, checkShape } from './array.js';
 import { DTYPES, bytesOf, dtypeOf, type DType } from './dtype.js';
 import { Expr, Operand, fuse, where, type AxisOptions, type OperandLike } from './expr.js';
 import { reflectWGSL, encode, type BindingInfo, type HostValue, type ModuleInfo } from './wgsl.js';
-import { WG, mapShader, type Operator } from './shaders.js';
+import { WG, mapShader, type KernelRoute, type Operator } from './shaders.js';
 import * as reduce from './reduce.js';
 import * as scan from './scan.js';
 import * as sort from './sort.js';
@@ -186,6 +186,8 @@ export class ComputeContext {
 
   /** @internal The sort kernel of the WebGL2 layer's route (./compat.ts), once loaded; only on the layer. */
   sortRoute: string | undefined;
+  /** @internal Kernels of an optional entry (`/subgroups`) in place of the default ones. */
+  kernelRoute: KernelRoute | undefined;
   /** @internal Resolves once the layer's route has loaded (at once on native WebGPU). */
   readonly routeReady: Promise<void>;
 
@@ -216,6 +218,11 @@ export class ComputeContext {
   /** True when the device can run `f16` arrays (the `shader-f16` feature). */
   get f16(): boolean {
     return this.device.features.has('shader-f16');
+  }
+
+  /** True when the device has the `subgroups` feature, which `@margoengine/compute/subgroups` puts to use. */
+  get subgroups(): boolean {
+    return this.device.features.has('subgroups');
   }
 
   /** @internal Throws after dispose. */
@@ -1011,7 +1018,7 @@ async function ready(context: ComputeContext): Promise<ComputeContext> {
 /**
  * Opens a compute context. With `engine` (WebGPU backend) or `device` it shares that device; otherwise it opens a
  * headless device of its own with the adapter's largest buffer limits (so big arrays fit) and, where available, the
- * `shader-f16` and `timestamp-query` features. Without WebGPU it falls back to the CPU (`backend`, default
+ * `shader-f16`, `timestamp-query` and `subgroups` features. Without WebGPU it falls back to the CPU (`backend`, default
  * `'auto'`; check `gpu.backend`); with `backend: 'webgpu'` it rejects with a MargoError (`unsupported`) instead.
  * @example
  * using gpu = await createCompute();
@@ -1055,7 +1062,7 @@ export async function createCompute(options: CreateComputeOptions = {}): Promise
       'compute',
     );
   }
-  const wanted: GPUFeatureName[] = ['shader-f16', 'timestamp-query'];
+  const wanted: GPUFeatureName[] = ['shader-f16', 'timestamp-query', 'subgroups'];
   const device = await adapter.requestDevice({
     requiredFeatures: wanted.filter((f) => adapter.features.has(f)),
     requiredLimits: {

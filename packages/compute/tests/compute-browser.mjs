@@ -4,7 +4,8 @@
 // at sizes around every block boundary, kernels bound by name, coded GPU errors, AbortSignal, disposal, the 2D grid
 // past 65,535 workgroups and device sharing with an engine; compute-extras-browser.js checks linalg, fft, signal,
 // random, stream and frame; compute-cpu-browser.js runs the same operations on the CPU backend and the GPU and
-// compares them. Results go to test-results/compute-browser.json.
+// compares them; compute-subgroups-browser.js checks the subgroup kernels against the default ones. Results go to
+// test-results/compute-browser.json.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -27,18 +28,21 @@ try {
       typeof window.runComputeTests === 'function' &&
       typeof window.runExtrasTests === 'function' &&
       typeof window.runCpuParityTests === 'function' &&
-      typeof window.runPreciseTests === 'function',
+      typeof window.runPreciseTests === 'function' &&
+      typeof window.runSubgroupTests === 'function',
   );
   // The precise maths first: every other check of a transcendental function rests on it.
   const precise = await page.evaluate(() => window.runPreciseTests());
   const core = await page.evaluate(() => window.runComputeTests());
   const extras = await page.evaluate(() => window.runExtrasTests());
   const cpu = await page.evaluate(() => window.runCpuParityTests());
+  const subgroups = await page.evaluate(() => window.runSubgroupTests());
   const report = {
-    checks: [...precise.checks, ...core.checks, ...extras.checks, ...cpu.checks],
+    checks: [...precise.checks, ...core.checks, ...extras.checks, ...cpu.checks, ...subgroups.checks],
     timings: { ...core.timings, ...extras.timings, ...cpu.timings },
     adapter: core.adapter,
     preciseMath: precise.results,
+    subgroups: subgroups.subgroups,
   };
   assert.deepEqual(errors, []);
   // The two shaders broken on purpose must have failed (their labels are excused only when they do).
