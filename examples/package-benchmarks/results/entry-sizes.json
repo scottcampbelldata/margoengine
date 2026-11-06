@@ -1,5 +1,5 @@
 {
-  "commit": "c431706bf",
+  "commit": "d220cf413",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -680,8 +680,8 @@
         "gzip": 33654
       },
       "./usdz": {
-        "raw": 32469,
-        "gzip": 11669
+        "raw": 31713,
+        "gzip": 11375
       },
       "./model": {
         "raw": 24235,
@@ -1084,6 +1084,18 @@
       ".": {
         "raw": 35881,
         "gzip": 11581
+      },
+      "./robot": {
+        "raw": 27978,
+        "gzip": 10084
+      },
+      "./swept": {
+        "raw": 25790,
+        "gzip": 9420
+      },
+      "./limits": {
+        "raw": 36996,
+        "gzip": 13266
       }
     },
     "@margoengine/labels": {
@@ -1488,12 +1500,16 @@
         "gzip": 8311
       },
       "./remesh": {
-        "raw": 22335,
-        "gzip": 8459
+        "raw": 22747,
+        "gzip": 8665
       },
       "./sculpt": {
-        "raw": 15870,
-        "gzip": 6030
+        "raw": 23480,
+        "gzip": 8785
+      },
+      "./sculpt-view": {
+        "raw": 1006,
+        "gzip": 556
       },
       "./bake": {
         "raw": 10922,

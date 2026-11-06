@@ -770,7 +770,7 @@ Import `exportUSDZ` from `@margoengine/exporters/usdz`; it loads only USDZ seria
 
 Save as `.usdz`. A supported Apple device can open `<a rel="ar" href="model.usdz"><img src="preview.png" alt="View the model in AR"></a>`. No headset is required to generate or validate the file.
 
-A geometry object two or more nodes draw is written once as a class prim, and each node references it with its own transform, name and material, so a thousand copies of a box cost a thousand short nodes. A mesh used once and a mirrored node are written as world-space meshes, the winding reversed in the file. All other hierarchy is baked.
+Every mesh is written in its own space, with the node's world matrix as `xformOp:transform`, so its points are the ones you gave. A geometry object two or more nodes draw is written once as a class prim, and each node references it with its own transform, name and material, so a thousand copies of a box cost a thousand short nodes. A node with a reflection in its matrix draws a reflected copy of the geometry, written once for all the nodes that mirror it, with the reflection taken out of the node's matrix and the winding reversed in the file: no matrix in the file has a negative determinant, so nothing depends on how a viewer treats a negative scale. Parents are folded into each node's matrix; the file holds no Xform tree.
 
 ```ts
 import { exportUSDZ } from 'margoengine/exporters/usdz';

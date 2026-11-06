@@ -3,7 +3,6 @@ import {
   determinant3,
   drawables,
   num,
-  toWorld,
   normalizeMaterial,
   samplerOf,
   textureFiles,
@@ -113,8 +112,11 @@ const TEXTURES = [
 const samples = (material: Mat, set: number): boolean =>
   TEXTURES.some((slot) => material[slot] && (material[slot].texCoord ?? 0) === set);
 
-/** One geometry written once for the nodes that share it: its class prim's name, local bounds and the UV sets they read. */
+/** One geometry in its own space: the class prim of the nodes that share it, its local bounds and the UV sets they read. */
 interface Shape {
+  positions: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
   users: number;
   sets: [boolean, boolean];
   path?: string;
@@ -122,38 +124,67 @@ interface Shape {
   max: number[];
 }
 
+/** A shape's data with no users yet. */
+function shapeOf(positions: Float32Array, normals: Float32Array, indices: Uint32Array): Shape {
+  const min = [Infinity, Infinity, Infinity],
+    max = [-Infinity, -Infinity, -Infinity];
+  for (let v = 0; v < positions.length; v++) {
+    min[v % 3] = Math.min(min[v % 3], positions[v]);
+    max[v % 3] = Math.max(max[v % 3], positions[v]);
+  }
+  return { positions, normals, indices, users: 0, sets: [false, false], min, max };
+}
+
+/** The geometry reflected in X with its winding reversed. */
+function reflected({ positions, normals, indices }: Geo): Shape {
+  const flip = (values: Float32Array): Float32Array => values.map((v, i) => (i % 3 ? v : -v)),
+    winding = indices.slice();
+  for (let i = 0; i < winding.length; i += 3) {
+    winding[i + 1] = indices[i + 2];
+    winding[i + 2] = indices[i + 1];
+  }
+  return shapeOf(flip(positions), flip(normals), winding);
+}
+
 /**
- * The geometries drawn by two or more nodes. A mirrored node keeps its own world-space mesh: its winding is reversed in
- * the file, so nothing depends on how a renderer treats a negative scale.
+ * The shape each node draws. A node with a reflection in its matrix draws the geometry's reflected shape through
+ * {@link unreflected}, so every matrix in the file keeps a positive determinant, the winding is right in the file and
+ * nothing depends on how a renderer treats a negative scale. Nodes that mirror one geometry share that shape too.
  */
-function sharedShapes(items: readonly Drawable[], fallback: Mat): Map<Geo, Shape> {
-  const shapes = new Map<Geo, Shape>();
-  for (const { geometry, material = fallback, world } of items) {
-    if (determinant3(world) <= 0) continue;
-    let shape = shapes.get(geometry);
+function localShapes(items: readonly Drawable[], fallback: Mat): Map<Drawable, Shape> {
+  const plain = new Map<Geo, Shape>(),
+    mirrored = new Map<Geo, Shape>(),
+    drawn = new Map<Drawable, Shape>();
+  for (const item of items) {
+    const { geometry, material = fallback, world } = item,
+      determinant = determinant3(world);
+    if (!determinant || !Number.isFinite(determinant))
+      throw new RangeError('Singular transform; use a transform with a non-zero determinant');
+    const known = determinant > 0 ? plain : mirrored;
+    let shape = known.get(geometry);
     if (!shape) {
-      const min = [Infinity, Infinity, Infinity],
-        max = [-Infinity, -Infinity, -Infinity];
-      for (let v = 0; v < geometry.count * 3; v++) {
-        min[v % 3] = Math.min(min[v % 3], geometry.positions[v]);
-        max[v % 3] = Math.max(max[v % 3], geometry.positions[v]);
-      }
-      shapes.set(geometry, (shape = { users: 0, sets: [false, false], min, max }));
+      shape = determinant > 0 ? shapeOf(geometry.positions, geometry.normals, geometry.indices) : reflected(geometry);
+      known.set(geometry, shape);
     }
     shape.users++;
     shape.sets[0] ||= samples(material, 0);
     shape.sets[1] ||= samples(material, 1);
+    drawn.set(item, shape);
   }
-  for (const [geometry, shape] of shapes) if (shape.users < 2) shapes.delete(geometry);
-  return shapes;
+  return drawn;
 }
 
-const OUTSIDE_FLOAT32 = 'USDZ world position exceeds Float32 range; move the model closer to the origin or lower its scale';
+/** `world` with its first axis negated: applied to a reflected shape it puts every vertex where `world` puts the geometry's. */
+const unreflected = (world: Float64Array): Float64Array => world.map((v, i) => (i < 3 ? -v : v));
+
+const OUTSIDE_FLOAT32 =
+  'USDZ world position exceeds Float32 range; move the model closer to the origin or lower its scale';
 
 /**
- * Static USD meshes with UsdPreviewSurface materials in a stored, 64-byte-aligned USDZ archive. A mesh used by one node is
- * written in world space. A geometry drawn by several nodes is written once, in its own space, as a `class` prim that
- * each node's Mesh references, with the node's world matrix as `xformOp:transform`. A material shared by several
+ * Static USD meshes with UsdPreviewSurface materials in a stored, 64-byte-aligned USDZ archive. Every mesh is written in
+ * its own space, with the node's world matrix as `xformOp:transform`. A geometry drawn by several nodes is written once,
+ * as a `class` prim each node's Mesh references. A node with a reflection in its matrix draws a reflected shape, written
+ * once for the nodes that mirror that geometry, with the reflection taken out of its matrix. A material shared by several
  * nodes is written once.
  *
  * Material textures (`TextureData`, as the glTF writers take them) become `UsdUVTexture` readers of the mesh's
@@ -175,7 +206,7 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
     throw new TypeError(`USDZ texturePrefix "${prefix}" leaves the archive; use a relative folder such as 'textures/'`);
   const files = textureFiles(prefix),
     fallback = normalizeMaterial({}),
-    shapes = sharedShapes(items, fallback),
+    shapes = localShapes(items, fallback),
     written = new Map<string, { path: string; sets: boolean[] }>(),
     keys = new Map<Mat, number>();
   const lines = [
@@ -189,9 +220,10 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
   ];
   for (let i = 0; i < items.length; i++) {
     const item = items[i],
-      { geometry, world } = item,
+      { geometry } = item,
+      world = determinant3(item.world) > 0 ? item.world : unreflected(item.world),
       material = item.material ?? fallback,
-      shape = determinant3(world) > 0 ? shapes.get(geometry) : undefined,
+      shape = shapes.get(item)!,
       base = material.baseColorTexture;
     for (const slot of TEXTURES) {
       const texture = material[slot];
@@ -331,9 +363,7 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
           : displayOpacity
             ? `        float inputs:opacity.connect = <${path}/Opacity.outputs:result>`
             : `        float inputs:opacity = ${num(opacity)}`,
-        ...(material.alphaMode === 'MASK' && !opaque
-          ? [`        float inputs:opacityThreshold = ${num(cutoff)}`]
-          : []),
+        ...(material.alphaMode === 'MASK' && !opaque ? [`        float inputs:opacityThreshold = ${num(cutoff)}`] : []),
         ...(normal ? [`        normal3f inputs:normal.connect = <${normal}rgb>`] : []),
         ...(occlusion ? [`        float inputs:occlusion.connect = <${occlusion}r>`] : []),
         '        token outputs:surface',
@@ -353,12 +383,12 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
         ? [`    texCoord2f[] primvars:st${set ? '1' : ''} = ${tuples(st(uvs), 2)} (interpolation = "vertex")`]
         : [];
     };
-    const topology = (points: ArrayLike<number>, normals: ArrayLike<number>, indices: Uint32Array, bounds: number[]) => [
-      `    float3[] extent = ${tuples(bounds, 3)}`,
-      `    point3f[] points = ${tuples(points, 3)}`,
-      `    normal3f[] normals = ${tuples(normals, 3)} (interpolation = "vertex")`,
-      `    int[] faceVertexCounts = [3${', 3'.repeat(indices.length / 3 - 1)}]`,
-      `    int[] faceVertexIndices = [${indices.join(', ')}]`,
+    const topology = [
+      `    float3[] extent = ${tuples([...shape.min, ...shape.max], 3)}`,
+      `    point3f[] points = ${tuples(shape.positions, 3)}`,
+      `    normal3f[] normals = ${tuples(shape.normals, 3)} (interpolation = "vertex")`,
+      `    int[] faceVertexCounts = [3${', 3'.repeat(shape.indices.length / 3 - 1)}]`,
+      `    int[] faceVertexIndices = [${shape.indices.join(', ')}]`,
       '    uniform token subdivisionScheme = "none"',
     ];
     const appearance = [
@@ -370,60 +400,54 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
           ]
         : []),
     ];
-    if (shape) {
-      // The world position of every vertex lies inside the world box of the local bounds' corners.
-      for (let corner = 0; corner < 8; corner++) {
-        const x = corner & 1 ? shape.max[0] : shape.min[0],
-          y = corner & 2 ? shape.max[1] : shape.min[1],
-          z = corner & 4 ? shape.max[2] : shape.min[2];
-        for (let r = 0; r < 3; r++)
-          if (!Number.isFinite(Math.fround(world[r] * x + world[4 + r] * y + world[8 + r] * z + world[12 + r])))
-            throw new RangeError(OUTSIDE_FLOAT32);
-      }
-      if (!shape.path) {
-        const name = `Shape_${i}`;
-        shape.path = `/Margo/${name}`;
-        lines.push(
-          `class Mesh "${name}" {`,
-          ...topology(geometry.positions, geometry.normals, geometry.indices, [...shape.min, ...shape.max]),
-          ...vertexST(0, shape.sets[0]),
-          ...vertexST(1, shape.sets[1]),
-          '}',
-        );
-      }
-      const row = (at: number): string => tuple([world[at], world[at + 1], world[at + 2], world[at + 3]]);
-      lines.push(
-        `def Mesh "Mesh_${i}" (`,
-        '    apiSchemas = ["MaterialBindingAPI"]',
-        `    references = <${shape.path}>`,
-        ') {',
-        `    string displayName = ${JSON.stringify(item.name ?? `Mesh ${i}`)}`,
+    // The world position of every vertex lies inside the world box of the local bounds' corners.
+    for (let corner = 0; corner < 8; corner++) {
+      const x = corner & 1 ? shape.max[0] : shape.min[0],
+        y = corner & 2 ? shape.max[1] : shape.min[1],
+        z = corner & 4 ? shape.max[2] : shape.min[2];
+      for (let r = 0; r < 3; r++)
+        if (!Number.isFinite(Math.fround(world[r] * x + world[4 + r] * y + world[8 + r] * z + world[12 + r])))
+          throw new RangeError(OUTSIDE_FLOAT32);
+    }
+    const row = (at: number): string => tuple([world[at], world[at + 1], world[at + 2], world[at + 3]]),
+      transform = [
         `    matrix4d xformOp:transform = (${row(0)}, ${row(4)}, ${row(8)}, ${row(12)})`,
         '    uniform token[] xformOpOrder = ["xformOp:transform"]',
+      ];
+    if (shape.users === 1) {
+      lines.push(
+        `def Mesh "Mesh_${i}" (apiSchemas = ["MaterialBindingAPI"]) {`,
+        `    string displayName = ${JSON.stringify(item.name ?? `Mesh ${i}`)}`,
+        ...transform,
+        ...topology,
         ...appearance,
+        ...vertexST(0, shape.sets[0]),
+        ...vertexST(1, shape.sets[1]),
         `    rel material:binding = <${path}>`,
         '}',
         ...materialLines,
       );
       continue;
     }
-    const { positions, normals, indices } = toWorld(item);
-    for (let v = 0; v < positions.length; v++)
-      if (!Number.isFinite(Math.fround(positions[v]))) throw new RangeError(OUTSIDE_FLOAT32);
-    const min = [Infinity, Infinity, Infinity],
-      max = [-Infinity, -Infinity, -Infinity];
-    for (let v = 0; v < positions.length; v++) {
-      const axis = v % 3;
-      min[axis] = Math.min(min[axis], positions[v]);
-      max[axis] = Math.max(max[axis], positions[v]);
+    if (!shape.path) {
+      const name = `Shape_${i}`;
+      shape.path = `/Margo/${name}`;
+      lines.push(
+        `class Mesh "${name}" {`,
+        ...topology,
+        ...vertexST(0, shape.sets[0]),
+        ...vertexST(1, shape.sets[1]),
+        '}',
+      );
     }
     lines.push(
-      `def Mesh "Mesh_${i}" (apiSchemas = ["MaterialBindingAPI"]) {`,
+      `def Mesh "Mesh_${i}" (`,
+      '    apiSchemas = ["MaterialBindingAPI"]',
+      `    references = <${shape.path}>`,
+      ') {',
       `    string displayName = ${JSON.stringify(item.name ?? `Mesh ${i}`)}`,
-      ...topology(positions, normals, indices, [...min, ...max]),
+      ...transform,
       ...appearance,
-      ...vertexST(0, !!sets[0]),
-      ...vertexST(1, !!sets[1]),
       `    rel material:binding = <${path}>`,
       '}',
       ...materialLines,

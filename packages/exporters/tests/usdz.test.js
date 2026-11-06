@@ -139,9 +139,11 @@ test('USDZ preserves linear AO vertex colors and alpha in connected PreviewSurfa
   assert.match(source, /inputs:opacity.connect = <\/Margo\/Material_0\/Opacity.outputs:result>/);
   assert.match(source, /inputs:roughness = 0.2/);
   assert.match(source, /inputs:metallic = 0.3/);
-  assert.deepEqual(values('points'), [4, 0, 0, 5, 0, 0, 4, 1, 0]);
+  assert.deepEqual(values('points'), [0, 0, 0, 1, 0, 0, 0, 1, 0]);
+  assert.match(source, /xformOp:transform = \(\(1, 0, 0, 0\), \(0, 1, 0, 0\), \(0, 0, 1, 0\), \(4, 0, 0, 1\)\)/);
   assert.deepEqual([...geometry.colors], [1, 0.5, 0.25, 1, 0.25, 0.5, 1, 0.5, 0, 1, 0.5, 0]);
   const parsed = await parseUSDZ(archive);
+  assert.deepEqual([...parsed.positions], [4, 0, 0, 5, 0, 0, 4, 1, 0]);
   const linear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
   const expected = [0.5, 0.125, 0.25, 0.125, 0.125, 1, 0, 0.25, 0.5];
   parsed.colors.forEach((v, i) => assert.ok(Math.abs(linear(v) - expected[i]) < 1e-6));

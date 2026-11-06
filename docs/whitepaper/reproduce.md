@@ -133,6 +133,7 @@ route is a clone because 1.0.0 is not on npm yet.
 | Instanced and moving boxes against three.js (entries 50, 51, 53, 54) | `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3` and `npm run bench -- dynamic --engines=margo,three-webgpu --runs=3` | yes | `benchmarks/runs/<id>.json` | |
 | Polygon offsets (entry 52) | `npm run build` in `packages/geometry`, then `node packages/geometry/scripts/polygon-bench.mjs` | no | console | |
 | Not repeatable by a script yet | - | - | - | The `Spring` timing (entry 55), the WebGL2 CPU tier's interpreter (entry 72) and the path tracer on the layer (entry 73). Each is on the re-measure list. |
+| USDZ on real models against Apple's tools (LIM-253) | Export with `exportUSDZ`, then on a Mac `usdchecker --arkit model.usdz` and `usdcat --flatten model.usdz -o flat.usda`; take each `Mesh_<i>`'s points through its `xformOp:transform` and compare with the source nodes | no | console | By hand, on a Mac; no script in the repository. |
 | Unit tests, API snapshots, size gate | `npm run verify` | no | console | `npm run verify:full` adds packed-package and interop suites. |
 
 ## A second machine
