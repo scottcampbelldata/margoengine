@@ -1,0 +1,97 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Compute model check</title></head><body>
+<script type="module">
+import {ComputePass,storage,workgroup,workgroupBarrier,storageBarrier,globalId,localIndex,localId,workgroupId,workgroupCount,instanceIndex,uint,Loop,If,Var,While,select} from '/packages/shader/dist/index.js';
+const adapter=await navigator.gpu.requestAdapter(),device=await adapter.requestDevice(),errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const read=async(buffer,Kind)=>{
+  const size=buffer.data.byteLength,target=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+  encoder.copyBufferToBuffer(buffer.buffer(device),0,target,0,size);device.queue.submit([encoder.finish()]);await target.mapAsync(GPUMapMode.READ);
+  const values=[...new Kind(target.getMappedRange())];target.unmap();target.destroy();return values;
+};
+const run=async(...passes)=>{
+  device.pushErrorScope('validation');
+  const encoder=device.createCommandEncoder();for(const p of passes)p.encode(device,encoder,{width:1,height:1,delta:0});
+  device.queue.submit([encoder.finish()]);await device.queue.onSubmittedWorkDone();
+  const e=await device.popErrorScope();if(e)errors.push(e.message);
+};
+window.check={
+  // An inclusive prefix sum per 256-wide workgroup, Hillis and Steele (1986), in workgroup memory with two barriers a step.
+  async scan(){
+    const n=1024,data=Uint32Array.from({length:n},(_,i)=>(i*7+3)%11),input=storage(data,'u32'),out=storage(n,'u32'),tile=workgroup(256,'u32');
+    await run(new ComputePass(n,i=>{
+      tile.store(localIndex,input.element(i));
+      workgroupBarrier();
+      Loop(8,k=>{
+        const step=Var(uint(1));Loop(k,()=>step.mulAssign(uint(2)));
+        const mine=Var(tile.element(localIndex));
+        If(localIndex.greaterThanEqual(step),()=>mine.addAssign(tile.element(localIndex.sub(step))));
+        workgroupBarrier();
+        tile.store(localIndex,mine);
+        workgroupBarrier();
+      });
+      return out.store(i,tile.element(localIndex));
+    },{workgroupSize:256}));
+    return {data:[...data],out:await read(out,Uint32Array)};
+  },
+  // Invocations past the count return: a 13 x 7 grid with 8 x 8 groups writes only its own cells.
+  async grid2(){
+    const w=13,h=7,out=storage(16*8,'u32');
+    await run(new ComputePass([w,h],()=>out.store(globalId.y.mul(16).add(globalId.x),globalId.x.mul(100).add(globalId.y).add(1))));
+    const linear=storage(w*h,'u32');
+    await run(new ComputePass([w,h],i=>linear.store(i,globalId.x.add(globalId.y.mul(1000)))));
+    return {out:await read(out,Uint32Array),linear:await read(linear,Uint32Array),w,h};
+  },
+  async grid3(){
+    const d=[5,3,6],out=storage(5*3*6,'u32');
+    await run(new ComputePass(d,i=>out.store(i,globalId.x.add(globalId.y.mul(10)).add(globalId.z.mul(100)))));
+    return {out:await read(out,Uint32Array),d};
+  },
+  // The first pass decides the size of the second, on the GPU.
+  async indirect(){
+    const args=storage(new Uint32Array([0,1,1]),'u32'),out=storage(256,'u32');
+    const decide=new ComputePass(1,()=>args.store(0,uint(3))),work=new ComputePass(256,i=>out.store(i,workgroupCount.x.add(1)),{indirect:args});
+    await run(decide,work);
+    return {out:await read(out,Uint32Array)};
+  },
+  // Each operation on 256 invocations.
+  async atomics(){
+    const a=storage(new Uint32Array([1000,0xffffffff,0,0,7,0,0]),'u32',{atomic:true}),seen=storage(256,'u32');
+    await run(new ComputePass(256,i=>{
+      a.atomicSub(0,1);
+      a.atomicAnd(1,select(i.mod(2).equal(0),uint(0xfffffffe),uint(0xfffffffd)));
+      a.atomicOr(2,i.mod(4).add(1));
+      a.atomicXor(3,uint(1));
+      const old=a.atomicExchange(4,i.add(1000));
+      // A lock-free maximum by compare and swap, in a loop.
+      const done=Var(false,'bool'),tries=Var(0,'u32');
+      While(done.not().and(tries.lessThan(uint(100000))),()=>{
+        const now=a.atomicLoad(5),want=select(i.greaterThan(now),i,now),r=a.atomicCompareExchange(5,now,want);
+        done.assign(r.exchanged);tries.addAssign(uint(1));
+      });
+      a.atomicAdd(6,select(done,uint(1),uint(0)));
+      return seen.store(i,old);
+    }));
+    return {values:await read(a,Uint32Array),seen:await read(seen,Uint32Array)};
+  },
+  // A histogram in workgroup atomics, flushed to storage by one invocation per bin.
+  async histogram(){
+    const n=512,data=Uint32Array.from({length:n},(_,i)=>(i*i)%16),input=storage(data,'u32'),bins=workgroup(16,'u32',{atomic:true}),out=storage(16,'u32',{atomic:true});
+    await run(new ComputePass(n,i=>{
+      If(localIndex.lessThan(16),()=>bins.atomicStore(localIndex,0));
+      workgroupBarrier();
+      bins.atomicAdd(input.element(i),1);
+      workgroupBarrier();
+      If(localIndex.lessThan(16),()=>{out.atomicAdd(localIndex,bins.atomicLoad(localIndex));});
+    },{workgroupSize:64}));
+    return {data:[...data],out:await read(out,Uint32Array)};
+  },
+  // Two buffers trade values in one pass.
+  async swap(){
+    const a=storage(Uint32Array.from([1,2,3,4]),'u32'),b=storage(Uint32Array.from([5,6,7,8]),'u32');
+    await run(new ComputePass(4,i=>[a.store(i,b.element(i)),b.store(i,a.element(i))]));
+    return {a:await read(a,Uint32Array),b:await read(b,Uint32Array)};
+  },
+  takeErrors:()=>errors.splice(0),
+};
+window.ready=true;
+</script></body></html>

@@ -10,15 +10,16 @@ export interface Write {
  * is set inside statement bodies, where a storage write is a statement. Loop and Fn bodies collect nothing: they run
  * their atomics only where the result is used.
  */
-export const effects: { list?: Node[]; store?: (write: Write) => void } = {};
+export const effects: { list?: Node[]; store?: (write: Write) => void; flush?: () => void } = {};
 /** Runs a loop or Fn body without collecting its effects. */
 export const nested = <R>(body: () => R): R => {
-  const { list, store } = effects;
-  effects.list = effects.store = undefined;
+  const { list, store, flush } = effects;
+  effects.list = effects.store = effects.flush = undefined;
   try {
     return body();
   } finally {
     effects.list = list;
     effects.store = store;
+    effects.flush = flush;
   }
 };

@@ -20,7 +20,7 @@ export interface ComputeReadbackOptions {
 
 export type StorageArray<T extends StorageType = StorageType> = T extends 'f32' | 'vec2f' | 'vec4f' ? Float32Array<ArrayBuffer> : T extends 'i32' | 'vec2i' | 'vec4i' ? Int32Array<ArrayBuffer> : Uint32Array<ArrayBuffer>;
 
-export function computeReadback<T extends StorageType>(target: GPUDevice | EngineKernel, count: number, body: (index: Node<'u32'>) => ComputeBody, output: StorageBuffer<T>, options?: ComputeReadbackOptions): Promise<ComputeReadback<T>>;
+export function computeReadback<T extends StorageType>(target: GPUDevice | EngineKernel, count: ComputeCount, body: (index: Node<'u32'>) => ComputeBody, output: StorageBuffer<T>, options?: ComputeReadbackOptions): Promise<ComputeReadback<T>>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -60,9 +60,16 @@ type ColorValue = string | number | readonly number[];
 
 type ComputeBody = Store | Node | readonly (Store | Node)[] | void;
 
+type ComputeCount = number | readonly [number, number] | readonly [number, number, number];
+
 type Count<S extends string, A extends 0[] = []> = S extends `${infer _}${infer Rest}` ? Count<Rest, [...A, 0]> : A['length'];
 
 type Emit = (b: Builder, n: Node) => string;
+
+interface Exchange<T extends Type> {
+    readonly old: Node<T>;
+    readonly exchanged: Node<'bool'>;
+}
 
 type Floats<T extends Type> = Node<VecOf<'f32', Size<T>>>;
 
@@ -234,8 +241,14 @@ class StorageBuffer<T extends StorageType = StorageType> implements Resource {
     element(i: Index): Node<T>;
     store(i: Index, value: NodeInput<T>): Store;
     atomicAdd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicSub(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
     atomicMax(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
     atomicMin(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicAnd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicOr(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicXor(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicExchange(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicCompareExchange(this: StorageBuffer<Atomic>, i: Index, compare: NodeInput<T>, value: NodeInput<T>): Exchange<T>;
     atomicLoad(this: StorageBuffer<Atomic>, i: Index): Node<T>;
     atomicStore(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Store;
     dispose(): void;

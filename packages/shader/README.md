@@ -224,6 +224,45 @@ read back exactly (65 ms on an NVIDIA Ampere GPU in Edge), a job on an engine th
 submit and while mapping, engine disposal and `device.destroy()` at both points, and a pipeline over the storage-binding
 limit; every job destroyed its buffers and no GPU error escaped.
 
+## The compute model
+
+`ComputePass` runs 1D, 2D or 3D grids, shares memory inside a workgroup, and can take its size from an earlier pass. None of it costs anything in a pass that does not use it. Here each 256-wide workgroup sums its items with a prefix scan:
+
+```ts
+import {ComputePass, Loop, If, Var, globalId, localIndex, storage, uint, workgroup, workgroupBarrier} from 'margoengine/shader';
+const input = storage(Uint32Array.from(values), 'u32'), sums = storage(values.length, 'u32');
+const tile = workgroup(256, 'u32');
+ComputePass.attach(stage.engine, values.length, i => {         // values.length: a multiple of 256, as it has barriers
+  tile.store(localIndex, input.element(i));
+  workgroupBarrier();
+  const step = Var(uint(1));
+  Loop(8, () => {
+    const mine = Var(tile.element(localIndex));
+    If(localIndex.greaterThanEqual(step), () => mine.addAssign(tile.element(localIndex.sub(step))));
+    workgroupBarrier();                                        // everyone has read
+    tile.store(localIndex, mine);
+    workgroupBarrier();                                        // everyone has written
+    step.mulAssign(uint(2));
+  });
+  return sums.store(i, tile.element(localIndex));
+}, {workgroupSize: 256});
+
+const image = storage(640 * 480, 'vec4f');
+ComputePass.attach(stage.engine, [640, 480], i => image.store(i, globalId.toFloat().xyzz));   // 2D: i runs row by row
+
+const args = storage(new Uint32Array([0, 1, 1]), 'u32');       // workgroups x, y, z, written by an earlier pass
+ComputePass.attach(stage.engine, 1, () => args.store(0, sums.element(0).div(64).add(1)));
+ComputePass.attach(stage.engine, 1 << 20, i => image.store(i, globalId.toFloat().xyzz), {indirect: args, order: -99});
+```
+
+- **Grids.** `count` is a number, `[x, y]` or `[x, y, z]`; invocations past it return at once. The body's `i` numbers them row by row. `workgroupSize` takes the same forms, at most 256 invocations and 64 along z; the default is 64, `[8, 8]` or `[4, 4, 4]`. `globalId` (vec3u) is the position in the grid.
+- **Inside a workgroup.** `localId`, `localIndex`, `workgroupId` and `workgroupCount` are the WGSL built-ins. `workgroup(count, type, {atomic})` declares memory the group shares; `.element(i)`, `.store(i, v)` (here and now, unlike a storage `store` at the top of a body) and `.uniformLoad(i)` use it.
+- **Barriers.** `workgroupBarrier()`, `storageBarrier()` and `textureBarrier()`. Every invocation must reach one, so a pass with a barrier has no early return and its `count` must be a multiple of `workgroupSize`, or it throws. A barrier under a branch that differs between invocations is a WGSL uniformity error when the pipeline compiles; `uniformLoad` gives a value the group agrees on. Storage writes made before a barrier at the top of a body happen before it.
+- **Atomics.** On storage and workgroup memory: `atomicAdd`, `atomicSub`, `atomicMax`, `atomicMin`, `atomicAnd`, `atomicOr`, `atomicXor`, `atomicExchange` (each returns the previous value), `atomicLoad`, `atomicStore`, and `atomicCompareExchange(i, compare, value)`, which returns `{old, exchanged}`. It is WGSL's weak form: it may fail when the values are equal, so retry on `exchanged`.
+- **Indirect.** `{indirect: buffer, indirectOffset}` reads three u32 workgroup counts from a storage buffer at dispatch. `count` stays the limit of the guard, and the 65,535 groups check does not apply to it.
+
+`node packages/shader/test/compute-model-check.mjs` (real GPU, under the GPU lock) checks each of these against a CPU result: a 1,024-item scan, 13 x 7 and 5 x 3 x 6 grids with the cells past the count left alone, an indirect dispatch sized by the pass before it, 256 invocations through every atomic including a compare-and-swap maximum, and a workgroup histogram.
+
 ## Compute that writes textures (`@margoengine/shader/compute-texture`)
 
 `storageTexture` is a texture a ComputePass writes; `pingPong` is a pair that a pass reads and writes in steps, for simulations, painting and repeated filters. Both work with `texture()`, so a material, NodePass or later pass reads them like any other texture.
@@ -370,10 +409,10 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 - Raw meshes are not picked by `engine.pick`, are not culled, and draw only into the main colour and depth: shadows, SSAO and SSR G-buffers and depth prepasses do not see them. Raw uniforms are scalars, vectors, mat3x3f and mat4x4f (no arrays or structs); no storage buffers or extra bind groups; one colour target; 32-bit attribute formats only.
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
 - Storage textures are 2D, one mip level, one sample; `@margoengine/shader/compute-texture` has no 3D or array form.
-- ComputePass is one-dimensional (up to 65535 workgroups), runs every frame while attached (`computeReadback` runs once) (an atomic counter keeps counting unless `update()` resets it), and has no workgroup memory, barriers or atomics on workgroup variables, and no `atomicSub`/`And`/`Or`/`Xor`/`Exchange`/`CompareExchange` yet. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
+- ComputePass dispatches at most 65,535 workgroups per axis (an indirect dispatch is checked by the GPU only) and runs every frame while attached (`computeReadback` runs once; an atomic counter keeps counting unless `update()` resets it). Workgroup memory has no struct elements, and all of a pass's must fit the device's 16,384 bytes. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
 - No GLSL/WebGL2 output, no node editor, no built-in noise library (write it with `Fn` or `wgslFn`), no light, shadow or environment nodes, no skinning or morph nodes, no MRT outputs.
 
-Size (min + gzip, Rolldown, peers external): whole package 13.9 kB (11.8 kB before statements); `NodeMaterial` with colour nodes only, 6.0 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
+Size (min + gzip, Rolldown, peers external): whole package 15.2 kB (11.8 kB before statements, 13.9 kB before the compute model); `NodeMaterial` with colour nodes only, 6.0 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
 
 Apache-2.0. Optional, tree-shakable package; peers `@margoengine/core`, `@margoengine/materials` and `@margoengine/gltf-pro` (^0.1.0 || ^1.0.0).
 

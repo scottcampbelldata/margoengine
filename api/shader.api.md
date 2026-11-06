@@ -55,19 +55,23 @@ export type ColorValue = string | number | readonly number[];
 
 export type ComputeBody = Store | Node | readonly (Store | Node)[] | void;
 
+export type ComputeCount = number | readonly [number, number] | readonly [number, number, number];
+
 export interface ComputeOptions {
-    workgroupSize?: number;
+    workgroupSize?: ComputeCount;
     order?: number;
     name?: string;
+    indirect?: StorageBuffer<'u32'>;
+    indirectOffset?: number;
 }
 
 export class ComputePass implements EnginePlugin {
-    readonly count: number;
+    readonly count: ComputeCount;
     readonly name: string;
     readonly program: Program;
     readonly code: string;
-    constructor(count: number, body: (index: Node<'u32'>) => ComputeBody, { workgroupSize, order, name }?: ComputeOptions);
-    static attach(engine: EngineKernel, count: number, body: (index: Node<'u32'>) => ComputeBody, options?: ComputeOptions): ComputePass;
+    constructor(count: ComputeCount, body: (index: Node<'u32'>) => ComputeBody, { workgroupSize, order, name, indirect, indirectOffset }?: ComputeOptions);
+    static attach(engine: EngineKernel, count: ComputeCount, body: (index: Node<'u32'>) => ComputeBody, options?: ComputeOptions): ComputePass;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     encode(device: GPUDevice, encoder: GPUCommandEncoder, host: Host): void;
@@ -79,6 +83,11 @@ export class ComputePass implements EnginePlugin {
 export function Continue(): void;
 
 export type Emit = (b: Builder, n: Node) => string;
+
+export interface Exchange<T extends Type> {
+    readonly old: Node<T>;
+    readonly exchanged: Node<'bool'>;
+}
 
 export const FIXED = 8;
 
@@ -306,8 +315,14 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
     element(i: Index): Node<T>;
     store(i: Index, value: NodeInput<T>): Store;
     atomicAdd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicSub(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
     atomicMax(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
     atomicMin(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicAnd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicOr(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicXor(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicExchange(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicCompareExchange(this: StorageBuffer<Atomic>, i: Index, compare: NodeInput<T>, value: NodeInput<T>): Exchange<T>;
     atomicLoad(this: StorageBuffer<Atomic>, i: Index): Node<T>;
     atomicStore(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Store;
     dispose(): void;
@@ -359,6 +374,33 @@ export type Vector = `vec${N}${'f' | 'i' | 'u'}` | `vec${N}<bool>`;
 export function While(condition: Node<'bool'>, body: Body): void;
 
 export type Widest<A extends readonly unknown[]> = [TypeOf<A[number]>] extends [never] ? 'f32' : [Exclude<TypeOf<A[number]>, Scalar>] extends [never] ? TypeOf<A[number]> : Exclude<TypeOf<A[number]>, Scalar>;
+
+export class WorkgroupArray<T extends WorkgroupType = WorkgroupType> implements Resource {
+    readonly count: number;
+    readonly type: T;
+    readonly atomic: boolean;
+    readonly prefix = "ndg";
+    readonly bindings = 0;
+    constructor(count: number, type: T, atomic?: boolean);
+    declare(name: string): string;
+    entries(): GPUBindingResource[];
+    element(i: Index): Node<T>;
+    store(i: Index, value: NodeInput<T>): void;
+    uniformLoad(i: Index): Node<T>;
+    atomicAdd(i: Index, value: NodeInput<T>): Node<T>;
+    atomicSub(i: Index, value: NodeInput<T>): Node<T>;
+    atomicMax(i: Index, value: NodeInput<T>): Node<T>;
+    atomicMin(i: Index, value: NodeInput<T>): Node<T>;
+    atomicAnd(i: Index, value: NodeInput<T>): Node<T>;
+    atomicOr(i: Index, value: NodeInput<T>): Node<T>;
+    atomicXor(i: Index, value: NodeInput<T>): Node<T>;
+    atomicExchange(i: Index, value: NodeInput<T>): Node<T>;
+    atomicCompareExchange(i: Index, compare: NodeInput<T>, value: NodeInput<T>): Exchange<T>;
+    atomicLoad(i: Index): Node<T>;
+    atomicStore(i: Index, value: NodeInput<T>): void;
+}
+
+export type WorkgroupType = StorageType | 'vec3f' | 'vec3i' | 'vec3u';
 
 export const abs: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
@@ -426,6 +468,8 @@ export const frontFacing: Node<"bool">;
 
 export const fwidth: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
+export const globalId: Node<"vec3u">;
+
 export function inputColor(coord?: NodeInput<'vec2f'>): Node<'vec4f'>;
 
 export function inputDepth(coord?: NodeInput<'vec2f'>): Node<'f32'>;
@@ -447,6 +491,10 @@ export const ivec4: (...p: Part[]) => Node<'vec4i'>;
 export const length: <A extends NodeInput[]>(...a: A) => Node<ScalarOf<Widest<A>>>;
 
 export function linearColor(c: ColorValue): number[];
+
+export const localId: Node<"vec3u">;
+
+export const localIndex: Node<"u32">;
 
 export const log: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
@@ -534,6 +582,8 @@ export function storage<T extends StorageType>(data: number | Float32Array | Int
     atomic?: boolean;
 }): StorageBuffer<T>;
 
+export function storageBarrier(): void;
+
 export const sub: <A extends NodeInput, B extends NodeInput>(a: A, b: B) => Node<BinaryResult<A, B>>;
 
 export const tan: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
@@ -541,6 +591,8 @@ export const tan: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 export const tanh: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export function texture(source: BindableTexture, coord?: NodeInput<'vec2f'>, level?: NodeInput<'f32'>): Node<'vec4f'>;
+
+export function textureBarrier(): void;
 
 export const time: Node<"f32">;
 
@@ -597,6 +649,16 @@ export const vertexColor: () => Node<'vec4f'>;
 export const viewDirection: Node<"vec3f">;
 
 export function wgslFn<R extends Type = Type>(code: string): (...args: NodeInput[]) => Node<R>;
+
+export const workgroup: <T extends WorkgroupType>(count: number, type: T, { atomic }?: {
+    atomic?: boolean;
+}) => WorkgroupArray<T>;
+
+export function workgroupBarrier(): void;
+
+export const workgroupCount: Node<"vec3u">;
+
+export const workgroupId: Node<"vec3u">;
 
 // Not exported from this entry, but used by the exports above:
 

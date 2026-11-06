@@ -43,27 +43,30 @@ export const statement = (args: Node[], emit: (b: Builder, n: Node) => void): No
     STMT,
   );
 /** A storage write made in a statement body: it happens here, in order with the statements around it. */
-function write(w: Write): void {
+export function write(w: Write): void {
   push(
     statement([w.index, w.value], (b, n) => {
       if (b.stage.kind !== 'compute') fail('Storage writes are only available in ComputePass nodes');
       const [i, v] = n.args.map((a) => b.expr(a)),
         at = `${b.resource(w.buffer as unknown as Resource)}[${i}]`;
       b.line(w.buffer.atomic ? `atomicStore(&${at}, ${v});` : `${at} = ${v};`);
+      b.epoch++;
     }),
     'store',
   );
 }
 /** Runs `body`, returning the statements it made. */
 function record(body: Body): Node[] {
-  const { list, store } = effects,
+  const { list, store, flush } = effects,
     made: Node[] = (effects.list = []);
   effects.store = write;
+  effects.flush = undefined;
   try {
     body();
   } finally {
     effects.list = list;
     effects.store = store;
+    effects.flush = flush;
   }
   return made;
 }

@@ -2,7 +2,8 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import { ComputePass, StorageBuffer, observeDeviceLoss, type ComputeBody, type StorageType } from './compute.js';
+import { ComputePass, StorageBuffer, observeDeviceLoss, type ComputeBody,
+  type ComputeCount, type StorageType } from './compute.js';
 import { scalarOf, type Node } from './node.js';
 declare const GPUBufferUsage: { MAP_READ: number; COPY_DST: number };
 declare const GPUMapMode: { READ: number };
@@ -53,7 +54,7 @@ const isDevice = (target: GPUDevice | EngineKernel): target is GPUDevice =>
  */
 export async function computeReadback<T extends StorageType>(
   target: GPUDevice | EngineKernel,
-  count: number,
+  count: ComputeCount,
   body: (index: Node<'u32'>) => ComputeBody,
   output: StorageBuffer<T>,
   options: ComputeReadbackOptions = {},
