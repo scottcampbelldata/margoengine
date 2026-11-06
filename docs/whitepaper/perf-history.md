@@ -1816,5 +1816,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 12. Rect area lights (entry 67): a quiet run, and the 0.26 against 0.15 ms left like for like.
 13. `p-pmrem` parts (entry 68): a quiet run, one part at a time.
 14. `TransformWriter` (entry 70): a quiet run, and the whole frame with thousands of moving meshes.
+15. The WebGL2 CPU tier on its interpreter (docs/limits.md, diagnostic 41.2 and 13.5 times slower than compiled): a quiet run.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

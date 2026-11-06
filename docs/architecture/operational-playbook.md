@@ -362,7 +362,7 @@ Mapping details:
 | --- | --- | --- | --- |
 | Fragment | Stores map each invocation to its own renderable texture texel and no buffer is written | Full-target draw, scissored per target/slice | Target must be renderable. |
 | Scatter | Bounded stores with no same-invocation read-after-write hazard | Instanced point draw per target; buffer words use R32UI textures | At most 1,024 stores per invocation per target. |
-| CPU | Atomics, workgroup memory, barriers, unbounded store loops, hazards, unsupported formats, or f16 uniform cases | Typed IR emitted as JavaScript; one invocation at a time, generators across barriers, f32 rounded with `Math.fround` | Requires CSP `unsafe-eval`; cannot read cube, multisampled, or external textures; GPU-written inputs can cause synchronous stalls. |
+| CPU | Atomics, workgroup memory, barriers, unbounded store loops, hazards, unsupported formats, or f16 uniform cases | Typed IR emitted as JavaScript; one invocation at a time, generators across barriers, f32 rounded with `Math.fround` | Under a CSP without `unsafe-eval` the same JavaScript runs on an interpreter (`compute/interpret.ts`), 13 to 41 times slower; cannot read cube, multisampled, or external textures; GPU-written inputs can cause synchronous stalls. |
 | Package alternate path | Planned for large atomic, sorting, or GPU-driven workloads | Feature-specific implementation | No recorded shader required it at the snapshot. |
 
 Package routes now cover VFX, scatter (not `ScatterTiles`) and the sky's light projection as well as DOF, splats,
@@ -370,8 +370,11 @@ culling and shadows. A CPU-tier kernel that reads a GPU-written resource waits f
 kernel can cost a whole frame: the sky projection cost 57 ms that way. Evidence: `routes.test.js` and the frame budget of
 `visual:compat:budget`; the integrated-GPU budget run is still missing.
 
-The CPU tier's CSP requirement applies only to this opt-in compatibility path. General claims that the shipped native
-engine needs no `unsafe-eval` must be scoped accordingly. Recorded A6000/Edge measurements for CPU clustered binning
+The CPU tier's `new Function` applies only to this opt-in compatibility path, and a strict policy sends it to the
+interpreter instead of refusing it. General claims that nothing builds code at run time must stay scoped to the native
+engine. Evidence: `packages/webgl2-compat/test/interpret.test.js` compares the two paths over the corpus, and
+`compute-browser.mjs` reruns every case under a real policy; there is no quiet speed record of the interpreter yet.
+Recorded A6000/Edge measurements for CPU clustered binning
 over 3,456 clusters were 1.5 ms with 16 lights, 2.8 ms with 64, and 9.4 ms with 256; a 64-wide reduction with seven
 barriers reached 4.4 million invocations per second.
 
@@ -520,7 +523,7 @@ Known rendering gaps:
 
 - WebGL preview size is stated inconsistently in older public files; current generated size records are authoritative.
 - Intel Arc 140V precise-math evidence needs a post-fix rerun.
-- Compatibility CPU compute needs `unsafe-eval`, which older broad CSP wording did not qualify.
+- Compatibility CPU compute compiled with `new Function` and was refused without `unsafe-eval`; it now falls to an interpreter, and older broad CSP wording still needs the CPU tier qualifier.
 - Visual profiles do not cover every GPU/browser/OS combination.
 - Compatibility path-tracer kernels remain outside the supported compilation budget.
 
@@ -716,7 +719,7 @@ The following remain technical gaps, not permission to weaken a check:
 5. Precise-math GPU cost versus builtins is measured on the RTX A6000 only.
 6. Intel Arc 140V precise-math bounds need a post-fix run; AMD and Intel UHD need one since the `pmLog2Pair` change of
    2026-11-05, and `precisePow`'s cost needs measuring again.
-7. Compatibility CPU compute requires `unsafe-eval`; broad CSP prose must remain scoped to the native engine.
+7. Compatibility CPU compute runs 13 to 41 times slower without `unsafe-eval` (interpreter); broad CSP prose must remain scoped to the native engine.
 8. Compatibility path-tracer kernels remain outside the practical shader-compilation budget.
 9. Visual baselines do not cover every supported GPU/browser/OS combination.
 10. The WebGL preview size was inconsistent across older public sources; current generated evidence should replace

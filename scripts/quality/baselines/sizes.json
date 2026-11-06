@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4948222,
+  "total": 4980690,
   "history": [
     {
       "date": "2026-10-24",
@@ -2090,6 +2090,12 @@
       "commit": "4e42e904e",
       "reason": "lod: imposter colour, emissive, frames and shadow source in the root",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "c57eb2a80",
+      "reason": "CPU compute tier without unsafe-eval: the interpreter chunk joins the lazy compute runtime and every whole-entry figure, though only a page that forbids new Function downloads it",
+      "grew": 5
     }
   ],
   "items": {
@@ -2603,15 +2609,15 @@
     "@margoengine/webgl/auto": 3942,
     "@margoengine/webgl/pick": 2385,
     "@margoengine/webgl/restore": 1097,
-    "@margoengine/webgl2-compat": 96428,
+    "@margoengine/webgl2-compat": 102814,
     "@margoengine/webgl2-compat base (without compute runtime)": 73000,
-    "@margoengine/webgl2-compat lazy compute runtime": 22701,
+    "@margoengine/webgl2-compat lazy compute runtime": 28843,
     "@margoengine/webgl2-compat/adapter": 880,
-    "@margoengine/webgl2-compat/compute": 42734,
-    "@margoengine/webgl2-compat/device": 96136,
+    "@margoengine/webgl2-compat/compute": 49684,
+    "@margoengine/webgl2-compat/device": 102935,
     "@margoengine/webgl2-compat/glsl": 43584,
     "@margoengine/webgl2-compat/wgsl": 27240,
-    "@margoengine/webgl2-compat/xr": 97790,
+    "@margoengine/webgl2-compat/xr": 103981,
     "@margoengine/wfc": 1878,
     "@margoengine/wfc/overlapping": 2259,
     "@margoengine/worker": 2128,

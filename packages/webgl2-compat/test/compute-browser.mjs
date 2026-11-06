@@ -3,6 +3,8 @@
 // numbers: integers equal, floats within the case's tolerance (1e-6 unless it samples or stores half floats, where the
 // two paths' filtering and rounding may differ in the last bits). Neither side may report a validation error, throw,
 // or (the layer) a GL error, and each case must run on the tier it was written for. A refusal is checked to be coded.
+// All of it runs twice: as the page comes, and under a Content-Security-Policy without 'unsafe-eval', where the CPU tier
+// runs on its interpreter.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 
@@ -23,13 +25,36 @@ const TIERS = {
   asyncPipeline: 'scatter',
 };
 
-const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/compute.html', port: 'free' });
+/** Sends the page with `?strict` a policy that forbids `new Function`, as a real header. */
+const strictPolicy = {
+  name: 'strict-policy',
+  configureServer(server) {
+    server.middlewares.use((request, response, next) => {
+      if (request.url.endsWith('compute.html?strict'))
+        response.setHeader(
+          'content-security-policy',
+          "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; worker-src 'self' blob:",
+        );
+      next();
+    });
+  },
+};
+
+const context = await openBrowser({
+  startPath: '/packages/webgl2-compat/test/compute.html',
+  port: 'free',
+  plugins: [strictPolicy],
+});
 const { page } = context;
 const pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => {
-  if (m.type() === 'error') pageErrors.push(m.text());
+  // The one attempt that finds out the page forbids `new Function` is logged by the browser.
+  if (m.type() === 'error' && !/unsafe-eval/.test(m.text())) pageErrors.push(m.text());
 });
+const requests = [];
+page.on('request', (r) => requests.push(r.url()));
+const usedInterpreter = () => requests.some((url) => /\/interpret-[^/]*\.js/.test(url));
 
 /** Paths where `a` and `b` differ (floats beyond `tol`), at most 8. */
 function differences(a, b, tol, path = '', out = []) {
@@ -53,7 +78,7 @@ function differences(a, b, tol, path = '', out = []) {
 }
 
 const lines = [];
-try {
+async function suite() {
   await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
   const names = await page.evaluate(() => window.check.names());
   assert.deepEqual(names, Object.keys(TIERS), 'every case has its expected tier');
@@ -97,6 +122,14 @@ try {
     /^MargoError unsupported: WebGL2 compatibility cannot run textureSampleLevel\(\) on a cube_array texture on the CPU/,
     'a cube array on the CPU tier is refused, coded',
   );
+}
+try {
+  await suite();
+  assert.equal(usedInterpreter(), false, 'a page that allows new Function does not download the interpreter');
+  await page.goto(`${page.url().split('?')[0]}?strict`);
+  lines.push("under a Content-Security-Policy without 'unsafe-eval':");
+  await suite();
+  assert.equal(usedInterpreter(), true, 'the policy must have sent the CPU tier to the interpreter');
   assert.deepEqual(pageErrors, []);
   console.log(`webgl2-compat compute (WebGL2 layer vs native WebGPU, same GPU):\n  ${lines.join('\n  ')}`);
 } finally {

@@ -578,7 +578,7 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
 - **Accepted differences.** Render shaders that write storage buffers or textures are refused (WebGL2 render stages
   cannot write them; no recorded shader does). CPU-tier kernels cannot read cube (sampled since 2026-10-29,
   [below](#cube-sampling-on-the-cpu-tier-2026-10-29)), multisampled or external textures (refused, coded: the light
-  probes' bake kernels sample a cube map in kernels with workgroup memory, the corpus's 3 refusals then) and need a page that allows `unsafe-eval`. CPU-tier transcendental functions (sin, exp, pow) differ from
+  probes' bake kernels sample a cube map in kernels with workgroup memory, the corpus's 3 refusals then) and run on an interpreter, much slower, on a page without `unsafe-eval`. CPU-tier transcendental functions (sin, exp, pow) differ from
   the GPU in the last bits, and CPU texture filtering uses exact weights where GPUs use 8-bit fixed-point ones (within
   4/255 in the check). The scatter tier runs the shader once per store (an invocation that stores a 20-word vertex
   runs 20 times), so it costs more GPU time than one compute dispatch; M7 measures it. Out-of-bounds reads clamp into
@@ -743,10 +743,13 @@ the browser offers it, the layer, and for the basic scene the milestone M2 layer
   as a GPU resets a dispatch that runs too long. The compute check runs an endless loop and a 64,000-invocation
   dispatch against a budget of 20,000, and the same dispatch after raising it.
 - **`unsafe-eval`.** Only the CPU tier compiles code at run time (`new Function`); rendering and the fragment and
-  point-draw tiers do not. Under a Content-Security-Policy without `unsafe-eval` the CPU-tier kernels are refused
-  with MargoError code `unsupported`. On the layer that means the splats route's sort and the generic routes of VFX,
-  scatter, clustered binning and other atomics or workgroup kernels. An interpreter of the IR
-  would remove the need at a large speed cost; it is listed for after M8.
+  point-draw tiers do not. Under a Content-Security-Policy without `unsafe-eval` the CPU tier runs each kernel on an
+  interpreter (`compute/interpret.ts`, a lazy chunk only such a page downloads): a parser for the JavaScript `js.ts`
+  writes and a compiler from it to closures, so one text still states what a kernel does. The buffer-only corpus
+  kernels end in the same memory both ways (`test/interpret.test.js`), and every `compute.html` case, textures
+  included, matches native WebGPU under a real policy. It costs speed: 41 times slower on a 256-light binning loop,
+  13.5 times on a reduction with barriers (diagnostic, measured while other work ran). On the layer that reaches the
+  splats route's sort and the generic routes of atomics or workgroup kernels.
 - **Adapter-independent checks (bug 66).** The features check compared compat with native exactly but also held
   three sanity bytes an Intel Arc 140V rounds one level differently (both natively and on the layer); those now
   allow two levels, and the exact comparison with native on the same adapter stays.

@@ -511,9 +511,9 @@ export class CompatDevice extends EventTarget {
    * compute; command buffers with compute passes wait in the queue until it has loaded.
    */
   loadCompute(): Promise<void> {
-    this.computeLoad ??= import('../compute/runtime.js').then(
-      (m) => {
-        this.computeRuntime = m.computeRuntime(this);
+    this.computeLoad ??= import('../compute/runtime.js').then((m) => m.computeRuntime(this)).then(
+      (runtime) => {
+        this.computeRuntime = runtime;
       },
       (error) => {
         this.lose(

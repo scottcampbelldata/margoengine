@@ -5,8 +5,9 @@
 import { checkWGSL } from './wgsl.js';
 import type { IRModule } from './wgsl/ir.js';
 import { type ComputePlan, planCompute as plan } from './compute/analyze.js';
-import { type CPUBuffer, runKernel } from './compute/cpu.js';
-import { compileCPU } from './compute/js.js';
+import { fault } from '../../shared/errors.js';
+import { type CPUBuffer, H, runKernel, WorkBudgetExceeded } from './compute/cpu.js';
+import { compileCPU, useInterpreter } from './compute/js.js';
 
 export type { ComputePlan, ComputeTarget, ComputeTier } from './compute/analyze.js';
 /** The WGSL front end's types, under the names its own entry gives them (the IR this entry's types refer to). */
@@ -66,6 +67,19 @@ export interface CPUDispatch extends ComputeStage {
    * buffers alike; give each binding its own bytes).
    */
   readonly buffers: ReadonlyMap<string, ArrayBufferView>;
+  /**
+   * Stop after this many invocations plus loop iterations, so an endless loop cannot hold the caller. What the kernel
+   * stored so far stays in the buffers. Default: no limit.
+   */
+  readonly workBudget?: number;
+}
+
+/**
+ * Fetches the CPU tier's interpreter, so {@link runComputeOnCPU} also runs on a page whose Content-Security-Policy
+ * forbids JavaScript compiled at run time. A page that allows it needs no call; the device loads its own.
+ */
+export async function loadInterpreter(): Promise<void> {
+  useInterpreter((await import('./compute/interpret.js')).interpretKernel);
 }
 
 /**
@@ -73,8 +87,9 @@ export interface CPUDispatch extends ComputeStage {
  * arithmetic rounded as an f32 GPU rounds it, atomics as plain read-modify-writes, and every invocation of a
  * workgroup run to each barrier before any goes on. Buffers only (textures need a device).
  * @param dispatch The entry point, workgroup counts and buffer bindings.
+ * Where the Content-Security-Policy forbids JavaScript compiled at run time, await {@link loadInterpreter} first.
  * @throws As {@link planCompute}; MargoError code `unsupported` for WGSL the CPU tier cannot run (textures, cube
- *   sampling) or on a page whose Content-Security-Policy forbids JavaScript compiled at run time.
+ *   sampling) or on such a page without the interpreter; MargoError code `failed` past `workBudget`.
  */
 export function runComputeOnCPU(dispatch: CPUDispatch): void {
   const { module, entry } = resolve(dispatch);
@@ -86,9 +101,22 @@ export function runComputeOnCPU(dispatch: CPUDispatch): void {
     buffers.set(key, { dv: new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), bytes });
   }
   const [x, y = 1, z = 1] = dispatch.workgroups;
-  runKernel(kernel.bind({ buffers, textures: new Map(), samplers: new Map() }), kernel.barriers, p.workgroupSize, [
-    x,
-    y,
-    z,
-  ]);
+  H.work.left = dispatch.workBudget ?? Number.POSITIVE_INFINITY;
+  try {
+    runKernel(kernel.bind({ buffers, textures: new Map(), samplers: new Map() }), kernel.barriers, p.workgroupSize, [
+      x,
+      y,
+      z,
+    ]);
+  } catch (error) {
+    if (error instanceof WorkBudgetExceeded)
+      throw fault(
+        'failed',
+        `A compute dispatch on the CPU stopped at its work budget of ${dispatch.workBudget} invocations and loop iterations`,
+        'compatibility-layer',
+      );
+    throw error;
+  } finally {
+    H.work.left = Number.POSITIVE_INFINITY;
+  }
 }

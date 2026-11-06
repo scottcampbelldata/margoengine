@@ -1,5 +1,5 @@
 {
-  "commit": "906cc2341",
+  "commit": "c57eb2a80",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1066,12 +1066,16 @@
     },
     "@margoengine/lod": {
       ".": {
-        "raw": 28250,
-        "gzip": 10943
+        "raw": 37653,
+        "gzip": 13232
       },
       "./auto": {
-        "raw": 13318,
-        "gzip": 5242
+        "raw": 13326,
+        "gzip": 5246
+      },
+      "./fade": {
+        "raw": 5499,
+        "gzip": 2286
       }
     },
     "margoengine": {
@@ -1901,6 +1905,10 @@
         "raw": 13992,
         "gzip": 4798
       },
+      "./compile": {
+        "raw": 4138,
+        "gzip": 1626
+      },
       "./report": {
         "raw": 2263,
         "gzip": 1122
@@ -2238,20 +2246,20 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 311478,
-        "gzip": 93818
+        "raw": 331540,
+        "gzip": 99819
       },
       "./adapter": {
         "raw": 1123,
         "gzip": 624
       },
       "./compute": {
-        "raw": 145164,
-        "gzip": 42136
+        "raw": 165456,
+        "gzip": 48236
       },
       "./device": {
-        "raw": 310546,
-        "gzip": 93866
+        "raw": 330667,
+        "gzip": 99936
       },
       "./glsl": {
         "raw": 145692,
@@ -2262,8 +2270,8 @@
         "gzip": 26476
       },
       "./xr": {
-        "raw": 313825,
-        "gzip": 94941
+        "raw": 333979,
+        "gzip": 100952
       }
     },
     "@margoengine/wfc": {
@@ -2454,14 +2462,14 @@
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {
-        "raw": 242143,
-        "gzip": 72302,
+        "raw": 242206,
+        "gzip": 72354,
         "target": 73000
       },
       "lazy": {
         "name": "compute runtime",
-        "raw": 69334,
-        "gzip": 22041,
+        "raw": 89333,
+        "gzip": 28002,
         "loadedBy": "the first compute pipeline on the layer (import() of compute/runtime.js in device/device.ts)"
       }
     }

@@ -51,6 +51,7 @@ export type BinaryOp = '||' | '&&' | '|' | '&' | '^' | '==' | '!=' | '<' | '>' |
 export interface CPUDispatch extends ComputeStage {
     readonly workgroups: readonly [number, number?, number?];
     readonly buffers: ReadonlyMap<string, ArrayBufferView>;
+    readonly workBudget?: number;
 }
 
 export interface CallExpr extends Span {
@@ -561,6 +562,8 @@ export interface WhileStmt extends Span {
 }
 
 export function checkWGSL(source: string): IRModule;
+
+export function loadInterpreter(): Promise<void>;
 
 export function parseWGSL(source: string): ModuleAst;
 

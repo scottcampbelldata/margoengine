@@ -80,15 +80,18 @@ What it does:
 
   Reads see memory as it was before the dispatch, as WGSL allows for invocations that never read back their own
   stores. The CPU tier samples cube textures at a level as WebGPU does (seamless filtering across face edges; at a
-  corner the three texels that meet there are averaged), cannot read multisampled or external textures, and needs a
-  page that allows JavaScript
-  compiled at run time (Content-Security-Policy `unsafe-eval`); either refusal is MargoError code `unsupported`.
+  corner the three texels that meet there are averaged) and cannot read multisampled or external textures, a refusal
+  with MargoError code `unsupported`. On a page that allows JavaScript compiled at run time (Content-Security-Policy
+  `unsafe-eval`) the CPU tier compiles each kernel with `new Function`; under a strict policy it runs the same kernel
+  on an interpreter, a lazy chunk only such a page downloads, with the same results, about 13 to 41 times slower.
   A CPU-tier dispatch may do at most `cpuWorkBudget` invocations plus loop iterations (an `install()` option and a
   device property; default 100,000,000, about one to three seconds): past it the dispatch stops, nothing it stored
   lands, and it is reported as a `GPUInternalError` with MargoError code `failed`, so an endless loop cannot hold the
-  page. Only the CPU tier needs `unsafe-eval`; rendering and the fragment and point-draw tiers do not.
+  page. Rendering and the fragment and point-draw tiers never compile JavaScript, and the CPU tier only runs faster
+  with `unsafe-eval`. The one refused `new Function` that finds this out is the only violation such a page sees.
   `planCompute(stage)` tells which tier an entry point gets and why; `runComputeOnCPU(dispatch)` runs one on the CPU
-  with buffers, without a device. `device.dispatches` counts the dispatches each tier has run, `device.programs` the
+  with buffers, without a device (`workBudget` stops it past that many invocations plus loop iterations; default no
+  limit; on a page without `unsafe-eval`, `await loadInterpreter()` once first). `device.dispatches` counts the dispatches each tier has run, `device.programs` the
   render programs made with their translation and link time, and `device.state.counts` the state changes asked for
   and those the cache answered without a GL call (milestone M7 measures them on each ANGLE back end with
   `test/perf-browser.mjs`).

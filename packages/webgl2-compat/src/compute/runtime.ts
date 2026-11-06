@@ -33,7 +33,7 @@ import {
   WorkBudgetExceeded,
 } from './cpu.js';
 import { emitCompute } from './glsl.js';
-import { type CPUKernel, compileCPU } from './js.js';
+import { type CPUKernel, compileCPU, evalAllowed, useInterpreter } from './js.js';
 
 interface Draw {
   readonly target: ComputeTarget;
@@ -67,7 +67,9 @@ interface Words {
 const WORDS_WIDTH = 4096;
 
 /** The runtime for one device. */
-export function computeRuntime(device: CompatDevice): ComputeRuntime {
+export async function computeRuntime(device: CompatDevice): Promise<ComputeRuntime> {
+  // Only a page that forbids `new Function` downloads the interpreter.
+  if (!evalAllowed()) useInterpreter((await import('./interpret.js')).interpretKernel);
   return new Runtime(device);
 }
 

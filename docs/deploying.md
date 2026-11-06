@@ -16,9 +16,10 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval
 - `'wasm-unsafe-eval'` is the one directive Margo itself needs. Without it the engine does not start.
 - The standard WebGPU path and the other WebGL2 tiers need no `'unsafe-eval'`, workers included: Draco and KTX2 decoding
   (`@margoengine/decoders`) run under the same policy. See
-  [Third-party Emscripten code without `eval`](#third-party-emscripten-code-without-eval). The one exception is the
-  optional CPU compute tier of `@margoengine/webgl2-compat`, which builds its shaders with `new Function`: it needs
-  `'unsafe-eval'` on the page, or it is refused with MargoError `unsupported`.
+  [Third-party Emscripten code without `eval`](#third-party-emscripten-code-without-eval). The optional CPU compute
+  tier of `@margoengine/webgl2-compat` builds its shaders with `new Function` where `'unsafe-eval'` allows it; without it
+  the same kernels run on an interpreter, a lazy chunk, 13 to 41 times slower. The one refused attempt that finds this
+  out is the only violation such a page reports.
 - You do **not** need cross-origin isolation (COOP/COEP).
 - Fingerprinted files in `assets/` can be cached for a year; HTML must revalidate.
 

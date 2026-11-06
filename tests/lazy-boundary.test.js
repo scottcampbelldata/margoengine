@@ -98,6 +98,7 @@ test('the only import() calls in the layer are index.ts to device.ts and device.
   for (const file of reach(join(src, 'index.ts')).keys())
     for (const next of importsOf(file)) if (next.dynamic) edges.push(`${rel(file)} -> ${rel(next.file)}`);
   assert.deepEqual(edges.sort(), [
+    'packages/webgl2-compat/src/compute/runtime.ts -> packages/webgl2-compat/src/compute/interpret.ts',
     'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/compute/runtime.ts',
     'packages/webgl2-compat/src/index.ts -> packages/webgl2-compat/src/device.ts',
   ]);

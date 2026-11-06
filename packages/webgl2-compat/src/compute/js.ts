@@ -56,6 +56,31 @@ type JRef =
   | { readonly k: 'ptr'; readonly p: string; readonly keys: readonly string[]; readonly type: Type }
   | { readonly k: 'mem'; readonly b: string; readonly off: string; readonly type: Type };
 
+/** Builds a kernel from the text js.ts wrote without `new Function`: compute/interpret.ts. */
+export type Interpreter = (source: string) => (h: typeof H, r: CPUBindings) => KernelModule;
+
+let interpreter: Interpreter | undefined;
+/** Names what runs kernels on a page that forbids `new Function`; without one such a page refuses them. */
+export function useInterpreter(i: Interpreter): void {
+  interpreter = i;
+}
+
+let evalWorks: boolean | undefined;
+/**
+ * Whether this page lets JavaScript be compiled at run time. Asked once: a refusal counts as a violation that a page
+ * can have reported to it, so one refused attempt is the most a page sees.
+ */
+export function evalAllowed(): boolean {
+  if (evalWorks === undefined)
+    try {
+      new Function('');
+      evalWorks = true;
+    } catch {
+      evalWorks = false;
+    }
+  return evalWorks;
+}
+
 const BARRIERS = new Set(['workgroupBarrier', 'storageBarrier', 'textureBarrier', 'workgroupUniformLoad']);
 
 /** Compiles one compute entry point to JavaScript. */
@@ -65,21 +90,22 @@ export function compileCPU(
   constants: Readonly<Record<string, number | boolean>> = {},
 ): CPUKernel {
   const source = new JSEmitter(module, entry, constants).run();
-  let factory: (h: typeof H, r: CPUBindings) => KernelModule;
-  try {
-    factory = new Function('H', 'R', source) as typeof factory;
-  } catch (error) {
-    if (error instanceof SyntaxError)
+  let factory: ReturnType<Interpreter>;
+  if (evalAllowed())
+    try {
+      factory = new Function('H', 'R', source) as typeof factory;
+    } catch (error) {
       throw fault(
         'failed',
-        `WebGL2 compatibility made JavaScript that does not parse (a bug: report it): ${error.message}`,
+        `WebGL2 compatibility made JavaScript that does not parse (a bug: report it): ${(error as Error).message}`,
         'compatibility-layer',
       );
-    // A Content-Security-Policy without 'unsafe-eval' forbids new Function.
+    }
+  else if (interpreter) factory = interpreter(source);
+  else
     throw unsupported(
-      `'${entry.name}': the page forbids JavaScript compiled at run time (its Content-Security-Policy lacks 'unsafe-eval')`,
+      `'${entry.name}': the page forbids JavaScript compiled at run time; await loadInterpreter() first`,
     );
-  }
   const barriers = /\byield\b/.test(source);
   return { source, barriers, bind: (r) => factory(H, r) };
 }
