@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-146). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-147). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -103,6 +103,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | `CascadeParts` and `CascadeInstances` lists | One u32 per slot per cascade, up to the GPU's storage binding size | Each cascade's list can hold every caster | Past the binding size, or on the WebGL2 layer, every cascade draws every caster, as the plain classes do | Use fewer cascades, or split the parts |
 | `LodInstances` | 1 to 4 levels; 96 bytes per instance per level, plus the 96-byte source record | Each level's list can hold every instance, and one thread appends to one of them | Shadows: not cast, as `shadows.add` takes no `LodInstances`. WebGL2 layer: every shown instance draws the first level. Instances of a level draw in no fixed order, which only shows between exactly coplanar faces | Use `CascadeInstances` for casters of the first level |
 | `MeshletMesh` | One mesh, one matrix; twice the mesh index memory on the GPU, plus 40 bytes per cluster | Kept clusters are written to one index buffer for that matrix | Instances of a clustered mesh are not supported. Shadows and picking draw the whole mesh. No Hi-Z per cluster. On the WebGL2 layer the whole mesh draws | Use `CulledParts` for many copies; split a large scene into several `MeshletMesh` |
+| Attributes in generated LOD levels (`autoLOD`, `hierarchicalLOD`, `simplifyAttributes`) | Per primitive: mesh-edit's limit of 200,000 vertices or faces. A level is a subset of the source's vertices, so a position can only be one the source has. Triangles mesh-edit cannot take (a third face on an edge, a flipped neighbour) simplify as separate sheets, up to 4, then alone. | Vertex-subset collapses keep every attribute exact with no interpolation; the price is less accuracy per triangle than placing new vertices. Primitives simplify one at a time, so an open edge between two primitives can slide apart a little. | A core mesh's levels hold positions and normals only, as core geometry does. A materials mesh's levels do not follow a material swapped on the source later, and `shadows.add` takes each level on its own. | Give the source's borders the same vertices in one primitive, or use `Imposter` for the farthest level. |
 
 ## Geometry
 

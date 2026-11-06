@@ -6,6 +6,7 @@ import { neutralShader } from '../../shared/display.js';
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import { ggxDFloat, smithGFloat } from '../../shared/light-terms.js';
+import { normalMatrix } from './attributes.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; MAP_READ: number };
 declare const GPUTextureUsage: {
   TEXTURE_BINDING: number;
@@ -158,17 +159,7 @@ function coreModel(engine: Engine, parts: readonly Part[]): PBRModel {
     const v = g.vertices,
       count = v.length / 6,
       out = new Float32Array(count * 20),
-      c = [
-        m[5] * m[10] - m[6] * m[9],
-        m[6] * m[8] - m[4] * m[10],
-        m[4] * m[9] - m[5] * m[8],
-        m[2] * m[9] - m[1] * m[10],
-        m[0] * m[10] - m[2] * m[8],
-        m[1] * m[8] - m[0] * m[9],
-        m[1] * m[6] - m[2] * m[5],
-        m[2] * m[4] - m[0] * m[6],
-        m[0] * m[5] - m[1] * m[4],
-      ];
+      { c, mirrored } = normalMatrix(m);
     for (let i = 0; i < count; i++) {
       const s = i * 6,
         o = i * 20,
@@ -178,9 +169,9 @@ function coreModel(engine: Engine, parts: readonly Part[]): PBRModel {
         a = v[s + 3],
         b = v[s + 4],
         e = v[s + 5],
-        nx = c[0] * a + c[1] * b + c[2] * e,
-        ny = c[3] * a + c[4] * b + c[5] * e,
-        nz = c[6] * a + c[7] * b + c[8] * e,
+        nx = c[0] * a + c[3] * b + c[6] * e,
+        ny = c[1] * a + c[4] * b + c[7] * e,
+        nz = c[2] * a + c[5] * b + c[8] * e,
         l = Math.hypot(nx, ny, nz);
       out[o] = m[0] * x + m[4] * y + m[8] * z + m[12];
       out[o + 1] = m[1] * x + m[5] * y + m[9] * z + m[13];
@@ -194,7 +185,7 @@ function coreModel(engine: Engine, parts: readonly Part[]): PBRModel {
       out.fill(1, o + 16, o + 20);
     }
     let indices = g.indices;
-    if (m[0] * c[0] + m[4] * c[3] + m[8] * c[6] < 0) {
+    if (mirrored) {
       indices = indices.slice();
       for (let i = 0; i < indices.length; i += 3) {
         const t = indices[i + 1];

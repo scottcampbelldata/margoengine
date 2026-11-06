@@ -1000,6 +1000,7 @@
       "frameBasis",
       "frameDirection",
       "frameMatrix",
+      "normalMatrix",
       "octDecode",
       "octEncode"
     ]

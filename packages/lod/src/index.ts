@@ -21,6 +21,7 @@ export {
   type ImposterOptions,
   type ImposterSource,
 } from './imposter.js';
+export { normalMatrix } from './attributes.js';
 import { MargoError } from '@margoengine/math/errors';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { worldRadius } from '../../shared/sphere.js';

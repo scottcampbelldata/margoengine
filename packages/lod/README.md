@@ -134,7 +134,7 @@ LOD.fromModel(LODSystem.attach(stage.engine), model);
 
 ## Levels built for you: `margoengine/lod/auto`
 
-`autoLOD` simplifies a core mesh's geometry into lower levels. `hierarchicalLOD` merges still core meshes into one far mesh per grid cell and material, shown in their place past `distance`: 400 boxes in 16 cells draw 16 meshes from afar. Both load `@margoengine/mesh-edit` only when they simplify (`autoLOD` always, `hierarchicalLOD` with `ratio` below 1), an optional peer you install.
+`autoLOD` simplifies a mesh's geometry into lower levels. `hierarchicalLOD` merges still meshes into one far mesh per grid cell and material, shown in their place past `distance`: 400 boxes in 16 cells draw 16 meshes from afar. Both load `@margoengine/mesh-edit` only when they simplify (`autoLOD` always, `hierarchicalLOD` with `ratio` below 1), an optional peer you install.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -151,4 +151,24 @@ const city = await hierarchicalLOD(lods, props, {cell: 20}); // defaults: distan
 city.remove(); // frees the far meshes, shows the sources
 ```
 
-Levels keep positions and normals only, since core geometry holds nothing else. A source moved afterwards does not move its far mesh.
+A core mesh's levels keep positions and normals, since core geometry holds nothing else. A source moved afterwards does not move its far mesh.
+
+### Textured meshes
+
+A `createMesh` mesh of `@margoengine/materials` keeps everything: UVs, UV1, tangents, vertex colours and its materials, in `autoLOD` levels and in `hierarchicalLOD` far meshes, one per cell and material. Each collapse keeps one end of an edge, so every vertex of a level is one of the source's, unchanged. Corners that share a position stay welded, and an edge where a UV or any other attribute jumps is held as a seam, so seams and hard edges stay closed.
+
+```ts
+import {createStage} from 'margoengine';
+import {LODSystem} from 'margoengine/lod';
+import {autoLOD} from 'margoengine/lod/auto';
+import {PbrMaterial, Texture, createMesh} from 'margoengine/materials';
+import {sphereGeometry} from 'margoengine/geometry';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const lods = LODSystem.attach(stage.engine);
+const data = new Uint8Array(4 * 4 * 4).fill(200);
+const map = new Texture({data, width: 4, height: 4});
+const mesh = createMesh(stage.engine, sphereGeometry({radius: 1}), new PbrMaterial({map}));
+const lod = await autoLOD(lods, mesh, {ratios: [0.5, 0.25]}); // levels hang under mesh.root and go with the mesh
+```
+
+The levels are materials meshes of their own: pass each of `lod.levels.slice(1)` to `shadows.add` and the like as you do the source. `simplifyAttributes(geometry, ratios)` does the simplifying alone, on any packed `{vertices, indices}` such as a model's `primitive`. A material swapped on the source later does not reach its levels. A mesh with instances is refused: use `LodInstances` from `margoengine/culling/lod`. Faces mesh-edit cannot take (a third face on an edge, a flipped neighbour) simplify as separate sheets. mesh-edit's limit of 200,000 vertices or faces applies per primitive.

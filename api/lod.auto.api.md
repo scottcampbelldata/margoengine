@@ -6,6 +6,7 @@
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { PBRModel } from "@margoengine/gltf-pro";
+import { Material, MaterialMesh } from "@margoengine/materials";
 import { MutableVec3 } from "@margoengine/math";
 
 export interface AutoLODOptions {
@@ -29,11 +30,22 @@ export interface HierarchicalLODOptions {
     signal?: AbortSignal;
 }
 
-export function autoLOD(system: LODSystem, mesh: Mesh, options?: AutoLODOptions): Promise<LOD>;
+export type LODSource = Mesh | MaterialMesh<Material | readonly Material[]>;
+
+export interface PackedGeometry {
+    vertices: Float32Array;
+    indices: Uint32Array;
+}
+
+export function autoLOD(system: LODSystem, mesh: LODSource, options?: AutoLODOptions): Promise<LOD>;
 
 export function creased(vertices: readonly ArrayLike<number>[], triangles: readonly number[], crease?: number): Geometry;
 
-export function hierarchicalLOD(system: LODSystem, meshes: readonly Mesh[], options: HierarchicalLODOptions): Promise<HierarchicalLOD>;
+export function hierarchicalLOD(system: LODSystem, meshes: readonly LODSource[], options: HierarchicalLODOptions): Promise<HierarchicalLOD>;
+
+export function simplifyAttributes(geometry: PackedGeometry, ratios?: readonly number[], { signal }?: {
+    signal?: AbortSignal;
+}): Promise<PackedGeometry[]>;
 
 // Not exported from this entry, but used by the exports above:
 

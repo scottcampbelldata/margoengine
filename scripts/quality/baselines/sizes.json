@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4836996,
+  "total": 4839655,
   "history": [
     {
       "date": "2026-10-24",
@@ -2042,6 +2042,12 @@
       "commit": "b8278a081",
       "reason": "New webgl entry ./auto: autoEngine chooses WebGPU, the preview or the compatibility layer the app passes as loadCompat",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d4b71faef",
+      "reason": "lod: packed attribute simplifier, materials levels in lod/auto",
+      "grew": 1
     }
   ],
   "items": {
@@ -2289,7 +2295,7 @@
     "@margoengine/loaders/vrml": 5087,
     "@margoengine/loaders/worker": 8571,
     "@margoengine/lod": 11224,
-    "@margoengine/lod/auto": 2165,
+    "@margoengine/lod/auto": 4824,
     "@margoengine/materials": 61113,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,

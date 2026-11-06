@@ -29,6 +29,13 @@ try {
   assert.ok(r.triangles[1] < r.triangles[0] && r.triangles[2] < r.triangles[1], `levels shrink: ${r.triangles}`);
   assert.equal(r.ballNear, 0);
   assert.equal(r.ballFar, 2);
+  const { levels, farNear, farAway } = r.textured;
+  assert.deepEqual(levels.map((l) => l.level), [0, 1, 2], 'a materials mesh walks its levels');
+  for (const l of levels) assert.ok(l.red > 0 && l.green > 0, `every level keeps the texture: ${JSON.stringify(l)}`);
+  assert.equal(farNear.visible, true);
+  assert.equal(farAway.visible, false);
+  assert.equal(farAway.meshes, 1, 'one material, one far mesh');
+  assert.ok(farAway.red > 0 && farAway.green > 0, `the far mesh keeps the texture: ${JSON.stringify(farAway)}`);
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);
   assert.deepEqual(pageErrors, []);
 } finally {

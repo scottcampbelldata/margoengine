@@ -42,9 +42,13 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/materials": "^1.0.0",
     "@margoengine/mesh-edit": "^1.0.0"
   },
   "peerDependenciesMeta": {
+    "@margoengine/materials": {
+      "optional": true
+    },
     "@margoengine/mesh-edit": {
       "optional": true
     }

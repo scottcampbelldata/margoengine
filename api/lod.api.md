@@ -120,6 +120,11 @@ export const frameDirection: (i: number, j: number, n: number) => MutableVec3;
 
 export function frameMatrix(d: Vec3, c: Vec3, r: number, out?: Float32Array<ArrayBuffer>): Float32Array;
 
+export function normalMatrix(m: ArrayLike<number>): {
+    c: number[];
+    mirrored: boolean;
+};
+
 export function octDecode(x: number, y: number): MutableVec3;
 
 export function octEncode(d: Vec3): [number, number];

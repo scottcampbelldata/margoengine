@@ -2566,7 +2566,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-146). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-147). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2655,6 +2655,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | `CascadeParts` and `CascadeInstances` lists | One u32 per slot per cascade, up to the GPU's storage binding size | Each cascade's list can hold every caster | Past the binding size, or on the WebGL2 layer, every cascade draws every caster, as the plain classes do | Use fewer cascades, or split the parts |
 | `LodInstances` | 1 to 4 levels; 96 bytes per instance per level, plus the 96-byte source record | Each level's list can hold every instance, and one thread appends to one of them | Shadows: not cast, as `shadows.add` takes no `LodInstances`. WebGL2 layer: every shown instance draws the first level. Instances of a level draw in no fixed order, which only shows between exactly coplanar faces | Use `CascadeInstances` for casters of the first level |
 | `MeshletMesh` | One mesh, one matrix; twice the mesh index memory on the GPU, plus 40 bytes per cluster | Kept clusters are written to one index buffer for that matrix | Instances of a clustered mesh are not supported. Shadows and picking draw the whole mesh. No Hi-Z per cluster. On the WebGL2 layer the whole mesh draws | Use `CulledParts` for many copies; split a large scene into several `MeshletMesh` |
+| Attributes in generated LOD levels (`autoLOD`, `hierarchicalLOD`, `simplifyAttributes`) | Per primitive: mesh-edit's limit of 200,000 vertices or faces. A level is a subset of the source's vertices, so a position can only be one the source has. Triangles mesh-edit cannot take (a third face on an edge, a flipped neighbour) simplify as separate sheets, up to 4, then alone. | Vertex-subset collapses keep every attribute exact with no interpolation; the price is less accuracy per triangle than placing new vertices. Primitives simplify one at a time, so an open edge between two primitives can slide apart a little. | A core mesh's levels hold positions and normals only, as core geometry does. A materials mesh's levels do not follow a material swapped on the source later, and `shadows.add` takes each level on its own. | Give the source's borders the same vertices in one primitive, or use `Imposter` for the farthest level. |
 
 ## Geometry
 
@@ -3583,6 +3584,7 @@ Three entries were open on the Plaza branches and did not come across when they 
 | A player flying onto new ground was closed with 1008 "too many messages": 38 of 150 bots on the real server, 18 to 28 of 150 locally at the same generator speed | the server holds a client's inputs until the chunks around it exist, while the client runs ahead on chunks it was sent; the 256 message queue limit (12.8 s) counted the server's own backlog against the player, and a wait has no upper bound under load | `5614fb925`: while held, inputs past 256 fold into the last one (at most 60 steps are banked after a wait, the rest only count), and the chunks that hold a player go to the front of the generator queue; over 64 messages a second during a wait, and 256 in a tick outside one, still close the player | `packages/voxel-net/tests/held-inputs.test.js` |
 | Plaza connections were closed after about 15 minutes (first cut at 1,073 s of age: 66 of 100 bots through the CDN, 0 of 40 past it) | not the game or the home line: the first FIN comes from the CDN proxy, and a plain echo server with no Margo code is cut the same way | protocol 4: the server parks a dropped player for 30 s and takes it back on a token, and `connectVoxelNet` and `VoxelBot` resume in place on their own | `packages/voxel-net/tests/resume.test.js`, `resume-client.test.js`, `resume-crowd.test.js` |
 | 1006 closes with no cause on old connections | the same CDN proxy cut as the row above | the same resume; the page plays on through the close | the same tests. Not explained: the one `client-silent` close in the capacity run, which `/metrics` counts as a park of its own kind |
+| Imposters of a subassembly lit rotated parts from the wrong side, mirrored parts inside out; `hierarchicalLOD` far meshes bent normals on stretched sources and turned mirrored sources inside out | `coreModel` applied the transpose of the cofactor matrix and did not negate it for a mirror; the far mesh used the plain matrix and kept the winding | `normalMatrix` in `packages/lod/src/attributes.ts`, used by both, with mirrored triangles rewound | `packages/lod/test/auto.test.js` (normalMatrix) |
 
 ## Fixed 2026-10-26 to 10-28
 
