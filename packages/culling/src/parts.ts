@@ -371,11 +371,11 @@ export class CulledParts extends CulledInstances {
     d.queue.writeBuffer(s.uniforms[cascade], 0, matrix as Float32Array<ArrayBuffer>);
     pass.setPipeline(s.pipeline);
     pass.setBindGroup(0, s.groups[cascade]);
-    this.drawParts(pass);
+    this.drawParts(pass, cascade);
   }
 
   // One draw per batch of all its slots: firstInstance is the flat slot, so instance_index names the part.
-  private drawParts(pass: GPURenderPassEncoder): void {
+  protected drawParts(pass: GPURenderPassEncoder, _cascade?: number): void {
     pass.setVertexBuffer(1, this.buffers.records);
     pass.setVertexBuffer(2, this.buffers.hidden);
     this.batches.forEach((batch, i) => {

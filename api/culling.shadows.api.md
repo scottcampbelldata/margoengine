@@ -85,6 +85,7 @@ class CulledInstances implements EnginePlugin {
         vertex: GPUBuffer;
         index: GPUBuffer;
     }>;
+    protected hiz?: Pyramid;
     static attach(engine: EngineKernel, batches: readonly CulledBatch[], options?: CulledInstancesOptions): CulledInstances;
     constructor(batches: readonly CulledBatch[], { culling, occluderSize, bounds }?: CulledInstancesOptions);
     get count(): number;
@@ -105,7 +106,7 @@ class CulledInstances implements EnginePlugin {
     protected write(i: number, m: ArrayLike<number>): void;
     protected bind(pipeline: GPUComputePipeline | GPURenderPipeline, entries: [number, GPUBindingResource][]): GPUBindGroup;
     protected refine(_c: Context): void;
-    protected mainIndex(_batch: number, index: GPUBuffer): GPUBuffer;
+    protected drawBatch(main: GPURenderPassEncoder, batch: number, index: GPUBuffer): void;
     protected release(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -152,6 +153,7 @@ class CulledParts extends CulledInstances {
         matrix: Float32Array;
         cascade: number;
     }): void;
+    protected drawParts(pass: GPURenderPassEncoder, _cascade?: number): void;
     protected backFaces(batch: number): boolean;
     protected singleSided(batch: number): boolean;
     protected show(i: number, word: number): void;
@@ -268,5 +270,22 @@ interface OccluderSource {
     }[];
     drawOccluder?(context: OccluderContext): void;
     readonly disposed?: boolean;
+}
+
+class Pyramid {
+    width: number;
+    height: number;
+    levels: number;
+    buffer?: GPUBuffer;
+    readonly pass: GPURenderPassDescriptor;
+    constructor(device: GPUDevice, samples: number, pipelines: {
+        depth0: GPUComputePipeline;
+        reduce: GPUComputePipeline;
+    }, uniform: GPUBuffer, table: GPUBuffer,
+    words: Uint32Array);
+    resize(width: number, height: number): void;
+    plan(width: number, height: number): number;
+    encode(pass: GPUComputePassEncoder, width: number, height: number): void;
+    destroy(): void;
 }
 ```

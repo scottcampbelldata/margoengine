@@ -3,11 +3,14 @@ import type { Geometry, PassContext } from '@margoengine/core/extension';
 import { compatTier } from '../../shared/compat.js';
 import type { CulledInstancesOptions } from './index.js';
 import { CulledParts, type CulledPartsBatch } from './parts.js';
+import { exactShader } from './pyramid.js';
+import { occlusionCode } from './shaders.js';
 
 declare const GPUBufferUsage: {
   COPY_DST: number;
   COPY_SRC: number;
   INDEX: number;
+  INDIRECT: number;
   MAP_READ: number;
   STORAGE: number;
   UNIFORM: number;
@@ -148,64 +151,97 @@ function clusterBounds(vertices: Float32Array, indices: Uint32Array, from: numbe
   out.push(c[0], c[1], c[2], radius, axis[0], axis[1], axis[2], cosine > 0 ? Math.sqrt(1 - cosine * cosine) : -1);
 }
 
-// One workgroup per cluster: its first thread tests the cluster and reserves room, then all copy its indices. Local-space
-// tests hold under any affine matrix of positive determinant; a triangle's side of its plane does not change.
-const shader = `
+// One workgroup per cluster and part: its first thread tests the cluster and reserves room in the part's region, then all
+// copy its indices. Local-space tests hold under any affine matrix of positive determinant; a triangle's side of its plane
+// does not change. `live` says which parts run: the camera's kernel reads the count of parts kept, a shadow kernel their
+// hidden words. Each part's indices sit in a region of their own, so a part draws with one indirect call.
+const clusterShader = (shadow: boolean, occlusion: boolean): string => `
 struct Frame {planes:array<vec4f,6>,eye:vec4f,size:vec4u}
 struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
 @group(0) @binding(0) var<uniform> f:Frame;
-@group(0) @binding(1) var<storage,read> records:array<Record>;
+@group(0) @binding(1) var<storage,read> parts:array<Record>;
 @group(0) @binding(2) var<storage,read> bounds:array<vec4f>;
 @group(0) @binding(3) var<storage,read> ranges:array<vec2u>;
 @group(0) @binding(4) var<storage,read> indices:array<u32>;
 @group(0) @binding(5) var<storage,read_write> kept:array<u32>;
 @group(0) @binding(6) var<storage,read_write> args:array<atomic<u32>>;
+@group(0) @binding(7) var<storage,read> live:array<u32>;
+${
+  occlusion
+    ? `struct Cull {camera:mat4x4f,planes:array<vec4f,6>,size:vec4u,mode:vec4u,levels:array<vec4u,16>}
+@group(0) @binding(8) var<uniform> u:Cull;
+@group(0) @binding(9) var<storage,read> hiz:array<f32>;
+${occlusionCode}`
+    : ''
+}
 var<workgroup> base:u32;
-fn keep(n:u32)->bool {
-  let m=records[0].m;let s=bounds[n*2u];let c=(m*vec4f(s.xyz,1.0)).xyz;
+fn keep(n:u32,m:mat4x4f)->bool {
+  let s=bounds[n*2u];let c=(m*vec4f(s.xyz,1.0)).xyz;
   var r=s.w*sqrt(max(dot(m[0].xyz,m[0].xyz),max(dot(m[1].xyz,m[1].xyz),dot(m[2].xyz,m[2].xyz))));
   r+=1e-5*(length(c)+r);
   for(var p=0u;p<6u;p++){if(dot(f.planes[p].xyz,c)+f.planes[p].w< -r){return false;}}
+  ${occlusion ? 'if(f.size.z!=0u&&!unoccluded(vec4f(c,r))){return false;}' : ''}
   let cone=bounds[n*2u+1u];
   if(f.eye.w==0.0||cone.w<0.0){return true;}
+  // The eye in the mesh's own space, by the cofactors of the matrix; a mirrored part has no cone test.
+  let a=m[0].xyz;let b=m[1].xyz;let e=m[2].xyz;let x=cross(b,e);let det=dot(a,x);
+  if(det<=0.0){return true;}
+  let q=f.eye.xyz-m[3].xyz;let eye=vec3f(dot(x,q),dot(cross(e,a),q),dot(cross(a,b),q))/det;
   // Every point of the sphere lies behind every plane of the cone's normals: all its triangles face away.
-  let d=s.xyz-f.eye.xyz;let l=length(d);
+  let d=s.xyz-eye;let l=length(d);
   if(l<=s.w){return true;}
   let along=dot(d,cone.xyz);let aside=sqrt(max(l*l-along*along,0.0));
   let cosine=sqrt(1.0-cone.w*cone.w);
   return along*cosine-aside*cone.w<=s.w*(1.0+1e-4)+1e-5*l;
 }
 @compute @workgroup_size(64) fn cull(@builtin(workgroup_id) w:vec3u,@builtin(local_invocation_index) l:u32) {
-  let n=w.y*65535u+w.x;
-  if(n>=f.size.x){return;}
-  let range=ranges[n];
-  if(l==0u){base=0xffffffffu;if(keep(n)){base=atomicAdd(&args[0],range.y);}}
+  let n=w.y*65535u+w.x;let j=w.z;
+  if(n>=f.size.x||${shadow ? 'live[j]!=0u' : 'j>=live[1]'}){return;}
+  let slot=f.size.w+j;let range=ranges[n];
+  if(l==0u){base=0xffffffffu;if(keep(n,parts[j].m)){base=atomicAdd(&args[slot*5u],range.y);}}
   let at=workgroupUniformLoad(&base);
   if(at==0xffffffffu){return;}
-  for(var k=l;k<range.y;k+=64u){kept[at+k]=indices[range.x+k];}
+  for(var k=l;k<range.y;k+=64u){kept[slot*f.size.y+at+k]=indices[range.x+k];}
 }
 `;
 
 /** {@link MeshletMesh} settings. */
 export interface MeshletMeshOptions extends CulledInstancesOptions, MeshletOptions {}
 
+/** One list of kept clusters per part, for the camera or for the cascades of a shadow pass. */
+interface ClusterLists {
+  kept: GPUBuffer;
+  args: GPUBuffer;
+  /** What `args` starts each frame from: nothing kept, one instance, each part's region. */
+  reset: GPUBuffer;
+}
+
 /**
- * One large mesh drawn cluster by cluster: each frame a compute pass tests every cluster against the frustum and, for
- * single-sided materials under a perspective camera, against a cone of its normals, then writes the kept clusters' indices
- * into an index buffer the main pass draws. A {@link CulledParts} of one part: picking, shadows and whole-part culling work
- * as they do there, and draw the whole mesh.
+ * One large mesh drawn cluster by cluster, one or many times: each frame a compute pass tests every cluster of every part
+ * the part cull kept against the frustum, for `'occlusion'` culling against the Hi-Z pyramid, and for single-sided materials
+ * under a perspective camera against a cone of its normals, then writes the kept clusters' indices into that part's
+ * region of an index buffer the main pass draws, one indirect draw per part. Shadow cascades do the same against each
+ * light box, so a shadow pass draws only the clusters in it. A {@link CulledParts} of one batch: picking and whole-part
+ * culling work as they do there, and a pick draws the whole mesh. The regions hold the mesh's indices once per part.
  */
 export class MeshletMesh extends CulledParts {
   /** The clusters. */
   readonly meshlets: Meshlets;
-  private clusters?: {
+  private clusters?: ClusterLists & {
     frame: GPUBuffer;
     bounds: GPUBuffer;
     ranges: GPUBuffer;
     indices: GPUBuffer;
-    kept: GPUBuffer;
     pipeline: GPUComputePipeline;
-    group: GPUBindGroup;
+    group?: GPUBindGroup;
+    pyramid?: GPUBuffer;
+  };
+  private shadowClusters?: ClusterLists & {
+    frames: GPUBuffer;
+    pipeline: GPUComputePipeline;
+    groups: GPUBindGroup[];
+    /** Cascades whose lists this frame's `prepareShadow` wrote. */
+    cascades: number;
   };
   private readonly clusterValues = new ArrayBuffer(144);
   private readonly clusterFloats = new Float32Array(this.clusterValues);
@@ -220,27 +256,56 @@ export class MeshletMesh extends CulledParts {
     engine.use(value);
     return value;
   }
-  /** @throws RangeError unless `batches` holds one batch of one part: clusters are kept for one matrix. */
+  /** @throws RangeError unless `batches` holds one batch: one mesh, drawn once per part of it. */
   constructor(batches: readonly CulledPartsBatch[], { maxVertices, maxTriangles, ...options }: MeshletMeshOptions = {}) {
-    if (batches?.length !== 1 || batches[0].transforms?.length !== 16)
-      throw new RangeError('Invalid MeshletMesh; pass one batch of one part');
+    if (batches?.length !== 1) throw new RangeError('Invalid MeshletMesh; pass one batch, one mesh with its parts');
     super(batches, options);
     this.meshlets = buildMeshlets(batches[0].geometry, { maxVertices, maxTriangles });
   }
-  /** Indices the last frame kept, as triangles. A GPU readback; for tests and tools. */
+  /** Indices the last frame kept over all parts, as triangles. A GPU readback; for tests and tools. */
   async readTriangles(): Promise<number> {
-    const d = this.device,
-      args = this.buffers.args;
+    return this.readKept(this.clusters?.args, 0, this.slots);
+  }
+  /** As {@link readTriangles}, for one cascade of the last shadow frame. */
+  async readShadowTriangles(cascade: number): Promise<number> {
+    return this.readKept(this.shadowClusters?.args, cascade * this.slots, this.slots);
+  }
+  private async readKept(args: GPUBuffer | undefined, first: number, count: number): Promise<number> {
+    const d = this.device;
     if (!d || !args) return 0;
-    const staging = d.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+    const staging = d.createBuffer({ size: count * 20, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
       encoder = d.createCommandEncoder();
-    encoder.copyBufferToBuffer(args, 0, staging, 0, 4);
+    encoder.copyBufferToBuffer(args, first * 20, staging, 0, count * 20);
     d.queue.submit([encoder.finish()]);
     await staging.mapAsync(GPUMapMode.READ);
-    const count = new Uint32Array(staging.getMappedRange())[0] / 3;
+    const words = new Uint32Array(staging.getMappedRange());
+    let indices = 0;
+    for (let i = 0; i < count; i++) indices += words[i * 5];
     staging.unmap();
     staging.destroy();
-    return count;
+    return indices / 3;
+  }
+  /** Regions and draw arguments for `lists` lists of every part. */
+  private lists(d: GPUDevice, lists: number): ClusterLists {
+    const region = this.meshlets.indices.length,
+      parts = lists * this.slots,
+      bytes = parts * region * 4;
+    if (bytes > d.limits.maxStorageBufferBindingSize)
+      throw new RangeError(
+        `MeshletMesh needs ${bytes} bytes for its kept clusters, over this device's ${d.limits.maxStorageBufferBindingSize}; use fewer parts or split the mesh`,
+      );
+    const start = new Uint32Array(parts * 5);
+    for (let i = 0; i < parts; i++) start.set([0, 1, i * region, 0, 0], i * 5);
+    const reset = d.createBuffer({ size: start.byteLength, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+    d.queue.writeBuffer(reset, 0, start);
+    return {
+      kept: d.createBuffer({ size: Math.max(bytes, 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDEX }),
+      args: d.createBuffer({
+        size: start.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+      }),
+      reset,
+    };
   }
   private buildClusters(d: GPUDevice): NonNullable<MeshletMesh['clusters']> {
     const { bounds: b, ranges: r, indices: i } = this.meshlets,
@@ -250,80 +315,181 @@ export class MeshletMesh extends CulledParts {
         const buffer = d.createBuffer({ size: Math.max(values.byteLength, 4), usage: S | C });
         d.queue.writeBuffer(buffer, 0, values as Uint32Array<ArrayBuffer>);
         return buffer;
-      },
-      frame = d.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | C }),
-      bounds = data(b),
-      ranges = data(r),
-      indices = data(i),
-      kept = d.createBuffer({ size: Math.max(i.byteLength, 4), usage: S | GPUBufferUsage.INDEX }),
-      pipeline = d.createComputePipeline({
+      };
+    return {
+      ...this.lists(d, 1),
+      frame: d.createBuffer({ size: 144, usage: GPUBufferUsage.UNIFORM | C }),
+      bounds: data(b),
+      ranges: data(r),
+      indices: data(i),
+      pipeline: d.createComputePipeline({
         layout: 'auto',
-        compute: { module: d.createShaderModule({ code: shader }), entryPoint: 'cull' },
+        compute: {
+          module: d.createShaderModule({ code: clusterShader(false, this.culling === 'occlusion') }),
+          entryPoint: 'cull',
+        },
       }),
-      entry = (binding: number, buffer: GPUBuffer) => ({ binding, resource: { buffer } }),
-      group = d.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          entry(0, frame),
-          entry(1, this.buffers.records),
-          entry(2, bounds),
-          entry(3, ranges),
-          entry(4, indices),
-          entry(5, kept),
-          entry(6, this.buffers.args),
-        ],
-      });
-    return { frame, bounds, ranges, indices, kept, pipeline, group };
+    };
   }
-  /** The camera in the mesh's own space, or 0 in `w` when no cone test applies. */
-  private eye(c: Context, out: Float32Array): void {
-    const m = this.records,
-      p = c.camera.position,
-      x = p[0] - m[12],
-      y = p[1] - m[13],
-      z = p[2] - m[14],
-      // Cofactors of the 3x3.
-      a = m[5] * m[10] - m[9] * m[6],
-      b = m[9] * m[2] - m[1] * m[10],
-      e = m[1] * m[6] - m[5] * m[2],
-      f = m[8] * m[6] - m[4] * m[10],
-      g = m[0] * m[10] - m[8] * m[2],
-      h = m[4] * m[2] - m[0] * m[6],
-      i = m[4] * m[9] - m[8] * m[5],
-      j = m[8] * m[1] - m[0] * m[9],
-      k = m[0] * m[5] - m[4] * m[1],
-      det = m[0] * a + m[4] * b + m[8] * e;
-    out[0] = (a * x + f * y + i * z) / det;
-    out[1] = (b * x + g * y + j * z) / det;
-    out[2] = (e * x + h * y + k * z) / det;
-    // Back faces are discarded only on a single-sided batch; an orthographic camera has no eye point.
-    const v = c.camera.matrix;
-    out[3] = det > 0 && !this.backFaces(0) && (v[3] || v[7] || v[11]) ? 1 : 0;
+  /** The bindings both kernels share. */
+  private entries(
+    frame: GPUBindingResource,
+    parts: GPUBuffer,
+    live: GPUBuffer,
+    { kept, args }: ClusterLists,
+  ): GPUBindGroupEntry[] {
+    const s = this.clusters!,
+      entry = (binding: number, buffer: GPUBuffer) => ({ binding, resource: { buffer } });
+    return [
+      { binding: 0, resource: frame },
+      entry(1, parts),
+      entry(2, s.bounds),
+      entry(3, s.ranges),
+      entry(4, s.indices),
+      entry(5, kept),
+      entry(6, args),
+      entry(7, live),
+    ];
+  }
+  /** The camera's bind group, new when the Hi-Z pyramid has a new buffer. */
+  private cameraGroup(d: GPUDevice): GPUBindGroup {
+    const s = this.clusters!,
+      pyramid = this.culling === 'occlusion' ? this.hiz!.buffer! : undefined;
+    if (s.group && s.pyramid === pyramid) return s.group;
+    s.pyramid = pyramid;
+    return (s.group = d.createBindGroup({
+      layout: s.pipeline.getBindGroupLayout(0),
+      entries: [
+        ...this.entries({ buffer: s.frame }, this.buffers.drawn, this.buffers.args, s),
+        ...(pyramid
+          ? [
+              { binding: 8, resource: { buffer: this.buffers.uniform } },
+              { binding: 9, resource: { buffer: pyramid } },
+            ]
+          : []),
+      ],
+    }));
+  }
+  private dispatch(c: GPUCommandEncoder, pipeline: GPUComputePipeline, group: GPUBindGroup): void {
+    const n = this.meshlets.count,
+      pass = c.beginComputePass();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, group);
+    pass.dispatchWorkgroups(Math.min(n, 65535), Math.ceil(n / 65535), this.slots);
+    pass.end();
   }
   protected override refine(c: Context): void {
     if (compatTier(c.device) === 'webgl2') return;
     const d = c.device,
       s = (this.clusters ??= this.buildClusters(d)),
       f = this.clusterFloats,
-      n = this.meshlets.count;
+      w = this.clusterWords,
+      v = c.camera.matrix;
     f.set(c.camera.planes);
-    this.eye(c, f.subarray(24, 28));
-    this.clusterWords[28] = n;
+    f.set(c.camera.position.slice(0, 3), 24);
+    // Back faces are discarded only on a single-sided batch; an orthographic camera has no eye point.
+    f[27] = !this.backFaces(0) && (v[3] || v[7] || v[11]) ? 1 : 0;
+    w[28] = this.meshlets.count;
+    w[29] = this.meshlets.indices.length;
+    w[30] = this.culling === 'occlusion' && exactShader(c.shader) ? 1 : 0;
+    w[31] = 0;
     d.queue.writeBuffer(s.frame, 0, this.clusterValues);
-    c.encoder.clearBuffer(this.buffers.args, 0, 4);
-    const pass = c.encoder.beginComputePass();
-    pass.setPipeline(s.pipeline);
-    pass.setBindGroup(0, s.group);
-    pass.dispatchWorkgroups(Math.min(n, 65535), Math.ceil(n / 65535));
-    pass.end();
+    c.encoder.copyBufferToBuffer(s.reset, 0, s.args, 0, this.slots * 20);
+    this.dispatch(c.encoder, s.pipeline, this.cameraGroup(d));
   }
-  protected override mainIndex(batch: number, index: GPUBuffer): GPUBuffer {
-    return this.clusters?.kept ?? index;
+  protected override drawBatch(main: GPURenderPassEncoder, batch: number, index: GPUBuffer): void {
+    const s = this.clusters;
+    if (!s) {
+      super.drawBatch(main, batch, index);
+      return;
+    }
+    main.setIndexBuffer(s.kept, 'uint32');
+    // An indirect draw's firstInstance needs a feature, so each part's record comes by the buffer's offset.
+    for (let j = 0; j < this.slots; j++) {
+      main.setVertexBuffer(1, this.buffers.drawn, j * 96);
+      main.drawIndexedIndirect(s.args, j * 20);
+    }
+  }
+  /** Keeps, per cascade and part, the clusters inside that cascade's light box. `shadows.add(mesh)` calls it. */
+  prepareShadow({
+    context,
+    matrices,
+    cascades,
+  }: {
+    context: { device: GPUDevice; encoder: GPUCommandEncoder };
+    matrices: Float32Array;
+    cascades: number;
+  }): void {
+    const d = context.device;
+    if (!this.device || compatTier(d) === 'webgl2') return;
+    this.clusters ??= this.buildClusters(d);
+    let s = this.shadowClusters;
+    if (!s) {
+      const lists = this.lists(d, 4),
+        pipeline = d.createComputePipeline({
+          layout: 'auto',
+          compute: { module: d.createShaderModule({ code: clusterShader(true, false) }), entryPoint: 'cull' },
+        }),
+        frames = d.createBuffer({ size: 4 * 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        groups = [0, 1, 2, 3].map((k) =>
+          d.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: this.entries(
+              { buffer: frames, offset: k * 256, size: 144 },
+              this.buffers.records,
+              this.buffers.hidden,
+              lists,
+            ),
+          }),
+        );
+      s = this.shadowClusters = { ...lists, frames, pipeline, groups, cascades: 0 };
+    }
+    this.flush(d);
+    const f = this.clusterFloats,
+      w = this.clusterWords;
+    context.encoder.copyBufferToBuffer(s.reset, 0, s.args, 0, cascades * this.slots * 20);
+    for (let k = 0; k < cascades; k++) {
+      const m = matrices.subarray(k * 16, k * 16 + 16);
+      // The six planes of a clip box with depth from 0 to 1, from the rows of the matrix.
+      for (let p = 0; p < 6; p++) {
+        const row = p >> 1,
+          sign = p & 1 ? -1 : 1,
+          plane = [0, 1, 2, 3].map((c) =>
+            p === 4 ? m[c * 4 + 2] : m[c * 4 + 3] + sign * m[c * 4 + (row === 2 ? 2 : row)],
+          ),
+          size = Math.hypot(plane[0], plane[1], plane[2]) || 1;
+        for (let c = 0; c < 4; c++) f[p * 4 + c] = plane[c] / size;
+      }
+      f.fill(0, 24, 28);
+      w[28] = this.meshlets.count;
+      w[29] = this.meshlets.indices.length;
+      w[30] = 0;
+      w[31] = k * this.slots;
+      d.queue.writeBuffer(s.frames, k * 256, this.clusterValues);
+      this.dispatch(context.encoder, s.pipeline, s.groups[k]);
+    }
+    s.cascades = cascades;
+  }
+  protected override drawParts(pass: GPURenderPassEncoder, cascade?: number): void {
+    const s = this.shadowClusters;
+    if (cascade === undefined || !s || cascade >= s.cascades) {
+      super.drawParts(pass);
+      return;
+    }
+    pass.setVertexBuffer(0, this.geometryBuffers.get(this.batches[0].geometry)!.vertex);
+    pass.setIndexBuffer(s.kept, 'uint32');
+    for (let j = 0; j < this.slots; j++) {
+      pass.setVertexBuffer(1, this.buffers.records, j * 96);
+      pass.setVertexBuffer(2, this.buffers.hidden, j * 4);
+      pass.drawIndexedIndirect(s.args, (cascade * this.slots + j) * 20);
+    }
   }
   protected override release(): void {
-    const s = this.clusters;
-    if (s) for (const buffer of [s.frame, s.bounds, s.ranges, s.indices, s.kept]) buffer.destroy();
-    this.clusters = undefined;
+    const s = this.clusters,
+      h = this.shadowClusters;
+    if (s) for (const buffer of [s.frame, s.bounds, s.ranges, s.indices, s.kept, s.args, s.reset]) buffer.destroy();
+    if (h) for (const buffer of [h.frames, h.kept, h.args, h.reset]) buffer.destroy();
+    this.clusters = this.shadowClusters = undefined;
     super.release();
   }
 }

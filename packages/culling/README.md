@@ -261,7 +261,8 @@ cast no shadows through this class, and the WebGL2 layer draws every shown insta
 ## One large mesh, cluster by cluster: `MeshletMesh`
 
 `MeshletMesh` from `margoengine/culling/meshlets` splits one mesh into clusters of neighbouring triangles. Each frame a compute
-pass tests every cluster against the frustum and against a cone of its normals, and the main pass draws only the kept clusters.
+pass tests every cluster of every part against the frustum, against a cone of its normals and, with `culling: 'occlusion'`,
+against the Hi-Z pyramid, and the main pass draws only the kept clusters.
 Clusters facing away are dropped only when the back-face discard would drop their triangles anyway: a single-sided material, a
 perspective camera, no mirroring. The image does not change.
 
@@ -280,9 +281,18 @@ const mesh = MeshletMesh.attach(engine, [
 mesh.setTransform(0, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 1]);
 ```
 
-It takes one batch of one part. `maxVertices` (default 64) and `maxTriangles` (124) set the cluster size, next to the options of
-`CulledParts`, whose picking, shadows and part culling it keeps; those draw the whole mesh. `buildMeshlets(geometry)` gives the
-clusters alone. `readTriangles()` resolves how many triangles the last frame kept. The WebGL2 layer draws the whole mesh.
+It takes one batch, of as many parts as you like: each part is a copy of the mesh with its own matrix and material, culled
+cluster by cluster on its own, and drawn with one indirect call. Each part holds a region of the mesh's indices, so copies
+cost index memory, and a device limit refuses too many: `CulledParts` draws many small copies for less.
+
+`culling: 'occlusion'` adds the Hi-Z test per cluster, so a wall hides the part of a mesh behind it and a mesh hides its own
+far side. The depth comes from `addOccluder` sources and from whole parts drawn as occluders first, which is a depth draw of a
+whole part. `shadows.add(mesh)` culls per cascade too: each cascade draws only the clusters inside its light box, in a list of
+its own, so four cascades hold four more regions per part. A pick draws the whole mesh.
+
+`maxVertices` (default 64) and `maxTriangles` (124) set the cluster size, next to the options of `CulledParts`, whose picking and
+part culling it keeps. `buildMeshlets(geometry)` gives the clusters alone. `readTriangles()` resolves how many triangles the last
+frame kept over all parts, and `readShadowTriangles(cascade)` the same for a shadow pass. The WebGL2 layer draws the whole mesh.
 
 
 ## Moving objects: `DynamicInstances`

@@ -36,6 +36,14 @@ try {
       assert.equal(n, 0, `${r.label}: frame differs from core`);
       assert.ok(r.kept > 0 && r.kept < r.total, `${r.label}: clusters drop triangles (${r.kept})`);
     }
+    for (const name of ['instances', 'occlusion', 'shadowed']) {
+      const r = await page.evaluate((n) => window.check[n](), name),
+        [a, b] = [await shot('a'), await shot('b')],
+        n = differing(a, b);
+      console.log(`${r.label}: ${n} differ, ${r.kept} of ${r.total} triangles, ${r.clusters} clusters`);
+      assert.equal(n, 0, `${r.label}: frame differs from core`);
+      assert.ok(r.kept > 0 && r.kept < r.total, `${r.label}: clusters drop triangles (${r.kept})`);
+    }
     assert.deepEqual(await page.evaluate(() => window.check.errors), []);
     assert.deepEqual(pageErrors, []);
   } finally {

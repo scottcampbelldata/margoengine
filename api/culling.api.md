@@ -33,6 +33,7 @@ export class CulledInstances implements EnginePlugin {
         vertex: GPUBuffer;
         index: GPUBuffer;
     }>;
+    protected hiz?: Pyramid;
     static attach(engine: EngineKernel, batches: readonly CulledBatch[], options?: CulledInstancesOptions): CulledInstances;
     constructor(batches: readonly CulledBatch[], { culling, occluderSize, bounds }?: CulledInstancesOptions);
     get count(): number;
@@ -53,7 +54,7 @@ export class CulledInstances implements EnginePlugin {
     protected write(i: number, m: ArrayLike<number>): void;
     protected bind(pipeline: GPUComputePipeline | GPURenderPipeline, entries: [number, GPUBindingResource][]): GPUBindGroup;
     protected refine(_c: Context): void;
-    protected mainIndex(_batch: number, index: GPUBuffer): GPUBuffer;
+    protected drawBatch(main: GPURenderPassEncoder, batch: number, index: GPUBuffer): void;
     protected release(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -141,4 +142,21 @@ export interface OccluderSource {
 type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+class Pyramid {
+    width: number;
+    height: number;
+    levels: number;
+    buffer?: GPUBuffer;
+    readonly pass: GPURenderPassDescriptor;
+    constructor(device: GPUDevice, samples: number, pipelines: {
+        depth0: GPUComputePipeline;
+        reduce: GPUComputePipeline;
+    }, uniform: GPUBuffer, table: GPUBuffer,
+    words: Uint32Array);
+    resize(width: number, height: number): void;
+    plan(width: number, height: number): number;
+    encode(pass: GPUComputePassEncoder, width: number, height: number): void;
+    destroy(): void;
+}
 ```

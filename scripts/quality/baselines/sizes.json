@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8953307,
+  "total": 8937688,
   "history": [
     {
       "date": "2026-10-24",
@@ -2708,6 +2708,12 @@
       "commit": "ea67e75ab",
       "reason": "gltf-pro: the KHR_gaussian_splatting reader hook, model.splats and new entry /splats; splats: splatsFromAttributes exported, flat splat floor",
       "grew": 7
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d34fd6c26",
+      "reason": "MeshletMesh gains parts, Hi-Z per cluster and per-cascade shadow lists, the B12 gap; these are the job, in an optional entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2828,7 +2834,7 @@
     "@margoengine/culling": 14096,
     "@margoengine/culling/dynamic": 7461,
     "@margoengine/culling/lod": 4010,
-    "@margoengine/culling/meshlets": 16974,
+    "@margoengine/culling/meshlets": 18048,
     "@margoengine/culling/models": 9657,
     "@margoengine/culling/parts": 15027,
     "@margoengine/culling/shadows": 20972,

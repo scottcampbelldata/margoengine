@@ -66,13 +66,17 @@ test('a triangle with a repeated vertex counts its vertices once', () => {
   assert.equal(buildMeshlets(g, { maxVertices: 3 }).count, 2);
 });
 
-test('bad limits and more than one part are refused', () => {
+test('bad limits and more than one batch are refused', () => {
   assert.throws(() => buildMeshlets(grid(1), { maxVertices: 2 }), /maxVertices/);
   assert.throws(() => buildMeshlets(grid(1), { maxTriangles: 0 }), /maxTriangles/);
   const material = new PbrMaterial();
   assert.throws(
-    () => new MeshletMesh([{ geometry: box(), material, transforms: new Float32Array([...identity, ...identity]) }]),
-    /one batch of one part/,
+    () =>
+      new MeshletMesh([
+        { geometry: box(), material, transforms: new Float32Array(identity) },
+        { geometry: box(), material, transforms: new Float32Array(identity) },
+      ]),
+    /pass one batch/,
   );
 });
 
@@ -103,8 +107,8 @@ test('the main pass draws the kept indices; the cone test is on for a single-sid
     m = mesh();
   h.engine.use(m);
   h.engine.frameGraph.execute(h.context);
-  assert.ok(h.pipelines.some((p) => /fn keep\(n:u32\)/.test(p.compute?.module.code ?? '')));
-  assert.equal(m.mainIndex(0, 'plain') === 'plain', false);
+  assert.ok(h.pipelines.some((p) => /fn keep\(n:u32,m:mat4x4f\)/.test(p.compute?.module.code ?? '')));
+  assert.ok(m.clusters.kept, 'the kept indices are drawn');
   assert.equal(coneTest(m), 1);
   const both = mesh(true);
   h.engine.use(both);
@@ -112,13 +116,75 @@ test('the main pass draws the kept indices; the cone test is on for a single-sid
   assert.equal(coneTest(both), 0, 'a double-sided mesh draws its back faces');
 });
 
-test('the eye reaches the cone test in the mesh space, through any matrix', () => {
+test('the kernel gets the eye in the world and finds it in each part\'s own space', () => {
   const h = harness(),
     m = mesh();
   h.engine.use(m);
   m.setTransform(0, 0, [2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 2, 0, 1, 0, 1, 1]);
   h.engine.frameGraph.execute(h.context);
-  assert.deepEqual([...new Float32Array(m.clusterValues).subarray(24, 27)], [-0.5, 0, 2]);
+  assert.deepEqual([...new Float32Array(m.clusterValues).subarray(24, 27)], [0, 0, 5]);
+  assert.ok(h.pipelines.some((p) => /cross\(e,a\)/.test(p.compute?.module.code ?? '')));
+});
+
+test('parts: one region and one indirect draw each, over the device limit refused', () => {
+  const h = harness(),
+    geometry = box(),
+    material = new PbrMaterial(),
+    m = new MeshletMesh([{ geometry, material, transforms: new Float32Array([...identity, ...identity, ...identity]) }]);
+  h.engine.use(m);
+  h.engine.frameGraph.execute(h.context);
+  assert.equal(m.clusters.kept.size, geometry.indices.length * 3 * 4);
+  assert.equal(m.clusters.args.size, 3 * 20);
+  const over = new MeshletMesh([{ geometry, material, transforms: new Float32Array(identity) }]);
+  h.engine.use(over);
+  const limits = h.engine.gpu.limits;
+  h.engine.gpu.limits = { ...limits, maxStorageBufferBindingSize: 8 };
+  assert.throws(() => h.engine.frameGraph.execute(h.context), /use fewer parts/);
+  h.engine.gpu.limits = limits;
+});
+
+test('occlusion culling compiles the Hi-Z test into the cluster kernel, frustum culling leaves it out', () => {
+  const plain = harness(),
+    m = mesh();
+  plain.engine.use(m);
+  plain.engine.frameGraph.execute(plain.context);
+  assert.ok(!plain.pipelines.some((p) => /unoccluded\(vec4f\(c,r\)\)/.test(p.compute?.module.code ?? '')));
+  const h = harness(),
+    culled = new MeshletMesh(
+      [{ geometry: box(), material: new PbrMaterial(), transforms: new Float32Array(identity) }],
+      { culling: 'occlusion' },
+    );
+  h.engine.use(culled);
+  h.engine.frameGraph.execute(h.context);
+  assert.ok(h.pipelines.some((p) => /unoccluded\(vec4f\(c,r\)\)/.test(p.compute?.module.code ?? '')));
+});
+
+test('a shadow frame writes clip-box planes per cascade, and a frame without one draws the whole mesh', () => {
+  const h = harness(),
+    m = mesh();
+  h.engine.use(m);
+  h.engine.frameGraph.execute(h.context);
+  const draws = [],
+    pass = {
+      setVertexBuffer() {},
+      setIndexBuffer: (buffer) => draws.push(buffer),
+      drawIndexed: () => draws.push('whole'),
+      drawIndexedIndirect: () => draws.push('clusters'),
+    };
+  m.drawParts(pass, 0);
+  assert.ok(draws.includes('whole'));
+  const scale = new Float32Array([0.5, 0, 0, 0, 0, 0.5, 0, 0, 0, 0, 0.25, 0, 0, 0, 0.5, 1]);
+  m.prepareShadow({ context: { device: h.engine.gpu, encoder: h.context.encoder }, matrices: scale, cascades: 1 });
+  const planes = new Float32Array(m.clusterValues).subarray(0, 24);
+  assert.deepEqual([...planes.subarray(0, 4)].map((v) => +v.toFixed(5)), [1, 0, 0, 2], 'x >= -2');
+  assert.deepEqual([...planes.subarray(16, 20)].map((v) => +v.toFixed(5)), [0, 0, 1, 2], 'depth >= 0');
+  assert.deepEqual([...planes.subarray(20, 24)].map((v) => +v.toFixed(5)), [0, 0, -1, 2], 'depth <= 1');
+  draws.length = 0;
+  m.drawParts(pass, 0);
+  assert.ok(draws.includes('clusters') && !draws.includes('whole'));
+  draws.length = 0;
+  m.drawParts(pass);
+  assert.ok(draws.includes('whole'), 'a pick draws the whole mesh');
 });
 
 test('a perspective camera looking along x keeps its cone test', () => {
@@ -144,6 +210,6 @@ test('on the WebGL2 layer the whole mesh draws through its own index buffer', ()
     m = mesh();
   h.engine.use(m);
   h.engine.frameGraph.execute(h.context);
-  assert.equal(m.mainIndex(0, 'plain'), 'plain');
-  assert.ok(!h.pipelines.some((p) => /fn keep\(n:u32\)/.test(p.compute?.module.code ?? '')));
+  assert.equal(m.clusters, undefined);
+  assert.ok(!h.pipelines.some((p) => /fn keep\(n:u32/.test(p.compute?.module.code ?? '')));
 });

@@ -111,7 +111,7 @@ export class CulledInstances implements EnginePlugin {
   };
   private prepass?: { plain: GPURenderPipeline; sided: GPURenderPipeline };
   private groups: Record<string, GPUBindGroup> = {};
-  private hiz?: Pyramid;
+  protected hiz?: Pyramid;
   private samples = 0;
   private outside?: OccluderList;
   // The main pass draws with core's pipeline state; single-sided batches without mirrored parts use its back-culled
@@ -623,17 +623,18 @@ export class CulledInstances implements EnginePlugin {
       }
       const g = this.geometryBuffers.get(batch.geometry)!;
       main.setVertexBuffer(0, g.vertex);
-      main.setVertexBuffer(1, b.drawn, this.starts[i] * 96);
-      main.setIndexBuffer(this.mainIndex(i, g.index), 'uint32');
-      main.drawIndexedIndirect(b.args, i * 20);
+      this.drawBatch(main, i, g.index);
     });
     main.end();
   }
   /** Runs after the parts are culled and before the main pass; see `./meshlets`. */
   protected refine(_c: Context): void {}
-  /** The index buffer the main pass draws a batch with. */
-  protected mainIndex(_batch: number, index: GPUBuffer): GPUBuffer {
-    return index;
+  /** Draws a batch in the main pass, its vertices bound; `./meshlets` draws each part's kept clusters instead. */
+  protected drawBatch(main: GPURenderPassEncoder, batch: number, index: GPUBuffer): void {
+    const b = this.buffers;
+    main.setVertexBuffer(1, b.drawn, this.starts[batch] * 96);
+    main.setIndexBuffer(index, 'uint32');
+    main.drawIndexedIndirect(b.args, batch * 20);
   }
   protected release(): void {
     this.route = undefined;
