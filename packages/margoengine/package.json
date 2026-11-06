@@ -1098,6 +1098,14 @@
       "types": "./dist/loaders/vdb.d.ts",
       "import": "./dist/loaders/vdb.js"
     },
+    "./loaders/materialx": {
+      "types": "./dist/loaders/materialx.d.ts",
+      "import": "./dist/loaders/materialx.js"
+    },
+    "./loaders/lottie": {
+      "types": "./dist/loaders/lottie.d.ts",
+      "import": "./dist/loaders/lottie.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"

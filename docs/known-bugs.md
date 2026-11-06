@@ -813,6 +813,20 @@ Each is described with its cause and guard in
 - **Cause:** no real runtime or sample file in the repository.
 - **Needed to close:** add rhino3dm as a dev dependency, add a sample file to `THIRD-PARTY-NOTICES.md`, and run the entry's test against both.
 
+### parseLottie is not yet compared with a Lottie player
+
+- **What:** `@margoengine/loaders/lottie` is tested on animations its test writes, by the numbers it gives back, and on a real canvas in the browser test. No file exported from After Effects was read and no frame was compared with a reference player, because neither is on this PC and getting one needs Scott's approval. The sign of layer skew and the stacking of nested groups are the parts most likely to differ.
+- **Repro:** export a file with Bodymovin, draw a frame with `animation.draw`, and compare it with the same frame in a player.
+- **Cause:** no real sample or reference player in the repository.
+- **Needed to close:** add a few sample animations to `THIRD-PARTY-NOTICES.md` with reference frames from a player, and compare them.
+
+### toGraph of MaterialX is not yet compared with a MaterialX render
+
+- **What:** `@margoengine/loaders/materialx` read one real file, an ambientCG `open_pbr_surface` material kept outside the repository, and its test compiles a graph through `nodeMaterial()`. No material was rendered and compared with a MaterialX viewer, and the shader defaults were not checked line by line against each published definition.
+- **Repro:** convert a material from the MaterialX sample library, render it on a sphere and compare with MaterialXView.
+- **Cause:** no reference renderer or sample library in the repository.
+- **Needed to close:** add sample documents to `THIRD-PARTY-NOTICES.md` with reference renders, and compare them.
+
 ### parseVDB is not yet run against a file OpenVDB wrote
 
 - **What:** `@margoengine/loaders/vdb` is tested only on files its own test writes. No published byte-level specification of `.vdb` exists, so the reader and the test's writer share one reading of the format, and a mistake in it would pass both. No real file was on this PC, and getting one needs a download or an OpenVDB install, which needs Scott's approval. The Blosc path has the same gap: its chunks come from the test's own encoder, not from the Blosc library.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5181793,
+  "total": 5194466,
   "history": [
     {
       "date": "2026-10-24",
@@ -2348,6 +2348,12 @@
       "commit": "c3fced4f3",
       "reason": "raw meshes in shadows, SSAO, culling and picking; uniform arrays, storage and bind groups",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "2898926a2",
+      "reason": "loaders/materialx and loaders/lottie, new optional entries",
+      "grew": 2
     }
   ],
   "items": {
@@ -2606,7 +2612,9 @@
     "@margoengine/loaders/kmz": 16930,
     "@margoengine/loaders/las": 2463,
     "@margoengine/loaders/ldraw": 4126,
+    "@margoengine/loaders/lottie": 7591,
     "@margoengine/loaders/lwo": 3115,
+    "@margoengine/loaders/materialx": 5082,
     "@margoengine/loaders/md2": 2265,
     "@margoengine/loaders/mocap": 2146,
     "@margoengine/loaders/mtl": 8186,

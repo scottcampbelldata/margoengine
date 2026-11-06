@@ -818,3 +818,18 @@ More file formats, each in its own optional entry of `@margoengine/loaders`, so 
 - **Proved:** CPU tests on files the tests build, with known answers: exact rational circles and spheres for NURBS, handedness and seams for LWO, every point format for LAS. No job touched a GPU path; the loaders GPU test still ran before each push. `parse3MF` keeps its welded output, and its existing tests passed on the hooks job 3 added.
 - **Limits:** no file from a real tool was read. Job 5 ran against a stand-in with rhino3dm's shape and job 8's LAZ path against a stand-in decompressor, because adding the real module, a decoder or a sample needs a download Scott has not approved; both are open in `docs/known-bugs.md`. TDS is the 3DS reader under its other name. 3DM reads saved render meshes only, and NURBS has no trims, topology or boolean operations. No speed was measured.
 - **Gate:** job 2 failed `verify` once, when the helper's scratch build under `.lane` changed during the wall-budget scan. The scratch build was removed, and the job then passed. Nothing failed reached `main`.
+
+## Batch 40: loaders (part 2 of 2)
+
+The last two jobs on the loaders list, each in its own optional entry, and one fix to `verify` itself.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | OpenVDB sparse volumes | DONE, GAP OPEN | `5ad2181d1` | `@margoengine/loaders/vdb` | LIM-202 |
+| 2 | MaterialX and Lottie | DONE, GAP OPEN | this commit | `/materialx`, `/lottie` | LIM-204 |
+
+- **Fix first:** `294a0c12c` made `check-wall-budgets` and `check-fixed-waits` read tracked files only. Both walked the disk, so a scratch build in a git-ignored folder failed `verify`, as it did in batch 39 job 2. On the tree at the fix, the list lost the 21 ignored `.lane` files and nothing else. Regression tests: the ignored-file tests in `tests/check-wall-budgets.test.js` and `tests/check-fixed-waits.test.js`, which failed without the fix.
+- **Bugs:** one, caught before landing: a Lottie trim placed its cut by the curve parameter, not by length, so 25 to 75 percent of a straight line came out as 15.6 to 84.4. It now measures along the curve (`lottie.test.js`, "a trim measures length along a curve").
+- **Proved:** CPU tests on files and documents the tests write. The MaterialX test compiles a graph with every lobe through `nodeMaterial()`, and one real ambientCG `.mtlx` kept outside the repository converted with only its opacity skipped. The loaders browser test draws a Lottie frame on a real canvas, checks two pixels and uploads it as a texture on real WebGPU.
+- **Limits:** no `.vdb` from OpenVDB was read, and no public byte-level specification exists, so the reader and the test's writer share one reading of the format. NanoVDB is not read, which the job allowed. No Lottie file from After Effects was read, and no output was compared with a reference player or MaterialX viewer. The three gaps are in known-bugs.md. The format details came from the agent's general knowledge, with no other project's source open (clean-room.md, LF26, LF29, LF30, LF32).
+- **Gate:** every commit passed `lint`, `hygiene`, `verify`, the loaders tests and both loaders browser tests before its push. Job 2 failed `verify` once, because Lottie carried its own hex colour parser; it now uses `hexColor` from `@margoengine/math/color`, and MaterialX uses `SRGBToLinear` from the same entry. Nothing failed reached `main`. No speed was measured.

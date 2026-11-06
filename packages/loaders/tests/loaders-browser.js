@@ -1,6 +1,7 @@
 import { Engine } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { createMeshes, load, parse3MF, LoaderError } from '@margoengine/loaders';
+import { parseLottie } from '@margoengine/loaders/lottie';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -108,6 +109,44 @@ window.runLoaderTests = async () => {
       leftover++;
   assert(leftover === 0, `${leftover} pixels remain after dispose`);
   checks.push('dispose() removes every mesh');
+
+  // A Lottie frame on a real 2D canvas, then uploaded as a texture.
+  const paint = (rgb, shape) => ({
+    ty: 4,
+    ks: {},
+    ip: 0,
+    op: 10,
+    st: 0,
+    shapes: [shape, { ty: 'fl', c: { k: rgb }, o: { k: 100 } }],
+  });
+  const lottie = parseLottie(
+    JSON.stringify({
+      fr: 30,
+      w: 32,
+      h: 32,
+      ip: 0,
+      op: 10,
+      layers: [
+        paint([1, 0, 0], { ty: 'el', p: { k: [16, 16] }, s: { k: [16, 16] } }),
+        paint([0, 0, 1], { ty: 'rc', p: { k: [16, 16] }, s: { k: [32, 32] }, r: { k: 0 } }),
+      ],
+    }),
+  );
+  const surface = new OffscreenCanvas(32, 32),
+    painted = surface.getContext('2d', { willReadFrequently: true });
+  lottie.draw(painted, 0);
+  const middle = painted.getImageData(16, 16, 1, 1).data,
+    edge = painted.getImageData(1, 1, 1, 1).data;
+  assert(middle[0] === 255 && middle[2] === 0 && middle[3] === 255, `Lottie top layer is ${[...middle]}`);
+  assert(edge[0] === 0 && edge[2] === 255 && edge[3] === 255, `Lottie bottom layer is ${[...edge]}`);
+  const uploaded = device.createTexture({
+    size: [32, 32],
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+  device.queue.copyExternalImageToTexture({ source: surface }, { texture: uploaded }, [32, 32]);
+  uploaded.destroy();
+  checks.push('A Lottie frame draws on a real canvas and uploads as a texture');
 
   const scope = await device.popErrorScope();
   await device.queue.onSubmittedWorkDone();

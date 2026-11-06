@@ -635,6 +635,10 @@ File formats written from their public descriptions; no reader of another projec
 | LF25 | The VDB tree: a root table over internal nodes over leaf blocks, active masks, tiles, background | loaders/src/vdb.ts | K. Museth, "VDB: High-Resolution Sparse Volumes with Dynamic Topology", ACM Transactions on Graphics 32(3), 2013 |
 | LF26 | `.vdb` byte layout: header, metadata, grid descriptors, transforms, topology, value kinds | loaders/src/vdb.ts | No published specification exists. Written from the agent's general knowledge of the format, with no OpenVDB source open; not yet checked against a real file (known-bugs.md) |
 | LF27 | Blosc chunk header, block offsets and byte shuffle | loaders/src/vdb.ts | The Blosc project's public chunk format description |
+| LF29 | MaterialX elements, types, inheritance of `colorspace` and `fileprefix`, node inputs | loaders/src/materialx.ts | ASWF, "MaterialX Specification" 1.39. Written from the agent's general knowledge of it, with no MaterialX source open |
+| LF30 | Input names and defaults of the four surface shaders | loaders/src/materialx.ts | Autodesk Standard Surface, the OpenPBR Surface specification, the MaterialX glTF PBR node description and the OpenUSD UsdPreviewSurface specification. Same basis as LF29; not compared line by line |
+| LF32 | Lottie JSON: layers, transforms, shapes, keyframes, gradients, trim paths | loaders/src/lottie.ts | The Lottie Animation Community format description. Written from the agent's general knowledge of it, with no player source open |
+| LF33 | Circle by four cubics, handle 4 (sqrt 2 - 1) / 3; de Casteljau subdivision | loaders/src/lottie.ts | Standard results of computer-aided geometric design |
 | LF28 | LZ4 block format | loaders/src/vdb.ts, loaders/tests/vdb.test.js | Y. Collet, "LZ4 Block Format Description" |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`

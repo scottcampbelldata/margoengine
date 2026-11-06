@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-204). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-205). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -292,6 +292,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | NURBS (`@margoengine/loaders/nurbs`, 2026-11-06) | By method: evaluates and tessellates whole curves and surfaces. Trim curves are not applied, and no solid topology or boolean operation exists. Surface grids use a fixed `segmentsU` and `segmentsV` per knot span, with no chord tolerance as curves have. | Trims and topology belong to a solid modelling kernel, which stays out of this repository. | A trimmed surface draws untrimmed. | Use the render mesh a file saves, or raise the segments. |
 | LAS and LAZ (`@margoengine/loaders/las`, 2026-11-06) | By method: LAZ needs a caller's `decompress`, because no decoder is included, and that hook is tested with a stand-in, not a real file. Extra bytes per point are skipped, not decoded. Positions are 32-bit floats relative to `origin`. | A LAZ decoder is an arithmetic coder of its own, with no real sample files in the repository to prove one against. | Files larger than memory do not stream. | `step` thins a cloud; `maxVertices` refuses one past the limit. |
 | OpenVDB volumes (`@margoengine/loaders/vdb`, 2026-11-06) | By method: file versions 222 and later; `float`, `double`, `int32`, `int64`, `vec3s`, `vec3d`, `vec3i` and half grids; uncompressed, zlib and Blosc with LZ4. Other grids and frustum transforms are left out. NanoVDB is not read. Tested only on files the test writes (LIM-202). | No published byte-level specification and no real sample file in the repository to prove more against. | A left-out grid is named in `skipped`; a file with no grid offsets, another Blosc codec or an older version is refused with code `unsupported`. | Convert the grid to a supported type in the tool that wrote it. |
+| MaterialX and Lottie (`@margoengine/loaders/materialx`, `/lottie`, 2026-11-06) | By method: MaterialX converts four surface shaders and the nodes node materials can hold; emission, opacity, procedural nodes, `uvtiling`, includes and custom nodedefs do not convert. Lottie leaves out masks, mattes, text, effects, blend modes, 3D layers, repeaters, merge paths, rounded corners, star roundness and expressions (LIM-204). | Node materials are a closed set of nodes; a Lottie frame here is paths and images, and those features need a compositor. | MaterialX names each loss in `skipped`, and Lottie each feature in `unsupported`, except expressions. | Bake the feature in the authoring tool, or build the graph with `@margoengine/materials` by hand. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in

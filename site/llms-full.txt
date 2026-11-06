@@ -332,7 +332,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | --- | --- |
 | [`@margoengine/gltf`](packages/gltf/README.md) | Lazy static glTF/GLB loading for Margo Engine. |
 | [`@margoengine/gltf-pro`](packages/gltf-pro/README.md) | Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU. |
-| [`@margoengine/loaders`](packages/loaders/README.md) | PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, 3DS, LWO, AMF, MD2, PDB, KMZ, NURBS, LAS, OpenVDB, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine. |
+| [`@margoengine/loaders`](packages/loaders/README.md) | PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, 3DS, LWO, AMF, MD2, PDB, KMZ, NURBS, LAS, OpenVDB, MaterialX, Lottie, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine. |
 | [`@margoengine/decoders`](packages/decoders/README.md) | Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG, TGA, TIFF, DDS and KTX reading, for Margo Engine. |
 | [`@margoengine/fbx`](packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
@@ -2571,7 +2571,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-204). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-205). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2849,6 +2849,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | NURBS (`@margoengine/loaders/nurbs`, 2026-11-06) | By method: evaluates and tessellates whole curves and surfaces. Trim curves are not applied, and no solid topology or boolean operation exists. Surface grids use a fixed `segmentsU` and `segmentsV` per knot span, with no chord tolerance as curves have. | Trims and topology belong to a solid modelling kernel, which stays out of this repository. | A trimmed surface draws untrimmed. | Use the render mesh a file saves, or raise the segments. |
 | LAS and LAZ (`@margoengine/loaders/las`, 2026-11-06) | By method: LAZ needs a caller's `decompress`, because no decoder is included, and that hook is tested with a stand-in, not a real file. Extra bytes per point are skipped, not decoded. Positions are 32-bit floats relative to `origin`. | A LAZ decoder is an arithmetic coder of its own, with no real sample files in the repository to prove one against. | Files larger than memory do not stream. | `step` thins a cloud; `maxVertices` refuses one past the limit. |
 | OpenVDB volumes (`@margoengine/loaders/vdb`, 2026-11-06) | By method: file versions 222 and later; `float`, `double`, `int32`, `int64`, `vec3s`, `vec3d`, `vec3i` and half grids; uncompressed, zlib and Blosc with LZ4. Other grids and frustum transforms are left out. NanoVDB is not read. Tested only on files the test writes (LIM-202). | No published byte-level specification and no real sample file in the repository to prove more against. | A left-out grid is named in `skipped`; a file with no grid offsets, another Blosc codec or an older version is refused with code `unsupported`. | Convert the grid to a supported type in the tool that wrote it. |
+| MaterialX and Lottie (`@margoengine/loaders/materialx`, `/lottie`, 2026-11-06) | By method: MaterialX converts four surface shaders and the nodes node materials can hold; emission, opacity, procedural nodes, `uvtiling`, includes and custom nodedefs do not convert. Lottie leaves out masks, mattes, text, effects, blend modes, 3D layers, repeaters, merge paths, rounded corners, star roundness and expressions (LIM-204). | Node materials are a closed set of nodes; a Lottie frame here is paths and images, and those features need a compositor. | MaterialX names each loss in `skipped`, and Lottie each feature in `unsupported`, except expressions. | Bake the feature in the authoring tool, or build the graph with `@margoengine/materials` by hand. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in
@@ -3689,6 +3690,20 @@ Each is described with its cause and guard in
 - **Repro:** install rhino3dm, load a `.3dm` file and call `parse3DM(await rhino3dm(), bytes)`.
 - **Cause:** no real runtime or sample file in the repository.
 - **Needed to close:** add rhino3dm as a dev dependency, add a sample file to `THIRD-PARTY-NOTICES.md`, and run the entry's test against both.
+
+### parseLottie is not yet compared with a Lottie player
+
+- **What:** `@margoengine/loaders/lottie` is tested on animations its test writes, by the numbers it gives back, and on a real canvas in the browser test. No file exported from After Effects was read and no frame was compared with a reference player, because neither is on this PC and getting one needs Scott's approval. The sign of layer skew and the stacking of nested groups are the parts most likely to differ.
+- **Repro:** export a file with Bodymovin, draw a frame with `animation.draw`, and compare it with the same frame in a player.
+- **Cause:** no real sample or reference player in the repository.
+- **Needed to close:** add a few sample animations to `THIRD-PARTY-NOTICES.md` with reference frames from a player, and compare them.
+
+### toGraph of MaterialX is not yet compared with a MaterialX render
+
+- **What:** `@margoengine/loaders/materialx` read one real file, an ambientCG `open_pbr_surface` material kept outside the repository, and its test compiles a graph through `nodeMaterial()`. No material was rendered and compared with a MaterialX viewer, and the shader defaults were not checked line by line against each published definition.
+- **Repro:** convert a material from the MaterialX sample library, render it on a sphere and compare with MaterialXView.
+- **Cause:** no reference renderer or sample library in the repository.
+- **Needed to close:** add sample documents to `THIRD-PARTY-NOTICES.md` with reference renders, and compare them.
 
 ### parseVDB is not yet run against a file OpenVDB wrote
 
@@ -4642,12 +4657,12 @@ Every parser returns the same `LoadedGeometry`:
 | `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
+| `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
+| `parseLottie` (`/lottie`) | See [Lottie](#lottie) |
 | `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
 | `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
 | `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
-| `parseVTKXML` (`/vtk-xml`, async) | See [VTK XML](#vtk-xml) |
-| `parse3DM` (`/3dm`) | See [Rhino 3DM](#rhino-3dm) |
-| `parse3DS` (`/3ds
+| `parseVTKXML` (
 
 [README continues: https://margoengine.com/llms/packages/loaders.md]
 

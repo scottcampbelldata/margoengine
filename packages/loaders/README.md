@@ -51,6 +51,8 @@ Every parser returns the same `LoadedGeometry`:
 | `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
+| `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
+| `parseLottie` (`/lottie`) | See [Lottie](#lottie) |
 | `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
 | `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
 | `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
@@ -589,6 +591,56 @@ console.log(data.length, dims, bounds); // fig.volume(data, { dims, bounds }) in
 - **Compression.** Uncompressed, zlib and Blosc with LZ4, the OpenVDB default, in every value layout. Blosc with another codec or with bit shuffle is refused with code `unsupported`.
 - **Transforms.** `matrix` is the index-to-world matrix of an affine, scale, translation or unitary map, column-major. A frustum map has no matrix, so that grid goes to `skipped`.
 - **Left out.** A grid this reader does not decode goes to `skipped` with the reason, and the others still read: `bool`, mask and point grids. NanoVDB files (`.nvdb`) are refused, because their header is not an OpenVDB one.
+
+## MaterialX
+
+`parseMaterialX` from `@margoengine/loaders/materialx` reads `.mtlx` documents, version 1.38 and later, and `toGraph` turns a material into the graph that `nodeMaterial()` of `@margoengine/materials` takes.
+
+```ts
+import { parseMaterialX } from '@margoengine/loaders/materialx';
+import { nodeMaterial } from '@margoengine/materials';
+
+const text = '<materialx version="1.39"><standard_surface name="S" type="surfaceshader">' +
+  '<input name="base_color" type="color3" value="0.9, 0.6, 0.2"/><input name="metalness" type="float" value="1"/>' +
+  '</standard_surface><surfacematerial name="Brass" type="material">' +
+  '<input name="surfaceshader" type="surfaceshader" nodename="S"/></surfacematerial></materialx>';
+const parsed = parseMaterialX(text);
+const { graph, skipped } = await parsed.toGraph('Brass');
+console.log(parsed.materials[0]?.shader?.category, skipped);
+const extension = nodeMaterial(graph); // primitive.extension = extension
+console.log(Object.keys(extension).length);
+```
+
+- **Shaders.** `standard_surface`, `open_pbr_surface`, `gltf_pbr` and `UsdPreviewSurface`: base colour and its weight, metal, roughness, normal, coat and transmission. An unset input takes that shader's own default. Converting another shader is refused with code `unsupported`, though the document still reads.
+- **Nodes.** `image`, `tiledimage`, `gltf_image`, `constant`, `add`, `multiply`, `subtract`, `mix`, `dot`, `convert` and `normalmap`, inside and outside node graphs, with interface inputs.
+- **Images.** Pass `texture`, which gets `{ file, type, colorspace, addressU, addressV, filter }` once per image and returns `{ view, sampler }`. Upload `srgb_texture` images as sRGB. An image feeds a lobe as the node material reads it, so roughness reads green and metal blue: a grey image works, and a packed one needs `metalRough` by hand.
+- **`skipped`.** Node materials are a closed set, so whatever has no form there is listed with its reason and the input keeps its default: emission, opacity, noise and other procedural nodes. `uvtiling` and `uvoffset` are listed too, and the image still applies untiled.
+- **Colour.** Constants in `srgb_texture` convert to linear. Another colour space reads as linear and is named in `skipped`.
+- **Left out.** `xi:include` targets are listed in `includes` and not followed, custom `nodedef` graphs are not expanded, and the `<material>` form of 1.37 and before is refused. `look` assignments are read into `assignments`, for you to apply.
+
+## Lottie
+
+`parseLottie` from `@margoengine/loaders/lottie` reads Lottie JSON animations. `draw` paints a frame onto a 2D canvas for use as a texture, and `frame` gives the same frame as vector shapes.
+
+```ts
+import { parseLottie } from '@margoengine/loaders/lottie';
+
+const animation = parseLottie(await (await fetch('/motion/logo.json')).text());
+console.log(animation.width, animation.duration, animation.unsupported);
+
+const canvas = new OffscreenCanvas(animation.width, animation.height);
+const context = canvas.getContext('2d')!;
+animation.draw(context, animation.frameRate * 0.5); // the frame half a second in; upload the canvas as a texture
+
+for (const item of animation.frame(12.5)) // fractions blend between keyframes
+  if (item.kind === 'path') console.log(item.fill, item.opacity, item.toShapes({ flipY: true }).length);
+```
+
+- **Layers.** Shape, solid, image, null and precomposition layers, with parents, in and out frames, time stretch and time remapping. Hand `draw` your loaded images as `{ images: { id: bitmap } }`, by the ids in `animation.images`.
+- **Shapes.** Rectangles, ellipses, polygons, stars, bezier paths and groups, with solid and gradient fills and strokes, dashes and trim paths.
+- **Keyframes.** Bezier easing, per axis where the file gives it, hold keys, spatial curves on positions, and paths that blend between keys.
+- **Clear the canvas yourself.** `draw` paints over what is there, so call `clearRect` between frames.
+- **`unsupported`.** Masks, track mattes, text layers, effects, blend modes, 3D layers, repeaters, merge paths, rounded corners and star roundness are not drawn. Each one the file uses is named in this list, so check it when a file looks wrong. Expressions are ignored and are not listed.
 
 ## Tiled TMX
 
