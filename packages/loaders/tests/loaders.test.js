@@ -281,6 +281,12 @@ test('PLY: float colors, u/v and texture_u/texture_v names, CRLF header, ArrayBu
   assert.deepEqual([...parsePLY(padded.subarray(5, 5 + crlf.length)).positions], [0, 0, 0, 1, 0, 0, 0, 1, 0]);
 });
 
+test('regression: a PLY header line with no keyword, as Blender 2.4x wrote, is kept as a comment', () => {
+  const file = 'ply\nformat ascii 1.0\nCreated by Blender3D 247 - www.blender.org\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nend_header\n1 2 3\n';
+  assert.deepEqual([...parsePLY(text(file)).positions], [1, 2, 3]);
+  assert.deepEqual(parsePLYHeader(text(file)).comments, ['Created by Blender3D 247 - www.blender.org']);
+});
+
 test('PLY: point clouds without faces in every encoding', () => {
   for (const format of ['ascii', 'binary_little_endian', 'binary_big_endian']) {
     const { elements } = plyCube({ faces: false, extra: false });

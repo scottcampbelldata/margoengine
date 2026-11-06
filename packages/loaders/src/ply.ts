@@ -149,7 +149,7 @@ export function parsePLYHeader(input: BinaryInput): PLYHeader {
         if (parts.length !== 3 || !type) throw new LoaderError(F, 'header', `invalid property "${line.slice(0, 80)}"`);
         element.properties.push({ name: parts[2], type });
       }
-    } else throw new LoaderError(F, 'header', `unknown header keyword "${keyword.slice(0, 32)}"`);
+    } else comments.push(line.trim()); // Blender 2.4x wrote a bare "Created by ..." line with no comment keyword.
   }
   if (!format) throw new LoaderError(F, 'header', 'missing format line');
   return { format, elements, comments, bodyOffset };
