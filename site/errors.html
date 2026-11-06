@@ -52,6 +52,12 @@
       <p><strong>Fix.</strong> Start fewer engines at once on one page or in one browser (start the next when the previous one has drawn, or close pages you no longer show). With <code>backend: "auto"</code> and <code>fallback: webglRenderer</code> from <code>@margoengine/webgl</code> the page draws on WebGL2 instead. Raise <code>startupTimeout</code> for a slow first compile; pass <code>signal</code> to cancel creation yourself. Branch on <code>error.code === "timeout"</code>.</p>
     </section>
     <h2>Messages</h2>
+    <section id="worker">
+      <h2><a href="#worker">Moving a canvas to a worker</a></h2>
+      <p class="messages"><code>transferCanvas needs a canvas element in a browser with OffscreenCanvas</code> <code>transferCanvas: expected a Worker</code> <code>transferCanvas: timeout above 0</code> <code>This canvas has a context or already moved to a worker</code> <code>Worker failed before it took the canvas</code> <code>The worker never called receiveCanvas</code> <code>The page never called transferCanvas</code> <code>receiveCanvas: timeout above 0</code></p>
+      <p><strong>Cause.</strong> A canvas moves to a worker once, before anything draws on it, and both sides must take part: the page calls <code>transferCanvas</code> and the worker calls <code>receiveCanvas</code>. The call failed because the browser has no OffscreenCanvas, the canvas already has a context or already moved, the worker script failed to load, or one side never arrived within <code>timeout</code>.</p>
+      <p><strong>Fix.</strong> Check <code>workerCanvasSupported()</code> and keep a path on the page. Pass a fresh canvas that no code called <code>getContext</code> on. For a timeout, make sure the worker script runs <code>receiveCanvas()</code> and look for its error in <code>worker.addEventListener("error", ...)</code>.</p>
+    </section>
     <section id="webgpu">
       <h2><a href="#webgpu">WebGPU required or unavailable</a></h2>
       <p class="messages"><code>WebGPU required</code> <code>WebGPU unavailable</code> <code>WebGPU adapter unavailable</code> <code>No WebGPU canvas</code></p>

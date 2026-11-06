@@ -1926,6 +1926,14 @@
       "types": "./dist/wfc/overlapping.d.ts",
       "import": "./dist/wfc/overlapping.js"
     },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
+    },
+    "./worker/canvas": {
+      "types": "./dist/worker/canvas.d.ts",
+      "import": "./dist/worker/canvas.js"
+    },
     "./xr": {
       "types": "./dist/xr.d.ts",
       "import": "./dist/xr.js"
@@ -2040,6 +2048,7 @@
     "@margoengine/webgl": "^1.0.0",
     "@margoengine/webgl2-compat": "^1.0.0",
     "@margoengine/wfc": "^1.0.0",
+    "@margoengine/worker": "^1.0.0",
     "@margoengine/xr": "^1.0.0"
   },
   "peerDependencies": {

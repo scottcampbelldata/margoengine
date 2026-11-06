@@ -262,6 +262,11 @@ nobody took runs before the following pass. Core resolves in a pass of its own o
 Evidence: `packages/culling/test/gpu/last-pass-check.mjs` (pass counts, frames unchanged) and `tests/modern-msaa.test.js`, RTX
 A6000 only; the gain on tile-based GPUs is unmeasured.
 
+**Rendering in a worker (2026-11-05).** Core runs on a transferred `OffscreenCanvas` with no change: it reads no DOM it does not
+guard. `@margoengine/worker` gives the canvas `clientWidth` and `clientHeight` and copies `devicePixelRatio` and `margoLow`, so
+`resize`, `sceneSamples` and `pick` take the same paths as on the page. Evidence: `packages/worker/tests/browser-check.mjs`
+(WebGPU and the WebGL2 fallback in a real worker), RTX A6000 on Chromium only.
+
 ### 3.1 Fallback ladder
 
 | Tier | Behavior | Loading and cost |

@@ -17,6 +17,24 @@ export const entries = [
     fix: 'Drop references when you call `dispose()`, and create a new `Engine` or mesh (`engine.createMesh()`) to keep drawing. Check `engine.disposed` before late callbacks (timers, fetches, promise continuations) touch the engine.',
   },
   {
+    id: 'worker',
+    title: 'Moving a canvas to a worker',
+    kind: 'family',
+    messages: [
+      'transferCanvas needs a canvas element in a browser with OffscreenCanvas',
+      'transferCanvas: expected a Worker',
+      'transferCanvas: timeout above 0',
+      'This canvas has a context or already moved to a worker',
+      'Worker failed before it took the canvas',
+      'The worker never called receiveCanvas',
+      'The page never called transferCanvas',
+      'receiveCanvas: timeout above 0',
+    ],
+    cause:
+      'A canvas moves to a worker once, before anything draws on it, and both sides must take part: the page calls `transferCanvas` and the worker calls `receiveCanvas`. The call failed because the browser has no OffscreenCanvas, the canvas already has a context or already moved, the worker script failed to load, or one side never arrived within `timeout`.',
+    fix: 'Check `workerCanvasSupported()` and keep a path on the page. Pass a fresh canvas that no code called `getContext` on. For a timeout, make sure the worker script runs `receiveCanvas()` and look for its error in `worker.addEventListener("error", ...)`.',
+  },
+  {
     id: 'unsupported',
     title: 'unsupported: the browser or device lacks something needed',
     kind: 'code',

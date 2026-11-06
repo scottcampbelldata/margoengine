@@ -201,6 +201,24 @@
     ]
   },
   {
+    "id": "worker",
+    "title": "Worker",
+    "category": "Setup and diagnostics",
+    "package": "@margoengine/worker",
+    "version": "1.0.0",
+    "published": false,
+    "description": "Runs Margo Engine in a Web Worker on an OffscreenCanvas: canvas transfer, resize, pixel ratio and input forwarding, so heavy scenes never block the page.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
+    "keywords": "worker",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/worker@1.0.0",
+    "imports": "import { WorkerCanvas } from '@margoengine/worker';",
+    "exports": [
+      "WorkerCanvas",
+      "transferCanvas",
+      "workerCanvasSupported"
+    ]
+  },
+  {
     "id": "stats",
     "title": "Stats",
     "package": "@margoengine/stats",
