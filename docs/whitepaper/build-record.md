@@ -928,7 +928,7 @@ Eight jobs, each in its own optional entry of `@margoengine/decoders`. Nothing t
 | 2 | UASTC HDR KTX2 | DONE | `66c19dc85` | `/ktx2-hdr` | LIM-220 |
 | 3 | Streaming mip levels | DONE, SLIPPED | `7688d54c9`, `7439d930e` | `/ktx2-stream` | LIM-222 |
 | 4 | Basis on compute shaders | DONE, LOAD TIME UNPROVEN | `5bfde4ecf` | `/ktx2-gpu` | LIM-227 |
-| 5 | Meshopt on Wasm SIMD | DONE | `9251dc434` | `/meshopt-simd` | LIM-228 |
+| 5 | Meshopt on Wasm SIMD | DONE | `9251dc434` | `/meshopt-simd` | LIM-229 |
 | 6 | JPEG XL | DONE | `4415e20eb` | `/jxl` | LIM-233 |
 | 7 | PVRTC fallback decode | DONE | `dc7fcbed0` | `/pvr` | LIM-236 |
 | 8 | Draco point clouds | DONE | `dfb604e90` | `/draco-points` | LIM-238 |
@@ -943,7 +943,7 @@ Eight jobs, each in its own optional entry of `@margoengine/decoders`. Nothing t
 - **Job 7:** PVRTC decodes on the CPU because WebGPU has no such format. Levels under 8 texels wide differ from `texture2ddecoder` in 111 of 2,621,456 channels and which side is right is unknown; no real cube or array file was found, so that layout is tested on no real file. Both are in `docs/limits.md`.
 - **Job 8:** a bug and a feature. Draco's glTF build rejects every point cloud with "Unsupported geometry type.", which `decodeDraco` reported as a damaged file, while its docs implied support. It now raises a coded error naming this entry, with a regression test that fails without the fix. The new entry brings Google's full 1.5.6 build. The real files come from Draco's `testdata`, and their attributes equal draco3d 1.5.7's own decoder; no public file has generic attributes, so those are proved on files written by Draco's own encoder.
 - **Other bugs:** bare class fields in `packages/shared/zstd.js` (job 1), with a regression test.
-- **Gate:** every commit passed `lint`, `hygiene`, `verify`, the decoders and splats tests and the decoders browser tests before its push, job 3's missing docs apart. Failures caught before a push: job 5's error message had no fix clause in the `quality` gate, job 6's new parity row left the summary counts stale in `check:parity`, and job 6's worker and Wasm were missing from `scripts/lazy-files.js`, which `tests/sizes-page.test.js` caught. All were fixed, and nothing failed reached `main`. All timings here are diagnostic.
+- **Gate:** every job passed `lint`, `hygiene`, `verify`, the decoders and splats tests and the decoders browser tests, job 3's missing docs apart. Jobs 1 to 5 did so before their push. Jobs 6, 7, 8 and the record fix went out through `push.sh` after `main` moved, which reran the decoders tests, the claims test and the sizes page test, not a full `verify` on the rebased code. Failures caught before a push: job 5's error message had no fix clause in the `quality` gate, job 6's new parity row left the summary counts stale in `check:parity`, and job 6's worker and Wasm were missing from `scripts/lazy-files.js`, which `tests/sizes-page.test.js` caught. All were fixed, and nothing failed reached `main`. All timings here are diagnostic.
 
 ## Batch 81: animation
 
