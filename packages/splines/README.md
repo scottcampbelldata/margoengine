@@ -72,7 +72,7 @@ const pipe = deformAlongSpline(curve, positions, {axis: 'z', normals, fit: 'stre
 // pipe.positions, pipe.normals
 ```
 
-`placeAlongSpline` puts the mesh's `forward` axis along the tangent with its up axis on the frame normal (`frames` takes `SplineFrames` options or a ready instance; `align: false` keeps every instance upright). `deformAlongSpline` turns each vertex's coordinate along `axis` into a distance along the curve and its other two coordinates into offsets in the frame there; `fit: 'stretch'` scales the mesh to the curve's length and `overflow` chooses between continuing straight past the ends or holding the end frame. A mesh bends in straight chords between its vertices, so subdivide long pieces first. Normals are rotated with the frame, not re-derived.
+`frameBasis(frame, forward)` gives that same turn for one frame. `placeAlongSpline` puts the mesh's `forward` axis along the tangent with its up axis on the frame normal (`frames` takes `SplineFrames` options or a ready instance; `align: false` keeps every instance upright). `deformAlongSpline` turns each vertex's coordinate along `axis` into a distance along the curve and its other two coordinates into offsets in the frame there; `fit: 'stretch'` scales the mesh to the curve's length and `overflow` chooses between continuing straight past the ends or holding the end frame. A mesh bends in straight chords between its vertices, so subdivide long pieces first. Normals are rotated with the frame, not re-derived.
 
 ## Fit a spline to points (`@margoengine/splines/fit`)
 

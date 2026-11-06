@@ -2206,6 +2206,10 @@
       "types": "./dist/tween/stagger.d.ts",
       "import": "./dist/tween/stagger.js"
     },
+    "./tween/motion-path": {
+      "types": "./dist/tween/motion-path.d.ts",
+      "import": "./dist/tween/motion-path.js"
+    },
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"

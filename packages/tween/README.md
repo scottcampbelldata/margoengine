@@ -101,6 +101,43 @@ timeline.play();
 - The function returned cancels them all. If `Tween.to` refuses one target, none is left running.
 - `staggerDelays(count, options)` returns just the offsets as a `Float64Array`.
 
+## Motion paths: even speed, facing the way it goes
+
+`motionPath` from `margoengine/tween/motion-path` moves an object along a [spline](../splines/README.md) by arc length, so its speed stays even however the knots are spaced, and turns it to face along the curve:
+
+```ts
+import {Engine, box, PbrMaterial} from 'margoengine/core';
+import {Spline} from 'margoengine/splines';
+import {Tween} from 'margoengine/tween';
+import {MotionPath, motionPath} from 'margoengine/tween/motion-path';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const train = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial());
+const track = new Spline([[0, 0, 0], [10, 0, 2], [20, 3, 0], [30, 0, -8]]);
+const tween = new Tween();
+
+// 4 m/s from one end to the other; the duration comes from the length.
+const stop = motionPath(tween, train, track, {speed: 4, onComplete: () => console.log('arrived')});
+tween.update(1 / 60);
+
+// A camera looks down its -z, and a function target gets the pose for anything that is not a mesh.
+motionPath(tween, (pose) => console.log(pose.position, pose.quaternion), track, {duration: 10, forward: '-z'});
+
+// Or read poses yourself: arc-length position in, position and rotation out.
+const path = new MotionPath(track);
+const middle = path.poseAt(path.length / 2);
+```
+
+| Option | Meaning | Default |
+| --- | --- | --- |
+| `duration` or `speed` | Seconds for the run, or world units per second. Give one. | |
+| `forward` | Local axis that faces along the path: `'x'`, `'y'`, `'z'`, or `'-x'`, `'-y'`, `'-z'`. | `'z'` |
+| `orient` | False moves the object and leaves its rotation alone. | true |
+| `start`, `end` | Arc-length positions; `end` below `start` runs backwards. | 0, the length |
+| `frames` | `SplineFrames` options such as `up` and `roll`, or ready frames. | |
+
+The options of a tween also work: `delay`, `repeat`, `yoyo`, `onComplete`, `onRepeat`, and `easing`, which shapes the speed. With no `easing` the speed is even. The rotation comes from `SplineFrames`, so it does not flip on a loop. Moving back on a `yoyo` pass, the object keeps facing the path's direction.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/tween

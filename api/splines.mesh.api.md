@@ -41,6 +41,8 @@ export interface SplinePlacement {
 
 export function deformAlongSpline(spline: Spline, positions: ArrayLike<number>, options?: SplineDeformOptions): SplineDeformed;
 
+export function frameBasis(frame: SplineFrame, forward?: ForwardAxis, out?: Float64Array): Float64Array;
+
 export function placeAlongSpline(spline: Spline, options: SplinePlaceOptions): SplinePlacement;
 
 // Not exported from this entry, but used by the exports above:

@@ -33,6 +33,20 @@ const basisOf = (
   }
 };
 
+/**
+ * The rotation that puts a mesh's `forward` axis along a frame's tangent and its up axis on the frame normal: 9 numbers,
+ * three columns, x then y then z, the same turn {@link placeAlongSpline} gives its instances.
+ * @throws RangeError for an unknown axis.
+ */
+export function frameBasis(
+  frame: SplineFrame,
+  forward: ForwardAxis = 'z',
+  out: Float64Array = new Float64Array(9),
+): Float64Array {
+  basisOf(frame, axisOf(forward), out);
+  return out;
+}
+
 /** Options for {@link placeAlongSpline}. */
 export interface SplinePlaceOptions {
   /** Distance between instances, above 0. Give this or `count`. */
