@@ -40,6 +40,10 @@
     "./inertialize": {
       "types": "./dist/inertialize.d.ts",
       "import": "./dist/inertialize.js"
+    },
+    "./sync": {
+      "types": "./dist/sync.d.ts",
+      "import": "./dist/sync.js"
     }
   },
   "files": [

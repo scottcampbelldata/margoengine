@@ -310,6 +310,39 @@ inertia.dispose();                              // back to crossfades
 - **What fades:** local positions, rotations, scales and morph weights, on the finished pose (states and layers). Foot IK and solvers run after it, so their targets are still met.
 - **`smooth(duration?)`** fades a jump the graph did not cause, such as a clip time set by hand or a layer switched on: call it, then change the pose.
 
+## Sync groups (`margoengine/animator/sync`)
+
+Clips of different lengths drift apart in a blend: at half weight a 1 s walk and a 0.6 s run show each foot at two places in its stride. `addSyncGroup(animator, {states})` gives a set of states one phase. In a blend tree every clip plays at that phase, the cycle takes the blended length, and a transition inside the group starts the new state at the phase the old one had. During a crossfade the old state keeps playing in phase instead of freezing.
+
+```ts
+import {Animator} from 'margoengine/animator';
+import {addSyncGroup} from 'margoengine/animator/sync';
+
+const animator = Animator.attach(animation, {
+  initial: 'move', parameters: {speed: 0},
+  states: {
+    move: {parameter: 'speed', samples: [{value: 0, clip: 'Walk'}, {value: 1, clip: 'Run'}]},
+    sprint: 'Sprint',
+  },
+  transitions: [{from: 'move', to: 'sprint', when: (p) => p.speed > 1, duration: 0.2}],
+});
+const sync = addSyncGroup(animator, {
+  states: ['move', 'sprint'],
+  markers: ['LeftFootDown', 'RightFootDown'],   // optional: line up steps, not just clip fractions
+  clipMarkers: {                                // for clips with no markers of their own, as glTF clips are
+    Walk: [{time: 0.1, name: 'LeftFootDown'}, {time: 0.6, name: 'RightFootDown'}],
+    Run: [{time: 0.05, name: 'LeftFootDown'}, {time: 0.3, name: 'RightFootDown'}],
+    Sprint: [{time: 0.02, name: 'LeftFootDown'}, {time: 0.25, name: 'RightFootDown'}],
+  },
+});
+console.log(sync.phase); // 0 up to 1, the group's place in its cycle
+```
+
+- **`markers`** (default none) cuts the cycle at named moments, in order. Each clip maps phase to its own time piece by piece, so steps at different fractions of two clips still land together, and each piece runs at its blended length. Without markers, phase is each clip's fraction. Every clip must have those markers in that order round its loop; a clip built with `createKeyframeClip` brings its own, and `clipMarkers` serves the rest. Phase 0 is the first name, so a state entered from outside the group starts at that marker rather than at the clip's first frame.
+- **State time.** In a group, `animator.time` is the phase counted in the state's longest clip, so `normalizedTime`, `exitTime` and timed events all read phase: a footstep event at 0.5 stays on the step at any blend.
+- **Root motion** follows the phase through `addRootMotion`: a blended cycle travels the blended stride, and entering a state mid-cycle adds no jump.
+- A state belongs to one group. Disposing the group gives each clip its own clock back.
+
 ## Explicit rotation writer
 
 `AnimatorOptions.writeRotation?: (node: Mesh, rotation: readonly number[]) => void` is an optional, explicit commit hook for applications that own their transform writer. It is captured and validated once during construction. Omit it to keep the current dynamic `Mesh.setQuaternion` call, including method overrides. This is an additive public API option; it does not change core/stage.

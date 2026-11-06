@@ -3,8 +3,8 @@
 // blend trees. Kept out of the Animator class so an app that never uses it does not bundle it.
 import type { Mesh, Vec3 } from '@margoengine/core/extension';
 import { sampleTrackInto } from '@margoengine/animation/sampling';
-import { blend1D, blend2D } from './blend.js';
-import type { Animator, BlendTree } from './index.js';
+import { treeWeights } from './blend.js';
+import type { Animator } from './index.js';
 
 /** Options for {@link addRootMotion}. */
 export interface RootMotionOptions {
@@ -108,51 +108,33 @@ export function addRootMotion(animator: Animator, options: RootMotionOptions): R
       offset[3] += weight * wrap(to - start);
     }
   };
-  const weightsOf = (tree: BlendTree): { clips: string[]; weights: ArrayLike<number> } => {
-    if (typeof tree === 'string') return { clips: [tree], weights: [1] };
-    if ('parameter' in tree)
-      return {
-        clips: tree.samples.map((s) => s.clip),
-        weights: blend1D(
-          tree.samples.map((s) => s.value),
-          animator.parameters[tree.parameter] ?? 0,
-        ),
-      };
-    return {
-      clips: tree.samples.map((s) => s.clip),
-      weights: blend2D(
-        tree.samples.map((s) => s.value),
-        animator.parameters[tree.parameters[0]] ?? 0,
-        animator.parameters[tree.parameters[1]] ?? 0,
-      ),
-    };
-  };
-  const remove = animator.addPoseStep((position, rotation) => {
-    const state = animator.state,
-      time = animator.time,
-      from = state === lastState && time >= lastTime ? lastTime : 0;
-    lastState = state;
-    lastTime = time;
-    const { clips, weights } = weightsOf(animator.options.states[state]),
-      sum = [0, 0, 0, 0],
-      offset = [0, 0, 0, 0];
+  /** Travel of `state`'s clips, weighted, from state time `a` to `b`; false when no clip has weight. */
+  const measure = (state: string, a: number, b: number, sum: number[], offset: number[]) => {
+    const { clips, weights } = treeWeights(animator.options.states[state], animator.parameters);
     let total = 0;
     for (let i = 0; i < clips.length; i++) total += weights[i] > 0 ? weights[i] : 0;
-    if (!(total > 0)) return;
+    if (!(total > 0)) return false;
     for (let i = 0; i < clips.length; i++)
       if (weights[i] > 0) {
         const clip = animator.animation.clips.find((c) => c.name === clips[i])!;
-        travel(clip, from, time, weights[i] / total, sum, offset);
+        travel(
+          clip,
+          animator.clipTime(clips[i], a, state),
+          animator.clipTime(clips[i], b, state),
+          weights[i] / total,
+          sum,
+          offset,
+        );
       }
-    // In place: the bone keeps its pose minus the travel since its clip's start.
-    const bone = position[joint];
+    return true;
+  };
+  /** Keeps the bone in place: its pose less the travel since its clip's start. */
+  const inPlace = (bone: number[], q: number[], offset: number[]) => {
     bone[0] -= offset[0];
     if (axes === 'xyz') bone[1] -= offset[1];
     bone[2] -= offset[2];
-    if (axes === 'xz') sum[1] = 0;
     if (turn && offset[3]) {
       const half = -offset[3] / 2,
-        q = rotation[joint],
         s = Math.sin(half),
         c = Math.cos(half);
       // (yaw by -offset) x q
@@ -165,6 +147,18 @@ export function addRootMotion(animator: Animator, options: RootMotionOptions): R
       q[2] = z;
       q[3] = w;
     }
+  };
+  const remove = animator.addPoseStep((position, rotation) => {
+    const state = animator.state,
+      time = animator.time,
+      from = state === lastState && time >= lastTime ? lastTime : animator.entryTime;
+    lastState = state;
+    lastTime = time;
+    const sum = [0, 0, 0, 0],
+      offset = [0, 0, 0, 0];
+    if (!measure(state, from, time, sum, offset)) return;
+    inPlace(position[joint], rotation[joint], offset);
+    if (axes === 'xz') sum[1] = 0;
     // The bone's travel is in its parent's space; carry it through world space into the target's parent space.
     const store = model.root.engine.store,
       parentOf = (mesh: Mesh) => store.parents[mesh.id],
@@ -188,6 +182,11 @@ export function addRootMotion(animator: Animator, options: RootMotionOptions): R
       target.setQuaternion([q[0] * c - q[2] * s, q[1] * c + q[3] * s, q[2] * c + q[0] * s, q[3] * c - q[1] * s]);
     }
   });
+  // A crossfade that keeps the old state playing samples it past the pose step: the same travel comes out.
+  const removeFade = animator.addFadeStep((position, rotation, state, time) => {
+    const offset = [0, 0, 0, 0];
+    if (measure(state, time, time, [0, 0, 0, 0], offset)) inPlace(position[joint], rotation[joint], offset);
+  });
   const handle: RootMotion = {
     get translation() {
       return translation;
@@ -199,6 +198,7 @@ export function addRootMotion(animator: Animator, options: RootMotionOptions): R
       if (disposed) return;
       disposed = true;
       remove();
+      removeFade();
     },
     [Symbol.dispose]() {
       handle.dispose();

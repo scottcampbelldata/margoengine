@@ -94,6 +94,10 @@
       "types": "./dist/animator/inertialize.d.ts",
       "import": "./dist/animator/inertialize.js"
     },
+    "./animator/sync": {
+      "types": "./dist/animator/sync.d.ts",
+      "import": "./dist/animator/sync.js"
+    },
     "./audio": {
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"

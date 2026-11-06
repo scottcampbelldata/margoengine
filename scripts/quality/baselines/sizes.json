@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5204775,
+  "total": 5207162,
   "history": [
     {
       "date": "2026-10-24",
@@ -2372,6 +2372,12 @@
       "commit": "ef9d0bc90",
       "reason": "animator/inertialize, new optional entry; Animator gains the late pose step it runs on",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "be7fa7015",
+      "reason": "animator/sync, new optional entry; state clocks in Animator",
+      "grew": 2
     }
   ],
   "items": {
@@ -2387,8 +2393,9 @@
     "@margoengine/animation/skeleton-utils": 8891,
     "@margoengine/animation/vat": 8512,
     "@margoengine/animator": 18654,
-    "@margoengine/animator/graph": 8225,
+    "@margoengine/animator/graph": 8542,
     "@margoengine/animator/inertialize": 2150,
+    "@margoengine/animator/sync": 2070,
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 8909,
     "@margoengine/behavior/steering": 3827,

@@ -1,3 +1,4 @@
+import type { BlendTree } from './index.js';
 /**
  * Weights for a 1D blend tree: the two samples around `value` share the weight linearly, and a value outside the
  * range clamps to the nearest end sample.
@@ -67,6 +68,30 @@ export function blend2D(samples: readonly (readonly [number, number])[], x: numb
   }
   for (let i = 0; i < weights.length; i++) weights[i] /= sum;
   return weights;
+}
+/** The clips a state plays and their weights at `parameters`. */
+export function treeWeights(
+  tree: BlendTree,
+  parameters: Readonly<Record<string, number>>,
+): { clips: string[]; weights: ArrayLike<number> } {
+  if (typeof tree === 'string') return { clips: [tree], weights: [1] };
+  const clips = tree.samples.map((sample) => sample.clip);
+  if ('parameter' in tree)
+    return {
+      clips,
+      weights: blend1D(
+        tree.samples.map((sample) => sample.value),
+        parameters[tree.parameter] ?? 0,
+      ),
+    };
+  return {
+    clips,
+    weights: blend2D(
+      tree.samples.map((sample) => sample.value),
+      parameters[tree.parameters[0]] ?? 0,
+      parameters[tree.parameters[1]] ?? 0,
+    ),
+  };
 }
 /** Writes into `out` when given (it may be `a`); otherwise returns a fresh array. */
 export function quaternionBlend(a: ArrayLike<number>, b: ArrayLike<number>, weight: number, out?: number[]): number[] {

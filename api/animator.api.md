@@ -40,7 +40,13 @@ export class Animator implements EnginePlugin {
     addFootIK(foot: FootIK): () => void;
     addSolver(step: () => void): () => void;
     addPoseStep(step: (position: number[][], rotation: number[][]) => void): () => void;
+    addFadeStep(step: (position: number[][], rotation: number[][], state: string, time: number) => void): () => void;
     addLateStep(step: (pose: Pose, step: number) => void): () => void;
+    setStateClock(state: string, clock: StateClock | null): void;
+    hasStateClock(state: string): boolean;
+    enterAt(time: number): void;
+    get entryTime(): number;
+    clipTime(clip: string, time: number, state?: string): number;
     cancelFade(): void;
     restRotation(index: number): readonly number[];
     writeNodeRotation(node: Mesh, rotation: readonly number[]): void;
@@ -250,6 +256,12 @@ export interface RootMotionOptions {
     axes?: 'xz' | 'xyz';
     rotation?: boolean;
     apply?: boolean;
+}
+
+export interface StateClock {
+    advance(time: number, step: number): number;
+    clipTime(clip: string, time: number): number;
+    follow?(from: string, time: number): number | undefined;
 }
 
 export function addAimConstraint(animator: Animator, aim: AimConstraint): () => void;

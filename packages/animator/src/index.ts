@@ -5,7 +5,7 @@ import type { Engine, EnginePlugin, Mesh, Vec3 } from '@margoengine/core/extensi
 import { finiteVector } from '@margoengine/math/validate';
 import { multiplyQuaternions as quaternionMultiply } from '@margoengine/math/quat';
 import { MargoError } from '@margoengine/math/errors';
-import { blend1D, blend2D, quaternionBlend } from './blend.js';
+import { blend1D, blend2D, quaternionBlend, treeWeights } from './blend.js';
 import { solveTwoBoneIK, rotationBetween } from './ik.js';
 export { blend1D, blend2D } from './blend.js';
 export { solveTwoBoneIK } from './ik.js';
@@ -134,6 +134,15 @@ export interface FootIK {
   /** How far above the ankle the ray starts, in metres; above 0. Default 1. */
   probeHeight?: number;
 }
+/** @internal A state's own clock, for time that does not run at one second a second. */
+export interface StateClock {
+  /** The state's time after `step` seconds from `time`. */
+  advance(time: number, step: number): number;
+  /** Seconds along `clip`, counted over its loops, at the state's `time`. */
+  clipTime(clip: string, time: number): number;
+  /** The time state `from` would be at now, to keep it playing through a crossfade; undefined freezes it. */
+  follow?(from: string, time: number): number | undefined;
+}
 /** @internal One frame's finished pose: local transforms per glTF node, morph weights per node. */
 export interface Pose {
   position: number[][];
@@ -206,13 +215,17 @@ export class Animator implements EnginePlugin {
   private readonly weightNodes: number[];
   private readonly morphed: Set<number>;
   private readonly applied: Float64Array[];
-  private fade?: { pose: Pose; elapsed: number; duration: number };
+  private fade?: { pose: Pose; elapsed: number; duration: number; from: string };
+  private entry = 0;
+  private readonly clocks = new Map<string, StateClock>();
   private layers = new Set<AdditiveLayer>();
   private readonly scratch = new Map<number, Float32Array>();
   private feet = new Set<FootIK>();
   private readonly solvers: Array<() => void> = [];
   private readonly poseSteps: Array<(position: number[][], rotation: number[][]) => void> = [];
   private readonly lateSteps: Array<(pose: Pose, step: number) => void> = [];
+  private readonly fadeSteps: Array<(position: number[][], rotation: number[][], state: string, time: number) => void> =
+    [];
   private disposed = false;
   private readonly triggers = new Set<string>();
   private readonly durations = new Map<string, number>();
@@ -337,10 +350,11 @@ export class Animator implements EnginePlugin {
         'Invalid animator transition; pass a state name from options.states and a duration of 0 or more, on an Animator that is not disposed',
       );
     if (state === this.state) return this;
-    this.fade = duration ? { pose: clone(this.current), elapsed: 0, duration } : undefined;
     const from = this.state;
+    this.fade = duration ? { pose: clone(this.current), elapsed: 0, duration, from } : undefined;
     this.state = state;
     this.time = 0;
+    this.entry = 0;
     this.entered = true;
     this.emit('statechange', { from, to: state, duration });
     return this;
@@ -475,6 +489,18 @@ export class Animator implements EnginePlugin {
     };
   }
   /**
+   * @internal A step that edits a state's pose when a crossfade samples the state it is leaving, which a pose step does
+   * not see ({@link addRootMotion} takes the travel out). Returns its remover.
+   */
+  addFadeStep(step: (position: number[][], rotation: number[][], state: string, time: number) => void): () => void {
+    if (this.disposed) throw new MargoError('disposed', 'Animator is disposed; attach a new Animator');
+    this.fadeSteps.push(step);
+    return () => {
+      const index = this.fadeSteps.indexOf(step);
+      if (index !== -1) this.fadeSteps.splice(index, 1);
+    };
+  }
+  /**
    * @internal A step that edits the finished pose (after crossfades and layers, before it reaches the nodes, foot IK and
    * the solvers), with the seconds of animation time this frame advanced. Returns its remover.
    */
@@ -485,6 +511,29 @@ export class Animator implements EnginePlugin {
       const index = this.lateSteps.indexOf(step);
       if (index !== -1) this.lateSteps.splice(index, 1);
     };
+  }
+  /** @internal Gives `state` its own clock, or takes it away with null. */
+  setStateClock(state: string, clock: StateClock | null): void {
+    if (clock) this.clocks.set(state, clock);
+    else this.clocks.delete(state);
+  }
+  /** @internal True when `state` has its own clock. */
+  hasStateClock(state: string): boolean {
+    return this.clocks.has(state);
+  }
+  /** @internal Starts the state just entered at `time` instead of 0. */
+  enterAt(time: number): void {
+    this.time = time;
+    this.entry = time;
+  }
+  /** @internal The state time the current state started at. */
+  get entryTime(): number {
+    return this.entry;
+  }
+  /** @internal Seconds along `clip`, counted over its loops, at `state`'s `time`. */
+  clipTime(clip: string, time: number, state = this.state): number {
+    const clock = this.clocks.get(state);
+    return clock ? clock.clipTime(clip, time) : time;
   }
   /** @internal Ends the crossfade in progress: the pose jumps to the current state on this frame. */
   cancelFade(): void {
@@ -547,7 +596,8 @@ export class Animator implements EnginePlugin {
     if (!Number.isFinite(speed) || speed < 0) throw new RangeError('Animation speed must be a finite number >= 0');
     const step = this.playing ? delta * speed : 0,
       before = this.time;
-    this.time += step;
+    const clock = this.clocks.get(this.state);
+    this.time = clock ? clock.advance(this.time, step) : this.time + step;
     if (this.events.size) this.fireEvents(before, this.time);
     else this.entered = false;
     const tree = this.options.states[this.state];
@@ -555,40 +605,18 @@ export class Animator implements EnginePlugin {
     // One unlayered clip needs one owned pose, not a deep clone of every node
     // on every frame. Transition snapshots remain independent clones.
     if (typeof tree === 'string' && !this.fade && this.layers.size === 0) {
-      pose = this.sample(tree, this.time, this.animation.options.loop ?? true, this.singlePose);
-    } else {
-      let clips: string[], weights: Float32Array;
-      if (typeof tree === 'string') {
-        clips = [tree];
-        weights = new Float32Array([1]);
-      } else if ('parameter' in tree) {
-        clips = tree.samples.map((s) => s.clip);
-        weights = blend1D(
-          tree.samples.map((s) => s.value),
-          this.parameters[tree.parameter] ?? 0,
-        );
-      } else {
-        clips = tree.samples.map((s) => s.clip);
-        weights = blend2D(
-          tree.samples.map((s) => s.value),
-          this.parameters[tree.parameters[0]] ?? 0,
-          this.parameters[tree.parameters[1]] ?? 0,
-        );
-      }
-      let total = 0;
-      for (let i = 0; i < clips.length; i++)
-        if (weights[i] > 0) {
-          const sampled = this.sample(clips[i], this.time, this.animation.options.loop ?? true);
-          total += weights[i];
-          pose = pose ? this.mix(pose, sampled, weights[i] / total) : sampled;
-        }
-    }
+      pose = this.sample(tree, this.clipTime(tree, this.time), this.animation.options.loop ?? true, this.singlePose);
+    } else pose = this.treePose(this.state, this.time);
     if (!pose) pose = clone(this.rest);
     for (let i = 0; i < this.poseSteps.length; i++) this.poseSteps[i](pose.position, pose.rotation);
     if (this.fade) {
-      const f = this.fade;
+      const f = this.fade,
+        follow = clock?.follow?.(f.from, this.time),
+        from = follow === undefined ? undefined : this.treePose(f.from, follow);
+      if (from)
+        for (let i = 0; i < this.fadeSteps.length; i++) this.fadeSteps[i](from.position, from.rotation, f.from, follow!);
       f.elapsed += step;
-      pose = this.mix(clone(f.pose), pose, Math.min(1, f.elapsed / f.duration));
+      pose = this.mix(from ?? clone(f.pose), pose, Math.min(1, f.elapsed / f.duration));
       if (f.elapsed >= f.duration) this.fade = undefined;
     }
     if (this.layers.size)
@@ -749,6 +777,21 @@ export class Animator implements EnginePlugin {
       this.rotationWriteActive = false;
     }
   }
+  /** State `state`'s clips, blended at its `time`; undefined when no clip has weight. */
+  private treePose(state: string, time: number): Pose | undefined {
+    const { clips, weights } = treeWeights(this.options.states[state], this.parameters),
+      clock = this.clocks.get(state),
+      loop = this.animation.options.loop ?? true;
+    let pose: Pose | undefined,
+      total = 0;
+    for (let i = 0; i < clips.length; i++)
+      if (weights[i] > 0) {
+        const sampled = this.sample(clips[i], clock ? clock.clipTime(clips[i], time) : time, loop);
+        total += weights[i];
+        pose = pose ? this.mix(pose, sampled, weights[i] / total) : sampled;
+      }
+    return pose;
+  }
   private sample(name: string, time: number, loop = true, out?: Pose): Pose {
     const clip = this.clip(name),
       pose = out ? copyPose(this.rest, out, this.weightNodes) : clone(this.rest),
@@ -864,6 +907,8 @@ export class Animator implements EnginePlugin {
     this.solvers.length = 0;
     this.poseSteps.length = 0;
     this.lateSteps.length = 0;
+    this.fadeSteps.length = 0;
+    this.clocks.clear();
     this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;
