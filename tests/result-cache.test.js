@@ -453,6 +453,55 @@ test('building three small packages twice gives the same bytes', { timeout: 120_
   assert.deepEqual(build(), build());
 });
 
+// Found on 2026-11-06: build:package:fbx and build:package:usdz reported "same inputs built different bytes" after a
+// rebase that changed only gltf-pro. Their worker bundles take in gltf-pro's dist, which the key did not name.
+test('a package build keys on the dist of what it depends on, near and far, and of nothing else', (t) => {
+  const files = {
+    'package.json': '{}',
+    'packages/app/package.json': JSON.stringify({ name: '@x/app', peerDependencies: { '@x/near': '1' } }),
+    'packages/app/src/index.js': 'app',
+    'packages/near/package.json': JSON.stringify({ name: '@x/near', dependencies: { '@x/far': '1' } }),
+    'packages/far/package.json': JSON.stringify({ name: '@x/far' }),
+    'packages/other/package.json': JSON.stringify({ name: '@x/other' }),
+  };
+  const { root, repository } = fixture(t, files);
+  for (const name of ['app', 'near', 'far', 'other']) mkdirSync(join(root, `packages/${name}/dist`));
+  const dist = (name) => join(root, `packages/${name}/dist/index.js`);
+  for (const name of ['near', 'far', 'other']) writeFileSync(dist(name), name);
+  repository.tracked.add('build.mjs');
+  const script = join(root, 'build.mjs');
+  writeFileSync(
+    script,
+    `import { readFileSync } from 'node:fs';
+await globalThis[Symbol.for('margoengine.recordReads')].job('package:app', async () =>
+  readFileSync('packages/app/src/index.js'),
+);
+`,
+  );
+  const store = new ResultStore(join(temp(t), 'store'));
+  const build = () => {
+    const run = shadowRun(t, repository, store),
+      { dir, env } = run.stepEnv(),
+      result = spawnSync(process.execPath, [script], { cwd: root, env, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    // The bundler reads and writes natively: the recorder sees none of this, as in a real build.
+    writeFileSync(dist('app'), `${readFileSync(dist('near'))} ${readFileSync(dist('far'))}`);
+    const [row] = run.finish('npm run build:packages', dir, { kind: 'builds', code: 0 });
+    assert.deepEqual(row.refused, []);
+    return { row, disagreements: run.disagreements };
+  };
+  assert.equal(build().row.cache.wouldHit, false);
+  assert.equal(build().row.cache.wouldHit, true, 'nothing changed');
+  writeFileSync(dist('other'), 'changed');
+  assert.equal(build().row.cache.wouldHit, true, 'a package it does not depend on changes nothing');
+  for (const name of ['near', 'far']) {
+    writeFileSync(dist(name), `${name} changed`);
+    const { row, disagreements } = build();
+    assert.equal(row.cache.wouldHit, false, `a changed ${name} dist is a changed input`);
+    assert.deepEqual(disagreements, [], 'and never reads as same inputs, different bytes');
+  }
+});
+
 function withoutRecorder() {
   const env = { ...process.env };
   delete env.MARGO_RECORD_DIR;

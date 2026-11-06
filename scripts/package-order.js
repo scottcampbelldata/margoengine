@@ -35,6 +35,20 @@ export function packageDependencies(manifests) {
   );
 }
 
+// Every workspace directory `dir` reaches through those edges, nearest first; `dir` itself is left out.
+export function packageClosure(dir, dependencies) {
+  const seen = new Set(),
+    walk = (from) => {
+      for (const next of dependencies.get(from) ?? [])
+        if (next !== dir && !seen.has(next)) {
+          seen.add(next);
+          walk(next);
+        }
+    };
+  walk(dir);
+  return [...seen];
+}
+
 /**
  * Runs build(name) for every name, each one only after the names it depends on (dependencies: name -> Set of names;
  * a dependency that is not in `names` is ignored) have finished, with at most `jobs` running at once. A failed build

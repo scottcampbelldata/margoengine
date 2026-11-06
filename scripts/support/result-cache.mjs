@@ -24,13 +24,14 @@ import { homedir, release } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { margoError } from '../../packages/shared/errors.js';
+import { packageClosure, packageDependencies } from '../package-order.js';
 import { isClockInfrastructure, READ_RANK } from './record-reads.mjs';
 
 export const CAP_BYTES = 5 * 1024 ** 3;
 /** Stored passes kept per step; the newest are the ones a tree can still match. */
 const CANDIDATES_PER_STEP = 8;
 /** Bump when the recorder or the meaning of a key changes: every old entry then misses, with no false disagreement. */
-const KEY_VERSION = 2;
+const KEY_VERSION = 3;
 
 /**
  * Paths excluded from keys, each with the reason. Everything else a step reads is an input or refuses the step.
@@ -173,6 +174,29 @@ function allDistValue(context) {
   return context.memo.allDist;
 }
 
+/** The hash of one package's dist folder, once per run. */
+function distValue(name, context) {
+  context.memo.dists ??= new Map();
+  let value = context.memo.dists.get(name);
+  if (value === undefined) {
+    const folder = join(context.repository.root, 'packages', name, 'dist');
+    value = existsSync(folder) ? hashFolder(folder) : 'absent';
+    context.memo.dists.set(name, value);
+  }
+  return value;
+}
+
+/** Directory name of every workspace package to its parsed package.json. */
+function readManifests(root) {
+  const packages = join(root, 'packages');
+  if (!existsSync(packages)) return new Map();
+  return new Map(
+    readdirSync(packages)
+      .filter((name) => existsSync(join(packages, name, 'package.json')))
+      .map((name) => [name, JSON.parse(readFileSync(join(packages, name, 'package.json'), 'utf8'))]),
+  );
+}
+
 /** Maps a path into the node_modules of the lock file; returns `{ lock }` for a package, `{ path }` otherwise. */
 function placeNodeModules(path, repository) {
   const at = path.indexOf('node_modules/');
@@ -289,7 +313,7 @@ export function collectLogs(dir) {
  * nondeterministic call. A refused scope still runs and reports why; it is simply never stored.
  */
 export function buildManifest(record, context) {
-  const { repository, hasher, outputs, base, declared } = context,
+  const { repository, hasher, outputs, base, declared, builtOn } = context,
     root = repository.root;
   context.memo ??= {};
   context.memo.trees ??= new Map();
@@ -394,6 +418,7 @@ export function buildManifest(record, context) {
     ([kind, name]) =>
       (kind === 'lock' && NATIVE_READERS.test(name)) || (kind === 'program' && NATIVE_PROGRAMS.has(name)),
   );
+  for (const name of builtOn ?? []) inputs.set(`dist:${name}`, ['dist', name, distValue(name, context)]);
   if (declared) {
     for (const pattern of declared) addTree(pattern);
   } else if (native) {
@@ -462,6 +487,8 @@ export function manifestHolds(entry, context, liveEnv = new Map()) {
       if (treeValue(name, repository, context.memo.trees) !== row[2]) return false;
     } else if (kind === 'all-dist') {
       if (allDistValue(context) !== row[2]) return false;
+    } else if (kind === 'dist') {
+      if (distValue(name, context) !== row[2]) return false;
     } else if (kind === 'file' || kind === 'dir' || kind === 'exists') {
       const read = kind === 'dir' ? 'd' : kind === 'exists' ? 'e' : 'r';
       if (hasher.value(read, resolve(root, name)) !== row[2]) return false;
@@ -746,13 +773,16 @@ export class ShadowRun {
     } else {
       const base = scopes.get('');
       const named = order.filter(Boolean);
+      const dependencies = packageDependencies(readManifests(this.root));
       for (const [index, name] of named.entries()) {
         const record = scopes.get(name);
         // A build stops at its first failure, which is the last job it started; the ones before it finished.
         const passed = code === 0 || index < named.length - 1;
         const packageName = name.startsWith('package:') ? name.slice('package:'.length) : undefined;
-        // The bundler reads sources and writes dist natively, so a package build declares both. tsc, recorded, sees any
-        // import that leaves the package; a build whose bytes differ on equal keys is a disagreement.
+        // The bundler reads sources and writes dist natively, so a package build declares both. It also reads the dist
+        // of what the package depends on: a subpath outside the external list is inlined, and a worker bundle takes in
+        // everything it imports, while tsc sees only the .d.ts beside that code. So the key names the dist of every
+        // package the build order puts first. A build whose bytes differ on equal keys is a disagreement.
         if (packageName) {
           const dist = join(this.root, 'packages', packageName, 'dist');
           record.covers.add(dist);
@@ -765,6 +795,7 @@ export class ShadowRun {
             incomplete: [...unfinished(record), ...(base ? unfinished(base) : [])],
             base,
             declared: packageName ? [`^packages/${packageName}/(?!tests?/|.*\\.md$)`, '^packages/shared/'] : undefined,
+            builtOn: packageName ? packageClosure(packageName, dependencies).sort() : undefined,
             output: name.startsWith('package:')
               ? join(this.root, 'packages', name.slice('package:'.length), 'dist')
               : undefined,
@@ -779,8 +810,8 @@ export class ShadowRun {
     return rows;
   }
 
-  #record(step, record, { passed, seconds, incomplete, base, output, extraRefusal, declared }) {
-    const context = { ...this.context, base, declared };
+  #record(step, record, { passed, seconds, incomplete, base, output, extraRefusal, declared, builtOn }) {
+    const context = { ...this.context, base, declared, builtOn };
     context.git = this.context.git ??= new Map();
     const { inputs, refused } = buildManifest(record, context);
     refused.push(...incomplete);
