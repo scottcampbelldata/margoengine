@@ -191,7 +191,7 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
   if (!Number.isSafeInteger(maxDepth) || maxDepth < 1 || maxDepth > 64) fail('range', 'maxDepth must be 1..64');
   if (!text.startsWith('#usda 1.0')) fail('syntax', 'expected #usda 1.0');
   const token =
-    /\s+|#[^\n]*|"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|<[^>]*>|@[\s\S]*?@|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_!][\w:!.]*|[{}()[\]=,;]/y;
+    /\s+|#[^\n]*|"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|<[^>]*>|@[\s\S]*?@|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_!][\w:!.]*|[{}()[\]=,;]/y;
   let offset = 0,
     cached: { text: string; newLine: boolean } | undefined,
     numbers = 0;
@@ -219,7 +219,7 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
   };
   // A quoted token: triple-quoted text as is, else JSON escapes; a bad escape is a named syntax error.
   const string = (word: string): string => {
-    if (word.startsWith('"""')) return word.slice(3, -3);
+    if (word.startsWith('"""') || word.startsWith("'''")) return word.slice(3, -3);
     try {
       return JSON.parse(word);
     } catch {

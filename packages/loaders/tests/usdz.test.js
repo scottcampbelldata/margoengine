@@ -188,3 +188,8 @@ test('USDA reader fallback, constant opacity, mixed meshes and unsupported graph
     /PrimvarReader/,
   );
 });
+
+test("regression: triple single quoted strings, as MaterialX's converter writes in customLayerData", () => {
+  const meta = `customLayerData = {\n string source = '''Converted to usd from teapot.obj'''\n}\nmetersPerUnit = 1 upAxis = "Y"`;
+  assert.equal(parseUSDA(stage(triangle, meta)).positions.length, 9);
+});
