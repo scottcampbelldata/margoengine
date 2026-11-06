@@ -261,6 +261,8 @@ export class CompatDevice extends EventTarget {
   private readonly framebuffers = new Map<string, WebGLFramebuffer>();
   /** Canvas contexts with a frame waiting to be shown. */
   readonly presents = new Set<{ present(): void }>();
+  /** Canvas contexts showing an image of this device's WebGL2 context. */
+  readonly shown = new Set<{ keepFrame(): void }>();
   readonly replayer: Replayer;
   /** The texture each external source copies into, reused while its size stays. */
   private readonly externals = new WeakMap<object, CompatTexture>();
@@ -384,6 +386,8 @@ export class CompatDevice extends EventTarget {
 
   destroy(): void {
     if (this.destroyed) return;
+    for (const c of this.shown) c.keepFrame();
+    this.shown.clear();
     this.lose('destroyed', 'The device was destroyed');
     this.ext.lose?.loseContext();
   }

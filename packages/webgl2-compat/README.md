@@ -43,7 +43,8 @@ What it does:
   samples. Buffers, textures (2D, 2D array, 3D, cube, 4x multisampled, depth and stencil formats), samplers, bind
   groups, render pipelines (async creation waits for `KHR_parallel_shader_compile`), render passes with clears,
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
-  `mapAsync` with fenced readbacks, error scopes, `uncapturederror` and `device.lost`. Texture views GL has no view
+  `mapAsync` with fenced readbacks, error scopes, `uncapturederror` and `device.lost`. `device.destroy()` frees the
+  context and, as in WebGPU, leaves the last frame on the canvas (one copy into a 2D context of the page). Texture views GL has no view
   for (an sRGB view of a unorm texture, a 2D view of an array layer, a cube view of 6 array layers, an array view of a
   cube) read a copy that is brought up to date before each use; a square 6-layer texture is a cube map. Compressed
   BC, ETC2 and ASTC textures are written with `writeTexture` where the browser's WebGL2 has their extensions (the

@@ -292,6 +292,10 @@ features are filtered against adapter support. Desktop scenes default to 4x MSAA
 size use 1x. `Engine.create` records the native failure before invoking an app-supplied fallback. `exactSize` fixes the
 canvas dimensions, disables resizing, and forces one sample.
 
+**Device destroy (2026-11-06).** A frame on the page is an ImageBitmap of the device's own WebGL2 context, so `destroy()` copies it
+into a 2D context of the page before it loses the context. Chrome 157 on macOS crashed the tab otherwise. Evidence:
+`packages/webgl2-compat/test/destroy-frame-browser.mjs` in `test:gpu`, run on the Apple M6 in Chrome and WebKit and on the RTX A6000 in Edge.
+
 **Native compatibility level (2026-11-05).** `allowCompatibilityAdapters` in `@margoengine/webgl2-compat/adapter` adds a
 rung between native WebGPU and the layers: `navigator.gpu.requestAdapter` retries with `featureLevel: 'compatibility'`
 when the full level finds nothing. Core changes by 0 bytes: it calls `requestAdapter` at creation and in `rebootDevice`,

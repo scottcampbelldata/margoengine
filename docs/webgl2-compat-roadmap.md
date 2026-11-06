@@ -660,7 +660,10 @@ wall time per frame, native then the layer.
   natively and on the layer in exact-pixel mode once a frame's dispatches are the route's own: no pixel differs.
   `routes.test.js` checks each route's tiers and computes the sort and the culling against the kernels' results. The
   VFX and scatter LOD checks run with `--compat` in `npm run test:gpu`.
-- **Bugs found and fixed, each with a regression test.** (61) A buffer or texture destroyed right after the submit that used
+- **Bugs found and fixed, each with a regression test.** (62) `destroy()` lost the context while the page canvas showed an
+  ImageBitmap of it, and Chrome 157 on macOS crashed the tab at its next commit; the canvas now takes its own copy first
+  (`destroy-frame-browser.mjs`).
+  (61) A buffer or texture destroyed right after the submit that used
   it lost its GL object before that work ran when the queue was waiting for the compute part to load (an incomplete
   framebuffer at DOF's first frames); WebGPU frees a resource only after the work submitted before. `destroy()` now
   waits behind the queue's backlog (compute check, `destroyAfterSubmit`).

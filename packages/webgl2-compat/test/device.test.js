@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COMPAT_LIMITS } from '../dist/index.js';
-import { COMPAT_VENDOR, createCompatGPU, isCompatDevice } from '../dist/device.js';
+import { COMPAT_VENDOR, CompatCanvasContext, createCompatGPU, isCompatDevice } from '../dist/device.js';
 
 /** A stand-in context: just what webgl2Capabilities reads. */
 function fakeContext({ extensions = ['EXT_color_buffer_float'], limits = {} } = {}) {
@@ -179,5 +179,67 @@ test('an uncaptured error shows in the console unless a listener prevents it, as
     assert.equal(warned.length, 1, 'a prevented error is not shown');
   } finally {
     console.warn = warn;
+  }
+});
+
+// Bug (Chrome 157 on an Apple M6, the lines suite on the layer: `Target crashed`): destroy() lost the context while the
+// page canvas showed an ImageBitmap of it, and that image is invalid after the loss. The canvas takes its own copy
+// first; destroy-frame-browser.mjs proves it on a real tab.
+test('destroy() moves each frame on the page off the context before it loses the context', async () => {
+  const gl = new Proxy(fakeContext(), { get: (context, key) => (key in context ? context[key] : () => ({})) });
+  const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
+  const device = await adapter.requestDevice();
+  const seen = [];
+  device.shown.add({ keepFrame: () => seen.push(gl.lost) });
+  device.destroy();
+  device.destroy();
+  assert.deepEqual(seen, [false], 'once, while the context still lives');
+  assert.equal(gl.lost, true);
+});
+
+test('keepFrame() replaces the shown image with a copy made outside the WebGL2 context', () => {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'OffscreenCanvas'),
+    calls = [];
+  const bitmap = { name: 'copy' };
+  globalThis.OffscreenCanvas = class {
+    constructor(width, height) {
+      calls.push(['size', width, height]);
+    }
+    getContext(type) {
+      calls.push(['context', type]);
+      const context = {
+        drawImage: (source, x, y) => calls.push(['draw', source, x, y, context.globalCompositeOperation]),
+      };
+      return context;
+    }
+    transferToImageBitmap() {
+      return bitmap;
+    }
+  };
+  try {
+    const canvas = { width: 3, height: 2 };
+    const context = new CompatCanvasContext(canvas, () => null);
+    context.keepFrame();
+    assert.deepEqual(calls, [], 'nothing shown, nothing to copy');
+    const shown = [];
+    context.output = { transferFromImageBitmap: (b) => shown.push(b) };
+    context.keepFrame();
+    assert.deepEqual(calls, [
+      ['size', 3, 2],
+      ['context', '2d'],
+      ['draw', canvas, 0, 0, 'copy'],
+    ]);
+    assert.deepEqual(shown, [bitmap]);
+    canvas.width = 0;
+    context.keepFrame();
+    assert.equal(shown.length, 1, 'a canvas of no size has nothing to copy, and drawImage would throw');
+    context.output = { drawImage() {} };
+    canvas.width = 3;
+    calls.length = 0;
+    context.keepFrame();
+    assert.deepEqual(calls, [], 'a 2d canvas owns its pixels');
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'OffscreenCanvas', saved);
+    else delete globalThis.OffscreenCanvas;
   }
 });

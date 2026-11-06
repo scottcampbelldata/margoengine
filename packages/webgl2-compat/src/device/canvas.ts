@@ -14,6 +14,8 @@ export class CompatCanvasContext {
   private texture: CompatTexture | null = null;
   private frameOpen = false;
   private output: ImageBitmapRenderingContext | CanvasRenderingContext2D | null = null;
+  /** The device whose context backs the image the page canvas shows now, while it is an ImageBitmap of that context. */
+  private shownBy: CompatDevice | null = null;
 
   constructor(
     readonly canvas: Canvas,
@@ -96,8 +98,14 @@ export class CompatCanvasContext {
     if (typeof (source as OffscreenCanvas).transferToImageBitmap === 'function') {
       this.output ??= this.getContext.call(this.canvas, 'bitmaprenderer') as ImageBitmapRenderingContext | null;
       const bitmap = (source as OffscreenCanvas).transferToImageBitmap();
-      if (this.output && 'transferFromImageBitmap' in this.output) this.output.transferFromImageBitmap(bitmap);
-      else device.validationError('The canvas already has another kind of context; the frame cannot be shown');
+      if (this.output && 'transferFromImageBitmap' in this.output) {
+        this.output.transferFromImageBitmap(bitmap);
+        if (this.shownBy !== device) {
+          this.shownBy?.shown.delete(this);
+          device.shown.add(this);
+          this.shownBy = device;
+        }
+      } else device.validationError('The canvas already has another kind of context; the frame cannot be shown');
     } else {
       this.output ??= this.getContext.call(this.canvas, '2d') as CanvasRenderingContext2D | null;
       const o = this.output as CanvasRenderingContext2D | null;
@@ -107,5 +115,22 @@ export class CompatCanvasContext {
         o.drawImage(source as HTMLCanvasElement, 0, 0);
       }
     }
+  }
+
+  /**
+   * Moves the frame on the page off the device's context, which is about to be lost. As in WebGPU the page keeps showing
+   * it; and the image from transferToImageBitmap is only valid while that context lives. Chrome 157 on macOS kills the
+   * tab when such an image reaches its next commit after the loss, so a copy from a context of the page's own replaces it.
+   */
+  keepFrame(): void {
+    const { canvas, output } = this,
+      { width, height } = canvas;
+    this.shownBy = null;
+    if (!output || !('transferFromImageBitmap' in output) || !width || !height) return;
+    const copy = new OffscreenCanvas(width, height),
+      context = copy.getContext('2d') as OffscreenCanvasRenderingContext2D;
+    context.globalCompositeOperation = 'copy';
+    context.drawImage(canvas, 0, 0);
+    output.transferFromImageBitmap(copy.transferToImageBitmap());
   }
 }

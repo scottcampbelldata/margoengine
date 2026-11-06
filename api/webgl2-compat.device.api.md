@@ -146,6 +146,7 @@ export class CompatCanvasContext {
     getConfiguration(): GPUCanvasConfiguration | null;
     getCurrentTexture(): CompatTexture;
     present(): void;
+    keepFrame(): void;
 }
 
 export class CompatCommandBuffer {
@@ -205,6 +206,9 @@ export class CompatDevice extends EventTarget {
     readonly loadSampler: WebGLSampler;
     readonly presents: Set<{
         present(): void;
+    }>;
+    readonly shown: Set<{
+        keepFrame(): void;
     }>;
     readonly replayer: Replayer;
     computeRuntime: ComputeRuntime | null;

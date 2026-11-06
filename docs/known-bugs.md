@@ -175,9 +175,6 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   1,227 seen), failing about 3 runs in 4. Two draws in the same mode differ too: about 1,040 bytes, at most 4 levels, all in the distant grass (y 163 to 216 of the frame),
   so it has nothing to do with shadow culling, and shadow map texels match in every run. WebKit and the A6000 pass. It fails the same with the colour clamp of 2026-11-05
   taken out. Likely the order the cull pass's atomics write instances in, which decides depth ties among far blades. Not proved. Repro: `MARGO_BROWSER=chrome node packages/scatter/test/shadow-cull.browser.mjs`.
-- **`lines` on the WebGL2 compatibility layer crashes the Chrome tab on the M6 about 4 runs in 6.** `webgl2-compat` `test:gpu`, last steps; repro:
-  `cd packages/lines && MARGO_BROWSER=chrome node scripts/test-browser.js --compat`, `Target crashed` in `runGallery`. The gallery alone, without `runLineTests` first, ran 8 of 8,
-  so it depends on what the earlier tests leave alive. WebKit and the A6000 pass. It was hidden until now, as the chain stopped at the sRGB check. Cause not found.
 - **Playwright WebKit sometimes drops to 20 or 30 FPS after navigating in the same tab.** `examples/voxel-sandbox`, `quality=high`, 1920 x 1000, 60 Hz display:
   in chains of five same-tab loads, 7 of 30 loads ran at 30 FPS, then the rate came back by itself on a later load. Never on the first load of a browser (0 of 11 chains),
   and not at 1280 x 720 (0 of 11 loads). First seen as 20 (light then high) and 30 (high then high), with the rate of the page's own `requestAnimationFrame` the same, frame CPU
@@ -673,6 +670,12 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   compute pipeline), and the render pipeline's compile, which overlaps the build by only 11 to 29 ms.
 - **Plan:** share the bind-pose block between copies in `DeformArena`, as the morph deltas are. If that does not close the
   gap, record what is left as an accepted difference.
+
+## Fixed 2026-11-06
+
+| Bug | Cause | Fix | Regression test |
+| --- | --- | --- | --- |
+| Chrome tab crash on the WebGL2 layer: `Target crashed` in the `lines` suite with `--compat`, 4 runs in 6 and later 5 in 5 (Chrome 157, Apple M6) | `device.destroy()` lost the WebGL2 context while the page canvas held an ImageBitmap of it that Chrome had not committed yet. Such an image is invalid once its context dies, and `ImageLayerBridge` in the renderer reads its shared image at the next commit without a check (null at +0x70; `Target crashed` is that read, found from the crash dumps). Five lines of WebGL2 and `loseContext()` crash the tab 5 of 5; Edge 156 on Windows does not. The chance came from whether a commit fell between the last frame and the dispose | `destroy()` first gives each canvas showing a frame of the device its own copy, made in a 2D context of the page (`keepFrame` in `packages/webgl2-compat/src/device/canvas.ts`), so the last frame stays on the page as in WebGPU. One copy per destroy, none per frame | `packages/webgl2-compat/test/destroy-frame-browser.mjs` (crashes the tab 3 of 3 without the fix), `packages/webgl2-compat/test/device.test.js` |
 
 ## Fixed 2026-11-05
 
