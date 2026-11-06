@@ -1082,6 +1082,10 @@
       "types": "./dist/loaders/nurbs.d.ts",
       "import": "./dist/loaders/nurbs.js"
     },
+    "./loaders/las": {
+      "types": "./dist/loaders/las.d.ts",
+      "import": "./dist/loaders/las.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"

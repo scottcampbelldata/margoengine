@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-196). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-197). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -284,6 +284,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | Rhino 3DM (`@margoengine/loaders/3dm`, 2026-11-06) | By method: reads meshes and saved render meshes only. Surface objects saved without a render mesh are counted in `skipped`, and materials are indices, not read. Needs a rhino3dm runtime from the caller, and is tested against a stand-in, not the real runtime. | Meshing a surface needs a solid modelling kernel, which this repository does not hold. | A file saved with small-file options loads with objects skipped. | Save with render meshes kept, or export a mesh format. |
 | Long-tail formats (`/3ds`, `/tds`, `/lwo`, `/amf`, `/md2`, `/pdb`, `/kmz`, 2026-11-06) | By method: 3DS skips cameras, lights and keyframes; LWO skips curves, patches, bones and image maps and reads the first UV map; AMF skips curved edges and colour formulas; MD2 computes its normals; PDB loads the first MODEL; KMZ returns locations unapplied and reads models only. Tested on files built by the test, not on files from the original tools. | Each entry reads what a mesh needs, and the skipped parts have no place in the shared loader result. | A file's animation or lights do not come through 3DS or LWO. | glTF carries them where a file can be converted. |
 | NURBS (`@margoengine/loaders/nurbs`, 2026-11-06) | By method: evaluates and tessellates whole curves and surfaces. Trim curves are not applied, and no solid topology or boolean operation exists. Surface grids use a fixed `segmentsU` and `segmentsV` per knot span, with no chord tolerance as curves have. | Trims and topology belong to a solid modelling kernel, which stays out of this repository. | A trimmed surface draws untrimmed. | Use the render mesh a file saves, or raise the segments. |
+| LAS and LAZ (`@margoengine/loaders/las`, 2026-11-06) | By method: LAZ needs a caller's `decompress`, because no decoder is included, and that hook is tested with a stand-in, not a real file. Extra bytes per point are skipped, not decoded. Positions are 32-bit floats relative to `origin`. | A LAZ decoder is an arithmetic coder of its own, with no real sample files in the repository to prove one against. | Files larger than memory do not stream. | `step` thins a cloud; `maxVertices` refuses one past the limit. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in

@@ -631,6 +631,7 @@ File formats written from their public descriptions; no reader of another projec
 | LF21 | KML `Model`, `Location`, `Orientation` and `Scale`, and the KMZ layout | loaders/src/kmz.ts | OGC, "KML 2.3" standard |
 | LF22 | B-spline basis functions, knot spans and rational evaluation | loaders/src/nurbs.ts | Piegl and Tiller, "The NURBS Book" (2nd ed., 1997), algorithms A2.1 to A2.3 and A4.1, written from the published mathematics |
 | LF23 | Rational circle and sphere test shapes | loaders/tests/nurbs.test.js | Piegl and Tiller, "The NURBS Book", chapter 7 |
+| LF24 | LAS public header, variable records and point formats 0 to 10 | loaders/src/las.ts | ASPRS, "LAS Specification" 1.4 R15 and earlier versions |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 

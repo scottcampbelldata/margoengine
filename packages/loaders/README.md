@@ -59,6 +59,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseLWO` (`/lwo`), `parseAMF` (`/amf`, async), `parseMD2` (`/md2`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
 | `parsePDB` (`/pdb`), `parseKMZ` (`/kmz`, async) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
 | `evaluateNurbsCurve`, `tessellateNurbsCurve`, `evaluateNurbsSurface`, `tessellateNurbsSurface` (`/nurbs`) | See [NURBS curves and surfaces](#nurbs-curves-and-surfaces) |
+| `parseLAS` (`/las`, async) | See [LAS and LAZ](#las-and-laz) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
@@ -547,6 +548,23 @@ console.log(tessellateNurbsSurface(patch, { segmentsU: 2, segmentsV: 2 }).indice
 - **Curves.** `tessellateNurbsCurve` splits each knot span until the curve is within `tolerance` of its chords, so straight runs stay cheap. The result is xyz per point, for `mode: 'strip'` of `@margoengine/lines`. `maxPoints` caps it.
 - **Surfaces.** `tessellateNurbsSurface` makes a triangle grid with exact normals, with grid lines on every distinct knot and `segmentsU` and `segmentsV` quads per span. `evaluateNurbsSurface` gives a point and unit normal, and the normal is zero at a pole.
 - **Whole surfaces.** Trim curves are not applied, and there is no solid modelling: no topology and no boolean operations.
+
+## LAS and LAZ
+
+`parseLAS` from `@margoengine/loaders/las` reads ASPRS LAS point clouds, versions 1.0 to 1.4 and point formats 0 to 10.
+
+```ts
+import { parseLAS } from '@margoengine/loaders/las';
+
+const bytes = await (await fetch('/surveys/quarry.las')).arrayBuffer();
+const { positions, classification, origin } = await parseLAS(bytes, { step: 4 });
+console.log(positions.length / 3, classification[0], origin);
+```
+
+- **Positions.** They come back relative to `origin`, because survey coordinates are too large for 32-bit floats. Add it back for world coordinates.
+- **Attributes.** `intensity`, `classification`, `returnNumber`, `returnCount`, `gpsTime` where the format has it, and `colors` in [0,1], from 16 bits or from 8 for files that fill only the low byte. `header` and `records` give the header and its variable records, projection included.
+- **Thinning.** `step: 4` keeps every fourth point, and `maxVertices` counts points after thinning.
+- **LAZ.** LAZ is the same layout behind an entropy coder. This package has no decoder of its own: pass `decompress`, a wrapper around one you load, which gets the file and its header and returns the plain point records. Without it a LAZ file is an `unsupported` error. The hook is tested with a stand-in, not a real decoder: see [known bugs](../../docs/known-bugs.md).
 
 ## Tiled TMX
 

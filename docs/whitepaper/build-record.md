@@ -797,3 +797,24 @@ The light glTF loader takes more files without growing its root.
 - **Gate:** job 2 failed the gate twice before it passed, on error messages with no fix text, then on a missing corpus entry
   and an unmarked fixed wait. Nothing failed reached `main`. After their last rebases jobs 2, 3 and 4 reran the package,
   corpus and claims tests, not `verify`.
+
+## Batch 39: loaders (part 1 of 2)
+
+More file formats, each in its own optional entry of `@margoengine/loaders`, so an app pays only for what it imports.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | NRRD volumes | DONE | `1d10590f7` | `@margoengine/loaders/nrrd` | LIM-178 |
+| 2 | LDraw brick models | DONE | `a17a0cc13` | `/ldraw` | LIM-185 |
+| 3 | 3MF textures and colour groups | DONE | `f8707ef1e` | `/threemf-materials` | LIM-187 |
+| 4 | VTK XML | DONE | `87140c29b` | `/vtk-xml` | LIM-190 |
+| 5 | Rhino 3DM through a caller-owned runtime | DONE | `798ea6038` | `/3dm` | LIM-193 |
+| 6 | 3DS, LWO, AMF, MD2, PDB, TDS and KMZ | DONE | `4e3839d52` | `/3ds`, `/lwo`, `/amf`, `/md2`, `/pdb`, `/tds`, `/kmz` | LIM-195 |
+| 7 | NURBS curves and surfaces | DONE | `92388e3ed` | `/nurbs` | LIM-196 |
+| 8 | LAS, and LAZ through a hook | DONE | this commit | `/las` | LIM-197 |
+
+- **Rule:** before job 5, `3f2ab19ee` replaced the no-CAD rule in `AGENTS.md` with Scott's ruling of 2026-11-06. No entry of the banned list changed, and the rule spells the kernel's name out, because its short form is one of those terms.
+- **Bugs:** caught before landing, each with a test in the entry's own file: an LDraw `color` option of 16 or 24 recursed without end and is now a `range` error (`ldraw.test.js`), and NRRD read the wrong bytes from a pooled Node `Buffer` (`nrrd.test.js`).
+- **Proved:** CPU tests on files the tests build, with known answers: exact rational circles and spheres for NURBS, handedness and seams for LWO, every point format for LAS. No job touched a GPU path; the loaders GPU test still ran before each push. `parse3MF` keeps its welded output, and its existing tests passed on the hooks job 3 added.
+- **Limits:** no file from a real tool was read. Job 5 ran against a stand-in with rhino3dm's shape and job 8's LAZ path against a stand-in decompressor, because adding the real module, a decoder or a sample needs a download Scott has not approved; both are open in `docs/known-bugs.md`. TDS is the 3DS reader under its other name. 3DM reads saved render meshes only, and NURBS has no trims, topology or boolean operations. No speed was measured.
+- **Gate:** job 2 failed `verify` once, when the helper's scratch build under `.lane` changed during the wall-budget scan. The scratch build was removed, and the job then passed. Nothing failed reached `main`.

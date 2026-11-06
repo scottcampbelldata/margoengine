@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5145739,
+  "total": 5148202,
   "history": [
     {
       "date": "2026-10-24",
@@ -2300,6 +2300,12 @@
       "commit": "7ef91c99c",
       "reason": "loaders/nurbs, new optional entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "51c7d15eb",
+      "reason": "loaders/las, new optional entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2554,6 +2560,7 @@
     "@margoengine/loaders/font": 6577,
     "@margoengine/loaders/gcode": 1966,
     "@margoengine/loaders/kmz": 16930,
+    "@margoengine/loaders/las": 2463,
     "@margoengine/loaders/ldraw": 4126,
     "@margoengine/loaders/lwo": 3115,
     "@margoengine/loaders/md2": 2265,

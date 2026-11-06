@@ -809,3 +809,10 @@ Each is described with its cause and guard in
 - **Repro:** install rhino3dm, load a `.3dm` file and call `parse3DM(await rhino3dm(), bytes)`.
 - **Cause:** no real runtime or sample file in the repository.
 - **Needed to close:** add rhino3dm as a dev dependency, add a sample file to `THIRD-PARTY-NOTICES.md`, and run the entry's test against both.
+
+### parseLAS is not yet run against a real LAZ decoder or survey file
+
+- **What:** `@margoengine/loaders/las` is tested on LAS files built by the test, and its LAZ path through a stand-in `decompress`. No real LAZ decoder was run, because adding one or a sample file needs Scott's approval.
+- **Repro:** load a `.laz` file with `parseLAS(bytes, { decompress })` around a real decoder.
+- **Cause:** no real decoder or sample file in the repository.
+- **Needed to close:** add a small sample `.las` and `.laz` pair to `THIRD-PARTY-NOTICES.md`, and test that both give the same cloud.
