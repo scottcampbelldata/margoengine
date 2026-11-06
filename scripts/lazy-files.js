@@ -298,8 +298,20 @@ export const LAZY_SPLITS = [
     chunk: /^(runtime|readback)-/,
     lazyLabel: 'compute runtime and read-back',
     source: 'packages/webgl2-compat/src/compute/runtime.ts',
+    baseLabel: 'everything the first call of <code>install()</code> loads',
     baseTarget: 73_000,
     when: 'the first compute pipeline or texture read-back on the layer (import() in device/device.ts)',
+  },
+  {
+    package: 'points',
+    entry: './las',
+    specifier: '@margoengine/points/las',
+    dist: 'packages/points/dist/las.js',
+    chunk: /^laz-/,
+    lazyLabel: 'LAZ decoder',
+    source: 'packages/points/src/laz.ts',
+    baseLabel: 'everything a plain <code>.las</code> file loads',
+    when: 'the first compressed file, unless the caller passes its own decoder (import() in las.ts)',
   },
 ];
 

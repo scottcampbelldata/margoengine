@@ -1648,7 +1648,7 @@
    "id": "laz-laszip12",
    "format": "laz",
    "check": "lazRefused",
-   "variant": "LASzip 1.2 compressor",
+   "variant": "LASzip 1.2 item coding",
    "entry": "@margoengine/loaders/las",
    "file": "simple-laszip-compressor-version-1.2r0.laz",
    "url": "https://raw.githubusercontent.com/PDAL/PDAL/master/test/data/laz/simple-laszip-compressor-version-1.2r0.laz",
@@ -1656,7 +1656,7 @@
    "author": "PDAL test data",
    "size": 22149,
    "sha256": "91a7f42d5d9b8fc4bc55fb71647ecfa9624177bcb8f8a5310238c64250d57741",
-   "note": "the unchunked compressor of LASzip 1.x, as packages/points documents"
+   "note": "item version 1, which no published text describes"
   },
   {
    "id": "laz-usgs-format6",
@@ -1692,6 +1692,166 @@
      "sha256": "3d351885f3aa03d5ac92358037ba0b850ea4f56f644ffcc56d57cd5d830aaf75"
     }
    ]
+  },
+  {
+   "id": "las-format4",
+   "format": "las",
+   "check": "las",
+   "variant": "1.3 format 4, wave packets",
+   "entry": "@margoengine/loaders/las",
+   "file": "simple1_3.las",
+   "url": "https://raw.githubusercontent.com/laspy/laspy/master/tests/data/simple1_3.las",
+   "licence": "BSD-2-Clause",
+   "author": "laspy test data",
+   "size": 62888,
+   "sha256": "6753c0da6e89b9e9e1e866946746dadb2b2c31b7eb8fd4602bcaf6a1d1ad2cea",
+   "rawHeaderBox": true,
+   "note": "ALSXX_PP stored the header box as raw integers, so the check scales it first"
+  },
+  {
+   "id": "laz-format0",
+   "format": "laz",
+   "check": "laz",
+   "variant": "format 0, pair",
+   "entry": "@margoengine/loaders/las",
+   "file": "point10.laz",
+   "url": "https://raw.githubusercontent.com/laz-rs/laz-rs/master/tests/data/point10.laz",
+   "licence": "Apache-2.0",
+   "author": "laz-rs test data",
+   "size": 9976,
+   "sha256": "b81263c1be91e6aca0ba976f597456ac4fbcb0654af59408e1f548c0b7e59bc3",
+   "companions": [
+    {
+     "file": "point10.las",
+     "url": "https://raw.githubusercontent.com/laz-rs/laz-rs/master/tests/data/point10.las",
+     "size": 21527,
+     "sha256": "348c7eb7518e15702be65e874183be3ce0fdf45366476d783783517db23783c7"
+    }
+   ]
+  },
+  {
+   "id": "laz-format1",
+   "format": "laz",
+   "check": "laz",
+   "variant": "format 1, pair",
+   "entry": "@margoengine/loaders/las",
+   "file": "point-time.laz",
+   "url": "https://raw.githubusercontent.com/laz-rs/laz-rs/master/tests/data/point-time.laz",
+   "licence": "Apache-2.0",
+   "author": "laz-rs test data",
+   "size": 14621,
+   "sha256": "855bf662e36c6545090e49d2cb821a7c878068a911c5c1d375a728c69a30d297",
+   "companions": [
+    {
+     "file": "point-time.las",
+     "url": "https://raw.githubusercontent.com/laz-rs/laz-rs/master/tests/data/point-time.las",
+     "size": 30047,
+     "sha256": "6e78cbf847591c9560fff5346978e5f2fae251421d9041cbe569774efe5a3675"
+    }
+   ]
+  },
+  {
+   "id": "laz-format2",
+   "format": "laz",
+   "check": "laz",
+   "variant": "format 2, pair",
+   "entry": "@margoengine/loaders/las",
+   "file": "point-color.laz",
+   "url": "https://raw.githubusercontent.com/laz-rs/laz-rs/master/tests/data/point-color.laz",
+   "licence": "Apache-2.0",
+   "author": "laz-rs test data",
+   "size": 12901,
+   "sha256": "c0b89fdfed23b53399d9f8322893d08323ca4eda4ccdda38a8da0119af68e4fa",
+   "companions": [
+    {
+     "file": "point-color.las",
+     "url": "https://raw.githubusercontent.com/laz-rs/laz-rs/master/tests/data/point-color.las",
+     "size": 27917,
+     "sha256": "6fe452eac4df6ab23eb5073e82db0b3938f9abcce3c6a1be5f12b23c01a2a5f3"
+    }
+   ]
+  },
+  {
+   "id": "laz-format3",
+   "format": "laz",
+   "check": "laz",
+   "variant": "format 3, pair",
+   "entry": "@margoengine/loaders/las",
+   "file": "point-time-color.laz",
+   "url": "https://raw.githubusercontent.com/laz-rs/laz-rs/master/tests/data/point-time-color.laz",
+   "licence": "Apache-2.0",
+   "author": "laz-rs test data",
+   "size": 17546,
+   "sha256": "b4c7b9149e214b7ef31f0e7a40c3ec8dd7c2e5054fb5e02c49284c0164925294",
+   "companions": [
+    {
+     "file": "point-time-color.las",
+     "url": "https://raw.githubusercontent.com/laz-rs/laz-rs/master/tests/data/point-time-color.las",
+     "size": 36437,
+     "sha256": "0b9e780e80ea1008a916dcc73ce1df28097c4e2960821c0b6a46095704f7d967"
+    }
+   ]
+  },
+  {
+   "id": "laz-format7",
+   "format": "laz",
+   "check": "laz",
+   "variant": "1.4 format 7, COPC",
+   "entry": "@margoengine/loaders/las",
+   "file": "simple.copc.laz",
+   "url": "https://raw.githubusercontent.com/laspy/laspy/master/tests/data/simple.copc.laz",
+   "licence": "BSD-2-Clause",
+   "author": "laspy test data",
+   "size": 33684,
+   "sha256": "c94fa8dfe14ce7bff074231ce9e8aa36f7200342a4ff675c2902205f40e72728"
+  },
+  {
+   "id": "laz-format8-nir",
+   "format": "laz",
+   "check": "laz",
+   "variant": "1.4 format 8, two extra bytes records",
+   "entry": "@margoengine/loaders/las",
+   "file": "append-bug.laz",
+   "url": "https://raw.githubusercontent.com/laspy/laspy/master/tests/data/append-bug.laz",
+   "licence": "BSD-2-Clause",
+   "author": "laspy test data",
+   "size": 186462,
+   "sha256": "15b8493da724b03f073f7b677981fd14177a00da5ff9751c57c0285d6c0b3f16"
+  },
+  {
+   "id": "laz-format10",
+   "format": "laz",
+   "check": "lazWaves",
+   "variant": "1.4 format 10, full waveform",
+   "entry": "@margoengine/loaders/las",
+   "file": "fullwave.laz",
+   "url": "https://raw.githubusercontent.com/laspy/laspy/master/tests/data/fullwave.laz",
+   "licence": "BSD-2-Clause",
+   "author": "laspy test data",
+   "size": 200894,
+   "sha256": "8d49c1c46bf8e26d79809225cd3b5684a7c8a7660d029e56e3694a18b279a844",
+   "companions": [
+    {
+     "file": "fullwave.wdp",
+     "url": "https://raw.githubusercontent.com/laspy/laspy/master/tests/data/fullwave.wdp",
+     "size": 35392092,
+     "sha256": "77c6b8b76014df5846185e776fa6537000d0ac081bf32e76521b1c2b9997c5a3"
+    }
+   ]
+  },
+  {
+   "id": "laz-item-version-1",
+   "format": "laz",
+   "check": "lazRefused",
+   "variant": "LASzip 1.0 item coding, point wise",
+   "entry": "@margoengine/loaders/las",
+   "file": "point-version-1-point-wise.laz",
+   "url": "https://raw.githubusercontent.com/laz-rs/laz-rs/master/tests/data/point-version-1-point-wise.laz",
+   "licence": "Apache-2.0",
+   "author": "laz-rs test data",
+   "size": 70993,
+   "sha256": "5a5dbcbab958dae19c8f5fd7c46dd5fc3100e35b4af54fcd4f3f62c38805764d",
+   "note": "item version 1, which no published text describes"
   }
  ]
 }

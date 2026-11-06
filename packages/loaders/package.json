@@ -166,6 +166,7 @@
   },
   "dependencies": {
     "@margoengine/geometry": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/points": "^1.0.0"
   }
 }

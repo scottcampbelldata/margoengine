@@ -4,8 +4,9 @@
 // below, or published facts. The downloads are never committed.
 //
 //   REAL_FILES_DIR       where downloads go, one folder per format (default test-results/real-files)
-//   REAL_FILES_RUNTIMES  a folder whose node_modules holds rhino3dm and laz-perf, the caller-owned hooks. Without it
-//                        the 3DM and LAZ rows are reported as not run, and the exit code says so.
+//   REAL_FILES_RUNTIMES  a folder whose node_modules holds rhino3dm, the caller-owned hook, and laz-perf, to compare
+//                        LAZ records with. Without it the 3DM rows are reported as not run, and the exit code says so,
+//                        and the LAZ rows skip that comparison.
 //   REAL_FILES_ONLY      comma-separated formats or ids to run
 //   REAL_FILES_RENDER    1 draws every geometry through the real engine on the GPU (real-files-render.mjs)
 import assert from 'node:assert/strict';
@@ -42,6 +43,7 @@ import { parseAMF } from '../dist/amf.js';
 import { parseGCode } from '../dist/gcode.js';
 import { parseKMZ } from '../dist/kmz.js';
 import { parseLAS } from '../dist/las.js';
+import { lasWaveDescriptors, lasWaveform } from '@margoengine/points/las';
 import { parseLDraw } from '../dist/ldraw.js';
 import { parseLWO } from '../dist/lwo.js';
 import { parseMD2 } from '../dist/md2.js';
@@ -288,8 +290,8 @@ async function loadRuntimes() {
   return (runtimes = { rhino, laz: await createLazPerf() });
 }
 
-/** The decompress hook of `parseLAS` around Margo's own LAZ decoder. */
-async function margoDecompress({ bytes, header, pointOffset, records }) {
+/** The plain point records of Margo's own LAZ decoder, to compare with those of laz-perf. */
+async function margoRecords({ bytes, header, pointOffset, records }) {
   const { lazChunks } = await import('../../points/dist/laz.js'),
     out = new Uint8Array(header.pointCount * header.pointRecordLength);
   let at = 0;
@@ -718,13 +720,17 @@ const checks = {
     assert.equal(first.location?.latitude, latitude, 'latitude');
     return { result: `${models} model, ${checkGeometry(first.mesh ?? first.geometry ?? first)}, at ${JSON.stringify(first.location)}`, draw: [mesh(first.mesh ?? first.geometry ?? first)] };
   },
-  async las(bytes) {
+  async las(bytes, item) {
     const cloud = await parseLAS(bytes),
       view = new DataView(bytes.buffer, bytes.byteOffset),
       version = bytes[25],
       legacy = view.getUint32(107, true),
       total = version >= 4 && legacy === 0 ? Number(view.getBigUint64(247, true)) : legacy;
-    const header = [179, 187, 195, 203, 211, 219].map((o) => view.getFloat64(o, true)); // max x, min x, max y, min y, max z, min z
+    const stored = [179, 187, 195, 203, 211, 219].map((o) => view.getFloat64(o, true)); // max x, min x, max y, min y, max z, min z
+    // A writer that stored its box as raw integers: turned to world units here by the scale and offset of the file.
+    const header = item.rawHeaderBox
+      ? stored.map((v, i) => v * view.getFloat64(131 + 8 * (i >> 1), true) + view.getFloat64(155 + 8 * (i >> 1), true))
+      : stored;
     assert.equal(cloud.positions.length / 3, total, 'point count');
     if (total > 1) checkGeometry(cloud);
     const box = bounds(cloud.positions);
@@ -737,16 +743,16 @@ const checks = {
   },
   async lazRefused(bytes, item) {
     await assert.rejects(
-      async () => parseLAS(bytes, { decompress: margoDecompress }),
+      async () => parseLAS(bytes),
       (error) => error.code === 'unsupported',
     );
     return { result: `refused with code unsupported: ${item.note}` };
   },
   async laz(bytes, item, read) {
-    const cloud = await parseLAS(bytes, { decompress: margoDecompress }),
+    const cloud = await parseLAS(bytes),
       version = bytes[25],
       format = bytes[104] & 63;
-    const facts = [`1.${version} format ${format}, ${cloud.positions.length / 3} points through createLazDecoder`];
+    const facts = [`1.${version} format ${format}, ${cloud.positions.length / 3} points with no hook`];
     checkGeometry(cloud);
     if (item.companions) {
       const pair = await parseLAS(await read(item.companions[0]));
@@ -759,12 +765,38 @@ const checks = {
     const hooks = await loadRuntimes();
     if (hooks) {
       let ours, theirs;
-      await parseLAS(bytes, { decompress: async (s) => (ours = await margoDecompress(s)) });
+      await parseLAS(bytes, { decompress: async (s) => (ours = await margoRecords(s)) });
       await parseLAS(bytes, { decompress: (s) => (theirs = lazDecompress(hooks.laz)(s)) });
-      assert.equal(Buffer.compare(ours, theirs), 0, 'createLazDecoder and laz-perf give the same records');
+      assert.equal(Buffer.compare(ours, theirs), 0, 'the built-in decoder and laz-perf give the same records');
       facts.push('records byte for byte equal to laz-perf');
     }
     return { result: facts.join(', '), draw: [mesh(cloud)] };
+  },
+  /** A waveform file: every packet reads from the `.wdp` beside it, and the strongest sample sits where the point says. */
+  async lazWaves(bytes, item, read) {
+    const cloud = await parseLAS(bytes),
+      { wavePackets } = cloud.points,
+      source = await read(item.companions[0]),
+      descriptors = lasWaveDescriptors(cloud.records);
+    let waves = 0,
+      located = 0;
+    checkGeometry(cloud);
+    for (let i = 0; i < wavePackets.descriptor.length; i++) {
+      const wave = lasWaveform(cloud.points, i, source);
+      if (!wave) continue;
+      assert.equal(wave.raw.length, descriptors.get(wavePackets.descriptor[i]).samples, 'samples per wave');
+      waves++;
+      let peak = 0;
+      for (let k = 1; k < wave.raw.length; k++) if (wave.raw[k] > wave.raw[peak]) peak = k;
+      if (Math.abs(peak - wavePackets.location[i] / wave.spacing) <= 3) located++;
+    }
+    assert.ok(waves > 0, 'the file has waves');
+    // Later returns of a pulse share its wave, so their location is not the strongest sample.
+    assert.ok(located * 2 > waves, `the peak sits at the point's location in ${located} of ${waves} waves`);
+    return {
+      result: `1.${bytes[25]} format ${cloud.header.pointFormat}, ${waves} waves read from ${item.companions[0].file}, the peak at the point's location in ${located}`,
+      draw: [mesh(cloud)],
+    };
   },
 };
 

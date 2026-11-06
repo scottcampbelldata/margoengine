@@ -61,10 +61,11 @@ interface LASHeader {
     readonly offset: readonly [number, number, number];
     readonly min: readonly [number, number, number];
     readonly max: readonly [number, number, number];
+    readonly waveformDataOffset: number;
 }
 
 interface LASOptions {
-    origin?: readonly [number, number, number];
+    origin?: readonly [number, number, number] | 'min';
     maxPoints?: number;
     stride?: number;
     laz?: LazDecoder;
@@ -94,6 +95,7 @@ interface LASPoints {
     readonly gpsTime?: Float64Array;
     readonly rgb?: Uint16Array;
     readonly nir?: Uint16Array;
+    readonly wavePackets?: LASWavePackets;
     readonly extra: Readonly<Record<string, Float64Array>>;
 }
 
@@ -103,6 +105,14 @@ interface LASRecord {
     readonly description: string;
     readonly data: Uint8Array;
     readonly extended: boolean;
+}
+
+interface LASWavePackets {
+    readonly descriptor: Uint8Array;
+    readonly offset: Float64Array;
+    readonly size: Uint32Array;
+    readonly location: Float32Array;
+    readonly direction: Float32Array;
 }
 
 type LazDecoder = (file: Uint8Array, header: LASHeader, records: readonly LASRecord[], signal?: AbortSignal) => Uint8Array | Promise<Uint8Array> | AsyncIterable<Uint8Array>;

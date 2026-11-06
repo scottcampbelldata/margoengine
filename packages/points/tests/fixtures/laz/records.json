@@ -1,0 +1,521 @@
+{
+ "append-bug.laz": {
+  "records": "da661009d733479c3c414a9f9584df5f4066260ae9b091e9e16b542ba7fab34c",
+  "format": 8,
+  "points": 37805,
+  "version": "1.4",
+  "fields": {
+   "positions": "1be4dc65d04d606b942de0b6689caf25",
+   "intensity": "8466a48dd490b534c90a96e59cc381f4",
+   "returnNumber": "a9a1ed747c72cca7ea3a2bac1218b354",
+   "numberOfReturns": "e01974ba258e3291751967adec6e775c",
+   "classification": "cb3f2160797814bf94176f1f16e4fc88",
+   "classificationFlags": "29937b0a15e8dd53e04c1c288fcff465",
+   "scanDirection": "327d0dfb693c2100342ee49cc2a99624",
+   "edgeOfFlightLine": "29937b0a15e8dd53e04c1c288fcff465",
+   "scanAngle": "8402498ebdde025c462dad66d418d8d1",
+   "scannerChannel": "29937b0a15e8dd53e04c1c288fcff465",
+   "userData": "29937b0a15e8dd53e04c1c288fcff465",
+   "pointSourceId": "d85b56509e0616bdcdcd2d6698abb4fb",
+   "gpsTime": "bbf230e66bc058fca73ceb732486e11e",
+   "rgb": "83c8ed4fa52094589ce32c8f056ab077",
+   "nir": "634013fa93cc01cb0e86ab994206ada1",
+   "extra": {
+    "Deviation": "8d4264a763b54c92d84e33f7a3d26f13",
+    "confidence": "3d121ef8597528ca5260b3257d619b19"
+   }
+  }
+ },
+ "extra-bytes.laz": {
+  "records": "c98294910637458e4b55447460f2dece893aca5990f4fd5624fec7d570783c31",
+  "format": 3,
+  "points": 1065,
+  "version": "1.2",
+  "fields": {
+   "positions": "1b9d5ec78a9e5d21d0330af6ea9933ab",
+   "intensity": "701d089da4d2aea3039455e65bbbddaf",
+   "returnNumber": "7eee8d7c7b4b6c4d67b1171623014348",
+   "numberOfReturns": "090354c9c89460950a14b1c8953e5768",
+   "classification": "e675481bd41b08c40f6a6ee9893cbc46",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "51dcee3b680812942769f3f6611ac35c",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "59fa79b54c120720b35a413825dffc1a",
+   "userData": "6a5b9c51bb2a65ebd38a8d6302b6d602",
+   "pointSourceId": "56251dc92fd62a3a75d82208a2a70bab",
+   "gpsTime": "52782da5675757d55dec840fdccc8863",
+   "rgb": "a4d4a67da11adee4b54a5de988862933",
+   "extra": {
+    "Colors[0]": "cf493ececb2fcb1ab3d93dcf7a93a9f5",
+    "Colors[1]": "c2a6f6b2ee726b2ed758221ceba16182",
+    "Colors[2]": "d32713f941123f65b91f72ac6aedde21",
+    "Flags[0]": "631c0da732be9bf027ebc8d35cf55c33",
+    "Flags[1]": "57dc197ca2d38a0ea2cc8ae0a73d1698",
+    "Intensity": "178479fe6337ce798ea1b7657b69da7b",
+    "Time": "42447406616466b2b1c96147a7af249e"
+   }
+  }
+ },
+ "fullwave.laz": {
+  "records": "b49cab16bf6befbbc8f00653bda3b288883b82c5c6ef91018252210338ab9f02",
+  "format": 10,
+  "points": 10750,
+  "version": "1.4",
+  "fields": {
+   "positions": "8062e1c4b47cf3652263315f8ba0d22d",
+   "intensity": "eb47f0a9c2e677f4e9d7d258acf0218f",
+   "returnNumber": "1b7f626df195f71476c189590c53152d",
+   "numberOfReturns": "c212436e6fbb8ca79632ff1a20fe826a",
+   "classification": "e7ce979c7683235f8836a3a01ec770ee",
+   "classificationFlags": "e7ce979c7683235f8836a3a01ec770ee",
+   "scanDirection": "e7ce979c7683235f8836a3a01ec770ee",
+   "edgeOfFlightLine": "e7ce979c7683235f8836a3a01ec770ee",
+   "scanAngle": "7873020060da73de3c03662b4d4f37a6",
+   "scannerChannel": "e7ce979c7683235f8836a3a01ec770ee",
+   "userData": "f50520238800e0fc8fac05ce611f3f0f",
+   "pointSourceId": "2fb79cf5c3855829fef9d08fb89848da",
+   "gpsTime": "88cd78c4534655c3bf23f69a57c8d363",
+   "rgb": "55370ca24d2de5e6f3bcf03f67bf63bc",
+   "nir": "c087400bedbab879032f2a07b3123305",
+   "waveDescriptor": "f50520238800e0fc8fac05ce611f3f0f",
+   "waveOffset": "c7dc0148bcbf3d2e2f8ff3f12cd7a324",
+   "waveSize": "b528ae5c0e5a51267a7adead9e621934",
+   "waveLocation": "beb49e3f7c2c5fa7237557a36e8529d3",
+   "waveDirection": "5dcb1bd4631ecd2ef7c39e422de237ff"
+  }
+ },
+ "laszip-channels-format10.laz": {
+  "records": "db364ab8837e1c168208a35df3db945d0938b91719f47499b90e3589025d9541",
+  "format": 10,
+  "points": 2000,
+  "version": "1.4",
+  "fields": {
+   "positions": "bfeb6bf6110a722c1af0c3813bd3fb7c",
+   "intensity": "447a32cc90b89e638e458f5bcb28c2f4",
+   "returnNumber": "8d5f0c5e926e14ee942ada0634f47c7e",
+   "numberOfReturns": "26280a6efc1b71ece8af627263d165fb",
+   "classification": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "classificationFlags": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanDirection": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "edgeOfFlightLine": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanAngle": "12c40b32a67b85326ed2950da1a2e5a3",
+   "scannerChannel": "7f95120da6483e4de2597ccb3d5f0fb2",
+   "userData": "236b232fb94678b33f7cfe5d9b11edf4",
+   "pointSourceId": "52ebf5291818eb4ade70f6e9be75f4d1",
+   "gpsTime": "ce3f4600cf3097dc7d412017efb65900",
+   "rgb": "2b570ed3363ad1b1a64ba62f652ef0c9",
+   "nir": "fc19b1997119425765295aeab72d76fa",
+   "waveDescriptor": "8c920e9f5c76535cbe19da319b24b0e0",
+   "waveOffset": "86a86d1ab12e231a167a8e1043170ef4",
+   "waveSize": "ab28443b18a1e9fba6ef576f5f78caec",
+   "waveLocation": "b830f3bf0b23eca8274173cd232af3ae",
+   "waveDirection": "8d692800cfa3f543328a6f7e02082b73",
+   "extra": {
+    "amp": "d6761741cb7176bab93f25dbe867d4e8",
+    "w": "50bef6390101c8f1ed9d01f01bdeb328"
+   }
+  }
+ },
+ "laszip-channels-format7.laz": {
+  "records": "5a1e316fee5f838836f455e2b3e03f0b4a2740015f4ed2e6f34de89a4e0189f7",
+  "format": 7,
+  "points": 2000,
+  "version": "1.4",
+  "fields": {
+   "positions": "bfeb6bf6110a722c1af0c3813bd3fb7c",
+   "intensity": "447a32cc90b89e638e458f5bcb28c2f4",
+   "returnNumber": "8d5f0c5e926e14ee942ada0634f47c7e",
+   "numberOfReturns": "26280a6efc1b71ece8af627263d165fb",
+   "classification": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "classificationFlags": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanDirection": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "edgeOfFlightLine": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanAngle": "12c40b32a67b85326ed2950da1a2e5a3",
+   "scannerChannel": "01c7a006f6e55839463e2752d8dec884",
+   "userData": "236b232fb94678b33f7cfe5d9b11edf4",
+   "pointSourceId": "52ebf5291818eb4ade70f6e9be75f4d1",
+   "gpsTime": "ce3f4600cf3097dc7d412017efb65900",
+   "rgb": "2b570ed3363ad1b1a64ba62f652ef0c9",
+   "extra": {
+    "amp": "d6761741cb7176bab93f25dbe867d4e8",
+    "w": "50bef6390101c8f1ed9d01f01bdeb328"
+   }
+  }
+ },
+ "laszip-channels-format8.laz": {
+  "records": "bcf08f92cafaa230883700d7e939b267c5a687f1ad769e00477e9cc5ae23913f",
+  "format": 8,
+  "points": 2000,
+  "version": "1.4",
+  "fields": {
+   "positions": "bfeb6bf6110a722c1af0c3813bd3fb7c",
+   "intensity": "447a32cc90b89e638e458f5bcb28c2f4",
+   "returnNumber": "8d5f0c5e926e14ee942ada0634f47c7e",
+   "numberOfReturns": "26280a6efc1b71ece8af627263d165fb",
+   "classification": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "classificationFlags": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanDirection": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "edgeOfFlightLine": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanAngle": "12c40b32a67b85326ed2950da1a2e5a3",
+   "scannerChannel": "a08418654afddb02df8c5015e5e12d84",
+   "userData": "236b232fb94678b33f7cfe5d9b11edf4",
+   "pointSourceId": "52ebf5291818eb4ade70f6e9be75f4d1",
+   "gpsTime": "ce3f4600cf3097dc7d412017efb65900",
+   "rgb": "2b570ed3363ad1b1a64ba62f652ef0c9",
+   "nir": "fc19b1997119425765295aeab72d76fa",
+   "extra": {
+    "amp": "d6761741cb7176bab93f25dbe867d4e8",
+    "w": "50bef6390101c8f1ed9d01f01bdeb328"
+   }
+  }
+ },
+ "laszip-channels-format9.laz": {
+  "records": "ab3589003e3c7f28a01414bbbf2ceee9f1cfdadac5b5fecb04ae26f9d190e51d",
+  "format": 9,
+  "points": 2000,
+  "version": "1.4",
+  "fields": {
+   "positions": "bfeb6bf6110a722c1af0c3813bd3fb7c",
+   "intensity": "447a32cc90b89e638e458f5bcb28c2f4",
+   "returnNumber": "8d5f0c5e926e14ee942ada0634f47c7e",
+   "numberOfReturns": "26280a6efc1b71ece8af627263d165fb",
+   "classification": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "classificationFlags": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanDirection": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "edgeOfFlightLine": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanAngle": "12c40b32a67b85326ed2950da1a2e5a3",
+   "scannerChannel": "933922e2fc8f76f65eb2a9b73d91cba9",
+   "userData": "236b232fb94678b33f7cfe5d9b11edf4",
+   "pointSourceId": "52ebf5291818eb4ade70f6e9be75f4d1",
+   "gpsTime": "ce3f4600cf3097dc7d412017efb65900",
+   "waveDescriptor": "b5421e9a0cc3e349bc919100ac21e36b",
+   "waveOffset": "8529db7d408c21e34a45c0e7a301b9f8",
+   "waveSize": "ab28443b18a1e9fba6ef576f5f78caec",
+   "waveLocation": "b830f3bf0b23eca8274173cd232af3ae",
+   "waveDirection": "8d692800cfa3f543328a6f7e02082b73",
+   "extra": {
+    "amp": "d6761741cb7176bab93f25dbe867d4e8",
+    "w": "50bef6390101c8f1ed9d01f01bdeb328"
+   }
+  }
+ },
+ "laszip-format4.laz": {
+  "records": "a999293b6ddf1411297a82d73d6af28f4e23bd1e0b37a930ce37a5f828703d77",
+  "format": 4,
+  "points": 999,
+  "version": "1.3",
+  "fields": {
+   "positions": "197768d2a8cfcecd0924c58ea32e66b1",
+   "intensity": "6202ef97c5b8a6f1b370ed583c54df81",
+   "returnNumber": "1237ca5abf7d2ffedbe69350135b18d4",
+   "numberOfReturns": "1237ca5abf7d2ffedbe69350135b18d4",
+   "classification": "1237ca5abf7d2ffedbe69350135b18d4",
+   "classificationFlags": "84ba348aafb41879cfa434256c8657ba",
+   "scanDirection": "1ae886ae4b082eebf4a3dee52ccbf9ce",
+   "edgeOfFlightLine": "93fe16c593cf69839dd85f14202c31b5",
+   "scanAngle": "4665f776202785f89e19acbdbdff299f",
+   "userData": "84ba348aafb41879cfa434256c8657ba",
+   "pointSourceId": "b04c0fe8871e95dd3fa71aefe20543d2",
+   "gpsTime": "5bdd910b27ecdb22629fa000a35a88b1",
+   "waveDescriptor": "1237ca5abf7d2ffedbe69350135b18d4",
+   "waveOffset": "0a146c6f73b081cfd9b3fa25846f920f",
+   "waveSize": "439a2db8e059d8cdf0f43bcd49c4507f",
+   "waveLocation": "73bad3ed10166d9f182c6bc951180e4c",
+   "waveDirection": "bbf5a39e68f6a8153fa020d7c4cde297"
+  }
+ },
+ "laszip-format5.laz": {
+  "records": "3a6382f9901ad9f856d2a97dc2351758cd6b92b320b7d7c1c9530ef5beda0376",
+  "format": 5,
+  "points": 2000,
+  "version": "1.4",
+  "fields": {
+   "positions": "bfeb6bf6110a722c1af0c3813bd3fb7c",
+   "intensity": "447a32cc90b89e638e458f5bcb28c2f4",
+   "returnNumber": "8d5f0c5e926e14ee942ada0634f47c7e",
+   "numberOfReturns": "26280a6efc1b71ece8af627263d165fb",
+   "classification": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "classificationFlags": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanDirection": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "edgeOfFlightLine": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanAngle": "668946bab9868b28489bb906205ee102",
+   "userData": "236b232fb94678b33f7cfe5d9b11edf4",
+   "pointSourceId": "52ebf5291818eb4ade70f6e9be75f4d1",
+   "gpsTime": "ce3f4600cf3097dc7d412017efb65900",
+   "rgb": "2b570ed3363ad1b1a64ba62f652ef0c9",
+   "waveDescriptor": "236b232fb94678b33f7cfe5d9b11edf4",
+   "waveOffset": "69e9da23fc96e2eaf8af6bbc43ddb01f",
+   "waveSize": "ab28443b18a1e9fba6ef576f5f78caec",
+   "waveLocation": "b830f3bf0b23eca8274173cd232af3ae",
+   "waveDirection": "8d692800cfa3f543328a6f7e02082b73"
+  }
+ },
+ "laszip-format9.laz": {
+  "records": "6136280f3aea61f1e6c3a0992df9349d16ac4ac51e8c9afd06ce71ed10be5988",
+  "format": 9,
+  "points": 2000,
+  "version": "1.4",
+  "fields": {
+   "positions": "bfeb6bf6110a722c1af0c3813bd3fb7c",
+   "intensity": "447a32cc90b89e638e458f5bcb28c2f4",
+   "returnNumber": "8d5f0c5e926e14ee942ada0634f47c7e",
+   "numberOfReturns": "26280a6efc1b71ece8af627263d165fb",
+   "classification": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "classificationFlags": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanDirection": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "edgeOfFlightLine": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "scanAngle": "12c40b32a67b85326ed2950da1a2e5a3",
+   "scannerChannel": "2da42fb1d7bd8524e83d5a1e332bad69",
+   "userData": "236b232fb94678b33f7cfe5d9b11edf4",
+   "pointSourceId": "52ebf5291818eb4ade70f6e9be75f4d1",
+   "gpsTime": "ce3f4600cf3097dc7d412017efb65900",
+   "waveDescriptor": "236b232fb94678b33f7cfe5d9b11edf4",
+   "waveOffset": "69e9da23fc96e2eaf8af6bbc43ddb01f",
+   "waveSize": "ab28443b18a1e9fba6ef576f5f78caec",
+   "waveLocation": "b830f3bf0b23eca8274173cd232af3ae",
+   "waveDirection": "8d692800cfa3f543328a6f7e02082b73"
+  }
+ },
+ "point-color.las": {
+  "format": 2,
+  "points": 1065,
+  "version": "1.2",
+  "fields": {
+   "positions": "8bb9a9ff4c3bddc0cbeb3ec88d719830",
+   "intensity": "701d089da4d2aea3039455e65bbbddaf",
+   "returnNumber": "7eee8d7c7b4b6c4d67b1171623014348",
+   "numberOfReturns": "090354c9c89460950a14b1c8953e5768",
+   "classification": "e675481bd41b08c40f6a6ee9893cbc46",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "51dcee3b680812942769f3f6611ac35c",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "59fa79b54c120720b35a413825dffc1a",
+   "userData": "6a5b9c51bb2a65ebd38a8d6302b6d602",
+   "pointSourceId": "56251dc92fd62a3a75d82208a2a70bab",
+   "rgb": "a4d4a67da11adee4b54a5de988862933"
+  }
+ },
+ "point-color.laz": {
+  "records": "b31e5bc003bae4f6dab5ab7f81488bfc6854a758dd71f1b38a6753425af7c76d",
+  "format": 2,
+  "points": 1065,
+  "version": "1.2",
+  "fields": {
+   "positions": "8bb9a9ff4c3bddc0cbeb3ec88d719830",
+   "intensity": "701d089da4d2aea3039455e65bbbddaf",
+   "returnNumber": "7eee8d7c7b4b6c4d67b1171623014348",
+   "numberOfReturns": "090354c9c89460950a14b1c8953e5768",
+   "classification": "e675481bd41b08c40f6a6ee9893cbc46",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "51dcee3b680812942769f3f6611ac35c",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "59fa79b54c120720b35a413825dffc1a",
+   "userData": "6a5b9c51bb2a65ebd38a8d6302b6d602",
+   "pointSourceId": "56251dc92fd62a3a75d82208a2a70bab",
+   "rgb": "a4d4a67da11adee4b54a5de988862933"
+  }
+ },
+ "point-time-color.las": {
+  "format": 3,
+  "points": 1065,
+  "version": "1.2",
+  "fields": {
+   "positions": "8bb9a9ff4c3bddc0cbeb3ec88d719830",
+   "intensity": "701d089da4d2aea3039455e65bbbddaf",
+   "returnNumber": "7eee8d7c7b4b6c4d67b1171623014348",
+   "numberOfReturns": "090354c9c89460950a14b1c8953e5768",
+   "classification": "e675481bd41b08c40f6a6ee9893cbc46",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "51dcee3b680812942769f3f6611ac35c",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "59fa79b54c120720b35a413825dffc1a",
+   "userData": "6a5b9c51bb2a65ebd38a8d6302b6d602",
+   "pointSourceId": "56251dc92fd62a3a75d82208a2a70bab",
+   "gpsTime": "52782da5675757d55dec840fdccc8863",
+   "rgb": "a4d4a67da11adee4b54a5de988862933"
+  }
+ },
+ "point-time-color.laz": {
+  "records": "df9ea7bd185ff9d99700cbfced75989bb91415a12c893381273cca1dbd7182c1",
+  "format": 3,
+  "points": 1065,
+  "version": "1.2",
+  "fields": {
+   "positions": "8bb9a9ff4c3bddc0cbeb3ec88d719830",
+   "intensity": "701d089da4d2aea3039455e65bbbddaf",
+   "returnNumber": "7eee8d7c7b4b6c4d67b1171623014348",
+   "numberOfReturns": "090354c9c89460950a14b1c8953e5768",
+   "classification": "e675481bd41b08c40f6a6ee9893cbc46",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "51dcee3b680812942769f3f6611ac35c",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "59fa79b54c120720b35a413825dffc1a",
+   "userData": "6a5b9c51bb2a65ebd38a8d6302b6d602",
+   "pointSourceId": "56251dc92fd62a3a75d82208a2a70bab",
+   "gpsTime": "52782da5675757d55dec840fdccc8863",
+   "rgb": "a4d4a67da11adee4b54a5de988862933"
+  }
+ },
+ "point-time.las": {
+  "format": 1,
+  "points": 1065,
+  "version": "1.2",
+  "fields": {
+   "positions": "8bb9a9ff4c3bddc0cbeb3ec88d719830",
+   "intensity": "701d089da4d2aea3039455e65bbbddaf",
+   "returnNumber": "7eee8d7c7b4b6c4d67b1171623014348",
+   "numberOfReturns": "090354c9c89460950a14b1c8953e5768",
+   "classification": "e675481bd41b08c40f6a6ee9893cbc46",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "51dcee3b680812942769f3f6611ac35c",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "59fa79b54c120720b35a413825dffc1a",
+   "userData": "6a5b9c51bb2a65ebd38a8d6302b6d602",
+   "pointSourceId": "56251dc92fd62a3a75d82208a2a70bab",
+   "gpsTime": "52782da5675757d55dec840fdccc8863"
+  }
+ },
+ "point-time.laz": {
+  "records": "0e80c2de788f2a50a3a2797cd807af2434ecd3fd3b8330a2087f699725c94874",
+  "format": 1,
+  "points": 1065,
+  "version": "1.2",
+  "fields": {
+   "positions": "8bb9a9ff4c3bddc0cbeb3ec88d719830",
+   "intensity": "701d089da4d2aea3039455e65bbbddaf",
+   "returnNumber": "7eee8d7c7b4b6c4d67b1171623014348",
+   "numberOfReturns": "090354c9c89460950a14b1c8953e5768",
+   "classification": "e675481bd41b08c40f6a6ee9893cbc46",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "51dcee3b680812942769f3f6611ac35c",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "59fa79b54c120720b35a413825dffc1a",
+   "userData": "6a5b9c51bb2a65ebd38a8d6302b6d602",
+   "pointSourceId": "56251dc92fd62a3a75d82208a2a70bab",
+   "gpsTime": "52782da5675757d55dec840fdccc8863"
+  }
+ },
+ "point-version-1-point-wise.laz": {
+  "records": "bc1d14fa2fe3c6e0e8c9e922812176f70fdd772123cc77d05a032ac7fed97a15",
+  "format": 0,
+  "points": 11781,
+  "version": "1.0",
+  "fields": {
+   "positions": "ad4630f23a1f7af6d01860ddc55d0f6e",
+   "intensity": "db9e8f799f544062709d7d284c453d19",
+   "returnNumber": "acef9dd76ca54a471983904a3ce404d6",
+   "numberOfReturns": "2976dc2e0da27597209208bb53b249ca",
+   "classification": "25e786c16d0b16a964ce5a39c76f6fe9",
+   "classificationFlags": "93093283394cfd59eb978c2d501357db",
+   "scanDirection": "a93151df0ced43cfa8872c1e2248f746",
+   "edgeOfFlightLine": "93093283394cfd59eb978c2d501357db",
+   "scanAngle": "830838600e763fa14e39a549538c1362",
+   "userData": "93093283394cfd59eb978c2d501357db",
+   "pointSourceId": "2131d2bd230a0ff0a6787f7e566154c3"
+  }
+ },
+ "point10.las": {
+  "format": 0,
+  "points": 1065,
+  "version": "1.2",
+  "fields": {
+   "positions": "8bb9a9ff4c3bddc0cbeb3ec88d719830",
+   "intensity": "701d089da4d2aea3039455e65bbbddaf",
+   "returnNumber": "7eee8d7c7b4b6c4d67b1171623014348",
+   "numberOfReturns": "090354c9c89460950a14b1c8953e5768",
+   "classification": "e675481bd41b08c40f6a6ee9893cbc46",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "51dcee3b680812942769f3f6611ac35c",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "59fa79b54c120720b35a413825dffc1a",
+   "userData": "6a5b9c51bb2a65ebd38a8d6302b6d602",
+   "pointSourceId": "56251dc92fd62a3a75d82208a2a70bab"
+  }
+ },
+ "point10.laz": {
+  "records": "d2033d0504e6b849a1301368703f90c77eda09c93e5d623e89cab06cb98ad63f",
+  "format": 0,
+  "points": 1065,
+  "version": "1.2",
+  "fields": {
+   "positions": "8bb9a9ff4c3bddc0cbeb3ec88d719830",
+   "intensity": "701d089da4d2aea3039455e65bbbddaf",
+   "returnNumber": "7eee8d7c7b4b6c4d67b1171623014348",
+   "numberOfReturns": "090354c9c89460950a14b1c8953e5768",
+   "classification": "e675481bd41b08c40f6a6ee9893cbc46",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "51dcee3b680812942769f3f6611ac35c",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "59fa79b54c120720b35a413825dffc1a",
+   "userData": "6a5b9c51bb2a65ebd38a8d6302b6d602",
+   "pointSourceId": "56251dc92fd62a3a75d82208a2a70bab"
+  }
+ },
+ "simple.copc.laz": {
+  "records": "361eda6829430490b1bba3a2665408642d16211f6c349b2f11edf451c8164422",
+  "format": 7,
+  "points": 1065,
+  "version": "1.4",
+  "fields": {
+   "positions": "7c394a5adf434e249a5068d235df8489",
+   "intensity": "459ae85510a08cf407972869b05665d3",
+   "returnNumber": "92196e847fe372f488d2bea8b2f1d67a",
+   "numberOfReturns": "9d0bbb2fc0da8c2d75b2cd369890068c",
+   "classification": "41e1e1cbb9fb124a24ce2339f78c87b0",
+   "classificationFlags": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanDirection": "1695d2686cebc4c157a3d136c23e62e5",
+   "edgeOfFlightLine": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "scanAngle": "4ac306e307b95912440ffb2eb14006bb",
+   "scannerChannel": "c2ed6cf29064edb9cd5a7d036ed76e2f",
+   "userData": "7c2c317373996f5de760fba362c8a384",
+   "pointSourceId": "f4bce6ed8452a525efaa9e167f51e47d",
+   "gpsTime": "38401e65cd1a6cd483ba9523ac327d92",
+   "rgb": "b86b9870e4a2fe34aeaf045e6a3e033d"
+  }
+ },
+ "simple1_3.las": {
+  "format": 4,
+  "points": 999,
+  "version": "1.3",
+  "fields": {
+   "positions": "1329ec2efba58470c31b9e1c8d2704cc",
+   "intensity": "6202ef97c5b8a6f1b370ed583c54df81",
+   "returnNumber": "1237ca5abf7d2ffedbe69350135b18d4",
+   "numberOfReturns": "1237ca5abf7d2ffedbe69350135b18d4",
+   "classification": "1237ca5abf7d2ffedbe69350135b18d4",
+   "classificationFlags": "84ba348aafb41879cfa434256c8657ba",
+   "scanDirection": "1ae886ae4b082eebf4a3dee52ccbf9ce",
+   "edgeOfFlightLine": "93fe16c593cf69839dd85f14202c31b5",
+   "scanAngle": "4665f776202785f89e19acbdbdff299f",
+   "userData": "84ba348aafb41879cfa434256c8657ba",
+   "pointSourceId": "b04c0fe8871e95dd3fa71aefe20543d2",
+   "gpsTime": "5bdd910b27ecdb22629fa000a35a88b1",
+   "waveDescriptor": "1237ca5abf7d2ffedbe69350135b18d4",
+   "waveOffset": "0a146c6f73b081cfd9b3fa25846f920f",
+   "waveSize": "439a2db8e059d8cdf0f43bcd49c4507f",
+   "waveLocation": "73bad3ed10166d9f182c6bc951180e4c",
+   "waveDirection": "bbf5a39e68f6a8153fa020d7c4cde297"
+  }
+ },
+ "USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz": {
+  "records": "78e0e96cf554567e2af6ca81083a0da8a3e1a04cbbc0bff3068bb9a2226b5bac",
+  "format": 6,
+  "points": 54634,
+  "version": "1.4",
+  "fields": {
+   "positions": "92296e9a706e10eef9108484f3b0508a",
+   "intensity": "443d31c717b789f4ff3e84ed423338a3",
+   "returnNumber": "9b2d0b81358f094f729cb371cc1fa519",
+   "numberOfReturns": "d4bf3d911a65bfcf00035551dc4978f8",
+   "classification": "4e1c12bd5801abcbf1de01e357285eed",
+   "classificationFlags": "171f59fa4b20208c2aac2ded8c6eef0a",
+   "scanDirection": "4b7b81d7d7f24d6a07ffd708aa3ddcb5",
+   "edgeOfFlightLine": "171f59fa4b20208c2aac2ded8c6eef0a",
+   "scanAngle": "5c37db444be1e945c31ae8aadba1b245",
+   "scannerChannel": "4e0fe87b21fe3ff5b5adf2beddabbae6",
+   "userData": "4e0fe87b21fe3ff5b5adf2beddabbae6",
+   "pointSourceId": "7ed32447593cae9d689fbfbf8a253eb7",
+   "gpsTime": "5b9c321debea1d2a260b2e31e004b3ff"
+  }
+ }
+}

@@ -599,7 +599,7 @@ class Point14Writer {
   init(view, at) {
     const p = read14(view, at);
     this.contexts = [];
-    this.channel.current = p.channel;
+    this.channel.current = this.channel.item = p.channel;
     this.context(p.channel, p);
   }
   write(view, at) {
@@ -625,10 +625,11 @@ class Point14Writer {
       (p.returns !== t.returns ? 4 : 0) |
       code;
     xy.symbol(ctx.changed[lpr], changed);
+    this.channel.item = 0;
     if (switched) {
       xy.symbol(ctx.channel, ((p.channel - this.channel.current + 4) & 3) - 1);
       ctx = target ?? this.context(p.channel, last);
-      this.channel.current = p.channel;
+      this.channel.current = this.channel.item = p.channel;
       last = ctx.last;
       last.channel = p.channel;
     }
@@ -687,7 +688,18 @@ class Point14Writer {
   }
 }
 
-/** RGB14 / RGBNIR14 / BYTE14: per scanner channel contexts that follow the point14 channel. */
+/** The context rule of the layered items after point14: models of the record's context, last value of the one before. */
+function pickContext(writer) {
+  const context = writer.channel.item;
+  let holder = writer.contexts[writer.current];
+  if (writer.current !== context) {
+    writer.current = context;
+    if (!writer.contexts[context]) holder = writer.context(context, holder.last);
+  }
+  return { ctx: writer.contexts[context], last: holder.last };
+}
+
+/** RGB14 / RGBNIR14 / BYTE14: per context models, by the rule of `pickContext`. */
 class ChannelWriter {
   constructor(channel, size, kind) {
     this.channel = channel;
@@ -719,13 +731,8 @@ class ChannelWriter {
     this.context(this.current, this.values(view, at));
   }
   write(view, at) {
-    let ctx = this.contexts[this.current];
-    if (this.current !== this.channel.current) {
-      this.current = this.channel.current;
-      ctx = this.contexts[this.current] ?? this.context(this.current, ctx.last);
-    }
-    const v = this.values(view, at),
-      last = ctx.last;
+    const { ctx, last } = pickContext(this),
+      v = this.values(view, at);
     if (this.kind === 'bytes') {
       for (let i = 0; i < this.size; i++) {
         this.layers[i].enc.symbol(ctx.bytes[i], (v[i] - last[i]) & 255);
@@ -754,6 +761,99 @@ class ChannelWriter {
   }
 }
 
+/** Reads the fields of a wave packet record. */
+const readWave = (view, at) => ({
+  index: view.getUint8(at),
+  offset: view.getBigUint64(at + 1, true),
+  size: view.getInt32(at + 9, true),
+  location: view.getInt32(at + 13, true),
+  direction: [view.getInt32(at + 17, true), view.getInt32(at + 21, true), view.getInt32(at + 25, true)],
+});
+
+const waveModels = (enc) => ({
+  index: new SymbolModel(256),
+  type: Array.from({ length: 4 }, () => new SymbolModel(4)),
+  diff: new IntegerCompressor(enc, 32),
+  size: new IntegerCompressor(enc, 32),
+  location: new IntegerCompressor(enc, 32),
+  direction: new IntegerCompressor(enc, 32, 3),
+  lastType: 0,
+  lastDiff: 0,
+});
+
+/** Encodes `w` after `last`. Returns whether any field changed. */
+function writeWave(enc, m, last, w) {
+  enc.symbol(m.index, w.index);
+  const delta = BigInt.asIntN(64, w.offset - last.offset),
+    type =
+      delta === 0n
+        ? 0
+        : w.offset === BigInt.asUintN(64, last.offset + BigInt(last.size >>> 0))
+          ? 1
+          : delta === BigInt.asIntN(32, delta)
+            ? 2
+            : 3;
+  enc.symbol(m.type[m.lastType], type);
+  m.lastType = type;
+  if (type === 2) {
+    m.diff.compress(m.lastDiff, Number(delta));
+    m.lastDiff = Number(delta);
+  } else if (type === 3) {
+    enc.int(Number(w.offset & 0xffffffffn));
+    enc.int(Number(w.offset >> 32n));
+  }
+  m.size.compress(last.size, w.size);
+  m.location.compress(last.location, w.location);
+  for (let c = 0; c < 3; c++) m.direction.compress(last.direction[c], w.direction[c], c);
+  const changed =
+    w.index !== last.index ||
+    delta !== 0n ||
+    w.size !== last.size ||
+    w.location !== last.location ||
+    w.direction.some((v, c) => v !== last.direction[c]);
+  Object.assign(last, w);
+  return changed;
+}
+
+class Wave13Writer {
+  constructor(enc) {
+    this.size = 29;
+    this.enc = enc;
+    this.models = waveModels(enc);
+  }
+  init(view, at) {
+    this.last = readWave(view, at);
+  }
+  write(view, at) {
+    writeWave(this.enc, this.models, this.last, readWave(view, at));
+  }
+}
+
+class Wave14Writer {
+  constructor(channel) {
+    this.size = 29;
+    this.channel = channel;
+  }
+  start() {
+    this.layer = new Layer();
+  }
+  context(c, last) {
+    return (this.contexts[c] = { last: { ...last }, models: waveModels(this.layer.enc) });
+  }
+  init(view, at) {
+    this.contexts = [];
+    this.current = this.channel.current;
+    this.context(this.current, readWave(view, at));
+  }
+  write(view, at) {
+    const { ctx, last } = pickContext(this);
+    if (writeWave(this.layer.enc, ctx.models, last, readWave(view, at))) this.layer.changed = true;
+  }
+  chunkLayers() {
+    return [this.layer.bytes(false)];
+  }
+}
+
 const concat = (parts) => {
   const out = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
   let at = 0;
@@ -765,24 +865,38 @@ const concat = (parts) => {
 };
 
 /**
- * Compresses an uncompressed LAS file (formats 0 to 3 and 6 to 8, any extra bytes) to LAZ.
+ * Compresses an uncompressed LAS file (formats 0 to 10, any extra bytes) to LAZ.
  * `chunkSize`: points per chunk (default 50,000); `chunks`: explicit chunk point counts (variable chunks);
  * `tableAtEnd`: write -1 as the chunk table offset and the offset in the file's last 8 bytes.
+ * `pointwise`: compressor 1, one stream with no chunk table (formats 0 to 5); `adaptiveZero`: mark variable chunks with
+ * a chunk size of 0, the specification's other spelling of 2^32 - 1.
  * `override`: LASzip record fields to write instead (compressor, coder, item version, the item list) for the
  * unsupported-feature tests.
  */
-export function encodeLAZ(las, { chunkSize = 50_000, chunks, tableAtEnd = false, override = {} } = {}) {
+export function encodeLAZ(
+  las,
+  { chunkSize = 50_000, chunks, tableAtEnd = false, pointwise = false, adaptiveZero = false, override = {} } = {},
+) {
   const { header } = readLASHeader(las),
     format = header.pointFormat,
     length = header.pointRecordLength,
     count = header.pointCount,
     layered = format >= 6,
-    channel = { current: 0 };
+    channel = { current: 0, item: 0 };
   const base = [20, 28, 26, 34, 57, 63, 30, 36, 38, 59, 67][format],
     extra = length - base;
   const items = layered
-    ? [[10, 30], ...(format === 7 ? [[11, 6]] : format === 8 ? [[12, 8]] : [])]
-    : [[6, 20], ...([1, 3].includes(format) ? [[7, 8]] : []), ...([2, 3].includes(format) ? [[8, 6]] : [])];
+    ? [
+        [10, 30],
+        ...(format === 7 ? [[11, 6]] : format === 8 || format === 10 ? [[12, 8]] : []),
+        ...(format >= 9 ? [[13, 29]] : []),
+      ]
+    : [
+        [6, 20],
+        ...([1, 3, 4, 5].includes(format) ? [[7, 8]] : []),
+        ...([2, 3, 5].includes(format) ? [[8, 6]] : []),
+        ...(format >= 4 ? [[9, 29]] : []),
+      ];
   if (extra) items.push([layered ? 14 : 0, extra]);
   const version = layered ? 3 : 2;
   const makeWriters = (enc) =>
@@ -794,6 +908,10 @@ export function encodeLAZ(las, { chunkSize = 50_000, chunks, tableAtEnd = false,
           return new Gps11Writer(enc);
         case 8:
           return new Rgb12Writer(enc);
+        case 9:
+          return new Wave13Writer(enc);
+        case 13:
+          return new Wave14Writer(channel);
         case 0:
           return new ByteWriter(enc, size);
         case 10:
@@ -806,8 +924,8 @@ export function encodeLAZ(las, { chunkSize = 50_000, chunks, tableAtEnd = false,
           return new ChannelWriter(channel, size, 'bytes');
       }
     });
-  const counts = chunks ? [...chunks] : [];
-  if (!chunks) for (let left = count; left > 0; left -= chunkSize) counts.push(Math.min(chunkSize, left));
+  const counts = pointwise ? [count] : chunks ? [...chunks] : [];
+  if (!chunks && !pointwise) for (let left = count; left > 0; left -= chunkSize) counts.push(Math.min(chunkSize, left));
   const data = las.subarray(header.pointDataOffset),
     view = new DataView(data.buffer, data.byteOffset, data.byteLength);
   const parts = [];
@@ -866,18 +984,18 @@ export function encodeLAZ(las, { chunkSize = 50_000, chunks, tableAtEnd = false,
   // The LASzip record.
   const listed = override.items ?? items,
     vlr = new DataView(new ArrayBuffer(34 + listed.length * 6));
-  vlr.setUint16(0, override.compressor ?? (layered ? 3 : 2), true);
+  vlr.setUint16(0, override.compressor ?? (layered ? 3 : pointwise ? 1 : 2), true);
   vlr.setUint16(2, override.coder ?? 0, true);
   vlr.setUint8(4, 3);
   vlr.setUint8(5, 4);
-  vlr.setUint32(12, chunks ? 0xffffffff : chunkSize, true);
+  vlr.setUint32(12, pointwise || adaptiveZero ? 0 : chunks ? 0xffffffff : chunkSize, true);
   vlr.setBigInt64(16, -1n, true);
   vlr.setBigInt64(24, -1n, true);
   vlr.setUint16(32, listed.length, true);
   listed.forEach(([type, size], i) => {
     vlr.setUint16(34 + i * 6, type, true);
     vlr.setUint16(36 + i * 6, size, true);
-    vlr.setUint16(38 + i * 6, override.version ?? version, true);
+    vlr.setUint16(38 + i * 6, override.version ?? (type === 9 ? 1 : version), true);
   });
   const record = new Uint8Array(54 + vlr.byteLength),
     rv = new DataView(record.buffer);
@@ -891,6 +1009,7 @@ export function encodeLAZ(las, { chunkSize = 50_000, chunks, tableAtEnd = false,
   hv.setUint32(96, pointOffset, true);
   hv.setUint32(100, hv.getUint32(100, true) + 1, true);
   hv.setUint8(104, format | 0x80);
+  if (pointwise) return concat([head, record, ...parts]);
   const chunkBytes = concat(parts),
     tableOffset = pointOffset + 8 + chunkBytes.length,
     offset = new DataView(new ArrayBuffer(8));

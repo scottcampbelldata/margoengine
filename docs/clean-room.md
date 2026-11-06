@@ -631,7 +631,7 @@ File formats written from their public descriptions; no reader of another projec
 | LF21 | KML `Model`, `Location`, `Orientation` and `Scale`, and the KMZ layout | loaders/src/kmz.ts | OGC, "KML 2.3" standard |
 | LF22 | B-spline basis functions, knot spans and rational evaluation | loaders/src/nurbs.ts | Piegl and Tiller, "The NURBS Book" (2nd ed., 1997), algorithms A2.1 to A2.3 and A4.1, written from the published mathematics |
 | LF23 | Rational circle and sphere test shapes | loaders/tests/nurbs.test.js | Piegl and Tiller, "The NURBS Book", chapter 7 |
-| LF24 | LAS public header, variable records and point formats 0 to 10 | loaders/src/las.ts | ASPRS, "LAS Specification" 1.4 R15 and earlier versions |
+| LF24 | LAS public header, variable records and point formats 0 to 10 | points/src/las.ts, read through loaders/src/las.ts | ASPRS, "LAS Specification" 1.4 R15 and earlier versions |
 | LF25 | The VDB tree: a root table over internal nodes over leaf blocks, active masks, tiles, background | loaders/src/vdb.ts | K. Museth, "VDB: High-Resolution Sparse Volumes with Dynamic Topology", ACM Transactions on Graphics 32(3), 2013 |
 | LF26 | `.vdb` byte layout: header, metadata, grid descriptors, transforms, topology, value kinds | loaders/src/vdb.ts | No published specification exists. Written from the agent's general knowledge of the format, with no OpenVDB source open; not yet checked against a real file (known-bugs.md) |
 | LF27 | Blosc chunk header, block offsets and byte shuffle | loaders/src/vdb.ts | The Blosc project's public chunk format description |
@@ -758,7 +758,7 @@ Written clean room from the specifications and papers below. No source code of p
 | Nested-sample octree | Grid subsampling per node as described in M. Schütz, "Potree: Rendering Large Point Clouds in Web Browsers", diploma thesis, TU Wien, 2016 (the idea only); budget-ordered node selection by projected size |
 | Seeded shuffle | Fisher-Yates (Knuth, TAOCP vol. 2, algorithm P) with the mulberry32 generator |
 | Polygon area | Newell's method for a polygon's normal (M. E. Newell, 1972, as in F. S. Hill, "Computer Graphics", 1990) |
-| LAZ decoder (`/laz`) and the test-only encoder | M. Isenburg, "LASzip: lossless compression of LiDAR data", Photogrammetric Engineering and Remote Sensing 79(2), 2013 (item predictors, return contexts, GPS time sequences, integer corrector coding); the public LAZ format description (record "laszip encoded" 22204, compressor and item ids, chunk table, layered point14 chunks); I. H. Witten, R. M. Neal and J. G. Cleary, "Arithmetic coding for data compression", CACM 30(6), 1987, and A. Said, "Introduction to arithmetic coding: theory and practice", HP Labs HPL-2004-76, 2004 (32-bit range coder, adaptive bit and symbol models) |
+| LAZ decoder (`/laz`) and the test-only encoder | M. Isenburg, "LASzip: lossless compression of LiDAR data", Photogrammetric Engineering and Remote Sensing 79(2), 2013 (item predictors, return contexts, GPS time sequences, integer corrector coding); the LAZ Specification 1.4 R1 from rapidlasso (record "laszip encoded" 22204, compressors, item ids and versions, chunk table, layered point14 chunks, wave packets); I. H. Witten, R. M. Neal and J. G. Cleary, "Arithmetic coding for data compression", CACM 30(6), 1987, and A. Said, "Introduction to arithmetic coding: theory and practice", HP Labs HPL-2004-76, 2004 (32-bit range coder, adaptive bit and symbol models) |
 
 Verified against a real USGS file: yes (2026-10-27). `packages/points/tests/fixtures/USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz`
 (public domain 3DEP tile, LAS 1.4, point format 6, written by LASzip 3.4.3, 54,634 points, two chunks) decodes to the point
@@ -767,14 +767,24 @@ once by laspy 2.7.0 with lazrs 0.8.2 (installed in a throwaway virtual environme
 through their public Python API as a black box; nothing from them is in the repository, package.json or the lock file).
 Verified against laspy 2.7.0 / lazrs 0.8.2 on a real USGS file: all 54,634 points are field by field identical (raw
 integer X, Y and Z, intensity, return number, number of returns, flag byte with scanner channel, classification, user
-data, scan angle, point source id and the GPS time bit for bit; the 1,639,020 record bytes are equal). The file has no
-RGB, NIR or extra bytes, so those are still verified only against the encoder. It exposed two errors that the
+data, scan angle, point source id and the GPS time bit for bit; the 1,639,020 record bytes are equal). It exposed two errors that the
 encoder-made files could not: in point14 the GPS time sequence model has 515 symbols (a new sequence is 511, the
 switches 512 to 514), not the 516 of GPSTIME11 (LAZ specification 1.4, note 6 of the point14 item); and a multiplier 1
 GPS point leaves the stored difference unchanged (the file is the authority; the specification text is silent). The
-test encoder follows both readings. Formats 0 to 3, 7 and 8 and RGB, NIR and extra bytes are still verified only
-against the encoder; the GPSTIME11 coding of formats 0 to 3 keeps its own reading until a real file of those formats is
-checked.
+test encoder follows both readings.
+
+Verified against real files in every point format: yes (2026-11-06). `packages/points/tests/laz-real.test.js` holds what
+LASzip (through the `laszip` Python module) and lazrs 0.8.2 decode from public files of formats 0 to 3, 6, 7, 8 and 10,
+and from real points LASzip itself compressed for formats 4, 5 and 9, as SHA-256 digests in
+`packages/points/tests/fixtures/laz/records.json`. GPSTIME11, RGB12, RGB14, RGBNIR14, BYTE, BYTE14, WAVEPACKET13 and
+WAVEPACKET14 are all covered, so the GPSTIME11 reading above is now checked on real files. Both decoders ran outside
+the repository as black boxes through their public Python API; no source of LASzip, lazrs, laz-perf or laspy was read.
+One rule came from that comparison and not from a text, because the specification is silent: the context passed to the
+items after POINT14 is the new scanner channel only on a record where the channel changed, and 0 on every other record;
+a record reads the last values of the record before it with the models of its own context, and a context first used in
+a chunk takes a copy of those values. The test encoder follows this too. Item version 1, the coding of LASzip 1.0, is
+refused: the LAZ specification calls it outdated and leaves it out, and the LASzip paper says it does not describe it.
+Reading LASzip's source to get it is what this file rules out.
 The LAZ specification PDF was read from downloads.rapidlasso.de (public format description, no code).
 
 ## Cutscenes: `@margoengine/cutscene`

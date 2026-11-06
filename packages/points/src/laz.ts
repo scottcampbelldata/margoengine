@@ -26,7 +26,7 @@ export interface LazItem {
 
 /** The LASzip record (user id `laszip encoded`, record id 22204) of a LAZ file. */
 export interface LazInfo {
-  /** 1 pointwise, 2 pointwise chunked (formats 0 to 5), 3 layered chunked (formats 6 to 10). */
+  /** 0 none (plain records), 1 pointwise, 2 pointwise chunked (formats 0 to 5), 3 layered chunked (formats 6 to 10). */
   readonly compressor: number;
   /** 0: arithmetic coding (the only coder defined). */
   readonly coder: number;
@@ -96,13 +96,15 @@ export function lazInfo(records: readonly LASRecord[]): LazInfo {
       version: view.getUint16(38 + i * 6, true),
     });
   }
-  const chunk = view.getUint32(12, true);
+  const chunk = view.getUint32(12, true),
+    compressor = view.getUint16(0, true);
   return {
-    compressor: view.getUint16(0, true),
+    compressor,
     coder: view.getUint16(2, true),
     version: `${view.getUint8(4)}.${view.getUint8(5)}.${view.getUint16(6, true)}`,
     options: view.getUint32(8, true),
-    chunkSize: chunk === VARIABLE ? 'variable' : chunk,
+    // Both 2^32 - 1 and 0 mean adaptive chunks; a file without chunks (compressors 0 and 1) stores 0 or 1 for nothing.
+    chunkSize: chunk === VARIABLE || (chunk === 0 && compressor >= 2) ? 'variable' : chunk,
     items,
   };
 }
@@ -130,16 +132,14 @@ const unsupported = (what: string) =>
 /** Checks the items against the header and that every one is implemented. */
 function checkItems(info: LazInfo, header: LASHeader) {
   if (info.coder !== 0) throw unsupported(`coder ${info.coder} (only arithmetic coding, 0, is defined)`);
-  if (info.compressor === 0 || info.compressor === 1)
-    throw unsupported(
-      `compressor ${info.compressor} (${info.compressor ? 'pointwise without chunks, from LASzip 1.x' : 'none'})`,
-    );
-  if (info.compressor !== 2 && info.compressor !== 3) throw unsupported(`compressor ${info.compressor}`);
+  if (info.compressor > 3) throw unsupported(`compressor ${info.compressor}`);
+  // Compressor 0 is a plain LAS file with the record: its points need no item.
+  if (info.compressor === 0) return;
   const layered = info.compressor === 3,
     format = header.pointFormat;
   if (layered !== format >= 6)
     throw unsupported(
-      `point format ${format} with compressor ${info.compressor} (formats 0 to 5 use 2, formats 6 to 10 use 3)`,
+      `point format ${format} with compressor ${info.compressor} (formats 0 to 5 use 1 or 2, formats 6 to 10 use 3)`,
     );
   const expected = expectedItems(format, layered),
     types = info.items.map((i) => i.type),
@@ -161,18 +161,20 @@ function checkItems(info: LazInfo, header: LASHeader) {
     [POINT14]: 30,
     [RGB14]: 6,
     [RGBNIR14]: 8,
+    [WAVEPACKET13]: 29,
+    [WAVEPACKET14]: 29,
   };
   for (const item of info.items) {
-    if (item.type === WAVEPACKET13 || item.type === WAVEPACKET14)
-      throw unsupported(`item ${item.name} (waveform packets of point formats 4, 5, 9 and 10)`);
     if (sizes[item.type] !== undefined && sizes[item.type] !== item.size)
       throw new TypeError(
         `LASzip item ${item.name} has size ${item.size}, not ${sizes[item.type]}; the file is corrupt`,
       );
-    const version = layered ? 3 : 2;
+    const version = layered ? 3 : item.type === WAVEPACKET13 ? 1 : 2;
     if (item.version !== version)
       throw unsupported(
-        `item ${item.name} version ${item.version} (this decoder reads version ${version}, what LASzip 2 and 3 write)`,
+        item.version === 1 && version === 2
+          ? `item ${item.name} version 1 (the coding of LASzip 1.0, which neither the LAZ specification 1.4 nor the LASzip paper describes, so a clean room decoder has nothing to follow)`
+          : `item ${item.name} version ${item.version} (this decoder reads version ${version}, what LASzip 2 and 3 write)`,
       );
   }
 }
@@ -399,6 +401,12 @@ class RangeDecoder {
   readInt(): number {
     const low = this.readBits(16);
     return this.readBits(16) * 0x10000 + low;
+  }
+
+  /** 64 raw bits, the low half first. */
+  readInt64(): bigint {
+    const low = this.readInt();
+    return (BigInt(this.readInt()) << 32n) | BigInt(low);
   }
 }
 
@@ -900,6 +908,105 @@ class ByteReader implements ItemReader {
   }
 }
 
+/** A wave packet record (29 bytes). */
+class WavePacket {
+  index = 0;
+  offset = 0n;
+  size = 0;
+  location = 0;
+  dx = 0;
+  dy = 0;
+  dz = 0;
+  readFrom(view: DataView, at: number) {
+    this.index = view.getUint8(at);
+    this.offset = view.getBigUint64(at + 1, true);
+    this.size = view.getInt32(at + 9, true);
+    this.location = view.getInt32(at + 13, true);
+    this.dx = view.getInt32(at + 17, true);
+    this.dy = view.getInt32(at + 21, true);
+    this.dz = view.getInt32(at + 25, true);
+  }
+  copy(from: WavePacket) {
+    this.index = from.index;
+    this.offset = from.offset;
+    this.size = from.size;
+    this.location = from.location;
+    this.dx = from.dx;
+    this.dy = from.dy;
+    this.dz = from.dz;
+  }
+  writeTo(view: DataView, at: number) {
+    view.setUint8(at, this.index);
+    view.setBigUint64(at + 1, this.offset, true);
+    view.setInt32(at + 9, this.size, true);
+    view.setInt32(at + 13, this.location, true);
+    view.setInt32(at + 17, this.dx, true);
+    view.setInt32(at + 21, this.dy, true);
+    view.setInt32(at + 25, this.dz, true);
+  }
+}
+
+/** Models of a wave packet, with how the last record stored its offset. Floats are coded as the integers their bytes spell. */
+class WaveModels {
+  readonly index = new SymbolModel(256);
+  readonly offsetType = Array.from({ length: 4 }, () => new SymbolModel(4));
+  readonly offsetDiff: IntegerDecompressor;
+  lastType = 0;
+  /** The last difference stored with offset type 2. */
+  lastDiff = 0;
+  readonly size: IntegerDecompressor;
+  readonly location: IntegerDecompressor;
+  readonly direction: IntegerDecompressor;
+  constructor(dec: RangeDecoder) {
+    this.offsetDiff = new IntegerDecompressor(dec, 32);
+    this.size = new IntegerDecompressor(dec, 32);
+    this.location = new IntegerDecompressor(dec, 32);
+    this.direction = new IntegerDecompressor(dec, 32, 3);
+  }
+  reset() {
+    this.lastType = this.lastDiff = 0;
+    this.index.reset();
+    resetAll(this.offsetType);
+    this.offsetDiff.reset();
+    this.size.reset();
+    this.location.reset();
+    this.direction.reset();
+  }
+}
+
+/** Decodes the next wave packet over `last`. Offset types: 0 same, 1 after the last packet, 2 a difference, 3 stored. */
+function readWavePacket(dec: RangeDecoder, m: WaveModels, last: WavePacket) {
+  last.index = dec.decodeSymbol(m.index);
+  const type = (m.lastType = dec.decodeSymbol(m.offsetType[m.lastType]));
+  if (type === 1) last.offset = BigInt.asUintN(64, last.offset + BigInt(last.size >>> 0));
+  else if (type === 2) {
+    m.lastDiff = m.offsetDiff.decompress(m.lastDiff);
+    last.offset = BigInt.asUintN(64, last.offset + BigInt(m.lastDiff));
+  } else if (type === 3) last.offset = dec.readInt64();
+  last.size = m.size.decompress(last.size);
+  last.location = m.location.decompress(last.location);
+  last.dx = m.direction.decompress(last.dx, 0);
+  last.dy = m.direction.decompress(last.dy, 1);
+  last.dz = m.direction.decompress(last.dz, 2);
+}
+
+class Wave13Reader implements ItemReader {
+  readonly size = 29;
+  private readonly last = new WavePacket();
+  private readonly models: WaveModels;
+  constructor(private readonly dec: RangeDecoder) {
+    this.models = new WaveModels(dec);
+  }
+  init(view: DataView, at: number) {
+    this.models.reset();
+    this.last.readFrom(view, at);
+  }
+  read(view: DataView, at: number) {
+    readWavePacket(this.dec, this.models, this.last);
+    this.last.writeTo(view, at);
+  }
+}
+
 // --- point14 family (point formats 6 to 10), version 3, layered: one stream per attribute per chunk --------------
 
 /** The fields of a point14 record, as the predictors see them. */
@@ -1028,6 +1135,8 @@ class Point14Context {
 /** The scanner channel the point14 item last decoded, which the other layered items follow. */
 interface Channel {
   current: number;
+  /** The context the other items of this record use: see `ChannelReader`. */
+  item: number;
 }
 
 class Point14Reader implements LayeredReader {
@@ -1053,7 +1162,7 @@ class Point14Reader implements LayeredReader {
   init(view: DataView, at: number) {
     this.first.readFrom(view, at);
     for (const ctx of this.contexts) if (ctx) ctx.unused = true;
-    this.channel.current = this.first.channel;
+    this.channel.current = this.channel.item = this.first.channel;
     this.context(this.first.channel, this.first);
   }
 
@@ -1065,11 +1174,12 @@ class Point14Reader implements LayeredReader {
     // Context of the last point: first and/or last return, and whether its GPS time changed.
     const lpr = (last.ret === 1 ? 1 : 0) + (last.ret >= last.returns ? 2 : 0) + (last.gpsChange ? 4 : 0);
     const changed = dec[XY].decodeSymbol(ctx.changed[lpr]);
+    this.channel.item = 0;
     if (changed & 64) {
       const channel = (this.channel.current + dec[XY].decodeSymbol(ctx.channel) + 1) & 3,
         next = this.contexts[channel];
       ctx = next && !next.unused ? next : this.context(channel, last);
-      this.channel.current = channel;
+      this.channel.current = this.channel.item = channel;
       last = ctx.last;
       last.channel = channel;
     }
@@ -1136,7 +1246,17 @@ class Point14Reader implements LayeredReader {
   }
 }
 
-/** A layered item that follows the point14 scanner channel: per channel last value and models. */
+/**
+ * A layered item with models per context. The context is not simply the scanner channel, and the last value does not
+ * simply follow it (LAZ specification 1.4, clause 12.2, calls this an implementation problem that is nevertheless part
+ * of the standard):
+ *
+ * - The context is the new channel on a record where point14 switched channel, and 0 on every other record. The
+ *   specification does not say this. Files written by LASzip with channels switching do it, and reading them any other
+ *   way loses the colours after the second switch (`tests/laz-real.test.js`).
+ * - A record reads and writes the last value of the context the record before had, with the models of its own. Only a
+ *   context used for the first time in the chunk takes its own last value, a copy of that one.
+ */
 abstract class ChannelReader<C extends { unused: boolean }> implements LayeredReader {
   abstract readonly size: number;
   abstract readonly layers: number;
@@ -1148,7 +1268,8 @@ abstract class ChannelReader<C extends { unused: boolean }> implements LayeredRe
   protected abstract create(): C;
   /** Starts context `ctx` from a record's bytes (`view`) or from another context. */
   protected abstract start(ctx: C, from: DataView | C, at: number): void;
-  protected abstract decode(ctx: C, view: DataView, at: number): void;
+  /** Decodes a record with the models of `ctx`, over the last value of `holder`. */
+  protected abstract decode(ctx: C, holder: C, view: DataView, at: number): void;
 
   layer(i: number, bytes: Uint8Array, start: number, end: number, label: string) {
     this.dec[i] ??= new RangeDecoder();
@@ -1167,13 +1288,14 @@ abstract class ChannelReader<C extends { unused: boolean }> implements LayeredRe
     this.context(this.current, view, at);
   }
   read(view: DataView, at: number) {
-    let ctx = this.contexts[this.current]!;
-    if (this.current !== this.channel.current) {
-      this.current = this.channel.current;
-      const next = this.contexts[this.current];
-      ctx = next && !next.unused ? next : this.context(this.current, ctx, 0);
+    const context = this.channel.item;
+    let holder = this.contexts[this.current]!;
+    if (this.current !== context) {
+      this.current = context;
+      const next = this.contexts[context];
+      if (!next || next.unused) holder = this.context(context, holder, 0);
     }
-    this.decode(ctx, view, at);
+    this.decode(this.contexts[context]!, holder, view, at);
   }
 }
 
@@ -1204,19 +1326,20 @@ class Rgb14Reader extends ChannelReader<RgbContext> {
     if (!(from instanceof DataView)) ctx.last.set(from.last);
     else for (let c = 0; c < this.size / 2; c++) ctx.last[c] = from.getUint16(at + c * 2, true);
   }
-  protected decode(ctx: RgbContext, view: DataView, at: number) {
-    if (this.has[0]) readRgb(this.dec[0], ctx.rgb, ctx.last);
-    writeRgb(view, at, ctx.last);
+  protected decode(ctx: RgbContext, holder: RgbContext, view: DataView, at: number) {
+    const last = holder.last;
+    if (this.has[0]) readRgb(this.dec[0], ctx.rgb, last);
+    writeRgb(view, at, last);
     if (this.layers === 2) {
       if (this.has[1]) {
         const dec = this.dec[1],
           sym = dec.decodeSymbol(ctx.nirUsed),
-          l = ctx.last[3];
+          l = last[3];
         let v = sym & 1 ? (dec.decodeSymbol(ctx.nir[0]) + (l & 255)) & 255 : l & 255;
         v |= sym & 2 ? ((dec.decodeSymbol(ctx.nir[1]) + (l >> 8)) & 255) << 8 : l & 0xff00;
-        ctx.last[3] = v;
+        last[3] = v;
       }
-      view.setUint16(at + 6, ctx.last[3], true);
+      view.setUint16(at + 6, last[3], true);
     }
   }
 }
@@ -1248,11 +1371,38 @@ class Byte14Reader extends ChannelReader<BytesContext> {
     if (from instanceof DataView) for (let i = 0; i < this.size; i++) ctx.last[i] = from.getUint8(at + i);
     else ctx.last.set(from.last);
   }
-  protected decode(ctx: BytesContext, view: DataView, at: number) {
+  protected decode(ctx: BytesContext, holder: BytesContext, view: DataView, at: number) {
+    const last = holder.last;
     for (let i = 0; i < this.size; i++) {
-      if (this.has[i]) ctx.last[i] = (ctx.last[i] + this.dec[i].decodeSymbol(ctx.models[i])) & 255;
-      view.setUint8(at + i, ctx.last[i]);
+      if (this.has[i]) last[i] = (last[i] + this.dec[i].decodeSymbol(ctx.models[i])) & 255;
+      view.setUint8(at + i, last[i]);
     }
+  }
+}
+
+class WaveContext {
+  unused = true;
+  readonly last = new WavePacket();
+  readonly models: WaveModels;
+  constructor(dec: RangeDecoder) {
+    this.models = new WaveModels(dec);
+  }
+}
+
+class Wave14Reader extends ChannelReader<WaveContext> {
+  readonly size = 29;
+  readonly layers = 1;
+  protected create() {
+    return new WaveContext(this.dec[0]);
+  }
+  protected start(ctx: WaveContext, from: DataView | WaveContext, at: number) {
+    ctx.models.reset();
+    if (from instanceof DataView) ctx.last.readFrom(from, at);
+    else ctx.last.copy(from.last);
+  }
+  protected decode(ctx: WaveContext, holder: WaveContext, view: DataView, at: number) {
+    if (this.has[0]) readWavePacket(this.dec[0], ctx.models, holder.last);
+    holder.last.writeTo(view, at);
   }
 }
 
@@ -1318,7 +1468,7 @@ function chunkTable(file: Uint8Array, header: LASHeader, info: LazInfo): Chunk[]
 function readersFor(info: LazInfo): { readers: ItemReader[]; dec: RangeDecoder; layered: boolean } {
   const dec = new RangeDecoder(),
     layered = info.compressor === 3,
-    channel: Channel = { current: 0 };
+    channel: Channel = { current: 0, item: 0 };
   const readers = info.items.map((item): ItemReader => {
     switch (item.type) {
       case POINT10:
@@ -1327,6 +1477,8 @@ function readersFor(info: LazInfo): { readers: ItemReader[]; dec: RangeDecoder; 
         return new Gps11Reader(dec);
       case RGB12:
         return new Rgb12Reader(dec);
+      case WAVEPACKET13:
+        return new Wave13Reader(dec);
       case BYTE:
         return new ByteReader(dec, item.size);
       case POINT14:
@@ -1334,6 +1486,8 @@ function readersFor(info: LazInfo): { readers: ItemReader[]; dec: RangeDecoder; 
       case RGB14:
       case RGBNIR14:
         return new Rgb14Reader(channel, item.size);
+      case WAVEPACKET14:
+        return new Wave14Reader(channel);
       default:
         return new Byte14Reader(channel, item.size);
     }
@@ -1383,12 +1537,40 @@ function decodeChunk(
     reader.init(view, at);
     at += reader.size;
   }
-  for (let p = 1; p < chunk.count; p++) {
+  readRecords(readers, view, 1, chunk.count, length);
+}
+
+/** Decodes records `from` to `to` of `view`, each reader carrying on from the record before. */
+function readRecords(readers: readonly ItemReader[], view: DataView, from: number, to: number, length: number) {
+  for (let p = from; p < to; p++) {
     let o = p * length;
     for (const reader of readers) {
       reader.read(view, o);
       o += reader.size;
     }
+  }
+}
+
+/** Records per block of a file without chunks, so its uncompressed points are never held all at once. */
+const POINTWISE_BLOCK = 50000;
+
+/** Decodes a pointwise file, one stream from the first record to the end, one block at a time. */
+function* pointwiseBlocks(file: Uint8Array, header: LASHeader, plan: ReturnType<typeof readersFor>) {
+  const length = header.pointRecordLength,
+    total = header.pointCount;
+  if (!total) return;
+  const first = Math.min(POINTWISE_BLOCK, total),
+    out = new Uint8Array(first * length);
+  if (header.pointDataOffset + length > file.byteLength)
+    throw new RangeError('LAZ point data is shorter than its first point; the file is truncated');
+  decodeChunk(file, { start: header.pointDataOffset, end: file.byteLength, count: first }, 0, length, plan, out);
+  yield out;
+  for (let done = first; done < total; ) {
+    const count = Math.min(POINTWISE_BLOCK, total - done),
+      block = new Uint8Array(count * length);
+    readRecords(plan.readers, new DataView(block.buffer), 0, count, length);
+    done += count;
+    yield block;
   }
 }
 
@@ -1411,18 +1593,32 @@ export async function* lazChunks(
     throw new TypeError('LAS file is not compressed (no LAZ bit in the point format); use parseLAS');
   const info = lazInfo(records);
   checkItems(info, header);
-  // The chunk table sits after the points, so a file cut short loses it and cannot be read, even with `partial`.
-  const chunks = chunkTable(file, header, info);
-  const plan = readersFor(info),
-    length = header.pointRecordLength;
+  const length = header.pointRecordLength;
+  if (info.compressor === 0) {
+    yield file.subarray(header.pointDataOffset, header.pointDataOffset + header.pointCount * length);
+    return;
+  }
+  const plan = readersFor(info);
   let turn = now();
-  for (let i = 0; i < chunks.length; i++) {
+  const breathe = async () => {
     signal?.throwIfAborted();
     if (now() - turn > 30) {
       await new Promise((resolve) => setTimeout(resolve, 0));
       signal?.throwIfAborted();
       turn = now();
     }
+  };
+  if (info.compressor === 1) {
+    for (const block of pointwiseBlocks(file, header, plan)) {
+      yield block;
+      await breathe();
+    }
+    return;
+  }
+  // The chunk table sits after the points, so a file cut short loses it and cannot be read, even with `partial`.
+  const chunks = chunkTable(file, header, info);
+  for (let i = 0; i < chunks.length; i++) {
+    await breathe();
     const out = new Uint8Array(chunks[i].count * length);
     decodeChunk(file, chunks[i], i, length, plan, out);
     yield out;
@@ -1447,9 +1643,10 @@ export function decodeLazChunk(
 }
 
 /**
- * A LAZ decoder for `parseLAS` / `loadLAS`: `parseLAS(bytes, { laz: createLazDecoder() })`. Point formats 0 to 3
- * (POINT10, GPSTIME11, RGB12 and extra bytes, version 2) and 6 to 8 (POINT14, RGB14, RGBNIR14 and extra bytes,
- * layered version 3), fixed or variable chunks. Decodes one chunk at a time into the point arrays.
+ * A LAZ decoder for `parseLAS` / `loadLAS`, which load this one by themselves when `options.laz` is not given. Point
+ * formats 0 to 5 (POINT10, GPSTIME11, RGB12 and extra bytes, version 2, WAVEPACKET13, version 1) and 6 to 10 (POINT14,
+ * RGB14, RGBNIR14, WAVEPACKET14 and extra bytes, layered version 3), pointwise, or in fixed or variable chunks. Decodes
+ * one chunk at a time into the point arrays.
  */
 export function createLazDecoder(): LazDecoder {
   return (file, header, records, signal) => lazChunks(file, header, records, { signal });

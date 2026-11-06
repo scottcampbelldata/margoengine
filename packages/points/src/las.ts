@@ -2,7 +2,8 @@
 // extra bytes (the LASF_Spec record 4 descriptors) and the coordinate reference system records (OGC WKT 2112 and the
 // GeoTIFF keys 34735 to 34737). Written from the ASPRS LAS specifications 1.2 (2008), 1.3 R11 (2010) and 1.4 R15
 // (2019). Every offset is checked against the bytes: truncated or corrupt files throw a TypeError or RangeError that
-// names the problem, and never read out of bounds. LAZ (compressed) files need a decoder: see `LazDecoder` and `margoengine/points/laz`.
+// names the problem, and never read out of bounds. LAZ (compressed) files load the decoder of `margoengine/points/laz`
+// when they meet one, so a plain LAS file never pays for it.
 import { MargoError } from '@margoengine/math/errors';
 
 /** One variable length record (VLR) or extended VLR (EVLR). */
@@ -18,7 +19,7 @@ export interface LASRecord {
 export interface LASExtraBytes {
   readonly name: string;
   readonly description: string;
-  /** 1 u8, 2 i8, 3 u16, 4 i16, 5 u32, 6 i32, 7 u64, 8 i64, 9 f32, 10 f64; 0 = undocumented bytes. */
+  /** 1 u8, 2 i8, 3 u16, 4 i16, 5 u32, 6 i32, 7 u64, 8 i64, 9 f32, 10 f64; 0 = undocumented bytes. The deprecated pairs and triples (types 11 to 30) come as one entry per element, `name[0]`, `name[1]`, ... */
   readonly dataType: number;
   /** Byte offset inside the extra bytes of each record, and size. */
   readonly offset: number;
@@ -52,6 +53,39 @@ export interface LASHeader {
   readonly offset: readonly [number, number, number];
   readonly min: readonly [number, number, number];
   readonly max: readonly [number, number, number];
+  /** Where the waveform data record starts in this file (LAS 1.3 and later), 0 when it holds none. */
+  readonly waveformDataOffset: number;
+}
+
+/** What `code` on a reader's RangeError or TypeError says went wrong. */
+export type LASErrorCode = 'header' | 'truncated' | 'range' | 'unsupported';
+
+/** The waveform packet of each point, in formats 4, 5, 9 and 10. */
+export interface LASWavePackets {
+  /** Which wave packet descriptor a point uses (`lasWaveDescriptors`); 0 means it has no waveform. */
+  readonly descriptor: Uint8Array;
+  /** Byte offset of the samples, from the start of the waveform data record. */
+  readonly offset: Float64Array;
+  /** Size of the samples in bytes. */
+  readonly size: Uint32Array;
+  /** Time from the first sample to this return, in picoseconds. */
+  readonly location: Float32Array;
+  /** xyz per point: how the pulse moves per picosecond, to place any sample along its ray. */
+  readonly direction: Float32Array;
+}
+
+/** A wave packet descriptor (LASF_Spec records 100 to 354): how the samples of a waveform are stored. */
+export interface LASWaveDescriptor {
+  readonly bitsPerSample: number;
+  /** 0 is uncompressed, the only value LAS defines. */
+  readonly compression: number;
+  readonly samples: number;
+  /** Time between samples in picoseconds. */
+  readonly spacing: number;
+  /** Volts per unit of a raw sample. */
+  readonly gain: number;
+  /** Volts at a raw sample of 0. */
+  readonly offset: number;
 }
 
 /** The coordinate reference system, when the file names one. */
@@ -74,7 +108,7 @@ export interface LASPoints {
   readonly extraBytes: readonly LASExtraBytes[];
   /** Points decoded (fewer than header.pointCount with `maxPoints`, a stride or a file cut short when `partial`). */
   readonly count: number;
-  /** World position of local [0, 0, 0] (float64): the bounding box centre unless `origin` was given. */
+  /** World position of local [0, 0, 0] (float64): see {@link LASOptions.origin}. */
   readonly origin: readonly [number, number, number];
   /** xyz per point relative to `origin`, float32 (sub-millimetre for a scan a few kilometres across). */
   readonly positions: Float32Array;
@@ -96,6 +130,8 @@ export interface LASPoints {
   /** RGB per point, 16-bit as stored. */
   readonly rgb?: Uint16Array;
   readonly nir?: Uint16Array;
+  /** Waveform packets, in formats 4, 5, 9 and 10. Read the samples with `lasWaveform`. */
+  readonly wavePackets?: LASWavePackets;
   /** Extra bytes attributes, scaled and offset, by name. */
   readonly extra: Readonly<Record<string, Float64Array>>;
 }
@@ -103,7 +139,7 @@ export interface LASPoints {
 /**
  * Decompresses LAZ point data into uncompressed LAS records: all at once (a `Uint8Array`), or one chunk at a time (an
  * async iterable of record blocks, decoded into the point arrays as they arrive, so the whole uncompressed file is
- * never held). `createLazDecoder()` from `margoengine/points/laz` is one.
+ * never held). `createLazDecoder()` from `margoengine/points/laz` is one, and the default.
  */
 export type LazDecoder = (
   file: Uint8Array,
@@ -114,13 +150,17 @@ export type LazDecoder = (
 
 /** Options of `parseLAS`. */
 export interface LASOptions {
-  /** World position to store positions relative to. Default: the header's bounding box centre. */
-  origin?: readonly [number, number, number];
+  /**
+   * World position to store positions relative to. Default: the header's bounding box centre; `'min'` is its minimum
+   * corner. Some writers put a wrong box in the header, so when the first point lies outside it the first point is the
+   * origin in both of those cases, which keeps float32 exact. The result's `origin` says which was used.
+   */
+  origin?: readonly [number, number, number] | 'min';
   /** Decode at most this many points. Default: all. */
   maxPoints?: number;
   /** Keep every n-th point (a quick preview). Default 1. */
   stride?: number;
-  /** Decompressor for LAZ files (`createLazDecoder()` from `margoengine/points/laz`). Without it a LAZ file throws a MargoError with code `unsupported`. */
+  /** Decompressor for LAZ files. Default: `createLazDecoder()` from `margoengine/points/laz`, loaded when a file needs it. */
   laz?: LazDecoder;
   /** Accept a file whose point data is cut short (decode what is there). Default false: throw a RangeError. */
   partial?: boolean;
@@ -132,6 +172,11 @@ export const LAS_RECORD_SIZES: readonly number[] = [20, 28, 26, 34, 57, 63, 30, 
 const GPS_OFFSET = [-1, 20, -1, 20, 20, 20, 22, 22, 22, 22, 22],
   RGB_OFFSET = [-1, -1, 20, 28, -1, 28, -1, 30, 30, -1, 30];
 const EXTRA_SIZE = [0, 1, 1, 2, 2, 4, 4, 8, 8, 4, 8];
+const WAVE_OFFSET = [-1, -1, -1, -1, 28, 34, -1, -1, -1, 30, 38];
+
+/** An error of type `Type` with a `code` a caller can branch on. */
+const fail = (code: LASErrorCode, message: string, Type: typeof RangeError | typeof TypeError = RangeError) =>
+  Object.assign(new Type(message), { code });
 
 const latin1 = /* @__PURE__ */ new TextDecoder('latin1');
 const text = (bytes: Uint8Array, at: number, length: number) => {
@@ -143,8 +188,9 @@ const text = (bytes: Uint8Array, at: number, length: number) => {
 /** Reads only the header and records (cheap: no point data is touched). */
 export function readLASHeader(input: ArrayBuffer | Uint8Array): { header: LASHeader; records: LASRecord[] } {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
-  if (bytes.byteLength < 227) throw new RangeError('LAS file shorter than its 227-byte header; the file is truncated');
-  if (text(bytes, 0, 4) !== 'LASF') throw new TypeError('Not a LAS file (no LASF signature); pass a .las or .laz file');
+  if (bytes.byteLength < 227) throw fail('header', 'LAS file shorter than its 227-byte header; the file is truncated');
+  if (text(bytes, 0, 4) !== 'LASF')
+    throw fail('header', 'Not a LAS file (no LASF signature); pass a .las or .laz file', TypeError);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     u8 = (o: number) => view.getUint8(o),
     u16 = (o: number) => view.getUint16(o, true),
@@ -159,16 +205,18 @@ export function readLASHeader(input: ArrayBuffer | Uint8Array): { header: LASHea
     formatByte = u8(104),
     pointRecordLength = u16(105);
   if (versionMajor !== 1 || versionMinor > 4)
-    throw new TypeError(`Unsupported LAS version ${versionMajor}.${versionMinor}; read LAS 1.0 to 1.4`);
+    throw fail('unsupported', `Unsupported LAS version ${versionMajor}.${versionMinor}; read LAS 1.0 to 1.4`, TypeError);
   if (headerSize < 227 || headerSize > bytes.byteLength || pointDataOffset < headerSize)
-    throw new RangeError(
-      `LAS header size ${headerSize} or point offset ${pointDataOffset} is invalid; the file is corrupt`,
-    );
+    throw fail('header', `LAS header size ${headerSize} or point offset ${pointDataOffset} is invalid; the file is corrupt`);
+  if (pointDataOffset > bytes.byteLength)
+    throw fail('header', `LAS points start at ${pointDataOffset}, past the end of the file; the file is corrupt`);
   const pointFormat = formatByte & 0x3f,
     compressed = (formatByte & 0xc0) !== 0;
-  if (pointFormat > 10) throw new TypeError(`Unsupported LAS point format ${pointFormat}; formats 0 to 10 exist`);
+  if (pointFormat > 10)
+    throw fail('unsupported', `Unsupported LAS point format ${pointFormat}; formats 0 to 10 exist`, TypeError);
   if (pointRecordLength < LAS_RECORD_SIZES[pointFormat])
-    throw new RangeError(
+    throw fail(
+      'header',
       `LAS record length ${pointRecordLength} is shorter than format ${pointFormat}'s ${LAS_RECORD_SIZES[pointFormat]} bytes; the file is corrupt`,
     );
   let pointCount = u32(107);
@@ -200,17 +248,18 @@ export function readLASHeader(input: ArrayBuffer | Uint8Array): { header: LASHea
     offset: [f64(155), f64(163), f64(171)],
     max: [f64(179), f64(195), f64(211)],
     min: [f64(187), f64(203), f64(219)],
+    waveformDataOffset: versionMinor >= 3 && headerSize >= 235 ? u64(227) : 0,
   };
   if (!header.scale.every((s) => Number.isFinite(s) && s !== 0) || !header.offset.every(Number.isFinite))
-    throw new RangeError('LAS scale or offset is zero or not finite; the file is corrupt');
+    throw fail('range', 'LAS scale or offset is zero or not finite; the file is corrupt');
   const records: LASRecord[] = [];
   let at = headerSize;
   for (let i = 0; i < vlrCount; i++) {
     if (at + 54 > pointDataOffset || at + 54 > bytes.byteLength)
-      throw new RangeError(`LAS VLR ${i} header runs past the point data offset; the file is corrupt`);
+      throw fail('truncated', `LAS VLR ${i} header runs past the point data offset; the file is corrupt`);
     const length = u16(at + 20);
     if (at + 54 + length > pointDataOffset || at + 54 + length > bytes.byteLength)
-      throw new RangeError(`LAS VLR ${i} data runs past the point data offset; the file is corrupt`);
+      throw fail('truncated', `LAS VLR ${i} data runs past the point data offset; the file is corrupt`);
     records.push({
       userId: text(bytes, at + 2, 16),
       recordId: u16(at + 18),
@@ -243,42 +292,47 @@ export function readLASHeader(input: ArrayBuffer | Uint8Array): { header: LASHea
   return { header, records };
 }
 
-/** The extra bytes descriptors (LASF_Spec record 4), laid out in record order. */
+/** The extra bytes descriptors (LASF_Spec record 4, which some writers split over several records), in record order. */
 export function lasExtraBytes(records: readonly LASRecord[], header: LASHeader): LASExtraBytes[] {
-  const record = records.find((r) => r.userId === 'LASF_Spec' && r.recordId === 4);
-  if (!record) return [];
   const available = header.pointRecordLength - LAS_RECORD_SIZES[header.pointFormat],
-    view = new DataView(record.data.buffer, record.data.byteOffset, record.data.byteLength),
     out: LASExtraBytes[] = [];
   let offset = 0;
-  for (let at = 0; at + 192 <= record.data.byteLength; at += 192) {
-    const dataType = view.getUint8(at + 2),
-      options = view.getUint8(at + 3);
-    if (dataType > 10)
-      throw new TypeError(
-        `Extra bytes data type ${dataType} is deprecated or unknown; rewrite the file with scalar extra bytes (types 1 to 10)`,
-      );
-    const size = dataType === 0 ? options : EXTRA_SIZE[dataType];
-    const name = text(record.data, at + 4, 32);
-    if (offset + size > available)
-      throw new RangeError(`Extra bytes ${name} pass the record length; the file is corrupt`);
-    const number = (o: number) =>
-      dataType >= 9
-        ? view.getFloat64(o, true)
-        : dataType % 2 === 0 && dataType
-          ? Number(view.getBigInt64(o, true))
-          : Number(view.getBigUint64(o, true));
-    out.push({
-      name,
-      description: text(record.data, at + 160, 32),
-      dataType,
-      offset,
-      size,
-      scale: options & 8 ? view.getFloat64(at + 112, true) : 1,
-      addOffset: options & 16 ? view.getFloat64(at + 136, true) : 0,
-      noData: options & 1 ? number(at + 40) : undefined,
-    });
-    offset += size;
+  for (const record of records) {
+    if (record.userId !== 'LASF_Spec' || record.recordId !== 4) continue;
+    const view = new DataView(record.data.buffer, record.data.byteOffset, record.data.byteLength);
+    for (let at = 0; at + 192 <= record.data.byteLength; at += 192) {
+      const dataType = view.getUint8(at + 2),
+        options = view.getUint8(at + 3),
+        name = text(record.data, at + 4, 32);
+      if (dataType > 30)
+        throw fail('header', `Extra bytes data type ${dataType} of ${name} is reserved; the file is corrupt`, TypeError);
+      // Types 11 to 30 are the deprecated pairs and triples of types 1 to 10, one field per element here.
+      const scalar = dataType > 10 ? ((dataType - 1) % 10) + 1 : dataType,
+        elements = dataType > 20 ? 3 : dataType > 10 ? 2 : 1,
+        size = scalar ? EXTRA_SIZE[scalar] : options;
+      if (offset + size * elements > available)
+        throw fail('header', `Extra bytes ${name} pass the record length; the file is corrupt`);
+      for (let e = 0; e < elements; e++) {
+        const noData = at + 40 + e * 8,
+          number = () =>
+            scalar >= 9
+              ? view.getFloat64(noData, true)
+              : scalar % 2 === 0 && scalar
+                ? Number(view.getBigInt64(noData, true))
+                : Number(view.getBigUint64(noData, true));
+        out.push({
+          name: elements > 1 ? `${name}[${e}]` : name,
+          description: text(record.data, at + 160, 32),
+          dataType: scalar,
+          offset,
+          size,
+          scale: options & 8 ? view.getFloat64(at + 112 + e * 8, true) : 1,
+          addOffset: options & 16 ? view.getFloat64(at + 136 + e * 8, true) : 0,
+          noData: options & 1 ? number() : undefined,
+        });
+        offset += size;
+      }
+    }
   }
   return out;
 }
@@ -330,18 +384,71 @@ export function lasCrs(records: readonly LASRecord[]): LASCrs | undefined {
   return { wkt, epsg, verticalEpsg, geoKeys };
 }
 
-/** Parses a LAS file (or a LAZ file with `options.laz`). */
+/** The wave packet descriptors of a file (LASF_Spec records 100 to 354), by the index points store. */
+export function lasWaveDescriptors(records: readonly LASRecord[]): Map<number, LASWaveDescriptor> {
+  const out = new Map<number, LASWaveDescriptor>();
+  for (const r of records) {
+    if (r.userId !== 'LASF_Spec' || r.recordId < 100 || r.recordId > 354 || r.data.byteLength < 26) continue;
+    const view = new DataView(r.data.buffer, r.data.byteOffset, r.data.byteLength);
+    out.set(r.recordId - 99, {
+      bitsPerSample: view.getUint8(0),
+      compression: view.getUint8(1),
+      samples: view.getUint32(2, true),
+      spacing: view.getUint32(6, true),
+      gain: view.getFloat64(10, true),
+      offset: view.getFloat64(18, true),
+    });
+  }
+  return out;
+}
+
+/**
+ * The waveform of point `index`: its raw samples and their voltages. `source` is the file itself when the waveforms
+ * sit inside it, or the bytes of the `.wdp` file beside it when global encoding bit 2 says they sit outside.
+ * Returns undefined for a point with no waveform. Throws a MargoError with code `unsupported` for samples that are
+ * compressed or not 8, 16 or 32 bits, and a RangeError when `source` is too short.
+ */
+export function lasWaveform(
+  las: Pick<LASPoints, 'header' | 'records' | 'wavePackets'>,
+  index: number,
+  source: Uint8Array,
+): { raw: Uint32Array; volts: Float64Array; spacing: number } | undefined {
+  const packets = las.wavePackets,
+    id = packets?.descriptor[index];
+  if (!packets || !id) return undefined;
+  const descriptor = lasWaveDescriptors(las.records).get(id);
+  if (!descriptor) throw fail('header', `LAS point ${index} names wave packet descriptor ${id}, which the file lacks`);
+  const { bitsPerSample: bits, samples, compression, gain, offset, spacing } = descriptor;
+  if (compression !== 0 || ![8, 16, 32].includes(bits))
+    throw new MargoError(
+      'unsupported',
+      `LAS waveform samples of ${bits} bits with compression ${compression} are not read; 8, 16 and 32 uncompressed are`,
+    );
+  // Bit 2 of the global encoding: the record sits outside, where offsets count from the start of the `.wdp` file.
+  const external = (las.header.globalEncoding & 4) !== 0,
+    start = (external ? 0 : las.header.waveformDataOffset) + packets.offset[index],
+    count = Math.min(samples, Math.floor((packets.size[index] * 8) / bits));
+  if (start + (count * bits) / 8 > source.byteLength)
+    throw fail('truncated', `LAS waveform of point ${index} runs past the ${source.byteLength} bytes given`);
+  const view = new DataView(source.buffer, source.byteOffset, source.byteLength),
+    raw = new Uint32Array(count),
+    volts = new Float64Array(count);
+  for (let i = 0; i < count; i++) {
+    const at = start + (i * bits) / 8;
+    raw[i] = bits === 8 ? view.getUint8(at) : bits === 16 ? view.getUint16(at, true) : view.getUint32(at, true);
+    volts[i] = offset + gain * raw[i];
+  }
+  return { raw, volts, spacing };
+}
+
+/** Parses a LAS or LAZ file. A LAZ file loads the decoder of `margoengine/points/laz` unless `options.laz` is given. */
 export async function parseLAS(input: ArrayBuffer | Uint8Array, options: LASOptions = {}): Promise<LASPoints> {
   options.signal?.throwIfAborted();
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
   const { header, records } = readLASHeader(bytes);
   if (!header.compressed) return decodePoints(header, records, bytes.subarray(header.pointDataOffset), options);
-  if (!options.laz)
-    throw new MargoError(
-      'unsupported',
-      'LAZ (compressed LAS) needs a decoder; pass options.laz (createLazDecoder from margoengine/points/laz)',
-    );
-  const decoded = await options.laz(bytes, header, records, options.signal);
+  const laz = options.laz ?? (await import('./laz.js')).createLazDecoder();
+  const decoded = await laz(bytes, header, records, options.signal);
   options.signal?.throwIfAborted();
   if (decoded instanceof Uint8Array) return decodePoints(header, records, decoded, options);
   // One block of records at a time: only the points kept (stride, maxPoints) are decoded into the arrays.
@@ -360,7 +467,8 @@ export async function parseLAS(input: ArrayBuffer | Uint8Array, options: LASOpti
     if (written >= sink.count) break;
   }
   if (written < sink.count && !options.partial)
-    throw new RangeError(
+    throw fail(
+      'truncated',
       `LAZ decoder returned ${first} of ${header.pointCount} records; the file is truncated (pass partial: true to read what is there)`,
     );
   return sink.finish(written);
@@ -377,7 +485,8 @@ export function decodePoints(
     available = Math.floor(data.byteLength / length);
   const sink = pointSink(header, records, options, Math.min(header.pointCount, available));
   if (available < header.pointCount && !options.partial)
-    throw new RangeError(
+    throw fail(
+      'truncated',
       `LAS point data holds ${available} of ${header.pointCount} records; the file is truncated (pass partial: true to read what is there)`,
     );
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -395,11 +504,18 @@ function pointSink(header: LASHeader, records: readonly LASRecord[], options: LA
   const count = Math.min(Math.ceil(total / stride), max);
   const extraBytes = lasExtraBytes(records, header),
     crs = lasCrs(records),
-    origin = options.origin ?? ([0, 1, 2].map((i) => (header.min[i] + header.max[i]) / 2) as [number, number, number]);
+    asked = options.origin,
+    fromBox = asked === undefined || asked === 'min';
+  let origin: readonly [number, number, number] = !fromBox
+    ? asked
+    : asked === 'min'
+      ? header.min
+      : ([0, 1, 2].map((i) => (header.min[i] + header.max[i]) / 2) as [number, number, number]);
   const extended = format >= 6,
     hasGps = GPS_OFFSET[format] >= 0,
     hasRgb = RGB_OFFSET[format] >= 0,
-    hasNir = format === 8 || format === 10;
+    hasNir = format === 8 || format === 10,
+    waveAt = WAVE_OFFSET[format];
   let positions = new Float32Array(count * 3),
     intensity = new Uint16Array(count),
     returnNumber = new Uint8Array(count),
@@ -414,13 +530,25 @@ function pointSink(header: LASHeader, records: readonly LASRecord[], options: LA
     scannerChannel = extended ? new Uint8Array(count) : undefined,
     gpsTime = hasGps ? new Float64Array(count) : undefined,
     rgb = hasRgb ? new Uint16Array(count * 3) : undefined,
-    nir = hasNir ? new Uint16Array(count) : undefined;
+    nir = hasNir ? new Uint16Array(count) : undefined,
+    waveDescriptor = waveAt >= 0 ? new Uint8Array(count) : undefined,
+    waveOffset = waveAt >= 0 ? new Float64Array(count) : undefined,
+    waveSize = waveAt >= 0 ? new Uint32Array(count) : undefined,
+    waveLocation = waveAt >= 0 ? new Float32Array(count) : undefined,
+    waveDirection = waveAt >= 0 ? new Float32Array(count * 3) : undefined;
   const extra: Record<string, Float64Array> = {};
   for (const e of extraBytes) if (e.dataType) extra[e.name] = new Float64Array(count);
   const [sx, sy, sz] = header.scale,
     [ox, oy, oz] = header.offset,
     base = LAS_RECORD_SIZES[format];
   const put = (view: DataView, at: number, i: number) => {
+    if (i === 0 && fromBox) {
+      const first = [view.getInt32(at, true) * sx + ox, view.getInt32(at + 4, true) * sy + oy, view.getInt32(at + 8, true) * sz + oz];
+      const inside = first.every(
+        (v, a) => v >= header.min[a] - header.scale[a] && v <= header.max[a] + header.scale[a],
+      );
+      if (!inside) origin = first as [number, number, number];
+    }
     positions[i * 3] = view.getInt32(at, true) * sx + ox - origin[0];
     positions[i * 3 + 1] = view.getInt32(at + 4, true) * sy + oy - origin[1];
     positions[i * 3 + 2] = view.getInt32(at + 8, true) * sz + oz - origin[2];
@@ -458,6 +586,14 @@ function pointSink(header: LASHeader, records: readonly LASRecord[], options: LA
       rgb[i * 3 + 2] = view.getUint16(r + 4, true);
     }
     if (nir) nir[i] = view.getUint16(at + 36, true);
+    if (waveDescriptor) {
+      const w = at + waveAt;
+      waveDescriptor[i] = view.getUint8(w);
+      waveOffset![i] = Number(view.getBigUint64(w + 1, true));
+      waveSize![i] = view.getUint32(w + 9, true);
+      waveLocation![i] = view.getFloat32(w + 13, true);
+      for (let c = 0; c < 3; c++) waveDirection![i * 3 + c] = view.getFloat32(w + 17 + c * 4, true);
+    }
     for (const e of extraBytes) {
       if (!e.dataType) continue;
       const o = at + base + e.offset;
@@ -499,7 +635,7 @@ function pointSink(header: LASHeader, records: readonly LASRecord[], options: LA
   /** The points, cut to the `n` written (fewer than `count` when a LAZ stream ended early). */
   const finish = (n: number): LASPoints => {
     if (n < count) {
-      const cut = <T extends Float32Array | Float64Array | Uint8Array | Uint16Array>(a: T, k = 1) =>
+      const cut = <T extends Float32Array | Float64Array | Uint8Array | Uint16Array | Uint32Array>(a: T, k = 1) =>
         a.subarray(0, n * k) as T;
       positions = cut(positions, 3);
       intensity = cut(intensity);
@@ -516,6 +652,11 @@ function pointSink(header: LASHeader, records: readonly LASRecord[], options: LA
       gpsTime = gpsTime && cut(gpsTime);
       rgb = rgb && cut(rgb, 3);
       nir = nir && cut(nir);
+      waveDescriptor = waveDescriptor && cut(waveDescriptor);
+      waveOffset = waveOffset && cut(waveOffset);
+      waveSize = waveSize && cut(waveSize);
+      waveLocation = waveLocation && cut(waveLocation);
+      waveDirection = waveDirection && cut(waveDirection, 3);
       for (const name of Object.keys(extra)) extra[name] = cut(extra[name]);
     }
     return {
@@ -540,6 +681,13 @@ function pointSink(header: LASHeader, records: readonly LASRecord[], options: LA
       gpsTime,
       rgb,
       nir,
+      wavePackets: waveDescriptor && {
+        descriptor: waveDescriptor,
+        offset: waveOffset!,
+        size: waveSize!,
+        location: waveLocation!,
+        direction: waveDirection!,
+      },
       extra,
     };
   };

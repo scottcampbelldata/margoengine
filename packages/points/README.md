@@ -202,52 +202,66 @@ console.log(las.crs?.epsg, las.header.pointFormat, Object.keys(las.extra));
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `origin` | box centre | World point positions are stored relative to. |
+| `origin` | box centre | World point positions are stored relative to, or `'min'` for the box's minimum corner. When the first point lies outside the header's box, a fault of some writers, the first point is the origin instead; `las.origin` says which. |
 | `maxPoints` / `stride` | all / 1 | Read fewer points (a preview). |
 | `partial` | `false` | Read what a cut-short file holds instead of throwing a `RangeError`. |
-| `laz` | none | A LAZ decompressor (see below). |
+| `laz` | built-in decoder | A LAZ decompressor of your own (see below). |
 | `signal` | none | `AbortSignal`. |
 
-LAZ files (compressed LAS) are recognised by the header's compression bit and need `options.laz`, a function that
-returns the uncompressed point records (`LazDecoder`); without one they throw a `MargoError` with code `unsupported`.
-`margoengine/points/laz` has one (below). `writeLAS` writes uncompressed LAS (any format, extra bytes, WKT or EPSG)
-for tools and tests.
+LAZ files (compressed LAS) are recognised by the header's compression bit and open as they are: the decoder below loads
+the first time a compressed file arrives, so a plain LAS file never pays for it. `options.laz` replaces it with a
+function of your own that returns the uncompressed point records (`LazDecoder`). `writeLAS` writes uncompressed LAS
+(any format, extra bytes, WKT or EPSG) for tools and tests.
+
+Formats 4, 5, 9 and 10 carry wave packets: `las.wavePackets` holds the descriptor, offset, size, location and direction
+of each point. `lasWaveDescriptors(records)` reads the descriptors, and `lasWaveform(las, index, source)` reads one
+point's samples, from the file itself or from the `.wdp` file beside it, as `raw`, `volts` and `spacing` in picoseconds.
+It returns `undefined` for a point with no wave.
+
+```ts
+import { lasWaveDescriptors, lasWaveform, loadLAS } from 'margoengine/points/las';
+
+const scan = await loadLAS('/scans/fullwave.laz');
+const samples = new Uint8Array(await (await fetch('/scans/fullwave.wdp')).arrayBuffer());
+const wave = lasWaveform(scan, 0, samples);
+console.log(lasWaveDescriptors(scan.records).size, wave?.raw.length, wave?.volts[0], wave?.spacing);
+```
 
 ## LAZ decoder (`margoengine/points/laz`)
 
-`createLazDecoder()` reads LASzip compressed files through `parseLAS` and `loadLAS`. It decodes one chunk at a time
-straight into the point arrays, so the uncompressed file is never held in memory, and `signal` stops it between
-chunks. `lazChunks(bytes, header, records, {signal})` is the same decoder as an async iterator of uncompressed record
-blocks, one per chunk, for streaming tools; `lazInfo(records)` reads the LASzip record (compressor, chunk size, items).
+`parseLAS` and `loadLAS` use `createLazDecoder()` by default. It decodes one chunk at a time straight into the point
+arrays, so the uncompressed file is never held in memory, and `signal` stops it between chunks.
+`lazChunks(bytes, header, records, {signal})` is the same decoder as an async iterator of uncompressed record blocks, one
+per chunk, for streaming tools; `lazInfo(records)` reads the LASzip record (compressor, chunk size, items).
 
 ```ts
 import { loadLAS } from 'margoengine/points/las';
-import { createLazDecoder } from 'margoengine/points/laz';
 
 const controller = new AbortController();
-const scan = await loadLAS('/scans/site.laz', { laz: createLazDecoder(), stride: 4, signal: controller.signal });
+const scan = await loadLAS('/scans/site.laz', { stride: 4, signal: controller.signal });
 console.log(scan.count, scan.header.pointFormat, scan.gpsTime?.[0], scan.rgb?.length);
 ```
 
 | Point formats | LASzip items read |
 | --- | --- |
 | 0 to 3 | POINT10, GPSTIME11, RGB12 and extra bytes (BYTE), version 2, pointwise chunks |
+| 4, 5 | The same, with WAVEPACKET13 version 1 |
 | 6 to 8 | POINT14, RGB14, RGBNIR14 and extra bytes (BYTE14), version 3, layered chunks with per-scanner-channel contexts |
+| 9, 10 | The same, with WAVEPACKET14 version 3 |
 
-Fixed and variable chunk sizes are read, and a chunk table whose offset was written at the end of the file. Anything
-else throws a `MargoError` with code `unsupported` that names it: waveform packets (formats 4, 5, 9 and 10), the
-unchunked compressor of LASzip 1.x, item versions other than 2 (formats 0 to 5) and 3 (formats 6 to 10), and coders
-other than arithmetic. Corrupt data throws a `RangeError` or `TypeError` that names the chunk; every read stays inside
-its chunk. The chunk table sits after the points, so a cut-short LAZ file cannot be read, even with `partial`.
+Compressors 0 (plain records), 1 (one stream, no chunk table), 2 and 3 are read, in fixed and variable chunks, with a
+chunk table whose offset was written at the end of the file. Anything else throws a `MargoError` with code `unsupported`
+that names it: item version 1, the coding of LASzip 1.0, which neither the LAZ specification 1.4 nor the LASzip paper
+describes; coders other than arithmetic; compressors above 3; chunk table versions other than 0. Corrupt data throws a
+`RangeError` or `TypeError` that names the chunk; every read stays inside its chunk. The chunk table sits after the
+points, so a cut-short LAZ file cannot be read, even with `partial`. A LAS 1.4 compatibility mode file reads as stored.
 
-Verification: the decoder was written clean room from the LASzip paper and the public LAZ format description, and was
-tested against an encoder written from the same reading (in `tests/`), with byte-exact round trips of random and
-survey-like points in every supported format, fuzzing and mutation checks. It was then checked against a real USGS 3DEP
-tile (LAS 1.4, point format 6, written by LASzip 3.4.3; `tests/laz-usgs.test.js`): verified against laspy 2.7.0 and
-lazrs 0.8.2 on a real USGS file, field by field identical for all 54,634 points (coordinates, intensity, returns,
-flags, classification, scan angle, user data, point source id and GPS time bit for bit; the reference decoders are not
-part of the repository). The file has no RGB, NIR or extra bytes, and formats 0 to 3, 7 and 8 and files with other
-producers remain verified only against the test encoder.
+Verification: the decoder was written clean room from the LASzip paper and the LAZ specification. `tests/laz-real.test.js`
+holds what LASzip and lazrs decode from real files, as digests, and every record and field matches in every point
+format: public files of formats 0 to 3, 7, 8 and 10 (`tests/fixtures/NOTICE.md`), the real USGS 3DEP tile of format 6
+(`tests/laz-usgs.test.js`), and real points LASzip compressed for formats 4, 5 and 9 and for channels that switch. The
+reference decoders are not part of the repository. Compressor 0, compressor 1 with version 2 items and chunk size 0 are
+checked only against the test encoder, a stand-in, because no tool here writes them.
 
 ## E57 scans (`margoengine/points/e57`)
 
@@ -437,7 +451,7 @@ console.log(source.version, source.points, source.origin);
 | 2.0 | `metadata.json`, `hierarchy.bin`, `octree.bin` | Range requests. Encoding `DEFAULT` only. |
 | 1.5 to 1.8 | `cloud.js`, `.hrc`, one `.bin`, `.las` or `.laz` per node | Whole files per node. `.las` and `.laz` nodes need the option below. |
 
-A 1.x folder of LAS or LAZ nodes needs their decoders, so a folder of binary nodes never pays for them: `PotreeSource.open(url, {parseLAS, laz: createLazDecoder()})`, with `parseLAS` from `margoengine/points/las` and `createLazDecoder` from `margoengine/points/laz`.
+A 1.x folder of LAS or LAZ nodes needs a reader, so a folder of binary nodes never pays for one: `PotreeSource.open(url, {parseLAS})`, with `parseLAS` from `margoengine/points/las`, which brings the LAZ decoder when a compressed node arrives.
 
 Encoding `BROTLI` throws a `MargoError` with code `unsupported`: browsers have no Brotli stream decoder, so convert with encoding `DEFAULT`. So do versions before 1.5. Only position and colour are read, and the writers in `tests/potree-writer.js` were written here from the public format descriptions: the reader has not yet met a file from PotreeConverter.
 
@@ -490,10 +504,10 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 
 `npm test` in `packages/points` runs Node checks: chunking (coverage, block sizes, bounds, determinism, non-finite points) on random data and the real PCL `bunny.pcd` scan, even subsampling of shuffled prefixes, bounds growth, frustum culling against core `Camera.planes` with a randomized no-false-negative check, screen area, budget water-filling invariants, projection and picking against brute force, orthographic screen area and picking, color packing, ranges, atlas cells, `PointCloud` and `SpriteBatch` bookkeeping, materials, SSR safety and the WebGL2 warning.
 
-The LAZ tests (`tests/laz.test.js`) compress random, survey-like and mixed points of formats 0 to 3 and 6 to 8 with
+The LAZ tests (`tests/laz.test.js`) compress random, survey-like and mixed points of formats 0 to 10 with
 the test-only encoder (`tests/laz-encoder.js`) in fixed and variable chunks, check that decoding returns every record
 byte for byte (`tests/laz-usgs.test.js` runs the real USGS tile through the same decoder and checks it against the file's header) and that `parseLAS` with the decoder matches the uncompressed file, and fuzz truncated and corrupt
-files (only coded errors, no hang).
+files (only coded errors, no hang). `tests/laz-real.test.js` reads the real files in `tests/fixtures/laz` against LASzip and lazrs.
 
 `npm run test:browser` (a real-GPU script, not in CI) renders with a real engine in Chromium (or Edge via `BROWSER_CHANNEL`): exact square coverage at 2 to 16 px, round coverage within 4% of the disc area with empty corners, per-point byte and float colors, depth against a core mesh and between points, attachment to a mesh, size attenuation, a 2,000,000 point cloud culled and drawn within a 500,000 point budget, subrange updates that issue exactly one `writeBuffer` per changed range, sprites that stay square after an orbit with the right atlas cell, rotation, pivot and pixel size, 5000 sprites in one draw call, textured points with alpha test, sphere shading, eye-dome lighting, CPU picking, an orthographic camera (world sizes equal at two depths, sphere impostor depth against a box, EDL at a depth step, nearer-point picking), zero WebGPU validation errors, device restore and dispose. It saves `test-results/points-gallery.png` and `test-results/points-browser.json`.
 

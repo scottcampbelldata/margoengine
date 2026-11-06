@@ -124,7 +124,7 @@ const ASSETS = [
   ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
   [
     'packages/loaders/tests/real-files/manifest.json',
-    'real-file test: 82 public sample files, downloaded by URL and never in the repository or a tarball; each one\'s source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices)',
+    'real-file test: 91 public sample files, downloaded by URL and never in the repository or a tarball; each one\'s source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices)',
   ],
   [
     'packages/loaders/tests/fixtures/SOURCES.txt',
@@ -132,7 +132,7 @@ const ASSETS = [
   ],
   [
     'packages/points/tests/fixtures/NOTICE.md',
-    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan); USGS 3DEP lidar tile USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz (public domain, rockyweb.usgs.gov, 609,938 bytes, SHA-256 c2804c3827fd6104acf657803f55ed4e5fa9ba83b4ec481888510385a14e31ae, downloaded 2026-10-27)',
+    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl; Stanford bunny scan); USGS 3DEP lidar tile USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz (public domain, rockyweb.usgs.gov, 609,938 bytes, SHA-256 c2804c3827fd6104acf657803f55ed4e5fa9ba83b4ec481888510385a14e31ae, downloaded 2026-10-27); LAS and LAZ samples from laz-rs tests/data (Apache-2.0, Thomas Montaigu) and laspy tests/data (BSD-2-Clause, Grant Brown, Howard Butler, Thomas Montaigu), with points from them compressed by LASzip, in tests/fixtures/laz',
   ],
   [
     'packages/decoders/tests/fixtures/NOTICE.md',

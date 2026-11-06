@@ -13,7 +13,12 @@ export interface LASCloud extends LoadedGeometry {
     returnCount: Uint8Array;
     gpsTime?: Float64Array;
     records: LASRecord[];
+    extra: Readonly<Record<string, Float64Array>>;
+    crs?: LASCrs;
+    points: LASPoints;
 }
+
+export { LASCrs } from "@margoengine/points";
 
 export interface LASHeader {
     version: [number, number];
@@ -34,12 +39,13 @@ export interface LASOptions extends ParseLimits {
     signal?: AbortSignal;
 }
 
-export interface LASRecord {
-    userId: string;
-    recordId: number;
-    description: string;
-    data: Uint8Array;
-}
+export { LASPoints } from "@margoengine/points";
+
+export { LASRecord } from "@margoengine/points";
+
+export { LASWaveDescriptor } from "@margoengine/points";
+
+export { LASWavePackets } from "@margoengine/points";
 
 export interface LAZSource {
     bytes: Uint8Array;

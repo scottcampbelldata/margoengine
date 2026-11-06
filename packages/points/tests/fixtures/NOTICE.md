@@ -15,3 +15,16 @@ Fixtures are used only by the tests and are not part of the published package (`
   USGS states that all 3DEP products are available free of charge and without use restrictions
   (https://www.usgs.gov/3d-elevation-program/about-3dep-products-services, data labelled Public Domain). It is
   committed here, not downloaded by the tests.
+- `laz/` holds real LAS and LAZ samples for `tests/laz-real.test.js`, committed here, not downloaded by the tests:
+  - `point10`, `point-time`, `point-color` and `point-time-color` (`.laz` and `.las`), `extra-bytes.laz` and
+    `point-version-1-point-wise.laz` are copies from `tests/data` of https://github.com/laz-rs/laz-rs (Apache-2.0,
+    Copyright 2023 Thomas Montaigu).
+  - `simple.copc.laz`, `append-bug.laz`, `fullwave.laz` and `simple1_3.las` are copies from `tests/data` of
+    https://github.com/laspy/laspy (BSD-2-Clause; Copyright (c) 2012 Grant Brown, Copyright (c) 2012 Howard Butler,
+    Copyright (c) 2020 Thomas Montaigu; licence text in that repository's `LICENSE.txt`).
+  - `laszip-format4.laz` is `simple1_3.las` compressed by LASzip. `laszip-format5.laz`, `laszip-format9.laz` and
+    `laszip-channels-format7.laz` to `format10.laz` hold the first 2,000 points of `fullwave.laz` compressed by LASzip,
+    with scanner channels and wave packet offsets randomised (seed 2026) in the channels files, so that LASzip's
+    switching is exercised. No public file of those formats was found.
+  - `records.json` holds the SHA-256 digests of what LASzip and lazrs decode from each file. Made once outside the
+    repository, through laspy; no code of those projects is here.

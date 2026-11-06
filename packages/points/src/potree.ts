@@ -16,7 +16,7 @@ export interface PotreeOptions {
   signal?: AbortSignal;
   /** `parseLAS` from `@margoengine/points/las`, for 1.x folders of LAS or LAZ nodes. Binary folders do not need it. */
   parseLAS?: typeof parseLAS;
-  /** `createLazDecoder()` from `@margoengine/points/laz`, for 1.x folders of LAZ nodes. */
+  /** A LAZ decoder for 1.x folders of LAZ nodes. Default: what `parseLAS` loads by itself. */
   laz?: LazDecoder;
 }
 interface PotreeNode extends OctreeNode {
@@ -368,11 +368,8 @@ async function open1(
   const opened = { root, version, points: Number(meta.points) || 0, origin };
   if (fields === 'LAS' || fields === 'LAZ') {
     const compressed = fields === 'LAZ';
-    if (!parse || (compressed && !laz))
-      throw new MargoError(
-        'unsupported',
-        `Potree folder of ${fields} nodes needs a decoder; pass parseLAS from points/las${compressed ? ' and laz from points/laz' : ''}`,
-      );
+    if (!parse)
+      throw new MargoError('unsupported', `Potree folder of ${fields} nodes needs a reader; pass parseLAS from points/las`);
     return {
       ...opened,
       fetchNode: async (node, nodeSignal) => {

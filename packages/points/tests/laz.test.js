@@ -120,7 +120,7 @@ const surveyFill = (seed) => {
  */
 const mixedFill = (seed) => {
   const random = rng(seed),
-    previous = new Uint8Array(67);
+    previous = new Uint8Array(80);
   return (view, at, i, format, length) => {
     const bytes = new Uint8Array(view.buffer, view.byteOffset + at, length);
     if (i % 5 !== 0 && random() < 0.3) {
@@ -172,7 +172,7 @@ async function roundTrip(las, options, label) {
   return { laz, blocks };
 }
 
-const formats = [0, 1, 2, 3, 6, 7, 8];
+const formats = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 test('LAZ round trip: random records of every supported format, with and without extra bytes', async () => {
   for (const format of formats)
@@ -250,35 +250,11 @@ test('LAZ: the LASzip record is parsed, and what is not implemented throws a cod
   const decoder = createLazDecoder();
   const unsupported = async (file, pattern) =>
     assert.rejects(parseLAS(file, { laz: decoder }), (e) => e.code === 'unsupported' && pattern.test(e.message));
-  await unsupported(encodeLAZ(las, { override: { compressor: 1 } }), /compressor 1/);
+  await unsupported(encodeLAZ(las, { override: { compressor: 4 } }), /compressor 4/);
   await unsupported(encodeLAZ(las, { override: { coder: 1 } }), /coder 1/);
-  await unsupported(encodeLAZ(las, { override: { version: 1 } }), /POINT10 version 1/);
-  // Waveform formats (4, 5, 9, 10): the record lists a WAVEPACKET item.
-  const wave = lasFile(4, 10, randomFill(2));
-  await unsupported(
-    encodeLAZ(wave, {
-      override: {
-        items: [
-          [6, 20],
-          [7, 8],
-          [9, 29],
-        ],
-      },
-    }),
-    /WAVEPACKET13/,
-  );
-  const wave14 = lasFile(9, 10, randomFill(2));
-  await unsupported(
-    encodeLAZ(wave14, {
-      override: {
-        items: [
-          [10, 30],
-          [13, 29],
-        ],
-      },
-    }),
-    /WAVEPACKET14/,
-  );
+  // Item version 1 is LASzip 1.0's coding: no published text describes it.
+  await unsupported(encodeLAZ(las, { override: { version: 1 } }), /POINT10 version 1 .*neither the LAZ specification/);
+  await unsupported(encodeLAZ(lasFile(4, 10, randomFill(2)), { override: { version: 2 } }), /WAVEPACKET13 version 2/);
   // Items that do not match the point format are a malformed file.
   await assert.rejects(
     parseLAS(
@@ -304,6 +280,69 @@ test('LAZ: the LASzip record is parsed, and what is not implemented throws a cod
     (e) => e instanceof TypeError && /LASzip record/.test(e.message),
   );
   await assert.rejects(decodeRecords(las), (e) => e instanceof TypeError && /not compressed/.test(e.message));
+});
+
+const WAVE_AT = { 4: 28, 5: 34, 9: 30, 10: 38 };
+
+/** Survey points with wave packets whose offsets use all four codings, in channels that switch. */
+const waveFill = (seed) => {
+  const survey = surveyFill(seed),
+    random = rng(seed + 1);
+  let offset = 1000n,
+    size = 256;
+  return (view, at, i, format, length) => {
+    survey(view, at, i, format, length);
+    const w = at + WAVE_AT[format],
+      kind = i % 4;
+    if (kind === 1) offset += BigInt(size);
+    else if (kind === 2) offset += BigInt(Math.floor(random() * 2000) - 1000);
+    else if (kind === 3) offset = BigInt(Math.floor(random() * 2 ** 40)) << 12n;
+    if (i % 3 === 0) size = 256 + Math.floor(random() * 4) * 64;
+    view.setUint8(w, 1 + (i % 2));
+    view.setBigUint64(w + 1, offset, true);
+    view.setUint32(w + 9, size, true);
+    view.setFloat32(w + 13, 1000 + random() * 500, true);
+    for (let c = 0; c < 3; c++) view.setFloat32(w + 17 + c * 4, random() - 0.5, true);
+  };
+};
+
+test('LAZ waveforms: formats 4, 5, 9 and 10 round trip with every offset coding, and a wave layer may be empty', async () => {
+  for (const format of [4, 5, 9, 10])
+    for (const options of [{ chunkSize: 300 }, { chunks: [100, 1, 500, 399] }])
+      await roundTrip(lasFile(format, 1000, waveFill(format), 3), options, `format ${format}`);
+  // The same packet on every point: the layered item stores nothing after the first.
+  const same = (view, at, i, format, length) => {
+    surveyFill(1)(view, at, i, format, length);
+    view.setUint8(at + WAVE_AT[format], 1);
+    view.setBigUint64(at + WAVE_AT[format] + 1, 77n, true);
+  };
+  await roundTrip(lasFile(9, 200, same), { chunkSize: 100 }, 'constant wave packets');
+});
+
+test('LAZ compressors 0 and 1, and a chunk size of 0 for adaptive chunks', async () => {
+  // Compressor 1: one stream, no chunk table, handed out in blocks. More points than one block.
+  for (const format of [0, 1, 2, 3, 4, 5]) {
+    const las = lasFile(format, 60_000 + format, format >= 4 ? waveFill(format) : surveyFill(format), 2),
+      { blocks, laz } = await roundTrip(las, { pointwise: true }, `pointwise format ${format}`);
+    assert.equal(lazInfo(readLASHeader(laz).records).compressor, 1);
+    assert.equal(blocks.length, 2, 'a file without chunks is not decoded into one block');
+  }
+  await assert.rejects(
+    parseLAS(encodeLAZ(lasFile(6, 10, surveyFill(1)), { override: { compressor: 1 } })),
+    (e) => e.code === 'unsupported' && /formats 0 to 5 use 1 or 2/.test(e.message),
+  );
+  // Compressor 0: the LASzip record on a plain file.
+  const plain = lasFile(1, 40, surveyFill(3)),
+    marked = encodeLAZ(plain, { pointwise: true, override: { compressor: 0, version: 0 } }),
+    { header } = readLASHeader(marked);
+  const whole = new Uint8Array(header.pointDataOffset + recordsOf(plain).length);
+  whole.set(marked.subarray(0, header.pointDataOffset));
+  whole.set(recordsOf(plain), header.pointDataOffset);
+  const parsed = await parseLAS(whole);
+  assert.deepEqual(parsed.gpsTime, (await parseLAS(plain)).gpsTime);
+  // Chunk size 0 is the specification's other mark for adaptive chunks.
+  const adaptive = await roundTrip(lasFile(7, 100, surveyFill(4)), { chunks: [30, 70], adaptiveZero: true }, 'chunk size 0');
+  assert.equal(lazInfo(readLASHeader(adaptive.laz).records).chunkSize, 'variable');
 });
 
 test('parseLAS with a streaming decoder: blocks of any size, a stream that ends early, and an early stop', async () => {

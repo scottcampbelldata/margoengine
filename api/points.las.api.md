@@ -10,6 +10,8 @@ export interface LASCrs {
     readonly geoKeys?: ReadonlyMap<number, number | string | readonly number[]>;
 }
 
+export type LASErrorCode = 'header' | 'truncated' | 'range' | 'unsupported';
+
 export interface LASExtraBytes {
     readonly name: string;
     readonly description: string;
@@ -42,10 +44,11 @@ export interface LASHeader {
     readonly offset: readonly [number, number, number];
     readonly min: readonly [number, number, number];
     readonly max: readonly [number, number, number];
+    readonly waveformDataOffset: number;
 }
 
 export interface LASOptions {
-    origin?: readonly [number, number, number];
+    origin?: readonly [number, number, number] | 'min';
     maxPoints?: number;
     stride?: number;
     laz?: LazDecoder;
@@ -75,6 +78,7 @@ export interface LASPoints {
     readonly gpsTime?: Float64Array;
     readonly rgb?: Uint16Array;
     readonly nir?: Uint16Array;
+    readonly wavePackets?: LASWavePackets;
     readonly extra: Readonly<Record<string, Float64Array>>;
 }
 
@@ -84,6 +88,23 @@ export interface LASRecord {
     readonly description: string;
     readonly data: Uint8Array;
     readonly extended: boolean;
+}
+
+export interface LASWaveDescriptor {
+    readonly bitsPerSample: number;
+    readonly compression: number;
+    readonly samples: number;
+    readonly spacing: number;
+    readonly gain: number;
+    readonly offset: number;
+}
+
+export interface LASWavePackets {
+    readonly descriptor: Uint8Array;
+    readonly offset: Float64Array;
+    readonly size: Uint32Array;
+    readonly location: Float32Array;
+    readonly direction: Float32Array;
 }
 
 export interface LASWriteInput {
@@ -113,6 +134,14 @@ export function decodePoints(header: LASHeader, records: readonly LASRecord[], d
 export function lasCrs(records: readonly LASRecord[]): LASCrs | undefined;
 
 export function lasExtraBytes(records: readonly LASRecord[], header: LASHeader): LASExtraBytes[];
+
+export function lasWaveDescriptors(records: readonly LASRecord[]): Map<number, LASWaveDescriptor>;
+
+export function lasWaveform(las: Pick<LASPoints, 'header' | 'records' | 'wavePackets'>, index: number, source: Uint8Array): {
+    raw: Uint32Array;
+    volts: Float64Array;
+    spacing: number;
+} | undefined;
 
 export function loadLAS(url: string | URL, options?: LASOptions & {
     fetch?: typeof fetch;

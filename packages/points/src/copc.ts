@@ -2,7 +2,6 @@
 // `copc`, id 1) gives a cube and where the hierarchy pages are; each page lists voxels and the byte range of their
 // points, one LAZ chunk per voxel. Everything comes by HTTP range requests, so a viewer reads only what it shows.
 import { decodePoints, readLASHeader, type LASHeader, type LASRecord } from './las.js';
-import { decodeLazChunk } from './laz.js';
 import type { OctreeNode, OctreeNodeData, OctreeSource } from './octree.js';
 import { readRange } from './range.js';
 
@@ -161,7 +160,10 @@ export class CopcSource implements OctreeSource {
   async load(node: OctreeNode, signal: AbortSignal): Promise<OctreeNodeData> {
     const { offset, bytes, count } = node as CopcNode;
     if (!count) return { positions: new Float32Array(0) };
-    const chunk = await readRange(this.fetcher, this.url, offset, bytes, signal),
+    const [chunk, { decodeLazChunk }] = await Promise.all([
+        readRange(this.fetcher, this.url, offset, bytes, signal),
+        import('./laz.js'),
+      ]),
       data = decodeLazChunk(chunk, count, this.header, this.records);
     signal.throwIfAborted();
     const points = decodePoints({ ...this.header, pointCount: count }, this.records, data, { origin: this.origin }),

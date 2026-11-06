@@ -79,7 +79,7 @@ function splits(sizes) {
     const cells = (part) => `<td class="num">${bytes(part.raw)}</td><td class="num">${bytes(part.gzip)}</td>`;
     const name = `<th scope="row"><code>${esc(split.specifier)}</code></th>`;
     return [
-      `<tr>${name}<td>Base: everything the first call of <code>install()</code> loads, without the lazy part</td>${cells(base)}<td>Limit ${bytes(base.target)} B</td></tr>`,
+      `<tr>${name}<td>Base: ${split.baseLabel}, without the lazy part</td>${cells(base)}<td>${base.target ? `Limit ${bytes(base.target)} B` : ''}</td></tr>`,
       `<tr>${name}<td>Lazy: ${esc(lazy.name)}</td>${cells(lazy)}<td>${prose(split.when)}</td></tr>`,
     ];
   });

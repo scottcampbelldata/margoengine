@@ -126,7 +126,7 @@ The repository's speed matrix (`docs/whitepaper`, row 10.11) measures this loade
 
 ## Real files
 
-`tests/real-files/manifest.json` names 82 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
+`tests/real-files/manifest.json` names 91 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
 
 ```sh
 npm run test:real-files -w @margoengine/loaders
@@ -138,7 +138,7 @@ The script downloads each file by URL into `test-results/real-files`, refuses on
 | --- | --- | --- |
 | `REAL_FILES_DIR` | `test-results/real-files` | Where files are kept between runs. |
 | `REAL_FILES_ONLY` | every row | Comma-separated formats or row ids. |
-| `REAL_FILES_RUNTIMES` | unset | A folder whose `node_modules` holds `rhino3dm` and `laz-perf`. Without it the 3DM rows read NOT RUN, and LAZ rows use Margo's own `createLazDecoder` with no comparison. |
+| `REAL_FILES_RUNTIMES` | unset | A folder whose `node_modules` holds `rhino3dm` and `laz-perf`. Without it the 3DM rows read NOT RUN, and LAZ rows skip the comparison with laz-perf. |
 | `REAL_FILES_RENDER` | unset | `1` draws every geometry through the real engine on the GPU and fails a blank picture. |
 | `REAL_FILES_TRACE` | unset | Prints the stack of a failure. |
 
@@ -574,20 +574,21 @@ console.log(tessellateNurbsSurface(patch, { segmentsU: 2, segmentsV: 2 }).indice
 
 ## LAS and LAZ
 
-`parseLAS` from `@margoengine/loaders/las` reads ASPRS LAS point clouds, versions 1.0 to 1.4 and point formats 0 to 10.
+`parseLAS` from `@margoengine/loaders/las` reads ASPRS LAS and LAZ point clouds, versions 1.0 to 1.4 and point formats 0 to 10. It is a thin layer over `@margoengine/points/las`, the one LAS reader of the engine, and gives the same data in the shape of this package.
 
 ```ts
 import { parseLAS } from '@margoengine/loaders/las';
 
-const bytes = await (await fetch('/surveys/quarry.las')).arrayBuffer();
+const bytes = await (await fetch('/surveys/quarry.laz')).arrayBuffer();
 const { positions, classification, origin } = await parseLAS(bytes, { step: 4 });
 console.log(positions.length / 3, classification[0], origin);
 ```
 
-- **Positions.** They come back relative to `origin`, because survey coordinates are too large for 32-bit floats. Add it back for world coordinates.
-- **Attributes.** `intensity`, `classification`, `returnNumber`, `returnCount`, `gpsTime` where the format has it, and `colors` in [0,1], from 16 bits or from 8 for files that fill only the low byte. `header` and `records` give the header and its variable records, projection included.
+- **Positions.** They come back relative to `origin`, because survey coordinates are too large for 32-bit floats. Add it back for world coordinates. `origin` is the header's minimum corner, or the first point when the header's box misses the points, a fault of some writers.
+- **Attributes.** `intensity`, `classification`, `returnNumber`, `returnCount`, `gpsTime` where the format has it, and `colors` in [0,1], from 16 bits or from 8 for files that fill only the low byte. `header` and `records` give the header and its variable records. `extra` holds extra bytes by name, `crs` the projection, and `points` everything else the file stores: flags, scan angle, user data, source id, channel, NIR and wave packets.
 - **Thinning.** `step: 4` keeps every fourth point, and `maxVertices` counts points after thinning.
-- **LAZ.** LAZ is the same layout behind an entropy coder. This package has no decoder of its own: pass `decompress`, a wrapper around one you load, which gets the file and its header and returns the plain point records. Without it a LAZ file is an `unsupported` error. The hook is tested with a stand-in, not a real decoder: see [known bugs](../../docs/known-bugs.md).
+- **LAZ.** A `.laz` opens as it is. The decoder of `@margoengine/points/laz` loads when the first compressed file arrives, so a plain `.las` never pays for it. `decompress` replaces it with a decoder of your own, which gets the file and its header and returns the plain point records. LAZ item version 1, the coding of LASzip 1.0, is an `unsupported` error, as no published text describes it: [limits](../../docs/limits.md).
+- **Waves.** Formats 4, 5, 9 and 10 carry wave packets in `points.wavePackets`. `lasWaveform(cloud.points, index, source)` from `@margoengine/points/las` reads one point's samples, from the file or from the `.wdp` beside it, and `lasWaveDescriptors(cloud.records)` the descriptors.
 
 ## VDB volumes
 

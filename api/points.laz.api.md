@@ -54,6 +54,7 @@ interface LASHeader {
     readonly offset: readonly [number, number, number];
     readonly min: readonly [number, number, number];
     readonly max: readonly [number, number, number];
+    readonly waveformDataOffset: number;
 }
 
 interface LASRecord {

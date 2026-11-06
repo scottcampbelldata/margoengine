@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5207162,
+  "total": 5232878,
   "history": [
     {
       "date": "2026-10-24",
@@ -2378,6 +2378,18 @@
       "commit": "be7fa7015",
       "reason": "animator/sync, new optional entry; state clocks in Animator",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "a3f38a6e8",
+      "reason": "LAZ item 12a: loaders/las is a thin layer over points/las (accepted leak; decoder stays behind import(), held as base and lazy part); wave packets, lasWaveform, compressors 0 and 1 and every extra bytes record grow points/las, /laz and /copc",
+      "grew": 6
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "a3f38a6e8",
+      "reason": "points/copc: the LAZ decoder moved behind import(), as in points/las, so the joined figure is two gzip streams",
+      "grew": 1
     }
   ],
   "items": {
@@ -2637,7 +2649,7 @@
     "@margoengine/loaders/font": 6577,
     "@margoengine/loaders/gcode": 1962,
     "@margoengine/loaders/kmz": 16930,
-    "@margoengine/loaders/las": 2463,
+    "@margoengine/loaders/las": 1466,
     "@margoengine/loaders/ldraw": 4126,
     "@margoengine/loaders/lottie": 7591,
     "@margoengine/loaders/lwo": 3115,
@@ -2725,13 +2737,15 @@
     "@margoengine/pixel/palette": 4341,
     "@margoengine/pixel/render3d": 3866,
     "@margoengine/points": 22649,
-    "@margoengine/points/copc": 11717,
+    "@margoengine/points/copc": 13792,
     "@margoengine/points/e57": 6537,
-    "@margoengine/points/las": 5116,
-    "@margoengine/points/laz": 8046,
+    "@margoengine/points/las": 14148,
+    "@margoengine/points/las base (without LAZ decoder)": 6017,
+    "@margoengine/points/las lazy LAZ decoder": 8779,
+    "@margoengine/points/laz": 8872,
     "@margoengine/points/octree": 9267,
     "@margoengine/points/pick": 5274,
-    "@margoengine/points/potree": 3670,
+    "@margoengine/points/potree": 3653,
     "@margoengine/points/surfels": 14856,
     "@margoengine/post": 40110,
     "@margoengine/post/afterimage": 5619,
@@ -2967,6 +2981,7 @@
     "leak @margoengine/lightmap -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/global -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/refracted -> @margoengine/bvh/tree": 1,
+    "leak @margoengine/loaders/las -> @margoengine/points/las": 1,
     "leak @margoengine/loaders/mtl -> @margoengine/gltf-pro": 1,
     "leak @margoengine/loaders/mtl -> @margoengine/materials": 1,
     "leak @margoengine/loaders/render -> @margoengine/gltf-pro": 1,

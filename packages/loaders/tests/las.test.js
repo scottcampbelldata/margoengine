@@ -1,6 +1,12 @@
-// parseLAS: every point format, 1.2 and 1.4 headers, variable records, colours, LAZ through a hook, limits and refusals.
+// parseLAS: every point format, 1.2 and 1.4 headers, variable records, colours, limits and refusals, and real LAS and LAZ
+// files read with no hook, every field against what LASzip decodes (packages/points/tests/fixtures/laz/records.json).
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { lasWaveDescriptors, lasWaveform } from '@margoengine/points/las';
 import { parseLAS } from '../dist/las.js';
 import { LoaderError } from '../dist/common.js';
 
@@ -15,7 +21,7 @@ function las({
   points = [],
   scale = [0.01, 0.01, 0.01],
   offset = [0, 0, 0],
-  min = [0, 0, 0],
+  min,
   extra = 0,
   vlrs = [],
   evlrs = [],
@@ -42,7 +48,13 @@ function las({
   v.setUint16(105, size, true);
   if (minor < 4) v.setUint32(107, points.length, true);
   [...scale, ...offset].forEach((value, i) => v.setFloat64(131 + i * 8, value, true));
-  min.forEach((value, i) => v.setFloat64(187 + i * 16, value, true));
+  // The box of the points, as a sound writer stores it, or from the given minimum corner up.
+  const world = points.map((p) => [p.x, p.y, p.z].map((value, i) => value * scale[i] + offset[i]));
+  [0, 1, 2].forEach((i) => {
+    const along = world.map((p) => p[i]);
+    v.setFloat64(187 + i * 16, min?.[i] ?? Math.min(0, ...along), true);
+    v.setFloat64(179 + i * 16, Math.max(0, min?.[i] ?? 0, ...along), true);
+  });
   if (minor >= 4) {
     v.setBigUint64(235, BigInt(evlrs.length ? evlrStart : 0), true);
     v.setUint32(243, evlrs.length, true);
@@ -93,8 +105,8 @@ test('every point format gives positions, returns and classification; each extra
   for (let format = 0; format <= 10; format++) {
     const cloud = await parseLAS(las({ format, minor: format >= 6 ? 4 : 2, points: [POINT] }));
     assert.equal(cloud.header.pointFormat, format);
-    assert.ok(Math.abs(cloud.positions[0] - 1.5) < 1e-6, `format ${format}`);
-    assert.ok(Math.abs(cloud.positions[1] + 2.5) < 1e-6, `format ${format}`);
+    assert.ok(Math.abs(cloud.positions[0] + cloud.origin[0] - 1.5) < 1e-6, `format ${format}`);
+    assert.ok(Math.abs(cloud.positions[1] + cloud.origin[1] + 2.5) < 1e-6, `format ${format}`);
     assert.equal(cloud.intensity[0], 700);
     assert.equal(cloud.classification[0], 6, `format ${format}: flag bits stay out of the class`);
     assert.equal(cloud.returnNumber[0], 2);
@@ -106,7 +118,7 @@ test('every point format gives positions, returns and classification; each extra
 
 test('extra bytes per point move the stride, not the fields', async () => {
   const cloud = await parseLAS(las({ format: 1, extra: 6, points: [POINT, { ...POINT, x: 250 }] }));
-  assert.ok(Math.abs(cloud.positions[3] - 2.5) < 1e-6);
+  assert.ok(Math.abs(cloud.positions[3] + cloud.origin[0] - 2.5) < 1e-6);
   assert.equal(cloud.gpsTime[1], 12.5);
 });
 
@@ -168,13 +180,117 @@ test('step thins the cloud and counts against the limit after thinning', async (
   await refuses(parseLAS(las({ points }), { step: 0 }), 'range');
 });
 
-test('a LAZ file is refused without a decompressor and reads through one', async () => {
+const fixtures = new URL('../../points/tests/fixtures/', import.meta.url);
+const expected = JSON.parse(readFileSync(new URL('laz/records.json', fixtures)));
+const USGS = 'USGS_LPC_MT_Statewide_Phase3_2021_B21_568232.laz';
+const real = (name) => new Uint8Array(readFileSync(new URL(name === USGS ? name : `laz/${name}`, fixtures)));
+const digest = (a) =>
+  createHash('sha256').update(new Uint8Array(a.buffer, a.byteOffset, a.byteLength)).digest('hex').slice(0, 32);
+
+/** The fields of a cloud under the names of records.json. */
+function fieldsOf(cloud) {
+  const { points } = cloud,
+    wave = points.wavePackets;
+  return {
+    positions: cloud.positions,
+    intensity: cloud.intensity,
+    returnNumber: cloud.returnNumber,
+    numberOfReturns: cloud.returnCount,
+    classification: cloud.classification,
+    classificationFlags: points.classificationFlags,
+    scanDirection: points.scanDirection,
+    edgeOfFlightLine: points.edgeOfFlightLine,
+    scanAngle: points.scanAngle,
+    scannerChannel: points.scannerChannel,
+    userData: points.userData,
+    pointSourceId: points.pointSourceId,
+    gpsTime: cloud.gpsTime,
+    rgb: points.rgb,
+    nir: points.nir,
+    waveDescriptor: wave?.descriptor,
+    waveOffset: wave?.offset,
+    waveSize: wave?.size,
+    waveLocation: wave?.location,
+    waveDirection: wave?.direction,
+  };
+}
+
+for (const [name, want] of Object.entries(expected)) {
+  if (name === 'point-version-1-point-wise.laz') continue;
+  test(`${name} opens with no hook: format ${want.format}, ${want.points} points, every field matching LASzip`, async () => {
+    const cloud = await parseLAS(real(name)),
+      fields = fieldsOf(cloud);
+    assert.equal(cloud.header.pointFormat, want.format);
+    assert.equal(cloud.positions.length, want.points * 3);
+    // simple1_3.las has a wrong box in its header, so its own test below checks the positions.
+    const boxIsRight = name !== 'simple1_3.las';
+    if (boxIsRight) assert.deepEqual(cloud.origin, cloud.header.min);
+    for (const [field, value] of Object.entries(want.fields))
+      if (field !== 'extra' && (boxIsRight || field !== 'positions')) assert.equal(digest(fields[field]), value, field);
+    for (const [field, value] of Object.entries(want.fields.extra ?? {}))
+      assert.equal(digest(cloud.extra[field]), value, `extra bytes ${field}`);
+  });
+}
+
+test('the USGS tile opens through loaders/las, as the header of the survey says', async () => {
+  const cloud = await parseLAS(real(USGS));
+  assert.equal(cloud.header.pointCount, 54634);
+  assert.equal(cloud.header.compressed, true);
+  assert.deepEqual(cloud.header.version, [1, 4]);
+  assert.ok(cloud.crs.epsg !== undefined || cloud.crs.wkt, 'the survey names its coordinate system');
+  const { min, max } = cloud.header;
+  for (let i = 0; i < cloud.positions.length; i += 3)
+    for (let c = 0; c < 3; c++) {
+      const v = cloud.origin[c] + cloud.positions[i + c];
+      assert.ok(v >= min[c] - 0.01 && v <= max[c] + 0.01);
+    }
+  const thin = await parseLAS(real(USGS), { step: 10 });
+  assert.equal(thin.intensity.length, Math.ceil(54634 / 10));
+  assert.equal(thin.intensity[7], cloud.intensity[70]);
+});
+
+test('a real file whose header box is wrong keeps exact positions', async () => {
+  // The writer of this file stored its box as raw integers, a thousand times too far out. Read against that box a float32
+  // position is 16 m coarse. The extent here is what the records say, as laspy reads them.
+  const cloud = await parseLAS(real('simple1_3.las'));
+  assert.equal(cloud.header.min[0], -235434519);
+  const extent = (axis) => {
+    let low = Infinity,
+      high = -Infinity;
+    for (let i = axis; i < cloud.positions.length; i += 3) {
+      low = Math.min(low, cloud.positions[i]);
+      high = Math.max(high, cloud.positions[i]);
+    }
+    return [low + cloud.origin[axis], high + cloud.origin[axis]];
+  };
+  const near = ([low, high], [wantLow, wantHigh]) =>
+    assert.ok(Math.abs(low - wantLow) < 0.001 && Math.abs(high - wantHigh) < 0.001, `${low} to ${high}`);
+  near(extent(0), [-235434.519, -234935.841]);
+  near(extent(1), [5800843.145, 5800946.249]);
+  near(extent(2), [265.094, 273.811]);
+});
+
+test('a real waveform file gives its packets, descriptor and sample reader', async () => {
+  const cloud = await parseLAS(real('fullwave.laz')),
+    { wavePackets } = cloud.points,
+    descriptor = lasWaveDescriptors(cloud.records).get(1);
+  assert.deepEqual([wavePackets.offset[0], wavePackets.size[0], descriptor.bitsPerSample], [60, 4968, 16]);
+  // The samples sit in a 35 MB `.wdp` beside it, so here a stand-in with the first packet where the offset says.
+  const wdp = new Uint8Array(60 + 4968);
+  new DataView(wdp.buffer).setUint16(60 + 2 * 1371, 24759, true);
+  const wave = lasWaveform(cloud.points, 0, wdp);
+  assert.equal(wave.raw.length, 2484);
+  assert.equal(wave.raw[1371], 24759);
+  assert.equal(wave.spacing, descriptor.spacing);
+});
+
+test('a decompress option replaces the built-in decoder, and LASzip 1.0 coding is refused by name', async () => {
   const plain = las({ format: 1, points: [POINT] });
   const pointBytes = plain.subarray(227);
   const file = las({ format: 1, points: [POINT], compressed: true, body: new Uint8Array(5), vlrs: [{ user: 'laszip encoded', id: 22204, data: new Uint8Array(4) }] });
   // The count in the header stays the file's own, whatever the compressed size is.
   new DataView(file.buffer).setUint32(107, 1, true);
-  await refuses(parseLAS(file), 'unsupported');
+  await refuses(parseLAS(file), 'header');
   let seen;
   const cloud = await parseLAS(file, {
     decompress: async (source) => {
@@ -185,8 +301,40 @@ test('a LAZ file is refused without a decompressor and reads through one', async
   assert.equal(seen.header.compressed, true);
   assert.equal(seen.records[0].recordId, 22204);
   assert.equal(seen.pointOffset, 227 + 58);
-  assert.ok(Math.abs(cloud.positions[0] - 1.5) < 1e-6);
+  assert.ok(Math.abs(cloud.positions[0] + cloud.origin[0] - 1.5) < 1e-6);
   await refuses(parseLAS(file, { decompress: () => new Uint8Array(3) }), 'truncated');
+  await assert.rejects(
+    parseLAS(real('point-version-1-point-wise.laz')),
+    (e) => e instanceof LoaderError && e.code === 'unsupported' && /POINT10 version 1/.test(e.message),
+  );
+});
+
+test('a damaged LAZ stream is a named error, and a hook that fails keeps its own error', async () => {
+  const cut = real('point-time.laz').slice(0, 9000);
+  await refuses(parseLAS(cut), 'truncated');
+  const broken = new Error('my decoder failed');
+  await assert.rejects(parseLAS(real('point-time.laz'), { decompress: () => Promise.reject(broken) }), (e) => e === broken);
+});
+
+/** Every module a file reaches by static imports, following `@margoengine/` names and relative paths. */
+function staticGraph(file, seen = new Set()) {
+  if (seen.has(file)) return seen;
+  seen.add(file);
+  const text = readFileSync(file, 'utf8');
+  for (const [, specifier] of text.matchAll(/^\s*(?:import|export)\s[^'"()]*?['"]([^'"]+)['"]/gm)) {
+    if (specifier.startsWith('.')) staticGraph(resolve(dirname(file), specifier), seen);
+    else if (specifier.startsWith('@margoengine/')) staticGraph(fileURLToPath(import.meta.resolve(specifier)), seen);
+  }
+  return seen;
+}
+
+test('a plain LAS file never pays for the decoder: laz.js is only reached by the import() of a compressed file', () => {
+  const entry = fileURLToPath(new URL('../dist/las.js', import.meta.url)),
+    graph = [...staticGraph(entry)],
+    reader = graph.find((file) => /points[\\/]dist[\\/]las\.js$/.test(file));
+  assert.ok(reader, 'loaders/las goes through the points reader');
+  assert.deepEqual(graph.filter((file) => /laz\.js$/.test(file)), []);
+  assert.match(readFileSync(reader, 'utf8'), /import\("\.\/laz\.js"\)/);
 });
 
 test('bad files are named errors', async () => {

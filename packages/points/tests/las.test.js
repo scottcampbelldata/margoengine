@@ -33,6 +33,28 @@ function survey(n, seed = 3) {
   return { positions, intensity, classification, gpsTime, rgb, nir, returnNumber, numberOfReturns, extra: { height } };
 }
 
+test('a header box that misses the points does not cost float32 precision', async () => {
+  // Real files do this (simple1_3.las stores its box as raw integers). The points sit far from the box, 2 mm apart.
+  const data = survey(50),
+    file = writeLAS({ ...data, positions: data.positions.map((_, i) => 5_800_000 + (i % 3) * 7 + Math.floor(i / 3) * 0.002) });
+  const v = new DataView(file.buffer, file.byteOffset);
+  for (const at of [179, 187, 195, 203, 211, 219]) v.setFloat64(at, v.getFloat64(at, true) * 1000, true);
+  for (const options of [{}, { origin: 'min' }]) {
+    const las = await parseLAS(file, options);
+    assert.deepEqual([...las.origin], [5_800_000, 5_800_007, 5_800_014]);
+    assert.ok(Math.abs(las.positions[147] - 0.098) < 1e-5, 'the last point keeps its millimetres');
+  }
+  const given = await parseLAS(file, { origin: [1, 2, 3] });
+  assert.deepEqual([...given.origin], [1, 2, 3], 'an origin the caller gave is kept');
+});
+
+test('a sound header box gives its centre, or its minimum corner', async () => {
+  const file = writeLAS(survey(50)),
+    { header } = readLASHeader(file);
+  assert.deepEqual([...(await parseLAS(file, { origin: 'min' })).origin], [...header.min]);
+  assert.deepEqual([...(await parseLAS(file)).origin], [0, 1, 2].map((i) => (header.min[i] + header.max[i]) / 2));
+});
+
 test('LAS round trip: every point format 0 to 10 through writeLAS and parseLAS', async () => {
   const data = survey(500);
   for (let format = 0; format <= 10; format++) {
@@ -85,10 +107,11 @@ test('LAS header: 1.4 64-bit counts, bounding box, CRS from GeoTIFF keys, partia
   assert.ok(Math.max(...partial.positions.map(Math.abs)) < 1000);
 });
 
-test('LAZ: compressed files ask for a decoder; a decoder plugs in through options.laz', async () => {
+test('LAZ: compressed files load the decoder by themselves; another plugs in through options.laz', async () => {
   const file = writeLAS(survey(50));
   file[104] |= 0x80; // the compression bit
-  await assert.rejects(parseLAS(file), (e) => e.code === 'unsupported' && /options\.laz/.test(e.message));
+  // No LASzip record here, so the decoder it loaded says so.
+  await assert.rejects(parseLAS(file), (e) => e instanceof TypeError && /no LASzip record/.test(e.message));
   // A stand-in decoder that returns the (here already uncompressed) records.
   const las = await parseLAS(file, { laz: (bytes, header) => bytes.subarray(header.pointDataOffset) });
   assert.equal(las.count, 50);
