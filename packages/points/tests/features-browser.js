@@ -47,10 +47,11 @@ const lit = ([r, g, b]) => r + g + b > 60;
 /** Waits until an octree has loaded everything it wants, drawing frames. */
 async function settled(octree, frame) {
   // fixed-wait: a cap, not a delay; it returns on the first frame after every node load has settled
-  for (let i = 0; i < 400; i++) {
+  for (let i = 0, quiet = 0; i < 400; i++) {
     await frame();
     await new Promise((r) => setTimeout(r, 0));
-    if (octree.stats.loading === 0 && i > 3) return frame();
+    quiet = octree.stats.loading ? 0 : quiet + 1;
+    if (quiet > 3) return frame();
   }
   throw new Error(`octree did not settle: ${JSON.stringify(octree.stats)}`);
 }
@@ -169,8 +170,32 @@ async function surfelDepth() {
   return 'Surfels keep a near surface in front of a far one, honour clipping planes and share depth with meshes';
 }
 
+/** A Potree 2.0 folder and a 1.x one, served from memory, drawn through OctreeCloud. */
+async function potree() {
+  const { OctreeCloud } = await import('../dist/octree.js');
+  const { PotreeSource } = await import('../dist/potree.js');
+  const { serve, writePotree1, writePotree2 } = await import('./potree-writer.js');
+  const positions = [...square(120)].map((v, i) => v + [1000, 2000, 3000][i % 3]),
+    colors = new Array((positions.length / 3) * 3).fill(255),
+    cloud = { positions, colors, capacity: 1000 },
+    drawn = [];
+  for (const files of [writePotree2(cloud), writePotree1(cloud)]) {
+    const { engine, frame, end } = await rig({ position: [0, 0, 10] }),
+      points = PointsPlugin.attach(engine),
+      source = await PotreeSource.open('/scan/', { fetch: serve(files, '/scan/') }),
+      octree = OctreeCloud.attach(engine, points, source, { adaptiveSize: true, material: { size: 2 } });
+    const image = await settled(octree, frame);
+    drawn.push(fraction(image, lit, [80, 80, 176, 176]));
+    assert(octree.stats.failed === 0, 'no node failed');
+    octree.dispose();
+    await end();
+  }
+  assert(drawn[0] > 0.9 && drawn[1] > 0.9, `both versions draw the square: ${drawn}`);
+  return `A Potree 2.0 and a 1.x folder stream through OctreeCloud and draw the same square (${drawn.map((v) => v.toFixed(2))})`;
+}
+
 window.runFeatures = async () => {
   const checks = [];
-  for (const check of [adaptiveSize, surfels, surfelDepth]) checks.push(await check());
+  for (const check of [adaptiveSize, surfels, surfelDepth, potree]) checks.push(await check());
   return checks;
 };

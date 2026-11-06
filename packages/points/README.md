@@ -320,6 +320,33 @@ OctreeCloud.attach(engine, PointsPlugin.attach(engine, { pointBudget: 2_000_000 
 
 Positions and bounds are relative to `source.origin`, the cube's centre, which keeps float32 positions exact for a scan far from zero. Reads only: there is no COPC writer. It reads point formats 6 to 8, as the specification requires. Tested against files written here from the public specification with the package's own test encoder, not yet against files from another tool.
 
+## Potree folders (`margoengine/points/potree`)
+
+Potree is the most common format for scans published on the web. `PotreeSource.open` reads a folder's metadata and whole hierarchy, then `OctreeCloud` fetches each node when it is shown. Pass the folder, or its `metadata.json` or `cloud.js`.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PointsPlugin } from 'margoengine/points';
+import { OctreeCloud } from 'margoengine/points/octree';
+import { PotreeSource } from 'margoengine/points/potree';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine, { pointBudget: 2_000_000 });
+const source = await PotreeSource.open('/scans/site/'); // options: fetch, signal
+OctreeCloud.attach(engine, points, source, { pointBudget: 2_000_000, adaptiveSize: true });
+engine.camera.position = [0, 50, 200]; // positions are relative to source.origin, the centre of the box
+console.log(source.version, source.points, source.origin);
+```
+
+| Version | Files | Read |
+| --- | --- | --- |
+| 2.0 | `metadata.json`, `hierarchy.bin`, `octree.bin` | Range requests. Encoding `DEFAULT` only. |
+| 1.5 to 1.8 | `cloud.js`, `.hrc`, one `.bin`, `.las` or `.laz` per node | Whole files per node. `.las` and `.laz` nodes need the option below. |
+
+A 1.x folder of LAS or LAZ nodes needs their decoders, so a folder of binary nodes never pays for them: `PotreeSource.open(url, {parseLAS, laz: createLazDecoder()})`, with `parseLAS` from `margoengine/points/las` and `createLazDecoder` from `margoengine/points/laz`.
+
+Encoding `BROTLI` throws a `MargoError` with code `unsupported`: browsers have no Brotli stream decoder, so convert with encoding `DEFAULT`. So do versions before 1.5. Only position and colour are read, and the writers in `tests/potree-writer.js` were written here from the public format descriptions: the reader has not yet met a file from PotreeConverter.
+
 ## Surfels (`margoengine/points/surfels`)
 
 `SurfelPlugin` draws clouds as small blended discs, so a scan reads as one continuous surface instead of overlapping dots. It runs three passes: every disc writes depth pushed back a little, discs within that push of the front add colour and weight into a float target, and a full-screen pass divides one by the other and draws it over the scene. The weight is Gaussian across the disc and falls with depth behind the front surface, so a wall does not bleed through the floor in front of it. Discs share the scene's depth, so meshes and surfels hide each other.
@@ -363,7 +390,7 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 - Per-point colors are stored as RGBA8, so HDR vertex colors are clamped to 0..1.
 - No mipmaps on maps. A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.
 - Transparent points and sprites are not sorted per point. Use `alphaTest` or additive blending for order-independent results. Round antialiased edges of opaque points write depth.
-- A plain `PointCloud` does not grow its points when the budget subsamples its blocks; `OctreeCloud` does with `adaptiveSize`. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own (COPC is not read).
+- A plain `PointCloud` does not grow its points when the budget subsamples its blocks; `OctreeCloud` does with `adaptiveSize`. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own; it reads COPC and Potree.
 - `OctreeCloud` culls in world space and does not follow a mesh transform; place the points in world coordinates.
 
 ## Tests

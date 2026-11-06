@@ -58,6 +58,10 @@
     "./surfels": {
       "types": "./dist/surfels.d.ts",
       "import": "./dist/surfels.js"
+    },
+    "./potree": {
+      "types": "./dist/potree.d.ts",
+      "import": "./dist/potree.js"
     }
   },
   "files": [

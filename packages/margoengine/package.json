@@ -1194,6 +1194,10 @@
       "types": "./dist/points/surfels.d.ts",
       "import": "./dist/points/surfels.js"
     },
+    "./points/potree": {
+      "types": "./dist/points/potree.d.ts",
+      "import": "./dist/points/potree.js"
+    },
     "./post": {
       "types": "./dist/post.d.ts",
       "import": "./dist/post.js"

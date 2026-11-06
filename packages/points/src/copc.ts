@@ -1,10 +1,10 @@
 // Cloud Optimized Point Cloud reader, from the public COPC 1.0 specification: a LAZ 1.4 file whose first record (user id
 // `copc`, id 1) gives a cube and where the hierarchy pages are; each page lists voxels and the byte range of their
 // points, one LAZ chunk per voxel. Everything comes by HTTP range requests, so a viewer reads only what it shows.
-import { MargoError } from '@margoengine/math/errors';
 import { decodePoints, readLASHeader, type LASHeader, type LASRecord } from './las.js';
 import { decodeLazChunk } from './laz.js';
 import type { OctreeNode, OctreeNodeData, OctreeSource } from './octree.js';
+import { readRange } from './range.js';
 
 /** Options of `CopcSource.open`. */
 export interface CopcOptions {
@@ -81,7 +81,7 @@ export class CopcSource implements OctreeSource {
   static async open(url: string | URL, options: CopcOptions = {}): Promise<CopcSource> {
     const fetcher = options.fetch ?? globalThis.fetch,
       signal = options.signal,
-      get = (at: number, bytes: number) => range(fetcher, url, at, bytes, signal),
+      get = (at: number, bytes: number) => readRange(fetcher, url, at, bytes, signal),
       first = await get(0, HEADER_BYTES),
       head = readLASHeaderBytes(first),
       { header, records } = readLASHeader(await get(0, head));
@@ -161,7 +161,7 @@ export class CopcSource implements OctreeSource {
   async load(node: OctreeNode, signal: AbortSignal): Promise<OctreeNodeData> {
     const { offset, bytes, count } = node as CopcNode;
     if (!count) return { positions: new Float32Array(0) };
-    const chunk = await range(this.fetcher, this.url, offset, bytes, signal),
+    const chunk = await readRange(this.fetcher, this.url, offset, bytes, signal),
       data = decodeLazChunk(chunk, count, this.header, this.records);
     signal.throwIfAborted();
     const points = decodePoints({ ...this.header, pointCount: count }, this.records, data, { origin: this.origin }),
@@ -179,22 +179,4 @@ export class CopcSource implements OctreeSource {
 function readLASHeaderBytes(bytes: Uint8Array): number {
   if (bytes.byteLength < 100) throw new RangeError('COPC header is cut short; the file is truncated');
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(96, true);
-}
-/** `bytes` bytes from `at`: the answered part, or the part cut out of a whole file when the server ignored `Range`. */
-async function range(
-  fetcher: typeof fetch,
-  url: string | URL,
-  at: number,
-  bytes: number,
-  signal?: AbortSignal,
-): Promise<Uint8Array> {
-  signal?.throwIfAborted();
-  const response = await fetcher(url, { signal, headers: { Range: `bytes=${at}-${at + bytes - 1}` } });
-  if (!response.ok)
-    throw new MargoError(
-      'failed',
-      `GET ${url} answered ${response.status}; check the URL and that the server allows it`,
-    );
-  const body = new Uint8Array(await response.arrayBuffer());
-  return response.status === 206 ? body : body.subarray(at, at + bytes);
 }
