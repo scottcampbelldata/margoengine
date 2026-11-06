@@ -8,7 +8,7 @@ want to check. Status of each claim and which command backs it: [claims.md](clai
 ```sh
 git clone https://github.com/scottcampbelldata/margoengine.git && cd margoengine
 npm ci                     # Node 24.18+; installs three@0.186.1, Vite, Playwright and the test tooling
-npx playwright install msedge   # or set MARGO_BROWSER=chrome; the real-GPU scripts default to Edge
+npx playwright install msedge   # or set MARGO_BROWSER=chrome, or webkit on macOS; the real-GPU scripts default to Edge
 npm run build:packages     # every package, size gates, catalog (no Rust toolchain needed; the Wasm is checked in)
 ```
 
@@ -125,10 +125,16 @@ route is a clone because 1.0.0 is not on npm yet.
 | Every real-browser test | `node examples/package-benchmarks/gates/run-browser-tests.mjs` | yes | `results/gates-browser-tests.json` | 41 scripts; `modern-hardware-gpu-tests.js` needs `GPU_VENDOR` and a discrete GPU. |
 | Light-tier pace and GPU reading (LIM-077) | `npm test --workspace @margoengine/quality` | no | console | A physical 100 Hz display shows it live: the voxel sandbox's HUD with `?seed=1`. |
 | Bulk transform writes against setters | `node packages/scene/scripts/bulk-bench.mjs 10000` | no | console | CPU only; build the package first. |
+| Every three.js parity row (perf-vs-threejs) | `npm run build:packages`, then `npm run bench:parity` | yes | `docs/whitepaper/perf-vs-threejs.md`, `.json` | The ledger keeps every run. The numbers below are diagnostic until a quiet run. |
+| One parity row (perf-history entries 56 to 60, 63, 65 to 69) | `node bench/cli.mjs parity --cases=<scene> --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5` | yes for frame scenes | `benchmarks/runs/<id>.json` | Scenes: `p-morph`, `p-morph-compiled`, `p-stl`, `p-stl-normals`, `p-skeleton-clone`, `p-gpu-pick`, `p-gpu-pick-batch`, `helmet`, `p-motion-blur`, `p-motion-blur-velocity`, `p-custom-shader`, `p-rect-area`, `p-pmrem`, `p-pmrem-refresh`, `p-export-usdz`. Each entry names its own engines and runs. |
+| Instanced and moving boxes against three.js (entries 50, 51, 53, 54) | `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3` and `npm run bench -- dynamic --engines=margo,three-webgpu --runs=3` | yes | `benchmarks/runs/<id>.json` | |
+| Polygon offsets (entry 52) | `npm run build` in `packages/geometry`, then `node packages/geometry/scripts/polygon-bench.mjs` | no | console | |
+| Not repeatable by a script yet | - | - | - | The `Spring` timing (entry 55), the WebGL2 CPU tier's interpreter (entry 72) and the path tracer on the layer (entry 73). Each is on the re-measure list. |
 | Unit tests, API snapshots, size gate | `npm run verify` | no | console | `npm run verify:full` adds packed-package and interop suites. |
 
 ## A second machine
 
 On a discrete-GPU desktop or a Mac: the setup above, then `npm run bench` and `npm run bench -- features`, and
 keep the `benchmarks/runs/` folder. On Linux or macOS the AC check returns `null` (recorded, not enforced). Set
-`MARGO_BROWSER=chrome` where Edge is not installed. Phones are not scripted yet.
+`MARGO_BROWSER=chrome` where Edge is not installed. On macOS, `MARGO_BROWSER=webkit` runs the browser suites in Playwright's
+WebKit build, which has WebGPU there (`npx playwright install webkit`). That is not Safari. Phones are not scripted yet.

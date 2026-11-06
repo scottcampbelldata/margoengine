@@ -1481,7 +1481,8 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   | 250,000 moving | 2.76 | 2.73 | 2.00 |
   | 250,000 still | 1.54 | 1.50 | not measured |
 
-  Smaller than expected: the removed traffic was not the main cost.
+  Smaller than expected: the removed traffic was not the main cost. Skipping the compute passes altogether still leaves
+  2.51 ms at 250,000 moving boxes (commit `8fc9f4bb3`, same runs, diagnostic).
 - **Same output:** `packages/culling/test/gpu/dynamic-check.mjs` compares frames with core meshes with shadows on and off, and picks.
 - **Rerun:** `npm run bench -- dynamic --engines=margo,three-webgpu --runs=3`.
 - **Guard:** `packages/culling/test/dynamic.test.js` and the browser test above.
@@ -1500,6 +1501,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   `core`, `stage`, `kernel`, `shared`, `react` and `margoengine` have their own tsconfig and were left alone; `core` and
   `stage` output is unchanged.
 - **Limit:** `#private` fields must be declared, so a bare one still starts as `undefined`. None was measured.
+- **Rerun:** not recorded: the `Spring` timing was taken by hand and no committed script repeats it.
 - **Guard:** `tests/class-fields.test.js`.
 
 ### 56. `p-morph`'s render pipeline, compiled during the build
@@ -1765,6 +1767,31 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `npm run bench -- compute --cases=compute-elementwise --runs=3` and `npm run bench -- tracer --runs=3`.
   A quiet rerun on current main is owed.
 
+### 72. The WebGL2 CPU tier on an interpreter: 13 to 41 times slower, kept (accepted difference in work)
+
+- **Loss:** a page whose policy forbids `new Function` has no way to compile the CPU tier's JavaScript. Before `3c21e0044`
+  the tier refused every kernel there, so the choice was this speed or no compute at all.
+- **Cause:** the interpreter parses the JavaScript the tier writes and runs it as closures, which is the only route such
+  a policy leaves. Compiled kernels are unchanged, and only a page with that policy downloads the chunk.
+- **Measured:** RTX A6000 PC, other jobs running, diagnostic (commit `3c21e0044`): 41.2 times slower than compiled on a
+  256-light binning loop, 13.5 times on a reduction with barriers.
+- **Same output:** `packages/webgl2-compat/test/interpret.test.js`: all 372 buffer-only corpus kernels leave the same memory
+  both ways. `packages/webgl2-compat/test/compute-browser.mjs` reruns every case under a real policy.
+- **Rerun:** not recorded: the two timings have no committed script. The checks above repeat the results, not the speed.
+- **Guard:** the two tests above and LIM-155.
+
+### 73. The voxel path tracer on the WebGL2 layer (accepted difference in work)
+
+- **Loss:** against native WebGPU on one GPU, a 1500 x 1100, 64-sample denoised render took 6.4 s against 2.3 s, and a
+  400 x 240 viewport frame 24 ms against 9 ms (RTX A6000, ANGLE Vulkan, other jobs running, diagnostic, commit `3303ffa9c`).
+- **Cause:** WebGL2 has no compute, so `trace` runs as a fragment shader writing four `rgba32float` targets, and a small
+  kernel adds them to the image buffers. Before this the tracer refused the layer.
+- **Open:** ANGLE on Direct3D 11, the default on Windows, had not finished compiling `trace` after 20 minutes
+  ([limits.md](../limits.md), Platform), with the page drawing throughout.
+- **Rerun:** not recorded: the timings have no committed script. `node packages/voxel-pathtracer/tests/browser-check.mjs --compat`
+  repeats the correctness checks.
+- **Guard:** that check, and `compute-browser.mjs` for the polling `createComputePipelineAsync`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1816,6 +1843,12 @@ These entries lack a recorded number, a named machine or a quiet run:
 12. Rect area lights (entry 67): a quiet run, and the 0.26 against 0.15 ms left like for like.
 13. `p-pmrem` parts (entry 68): a quiet run, one part at a time.
 14. `TransformWriter` (entry 70): a quiet run, and the whole frame with thousands of moving meshes.
-15. The WebGL2 CPU tier on its interpreter (docs/limits.md, diagnostic 41.2 and 13.5 times slower than compiled): a quiet run.
+15. The WebGL2 CPU tier on its interpreter (entry 72, diagnostic 41.2 and 13.5 times slower than compiled): a quiet run, and
+    a committed timing script.
+16. The voxel path tracer on the layer (entry 73): a quiet run, and a committed timing script.
+17. `Spring` after the shared tsconfig change (entry 55): a committed script and a quiet run.
+18. Parity scenes added since the last ledger run, `p-morph-compiled`, `p-motion-blur-velocity` and `p-pmrem-refresh`, have no
+    row in `perf-vs-threejs.json` yet: `npm run bench:parity` adds them. Every row's after number in
+    [perf-vs-threejs.md](perf-vs-threejs.md) since 2026-10-27 is in its cause text, not in the ledger.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.
