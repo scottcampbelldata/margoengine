@@ -4,7 +4,7 @@
 // @margoengine/materials + @margoengine/gltf-pro built from `ref` and from the candidate.
 // Run: node examples/package-benchmarks/proofs/materials-uv-transform.proof.js [ref] [pin] [--current]
 // Pinned: 1970fda (before the transforms) against 700838e, the commit that added them and made this claim. --current:
-// 67d95b8c against the working tree (one view per texture, one sampler per state; e2cb3815 before it: a steady material keeps its shader across frames, so a texture update uploads before the
+// de20fb3c against the working tree (one view per texture, one sampler per state; e2cb3815 before it: a steady material keeps its shader across frames, so a texture update uploads before the
 // pass begins; b953071e before it: the materials draw work: uniform arena, view block, shared pipelines, blended draws
 // in the run's pass; 1fafaf6a before it: one render pass; c640305c before that: a material without
 // maps reads no textures, 57250a49 before that), including the
@@ -23,7 +23,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
-  { ref, pin } = refs('1970fda', '700838e', '67d95b8c');
+  { ref, pin } = refs('1970fda', '700838e', 'de20fb3c');
 const sources = ['materials/src', 'gltf-pro/src', 'shared'].map((name) => slash(resolve(root, 'packages', name)) + '/');
 // A revision this clone lacks is HISTORICAL (history.js); only a file the revision lacks reads the working tree.
 const show = (from, file) => showAt(from, file.slice(slash(root).length + 1));
