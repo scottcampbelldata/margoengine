@@ -175,6 +175,43 @@ const link = scrollTimeline(timeline, {
 
 The timeline's values are written on attach, from where the page already is, so a reload half way down starts half way through. A page that cannot scroll stays at 0. `Timeline.call` callbacks do not run, as for any seek; use `onUpdate`. The link reads the scroll on `scroll`, on `resize` and when the page or the element changes size; `link.refresh()` reads it at any other time.
 
+## Custom ease curves
+
+`customEase` from `margoengine/tween/custom-ease` makes an easing from data, so a curve drawn in an editor can be saved as JSON and loaded again:
+
+```ts
+import {Tween} from 'margoengine/tween';
+import {customEase, easeFromSamples, easeFromStroke} from 'margoengine/tween/custom-ease';
+
+// Through these points, with no overshoot between them.
+const hop = customEase({version: 1, kind: 'smooth', points: [[0, 0], [0.4, 1], [0.7, 0.8], [1, 1]]});
+
+const light = {intensity: 0};
+const tween = new Tween();
+tween.to(light, 'intensity', 3, {duration: 1, easing: hop});
+
+// Save it and load it back: the same numbers.
+const saved = JSON.stringify(hop);
+const loaded = customEase(saved);
+
+// What a curve editor draws: anchor, handle, handle, anchor.
+const swing = customEase({version: 1, kind: 'bezier', points: [[0, 0], [0.2, 1.4], [0.5, 1.2], [1, 1]]});
+
+// Evenly spaced values, or a stroke drawn with a pointer, in pixels, in the order drawn.
+const measured = easeFromSamples([0, 0.1, 0.5, 0.9, 1]);
+const drawn = easeFromStroke([[10, 300], [60, 280], [120, 120], [200, 100]]);
+```
+
+| `kind` | The curve | Points |
+| --- | --- | --- |
+| `'smooth'` | Passes through every point. Between two points it does not rise above or fall below them (a monotone cubic). | 2 or more |
+| `'linear'` | Straight lines, like CSS `linear()`. | 2 or more |
+| `'bezier'` | Cubic segments. A handle's x stays between the two anchors of its segment. | 3n + 1 |
+
+- x runs from exactly 0 to exactly 1 and only moves forward; `y` is free, so a curve can overshoot or end away from 1. A curve that breaks a rule throws a `RangeError` naming it.
+- A custom ease is a plain easing function with `curve` holding its data. It works anywhere an `easing` goes.
+- `easeFromStroke(samples, tolerance?)` scales a stroke to 0..1 from its first and last sample, drops samples that went back in x, and keeps the few points that hold the shape within `tolerance`, default 0.005 of its height. A stroke that ends at the y it began throws, as there is no height to scale by.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/tween

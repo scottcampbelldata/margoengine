@@ -37,6 +37,10 @@
     "./scroll": {
       "types": "./dist/scroll.d.ts",
       "import": "./dist/scroll.js"
+    },
+    "./custom-ease": {
+      "types": "./dist/custom-ease.d.ts",
+      "import": "./dist/custom-ease.js"
     }
   },
   "files": [

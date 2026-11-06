@@ -2218,6 +2218,10 @@
       "types": "./dist/tween/scroll.d.ts",
       "import": "./dist/tween/scroll.js"
     },
+    "./tween/custom-ease": {
+      "types": "./dist/tween/custom-ease.d.ts",
+      "import": "./dist/tween/custom-ease.js"
+    },
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"

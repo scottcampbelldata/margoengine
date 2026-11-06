@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9092074,
+  "total": 9094076,
   "history": [
     {
       "date": "2026-10-24",
@@ -2834,6 +2834,12 @@
       "commit": "bfcda04de",
       "reason": "texture streaming: GLTFStreamedImage binding path in the root entry, new lazy chunk loaded only with the textures option",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "b9b21f139",
+      "reason": "new optional entry @margoengine/tween/custom-ease; the bezier solver moved to its own file",
+      "grew": 1
     }
   ],
   "items": {
@@ -3388,6 +3394,7 @@
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4303,
     "@margoengine/tween": 5466,
+    "@margoengine/tween/custom-ease": 2002,
     "@margoengine/tween/motion-path": 1263,
     "@margoengine/tween/scroll": 1198,
     "@margoengine/tween/stagger": 1435,

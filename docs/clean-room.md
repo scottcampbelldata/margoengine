@@ -946,6 +946,7 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 | Kinematics motion planner (`kinematics-constraints/plan`) | RRT from S. M. LaValle, TR 98-11, Iowa State University, 1998; RRT-Connect from J. J. Kuffner, S. M. LaValle, ICRA 2000; PRM from L. E. Kavraki, P. Svestka, J.-C. Latombe, M. H. Overmars, IEEE Trans. Robotics and Automation 12(4), 1996; shortcutting from R. Geraerts, M. H. Overmars, IJRR 26(8), 2007. No planning library's source was read |
 | Kinematics URDF import (`kinematics-constraints/urdf`) | The public URDF specification (ROS wiki pages on the robot, link and joint elements); forward kinematics checked against the modified DH table Franka Emika publishes in its robot documentation. No ROS, MoveIt, Pinocchio or other library's source was read |
 | Kinematics batched GPU clearance (`kinematics-constraints/gpu`) | GJK from E. G. Gilbert, D. W. Johnson, S. S. Keerthi, IEEE J. Robotics and Automation 4(2), 1988, in WGSL from the repository's own `hull.ts`; `preciseSin` and `preciseCos` from `packages/shared/precise-math.js`; Lipschitz pruning as in `kinematics-constraints/sdf`. No other engine's or library's source was read |
+| Custom ease curves (`tween/custom-ease`) | Monotone cubic from F. N. Fritsch and R. E. Carlson, SIAM J. Numer. Anal. 17(2), 1980; stroke thinning from U. Ramer, 1972, and D. Douglas and T. Peucker, 1973; the JSON shape is Margo's own. |
 
 ## 2D sprites: `@margoengine/sprites`
 

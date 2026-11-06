@@ -1,9 +1,10 @@
 // The standard easing families (quad to quint, sine, expo, circ, back, elastic, bounce) as they are defined in the
 // public easing-function literature (R. Penner's equations; easings.net lists the same curves), written from the
 // formulas. cubicBezier follows the CSS Easing Functions Level 1 definition.
+import { bezierSolver } from './bezier.js';
 import type { Easing } from './index.js';
 
-const { PI, sin, cos, sqrt, pow, abs } = Math;
+const { PI, sin, cos, sqrt, pow } = Math;
 const inOut =
   (easeIn: Easing): Easing =>
   (t) =>
@@ -100,33 +101,14 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): Eas
     throw new RangeError(
       'cubicBezier needs finite points with x1 and x2 in [0, 1]; use values like (0.25, 0.1, 0.25, 1)',
     );
-  const cx = 3 * x1,
-    bx = 3 * (x2 - x1) - cx,
-    ax = 1 - cx - bx,
+  const solve = bezierSolver(x1, x2),
     cy = 3 * y1,
     by = 3 * (y2 - y1) - cy,
     ay = 1 - cy - by;
-  const x = (s: number) => ((ax * s + bx) * s + cx) * s;
-  const dx = (s: number) => (3 * ax * s + 2 * bx) * s + cx;
   return (t) => {
     if (t <= 0) return 0;
     if (t >= 1) return 1;
-    let s = t;
-    for (let i = 0; i < 8; i++) {
-      const err = x(s) - t;
-      if (abs(err) < 1e-7) return ((ay * s + by) * s + cy) * s;
-      const d = dx(s);
-      if (abs(d) < 1e-6) break;
-      s -= err / d;
-    }
-    let lo = 0,
-      hi = 1;
-    s = t;
-    for (let i = 0; i < 40 && hi - lo > 1e-9; i++) {
-      if (x(s) < t) lo = s;
-      else hi = s;
-      s = (lo + hi) / 2;
-    }
+    const s = solve(t);
     return ((ay * s + by) * s + cy) * s;
   };
 }
