@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4988075,
+  "total": 4988762,
   "history": [
     {
       "date": "2026-10-24",
@@ -2126,6 +2126,12 @@
       "commit": "41fb0c47b",
       "reason": "New stats entry ./beacon: frame time percentiles from real sessions to an endpoint the app chooses. Core and core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "36579c818",
+      "reason": "lod, selection: imposter selection mask",
+      "grew": 1
     }
   ],
   "items": {
@@ -2374,7 +2380,7 @@
     "@margoengine/loaders/usd": 7778,
     "@margoengine/loaders/vrml": 5087,
     "@margoengine/loaders/worker": 8571,
-    "@margoengine/lod": 13629,
+    "@margoengine/lod": 14316,
     "@margoengine/lod/auto": 5831,
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/stream": 1778,

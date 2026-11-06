@@ -150,6 +150,24 @@ shadows.add(lods); // every imposter casts and receives; {castShadow: false} or 
 
 Each frame of `ImposterFrames` is an atlas of its own, so the memory is `count` atlases, and objects on the same frame share a draw: a forest on 8 frames is 8 draws. `shadows` sees an imposter as a card facing the light with the surface of the view nearest the light, standing back from itself by a tile's angle over its radius so that it does not shadow its own surface: an imposter's self-shadowing below that depth is lost, and the shadow it throws on other objects stays in place. Of a lighting effect only the `direct` hook reaches imposters, which is what `Shadows` gives; clustered lights and environment light do not. Casters are not culled against the cascades. The emissive atlas is RGBA8, so baked emissive stops at 1; add more through `lod.emissive`.
 
+## Selection outlines on imposters
+
+`@margoengine/selection` outlines an object shown as an imposter like any other, x-ray included. Select its anchor or any of its levels: the outline stays through a level switch.
+
+```ts
+import {createStage} from 'margoengine';
+import {box, PbrMaterial} from 'margoengine/core';
+import {Imposter, LODSystem} from 'margoengine/lod';
+import {Selection} from 'margoengine/selection';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const engine = stage.engine;
+const lods = LODSystem.attach(engine);
+const near = engine.createMesh().setGeometry(box(1, 1, 1));
+const atlas = Imposter.bake(engine, box(1, 1, 1), {material: new PbrMaterial()});
+lods.add(engine.createMesh(), [{object: near}, {object: atlas, distance: 50}]);
+Selection.attach(engine, {width: 3}).set([near]);
+```
+
 ## Streamed levels: `margoengine/lod/stream`
 
 For a city too big to load, a `LevelStream` fetches a fine level only when the camera comes near it. While a level is on its way the object keeps the level it has, so give every object a coarse level that needs no fetch.

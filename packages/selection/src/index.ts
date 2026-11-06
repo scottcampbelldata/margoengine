@@ -94,6 +94,34 @@ const composite =
  else {let size=vec2i(textureDimensions(mask));let radius=i32(ceil(settings[0].x));for(var y=-radius;y<=radius;y++){for(var x=-radius;x<=radius;x++){if(f32(x*x+y*y)>settings[0].x*settings[0].x){continue;}let q=clamp(p+vec2i(x,y),vec2i(0),size-1);hit=hit||textureLoad(mask,q,0).r>0.5;}}}
  if(!hit){discard;}return vec4f(settings[1].rgb,1);
 }`;
+/** A pass on the mask, over the frame's depth, which it only reads. */
+function maskPass(c: Context): GPURenderPassEncoder {
+  const pass = c.encoder.beginRenderPass({
+    colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
+    depthStencilAttachment: {
+      view: c.depth,
+      depthReadOnly: true,
+      ...(c.descriptor.depthStencil!.format.includes('stencil') ? { stencilReadOnly: true } : {}),
+    },
+  });
+  applyView(pass, c);
+  return pass;
+}
+/** What {@link SelectionMaskSource.drawSelectionMask} receives. Borrowed: use it synchronously. */
+export interface SelectionMaskContext {
+  /** The frame's WebGPU pass context; `context.color` is the `r8unorm` mask, and any non-zero red marks a pixel. */
+  context: Context;
+  /** True for the id of a mesh in the selection, or under one. */
+  selected(id: number): boolean;
+  /** This is the hidden-lines mask: draw without the depth test. */
+  xray: boolean;
+  /** Opens a pass on the mask that reads the frame's depth; end it yourself. */
+  begin(): GPURenderPassEncoder;
+}
+/** An engine plugin that draws objects with no triangles of their own, and marks them in the selection's mask. */
+export interface SelectionMaskSource {
+  drawSelectionMask(context: SelectionMaskContext): void;
+}
 // X-ray: the outline of the whole selection (mask drawn without the depth test), dashed by the nearest silhouette pixel's
 // coordinate along the edge's dominant axis, so straight and curved edges get dashes of the same screen length.
 const xrayComposite =
@@ -400,6 +428,7 @@ export class Selection implements EnginePlugin {
       clear.end();
       c.draw(options);
       this.drawModels(c, xray);
+      this.drawPlugins(c, xray);
       if (this.sources.hasSources)
         this.sources.draw(c, c.camera.matrix, {
           format: 'r8unorm',
@@ -493,17 +522,20 @@ export class Selection implements EnginePlugin {
           c.descriptor.multisample,
         );
     const model = xray ? (this.xr!.model ??= pipeline('always')) : (this.modelMask ??= pipeline('equal'));
-    const pass = c.encoder.beginRenderPass({
-      colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
-      depthStencilAttachment: {
-        view: c.depth,
-        depthReadOnly: true,
-        ...(format.includes('stencil') ? { stencilReadOnly: true } : {}),
-      },
-    });
-    applyView(pass, c);
+    const pass = maskPass(c);
     draws.draw(c.device, pass, model, c.camera.matrix, c.view ?? c);
     pass.end();
+  }
+  /** Lets the plugins that draw what has no triangles of its own (imposters) mark the selection too. */
+  private drawPlugins(c: Context, xray: boolean): void {
+    const flags = this.flags;
+    for (const plugin of this.engine!.plugins.values())
+      (plugin as Partial<SelectionMaskSource>).drawSelectionMask?.({
+        context: c,
+        xray,
+        selected: (id) => flags[id] === 1,
+        begin: () => maskPass(c),
+      });
   }
   private releaseTargets(): void {
     if (this.xr) this.xr.mask = this.xr.model = this.xr.composite = this.xr.bind = this.xr.draw.pipeline = undefined;

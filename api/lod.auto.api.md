@@ -198,6 +198,12 @@ class LODSystem implements EnginePlugin {
         matrix: Float32Array;
         cascade: number;
     }): void;
+    drawSelectionMask({ context: c, xray, selected, begin }: {
+        context: Context;
+        xray: boolean;
+        selected(id: number): boolean;
+        begin(): GPURenderPassEncoder;
+    }): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

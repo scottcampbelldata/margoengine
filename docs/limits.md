@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-160). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-161). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -109,6 +109,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Fuller imposters (`LODOptions.color`, `emissive`, `frame`; `ImposterOptions.emissive`, `pose`, `margin`; `ImposterFrames`; `shadows.add(lods)`) | Instance record 96 bytes (was 64). `ImposterFrames`: `count` atlases, at least 2, a draw per frame in use. Baked emissive stops at 1 (RGBA8). Lighting effects: the `direct` hook only. | Colour and emissive ride on the one instanced draw, and shadows use the atlas instead of a mesh. | An imposter loses self-shadow within `r*(2/(frames-1)+4/frameSize)`. Casters are not culled per cascade. A skinned source needs `margin` for poses past its bind-pose bounds. | Keep a mesh level at the range where these matter. |
 | Streamed levels (`LevelStream`, `@margoengine/lod/stream`) | Default 4 fetches at once and 256 MiB kept; a level on show is never freed, so `resident` can pass `maxBytes`. The default count holds vertices and indices, not textures. | A wish for a level that is not there holds the level on show, so nothing pops out, at the cost of a coarse level per object. | A fetch unasked for over two frames is aborted and starts over when wanted: partial bytes are not kept. No automatic retry: a failed level waits for `retry()`. | `bytes` per level to count textures; load up front for scenes that fit. |
 | Moving sources of a far mesh (`HierarchicalLOD.update`, `follow`) | A cell keeps its meshes and centre. A rebuild merges the whole cell again, and simplifies it with a `ratio` below 1. | Far meshes stay plain meshes, so nothing is paid per frame for what stands still beyond comparing matrices. | `follow` runs a frame behind the sources and only for cells on their far mesh; a cell coming into range shows its old far mesh for one frame. | `update()` when you know something moved. |
+| Selection outlines on imposters (`LODSystem.drawSelectionMask`, `SelectionMaskSource`) | An object counts as selected through its anchor or a level; a part of a model level does not. | The mask redraws only selected imposters, from a buffer of their own, with the imposter's own shader, so the outline sits on the imposter's pixels. | The mask pass runs the full imposter fragment shader for the selected objects. | Select the anchor or the model. |
 
 ## Geometry
 

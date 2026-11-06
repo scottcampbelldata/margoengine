@@ -90,6 +90,7 @@ export function gpuHarness() {
     engine = {
       gpu: device,
       frameGraph: graph,
+      plugins,
       hasPlugin(name) {
         return plugins.has(name);
       },

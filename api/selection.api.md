@@ -4,7 +4,7 @@
 
 ```ts
 import { Camera, EngineKernel, Mesh, RenderView } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
 export interface ElementHit {
     mesh: Mesh;
@@ -201,6 +201,17 @@ export interface SelectionElement {
     } | null;
 }
 
+export interface SelectionMaskContext {
+    context: Context;
+    selected(id: number): boolean;
+    xray: boolean;
+    begin(): GPURenderPassEncoder;
+}
+
+export interface SelectionMaskSource {
+    drawSelectionMask(context: SelectionMaskContext): void;
+}
+
 export interface SelectionOptions {
     algorithm?: 'jfa' | 'morphological';
     width?: number;
@@ -244,6 +255,10 @@ export function selectInPolygon(engine: EngineKernel, polygon: readonly (readonl
 export function selectInRect(engine: EngineKernel, rect: ScreenRect, options?: ScreenSelectOptions): Mesh[];
 
 // Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type PickView = RenderView & {
     pixels: true;

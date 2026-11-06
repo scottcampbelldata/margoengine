@@ -8,7 +8,7 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import { Imposter, ImposterFrames, imposterShader, imposterShadowShader } from './imposter.js';
+import { Imposter, ImposterFrames, imposterMaskShader, imposterShader, imposterShadowShader } from './imposter.js';
 export {
   Imposter,
   ImposterFrames,
@@ -150,6 +150,13 @@ interface Atlas {
   castBuffer?: GPUBuffer;
   castGroups: GPUBindGroup[];
   castTexture?: GPUTexture;
+  /** Selected instances, for the selection's mask: a buffer of their own, since the beauty pass reads `buffer`. */
+  mask: Float32Array;
+  maskCount: number;
+  maskBuffer?: GPUBuffer;
+  maskGroup?: GPUBindGroup;
+  maskTexture?: GPUTexture;
+  maskPipeline?: GPURenderPipeline;
 }
 /** Floats per instance: matrix, colour, emissive. */
 const STRIDE = 24;
@@ -202,6 +209,7 @@ export class LODSystem implements EnginePlugin {
   private castPipeline?: GPURenderPipeline;
   private castUniform?: GPUBuffer;
   private readonly castValues = new Float32Array(20);
+  private readonly maskPipelines = new Map<string, GPURenderPipeline>();
   private transition?: (lod: LOD, from: number, to: number) => boolean;
   private readonly descriptor = overlayDepthPass();
   private readonly color = this.descriptor.colorAttachments[0];
@@ -398,6 +406,8 @@ export class LODSystem implements EnginePlugin {
           cast: new Float32Array(0),
           castCount: 0,
           castGroups: [],
+          mask: new Float32Array(0),
+          maskCount: 0,
         });
       if (object instanceof ImposterFrames) this.atlases[s].frames = object;
     }
@@ -761,16 +771,112 @@ export class LODSystem implements EnginePlugin {
       pass.draw(4, a.castCount);
     }
   }
+  /** Whether object `i`'s anchor or any of its levels is in the selection. */
+  private marked(i: number, selected: (id: number) => boolean): boolean {
+    if (selected(this.ids[i])) return true;
+    for (const object of this.objects[i]) {
+      const mesh = (object as { model?: { root: Mesh } } | null)?.model?.root ?? (object as { root?: Mesh } | null)?.root ?? object,
+        id = (mesh as { id?: number } | null)?.id;
+      if (id !== undefined && selected(id)) return true;
+    }
+    return false;
+  }
+  /** Marks the selected objects on show as imposters in the mask of `@margoengine/selection`, which calls this. */
+  drawSelectionMask({
+    context: c,
+    xray,
+    selected,
+    begin,
+  }: {
+    context: Context;
+    xray: boolean;
+    selected(id: number): boolean;
+    begin(): GPURenderPassEncoder;
+  }): void {
+    const e = this.engine,
+      atlases = this.atlases;
+    if (!e || !this.uniform || !atlases.length) return;
+    const m = e.store.matrices,
+      parents = e.store.parents,
+      hidden = e.store.hidden;
+    let total = 0;
+    for (const a of atlases) a.maskCount = 0;
+    for (let i = 0; i < this.count; i++) {
+      if (this.slots[i] < 0 || !this.marked(i, selected)) continue;
+      let shown = true;
+      for (let p = this.ids[i]; p >= 0 && shown; p = parents[p]) shown = !hidden[p];
+      if (!shown) continue;
+      const a = atlases[this.slotOf(i)];
+      if (a.mask.length < a.data.length) a.mask = new Float32Array(a.data.length);
+      this.record(a.mask, a.maskCount++ * STRIDE, m, this.ids[i] * 16, i);
+      total++;
+    }
+    if (!total) return;
+    const device = c.device,
+      format = c.descriptor.depthStencil!.format,
+      samples = c.descriptor.multisample?.count ?? 1,
+      key = `${format}|${samples}|${xray}`;
+    let pipeline = this.maskPipelines.get(key);
+    if (!pipeline) {
+      const module = device.createShaderModule({ code: imposterMaskShader });
+      pipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: 'r8unorm' }] },
+        primitive: { topology: 'triangle-strip' },
+        depthStencil: { format, depthWriteEnabled: false, depthCompare: xray ? 'always' : 'greater-equal' },
+        multisample: { count: samples },
+      });
+      this.maskPipelines.set(key, pipeline);
+    }
+    const pass = begin();
+    pass.setPipeline(pipeline);
+    for (const a of atlases) {
+      const imp = a.imposter;
+      if (!a.maskCount || !imp.ready()) continue;
+      if (!a.maskBuffer || a.maskBuffer.size < a.mask.byteLength) {
+        a.maskBuffer?.destroy();
+        a.maskBuffer = device.createBuffer({
+          size: a.mask.byteLength,
+          usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        });
+        a.maskGroup = undefined;
+      }
+      if (!a.maskGroup || a.maskTexture !== imp.color || a.maskPipeline !== pipeline) {
+        a.maskTexture = imp.color;
+        a.maskPipeline = pipeline;
+        a.maskGroup = device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: this.uniform } },
+            { binding: 1, resource: { buffer: a.maskBuffer } },
+            { binding: 2, resource: imp.color!.createView() },
+            { binding: 3, resource: imp.normal!.createView() },
+            { binding: 4, resource: this.sampler! },
+            { binding: 5, resource: { buffer: imp.uniform! } },
+            { binding: 6, resource: imp.glow!.createView() },
+          ],
+        });
+      }
+      device.queue.writeBuffer(a.maskBuffer, 0, a.mask, 0, a.maskCount * STRIDE);
+      pass.setBindGroup(0, a.maskGroup);
+      pass.draw(4, a.maskCount);
+    }
+    pass.end();
+  }
   private release(): void {
     this.uniform?.destroy();
     this.castUniform?.destroy();
     for (const a of this.atlases) {
       a.buffer?.destroy();
       a.castBuffer?.destroy();
+      a.maskBuffer?.destroy();
       a.buffer = a.group = a.texture = a.pipeline = a.castBuffer = a.castTexture = undefined;
+      a.maskBuffer = a.maskGroup = a.maskTexture = a.maskPipeline = undefined;
       a.castGroups = [];
       a.castCount = 0;
     }
+    this.maskPipelines.clear();
     this.uniform = this.sampler = this.pipeline = this.castPipeline = this.castUniform = undefined;
   }
   onDeviceRestored(): void {

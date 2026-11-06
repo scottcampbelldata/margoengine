@@ -434,6 +434,10 @@ Imposters (`@margoengine/lod`) draw 96 bytes an instance: world matrix, colour, 
 draws, per cascade, a card facing the light per object, reprojecting the ray along the light onto the nearest atlas view with
 one parallax step, and stands the depth back by `r*(2/(frames-1)+4/frameSize)` so an imposter does not shadow itself. Evidence:
 `packages/lod/test/imposter-full-check.mjs` on the RTX A6000. Missing: other GPUs, and a measure of the cost per cascade.
+`@margoengine/selection` asks each engine plugin with `drawSelectionMask` to mark its own pixels; a `LODSystem` redraws the
+selected imposters with the same fragment shader at the same depth. A pixel of alpha 0 is discarded whatever `fwidth` says:
+it holds no depth, and once landed on the eye, in front of any wall. Evidence: `packages/lod/test/imposter-outline-check.mjs`
+on the RTX A6000. Missing: other GPUs.
 
 `LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
 the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by

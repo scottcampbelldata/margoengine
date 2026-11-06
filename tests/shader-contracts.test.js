@@ -120,6 +120,13 @@ test('lod imposters take the direct hook of shadows, with the names they rewrite
   assert.ok(source('lod/src/imposter.ts').includes('/*lod:direct*/'));
 });
 
+test('the lod selection mask rewrites the imposter shader', () => {
+  const anchor = 'return Pixel(vec4f(color,coverage),',
+    code = source('lod/src/imposter.ts');
+  assert.ok(code.includes(`${anchor}clamp(clip.z/clip.w,0.0,1.0));`), 'the shader returns this');
+  assert.ok(code.includes(`imposterShader.replace('${anchor}',`), 'and the mask rewrites it');
+});
+
 test('lod fade guards all three surface entries of the gltf-pro shader', () => {
   const anchor = 'let s=surface(i,front);';
   assert.equal(count(pbrShader, anchor), 3);

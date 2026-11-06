@@ -737,7 +737,8 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  // Views that still disagree (silhouettes) cross-fade over alpha 0.25-0.75 instead of a hard cut at 0.5, where whole regions
  // would switch at once as the weights pass it: alpha-to-coverage under MSAA, a per-pixel dither threshold at 1x.
  let alpha=acc.a;let coverage=clamp((alpha-0.5)/max(fwidth(alpha),0.5)+0.5,0.0,1.0);
- if(coverage<=select(fract(52.9829189*fract(dot(i.clip.xy,vec2f(0.06711056,0.00583715)))),0.0,frame.options.y>0.5)){discard;}
+ // Alpha 0 is no surface at all, whatever a steep neighbour does to fwidth: \`along\` holds no depth there, and the pixel would land on the eye, in front of everything.
+ if(alpha<=0.000001||coverage<=select(fract(52.9829189*fract(dot(i.clip.xy,vec2f(0.06711056,0.00583715)))),0.0,frame.options.y>0.5)){discard;}
  let instance=instances[i.id];let m=instance.m;let world=(m*vec4f(i.eye+ray*(along/max(alpha,0.000001)),1.0)).xyz;let clip=frame.camera*vec4f(world,1.0);
  let albedo=acc.rgb/max(alpha,0.0001)*instance.color.rgb;let glow=emit/max(alpha,0.0001)+instance.emissive.rgb;let rm=surface/max(alpha,0.000001)/31.0;let rough=clamp(rm.x,0.045,1.0);let metal=clamp(rm.y,0.0,1.0);
  let nn=normalize(mat3x3f(cross(m[1].xyz,m[2].xyz),cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*normalize(normal)*sign(dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))));
@@ -795,3 +796,6 @@ fn lod_cell(p:vec3f,c:vec3f,r:f32,b:mat3x3f)->vec2f {let l=(p-c)/r;return vec2f(
  let clip=lod_cast.matrix*(instances[i.id].m*vec4f(i.p+i.ray*(start+nd.z*r/denom+back),1.0));
  return Pixel(clamp(clip.z/clip.w,0.0,1.0));
 }`;
+
+/** The imposter as `@margoengine/selection` marks it: the same pixels at the same depth, at full strength. */
+export const imposterMaskShader = imposterShader.replace('return Pixel(vec4f(color,coverage),', 'return Pixel(vec4f(1.0),');
