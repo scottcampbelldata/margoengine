@@ -130,8 +130,15 @@ test('slerp follows the great circle: constant angular speed and unit length (fi
 });
 
 test('interpolateQuaternions (kept) still matches its regression vectors', () => {
+  // Math.sin and Math.acos are not bit-identical between machines (the spec leaves them approximate): one row is a last
+  // bit apart on Apple arm64, so it records that machine's bits too. Every row stays exact on each machine.
+  const macArm = process.platform === 'darwin' && process.arch === 'arm64';
   for (const row of vectors.interpolateQuaternions)
-    exact(interpolateQuaternions(nums(row.a), nums(row.b), row.t, row.linearAbove), row.result, row.note);
+    exact(
+      interpolateQuaternions(nums(row.a), nums(row.b), row.t, row.linearAbove),
+      (macArm && row.resultDarwinArm64) || row.result,
+      row.note,
+    );
   for (const row of vectors.interpolateQuaternionsThrows)
     assert.throws(() => interpolateQuaternions([0, 0, 0, 1], [0, 0, 0, 1], 0.5, row.linearAbove), {
       name: row.threw,
