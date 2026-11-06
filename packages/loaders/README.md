@@ -50,6 +50,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseBVH` (`/mocap`) | See [Motion capture](#motion-capture-bvh) |
 | `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
+| `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
@@ -379,6 +380,32 @@ const { layers, filament, min, max } = parseGCode('G1 Z0.2\nG1 X10 E1\nG1 Y10 E2
 const first = { mode: 'segments', positions: layers[0].extrusion };
 console.log(first.positions.length, filament, min, max);
 ```
+
+## NRRD volumes
+
+`parseNRRD` from `@margoengine/loaders/nrrd` reads the NRRD files CT and MRI tools write, `.nrrd` and detached `.nhdr`, into the arrays `fig.volume()` of `@margoengine/sciviz` takes. It reads raw, ascii, hex and gzip data in either byte order, `line skip`, `byte skip` (with -1 for the end of a raw file), and one data file, a `%03d` pattern or a `LIST`. Samples stay in the file's own type; 64-bit integers become `Float64Array`, exact up to 2^53.
+
+```ts
+import { parseNRRD } from '@margoengine/loaders/nrrd';
+
+const header = 'NRRD0004\ntype: short\ndimension: 3\nsizes: 2 2 1\nspace: LPS\n' +
+  'space directions: (0.5,0,0) (0,0.5,0) (0,0,2)\nspace origin: (10,0,0)\nencoding: ascii\n\n';
+const scan = await parseNRRD(new TextEncoder().encode(`${header}0 100 200 300\n`));
+console.log(scan.dims, scan.spacing, scan.bounds, scan.matrix);
+// With a figure: fig.volume(scan.data, { dims: scan.dims, bounds: scan.bounds });
+
+// A .nhdr header reads its data through resolve, by the path the header names.
+const detached = 'NRRD0004\ntype: uchar\ndimension: 1\nsizes: 2\nencoding: raw\ndata file: body.raw\n';
+const { data } = await parseNRRD(new TextEncoder().encode(detached), {
+  resolve: async (path) => new Uint8Array([path.length, 1]),
+});
+console.log(data);
+```
+
+- `dims` holds the spatial axes, the first fastest. A leading non-spatial axis (an RGB `kinds` entry, or `none` in `space directions`) is `components`; axes after the spatial ones, such as time, are `frames`. A sample sits at `(((t * nz + z) * ny + y) * nx + x) * components + c`.
+- `bounds` is the box in true proportions from 0. `matrix` takes a voxel index to the file's `space`, with its origin, rotation and flips: use it to line a scan up with other data.
+- `resolve` gets the path as the header writes it, tidied of `.` and `..`. It is your code: keep it inside the folder you trust.
+- `maxSamples` (default 536,870,912) stops a huge declared size before anything is allocated, and gzip data cannot inflate past what the header declares. `bzip2` data and the `block` type are refused with code `unsupported`.
 
 ## Tiled TMX
 

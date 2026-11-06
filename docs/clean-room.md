@@ -612,6 +612,7 @@ File formats written from their public descriptions; no reader of another projec
 | LF2 | VRML97 grammar and nodes; Transform as T * C * R * SR * S * -SR * -C | loaders/src/vrml.ts | ISO/IEC 14772-1:1997 |
 | LF3 | X3D XML encoding, DEF and USE attributes, containerField | loaders/src/vrml.ts | ISO/IEC 19776-1 |
 | LF4 | G0, G1, G90, G91, M82, M83, G92, G20, G21, G28 | loaders/src/gcode.ts | RepRap wiki, "G-code" |
+| LF5 | NRRD header fields, encodings, space directions and kinds | loaders/src/nrrd.ts | Teem project, "Definition of NRRD File Format" |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 

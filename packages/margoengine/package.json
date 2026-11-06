@@ -1018,6 +1018,10 @@
       "types": "./dist/loaders/gcode.d.ts",
       "import": "./dist/loaders/gcode.js"
     },
+    "./loaders/nrrd": {
+      "types": "./dist/loaders/nrrd.d.ts",
+      "import": "./dist/loaders/nrrd.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"

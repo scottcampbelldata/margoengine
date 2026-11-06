@@ -1,5 +1,5 @@
 {
-  "commit": "338023c66",
+  "commit": "476bbe8f1",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1082,6 +1082,10 @@
       "./gcode": {
         "raw": 3740,
         "gzip": 1710
+      },
+      "./nrrd": {
+        "raw": 11795,
+        "gzip": 4722
       },
       "dist/workers/usd.js": {
         "raw": 21673,

@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/loaders",
   "version": "1.0.0",
-  "description": "PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.",
+  "description": "PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, legacy VTK, NRRD, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -76,6 +76,10 @@
     "./gcode": {
       "types": "./dist/gcode.d.ts",
       "import": "./dist/gcode.js"
+    },
+    "./nrrd": {
+      "types": "./dist/nrrd.d.ts",
+      "import": "./dist/nrrd.js"
     }
   },
   "files": [
