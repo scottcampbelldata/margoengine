@@ -16,6 +16,7 @@ const physical = [
   'KHR_materials_iridescence',
   'KHR_materials_anisotropy',
   'KHR_materials_diffuse_transmission',
+  'EXT_materials_bump',
 ];
 /**
  * Decoders with the physical material shader added when the file uses a physical material extension and the caller

@@ -6,6 +6,7 @@ import { cotangentFrameShader } from '../../shared/tangent-frame.js';
 import { ggxD, smithG } from '../../shared/light-terms.js';
 import { sheenAlbedoWGSL, sheenBrdfWGSL } from '../../shared/sheen.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
+import { bumpGradientWgsl } from '../../shared/bump.js';
 // Hemisphere ambient and GGX direct light, shared by the compact and extended shaders.
 // Direct light: glTF 2.0 specification Appendix B (GGX D: Walter et al. 2007, eq. 33; Smith G: eq. 34; Fresnel:
 // Schlick 1994; dielectric F0 0.04 = IOR 1.5). Hemisphere ambient (ground (0.35, 0.3, 0.25) to sky 1 by n.y / 2 + 1/2,
@@ -337,14 +338,15 @@ export const physicalMaps = [
   'specular',
   'specularColor',
 ];
-// Slots 13-17, extended materials only: iridescence (R), its thickness (G), anisotropy (RG direction, B strength), diffuse
-// transmission (A) and its colour (RGB, sRGB).
+// Slots 13-18, extended materials only: iridescence (R), its thickness (G), anisotropy (RG direction, B strength), diffuse
+// transmission (A) and its colour (RGB, sRGB), bump height (R, linear).
 export const extendedMaps = [
   'iridescence',
   'iridescenceThickness',
   'anisotropy',
   'diffuseTransmission',
   'diffuseTransmissionColor',
+  'bump',
 ];
 const sample = (name: string) => `textureSample(${name}Map,${name}Sampler,uv(i,${physicalMaps.indexOf(name) + 5}))`;
 function patch(source: string, edits: [string | RegExp, string][]): string {
@@ -553,8 +555,8 @@ export function transmissionPBR(code: string, declarations: string): string {
 }
 
 /**
- * What an extended material shades (KHR_materials_iridescence, anisotropy and diffuse_transmission in use) and
- * which group-1 texture each map slot 5-17 samples: `slots[k]` is a binding index j (`margoMap{j}` at binding 10 + 2j) or
+ * What an extended material shades (KHR_materials_iridescence, anisotropy, diffuse_transmission and EXT_materials_bump
+ * in use) and which group-1 texture each map slot 5-18 samples: `slots[k]` is a binding index j (`margoMap{j}` at binding 10 + 2j) or
  * -1 for the slot's default value. Base slots 0-4 always keep their own bindings 0-9 (text patches use them).
  */
 export interface ExtendedPlan {
@@ -562,11 +564,12 @@ export interface ExtendedPlan {
   readonly iridescence: boolean;
   readonly anisotropy: boolean;
   readonly diffuseTransmission: boolean;
+  readonly bump?: boolean;
 }
 /** Extension textures an extended material may bind: 5 base + 8 = 13, so shadows, IBL and LocalShadows (3) still fit WebGPU's 16. */
 export const extendedTextureLimit = 8;
 /**
- * Binding plan for an extended material's 18 map slots: slots sharing a glTF texture share one binding (their UV rows
+ * Binding plan for an extended material's 19 map slots: slots sharing a glTF texture share one binding (their UV rows
  * stay per slot); at most `extendedTextureLimit` distinct textures, later slots beyond that fall back to their defaults.
  */
 export function extendedPlan(
@@ -574,7 +577,7 @@ export function extendedPlan(
   features: Omit<ExtendedPlan, 'slots'>,
 ): ExtendedPlan {
   const textures: number[] = [],
-    slots = Array.from({ length: 18 }, (_, k) => {
+    slots = Array.from({ length: 19 }, (_, k) => {
       const map = k < 5 ? undefined : maps[k];
       if (!map) return -1;
       const j = textures.indexOf(map.index);
@@ -674,24 +677,34 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {
   return sum;
 }
 `;
+// EXT_materials_bump: d = height x factor, a length measured in world space, or in the node's space (heightSpace "object"),
+// where the scale along the surface normal is |transpose(M) n|: a point moved d along the mesh normal moves that far along
+// the world normal. The gradient takes forward differences of the map a pixel away (Mikkelsen 2010), so it changes every
+// pixel, where dpdx of the height would change every second one. Before `s.ir`: thin film and anisotropy read s.n.
+const bumpEdit = (sampleOf: (name: string, at?: string) => string) => `  {
+    let bumpUV=uv(i,18); let bumpBase=${sampleOf('bump', 'bumpUV')}.r;
+    let bumpScale=f.bump.x*select(1.0,length(n*mat3x3f(f.model[0].xyz,f.model[1].xyz,f.model[2].xyz)),f.bump.y>0.5);
+    s.n=margoBumpGradient(s.n,i.position,(${sampleOf('bump', 'bumpUV+dpdx(bumpUV)')}.r-bumpBase)*bumpScale,(${sampleOf('bump', 'bumpUV+dpdy(bumpUV)')}.r-bumpBase)*bumpScale,facing);
+  }
+`;
 const extended = new Map<string, string>();
 /**
  * Physical variant for an extended material (`ExtendedPlan`), cached per plan: only the extension maps the material uses
- * are bound (shared textures once), the thin-film, anisotropic and diffuse-transmission terms only when used, and a
- * Frame with 18 UV rows and three more factor rows (iri: factor, film IOR, thickness min, max; aniso: strength, cos, sin;
- * dtr: factor, colour). Hook points and text-patch anchors are those of `physicalShader`.
+ * are bound (shared textures once), the thin-film, anisotropic, diffuse-transmission and bump terms only when used, and
+ * a Frame with 19 UV rows and four more factor rows (iri: factor, film IOR, thickness min, max; aniso: strength, cos, sin;
+ * dtr: factor, colour; bump: factor, 1 for object space). Hook points and text-patch anchors are those of `physicalShader`.
  */
 export function extendedShader(plan: ExtendedPlan): string {
-  const key = plan.slots.join() + +plan.iridescence + +plan.anisotropy + +plan.diffuseTransmission;
+  const key = plan.slots.join() + +plan.iridescence + +plan.anisotropy + +plan.diffuseTransmission + +!!plan.bump;
   let out = extended.get(key);
   if (out !== undefined) return out;
   const names = [...physicalMaps, ...extendedMaps],
     count = Math.max(-1, ...plan.slots) + 1;
-  const sampleOf = (name: string) => {
+  const sampleOf = (name: string, at?: string) => {
     const k = names.indexOf(name) + 5,
       j = plan.slots[k];
     return j >= 0
-      ? `textureSample(margoMap${j},margoSampler${j},uv(i,${k}))`
+      ? `textureSample(margoMap${j},margoSampler${j},${at ?? `uv(i,${k})`})`
       : name === 'clearcoatNormal'
         ? 'vec4f(0.5,0.5,1,1)'
         : name === 'anisotropy'
@@ -706,12 +719,12 @@ export function extendedShader(plan: ExtendedPlan): string {
   out =
     patch(extendedPBRShader, [
       ...physicalEdits(sampleOf, bindings),
-      ['uvt:array<vec4f,26>', 'uvt:array<vec4f,36>'],
-      ['sheen:vec4f\n}', 'sheen:vec4f, iri:vec4f, aniso:vec4f, dtr:vec4f\n}'],
+      ['uvt:array<vec4f,26>', 'uvt:array<vec4f,38>'],
+      ['sheen:vec4f\n}', 'sheen:vec4f, iri:vec4f, aniso:vec4f, dtr:vec4f, bump:vec4f\n}'],
       ['sh:vec4f}', 'sh:vec4f, ir:vec4f, at:vec4f, dt:vec4f}'],
       [
         '  if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}',
-        `  s.ir=${plan.iridescence ? `vec4f(margoIridescence(mix(s.f0,s.base.rgb,s.metal),clamp(dot(s.n,normalize(f.eye.xyz-i.position)),0.0,1.0),mix(f.iri.z,f.iri.w,${sampleOf('iridescenceThickness')}.g),f.iri.y),f.iri.x*${sampleOf('iridescence')}.r)` : 'vec4f(0)'};
+        `${plan.bump ? bumpEdit(sampleOf) : ''}  s.ir=${plan.iridescence ? `vec4f(margoIridescence(mix(s.f0,s.base.rgb,s.metal),clamp(dot(s.n,normalize(f.eye.xyz-i.position)),0.0,1.0),mix(f.iri.z,f.iri.w,${sampleOf('iridescenceThickness')}.g),f.iri.y),f.iri.x*${sampleOf('iridescence')}.r)` : 'vec4f(0)'};
   s.at=${plan.anisotropy ? `margoAnisotropy(s.n,t,b,${sampleOf('anisotropy')}.xyz)` : 'vec4f(0)'};
   s.dt=${plan.diffuseTransmission ? `vec4f(f.dtr.yzw*${sampleOf('diffuseTransmissionColor')}.rgb,f.dtr.x*${sampleOf('diffuseTransmission')}.a)` : 'vec4f(0)'};
   if(margoFaceTest&&!facing&&f.settings.z<0.5){discard;}`,
@@ -723,7 +736,8 @@ export function extendedShader(plan: ExtendedPlan): string {
       ],
       [
         '@fragment fn fragment(',
-        (plan.iridescence ? iridescenceWgsl : '') +
+        (plan.bump ? bumpGradientWgsl : '') +
+          (plan.iridescence ? iridescenceWgsl : '') +
           (plan.anisotropy ? anisotropyWgsl : '') +
           directWgsl(plan.anisotropy) +
           ambientWgsl(plan) +

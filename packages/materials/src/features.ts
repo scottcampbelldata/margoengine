@@ -8,6 +8,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { featureStruct, displacementWgsl } from '../../shared/displacement.js';
 import { parallaxShader, subsurfaceShader, surfaceDeclarations, triplanarShader } from './surface-features.js';
 import { ditherShader } from '../../shared/dither.js';
+import { bumpGradientWgsl } from '../../shared/bump.js';
 /** Feature maps in UV-row (and binding) order, with their WGSL names. */
 export const featureMaps = ['alphaMap', 'bumpMap', 'displacementMap', 'lightMap'] as const;
 const names = ['Alpha', 'Bump', 'Displacement', 'Light'];
@@ -28,14 +29,7 @@ function edit(code: string, from: string | RegExp, to: string | ((match: string,
     );
   return next;
 }
-// Bump mapping from screen-space derivatives (Mikkelsen 2010, "Bump Mapping Unparametrized Surfaces on the GPU"): the
-// height's screen gradient through the surface's, R1 = dP/dy x N, R2 = N x dP/dx, N' = |det| N - sign(det) (dH/dx R1 +
-// dH/dy R2). det takes the face's sign so a back face sees the bump mirrored, as the surface's other side.
-const bump = `fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {
-  let sx=dpdx(p); let sy=dpdy(p); let r1=cross(sy,n); let r2=cross(n,sx);
-  let det=dot(sx,r1)*select(-1.0,1.0,facing); let o=abs(det)*n-sign(det)*(dpdx(height)*r1+dpdy(height)*r2);
-  return select(n,normalize(o),dot(o,o)>0.0);
-}
+const bump = `${bumpGradientWgsl}fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {return margoBumpGradient(n,p,dpdx(height),dpdy(height),facing);}
 `;
 /**
  * `code` with the features `key` names: `a` alphaMap, `b` bumpMap, `d` displacementMap, `f` flatShading, `v`

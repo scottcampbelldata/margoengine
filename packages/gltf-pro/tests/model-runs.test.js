@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { PBRModel, parseGLTF } from '../dist/index.js';
+import { extendedMaterials } from '../dist/extended.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 async function fixture(t) {
@@ -140,6 +141,35 @@ test('writeGeometry on one copy leaves the shared buffer, and later copies, with
   f.engine.use(c);
   assert.notEqual(c.primitives[0].buffers.vertex, shared, 'a later copy drew from an edited buffer');
   assert.deepEqual(new Float32Array(c.primitives[0].buffers.vertex.data), packed, 'a later copy got edited data');
+});
+
+test('a bump height in the node space keeps its primitives out of static batches', async (t) => {
+  const f = await fixture(t),
+    uv = new Float32Array(8),
+    batches = (extensions) => {
+      f.engine.gpu.queue.copyExternalImageToTexture ??= () => {};
+      const model = parseGLTF(
+        f.engine,
+        {
+          ...f.doc,
+          buffers: [...f.doc.buffers, { byteLength: uv.byteLength }],
+          bufferViews: [...f.doc.bufferViews, { buffer: 3, byteLength: uv.byteLength }],
+          accessors: [...f.doc.accessors, { bufferView: 3, componentType: 5126, count: 4, type: 'VEC2' }],
+          meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 3 }, indices: 2, material: 0 }] }],
+          materials: [{ extensions }],
+          textures: [{ source: 0 }],
+          images: [{}],
+          nodes: [{ mesh: 0 }, { mesh: 0, translation: [3, 0, 0], scale: [2, 2, 2] }],
+        },
+        [...f.buffers, uv],
+        [{ width: 1, height: 1, close() {} }],
+        { materials: extendedMaterials },
+      );
+      if (f.engine.plugins.get(model.name) !== model) f.engine.use(model);
+      return model['staticBatches'].length;
+    };
+  assert.equal(batches({ KHR_materials_iridescence: { iridescenceFactor: 1 } }), 1, 'an extended material batches');
+  assert.equal(batches({ EXT_materials_bump: { heightSpace: 'object', bumpTexture: { index: 0 } } }), 0);
 });
 
 test('copies of one asset share their baked static batch arrays and its buffers', async (t) => {

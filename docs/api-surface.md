@@ -28,7 +28,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/controls | `.` 58, `./orbit` 8, `./fly` 2, `./trackball` 2, `./arcball` 9, `./transform` 6, `./drag` 4, `./profiles` 13, `./third-person` 5, `./walk` 6 | 96 |  | 26,715 |
 | @margoengine/core | `.` 17, `./extension` 26 | 18 |  | 21,468 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 19,126 |
-| @margoengine/culling | `.` 11, `./dynamic` 2, `./parts` 6, `./models` 6, `./shadows` 3, `./lod` 3, `./meshlets` 5 | 53 |  | 13,693 |
+| @margoengine/culling | `.` 11, `./dynamic` 2, `./parts` 6, `./models` 6, `./shadows` 3, `./lod` 3, `./meshlets` 5 | 53 |  | 13,696 |
 | @margoengine/cutscene | `.` 43 |  |  | 6,566 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 4, `./brotli` 2, `./tga` 3, `./dds` 5, `./ktx` 5, `./tiff` 3, `./ktx2-layers` 7, `./ktx2-hdr` 10, `./ktx2-gpu` 3, `./ktx2-stream` 7, `./meshopt-simd` 2, `./jxl` 9, `./pvr` 7, `./draco-points` 6 | 32 |  | 478,232 |
 | @margoengine/dof | `.` 2, `./lens` 3, `./autofocus` 2 | 8 |  | 7,815 |

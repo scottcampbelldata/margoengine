@@ -20,6 +20,7 @@ interface ExtendedPlan {
     readonly iridescence: boolean;
     readonly anisotropy: boolean;
     readonly diffuseTransmission: boolean;
+    readonly bump?: boolean;
 }
 
 interface GLTFAccessor extends GLTFProperty {
@@ -224,6 +225,11 @@ interface GLTFExtensions {
     diffuseTransmissionColorFactor?: number[];
     diffuseTransmissionTexture?: GLTFTextureInfo;
     diffuseTransmissionColorTexture?: GLTFTextureInfo;
+  };
+  EXT_materials_bump?: {
+    bumpFactor?: number;
+    bumpTexture?: GLTFTextureInfo;
+    heightSpace?: 'world' | 'object';
   };
 }
 

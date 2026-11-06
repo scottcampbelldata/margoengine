@@ -8,6 +8,7 @@ export interface ExtendedPlan {
     readonly iridescence: boolean;
     readonly anisotropy: boolean;
     readonly diffuseTransmission: boolean;
+    readonly bump?: boolean;
 }
 
 export interface GLTFExtendedMaterials {
@@ -87,6 +88,11 @@ interface GLTFExtensions {
     diffuseTransmissionColorFactor?: number[];
     diffuseTransmissionTexture?: GLTFTextureInfo;
     diffuseTransmissionColorTexture?: GLTFTextureInfo;
+  };
+  EXT_materials_bump?: {
+    bumpFactor?: number;
+    bumpTexture?: GLTFTextureInfo;
+    heightSpace?: 'world' | 'object';
   };
 }
 

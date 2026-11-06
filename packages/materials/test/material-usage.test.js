@@ -573,7 +573,7 @@ test('physical options set after createMesh switch that material to the physical
   assert.deepEqual(coat.extensions, ['clearcoat', 'transmission', 'anisotropy']);
   log = s.frame();
   assert.ok(codes(log).some((c) => c.includes('fn margoAnisotropy(')));
-  assert.equal(mesh['resources'][0].uniform.binding.size, 1088, 'extended uniform rows');
+  assert.equal(mesh['resources'][0].uniform.binding.size, 1136, 'extended uniform rows');
   assert.ok(
     of(log, 'renderPipeline').some((e) => e[2].fragment.entryPoint === 'margoTint'),
     'tinted transmission',

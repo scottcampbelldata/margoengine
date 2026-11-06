@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { loadGLTF, parseGLTF } from '../dist/index.js';
+import { GLTFAsset, loadGLTF, parseGLTF } from '../dist/index.js';
 import { extendedMaterials } from '../dist/extended.js';
 import { Shadows } from '../../shadows/dist/index.js';
 import { Clustered } from '../../clustered/dist/index.js';
@@ -40,7 +40,7 @@ const near = (a, b, tolerance, label) =>
     .flat()
     .forEach((v, i) => assert.ok(Math.abs(v - [b].flat()[i]) <= tolerance, `${label}[${i}]: ${v} vs ${[b].flat()[i]}`));
 const textures = (code) => code.match(/var\s*\w+\s*:\s*texture_(?!storage)/g)?.length ?? 0;
-const features = { iridescence: true, anisotropy: true, diffuseTransmission: true };
+const features = { iridescence: true, anisotropy: true, diffuseTransmission: true, bump: false };
 // A recorded writeBuffer's hex bytes as floats (copied: Buffer.from may hand out a slice of a shared pool).
 const floatsOf = (hex) => new Float32Array(Uint8Array.from(Buffer.from(hex, 'hex')).buffer);
 
@@ -116,7 +116,7 @@ for (const variant of ['physical', 'extended', 'factors']) {
         const authoredScale = material.physical[2],
           log = gpu.record(() => model.draw(view.c, 'beauty', view.c.color, view.c.depth)),
           frame = model['resources'][0].uniform.contents;
-        assert.equal(frame[variant === 'extended' ? 250 : 210], mapped ? 1.75 : 0);
+        assert.equal(frame[variant === 'extended' ? 258 : 210], mapped ? 1.75 : 0);
         assert.equal(material.physical[2], authoredScale, 'Rendering must not mutate authored normal scale');
       } finally {
         engine.dispose();
@@ -200,14 +200,14 @@ test('CPU reference: thin-film sensitivity and Fresnel limits from the iridescen
 test('binding plan: shared glTF textures bind once, at most 8 extension textures, unused maps fall back to defaults', () => {
   const maps = Array.from({ length: 18 }, (_, k) => (k < 5 ? { index: k } : { index: 100 + (k % 4) }));
   const plan = extendedPlan(maps, features);
-  assert.deepEqual(plan.slots, [-1, -1, -1, -1, -1, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0]);
+  assert.deepEqual(plan.slots, [-1, -1, -1, -1, -1, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, -1]);
   const distinct = extendedPlan(
     Array.from({ length: 18 }, (_, k) => ({ index: k })),
     features,
   );
   assert.deepEqual(
     distinct.slots.slice(5),
-    [0, 1, 2, 3, 4, 5, 6, 7, -1, -1, -1, -1, -1],
+    [0, 1, 2, 3, 4, 5, 6, 7, -1, -1, -1, -1, -1, -1],
     'extension slots beyond the limit use their defaults',
   );
   assert.equal(extendedTextureLimit, 8);
@@ -305,7 +305,7 @@ test('extended shaders: hook points once, only used features compiled, worst cas
   engine.dispose();
 });
 
-test('extended material: uniform rows, 1088-byte buffer, only used textures bound (shared once), extended shader', async () => {
+test('extended material: uniform rows, 1136-byte buffer, only used textures bound (shared once), extended shader', async () => {
   const { gpu, engine, model, view } = await scene(
     [
       {
@@ -341,13 +341,13 @@ test('extended material: uniform rows, 1088-byte buffer, only used textures boun
   );
   const m = model.primitives[0].material;
   assert.deepEqual(m.extended, features);
-  assert.equal(m.maps.length, 18);
-  assert.equal(m.uvt.length, 144);
+  assert.equal(m.maps.length, 19);
+  assert.equal(m.uvt.length, 152);
   near(
     m.physical.slice(12),
-    [0.8, 1.8, 120, 450, 0.6, Math.cos(0.5), Math.sin(0.5), 0, 0.4, 0.9, 0.8, 0.7],
+    [0.8, 1.8, 120, 450, 0.6, Math.cos(0.5), Math.sin(0.5), 0, 0.4, 0.9, 0.8, 0.7, 1, 0, 0, 0],
     1e-7,
-    'iri, aniso, dtr',
+    'iri, aniso, dtr, bump',
   );
   const log = gpu.record(() => {
     view.begin(0);
@@ -355,7 +355,7 @@ test('extended material: uniform rows, 1088-byte buffer, only used textures boun
   });
   const module = log.find((e) => e[0] === 'module')[2].code,
     groups = log.filter((e) => e[0] === 'group');
-  assert.ok(module.includes('uvt:array<vec4f,36>') && module.includes('fn margoIridescence('));
+  assert.ok(module.includes('uvt:array<vec4f,38>') && module.includes('fn margoIridescence('));
   // Material group: base maps 0-9 plus texture 1 (thickness + anisotropy) and texture 0 (diffuse transmission) once each.
   assert.deepEqual(
     groups[1][2].entries.map((e) => e.binding),
@@ -363,9 +363,9 @@ test('extended material: uniform rows, 1088-byte buffer, only used textures boun
   );
   const uniform = model['resources'][0].uniform,
     floats = uniform.contents;
-  assert.equal(uniform.binding.size, 1088);
+  assert.equal(uniform.binding.size, 1136);
   near(
-    Array.from(floats.slice(248 + 12, 272)),
+    Array.from(floats.slice(256 + 12, 284)),
     m.physical.slice(12),
     1e-6,
     'extended rows after coat, specular, sheen',
@@ -373,6 +373,55 @@ test('extended material: uniform rows, 1088-byte buffer, only used textures boun
   near(Array.from(floats.slice(104 + 14 * 8, 104 + 14 * 8 + 4)), [1, 0, 0, 0], 1e-6, 'slot 14 (thickness) UV row');
   model.dispose();
   engine.dispose();
+});
+
+test('EXT_materials_bump: the height map takes slot 18, its factor and space the bump row, and only this shader tilts s.n', async () => {
+  const { gpu, engine, model, view } = await scene(
+    [{ extensions: { EXT_materials_bump: { bumpFactor: 0.25, heightSpace: 'object', bumpTexture: { index: 0 } } } }],
+    {
+      doc: { textures: [{ source: 0 }], images: [{}] },
+      images: [{ width: 1, height: 1, close() {} }],
+    },
+  );
+  const m = model.primitives[0].material;
+  assert.deepEqual(m.extended, { iridescence: false, anisotropy: false, diffuseTransmission: false, bump: true });
+  assert.equal(m.maps[18].index, 0);
+  const log = gpu.record(() => {
+    view.begin(0);
+    model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+  });
+  const code = log.find((e) => e[0] === 'module')[2].code,
+    uniform = model['resources'][0].uniform;
+  assert.ok(code.includes('fn margoBumpGradient(') && code.includes('uvt:array<vec4f,38>'));
+  // Bump stands before the thin film and anisotropy, which read s.n.
+  assert.ok(code.indexOf('s.n=margoBumpGradient(') < code.indexOf('s.ir='));
+  assert.equal(uniform.binding.size, 1136);
+  near(Array.from(uniform.contents.slice(256 + 24, 284)), [0.25, 1, 0, 0], 1e-7, 'bump row');
+  near(Array.from(uniform.contents.slice(104 + 18 * 8, 104 + 18 * 8 + 4)), [1, 0, 0, 0], 1e-6, 'slot 18 UV row');
+  model.dispose();
+  engine.dispose();
+  assert.equal(extendedShader(extendedPlan([], { ...features, bump: false })).includes('margoBumpGradient'), false);
+  assert.notEqual(extendedShader(extendedPlan([], { ...features, bump: true })), extendedShader(extendedPlan([], features)));
+});
+
+test('EXT_materials_bump: no texture or a zero factor is no bump, a bad height space or factor is refused', () => {
+  const parse = (bump) => extendedMaterials.parse({ EXT_materials_bump: bump });
+  assert.equal(parse({ bumpFactor: 2 }), undefined, 'one height everywhere has no gradient');
+  assert.equal(parse({ bumpFactor: 0, bumpTexture: { index: 0 } }), undefined);
+  const defaults = parse({ bumpTexture: { index: 3 } });
+  assert.deepEqual(defaults.rows.slice(12), [1, 0, 0, 0], 'bumpFactor 1, world space when heightSpace is absent');
+  assert.equal(defaults.maps[5].index, 3);
+  assert.deepEqual(parse({ heightSpace: 'world', bumpTexture: { index: 0 } }).rows.slice(12), [1, 0, 0, 0]);
+  assert.throws(() => parse({ heightSpace: 'tangent', bumpTexture: { index: 0 } }), /bump height space/);
+  assert.throws(() => parse({ bumpFactor: 'high', bumpTexture: { index: 0 } }), /bump factor/);
+});
+
+test('EXT_materials_bump: a file that requires it needs the extended decoder', () => {
+  const { doc, buffers } = animatedTriangle();
+  doc.extensionsRequired = ['EXT_materials_bump'];
+  doc.extensionsUsed = ['EXT_materials_bump'];
+  assert.throws(() => new GLTFAsset(doc, buffers), /EXT_materials_bump \(pass a materials decoder\)/);
+  assert.doesNotThrow(() => new GLTFAsset(doc, buffers, undefined, { materials: extendedMaterials }));
 });
 
 test('materials without the new extensions keep their shaders and buffers; zero factors stay standard', async () => {
@@ -522,11 +571,11 @@ test('KHR_materials_variants: names, switching rebinds the mapped material, unde
   const frame = model['resources'].find((r) => r.primitive === p).uniform.contents;
   assert.deepEqual(Array.from(frame.slice(76, 80)), [1, 0, 0, 1], 'primitive 0 draws red');
   model.selectVariant(1);
-  assert.deepEqual(p.material.extended, { iridescence: true, anisotropy: false, diffuseTransmission: false });
+  assert.deepEqual(p.material.extended, { iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false });
   const log = draw();
   assert.equal(
     model['resources'].find((r) => r.primitive === p).uniform.binding.size,
-    1088,
+    1136,
     'uniform buffer resized for the extended material',
   );
   assert.equal(
@@ -562,22 +611,22 @@ test('Khronos samples: extended materials and variants parse as their files decl
       [...lampExtended].sort(),
       [
         JSON.stringify([null, false]),
-        JSON.stringify([{ iridescence: true, anisotropy: false, diffuseTransmission: false }, false]),
-        JSON.stringify([{ iridescence: true, anisotropy: false, diffuseTransmission: false }, true]),
+        JSON.stringify([{ iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false }, false]),
+        JSON.stringify([{ iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false }, true]),
       ],
       'plain, iridescent, and iridescent transmissive glass',
     );
     const barn = await load(await headless(), 'AnisotropyBarnLamp/AnisotropyBarnLamp.glb'),
       metal = barn.primitives.find((p) => p.material.name === 'Lamp Metal').material;
-    assert.deepEqual(metal.extended, { iridescence: false, anisotropy: true, diffuseTransmission: false });
+    assert.deepEqual(metal.extended, { iridescence: false, anisotropy: true, diffuseTransmission: false, bump: false });
     assert.deepEqual(
       extendedPlan(metal.maps, metal.extended).slots.slice(5),
-      [-1, -1, 0, -1, -1, -1, -1, -1, -1, -1, 1, -1, -1],
+      [-1, -1, 0, -1, -1, -1, -1, -1, -1, -1, 1, -1, -1, -1],
       'clearcoat normal and anisotropy textures only',
     );
     const cup = await load(await headless(), 'DiffuseTransmissionTeacup/DiffuseTransmissionTeacup.glb'),
       saucer = cup.primitives.find((p) => p.material.name === 'tea_saucer').material;
-    near(saucer.physical.slice(20), [1, 0.84, 0.8, 0.74], 1e-6, 'diffuse transmission factor and colour');
+    near(saucer.physical.slice(20, 24), [1, 0.84, 0.8, 0.74], 1e-6, 'diffuse transmission factor and colour');
     const shoe = await load(await headless(), 'MaterialsVariantsShoe/MaterialsVariantsShoe.glb');
     assert.ok(shoe.variants.length >= 2, String(shoe.variants));
     const before = shoe.primitives.map((p) => p.material);

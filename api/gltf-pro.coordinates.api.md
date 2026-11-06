@@ -79,6 +79,11 @@ interface GLTFExtensions {
     diffuseTransmissionTexture?: GLTFTextureInfo;
     diffuseTransmissionColorTexture?: GLTFTextureInfo;
   };
+  EXT_materials_bump?: {
+    bumpFactor?: number;
+    bumpTexture?: GLTFTextureInfo;
+    heightSpace?: 'world' | 'object';
+  };
 }
 
 interface GLTFInstancing {

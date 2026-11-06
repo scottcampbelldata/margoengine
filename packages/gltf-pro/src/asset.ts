@@ -133,13 +133,14 @@ export interface GLTFDracoGeometry {
 /** What gltf-pro needs to shade extended materials (`extendedMaterials` from @margoengine/gltf-pro/extended implements it). */
 export interface GLTFExtendedMaterials {
   /**
-   * A glTF material's `extensions` read for its thin film, anisotropy and diffuse transmission, or undefined when none is
-   * in use (every factor 0): the features, map slots 13-17 (texture infos) and 12 uniform floats (rows iri, aniso, dtr).
+   * A glTF material's `extensions` read for its thin film, anisotropy, diffuse transmission and bump, or undefined when
+   * none is in use (every factor 0): the features, map slots 13-18 (texture infos) and 16 uniform floats (rows iri, aniso,
+   * dtr, bump).
    */
   parse(
     extensions: GLTFExtensions,
   ): { features: Omit<ExtendedPlan, 'slots'>; maps: (GLTFTextureInfo | undefined)[]; rows: number[] } | undefined;
-  /** The binding plan for a material's 18 map slots (`extendedPlan`). */
+  /** The binding plan for a material's 19 map slots (`extendedPlan`). */
   plan(maps: readonly ({ index: number } | undefined)[], features: Omit<ExtendedPlan, 'slots'>): ExtendedPlan;
   /** The extended physical shader for a plan (`extendedShader`). */
   shader(plan: ExtendedPlan): string;
@@ -174,6 +175,7 @@ const hookFor: Record<string, keyof GLTFDecoderHooks> = {
   KHR_materials_iridescence: 'materials',
   KHR_materials_anisotropy: 'materials',
   KHR_materials_diffuse_transmission: 'materials',
+  EXT_materials_bump: 'materials',
   KHR_gaussian_splatting: 'splats',
   KHR_gaussian_splatting_compression_spz_2: 'splats',
 };

@@ -137,7 +137,7 @@ viewGLTFCamera(model, 0); // the animated yfov
 applyGLTFLights(model); // the animated sun; pass {clustered} for point and spot lights
 ```
 
-`loadGLTF` and `parseGLTFAsync` shade a file that uses clearcoat, transmission, IOR, volume, dispersion, sheen, specular, iridescence, anisotropy or diffuse transmission with the physical renderer by default: they import `extendedMaterials` from `@margoengine/gltf-pro/extended` on first need, so an app whose files never use those extensions ships none of its WGSL. Pass `{decoders: {materials: false}}` to keep the base shader (the extensions are then ignored, as glTF allows), or your own `extendedMaterials`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. The imported metadata also stays available for explicit `@margoengine/materials` installation, whose lobes replace the physical renderer for the materials they cover. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
+`loadGLTF` and `parseGLTFAsync` shade a file that uses clearcoat, transmission, IOR, volume, dispersion, sheen, specular, iridescence, anisotropy, diffuse transmission or a bump map with the physical renderer by default: they import `extendedMaterials` from `@margoengine/gltf-pro/extended` on first need, so an app whose files never use those extensions ships none of its WGSL. Pass `{decoders: {materials: false}}` to keep the base shader (the extensions are then ignored, as glTF allows), or your own `extendedMaterials`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. The imported metadata also stays available for explicit `@margoengine/materials` installation, whose lobes replace the physical renderer for the materials they cover. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
 
 `KHR_materials_dispersion` is accepted when required. Its factor is validated and
 retained as `primitive.material.dispersion` even without a materials decoder;
@@ -242,6 +242,23 @@ same-device renderers can reuse it. Its optional `lit(code)` rewrites the shader
 after the `addLighting()` effects are composed in (materials' Lambert and Phong
 put their own BRDF in clustered's light loop there); returning `code` changes
 nothing.
+
+### Bump maps in glTF (`EXT_materials_bump`, draft)
+
+`loadGLTF` and `parseGLTFAsync` read `EXT_materials_bump` by themselves through `@margoengine/gltf-pro/extended`: the red channel of `bumpTexture`, read as linear data, times `bumpFactor` is a height, and the surface normal becomes `normalize(n - grad d)`. It tilts the normal a normal map has already tilted, so a file can hold large forms in the normal map and fine detail in the bump map. `heightSpace: 'object'` scales the height with the node, along the surface normal, so uneven scale works too; `'world'` keeps it in metres. Without `heightSpace` the draft leaves the strength to the renderer: Margo reads it as `'world'`.
+
+```ts
+import {parseGLTF} from 'margoengine/gltf-pro';
+import {extendedMaterials} from 'margoengine/gltf-pro/extended';
+import type {Engine} from 'margoengine';
+declare const engine: Engine;
+declare const doc: object;
+// The default loaders need none of this; the synchronous parser takes the decoder by hand.
+const model = parseGLTF(engine, doc, [], [], {materials: extendedMaterials});
+console.log(model.primitives[0].material.extended?.bump);
+```
+
+This follows the draft of Khronos glTF pull request 2339 as it stood on 2026-11-04, Status "Draft": it can still change. The height has one row in the extended uniform and the map is one of the eight extension textures of an extended material, so a ninth loses its bump.
 
 ### Gaussian splats in glTF (`/splats`)
 

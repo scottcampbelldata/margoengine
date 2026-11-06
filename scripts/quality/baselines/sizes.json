@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8979032,
+  "total": 8979427,
   "history": [
     {
       "date": "2026-10-24",
@@ -2726,6 +2726,12 @@
       "commit": "64ab0faee",
       "reason": "new meshopt entry in exporters",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "3fef4033d",
+      "reason": "EXT_materials_bump in the extended entry: one extra shader term, map slot and uniform row",
+      "grew": 1
     }
   ],
   "items": {
@@ -2949,7 +2955,7 @@
     "@margoengine/gltf-pro dist/workers/progressive.js": 15374,
     "@margoengine/gltf-pro/asset": 5490,
     "@margoengine/gltf-pro/coordinates": 755,
-    "@margoengine/gltf-pro/extended": 7245,
+    "@margoengine/gltf-pro/extended": 7640,
     "@margoengine/gltf-pro/instancing": 3350,
     "@margoengine/gltf-pro/prepare": 19822,
     "@margoengine/gltf-pro/progressive": 70098,
