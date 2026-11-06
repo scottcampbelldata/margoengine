@@ -171,12 +171,14 @@ const FACES: readonly (readonly [Vec3, Vec3])[] = [
   ],
 ];
 
-const dataWgsl = (access: string, group: number, binding: number) => /* wgsl */ `
+// The bake sees the same bytes as one vec2u per texel. Two neighbouring texels share a vec4u and are written by different
+// workgroups, and Apple GPUs write a part of a vec4u as the whole vector: one of the two was lost, leaving black texels.
+const dataWgsl = (access: string, group: number, binding: number, texel = access === 'read_write') => /* wgsl */ `
 struct ProbeBox {position:vec4f,min:vec4f,max:vec4f,data:vec4u}
-struct ProbeData {volumeMin:vec4f,volumeMax:vec4f,volumeCounts:vec4u,reflections:vec4u,boxes:array<ProbeBox,${MAX_REFLECTION_PROBES}>,texels:array<vec4u>}
+struct ProbeData {volumeMin:vec4f,volumeMax:vec4f,volumeCounts:vec4u,reflections:vec4u,boxes:array<ProbeBox,${MAX_REFLECTION_PROBES}>,texels:array<${texel ? 'vec2u' : 'vec4u'}>}
 @group(${group}) @binding(${binding}) var<storage,${access}> probeData:ProbeData;
 // Texel i: float16 r, g, b in the 8-byte half i & 1 of vec4u i / 2 (octahedral radiance). Volume probes pack their SH in whole vec4u.
-fn probeTexel(i:u32)->vec3f {let t=probeData.texels[i>>1u];let u=select(t.xy,t.zw,(i&1u)==1u);return vec3f(unpack2x16float(u.x),unpack2x16float(u.y).x);}
+fn probeTexel(i:u32)->vec3f {${texel ? 'let u=probeData.texels[i];' : 'let t=probeData.texels[i>>1u];let u=select(t.xy,t.zw,(i&1u)==1u);'}return vec3f(unpack2x16float(u.x),unpack2x16float(u.y).x);}
 fn probeOct(d:vec3f)->vec2f {
   let a=d/max(abs(d.x)+abs(d.y)+abs(d.z),1e-20);var q=a.xz;
   if(a.y<0.0){q=(1.0-abs(a.zx))*select(vec2f(-1.0),vec2f(1.0),a.xz>=vec2f(0.0));}
@@ -292,7 +294,7 @@ fn envRadiance(d:vec3f)->vec3f {return textureSampleLevel(sky,linear,vec3f(skyPa
 fn face(f:u32)->mat3x3f {return array<mat3x3f,6>(
   mat3x3f(0,0,1, 0,1,0, 1,0,0),mat3x3f(0,0,-1, 0,1,0, -1,0,0),mat3x3f(-1,0,0, 0,0,-1, 0,1,0),
   mat3x3f(-1,0,0, 0,0,1, 0,-1,0),mat3x3f(-1,0,0, 0,1,0, 0,0,1),mat3x3f(1,0,0, 0,1,0, 0,0,-1))[f];}
-fn store(i:u32,c:vec3f) {let u=vec2u(pack2x16float(c.rg),pack2x16float(vec2f(c.b,0.0)));let q=i>>1u;if((i&1u)==0u){probeData.texels[q].x=u.x;probeData.texels[q].y=u.y;}else{probeData.texels[q].z=u.x;probeData.texels[q].w=u.y;}}
+fn store(i:u32,c:vec3f) {probeData.texels[i]=vec2u(pack2x16float(c.rg),pack2x16float(vec2f(c.b,0.0)));}
 fn octDecode(uv:vec2f)->vec3f {let f=uv*2.0-1.0;var n=vec3f(f.x,1.0-abs(f.x)-abs(f.y),f.y);let t=max(-n.y,0.0);n.x+=select(t,-t,n.x>=0.0);n.z+=select(t,-t,n.z>=0.0);return n;}
 fn sampleFaces(d:vec3f)->vec3f {
   let m=abs(d);var f=select(1u,0u,d.x>0.0);if(m.y>=m.x&&m.y>=m.z){f=select(3u,2u,d.y>0.0);}else if(m.z>m.x&&m.z>m.y){f=select(5u,4u,d.z>0.0);}
@@ -317,7 +319,7 @@ var<workgroup> partial:array<vec4f,256>;
     workgroupBarrier();
   }
   // Pack the count * 3 halves into bake.size vec4u at vec4 index bake.offset (zero padded).
-  if(t<bake.size){var v=vec4u(0);for(var e=0u;e<4u;e++){let h=(t*4u+e)*2u;v[e]=pack2x16float(vec2f(coefficientHalf(h),coefficientHalf(h+1u)));}probeData.texels[bake.offset+t]=v;}
+  if(t<bake.size){var v=vec4u(0);for(var e=0u;e<4u;e++){let h=(t*4u+e)*2u;v[e]=pack2x16float(vec2f(coefficientHalf(h),coefficientHalf(h+1u)));}let q=(bake.offset+t)*2u;probeData.texels[q]=v.xy;probeData.texels[q+1u]=v.zw;}
 }
 var<workgroup> coefficients:array<vec3f,9>;
 fn coefficientHalf(h:u32)->f32 {if(h>=bake.count*3u){return 0.0;}return coefficients[h/3u][h%3u];}
