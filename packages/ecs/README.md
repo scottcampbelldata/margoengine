@@ -113,6 +113,32 @@ tracker.stop();
 
 `fields` are plain typed arrays, so a direct write cannot be seen: call `component.touch(entity)` after one, or write through `component.add`. Results are net over the window: added then removed reports nothing, removed then added back is `changed`, added then written stays `added`. Each tracker keeps its own window, so systems can read at their own pace; call `clear()` when one is done, for example in a last system of a `Schedule`. `stop()`, or `using`, detaches a tracker. A tracker costs 24 bytes per world slot. To react at once instead of reading a window, push your own `{onAdd, onChange, onRemove}` onto `component.observers`; do not add or remove rows of that component from inside one.
 
+## Engine bridge
+
+`MeshBridge` (from `margoengine/ecs/engine`) copies a transform component to core meshes in one call a frame, so systems work on packed arrays and never touch a mesh.
+
+```ts
+import {createStage} from 'margoengine';
+import {World} from 'margoengine/ecs';
+import {MeshBridge, transformSchema} from 'margoengine/ecs/engine';
+const stage = await createStage('#app');
+const world = new World(1024);
+const transform = world.component(transformSchema);
+const bridge = new MeshBridge(transform, {disposeMeshes: true});
+const entity = world.create();
+bridge.link(entity, stage.box());
+stage.onTick((delta) => {
+  transform.fields.x[transform.index(entity)] += delta;
+  bridge.sync();
+});
+```
+
+| `new MeshBridge` option | Default | Meaning |
+| --- | --- | --- |
+| `disposeMeshes` | `false` | Dispose a linked mesh when its entity loses the component or is destroyed |
+
+`transformSchema` is position `x y z`, quaternion `qx qy qz qw` and scale `sx sy sz`. A component may hold any of those three groups, whole; a mesh keeps its own values for a group the component lacks. `link(entity, mesh)` fills a new row from the mesh, so nothing jumps; a row made by hand needs `qw: 1` and a scale, or `sync` throws the mesh's RangeError. `sync()` goes through the mesh's setters, so the checks are the same as a hand write and `mesh.rotation` stays correct, and it leaves a group alone when the mesh already holds those values. A link ends with `unlink(entity)`, when the entity loses the component or is destroyed, or with `stop()`. A mesh disposed behind the bridge makes `sync` throw MargoError `'disposed'` rather than write to whichever mesh reuses its slot. Transforms are local to the mesh's parent; set hierarchies on the meshes with `setParent`.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/ecs

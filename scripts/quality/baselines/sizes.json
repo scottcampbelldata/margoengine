@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4473247,
+  "total": 4474683,
   "history": [
     {
       "date": "2026-10-24",
@@ -1634,6 +1634,12 @@
       "commit": "d462f554a",
       "reason": "New ecs entry ./query: Query with without and optional terms; world.tag and Component.has in the root",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "406af9caf",
+      "reason": "New ecs entry ./engine: MeshBridge and transformSchema, one sync a frame from a transform component to core meshes",
+      "grew": 1
     }
   ],
   "items": {
@@ -1737,6 +1743,7 @@
     "@margoengine/dof/lens": 1506,
     "@margoengine/ecs": 3903,
     "@margoengine/ecs/changes": 886,
+    "@margoengine/ecs/engine": 1436,
     "@margoengine/ecs/query": 1021,
     "@margoengine/ecs/schedule": 1743,
     "@margoengine/environment": 29930,

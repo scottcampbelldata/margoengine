@@ -30,6 +30,10 @@
       "types": "./dist/changes.d.ts",
       "import": "./dist/changes.js"
     },
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
+    },
     "./query": {
       "types": "./dist/query.d.ts",
       "import": "./dist/query.js"

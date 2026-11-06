@@ -159,6 +159,7 @@ backs them yet:
 | LIM-056 | Scheduler: stable order from before and after, cycles and missing names refused by name, one run per paid fixed step with the remainder carried, at most maxSteps with the rest reported as dropped (docs/limits.md, Entities) | `packages/ecs/test/schedule.test.js` | `npm test --workspace packages/ecs` | PROVEN | |
 | LIM-057 | Change detection: net added, changed and removed lists equal a snapshot diff of the window over 500 seeded rounds of mixed work with slot reuse, and each tracker keeps its own window (docs/limits.md, Entities) | `packages/ecs/test/changes.test.js` | `npm test --workspace packages/ecs` | PROVEN | |
 | LIM-058 | Query filters and tags: results equal a filter over every entity on 200 seeded scenes, and forEach survives structural changes made while it runs (docs/limits.md, Entities) | `packages/ecs/test/query.test.js` | `npm test --workspace packages/ecs` | PROVEN | |
+| LIM-059 | Engine bridge: a real engine and transform kernel get position, quaternion and scale from one sync, also after the store grows; disposed meshes are reported, and their reused slot is not written (docs/limits.md, Entities) | `packages/ecs/test/engine.test.js` | `npm test --workspace packages/ecs` | PROVEN | |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 
