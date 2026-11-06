@@ -1,6 +1,6 @@
 # @margoengine/voxel: approved design (names chosen 2026-10-19)
 
-Goal: a Minecraft-style voxel game on Margo, and later a MagicaVoxel-style editor sharing the package. Margo is
+Goal: a block-world voxel game on Margo, and later a MagicaVoxel-style editor sharing the package. Margo is
 also the base for a 3D modeller and a game engine, so it must look good and run well. Core and stage
 are frozen (gzip gate 25,000; 21,343 now). Never one core entity per block, never vertex colours on core Geometry,
 keep buffers within default WebGPU limits (128 MiB per storage binding, 256 MiB per buffer). Clean-room code (no
