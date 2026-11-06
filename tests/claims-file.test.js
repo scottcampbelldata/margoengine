@@ -21,6 +21,14 @@ test('no two limit claims share a number', () => {
   }
 });
 
+test('no two limit claims say the same thing', () => {
+  const seen = new Map();
+  for (const [, id, text] of claims.matchAll(/^\| LIM-(\d+) \| ([^|]+) \|/gm)) {
+    assert.ok(!seen.has(text), `LIM-${id} repeats LIM-${seen.get(text)}`);
+    seen.set(text, id);
+  }
+});
+
 test('docs/limits.md names the last limit claim', () => {
   const [, last] = /LIM-001 to LIM-(\d+)/.exec(limits);
   assert.equal(Number(last), Math.max(...ids));
