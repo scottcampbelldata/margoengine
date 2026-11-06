@@ -138,6 +138,43 @@ const middle = path.poseAt(path.length / 2);
 
 The options of a tween also work: `delay`, `repeat`, `yoyo`, `onComplete`, `onRepeat`, and `easing`, which shapes the speed. With no `easing` the speed is even. The rotation comes from `SplineFrames`, so it does not flip on a loop. Moving back on a `yoyo` pass, the object keeps facing the path's direction.
 
+## Scroll-linked timelines
+
+`scrollTimeline` from `margoengine/tween/scroll` hands a timeline to the page's scroll, for pages that tell a 3D story as the reader scrolls. The timeline stops running by the clock and its position follows the scroll, both ways:
+
+```ts
+import {Timeline} from 'margoengine/tween';
+import {scrollTimeline} from 'margoengine/tween/scroll';
+
+const camera = {height: 10, tilt: 0};
+const timeline = new Timeline()
+  .to(camera, 'height', 2, {duration: 1})
+  .to(camera, 'tilt', 0.6, {duration: 1});
+
+// A tall section with a sticky canvas: the timeline runs while the section fills the view.
+const section = document.querySelector('#story')!;
+const controller = new AbortController();
+const link = scrollTimeline(timeline, {
+  element: section,
+  range: 'contain',
+  scrub: 0.2,
+  signal: controller.signal,
+  onUpdate: (progress) => console.log(progress),
+});
+// link.dispose() or controller.abort() ends it; `using link = scrollTimeline(...)` does too.
+```
+
+| Option | Meaning | Default |
+| --- | --- | --- |
+| `source` | What scrolls: a scrolling element or a window. | the page |
+| `element` | Follow this element through the view instead of the whole scroll range. | none |
+| `range` | With `element`, the words of CSS view timelines. `'cover'`: from its top entering the bottom of the view to its bottom leaving the top. `'contain'`: from its top at the top of the view to its bottom at the bottom. | `'cover'` |
+| `scrub` | Seconds the timeline takes to catch up, for a soft feel. The same at any frame rate. 0 follows at once. | 0 |
+| `signal` | Ends the link. | none |
+| `onUpdate` | Called with the progress 0..1 each time the timeline moves. | none |
+
+The timeline's values are written on attach, from where the page already is, so a reload half way down starts half way through. A page that cannot scroll stays at 0. `Timeline.call` callbacks do not run, as for any seek; use `onUpdate`. The link reads the scroll on `scroll`, on `resize` and when the page or the element changes size; `link.refresh()` reads it at any other time.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/tween

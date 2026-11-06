@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Scroll timeline check</title>
+    <style>
+      body { margin: 0; }
+      #box { height: 200px; overflow: auto; }
+      #box div { height: 1200px; }
+      #before { height: 1500px; }
+      #story { height: 2400px; }
+      #after { height: 1500px; }
+    </style>
+  </head>
+  <body>
+    <div id="box"><div></div></div>
+    <div id="before"></div>
+    <section id="story"></section>
+    <div id="after"></div>
+    <div id="spacer"></div>
+    <script type="module">
+      import { Timeline } from '/packages/tween/dist/index.js';
+      import { scrollTimeline } from '/packages/tween/dist/scroll.js';
+
+      const story = document.querySelector('#story');
+      const scene = () => {
+        const value = { x: 0 };
+        return { value, timeline: new Timeline().to(value, 'x', 10, { duration: 1 }) };
+      };
+      const page = scene(),
+        cover = scene(),
+        contain = scene(),
+        inner = scene(),
+        soft = scene();
+      window.box = document.querySelector('#box');
+      window.controller = new AbortController();
+      scrollTimeline(page.timeline, { signal: window.controller.signal });
+      scrollTimeline(cover.timeline, { element: story });
+      scrollTimeline(contain.timeline, { element: story, range: 'contain' });
+      scrollTimeline(inner.timeline, { source: window.box });
+      scrollTimeline(soft.timeline, { scrub: 0.15 });
+      window.state = () => ({
+        page: page.value.x,
+        cover: cover.value.x,
+        contain: contain.value.x,
+        inner: inner.value.x,
+        soft: soft.value.x,
+        scrollY: window.scrollY,
+        view: window.innerHeight,
+        most: document.documentElement.scrollHeight - window.innerHeight,
+        sectionTop: story.getBoundingClientRect().top + window.scrollY,
+        sectionHeight: story.getBoundingClientRect().height,
+      });
+      window.ready = true;
+    </script>
+  </body>
+</html>

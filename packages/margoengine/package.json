@@ -2214,6 +2214,10 @@
       "types": "./dist/tween/motion-path.d.ts",
       "import": "./dist/tween/motion-path.js"
     },
+    "./tween/scroll": {
+      "types": "./dist/tween/scroll.d.ts",
+      "import": "./dist/tween/scroll.js"
+    },
     "./ui": {
       "types": "./dist/ui.d.ts",
       "import": "./dist/ui.js"

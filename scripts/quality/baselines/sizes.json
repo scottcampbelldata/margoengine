@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9085163,
+  "total": 9086361,
   "history": [
     {
       "date": "2026-10-24",
@@ -2822,6 +2822,12 @@
       "commit": "736692cd3",
       "reason": "exporters/threemf: new entry for 3MF export",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "a7818f097",
+      "reason": "new optional entry @margoengine/tween/scroll",
+      "grew": 1
     }
   ],
   "items": {
@@ -3377,6 +3383,7 @@
     "@margoengine/transitions": 4303,
     "@margoengine/tween": 5466,
     "@margoengine/tween/motion-path": 1263,
+    "@margoengine/tween/scroll": 1198,
     "@margoengine/tween/stagger": 1435,
     "@margoengine/ui": 28221,
     "@margoengine/ui/react": 28301,

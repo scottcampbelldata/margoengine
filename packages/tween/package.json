@@ -33,6 +33,10 @@
     "./motion-path": {
       "types": "./dist/motion-path.d.ts",
       "import": "./dist/motion-path.js"
+    },
+    "./scroll": {
+      "types": "./dist/scroll.d.ts",
+      "import": "./dist/scroll.js"
     }
   },
   "files": [
@@ -53,6 +57,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js tween",
     "test": "npm run build && node --test test/*.test.js",
+    "test:browser": "cd ../.. && node packages/tween/test/scroll-browser.mjs",
     "prepack": "npm run build"
   }
 }
