@@ -1042,6 +1042,10 @@
       "types": "./dist/kinematics-constraints/limits.d.ts",
       "import": "./dist/kinematics-constraints/limits.js"
     },
+    "./kinematics-constraints/sdf": {
+      "types": "./dist/kinematics-constraints/sdf.d.ts",
+      "import": "./dist/kinematics-constraints/sdf.js"
+    },
     "./labels": {
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"

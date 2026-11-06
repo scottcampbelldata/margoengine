@@ -412,8 +412,56 @@ else console.log('stopped by joints', result.limited);
 
 The result is reused by the next `solve`. This is a local method: from a bad start it can stall behind an obstacle with a way round it, and then `blocked` is your cue to call a planner. `armRobot({upperLength, forearmLength, radius, yaw?, pitch?, twist?, elbow?, base?})` builds the two-bone arm as a `Robot`, bones along +Y as in a glTF rig, with a fixed joint named `hand` at the end. `robot.jacobian(joint, point, out?)` gives the tip's Jacobian at the last pose, for a solver of your own.
 
+## Concave obstacles (`margoengine/kinematics-constraints/sdf`)
+
+A sphere, a capsule or a convex hull cannot have a hole or a hollow: a hull round a ring fills the ring, and a hull round a bowl fills the bowl. `MeshVolume` and `SDFVolume` take the shape itself. They work anywhere a collider does, in `AvoidanceSolver`, the swept checks, `JointLimitSolver`, and for link hulls too.
+
+```ts
+import { MeshBVH } from 'margoengine/bvh';
+import { bakeSDF } from 'margoengine/bvh/sdf';
+import { MeshVolume, SDFVolume } from 'margoengine/kinematics-constraints/sdf';
+import { Robot } from 'margoengine/kinematics-constraints/robot';
+import { sweepRobot } from 'margoengine/kinematics-constraints/swept';
+
+// A closed box as a stand-in for your mesh: pass your own positions and indices.
+const positions = new Float32Array([-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1]);
+const indices = new Uint32Array([
+  0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7,
+]);
+const bvh = MeshBVH.build({ positions, indices });
+
+const exact = new MeshVolume({ bvh }); // exact distances, through the tree
+const baked = new SDFVolume({ field: bakeSDF(bvh, { resolution: 32 }) }); // a fixed cost per reading
+
+const slider = new Robot({
+  joints: [{ type: 'prismatic', axis: [1, 0, 0], lower: -5, upper: 5 }],
+  shapes: [{ joint: 0, radius: 0.1 }],
+});
+for (const obstacle of [exact, baked]) {
+  const hit = sweepRobot(slider, [-4], [4], [obstacle]);
+  console.log(hit.clear, hit.time);
+}
+```
+
+| `new MeshVolume({bvh, matrix?, solid?})` | Default | Meaning |
+| --- | --- | --- |
+| `bvh` | Required | A `MeshBVH` from `margoengine/bvh`. Its triangles stay in the tree's own space. |
+| `matrix` | Identity | Rotation, one uniform scale and a move. `setTransform(matrix)` moves it later. |
+| `solid` | `true` | A closed mesh has an inside, by winding number: a point in it reads negative. `false` treats the mesh as a thin sheet, for an open surface such as a terrain or a bowl with no back, and reads the plain distance. |
+
+| `new SDFVolume({field, matrix?, margin?, precision?, lipschitz?, maxCells?})` | Default | Meaning |
+| --- | --- | --- |
+| `field` | Required | `bakeSDF`'s `MeshSDF`, or any `{distance(point)}`, such as an analytic shape. |
+| `matrix` | Identity | As above. |
+| `margin` | A grid: one cell's diagonal. A function: `0` | Taken off every reading. A trilinear reading can overstate a true distance by up to a cell's diagonal, so with this default the volume never reports a gap the mesh does not leave. |
+| `precision` | A quarter of a cell, or `1e-3` | How close a shape's smallest reading is pinned down. |
+| `lipschitz` | A grid: the square root of 3. A function: `1` | Fastest the field changes per unit of distance. A function that is not a true distance must say so here. |
+| `maxCells` | `4096` | Most cells one query opens. A query that runs out still answers with a safe lower bound. |
+
+`MeshVolume` is exact and pays for it per query. `SDFVolume` costs the same whatever the mesh, and is only as fine as its grid: a wall thinner than a cell may not be there at all, which is why the margin matters, and a coarse field reads obstacles fatter than they are. A grid field must hold the whole obstacle: past the grid's edge a reading is the distance to the grid. Segment and hull queries on both answer no more than the true gap, so the swept checks keep their promise. A segment that crosses a mesh reads minus its radius, and an overlapping hull reads zero or less: the value ranks poses, it is not a depth. This entry needs `@margoengine/bvh`, an optional peer of this package, and only this entry does.
+
 ## Scope
 
 `Success` describes static analytical proxy clearance at one evaluated instant, within numerical tolerance. It covers neither unsupplied mesh/skinning geometry nor unchecked link portions. Set proxies to enclose the full deformation envelope and any desired padding in your application.
 
-Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. This package does not implement concave mesh collision, dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or use a higher-level planner.
+Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. Concave obstacles are in `/sdf`. This package does not implement dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or use a higher-level planner.

@@ -38,6 +38,10 @@
     "./limits": {
       "types": "./dist/limits.d.ts",
       "import": "./dist/limits.js"
+    },
+    "./sdf": {
+      "types": "./dist/sdf.d.ts",
+      "import": "./dist/sdf.js"
     }
   },
   "files": [
@@ -53,5 +57,13 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "node ../../scripts/test-kinematics-constraints-browser.js",
     "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "@margoengine/bvh": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/bvh": {
+      "optional": true
+    }
   }
 }

@@ -790,3 +790,44 @@ const hullSegmentClearance = /* @__PURE__ */ originalSegmentClearance();
 export function hullPoints(hull: ConvexHullVolume): Float64Array {
   return hull['shape'].points;
 }
+
+/** @internal Writes the world box of a hull, min then max, into `out`. */
+export function hullBoundsInto(hull: ConvexHullVolume, out: Float64Array): void {
+  const { points, matrix: m } = hull['shape'];
+  for (let k = 0; k < 3; k++) {
+    out[k] = Infinity;
+    out[k + 3] = -Infinity;
+  }
+  for (let i = 0; i < points.length; i += 3) {
+    const x = points[i],
+      y = points[i + 1],
+      z = points[i + 2];
+    for (let k = 0; k < 3; k++) {
+      const value = m[k] * x + m[3 + k] * y + m[6 + k] * z + m[9 + k];
+      if (value < out[k]) out[k] = value;
+      if (value > out[k + 3]) out[k + 3] = value;
+    }
+  }
+}
+
+/** @internal Writes one world point of a hull into `out`. */
+export function hullCornerInto(hull: ConvexHullVolume, out: Float64Array): void {
+  const { points, matrix: m } = hull['shape'];
+  for (let k = 0; k < 3; k++) out[k] = m[k] * points[0] + m[3 + k] * points[1] + m[6 + k] * points[2] + m[9 + k];
+}
+
+/** @internal Makes a hull of three points the triangle a, b, c, without allocating. */
+export function setHullTriangle(
+  hull: ConvexHullVolume,
+  a: ArrayLike<number>,
+  b: ArrayLike<number>,
+  c: ArrayLike<number>,
+): void {
+  const { points, center } = hull['shape'];
+  for (let k = 0; k < 3; k++) {
+    points[k] = a[k];
+    points[3 + k] = b[k];
+    points[6 + k] = c[k];
+    center[k] = (a[k] + b[k] + c[k]) / 3;
+  }
+}

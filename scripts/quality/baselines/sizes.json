@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8923368,
+  "total": 8930599,
   "history": [
     {
       "date": "2026-10-24",
@@ -2684,6 +2684,12 @@
       "commit": "11babcfbb",
       "reason": "feat(kinematics-constraints): joint-limit solver (new entry @margoengine/kinematics-constraints/limits)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "a7176fed3",
+      "reason": "feat(kinematics-constraints): concave and distance-field obstacles (new entry @margoengine/kinematics-constraints/sdf)",
+      "grew": 2
     }
   ],
   "items": {
@@ -2942,6 +2948,7 @@
     "@margoengine/kinematics-constraints": 11751,
     "@margoengine/kinematics-constraints/limits": 13664,
     "@margoengine/kinematics-constraints/robot": 10142,
+    "@margoengine/kinematics-constraints/sdf": 7230,
     "@margoengine/kinematics-constraints/swept": 9703,
     "@margoengine/labels": 4756,
     "@margoengine/lighting2d": 4389,
@@ -3313,6 +3320,7 @@
     "leak @margoengine/fbx -> @margoengine/gltf-pro": 1,
     "leak @margoengine/fbx/worker -> @margoengine/gltf-pro/worker": 1,
     "leak @margoengine/inspector -> @margoengine/lines": 1,
+    "leak @margoengine/kinematics-constraints/sdf -> @margoengine/bvh/inside": 1,
     "leak @margoengine/lightmap -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/global -> @margoengine/bvh/tree": 1,
     "leak @margoengine/lightmap/refracted -> @margoengine/bvh/tree": 1,
