@@ -398,7 +398,9 @@ export async function run(create) {
     if (globalThis.dumped) result.dumped = globalThis.dumped;
     result.resources = resources();
     result.jsBytes = result.resources.filter((r) => r.name.endsWith('.js')).reduce((s, r) => s + r.bytes, 0);
-    // Final still frame at t = 0 for a screenshot.
+    // Final still frame at t = 0 for a screenshot, one frame step after the frame before it: motion vectors come from
+    // the last two frames, so a jump from wherever the timed loop stopped would blur by that engine's own jump.
+    app.render(1 / 60);
     app.render(0);
     await app.idle();
     await raf();

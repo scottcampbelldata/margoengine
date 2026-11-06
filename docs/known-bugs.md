@@ -756,6 +756,12 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   against 3.2).
 - **Cause (timestamps per pass):** `MotionBlur` reads TAA's velocity, Margo's only motion-vector source, so the frame
   also runs TAA's velocity and resolve passes (about 0.3 ms); the blur itself is about 0.27 ms.
+- **Why the two pictures differ (2026-11-06):** the harness drew its still frame at t = 0 straight after the timed loop, so
+  Margo blurred by the jump from wherever the loop stopped, in streaks 32 pixels long. The harness now steps one frame
+  into the still frame, and Margo's picture is what a 1/60 s step gives: sharp boxes, under a pixel of motion on most of
+  them. three's picture did not change with that step and stays a heavy smear, so its blur does not come from the last
+  two frames' motion alone. The SSIM of this row compares a true one-frame blur with that smear, so it says nothing
+  about either engine's quality. Timings are unaffected. three's velocity scale in the adapter is not yet explained.
 - **Fixed for effects that need no anti-aliasing:** `TAA`'s `velocityOnly` option runs the velocity pass with no jitter,
   capture, history or resolve: `p-motion-blur-velocity` 0.48 ms GPU and 1.2 ms CPU, against 0.63 and 2.8 for
   `p-motion-blur` in the same run (busy machine, diagnostic). `p-motion-blur` keeps its full TAA frame.
