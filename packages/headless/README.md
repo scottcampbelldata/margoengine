@@ -156,4 +156,36 @@ assert.ok(result.pass, `${result.different} pixels changed, SSIM ${result.ssim}`
 A pixel count sees how many pixels moved, and SSIM sees whether the picture looks different: a slight brightness change fails
 the first and passes the second, and a small hole does the opposite. Images of different sizes reject.
 
+## JPEG, WebP and EXR files
+
+`@margoengine/headless/formats` writes the pixels you read as the files previews and HDR captures need. Nothing here
+loads a codec: JPEG and lossless WebP are written in plain code, so they work in Node, a worker and a page.
+
+```ts
+import { writeFile } from 'node:fs/promises';
+import { readPixels } from '@margoengine/headless';
+import { encodeEXR, encodeJPEG, encodeWebP, readTexture } from '@margoengine/headless/formats';
+import { Engine } from '@margoengine/core';
+import type { PostStack } from '@margoengine/post/stack';
+
+declare const engine: Engine; // on a headless canvas, with the scene drawn
+declare const stack: PostStack; // attached to the engine, with an HDR effect
+
+const pixels = await readPixels(engine);
+await writeFile('preview.jpg', encodeJPEG(pixels, { quality: 85 }));
+await writeFile('preview.webp', await encodeWebP(pixels));
+await writeFile('frame.exr', await encodeEXR(await readTexture(engine, stack.sceneTexture!), { type: 'float' }));
+```
+
+| Export | What it does |
+| --- | --- |
+| `encodeJPEG(pixels, { quality?, subsampling?, background? })` | A baseline JPEG. `quality` is 1 to 100, default 90, scaled as other JPEG tools scale it. `subsampling` is `'420'` (default, smaller) or `'444'` (sharper colour edges). JPEG has no alpha, so pixels are laid over `background`, default white. |
+| `encodeWebP(pixels, { quality? })` | Unset `quality`: lossless WebP, the same pixels back, with alpha, in any runtime. `quality` 0 to 1: lossy WebP through the runtime's own encoder, so it needs `OffscreenCanvas` and WebP support (a browser or worker). Rejects, never gives a PNG in its place. |
+| `encodeEXR(hdr, { type?, signal? })` | Float RGBA as an uncompressed OpenEXR file. `type` is `'half'` (default) or `'float'`. Written by `@margoengine/environment/exr-write`, an optional peer loaded on first use. |
+| `readTexture(engine, texture, { signal? })` | Reads an `rgba16float` or `rgba32float` texture with `COPY_SRC` usage to `{ width, height, data }` float pixels. `stack.sceneTexture` from `@margoengine/post/stack` is the linear frame before tone mapping, where values go over 1. |
+| `linearPixels(pixels)` | Undoes the sRGB curve of display pixels, for an EXR of an 8-bit frame. Alpha stays linear. |
+
+The engine's own output is tone-mapped sRGB, so an EXR made from `readPixels` holds display values, not scene light.
+For a capture with true highlights, read `stack.sceneTexture`. Images are at most 65,535 pixels wide for JPEG and 16,384 for WebP.
+
 The errors are listed at [margoengine.com/errors#headless](https://margoengine.com/errors#headless).

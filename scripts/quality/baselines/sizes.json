@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4605533,
+  "total": 4611342,
   "history": [
     {
       "date": "2026-10-24",
@@ -1778,6 +1778,12 @@
       "commit": "1eb3b58f4",
       "reason": "headless gains the compare entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "9ffb221c9",
+      "reason": "headless gains the formats entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -1967,6 +1973,7 @@
     "@margoengine/headless": 2864,
     "@margoengine/headless/compare": 2607,
     "@margoengine/headless/ffmpeg": 1434,
+    "@margoengine/headless/formats": 5809,
     "@margoengine/headless/stage": 3306,
     "@margoengine/headless/video": 5641,
     "@margoengine/html": 5013,

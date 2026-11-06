@@ -774,6 +774,10 @@
       "types": "./dist/headless/compare.d.ts",
       "import": "./dist/headless/compare.js"
     },
+    "./headless/formats": {
+      "types": "./dist/headless/formats.d.ts",
+      "import": "./dist/headless/formats.js"
+    },
     "./html": {
       "types": "./dist/html.d.ts",
       "import": "./dist/html.js"

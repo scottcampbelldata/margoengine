@@ -1,6 +1,10 @@
 // The same scene on a page canvas and on the stand-in, each on its own engine and device of the same adapter.
 import { Camera, Engine, PbrMaterial, box } from '../../core/src/index.ts';
-import { createHeadlessCanvas, installGPU, toPNG } from '../src/index.ts';
+import { createHeadlessCanvas, installGPU, readPixels, toPNG } from '../src/index.ts';
+import { encodeEXR, encodeJPEG, encodeWebP, readTexture } from '../src/formats.ts';
+import { parseEXR } from '../../environment/src/exr.ts';
+import { PostStack } from '../../post/src/stack.ts';
+import { Bloom } from '../../post/src/bloom.ts';
 import { encodeVideo, renderFrames } from '../src/video.ts';
 import { createHeadlessStage } from '../src/stage.ts';
 import { createStage } from '../../stage/src/index.ts';
@@ -130,5 +134,92 @@ window.check.video = async (format) => {
     other,
     errors,
   };
+};
+/** The browser's own decode of a file, as straight RGBA with no colour management (WebCodecs). */
+async function decoded(bytes, type) {
+  const decoder = new ImageDecoder({ data: bytes, type, colorSpaceConversion: 'none' }),
+    { image } = await decoder.decode(),
+    out = new Uint8Array(image.allocationSize({ format: 'RGBA' }));
+  await image.copyTo(out, { format: 'RGBA' });
+  const size = [image.displayWidth, image.displayHeight];
+  image.close();
+  decoder.close();
+  return { size, data: out };
+}
+/** The same pixels premultiplied: the browser's decoders keep colour premultiplied, so a straight pixel of low alpha
+ * comes back rounded, and only its premultiplied value is a fact of the file. */
+const premultiplied = (data) => {
+  const out = new Uint8Array(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    for (let c = 0; c < 3; c++) out[i + c] = Math.round((data[i + c] * data[i + 3]) / 255);
+    out[i + 3] = data[i + 3];
+  }
+  return out;
+};
+/** Largest and mean channel difference between two RGBA arrays, alpha counted. */
+const distance = (a, b) => {
+  let largest = 0,
+    sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const d = Math.abs(a[i] - b[i]);
+    sum += d;
+    if (d > largest) largest = d;
+  }
+  return { largest, mean: sum / a.length };
+};
+// The encoders against the browser's decoders: JPEG in both samplings, lossless WebP bit for bit (odd sizes, alpha),
+// lossy WebP, and an EXR of the linear scene capture with a value over 1, parsed back.
+window.check.formats = async () => {
+  const installed = installGPU({ gpu: navigator.gpu }),
+    canvas = createHeadlessCanvas({ width: 256, height: 192 }),
+    engine = await Engine.create(canvas, { backend: 'webgpu' }),
+    errors = [],
+    out = {};
+  engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+  // Bright light, so the linear frame holds values over 1 that a display image cannot.
+  engine.lighting.radiance.set([30, 30, 30, 0.15]);
+  const stack = PostStack.attach(engine, [new Bloom({ strength: 0.1 })]),
+    camera = scene(engine);
+  engine.render({ camera });
+  const pixels = await readPixels(engine);
+  for (const subsampling of ['420', '444']) {
+    const file = encodeJPEG(pixels, { quality: 95, subsampling }),
+      seen = await decoded(file, 'image/jpeg');
+    out['jpeg' + subsampling] = { size: seen.size, bytes: file.length, ...distance(seen.data, pixels.data) };
+  }
+  const paint = (width, height) => {
+    const data = new Uint8Array(width * height * 4);
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++)
+        data.set([x * 7 + y, y * 13, (x * y) & 255, ((x + y) * 9) & 255], (y * width + x) * 4);
+    return { width, height, data };
+  };
+  out.lossless = [];
+  for (const [w, h] of [[1, 1], [37, 21], [101, 3], [64, 64]]) {
+    const source = paint(w, h),
+      seen = await decoded(await encodeWebP(source), 'image/webp');
+    out.lossless.push({ size: seen.size, want: [w, h], ...distance(premultiplied(seen.data), premultiplied(source.data)) });
+  }
+  const opaque = await decoded(await encodeWebP(pixels), 'image/webp');
+  out.opaque = distance(opaque.data, pixels.data);
+  const lossy = await encodeWebP(pixels, { quality: 0.9 });
+  out.lossy = { bytes: lossy.length, ...distance((await decoded(lossy, 'image/webp')).data, pixels.data) };
+  const texture = stack.sceneTexture,
+    hdr = await readTexture(engine, texture),
+    file = await encodeEXR(hdr),
+    parsed = parseEXR(file);
+  let high = 0;
+  for (let i = 0; i < hdr.data.length; i++) if (hdr.data[i] > high) high = hdr.data[i];
+  out.exr = {
+    size: [parsed.width, parsed.height],
+    want: [hdr.width, hdr.height],
+    high,
+    mean: distance(parsed.data, hdr.data).mean,
+    exact: distance(parsed.data, hdr.data).largest,
+  };
+  stack.dispose();
+  engine.dispose();
+  installed.dispose();
+  return { ...out, errors };
 };
 window.ready = true;
