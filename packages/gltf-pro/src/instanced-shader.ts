@@ -26,6 +26,8 @@ export function instancedShader(code: string): string {
   let margoI=f.model*margoInstanceMatrix; let margoS=select(-1.0,1.0,dot(margoI[0].xyz,cross(margoI[1].xyz,margoI[2].xyz))>0);`,
   );
   edit('let p=f.model*vec4f(', 'let p=margoI*vec4f(');
+  // Materials' objectNormal reads the matrix a vertex's normal goes through.
+  out = out.replace('let margoObjectModel=f.model;', 'let margoObjectModel=margoI;');
   edit(
     // margoNormal: a shader node graph's normal after its positionNode.
     /o\.normal=\(f\.normalMatrix\*vec4f\((i\.normal\.xyz|margoNormal),0\)\)\.xyz;/,

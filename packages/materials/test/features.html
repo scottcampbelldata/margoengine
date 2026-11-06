@@ -3,8 +3,9 @@
 // Real-adapter checks of the optional material features; features-browser.mjs reads the answers. Each check draws a
 // small scene and returns numbers, read back from a copy of the frame.
 import {Engine} from '/packages/core/dist/index.js';
-import {PbrMaterial,UnlitMaterial,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {NormalMaterial,PbrMaterial,UnlitMaterial,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
 import {alphaHash} from '/packages/materials/dist/alpha-hash.js';
+import {objectNormal} from '/packages/materials/dist/object-normal.js';
 import {TAA} from '/packages/taa/dist/index.js';
 const size=256;
 const scene=async(camera,options={})=>{
@@ -66,6 +67,32 @@ window.check={
     const mean=means.reduce((a,b)=>a+b)/means.length,spread=Math.sqrt(means.reduce((a,b)=>a+(b-mean)**2,0)/means.length);
     let pixelSum=0,n=0;for(let y=64;y<192;y++)for(let x=64;x<192;x++){pixelSum+=(light(data[(y*size+x)*4])-mean)**2;n++;}
     const out={mean,spread,pixelSpread:Math.sqrt(pixelSum/n),errors};engine.dispose();return out;
+  },
+  // The shading normal a material draws at the screen's middle, as view-space RGB decoded to -1..1.
+  async objectNormal(name){
+    const encode=v=>[...v.map(x=>Math.round((x*0.5+0.5)*255)),255],solid=v=>new Texture({data:new Uint8Array([...encode(v),...encode(v),...encode(v),...encode(v)]),width:2,height:2},{colorSpace:'linear',mipmaps:false,magFilter:'nearest',minFilter:'nearest'});
+    const made=await scene(front),{engine,errors,render}=made,s=Math.SQRT1_2,turn=[0,Math.PI/4,0];
+    const material=(v,o={})=>new NormalMaterial({normalMap:solid(v),features:[objectNormal(o.feature)],side:'double',...o.material});
+    const y45=[s,0,-s,0,0,1,0,0,s,0,s,0,0,0,0,1];
+    const cases={
+      // A map pointing along +z on a quad facing the camera, then turned 45 degrees about y: the normal turns with it.
+      plain:()=>createMesh(engine,quad(),material([0,0,1])),
+      turned:()=>{const m=createMesh(engine,quad(),material([0,0,1]));m.root.setRotation(turn);},
+      // The map wins over the vertex normal, and no tangents are in the geometry.
+      sideways:()=>createMesh(engine,quad(),material([1,0,0])),
+      // Twice as wide: normals go through the inverse transpose.
+      stretched:()=>{const m=createMesh(engine,quad(),material([s,0,s]));m.root.setScale([2,1,1]);},
+      // Mirrored in x: the normal mirrors with the mesh.
+      mirrored:()=>{const m=createMesh(engine,quad(),material([s,0,s]));m.root.setScale([-1,1,1]);},
+      instanced:()=>{const m=createInstancedMesh(engine,quad(),material([0,0,1]),1);m.instances.setMatrices(0,new Float32Array(y45));},
+      // Baked Z up: x, y, z read as x, z, -y, so the map's (0, -s, s) is the mesh's (0, s, s).
+      zUp:()=>createMesh(engine,quad(),material([0,-s,s],{feature:{up:'z'}})),
+      halfScale:()=>createMesh(engine,quad(),material([1,0,0],{material:{normalScale:0.5}})),
+    };
+    cases[name]();
+    await render();
+    const data=await pixels(made),o=(size/2*size+size/2)*4,out={normal:[0,1,2].map(k=>+(data[o+k]/255*2-1).toFixed(2)),errors};
+    engine.dispose();return out;
   },
 };
 window.ready=true;

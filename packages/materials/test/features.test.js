@@ -5,8 +5,9 @@ import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
-import { LambertMaterial, Material, PbrMaterial, createInstancedMesh, createMesh } from '../dist/index.js';
+import { LambertMaterial, Material, PbrMaterial, Texture, createInstancedMesh, createMesh } from '../dist/index.js';
 import { alphaHash } from '../dist/alpha-hash.js';
+import { objectNormal } from '../dist/object-normal.js';
 
 async function scene() {
   const gpu = mockGPU(),
@@ -88,4 +89,24 @@ test('the feature list is checked', () => {
   assert.throws(() => alphaHash({ cutoff: 0 }), RangeError);
   assert.throws(() => alphaHash({ cutoff: 1.5 }), RangeError);
   assert.ok(Object.isFrozen(new Material({ features: [alphaHash()] }).features));
+});
+
+const flat = () =>
+  new Texture({ data: new Uint8Array(16).fill(128), width: 2, height: 2 }, { colorSpace: 'linear', mipmaps: false });
+
+test('objectNormal replaces the tangent frame only while a normalMap is set, and follows instances', async () => {
+  const { engine, frame } = await scene(),
+    material = new PbrMaterial({ features: [objectNormal()] });
+  createMesh(engine, quad, material);
+  assert.ok(modules(frame()).every((c) => !c.includes('margoObjectX')));
+  material.normalMap = flat();
+  const code = modules(frame()).find((c) => c.includes('fn surface('));
+  assert.match(code, /mat3x3f\(i\.margoObjectX,i\.margoObjectY,i\.margoObjectZ\)\*\(sampledNormal\)/);
+  assert.doesNotMatch(code, /s\.n=normalize\(t\*sampledNormal/);
+  const other = await scene();
+  createInstancedMesh(other.engine, quad, new PbrMaterial({ normalMap: flat(), features: [objectNormal({ up: 'z' })] }), 2);
+  const instanced = modules(other.frame()).find((c) => c.includes('margoObjectX'));
+  assert.match(instanced, /let margoObjectModel=margoI;/);
+  assert.match(instanced, /sampledNormal\.xzy\*vec3f\(1,1,-1\)/);
+  assert.throws(() => objectNormal({ up: 'x' }), TypeError);
 });

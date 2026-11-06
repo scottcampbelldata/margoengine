@@ -37,6 +37,27 @@ const jobs = {
     assert.ok(Math.abs(on.mean - off.mean) < 0.05, 'TAA keeps the mean');
     assert.ok(on.pixelSpread < off.pixelSpread * 0.7, `TAA leaves grain ${on.pixelSpread} of ${off.pixelSpread}`);
   },
+  async objectNormal() {
+    const s = Math.SQRT1_2,
+      wide = Math.hypot(0.5, 1);
+    const want = {
+      plain: [0, 0, 1],
+      turned: [s, 0, s],
+      sideways: [1, 0, 0],
+      stretched: [0.5 / wide, 0, 1 / wide],
+      mirrored: [-s, 0, s],
+      instanced: [s, 0, s],
+      zUp: [0, s, s],
+      halfScale: [s, 0, s],
+    };
+    for (const [name, normal] of Object.entries(want)) {
+      const got = await check('objectNormal', name);
+      console.log(JSON.stringify({ label: `object normal ${name}`, ...got, want: normal.map((v) => +v.toFixed(2)) }));
+      assert.deepEqual(got.errors, []);
+      // 8-bit output: 2 / 255 per step, and an 8-bit map.
+      got.normal.forEach((v, k) => assert.ok(Math.abs(v - normal[k]) < 0.03, `${name}: ${got.normal}`));
+    }
+  },
 };
 let failed = false;
 try {

@@ -187,7 +187,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/cache API](https://margoengine.com/llms/api/cache.md): 3 entry points
 - [@margoengine/splats API](https://margoengine.com/llms/api/splats.md): 2 entry points
 - [@margoengine/tiles API](https://margoengine.com/llms/api/tiles.md): 1 entry point
-- [@margoengine/materials API](https://margoengine.com/llms/api/materials.md): 5 entry points
+- [@margoengine/materials API](https://margoengine.com/llms/api/materials.md): 6 entry points
 - [@margoengine/shader API](https://margoengine.com/llms/api/shader.md): 13 entry points
 - [@margoengine/environment API](https://margoengine.com/llms/api/environment.md): 7 entry points
 - [@margoengine/clustered API](https://margoengine.com/llms/api/clustered.md): 9 entry points

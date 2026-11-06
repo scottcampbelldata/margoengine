@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5638455,
+  "total": 5639405,
   "history": [
     {
       "date": "2026-10-24",
@@ -2426,6 +2426,12 @@
       "commit": "3c58d4289",
       "reason": "ktx2-layers entry and its worker job, zstd moved to shared",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "b263a8d9e",
+      "reason": "materials/object-normal is a new entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2717,6 +2723,7 @@
     "@margoengine/materials/alpha-hash": 1309,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,
+    "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/transmission": 7416,
     "@margoengine/math": 20105,
     "@margoengine/math/affine": 3936,

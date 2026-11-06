@@ -54,6 +54,10 @@
     "./alpha-hash": {
       "types": "./dist/alpha-hash.d.ts",
       "import": "./dist/alpha-hash.js"
+    },
+    "./object-normal": {
+      "types": "./dist/object-normal.d.ts",
+      "import": "./dist/object-normal.js"
     }
   },
   "files": [

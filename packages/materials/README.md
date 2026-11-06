@@ -706,6 +706,34 @@ Shadow maps, picking, contact shadows and TAA velocity cut at `cutoff`, not by n
 once and a surface moving under TAA with opacity below `cutoff` writes no velocity. SSAO's depth and normals see the
 noise. Overlapping copies of a mesh share one pattern, and a material drawn `transparent` blends and ignores the feature.
 
+### Object-space normal maps (`@margoengine/materials/object-normal`)
+
+`objectNormal()` reads `normalMap` as an object-space map: RGB is the normal in the mesh's own axes (0.5 at zero), the
+format many bakers and photogrammetry tools emit for rigid props. The map replaces the vertex normal and needs no
+tangents. The mesh's rotation, non-uniform scale, mirroring and instance matrices all carry it to world space.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
+import { objectNormal } from 'margoengine/materials/object-normal';
+import { sphereGeometry } from 'margoengine/geometry';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const normalMap = await loadTexture('/scan-normals.png', { colorSpace: 'linear' });
+const scan = new PbrMaterial({ normalMap, features: [objectNormal({ up: 'z' })] });
+const statue = createMesh(engine, sphereGeometry(1), scan);
+statue.root.setRotation([0, 0.38, 0, 0.92]); // the lighting turns with the statue
+```
+
+`up: 'z'` reads a map baked in Z-up axes (Blender, 3ds Max, most photogrammetry tools) on a mesh exported Y-up, as glTF
+is: x, y, z become x, z, -y. The default `'y'` reads the map in the mesh's own axes. `normalScale` runs from the vertex
+normal (0) to the map's (1). Without a `normalMap` the feature does nothing.
+
+The map follows rigid transforms only: a skinned or morphed mesh, or a `BatchedMesh` item with a matrix of its own,
+keeps the bind pose's normals, and `triplanar` has no meaningful projection of it. Clearcoat keeps its own tangent-space
+`clearcoatNormalMap`.
+
 ## Parallax, triplanar and subsurface
 
 Three more surface options, live like the others. Each compiles into a material's shader only while it is in use:

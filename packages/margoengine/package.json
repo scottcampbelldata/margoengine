@@ -1170,6 +1170,10 @@
       "types": "./dist/materials/alpha-hash.d.ts",
       "import": "./dist/materials/alpha-hash.js"
     },
+    "./materials/object-normal": {
+      "types": "./dist/materials/object-normal.d.ts",
+      "import": "./dist/materials/object-normal.js"
+    },
     "./math": {
       "types": "./dist/math.d.ts",
       "import": "./dist/math.js"
