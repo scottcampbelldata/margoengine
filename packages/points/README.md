@@ -342,6 +342,37 @@ OctreeCloud.attach(engine, PointsPlugin.attach(engine, { pointBudget: 2_000_000 
 
 Positions and bounds are relative to `source.origin`, the cube's centre, which keeps float32 positions exact for a scan far from zero. Reads only: there is no COPC writer. It reads point formats 6 to 8, as the specification requires. Tested against files written here from the public specification with the package's own test encoder, not yet against files from another tool.
 
+## GPU picking (`margoengine/points/pick`)
+
+`points.pick` runs on the CPU, so meshes do not block it and clipping planes do not cut it. `PointPicking` adds a `PointsPlugin` to `Picking` from `margoengine/selection`: one `picking.pick` or `engine.pick` then answers whichever of points and meshes is nearest at the pixel. A point behind a mesh is not hit, a part cut by a clipping plane is not hit, and `pickMany` works too.
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { PointCloud, PointsPlugin } from 'margoengine/points';
+import { PointPicking } from 'margoengine/points/pick';
+import { Picking } from 'margoengine/selection';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const points = PointsPlugin.attach(engine);
+const scan = points.add(new PointCloud({ positions: [0, 0, 0, 1, 0, 0], material: { size: 8 } }));
+engine.createMesh().setGeometry(box());
+
+const picking = Picking.attach(engine);
+PointPicking.attach(picking, points);
+
+canvas.addEventListener('pointerdown', async (event) => {
+  const hit = await picking.pick(event.offsetX, event.offsetY);
+  if (hit?.cloud === scan) console.log('point', hit.point, 'at', hit.position);
+  else if (hit) console.log('mesh', hit.mesh);
+});
+```
+
+- `hit.cloud`, `hit.point` and `hit.position` name the point. `hit.mesh` is the mesh the cloud follows, or else an empty mesh made for that cloud, which draws nothing and which `cloudOf` maps back; stand-ins go with their cloud or with `dispose()`. Attach `PointsPlugin` to the engine first.
+- A point hits where it shows: its shape, map, `alphaTest` and clipping planes apply, and fully transparent points such as a hidden class do not hit. A sphere impostor hits at its curved depth. Like every pick, the 3 x 3 tile also finds a neighbouring pixel when the exact one is empty.
+- Only points drawn in the view's latest frame pick, at their level of detail and transform, so an `OctreeCloud` picks through its nodes on screen. It answers the nearest thing only. Sprites and `SurfelPlugin` clouds do not pick.
+- Clouds at most 268,435,456 points in all per pick. While an overlay is registered, each pick draws every drawn point of that view again, with no culling to the pixel.
+
 ## Potree folders (`margoengine/points/potree`)
 
 Potree is the most common format for scans published on the web. `PotreeSource.open` reads a folder's metadata and whole hierarchy, then `OctreeCloud` fetches each node when it is shown. Pass the folder, or its `metadata.json` or `cloud.js`.
@@ -407,7 +438,7 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
 - One cloud's positions must fit one storage binding: `maxStorageBufferBindingSize / 12` points (about 11 million at the default 128 MiB limit). Split bigger clouds into several `PointCloud`s.
-- Picking is CPU-side over the points drawn in the latest frame; meshes do not occlude it, and clipping planes do not apply to it (a clipped point can still be picked).
+- `points.pick` is CPU-side over the points drawn in the latest frame; meshes do not occlude it, and clipping planes do not apply to it. `PointPicking` does both on the GPU, but answers later, through a promise.
 - Block bounds only grow on updates; call `rebuild()` to tighten them or to include points that turned finite. Non-finite points are never drawn. A `reorder`ed cloud cannot be rebuilt.
 - Per-point colors are stored as RGBA8, so HDR vertex colors are clamped to 0..1.
 - No mipmaps on maps. A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.

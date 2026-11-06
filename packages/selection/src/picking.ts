@@ -126,7 +126,9 @@ export interface PickingOverlay {
   /** Draws item `n` as ID `firstId + n`, after every mesh. */
   drawPick(context: PickingOverlayContext): void;
   /** The hit for item `index` of the last `drawPick`, or null. `mesh` must be a live mesh of the picked scene. */
-  pickHit(index: number): { mesh: Mesh; line?: object; segment?: number } | null;
+  pickHit(
+    index: number,
+  ): { mesh: Mesh; line?: object; segment?: number; cloud?: object; point?: number; position?: readonly number[] } | null;
 }
 /** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
 export interface PickHit {
@@ -137,6 +139,12 @@ export interface PickHit {
   approximate?: boolean;
   /** Instanced primitives (gltf-pro PBRInstances): the instance index. */
   instanceId?: number;
+  /** A hit on `@margoengine/points/pick`'s overlay: the cloud. `mesh` is then the mesh it follows or its stand-in. */
+  cloud?: object;
+  /** A hit on `@margoengine/points/pick`'s overlay: the point's index in the cloud's arrays. */
+  point?: number;
+  /** A hit on `@margoengine/points/pick`'s overlay: the point's world position. */
+  position?: readonly number[];
   /** A hit on `@margoengine/lines/pick`'s overlay: the line. `mesh` is then the mesh it follows or its stand-in. */
   line?: object;
   /** The line's segment index. */

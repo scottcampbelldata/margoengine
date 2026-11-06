@@ -68,6 +68,9 @@ export interface PickHit {
     primitiveIndex?: number;
     approximate?: boolean;
     instanceId?: number;
+    cloud?: object;
+    point?: number;
+    position?: readonly number[];
     line?: object;
     segment?: number;
 }
@@ -252,6 +255,9 @@ interface PickingOverlay {
         mesh: Mesh;
         line?: object;
         segment?: number;
+        cloud?: object;
+        point?: number;
+        position?: readonly number[];
     } | null;
 }
 

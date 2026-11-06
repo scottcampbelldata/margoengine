@@ -228,8 +228,91 @@ async function octreeTransform() {
   return 'An octree follows a mesh across the view, picks in world positions and hides with it';
 }
 
+/** One pick over meshes and points: depth order, clipping planes, shapes, hidden classes and engine.pick. */
+async function gpuPicking() {
+  const { box, PbrMaterial } = await import('@margoengine/core');
+  const { PointCloud } = await import('@margoengine/points');
+  const { PointPicking } = await import('../dist/pick.js');
+  const { Picking } = await import('../../selection/dist/index.js');
+  const { engine, frame, end, device } = await rig(),
+    points = PointsPlugin.attach(engine),
+    far = points.add(new PointCloud({ positions: [0, 0, -2, 2, 0, -2, 3, 3, 0], material: { size: 24 } })),
+    near = points.add(new PointCloud({ positions: [2, 0, 1], material: { size: 24 }, reorder: true })),
+    round = points.add(new PointCloud({ positions: [-3, 3, 0], material: { size: 40, shape: 'round' } })),
+    ball = points.add(
+      new PointCloud({
+        positions: [-3, -3, 0],
+        material: { size: 2, sizeUnits: 'world', shading: 'sphere', maxPixelSize: 256 },
+      }),
+    ),
+    hidden = points.add(new PointCloud({ positions: [3, -3, 0], colors: new Uint8Array([9, 9, 9, 0]), colorComponents: 4, material: { size: 24 } }));
+  const wall = engine
+    .createMesh()
+    .setGeometry(box(1, 1, 1))
+    .setMaterial(new PbrMaterial({ color: '#808080' }))
+    .setPosition([0, 0, 0]);
+  const picking = Picking.attach(engine),
+    overlay = PointPicking.attach(picking, points),
+    pixel = (x, y, z) => {
+      const d = 10 - z,
+        scale = (0.5 * 256) / Math.tan(Math.PI / 6);
+      return [128 + (x * scale) / d, 128 - (y * scale) / d];
+    };
+  await frame();
+  const at = async (x, y, z = 0) => {
+    const hit = await picking.pick(...pixel(x, y, z));
+    await device.queue.onSubmittedWorkDone();
+    return hit;
+  };
+  // A point behind the mesh is blocked; the mesh answers.
+  const blocked = await at(0, 0, -2);
+  assert(blocked?.mesh === wall && !blocked.cloud, `the mesh in front wins: ${blocked?.cloud?.name}`);
+  assert(points.pick(...pixel(0, 0, -2))?.cloud === far, 'the CPU pick has no mesh to stop it');
+  // Of two points on one pixel the nearer wins; a reordered cloud names the right point.
+  const pair = await at(2, 0, 1);
+  assert(pair?.cloud === near && pair.point === 0, 'the nearer point wins');
+  assert(Math.abs(pair.position[2] - 1) < 1e-5, `world position: ${pair.position}`);
+  const lone = await at(3, 3);
+  assert(lone?.cloud === far && lone.point === 2, `the point's own index: ${lone?.point}`);
+  // Clipping planes apply: cut, it no longer hits.
+  far.material.clippingPlanes = [[-1, 0, 0, 2.5]];
+  await frame();
+  assert((await at(3, 3)) === null, 'a clipped point does not hit');
+  assert(points.pick(...pixel(3, 3, 0))?.cloud === far, 'the CPU pick still finds it');
+  far.material.clippingPlanes = [];
+  await frame();
+  // Round points hit on the disc, not in the corners of their quad.
+  const [rx, ry] = pixel(-3, 3, 0);
+  assert((await picking.pick(rx, ry))?.cloud === round, 'the centre of a round point hits');
+  assert((await picking.pick(rx + 17, ry + 17)) === null, 'its corner does not');
+  // A sphere hits at its curved depth: it is in front of a mesh that cuts through its middle.
+  wall.setPosition([-3, -3, 0]);
+  await frame();
+  assert((await at(-3, -3))?.cloud === ball, 'the front of a sphere is nearer than its centre');
+  wall.setPosition([0, 0, 0]);
+  await frame();
+  assert((await at(3, -3)) === null, 'alpha 0 does not hit');
+  // engine.pick answers a mesh, which maps back to the cloud; a mesh-following cloud answers its mesh.
+  const answer = await engine.pick(...pixel(3, 3, 0));
+  assert(overlay.cloudOf(answer) === far, 'engine.pick answers the stand-in');
+  const anchor = engine.createMesh();
+  round.attach(anchor);
+  await frame();
+  assert((await picking.pick(rx, ry))?.mesh === anchor, 'a cloud that follows a mesh answers it');
+  round.attach(null);
+  // Point sizes in the tile are the view's pixels: a 24 px square hits 11 pixels out and misses 14 out.
+  await frame();
+  const [lx, ly] = pixel(3, 3, 0);
+  assert((await picking.pick(lx + 10, ly))?.cloud === far, 'inside the square');
+  assert((await picking.pick(lx + 15, ly)) === null, 'beyond the square and the tile');
+  overlay.dispose();
+  assert((await picking.pick(lx, ly)) === null, 'dispose leaves Picking');
+  await end();
+  return 'One GPU pick answers points and meshes by depth, honours clipping planes, shapes, hidden points and sphere depth, and maps back through engine.pick';
+}
+
 window.runFeatures = async () => {
   const checks = [];
-  for (const check of [adaptiveSize, surfels, surfelDepth, potree, octreeTransform]) checks.push(await check());
+  for (const check of [adaptiveSize, surfels, surfelDepth, potree, octreeTransform, gpuPicking]) checks.push(await check());
   return checks;
 };

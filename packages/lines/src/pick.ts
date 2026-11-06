@@ -8,6 +8,7 @@ import type { Line } from './line.js';
 import type { Lines } from './lines.js';
 import { fillFrame } from './math.js';
 import { biasedShader, clipCut, lineShader, pointWidthShader } from './shader.js';
+import { beginPickPass, ensurePickBase } from '../../shared/pick-base.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { FRAGMENT: number };
@@ -191,27 +192,13 @@ export class LinePicking {
     if (count) {
       const gpu = this.resources(device, layouts),
         bases = new Uint32Array((count * BASE_STRIDE) / 4);
-      if ((gpu.base?.size ?? 0) < bases.byteLength) {
-        gpu.base?.destroy();
-        gpu.base = device.createBuffer({
-          size: bases.byteLength * 2,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        gpu.baseGroup = device.createBindGroup({
-          layout: gpu.baseLayout,
-          entries: [{ binding: 0, resource: { buffer: gpu.base, size: 16 } }],
-        });
-      }
+      ensurePickBase(device, gpu, bases.byteLength);
       const canvas = engine.canvas,
         ratio = canvas.clientWidth ? canvas.width / canvas.clientWidth : 1;
       // A 3 x 3 target under the cropped matrix keeps every distance in drawing-buffer pixels.
       fillFrame(this.frameData, c.matrix, c.camera, 3, 3, ratio, c.rect[3], 0);
       device.queue.writeBuffer(gpu.frame, 0, this.frameData as Float32Array<ArrayBuffer>);
-      const pass = c.encoder.beginRenderPass({
-        colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
-        depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store' },
-      });
-      pass.setBindGroup(0, gpu.frameGroup);
+      const pass = beginPickPass(c, gpu.frameGroup);
       let next = 0,
         slot = 0;
       for (const [list, pipelines] of [

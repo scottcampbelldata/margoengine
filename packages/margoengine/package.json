@@ -1206,6 +1206,10 @@
       "types": "./dist/points/potree.d.ts",
       "import": "./dist/points/potree.js"
     },
+    "./points/pick": {
+      "types": "./dist/points/pick.d.ts",
+      "import": "./dist/points/pick.js"
+    },
     "./post": {
       "types": "./dist/post.d.ts",
       "import": "./dist/post.js"

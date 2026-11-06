@@ -74,6 +74,7 @@ export class PointCloud {
     colorComponents: 3 | 4;
     sizes: Float32Array | null;
     readonly normals: Float32Array | null;
+    readonly colorFormat: 'rgba8' | 'float';
     readonly colorSpace: 'srgb' | 'linear';
     readonly blockSize: number;
     readonly seed: number;
@@ -89,6 +90,8 @@ export class PointCloud {
     structure: number;
     readonly dirty: Record<PointChannel, Array<[number, number]>>;
     constructor(options: PointCloudOptions);
+    get colorStride(): number;
+    get floatColors(): Float32Array | null;
     get attachedMesh(): Mesh | null;
     attach(mesh: Mesh | null): this;
     updatePositions(start: number, values: ArrayLike<number>): this;
@@ -115,6 +118,7 @@ export interface PointCloudOptions extends PointCloudData {
     material?: PointsMaterial | PointsMaterialOptions;
     blockSize?: number;
     seed?: number;
+    colorFormat?: 'rgba8' | 'float';
     colorSpace?: 'srgb' | 'linear';
     reorder?: boolean;
     matrix?: Float32Array;

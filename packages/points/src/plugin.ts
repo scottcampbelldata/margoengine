@@ -188,6 +188,8 @@ export class PointsPlugin implements EnginePlugin {
   private readonly owned = new Map<AnyMaterial, OwnedTexture>();
   private readonly borrowed = new WeakMap<GPUTexture, { device: GPUDevice; view: GPUTextureView }>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
+  /** Told when clouds come and go (`@margoengine/points/pick`). */
+  private readonly watchers = new Set<{ added(cloud: PointCloud): void; removed(cloud: PointCloud): void }>();
   private engine?: Engine;
   private device?: GPUDevice;
   private gpu?: {
@@ -319,6 +321,7 @@ export class PointsPlugin implements EnginePlugin {
     if (item instanceof PointCloud) {
       item.bind(this);
       this.clouds.add(item);
+      for (const watcher of this.watchers) watcher.added(item);
     } else if (item instanceof SpriteBatch) {
       item.bind(this);
       this.batches.add(item);
@@ -332,6 +335,7 @@ export class PointsPlugin implements EnginePlugin {
       this.releaseCloud(item);
       item.bind(undefined);
       this.releaseUnusedTexture(item.material);
+      for (const watcher of this.watchers) watcher.removed(item);
     } else if (item instanceof SpriteBatch && this.batches.delete(item)) {
       this.releaseBatch(item);
       item.bind(undefined);
@@ -455,7 +459,8 @@ export class PointsPlugin implements EnginePlugin {
 
   /**
    * CPU picking: the drawn point nearest to CSS pixel (x, y) of the canvas within `radius`, using the latest
-   * frame's camera, transforms and level of detail of the view picked through. Meshes do not occlude picks.
+   * frame's camera, transforms and level of detail of the view picked through. Meshes do not occlude picks and clipping
+   * planes do not apply; `PointPicking` in `@margoengine/points/pick` picks on the GPU with both.
    */
   pick(x: number, y: number, options: PointsPickOptions = {}): PointsPickResult | null {
     if (!Number.isFinite(x) || !Number.isFinite(y))
@@ -966,7 +971,7 @@ export class PointsPlugin implements EnginePlugin {
     const f = this.frameData,
       c = context.camera.matrix,
       [width, height] = viewSize(context);
-    this.orthographic = fillFrame(f, this.view, context);
+    this.orthographic = fillFrame(f, this.view, context.camera, width, height, context.format);
     this.device!.queue.writeBuffer(this.gpu!.frame, 0, f);
     const picked = (this.pickView = this.pickViews.get(context));
     picked.viewProj.set(c);

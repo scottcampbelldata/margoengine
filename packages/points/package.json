@@ -62,6 +62,10 @@
     "./potree": {
       "types": "./dist/potree.d.ts",
       "import": "./dist/potree.js"
+    },
+    "./pick": {
+      "types": "./dist/pick.d.ts",
+      "import": "./dist/pick.js"
     }
   },
   "files": [

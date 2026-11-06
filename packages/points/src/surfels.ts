@@ -12,7 +12,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { alphaBlend } from '../../shared/pass.js';
 import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shared/fog.js';
-import { applyView } from '../../shared/view-rect.js';
+import { applyView, viewSize } from '../../shared/view-rect.js';
 import { PointCloud } from './cloud.js';
 import { fillFrame } from './frame.js';
 import { allocateBudget, boxInFrustum, mergeRanges, screenArea, worldBox } from './math.js';
@@ -569,7 +569,8 @@ export class SurfelPlugin implements EnginePlugin {
       gpu = this.gpu,
       camera = context.camera,
       f = this.frameData,
-      orthographic = fillFrame(f, this.view, context);
+      [viewWidth, viewHeight] = viewSize(context),
+      orthographic = fillFrame(f, this.view, camera, viewWidth, viewHeight, context.format);
     device.queue.writeBuffer(gpu.frame, 0, f);
     if (this.fogSource) {
       writeFog(this.fogSource, camera.position, this.fogData);

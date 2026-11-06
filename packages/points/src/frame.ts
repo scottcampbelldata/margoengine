@@ -1,9 +1,9 @@
-import type { PassContext } from '@margoengine/core/extension';
+import type { Camera } from '@margoengine/core';
 import { viewMatrix } from '../../shared/view.js';
-import { viewSize } from '../../shared/view-rect.js';
 
 /**
- * Fills the frame uniform of the point shaders (`f`, 36 floats) for the view being drawn; `view` is a scratch matrix.
+ * Fills the frame uniform of the point shaders (`f`, 36 floats) for a view of `width` x `height` pixels drawn to a
+ * target of `format`; `view` is a scratch matrix.
  * Returns whether the camera is orthographic: a clip matrix whose w does not depend on position, such as
  * @margoengine/cameras makes. Pixels per world unit then come from the y row's length, and depth is linear: depth.y is
  * NDC per world unit and the EDL and sphere value is 1 + distance from the near plane.
@@ -11,18 +11,19 @@ import { viewSize } from '../../shared/view-rect.js';
 export function fillFrame(
   f: Float32Array,
   view: Float32Array,
-  context: Extract<PassContext, { backend: 'webgpu' }>,
+  camera: Camera,
+  width: number,
+  height: number,
+  format: string,
 ): boolean {
-  const camera = context.camera,
-    c = camera.matrix,
+  const c = camera.matrix,
     orthographic = !(c[3] || c[7] || c[11]);
   f.set(c, 0);
   // Point sizes are pixels of the view being drawn: its camera projects onto its rectangle.
-  const [width, height] = viewSize(context);
   f[16] = width;
   f[17] = height;
   f[18] = orthographic ? 0.5 * height * Math.hypot(c[1], c[5], c[9]) : (0.5 * height) / Math.tan((camera.fov * Math.PI) / 360);
-  f[19] = context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1;
+  f[19] = format.endsWith('-srgb') || format.includes('float') ? 0 : 1;
   if (orthographic) {
     f[20] = 0;
     f[21] = Math.hypot(c[2], c[6], c[10]);
