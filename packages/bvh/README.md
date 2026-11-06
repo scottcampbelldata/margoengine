@@ -175,6 +175,33 @@ for (let x = 0; x < 100; x++) {
 | `objects` | everything `intersectEngine` tests; given, only these meshes and models, as `intersectObjects` (`add` and `remove` change the set) |
 | `rebuildThreshold` | 1.5 |
 
+## Picking points and sprites
+
+`PointRaycaster` from `@margoengine/bvh/points` is a `Raycaster` whose intersect calls also answer point clouds and sprite batches, sorted with the mesh hits by distance. `intersectEngine` finds the clouds and batches of a `PointsPlugin` by itself; `intersectObjects` takes them in its list beside meshes and models.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PointRaycaster} from 'margoengine/bvh/points';
+import {PointCloud, PointsPlugin} from 'margoengine/points';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+const cloud = points.add(new PointCloud({positions: new Float32Array([0, 0, 0, 1, 0, 0]), material: {size: 4}}));
+
+const ray = new PointRaycaster();
+ray.threshold = 5; // CSS pixels
+ray.setFromEngine(engine, 320, 240);
+for (const hit of ray.intersectEngine(engine))
+  if (hit.target === cloud) console.log('point', hit.index, 'missed its centre by', hit.offset);
+```
+
+A point hits when the ray passes within `threshold` of its centre, or within its drawn size when that is larger, and a sprite when the ray crosses its drawn quad grown by `threshold`, with `uv` at the hit. The hit's `distance` is along the ray; `offset` is how far the ray passed from the point's centre. Clipping planes, `visible`, and each cloud's size settings count. A cloud that follows a mesh also obeys the raycaster's `layers` and `filter`; one that follows no mesh has neither, and its hits carry `mesh: UNATTACHED`. Sprite transparency is not read: a sprite's whole quad hits.
+
+| Option | Default |
+| --- | --- |
+| `threshold` | 3 |
+| `thresholdUnits` | `'pixels'` (CSS pixels); or `'world'` |
+
 ## GPU traversal
 
 `@margoengine/bvh/gpu` uploads a `MeshBVH` to storage buffers and traces rays in WGSL compute, for picking at scale, baking, path tracing and audio occlusion. `GPUMeshBVH.create` takes a `GPUDevice`, or an `Engine` on WebGPU. The tree is built on the CPU as usual; after `bvh.refit()` call `update()`.

@@ -56,6 +56,10 @@
     "./scene": {
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"
+    },
+    "./points": {
+      "types": "./dist/points.d.ts",
+      "import": "./dist/points.js"
     }
   },
   "files": [

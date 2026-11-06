@@ -206,6 +206,10 @@
       "types": "./dist/bvh/scene.d.ts",
       "import": "./dist/bvh/scene.js"
     },
+    "./bvh/points": {
+      "types": "./dist/bvh/points.d.ts",
+      "import": "./dist/bvh/points.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"

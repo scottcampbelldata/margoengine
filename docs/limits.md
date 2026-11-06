@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-122). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-123). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -132,6 +132,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Fitting (`fitSpline` in `@margoengine/splines/fit`) | Enforced: 2 to 10,000,000 points, a `tolerance` above 0. By method: the error is measured at each point's own curve parameter (an upper bound on the true nearest distance); pieces are cut at the worst point, so a curve can use a piece or two more than the fewest possible. | Cutting at the worst point is the usual way to keep fitting linear in the points. | Output may have more control points than a hand-placed curve. | Raise `tolerance`, or run the result through `KnotPath` and remove knots. |
 | GPU BVH traversal (`GPUMeshBVH` in `@margoengine/bvh/gpu`) | Enforced: the tree, the rays and the hits each fit `maxStorageBufferBindingSize`, a tree at most 64 deep, `far` finite. By method: float32 queries, so a float64 source rounds on upload; `any` answers a hit, not the nearest; the tree is built on the CPU. | WGSL has no doubles, and the stack is a fixed array per thread. | Past those sizes the call throws a RangeError; distances differ from the CPU tree by float32 rounding. | Request a higher limit or split the mesh and the rays; use the CPU tree where float64 matters. |
 | Scene BVH (`SceneBVH` in `@margoengine/bvh/scene`) | Enforced: `rebuildThreshold` at least 1; a mesh under active GPU deformation throws, as `intersectEngine` does. By method: `update()` reads every object's world matrix once, so its cost grows with the object count; with `{refresh: false}` objects moved since the last update are found at their old place; instances cost one tree entry each. | Picks work as with `intersectEngine`, with fewer objects visited per ray; a stale tree misses a moved object until the next update. | Leave `refresh` on, or call `update()` once a frame; use `intersectModel` for a deforming mesh. |
+| Point and sprite picking (`PointRaycaster` in `@margoengine/bvh/points`) | Enforced: `threshold` finite and at least 0. By method: a sprite's whole quad hits, its texture's alpha is not read; a cloud or batch that follows no mesh has no layers or filter to test; `SceneBVH.intersect` answers meshes only; sizes in pixels need the engine camera, so a ray not cast from it reads them from that camera all the same. | A pick lands on a point within the threshold of the ray, sorted with the mesh hits. | Attach the cloud to a mesh to use layers and filter; `@margoengine/points` `PointPicking` tests depth on the GPU. |
 
 ## Entities
 
