@@ -306,6 +306,10 @@
       "types": "./dist/compute/nn.d.ts",
       "import": "./dist/compute/nn.js"
     },
+    "./compute/graph": {
+      "types": "./dist/compute/graph.d.ts",
+      "import": "./dist/compute/graph.js"
+    },
     "./controls": {
       "types": "./dist/controls.d.ts",
       "import": "./dist/controls.js"

@@ -8,7 +8,7 @@ statistics along axes, scans, sorting, selection and histograms. It also runs yo
 read from the source. Optional entries add matrix products (`/linalg`), Fourier transforms (`/fft`), convolution
 (`/signal`), reproducible random numbers (`/random`), sparse matrices and solvers (`/sparse`), gradients
 (`/autodiff`), data larger than GPU memory (`/stream`), kernels inside an engine's frame (`/frame`), subgroup
-kernels for reductions, scans and sorts (`/subgroups`) and neural networks (`/nn`).
+kernels for reductions, scans and sorts (`/subgroups`), neural networks (`/nn`) and graph algorithms (`/graph`).
 
 The package is optional and tree-shakable, adds nothing to core, and needs no engine: without one it opens a
 headless device of its own. Without WebGPU (Node, an older browser, a blocklisted GPU) the same code runs on the CPU.
@@ -340,6 +340,49 @@ console.log(y.shape); // [2, 16, 64]
 
 Gradients of convolutions and pooling repeat exactly from run to run. `Embedding` gradients add repeated ids atomically, so
 their rounding may vary on a GPU. [docs/limits.md](../../docs/limits.md#rendering) has what is left out and what memory it takes.
+
+## Graphs
+
+`@margoengine/compute/graph` runs breadth-first search, shortest paths and connected components on sparse graphs, on WebGPU
+and on the CPU backend. A graph is a `CsrMatrix` from `/sparse`, where row `r` lists the edges out of vertex `r` and each
+value is that edge's weight, so one matrix serves the solvers and these. `graph(gpu, { vertices, sources, targets })` builds one
+from edge lists: `weights` default to 1, `directed: false` makes every edge run both ways, and repeated edges keep the
+smallest weight (`coo` would add them).
+
+- **`bfs(g, sources)`** resolves `distances` (i32, edges from the nearest source, -1 where no path leads), `predecessors`
+  and `iterations`. It ignores weights and follows edges forward.
+- **`shortestPaths(g, sources)`** (Bellman-Ford) resolves `distances` (f32, Infinity where no path leads), `predecessors`,
+  `iterations` and `negativeCycle`. Weights may be negative. `negativeCycle: true` means a cycle of negative total weight can
+  be reached from a source: no shortest path exists then and the other results mean nothing.
+- **`connectedComponents(g)`** resolves `labels` (i32, numbered from 0 by each component's smallest vertex), `count` and
+  `iterations`. Every edge counts both ways, so a directed graph gives its weakly connected components.
+
+`sources` is one vertex or a list; distances are then to the nearest. `predecessors` (i32) holds the vertex before each one on
+a shortest path, the smallest if several tie, and -1 at sources and unreached vertices. Zero-weight cycles can make
+`shortestPaths` predecessors tie into a loop; `distances` still hold. The results belong to you: dispose them. Every algorithm
+takes `checkEvery` (rounds between read-backs of whether anything changed, default 8) and `signal`.
+
+```ts
+import { createCompute } from '@margoengine/compute';
+import { bfs, connectedComponents, graph, shortestPaths } from '@margoengine/compute/graph';
+
+using gpu = await createCompute();
+using g = graph(gpu, {
+  vertices: 5,
+  sources: [0, 0, 1, 2],
+  targets: [1, 2, 3, 3],
+  weights: [4, 1, 1, 1],
+});
+console.log(await (await bfs(g, 0)).distances.read()); // [0, 1, 1, 2, -1]
+const { distances, predecessors } = await shortestPaths(g, 0);
+console.log(await distances.read()); // [0, 4, 1, 2, Infinity]
+console.log(await predecessors.read()); // [-1, 0, 0, 2, -1]
+const { labels, count } = await connectedComponents(g);
+console.log(count, await labels.read()); // 2 [0, 0, 0, 0, 1]
+```
+
+Every round visits every edge, so a run costs edges x rounds and a long thin graph (a road network) takes as many rounds as
+its longest shortest path. [docs/limits.md](../../docs/limits.md#rendering) has the numbers.
 
 ## Streams and frames
 

@@ -411,6 +411,8 @@ export const entries = [
       'Tensor operands are Tensors, GpuArrays or numbers',
       'tensor takes a GpuArray; use gpu.array(data) first',
       'An optimizer needs at least one parameter',
+      'Graph algorithms take a CsrMatrix; make one with graph()',
+      'Give at least one source vertex',
       'GpuArray disposed; create a new array with gpu.array()',
       'GpuArray belongs to another compute context; create it with this context',
       'reshape takes at most one -1 dimension',

@@ -5,7 +5,8 @@
 // past 65,535 workgroups and device sharing with an engine; compute-extras-browser.js checks linalg, fft, signal,
 // random, stream and frame; compute-cpu-browser.js runs the same operations on the CPU backend and the GPU and
 // compares them; compute-subgroups-browser.js checks the subgroup kernels against the default ones and
-// compute-nn-browser.js the network layers against the CPU backend. Results go to test-results/compute-browser.json.
+// compute-nn-browser.js the network layers against the CPU backend; compute-graph-browser.js the graph algorithms
+// against sequential references.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +31,8 @@ try {
       typeof window.runCpuParityTests === 'function' &&
       typeof window.runPreciseTests === 'function' &&
       typeof window.runSubgroupTests === 'function' &&
-      typeof window.runNnTests === 'function',
+      typeof window.runNnTests === 'function' &&
+      typeof window.runGraphTests === 'function',
   );
   // The precise maths first: every other check of a transcendental function rests on it.
   const precise = await page.evaluate(() => window.runPreciseTests());
@@ -39,8 +41,9 @@ try {
   const cpu = await page.evaluate(() => window.runCpuParityTests());
   const subgroups = await page.evaluate(() => window.runSubgroupTests());
   const nn = await page.evaluate(() => window.runNnTests());
+  const graph = await page.evaluate(() => window.runGraphTests());
   const report = {
-    checks: [...precise.checks, ...core.checks, ...extras.checks, ...cpu.checks, ...subgroups.checks, ...nn.checks],
+    checks: [...precise.checks, ...core.checks, ...extras.checks, ...cpu.checks, ...subgroups.checks, ...nn.checks, ...graph.checks],
     timings: { ...core.timings, ...extras.timings, ...cpu.timings },
     adapter: core.adapter,
     preciseMath: precise.results,

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4560378,
+  "total": 4567903,
   "history": [
     {
       "date": "2026-10-24",
@@ -1712,6 +1712,12 @@
       "commit": "ce45393d0",
       "reason": "New optional entry @margoengine/compute/nn: neural networks",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "7bc4545a1",
+      "reason": "New optional entry @margoengine/compute/graph: graph algorithms",
+      "grew": 1
     }
   ],
   "items": {
@@ -1776,6 +1782,7 @@
     "@margoengine/compute/autodiff": 5845,
     "@margoengine/compute/fft": 6037,
     "@margoengine/compute/frame": 31457,
+    "@margoengine/compute/graph": 7525,
     "@margoengine/compute/linalg": 5745,
     "@margoengine/compute/nn": 19137,
     "@margoengine/compute/random": 8328,
