@@ -15,7 +15,7 @@ extra install), and it costs nothing you do not use: a bundler keeps only the na
 | `margoengine/web` | Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top | 156,772 B |
 
 The last column is min+gzip JavaScript with every name in the kit used, core and stage included (an app that uses
-part of a kit pays for that part; core + stage alone is 22,815 B). Wasm decoders, workers and lazily loaded parts
+part of a kit pays for that part; core + stage alone is 22,859 B). Wasm decoders, workers and lazily loaded parts
 are extra and load only when used. `tests/umbrella.test.js` measures these numbers on every run and fails when one
 moves more than 3%.
 

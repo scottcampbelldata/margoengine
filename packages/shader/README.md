@@ -494,7 +494,7 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
 - Storage textures are 2D, one mip level, one sample; `@margoengine/shader/compute-texture` has no 3D or array form.
 - ComputePass dispatches at most 65,535 workgroups per axis (an indirect dispatch is checked by the GPU only) and runs every frame while attached (`computeReadback` runs once; an atomic counter keeps counting unless `update()` resets it). Workgroup memory has no struct elements, and all of a pass's must fit the device's 16,384 bytes. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.
-- No GLSL/WebGL2 output, no node editor, no built-in noise library (write it with `Fn` or `wgslFn`), no light, shadow or environment nodes, no skinning or morph nodes, no MRT outputs.
+- No GLSL/WebGL2 output, no skinning or morph nodes, no MRT outputs.
 
 Size (min + gzip, Rolldown, peers external): whole package 16.8 kB (11.8 kB before statements, 13.9 kB before the compute model, 15.2 kB before node output in every pass); `NodeMaterial` with colour nodes only, 7.7 kB (post, compute, texture and statement code tree-shake away; the test enforces this).
 
