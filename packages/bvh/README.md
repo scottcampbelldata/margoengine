@@ -143,6 +143,38 @@ one laptop core).
 
 `intersectLines(raycaster, lines, options)` from `@margoengine/bvh/lines` picks `@margoengine/lines` lines with a Raycaster's ray, using a BVH per line, and returns the line, segment index, point, distance and offset. It has its own entry, so nothing else pays for it. Options, defaults and an example are in the [lines README](../lines/README.md#picking).
 
+## Scene BVH
+
+`SceneBVH` from `@margoengine/bvh/scene` keeps one top-level tree over every mesh, model primitive, instance and pick proxy of an engine, so a raycast over a city does not loop over every mesh. It answers what `raycaster.intersectEngine(engine)` answers, in the same order, with the raycaster's `near`, `far`, `side`, `layers`, `filter` and `firstHitOnly`.
+
+```ts
+import {box, Engine} from 'margoengine/core';
+import {Raycaster} from 'margoengine/bvh';
+import {SceneBVH} from 'margoengine/bvh/scene';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const geometry = box(1, 1, 1);
+for (let i = 0; i < 10000; i++) engine.createMesh().setGeometry(geometry).setPosition([(i % 100) * 3, 0, Math.floor(i / 100) * 3]);
+
+using scene = new SceneBVH(engine);
+const ray = new Raycaster([30, 50, 30], [0, -1, 0]);
+const [hit] = scene.intersect(ray); // looks for moved objects first
+
+// Many rays a frame: one update, then no refresh.
+scene.update(); // 'unchanged', 'refit' or 'rebuilt'
+for (let x = 0; x < 100; x++) {
+  ray.set([x * 3, 50, 30], [0, -1, 0]);
+  console.log(hit?.mesh, scene.intersect(ray, {refresh: false}).length);
+}
+```
+
+`update()` reads every object's world matrix once. Objects that moved refit the tree; objects that came or went rebuild it, and so does a refit that leaves the tree `rebuildThreshold` times as costly (by surface area) as it was when built. With `{refresh: false}` the tree stays as of the last `update()`, so objects moved since are found at their old place; hiding, layers and disposal always count. Instances cost one tree entry each. A mesh under an active GPU deformation throws, as `intersectEngine` does; use `intersectModel` for it.
+
+| Option | Default |
+| --- | --- |
+| `objects` | everything `intersectEngine` tests; given, only these meshes and models, as `intersectObjects` (`add` and `remove` change the set) |
+| `rebuildThreshold` | 1.5 |
+
 ## GPU traversal
 
 `@margoengine/bvh/gpu` uploads a `MeshBVH` to storage buffers and traces rays in WGSL compute, for picking at scale, baking, path tracing and audio occlusion. `GPUMeshBVH.create` takes a `GPUDevice`, or an `Engine` on WebGPU. The tree is built on the CPU as usual; after `bvh.refit()` call `update()`.

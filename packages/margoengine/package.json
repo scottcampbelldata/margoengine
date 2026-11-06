@@ -202,6 +202,10 @@
       "types": "./dist/bvh/gpu.d.ts",
       "import": "./dist/bvh/gpu.js"
     },
+    "./bvh/scene": {
+      "types": "./dist/bvh/scene.d.ts",
+      "import": "./dist/bvh/scene.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"

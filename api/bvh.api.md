@@ -292,6 +292,9 @@ export class Raycaster {
     intersectModel(source: DeformedPickingSource, { refresh }?: IntersectOptions): Promise<RaycasterHit[]>;
     intersectMeshes(engine: Engine, meshes: Iterable<Mesh>, options?: IntersectOptions): RaycasterHit[];
     intersectObjects(engine: Engine, objects: Iterable<Mesh | ModelLike>, options?: IntersectOptions): RaycasterHit[];
+    castCandidates(runtime: RaycastRuntime, candidates: Candidate[]): RaycasterHit[];
+    usable(runtime: RaycastRuntime, mesh: RuntimeMesh, mask: number, model: ModelLike | null): boolean;
+    entry(m: Float32Array, o: number, b: ArrayLike<number>): number;
 }
 
 export interface RaycasterHit {
@@ -393,4 +396,42 @@ export function setGeometryBVH(geometry: Geometry | GeometryLike, bvh: MeshBVH |
 export function terminateBVHWorker(): void;
 
 export function worldTriangles(engine: Engine, objects: Iterable<Mesh | ModelLike>, { refresh, filter }?: WorldTrianglesOptions): WorldTriangles;
+
+// Not exported from this entry, but used by the exports above:
+
+interface Candidate {
+    node: RuntimeMesh;
+    entry: number;
+    model: ModelLike | null;
+    primitive: ModelPrimitiveLike | null;
+    index: number;
+    ownLayers?: true;
+    sphere?: ArrayLike<number>;
+    matrix?: Float32Array;
+    instance?: number;
+}
+
+interface RaycastRuntime {
+    store: RuntimeStore;
+    meshes: Map<number, RuntimeMesh>;
+    camera: Camera;
+    canvas: HTMLCanvasElement;
+    backend: 'webgpu' | 'webgl2';
+    disposed: boolean;
+}
+
+interface RuntimeMesh {
+    id: number;
+    geometry: Geometry | null;
+    material: {
+        data: Float32Array;
+    };
+}
+
+interface RuntimeStore {
+    matrices: Float32Array;
+    parents: Float32Array;
+    hidden: Uint8Array;
+    tick(culling?: boolean): void;
+}
 ```

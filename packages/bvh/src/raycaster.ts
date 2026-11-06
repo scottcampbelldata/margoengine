@@ -21,12 +21,14 @@ interface RuntimeStore {
   hidden: Uint8Array;
   tick(culling?: boolean): void;
 }
-interface RuntimeMesh {
+/** @internal */
+export interface RuntimeMesh {
   id: number;
   geometry: Geometry | null;
   material: { data: Float32Array };
 }
-interface RuntimeEngine {
+/** @internal */
+export interface RaycastRuntime {
   store: RuntimeStore;
   meshes: Map<number, RuntimeMesh>;
   camera: Camera;
@@ -92,7 +94,8 @@ export function engineModels(engine: Engine): ModelLike[] {
   return out;
 }
 
-interface PrimitiveEntry {
+/** @internal */
+export interface PrimitiveEntry {
   vertices: Float32Array;
   sphere: Float64Array;
   bvh: MeshBVH | null;
@@ -104,7 +107,8 @@ const primitiveSource = (p: ModelPrimitiveLike) => ({
   normals: p.vertices.subarray(4),
   indices: p.indices,
 });
-function primitiveEntry(p: ModelPrimitiveLike): PrimitiveEntry {
+/** @internal */
+export function primitiveEntry(p: ModelPrimitiveLike): PrimitiveEntry {
   let entry = primitiveCache.get(p.indices);
   if (!entry || entry.vertices !== p.vertices) {
     entry = { vertices: p.vertices, sphere: boundingSphere(p.vertices, 20), bvh: null };
@@ -166,7 +170,8 @@ export async function computePrimitiveBVHAsync(
   return bvh;
 }
 
-interface Candidate {
+/** @internal One object a ray may hit, chosen by a bounding sphere. */
+export interface Candidate {
   node: RuntimeMesh;
   entry: number;
   model: ModelLike | null;
@@ -314,7 +319,7 @@ export class Raycaster {
 
   /** Ray through a canvas point in CSS pixels (as `engine.pick` takes), using the engine camera and backend. */
   setFromEngine(engine: Engine, x: number, y: number): this {
-    const runtime = engine as unknown as RuntimeEngine,
+    const runtime = engine as unknown as RaycastRuntime,
       canvas = runtime.canvas;
     const width = canvas.clientWidth || canvas.width,
       height = canvas.clientHeight || canvas.height,
@@ -325,7 +330,7 @@ export class Raycaster {
 
   /** Tests every visible core mesh with geometry, every attached gltf-pro model and every pick proxy (imposter levels). Hits are sorted by distance. */
   intersectEngine(engine: Engine, options?: IntersectOptions): RaycasterHit[] {
-    const runtime = engine as unknown as RuntimeEngine;
+    const runtime = engine as unknown as RaycastRuntime;
     return this.intersect(runtime, runtime.meshes.values(), engineModels(engine), engineProxies(engine), options);
   }
 
@@ -341,7 +346,7 @@ export class Raycaster {
   ): Promise<RaycasterHit[]> {
     if (!source || typeof source.readPickingGeometry !== 'function' || !source.root)
       throw new TypeError('Expected a deformed picking source');
-    const root = source.root as unknown as RuntimeMesh & { engine: RuntimeEngine },
+    const root = source.root as unknown as RuntimeMesh & { engine: RaycastRuntime },
       runtime = root.engine;
     if (!runtime || !runtime.meshes || !runtime.store)
       throw new TypeError('Picking source root has no engine; add the model to an Engine before picking');
@@ -381,7 +386,7 @@ export class Raycaster {
       if (!snapshot || !snapshot.node)
         throw new TypeError('Invalid picking geometry snapshot; pass the snapshots returned by readPickingGeometry()');
       const handle = snapshot.node,
-        mesh = handle as unknown as RuntimeMesh & { engine: RuntimeEngine };
+        mesh = handle as unknown as RuntimeMesh & { engine: RaycastRuntime };
       if (mesh.engine !== runtime)
         throw new TypeError('Picking geometry belongs to another engine; read it from this source model');
       if (runtime.meshes.get(mesh.id) !== mesh || hiddenInTree(runtime.store, mesh.id)) continue;
@@ -507,11 +512,11 @@ export class Raycaster {
       if (isModel(object)) models.push(object);
       else meshes.push(object as unknown as RuntimeMesh);
     const proxies = engineProxies(engine).filter((p) => given.has(p.anchor) || given.has(p.model));
-    return this.intersect(engine as unknown as RuntimeEngine, meshes, models, proxies, options);
+    return this.intersect(engine as unknown as RaycastRuntime, meshes, models, proxies, options);
   }
 
   private intersect(
-    runtime: RuntimeEngine,
+    runtime: RaycastRuntime,
     meshes: Iterable<RuntimeMesh>,
     models: readonly ModelLike[],
     proxies: readonly PickProxy[],
@@ -551,7 +556,7 @@ export class Raycaster {
       if (entry >= 0 && this.usable(runtime, mesh, getMeshLayers(mesh as unknown as Mesh), null))
         candidates.push({ node: mesh, entry, model: null, primitive: null, index: -1 });
     }
-    // ponytail: a linear scan over primitives (~0.1 µs each); add a top-level BVH over parts if assemblies pass ~10k primitives.
+    // A linear scan over primitives (~0.1 µs each); `@margoengine/bvh/scene` is the top-level tree for big scenes.
     for (const model of models) {
       if (model.disposed) continue;
       const primitives = model.primitives,
@@ -567,7 +572,7 @@ export class Raycaster {
         // Per ray, not per model: a rewritten primitive (new vertex or index array) gets a fresh sphere.
         const sphere = primitiveEntry(primitive).sphere;
         if (instances) {
-          // ponytail: a linear scan over instances (one 4x4 product and sphere test each); add a BVH over instances past ~100k.
+          // A linear scan over instances (one 4x4 product and sphere test each); `@margoengine/bvh/scene` holds them in its tree.
           if (
             !instances.count ||
             runtime.meshes.get(node.id) !== node ||
@@ -604,8 +609,15 @@ export class Raycaster {
       if (entry >= 0 && this.usable(runtime, node, getMeshLayers(anchor), owner))
         candidates.push({ node, entry, model: owner, primitive: null, index: -1, sphere, ownLayers: true });
     }
+    return this.castCandidates(runtime, candidates);
+  }
+
+  /** @internal Tests the ray against objects already chosen by their bounding spheres, in the order given. */
+  castCandidates(runtime: RaycastRuntime, candidates: Candidate[]): RaycasterHit[] {
+    if (!(this.near >= 0) || !(this.far >= this.near)) throw new RangeError('Expected 0 <= near <= far');
     if (this.firstHitOnly) candidates.sort((a, b) => a.entry - b.entry);
-    const hits: RaycasterHit[] = [],
+    const store = runtime.store,
+      hits: RaycasterHit[] = [],
       inverse = new Float64Array(16),
       matrix = new Float64Array(16),
       local = new Float64Array(3),
@@ -666,7 +678,8 @@ export class Raycaster {
     return hits.sort((a, b) => a.distance - b.distance);
   }
 
-  private usable(runtime: RuntimeEngine, mesh: RuntimeMesh, mask: number, model: ModelLike | null): boolean {
+  /** @internal */
+  usable(runtime: RaycastRuntime, mesh: RuntimeMesh, mask: number, model: ModelLike | null): boolean {
     return (
       this.live(runtime, mesh, model) &&
       !!(mask & this.layers) &&
@@ -674,7 +687,7 @@ export class Raycaster {
     );
   }
 
-  private live(runtime: RuntimeEngine, mesh: RuntimeMesh, model: ModelLike | null): boolean {
+  private live(runtime: RaycastRuntime, mesh: RuntimeMesh, model: ModelLike | null): boolean {
     return (
       !runtime.disposed &&
       !model?.disposed &&
@@ -683,8 +696,8 @@ export class Raycaster {
     );
   }
 
-  /** Distance at which the ray enters the local bounding sphere `b` under the world matrix at `m[o]`, or -1 for a miss. */
-  private entry(m: Float32Array, o: number, b: ArrayLike<number>): number {
+  /** @internal Distance at which the ray enters the local bounding sphere `b` under the world matrix at `m[o]`, or -1 for a miss. */
+  entry(m: Float32Array, o: number, b: ArrayLike<number>): number {
     return sphereEntry(worldSphere(m, o, b, SPHERE), this.origin, this.direction, this.near, this.far);
   }
 }
