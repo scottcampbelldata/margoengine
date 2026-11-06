@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4502346,
+  "total": 4508626,
   "history": [
     {
       "date": "2026-10-24",
@@ -1658,6 +1658,12 @@
       "commit": "62e44bced",
       "reason": "New mesh-edit entry ./remesh: isotropic and voxel remeshing",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "4c55d3146",
+      "reason": "New mesh-edit entry ./sculpt: sculpt brushes",
+      "grew": 1
     }
   ],
   "items": {
@@ -1912,7 +1918,8 @@
     "@margoengine/mesh-edit/boolean-exact": 9657,
     "@margoengine/mesh-edit/modeling": 32035,
     "@margoengine/mesh-edit/modifiers": 8566,
-    "@margoengine/mesh-edit/remesh": 8721,
+    "@margoengine/mesh-edit/remesh": 8715,
+    "@margoengine/mesh-edit/sculpt": 6286,
     "@margoengine/mixer": 6926,
     "@margoengine/navmesh": 7120,
     "@margoengine/navmesh/build": 11699,

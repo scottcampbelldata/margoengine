@@ -321,6 +321,36 @@ console.log(even.mesh.faces.length, voxels.quads.length, voxels.nonManifoldEdges
 - `remeshMeshVoxels(mesh, {voxelSize, maxCells = 16777216, createId, signal})` builds a signed distance grid and extracts it with surface nets (Gibson, 1998). Whatever the input's triangles were, the result has edges of about `voxelSize`; gaps under a voxel close and details under a voxel go. The input must be closed (use `fillMeshHoles` first). Inside is decided by parity, so where two parts overlap the shared region counts as outside: union them first if that matters. UVs do not carry over.
 - A `PolygonMesh` face must be planar, so a warped grid quad is stored as two triangles. `quads` always lists the full quad topology as vertex indices of `mesh`.
 - `nonManifoldEdges` counts edges joining four faces, which happens where two sheets of the surface pass within a voxel. A finer `voxelSize` separates them.
+## Sculpt brushes
+
+Draw, smooth, grab, inflate and crease brushes for apps like Margo Mesh, with optional dynamic topology:
+
+```ts
+import { createPrimitiveMesh } from 'margoengine/mesh-edit';
+import { subdivideMesh } from 'margoengine/mesh-edit/modeling';
+import { MeshSculptSession } from 'margoengine/mesh-edit/sculpt';
+
+let mesh = createPrimitiveMesh('cube', 'box');
+for (let level = 0; level < 3; level++) mesh = subdivideMesh(mesh).mesh;
+const session = new MeshSculptSession(mesh, { radius: 0.3, dynamicTopology: true, detailSize: 0.05 });
+
+const hit = session.pick([0, 0, 5], [0, 0, -1]);
+if (hit) {
+  session.beginStroke({ brush: 'draw', strength: 0.8 });
+  session.dab(hit.point); // once per pointer move
+  session.endStroke();
+}
+session.undo();
+session.redo();
+console.log(session.mesh().faces.length);
+```
+
+- `new MeshSculptSession(mesh, {brush, radius, strength, falloff, invert, symmetry, dynamicTopology, detailSize, undoLimit, createId})` copies the mesh into a triangle surface. `mesh()` returns it as a new polygon mesh.
+- `brush`: `'draw'` (default) pushes along the brush's average normal, `'inflate'` along each vertex's own normal, `'smooth'` toward neighbors, `'crease'` sinks and pinches toward the center, and `'grab'` holds the vertices under its first dab and drags them with the pointer. `invert` pushes the other way.
+- `radius` (default 0.25), `strength` 0 to 1 (default 0.5), `falloff` `'smooth'` (default), `'linear'`, `'sharp'` or `'constant'`, and `symmetry` `'x'`, `'y'` or `'z'` to repeat each dab across that plane through the origin. All can be set per stroke in `beginStroke`.
+- `pick(origin, direction)` returns the nearest `{point, normal, distance}`. It tests every triangle, and a dab visits every vertex, so one call costs time in proportion to the mesh.
+- `dynamicTopology` splits and collapses edges under the brush to hold `detailSize` (default the mean edge length), so a long pull does not stretch triangles. Corner UVs interpolate. For `grab` this runs once at the end of the stroke, since it holds fixed vertices.
+- Each stroke is one undo step, `undoLimit` of them (default 32). A step stores the whole surface, because dynamic topology changes more than positions: memory grows with mesh size times `undoLimit`.
 
 
 ## UV unwrap and lightmap UVs

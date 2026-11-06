@@ -42,6 +42,10 @@
     "./remesh": {
       "types": "./dist/remesh.d.ts",
       "import": "./dist/remesh.js"
+    },
+    "./sculpt": {
+      "types": "./dist/sculpt.d.ts",
+      "import": "./dist/sculpt.js"
     }
   },
   "files": [

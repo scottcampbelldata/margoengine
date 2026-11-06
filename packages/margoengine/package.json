@@ -1022,6 +1022,10 @@
       "types": "./dist/mesh-edit/remesh.d.ts",
       "import": "./dist/mesh-edit/remesh.js"
     },
+    "./mesh-edit/sculpt": {
+      "types": "./dist/mesh-edit/sculpt.d.ts",
+      "import": "./dist/mesh-edit/sculpt.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"
