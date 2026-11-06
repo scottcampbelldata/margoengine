@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { FrameGraph } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
-import { RawShaderMaterial, RawMesh, RawShaders } from '../dist/raw.js';
+import { RawShaderMaterial, RawMesh, RawPicking, RawShaders } from '../dist/raw.js';
 
 const shader = `
 struct Out { @builtin(position) clip:vec4f, @location(0) tint:vec3f }
@@ -63,6 +63,7 @@ function harness({ samples = 4, format = 'bgra8unorm', depthFormat = 'depth24plu
   h.view = context(h.gpu, { samples, shader: wgsl, format, depthFormat });
   h.frame = () => {
     h.view.begin(h.index++);
+    if (h.matrix) h.view.camera.matrix.set(h.matrix);
     graph.execute(h.view.c);
   };
   h.swap = () => {
@@ -291,6 +292,8 @@ test('transparent meshes draw after the opaque ones, back to front, with blendin
         attributes: triangle,
         matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -20, 1],
         instanceCount: 1,
+        // Past the mock camera's far plane: this test is about draw order.
+        frustumCulled: false,
       }),
     );
   raw.add(new RawMesh({ material: solid, attributes: triangle, instanceCount: 7 }));
@@ -672,4 +675,408 @@ test('a device swap leaves the old pool and shares again on the new device', () 
   h.frame();
   assert.notEqual(a.gpu.vertex.buffer, old);
   assert.equal(a.gpu.vertex.buffer, b.gpu.vertex.buffer);
+});
+
+test('uniform arrays and structs follow the WGSL layout, and their values land at those offsets', () => {
+  const m = new RawShaderMaterial({
+    vertexShader: shader,
+    uniforms: {
+      gain: { value: 1 },
+      colors: { type: 'vec3f', count: 2, value: ['#ff0000', [0, 1, 0]] },
+      light: { struct: { color: 'vec3f', power: 'f32', spin: 'mat3x3f' }, value: { color: [1, 2, 3], power: 4, spin: [1, 2, 3, 4, 5, 6, 7, 8, 9] } },
+      tail: { value: 5 },
+      rows: { count: 2, struct: { a: 'f32' }, value: [{ a: 6 }, { a: 7 }] },
+      flat: { type: 'vec4f', count: 2, value: [1, 2, 3, 4, 5, 6, 7, 8] },
+    },
+  });
+  assert.deepEqual(
+    m.members.map((x) => [x.name, x.type, x.offset]),
+    [
+      ['gain', 'f32', 0],
+      ['colors', 'vec3f', 16],
+      ['light', 'Raw_light', 48],
+      ['tail', 'f32', 112],
+      ['rows', 'Raw_rows', 128],
+      ['flat', 'vec4f', 160],
+    ],
+  );
+  assert.equal(m.size, 192);
+  const code = m.code('vertex');
+  for (const line of [
+    'struct Raw_light {\n  @align(16) color:vec3f,\n  power:f32,\n  spin:mat3x3f,\n}',
+    '  colors:array<vec3f,2>,',
+    '  light:Raw_light,',
+    '  rows:array<Raw_rows,2>,',
+    '  flat:array<vec4f,2>,',
+  ])
+    assert.ok(code.includes(line), line);
+  const h = harness(),
+    raw = RawShaders.attach(h.engine);
+  raw.add(new RawMesh({ material: m, attributes: quad() }));
+  const log = h.gpu.record(() => h.frame()),
+    id = named(log, 'buffer').find((c) => c[2].label === 'shader:raw:uniforms')[1],
+    f = floats(named(log, 'writeBuffer').find((c) => c[1] === id)[3]);
+  assert.deepEqual(f.slice(4, 7), [1, 0, 0], 'a colour string is an element');
+  assert.deepEqual(f.slice(8, 11), [0, 1, 0], 'the next element is 16 bytes on');
+  assert.deepEqual(f.slice(12, 16), [1, 2, 3, 4], 'a scalar field packs against a vec3f');
+  assert.deepEqual(f.slice(16, 28), [1, 2, 3, 0, 4, 5, 6, 0, 7, 8, 9, 0], 'a mat3x3f keeps its padded columns');
+  assert.equal(f[28], 5);
+  assert.deepEqual([f[32], f[36]], [6, 7], 'a struct of one f32 is 16 bytes apart in an array');
+  assert.deepEqual(f.slice(40, 48), [1, 2, 3, 4, 5, 6, 7, 8], 'numbers in a row fill the elements in order');
+});
+
+test('uniform arrays and structs refuse what WGSL cannot lay out, and name the fix', () => {
+  const make = (uniforms) => () => new RawShaderMaterial({ vertexShader: shader, uniforms });
+  assert.throws(make({ a: { type: 'f32', count: 4, value: [1, 2, 3, 4] } }), /16 bytes apart.*storage buffer/);
+  assert.throws(make({ a: { type: 'vec2f', count: 2, value: [1, 2, 3, 4] } }), /16 bytes apart/);
+  assert.throws(make({ a: { count: 2, value: [1, 2] } }), /is an array, so it needs type/);
+  assert.throws(make({ a: { type: 'vec4f', count: 0, value: [] } }), /positive integer/);
+  assert.throws(make({ a: { struct: {}, value: {} } }), /at least one field/);
+  assert.throws(make({ a: { struct: { b: 'vec9f' }, value: { b: 1 } } }), /field b needs a type/);
+  assert.throws(make({ a: { struct: { camera: 'f32' }, value: { camera: 1 } } }), /usable WGSL identifier/);
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    m = new RawShaderMaterial({
+      vertexShader: shader,
+      uniforms: { list: { type: 'vec4f', count: 2, value: [1, 2, 3, 4] }, s: { struct: { a: 'vec2f' }, value: { a: [1, 2] } } },
+    });
+  raw.add(new RawMesh({ material: m, attributes: quad() }));
+  assert.throws(() => h.frame(), /uniform list needs 2 elements/);
+  m.uniforms.list.value = [
+    [1, 2, 3, 4],
+    [1, 2, 3],
+  ];
+  assert.throws(() => h.frame(), /uniform list\[1\] needs 4 finite numbers/);
+  m.uniforms.list.value = [1, 2, 3, 4, 5, 6, 7, 8];
+  m.uniforms.s.value = { a: 1 };
+  assert.throws(() => h.frame(), /uniform s\.a needs 2 finite numbers/);
+});
+
+test('storage buffers are declared after the textures and bound live; read_write stays out of the vertex stage', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    node = { type: 'vec4f', calls: 0, buffer(device) {
+      this.calls++;
+      return (this.made ??= device.createBuffer({ size: 64, usage: 128 }));
+    } },
+    buffers = [],
+    ids = named(
+      h.gpu.record(() => buffers.push(...[0, 1].map(() => h.gpu.device.createBuffer({ size: 64, usage: 128 })))),
+      'buffer',
+    ).map((c) => c[1]),
+    [other, next] = buffers,
+    m = new RawShaderMaterial({
+      vertexShader: shader,
+      uniforms: { gain: { value: 1 } },
+      textures: { map: null },
+      storage: { field: node, items: { buffer: other, type: 'Item', access: 'read_write' } },
+    });
+  const code = m.code('vertex');
+  assert.ok(code.includes('@group(1) @binding(3) var<storage,read> field:array<vec4f>;'));
+  assert.ok(code.includes('@group(1) @binding(4) var<storage,read_write> items:array<Item>;'));
+  raw.add(new RawMesh({ material: m, attributes: quad() }));
+  const log = h.gpu.record(() => h.frame()),
+    layout = named(log, 'layout').find((c) => c[2].label === 'shader:raw:' + m.name)[2].entries,
+    group = () => named(log, 'group').at(-1)[2].entries;
+  assert.deepEqual(layout[3].buffer, { type: 'read-only-storage' });
+  assert.equal(layout[3].visibility, 3, 'a read buffer reaches both stages');
+  assert.deepEqual(layout[4].buffer, { type: 'storage' });
+  assert.equal(layout[4].visibility, 2, 'a written buffer reaches the fragment stage only');
+  const bound = group();
+  assert.equal(bound[3].resource.buffer, named(log, 'buffer').find((c) => c[2].usage === 128)[1], 'made by the node');
+  assert.equal(bound[4].resource.buffer, ids[0]);
+  const quiet = h.gpu.record(() => h.frame());
+  assert.equal(named(quiet, 'group').length, 0, 'an unchanged buffer keeps its group');
+  m.storage.items.buffer = next;
+  const moved = h.gpu.record(() => h.frame());
+  assert.equal(named(moved, 'group').at(-1)[2].entries[4].resource.buffer, ids[1], 'buffer is live');
+  assert.throws(() => new RawShaderMaterial({ vertexShader: shader, storage: { a: {} } }), /must be \{buffer, type, access\?\}/);
+  assert.throws(
+    () => new RawShaderMaterial({ vertexShader: shader, storage: { a: { buffer: other, type: 'u32', access: 'write' } } }),
+    /access must be read or read_write/,
+  );
+});
+
+test('extra bind groups sit at 2 and up, over an empty group 1 when the material binds nothing', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    made = [],
+    extra = (device) => {
+      const layout = device.createBindGroupLayout({ entries: [] }),
+        value = { layout, group: device.createBindGroup({ layout, entries: [] }) };
+      made.push(value);
+      return value;
+    },
+    m = new RawShaderMaterial({ vertexShader: shader, groups: [extra, extra] });
+  raw.add(new RawMesh({ material: m, attributes: quad() }));
+  raw.add(new RawMesh({ material: m, attributes: quad() }));
+  h.frame();
+  const log = h.gpu.record(() => h.frame()),
+    binds = named(log, 'pass.setBindGroup');
+  assert.equal(made.length, 2, 'one call each per device');
+  assert.deepEqual(
+    binds.filter((c) => c[1] !== 0).map((c) => c[1]),
+    [1, 2, 3],
+    'bound once for a run of the material',
+  );
+  h.swap();
+  h.frame();
+  assert.equal(made.length, 4, 'a restored device gets new groups');
+  assert.throws(() => new RawShaderMaterial({ vertexShader: shader, groups: [extra, extra, extra] }), /at most two/);
+  assert.throws(() => new RawShaderMaterial({ vertexShader: shader, groups: [{}] }), /functions of the device/);
+});
+
+test('a mesh out of view is skipped and counted; its sphere follows position, the matrix and bounds', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    m = material(),
+    single = { position: { data: [-1, -1, 0, 1, -1, 0, 1, 1, 0], type: 'vec3f' } },
+    code = `@vertex fn vertex(a:Attributes)->@builtin(position) vec4f {return vec4f(a.position,1);}
+@fragment fn fragment()->@location(0) vec4f {return vec4f(1);}`,
+    plain = new RawShaderMaterial({ vertexShader: code }),
+    mesh = raw.add(new RawMesh({ material: plain, attributes: single }));
+  // Clip space is world space: x and y within 1, z from 0 to 1.
+  h.matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const seen = () => {
+    h.frame();
+    return [raw.stats.meshes, raw.stats.culled];
+  };
+  assert.deepEqual(seen(), [1, 0]);
+  mesh.matrix[12] = 3;
+  assert.deepEqual(seen(), [0, 1], 'past the right plane by more than its radius');
+  mesh.matrix[12] = 2;
+  assert.deepEqual(seen(), [1, 0], 'its sphere still touches the view');
+  mesh.matrix[12] = 5;
+  mesh.matrix[0] = 8;
+  assert.deepEqual(seen(), [1, 0], "the world matrix's scale reaches the radius");
+  mesh.matrix[0] = 1;
+  assert.deepEqual(seen(), [0, 1]);
+  mesh.setAttribute('position', [4, -1, 0, 6, -1, 0, 6, 1, 0].map((v, i) => (i % 3 === 0 ? v - 10 : v)));
+  assert.deepEqual(seen(), [1, 0], 'new points make a new sphere');
+  mesh.bounds = { center: [90, 0, 0], radius: 1 };
+  assert.deepEqual(seen(), [0, 1], 'bounds replace it');
+  mesh.frustumCulled = false;
+  assert.deepEqual(seen(), [1, 0]);
+  // An instanced mesh places its copies in the shader: no sphere of its points can hold them.
+  raw.remove(mesh);
+  const crowd = raw.add(new RawMesh({ material: m, attributes: quad(), matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 50, 0, 0, 1] }));
+  assert.deepEqual(seen(), [1, 0]);
+  crowd.bounds = { center: [0, 0, 0], radius: 1 };
+  assert.deepEqual(seen(), [0, 1]);
+});
+
+test('reversed-Z with an infinite far plane culls by the other five planes', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    mesh = raw.add(new RawMesh({ material: material(), attributes: { position: quad().position } , vertexCount: 4 }));
+  // x and y as w = -z; clip z = near, so z >= 0 has a zero-length normal and must not divide by it.
+  h.matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, -1, 0, 0, 0.1, 0];
+  mesh.matrix[14] = -5;
+  h.frame();
+  assert.deepEqual([raw.stats.meshes, raw.stats.culled], [1, 0]);
+  mesh.matrix[14] = 5;
+  h.frame();
+  assert.deepEqual([raw.stats.meshes, raw.stats.culled], [0, 1], 'behind the eye');
+});
+
+test('a shadow cascade draws the vertex stage with the light matrix, and the fragment only when it can discard', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    plain = material(),
+    cut = material({ vertexShader: shader.replace('return margoDisplay', 'if(i.tint.x<0.5){discard;}return margoDisplay') }),
+    a = raw.add(new RawMesh({ material: plain, attributes: quad() })),
+    b = raw.add(new RawMesh({ material: cut, attributes: quad() })),
+    clear = raw.add(new RawMesh({ material: material({ transparent: true }), attributes: quad() })),
+    matrix = Float32Array.from({ length: 16 }, (_, i) => i + 1);
+  h.frame();
+  const cascade = (mesh, index) => {
+    const log = h.gpu.record(() => {
+      h.view.begin(h.index++);
+      const pass = h.gpu.encoder.beginRenderPass({ colorAttachments: [] });
+      mesh.drawShadow({ context: h.view.c, pass, matrix, cascade: index });
+      pass.end();
+    });
+    return log;
+  };
+  const first = cascade(a, 0),
+    pipeline = named(first, 'renderPipeline')[0][2],
+    camera = floats(
+      named(first, 'writeBuffer').find((c) => named(first, 'buffer').some((x) => x[1] === c[1] && x[2].label === 'shader:raw:camera'))[3],
+    );
+  assert.equal(pipeline.fragment, undefined, 'a depth-only pipeline');
+  assert.deepEqual(
+    [pipeline.depthStencil.format, pipeline.depthStencil.depthCompare, pipeline.depthStencil.depthWriteEnabled],
+    ['depth32float', 'less-equal', true],
+  );
+  assert.equal(pipeline.multisample.count, 1);
+  assert.equal(pipeline.primitive.cullMode, 'none', 'a back-face cull would lose a caster seen from behind');
+  assert.deepEqual(camera.slice(0, 16), [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 'the view is identity');
+  assert.deepEqual(camera.slice(16, 32), [...matrix], 'so projection * view is the light');
+  assert.deepEqual(camera.slice(32, 48), [...matrix]);
+  assert.equal(named(first, 'pass.drawIndexed').length + named(first, 'pass.draw').length, 1);
+  const cutting = named(cascade(b, 0), 'renderPipeline')[0][2];
+  assert.equal(cutting.fragment.entryPoint, 'fragment');
+  assert.deepEqual(cutting.fragment.targets, [], 'outputs go nowhere');
+  const glass = cascade(clear, 0);
+  assert.equal(named(glass, 'pass.draw').length + named(glass, 'pipeline').length, 0, 'transparent casts nothing');
+  // The colour pass keeps working after a cascade rebound the mesh's camera.
+  const colour = h.gpu.record(() => h.frame());
+  assert.equal(named(colour, 'group').length, 0, 'each camera keeps its group');
+  a.visible = false;
+  const hidden = cascade(a, 1);
+  assert.equal(named(hidden, 'pass.draw').length, 0);
+  const version = a.shadowVersion;
+  a.invalidateShadow();
+  assert.equal(a.shadowVersion, version + 1);
+  a.setAttribute('uv', [0, 0, 1, 0, 1, 1, 0, 1]);
+  assert.equal(a.shadowVersion, version + 2, 'a changed attribute redraws a static map');
+  a.dispose();
+  assert.equal(a.disposed, true, 'Shadows drops a disposed source');
+});
+
+test('a static shadow map redraws when a caster pipeline arrives', async () => {
+  const h = harness({ async: true }),
+    raw = RawShaders.attach(h.engine),
+    mesh = raw.add(new RawMesh({ material: material(), attributes: quad() })),
+    version = mesh.shadowVersion;
+  h.frame();
+  await raw.ready();
+  assert.ok(mesh.shadowVersion > version);
+});
+
+test('SSAO draws only opaque meshes with gbufferEntry, through that entry into two float targets', () => {
+  const code = `${shader}
+@fragment fn normals(i:Out)->MargoGBuffer {return margoGBuffer(vec3f(0,1,0),i.tint,vec3f(1));}`,
+    h = harness(),
+    raw = RawShaders.attach(h.engine),
+    own = material({ vertexShader: code, gbufferEntry: 'normals' });
+  raw.add(new RawMesh({ material: own, attributes: quad() }));
+  raw.add(new RawMesh({ material: material(), attributes: quad() }));
+  raw.add(new RawMesh({ material: material({ vertexShader: code, gbufferEntry: 'normals', transparent: true }), attributes: quad() }));
+  h.frame();
+  const log = h.gpu.record(() => {
+      h.view.begin(h.index++);
+      const pass = h.gpu.encoder.beginRenderPass({ colorAttachments: [] });
+      raw.draw(h.view.c, 'occlusion', null, null, 'all', { pass, view: new Float32Array(16), depthCompare: 'equal' });
+      pass.end();
+    }),
+    pipeline = named(log, 'renderPipeline')[0][2];
+  assert.equal(named(log, 'renderPipeline').length, 1);
+  assert.equal(pipeline.fragment.entryPoint, 'normals');
+  assert.deepEqual(pipeline.fragment.targets, [{ format: 'rgba16float' }, { format: 'rgba16float' }]);
+  assert.equal(pipeline.depthStencil.depthCompare, 'equal');
+  assert.equal(pipeline.depthStencil.depthWriteEnabled, false);
+  assert.equal(pipeline.multisample.count, 4, 'the samples of the scene it tests against');
+  assert.equal(named(log, 'pass.draw').length, 1);
+  // Another mode, or no open pass, is not this source's to draw.
+  const idle = h.gpu.record(() => raw.draw(h.view.c, 'gbuffer', null, null));
+  assert.equal(idle.length, 0);
+  assert.throws(() => material({ gbufferEntry: 'missing' }), /has no @fragment fn missing/);
+  const first = new RawShaderMaterial({
+    vertexShader: `@fragment fn normals()->MargoGBuffer {return margoGBuffer(vec3f(1),vec3f(0),vec3f(0));}\n${shader}`,
+    gbufferEntry: 'normals',
+  });
+  assert.ok(first.code('fragment'), 'the colour entry is not the G-buffer entry, whichever comes first');
+  const m = h.gpu.record(() => {
+    raw.add(new RawMesh({ material: first, attributes: quad() }));
+    h.frame();
+  });
+  assert.equal(named(m, 'renderPipeline').at(-1)[2].fragment.entryPoint, 'fragment');
+});
+
+test('RawPicking draws meshes into the tile with IDs from firstId and answers with a mesh', () => {
+  const h = harness(),
+    meshes = [],
+    host = {
+      overlays: [],
+      addOverlay(o) {
+        this.overlays.push(o);
+        return () => this.overlays.splice(this.overlays.indexOf(o), 1);
+      },
+    };
+  h.engine.createMesh = () => {
+    const mesh = { dispose() { this.disposed = true; } };
+    meshes.push(mesh);
+    return mesh;
+  };
+  const raw = RawShaders.attach(h.engine),
+    a = raw.add(new RawMesh({ material: material(), attributes: quad() })),
+    picking = RawPicking.attach(host, raw),
+    b = raw.add(new RawMesh({ material: material(), attributes: quad() })),
+    core = {};
+  assert.equal(meshes.length, 2, 'a stand-in for each mesh, made before any pick');
+  h.frame();
+  const pipelines = h.gpu.record(() => h.frame());
+  assert.equal(named(pipelines, 'renderPipeline').length, 0, 'the pick pipeline compiled with the colour one');
+  const pick = (mesh) =>
+    h.gpu.record(() =>
+      host.overlays[0].drawPick({
+        encoder: h.gpu.encoder,
+        color: {},
+        depth: {},
+        matrix: new Float32Array(16),
+        camera: h.view.camera,
+        rect: [0, 0, 1280, 720],
+        firstId: 1000,
+        ...mesh,
+      }),
+    );
+  const log = pick();
+  const ids = named(log, 'writeBuffer').filter((c) => c[2] === 112);
+  assert.deepEqual(
+    ids.map((c) => new Uint32Array(Uint8Array.from(Buffer.from(c[3], 'hex')).buffer)[0]),
+    [1000, 1001],
+  );
+  assert.equal(named(log, 'pass.draw').length, 2);
+  assert.equal(host.overlays[0].pickHit(1).mesh, meshes[1]);
+  assert.equal(picking.rawOf(host.overlays[0].pickHit(1).mesh), b);
+  assert.equal(host.overlays[0].pickHit(2), null);
+  assert.equal(picking.rawOf(null), null);
+  assert.equal(picking.rawOf({}), null);
+  a.mesh = core;
+  assert.equal(host.overlays[0].pickHit(0).mesh, core, 'a followed core mesh answers for it');
+  assert.equal(picking.rawOf(core), a);
+  a.mesh = null;
+  b.visible = false;
+  pick();
+  assert.equal(host.overlays[0].pickHit(1), null, 'a hidden mesh takes no ID');
+  const object = named(h.gpu.record(() => raw.remove(b)), 'pass.draw');
+  assert.equal(object.length, 0);
+  assert.equal(meshes[1].disposed, true, 'its stand-in goes with it');
+  picking.dispose();
+  assert.equal(host.overlays.length, 0);
+  assert.equal(meshes[0].disposed, true);
+  assert.equal(raw.watchers.size, 0);
+  const other = new RawShaders({ name: 'shader:raw:unattached' });
+  assert.throws(() => RawPicking.attach(host, other), /Attach RawShaders/);
+});
+
+test('a pick after a device swap makes a new camera block, and a broken material takes no ID', () => {
+  const h = harness(),
+    host = { addOverlay: (o) => ((host.overlay = o), () => {}) };
+  h.engine.createMesh = () => ({ dispose() {} });
+  const raw = RawShaders.attach(h.engine);
+  RawPicking.attach(host, raw);
+  const m = material(),
+    mesh = raw.add(new RawMesh({ material: m, attributes: quad() }));
+  h.frame();
+  const pick = () =>
+    host.overlay.drawPick({
+      encoder: h.gpu.encoder,
+      color: {},
+      depth: {},
+      matrix: new Float32Array(16),
+      camera: h.view.camera,
+      rect: [0, 0, 8, 8],
+      firstId: 0,
+    });
+  pick();
+  h.swap();
+  const log = h.gpu.record(pick);
+  assert.equal(named(log, 'buffer').filter((c) => c[2].label === 'shader:raw:camera').length, 1);
+  assert.equal(host.overlay.pickHit(0).mesh !== undefined, true);
+  m.error = new Error('did not compile');
+  pick();
+  assert.equal(host.overlay.pickHit(0), null);
+  assert.ok(mesh);
 });

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5178570,
+  "total": 5181793,
   "history": [
     {
       "date": "2026-10-24",
@@ -2342,6 +2342,12 @@
       "commit": "4b2344d94",
       "reason": "feat(animation): bone-texture crowds that blend two clips per member (new entry @margoengine/animation/instanced-skin)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "c3fced4f3",
+      "reason": "raw meshes in shadows, SSAO, culling and picking; uniform arrays, storage and bind groups",
+      "grew": 1
     }
   ],
   "items": {
@@ -2775,7 +2781,7 @@
     "@margoengine/shader/lighting": 9827,
     "@margoengine/shader/noise": 5772,
     "@margoengine/shader/pass": 11323,
-    "@margoengine/shader/raw": 10429,
+    "@margoengine/shader/raw": 13652,
     "@margoengine/shader/readback": 8876,
     "@margoengine/shader/utils": 7295,
     "@margoengine/shadows": 17321,

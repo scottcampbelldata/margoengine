@@ -572,11 +572,11 @@ createMesh(stage.engine, planeGeometry(2, 2), new NodeMaterial({shading: 'basic'
 
 `node packages/shader/test/compute-texture-check.mjs` (real GPU, under the GPU lock): eight generations of Conway's life on a 32 x 32 pair equal a CPU run, a material follows the pair as it swaps, all 16 formats write and read back through a second pass, a blur sampling in compute gives exact thirds, and in-place r32float counts to 3.
 
-## Raw shaders (`@margoengine/shader/raw`, 10.1 kB min+gzip)
+## Raw shaders (`@margoengine/shader/raw`, 13.2 kB min+gzip)
 
 Your own WGSL vertex and fragment
-entry points, any named attributes per vertex or per instance, live uniforms and textures, drawn into the scene's colour
-and depth.
+entry points, any named attributes per vertex or per instance, live uniforms, textures and storage buffers, drawn into the
+scene's colour and depth. Raw meshes also cast shadows, write SSAO's G-buffer, are culled and are picked like other meshes.
 
 ```ts
 import {RawShaders, RawShaderMaterial, RawMesh} from 'margoengine/shader/raw';
@@ -613,10 +613,19 @@ material.transparent = true;                      // render state is live too (a
   declares `camera` (`view`, `projection`, `viewProjection`, `position`, `time`, `resolution`, `deltaTime`), `mesh`
   (`world`, and `normal`, the inverse transpose of its 3x3), `struct Attributes` with one `@location` per attribute in
   the order given, `uniforms.<name>` (the WGSL layout is computed for you), each texture as `<name>` plus
-  `<name>Sampler`, and two colour helpers. Fragment output is written exactly as returned (raw); `margoDisplay(c)`
+  `<name>Sampler`, each storage buffer as `<name>`, and two colour helpers. Fragment output is written exactly as returned (raw); `margoDisplay(c)`
   applies the scene's display transform (PBR Neutral and sRGB on a display target, nothing inside an HDR PostStack
   capture, which tonemaps later) and `margoEncode(c)` only the sRGB encoding, for unlit colour as lines and points write
   it. With a separate `fragmentShader` each stage is its own module, so both may use `main`.
+- **Arrays and structs.** `count` makes a uniform array, `struct` a uniform struct, and both together an array of structs.
+  An array's value is a list of elements or all their numbers in a row. Elements of a uniform array sit 16 bytes apart, so
+  the element is a vec3, a vec4, a matrix or a struct; a list of `f32` or `vec2f` belongs in a storage buffer, and the
+  material says so when it refuses one. A struct field is a plain uniform type, not an array or another struct.
+- **Storage buffers and bind groups.** `storage: {name: buffer}` declares `<name>:array<type>`. Pass a `storage()` node as
+  it is, so a compute pass fills what the mesh draws, or `{buffer, type, access}` with your own GPUBuffer (or a function of
+  the device, which also serves device restoration). `type` may be a struct your code declares, in every stage that reads
+  the buffer. `'read_write'` binds to the fragment stage only, as WebGPU requires. `groups` adds up to two bind groups at
+  `@group(2)` and `@group(3)` for bindings your WGSL declares; each is a function of the device.
 - **Geometry.** Attribute types are `f32`, `vec2f` to `vec4f` and the `i32`/`u32` variants, up to 16 attributes;
   per-vertex and per-instance attributes are each interleaved into one buffer. `setAttribute(name, data, [first,
   count])` uploads only that element range; new lengths grow the buffer; `{data, type, step}` adds or retypes an
@@ -644,6 +653,61 @@ material.transparent = true;                      // render state is live too (a
   pipelines (rebuilt if drawn again); `engine.removePlugin('shader:raw')` frees everything and keeps the meshes. Device
   restoration rebuilds everything from the CPU copies; a materials Texture rebinds itself, a GPUTexture from the lost
   device draws white with a warning until you assign a new one.
+
+### Shadows, SSAO, culling and picking
+
+```ts
+import {createStage} from 'margoengine';
+import {SSAO} from 'margoengine/post/ssao';
+import {Picking} from 'margoengine/selection';
+import {Shadows} from 'margoengine/shadows';
+import {RawMesh, RawPicking, RawShaderMaterial, RawShaders} from 'margoengine/shader/raw';
+const stage = await createStage('#app');
+const engine = stage.engine, raw = RawShaders.attach(engine);
+const material = new RawShaderMaterial({
+  vertexShader: `
+    struct Out {@builtin(position) clip:vec4f, @location(0) world:vec3f, @location(1) normal:vec3f}
+    @vertex fn vertex(a:Attributes)->Out {
+      let w = mesh.world * vec4f(a.position, 1);
+      return Out(camera.viewProjection * w, w.xyz, normalize(mesh.normal * a.normal));
+    }
+    @fragment fn gbuffer(i:Out)->MargoGBuffer {return margoGBuffer(i.normal, i.world, vec3f(0.3));}
+    @fragment fn fragment(i:Out)->@location(0) vec4f {return margoDisplay(vec4f(vec3f(0.3) + i.normal.y * 0.5, 1));}`,
+  gbufferEntry: 'gbuffer',
+});
+const mesh = raw.add(new RawMesh({
+  material,
+  attributes: {
+    position: {data: [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], type: 'vec3f'},
+    normal: {data: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], type: 'vec3f'},
+  },
+  index: [0, 1, 2, 0, 2, 3],
+}));
+Shadows.attach(engine).add(mesh);                                 // casts through your vertex shader
+SSAO.attach(engine).add(raw);                                     // meshes with gbufferEntry write their own normals
+const picking = RawPicking.attach(Picking.attach(engine), raw);   // engine.pick now answers raw meshes
+await raw.ready();
+const hit = await engine.pick(200, 150);
+console.log(picking.rawOf(hit) === mesh);
+```
+
+- **Shadows.** `shadows.add(mesh)` draws the mesh into every cascade of `Shadows` with your vertex stage, where
+  `camera.viewProjection` and `camera.projection * camera.view` are the cascade's light matrix. Both sides cast, whatever
+  the material's `cull`, as in the depth pass of every other caster. Your fragment stage runs
+  too when its code holds `discard`, so a cut-out shape casts a cut-out shadow. Transparent materials cast none. For
+  `{static: true}`, call `mesh.invalidateShadow()` after moving the mesh; attribute changes and a newly compiled pipeline
+  redraw the map by themselves. A raw shader receives no shadow unless it samples one itself.
+- **SSAO.** Opaque raw meshes occlude from their depth with nothing to set, like every mesh, and their pixels are not
+  darkened. `ssao.add(raw)` with `gbufferEntry` on a material goes further: that `@fragment fn` returns
+  `margoGBuffer(worldNormal, worldPosition, ambient)`, SSAO uses your normals, and `ambient` is the light it may take away.
+- **Culling.** A mesh out of view is skipped in the colour, shadow, SSAO and pick passes, and counted in `raw.stats.culled`.
+  The sphere comes from a per-vertex vec3f `position`. A mesh with no such attribute, or an instanced one, is never culled
+  unless you give `bounds: {center, radius}`. A vertex shader that moves points outside that sphere needs `bounds` or
+  `frustumCulled: false`.
+- **Picking.** `RawPicking.attach(picking, raw)` draws the meshes into the pick tile after the scene's meshes, in the same
+  depth test, with your vertex stage, so a mesh is picked where it shows. `hit.mesh` is the core mesh it follows or an empty
+  stand-in, and `picking.rawOf(hit)` gives the RawMesh back. One ID covers a mesh, so a hit names no instance, and a
+  fragment's `discard` does not cut the pick.
 
 Measured on an NVIDIA Ampere GPU (Edge, 4x and 1x MSAA) by `node scripts/shader-raw-gpu-check.js` (under the GPU lock):
 a quad with a per-vertex colour attribute and a per-instance offset and `u32` id matches its analytic colours within 0.55
@@ -686,7 +750,7 @@ match their formulas within 0.6 of 255; halftone and dot screen compile and draw
 - Nodes are fixed when a NodeMaterial, NodePass or ComputePass is constructed; build a new one to change the graph. Only uniform values, textures' pixels and storage contents change live.
 - NodeMaterial patches gltf-pro's shader (standard and KHR physical variants); [Node output in every pass](#node-output-in-every-pass) lists what the other passes see. At most 8 varyings. Its bindings start at group 2, binding 48, and node textures count against WebGPU's 16 sampled textures per stage: a `NodeMaterial` on a materials mesh fits 6 texture nodes alone, 5 with directional shadows and 3 with shadows, IBL and LocalShadows; past that, gltf-pro throws a `RangeError` naming the combination.
 - `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; `If` runs one. A NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `texture(map, uv)`, `dpdx`, `dpdy` and `fwidth` inside an `If`, `Switch` or `While` on a per-pixel value, or a loop with a non-uniform bound or a `Break` on one, are a WGSL uniformity error, reported when the pipeline compiles; pass `texture` an explicit level there or sample before the branch.
-- Raw meshes are not picked by `engine.pick`, are not culled, and draw only into the main colour and depth: shadows, SSAO and SSR G-buffers and depth prepasses do not see them. Raw uniforms are scalars, vectors, mat3x3f and mat4x4f (no arrays or structs); no storage buffers or extra bind groups; one colour target; 32-bit attribute formats only.
+- Raw meshes cast into `Shadows` only: `VirtualShadows` and `LocalShadows` take no custom caster. SSR, GTAO, SSGI, TAA velocity and scene passes do not see them, beyond the depth they write. A raw pick names the mesh, not the instance, and ignores `discard`. Uniform arrays hold 16-byte elements, struct fields are not arrays or structs, and a material has one colour target, 32-bit attribute formats only and at most two extra bind groups.
 - NodePass runs only inside a PostStack (a stack of one is fine). An `hdr` pass that ends the chain tonemaps with ACES.
 - Storage textures are 2D, one mip level, one sample; `@margoengine/shader/compute-texture` has no 3D or array form.
 - ComputePass dispatches at most 65,535 workgroups per axis (an indirect dispatch is checked by the GPU only) and runs every frame while attached (`computeReadback` runs once; an atomic counter keeps counting unless `update()` resets it). Workgroup memory has no struct elements, and all of a pass's must fit the device's 16,384 bytes. Storage elements are 4- or 8- or 16-byte types (no vec3). A device loss re-uploads the CPU `data`, not what the GPU computed.

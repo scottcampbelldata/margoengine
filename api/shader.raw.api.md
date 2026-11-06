@@ -14,7 +14,17 @@ export interface RawAttribute {
 
 export type RawAttributeType = 'f32' | 'vec2f' | 'vec3f' | 'vec4f' | 'i32' | 'vec2i' | 'vec3i' | 'vec4i' | 'u32' | 'vec2u' | 'vec3u' | 'vec4u';
 
+export type RawBindGroup = (device: GPUDevice) => {
+    layout: GPUBindGroupLayout;
+    group: GPUBindGroup;
+};
+
 export type RawBlending = 'none' | 'normal' | 'additive' | 'multiply' | 'premultiplied' | GPUBlendState;
+
+export interface RawBounds {
+    center: readonly [number, number, number];
+    radius: number;
+}
 
 export class RawMesh {
     material: RawShaderMaterial;
@@ -25,12 +35,15 @@ export class RawMesh {
     instanceCount?: number;
     vertexCount?: number;
     topology: GPUPrimitiveTopology;
+    frustumCulled: boolean;
+    bounds: RawBounds | null;
     readonly drawRange: {
         start: number;
         count: number;
     };
     owner?: RawShaders;
     gpu?: MeshGpu;
+    disposed: boolean;
     constructor(options: RawMeshOptions);
     get layout(): readonly {
         name: string;
@@ -43,9 +56,13 @@ export class RawMesh {
     setAttribute(name: string, data: RawAttribute | ArrayLike<number>, range?: readonly [number, number]): this;
     removeAttribute(name: string): this;
     setIndex(index: Uint16Array | Uint32Array | readonly number[] | null): this;
+    get shadowVersion(): number;
+    invalidateShadow(): void;
+    drawShadow(context: RawShadowContext): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
     alive(): void;
+    culled(world: ArrayLike<number>, m: ArrayLike<number>): boolean;
     buffers(): GPUVertexBufferLayout[];
     release(): void;
     worldMatrix(engine: EngineKernel): Float32Array | null;
@@ -64,12 +81,49 @@ export interface RawMeshOptions {
     mesh?: Mesh | null;
     renderOrder?: number;
     visible?: boolean;
+    frustumCulled?: boolean;
+    bounds?: RawBounds | null;
+}
+
+export interface RawPickContext {
+    encoder: GPUCommandEncoder;
+    color: GPUTextureView;
+    depth: GPUTextureView;
+    matrix: Float32Array;
+    camera: PassContext['camera'];
+    rect: readonly number[];
+    firstId: number;
+}
+
+export interface RawPickHost {
+    addOverlay(overlay: {
+        drawPick(context: RawPickContext): void;
+        pickHit(index: number): {
+            mesh: Mesh;
+        } | null;
+    }): () => void;
+}
+
+export class RawPicking {
+    readonly raw: RawShaders;
+    static attach(picking: RawPickHost, raw: RawShaders): RawPicking;
+    private constructor();
+    rawOf(mesh: Mesh | null): RawMesh | null;
+    added(mesh: RawMesh): void;
+    removed(mesh: RawMesh): void;
+    drawPick(c: RawPickContext): void;
+    pickHit(index: number): {
+        mesh: Mesh;
+    } | null;
+    dispose(): void;
+    [Symbol.dispose]: () => void;
 }
 
 export class RawShaderMaterial {
     readonly name: string;
     readonly uniforms: Record<string, RawUniform>;
     readonly textures: Record<string, RawTexture>;
+    readonly storage: Record<string, RawStorage>;
     transparent: boolean;
     blending: RawBlending;
     depthTest: boolean;
@@ -82,6 +136,7 @@ export class RawShaderMaterial {
     readonly size: number;
     readonly gpu: Map<GPUDevice, MaterialGpu>;
     revision: number;
+    compiled: number;
     constructor(options: RawShaderMaterialOptions);
     get vertexShader(): string;
     set vertexShader(code: string);
@@ -94,7 +149,8 @@ export class RawShaderMaterial {
     state(): string;
     blend(): GPUBlendState | undefined;
     prepare(device: GPUDevice, pass: number): MaterialGpu;
-    pipeline(plugin: RawShaders, gpu: MaterialGpu, device: GPUDevice, mesh: RawMesh, c: RawPassContext): GPURenderPipeline | undefined;
+    get writesGBuffer(): boolean;
+    pipeline(plugin: RawShaders, gpu: MaterialGpu, device: GPUDevice, mesh: RawMesh, kind: RawPass, c?: RawPassContext, compare?: GPUCompareFunction): GPURenderPipeline | undefined;
 }
 
 export interface RawShaderMaterialOptions {
@@ -104,6 +160,9 @@ export interface RawShaderMaterialOptions {
     fragmentEntry?: string;
     uniforms?: Record<string, RawUniform>;
     textures?: Record<string, RawTextureSource | RawTexture | null>;
+    storage?: Record<string, RawStorage>;
+    groups?: readonly RawBindGroup[];
+    gbufferEntry?: string;
     transparent?: boolean;
     blending?: RawBlending;
     depthTest?: boolean;
@@ -120,8 +179,10 @@ export class RawShaders implements EnginePlugin {
     readonly stats: {
         meshes: number;
         drawCalls: number;
+        culled: number;
         pending: number;
     };
+    readonly watchers: Set<RawPicking>;
     static attach(engine: EngineKernel, options?: RawShadersOptions): RawShaders;
     constructor(options?: RawShadersOptions);
     add(mesh: RawMesh): RawMesh;
@@ -133,12 +194,33 @@ export class RawShaders implements EnginePlugin {
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+    cameraBlock(camera: PassContext['camera'], m: ArrayLike<number>, width: number, height: number, delta: number, encoding: number): Float32Array<ArrayBuffer>;
+    nextPass(): number;
+    shadow(mesh: RawMesh, { context: c, pass, matrix, cascade }: RawShadowContext): void;
+    draw(context: PassContext, mode: 'gbuffer' | 'ambient' | 'occlusion', _color: GPUTextureView, _depth: GPUTextureView, _phase?: 'all' | 'opaque' | 'blend', external?: {
+        pass: GPURenderPassEncoder;
+        view: ArrayLike<number>;
+        depthCompare: GPUCompareFunction;
+    }): void;
 }
 
 export interface RawShadersOptions {
     name?: string;
     opaqueOrder?: number;
     transparentOrder?: number;
+}
+
+export interface RawShadowContext {
+    context: RawPassContext;
+    pass: GPURenderPassEncoder;
+    matrix: Float32Array;
+    cascade: number;
+}
+
+export interface RawStorage {
+    buffer: GPUBuffer | ((device: GPUDevice) => GPUBuffer);
+    readonly type: string;
+    readonly access?: 'read' | 'read_write';
 }
 
 export interface RawTexture {
@@ -151,11 +233,15 @@ export interface RawTexture {
 export type RawTextureSource = GPUTexture | GPUTextureView | BindableTexture;
 
 export interface RawUniform {
-    value: number | string | ArrayLike<number>;
+    value: RawUniformValue | readonly RawUniformValue[] | Readonly<Record<string, RawUniformValue>> | readonly Readonly<Record<string, RawUniformValue>>[];
     readonly type?: RawUniformType;
+    readonly count?: number;
+    readonly struct?: Readonly<Record<string, RawUniformType>>;
 }
 
 export type RawUniformType = RawAttributeType | 'mat3x3f' | 'mat4x4f';
+
+export type RawUniformValue = number | string | ArrayLike<number>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -167,6 +253,12 @@ interface BoundBuffers {
     slots: (GPUBuffer | undefined)[];
     index?: GPUBuffer;
     format?: GPUIndexFormat;
+}
+
+interface Field {
+    name: string;
+    type: RawUniformType;
+    offset: number;
 }
 
 interface HeldBuffer {
@@ -186,6 +278,7 @@ interface MaterialGpu {
     written?: Uint8Array;
     group?: GPUBindGroup;
     bound: unknown[];
+    extras: GPUBindGroup[];
     pass?: number;
     modules: Map<string, GPUShaderModule>;
     pipelines: Map<string, PipelineEntry>;
@@ -193,8 +286,11 @@ interface MaterialGpu {
 
 interface Member {
     name: string;
-    type: RawUniformType;
+    type: string;
     offset: number;
+    count?: number;
+    stride?: number;
+    fields?: Field[];
 }
 
 interface MeshGpu {
@@ -205,13 +301,15 @@ interface MeshGpu {
     instance?: HeldBuffer;
     index?: HeldBuffer;
     group?: GPUBindGroup;
-    camera?: GPUBuffer;
+    groups: Map<GPUBuffer, GPUBindGroup>;
 }
 
 interface PipelineEntry {
     state: 'pending' | 'ready' | 'failed';
     pipeline?: GPURenderPipeline;
 }
+
+type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick';
 
 type RawPassContext = Extract<PassContext, {
     backend: 'webgpu';

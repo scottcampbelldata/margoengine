@@ -1,0 +1,118 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Raw meshes check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body>
+<script type="module">
+// Raw meshes as full citizens on a real adapter: uniform arrays and structs, storage buffers, extra bind groups, frustum culling,
+// shadows, SSAO's G-buffer and picking. The colour scenes write one colour the scene's middle pixel is read against.
+import {createStage} from '/packages/stage/dist/index.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {SSAO} from '/packages/post/dist/index.js';
+import {Picking} from '/packages/selection/dist/index.js';
+import {ComputePass,storage,vec4} from '/packages/shader/dist/index.js';
+import {RawMesh,RawPicking,RawShaderMaterial,RawShaders} from '/packages/shader/dist/raw.js';
+const vertex=`struct Out {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1) normal:vec3f}
+@vertex fn vertex(a:Attributes)->Out {let w=mesh.world*vec4f(a.position,1);return Out(camera.viewProjection*w,w.xyz,mesh.normal*vec3f(0,0,1));}\n`;
+const fragment=body=>`@fragment fn fragment(i:Out)->@location(0) vec4f {${body}}\n`;
+const paint=rgb=>vertex+fragment(`return margoEncode(vec4f(${rgb},1));`);
+const quad=(h=1,z=0)=>({position:{data:[-h,-h,z,h,-h,z,h,h,z,-h,h,z],type:'vec3f'}});
+const index=[0,1,2,0,2,3];
+const translate=(x,y,z)=>[1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1];
+const uniformBlock=(device,values)=>{const buffer=device.createBuffer({size:16,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(buffer,0,new Float32Array(values));const layout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,buffer:{type:'uniform'}}]});return {layout,group:device.createBindGroup({layout,entries:[{binding:0,resource:{buffer}}]})};};
+const read=async(device,buffer,size)=>{const out=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();e.copyBufferToBuffer(buffer,0,out,0,size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);const v=Array.from(new Float32Array(out.getMappedRange().slice(0)));out.unmap();out.destroy();return v;};
+const solid=(s,options,mesh={})=>s.raw.add(new RawMesh({material:new RawShaderMaterial(options),attributes:quad(),index,...mesh}));
+const scenarios={
+  uniformList:s=>solid(s,{vertexShader:paint('uniforms.colors[1].rgb'),uniforms:{colors:{type:'vec4f',count:3,value:[[1,0,0,1],[0,1,0,1],[0,0,1,1]]}}}),
+  uniformFlat:s=>solid(s,{vertexShader:paint('uniforms.colors[1]+uniforms.tail'),uniforms:{colors:{type:'vec3f',count:2,value:[1,0,0,0,0.5,0]},tail:{value:[0,0,0.25]}}}),
+  uniformColours:s=>solid(s,{vertexShader:paint('uniforms.colors[1]'),uniforms:{colors:{type:'vec3f',count:2,value:['#000000','#ff0000']}}}),
+  uniformStruct:s=>solid(s,{vertexShader:paint('uniforms.light.color*uniforms.light.gain+vec3f(0,uniforms.after,0)'),uniforms:{before:{value:9},light:{struct:{color:'vec3f',gain:'f32'},value:{color:[1,0,0],gain:0.5}},after:{value:0.25}}}),
+  // The second element, past a mat3x3f and a tight f32: its column 1, then a field after the matrix.
+  uniformStructList:s=>solid(s,{vertexShader:paint('uniforms.items[1].basis[1]*uniforms.items[1].gain+vec3f(0,0,uniforms.items[1].tail.y)'),uniforms:{items:{count:2,struct:{gain:'f32',basis:'mat3x3f',tail:'vec2f'},value:[{gain:9,basis:[1,1,1,1,1,1,1,1,1],tail:[9,9]},{gain:0.5,basis:[0,0,0,1,0,0,0,0,0],tail:[0,0.25]}]}}}),
+  uniformLive:async s=>{const m=solid(s,{vertexShader:paint('uniforms.colors[0]'),uniforms:{colors:{type:'vec3f',count:1,value:[1,0,0]}}});await s.draw();m.material.uniforms.colors.value=[0,0,1];},
+  storageRead:s=>{const data=storage(new Float32Array([1,0,0,1,0,1,0,1]),'vec4f');solid(s,{vertexShader:paint('data[1].rgb'),storage:{data}});},
+  storageVertex:s=>{const shift=storage(new Float32Array([-50,0,0,0]),'vec4f');solid(s,{vertexShader:`struct Out {@builtin(position) clip:vec4f}
+@vertex fn vertex(a:Attributes)->Out {return Out(camera.viewProjection*(mesh.world*vec4f(a.position,1)+vec4f(shift[0].xyz,0)));}
+@fragment fn fragment()->@location(0) vec4f {return margoEncode(vec4f(0,1,0,1));}`,storage:{shift}},{matrix:translate(50,0,0),frustumCulled:false});},
+  storageStruct:s=>{const buffer=s.device.createBuffer({size:64,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});s.device.queue.writeBuffer(buffer,0,new Float32Array([9,9,9,9,9,0,0,0,0,0,1,1,0.5,0,0,0]));solid(s,{vertexShader:`struct Item {color:vec4f,gain:f32}\n${paint('items[1].color.rgb*items[1].gain')}`,storage:{items:{buffer,type:'Item'}}});},
+  storageCompute:s=>{const field=storage(4,'vec4f');ComputePass.attach(s.engine,4,i=>field.store(i,vec4(0,1,0,1)),{order:-1});solid(s,{vertexShader:paint('field[2].rgb'),storage:{field}});},
+  storageWrite:s=>{const buffer=s.device.createBuffer({size:16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC});s.after=async()=>({written:await read(s.device,buffer,16)});solid(s,{vertexShader:vertex+fragment('hits[1]=7.0;return margoEncode(vec4f(1,0,0,1));'),storage:{hits:{buffer,type:'f32',access:'read_write'}}});},
+  extraGroups:s=>solid(s,{vertexShader:`@group(2) @binding(0) var<uniform> red:vec4f;@group(3) @binding(0) var<uniform> green:vec4f;\n${paint('red.rgb+green.rgb')}`,groups:[d=>uniformBlock(d,[0.5,0,0,0]),d=>uniformBlock(d,[0,0.25,0,0])]}),
+  extraGroupWithUniforms:s=>solid(s,{vertexShader:`@group(2) @binding(0) var<uniform> extra:vec4f;\n${paint('uniforms.tint+extra.rgb')}`,uniforms:{tint:{value:[0,0,0.5]}},groups:[d=>uniformBlock(d,[0.5,0,0,0])]}),
+  culledOut:s=>{solid(s,{vertexShader:paint('vec3f(1)')},{matrix:translate(50,0,0)});s.after=async()=>({stats:{...s.raw.stats}});},
+  culledIn:s=>{solid(s,{vertexShader:paint('vec3f(1)')},{matrix:translate(0.5,0,0)});s.after=async()=>({stats:{...s.raw.stats}});},
+  // Partly out of view stays in, and the world matrix's scale reaches the sphere: a unit quad 2 wide scaled by 40 at x = 30.
+  culledScale:s=>{solid(s,{vertexShader:paint('vec3f(1)')},{matrix:[40,0,0,0,0,40,0,0,0,0,1,0,30,0,0,1]});s.after=async()=>({stats:{...s.raw.stats}});},
+  culledBehind:s=>{solid(s,{vertexShader:paint('vec3f(1)')},{matrix:translate(0,0,10)});s.after=async()=>({stats:{...s.raw.stats}});},
+  culledBounds:s=>{solid(s,{vertexShader:paint('vec3f(1)')},{bounds:{center:[50,0,0],radius:1}});s.after=async()=>({stats:{...s.raw.stats}});},
+  culledNever:s=>{solid(s,{vertexShader:paint('vec3f(1)')},{matrix:translate(50,0,0),frustumCulled:false});s.after=async()=>({stats:{...s.raw.stats}});},
+  // The caster sits 0.5 in front of the wall and the light comes along x = z: its shadow falls on the wall's middle.
+  shadow:s=>shadowScene(s,paint('vec3f(0)')),
+  shadowProjection:s=>shadowScene(s,`struct Out {@builtin(position) clip:vec4f}
+@vertex fn vertex(a:Attributes)->Out {return Out(camera.projection*camera.view*mesh.world*vec4f(a.position,1));}
+@fragment fn fragment()->@location(0) vec4f {return vec4f(0);}`),
+  shadowCut:s=>shadowScene(s,vertex+fragment('if(abs(i.world.x-0.5)<0.15){discard;}return vec4f(0);')),
+  shadowMoved:s=>shadowScene(s,`struct Out {@builtin(position) clip:vec4f}
+@vertex fn vertex(a:Attributes)->Out {return Out(camera.viewProjection*(mesh.world*vec4f(a.position,1)+vec4f(uniforms.shift,0)));}
+@fragment fn fragment()->@location(0) vec4f {return vec4f(0);}`,{uniforms:{shift:{value:[-5,0,0]}}},{matrix:translate(5.5,0,0.5),frustumCulled:false}),
+  shadowStatic:s=>shadowScene(s,paint('vec3f(0)'),{},{},{static:true}),
+  shadowTransparent:s=>shadowScene(s,paint('vec3f(0)'),{transparent:true}),
+  shadowOut:s=>shadowScene(s,paint('vec3f(0)'),{},{visible:false}),
+  ssaoOwn:s=>room(s,true),
+  ssaoDepth:s=>room(s,false),
+  ssaoFlipped:s=>room(s,true,'-i.normal'),
+  pick:async s=>{const {picking,left,right}=await pickScene(s),at=async(x,y)=>picking.rawOf(await s.engine.pick(...s.pixel([x,y,0]))),miss=await s.engine.pick(...s.pixel([0,1.2,0]));return {left:await at(-0.6,0)===left,right:await at(0.6,0)===right,miss};},
+  pickBlocked:async s=>{const {picking}=await pickScene(s),near=createMesh(s.engine,planeGeometry(1,1),new Material({shading:'basic',color:[1,1,1]}));near.root.setPosition([-0.6,0,1]);await s.draw();const mesh=await s.engine.pick(...s.pixel([-0.6,0,1]));return {core:mesh!==null&&picking.rawOf(mesh)===null};},
+  pickInFront:async s=>{const {picking,left}=await pickScene(s,1),far=createMesh(s.engine,planeGeometry(1,1),new Material({shading:'basic',color:[1,1,1]}));far.root.setPosition([-0.6,0,-1]);await s.draw();return {raw:picking.rawOf(await s.engine.pick(...s.pixel([-0.6,0,1])))===left};},
+  pickHidden:async s=>{const {left}=await pickScene(s);left.visible=false;await s.draw();return {miss:await s.engine.pick(...s.pixel([-0.6,0,0]))};},
+  // The vertex shader moves the quad 2 to the right, so it picks where it shows, not where its points say.
+  pickMoved:async s=>{const picking=RawPicking.attach(Picking.attach(s.engine),s.raw),m=solid(s,{vertexShader:`struct Out {@builtin(position) clip:vec4f}
+@vertex fn vertex(a:Attributes)->Out {return Out(camera.viewProjection*(mesh.world*vec4f(a.position,1)+vec4f(0.8,0,0,0)));}
+@fragment fn fragment()->@location(0) vec4f {return vec4f(1);}`},{attributes:quad(0.3),frustumCulled:false});await s.draw();return {shown:picking.rawOf(await s.engine.pick(...s.pixel([0.8,0,0])))===m,source:await s.engine.pick(...s.pixel([-0.6,0,0]))};},
+  pickFollowed:async s=>{const picking=RawPicking.attach(Picking.attach(s.engine),s.raw),core=s.engine.createMesh(),m=solid(s,{vertexShader:paint('vec3f(1)')},{mesh:core});await s.draw();const hit=await s.engine.pick(...s.pixel([0,0,0]));return {core:hit===core,raw:picking.rawOf(hit)===m};},
+  pickRemoved:async s=>{const {picking,left}=await pickScene(s);s.raw.remove(left);await s.draw();return {miss:await s.engine.pick(...s.pixel([-0.6,0,0])),gone:picking.rawOf(null)};},
+};
+function shadowScene(s,code,options={},mesh={},add={}){
+  s.engine.lighting.radiance[3]=0;s.engine.lighting.direction.set([1,0,1,2]);
+  const wall=createMesh(s.engine,planeGeometry(2,2),new Material({shading:'lambert',color:[0.75,0.75,0.75]})),shadows=Shadows.attach(s.engine,{resolution:1024,filter:'hard'});
+  shadows.add(wall);
+  shadows.add(s.raw.add(new RawMesh({material:new RawShaderMaterial({vertexShader:code,colorWrite:false,depthWrite:false,...options}),attributes:quad(0.3),index,matrix:translate(0.5,0,0.5),...mesh})),add);
+}
+// A wall at z = 0 and a floor at y = -1 running towards the camera, in white, with SSAO. `own` writes the G-buffer with the
+// shader's normals and full ambient light; without it the mesh only gives SSAO its depth.
+function room(s,own,normal='i.normal'){
+  const code=`struct Out {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1) normal:vec3f}
+@vertex fn vertex(a:Attributes)->Out {let w=mesh.world*vec4f(a.position,1);return Out(camera.viewProjection*w,w.xyz,normalize(mesh.normal*a.normal));}
+@fragment fn gbuffer(i:Out)->MargoGBuffer {return margoGBuffer(${normal},i.world,vec3f(1));}
+@fragment fn fragment(i:Out)->@location(0) vec4f {return vec4f(1);}`;
+  const material=new RawShaderMaterial({vertexShader:code,fragmentEntry:'fragment',...(own?{gbufferEntry:'gbuffer'}:{})}),
+    wall={position:{data:[-3,-1,0,3,-1,0,3,3,0,-3,3,0],type:'vec3f'},normal:{data:[0,0,1,0,0,1,0,0,1,0,0,1],type:'vec3f'}},
+    floor={position:{data:[-3,-1,4,3,-1,4,3,-1,0,-3,-1,0],type:'vec3f'},normal:{data:[0,1,0,0,1,0,0,1,0,0,1,0],type:'vec3f'}};
+  s.raw.add(new RawMesh({material,attributes:wall,index}));s.raw.add(new RawMesh({material,attributes:floor,index}));
+  const ssao=SSAO.attach(s.engine);ssao.add(s.raw);
+  s.engine.camera.position=[0,0.5,3];s.engine.camera.target=[0,-0.5,0];
+  s.after=async()=>({crease:s.pixel([0,-0.9,0]),open:s.pixel([0,1.2,0])});
+}
+async function pickScene(s,z=0){
+  const picking=RawPicking.attach(Picking.attach(s.engine),s.raw),m=x=>solid(s,{vertexShader:paint('vec3f(1)')},{attributes:quad(0.5,z),matrix:translate(x,0,0)}),left=m(-0.6),right=m(0.6);
+  await s.draw();return {picking,left,right};
+}
+window.check={
+  async run(name){
+    const host=document.createElement('div');host.id='host';document.body.append(host);
+    const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0],near:0.5,far:50}}),engine=stage.engine,device=engine.gpu,errors=[];
+    device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    const raw=RawShaders.attach(engine),s={stage,engine,device,raw,
+      async draw(){engine.render();await device.queue.onSubmittedWorkDone();await raw.ready();engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();},
+      pixel(p){const m=engine.camera.matrix,c=[0,1,2,3].map(r=>m[r]*p[0]+m[4+r]*p[1]+m[8+r]*p[2]+m[12+r]),rect=engine.canvas.getBoundingClientRect();return [Math.round((c[0]/c[3]*0.5+0.5)*rect.width),Math.round((0.5-c[1]/c[3]*0.5)*rect.height)];}};
+    window.current=s;
+    await s.draw();
+    const value=await scenarios[name](s),data=value?.constructor===Object?value:{};
+    await s.draw();
+    const after=s.after?await s.after():{};
+    for(const mesh of raw['meshes'])if(mesh.material.error)errors.push(mesh.material.error.message);
+    return {...data,...after,errors};
+  },
+  clear(){window.current.stage.dispose();document.querySelector('#host').remove();},
+  names:()=>Object.keys(scenarios),
+};
+window.ready=true;
+</script></body></html>
