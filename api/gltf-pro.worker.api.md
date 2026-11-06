@@ -201,6 +201,7 @@ interface DrawResource {
     };
     uniform: UniformSlot;
     volume?: GPUBuffer;
+    streamed?: GLTFStreamedImage[];
     volumeData?: Float32Array;
     volumeWritten?: GPUBuffer;
     values: Float32Array;
@@ -376,6 +377,7 @@ interface GLTFDecoderHooks {
             signal?: AbortSignal;
         }): Promise<GLTFCompressedImage>;
     };
+    textureStream?: GLTFTextureOpener;
     instancing?: {
         read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined;
     };
@@ -515,7 +517,7 @@ interface GLTFExtensions {
   };
 }
 
-type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | undefined;
+type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
 
 interface GLTFImageBasedLight extends GLTFProperty {
   rotation?: number[];
@@ -665,6 +667,25 @@ interface GLTFSplatReader {
     }[], signal?: AbortSignal): Promise<GLTFSplatCloud[]>;
 }
 
+type GLTFStreamSource = {
+    url: string;
+    offset?: number;
+    length?: number;
+} | {
+    bytes: Uint8Array;
+};
+
+interface GLTFStreamedImage {
+    readonly streamed: true;
+    readonly width: number;
+    readonly height: number;
+    readonly users: Set<{
+        rebindStreamed(image: GLTFStreamedImage): void;
+    }>;
+    view(device: GPUDevice, srgb: boolean): GPUTextureView | undefined;
+    close(): void;
+}
+
 interface GLTFTexture extends GLTFProperty {
   source?: number;
   sampler?: number;
@@ -675,6 +696,10 @@ interface GLTFTextureInfo extends GLTFProperty {
   texCoord?: number;
   scale?: number;
   strength?: number;
+}
+
+interface GLTFTextureOpener {
+    open(source: GLTFStreamSource, index: number): Promise<GLTFStreamedImage>;
 }
 
 interface GLTFTextureTransform {
@@ -914,6 +939,7 @@ class PBRModel implements EnginePlugin {
     adoptStaticBatches(source: PBRModel): boolean;
     registerPasses(graph: FrameGraph): void;
     shareImages(): GLTFImage[];
+    rebindStreamed(image: GLTFStreamedImage): void;
     compile(): Promise<void>;
     image(index: number): Exclude<GLTFImage, undefined>;
     uploadImage(index: number, device: GPUDevice, srgb?: boolean): GPUTexture;

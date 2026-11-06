@@ -17,6 +17,8 @@ import {
 import { PBRModel, loadGLTF, type GLTFLoadOptions, type PBRMaterial } from './index.js';
 import { packed, primitiveDefs } from './pack.js';
 import type { GLTFStream, StreamMessage } from './stream.js';
+import type { GLTFTextureStream, GLTFTextureStreamOptions } from './texture-stream.js';
+export type { GLTFTextureStream, GLTFTextureStreamOptions } from './texture-stream.js';
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; INDEX: number; COPY_DST: number };
 // Same symbol PBRModel reads. Set until finish(), so setup does not bake the placeholder boxes.
 const deferStaticBatches = Symbol.for('margoengine.gltf-pro.defer-static-batches');
@@ -43,6 +45,12 @@ export interface ProgressiveGLTFOptions extends GLTFLoadOptions {
   onProgress?: (progress: ProgressiveGLTFProgress) => void;
   /** Main-thread milliseconds per frame spent on GPU uploads (default 4); at least one upload step runs each frame. */
   frameBudget?: number;
+  /**
+   * Streams KTX2 textures: each starts from its smallest levels, and finer levels load only as its size on screen calls
+   * for them, inside `budgetBytes`. PNG and JPEG files hold no mips, so those load whole. Default off; off WebGPU it has no
+   * effect.
+   */
+  textures?: boolean | GLTFTextureStreamOptions;
 }
 /**
  * A progressive load: `ready` resolves with placeholder boxes, `complete` with the full model, and abort() stops it.
@@ -54,6 +62,8 @@ export interface ProgressiveGLTF {
   readonly complete: Promise<PBRModel>;
   /** Stop loading and dispose the model; both promises reject (disposing the model does the same). */
   abort(reason?: unknown): void;
+  /** With the `textures` option: the live texture streams, which run for as long as the model lives. */
+  readonly textures?: Promise<GLTFTextureStream>;
 }
 
 // Kept out of `new Worker(...)` so bundlers copy the prebuilt script as an asset instead of rebuilding it (as /worker).
@@ -130,22 +140,35 @@ export function loadGLTFProgressive(
     progress.stage = stage;
     onProgress?.({ ...progress });
   };
+  const engine = engineRuntime(instance),
+    device = () => engine.gpu!,
+    settings = options.textures === true ? {} : options.textures,
+    textures =
+      settings && engine.gpu
+        ? import('./texture-stream.js').then(
+            ({ GLTFTextureStream }) => GLTFTextureStream.attach(instance, settings, controller.signal),
+          )
+        : undefined;
+  textures?.catch(() => {});
+  // The whole-file loader, its KTX2 images still streaming when `textures` is on.
+  const plain = async () => {
+    const stream = await textures,
+      loaded = await loadGLTF(instance, url, {
+        ...options,
+        decoders: stream ? { ...decoders, textureStream: stream } : decoders,
+        signal: controller.signal,
+      });
+    stream?.attach(loaded);
+    return loaded;
+  };
   if (options.fetch || options.draco || options.ktx2 || decoders.draco || decoders.meshopt || decoders.ktx2) {
-    const model = loadGLTF(instance, url, {
-      ...options,
-      decoders,
-      signal: controller.signal,
-      maxDownloadBytes: options.maxDownloadBytes,
-      maxNodes: options.maxNodes,
-    }).then((m) => {
+    const model = plain().then((m) => {
       emit('complete');
       return m;
     });
     model.catch(() => {});
-    return { ready: model, complete: model, abort };
+    return { ready: model, complete: model, abort, ...(textures ? { textures } : {}) };
   }
-  const engine = engineRuntime(instance),
-    device = () => engine.gpu!;
   let resolveReady!: (m: PBRModel) => void,
     rejectReady!: (e: unknown) => void,
     resolveComplete!: (m: PBRModel) => void,
@@ -175,6 +198,7 @@ export function loadGLTFProgressive(
     local: number[][][] = [];
   const received = new Set<number>(),
     pending = new Set<GPUBuffer>(),
+    opening: Promise<void>[] = [],
     jobs: Array<() => boolean> = [],
     hooks: GLTFDecoderHooks = {};
   let geometryBytes = 0,
@@ -192,6 +216,7 @@ export function loadGLTFProgressive(
     pending.clear();
     if (model) model.dispose();
     else for (const image of images) (image as ImageBitmap | undefined)?.close?.();
+    void textures?.then((stream) => stream.dispose(), () => {});
     rejectReady(error);
     rejectComplete(error);
   };
@@ -479,6 +504,7 @@ export function loadGLTFProgressive(
     });
     engine.use(model);
     model.onDispose(() => abort(new DOMException('Model disposed while loading', 'AbortError')));
+    void textures?.then((stream) => stream.attach(model!), fail);
     // The first order goes out on the next frame, after the app has had `ready` and placed its camera.
     emit('ready');
     resolveReady(model);
@@ -493,7 +519,7 @@ export function loadGLTFProgressive(
       if (m.type === 'fallback') {
         worker?.terminate();
         worker = undefined;
-        void loadGLTF(instance, url, { ...options, signal: controller.signal }).then((loaded) => {
+        void plain().then((loaded) => {
           if (finished) {
             loaded.dispose();
             return;
@@ -514,17 +540,41 @@ export function loadGLTFProgressive(
           throw new RangeError(
             'Progressive glTF worker sent an invalid image index; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
           );
-        images[m.index] = m.image;
-        settled[m.index] = true;
-        if (m.image) progress.imagesLoaded++;
-        texturesReady();
+        const { index, source } = m;
+        if (source)
+          opening.push(
+            textures!
+              .then((stream) => stream.open(source))
+              .then((image) => {
+                if (finished) {
+                  image.close();
+                  return;
+                }
+                images[index] = image;
+                settled[index] = true;
+                progress.imagesLoaded++;
+                texturesReady();
+              })
+              .catch(fail),
+          );
+        else {
+          images[index] = m.image;
+          settled[index] = true;
+          if (m.image) progress.imagesLoaded++;
+          texturesReady();
+        }
       } else if (m.type === 'bytes') {
         progress.bytesLoaded = m.loaded;
         progress.bytesTotal = m.total;
         if (model) emit();
       } else if (m.type === 'done') {
-        texturesReady(true);
-        jobs.push(finish(m.buffers, m.accessors));
+        const { buffers, accessors } = m;
+        // Streams still opening hold their primitives back until their smallest levels are on the GPU.
+        void Promise.all(opening).then(() => {
+          if (finished) return;
+          texturesReady(true);
+          jobs.push(finish(buffers, accessors));
+        });
       } else throw revive(m.error);
     } catch (error) {
       fail(error);
@@ -556,6 +606,7 @@ export function loadGLTFProgressive(
         maxDownloadBytes: limit,
         maxNodes: options.maxNodes,
         allowedURLs: options.allowedURLs,
+        textures: !!textures,
       });
     } else
       import('./stream.js').then(({ GLTFStream }) => {
@@ -567,10 +618,11 @@ export function loadGLTFProgressive(
             limit,
             options.maxNodes,
             options.allowedURLs,
+            !!textures,
           )).run();
       }, fail);
   } catch (error) {
     fail(error);
   }
-  return { ready, complete, abort };
+  return { ready, complete, abort, ...(textures ? { textures } : {}) };
 }

@@ -32,9 +32,23 @@ export interface KTX2Image {
   close(): void;
 }
 /**
+ * A texture that streams its mip levels (`textures` of @margoengine/gltf-pro/progressive): its GPU texture replaces itself
+ * as levels arrive and leave, so a model asks for the current view and rebinds through `users`.
+ */
+export interface GLTFStreamedImage {
+  readonly streamed: true;
+  readonly width: number;
+  readonly height: number;
+  /** The models drawing it; each is told when the texture is replaced. */
+  readonly users: Set<{ rebindStreamed(image: GLTFStreamedImage): void }>;
+  /** The current view on `device` in the colour space a map slot reads, or undefined while no texture lives there. */
+  view(device: GPUDevice, srgb: boolean): GPUTextureView | undefined;
+  close(): void;
+}
+/**
  * A decoded glTF image: an ImageBitmap, a transcoded KTX2 image, a compressed GPU image, or undefined when absent.
  */
-export type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | undefined;
+export type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
 export interface GLTFImageOptions {
   signal?: AbortSignal;
   device?: GPUDevice;
@@ -46,9 +60,10 @@ export interface GLTFImageOptions {
   };
 }
 /** Async codecs stay on the owning thread; meshopt is synchronous and can be packed in a parser worker. */
+export const asyncGeometry = (doc: GLTFDocument): boolean =>
+  !!doc.meshes?.some((mesh) => mesh?.primitives?.some((p) => p?.extensions?.KHR_draco_mesh_compression)) || hasSplats(doc);
 export const asyncCompression = (doc: GLTFDocument): boolean =>
-  !!doc.meshes?.some((mesh) => mesh?.primitives?.some((p) => p?.extensions?.KHR_draco_mesh_compression)) ||
-  hasSplats(doc) ||
+  asyncGeometry(doc) ||
   !!doc.textures?.some((texture) => texture?.extensions?.KHR_texture_basisu) ||
   !!doc.images?.some((image) => image?.mimeType === 'image/ktx2');
 export const assetLimit = 64 * 1024 * 1024;
@@ -69,6 +84,12 @@ export interface GLTFCompressedImage {
 }
 /** A decoded glTF image slot; undefined when a KTX2 image was skipped because no ktx2 decoder was passed. */
 
+/** Where a streamed KTX2 image is: a URL (with `offset` and `length` when it sits inside a larger file), or its bytes. */
+export type GLTFStreamSource = { url: string; offset?: number; length?: number } | { bytes: Uint8Array };
+/** Opens one KTX2 image as a stream, resolving once its smallest levels are on the GPU. */
+export interface GLTFTextureOpener {
+  open(source: GLTFStreamSource, index: number): Promise<GLTFStreamedImage>;
+}
 /** Optional decoders. Structurally matches @margoengine/decoders (DracoDecoder, MeshoptDecoder, KTX2Decoder) without importing it. */
 export interface GLTFDecoderHooks {
   draco?: {
@@ -85,6 +106,8 @@ export interface GLTFDecoderHooks {
     ): void;
   };
   ktx2?: { transcode(data: Uint8Array, options?: { signal?: AbortSignal }): Promise<GLTFCompressedImage> };
+  /** Streams KTX2 images instead of decoding them whole; `loadGLTFProgressive` sets it from its `textures` option. */
+  textureStream?: GLTFTextureOpener;
   /** EXT_mesh_gpu_instancing: `instancing` from @margoengine/gltf-pro/instancing. */
   instancing?: { read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined };
   /**
@@ -687,7 +710,7 @@ function ktxSources(doc: GLTFDocument): Set<number> {
   for (let i = 0; i < (doc.images?.length ?? 0); i++) if (doc.images![i]?.mimeType === 'image/ktx2') sources.add(i);
   return sources;
 }
-function unusedBasisuFallbacks(doc: GLTFDocument): Set<number> {
+export function unusedBasisuFallbacks(doc: GLTFDocument): Set<number> {
   const fallbacks = new Set<number>(),
     selected = new Set<number>();
   for (const texture of doc.textures ?? []) {
@@ -960,6 +983,17 @@ export async function loadAsset(
       for (let index = 0; index < (doc.images?.length ?? 0); index++) {
         if (fallbacks.has(index)) continue;
         const def = entry(doc.images, index, 'image');
+        if (sources.has(index) && decoders.textureStream) {
+          images[index] = await decoders.textureStream.open(
+            def.bufferView !== undefined
+              ? { bytes: asset.view(def.bufferView) }
+              : typeof def.uri === 'string' && def.uri.startsWith('data:')
+                ? { bytes: embedded(def.uri, limit) }
+                : { url: resolve(def.uri!).href },
+            index,
+          );
+          continue;
+        }
         let data: Uint8Array;
         if (def.bufferView !== undefined) data = asset.view(def.bufferView);
         else if (typeof def.uri === 'string' && def.uri.startsWith('data:')) {

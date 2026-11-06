@@ -44,6 +44,15 @@ export interface KTX2OpenOptions {
   label?: string;
   /** Texture usage. Default: TEXTURE_BINDING | COPY_DST | COPY_SRC; the copies need the last two, so they are always added. */
   usage?: number;
+  /** Where the KTX2 file starts inside the file at the URL, such as an image in a GLB's binary chunk. Default 0. */
+  offset?: number;
+  /** Bytes of the KTX2 file at `offset`. Needed with `offset`; default the whole file. */
+  length?: number;
+  /**
+   * Also allows views in the format's sRGB or linear twin, for a loader whose colour space comes from how a texture is
+   * used and not from the file. Default false.
+   */
+  colorViews?: boolean;
 }
 
 /** Wraps one level in a complete KTX2 file. ETC1S keeps its codebooks and the slice descriptions of that level's images. */
@@ -84,6 +93,14 @@ export function ktx2LevelFile(head: Uint8Array, index: KTX2Index, level: number,
   }
   out.set(data, dataAt);
   return out;
+}
+
+/** The format with or without `-srgb`: its twin, for the formats WebGPU has in both forms. */
+export function colorTwin(format: GPUTextureFormat): GPUTextureFormat | undefined {
+  if (format.endsWith('-srgb')) return format.slice(0, -5) as GPUTextureFormat;
+  return /^(rgba8unorm|bgra8unorm|bc[1-37]-rgba-unorm|etc2-rgba?8a?1?unorm|astc-.*-unorm)$/.test(format)
+    ? (`${format}-srgb` as GPUTextureFormat)
+    : undefined;
 }
 
 /** The coarsest level of a `width` by `height` texture that still covers `pixels` across without magnifying. */
@@ -273,6 +290,9 @@ export class StreamedKTX2 {
   private readonly label?: string;
   private readonly usage: number;
   private readonly url?: string;
+  private readonly offset: number;
+  private readonly length?: number;
+  private readonly colorViews: boolean;
   private whole?: Uint8Array;
   private head!: Uint8Array;
   private index!: KTX2Index;
@@ -291,6 +311,16 @@ export class StreamedKTX2 {
   ) {
     if (source instanceof Uint8Array) this.whole = source;
     else this.url = String(source);
+    this.offset = options.offset ?? 0;
+    this.length = options.length;
+    if (
+      !Number.isSafeInteger(this.offset) ||
+      this.offset < 0 ||
+      (this.offset && !Number.isSafeInteger(this.length)) ||
+      (this.length !== undefined && !(this.length > 0))
+    )
+      throw new RangeError('KTX2 open offset and length must be whole numbers; give a length above 0 with any offset');
+    this.colorViews = !!options.colorViews;
     this.label = options.label;
     this.usage =
       (options.usage ?? GPUTextureUsage.TEXTURE_BINDING) | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC;
@@ -345,30 +375,37 @@ export class StreamedKTX2 {
   private async read(from: number, to: number): Promise<Uint8Array> {
     if (this.whole) return this.whole.subarray(from, to);
     const response = await this.owner.fetch(this.url!, {
-      headers: { Range: `bytes=${from}-${to - 1}` },
+      headers: { Range: `bytes=${this.offset + from}-${this.offset + to - 1}` },
       signal: this.signal,
     });
     if (response.status === 200) {
-      this.whole = new Uint8Array(await response.arrayBuffer());
+      this.whole = this.inside(new Uint8Array(await response.arrayBuffer()));
       return this.whole.subarray(from, to);
     }
     if (response.status !== 206) throw decodeFailed(`KTX2: could not load ${this.url} (${response.status})`);
     return new Uint8Array(await response.arrayBuffer());
   }
 
+  // The KTX2 file inside a whole reply from a server without Range support.
+  private inside(bytes: Uint8Array): Uint8Array {
+    return this.length === undefined ? bytes : bytes.subarray(this.offset, this.offset + this.length);
+  }
+
   // The first read also learns the file's length from Content-Range.
   private async readHead(): Promise<{ bytes: Uint8Array; total: number }> {
     if (this.whole) return { bytes: this.whole, total: this.whole.length };
-    const response = await this.owner.fetch(this.url!, {
-      headers: { Range: `bytes=0-${this.owner.headBytes - 1}` },
-      signal: this.signal,
-    });
+    const size = Math.min(this.owner.headBytes, this.length ?? Infinity),
+      response = await this.owner.fetch(this.url!, {
+        headers: { Range: `bytes=${this.offset}-${this.offset + size - 1}` },
+        signal: this.signal,
+      });
     if (!response.ok) throw decodeFailed(`KTX2: could not load ${this.url} (${response.status})`);
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (response.status === 200) {
-      this.whole = bytes;
-      return { bytes, total: bytes.length };
+      this.whole = this.inside(bytes);
+      return { bytes: this.whole, total: this.whole.length };
     }
+    if (this.length !== undefined) return { bytes, total: this.length };
     const total = Number(/\/(\d+)$/.exec(response.headers.get('Content-Range') ?? '')?.[1]);
     if (!Number.isSafeInteger(total))
       throw decodeFailed(`KTX2: ${this.url} sent no Content-Range length; serve it with Range support or whole`);
@@ -437,6 +474,7 @@ export class StreamedKTX2 {
       mipLevelCount: this.levels - base,
       format: this.format,
       usage: this.usage,
+      ...(this.colorViews && colorTwin(this.format) ? { viewFormats: [colorTwin(this.format)!] } : {}),
     });
   }
 

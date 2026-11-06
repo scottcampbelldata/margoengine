@@ -6,17 +6,45 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { DracoDecodeOptions, KTX2Decoder, TranscodedKTX2Result } from "@margoengine/decoders";
+import { KTX2StreamerOptions, StreamedKTX2 } from "@margoengine/decoders/ktx2-stream";
 import { Splats } from "@margoengine/splats";
+
+export class GLTFTextureStream implements GLTFTextureOpener {
+    static attach(engine: EngineKernel, options?: GLTFTextureStreamOptions, signal?: AbortSignal): GLTFTextureStream;
+    constructor(instance: EngineKernel, options?: GLTFTextureStreamOptions, signal?: AbortSignal);
+    get device(): GPUDevice;
+    get budgetBytes(): number;
+    set budgetBytes(bytes: number);
+    get usedBytes(): number;
+    get textures(): {
+        width: number;
+        height: number;
+        level: number;
+        levels: number;
+        pixels: number;
+    }[];
+    open(source: GLTFStreamSource): Promise<GLTFStreamedImage>;
+    attach(model: PBRModel): void;
+    forget(image: StreamedImage): void;
+    update(): void;
+    dispose(): void;
+}
+
+export interface GLTFTextureStreamOptions extends Pick<KTX2StreamerOptions, 'budgetBytes' | 'concurrency' | 'headBytes' | 'decoder' | 'hdrDecoder'> {
+    onError?: (error: unknown) => void;
+}
 
 export interface ProgressiveGLTF {
     readonly ready: Promise<PBRModel>;
     readonly complete: Promise<PBRModel>;
     abort(reason?: unknown): void;
+    readonly textures?: Promise<GLTFTextureStream>;
 }
 
 export interface ProgressiveGLTFOptions extends GLTFLoadOptions {
     onProgress?: (progress: ProgressiveGLTFProgress) => void;
     frameBudget?: number;
+    textures?: boolean | GLTFTextureStreamOptions;
 }
 
 export interface ProgressiveGLTFProgress {
@@ -205,6 +233,7 @@ interface DrawResource {
     };
     uniform: UniformSlot;
     volume?: GPUBuffer;
+    streamed?: GLTFStreamedImage[];
     volumeData?: Float32Array;
     volumeWritten?: GPUBuffer;
     values: Float32Array;
@@ -380,6 +409,7 @@ interface GLTFDecoderHooks {
             signal?: AbortSignal;
         }): Promise<GLTFCompressedImage>;
     };
+    textureStream?: GLTFTextureOpener;
     instancing?: {
         read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined;
     };
@@ -519,7 +549,7 @@ interface GLTFExtensions {
   };
 }
 
-type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | undefined;
+type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
 
 interface GLTFImageBasedLight extends GLTFProperty {
   rotation?: number[];
@@ -669,6 +699,25 @@ interface GLTFSplatReader {
     }[], signal?: AbortSignal): Promise<GLTFSplatCloud[]>;
 }
 
+type GLTFStreamSource = {
+    url: string;
+    offset?: number;
+    length?: number;
+} | {
+    bytes: Uint8Array;
+};
+
+interface GLTFStreamedImage {
+    readonly streamed: true;
+    readonly width: number;
+    readonly height: number;
+    readonly users: Set<{
+        rebindStreamed(image: GLTFStreamedImage): void;
+    }>;
+    view(device: GPUDevice, srgb: boolean): GPUTextureView | undefined;
+    close(): void;
+}
+
 interface GLTFTexture extends GLTFProperty {
   source?: number;
   sampler?: number;
@@ -679,6 +728,10 @@ interface GLTFTextureInfo extends GLTFProperty {
   texCoord?: number;
   scale?: number;
   strength?: number;
+}
+
+interface GLTFTextureOpener {
+    open(source: GLTFStreamSource, index: number): Promise<GLTFStreamedImage>;
 }
 
 interface GLTFTextureTransform {
@@ -918,6 +971,7 @@ class PBRModel implements EnginePlugin {
     adoptStaticBatches(source: PBRModel): boolean;
     registerPasses(graph: FrameGraph): void;
     shareImages(): GLTFImage[];
+    rebindStreamed(image: GLTFStreamedImage): void;
     compile(): Promise<void>;
     image(index: number): Exclude<GLTFImage, undefined>;
     uploadImage(index: number, device: GPUDevice, srgb?: boolean): GPUTexture;
@@ -1139,6 +1193,23 @@ interface StaticBatch {
     material: PBRMaterial;
     primitive: PBRPrimitive;
     parts: BatchPart[];
+}
+
+class StreamedImage implements GLTFStreamedImage {
+    readonly source: GLTFStreamSource;
+    readonly streamed = true;
+    readonly users: Set<{
+        rebindStreamed(image: GLTFStreamedImage): void;
+    }>;
+    stream?: StreamedKTX2;
+    width: number;
+    height: number;
+    wanted: number;
+    constructor(owner: GLTFTextureStream, source: GLTFStreamSource);
+    view(device: GPUDevice, srgb: boolean): GPUTextureView | undefined;
+    use(stream: StreamedKTX2): void;
+    drop(): void;
+    close(): void;
 }
 
 interface TextureTransform {

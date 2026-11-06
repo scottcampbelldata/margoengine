@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { transcodeKTX2Layers } from '../dist/codec.js';
 import { readKTX2Index } from '../dist/ktx2-file.js';
-import { ktx2LevelFile, KTX2Streamer, levelForPixels } from '../dist/ktx2-stream.js';
+import { colorTwin, ktx2LevelFile, KTX2Streamer, levelForPixels } from '../dist/ktx2-stream.js';
 import { basis, fixture, sha } from './support/ktx2.js';
 
 globalThis.GPUTextureUsage ??= { TEXTURE_BINDING: 4, COPY_DST: 2, COPY_SRC: 1 };
@@ -209,4 +209,40 @@ test('a failed level leaves the stream as it was and reports once', async () => 
   assert.equal(stream.texture, texture);
   assert.ok(stream.error);
   s.dispose();
+});
+
+test('a KTX2 file inside a larger file reads through its offset, with and without Range', async () => {
+  const bytes = await fixture('cube-uastc-zstd.ktx2'),
+    offset = 4096,
+    outer = new Uint8Array(offset + bytes.length + 512).fill(255);
+  outer.set(bytes, offset);
+  const { web, streamer: s } = await streamer(outer),
+    stream = await s.open('/model.glb', { offset, length: bytes.length });
+  assert.equal(stream.levels, 7);
+  stream.want(64);
+  s.update();
+  await settled();
+  assert.equal(stream.residentLevel, 0);
+  assert.ok(web.reads.every(([from, to]) => from >= offset && to <= offset + bytes.length), 'reads stay inside the file');
+  // A server without Range sends the larger file: the stream cuts the KTX2 file out of it.
+  const whole = await streamer(outer, { fetch: async () => new Response(outer.slice(), { status: 200 }) }),
+    plain = await whole.streamer.open('/model.glb', { offset, length: bytes.length });
+  assert.equal(plain.levels, 7);
+  await assert.rejects(s.open('/model.glb', { offset }), RangeError);
+});
+
+test('colorViews lets a texture be viewed in its sRGB or linear twin, across replacements', async () => {
+  const bytes = await fixture('cube-uastc-zstd.ktx2'),
+    { device, streamer: s } = await streamer(bytes),
+    stream = await s.open('/cube.ktx2', { colorViews: true });
+  assert.deepEqual(device.log.created[0].viewFormats, [colorTwin(stream.format)]);
+  stream.want(64);
+  s.update();
+  await settled();
+  assert.deepEqual(stream.texture.viewFormats, [colorTwin(stream.format)]);
+  assert.equal(colorTwin('bc7-rgba-unorm-srgb'), 'bc7-rgba-unorm');
+  assert.equal(colorTwin('rgba8unorm'), 'rgba8unorm-srgb');
+  assert.equal(colorTwin('etc2-rgb8a1unorm'), 'etc2-rgb8a1unorm-srgb');
+  assert.equal(colorTwin('astc-4x4-unorm'), 'astc-4x4-unorm-srgb');
+  assert.equal(colorTwin('rgba16float'), undefined);
 });

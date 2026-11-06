@@ -16,6 +16,7 @@ scope.onmessage = ({ data }) => {
     maxDownloadBytes?: number;
     maxNodes?: number;
     allowedURLs?: readonly string[];
+    textures?: boolean;
   };
   if (Array.isArray(request.order)) {
     if (request.order.every(Number.isSafeInteger)) stream?.setOrder(request.order);
@@ -27,5 +28,6 @@ scope.onmessage = ({ data }) => {
       request.maxDownloadBytes,
       request.maxNodes,
       request.allowedURLs,
+      request.textures === true,
     )).run();
 };

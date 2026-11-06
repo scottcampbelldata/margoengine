@@ -85,6 +85,7 @@ export interface GLTFDecoderHooks {
             signal?: AbortSignal;
         }): Promise<GLTFCompressedImage>;
     };
+    textureStream?: GLTFTextureOpener;
     instancing?: {
         read(asset: GLTFAsset, extension: GLTFInstancing): PBRInstances | undefined;
     };
@@ -124,7 +125,7 @@ export interface GLTFExtendedMaterials {
     shader(plan: ExtendedPlan): string;
 }
 
-export type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | undefined;
+export type GLTFImage = ImageBitmap | KTX2Image | GLTFCompressedImage | GLTFStreamedImage | undefined;
 
 export interface GLTFLOD {
     node: Mesh;
@@ -169,6 +170,29 @@ export interface GLTFSplatReader {
         primitive: GLTFPrimitive;
         matrix: Float32Array;
     }[], signal?: AbortSignal): Promise<GLTFSplatCloud[]>;
+}
+
+export type GLTFStreamSource = {
+    url: string;
+    offset?: number;
+    length?: number;
+} | {
+    bytes: Uint8Array;
+};
+
+export interface GLTFStreamedImage {
+    readonly streamed: true;
+    readonly width: number;
+    readonly height: number;
+    readonly users: Set<{
+        rebindStreamed(image: GLTFStreamedImage): void;
+    }>;
+    view(device: GPUDevice, srgb: boolean): GPUTextureView | undefined;
+    close(): void;
+}
+
+export interface GLTFTextureOpener {
+    open(source: GLTFStreamSource, index: number): Promise<GLTFStreamedImage>;
 }
 
 export interface KTX2Image {
@@ -362,6 +386,7 @@ export class PBRModel implements EnginePlugin {
     adoptStaticBatches(source: PBRModel): boolean;
     registerPasses(graph: FrameGraph): void;
     shareImages(): GLTFImage[];
+    rebindStreamed(image: GLTFStreamedImage): void;
     compile(): Promise<void>;
     image(index: number): Exclude<GLTFImage, undefined>;
     uploadImage(index: number, device: GPUDevice, srgb?: boolean): GPUTexture;
@@ -703,6 +728,7 @@ interface DrawResource {
     };
     uniform: UniformSlot;
     volume?: GPUBuffer;
+    streamed?: GLTFStreamedImage[];
     volumeData?: Float32Array;
     volumeWritten?: GPUBuffer;
     values: Float32Array;

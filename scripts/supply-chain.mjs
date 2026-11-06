@@ -184,6 +184,10 @@ const ASSETS = [
     'test fixture: ScatteringSkull.gltf, the material of the Khronos glTF-Sample-Assets sample (CC0-1.0, Vladimir Petkovic and Adobe Inc.)',
   ],
   [
+    'packages/gltf-pro/tests/fixtures/streaming/NOTICE.md',
+    'test fixture: a texture of the Khronos glTF-Sample-Assets FlightHelmet, glTF-KTX-BasisU (CC0-1.0, Gary Hsu and Microsoft)',
+  ],
+  [
     'packages/gltf-pro/tests/fixtures/lights/NOTICE.md',
     'test fixtures: the EXT_lights_ies Example files and LightProfile.ies from https://github.com/BabylonJS/Assets/tree/master/meshes/EXT_lights_ies (CC-BY-4.0, The Babylon.js contributors)',
   ],

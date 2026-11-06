@@ -9,6 +9,7 @@ import { COMPONENT_BYTES } from '../../shared/accessor.js';
 import {
   GLTFAsset,
   asyncCompression,
+  asyncGeometry,
   assetLimit,
   checkDocument,
   decodeImage,
@@ -17,18 +18,19 @@ import {
   entry,
   overBudget,
   parseJSON,
+  unusedBasisuFallbacks,
 } from './asset.js';
 import { decodeExtras, packPrimitive, primitiveDefs, usesLaterUV } from './pack.js';
 import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { readResponse } from '../../shared/loading.js';
-import type { GLTFDocument } from './asset.js';
+import type { GLTFDocument, GLTFStreamSource } from './asset.js';
 
 export type StreamError = { name: string; message: string };
 export type StreamMessage =
   | { type: 'fallback' }
   | { type: 'doc'; doc: GLTFDocument }
   | { type: 'geometry'; key: number; vertices?: Float32Array; indices?: Uint32Array; uvs?: Float32Array; error?: StreamError }
-  | { type: 'image'; index: number; image?: ImageBitmap }
+  | { type: 'image'; index: number; image?: ImageBitmap; source?: GLTFStreamSource }
   | { type: 'bytes'; loaded: number; total: number }
   | { type: 'done'; buffers: Uint8Array[]; accessors: [number, Float32Array][] }
   | { type: 'error'; error: StreamError };
@@ -104,7 +106,10 @@ export class GLTFStream {
   private loaded = 0;
   private reported = 0;
   private base: URL;
-  /** `limit`: maxDownloadBytes, already validated by the caller; `maxNodes`: the load's maxNodes. */
+  /**
+   * `limit`: maxDownloadBytes, already validated by the caller; `maxNodes`: the load's maxNodes; `textures`: KTX2 images
+   * stream on the main thread, so this reports where each one is and fetches none of it.
+   */
   constructor(
     private readonly url: URL,
     private readonly post: (message: StreamMessage) => void,
@@ -112,6 +117,7 @@ export class GLTFStream {
     private readonly limit = assetLimit,
     private readonly maxNodes?: number,
     private readonly allowedURLs?: readonly string[],
+    private readonly textures = false,
   ) {
     this.base = url;
     signal.addEventListener('abort', () => this.notify(), { once: true });
@@ -134,7 +140,7 @@ export class GLTFStream {
       const doc = await this.head();
       checkDocument(doc); // before the main thread (or the fallback test) reads it
       if (
-        asyncCompression(doc) ||
+        (this.textures ? asyncGeometry(doc) : asyncCompression(doc)) ||
         doc.bufferViews?.some(
           (view) => view?.extensions?.EXT_meshopt_compression || view?.extensions?.KHR_meshopt_compression,
         )
@@ -499,6 +505,36 @@ export class GLTFStream {
       if (!wanted.length) await this.next();
     }
   }
+  // Where KTX2 image `def` is. A view in a ranged file is left unfetched (counted as received) for the stream to read.
+  private async textureSource(doc: GLTFDocument, def: NonNullable<GLTFDocument['images']>[number]): Promise<GLTFStreamSource> {
+    if (def.bufferView === undefined) {
+      if (typeof def.uri !== 'string')
+        throw new TypeError(
+          'Invalid glTF image; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
+        );
+      if (def.uri.startsWith('data:')) return { bytes: embedded(def.uri, this.limit) };
+      return { url: assetURL(def.uri, this.base, this.allowedURLs, 'glTF').href };
+    }
+    this.asset!.view(def.bufferView);
+    const v = entry(doc.bufferViews, def.bufferView, 'bufferView'),
+      b = this.map[v.buffer];
+    if (b?.source >= 0) {
+      const s = this.sources[b.source],
+        lo = b.offset + (v.byteOffset ?? 0),
+        hi = lo + v.byteLength;
+      while (s.ranged === undefined) {
+        if (!s.probing) this.request(b.source, lo, Math.min(hi, lo + 1));
+        await this.next();
+      }
+      if (s.ranged) {
+        add(s.asked, lo, hi);
+        add(s.got, lo, hi);
+        return { url: s.url.href, offset: lo, length: v.byteLength };
+      }
+      while (!covered(s.got, lo, Math.min(hi, s.data!.length))) await this.next();
+    }
+    return { bytes: this.asset!.view(def.bufferView).slice() };
+  }
   private async images(doc: GLTFDocument): Promise<void> {
     // Images used by the most important primitives first, then the rest.
     const defs = primitiveDefs(doc),
@@ -529,10 +565,15 @@ export class GLTFStream {
       ...images.map((_: unknown, i: number) => i).filter((i: number) => !first.includes(i)),
     ].filter((i) => i < images.length);
     let decoded = 0;
+    const skipped = this.textures ? unusedBasisuFallbacks(doc) : new Set<number>();
     const one = async (index: number) => {
       const def = images[index],
         ktx2 = def.mimeType === 'image/ktx2' || /\.ktx2$/i.test(def.uri ?? '');
-      if (ktx2) {
+      if (ktx2 && this.textures) {
+        this.post({ type: 'image', index, source: await this.textureSource(doc, def) });
+        return;
+      }
+      if (ktx2 || skipped.has(index)) {
         this.post({ type: 'image', index });
         return;
       }

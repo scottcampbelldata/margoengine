@@ -63,6 +63,7 @@ import {
   downloadLimit,
   decodeKTX2Images,
   type GLTFImage,
+  type GLTFStreamedImage,
   type AssetOptions,
   type GLTFDecoderHooks,
   type GLTFExtendedMaterials,
@@ -135,7 +136,7 @@ import { occlusionShader } from './occlusion.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
 export { GLTFAsset, closeImages } from './asset.js';
 export type { GLTFDocument } from './asset.js';
-export type { GLTFImage, KTX2Image } from './asset.js';
+export type { GLTFImage, GLTFStreamedImage, GLTFStreamSource, GLTFTextureOpener, KTX2Image } from './asset.js';
 export { textureCoordinates } from './texture-coordinates.js';
 import type { TextureTransform } from './texture-coordinates.js';
 export type { TextureTransform } from './texture-coordinates.js';
@@ -1129,6 +1130,8 @@ interface DrawResource {
   /** This draw's uniform block: a window of the device's uniform arena (`uniform-arena.ts`). */
   uniform: UniformSlot;
   volume?: GPUBuffer;
+  /** Streamed images this draw's material binds: replacing one's texture calls bindMaterial here again. */
+  streamed?: GLTFStreamedImage[];
   /** Float32 copy of `material.volume`, reused so a transmission draw does not allocate. */
   volumeData?: Float32Array;
   /** Buffer that `volumeData` was last written to. A new buffer uploads again. */
@@ -1581,7 +1584,7 @@ export interface PBRMaterialShading extends LightingEffect {
 }
 function uploadCompressedImage(
   device: GPUDevice,
-  image: Exclude<GLTFImage, ImageBitmap | undefined | import('./asset.js').KTX2Image>,
+  image: Exclude<GLTFImage, ImageBitmap | undefined | import('./asset.js').KTX2Image | GLTFStreamedImage>,
   srgb: boolean,
 ): GPUTexture {
   const formats: Record<string, TranscodedKTX2Result['target']> = {
@@ -2721,6 +2724,7 @@ export class PBRModel implements EnginePlugin {
     }
     r.views = [];
     r.samplers = [];
+    r.streamed = undefined;
     r.groups.clear();
     r.copies?.clear();
     r.replacesTextures = !!m.shading?.replacesTextures;
@@ -2739,9 +2743,19 @@ export class PBRModel implements EnginePlugin {
               .map((k) => def.extensions?.[k]?.source)
               .find((s) => s !== undefined && this.images[s]) ?? integer(def.source, 'image'))
           : -1,
-        image = this.images[source];
-      if (def && !image)
+        held = this.images[source];
+      if (def && !held)
         throw new TypeError('Missing decoded glTF image; this is a loader bug, report it with the file');
+      const streamed = held && 'streamed' in held ? held : undefined;
+      if (streamed && device !== this.engine.gpu)
+        throw margoError(
+          'unsupported',
+          'Streamed textures live on the engine device; load the model without `textures` to draw it on another device',
+        );
+      // A stream between devices (after a restore) draws as the slot's default until its smallest levels are back.
+      const live = streamed?.view(device, srgbMaps.includes(i)),
+        image = streamed ? undefined : held;
+      if (streamed) (r.streamed ??= []).push(streamed);
       const compressed = image && 'ktx2' in image ? image.ktx2 : image && 'mipmaps' in image ? image : undefined,
         format = compressed
           ? ((compressed.format.replace(/-srgb$/, '') + (srgbMaps.includes(i) ? '-srgb' : '')) as GPUTextureFormat)
@@ -2752,8 +2766,8 @@ export class PBRModel implements EnginePlugin {
       if (size.some((n) => n > device.limits.maxTextureDimension2D))
         throw new RangeError('Image exceeds device limit; load a smaller model, or reduce its textures and meshes');
       const key = image ? source + ':' + format : 'default:' + i;
-      let texture = cache.get(key) as GPUTexture | undefined;
-      const shares = texture ? undefined : texturesOf(device, image ?? this.asset),
+      let texture = live ? undefined : (cache.get(key) as GPUTexture | undefined);
+      const shares = texture || live ? undefined : texturesOf(device, image ?? this.asset),
         shareKey = image ? format : key,
         share = shares?.get(shareKey);
       if (share) {
@@ -2774,7 +2788,7 @@ export class PBRModel implements EnginePlugin {
         texture = uploadCompressedImage(device, compressed, srgbMaps.includes(i));
         hold(texture);
       }
-      if (!texture) {
+      if (!texture && !live) {
         const levels = compressed
           ? compressed.mipmaps.length
           : image
@@ -2801,8 +2815,8 @@ export class PBRModel implements EnginePlugin {
           );
         if (!compressed) generateMipmaps(device, texture, levels, mipPipelines(device), mipSampler);
       }
-      let view = textureViews.get(texture);
-      if (!view) textureViews.set(texture, (view = texture.createView()));
+      let view = live ?? textureViews.get(texture!);
+      if (!view) textureViews.set(texture!, (view = texture!.createView()));
       r.views.push(view);
       const s = def?.sampler === undefined ? {} : entry(this.asset.doc.samplers, def.sampler, 'sampler');
       const wrap = (v: unknown) => {
@@ -2880,6 +2894,16 @@ export class PBRModel implements EnginePlugin {
     if (this.disposed) throw margoError('disposed', 'PBRModel is disposed; load the model again');
     retainImages(this.images);
     return [...this.images];
+  }
+  /** Binds the draws of `image` again after its texture was replaced; a stream calls this. */
+  rebindStreamed(image: GLTFStreamedImage): void {
+    const device = this.engine.gpu;
+    if (this.disposed) image.users.delete(this);
+    if (this.disposed || !device) return;
+    let sampler: GPUSampler | undefined;
+    for (const r of this.resources)
+      if (r.streamed?.includes(image))
+        this.bindMaterial(r, device, (sampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' })));
   }
   /** Lets go of one of this model's material textures and forgets its cache key. */
   private dropTexture(device: GPUDevice, key: string, texture: GPUTexture): void {
@@ -2962,6 +2986,8 @@ export class PBRModel implements EnginePlugin {
   /** Upload a retained image; the caller owns and destroys the returned texture. */
   uploadImage(index: number, device: GPUDevice, srgb = false): GPUTexture {
     const image = this.image(index);
+    if ('streamed' in image)
+      throw margoError('unsupported', 'A streamed texture has no whole image to upload; load the model without `textures`');
     if ('ktx2' in image || 'mipmaps' in image)
       return uploadCompressedImage(device, 'ktx2' in image ? image.ktx2 : image, srgb);
     const size = [image.width, image.height],

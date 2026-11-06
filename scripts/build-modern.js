@@ -165,6 +165,7 @@ async function buildPackage(name) {
           '@margoengine/decoders/brotli',
           '@margoengine/decoders/meshopt',
           '@margoengine/decoders/texture',
+          '@margoengine/decoders/ktx2-stream',
           '@margoengine/text',
           '@margoengine/bvh',
           '@margoengine/splines',

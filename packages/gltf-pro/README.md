@@ -150,7 +150,7 @@ refraction output. Native transmission uses scalar volume thickness; imported
 `KHR_materials_volume.thicknessTexture` is sampled by the explicit
 `@margoengine/materials` installation route.
 
-The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; compressed assets use the normal async loader before publishing a model. `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced; `maxDownloadBytes` counts the root JSON/GLB file together with its fetched and data-URI resources.
+The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; compressed assets use the normal async loader before publishing a model, and its `textures` option streams KTX2 mip levels ("Texture mip streaming" below). `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced; `maxDownloadBytes` counts the root JSON/GLB file together with its fetched and data-URI resources.
 
 In a multi-view frame, a model draws only the nodes in the view's layers, and each view keeps its own camera uniforms
 even when one command encoder records several views or probe faces. Buffers released mid-draw (a callback that
@@ -348,6 +348,34 @@ Read against the two extensions' READMEs on the Khronos glTF repository as of 20
 - `gltfIESLights(model)` and `gltfImageLight(model)` return the data without a GPU; `orientIES` and `rotateCube` are the steps between.
 
 Limits are in [docs/limits.md](../../docs/limits.md): lights stay where their nodes were when applied, and at most 16 fixtures differ in profile or aim.
+
+### Texture mip streaming (`textures` of `/progressive`)
+
+KTX 2.0 keeps the smallest mip first, so a texture can start from a small read of the head of its file. With `textures` set, `loadGLTFProgressive` opens each KTX2 image from those smallest levels and loads finer ones only as the texture's size on screen calls for them, inside a memory budget. Levels nothing needs leave when the budget runs out. It reuses `KTX2Streamer` of `@margoengine/decoders/ktx2-stream`, loaded only with this option.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTFProgressive} from 'margoengine/gltf-pro/progressive';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const load = loadGLTFProgressive(stage.engine, '/city.gltf', {textures: {budgetBytes: 128 * 1024 * 1024}});
+const model = await load.complete;
+const textures = await load.textures;
+console.log(model.primitives.length, textures?.usedBytes, textures?.textures);
+```
+
+| Option of `textures` (or `true`) | Default | Meaning |
+| --- | --- | --- |
+| `budgetBytes` | 256 MiB | Most GPU memory the load's textures may hold. A stream always keeps its coarsest levels, whatever the budget. Change it later through `load.textures`. |
+| `concurrency` | `2` | Levels loading at once. |
+| `headBytes` | 64 KiB | Bytes of an image's first Range read. |
+| `decoder`, `hdrDecoder` | made on first use | Level decoders, as `KTX2Streamer`. |
+| `onError` | `console.error` | Called when a finer level fails; the texture keeps the levels it has. |
+
+`load.textures` is a promise of the live stream: `usedBytes`, `budgetBytes` (settable), `textures` (each one's size, finest level held, level count and size on screen) and `update()`. It runs by itself about five times a second for as long as the model lives; disposing the model frees it.
+
+A texture's size on screen is the square root of its primitive's surface area over its UV area, which is the length one whole texture covers, times the pixels one world unit covers at the nearest point of the primitive's bounding sphere, on the nearest camera that sees it. Tiling, atlases and `KHR_texture_transform` scale need no special case. An image inside a GLB or a `.bin` streams too, by Range reads at its offset, and those bytes stay out of the buffers; on a server without Range the file comes once and the texture streams from memory. A file `loadGLTFProgressive` takes whole (Draco, meshopt, or a `fetch` option) still streams its KTX2 images. `complete` means every primitive is loaded and every texture is drawing from at least its coarsest levels.
+
+PNG, JPEG, WebP and AVIF files hold no mips, so they load whole, and a KTX2 file stored with one level has nothing to stream. `model.uploadImage` refuses a streamed image, and a replica on another device refuses a streamed model. Off WebGPU the option has no effect. See `docs/limits.md`.
 
 ### Optional material extension slot
 

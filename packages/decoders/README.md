@@ -305,6 +305,8 @@ sets `error`; clear it to try again. Block formats start at the coarsest level w
 WebGPU wants that of level 0; `bytes()` and `usedBytes` report what the streams hold, and `dispose` frees it all. Lower
 `budgetBytes` under memory pressure and the next `update` drops levels to fit.
 
+`open` takes `offset` and `length` for a KTX2 file inside a larger file, such as an image in a GLB's binary chunk, and `colorViews` for a loader that picks sRGB or linear by how a texture is used: every texture it makes then allows views in the format's twin (`colorTwin(format)`).
+
 ## Basis on the GPU (`@margoengine/decoders/ktx2-gpu`)
 
 `KTX2GPUDecoder` transcodes Basis Universal KTX2 files with compute shaders, so a page that only needs textures skips the Wasm

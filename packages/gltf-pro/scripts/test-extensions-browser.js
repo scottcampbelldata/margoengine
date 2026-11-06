@@ -2,7 +2,8 @@
 // repository root after `npm run build:packages`: `npm run test:extensions:browser --workspace packages/gltf-pro`.
 // MARGO_SPLAT_SAMPLES names a folder holding the large tower.glb capture (tests/fixtures/splats/NOTICE.md).
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -355,7 +356,220 @@ async function cubeQuad(cube) {
   return middle;
 }
 
+const streamFile = 'packages/gltf-pro/tests/fixtures/streaming/FlightHelmet_Materials_LensesMat_BaseColor.ktx2';
+/** Serves `files` (name to bytes) with Range support to the page, counting the bytes sent. `ranges: false` sends them whole. */
+async function rangeServer(files, ranges = true) {
+  const served = { bytes: 0, requests: 0, spans: [] },
+    server = createServer((request, response) => {
+      const name = decodeURIComponent(new URL(request.url, 'http://x').pathname.slice(1)),
+        headers = {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Range',
+          'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges',
+          ...(ranges ? { 'Accept-Ranges': 'bytes' } : {}),
+        };
+      if (request.method === 'OPTIONS') return response.writeHead(204, headers).end();
+      const bytes = files[name];
+      if (!bytes) return response.writeHead(404, headers).end();
+      const range = ranges && /bytes=(\d+)-(\d*)/.exec(request.headers.range ?? ''),
+        from = range ? +range[1] : 0,
+        to = range && range[2] ? Math.min(+range[2] + 1, bytes.length) : bytes.length,
+        part = bytes.subarray(from, to);
+      served.bytes += part.length;
+      served.requests++;
+      served.spans.push([from, to]);
+      response
+        .writeHead(range ? 206 : 200, {
+          ...headers,
+          ...(range ? { 'Content-Range': `bytes ${from}-${to - 1}/${bytes.length}` } : {}),
+          'Content-Length': part.length,
+        })
+        .end(part);
+    });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return { url: `http://127.0.0.1:${server.address().port}/`, served, close: () => server.close() };
+}
+/** A 2 by 2 quad facing +Z with one texture over it, image `image` as glTF JSON and its binary, `tail` at offset `at` of it. */
+function texturedQuad(image, tail = new Uint8Array(0), at = 92) {
+  const positions = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]),
+    uvs = new Float32Array([0, 1, 1, 1, 1, 0, 0, 0]),
+    indices = new Uint16Array([0, 1, 2, 0, 2, 3]),
+    bytes = new Uint8Array(at + tail.length);
+  bytes.set(new Uint8Array(positions.buffer), 0);
+  bytes.set(new Uint8Array(uvs.buffer), 48);
+  bytes.set(new Uint8Array(indices.buffer), 80);
+  bytes.set(tail, at);
+  return {
+    bytes,
+    doc: {
+      asset: { version: '2.0' },
+      extensionsUsed: ['KHR_texture_basisu'],
+      extensionsRequired: ['KHR_texture_basisu'],
+      scene: 0,
+      scenes: [{ nodes: [0] }],
+      nodes: [{ mesh: 0 }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0, TEXCOORD_0: 1 }, indices: 2, material: 0 }] }],
+      materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 }, metallicFactor: 0 }, emissiveFactor: [0, 0, 0] }],
+      textures: [{ extensions: { KHR_texture_basisu: { source: 0 } } }],
+      images: [image],
+      accessors: [
+        { bufferView: 0, componentType: 5126, count: 4, type: 'VEC3', min: [-1, -1, 0], max: [1, 1, 0] },
+        { bufferView: 1, componentType: 5126, count: 4, type: 'VEC2' },
+        { bufferView: 2, componentType: 5123, count: 6, type: 'SCALAR' },
+      ],
+      bufferViews: [
+        { buffer: 0, byteOffset: 0, byteLength: 48 },
+        { buffer: 0, byteOffset: 48, byteLength: 32 },
+        { buffer: 0, byteOffset: 80, byteLength: 12 },
+        ...(tail.length ? [{ buffer: 0, byteOffset: at, byteLength: tail.length }] : []),
+      ],
+      buffers: [{ byteLength: bytes.length }],
+    },
+  };
+}
+/** Loads `url` with streaming textures as `window.check.load`, and waits until its levels stop changing at `camera`. */
+const streamed = (url, options, camera) =>
+  page.evaluate(
+    async ({ url, options, camera }) => {
+      const { loadGLTFProgressive } = await import('/packages/gltf-pro/dist/progressive.js'),
+        { engine } = window.check;
+      Object.assign(engine.camera, camera);
+      const load = loadGLTFProgressive(engine, url, { textures: options });
+      window.check.model = await load.complete;
+      window.check.stream = await load.textures;
+      engine.start();
+    },
+    { url, options, camera },
+  );
+/** Moves the camera and waits for the streams to settle; returns their levels and bytes. */
+const settle = (camera) =>
+  page.evaluate(async (camera) => {
+    const { engine, stream } = window.check;
+    Object.assign(engine.camera, camera);
+    const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
+    let last,
+      calm = 0;
+    const steady = () => {
+      stream.update();
+      const now = JSON.stringify(stream.textures.map((t) => t.level));
+      calm = now === last ? calm + 1 : 0;
+      last = now;
+      return calm > 40;
+    };
+    const frame = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      await engine.gpu.queue.onSubmittedWorkDone();
+    };
+    await waitForPipelines(frame, { ready: steady });
+    return { textures: stream.textures, used: stream.usedBytes };
+  }, camera);
+
 const checks = {
+  // A real Khronos KTX2 file on a quad. levelForPixels asks for the coarsest level at least as wide as the texture is on
+  // screen, so the file's width over a power of two must lie at or above the on-screen width, and below twice it.
+  async 'streaming: a real KTX2 texture loads the levels its size on screen needs, over HTTP Range'() {
+    const file = new Uint8Array(readFileSync(streamFile)),
+      quad = texturedQuad({ uri: 'lamp.ktx2' }),
+      doc = { ...quad.doc, buffers: [{ ...quad.doc.buffers[0], uri: 'quad.bin' }] },
+      host = await rangeServer({ 'quad.gltf': new TextEncoder().encode(JSON.stringify(doc)), 'quad.bin': quad.bytes, 'lamp.ktx2': file });
+    await open();
+    await streamed(`${host.url}quad.gltf`, {}, { position: [0, 0, 400], target: [0, 0, 0] });
+    const far = await settle({ position: [0, 0, 400], target: [0, 0, 0] }),
+      farBytes = host.served.bytes,
+      [distant] = far.textures,
+      // The quad is 2 wide; one unit at distance d is size / 2 / (d tan 30) pixels.
+      across = (d) => (2 * size) / 2 / ((d - Math.SQRT2) * Math.tan(Math.PI / 6));
+    assert.ok(distant.pixels > 0 && Math.abs(distant.pixels / across(400) - 1) < 1e-3, 'on-screen size from the camera');
+    const near = await settle({ position: [0, 0, 2], target: [0, 0, 0] }),
+      [close1] = near.textures;
+    assert.ok(close1.level < distant.level, 'a closer camera loads finer levels');
+    assert.ok(close1.width >> close1.level >= Math.min(close1.width, close1.pixels), 'at least as sharp as the screen');
+    assert.ok(host.served.bytes > farBytes, 'the finer levels came over the network afterwards');
+    assert.ok(farBytes < quad.bytes.length + file.length, 'far away the file is not all read');
+    assert.ok(near.used > far.used, 'the finer levels are on the GPU');
+    const image = await pixels();
+    await close();
+    // The same level 0 the plain loader uploads, so the same camera draws the same picture.
+    await open();
+    const whole = await page.evaluate(
+      async ({ url }) => {
+        const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+          { engine } = window.check;
+        Object.assign(engine.camera, { position: [0, 0, 2], target: [0, 0, 0] });
+        await loadGLTF(engine, url);
+      },
+      { url: `${host.url}quad.gltf` },
+    );
+    assert.equal(whole, undefined);
+    const plain = await pixels();
+    assert.equal(Buffer.compare(image.data, plain.data), 0, 'the same pixels as the plain loader');
+    await close();
+    host.close();
+  },
+  async 'streaming: a budget drops levels nothing needs, and the model keeps drawing'() {
+    const file = new Uint8Array(readFileSync(streamFile)),
+      quad = texturedQuad({ uri: 'lamp.ktx2' }),
+      doc = { ...quad.doc, buffers: [{ ...quad.doc.buffers[0], uri: 'quad.bin' }] },
+      host = await rangeServer({ 'quad.gltf': new TextEncoder().encode(JSON.stringify(doc)), 'quad.bin': quad.bytes, 'lamp.ktx2': file });
+    await open();
+    await streamed(`${host.url}quad.gltf`, {}, { position: [0, 0, 2], target: [0, 0, 0] });
+    const held = await settle({ position: [0, 0, 2], target: [0, 0, 0] });
+    await page.evaluate(() => {
+      window.check.stream.budgetBytes = 1;
+    });
+    const dropped = await settle({ position: [0, 0, 400], target: [0, 0, 0] });
+    assert.ok(dropped.used < held.used, 'over budget, the finer levels leave');
+    assert.ok(dropped.textures[0].level > held.textures[0].level);
+    await pixels();
+    await close();
+    host.close();
+  },
+  // In a GLB the image sits in the binary chunk: Range reads reach it there, and the rest of the chunk still loads. KTX2 keeps
+  // the largest level last, so a far camera never reads the end of the file. The image starts past the 256 KB blocks geometry
+  // is read in. Without Range the file comes whole, once, and the stream reads the same bytes from memory.
+  async 'streaming: an image in a GLB binary chunk streams, with and without HTTP Range'() {
+    const file = new Uint8Array(readFileSync(streamFile)),
+      quad = texturedQuad({ bufferView: 3, mimeType: 'image/ktx2' }, file, 512 << 10),
+      bytes = glb(quad.doc, Buffer.from(quad.bytes));
+    for (const ranges of [true, false]) {
+      const host = await rangeServer({ 'quad.glb': bytes }, ranges);
+      await open();
+      await streamed(`${host.url}quad.glb`, {}, { position: [0, 0, 400], target: [0, 0, 0] });
+      const far = await settle({ position: [0, 0, 400], target: [0, 0, 0] });
+      if (ranges) assert.ok(host.served.spans.every(([, to]) => to < bytes.length - 4), 'the largest level stays on the server');
+      const near = await settle({ position: [0, 0, 2], target: [0, 0, 0] });
+      assert.ok(near.textures[0].level < far.textures[0].level);
+      await pixels();
+      await close();
+      host.close();
+    }
+  },
+  // MARGO_SPLAT_SAMPLES/helmet holds the Khronos FlightHelmet glTF-KTX-BasisU files (CC0, 33 MB, so not in the repository).
+  async 'streaming: the real FlightHelmet starts from a small part of its files'() {
+    const folder = process.env.MARGO_SPLAT_SAMPLES;
+    if (!folder || !existsSync(join(folder, 'helmet/FlightHelmet.gltf'))) {
+      console.log('FlightHelmet absent: set MARGO_SPLAT_SAMPLES (packages/gltf-pro/README.md)');
+      return;
+    }
+    const names = readdirSync(join(folder, 'helmet')),
+      files = Object.fromEntries(names.map((name) => [name, new Uint8Array(readFileSync(join(folder, 'helmet', name)))])),
+      total = Object.values(files).reduce((sum, bytes) => sum + bytes.length, 0),
+      host = await rangeServer(files);
+    await open();
+    await streamed(`${host.url}FlightHelmet.gltf`, {}, { position: [0, 0.3, 40], target: [0, 0.3, 0] });
+    const far = await settle({ position: [0, 0.3, 40], target: [0, 0.3, 0] }),
+      farBytes = host.served.bytes;
+    const near = await settle({ position: [0, 0.35, 0.7], target: [0, 0.3, 0] }),
+      nearBytes = host.served.bytes,
+      image = await pixels();
+    console.log(`FlightHelmet: ${names.length} files, ${total} B; far ${farBytes} B, ${far.used} B on the GPU; near ${nearBytes} B, ${near.used} B on the GPU`);
+    assert.equal(far.textures.length, 15);
+    assert.ok(farBytes < total / 2, 'far away, under half the files are read');
+    assert.ok(near.used > far.used);
+    assert.ok(new Set(Array.from({ length: 16 }, (_, i) => String(image.at(size / 2, 16 * i + 8)))).size > 4, 'the helmet draws');
+    await close();
+    host.close();
+  },
   // The file's wall stands 0.1 behind a fixture aimed down it at y = 3. On the row y = 1, 2 below the fixture, the profile
   // dips to 3250 cd at 20 degrees and comes back to 5250 at 30, so the wall gets brighter going outward, which a light that
   // falls off smoothly cannot do. Each pixel is held to Lambert's law for its own place on the wall: the green of the tint

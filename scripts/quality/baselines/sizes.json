@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9086361,
+  "total": 9092074,
   "history": [
     {
       "date": "2026-10-24",
@@ -2828,6 +2828,12 @@
       "commit": "a7818f097",
       "reason": "new optional entry @margoengine/tween/scroll",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "bfcda04de",
+      "reason": "texture streaming: GLTFStreamedImage binding path in the root entry, new lazy chunk loaded only with the textures option",
+      "grew": 2
     }
   ],
   "items": {
@@ -3051,14 +3057,14 @@
     "@margoengine/gltf": 6831,
     "@margoengine/gltf-pro": 65573,
     "@margoengine/gltf-pro dist/workers/gltf.js": 24791,
-    "@margoengine/gltf-pro dist/workers/progressive.js": 15374,
+    "@margoengine/gltf-pro dist/workers/progressive.js": 16170,
     "@margoengine/gltf-pro/asset": 5490,
     "@margoengine/gltf-pro/coordinates": 755,
     "@margoengine/gltf-pro/extended": 8224,
     "@margoengine/gltf-pro/instancing": 3350,
     "@margoengine/gltf-pro/lights": 3470,
     "@margoengine/gltf-pro/prepare": 21088,
-    "@margoengine/gltf-pro/progressive": 70098,
+    "@margoengine/gltf-pro/progressive": 75015,
     "@margoengine/gltf-pro/scene": 1471,
     "@margoengine/gltf-pro/splats": 2100,
     "@margoengine/gltf-pro/worker": 66055,

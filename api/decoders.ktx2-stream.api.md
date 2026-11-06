@@ -13,6 +13,9 @@ export interface KTX2OpenOptions {
     signal?: AbortSignal;
     label?: string;
     usage?: number;
+    offset?: number;
+    length?: number;
+    colorViews?: boolean;
 }
 
 export class KTX2Streamer {
@@ -68,6 +71,8 @@ export class StreamedKTX2 {
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
+
+export function colorTwin(format: GPUTextureFormat): GPUTextureFormat | undefined;
 
 export function ktx2LevelFile(head: Uint8Array, index: KTX2Index, level: number, data: Uint8Array): Uint8Array;
 
