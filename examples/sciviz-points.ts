@@ -59,6 +59,7 @@ async function build(): Promise<void> {
     const selected = event.detail.points.reduce((sum, p) => sum + p.indices.length, 0);
     status.textContent = `${summary} Selected ${selected.toLocaleString('en')}.`;
   });
+  await fig.ready();
   canvas.dataset.ready = 'true';
 }
 

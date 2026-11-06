@@ -136,6 +136,7 @@ try {
   });
   window.addEventListener('pagehide', () => figure.dispose(), { once: true });
   status.textContent = `${(N ** 3).toLocaleString('en')} voxels generated and ray-marched on the GPU.`;
+  await figure.ready();
   canvas.dataset.ready = 'true';
 } catch (error) {
   status.textContent = `Could not start: ${(error as Error).message}`;

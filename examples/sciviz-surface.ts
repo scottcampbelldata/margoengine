@@ -81,6 +81,7 @@ try {
   requestAnimationFrame(tick);
   window.addEventListener('pagehide', () => figure.dispose(), { once: true });
   status.textContent = `${(N * N).toLocaleString('en')} heights recomputed per frame on the GPU and drawn in place.`;
+  await figure.ready();
   canvas.dataset.ready = 'true';
 } catch (error) {
   status.textContent = `Could not start: ${(error as Error).message}`;
