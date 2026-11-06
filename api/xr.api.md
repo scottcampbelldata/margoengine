@@ -73,6 +73,8 @@ export interface XRBinding {
         depthStencilFormat: GPUTextureFormat;
     }): XRProjectionLayer;
     getViewSubImage(layer: XRProjectionLayer, view: XRView): XRSubImage;
+    projection?(view: XRView): ArrayLike<number>;
+    present?(layer: XRProjectionLayer): void;
 }
 
 export class XRController {
@@ -175,6 +177,7 @@ export interface XRNativeSession extends EventTarget {
     requestReferenceSpace(type: string): Promise<XRSpace>;
     updateRenderState(state: {
         layers?: XRProjectionLayer[];
+        baseLayer?: unknown;
         depthNear?: number;
         depthFar?: number;
     }): void;
@@ -206,6 +209,7 @@ export interface XRPose {
 }
 
 export interface XRProjectionLayer {
+    baseLayer?: unknown;
     destroy(): void;
 }
 

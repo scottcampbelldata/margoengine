@@ -2,7 +2,7 @@
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 27 site demos, 20 draw the same pixels as native WebGPU and 7 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). The voxel path tracer and XR refuse the layer (MargoError `unsupported`). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small `@margoengine/webgl` preview stays for v1.0. This package
+**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 27 site demos, 20 draw the same pixels as native WebGPU and 7 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). The voxel path tracer refuses the layer (MargoError `unsupported`); XR runs on it through the [`/xr` entry](#xr-margoenginewebgl2-compatxr). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small `@margoengine/webgl` preview stays for v1.0. This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels
@@ -100,7 +100,7 @@ What it does:
   44 ms for 10,000 splats; one readback of the keys a frame); `CulledInstances` and `CulledMeshes` cull against the
   frustum on the CPU and upload what they keep (1.1 ms instead of 11.7 ms for 10,000 parts; `'occlusion'` culls
   against the frustum only there). Each draws the same pixels as on native WebGPU. VFX, creative particles and
-  scatter run their WebGPU kernels on the CPU tier, the plan's route for them. The voxel path tracer and XR refuse the layer with MargoError code `unsupported`.
+  scatter run their WebGPU kernels on the CPU tier, the plan's route for them. The voxel path tracer refuses the layer with MargoError code `unsupported`.
 - **WGSL front end** (`margoengine/webgl2-compat/wgsl`, milestone M1): `checkWGSL(source)` and `parseWGSL(source)`.
 - `webgl2Capabilities(gl)` and `probeWebGL2()`: what a browser's WebGL2 offers and the tier it reaches. The layer
   renders only on the `full` tier: renderable float colour targets (`EXT_color_buffer_float`) and `highp` in fragment
@@ -135,6 +135,42 @@ none, and its shaders' `@interpolate(flat)` becomes `@interpolate(flat, either)`
 Core, picking, device restore and `@margoengine/materials` run on the level. `Shadows`, `CulledInstances` occlusion and
 an HDR `PostStack` do not yet: the table is in [limits.md](../../docs/limits.md) and the causes are in
 [known-bugs.md](../../docs/known-bugs.md). The check is `test/adapter-browser.mjs`, in `test:gpu`.
+
+### XR (`margoengine/webgl2-compat/xr`)
+
+`XR` from `margoengine/xr` draws through the browser's `XRGPUBinding`, which needs WebGPU. Headsets and phones without it
+still have WebXR on WebGL: `installXR()` gives `XR` a binding of the same shape on an `XRWebGLLayer`, so sessions, input,
+hit testing and the stereo drawing run as they do on WebGPU. Call it after `install()` installed the layer, and create
+`XR` as usual:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { XR } from 'margoengine/xr';
+
+const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+const button = document.querySelector('button') as HTMLButtonElement;
+const { installed } = await (await import('margoengine/webgl2-compat')).install();
+if (installed) (await import('margoengine/webgl2-compat/xr')).installXR({ framebufferScale: 0.75 });
+const engine = await Engine.create(canvas);
+const xr = await XR.create(engine);
+button.onclick = () => xr.requestSession('immersive-vr');
+```
+
+Where `install()` leaves the browser's WebGPU in place, the `installed` test skips this entry and `XR` uses the native
+binding. `framebufferScale` is the layer's `framebufferScaleFactor` (default: the browser's own), the first setting to
+lower on a weak GPU.
+
+Each eye renders with 4x multisampling into a texture of its own, as big as its part of the XR framebuffer, and one draw
+per eye puts it into the framebuffer at the end of the frame: one extra full-eye copy a frame against the native binding.
+The session's `XRWebGLLayer` has no depth buffer, so the compositor gets no depth and cannot reproject by it. The session
+asks for no `webgpu` feature, and its `XRView` projections, which have z in [-1, 1] on WebGL, are remapped to the layer's
+[0, 1]. `dispose()` (or `using`) puts `XRGPUBinding` back; a second call before that throws MargoError `state`, as does a
+call before `install()`, and a browser without WebXR or `XRWebGLLayer` gets `unsupported`. The WebGL context of an XR
+device is a page canvas's (`xrCompatible`), not an `OffscreenCanvas`'s.
+
+The check is `test/xr-browser.mjs`, in `test:gpu`: one scene through `XR`, natively and on the layer, with no pixel
+different in either eye on an NVIDIA RTX A6000. `navigator.xr` and the browser's XR layers are stand-ins there, over real
+devices and framebuffers; no headset has run this route ([limits.md](../../docs/limits.md)).
 
 ### GLSL back end (`margoengine/webgl2-compat/glsl`)
 
@@ -251,6 +287,7 @@ browsers' own WebGPU compilers, where it was recorded.
   lights, image-based lighting, GPU culling of instances), the glTF PBR shader review, lod, lines, text, the shadows
   lit-faces check (a skinned robot), the voxel render check, the environment check, the post-effects suite, the VFX
   check and scatter's LOD check pass whole, and points on its single-sample path (its 4x eye-dome lighting shades per sample, which WebGL2 cannot).
+- XR against native WebGPU (`npm run test:gpu`): both eyes of one scene through `XR`, with stand-ins for the browser's XR objects; no pixel differs.
 - The package routes against native WebGPU (`npm run test:gpu`): DOF, splats, `CulledInstances` and `CulledMeshes`
   each draw the same scene natively and on the layer once a frame's dispatches are their route's; no pixel differs.
 - The compute check against native WebGPU in one page (`npm run test:gpu`): 13 cases over the three tiers (own-texel

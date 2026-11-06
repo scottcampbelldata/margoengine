@@ -301,7 +301,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 | three.js | Status | Margo | Shows it | Notes |
 | --- | --- | --- | --- | --- |
-| WebXR VR (`renderer.xr`) | PARTIAL | xr `XR.requestSession('immersive-vr')` (`packages/xr/src/index.ts`) | | Requires the native `XRGPUBinding` (WebGPU). Draws core meshes and loader-owned glTF-pro PBR models (skinning and morphs included) in both eyes. Not drawn or not implemented: other plugin passes (lines, points, terrain and the like), post effects, controller visuals, locomotion, hit testing and a WebGL XR fallback; caller-owned extension textures raise an error. Untested on physical headsets. |
+| WebXR VR (`renderer.xr`) | PARTIAL | xr `XR.requestSession('immersive-vr')` (`packages/xr/src/index.ts`) | | Requires the native `XRGPUBinding` (WebGPU), or `installXR()` from `@margoengine/webgl2-compat/xr` on the WebGL2 layer. Draws core meshes and loader-owned glTF-pro PBR models (skinning and morphs included) in both eyes. Not drawn or not implemented: other plugin passes (lines, points, terrain and the like), post effects, controller visuals, locomotion, and hit testing; caller-owned extension textures raise an error. Untested on physical headsets. |
 | WebXR AR (hit test, anchors, plane detection, depth sensing, light estimation) | PARTIAL | xr `immersive-ar` session mode; `HitTest` (`packages/xr/src/hit-test.ts`) | | Hit testing from the viewer, an input source or transient input (screen taps), results as poses in the reference space, anchors through `hits.anchor(hit)`. Plane detection, depth sensing and light estimation are not wrapped. Tested against the WebXR Hit Test Module's interfaces with a mocked session only; never run on an AR device. |
 | Controller and hand input poses | COVERED † | xr `XRController` (`packages/xr/src/controller.ts`) | | Target-ray and grip poses, buttons, axes, 25 hand joints; react `Controller` binds a mesh to the grip or target-ray pose with select and squeeze events. |
 | XRControllerModelFactory, XRHandModelFactory | MISSING | xr | | Poses and 25 hand joints exist; the models come after a headset test. |
@@ -316,7 +316,7 @@ Recounted from the rows (2026-11-06): 5 PARTIAL, 16 MISSING. Each fix goes in th
 | Meshlet rendering | PARTIAL. One mesh, one matrix; no instancing or Hi-Z per cluster. | Extend `@margoengine/culling/meshlets`. |
 | Node materials / TSL | PARTIAL. No statement-level `If`, workgroup memory or light nodes. | Extend `@margoengine/shader`. |
 | WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. | Test on a device first, then the XR layers, locomotion and plugin-pass row, then controller and hand models. |
-| WebGL2 fallback | PARTIAL. M8 is done; the voxel path tracer and XR refuse the layer, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
+| WebGL2 fallback | PARTIAL. M8 is done; the voxel path tracer refuses the layer, XR runs on it through `/xr`, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
 | Shadows from alpha cut-outs, soft particles, `alphaHash`, object-space normal maps, your own mip levels | MISSING. | Planned before v1.0.0, one landing per package. |
 | Rendering in a worker, render into layers, compute writing textures, supersampling and upscaling, clip distances, environment blend and ground projection, KTX2 arrays and cubes, NRRD, subsurface blur | MISSING. | After v1.0.0, in the owning package. |
 
@@ -339,7 +339,7 @@ Positioning caveats for a public page:
 
 - fbx and usdz used to run three.js code at runtime (`FBXLoader` and `GLTFExporter`; the USDA and USDC parsers). Both now have native parsers; three.js is only a test-time reference.
 - Several capabilities exist twice. html and labels both export `CSS3DObject`. gizmo and usdz-export are pure re-exports. Two toon paths and two navigation packages remain. The particle, bloom and sky duplicates were merged (2026-10-14): vfx is the one particle system (creative `GPUParticles` is a preset over it), post `Bloom` the one bloom (creative `PostProcessing` lost its bloom), and sky the one sky (scenery `SkyMoon` is a preset; `SkyMoonPass`, `NightAtmosphere` and creative's `atmosphere.sky` backdrop were removed). The merge shrank the five packages' root entries; Night Citadel and Afterlight load a few kB more gzip because they now use the fuller single sky and particle implementations (measured locally at the time; that measurement was not committed).
-- Many COVERED rows outside core are written for WebGPU. Against three.js's WebGL renderer, Margo's WebGL2 reach is the compatibility layer (milestones M0 to M8 done), which runs them on WebGL2 except the voxel path tracer and XR.
+- Many COVERED rows outside core are written for WebGPU. Against three.js's WebGL renderer, Margo's WebGL2 reach is the compatibility layer (milestones M0 to M8 done), which runs them on WebGL2 except the voxel path tracer.
 
 ## How this was checked
 

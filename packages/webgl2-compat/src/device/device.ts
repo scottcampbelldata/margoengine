@@ -121,8 +121,9 @@ function featuresOf(caps: WebGL2Capabilities): Set<string> {
 }
 
 function defaultContext(attributes: WebGLContextAttributes): WebGL2RenderingContext | null {
+  // A page canvas for XR: browsers differ on an XRWebGLLayer over an OffscreenCanvas context.
   const canvas =
-    typeof OffscreenCanvas === 'function'
+    typeof OffscreenCanvas === 'function' && !attributes.xrCompatible
       ? new OffscreenCanvas(1, 1)
       : typeof document === 'object'
         ? document.createElement('canvas')
@@ -151,6 +152,7 @@ export class CompatGPU {
     const gl = (this.options.createContext ?? defaultContext)({
       ...ATTRIBUTES,
       powerPreference: options.powerPreference ?? 'default',
+      xrCompatible: (options as { xrCompatible?: boolean }).xrCompatible,
     });
     if (!gl) return Promise.resolve(null);
     const caps = webgl2Capabilities(gl);

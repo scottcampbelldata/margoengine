@@ -60,7 +60,10 @@ export interface XRSessionOptions {
   onFrame?: (state: XRFrameState) => void;
 }
 const platform = () =>
-  globalThis as typeof globalThis & { XRGPUBinding?: new (session: XRNativeSession, device: GPUDevice) => XRBinding };
+  globalThis as typeof globalThis & {
+    /** `webgl` marks the WebGL2 layer's binding, on an XRWebGLLayer; the session then has no 'webgpu' feature. */
+    XRGPUBinding?: (new (session: XRNativeSession, device: GPUDevice) => XRBinding) & { webgl?: boolean };
+  };
 const system = (): XRSystem | undefined => (globalThis.navigator as (Navigator & { xr?: XRSystem }) | undefined)?.xr;
 
 /** WebGPU WebXR plugin: negotiates a session, tracks inputs and draws the scene in stereo. `using` or `dispose()` detaches it. */
@@ -116,11 +119,11 @@ export class XR implements EnginePlugin {
         'unsupported',
         'XR-compatible WebGPU adapter unavailable; use a headset browser with WebGPU XR support.',
       );
-    // WebXR on WebGL2 needs XRWebGLLayer, a separate path this version does not have.
-    if ((adapter as { info?: { vendor?: string } }).info?.vendor === COMPAT_VENDOR)
+    // WebXR on WebGL2 draws through XRWebGLLayer, which only the layer's own binding knows.
+    if ((adapter as { info?: { vendor?: string } }).info?.vendor === COMPAT_VENDOR && !platform().XRGPUBinding?.webgl)
       throw new MargoError(
         'unsupported',
-        "XR needs the browser's own WebGPU (XRGPUBinding); the WebGL2 compatibility layer has no XR path",
+        "XR needs the browser's own WebGPU (XRGPUBinding) or, on the WebGL2 compatibility layer, its route: call installXR() from the layer's xr entry first",
       );
     signal?.throwIfAborted();
     const requiredFeatures = runtime.gpu
@@ -201,7 +204,7 @@ export class XR implements EnginePlugin {
       session = await system()!.requestSession(mode, {
         requiredFeatures: [
           ...new Set([
-            ...(mode === 'inline' ? [] : ['webgpu']),
+            ...(mode === 'inline' || platform().XRGPUBinding?.webgl ? [] : ['webgpu']),
             ...(referenceSpace === 'viewer' ? [] : [referenceSpace]),
             ...(options.requiredFeatures ?? []),
           ]),
@@ -234,7 +237,7 @@ export class XR implements EnginePlugin {
       const colorFormat = this.binding.getPreferredColorFormat();
       this.layer = this.binding.createProjectionLayer({ colorFormat, depthStencilFormat: 'depth24plus' });
       session.updateRenderState({
-        layers: [this.layer],
+        ...(this.layer.baseLayer ? { baseLayer: this.layer.baseLayer } : { layers: [this.layer] }),
         depthNear: this.engine.camera.near,
         depthFar: this.engine.camera.far,
       });

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4843603,
+  "total": 4941393,
   "history": [
     {
       "date": "2026-10-24",
@@ -2066,6 +2066,12 @@
       "commit": "5f21472a0",
       "reason": "lod: autoLOD and hierarchicalLOD on loaded glTF models; gltf-pro: tangents packed at unit length",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "906cc2341",
+      "reason": "webgl2-compat /xr entry: XR on the layer through an XRWebGLLayer",
+      "grew": 1
     }
   ],
   "items": {
@@ -2585,6 +2591,7 @@
     "@margoengine/webgl2-compat/device": 96136,
     "@margoengine/webgl2-compat/glsl": 43584,
     "@margoengine/webgl2-compat/wgsl": 27240,
+    "@margoengine/webgl2-compat/xr": 97790,
     "@margoengine/wfc": 1878,
     "@margoengine/wfc/overlapping": 2259,
     "@margoengine/worker": 2128,

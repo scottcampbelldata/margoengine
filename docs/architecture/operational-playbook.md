@@ -311,6 +311,12 @@ silently install itself and changes no globals at import time.
 
 ### 3.2 WebGL2 compatibility architecture
 
+**XR route (2026-11-06).** `installXR()` in `@margoengine/webgl2-compat/xr` replaces `XRGPUBinding` with a binding on an
+`XRWebGLLayer`, so `@margoengine/xr` keeps one renderer: each eye resolves into its own texture and `present` draws it
+into the opaque framebuffer after the submit, and the view's projection is remapped to z in [0, 1]. Evidence:
+`packages/webgl2-compat/test/xr-browser.mjs` in `test:gpu`, 0 differing pixels in both eyes on the RTX A6000 with stand-in
+XR objects. Missing: a real headset.
+
 `install()` returns without changes when real WebGPU has an adapter, unless forced. Otherwise it probes WebGL2,
 requires highp fragment floats/ints and `EXT_color_buffer_float`, defines a `CompatGPU` at `navigator.gpu`, patches
 only `getContext('webgpu')`, and installs missing WebGPU flag constants. `uninstall()` reverses those changes. Lower

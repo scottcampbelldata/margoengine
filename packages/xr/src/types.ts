@@ -92,7 +92,12 @@ export interface XRNativeSession extends EventTarget {
     offsetRay?: XRRayLike;
   }): Promise<XRTransientInputHitTestSource>;
   requestReferenceSpace(type: string): Promise<XRSpace>;
-  updateRenderState(state: { layers?: XRProjectionLayer[]; depthNear?: number; depthFar?: number }): void;
+  updateRenderState(state: {
+    layers?: XRProjectionLayer[];
+    baseLayer?: unknown;
+    depthNear?: number;
+    depthFar?: number;
+  }): void;
   requestAnimationFrame(callback: (time: number, frame: XRNativeFrame) => void): number;
   cancelAnimationFrame(handle: number): void;
   end(): Promise<void>;
@@ -107,6 +112,8 @@ export interface XRSystem {
 }
 /** A WebGPU projection layer; destroy it when the session ends. */
 export interface XRProjectionLayer {
+  /** The XRWebGLLayer to show instead of this layer, on a binding that draws through one. */
+  baseLayer?: unknown;
   destroy(): void;
 }
 /** The texture and viewport of one eye in a projection layer. */
@@ -124,6 +131,10 @@ export interface XRBinding {
     depthStencilFormat: GPUTextureFormat;
   }): XRProjectionLayer;
   getViewSubImage(layer: XRProjectionLayer, view: XRView): XRSubImage;
+  /** The view's projection, where the session's differs from clip space with z in [0, 1]. */
+  projection?(view: XRView): ArrayLike<number>;
+  /** Shows the frame's sub-images, on a binding that does not draw straight into the session's layer. */
+  present?(layer: XRProjectionLayer): void;
 }
 /** One input source with its target-ray and grip poses. */
 export interface XRInputPose {

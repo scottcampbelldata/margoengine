@@ -648,7 +648,62 @@ test('XR.create refuses the WebGL2 compatibility layer with a coded error naming
   });
   await assert.rejects(XR.create(f.engine), {
     code: 'unsupported',
-    message: /XR needs the browser's own WebGPU \(XRGPUBinding\); the WebGL2 compatibility layer has no XR path/,
+    message: /XR needs the browser's own WebGPU \(XRGPUBinding\) or, on the WebGL2 compatibility layer, its route/,
   });
   assert.equal(f.engine.hasPlugin('xr'), false);
+});
+
+test("the WebGL2 layer's binding runs a session on an XRWebGLLayer: no webgpu feature, its projection, shown after the submit", async (t) => {
+  const f = await fixture(t);
+  navigator.gpu.requestAdapter = async () => ({
+    info: { vendor: 'margo-webgl2' },
+    requestDevice: async () => f.device,
+  });
+  const Native = globalThis.XRGPUBinding,
+    baseLayer = { webgl: true },
+    projection = identity(),
+    shown = [],
+    color = { width: 64, height: 64, format: 'rgba8unorm', createView: () => ({}) };
+  projection[0] = 7;
+  class Layer extends Native {
+    static webgl = true;
+    createProjectionLayer(init) {
+      return Object.assign(super.createProjectionLayer(init), { baseLayer });
+    }
+    getViewSubImage() {
+      return {
+        colorTexture: color,
+        depthStencilTexture: null,
+        viewport: { x: 0, y: 0, width: 64, height: 64 },
+        getViewDescriptor: () => ({}),
+      };
+    }
+    projection() {
+      return projection;
+    }
+    present(layer) {
+      shown.push({ layer, submitted: f.device.submitted });
+    }
+  }
+  Object.defineProperty(globalThis, 'XRGPUBinding', { configurable: true, value: Layer });
+  const xr = await XR.create(f.engine);
+  await xr.requestSession('immersive-vr');
+  assert.deepEqual(f.requests[0].init.requiredFeatures, ['local']);
+  assert.equal(f.session.state.baseLayer, baseLayer);
+  assert.equal(f.session.state.layers, undefined);
+  const view = { projectionMatrix: identity(), transform: pose(0).transform };
+  f.session.tick(100, { ...pose(0), views: [{ ...view, eye: 'left' }] });
+  assert.deepEqual(f.errors, []);
+  assert.equal(shown.length, 1, 'present runs once a frame');
+  assert.equal(shown[0].submitted, 1, 'present runs after the submit');
+  assert.ok(
+    f.writes.some((write) => write.data[0] === 7),
+    "the eye's matrix is built from the binding's projection",
+  );
+  assert.equal(
+    f.passes.filter((pass) => !pass.descriptor.colorAttachments.length).length,
+    0,
+    'no depth pass without a compositor depth texture',
+  );
+  await xr.end();
 });

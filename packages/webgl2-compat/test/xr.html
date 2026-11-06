@@ -1,0 +1,234 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>WebGL2 compatibility: XR route</title>
+</head>
+<body style="margin:0">
+<canvas style="width:256px;height:256px"></canvas>
+<script type="module">
+// The XR route: one scene through `XR` from @margoengine/xr, ?mode=native on a stand-in XRGPUBinding over a real WebGPU
+// texture array, ?mode=compat on installXR() and a stand-in XRWebGLLayer over a real WebGL framebuffer. No headset is
+// attached to a test machine, so navigator.xr is a stand-in; the devices, shaders and pixels are real. The compat
+// session gets what a WebGL session gets: projections with z in [-1, 1], eyes side by side in one framebuffer (one of
+// them raised, so a y offset is checked), and `layers` refused.
+import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+import { install } from '/packages/webgl2-compat/dist/index.js';
+import { installXR } from '/packages/webgl2-compat/dist/xr.js';
+import { XR } from '/packages/xr/dist/index.js';
+
+const mode = new URLSearchParams(location.search).get('mode') ?? 'native';
+const SIZE = 256, RAISE = 20, EYES = ['left', 'right'], NEAR = 0.1, FAR = 100;
+const errors = [];
+addEventListener('error', (e) => errors.push(String(e.message)));
+addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message ?? e.reason)));
+
+/** A perspective projection with clip z in [zero, 1], column-major. */
+function perspective(zero) {
+  const f = 1 / Math.tan(0.6), p = new Float32Array(16);
+  p[0] = f;
+  p[5] = f;
+  p[10] = zero === 0 ? FAR / (NEAR - FAR) : (FAR + NEAR) / (NEAR - FAR);
+  p[11] = -1;
+  p[14] = zero === 0 ? (FAR * NEAR) / (NEAR - FAR) : (2 * FAR * NEAR) / (NEAR - FAR);
+  return p;
+}
+function eyeView(eye) {
+  const x = eye === 'left' ? -0.4 : 0.4, y = 1, z = 5;
+  const inverse = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -x, -y, -z, 1]);
+  return {
+    eye,
+    projectionMatrix: perspective(mode === 'compat' ? -1 : 0),
+    transform: {
+      position: { x, y, z, w: 1 },
+      orientation: { x: 0, y: 0, z: 0, w: 1 },
+      matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]),
+      inverse: { matrix: inverse },
+    },
+  };
+}
+class Session extends EventTarget {
+  inputSources = [];
+  state = null;
+  features = null;
+  handles = new Map();
+  next = 1;
+  frames = 0;
+  updateRenderState(state) {
+    if (mode === 'compat' && state.layers) throw new TypeError('This session has no layers feature');
+    this.state = state;
+  }
+  async requestReferenceSpace() {
+    return {};
+  }
+  requestAnimationFrame(fn) {
+    const id = this.next++;
+    this.handles.set(id, setTimeout(() => {
+      this.handles.delete(id);
+      this.frames++;
+      fn(performance.now(), { session: this, getViewerPose: () => ({ views: EYES.map(eyeView) }), getPose: () => null });
+    }, 0));
+    return id;
+  }
+  cancelAnimationFrame(id) {
+    clearTimeout(this.handles.get(id));
+    this.handles.delete(id);
+  }
+  async end() {
+    this.dispatchEvent(new Event('end'));
+  }
+}
+let session = null, webglLayer = null, nativeLayer = null;
+// Page-canvas contexts made with xrCompatible.
+const xrContexts = new WeakSet(), getContext = HTMLCanvasElement.prototype.getContext;
+HTMLCanvasElement.prototype.getContext = function (type, attributes) {
+  const context = getContext.call(this, type, attributes);
+  if (type === 'webgl2' && attributes?.xrCompatible) xrContexts.add(context);
+  return context;
+};
+Object.defineProperty(navigator, 'xr', {
+  configurable: true,
+  value: {
+    isSessionSupported: async () => true,
+    async requestSession(requested, init) {
+      session = new Session();
+      session.features = init.requiredFeatures;
+      return session;
+    },
+  },
+});
+/** Stands for the browser's layer; its framebuffer is the opaque one, here an ordinary one with the same rules. */
+class FakeWebGLLayer {
+  constructor(owner, gl, init) {
+    // Chromium reports false here on a machine with no XR device, so what the layer asked for is what is checked.
+    if (!xrContexts.has(gl)) throw new DOMException('The context is not XR compatible', 'InvalidStateError');
+    this.gl = gl;
+    this.init = init;
+    this.width = SIZE * 2;
+    this.height = SIZE + RAISE;
+    this.texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, this.width, this.height);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    this.framebuffer = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    webglLayer = this;
+  }
+  getViewport(view) {
+    return view.eye === 'left'
+      ? { x: 0, y: RAISE, width: SIZE, height: SIZE }
+      : { x: SIZE, y: 0, width: SIZE, height: SIZE };
+  }
+  /** Both eyes, top row first as a WebGPU texture is read. */
+  read() {
+    const gl = this.gl, out = [];
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.framebuffer);
+    for (const eye of EYES) {
+      const v = this.getViewport({ eye }), rows = new Uint8Array(SIZE * SIZE * 4), flipped = new Uint8Array(rows.length);
+      gl.readPixels(v.x, v.y, SIZE, SIZE, gl.RGBA, gl.UNSIGNED_BYTE, rows);
+      for (let y = 0; y < SIZE; y++) flipped.set(rows.subarray(y * SIZE * 4, (y + 1) * SIZE * 4), (SIZE - 1 - y) * SIZE * 4);
+      out.push(flipped);
+    }
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    return out;
+  }
+}
+/** Stands for the browser's XRGPUBinding: a layer of two array layers, as a headset's WebGPU layer is. */
+class FakeGPUBinding {
+  constructor(owner, device) {
+    this.device = device;
+  }
+  getPreferredColorFormat() {
+    return 'rgba8unorm';
+  }
+  createProjectionLayer({ colorFormat, depthStencilFormat }) {
+    const size = [SIZE, SIZE, 2], device = this.device;
+    nativeLayer = {
+      color: device.createTexture({ size, format: colorFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC }),
+      depth: device.createTexture({ size, format: depthStencilFormat, usage: GPUTextureUsage.RENDER_ATTACHMENT }),
+      destroy() {},
+      async read() {
+        const out = [];
+        for (let layer = 0; layer < 2; layer++) {
+          const buffer = device.createBuffer({ size: SIZE * SIZE * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+          const encoder = device.createCommandEncoder();
+          encoder.copyTextureToBuffer(
+            { texture: nativeLayer.color, origin: [0, 0, layer] },
+            { buffer, bytesPerRow: SIZE * 4 },
+            [SIZE, SIZE, 1],
+          );
+          device.queue.submit([encoder.finish()]);
+          await buffer.mapAsync(GPUMapMode.READ);
+          out.push(new Uint8Array(buffer.getMappedRange().slice(0)));
+          buffer.destroy();
+        }
+        return out;
+      },
+    };
+    return nativeLayer;
+  }
+  getViewSubImage(layer, view) {
+    const baseArrayLayer = EYES.indexOf(view.eye);
+    return {
+      colorTexture: layer.color,
+      depthStencilTexture: layer.depth,
+      viewport: { x: 0, y: 0, width: SIZE, height: SIZE },
+      getViewDescriptor: () => ({ dimension: '2d', baseArrayLayer, arrayLayerCount: 1 }),
+    };
+  }
+}
+const base64 = (bytes) => {
+  let text = '';
+  for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(text);
+};
+
+async function main() {
+  const canvas = document.querySelector('canvas');
+  if (mode === 'compat') {
+    const result = await install({ force: true });
+    if (!result.installed) throw new Error('install() did not install: ' + result.reason);
+    globalThis.XRWebGLLayer = FakeWebGLLayer;
+    installXR({ framebufferScale: 0.5 });
+  } else globalThis.XRGPUBinding = FakeGPUBinding;
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    exactSize: [SIZE, SIZE],
+    camera: { position: [0, 1, 5], target: [0, 1, 0], near: NEAR, far: FAR },
+  });
+  const cube = box(1, 1, 1);
+  for (let i = 0; i < 5; i++)
+    engine
+      .createMesh()
+      .setGeometry(cube)
+      .setMaterial(new PbrMaterial({ color: [0.2 + (i % 3) * 0.3, 0.8 - (i % 4) * 0.15, 0.3 + i * 0.12], roughness: 0.4 }))
+      .setPosition([(i - 2) * 1.1, 0.4 + (i % 2) * 0.9, -i * 0.7])
+      .setRotation([0.3 * i, 0.5 * i, 0]);
+  const xr = await XR.create(engine);
+  await xr.requestSession('immersive-vr');
+  while (session.frames < 3) await new Promise((r) => setTimeout(r, 5));
+  const pixels = mode === 'compat' ? webglLayer.read() : await nativeLayer.read();
+  const device = xr.device;
+  window.check = {
+    vendor: device.adapterInfo?.vendor ?? null,
+    gl: device.gl ? device.gl.getError() : 0,
+    features: session.features,
+    baseLayer: !!session.state.baseLayer,
+    init: webglLayer?.init ?? null,
+    eyes: pixels.map(base64),
+    errors,
+  };
+  await xr.end();
+  window.check.ended = session.frames;
+  window.ready = true;
+}
+main().catch((e) => {
+  errors.push(String(e?.stack ?? e));
+  window.check = { errors };
+  window.ready = true;
+});
+</script>
+</body>
+</html>

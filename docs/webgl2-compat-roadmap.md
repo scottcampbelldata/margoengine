@@ -235,7 +235,7 @@ Expected result per package on WebGL2. "Same" means the same pixels within the p
 | culling and scatter packs | GPU-driven culling off; core's CPU frustum culling remains; scatter places instances on the CPU | Same image, more draw calls |
 | stats, inspector | No GPU timestamps | CPU timings only |
 | voxel-pathtracer | Out of scope for the first release; revisit after M8 | Not available on WebGL2 |
-| xr | WebXR on WebGL2 needs `XRWebGLLayer`, a separate path | Not available on WebGL2 in this version |
+| xr | WebXR on WebGL2 needs `XRWebGLLayer`, a separate path | The `/xr` entry's `installXR()` (2026-11-06): a binding of `XRGPUBinding`'s shape on an `XRWebGLLayer`; no headset has run it |
 | webgl (preview) | Kept as the small preview for apps that only show plain meshes | Unchanged |
 
 ## Milestones
@@ -655,8 +655,9 @@ wall time per frame, native then the layer.
   routes equal the WebGPU kernels word for word on the CPU runner (`routes.test.js`); the sandbox's pixels against native
   did not change (d > 2 on 1.15% of pixels, 1.16% before). `ScatterTiles` keeps the generic tiers.
 - **Refusals.** The voxel path tracer (out of scope: ANGLE's Direct3D compiler takes 20 s to minutes per kernel) and XR
-  (WebXR on WebGL2 needs `XRWebGLLayer`) refuse the layer with MargoError code `unsupported` naming what they need;
-  each message has a unit test.
+  (WebXR on WebGL2 needs `XRWebGLLayer`) refused the layer with MargoError code `unsupported` naming what they need;
+  each message has a unit test. XR has a route since 2026-11-06: `installXR()` from the `/xr` entry; without it XR still
+  refuses.
 - **Checks.** `routes-browser.mjs` (in `npm run test:gpu`) draws DOF, splats, `CulledInstances` and `CulledMeshes`
   natively and on the layer in exact-pixel mode once a frame's dispatches are the route's own: no pixel differs.
   `routes.test.js` checks each route's tiers and computes the sort and the culling against the kernels' results. The

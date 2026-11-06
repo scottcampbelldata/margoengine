@@ -160,7 +160,7 @@ export class StereoRenderer {
           throw error;
         }
       }
-      const p = view.projectionMatrix,
+      const p = binding.projection?.(view) ?? view.projectionMatrix,
         v = view.transform.inverse.matrix,
         data = frame.data;
       for (let c = 0; c < 4; c++)
@@ -177,7 +177,7 @@ export class StereoRenderer {
       data.fill(1, 28, 31);
       if (engine.lighting.ambient) data.set(engine.lighting.ambient, 28);
       device.queue.writeBuffer(frame.uniform, 0, data as Float32Array<ArrayBuffer>);
-      if (!image.depthStencilTexture)
+      if (!image.depthStencilTexture && !binding.present)
         throw new MargoError(
           'unsupported',
           'XR projection layer has no depth texture; use a runtime that provides a depth buffer for the layer',
@@ -281,6 +281,7 @@ export class StereoRenderer {
         }
       for (const renderers of this.pbr.values()) renderers[eye].draw(context, pass, view.transform.inverse.matrix);
       pass.end();
+      if (!image.depthStencilTexture) continue;
       // XR projection matrices use forward Z; populate the compositor's 1x depth layer.
       const depthPass = encoder.beginRenderPass({
         colorAttachments: [],
@@ -304,6 +305,7 @@ export class StereoRenderer {
         .end();
     }
     device.queue.submit([encoder.finish()]);
+    binding.present?.(layer);
   }
   dispose(): void {
     for (const renderers of this.pbr.values()) for (const renderer of renderers) renderer.dispose();
