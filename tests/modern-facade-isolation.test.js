@@ -164,6 +164,7 @@ test('initial core + stage consumer keeps every optional pack behind a lazy boun
     '@margoengine/scenery/sky',
     '@margoengine/shadows',
     '@margoengine/environment',
+    '@margoengine/xr',
   ]) {
     const entry = graph.entry(fileURLToPath(import.meta.resolve(specifier)));
     assert.ok(dynamic.has(entry.fileName), 'A stage feature entry lost its lazy import for ' + specifier);

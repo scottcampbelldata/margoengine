@@ -4,7 +4,7 @@ You normally use this package as [`margoengine`](../margoengine/README.md): `imp
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, and `@margoengine/shadows` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, `@margoengine/shadows` and `@margoengine/xr` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
@@ -48,6 +48,7 @@ the ones it imports. With `margoengine` the entries are `margoengine/stage/<entr
 | `@margoengine/stage/effects` | `await addEffects(app, options)`: attaches post-processing and atmosphere | `@margoengine/creative/post` |
 | `@margoengine/stage/environment` | `await addEnvironment(app, source, options)`: image-based lighting from an HDR, EXR or UltraHDR JPEG | `@margoengine/environment` |
 | `@margoengine/stage/shadows` | `await addShadows(app, options)`: cascaded shadows; the meshes present now cast | `@margoengine/shadows` |
+| `@margoengine/stage/xr` | `await addXRButton(app, options)`: an accessible Enter VR or Enter AR button that starts an XR session | `@margoengine/xr` |
 
 ```ts
 import {createStage} from 'margoengine';
@@ -90,6 +91,39 @@ model.destroy();
 ```
 
 Sky, particles, effects and GPU picking retain their WebGPU requirements; unsupported operations reject rather than silently disappearing. Plugins have their existing unique names: remove one through `app.engine.removePlugin(plugin.name)` before attaching a replacement.
+
+## Enter VR and Enter AR
+
+`addXRButton` puts a real `<button>` at the foot of the stage (`parent`, default the canvas's parent) and starts the session when it is clicked, which is the user gesture WebXR asks for. The XR device is prepared before the button appears, so the click goes straight to the browser.
+
+```ts
+import {createStage} from 'margoengine';
+import {addXRButton} from 'margoengine/stage/xr';
+
+const app = await createStage('#scene', {backend: 'webgpu'});
+const orb = app.sphere({color: '#84d6bd', position: [0, 1.5, -2], radius: 0.3});
+const button = await addXRButton(app, {
+  referenceSpace: 'local-floor',
+  onFrame({delta}) {
+    orb.rotation.y += delta; // onTick pauses during an immersive session
+  },
+});
+console.log(button.supported);
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `mode` | `'immersive-vr'` | `'immersive-ar'` makes an Enter AR button |
+| `parent` | the canvas's parent | Element the button goes in |
+| `label`, `exitLabel`, `unavailableLabel` | `Enter VR`, `Exit VR`, `VR not available` (AR likewise) | Button text, for translation |
+| `className` | none | Your own CSS class in place of the built-in style |
+| `onError` | `engine.onError` | Receives a session that failed to start or end, such as a refused permission |
+| `signal` | none | Cancels the wait for the package and the device |
+| `referenceSpace`, `requiredFeatures`, `optionalFeatures`, `onFrame` | as `XR.requestSession` | Passed to the session on each click |
+
+Where the session cannot start (no WebXR, no WebGPU binding, a WebGL2 stage, a page whose permissions policy blocks WebXR), the button stays on the page, disabled and reading `VR not available`, and `button.supported` is false: no error to catch. The built-in style needs the parent to be its containing block, so a parent with `position: static` is set to `position: relative` and stays so; a second button stacks above the first. With `className` the page is left alone and the placement is yours.
+
+Buttons of one stage share one `XR` plugin (`button.xr`, with `controllers`, `session` and `HitTest`), so a VR and an AR button work side by side. `button.dispose()` removes the button; the last one ends its session and frees the XR device, and the stage's disposal does the same. After the XR device is lost, a click reports through `onError`: dispose the button and add a new one. An `XR` you made yourself with `XR.create` takes the stage's one plugin slot, so `addXRButton` then rejects with `state`.
 
 All core exports are also available from this package. React applications can use the existing `@margoengine/react` components or wrap the engine received by Canvas `onCreated` with `new Stage(engine)`. The existing Canvas component retains ownership of rendering and teardown in that case.
 

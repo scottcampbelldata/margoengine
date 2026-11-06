@@ -25,7 +25,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --experimental-test-module-mocks --test ../../tests/modern-wrapper.test.js ../../tests/modern-facade-lifecycle.test.js ../../tests/deep-stage-sphere.test.js ../../tests/modern-silent-facade-drops.test.js",
+    "test": "node --experimental-test-module-mocks --test ../../tests/modern-wrapper.test.js ../../tests/modern-facade-lifecycle.test.js ../../tests/deep-stage-sphere.test.js ../../tests/modern-silent-facade-drops.test.js tests/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -57,6 +57,10 @@
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"
+    },
+    "./xr": {
+      "types": "./dist/xr.d.ts",
+      "import": "./dist/xr.js"
     }
   },
   "files": [
@@ -71,7 +75,8 @@
     "@margoengine/creative": "^1.0.0",
     "@margoengine/scenery": "^1.0.0",
     "@margoengine/environment": "^1.0.0",
-    "@margoengine/shadows": "^1.0.0"
+    "@margoengine/shadows": "^1.0.0",
+    "@margoengine/xr": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -87,6 +92,9 @@
       "optional": true
     },
     "@margoengine/shadows": {
+      "optional": true
+    },
+    "@margoengine/xr": {
       "optional": true
     }
   }

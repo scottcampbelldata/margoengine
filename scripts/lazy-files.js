@@ -65,6 +65,15 @@ export const LAZY_FILES = [
     external: core,
     when: '`addShadows(stage)` (`margoengine/stage/shadows`), first call',
   },
+  {
+    package: 'margoengine',
+    file: 'packages/xr/dist/index.js',
+    label: '@margoengine/xr',
+    kind: 'Chunk',
+    measure: 'bundle',
+    external: core,
+    when: '`addXRButton(stage)` (`margoengine/stage/xr`), first call',
+  },
   // Draco and KTX2/Basis: a pool of classic workers, each loading the decoder it is asked for once.
   {
     package: '@margoengine/decoders',

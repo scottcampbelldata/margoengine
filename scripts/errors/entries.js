@@ -46,7 +46,7 @@ export const entries = [
     id: 'state',
     title: 'state: not valid right now',
     kind: 'code',
-    messages: [],
+    messages: ['XR button needs a canvas on the page or the parent option'],
     cause:
       'The call is valid in general but not at this moment: a re-entrant call from a callback, a missing prerequisite, or a device that is being restored. The re-entrancy, device restore and install entries list the messages.',
     fix: 'Retry later, from outside the callback, or after the prerequisite is in place.',

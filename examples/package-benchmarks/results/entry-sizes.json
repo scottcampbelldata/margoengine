@@ -1,5 +1,5 @@
 {
-  "commit": "8d84baca2",
+  "commit": "f391c8d0b",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -326,32 +326,44 @@
     },
     "@margoengine/controls": {
       ".": {
-        "raw": 73155,
-        "gzip": 23099
+        "raw": 86627,
+        "gzip": 26715
       },
       "./orbit": {
-        "raw": 15888,
-        "gzip": 5690
+        "raw": 17235,
+        "gzip": 6156
+      },
+      "./fly": {
+        "raw": 7086,
+        "gzip": 2795
+      },
+      "./trackball": {
+        "raw": 11012,
+        "gzip": 4013
       },
       "./arcball": {
-        "raw": 11860,
-        "gzip": 4367
+        "raw": 21263,
+        "gzip": 7921
       },
       "./transform": {
-        "raw": 26902,
-        "gzip": 10016
+        "raw": 32609,
+        "gzip": 11767
       },
       "./drag": {
-        "raw": 5939,
-        "gzip": 2393
+        "raw": 9222,
+        "gzip": 3649
       },
       "./profiles": {
         "raw": 1975,
         "gzip": 704
       },
+      "./third-person": {
+        "raw": 8098,
+        "gzip": 3122
+      },
       "./walk": {
-        "raw": 34347,
-        "gzip": 12790
+        "raw": 37725,
+        "gzip": 13931
       }
     },
     "@margoengine/core": {
@@ -1796,6 +1808,10 @@
       "./shadows": {
         "raw": 787,
         "gzip": 494
+      },
+      "./xr": {
+        "raw": 2632,
+        "gzip": 1485
       }
     },
     "@margoengine/staging": {
@@ -2215,6 +2231,11 @@
       "raw": 52204,
       "gzip": 17137,
       "brotli": 15237
+    },
+    "packages/xr/dist/index.js": {
+      "raw": 19185,
+      "gzip": 6492,
+      "brotli": 5795
     },
     "packages/decoders/dist/decoder.worker.js": {
       "raw": 10691,

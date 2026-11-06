@@ -1,5 +1,7 @@
 import { Engine, box, PbrMaterial } from '@margoengine/core';
 import { XR } from '@margoengine/xr';
+import { Stage } from '@margoengine/stage';
+import { addXRButton } from '@margoengine/stage/xr';
 import type {
   XRBinding,
   XRMode,
@@ -141,6 +143,26 @@ async function pixels(): Promise<number[]> {
   buffer.destroy();
   return centers;
 }
+/** The stage's button on a real page: a real click enters, eye frames render, a second click leaves. */
+async function enterByButton(stage: Stage) {
+  let frames = 0;
+  const button = await addXRButton(stage, { onFrame: () => frames++ }),
+    { element } = button,
+    settle = async (done: () => boolean) => {
+      for (let wait = 0; wait < 300 && !done(); wait++) await new Promise(requestAnimationFrame);
+      if (!done()) throw new Error(`Button stuck at '${element.textContent}' after ${frames} frames`);
+    };
+  element.click();
+  await settle(() => frames >= 3 && element.textContent === 'Exit VR');
+  const box = element.getBoundingClientRect(),
+    host = element.parentElement!.getBoundingClientRect(),
+    inside = box.width > 0 && box.bottom <= host.bottom && box.height >= 44;
+  element.click();
+  await settle(() => element.textContent === 'Enter VR');
+  button.dispose();
+  if (element.isConnected || !inside) throw new Error(`Button placement ${inside}, connected ${element.isConnected}`);
+  return { frames, height: box.height };
+}
 async function run() {
   const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu', capacity: 4 }),
     errors: string[] = [];
@@ -163,9 +185,10 @@ async function run() {
     if (Math.abs(centers[0] - centers[1]) < 2) throw new Error('Stereo projections did not separate the eye images');
     await xr.end();
     xr.dispose();
+    const button = await enterByButton(new Stage(engine));
     engine.dispose();
     if (errors.length || gpuErrors.length) throw new Error([...errors, ...gpuErrors].join('\n'));
-    return { frames, centers, gpuErrors, headset: 'simulated session; real WebGPU rendering' };
+    return { frames, centers, gpuErrors, button, headset: 'simulated session; real WebGPU rendering' };
   } finally {
     engine.dispose();
     previousBinding
