@@ -168,7 +168,9 @@ const SPHERE = /* wgsl */ `
 fn surface(u: f32, v: f32, time: f32, p: vec4f) -> vec3f {
   let around = -2.0 * PI * u;
   let down = PI * (1.0 - v);
-  return p.x * vec3f(sin(down) * cos(around), cos(down), sin(down) * sin(around));
+  // f32 PI is just above pi, so an accurate sin gives a tiny negative at the south pole: a ring turned inside out.
+  let ring = max(sin(down), 0.0);
+  return p.x * vec3f(ring * cos(around), cos(down), ring * sin(around));
 }
 `;
 
