@@ -1,6 +1,7 @@
 import { Engine, Geometry, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { webglRenderer } from '@margoengine/webgl';
+import { alphaChecks } from './alpha-browser.js';
 import { gpuBuildChecks } from './gpu-build-browser.js';
 import { gpuChecks } from './gpu-browser.js';
 import { sdfChecks } from './sdf-browser.js';
@@ -384,5 +385,6 @@ window.runBVHTests = async () => {
   report.gpu = await gpuChecks(report);
   report.sdf = await sdfChecks(report);
   report.gpuBuild = await gpuBuildChecks(report);
+  report.alpha = await alphaChecks(report);
   return report;
 };

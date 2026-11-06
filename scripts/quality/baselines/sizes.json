@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6435095,
+  "total": 6436088,
   "history": [
     {
       "date": "2026-10-24",
@@ -2528,6 +2528,12 @@
       "commit": "83b287e4a",
       "reason": "stage/xr: the button finds the WebGL2 route and says why XR cannot start (audit row A5)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "e08b6e807",
+      "reason": "bvh/alpha: modelAlphaMasks reads a loaded model's cut-outs (audit row A7)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2582,7 +2588,7 @@
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,
     "@margoengine/bvh": 23398,
-    "@margoengine/bvh/alpha": 15880,
+    "@margoengine/bvh/alpha": 16873,
     "@margoengine/bvh/bake": 2583,
     "@margoengine/bvh/gpu": 5208,
     "@margoengine/bvh/gpu-build": 18897,

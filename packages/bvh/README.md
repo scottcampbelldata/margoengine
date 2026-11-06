@@ -331,7 +331,24 @@ Rays and hits are in the space `model.readPickingGeometry()` gives its vertices.
 
 ## Alpha-masked picking
 
-`AlphaRaycaster` from `@margoengine/bvh/alpha` is a `Raycaster` that drops hits on the transparent parts of masked surfaces, so a click through a fence or a leaf card lands on what shows through. Textures live on the GPU, so the caller names each hit's CPU pixels with `alphaMask`, and the hit's `uv` reads them with the filtering a linear sampler gives. Every intersect call works, `SceneBVH.intersect` included.
+`AlphaRaycaster` from `@margoengine/bvh/alpha` is a `Raycaster` that drops hits on the transparent parts of masked surfaces, so a click through a fence or a leaf card lands on what shows through. For a loaded model, `modelAlphaMasks` reads everything from its materials, once. The hit's `uv` reads the pixels with the filtering a linear sampler gives, and every intersect call works, `SceneBVH.intersect` included.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {AlphaRaycaster, modelAlphaMasks} from 'margoengine/bvh/alpha';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/fence.glb');
+
+const ray = new AlphaRaycaster();
+ray.alphaMask = await modelAlphaMasks(model);
+ray.firstHitOnly = true; // the nearest solid hit
+ray.setFromEngine(engine, 320, 240);
+console.log(ray.intersectEngine(engine)[0]?.mesh);
+```
+
+`modelAlphaMasks(model, {signal, pixels})` takes each `MASK` material's base colour alpha, cutoff and factor, its sampler's wrap per axis (`MIRRORED_REPEAT` too) and its `KHR_texture_transform`; every other material picks as solid. It reads pixels through an `OffscreenCanvas`, so in Node pass `pixels(image)`. A map on `TEXCOORD_1` or one held GPU compressed (KTX2) cannot be read: those materials pick as solid and are listed in `source.skipped` with the reason. Vertex colour alpha is not read. For textures of your own, name each hit's CPU pixels by hand.
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -347,13 +364,15 @@ ray.setFromEngine(engine, 320, 240);
 console.log(ray.intersectEngine(engine)[0]?.mesh);
 ```
 
-A hit stays when its alpha is at or above `cutoff`, when `alphaMask` answers null, or when it has no `uv`: core geometry holds none, so masks apply to model primitives and `intersectModel` hits. `uv` is TEXCOORD_0 with no texture transform; `sampleAlpha(mask, u, v)` is the sampler on its own. With a mask set, `firstHitOnly` tests every hit along the ray and then keeps the nearest solid one, since the nearest may be a hole.
+A hit stays when its alpha is at or above `cutoff`, when `alphaMask` answers null, or when it has no `uv`: core geometry holds none, so masks apply to model primitives and `intersectModel` hits. `uv` is TEXCOORD_0 as the mesh holds it, and a mask's `transform` maps it; `sampleAlpha(mask, u, v)` is the sampler on its own. With a mask set, `firstHitOnly` tests every hit along the ray and then keeps the nearest solid one, since the nearest may be a hole.
 
 | Option | Default |
 | --- | --- |
 | `alphaMask` | `null`: no hit is dropped |
 | `cutoff` (of a mask) | 0.5 |
-| `wrap` (of a mask) | `'repeat'`; or `'clamp'` |
+| `wrap` (of a mask) | `'repeat'`; or `'mirror'`, `'clamp'`, or `[u, v]` |
+| `transform` (of a mask) | none; six numbers, two rows of three, applied to the uv |
+| `factor` (of a mask) | 1; multiplies the sampled alpha |
 
 ## GPU traversal
 

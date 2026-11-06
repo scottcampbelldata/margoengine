@@ -12,10 +12,43 @@ export interface AlphaMask {
     height: number;
     data: ArrayLike<number>;
     cutoff?: number;
-    wrap?: 'repeat' | 'clamp';
+    wrap?: AlphaWrap | readonly [AlphaWrap, AlphaWrap];
+    transform?: readonly number[];
+    factor?: number;
 }
 
 export type AlphaMaskSource = (hit: RaycasterHit) => AlphaMask | null | undefined;
+
+export interface AlphaMaskedMaterial {
+    readonly name?: string;
+    readonly base: readonly number[];
+    readonly settings: readonly number[];
+    readonly maps: readonly (AlphaMaskedMap | undefined)[];
+}
+
+export interface AlphaMaskedModel {
+    readonly primitives: readonly {
+        readonly material: AlphaMaskedMaterial;
+    }[];
+    readonly asset: {
+        readonly doc: {
+            readonly textures?: readonly {
+                readonly source?: number;
+                readonly sampler?: number;
+                readonly extensions?: Readonly<Record<string, {
+                    readonly source?: number;
+                } | undefined>>;
+            }[];
+            readonly samplers?: readonly {
+                readonly wrapS?: number;
+                readonly wrapT?: number;
+            }[];
+        };
+    };
+    image(index: number): unknown;
+}
+
+export type AlphaPixels = Pick<AlphaMask, 'width' | 'height' | 'data'>;
 
 export class AlphaRaycaster extends Raycaster {
     alphaMask: AlphaMaskSource | null;
@@ -23,9 +56,40 @@ export class AlphaRaycaster extends Raycaster {
     intersectModel(source: DeformedPickingSource, options?: IntersectOptions): Promise<RaycasterHit[]>;
 }
 
+export type AlphaWrap = 'repeat' | 'mirror' | 'clamp';
+
+export interface ModelAlphaMaskSource extends AlphaMaskSource {
+    readonly skipped: readonly {
+        readonly material: AlphaMaskedMaterial;
+        readonly reason: string;
+    }[];
+}
+
+export interface ModelAlphaMasksOptions {
+    signal?: AbortSignal;
+    pixels?: (image: unknown) => AlphaPixels | Promise<AlphaPixels>;
+}
+
+export function modelAlphaMasks(model: AlphaMaskedModel, { signal, pixels }?: ModelAlphaMasksOptions): Promise<ModelAlphaMaskSource>;
+
 export function sampleAlpha(mask: AlphaMask, u: number, v: number): number;
 
 // Not exported from this entry, but used by the exports above:
+
+interface AlphaMaskedMap {
+    readonly index: number;
+    readonly texCoord?: number;
+    readonly extensions?: {
+        readonly KHR_texture_transform?: AlphaTextureTransform;
+    };
+}
+
+interface AlphaTextureTransform {
+    readonly offset?: readonly number[];
+    readonly rotation?: number;
+    readonly scale?: readonly number[];
+    readonly texCoord?: number;
+}
 
 interface BVHBuildOptions {
     maxLeafTriangles?: number;
