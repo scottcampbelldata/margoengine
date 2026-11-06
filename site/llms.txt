@@ -38,7 +38,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 - [@margoengine/webgl](https://margoengine.com/llms/packages/webgl.md): WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}).
 - [@margoengine/webgl2-compat](https://margoengine.com/llms/packages/webgl2-compat.md): The WebGL2 compatibility layer for browsers without WebGPU (milestones M0 to M8 done); the site's demos run on it there. install() gives core a WebGPU-shaped device on…
 - [@margoengine/worker](https://margoengine.com/llms/packages/worker.md): Runs Margo Engine in a Web Worker on an OffscreenCanvas: canvas transfer, resize, pixel ratio and input forwarding, so heavy scenes never block the page.
-- [@margoengine/stats](https://margoengine.com/llms/packages/stats.md): Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling and pipeline compile tracking.
+- [@margoengine/stats](https://margoengine.com/llms/packages/stats.md): Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling, pipeline compile tracking and a CPU phase breakdown.
 - [@margoengine/inspector](https://margoengine.com/llms/packages/inspector.md): Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger.
 
 ## Packages: Loading and formats
@@ -173,7 +173,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/webgl API](https://margoengine.com/llms/api/webgl.md): 4 entry points
 - [@margoengine/webgl2-compat API](https://margoengine.com/llms/api/webgl2-compat.md): 7 entry points
 - [@margoengine/worker API](https://margoengine.com/llms/api/worker.md): 2 entry points
-- [@margoengine/stats API](https://margoengine.com/llms/api/stats.md): 3 entry points
+- [@margoengine/stats API](https://margoengine.com/llms/api/stats.md): 4 entry points
 - [@margoengine/inspector API](https://margoengine.com/llms/api/inspector.md): 5 entry points
 - [@margoengine/gltf API](https://margoengine.com/llms/api/gltf.md): 1 entry point
 - [@margoengine/gltf-pro API](https://margoengine.com/llms/api/gltf-pro.md): 9 entry points

@@ -1758,6 +1758,10 @@
       "types": "./dist/stats/compile.d.ts",
       "import": "./dist/stats/compile.js"
     },
+    "./stats/phases": {
+      "types": "./dist/stats/phases.d.ts",
+      "import": "./dist/stats/phases.js"
+    },
     "./stats/report": {
       "types": "./dist/stats/report.d.ts",
       "import": "./dist/stats/report.js"

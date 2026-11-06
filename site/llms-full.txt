@@ -323,7 +323,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/webgl`](packages/webgl/README.md) | WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}). |
 | [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) | The WebGL2 compatibility layer for browsers without WebGPU (milestones M0 to M8 done); the site's demos run on it there. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures, gather and storage-buffer reads run, compute pipelines run as fragment draws, point draws or on the CPU, whichever the shader allows, and DOF, splats and culling take routes of their own there. XR runs through the /xr entry; the voxel path tracer refuses it. |
 | [`@margoengine/worker`](packages/worker/README.md) | Runs Margo Engine in a Web Worker on an OffscreenCanvas: canvas transfer, resize, pixel ratio and input forwarding, so heavy scenes never block the page. |
-| [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling and pipeline compile tracking. |
+| [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling, pipeline compile tracking and a CPU phase breakdown. |
 | [`@margoengine/inspector`](packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
 
 ### Loading and formats (12)
@@ -2566,7 +2566,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-155). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-156). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2778,6 +2778,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Image comparison (`@margoengine/headless/compare`, 2026-11-05) | CPU only. Images must be one size. `decodePNG` rejects interlaced files, ignores colour profiles and gamma, and cuts 16-bit samples to 8. SSIM runs on luma, so a change of hue at equal brightness is seen only by the pixel count. | Tests compare a few images, so the plain code is enough, and it runs anywhere. Both measures run in `compareImages` because each misses what the other sees. | A 4K image takes CPU time on every comparison: both passes run in JavaScript, and this has not been timed. | Compare at the size you render your tests, and tune `threshold`, `maxRatio` and `minSSIM` to your scene. |
 | Output formats (`@margoengine/headless/formats`, 2026-11-05) | JPEG is baseline with fixed standard tables, so files are larger than an optimized encoder's. Lossless WebP is a plain encoder (subtract green and three predictors, no colour cache), so files are larger than libwebp's. Lossy WebP needs a browser or worker. EXR is uncompressed. The engine's output is tone-mapped sRGB, so true HDR needs `PostStack`'s `sceneTexture`. | Previews and captures are small and written once, and plain code runs in Node with no codec to install. Every file is decoded by the browser's own decoders in the GPU check. | Bigger files than the best encoders; sizes have not been compared. | Use lossy WebP in a browser for the smallest previews, or run the file through a dedicated optimizer. |
 | Pipeline compile tracking (`@margoengine/stats/compile`, 2026-11-06) | Sees compiles made after attach, so not the engine's startup pipelines. Times are CPU time around each call: browsers compile in another process, so a blocking call can return quickly and the stall lands later. A hitch means a compile ran in a slow frame or the frame before it, which is evidence, not proof of the cause. Unlabelled compiles show an empty label; the `stacks` option finds them. Keeps the newest 256 records and hitches by default. |
+| CPU phase breakdown (`@margoengine/stats/phases`, 2026-11-06) | CPU time only, with the clock the browser gives: `performance.now()` steps by 5 to 100 microseconds, so a short phase in one frame can read 0 and the averages are the numbers to trust. The frustum test runs inside the one Wasm kernel call, so it is timed in `tick` and cannot be split from world matrices; `cull` is the visible-instance collection after it. `onFrame` callbacks added before attach fall outside the frame. Other scenes in a multi-view frame have no end pass, so time after their submit reads as `encode`. |
 
 ### React page
 
@@ -4232,25 +4233,32 @@ Each record has `kind` (`'shader'`, `'render'` or `'compute'`), `label`, `blocki
 
 It follows the engine's device through a device restore and sees only what is compiled after `attach`. Times are CPU time around each call. Browsers compile in another process, so a blocking call can return quickly and the stall arrives later, which is why the frame before counts too. A hitch is evidence that a compile was near a slow frame, not proof that it was the cause. With your own loop, call `compiles.track(device)` and `compiles.frame(milliseconds)` once per frame.
 
-The engine plugin samples actual frame intervals and counts direct/indirect draw
-and dispatch commands in its frame graph. Render bundle contents and commands
-recorded on other encoders are outside these counters. For a custom encoder,
-call `stats.track(encoder)` before recording and `stats.tick(deltaMs)` once per
-frame. Submit immediately after `encoder.finish()`; timestamp readback starts
-in the next microtask. The Stats plugin profiles one frame out of every 15;
-draw/dispatch counting and numeric ring sampling continue every frame.
+The CPU phase breakdown times the kernel tick, culling, encoding and submit of each frame:
 
-`{lowAllocationPasses: true}` is an explicit opt-in for applications that own their
-pass objects. It shares frozen prototypes for ordinary same-realm native WebGPU
-passes instead of attaching a separate owner and command methods to each pass.
-The default remains `false`, with the original own-property wrapper behavior.
-The opt-in falls back to that behavior for unknown factories, other realms,
-custom methods, existing own or inherited Stats owners, changed native
-methods/accessors, nonwritable inherited methods,
-and passes that cannot accept the derived prototype. Native command receivers,
-draw/dispatch counters and timestamp handling are preserved. Host allocations
-and profiling readbacks remain; this option does not promise zero allocation.
-Guards and inherited accessors can increase CPU cost, so measure your workload.
+```ts
+import {Engine} from 'margoengine/core';
+import {Stats} from 'margoengine/stats';
+import {FramePhases} from 'margoengine/stats/phases';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const phases = FramePhases.attach(engine, {samples: 120});
+phases.view(Stats.attach(engine));              // the averages in the panel
+engine.start();
+setInterval(() => console.log(phases.last.encode, phases.average().tick), 1000);
+```
+
+All numbers are CPU milliseconds, and they add up to `total`:
+
+| Phase | What it covers |
+| --- | --- |
+| `update` | `onFrame` callbacks, plugin updates, resize and camera, up to the kernel tick |
+| `tick` | The kernel tick: world matrices and the frustum test, in one Wasm call |
+| `cull` | Collecting the visible instances into batches and preparing the frame, up to the command encoder |
+| `encode` | Every frame graph pass, then `encoder.finish()` |
+| `submit` | `queue.submit` |
+| `other` | The rest of the frame's task |
+
+`last` is the newest finished frame, one object updated in place; `average()` is the mean over the last `samples` frames (2 to 4096, default 120). `JSON.stringify(phases)` gives `frames`, `last` and `average`. A frame ends when its task does, so read `last` from a later task. Views in one frame add into that frame. Nothing is allocated per frame, and core is not changed: the entry wraps `store.tick`, `createCommandEncoder` and `queue.submit` and adds two frame graph passes until `dispose()`. On WebGL2 `encode` is the frame graph and `submit` is 0.
 
 [README continues: https://margoengine.com/llms/packages/stats.md]
 

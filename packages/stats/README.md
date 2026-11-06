@@ -53,6 +53,35 @@ Each record has `kind` (`'shader'`, `'render'` or `'compute'`), `label`, `blocki
 
 It follows the engine's device through a device restore and sees only what is compiled after `attach`. Times are CPU time around each call. Browsers compile in another process, so a blocking call can return quickly and the stall arrives later, which is why the frame before counts too. A hitch is evidence that a compile was near a slow frame, not proof that it was the cause. With your own loop, call `compiles.track(device)` and `compiles.frame(milliseconds)` once per frame.
 
+The CPU phase breakdown times the kernel tick, culling, encoding and submit of each frame:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Stats} from 'margoengine/stats';
+import {FramePhases} from 'margoengine/stats/phases';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const phases = FramePhases.attach(engine, {samples: 120});
+phases.view(Stats.attach(engine));              // the averages in the panel
+engine.start();
+setInterval(() => console.log(phases.last.encode, phases.average().tick), 1000);
+```
+
+All numbers are CPU milliseconds, and they add up to `total`:
+
+| Phase | What it covers |
+| --- | --- |
+| `update` | `onFrame` callbacks, plugin updates, resize and camera, up to the kernel tick |
+| `tick` | The kernel tick: world matrices and the frustum test, in one Wasm call |
+| `cull` | Collecting the visible instances into batches and preparing the frame, up to the command encoder |
+| `encode` | Every frame graph pass, then `encoder.finish()` |
+| `submit` | `queue.submit` |
+| `other` | The rest of the frame's task |
+
+`last` is the newest finished frame, one object updated in place; `average()` is the mean over the last `samples` frames (2 to 4096, default 120). `JSON.stringify(phases)` gives `frames`, `last` and `average`. A frame ends when its task does, so read `last` from a later task. Views in one frame add into that frame. Nothing is allocated per frame, and core is not changed: the entry wraps `store.tick`, `createCommandEncoder` and `queue.submit` and adds two frame graph passes until `dispose()`. On WebGL2 `encode` is the frame graph and `submit` is 0.
+
+The frustum test is part of the kernel call, so it counts as `tick`. Browsers round `performance.now()` to 5 to 100 microseconds, so trust the averages over a single short phase.
+
 The engine plugin samples actual frame intervals and counts direct/indirect draw
 and dispatch commands in its frame graph. Render bundle contents and commands
 recorded on other encoders are outside these counters. For a custom encoder,

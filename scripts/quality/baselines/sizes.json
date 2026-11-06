@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4980690,
+  "total": 4982404,
   "history": [
     {
       "date": "2026-10-24",
@@ -2096,6 +2096,12 @@
       "commit": "c57eb2a80",
       "reason": "CPU compute tier without unsafe-eval: the interpreter chunk joins the lazy compute runtime and every whole-entry figure, though only a page that forbids new Function downloads it",
       "grew": 5
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "4e48d1dc0",
+      "reason": "New stats entry ./phases: CPU time per frame phase. Core and core + stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -2536,6 +2542,7 @@
     "@margoengine/staging": 7875,
     "@margoengine/stats": 4934,
     "@margoengine/stats/compile": 1882,
+    "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
     "@margoengine/taa": 11747,
     "@margoengine/taa/upscale": 7093,

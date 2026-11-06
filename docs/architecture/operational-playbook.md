@@ -160,6 +160,11 @@ Each rendered frame:
 There is no per-entity Wasm call during a normal tick and no kernel allocation in tick. Host work still scans one
 visibility byte per slot and copies each changed matrix. The cost of `kernel_sync_rotation` has not been isolated.
 
+`@margoengine/stats/phases` times these steps from outside core: step 3 is its `tick`, steps 4 and 5 are its `cull`,
+and it reads the frustum test as part of `tick`, because the test runs inside `kernel_tick`. It wraps `store.tick`,
+`createCommandEncoder` and `queue.submit` and adds two frame graph passes, so a change to this frame order must keep
+`packages/stats/test/phases.test.js` and `scripts/test-stats-browser.mjs` in step.
+
 ### 1.6 Kernel evidence and limits
 
 The native and host suites cover:

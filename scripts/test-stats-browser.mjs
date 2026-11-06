@@ -20,6 +20,7 @@ try {
     const { EngineKernel, box } = await import('/packages/core/dist/index.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
     const { PipelineCompiles } = await import('/packages/stats/dist/compile.js');
+    const { FramePhases } = await import('/packages/stats/dist/phases.js');
     const ensure = (condition, message) => {
       if (!condition) throw new Error(message);
     };
@@ -79,6 +80,40 @@ try {
     compiles.dispose();
     ensure(device.createRenderPipeline === createRenderPipeline, 'Device calls restored');
     result.compiles = { count: report.count, frames: report.frames, names };
+
+    // Each spin sits in one phase on the real frame path, so that phase must read at least its length.
+    const spin = (milliseconds) => {
+        const end = performance.now() + milliseconds;
+        while (performance.now() < end);
+      },
+      geometry = box();
+    for (let i = 0; i < 5000; i++) engine.createMesh().setGeometry(geometry);
+    // A native submit is shorter than the browser's clock step, so it is given a known length.
+    const slowSubmit = function (commands) {
+      spin(2);
+      return GPUQueue.prototype.submit.call(this, commands);
+    };
+    device.queue.submit = slowSubmit;
+    const phases = FramePhases.attach(instance, { samples: 16 }),
+      removeSpin = engine.onFrame(() => spin(3)),
+      removePass = engine.frameGraph.add({ name: 'stats-spin', order: 1, execute: () => spin(4) });
+    await frames(24);
+    const average = phases.average(),
+      { total, ...parts } = average,
+      sum = Object.values(parts).reduce((a, b) => a + b);
+    ensure(phases.frames >= 16, 'Frames reach FramePhases');
+    ensure(average.update >= 3, 'onFrame work reads as update: ' + average.update);
+    ensure(average.encode >= 4, 'A pass reads as encode: ' + average.encode);
+    ensure(average.tick > 0, 'The kernel tick is timed: ' + average.tick);
+    ensure(average.submit >= 2, 'The submit is timed: ' + average.submit);
+    ensure(Math.abs(sum - total) < 0.01, 'Phases add up to the total');
+    removeSpin();
+    removePass();
+    phases.dispose();
+    await frames(2);
+    ensure(device.queue.submit === slowSubmit, 'Submit restored');
+    delete device.queue.submit;
+    result.phases = average;
 
     engine.stop();
     await frames(2);
