@@ -1,6 +1,6 @@
 // Starts the real command over stdio, as Claude Code, Claude Desktop and Cursor do, and calls every tool.
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createInterface } from 'node:readline';
 import { PassThrough } from 'node:stream';
@@ -10,6 +10,13 @@ import { createMcpServer, runCli, serveStdio } from '../dist/index.js';
 import { repository } from './support.js';
 
 const bin = new URL('../bin/margoengine-mcp.js', import.meta.url);
+
+// npm makes a bin executable when it installs, so a mode of 644 in git shows the file as modified on every macOS and Linux checkout.
+test('the bin is executable in git', () => {
+  const file = fileURLToPath(bin),
+    entry = execFileSync('git', ['ls-files', '--stage', '--', file], { encoding: 'utf8' });
+  assert.match(entry, /^100755 /);
+});
 
 /** A running server process with `send` (one JSON line in) and `receive(id)` (the response with that id). */
 function start(args = ['--root', repository]) {
