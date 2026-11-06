@@ -69,6 +69,7 @@ export interface ShadowPrimitive {
         upload(device: GPUDevice): GPUBuffer;
     };
     clip?: GPUBufferBinding;
+    clipHardware?: boolean;
     displacement?: import('./shared/caster.js').CasterDisplacement;
     opacity?: {
         readonly buffer: GPUBuffer;

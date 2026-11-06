@@ -20,6 +20,7 @@ import {eye} from '/packages/materials/dist/eye.js';
 import {skin,skinTable} from '/packages/materials/dist/skin.js';
 import {sphereGeometry} from '/packages/geometry/dist/index.js';
 import {TAA} from '/packages/taa/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
 const size=256;
 // The real Seed-san avatar: one primitive of a mesh as geometry in its bind pose, UVs turned to this package's origin.
 let avatar;
@@ -101,7 +102,98 @@ const lobeSurfaces={
 // Light from straight ahead, tilted a little, with no ambient: the sun, or a clustered light of the same illuminance at the
 // quad's middle. Each surface gets enough of it to stay above the tone curve's dark end.
 const toward=[0.3,0.2,1],lobePower={coat:16,sheen:64,film:2,grain:1};
+// An engine with or without the clip-distances feature that keeps every shader it compiles.
+const clipScene=async(hardware,camera=front)=>{
+  const made=await scene(camera,hardware?{features:['clip-distances']}:{}),codes=[],make=made.engine.gpu.createShaderModule.bind(made.engine.gpu);
+  made.engine.gpu.createShaderModule=d=>{codes.push(d.code);return make(d);};
+  made.codes=codes;
+  made.path=()=>({has:made.engine.gpu.features.has('clip-distances'),rasterized:codes.some(c=>c.includes('@builtin(clip_distances)')),discarded:codes.some(c=>c.includes('materialClipBehind'))});
+  return made;
+};
+// Pixels of a green surface at z = 0 in front of a red wall that are the wrong colour for `keep(x, y)`, a signed distance to
+// the cut in world units. Within a pixel of the cut either colour, or a mix of them, is right.
+const wrongPixels=(data,keep)=>{
+  const half=5*Math.tan(Math.PI/6),pixel=2*half/size;let wrong=0;
+  for(let y=0;y<size;y++)for(let x=0;x<size;x++){
+    const d=keep(((x+0.5)/128-1)*half,(1-(y+0.5)/128)*half),k=(y*size+x)*4;
+    if(Math.abs(d)<=pixel)continue;
+    wrong+=d>0?data[k+1]<250||data[k]>5:data[k]<250||data[k+1]>5;
+  }
+  return wrong;
+};
 window.check={
+  // A surface cut by a slanted plane in front of a wall, with the feature and without: the same picture but for edge pixels.
+  async clip(){
+    const half=5*Math.tan(Math.PI/6),plane=[0.6,0.8,0,-0.3],keep=(x,y)=>plane[0]*x+plane[1]*y+plane[3];
+    const draw=async(hardware,slanted)=>{
+      const made=await clipScene(hardware),{engine,errors,render}=made;
+      createMesh(engine,quad(half),new UnlitMaterial({color:[0,1,0,1],clippingPlanes:[plane]}));
+      createMesh(engine,quad(half*2,-1),new UnlitMaterial({color:[1,0,0,1]}));
+      // A surface through the cut one along x = 0: where the two meet shows any change of depth.
+      if(slanted){const shape=quad(half);shape.positions=shape.positions.map((v,k,all)=>k%3===2?all[k-2]/2:v);createMesh(engine,shape,new UnlitMaterial({color:[0,0,1,1],side:'double'}));}
+      await render();const data=await pixels(made),path=made.path();engine.dispose();
+      return {data,errors,...path,wrong:slanted?undefined:wrongPixels(data,keep)};
+    };
+    const pixel=2*half/size,compare=(a,b)=>{
+      let differ=0,outside=0;
+      for(let k=0;k<size*size;k++){
+        if(![0,1,2].some(c=>a.data[k*4+c]!==b.data[k*4+c]))continue;
+        differ++;outside+=Math.abs(keep(((k%size+0.5)/128-1)*half,(1-(Math.floor(k/size)+0.5)/128)*half))>pixel;
+      }
+      return {differ,outside};
+    };
+    const fast=await draw(true),plain=await draw(false),crossing=compare(await draw(true,true),await draw(false,true)),{differ,outside}=compare(fast,plain);
+    fast.data=plain.data=undefined;
+    return {fast,plain,differ,outside,crossing};
+  },
+  // A cut caster's shadow on a wall, away from the caster on screen, with the feature and without.
+  async clipShadow(){
+    const half=5*Math.tan(Math.PI/6),edge=-0.1;
+    const draw=async(hardware)=>{
+      const made=await clipScene(hardware),{engine,errors,render}=made,shape=quad(0.5,1);
+      engine.lighting.direction.set([1,0,1,2]);engine.lighting.radiance.set([1,1,1,0]);
+      shape.positions=shape.positions.map((v,k)=>k%3===0?v+1:v);
+      const shadows=Shadows.attach(engine,{resolution:1024,filter:'hard'}),wall=createMesh(engine,quad(half*2),new PbrMaterial({roughness:1,toneMapped:false})),caster=createMesh(engine,shape,new PbrMaterial({clippingPlanes:[[0,1,0,-edge]]}));
+      shadows.add(wall);shadows.add(caster);await render();
+      const data=await pixels(made),path=made.path(),point=(x,y)=>at(data,Math.floor((x/half+1)*128),Math.floor((1-y/half)*128))[0];
+      // Down the wall's middle column from the kept shadow, the first lit row is where the shadow's cut lies.
+      let row=Math.floor((1-0.2/half)*128);while(at(data,128,row)[0]<0.2)row++;
+      const out={data,errors,...path,casterCut:made.codes.some(c=>c.includes('clip_distances')&&c.includes('alphaSampler')),kept:point(0,0.2),cut:point(0,-0.3),open:point(0,0.8),edge:(1-row/128)*half};
+      engine.dispose();return out;
+    };
+    const fast=await draw(true),plain=await draw(false);let differ=0,outside=0;
+    for(let k=0;k<size*size;k++){
+      if(![0,1,2].some(c=>fast.data[k*4+c]!==plain.data[k*4+c]))continue;
+      differ++;outside+=Math.abs((1-(Math.floor(k/size)+0.5)/128)*half-edge)>4*half/size;
+    }
+    fast.data=plain.data=undefined;
+    return {fast,plain,differ,outside};
+  },
+  // What stays on discard on a device with the feature, and instancing, which shares the stage's inter-stage slots.
+  async clipPaths(){
+    const half=5*Math.tan(Math.PI/6),plane=[0.6,0.8,0,-0.3],other=[-0.8,0.6,0,-0.2],keep=(x,y)=>plane[0]*x+plane[1]*y+plane[3],either=(x,y)=>Math.max(keep(x,y),other[0]*x+other[1]*y+other[3]),both=(x,y)=>Math.min(keep(x,y),other[0]*x+other[1]*y+other[3]);
+    const wall=(engine)=>createMesh(engine,quad(half*2,-1),new UnlitMaterial({color:[1,0,0,1]}));
+    const instanced=async()=>{
+      const made=await clipScene(true),{engine,errors,render}=made,m=createInstancedMesh(engine,quad(half),new UnlitMaterial({color:[0,1,0,1],clippingPlanes:[plane],features:[alphaHash()]}),1);
+      m.instances.setMatrices(0,new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]));wall(engine);await render();
+      const data=await pixels(made),path=made.path();engine.dispose();return {...path,errors,wrong:wrongPixels(data,keep)};
+    };
+    const eyed=async()=>{
+      const made=await clipScene(true),{engine,errors,render}=made;
+      createMesh(engine,sphereGeometry(1,32,24),new PbrMaterial({clippingPlanes:[[0,1,0,0]],features:[eye()]}));await render();
+      const data=await pixels(made),path=made.path();engine.dispose();
+      return {...path,errors,above:at(data,128,100),below:at(data,128,156)};
+    };
+    const live=async()=>{
+      const made=await clipScene(true),{engine,errors,render}=made,material=new UnlitMaterial({color:[0,1,0,1],clippingPlanes:[plane,other],clipIntersection:true});
+      createMesh(engine,quad(half),material);wall(engine);await render();
+      const first=await pixels(made),wedge={...made.path(),wrong:wrongPixels(first,either)};
+      material.clipIntersection=false;await render();
+      const second=await pixels(made),union={...made.path(),wrong:wrongPixels(second,both)};engine.dispose();
+      return {wedge,union,errors};
+    };
+    return {instanced:await instanced(),eyed:await eyed(),live:await live()};
+  },
   // A dark gradient across the whole canvas, drawn alike down every column. Returns each column's mean in 8-bit steps.
   async dithering({from,to,dithering,lit}){
     const half=5*Math.tan(Math.PI/6),geometry={...quad(half),colors:[from,from,from,1,to,to,to,1,to,to,to,1,from,from,from,1]};

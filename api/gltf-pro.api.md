@@ -260,6 +260,7 @@ export interface PBRMaterial extends GLTFMaterial {
     shading?: PBRMaterialShading;
     displacement?: import('./shared/caster.js').CasterDisplacement;
     clip?: GPUBufferBinding;
+    clipHardware?: boolean;
     surfaceClip?: GPUBufferBinding;
     castMask?: {
         readonly view: GPUTextureView;
@@ -1091,6 +1092,7 @@ interface ShadowCasterRecord {
     opacity?: NonNullable<PBRMaterial['castMask']>['opacity'];
     vertexAlpha?: boolean;
     clip?: GPUBufferBinding;
+    clipHardware?: boolean;
     surfaceClip?: GPUBufferBinding;
     dynamic: boolean;
 }

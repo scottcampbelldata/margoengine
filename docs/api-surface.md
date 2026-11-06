@@ -39,7 +39,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/fsm | `.` 3 |  |  | 952 |
 | @margoengine/geometry | `.` 76, `./shapes` 20, `./triangulate` 5, `./extrude` 6, `./primitives` 17, `./utils` 36, `./extras` 6, `./nurbs` 8, `./sample` 4, `./optimize` 9, `./flow` 7, `./delaunay` 5, `./polygon` 16, `./sweep` 9, `./tessellate` 4, `./gpu` 15 | 52 |  | 23,971 |
 | @margoengine/gltf | `.` 8, `./auto` 3, `./instancing` 1, `./meshopt` 1, `./quantized` 1, `./scene-data` 6, `./textured` 1 | 179 |  | 6,698 |
-| @margoengine/gltf-pro | `.` 45, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 338 |  | 59,440 |
+| @margoengine/gltf-pro | `.` 45, `./asset` 2, `./scene` 8, `./extended` 3, `./instancing` 3, `./prepare` 3, `./progressive` 4, `./coordinates` 2, `./worker` 4 | 338 |  | 59,835 |
 | @margoengine/headless | `.` 11, `./video` 11, `./ffmpeg` 4, `./stage` 3, `./compare` 11, `./formats` 9 | 8 |  | 2,611 |
 | @margoengine/html | `.` 7 |  |  | 4,954 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,568 |
@@ -53,7 +53,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/loaders | `.` 142, `./worker` 2, `./common` 17, `./usd` 8, `./font` 10, `./svg` 7, `./mtl` 10, `./render` 2, `./mocap` 6, `./vrml` 4, `./gcode` 3, `./nrrd` 5, `./ldraw` 6, `./threemf-materials` 4, `./vtk-xml` 4, `./3dm` 11, `./3ds` 5, `./lwo` 3, `./amf` 3, `./md2` 5, `./pdb` 4, `./tds` 5, `./kmz` 4, `./nurbs` 9, `./las` 10, `./vdb` 11, `./materialx` 12, `./lottie` 13 | 105 |  | 52,074 |
 | @margoengine/lod | `.` 23, `./auto` 9, `./fade` 6, `./stream` 7 | 34 |  | 13,899 |
 | margoengine | `.` 23, `./game` 43, `./viz` 33, `./web` 15 |  |  | 52 |
-| @margoengine/materials | `.` 115, `./atlas` 8, `./transmission` 8, `./batched` 4, `./mips` 5, `./prefilter` 3, `./layered` 7, `./alpha-hash` 2, `./object-normal` 2, `./hair` 2, `./eye` 3, `./skin` 5, `./stochastic` 3 | 313 |  | 62,034 |
+| @margoengine/materials | `.` 115, `./atlas` 8, `./transmission` 8, `./batched` 4, `./mips` 5, `./prefilter` 3, `./layered` 7, `./alpha-hash` 2, `./object-normal` 2, `./hair` 2, `./eye` 3, `./skin` 5, `./stochastic` 3 | 313 |  | 62,305 |
 | @margoengine/math | `.` 72, `./vector2` 1, `./vector3` 1, `./vector4` 1, `./quaternion` 1, `./euler` 3, `./matrix3` 1, `./matrix4` 1, `./color` 15, `./box3` 1, `./obb` 1, `./line3` 1, `./triangle` 1, `./color-space` 5, `./capsule` 3, `./sphere` 1, `./plane` 1, `./ray` 2, `./frustum` 1, `./project` 5, `./spherical` 1, `./cylindrical` 1, `./sh` 2, `./mathutils` 21, `./mat4` 11, `./validate` 3, `./quat` 10, `./vec3` 7, `./errors` 2, `./mesh` 1, `./billboard` 4, `./affine` 2 | 129 |  | 19,697 |
 | @margoengine/mcp | `.` 38 | 1 |  | 8,408 |
 | @margoengine/mesh-edit | `.` 88, `./modeling` 55, `./boolean-exact` 5, `./modifiers` 11, `./remesh` 6, `./sculpt` 6, `./bake` 5, `./weights` 7 | 17 |  | 29,559 |
@@ -62,14 +62,14 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/net | `.` 3 |  |  | 1,259 |
 | @margoengine/netcode | `.` 47, `./rollback` 4, `./websocket` 2, `./webrtc` 3, `./node` 6, `./rooms` 11, `./generate` 2 | 62 |  | 12,490 |
 | @margoengine/oit | `.` 2, `./meshes` 2 | 2 |  | 2,950 |
-| @margoengine/physics | `.` 44 | 23 |  | 16,267 |
+| @margoengine/physics | `.` 44 | 23 |  | 16,298 |
 | @margoengine/physics2d | `.` 29 | 16 |  | 7,664 |
 | @margoengine/pixel | `.` 13, `./palette` 15, `./render3d` 8 |  |  | 4,408 |
-| @margoengine/points | `.` 55, `./las` 21, `./laz` 7, `./e57` 13, `./copc` 4, `./octree` 11, `./surfels` 4, `./potree` 5, `./pick` 5 | 76 |  | 21,989 |
+| @margoengine/points | `.` 55, `./las` 21, `./laz` 7, `./e57` 13, `./copc` 4, `./octree` 11, `./surfels` 4, `./potree` 5, `./pick` 5 | 76 |  | 21,988 |
 | @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./outline` 2, `./mrt` 4, `./depth` 2, `./contact-shadows` 2 | 21 |  | 39,223 |
 | @margoengine/procedural | `.` 40, `./standin` 1, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 12,594 |
 | @margoengine/quality | `.` 27, `./warm` 3, `./ssaa` 6, `./features` 11, `./power` 8 | 4 | 2 | 3,686 |
-| @margoengine/ragdoll | `.` 8, `./powered` 4, `./getup` 6, `./hulls` 5, `./profile` 6, `./balance` 4 | 50 |  | 6,408 |
+| @margoengine/ragdoll | `.` 8, `./powered` 4, `./getup` 6, `./hulls` 5, `./profile` 6, `./balance` 4 | 50 |  | 7,148 |
 | @margoengine/react | `.` 43, `./controls` 12, `./gltf-pro` 5, `./fbx` 2, `./animation` 3, `./environment` 8, `./html` 2, `./shadows` 4, `./sky` 2, `./text` 2, `./geometry` 6, `./materials` 6, `./post` 28, `./dof` 2, `./tonemap` 2, `./taa` 2, `./voxel` 3, `./physics` 34, `./xr` 12, `./lines` 2, `./devtools` 2, `./helpers` 8 | 46 |  | 8,084 |
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10, `./hulls` 4, `./springs` 13, `./vrm` 26, `./voxel-weights` 3, `./correctives` 9, `./transfer` 4, `./face` 10 | 42 |  | 7,631 |
 | @margoengine/road | `.` 3 |  |  | 1,027 |
@@ -78,15 +78,15 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/scene | `.` 13, `./bulk` 3, `./mesh` 2 | 5 |  | 1,713 |
 | @margoengine/scenery | `.` 2, `./sky` 2 |  |  | 219 |
 | @margoengine/sciviz | `.` 71, `./bricks` 21, `./colormaps` 11, `./maths` 37 | 62 |  | 35,812 |
-| @margoengine/selection | `.` 27 | 5 |  | 20,184 |
+| @margoengine/selection | `.` 27 | 5 |  | 20,526 |
 | @margoengine/shader | `.` 188, `./noise` 14, `./graph` 17, `./readback` 4, `./raw` 21, `./effects` 19, `./editor` 24, `./compute-texture` 9, `./lighting` 11, `./deform` 11, `./pass` 5, `./utils` 37, `./subgroups` 12 | 347 | 1 | 18,012 |
-| @margoengine/shadows | `.` 10, `./virtual` 3 | 9 |  | 17,358 |
+| @margoengine/shadows | `.` 10, `./virtual` 3 | 9 |  | 17,733 |
 | @margoengine/sky | `.` 12, `./base` 13, `./preetham` 1, `./bruneton` 1, `./clouds` 1, `./night` 1, `./fog` 1, `./reflection` 1, `./lighting` 1, `./weather` 8, `./sun` 19 | 97 |  | 16,497 |
 | @margoengine/splats | `.` 19, `./data` 17 |  |  | 24,745 |
 | @margoengine/splines | `.` 3, `./closest` 4, `./frames` 8, `./knots` 5, `./mesh` 8, `./fit` 3 | 20 |  | 1,597 |
 | @margoengine/sprites | `.` 14, `./animation` 6, `./aseprite` 13, `./atlas` 3 | 6 |  | 4,803 |
 | @margoengine/stage | `.` 23, `./gltf` 3, `./sky` 1, `./particles` 1, `./effects` 1, `./environment` 2, `./shadows` 1, `./xr` 3, `./viewer` 4, `./physics` 4, `./scene` 3 | 23 |  | 1,984 |
-| @margoengine/staging | `.` 4 | 2 |  | 7,677 |
+| @margoengine/staging | `.` 4 | 2 |  | 8,003 |
 | @margoengine/stats | `.` 3, `./beacon` 3, `./compile` 5, `./leaks` 4, `./phases` 4, `./report` 6 | 11 |  | 4,798 |
 | @margoengine/taa | `.` 7, `./upscale` 2 | 2 |  | 11,973 |
 | @margoengine/terrain | `.` 13 | 2 |  | 12,120 |

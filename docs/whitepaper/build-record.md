@@ -67,8 +67,9 @@ Batches 1 to 3 are phase 1. Batches 19 and 21 are partly done, each with one job
 | [31](#batch-31-shader-part-1-of-2) | shader | 8 | 8 | 0 | 0 | 0 |
 | [32](#batch-32-shader-part-2-of-2) | shader | 4 | 4 | 0 | 0 | 0 |
 | [33](#batch-33-materials-part-1-of-2) | materials | 8 | 8 | 0 | 0 | 0 |
+| [34](#batch-34-materials-part-2-of-2) | materials | 4 | 4 | 0 | 0 | 0 |
 | [38](#batch-38-gltf) | gltf | 6 | 6 | 0 | 0 | 0 |
-| Total | | 183 | 175 | 2 | 4 | 2 |
+| Total | | 187 | 179 | 2 | 4 | 2 |
 
 ## Batch 1: fixes (part 1 of 3)
 
@@ -858,6 +859,44 @@ cube and array textures, layers and detail, hand-made mips, and rough metal and 
   `after` hook that leaves a server open can still hang `verify` with no test named: `--test-force-exit` was not added here, and
   that hang is Lane G's. Job 7's first GPU run failed on `target`, a reserved word in WGSL, before anything was committed. Nothing failed reached
   `main`.
+
+## Batch 34: materials (part 2 of 2)
+
+Large surfaces that stop repeating, characters with their own shading, dark gradients with no bands, and clipping planes that cut
+before the fragment stage where the device can.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Stochastic texture tiling | DONE | `c1a58baf4` | `@margoengine/materials/stochastic` | LIM-235 |
+| 2 | Hair, eye and skin shading models | DONE | `1ecfe8c78` | `/hair`, `/eye`, `/skin` | LIM-239 |
+| 3 | Output dithering | DONE | `63d744be4` | none (`dithering` option) | LIM-240 |
+| 4 | Hardware clip distances | DONE | this commit | none (`clippingPlanes` fast path) | LIM-249 |
+
+- **Bugs:** no bug in landed code was found in this batch, so no fix commit. Job 3 moved the noise that `Bloom` and `Sky` each held
+  into `packages/shared/dither.js`, with their text unchanged. Job 4 corrected two stale `docs/threejs-parity.md` rows left
+  from batch 33. Drafts caught before any commit: skin first took bindings 140-141 and the eye 142-144, and 141-144 are clustered's and
+  environment's, which the `character` GPU job failed on. The eye counted the cosine twice in its highlight.
+- **Proved:** a real GPU check per job in `packages/materials/test/features-browser.mjs`. Job 1 is on real floor and wood textures:
+  a repeat correlates with itself at 0.004 against 1.00 plain, and wood keeps 0.98 of its contrast. Job 2's hair lobes are compared
+  row by row with the formula on a flat stand-in, white peak within 0.01 of a row, and on the real Seed-san hair mesh the highlight
+  reaches 0.117 of the 0.121 possible and moves completely when the strands turn 90 degrees (correlation 0.005). Skin matches its
+  table within 1% and an 8-bit step on stand-in spheres of 5 mm and 2 m, and on the real head shows red ahead of green and blue on
+  861 pixels past the terminator where plain shading is black. The pupil's edges match a Snell trace within 1.5 pixels at five
+  settings, on a stand-in sphere only: Seed-san has no eyeball, just a shallow iris plate about 6% off a 65 mm sphere, on which the
+  pupil sits on the axis and opens 4.4 times in area for twice the radius. The `character` job fails without the clustered hook.
+  Job 3 holds a dark gradient's columns within 0.14 of an 8-bit step of the true level against 0.54 plain. Job 4 draws each scene
+  on a device with `clip-distances` and on one without and reads the compiled shaders: no clip `discard` in the first, every
+  pixel away from the cut right in both, a crossing surface and a cascaded shadow matching away from the cut, and a mutant that
+  writes no distances fails.
+- **Limits:** the character models reach the sun and clustered point, spot and directional lights; area lights, ambient and
+  environment reflections keep the plain model, and a shadow map cuts skin's bleed. Hair has no light through the strand. Dithering
+  acts on a material's own 8-bit output, so a float scene target is left to the pass that presents it, and only `Bloom` and `Sky` do
+  that. Clip distances must be requested at `Engine.create`, as core does not ask for them; `clipIntersection`, vertex outputs at
+  location 13 or higher (so the eye) and passes other than the colour pass and cascaded casters stay on discard.
+- **Unmeasured:** no timing was taken in this batch, so the three reads per map of tiling, the character models and clip distances
+  against discard are queued for the quiet speed pass. Only an RTX A6000 has run these checks. No real eyeball has been measured.
+- **Gate:** core and stage were not touched; job 4 needed no core change, as core's `options.features` already passes the feature
+  to the device. The new entries are recorded in the size gate. Nothing failed reached `main`.
 
 ## Batch 38: gltf
 

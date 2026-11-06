@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { markedClipDistances } from '../../shared/section.js';
 import type { GLTFPrimitive, GLTFMesh, GLTFNode, GLTFMaterial, GLTFTextureInfo } from '../../shared/gltf.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
@@ -962,6 +963,8 @@ export interface PBRMaterial extends GLTFMaterial {
    * to clip too: a uniform of up to 6 world planes in the scene `section` binding's layout (plane count in settings.x).
    */
   clip?: GPUBufferBinding;
+  /** True when those planes may cut in the rasterizer: a union of planes on a device with 'clip-distances'. */
+  clipHardware?: boolean;
   /** The same planes for passes that follow the surface and not its shadow: picking and TAA velocity. */
   surfaceClip?: GPUBufferBinding;
   /**
@@ -1154,6 +1157,7 @@ interface ShadowCasterRecord {
   /** False keeps vertex alpha out of the cut-out, as the colour pass does. Set only on a primitive that cuts. */
   vertexAlpha?: boolean;
   clip?: GPUBufferBinding;
+  clipHardware?: boolean;
   surfaceClip?: GPUBufferBinding;
   dynamic: boolean;
 }
@@ -1259,6 +1263,8 @@ function fillShadow(r: DrawResource, value: ShadowCasterRecord): void {
   else delete value.displacement;
   if (clip) value.clip = clip;
   else delete value.clip;
+  if (clip && m.clipHardware) value.clipHardware = true;
+  else delete value.clipHardware;
   const surfaceClip = m.surfaceClip;
   if (surfaceClip) value.surfaceClip = surfaceClip;
   else delete value.surfaceClip;
@@ -4490,7 +4496,7 @@ export class PBRModel implements EnginePlugin {
     if (!pipeline && build) {
       checkDrawLimits(c.device, code, m, transmission, this.lighting);
       const inputs = vertexInputs(code),
-        module = c.device.createShaderModule({ code: inputs.code }),
+        module = c.device.createShaderModule({ code: markedClipDistances(inputs.code) }),
         format = mode === 'beauty' ? c.format : 'rgba16float';
       const descriptor: GPURenderPipelineDescriptor = {
         layout: 'auto',

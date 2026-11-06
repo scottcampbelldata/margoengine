@@ -11,3 +11,7 @@ export function clipStatement(name: string, position?: string): string;
  * 'section'; another name lets one shader carry two sets of planes).
  */
 export function sectionShader(source: string, group: number, binding: number, name?: string): string;
+export function clipDeclaration(group: number, binding: number, name: string): string;
+export function clipDistances(code: string, name: string, position?: string): string;
+export function markClipDistances(code: string, group: number, binding: number, name: string): string;
+export function markedClipDistances(code: string): string;

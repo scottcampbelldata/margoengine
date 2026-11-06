@@ -170,6 +170,8 @@ export interface ShadowPrimitive {
    * `section` binding's layout. A scene's `section` binding takes precedence over it.
    */
   clip?: GPUBufferBinding;
+  /** True when `clip` may cut in the rasterizer: a union of planes on a device with 'clip-distances'. */
+  clipHardware?: boolean;
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices): bound at group 1. */
   displacement?: import('../../shared/caster.js').CasterDisplacement;
   /**
@@ -1538,7 +1540,8 @@ export class Shadows implements EnginePlugin {
       throw new RangeError('Unsupported shadow vertex stride; use 24-byte or 80-byte vertices.');
     // A scene's `section` binding wins; a material's planes (union or intersection, settings.y) bind under their own name.
     const section = scene ?? p.clip,
-      material = !scene && !!p.clip;
+      material = !scene && !!p.clip,
+      hardware = material && p.clipHardware === true;
     const inst = p.instances;
     if (inst && !inst.count) return;
     if (inst && p.stride !== 80) throw new RangeError('Instanced shadow casters need 80-byte vertices');
@@ -1568,7 +1571,8 @@ export class Shadows implements EnginePlugin {
         (material ? 32 : 0) +
         (opacity ? 64 : 0) +
         (tinted ? 128 : 0) +
-        (solid ? 256 : 0));
+        (solid ? 256 : 0) +
+        (hardware ? 512 : 0));
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       let code = shadowDepth(p.stride === 80, !!transform);
@@ -1580,7 +1584,7 @@ export class Shadows implements EnginePlugin {
       if (inst) code = instancedDepth(code);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
-      if (section) code = clippedDepth(code, 3, material ? 'materialClip' : 'section');
+      if (section) code = clippedDepth(code, 3, material ? 'materialClip' : 'section', hardware);
       const module = this.device!.createShaderModule({ code });
       pipeline = tinted
         ? tintPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines)

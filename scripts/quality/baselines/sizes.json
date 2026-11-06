@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7872097,
+  "total": 7873177,
   "history": [
     {
       "date": "2026-10-24",
@@ -2654,6 +2654,12 @@
       "commit": "50776aa2c",
       "reason": "new entry ragdoll/balance: capture point stepping on powered motors, with a capped assist",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d725f13cd",
+      "reason": "clip distances path in materials, gltf-pro, shadows and shared",
+      "grew": 2
     }
   ],
   "items": {
@@ -3120,7 +3126,7 @@
     "@margoengine/sciviz/bricks": 14265,
     "@margoengine/sciviz/colormaps": 4427,
     "@margoengine/sciviz/maths": 5638,
-    "@margoengine/selection": 20446,
+    "@margoengine/selection": 21142,
     "@margoengine/shader": 18459,
     "@margoengine/shader/compute-texture": 4761,
     "@margoengine/shader/deform": 5535,
@@ -3170,7 +3176,7 @@
     "@margoengine/stage/sky": 719,
     "@margoengine/stage/viewer": 2480,
     "@margoengine/stage/xr": 2138,
-    "@margoengine/staging": 7875,
+    "@margoengine/staging": 8259,
     "@margoengine/stats": 4934,
     "@margoengine/stats/beacon": 1639,
     "@margoengine/stats/compile": 1882,

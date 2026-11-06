@@ -47,7 +47,7 @@ import {
   type TranscodedTexture,
 } from './texture-kinds.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
-import { clipStatement, sectionShader } from '../../shared/section.js';
+import { clipStatement, markClipDistances, sectionShader } from '../../shared/section.js';
 export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
 export {
   packAtlas,
@@ -1967,6 +1967,19 @@ const surfaceAnchor = 'if(!facing&&f.settings.z<0.5){discard;}';
  * `code` discarding what the material's planes cut away: in every fragment entry, and in gltf-pro's `surface()` so
  * fragments appended later (the SSAO occlusion output) clip too.
  */
+/** Whether `m`'s planes may cut in the rasterizer on `device`. Clip distances cut a union; an intersection stays on discard. */
+const hardwareClip = (m: Material, device: GPUDevice | null | undefined): boolean =>
+  !m.clipIntersection && !!device?.features?.has('clip-distances');
+/**
+ * Whether the vertex stage of `code` has room for clip distances: six take two of the device's inter-stage slots, and
+ * instanced drawing passes one more variable. Otherwise, as with an eye's three, the planes stay on discard.
+ */
+function roomForDistances(code: string, device: GPUDevice): boolean {
+  const fields = /struct Out \{[^}]*\}/.exec(code)?.[0];
+  if (!fields || !code.includes('var o:Out;')) return false;
+  const top = Math.max(...[...fields.matchAll(/@location\((\d+)\)/g)].map((match) => +match[1]));
+  return top + 4 <= device.limits.maxInterStageShaderVariables;
+}
 function clipShader(code: string, group: number): string {
   const out = sectionShader(code, group, 199, 'materialClip');
   return out.replace(surfaceAnchor, clipStatement('materialClip') + surfaceAnchor);
@@ -4021,6 +4034,7 @@ const surfaceFields: PropertyDescriptorMap = {
     return (device && m.caster(device, g[recordRuntime])) ?? displacementOf(m, device, g[recordRuntime]);
   }),
   clip: live((m, g) => clipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
+  clipHardware: live((m, g) => hardwareClip(m, g[recordRuntime].gpu)),
   surfaceClip: live((m, g) => surfaceClipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   castMask: live((m, g) => castMaskOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   pickMask: live((m, g) => pickMaskOf(m, g[recordRuntime].gpu, g[recordRuntime])),
@@ -4105,9 +4119,18 @@ class MaterialShading implements PBRMaterialShading {
       own = m.shader(code, group),
       out = key ? featureShader(own, group, key) : own,
       env = m.envMap ? envMapShader(out, group, envKind(m)) : out;
-    let text = m['clipping'].length ? clipShader(env, group) : env;
-    for (const v of m['added']) text = v.shader(text, group, m);
-    return text;
+    const feed = (from: string) => {
+      let text = from;
+      for (const v of m['added']) text = v.shader(text, group, m);
+      return text;
+    };
+    if (!m['clipping'].length) return feed(env);
+    const device = this.runtime.gpu;
+    if (device && hardwareClip(m, device)) {
+      const text = feed(env);
+      if (roomForDistances(text, device)) return markClipDistances(text, group, 199, 'materialClip');
+    }
+    return feed(clipShader(env, group));
   }
   lit(code: string): string {
     const m = this.m,
@@ -4174,8 +4197,9 @@ function shaderRevision(m: Material): number {
       (+surface[1] << 15) |
       (+surface[2] << 16) |
       (+surface[3] << 17) |
-      (+m.dithering << 18),
-    variant = key + m['addedStamp'] * 524288;
+      (+m.dithering << 18) |
+      (+m.clipIntersection << 19),
+    variant = key + m['addedStamp'] * 1048576;
   let state = shaderRevisions.get(m);
   if (!state) shaderRevisions.set(m, (state = { key: variant, revision: nextShaderRevision++ }));
   else if (state.key !== variant) {

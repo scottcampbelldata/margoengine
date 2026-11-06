@@ -1201,13 +1201,22 @@ clipped caster redraws its shadow every frame. `@margoengine/lines` and `@margoe
 option. `clipIntersection: true` cuts away only what is behind every plane (their intersection: a wedge or a corner out of a solid) instead of what is behind any of them; it is a uniform value, so switching it compiles nothing, and shadows follow it. A scene's section planes (the `section` binding) still clip everything; with both, the scene's planes clip the shadows. Clustered
 point-light shadows and GPU picking ignore material planes.
 
+On a device with the optional `clip-distances` feature the planes cut in the rasterizer, before the fragment stage: there
+is no `discard`, so a clipped surface keeps early depth, and multisampling smooths the cut. Ask for it at creation with
+`Engine.create(canvas, { features: ['clip-distances'] })`; an adapter without it leaves the option out and the planes
+discard as before, with the same picture but for pixels on the cut. Cascaded shadow casters take the same path. Three
+things stay on `discard` on such a device: `clipIntersection`, because a wedge is not a union of half spaces; a material
+whose vertex outputs reach location 13 (`eye()`, `hair()` with a mesh-axis `direction`), because six distances take two
+inter-stage slots and instancing one more; and the passes that do not run the colour shader (picking, TAA velocity,
+contact shadows, local shadows).
+
 ```ts
 import { Engine } from 'margoengine/core';
 import { Material, createMesh } from 'margoengine/materials';
 import { torusKnotGeometry } from 'margoengine/geometry';
 
 declare const canvas: HTMLCanvasElement;
-const engine = await Engine.create(canvas);
+const engine = await Engine.create(canvas, { features: ['clip-distances'] }); // where the adapter has it
 const material = new Material({ color: '#e0a040', doubleSided: true, clippingPlanes: [[0, -1, 0, 0.5]] });
 createMesh(engine, torusKnotGeometry(), material); // everything above y = 0.5 is cut away
 material.clippingPlanes = [[0, -1, 0, 0.5], [1, 0, 0, 0]]; // live: also cut x < 0

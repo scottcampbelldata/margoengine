@@ -17,6 +17,46 @@ const check = (name, ...args) => page.evaluate(([n, a]) => window.check[n](...a)
 const near = (a, b, label, tolerance = 0.02) =>
   a.forEach((v, k) => assert.ok(Math.abs(v - b[k]) <= tolerance, `${label}: ${a} should be ${b}`));
 const jobs = {
+  async clip() {
+    const { fast, plain, differ, outside, crossing } = await check('clip');
+    console.log('clip', JSON.stringify({ fast, plain, differ, outside, crossing }));
+    assert.deepEqual([...fast.errors, ...plain.errors], []);
+    assert.equal(fast.has, true, 'this adapter has clip-distances');
+    assert.deepEqual([fast.rasterized, fast.discarded], [true, false], 'cut in the rasterizer, no discard');
+    assert.deepEqual([plain.has, plain.rasterized, plain.discarded], [false, false, true], 'the fallback discards');
+    // Both cut at the plane and leave the wall showing, so nothing behind the cut wrote depth, to the pixel.
+    assert.equal(fast.wrong, 0);
+    assert.equal(plain.wrong, 0);
+    // The two differ only along the cut: multisampling smooths a rasterized edge and a discard cuts whole pixels.
+    assert.ok(differ > 0, 'the rasterizer did the cutting');
+    assert.equal(outside, 0, 'nothing differs away from the cut');
+    // A surface crossing the kept part meets it on the same pixels: the depth of what stays has not moved.
+    assert.equal(crossing.outside, 0, 'depth matches where two surfaces meet');
+    const shadow = await check('clipShadow');
+    console.log('clip shadow', JSON.stringify(shadow));
+    assert.deepEqual([...shadow.fast.errors, ...shadow.plain.errors], []);
+    assert.deepEqual([shadow.fast.casterCut, shadow.plain.casterCut], [true, false], 'the caster is cut in the rasterizer');
+    for (const { kept, cut, open, edge } of [shadow.fast, shadow.plain]) {
+      // The wall is a pixel in 0.023 units, and the shadow's edge falls at the plane's -0.1 within two of those.
+      assert.ok(Math.abs(edge + 0.1) < 0.046, `the shadow ends at the plane: ${edge}`);
+      // The kept half shades the wall to black, and the wall under the cut half is as lit as open wall.
+      assert.ok(kept < 0.01, `the kept half casts: ${kept}`);
+      assert.ok(open > 0.1 && Math.abs(cut - open) < 0.01, `the cut half casts nothing: ${cut} ${open}`);
+    }
+    // Both cut the same triangles at each texel's centre, so the shadows match but for texels on the cut, under two pixels.
+    assert.equal(shadow.outside, 0, `the shadows match away from the cut: ${shadow.differ}`);
+    const { instanced, eyed, live } = await check('clipPaths');
+    console.log('clip paths', JSON.stringify({ instanced, eyed, live }));
+    assert.deepEqual([...instanced.errors, ...eyed.errors, ...live.errors], []);
+    // An instanced material at location 12 passes its block index at 13 and leaves room for the distances.
+    assert.deepEqual([instanced.rasterized, instanced.discarded, instanced.wrong], [true, false, 0]);
+    // The eye's outputs reach location 15, with no room for them: discard, on a device that has the feature.
+    assert.deepEqual([eyed.rasterized, eyed.discarded], [false, true]);
+    assert.ok(eyed.above[0] > 0.02 && eyed.below[0] < eyed.above[0] / 2, `the eye is cut: ${eyed.above} ${eyed.below}`);
+    // A wedge is not a union, so it discards; turned off live it recompiles to the rasterizer.
+    assert.deepEqual([live.wedge.rasterized, live.wedge.discarded, live.wedge.wrong], [false, true, 0]);
+    assert.deepEqual([live.union.rasterized, live.union.wrong], [true, 0]);
+  },
   async dithering() {
     const encode = (v) => 255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055),
       from = 0.004,

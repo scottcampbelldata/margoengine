@@ -2,7 +2,7 @@
 // shadow maps), @margoengine/staging (contact shadows) and @margoengine/selection (picking): the vertex layout of core
 // (24-byte) and gltf-pro (80-byte) geometry, the displacement bind group, the per-draw uniform and the draw itself.
 import { instanceLayout } from './instances.js';
-import { sectionShader } from './section.js';
+import { clipDeclaration, clipDistances, sectionShader } from './section.js';
 import { meshRuntime } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 
@@ -102,17 +102,20 @@ export function opacityDepth(code, group) {
 
 /**
  * A caster shader whose fragment discards what uniform `name`'s planes cut away, bound at `binding` of group 0. The vertex
- * stage must place `o.clip=f.camera*...` and the output struct be `Out`, with location 2 free. Apply it last.
+ * stage must place `o.clip=f.camera*...` and the output struct be `Out`, with location 2 free. Apply it last. `hardware`
+ * cuts by `clipDistances` instead, for a union of planes on a device with the feature.
  */
-export const clippedDepth = (code, binding, name) =>
-  sectionShader(
-    code
-      .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
-      .replace(/o.clip=f.camera\*([^;]+);/, 'let world=$1;o.clip=f.camera*world;o.position=world.xyz;'),
-    0,
-    binding,
-    name,
-  );
+export const clippedDepth = (code, binding, name, hardware = false) =>
+  hardware
+    ? clipDistances(clipDeclaration(0, binding, name) + code.replace(/o.clip=f.camera\*([^;]+);/, 'let world=$1;o.clip=f.camera*world;'), name, 'world.xyz')
+    : sectionShader(
+        code
+          .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
+          .replace(/o.clip=f.camera\*([^;]+);/, 'let world=$1;o.clip=f.camera*world;o.position=world.xyz;'),
+        0,
+        binding,
+        name,
+      );
 
 /** The bind group entries of a caster's `opacity`, from binding `first` (see `opacityCode`). */
 export const opacityEntries = (opacity, first = 4) => [

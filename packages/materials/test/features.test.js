@@ -377,3 +377,45 @@ test('dithering compiles in only while set, on the 8-bit path, and is live', asy
   assert.equal(clone.dithering, true);
   assert.throws(() => (material.dithering = 1), TypeError);
 });
+
+test('clipping planes cut in the rasterizer only on a device with clip-distances, a union and room for the distances', async () => {
+  const fitted = async (features) => {
+      const made = await scene();
+      Object.defineProperty(made.gpu.device, 'limits', { value: { ...made.gpu.device.limits, maxInterStageShaderVariables: 16 } });
+      for (const name of features) made.gpu.device.features.add(name);
+      return made;
+    },
+    plane = [[0, 1, 0, 0]],
+    surface = (log) => modules(log).find((c) => c.includes('fn surface('));
+  {
+    const { engine, frame } = await fitted(['clip-distances']);
+    createMesh(engine, quad, new PbrMaterial({ clippingPlanes: plane }));
+    const code = surface(frame());
+    assert.ok(code.startsWith('enable clip_distances;\n'));
+    assert.match(code, /@vertex fn vertex\(i:Input\)->MargoClipped \{\s*var o:MargoClipped;/);
+    assert.match(code, /struct MargoClipped \{[^}]*@builtin\(clip_distances\) margoClip:array<f32,6>\}/);
+    assert.match(code, /@fragment fn fragment\(i:Out,/, 'a fragment stage cannot read the distances');
+    assert.ok(!code.includes('materialClipBehind'), 'no discard');
+  }
+  {
+    const { engine, frame } = await fitted([]);
+    createMesh(engine, quad, new PbrMaterial({ clippingPlanes: plane }));
+    const code = surface(frame());
+    assert.ok(!code.includes('clip_distances'));
+    assert.ok(code.includes('materialClipBehind'));
+  }
+  {
+    const { engine, frame } = await fitted(['clip-distances']),
+      material = new PbrMaterial({ clippingPlanes: plane, clipIntersection: true });
+    createMesh(engine, quad, material);
+    assert.ok(surface(frame()).includes('materialClipBehind'), 'an intersection is no union');
+    material.clipIntersection = false;
+    assert.ok(surface(frame()).includes('clip_distances'), 'the switch recompiles');
+  }
+  {
+    const { engine, frame } = await fitted(['clip-distances']);
+    createMesh(engine, quad, new PbrMaterial({ clippingPlanes: plane, features: [eye()] }));
+    const code = surface(frame());
+    assert.ok(!code.includes('clip_distances') && code.includes('materialClipBehind'), 'an eye fills the inter-stage slots');
+  }
+});
