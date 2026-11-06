@@ -2,6 +2,7 @@
 import { Engine, box } from '@margoengine/core';
 import { Lines, Line } from '@margoengine/lines';
 import { LinePicking } from '@margoengine/lines/pick';
+import { Trail } from '@margoengine/lines/trail';
 import { Picking } from '../../selection/dist/index.js';
 import { Capture } from './lines-browser.js';
 
@@ -159,8 +160,39 @@ async function picking() {
   return 'Lines pick with meshes in one depth test, by segment, through picking.pick, engine.pick and pickMany';
 }
 
+async function trail() {
+  const { engine, lines, frame, done } = await rig();
+  const mesh = engine.createMesh().setGeometry(box(0.01, 0.01, 0.01));
+  const trailLine = lines.add(
+    new Trail({ target: mesh, lifetime: Infinity, maxLength: 6.5, width: 10, color: RED, tailWidth: 0.2, minDistance: 0 }),
+  );
+  // Walking the mesh along x leaves a line behind it, wide at the head and thin at the far end, faint at the far end.
+  for (let x = -3; x <= 3; x += 0.5) {
+    mesh.setPosition([x, 0, 0]);
+    await frame();
+  }
+  let image = await frame();
+  const head = pixel(2.8, 0, 0),
+    tail = pixel(-2.8, 0, 0);
+  const rows = (x) => {
+    let n = 0;
+    for (let y = 100; y < 156; y++) if (image.at(Math.round(x), y)[0] > 40) n++;
+    return n;
+  };
+  assert(image.at(Math.round(head[0]), 128)[0] > 200, 'The head is full colour');
+  assert(rows(head[0]) > rows(tail[0]) + 2, `The far end is thinner: ${rows(head[0])} against ${rows(tail[0])}`);
+  // Time up: nothing left to draw.
+  trailLine.lifetime = 0.5;
+  trailLine.update(engine, 1);
+  image = await frame();
+  assert(lines.stats.lines === 0, 'An aged-out trail draws nothing');
+  assert(image.at(Math.round(head[0]), 128)[0] < 40, 'An aged-out trail leaves no pixels');
+  done();
+  return 'Trail follows a mesh, thins and fades toward its far end, and disappears when aged out';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking]) checks.push(await check());
+  for (const check of [depthWrite, picking, trail]) checks.push(await check());
   return checks;
 };

@@ -116,6 +116,47 @@ lines.add(new Line({positions: [0, -2, 0, 0, 2, 0], width: 6, color: '#40ff40', 
 
 A depth-writing line takes two draws, so its edge stays smooth: the part at least half covered writes depth, then the rest of the edge ramp blends over it without writing. All writers draw before lines that do not write, so those sort against them. With `antialias: false` it is one draw. Dash gaps and parts cut by clipping planes write nothing. Depth is written at the line's centre, also for a translucent line, which then hides what is drawn behind it after it, as a depth-writing translucent mesh does.
 
+## Trails
+
+`Trail` from `margoengine/lines/trail` is a line that follows something and fades behind it: missiles, swords, cursors. It advances with the `Lines` plugin's frames, so there is nothing to call each frame.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {Lines} from 'margoengine/lines';
+import {Trail} from 'margoengine/lines/trail';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const lines = Lines.attach(engine);
+const missile = engine.createMesh().setGeometry(box(0.2, 0.2, 1));
+
+// Half a second of smoke, orange to grey, thinning to a point. A mesh target follows its world position.
+lines.add(new Trail({target: missile, lifetime: 0.5, width: 0.2, worldUnits: true, color: '#ffa030', tailColor: '#606060', tailWidth: 0}));
+
+// The tip of a sword (`offset` in the mesh's space), or a cursor from a function, kept to 4 units of length.
+const sword = engine.createMesh().setGeometry(box(0.1, 1, 0.1));
+lines.add(new Trail({target: sword, offset: [0, 0.5, 0], lifetime: 0.25, width: 6}));
+let cursor: [number, number, number] | null = [0, 0, 0];
+const pointer = lines.add(new Trail({target: () => cursor, lifetime: Infinity, maxLength: 4, width: 3}));
+
+// Teleporting? Forget the history, or the trail draws a line to the new place.
+pointer.reset();
+```
+
+| Option | Default | Notes |
+| --- | --- | --- |
+| `target` | none | A mesh, or a function returning a world position (null to pause). Without one call `trail.moveTo(x, y, z)`. |
+| `offset` | `[0, 0, 0]` | The followed point in a mesh target's local space |
+| `lifetime` | `1` | Seconds a point lives; `Infinity` for none |
+| `maxLength` | `Infinity` | World units from the head to the end |
+| `maxPoints` | `256` | 2 to 65,536. Past this the oldest point goes, so the end jumps: raise it for long trails |
+| `minDistance` | `0.05` | World units the head moves before it leaves a point behind |
+| `fade` | `1` | Opacity falls as `(1 - part) ^ fade` along the trail, part being the larger of age over `lifetime` and distance over `maxLength`; 0 does not fade |
+| `color`, `tailColor` | white, the head's | Colours at the two ends; `trail.setColor(color, tailColor)` changes them |
+| `tailWidth` | `1` | Width at the far end as a fraction of the head's, 0..1; ignored on a dashed trail |
+
+Any `LineMaterial` option applies too. The far end is cut exactly at the limit, between two points, so a trail shrinks smoothly, and a target that stops fades out with the rest of its trail. Like every line a trail faces the camera, so a flat ribbon on the ground, such as a tyre track seen from low down, is not what it draws. It is a line, so it also picks and takes fog and clipping planes.
+
 ## Fog
 
 `lines.setFog(fog)` fogs every line whose material has `fog: true` (the default) with `@margoengine/environment`'s `Fog`

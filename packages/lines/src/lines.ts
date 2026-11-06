@@ -4,7 +4,7 @@ import type { Camera, EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
-import { foggedLineShader, lineShader, phasedShader } from './shader.js';
+import { foggedLineShader, lineShader, phasedShader, pointWidthShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 import { overlayDepthPass, overlayPass, alphaBlend } from '../../shared/pass.js';
@@ -33,11 +33,15 @@ let warned = false;
  */
 const STYLE_BYTES = 224;
 
-/** Pipeline variant bits: draw over the scene, fogged, write depth; the draw step (shader.ts) sits above them. */
+/**
+ * Pipeline variant bits: draw over the scene, fogged, write depth, a width per point; the draw step (shader.ts) sits
+ * above them.
+ */
 const ON_TOP = 1,
   FOGGED = 2,
   WRITE = 4,
-  STEP = 8;
+  WIDTHS = 8,
+  STEP = 16;
 
 /** Options for the `Lines` plugin. An empty name or non-finite order throws a TypeError. */
 export interface LinesOptions {
@@ -61,7 +65,7 @@ export class Lines implements EnginePlugin {
   /** Told when a line joins or leaves (LinePicking's stand-in meshes). */
   private readonly watchers = new Set<{ added(line: Line): void; removed(line: Line): void }>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
-  private readonly modules = new Map<string, GPUShaderModule>();
+  private readonly modules = new Map<number, GPUShaderModule>();
   private engine?: Engine;
   private device?: GPUDevice;
   private layouts?: { frame: GPUBindGroupLayout; style: GPUBindGroupLayout; pipeline: GPUPipelineLayout };
@@ -161,7 +165,7 @@ export class Lines implements EnginePlugin {
       ],
     });
     this.layouts = { frame, style, pipeline: device.createPipelineLayout({ bindGroupLayouts: [frame, style] }) };
-    this.module(false, 0);
+    this.module(0);
     this.frameBuffer = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.frameGroup = device.createBindGroup({
       layout: frame,
@@ -173,12 +177,15 @@ export class Lines implements EnginePlugin {
     graph.add({ name: `${this.name}:draw`, order: this.order, execute: this.execute });
   }
 
-  /** The shader module of a variant's fog and draw step, made when first used. */
-  private module(fogged: boolean, phase: number): GPUShaderModule {
-    const key = `${fogged}|${phase}`;
+  /** The shader module of a variant, made when first used. */
+  private module(variant: number): GPUShaderModule {
+    const key = variant & ~(ON_TOP | WRITE);
     let module = this.modules.get(key);
     if (!module) {
-      module = this.device!.createShaderModule({ code: phasedShader(fogged ? foggedLineShader() : lineShader, phase) });
+      let code = variant & FOGGED ? foggedLineShader() : lineShader;
+      if (variant & WIDTHS) code = pointWidthShader(code);
+      code = phasedShader(code, Math.floor(variant / STEP));
+      module = this.device!.createShaderModule({ code });
       this.modules.set(key, module);
     }
     return module;
@@ -195,7 +202,7 @@ export class Lines implements EnginePlugin {
     if (!pipeline) {
       const fogged = (variant & FOGGED) !== 0,
         fog = fogged ? this.fogResources() : undefined,
-        module = this.module(fogged, Math.floor(variant / STEP));
+        module = this.module(variant);
       pipeline = this.device!.createRenderPipeline({
         layout: fog?.pipeline ?? this.layouts!.pipeline,
         vertex: { module, entryPoint: 'vertex' },
@@ -299,12 +306,12 @@ export class Lines implements EnginePlugin {
   }
 
   /** Updates every drawable line, uploads what changed and sorts the lines into `drawLists`. */
-  private collect(engine: EngineKernel): void {
+  private collect(engine: EngineKernel, delta: number): void {
     const device = this.device!,
       lists = this.drawLists;
     for (const list of lists) list.length = 0;
     for (const line of this.members) {
-      if (!line.visible || line.update(engine) === false) continue;
+      if (!line.visible || line.update(engine, delta) === false) continue;
       const mesh = line.attachedMesh,
         model = mesh ? meshWorldMatrix(engine, mesh) : line.matrix;
       if (!model) continue;
@@ -396,7 +403,7 @@ export class Lines implements EnginePlugin {
     const engine = this.engine as unknown as EngineKernel,
       device = this.device,
       lists = this.drawLists;
-    this.collect(engine);
+    this.collect(engine, context.delta);
     for (const list of lists)
       for (const [line] of list) {
         stats.lines++;
@@ -457,9 +464,10 @@ export class Lines implements EnginePlugin {
       edge = variant >= 2 * STEP;
     let current: GPURenderPipeline | undefined;
     for (const [line, r] of list) {
-      const { fog, antialias } = line.material;
+      const { fog, antialias, dashed } = line.material;
       if (edge && !antialias) continue;
-      const next = this.pipeline(context.format, depthFormat, count, variant | (fogged && fog ? FOGGED : 0));
+      const widths = line['pointWidths'] && !dashed ? WIDTHS : 0,
+        next = this.pipeline(context.format, depthFormat, count, variant | widths | (fogged && fog ? FOGGED : 0));
       if (next !== current) pass.setPipeline((current = next));
       pass.setBindGroup(1, r.group);
       pass.draw(VERTICES_PER_SEGMENT, line.segmentCount);

@@ -6,7 +6,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { VERTICES_PER_SEGMENT } from './geometry.js';
 import type { Line } from './line.js';
 import type { Lines } from './lines.js';
-import { clipCut, lineShader } from './shader.js';
+import { clipCut, lineShader, pointWidthShader } from './shader.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { FRAGMENT: number };
@@ -48,8 +48,8 @@ interface Gpu {
   baseLayout: GPUBindGroupLayout;
   base?: GPUBuffer;
   baseGroup?: GPUBindGroup;
-  depthTested: GPURenderPipeline;
-  onTop: GPURenderPipeline;
+  /** Pipelines by compare, then whether the line has a width per point. */
+  pipelines: Record<'depth' | 'top', [GPURenderPipeline, GPURenderPipeline]>;
 }
 
 /** Bytes between two lines' ID bases: WebGPU's dynamic offset alignment. */
@@ -128,8 +128,9 @@ export class LinePicking {
         ],
       }),
       layout = device.createPipelineLayout({ bindGroupLayouts: [layouts.frame, layouts.style, baseLayout] }),
-      module = device.createShaderModule({ code: linePickShader() }),
-      pipeline = (depthCompare: GPUCompareFunction) =>
+      plain = device.createShaderModule({ code: linePickShader() }),
+      widths = device.createShaderModule({ code: pointWidthShader(linePickShader()) }),
+      pipeline = (depthCompare: GPUCompareFunction, module: GPUShaderModule) =>
         device.createRenderPipeline({
           layout,
           vertex: { module, entryPoint: 'vertex' },
@@ -145,8 +146,10 @@ export class LinePicking {
         entries: [{ binding: 0, resource: { buffer: frame } }],
       }),
       baseLayout,
-      depthTested: pipeline('greater-equal'),
-      onTop: pipeline('always'),
+      pipelines: {
+        depth: [pipeline('greater-equal', plain), pipeline('greater-equal', widths)],
+        top: [pipeline('always', plain), pipeline('always', widths)],
+      },
     });
   }
 
@@ -177,7 +180,7 @@ export class LinePicking {
       engine = lines['engine'] as unknown as EngineKernel | undefined;
     this.entries = [];
     if (!device || !layouts || !engine) return;
-    lines['collect'](engine);
+    lines['collect'](engine, 0);
     const lists = lines['drawLists'],
       depthTested = [...lists[0], ...lists[1]],
       top = [...lists[2], ...lists[3]],
@@ -208,14 +211,14 @@ export class LinePicking {
       pass.setBindGroup(0, gpu.frameGroup);
       let next = 0,
         slot = 0;
-      for (const [list, pipeline] of [
-        [depthTested, gpu.depthTested],
-        [top, gpu.onTop],
-      ] as const) {
-        pass.setPipeline(pipeline);
+      for (const [list, pipelines] of [
+        [depthTested, gpu.pipelines.depth],
+        [top, gpu.pipelines.top],
+      ] as const)
         for (const [line, r] of list) {
           const segments = line.segmentCount;
           if (next + segments > MAX_IDS) break;
+          pass.setPipeline(pipelines[line['pointWidths'] && !line.material.dashed ? 1 : 0]);
           bases[(slot * BASE_STRIDE) / 4] = c.firstId + next;
           this.entries.push({ line, first: next });
           pass.setBindGroup(1, r.group);
@@ -224,7 +227,6 @@ export class LinePicking {
           next += segments;
           slot++;
         }
-      }
       device.queue.writeBuffer(gpu.base!, 0, bases);
       pass.end();
     }

@@ -42,6 +42,10 @@
     "./pick": {
       "types": "./dist/pick.d.ts",
       "import": "./dist/pick.js"
+    },
+    "./trail": {
+      "types": "./dist/trail.d.ts",
+      "import": "./dist/trail.js"
     }
   },
   "files": [

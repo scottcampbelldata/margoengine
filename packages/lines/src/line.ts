@@ -185,8 +185,10 @@ export class Line {
   capacityVersion = 0;
   /** Total length for dashes, including a loop's closing segment. */
   totalDistance = 0;
+  /** The points' fourth value scales the width at each point instead of holding a dash distance (`Trail`); dashes win. */
+  protected pointWidths = false;
   private pointCount = 0;
-  private target: Mesh | null = null;
+  private mount: Mesh | null = null;
   private owner?: LineOwner;
   private distancesFor = new Float32Array(16).fill(NaN);
   private distanceVersion = -1;
@@ -213,7 +215,7 @@ export class Line {
     return segmentCount(this.mode, this.pointCount);
   }
   get attachedMesh(): Mesh | null {
-    return this.target;
+    return this.mount;
   }
 
   /**
@@ -278,7 +280,7 @@ export class Line {
 
   /** Follow a core mesh's world matrix (the line's points are then in the mesh's local space), or null for world space. */
   attach(mesh: Mesh | null): this {
-    this.target = attachableMesh(mesh);
+    this.mount = attachableMesh(mesh);
     return this;
   }
 
@@ -289,8 +291,17 @@ export class Line {
     return this;
   }
 
-  /** Called by the plugin each frame before drawing; helpers override it to follow their targets. Return false to skip this frame. */
-  update(_engine: EngineKernel): boolean | void {}
+  /**
+   * Called by the plugin before drawing, with the seconds since the last frame (0 on a pick or a further view of a
+   * frame); helpers override it to follow their targets. Return false to skip this frame.
+   */
+  update(_engine: EngineKernel, _delta?: number): boolean | void {}
+
+  /** Sets the point count within the current capacity, for subclasses that write `points` and `colors` themselves. */
+  protected resize(count: number): void {
+    this.pointCount = count;
+    this.version++;
+  }
 
   /** Recomputes dash distances when the points, mode or model matrix changed. */
   updateDistances(model: Mat4): void {

@@ -196,6 +196,13 @@ export const phasedShader = (code: string, phase: number): string =>
     ? code.replace('let alpha=i.color.a*cover;', `if(cover${phase === 1 ? '<' : '>='}0.5){discard;}let alpha=i.color.a*cover;`)
     : code;
 
+/** `code` for lines with a width scale per point: the fourth value of each point scales the half width. */
+export const pointWidthShader = (code: string): string =>
+  code.replace(
+    'let rawA=halfWidth(ca);let rawB=halfWidth(cb);',
+    'let rawA=halfWidth(ca)*mix(points[ia].w,points[ib].w,ta);let rawB=halfWidth(cb)*mix(points[ia].w,points[ib].w,tb);',
+  );
+
 const fogEdits: Array<[string, string]> = [
   // Lines blend alpha over the scene, so a fogged line fades toward the fog colour, in linear before any encoding.
   [

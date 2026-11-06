@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4575440,
+  "total": 4580637,
   "history": [
     {
       "date": "2026-10-24",
@@ -1730,6 +1730,12 @@
       "commit": "c50f4be0d",
       "reason": "New optional entry @margoengine/compute/autotune: workgroup autotuning",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "65022531a",
+      "reason": "New lines entry ./trail: Trail; lines root gains a width per point variant",
+      "grew": 1
     }
   ],
   "items": {
@@ -1936,6 +1942,7 @@
     "@margoengine/lines": 18423,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/pick": 5665,
+    "@margoengine/lines/trail": 5197,
     "@margoengine/loaders": 52602,
     "@margoengine/loaders dist/workers/usd.js": 8435,
     "@margoengine/loaders/common": 3417,

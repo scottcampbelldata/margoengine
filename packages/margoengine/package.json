@@ -830,6 +830,10 @@
       "types": "./dist/lines/pick.d.ts",
       "import": "./dist/lines/pick.js"
     },
+    "./lines/trail": {
+      "types": "./dist/lines/trail.d.ts",
+      "import": "./dist/lines/trail.js"
+    },
     "./loaders": {
       "types": "./dist/loaders.d.ts",
       "import": "./dist/loaders.js"

@@ -71,6 +71,8 @@ test('a pick draws depth-tested lines first, then onTop ones, with IDs per segme
     pipelines.map((p) => [p.depthStencil.depthCompare, p.depthStencil.depthWriteEnabled]),
     [
       ['greater-equal', true],
+      ['greater-equal', true],
+      ['always', true],
       ['always', true],
     ],
   );

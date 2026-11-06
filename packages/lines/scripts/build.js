@@ -22,6 +22,7 @@ await build({
         index: resolve(root, 'src/index.ts'),
         edges: resolve(root, 'src/edges.ts'),
         pick: resolve(root, 'src/pick.ts'),
+        trail: resolve(root, 'src/trail.ts'),
       },
       formats: ['es'],
       fileName: (_, name) => name + '.js',

@@ -43,6 +43,7 @@ class Line {
     version: number;
     capacityVersion: number;
     totalDistance: number;
+    protected pointWidths: boolean;
     constructor(options?: LineOptions);
     get count(): number;
     get segmentCount(): number;
@@ -51,7 +52,8 @@ class Line {
     setColors(colors: ArrayLike<number> | null): this;
     attach(mesh: Mesh | null): this;
     setMatrix(matrix: Mat4): this;
-    update(_engine: EngineKernel): boolean | void;
+    update(_engine: EngineKernel, _delta?: number): boolean | void;
+    protected resize(count: number): void;
     updateDistances(model: Mat4): void;
     bind(owner: LineOwner | undefined): void;
     get attached(): boolean;
