@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6489097,
+  "total": 6435095,
   "history": [
     {
       "date": "2026-10-24",
@@ -2522,6 +2522,12 @@
       "commit": "8629c17e9",
       "reason": "feat(rigging): geodesic voxel weights (new entry @margoengine/rigging/voxel-weights)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "83b287e4a",
+      "reason": "stage/xr: the button finds the WebGL2 route and says why XR cannot start (audit row A5)",
+      "grew": 1
     }
   ],
   "items": {
@@ -3020,7 +3026,7 @@
     "@margoengine/stage/shadows": 750,
     "@margoengine/stage/sky": 719,
     "@margoengine/stage/viewer": 2480,
-    "@margoengine/stage/xr": 1741,
+    "@margoengine/stage/xr": 2185,
     "@margoengine/staging": 7875,
     "@margoengine/stats": 4934,
     "@margoengine/stats/beacon": 1639,

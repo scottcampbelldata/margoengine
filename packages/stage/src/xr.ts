@@ -14,7 +14,7 @@ export interface XRButtonOptions extends Omit<XRSessionOptions, 'signal'> {
   label?: string;
   /** Text during a session. Default 'Exit VR' or 'Exit AR'. */
   exitLabel?: string;
-  /** Text of the disabled button when the session cannot start here. Default 'VR not available' or 'AR not available'. */
+  /** Text of the disabled button when the session cannot start here. Default 'VR not available' or 'AR not available', or 'VR needs WebXR's WebGPU binding' where that is what is missing. */
   unavailableLabel?: string;
   /** Style the button with your own CSS class instead of the built-in style, which places it at the foot of `parent`. */
   className?: string;
@@ -32,6 +32,8 @@ export interface XRButton {
   readonly supported: boolean;
   /** The XR plugin, for `xr.controllers`, `xr.session` and `HitTest`; null when not supported. */
   readonly xr: XR | null;
+  /** Why the session cannot start, and the fix if there is one; undefined when supported. Also the button's `title`. */
+  readonly reason?: string;
   /** Removes the button. The last button of a stage also ends its session and releases the XR device. */
   dispose(): void;
   [Symbol.dispose](): void;
@@ -43,6 +45,41 @@ interface SharedXR {
   users: number;
 }
 const shared = new WeakMap<Stage, SharedXR>();
+/** The WebGL2 layer's XR route: one per page, since it fills a global, in place until the last stage using it lets go. */
+let route: Promise<{ dispose(): void }> | undefined;
+const routeUsers = new Set<Stage>();
+
+/**
+ * Browsers with WebXR and no WebGPU binding can still run XR on a page that runs on the WebGL2 compatibility layer, whose
+ * `navigator.gpu` has an `xrRoute` method that gives `@margoengine/xr` a route. Native WebGPU has none, so nothing happens.
+ */
+function routeOf(stage: Stage): Promise<unknown> | undefined {
+  if (!route) {
+    const { navigator: { xr = undefined, gpu = undefined } = {}, XRGPUBinding: binding, XRWebGLLayer: layer } = globalThis as unknown as {
+      navigator?: { xr?: unknown; gpu?: { xrRoute?(): Promise<{ dispose(): void }> } };
+      XRGPUBinding?: unknown;
+      XRWebGLLayer?: unknown;
+    };
+    if (!xr || binding || !layer || !gpu?.xrRoute) return undefined;
+    route = gpu.xrRoute();
+  }
+  routeUsers.add(stage);
+  return route;
+}
+/** Why a session cannot start on `stage`, in words for the developer, and the label for a missing binding. */
+function whyNot(stage: Stage, mode: string, kind: string): { reason: string; label?: string } {
+  const page = globalThis as unknown as { navigator?: { xr?: unknown; gpu?: unknown }; XRGPUBinding?: unknown };
+  if (stage.engine.backend !== 'webgpu')
+    return { reason: 'XR needs a WebGPU stage; on WebGL2 run the page on the WebGL2 compatibility layer, which has an XR route.' };
+  if (!page.navigator?.xr) return { reason: 'This browser has no WebXR, or the page is not on HTTPS.' };
+  if (!page.XRGPUBinding)
+    return {
+      reason:
+        "This browser has WebXR but not its WebGPU binding; run the page on the WebGL2 compatibility layer, which gives XR a route.",
+      label: `${kind} needs WebXR's WebGPU binding`,
+    };
+  return { reason: `This browser or device cannot start ${mode}.` };
+}
 
 const style =
   'position:absolute;left:50%;transform:translateX(-50%);z-index:1;min-height:44px;padding:0 24px;' +
@@ -53,7 +90,8 @@ const style =
  * it starts the session and turns it into Exit VR; where the session cannot start, the button stays on the page,
  * disabled and saying so. Immersive sessions stop the window's frame loop, so `stage.onTick` pauses: animate in `onFrame`.
  * Rejects with `Install @margoengine/xr` when it is missing, and with AbortError, adding nothing, when `signal` aborts
- * or the stage is disposed first. Needs WebGPU and a browser with WebXR's WebGPU binding.
+ * or the stage is disposed first. Needs WebGPU and a browser with WebXR's WebGPU binding, or a page on the WebGL2
+ * compatibility layer, whose XR route it installs itself.
  * @example const button = await addXRButton(stage, { onFrame: ({ delta }) => { cube.rotation.y += delta; } });
  */
 export async function addXRButton(
@@ -76,6 +114,8 @@ export async function addXRButton(
   abort.throwIfAborted();
   if (!host) throw fault('state', 'XR button needs a canvas on the page or the parent option');
   const { XR } = await optionalPackage('@margoengine/xr', () => import('@margoengine/xr'), abort);
+  if (stage.engine.backend === 'webgpu') await routeOf(stage);
+  abort.throwIfAborted();
   const supported =
     stage.engine.backend === 'webgpu' &&
     (await XR.isSupported(mode).catch((error: unknown) => {
@@ -99,7 +139,9 @@ export async function addXRButton(
     if ((error as { code?: string }).code !== 'unsupported') throw error;
     xr = null;
   }
-  const report = onError ?? ((error: unknown) => stage.engine.onError(error)),
+  if (!xr && !shared.has(stage)) dropRoute(stage);
+  const missing = xr ? undefined : whyNot(stage, mode, kind),
+    report = onError ?? ((error: unknown) => stage.engine.onError(error)),
     enter = label ?? `Enter ${kind}`,
     element = host.ownerDocument.createElement('button'),
     view = host.ownerDocument.defaultView!,
@@ -108,8 +150,9 @@ export async function addXRButton(
     busy = false,
     disposed = false;
   element.type = 'button';
-  element.textContent = xr ? enter : (unavailableLabel ?? `${kind} not available`);
+  element.textContent = xr ? enter : (unavailableLabel ?? missing?.label ?? `${kind} not available`);
   element.disabled = !xr;
+  if (missing) element.title = missing.reason;
   element.dataset.xrButton = mode;
   if (className) element.className = className;
   else {
@@ -156,15 +199,31 @@ export async function addXRButton(
   element.addEventListener('click', click);
   stage.signal.addEventListener('abort', dispose, { once: true });
   host.append(element);
-  return { element, supported: !!xr, xr, dispose, [Symbol.dispose ?? Symbol()]: dispose } as XRButton;
+  return {
+    element,
+    supported: !!xr,
+    xr,
+    reason: missing?.reason,
+    dispose,
+    [Symbol.dispose ?? Symbol()]: dispose,
+  } as XRButton;
 }
 
 /** One user fewer; the last one disposes the plugin, which ends its session. */
 function release(stage: Stage, share: SharedXR | undefined): void {
   if (!share || --share.users) return;
   if (shared.get(stage) === share) shared.delete(stage);
-  share.ready.then(
-    (xr) => xr.dispose(),
-    () => {},
-  );
+  share.ready
+    .then(
+      (xr) => xr.dispose(),
+      () => {},
+    )
+    .then(() => dropRoute(stage));
+}
+/** Takes the WebGL2 layer's route away, once no button of any stage uses it. */
+function dropRoute(stage: Stage): void {
+  if (!routeUsers.delete(stage) || routeUsers.size > 0) return;
+  const held = route;
+  route = undefined;
+  void held?.then((handle) => handle.dispose());
 }

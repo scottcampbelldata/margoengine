@@ -38,6 +38,21 @@ class XR {
   }
 }
 mock.module('@margoengine/xr', { namedExports: { XR } });
+const layer = { installs: 0, disposed: 0 };
+/** What `navigator.gpu` of the WebGL2 layer gives; native WebGPU has no such method. */
+const compatGPU = {
+  async xrRoute() {
+    layer.installs++;
+    globalThis.XRGPUBinding = class {};
+    world.supported = true;
+    return {
+      dispose() {
+        layer.disposed++;
+        delete globalThis.XRGPUBinding;
+      },
+    };
+  },
+};
 const { addXRButton } = await import('@margoengine/stage/xr');
 
 function fixture(t, { backend = 'webgpu', parentStyle = '' } = {}) {
@@ -151,6 +166,94 @@ test('real failures reject or report instead of showing an unavailable button', 
   second.element.click();
   await settled();
   assert.deepEqual(seen, [world.sessionFailure]);
+});
+
+const webXR = (t) => {
+  Object.assign(layer, { installs: 0, disposed: 0 });
+  Object.defineProperty(globalThis.navigator, 'xr', { configurable: true, value: {} });
+  const gpu = Object.getOwnPropertyDescriptor(globalThis.navigator, 'gpu');
+  Object.defineProperty(globalThis.navigator, 'gpu', { configurable: true, value: compatGPU });
+  globalThis.XRWebGLLayer = class {};
+  t.after(() => {
+    delete globalThis.navigator.xr;
+    delete globalThis.navigator.gpu;
+    if (gpu) Object.defineProperty(globalThis.navigator, 'gpu', gpu);
+    delete globalThis.XRWebGLLayer;
+    delete globalThis.XRGPUBinding;
+  });
+};
+
+test('WebXR with no binding on the WebGL2 layer: the button finds the route itself, and gives it back with the last button', async (t) => {
+  const { stage } = fixture(t);
+  webXR(t);
+  world.supported = false;
+  const first = await addXRButton(stage),
+    second = await addXRButton(stage, { mode: 'immersive-ar' });
+  assert.equal(first.supported, true);
+  assert.equal(first.element.disabled, false);
+  assert.equal(first.reason, undefined);
+  assert.equal(layer.installs, 1, 'one route per page');
+  first.dispose();
+  await new Promise((done) => setTimeout(done));
+  assert.equal(layer.disposed, 0, 'the second button still uses it');
+  second.dispose();
+  await new Promise((done) => setTimeout(done));
+  assert.equal(layer.disposed, 1);
+  assert.equal(globalThis.XRGPUBinding, undefined);
+});
+
+test('two stages on the layer share the one route of the page, until the last button of either goes', async (t) => {
+  const { stage: one } = fixture(t),
+    { stage: two } = fixture(t);
+  webXR(t);
+  world.supported = false;
+  const first = await addXRButton(one),
+    second = await addXRButton(two);
+  assert.equal(second.supported, true);
+  assert.equal(layer.installs, 1);
+  first.dispose();
+  await new Promise((done) => setTimeout(done));
+  assert.equal(layer.disposed, 0, 'the other stage still draws through it');
+  assert.ok(globalThis.XRGPUBinding);
+  second.dispose();
+  await new Promise((done) => setTimeout(done));
+  assert.equal(layer.disposed, 1);
+});
+
+test('WebXR with no binding on native WebGPU: the disabled button names what is missing', async (t) => {
+  const { stage } = fixture(t);
+  webXR(t);
+  Object.defineProperty(globalThis.navigator, 'gpu', { configurable: true, value: {} });
+  world.supported = false;
+  const button = await addXRButton(stage);
+  assert.equal(button.supported, false);
+  assert.equal(button.element.disabled, true);
+  assert.equal(button.element.textContent, "VR needs WebXR's WebGPU binding");
+  assert.match(button.reason, /WebGL2 compatibility layer/);
+  assert.equal(button.element.title, button.reason);
+  button.dispose();
+});
+
+test('a browser with the binding never touches the layer', async (t) => {
+  const { stage } = fixture(t);
+  webXR(t);
+  globalThis.XRGPUBinding = class {};
+  const button = await addXRButton(stage);
+  assert.equal(button.supported, true);
+  assert.equal(layer.installs, 0);
+  button.dispose();
+});
+
+test('a WebGL2 stage and a browser with no WebXR each give their own reason', async (t) => {
+  const webgl = await addXRButton(fixture(t, { backend: 'webgl2' }).stage);
+  assert.match(webgl.reason, /WebGPU stage/);
+  webgl.dispose();
+  const { stage } = fixture(t);
+  world.supported = false;
+  const plain = await addXRButton(stage);
+  assert.match(plain.reason, /no WebXR/);
+  assert.equal(plain.element.textContent, 'VR not available');
+  plain.dispose();
 });
 
 test('labels, parent and class come from the caller; a class leaves the page styles alone', async (t) => {

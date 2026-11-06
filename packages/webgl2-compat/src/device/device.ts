@@ -2,6 +2,7 @@
 // The WebGPU-shaped GPU, adapter, device and queue of the compatibility layer (W3C WebGPU specification sections 4
 // and 21 to 22), on one WebGL2 context per device. Validation errors go to error scopes or `uncapturederror`, as in
 // WebGPU; what the layer cannot do throws MargoError code `unsupported`.
+import type { CompatXR, CompatXROptions } from '../xr.js';
 import { fault } from '../../../shared/errors.js';
 import { webgl2Capabilities, type WebGL2Capabilities } from '../index.js';
 import { extensions, type Extensions, GLState } from './gl.js';
@@ -145,6 +146,14 @@ const ATTRIBUTES: WebGLContextAttributes = {
 export class CompatGPU {
   readonly wgslLanguageFeatures: ReadonlySet<string> = new Set();
   constructor(private readonly options: CompatGPUOptions = {}) {}
+
+  /**
+   * Runs `installXR` of `@margoengine/webgl2-compat/xr`, loading that entry only now. With it, code that holds
+   * `navigator.gpu` finds the XR route of the layer without naming the layer, as `addXRButton` of `@margoengine/stage` does.
+   */
+  xrRoute(options?: CompatXROptions): Promise<CompatXR> {
+    return import('../xr.js').then(({ installXR }) => installXR(options));
+  }
 
   /** A WebGL2-backed adapter, or null when the browser has no WebGL2 at the `full` tier. */
   requestAdapter(options: GPURequestAdapterOptions = {}): Promise<CompatAdapter | null> {

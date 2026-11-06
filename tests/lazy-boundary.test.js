@@ -100,7 +100,7 @@ test('texture read-back is reached only through the import() in device/device.ts
   assert.deepEqual(importers, [{ file: 'packages/webgl2-compat/src/device/device.ts', dynamic: true }]);
 });
 
-test('the only import() calls in the layer are index.ts to device.ts and device.ts to the compute runtime', () => {
+test('the only import() calls in the layer are index.ts to device.ts and device.ts to compute, read-back and the xr entry', () => {
   // scripts/lazy-files.js picks the lazy chunk by its built file name (split.chunk); any other dynamic import could
   // add or rename a chunk that pattern misses or wrongly catches, so the set of lazy edges is pinned here.
   const edges = [];
@@ -110,8 +110,11 @@ test('the only import() calls in the layer are index.ts to device.ts and device.
     'packages/webgl2-compat/src/compute/runtime.ts -> packages/webgl2-compat/src/compute/interpret.ts',
     'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/compute/runtime.ts',
     'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/device/readback.ts',
+    'packages/webgl2-compat/src/device/device.ts -> packages/webgl2-compat/src/xr.ts',
     'packages/webgl2-compat/src/index.ts -> packages/webgl2-compat/src/device.ts',
   ]);
   assert.ok(split.chunk.test('runtime-AbC123.js') && !split.chunk.test('device-AbC123.js'));
   assert.ok(split.chunk.test('readback-AbC123.js'));
+  // CompatGPU.xrRoute loads a public entry, built under its own name, so it adds no chunk and stays outside the pattern.
+  assert.ok(!split.chunk.test('xr.js'));
 });

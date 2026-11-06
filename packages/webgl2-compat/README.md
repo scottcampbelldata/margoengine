@@ -165,6 +165,9 @@ Where `install()` leaves the browser's WebGPU in place, the `installed` test ski
 binding. `framebufferScale` is the layer's `framebufferScaleFactor` (default: the browser's own), the first setting to
 lower on a weak GPU.
 
+`addXRButton` of `@margoengine/stage/xr` needs none of this: it calls `navigator.gpu.xrRoute()`, which runs `installXR` with
+the same options, so a stage on the layer gets its route without importing this package by name.
+
 Each eye renders with 4x multisampling into a texture of its own, as big as its part of the XR framebuffer, and one draw
 per eye puts it into the framebuffer at the end of the frame: one extra full-eye copy a frame against the native binding.
 The session's `XRWebGLLayer` has no depth buffer, so the compositor gets no depth and cannot reproject by it. The session

@@ -10,6 +10,7 @@ export interface XRButton {
     readonly element: HTMLButtonElement;
     readonly supported: boolean;
     readonly xr: XR | null;
+    readonly reason?: string;
     dispose(): void;
     [Symbol.dispose](): void;
 }

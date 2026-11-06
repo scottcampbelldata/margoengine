@@ -115,6 +115,14 @@ test('the session gets an XRWebGLLayer on the device context, without multisampl
   );
 });
 
+test('navigator.gpu of the layer gives its route to code that does not name the layer', async (t) => {
+  stage(t);
+  const handle = await globalThis.navigator.gpu.xrRoute({ framebufferScale: 0.5 });
+  t.after(() => handle.dispose());
+  assert.equal(globalThis.XRGPUBinding, CompatXRBinding);
+  await assert.rejects(globalThis.navigator.gpu.xrRoute(), { code: 'state' });
+});
+
 test('installXR takes the place of XRGPUBinding until disposed, once at a time', (t) => {
   stage(t);
   const before = { value: 'native', configurable: true };

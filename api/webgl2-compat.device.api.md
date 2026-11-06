@@ -262,6 +262,7 @@ export class CompatExternalTexture {
 export class CompatGPU {
     readonly wgslLanguageFeatures: ReadonlySet<string>;
     constructor(options?: CompatGPUOptions);
+    xrRoute(options?: CompatXROptions): Promise<CompatXR>;
     requestAdapter(options?: GPURequestAdapterOptions): Promise<CompatAdapter | null>;
     getPreferredCanvasFormat(): GPUTextureFormat;
 }
@@ -1022,6 +1023,15 @@ type CompatExtension = (typeof COMPAT_EXTENSIONS)[number];
 type CompatLimit = (typeof COMPAT_LIMITS)[number];
 
 type CompatTier = 'full' | 'half-float' | 'ldr';
+
+interface CompatXR {
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+interface CompatXROptions {
+    readonly framebufferScale?: number;
+}
 
 interface ComputeBuilt {
     readonly tier: string;
