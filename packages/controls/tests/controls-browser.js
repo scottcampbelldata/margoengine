@@ -36,7 +36,10 @@ function read(engine) {
   copy.height = canvas.height;
   const context = copy.getContext('2d');
   context.drawImage(canvas, 0, 0);
-  return { width: copy.width, height: copy.height, data: context.getImageData(0, 0, copy.width, copy.height).data };
+  const data = context.getImageData(0, 0, copy.width, copy.height).data;
+  // A new drawing buffer for the next frame: WebKit answers every read of one buffer in a task from the first read.
+  canvas.setAttribute('width', canvas.width);
+  return { width: copy.width, height: copy.height, data };
 }
 const kind = (r, g, b) => {
   if (r > 200 && g > 200 && b < 90) return 'yellow';

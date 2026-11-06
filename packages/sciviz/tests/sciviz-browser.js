@@ -28,6 +28,8 @@ const watch = (figure) => {
 // is still the canvas's current image.
 async function pixels(figure) {
   const engine = figure.engine;
+  // A new drawing buffer: WebKit answers every read of one buffer in a task from the first read.
+  engine.canvas.setAttribute('width', engine.canvas.width);
   engine.render();
   const bitmap = await createImageBitmap(engine.canvas),
     copy = new OffscreenCanvas(bitmap.width, bitmap.height),
@@ -371,6 +373,7 @@ window.runSciVizTests = async () => {
     return [(64 + ((x - x0) / (x1 - x0)) * w) * sx, (16 + ((y1 - y) / (y1 - y0)) * h) * sx];
   };
   const chartPixels = async (figure) => {
+    figure.engine.canvas.setAttribute('width', figure.engine.canvas.width);
     figure.render();
     const bitmap = await createImageBitmap(figure.engine.canvas),
       copy = new OffscreenCanvas(bitmap.width, bitmap.height),

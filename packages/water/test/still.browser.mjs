@@ -108,7 +108,9 @@ try {
       engine.camera.target = [...target];
       const off = new OffscreenCanvas(W, H),
         c = off.getContext('2d', { willReadFrequently: true });
-      // In the same task as the frame: the canvas holds it until the browser presents.
+      // A new drawing buffer: WebKit answers every read of one buffer in a task from the first read. The read comes in the
+      // same task as the frame: the canvas holds it until the browser presents.
+      canvas.setAttribute('width', W);
       engine.render({ delta: 1 / 60 });
       c.drawImage(canvas, 0, 0);
       return c.getImageData(0, 0, W, H).data;

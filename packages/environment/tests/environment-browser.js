@@ -851,7 +851,10 @@ window.runEnvironmentTests = async () => {
       copy.height = canvas.height;
       const context = copy.getContext('2d');
       context.drawImage(canvas, 0, 0);
-      return context.getImageData(0, 0, copy.width, copy.height).data;
+      const data = context.getImageData(0, 0, copy.width, copy.height).data;
+      // A new drawing buffer for the next frame: WebKit answers every read of one buffer in a task from the first read.
+      canvas.setAttribute('width', copy.width);
+      return data;
     };
     engine.render();
     const plain = capture();
@@ -1039,7 +1042,10 @@ window.runEnvironmentTests = async () => {
       copy.height = canvas.height;
       const context = copy.getContext('2d');
       context.drawImage(canvas, 0, 0);
-      return context.getImageData(0, 0, copy.width, copy.height).data;
+      const data = context.getImageData(0, 0, copy.width, copy.height).data;
+      // A new drawing buffer for the next frame: WebKit answers every read of one buffer in a task from the first read.
+      canvas.setAttribute('width', copy.width);
+      return data;
     };
     const mesh = engine
       .createMesh()

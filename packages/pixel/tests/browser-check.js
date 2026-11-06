@@ -116,7 +116,10 @@ const readFrom = (from) => {
   context.drawImage(from, 0, 0);
   return context.getImageData(0, 0, WIDTH, HEIGHT).data;
 };
+// Resetting the width gives the frame a new drawing buffer. WebKit answers every read of one buffer in a task from the
+// first read, so a second frame in this task would read as the first. Chrome reads the newest frame either way.
 const frame = (options) => {
+  canvas.width = WIDTH;
   instance.render({ delta: 1 / 60, ...options });
   return readFrom(canvas);
 };

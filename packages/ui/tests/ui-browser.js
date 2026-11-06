@@ -44,6 +44,8 @@ async function run() {
 
   // Frame readback: the bitmap is taken in the same task as the render, while the frame is still the canvas's image.
   async function frame() {
+    // Also resets the buffer: WebKit answers every read of one buffer in a task from the first read.
+    canvas.setAttribute('width', canvas.width);
     engine.render(0.016);
     const bitmap = await createImageBitmap(canvas),
       copy = new OffscreenCanvas(bitmap.width, bitmap.height),

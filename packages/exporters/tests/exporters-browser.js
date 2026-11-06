@@ -9,6 +9,8 @@ const assert = (condition, message) => {
 
 /** Renders one frame and copies the canvas in the same task, before the swap chain texture expires. */
 function snapshot(engine) {
+  // A new drawing buffer: WebKit answers every read of one buffer in a task from the first read.
+  engine.canvas.setAttribute('width', engine.canvas.width);
   engine.render({ culling: false });
   const canvas = document.createElement('canvas');
   canvas.width = engine.canvas.width;

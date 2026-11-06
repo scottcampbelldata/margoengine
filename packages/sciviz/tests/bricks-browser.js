@@ -52,6 +52,8 @@ async function pump(figure, promise) {
 // The canvas's pixels after a rendered frame.
 async function capture(figure) {
   const engine = figure.engine;
+  // A new drawing buffer: WebKit answers every read of one buffer in a task from the first read.
+  engine.canvas.setAttribute('width', engine.canvas.width);
   engine.render();
   const bitmap = await createImageBitmap(engine.canvas),
     copy = new OffscreenCanvas(bitmap.width, bitmap.height),
