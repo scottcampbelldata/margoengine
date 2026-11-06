@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9007126,
+  "total": 8955824,
   "history": [
     {
       "date": "2026-10-24",
@@ -2750,6 +2750,12 @@
       "commit": "0d6268659",
       "reason": "exporters: new optimize entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "e3e3d5958",
+      "reason": "addScene gains the light and camera components and one load per URL, the B13 gap; the entry is optional and core plus stage root do not change",
+      "grew": 1
     }
   ],
   "items": {
@@ -3273,7 +3279,7 @@
     "@margoengine/stage/gltf": 1621,
     "@margoengine/stage/particles": 724,
     "@margoengine/stage/physics": 1458,
-    "@margoengine/stage/scene": 1998,
+    "@margoengine/stage/scene": 3441,
     "@margoengine/stage/shadows": 750,
     "@margoengine/stage/sky": 719,
     "@margoengine/stage/viewer": 2480,

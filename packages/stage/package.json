@@ -26,7 +26,7 @@
   },
   "scripts": {
     "test": "node --experimental-test-module-mocks --test ../../tests/modern-wrapper.test.js ../../tests/modern-facade-lifecycle.test.js ../../tests/deep-stage-sphere.test.js ../../tests/modern-silent-facade-drops.test.js tests/*.test.js",
-    "test:gpu": "cd ../.. && node scripts/stage-viewer-gpu-check.js",
+    "test:gpu": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node packages/stage/test/gpu/scene-check.mjs",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -95,9 +95,17 @@
     "@margoengine/tonemap": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
     "@dimforge/rapier3d-compat": ">=0.14.0 <1",
-    "@margoengine/save": "^1.0.0"
+    "@margoengine/save": "^1.0.0",
+    "@margoengine/animation": "^1.0.0",
+    "@margoengine/clustered": "^1.0.0"
   },
   "peerDependenciesMeta": {
+    "@margoengine/animation": {
+      "optional": true
+    },
+    "@margoengine/clustered": {
+      "optional": true
+    },
     "@margoengine/gltf": {
       "optional": true
     },

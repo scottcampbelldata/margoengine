@@ -50,7 +50,7 @@ the ones it imports. With `margoengine` the entries are `margoengine/stage/<entr
 | `@margoengine/stage/shadows` | `await addShadows(app, options)`: cascaded shadows; the meshes present now cast | `@margoengine/shadows` |
 | `@margoengine/stage/xr` | `await addXRButton(app, options)`: an accessible Enter VR or Enter AR button that starts an XR session | `@margoengine/xr` |
 | `@margoengine/stage/physics` | `await addBody(app, mesh, options)`: a rigid body and a fitted collider, loading physics on first use; `await addPhysics(app, options)` for the world | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
-| `@margoengine/stage/scene` | `await addScene(app, source, options)`: loads a save or prefab document, one mesh per entity, all or nothing | `@margoengine/save`, and `@margoengine/gltf-pro` when an entity names a model |
+| `@margoengine/stage/scene` | `await addScene(app, source, options)`: loads a save or prefab document, one mesh per entity, with lights and cameras, all or nothing | `@margoengine/save`; `@margoengine/gltf-pro` when an entity names a model, `@margoengine/animation` when two entities name the same one, `@margoengine/clustered` for point, spot and extra directional lights |
 | `@margoengine/stage/viewer` | `await addViewer(app, url, options)`: a product viewer: model, image-based light, backdrop, shadow, tone mapping, fit and turntable tuned together | `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging` or `@margoengine/shadows`, `@margoengine/tonemap` |
 
 ```ts
@@ -217,24 +217,49 @@ const level = await addScene(app, {
   },
 });
 level.meshes.get('ball')!.position.y = 3;
-level.dispose(); // removes every mesh and model of the scene
+level.dispose(); // removes every mesh, model and light of the scene
 ```
 
-Two components are built in. `mesh` is a glTF URL, relative to the document (loaded with `@margoengine/gltf-pro`), or `{shape: 'box', size}` or `{shape: 'sphere', radius, segments}`. `material` is the PBR options, such as `{color, roughness, metalness}`, and cannot move the mesh. `onEntity` takes every other component.
+Four components are built in. `mesh` is a glTF URL, relative to the document (loaded with `@margoengine/gltf-pro`), or `{shape: 'box', size}` or `{shape: 'sphere', radius, segments}`. `material` is the PBR options, such as `{color, roughness, metalness}`, and cannot move the mesh. `onEntity` takes every other component.
+
+Lights and cameras come from the document too. Both look down their entity's -Z axis, as in glTF, and take its world pose at load:
+
+```ts
+import {createStage} from 'margoengine';
+import {addScene} from 'margoengine/stage/scene';
+
+const app = await createStage('#scene');
+const level = await addScene(app, {
+  format: 'margo-save',
+  version: 1,
+  entities: [
+    {id: 'floor', components: {mesh: {shape: 'box', size: [10, 1, 10]}}},
+    {id: 'sun', transform: {rotation: [-0.383, 0, 0, 0.924]}, components: {light: {intensity: 2, color: [1, 0.95, 0.9]}}},
+    {id: 'lamp', transform: {position: [2, 2, 0]}, components: {light: {type: 'point', color: [1, 0.5, 0.2], intensity: 12, range: 8}}},
+    {id: 'main', transform: {position: [0, 3, 9]}, components: {camera: {fov: 45, target: [0, 0, 0]}}},
+    {id: 'side', transform: {position: [9, 3, 0]}, components: {camera: {target: [0, 0, 0], active: false}}},
+  ],
+});
+Object.assign(app.engine.camera, level.cameras.get('side')); // switch view
+```
+
+`light` takes the names and defaults of `KHR_lights_punctual`: `{type, color, intensity, range, innerConeAngle, outerConeAngle}`, with `type` `'directional'` (default), `'point'` or `'spot'` and `color` in linear RGB. The first directional light is the engine's sun, and `ambient` sets its ambient strength. Point, spot and further directional lights go to `@margoengine/clustered`, which is attached if it is not already, and every model of the scene receives them; `level.lights` is that `Clustered`. Two scenes' lights add up, and each `dispose` takes its own and puts the sun back. The lights replace a list you set yourself with `setLights`. They need WebGPU; the sun does not.
+
+`camera` is `{fov, near, far, target, active}`; `fov`, `near` and `far` default to the engine camera's, and `target` to the point 10 units ahead. Core's camera looks at a point, so a roll in the entity's rotation is dropped. The first camera the document marks `active: true`, or else the first without `active: false`, sets the view, and then `fit` defaults to false. `level.cameras` holds them all in world space, by entity id.
 
 | Option | Default | What it does |
 | --- | --- | --- |
 | `prefab` | the document's entities | Loads only this prefab of the document, as one instance |
 | `parent` | none | Mesh the top-level entities go under |
 | `base` | the document's URL, or the page's | Base of relative model URLs |
-| `fit` | `true` | Frames the camera on what loaded; a scene with no geometry leaves it alone |
+| `fit` | `true`, `false` when a `camera` sets the view | Frames the camera on what loaded; a scene with no geometry leaves it alone |
 | `onEntity` | none | Called for each entity once all exist: `(mesh, entity, get)`, where `get(id)` gives another entity's mesh for `{"$ref": id}` values. A throw undoes the load |
 | `migrations` | none | A `Migrations` that brings an older document to the current version |
 | `components`, `strictComponents` | none | Validation, as `parseSave` |
 | `gltf` | none | `loadGLTF` options, such as a shared `draco` decoder |
 | `signal` | none | Cancels the load; the stage's disposal cancels it too |
 
-An invalid document rejects with a TypeError naming its first problem, and a step that fails rejects with `failed` and the `cause`. Each entity with a model loads its own copy, in parallel, before the first mesh is made: a level that repeats one model many times pays for each copy (docs/limits.md).
+An invalid document rejects with a TypeError naming its first problem, and a step that fails rejects with `failed` and the `cause`. Each model URL loads once, in parallel with the other URLs, before the first mesh is made. The other entities on a URL get a `cloneModel` copy, which shares the parsed file, the images and the GPU buffers and has nodes of its own, so 100 trees are one load and one upload, each placed and animated on its own.
 
 All core exports are also available from this package. React applications can use the existing `@margoengine/react` components or wrap the engine received by Canvas `onCreated` with `new Stage(engine)`. The existing Canvas component retains ownership of rendering and teardown in that case.
 

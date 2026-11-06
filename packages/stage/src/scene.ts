@@ -1,5 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { Mesh } from '@margoengine/core';
+import type { Clustered, PointLight, SpotLight } from '@margoengine/clustered';
+import type { CameraOptions, Mesh } from '@margoengine/core';
+import type { Engine as RuntimeEngine, Mesh as RuntimeMesh } from '@margoengine/core/extension';
 import type { GLTFLoadOptions, PBRModel } from '@margoengine/gltf-pro';
 import type { Json, Migrations, ResolvedEntity, SaveDocument, ValidateOptions } from '@margoengine/save';
 import type { MeshOptions, Stage } from './index.js';
@@ -16,7 +18,7 @@ export interface AddSceneOptions extends ValidateOptions {
   parent?: Mesh;
   /** Base of relative model URLs. Default the document's URL, or the page's. */
   base?: string | URL;
-  /** Frame the camera on what loaded. Default true. */
+  /** Frame the camera on what loaded. Default true, or false when the document's `camera` sets the view. */
   fit?: boolean;
   /**
    * Called once per entity after all exist, for your own components. `get(id)` gives another entity's
@@ -35,11 +37,33 @@ export interface LoadedScene {
   readonly meshes: ReadonlyMap<string, Mesh>;
   /** The glTF models, by the id of the entity that holds each. */
   readonly models: ReadonlyMap<string, PBRModel>;
+  /** Each `camera` component in world space, by entity id: `Object.assign(stage.engine.camera, cameras.get(id))` switches. */
+  readonly cameras: ReadonlyMap<string, Required<CameraOptions>>;
+  /** The `Clustered` holding the scene's point and spot lights, for `add`ing more receivers. Undefined when it has none. */
+  readonly lights: Clustered | undefined;
   /** The document's `meta`. */
   readonly meta: Readonly<Record<string, Json>>;
-  /** Removes every mesh and model of the scene. */
+  /** Removes every mesh, model and light of the scene and puts the sun back. The camera stays where it is. */
   dispose(): void;
   [Symbol.dispose](): void;
+}
+
+/** A `light` component. Names and defaults are `KHR_lights_punctual`'s; a light shines down its entity's -Z. */
+export interface SceneLight {
+  /** Default `'directional'`. The first directional light of a scene is the engine's sun. */
+  type?: 'directional' | 'point' | 'spot';
+  /** Linear RGB. Default `[1, 1, 1]`. */
+  color?: [number, number, number];
+  /** Default 1. */
+  intensity?: number;
+  /** Point and spot. Default where inverse-square light falls under 1/256, as gltf-pro gives a light with none. */
+  range?: number;
+  /** Spot, radians. Default 0. */
+  innerConeAngle?: number;
+  /** Spot, radians, up to pi / 2. Default pi / 4. */
+  outerConeAngle?: number;
+  /** The sun's ambient strength. Default the engine's. */
+  ambient?: number;
 }
 
 type Placement = Pick<MeshOptions, 'position' | 'scale' | 'name'>;
@@ -49,6 +73,62 @@ const look = (value: Record<string, Json> | undefined): Record<string, Json> =>
   Object.fromEntries(Object.entries(value ?? {}).filter(([key]) => !placement.includes(key)));
 const record = (value: unknown): value is Record<string, Json> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const vector = (value: unknown, length: number): value is number[] =>
+  Array.isArray(value) && value.length === length && value.every(Number.isFinite);
+const positive = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
+const lightOf = (entity: ResolvedEntity) => entity.components.light as unknown as SceneLight;
+
+/** Refuses a `light` before anything loads. */
+function checkLight(entity: ResolvedEntity): void {
+  const light = entity.components.light,
+    wrong = (text: string) => typeError(`Entity '${entity.id}' light: ${text}`, 'arguments');
+  if (!record(light)) throw wrong("{ type: 'directional', 'point' or 'spot', color, intensity }");
+  const { type = 'directional', color, intensity, range, innerConeAngle = 0, outerConeAngle = Math.PI / 4, ambient } = light,
+    inner = innerConeAngle as number,
+    outer = outerConeAngle as number;
+  if (type !== 'directional' && type !== 'point' && type !== 'spot') throw wrong("type: 'directional', 'point' or 'spot'");
+  if (color !== undefined && !(vector(color, 3) && color.every((v) => v >= 0))) throw wrong('color: [r, g, b], linear, 0 or more');
+  if (intensity !== undefined && !(typeof intensity === 'number' && intensity >= 0)) throw wrong('intensity: 0 or more');
+  if (range !== undefined && !positive(range)) throw wrong('range: more than 0');
+  if (ambient !== undefined && !(type === 'directional' && typeof ambient === 'number' && ambient >= 0))
+    throw wrong('ambient: 0 or more, on a directional light');
+  if (type === 'spot' && !(inner >= 0 && inner < outer && outer <= Math.PI / 2))
+    throw wrong('0 <= innerConeAngle < outerConeAngle <= pi / 2, in radians');
+}
+
+/** Refuses a `camera` before anything loads. */
+function checkCamera(entity: ResolvedEntity): void {
+  const camera = entity.components.camera,
+    wrong = (text: string) => typeError(`Entity '${entity.id}' camera: ${text}`, 'arguments');
+  if (!record(camera)) throw wrong('{ fov, near, far, target, active }');
+  const { fov, near, far, target, active } = camera;
+  if (fov !== undefined && !(positive(fov) && fov < 180)) throw wrong('fov: degrees, between 0 and 180');
+  if (near !== undefined && !positive(near)) throw wrong('near: more than 0');
+  if (far !== undefined && !(positive(far) && far > ((near as number) ?? 0))) throw wrong('far: more than near');
+  if (target !== undefined && !vector(target, 3)) throw wrong('target: [x, y, z]');
+  if (active !== undefined && typeof active !== 'boolean') throw wrong('active: boolean');
+}
+
+/** Where an entity's mesh is and which way it faces in the world: glTF's rule, a light or camera looks down its -Z. */
+function pose(mesh: Mesh): { position: [number, number, number]; forward: [number, number, number] } {
+  const m = (mesh as unknown as RuntimeMesh).matrix,
+    length = Math.hypot(m[8], m[9], m[10]) || 1;
+  return { position: [m[12], m[13], m[14]], forward: [-m[8] / length, -m[9] / length, -m[10] / length] };
+}
+
+/** What each scene put on a shared light list, so that two scenes add up and one leaves without taking the other's. */
+const held = new WeakMap<object, Set<unknown[]>>();
+function hold<T>(list: { setLights(lights: T[]): unknown }, own: T[]): () => void {
+  const all = (held.get(list) ?? new Set()) as Set<T[]>;
+  held.set(list, all as Set<unknown[]>);
+  all.add(own);
+  list.setLights([...all].flat());
+  return () => {
+    all.delete(own);
+    list.setLights([...all].flat());
+  };
+}
 
 /** Builds an entity's mesh from its `mesh` and `material` components. */
 function build(stage: Stage, entity: ResolvedEntity): Mesh {
@@ -76,7 +156,9 @@ function build(stage: Stage, entity: ResolvedEntity): Mesh {
  * Loads a `@margoengine/save` document into the stage: one mesh per entity with its transform and parent, prefabs
  * expanded, migrations run, all or nothing. `source` is a URL, a document, its JSON text or its bytes (gzip or not). A
  * string starting with `{` is JSON text. Built-in components: `mesh` (a glTF URL, loaded with `@margoengine/gltf-pro`,
- * or `{shape: 'box', size}` or `{shape: 'sphere', radius, segments}`) and `material` (`{color, roughness, metalness}`);
+ * once per URL, or `{shape: 'box', size}` or `{shape: 'sphere', radius, segments}`), `material`
+ * (`{color, roughness, metalness}`), `light` (`{type, color, intensity, range, innerConeAngle, outerConeAngle, ambient}`)
+ * and `camera` (`{fov, near, far, target, active}`);
  * `onEntity` takes the rest. Rejects with `Install <package>` when one is missing, TypeError for an invalid document,
  * MargoError `'failed'` with the `cause` when a step fails, and AbortError when `signal` aborts or the stage is disposed
  * first; nothing stays built.
@@ -85,9 +167,9 @@ function build(stage: Stage, entity: ResolvedEntity): Mesh {
 export async function addScene(
   stage: Stage,
   source: string | URL | SaveDocument | ArrayBuffer | ArrayBufferView,
-  { migrations, prefab, parent, base, fit = true, onEntity, gltf, signal, ...checks }: AddSceneOptions = {},
+  { migrations, prefab, parent, base, fit, onEntity, gltf, signal, ...checks }: AddSceneOptions = {},
 ): Promise<LoadedScene> {
-  if (typeof fit !== 'boolean') throw typeError('fit: boolean', 'arguments');
+  if (fit !== undefined && typeof fit !== 'boolean') throw typeError('fit: boolean', 'arguments');
   const abort = stageSignal(stage, signal);
   abort.throwIfAborted();
   const save = await optionalPackage('@margoengine/save', () => import('@margoengine/save'), abort);
@@ -112,7 +194,22 @@ export async function addScene(
   }
   const entities = save.expandSave(save.parseSave(document, checks)),
     root = base ?? address ?? page,
-    wanted = entities.filter((entity) => typeof entity.components.mesh === 'string');
+    wanted = entities.filter((entity) => typeof entity.components.mesh === 'string'),
+    lit = entities.filter((entity) => entity.components.light !== undefined),
+    viewed = entities.filter((entity) => entity.components.camera !== undefined);
+  lit.forEach(checkLight);
+  viewed.forEach(checkCamera);
+  // Core has one sun: the first directional light. The rest of the lights are clustered ones.
+  const suns = lit.filter((entity) => (lightOf(entity).type ?? 'directional') === 'directional'),
+    local = lit.filter((entity) => !suns.includes(entity)),
+    clustered =
+      local.length || suns.length > 1
+        ? await optionalPackage('@margoengine/clustered', () => import('@margoengine/clustered'), abort)
+        : undefined,
+    directional =
+      suns.length > 1
+        ? await optionalPackage('@margoengine/clustered', () => import('@margoengine/clustered/directional'), abort)
+        : undefined;
   const models = new Map<string, PBRModel>(),
     // The stage's disposal already took every model with the engine.
     release = (): void => {
@@ -120,19 +217,41 @@ export async function addScene(
       models.clear();
     };
   if (wanted.length) {
+    const byURL = new Map<string, ResolvedEntity[]>();
+    for (const entity of wanted) {
+      const url = new URL(entity.components.mesh as string, root).href;
+      byURL.set(url, [...(byURL.get(url) ?? []), entity]);
+    }
     const { loadGLTF } = await optionalPackage('@margoengine/gltf-pro', () => import('@margoengine/gltf-pro'), abort),
+      groups = [...byURL.values()],
       loads = await Promise.allSettled(
-        wanted.map((entity) =>
-          loadGLTF(stage.engine, new URL(entity.components.mesh as string, root), { ...gltf, signal: abort }),
-        ),
+        [...byURL.keys()].map((url) => loadGLTF(stage.engine, new URL(url), { ...gltf, signal: abort })),
       );
     loads.forEach((load, index) => {
-      if (load.status === 'fulfilled') models.set(wanted[index].id, load.value);
+      if (load.status === 'fulfilled') models.set(groups[index][0].id, load.value);
     });
     const failed = loads.find((load) => load.status === 'rejected');
     if (failed) {
       release();
       throw failed.reason;
+    }
+    // One asset per URL: a copy shares its parsed file, images and GPU buffers with the first, and has nodes of its own.
+    if (groups.some((group) => group.length > 1)) {
+      try {
+        const { cloneModel } = await optionalPackage(
+          '@margoengine/animation',
+          () => import('@margoengine/animation/skeleton-utils'),
+          abort,
+        );
+        for (const [first, ...rest] of groups)
+          for (const entity of rest) {
+            abort.throwIfAborted();
+            models.set(entity.id, await cloneModel(models.get(first.id)!));
+          }
+      } catch (error) {
+        release();
+        throw error;
+      }
     }
   }
   let meshes: Map<string, Mesh>;
@@ -155,23 +274,87 @@ export async function addScene(
     throw error;
   }
   const built = [...meshes.values()].reverse(),
+    undo: (() => void)[] = [],
     dispose = (): void => {
       if (stage.signal.aborted) return;
+      for (const step of undo.splice(0).reverse()) step();
       release();
       for (const mesh of built.splice(0)) mesh.dispose();
     };
-  const shown = [...meshes.values(), ...[...models.values()].flatMap((model) => model.nodes)];
-  if (fit && shown.some((mesh) => mesh.geometry)) {
-    try {
-      stage.fit(shown);
-    } catch (error) {
-      dispose();
-      throw error;
+  const shown = [...meshes.values(), ...[...models.values()].flatMap((model) => model.nodes)],
+    cameras = new Map<string, Required<CameraOptions>>(),
+    runtime = stage.engine as unknown as RuntimeEngine;
+  let lights: Clustered | undefined;
+  try {
+    if (lit.length || viewed.length) runtime.store.tick(false);
+    const camera = stage.engine.camera;
+    for (const entity of viewed) {
+      const { fov = camera.fov, near = camera.near, far = camera.far, target } = entity.components.camera as CameraOptions,
+        { position, forward } = pose(meshes.get(entity.id)!);
+      cameras.set(entity.id, {
+        fov,
+        near,
+        far,
+        position,
+        target: target ?? (position.map((v, i) => v + forward[i] * 10) as [number, number, number]),
+      });
     }
+    const active = (wanted: boolean | undefined) =>
+        viewed.find((entity) => (entity.components.camera as Record<string, Json>).active === wanted),
+      chosen = active(true) ?? active(undefined);
+    if (chosen) Object.assign(camera, cameras.get(chosen.id));
+    const [sun, ...more] = suns;
+    if (sun) {
+      const { direction, radiance } = runtime.lighting,
+        was = [direction.slice(), radiance.slice()],
+        { color = [1, 1, 1], intensity = 1, ambient = radiance[3] } = lightOf(sun),
+        { forward } = pose(meshes.get(sun.id)!);
+      undo.push(() => {
+        direction.set(was[0]);
+        radiance.set(was[1]);
+      });
+      direction.set([-forward[0], -forward[1], -forward[2], intensity]);
+      radiance.set([...color, ambient]);
+    }
+    if (clustered) {
+      lights = (runtime.plugins.get('clustered') as Clustered | undefined) ?? clustered.Clustered.attach(stage.engine);
+      for (const model of models.values()) undo.push(lights.add(model));
+      undo.push(
+        hold<PointLight | SpotLight>(
+          lights,
+          local.map((entity) => {
+            const { type, color = [1, 1, 1], intensity = 1, range, innerConeAngle = 0, outerConeAngle = Math.PI / 4 } = lightOf(entity),
+              { position, forward } = pose(meshes.get(entity.id)!),
+              // The range gltf-pro gives a light with none: where inverse-square light falls under 1/256.
+              place = { position, color, intensity, range: range ?? (Math.sqrt(intensity * 256) || 1) };
+            return type === 'spot'
+              ? { ...place, direction: forward, innerAngle: innerConeAngle, outerAngle: outerConeAngle }
+              : place;
+          }),
+        ),
+      );
+    }
+    if (directional)
+      undo.push(
+        hold(
+          (runtime.plugins.get('clustered:directional') as InstanceType<typeof directional.DirectionalLights> | undefined) ??
+            directional.DirectionalLights.attach(stage.engine, { lights: lights! }),
+          more.map((entity) => {
+            const { color = [1, 1, 1], intensity = 1 } = lightOf(entity);
+            return { direction: pose(meshes.get(entity.id)!).forward, color, intensity };
+          }),
+        ),
+      );
+    if ((fit ?? !chosen) && shown.some((mesh) => mesh.geometry)) stage.fit(shown);
+  } catch (error) {
+    dispose();
+    throw error;
   }
   return {
     meshes,
     models,
+    cameras,
+    lights,
     meta: document.meta ?? {},
     dispose,
     [Symbol.dispose ?? Symbol()]: dispose,

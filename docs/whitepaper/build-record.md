@@ -1110,7 +1110,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B7 | Sculpting follows the brush: grids, local topology passes, delta undo, SculptView with ranged uploads, browser check (closes C13) | DONE | `8eaaf29dd` | LIM-064 |
 | B10 | Workgroup autotuning for the package's own kernels | DONE | `dd10fafb1` | LIM-082 |
 | B11 | autoLOD levels skinned, morphed and flat-shaded models, node animation follows | DONE | `d34fd6c26` | LIM-147, LIM-252 |
-| B12 | MeshletMesh parts, Hi-Z, shadow clusters | DONE | this commit | LIM-145 |
+| B12 | MeshletMesh parts, Hi-Z, shadow clusters | DONE | `e3e3d5958` | LIM-145 |
+| B13 | addScene lights, cameras, one load per URL | DONE | this commit | LIM-131 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 
