@@ -138,9 +138,10 @@ export const entries = [
       'Invalid off-axis screen',
       'Invalid off-axis eye',
       'Invalid oblique plane',
+      'Invalid physical camera',
     ],
     cause:
-      'The camera cannot build a view: `fov` outside 0-180, `near` not above 0 or `far` not above `near`, the position equal to the target, a view parallel to `camera.up`, or non-finite values. `fitToBoundingBox` needs min <= max, aspect > 0, duration >= 0 and padding >= 1, and a box that fits inside `far`. Controls need finite input and a camera off its target. `@margoengine/cameras` also refuses a view offset or tile size that is not above 0, a focal length, film gauge or aspect that is not above 0, an off-axis screen with collinear corners or an eye behind it, and an oblique plane the camera is not behind.',
+      'The camera cannot build a view: `fov` outside 0-180, `near` not above 0 or `far` not above `near`, the position equal to the target, a view parallel to `camera.up`, or non-finite values. `fitToBoundingBox` needs min <= max, aspect > 0, duration >= 0 and padding >= 1, and a box that fits inside `far`. Controls need finite input and a camera off its target. `@margoengine/cameras` also refuses a view offset or tile size that is not above 0, a focal length, film gauge or aspect that is not above 0, an off-axis screen with collinear corners or an eye behind it, an oblique plane the camera is not behind, and a physical camera with an aperture, shutter, ISO, focal length, focus distance or frame rate that is not above 0.',
     fix: 'Keep 0 < fov < 180 and 0 < near < far; move the position off the target; for straight-down views set `camera.up` (for example `[0, 0, -1]`) or use `CameraProjection` from `@margoengine/cameras`. Raise `camera.far` for large models. For cameras options, pass whole sizes above 0, put the eye in front of the screen, and keep the camera on the clipped side of an oblique plane.',
   },
   {

@@ -37,6 +37,10 @@
     "./offaxis": {
       "types": "./dist/offaxis.d.ts",
       "import": "./dist/offaxis.js"
+    },
+    "./physical": {
+      "types": "./dist/physical.d.ts",
+      "import": "./dist/physical.js"
     }
   },
   "files": [

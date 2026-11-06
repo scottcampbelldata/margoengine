@@ -216,6 +216,41 @@ oblique.plane = [0, -1, 0, 2];                      // change it every frame; un
   extra slant, so keep it away from edge-on views of the camera.
 - `obliqueProjection(matrix, planeInEyeSpace, webgpu)` does the matrix part on its own.
 
+## Physical exposure: `@margoengine/cameras/physical`
+
+Aperture, shutter time and ISO set the exposure, the depth of field and the motion blur together, as on a real camera. 0 core bytes.
+
+```ts
+import {DOF} from 'margoengine/dof';
+import {MotionBlur} from 'margoengine/post';
+import {Tonemap} from 'margoengine/tonemap';
+import {PhysicalCamera} from 'margoengine/cameras/physical';
+
+const camera = new PhysicalCamera({focalLength: 85, aperture: 1.8, shutter: 1 / 120, iso: 200, focusDistance: 3});
+camera.apply({dof, motionBlur, exposure: tonemap, camera: engine.camera, aspect: 16 / 9}); // your DOF, MotionBlur and Tonemap effects
+camera.aperture = 5.6;                  // stops down: darker, deeper focus
+camera.apply({dof, motionBlur, exposure: tonemap});
+camera.exposure;                        // stops against the reference: -1 at f/5.6, 1/120 s, ISO 200
+camera.depthOfField();                  // {hyperfocal, near, far} in metres, far is Infinity past the hyperfocal distance
+camera.blurDiameter(10);                // mm of blur on the sensor for a point 10 m away
+```
+
+- **Exposure**: `ev100 = log2(N² / t) − log2(ISO / 100)` for f-number N, shutter time t seconds. `exposure` is
+  `referenceEV − ev100` in stops: a stop wider aperture, a doubled shutter time and a doubled ISO each add one. The
+  engine's light is not calibrated in photometric units, so the reference decides what looks right: by default the
+  defaults of `DOF` and `MotionBlur` (f/2.8, 1/120 s, ISO 100) are 0 stops and an unchanged scene looks as before. Set
+  `referenceEV` to the setting that should look as the scene was lit.
+- **Depth of field**: `apply` gives `DOF` the focus distance, the focal length (millimetres to metres) and the f-number.
+  `depthOfField(coc)` and `blurDiameter(distance)` are the thin-lens formulas, with a circle of confusion of
+  `filmGauge / 1500` unless you pass one.
+- **Motion blur**: `shutterFraction` is the exposure time as a share of the frame interval at `frameRate`, at most 1;
+  `MotionBlur.shutter` takes it, and `shutterAngle` is the same as a rotary shutter's angle.
+- **Lens**: `apply({camera, aspect})` sets `camera.fov` from the focal length and film gauge; `apply({projection})` sets
+  a `CameraProjection`'s `focalLength` and `filmGauge`.
+- **Targets**: `apply` writes only the targets you pass. `exposure` takes anything with an `exposure` option in stops
+  (`Tonemap`, `Bloom`, `PostStack`), whose own ranges apply. Errors: `Invalid physical camera; ...` for a value that is
+  not finite and above 0, or a focus distance inside the focal length.
+
 Apache-2.0. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras

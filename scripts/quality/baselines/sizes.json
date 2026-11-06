@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4645256,
+  "total": 4646605,
   "history": [
     {
       "date": "2026-10-24",
@@ -1844,6 +1844,12 @@
       "commit": "3ff04c8d7",
       "reason": "new optional package @margoengine/scene: scene graph helpers over core meshes (Batch 17 job 2)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "e9b71d40e",
+      "reason": "cameras gains the physical entry (PhysicalCamera)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1895,6 +1901,7 @@
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/offaxis": 2078,
     "@margoengine/cameras/origin": 1514,
+    "@margoengine/cameras/physical": 1349,
     "@margoengine/cinematic": 2076,
     "@margoengine/clustered": 13989,
     "@margoengine/clustered/area": 10461,

@@ -226,6 +226,10 @@
       "types": "./dist/cameras/offaxis.d.ts",
       "import": "./dist/cameras/offaxis.js"
     },
+    "./cameras/physical": {
+      "types": "./dist/cameras/physical.d.ts",
+      "import": "./dist/cameras/physical.js"
+    },
     "./cinematic": {
       "types": "./dist/cinematic.d.ts",
       "import": "./dist/cinematic.js"
