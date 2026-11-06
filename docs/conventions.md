@@ -111,6 +111,11 @@ size limit):** `FramePass.joins` and the context's `attach` let a package's pass
 entry 51). No package can hold this: core owns the clear, the resolve target and the graph's order. Cost: core + stage
 22,522 -> 22,815 B gzip. The exception covers this one change; the freeze applies again after it.
 
+**Exception, `Engine.renderTarget` (Scott, 2026-11-05):** one read-only getter so `PBRModel.compile()` can build the key of a render
+pipeline off the frame (perf-history entry 56). No package can hold it: the depth format and sample count live in the renderer's
+private descriptor. It prevents no engine failure; it is a speed gain Scott approved. Cost: core + stage 22,815 -> 22,859 B gzip. The
+exception covers this one getter; the freeze applies again after it.
+
 ## Names exported by more than one package
 
 A name declared and exported by two packages must mean the same thing, or be renamed. Decisions:

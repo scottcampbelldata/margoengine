@@ -165,6 +165,15 @@ and it reads the frustum test as part of `tick`, because the test runs inside `k
 `createCommandEncoder` and `queue.submit` and adds two frame graph passes, so a change to this frame order must keep
 `packages/stats/test/phases.test.js` and `scripts/test-stats-browser.mjs` in step.
 
+`@margoengine/scene` adds no kernel entry and no core bytes. `TransformWriter` (`/bulk`) writes the columns the setters write, from
+typed arrays, with validation and column lookups once per call; Euler rows still go through the mesh's own `syncRotation`, so
+`kernel_sync_rotation` runs once per row. A bad value or a disposed mesh changes nothing. The scene helpers read the store and
+its parents, so a world value is right before any frame. A change to these columns or to the setters must keep the package in
+step. Evidence: `packages/scene/tests/bulk.test.js` (bit for bit what the setters give, world matrices included) and
+`packages/scene/tests/scene.test.js` (against the Wasm kernel's matrix, mirrors and uneven parents included). Measured,
+diagnostic, Node, 10,000 meshes: positions 0.12 ms against 0.59 with setters (perf-history entry 70). Missing: a quiet run, and
+the whole frame with thousands of moving meshes.
+
 ### 1.6 Kernel evidence and limits
 
 The native and host suites cover:
@@ -284,6 +293,34 @@ guard. `@margoengine/worker` gives the canvas `clientWidth` and `clientHeight` a
 `resize`, `sceneSamples` and `pick` take the same paths as on the page. Evidence: `packages/worker/tests/browser-check.mjs`
 (WebGPU and the WebGL2 fallback in a real worker), RTX A6000 on Chromium only.
 
+**Per-device sharing (2026-11-05).** Three caches hold GPU objects by count and free them with their last holder: `Environment`'s BRDF LUT
+per device, size and sample count (a failed create drops its count, and nothing joins that LUT again); gltf-pro's textures per
+device, image and format (100 `cloneModel` copies of `p-morph` hold 7 textures, not 700); `@margoengine/shader/raw` buffers per
+set of equal bytes, with copy on write. Evidence: `packages/environment/tests/brdf-share.test.js`,
+`packages/gltf-pro/tests/model-runs.test.js`, `packages/shader/test/raw.test.js`, and the two browser checks they pair with, RTX
+A6000 only.
+
+**Textured meshes on the light path (2026-11-06).** `@margoengine/gltf/textured` keeps a mesh a core mesh, claims its batch and draws it
+with core's shader plus a UV input and a texture read, in one extra render pass per frame for all textured meshes of a scene.
+WebGPU only. A cut-out picks and casts shadows as solid, and `engine.stats.drawCalls` leaves these draws out. Evidence:
+`packages/gltf/test/textured.test.js` and `scripts/test-gltf-browser.mjs`.
+
+**Lighting in a node graph (2026-11-06).** `Material` gains one internal step, `relight`, that runs after the effects composed; it returns
+the code unchanged for every other material. `@margoengine/shader/lighting` reads the sun, its shadow visibility, the clustered
+lights, the ambient light and the environment as the attached effects worked them out. Rectangle and disc area lights are not
+covered. Evidence: `packages/shader/test/lighting.test.js` and `packages/shader/test/lighting-check.mjs` on a real GPU, a graph
+Lambert equal to the Lambert shading.
+
+**Motion vectors without the resolve (2026-11-05).** TAA's `velocityOnly` leaves out jitter, capture, history and resolve, so `MotionBlur`
+no longer pays for them, and the blur runs inside the `PostStack`. It reads the depth and scene target another plugin made, so a
+4x MSAA frame with no `PostStack` throws `state`. Evidence: `packages/taa/test/velocity-only-browser.mjs`, RTX A6000 only.
+Plain TAA is unchanged.
+
+**Dithered level changes (2026-11-05).** `LODFade` draws both levels for the fade, each pixel from one by a fixed noise threshold, so
+depth stays right with no sorting. Core meshes read the value from a buffer by mesh id, one storage read per core-mesh pixel while
+attached; models read a lighting effect's uniform. WebGPU only, instant on WebGL2. Evidence: `packages/lod/test/fade-check.mjs`.
+Missing: a measured cost.
+
 ### 3.1 Fallback ladder
 
 | Tier | Behavior | Loading and cost |
@@ -310,6 +347,11 @@ so answering there covers both. Compatibility devices take the adapter's limits 
 RTX A6000 (D3D12, Chromium): same pixels as the full level, pick hits and misses, restore keeps the level. Missing: a run
 on a real OpenGL ES or Direct3D 11 class device, so forced runs prove the validation, not the older GPU's limits;
 `Shadows`, occlusion culling and HDR `PostStack` fail there (known-bugs.md).
+
+`@margoengine/headless` is outside this ladder: it takes a WebGPU implementation through `installGPU` and a stand-in canvas, so a stage
+runs with no page. Stages alive at once share one `gpu`, because `installGPU` changes globals, and `engine.start()` needs
+`requestAnimationFrame`, so time moves with `step(delta)`. Evidence: `packages/headless/tests/browser-check.mjs`, on a browser's
+WebGPU through the stand-in canvas. Missing: Node itself; no WebGPU binding is in the repository.
 
 App-side detection must test both presence of `navigator.gpu` and a non-null adapter. The compatibility layer does not
 silently install itself and changes no globals at import time.
@@ -462,6 +504,24 @@ survives any affine map of positive determinant, so uneven scale needs no wider 
 discard would drop. Evidence: `packages/culling/test/gpu/meshlets-check.mjs`, 0 differing pixels against a core mesh, RTX
 A6000. Still missing: a timed run, Hi-Z per cluster, and instancing of a clustered mesh.
 
+`DynamicInstances` builds kept records from the rows in its scatter; a `fill` kernel writes `world` once per cull, only for what reads it,
+`prepareShadow` and `pick`. A scene with shadows pays what it paid before and the compatibility route is unchanged. Evidence:
+`packages/culling/test/gpu/dynamic-check.mjs`, frames equal to core meshes with shadows on and off, and picks that agree, RTX A6000.
+The removed traffic was not the main cost (perf-history entry 54; known-bugs.md).
+
+`@margoengine/shader` compute passes (`ComputePass` grids, `workgroup`, barriers, `indirect`, every atomic, `storageTexture`, `pingPong`) are
+checked on WebGPU only: `packages/shader/test/compute-model-check.mjs` and `compute-texture-check.mjs`. The package emits no GLSL,
+and no check runs them through these tiers; by the table above, atomics, workgroup memory and barriers select the CPU tier.
+Invocation inputs reach the entry point only when a graph reads them, so 1D passes compile to the same text as before. Statement
+nodes (`If`, `Loop`, `While`, `Switch`) leave graphs without statements byte for byte unchanged.
+
+`@margoengine/compute` has two backends of its own, WebGPU and CPU. `/graph` runs rounds over all edges with an atomic minimum so one
+code path serves both, and `/nn` gathers through an inverse table so it needs no atomics and its gradients repeat exactly. `/autotune`
+times candidate workgroup sizes in interleaved rounds, keeps the median-fastest and caches per adapter, name, signature, source and
+candidates; `createCompute` now asks for the adapter's workgroup limits so sizes above 256 can be tried. Evidence: `npm test` and
+`compute-browser.mjs` in `packages/compute`, LIM-079, LIM-080 and LIM-082. Speed is not measured for `/nn` or `/graph`, and `/autotune`
+makes no claim about how much a tuned size gains.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback
@@ -548,6 +608,18 @@ set `rise` and `readings`.
 pipelines available. It retries bounded rounds and can reboot the device before falling back to synchronous pipeline
 creation. `redrawAfterRestore` schedules two animation-frame renders for on-demand apps.
 
+`PBRModel.compile()` (2026-11-05) warms one model rather than a frame: it runs the draw's own derivation and compiles with
+`createRenderPipelineAsync`, so the draw finds the same pipeline under the same key. Its key needs the target formats and sample
+count, which live in the renderer's private descriptor, so core gained one read-only getter, `Engine.renderTarget` (44 B gzip, Scott's
+exception of 2026-11-05, `docs/conventions.md`). It is opt-in: at every load it would compile twice in a scene that adds lights
+or effects afterwards. The wait moves rather than disappears: first frame 100 to 17 ms, build 54 to 108-126 ms, 11 to 29 ms saved in
+all, busy machine, diagnostic. Evidence: `packages/gltf-pro/tests/model-runs.test.js` and `tests/core-timestamp-feature.test.js`
+(after a device restore too).
+
+`PipelineCompiles` (`@margoengine/stats/compile`) records every shader and pipeline create call on a device, follows restored devices,
+and links a slow frame to the compiles in it or the frame before, blocking calls first. Evidence:
+`packages/stats/test/compile.test.js` and a real-device check in `scripts/test-stats-browser.mjs`.
+
 Core treats `device.lost` and relevant frame-time DOM exceptions as loss. Recovery is deduplicated by one shared
 promise, creates a new adapter/device/renderer with the same features and samples, re-adds every geometry batch from
 CPU copies, swaps renderers, rearms the watcher, and calls every plugin's restore hook in its scene. CPU-side Wasm
@@ -601,6 +673,8 @@ Known rendering gaps:
 | Async hygiene | support async call test | Async helpers in tests/scripts are awaited or returned. |
 | Node compatibility | CI matrix and proof-golden tests | Minimum and supported Node APIs and proof results stay compatible. |
 | Rust kernel | `npm run test:kernel` | Native kernel invariants. |
+| Class fields | `tests/class-fields.test.js` | Packages on the shared tsconfig declare no bare class fields; `@margoengine/materials` is the one named exception. |
+| Browser choice | `tests/browser-selection.test.js` | `MARGO_BROWSER` names edge, chrome, chromium, firefox or webkit, and each maps to its launcher. |
 
 ### 4.2 Size and ratchet contracts
 
@@ -706,6 +780,9 @@ Profiles are keyed by GPU slug, browser family, and browser major. A run must ne
 profile. Creating a profile requires the complete view set from clean rendered inputs. Missing hardware evidence is a
 failure with an instruction to select the intended GPU or deliberately capture a new profile.
 
+`MARGO_BROWSER=webkit` (2026-11-05) runs the browser suites in Playwright's WebKit build, which has WebGPU on macOS; the Mac sweep
+needs it. It is not Safari, which needs safaridriver, and it is not a visual profile of its own.
+
 At the audit snapshot, profiles existed for Intel Arc 140V/Edge 155 and RTX A6000/Edge 155 and 156. Intel on newer
 Edge, Intel UHD, AMD, and Linux coverage remained absent.
 
@@ -714,7 +791,9 @@ Edge, Intel UHD, AMD, and Linux coverage remained absent.
 `scripts/support/public-truth.mjs` validates structured license URLs against `package.json` and `LICENSE`, and package
 count phrases against `docs/catalog.json`. It does not validate every size, timing, or test-count statement. Those must
 cite generated records and retain evidence status. An older WebGL preview-size inconsistency demonstrates why this
-scope matters.
+scope matters. So does the audit of 2026-11-06: the 44 B of `Engine.renderTarget` reached `README.md`, `site/index.html` and
+`docs/limits.md`, while 11 other files kept 22,815 B or older, `claims.md` among them, and a replace of the current figure had
+rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,468 B.
 
 The benchmarking protocol uses AC power, a shared GPU-resource lock, a whole-machine idle gate, warmup, repeated
 measurements, between-case load checks, fixed browser/canvas conditions, and a spread validity limit. Defaults at the
@@ -744,6 +823,8 @@ slower baseline is invalid; compare the run's baseline against the recorded base
 | Wall-time assertion failed only under CPU contention | CPU-time budget helper plus wall-budget gate. |
 | GPU driver reset produced a misleading code failure | One evidence-backed retry with explicit result annotation. |
 | Public generated records or prose drifted | Revision-stamped generation, public-truth checks, and whitepaper evidence. |
+| A number field declared in a class started as `undefined`, so each write of a fraction allocated | `tests/class-fields.test.js`. |
+| A GPU script nothing ran failed unseen (`area-lights-gpu.mjs` still mirrored a display curve core left on 2026-10-17) | The script runs in `test:gpu:area` of `packages/clustered`, and a correctness run no longer overwrites the bench record. |
 | A pass other than the colour pass drew a material's whole surface | `packages/materials/test/cutout-passes-browser.mjs` (picking, contact shadows, TAA velocity) and `packages/shadows/test/cutout-casters-browser.mjs` (every shadow map pass, virtual included) read pixels and velocities through a cut-out, a displaced surface and a clipping plane. |
 | A node graph's vertex offset and discards reached only the colour pass | `packages/shader/test/passes-check.mjs` compares a moved caster with a plain mesh placed there in `Shadows`, `VirtualShadows`, `LocalShadows` and integrated clustered shadows, and a cut caster with a half-sized one. Depth passes take the graph through the `displacement` record of a primitive (`CasterDisplacement` in `packages/shared/caster.d.ts`), so caster caches treat it as moving. Still missing: TAA velocity for such a surface (docs/limits.md). |
 
@@ -765,15 +846,24 @@ The following remain technical gaps, not permission to weaken a check:
     every stale statement.
 11. One duplicate-window comment says eight lines while implementation and conventions use six.
 12. GPU geometry generation has no speed measurement and no run on a GPU other than the RTX A6000.
-12. Only the upper core-stage bound is enforced; there is intentionally no lower bound.
-13. Public-truth checks cover license and package count, not every size or performance number.
-14. Remote workflow configuration is not proof that a workflow actually ran.
-15. The quality classifier must keep a conservative full-mode fallback for genuinely unclassifiable or shared
+13. Only the upper core-stage bound is enforced; there is intentionally no lower bound.
+14. Public-truth checks cover license and package count, not every size or performance number, so a size figure in a guide or
+    package README can go stale with no check failing (section 4.7).
+15. Remote workflow configuration is not proof that a workflow actually ran.
+16. The quality classifier must keep a conservative full-mode fallback for genuinely unclassifiable or shared
     changes, while ordinary package changes remain affected-only.
-16. Scatter's GPU cull keeps candidate order (2026-11-05; it used to append at `atomicAdd` slots, and an Apple M6 drew
+17. Scatter's GPU cull keeps candidate order (2026-11-05; it used to append at `atomicAdd` slots, and an Apple M6 drew
     other 4x MSAA edge pixels every frame). The exact 4x MSAA repeat check (`packages/scatter/test/repeat.browser.mjs`)
     and `packages/biomes/tests/shadows-check.mjs --msaa` have passed on the RTX A6000 and the M6 only, run by hand;
     no gate runs either one on Apple GPUs, and other GPUs are not checked. Its shadow lists still append atomically
     (depth only, so the same depth in any order).
-17. Subgroup kernels have run at subgroup sizes 32 and 4 only, and no gate runs size 4.
-18. GPU BVH traversal and the GPU build have no quiet speed measurement and no run on a GPU other than the RTX A6000.
+18. Subgroup kernels have run at subgroup sizes 32 and 4 only, and no gate runs size 4.
+19. GPU BVH traversal and the GPU build have no quiet speed measurement and no run on a GPU other than the RTX A6000.
+20. `CulledModels`, per-cascade caster culling, `LodInstances` and `MeshletMesh` have no timed run; each is proved by pixels on the RTX
+    A6000 alone, as are occluders, oriented boxes and occlusion for core meshes.
+21. Every timing since 2026-11-05 is diagnostic. The parity ledger's last run is 2026-10-27: after numbers sit in the row's cause text,
+    and `p-morph-compiled`, `p-motion-blur-velocity` and `p-pmrem-refresh` have no ledger row yet.
+22. The WebGL2 CPU tier's interpreter and the path tracer on the layer have no committed timing script.
+23. `@margoengine/shader` compute passes have no check on the WebGL2 layer, and `@margoengine/compute/nn` and `/graph` no speed measurement.
+24. The headless stage has not run in Node: no WebGPU binding is in the repository.
+25. Draw counts in LIM rows are printed by GPU checks and asserted only as bounds, and no result file holds them.
