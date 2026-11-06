@@ -561,7 +561,15 @@ export class ResultStore {
       .map((name) => ({ name, at: modified(join(folder, name)) ?? 0 }))
       .sort((a, b) => b.at - a.at)
       .slice(CANDIDATES_PER_STEP)
-      .forEach(({ name }) => rmSync(join(folder, name), { force: true }));
+      .forEach(({ name }) => {
+        // Windows refuses a delete (EPERM, EBUSY) while another lane reads or deletes the same file. The entry is only
+        // over the count, not wrong: it stays until the next put prunes this step. Anything else still throws.
+        try {
+          rmSync(join(folder, name), { force: true });
+        } catch (error) {
+          if (error.code !== 'EPERM' && error.code !== 'EBUSY') throw error;
+        }
+      });
   }
   /** Marks a key as never to be served again. */
   poison(key, why) {

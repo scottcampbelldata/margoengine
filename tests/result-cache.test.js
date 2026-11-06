@@ -291,6 +291,37 @@ test('an entry another run prunes after the listing counts as not stored', (t) =
   assert.equal(store.get('step', 'gone'), undefined);
 });
 
+test('a prune another run blocks leaves the entry for the next put; other errors still throw', (t) => {
+  const store = new ResultStore(join(temp(t), 'store'));
+  const { rmSync: remove } = fs,
+    refusing = (code, work) => {
+      fs.rmSync = (path, ...rest) => {
+        if (!String(path).endsWith('.tmp')) throw Object.assign(new Error(code), { code });
+        return remove(path, ...rest);
+      };
+      syncBuiltinESMExports();
+      try {
+        return work();
+      } finally {
+        fs.rmSync = remove;
+        syncBuiltinESMExports();
+      }
+    },
+    count = () => store.candidates('step').length,
+    files = () => readdirSync(join(store.dir, 'steps', readdirSync(join(store.dir, 'steps'))[0])).length;
+  let next = 0;
+  const put = () => store.put({ step: 'step', key: `k${next++}`, passed: true });
+  put();
+  while (files() < 8) put();
+  const full = files();
+  assert.ok(count() > 0);
+  for (const code of ['EPERM', 'EBUSY']) assert.equal(refusing(code, put), true, code);
+  assert.equal(files(), full + 2, 'the refused entries stay for now');
+  put();
+  assert.equal(files(), full, 'the next put prunes them');
+  assert.throws(() => refusing('EIO', put), { code: 'EIO' });
+});
+
 test('a stored entry that cannot be parsed still throws', (t) => {
   const store = new ResultStore(join(temp(t), 'store'));
   store.put({ step: 'step', key: 'k', passed: true });
