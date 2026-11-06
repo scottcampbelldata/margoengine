@@ -245,8 +245,12 @@ class Writer {
       if (owner.tangents) attributes.TANGENT = this.floatAccessor(owner.tangents, 4, 'VEC4');
       if (owner.uvs) attributes.TEXCOORD_0 = this.floatAccessor(owner.uvs, 2, 'VEC2');
       if (owner.uvs1) attributes.TEXCOORD_1 = this.floatAccessor(owner.uvs1, 2, 'VEC2');
+      if (owner.uvs2) attributes.TEXCOORD_2 = this.floatAccessor(owner.uvs2, 2, 'VEC2');
+      if (owner.uvs3) attributes.TEXCOORD_3 = this.floatAccessor(owner.uvs3, 2, 'VEC2');
       if (owner.colors)
         attributes.COLOR_0 = this.floatAccessor(owner.colors, owner.colorSize, owner.colorSize === 3 ? 'VEC3' : 'VEC4');
+      if (owner.colors1)
+        attributes.COLOR_1 = this.floatAccessor(owner.colors1, owner.colors1Size!, owner.colors1Size === 3 ? 'VEC3' : 'VEC4');
       if (owner.joints) {
         const data = owner.joints;
         attributes.JOINTS_0 = this.list('accessors', {
@@ -408,10 +412,10 @@ class Writer {
     const primitives = items.map(({ geometry, material, extras: source }) => {
       for (const slot of textureSlots) {
         const texture = material?.[slot];
-        if (texture && !(texture.texCoord === 1 ? geometry.uvs1 : geometry.uvs))
+        if (texture && !(texture.texCoord ? geometry[`uvs${texture.texCoord}`] : geometry.uvs))
           throw new TypeError(
-            texture.texCoord === 1
-              ? 'Textures sampled with texCoord 1 need geometry with uvs1'
+            texture.texCoord
+              ? `Textures sampled with texCoord ${texture.texCoord} need geometry with uvs${texture.texCoord}`
               : 'Textured materials need geometry with uvs',
           );
       }

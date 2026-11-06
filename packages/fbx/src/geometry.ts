@@ -31,7 +31,27 @@ interface Layer {
 }
 function layer(node: FBXNode, name: string, values: string, indexes: string, size: number): Layer | undefined {
   const child = findChild(node, name);
-  if (!child) return;
+  return child && readLayer(child, name, values, indexes, size);
+}
+
+/** Every layer of a kind by its index in the file, up to `most`: the first alone unless `all`. */
+function layerList(
+  node: FBXNode,
+  name: string,
+  values: string,
+  indexes: string,
+  size: number,
+  most: number,
+): { layer: Layer; name: string }[] {
+  const found = node.children.filter((child) => child.name === name);
+  found.sort((a, b) => Number(a.properties[0] ?? 0) - Number(b.properties[0] ?? 0));
+  return found.slice(0, most).map((child) => ({
+    layer: readLayer(child, name, values, indexes, size),
+    name: String(findChild(child, 'Name')?.properties[0] ?? ''),
+  }));
+}
+
+function readLayer(child: FBXNode, name: string, values: string, indexes: string, size: number): Layer {
   const mapping = String(findChild(child, 'MappingInformationType')?.properties[0]),
     reference = String(findChild(child, 'ReferenceInformationType')?.properties[0]);
   if (!['ByVertice', 'ByVertex', 'ByControlPoint', 'ByPolygonVertex', 'ByPolygon', 'AllSame'].includes(mapping))
@@ -206,9 +226,9 @@ function triangulate(
 interface Builder {
   positions: number[];
   normals: number[];
-  uvs: number[];
+  uvs: number[][];
   tangents: number[];
-  colors: number[];
+  colors: number[][];
   indices: number[];
   controlPoints: number[];
   vertices: Map<string, number>;
@@ -217,10 +237,15 @@ export interface BuiltGeometry {
   primitives: { geometry: GeometryData; materialIndex: number }[];
   controlPoints: Uint32Array[];
   vertexCount: number;
+  /** The file's name of each UV set kept, in order. */
+  uvNames: string[];
 }
 
-/** Converts the first normal, UV, tangent and color layer; later UV sets are deliberately omitted. */
-export function buildGeometry(node: FBXNode): BuiltGeometry {
+const UV_KEYS = ['uvs', 'uvs1', 'uvs2', 'uvs3'] as const,
+  COLOR_KEYS = ['colors', 'colors1'] as const;
+
+/** Converts the first normal and tangent layer, and the first UV and color layer, or as many as glTF here holds with `all`. */
+export function buildGeometry(node: FBXNode, all = false): BuiltGeometry {
   const positions = array(node, 'Vertices'),
     polygonIndices = array(node, 'PolygonVertexIndex'),
     count = positions.length / 3;
@@ -228,8 +253,8 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
   if (count > MAX_VERTICES || polygonIndices.length > MAX_CORNERS) budget();
   for (let i = 0; i < positions.length; i++) finite(positions[i], 'positions');
   const normal = layer(node, 'LayerElementNormal', 'Normals', 'NormalsIndex', 3);
-  const uv = layer(node, 'LayerElementUV', 'UV', 'UVIndex', 2),
-    color = layer(node, 'LayerElementColor', 'Colors', 'ColorIndex', 4);
+  const uvs = layerList(node, 'LayerElementUV', 'UV', 'UVIndex', 2, all ? UV_KEYS.length : 1),
+    colors = layerList(node, 'LayerElementColor', 'Colors', 'ColorIndex', 4, all ? COLOR_KEYS.length : 1);
   const tangent = layer(node, 'LayerElementTangent', 'Tangents', 'TangentsIndex', 3),
     binormal = layer(node, 'LayerElementBinormal', 'Binormals', 'BinormalsIndex', 3);
   const material = findChild(node, 'LayerElementMaterial');
@@ -315,9 +340,9 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
       builder = {
         positions: [],
         normals: [],
-        uvs: [],
+        uvs: uvs.map(() => []),
         tangents: [],
-        colors: [],
+        colors: colors.map(() => []),
         indices: [],
         controlPoints: [],
         vertices: new Map(),
@@ -325,8 +350,8 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
       builders.set(materialIndex, builder);
     }
     const ni = normal ? layerIndex(normal, control, corner, poly) : -1,
-      ui = uv ? layerIndex(uv, control, corner, poly) : -1;
-    const ci = color ? layerIndex(color, control, corner, poly) : -1,
+      ui = uvs.map(({ layer: uv }) => layerIndex(uv, control, corner, poly));
+    const ci = colors.map(({ layer: color }) => layerIndex(color, control, corner, poly)),
       ti = tangent ? layerIndex(tangent, control, corner, poly) : -1,
       bi = binormal ? layerIndex(binormal, control, corner, poly) : -1;
     const key = `${control}/${ni}/${ui}/${ci}/${ti}/${bi}`;
@@ -355,13 +380,16 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
     ny /= length;
     nz /= length;
     builder.normals.push(nx, ny, nz);
-    if (uv) builder.uvs.push(finite(uv.values[ui * 2], 'UVs'), 1 - finite(uv.values[ui * 2 + 1], 'UVs'));
-    if (color)
+    uvs.forEach(({ layer: uv }, set) =>
+      builder.uvs[set].push(finite(uv.values[ui[set] * 2], 'UVs'), 1 - finite(uv.values[ui[set] * 2 + 1], 'UVs')),
+    );
+    colors.forEach(({ layer: color }, set) => {
       for (let k = 0; k < 4; k++) {
-        const value = finite(color.values[ci * 4 + k], 'colors');
+        const value = finite(color.values[ci[set] * 4 + k], 'colors');
         if (value < 0 || value > 1) throw new RangeError('FBX colors must be in [0, 1]');
-        builder.colors.push(value);
+        builder.colors[set].push(value);
       }
+    });
     if (tangent) {
       let tx = finite(tangent.values[ti * 3], 'tangents'),
         ty = finite(tangent.values[ti * 3 + 1], 'tangents'),
@@ -394,11 +422,11 @@ export function buildGeometry(node: FBXNode): BuiltGeometry {
       normals: Float32Array.from(builder.normals),
       indices: Uint32Array.from(builder.indices),
     };
-    if (uv) geometry.uvs = Float32Array.from(builder.uvs);
+    uvs.forEach((_, set) => (geometry[UV_KEYS[set]] = Float32Array.from(builder.uvs[set])));
     if (tangent) geometry.tangents = Float32Array.from(builder.tangents);
-    if (color) geometry.colors = Float32Array.from(builder.colors);
+    colors.forEach((_, set) => (geometry[COLOR_KEYS[set]] = Float32Array.from(builder.colors[set])));
     primitives.push({ materialIndex, geometry });
     controlPoints.push(Uint32Array.from(builder.controlPoints));
   }
-  return { primitives, controlPoints, vertexCount };
+  return { primitives, controlPoints, vertexCount, uvNames: uvs.map((uv) => uv.name) };
 }

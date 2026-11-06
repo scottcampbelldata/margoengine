@@ -22,5 +22,6 @@ interface FBXOptions {
     fetch?: typeof fetch;
     allowedURLs?: readonly string[];
     extensions?: readonly FBXExtension[];
+    layers?: boolean;
 }
 ```

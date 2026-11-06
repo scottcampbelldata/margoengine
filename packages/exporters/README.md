@@ -365,7 +365,7 @@ validator in the tests:
 - **Textures and extensions.** `MaterialData` adds `occlusionTexture` (with `occlusionStrength`), `emissiveTexture`
   (multiplied by `emissive`, so set it to [1, 1, 1]), `normalScale`, and `transmission`, `ior` and `emissiveStrength`,
   written as `KHR_materials_transmission`, `KHR_materials_ior` and `KHR_materials_emissive_strength` when they differ
-  from glTF's defaults. A texture's `texCoord: 1` samples `uvs1` (`TEXCOORD_1`).
+  from glTF's defaults. A texture's `texCoord: 1` samples `uvs1` (`TEXCOORD_1`). `uvs2`, `uvs3` and `colors1` write `TEXCOORD_2`, `TEXCOORD_3` and `COLOR_1` in the glTF writers only; `texCoord` 2 and 3 sample them.
 - **Indexed palette textures.** `await paletteTexture(rgba)` lays out RGBA8 palette entries one per texel in the
   smallest square power-of-two PNG, sampled NEAREST without mipmaps and clamped, and returns each entry's texel-centre
   UV, so a face picks its exact palette colour.

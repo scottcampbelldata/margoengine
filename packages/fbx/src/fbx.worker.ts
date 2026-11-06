@@ -15,8 +15,9 @@ type FBXJob = {
   resourcePath?: string;
   allowedURLs?: readonly string[];
   extensions?: readonly string[];
+  layers?: boolean;
 };
-serve(async ({ url, input, resourcePath, allowedURLs, extensions }: FBXJob) => {
+serve(async ({ url, input, resourcePath, allowedURLs, extensions, layers }: FBXJob) => {
   if (url) {
     const response = await fetch(url);
     input = (await readResponse(response, { maxBytes: budget, label: 'FBX' })).buffer;
@@ -28,6 +29,7 @@ serve(async ({ url, input, resourcePath, allowedURLs, extensions }: FBXJob) => {
       resourcePath,
       allowedURLs,
       extensions: known.filter((extension) => extensions?.includes(extension.name)),
+      layers,
     }),
   );
   // parseFBX's texture budget (all textures together), checked after decoding as it does.

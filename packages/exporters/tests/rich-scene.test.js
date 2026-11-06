@@ -328,7 +328,7 @@ test('extras must be JSON; invalid rich fields are refused with the fix in the m
     () => exportGLB({ nodes: [{ geometry: plain, material: { occlusionTexture: { ...image, texCoord: 1 } } }] }),
     /uvs1/,
   );
-  assert.throws(() => exportGLB(node({ material: { emissiveTexture: { ...image, texCoord: 2 } } })), RangeError);
+  assert.throws(() => exportGLB(node({ material: { emissiveTexture: { ...image, texCoord: 4 } } })), RangeError);
   assert.throws(() => exportGLB(node({ material: { ior: 0.5 } })), /ior/);
   assert.throws(() => exportGLB(node({ material: { transmission: 2 } })), RangeError);
   assert.throws(() => exportGLB(node({ material: { emissiveStrength: -1 } })), RangeError);

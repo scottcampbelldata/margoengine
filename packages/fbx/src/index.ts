@@ -14,13 +14,15 @@ export interface FBXOptions {
   allowedURLs?: readonly string[];
   /** Optional parts of the import, from this package's entries, such as `sceneExtras`. Default none. */
   extensions?: readonly FBXExtension[];
+  /** Keep up to four UV sets and two colour layers instead of the first of each. Default false. */
+  layers?: boolean;
 }
 const budget = 64 * 1024 * 1024;
 
 /** Converts native binary or ASCII FBX through Margo's first-party glTF writer. */
 export async function convertFBX(
   input: ArrayBuffer | ArrayBufferView,
-  { resourcePath = '', signal, fetch: get, allowedURLs, extensions }: FBXOptions = {},
+  { resourcePath = '', signal, fetch: get, allowedURLs, extensions, layers }: FBXOptions = {},
 ): Promise<ArrayBuffer> {
   signal?.throwIfAborted();
   if (
@@ -31,7 +33,7 @@ export async function convertFBX(
     throw new RangeError('Invalid FBX byte budget; pass a 32 byte to 64 MiB FBX file');
   if (resourcePath && !['http:', 'https:'].includes(new URL(resourcePath, globalThis.location?.href).protocol))
     throw new TypeError('FBX resources need HTTP(S)');
-  return convert(input, resourcePath, signal, { fetch: get, allowedURLs, extensions });
+  return convert(input, resourcePath, signal, { fetch: get, allowedURLs, extensions, layers });
 }
 
 /**

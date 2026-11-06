@@ -18,14 +18,33 @@ animation.play('Walking');
 
 ## Supported first implementation
 
+- A connection naming an object the file left out is dropped: the FBX SDK writes such links, for curves on properties a plug-in owns.
 - Binary FBX versions 7400-7700 with 32/64-bit node records, raw arrays, and zlib-compressed arrays. Array headers remain 32-bit in every supported version. ASCII uses the same scene conversion.
-- Bounded concave triangulation; normal, UV, tangent/binormal, color, and material layers with Direct/IndexToDirect and ByControlPoint/ByVertice/ByPolygonVertex/ByPolygon/AllSame mappings. The first attribute layer and UV set are imported; UV V and tangent handedness convert to glTF conventions.
+- Bounded concave triangulation; normal, UV, tangent/binormal, color, and material layers with Direct/IndexToDirect and ByControlPoint/ByVertice/ByPolygonVertex/ByPolygon/AllSame mappings. The first attribute layer and UV set are imported, or up to four UV sets and two colour layers with the `layers` option; UV V and tangent handedness convert to glTF conventions.
 - Area-weighted normals, UV/hard-edge vertex splitting, shared geometry instances, and material partitions. Multiple material partitions become separate child mesh nodes under the original model transform.
 - Six fixed-axis Euler orders, pivots/offsets, pre-rotation and inverse post-rotation, mesh-only geometric transforms, units, and signed axis conversion. Missing GlobalSettings preserves raw coordinates. Canonical FBX Y-up uses FrontAxisSign +1; Blender Z-up converts `(x,y,z)` to `(x,z,-y)`.
 - Linear Normalize skin clusters, exact joint IDs and bind matrices, four strongest influences with deterministic tie order and normalization, and remapping onto split vertices.
 - Single-shape blend channels with sparse position/normal deltas, names, initial weights, and animated percent weights. Blender's all-100 per-control-point FullWeights convention is accepted.
 - Lambert/Phong dielectric materials, diffuse/emissive colors, opacity/transparency, shininess-derived roughness, and embedded or external PNG/JPEG diffuse and normal textures.
 - Multiple animation stacks, one layer per stack, STEP and LINEAR curves, missing-axis rest values, and interpolation at common key times. LINEAR transform tracks are adaptively baked for Euler motion and moving pivots, with sampled translation/scale tolerance `1e-5 * max(1, magnitude)` and angular tolerance `1e-4` radians. These are sampling criteria, not a proof of continuous error bounds. Rotation segments are subdivided to preserve full turns.
+
+## UV sets and colour layers
+
+`layers: true` keeps up to four UV sets and two colour layers instead of the first of each, for lightmaps and detail textures. They arrive as `TEXCOORD_0` to `TEXCOORD_3` and `COLOR_0`, `COLOR_1`, in the file's layer order.
+
+```ts
+import {loadFBX} from 'margoengine/fbx';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadFBX(engine, '/assets/room.fbx', {layers: true});
+console.log(model.primitives.length);
+```
+
+A texture whose `UVSet` names a later set samples that set (`texCoord`); the first set, `default` or a name the mesh does not have stays on the first set. The option also works in `convertFBX`, `parseFBX` and the worker entry. Default `false`, which leaves the first set and layer alone and splits vertices on those only.
+
+A vertex that differs in any kept layer is split, so a file with a separate lightmap layout can gain vertices. Sets past the fourth and layers past the second are dropped. gltf-pro draws `COLOR_0` only, so `COLOR_1` is there for your own reader; it packs `TEXCOORD_2` and `3` only when a material reads them.
+
+Proof: a grid from Blender's own exporter with three UV maps and two colour attributes (`test/fixtures/blender-layers.py`) keeps every value Blender reports.
 
 ## Cameras and lights
 

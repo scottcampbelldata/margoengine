@@ -61,6 +61,7 @@ export interface MeshBinding {
   geometric: Float64Array;
   geometricInverse?: Float64Array;
   materialIndex: number;
+  uvNames: string[];
 }
 export interface SceneContext {
   document: FBXDocument;
@@ -75,12 +76,15 @@ export interface SceneContext {
   signal?: AbortSignal;
   budget: SceneBudget;
   extensions: readonly ExtensionHooks[];
+  /** Keep every UV and colour layer glTF here holds, not just the first. */
+  layers: boolean;
 }
 
 export function context(
   document: FBXDocument,
   signal?: AbortSignal,
   extensions: readonly ExtensionHooks[] = [],
+  layers = false,
 ): SceneContext {
   const budget = new SceneBudget(signal);
   budget.work(document.connections.length + document.roots.length);
@@ -134,6 +138,7 @@ export function context(
     signal,
     budget,
     extensions,
+    layers,
   };
 }
 
@@ -229,6 +234,8 @@ export function transformGeometry(
 
 /** Charge before geometry's large generated-normal, topology and builder buffers. */
 function preflight(ctx: SceneContext, source: FBXNode): void {
+  const count = (name: string) =>
+    ctx.layers ? source.children.filter((child) => child.name === name).length : findChild(source, name) ? 1 : 0;
   const positions = array(source, 'Vertices'),
     indices = array(source, 'PolygonVertexIndex');
   if (positions.length > 3_000_000 || indices.length > 3_000_000)
@@ -255,9 +262,9 @@ function preflight(ctx: SceneContext, source: FBXNode): void {
     throw new RangeError(
       'FBX geometry budget exceeded; simplify or split the scene, the import limits are listed in the README',
     );
-  const uv = findChild(source, 'LayerElementUV') ? 2 : 0,
+  const uv = Math.min(count('LayerElementUV'), 4) * 2,
     tangent = findChild(source, 'LayerElementTangent') ? 4 : 0,
-    color = findChild(source, 'LayerElementColor') ? 4 : 0;
+    color = Math.min(count('LayerElementColor'), 2) * 4;
   const vertices = Math.min(indices.length, 1_000_000),
     width = 7 + uv + tangent + color;
   // Numeric JS builders and vertex-key maps coexist with the final typed arrays.
@@ -266,7 +273,18 @@ function preflight(ctx: SceneContext, source: FBXNode): void {
 }
 
 function cloneGeometry(ctx: SceneContext, baked: BuiltGeometry): BuiltGeometry {
-  const arrays = ['positions', 'normals', 'uvs', 'tangents', 'colors', 'indices'] as const;
+  const arrays = [
+    'positions',
+    'normals',
+    'uvs',
+    'uvs1',
+    'uvs2',
+    'uvs3',
+    'tangents',
+    'colors',
+    'colors1',
+    'indices',
+  ] as const;
   let bytes = 0;
   for (const p of baked.primitives) for (const key of arrays) bytes += (p.geometry[key]?.length ?? 0) * 4;
   ctx.budget.reserve(bytes);
@@ -278,7 +296,7 @@ function cloneGeometry(ctx: SceneContext, baked: BuiltGeometry): BuiltGeometry {
         positions: new Float32Array(p.geometry.positions),
         normals: new Float32Array(p.geometry.normals),
       };
-      for (const key of ['uvs', 'tangents', 'colors'] as const)
+      for (const key of ['uvs', 'uvs1', 'uvs2', 'uvs3', 'tangents', 'colors', 'colors1'] as const)
         if (p.geometry[key]) geometry[key] = new Float32Array(p.geometry[key]!);
       geometry.indices = new Uint32Array(p.geometry.indices!);
       return { materialIndex: p.materialIndex, geometry };
@@ -340,7 +358,7 @@ export function buildScene(ctx: SceneContext): void {
       let base = cache.get(source);
       if (!base) {
         preflight(ctx, source);
-        base = buildGeometry(source);
+        base = buildGeometry(source, ctx.layers);
         if ((instances.get(source) ?? 0) > 1) cache.set(source, base);
       }
       vertices += base.vertexCount;
@@ -372,6 +390,7 @@ export function buildScene(ctx: SceneContext): void {
           geometric: m,
           geometricInverse: normalMatrix,
           materialIndex: primitive.materialIndex,
+          uvNames: baked.uvNames,
         });
       }
     }

@@ -16,9 +16,10 @@ export interface FBXOptions {
     fetch?: typeof fetch;
     allowedURLs?: readonly string[];
     extensions?: readonly FBXExtension[];
+    layers?: boolean;
 }
 
-export function convertFBX(input: ArrayBuffer | ArrayBufferView, { resourcePath, signal, fetch: get, allowedURLs, extensions }?: FBXOptions): Promise<ArrayBuffer>;
+export function convertFBX(input: ArrayBuffer | ArrayBufferView, { resourcePath, signal, fetch: get, allowedURLs, extensions, layers }?: FBXOptions): Promise<ArrayBuffer>;
 
 export function loadFBX(engine: EngineKernel, url: string | URL, options?: FBXOptions): Promise<PBRModel>;
 

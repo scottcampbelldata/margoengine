@@ -26,6 +26,7 @@ export async function parseFBXInWorker(
       resourcePath: absolute(options.resourcePath ?? ''),
       allowedURLs: options.allowedURLs,
       extensions: options.extensions?.map((extension) => extension.name),
+      layers: options.layers,
     },
     options.signal,
   );
@@ -47,6 +48,7 @@ export async function loadFBXInWorker(
       resourcePath: absolute(options.resourcePath),
       allowedURLs: options.allowedURLs,
       extensions: options.extensions?.map((extension) => extension.name),
+      layers: options.layers,
     },
     options.signal,
   );

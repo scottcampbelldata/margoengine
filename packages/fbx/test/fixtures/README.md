@@ -46,6 +46,18 @@ fd118cbc1e40d5d5de5a049e963c7648104ff41cec277e4866dae107991027c2  blender-shot.f
 
 Regenerate them with `blender --background --factory-startup --python blender-shot.py -- /absolute/folder`.
 
+## Blender layers fixture
+
+`blender-layers.fbx` is one original 3 by 3 grid with three UV maps and two colour attributes, exported through
+Blender's FBX exporter. `blender-layers.py` authors it and writes `blender-layers.json`, every value as Blender holds
+it, which the test compares against. CC0 like the rig, exported on 2026-11-06 by the same Blender build:
+
+```text
+24d4451aa65fc054050e4100cc102d0ad5b7d6fae979804c4e7a4178194c139a  blender-layers.fbx
+```
+
+Regenerate it with `blender --background --factory-startup --python blender-layers.py -- /absolute/folder`.
+
 ## Exported subset
 
 The fan has three closed tapered blades, 24 control points, 18 quad faces, and

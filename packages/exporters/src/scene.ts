@@ -25,10 +25,16 @@ export interface GeometryData {
   uvs?: ArrayLike<number>;
   /** Optional second UV set. */
   uvs1?: ArrayLike<number>;
+  /** Optional third UV set. glTF writers only. */
+  uvs2?: ArrayLike<number>;
+  /** Optional fourth UV set. glTF writers only. */
+  uvs3?: ArrayLike<number>;
   /** xyzw per vertex, w is the bitangent sign (+1 or -1). */
   tangents?: ArrayLike<number>;
   /** Linear rgb or rgba per vertex, each in [0, 1]. */
   colors?: ArrayLike<number>;
+  /** A second color set, as `colors`. glTF writers only. */
+  colors1?: ArrayLike<number>;
   /** Triangle list. Omit for non-indexed triangles. */
   indices?: ArrayLike<number>;
   /**
@@ -122,8 +128,8 @@ export interface TextureData {
   wrapS?: 'repeat' | 'clamp' | 'mirror';
   /** Wrap mode across v. Default 'repeat'. */
   wrapT?: 'repeat' | 'clamp' | 'mirror';
-  /** UV set the material samples it with: 0 (`uvs`, default) or 1 (`uvs1`). glTF writers only. */
-  texCoord?: 0 | 1;
+  /** UV set the material samples it with: 0 (`uvs`, default), 1 (`uvs1`), 2 or 3. glTF writers only. */
+  texCoord?: 0 | 1 | 2 | 3;
   extras?: Extras;
 }
 
@@ -373,9 +379,13 @@ export interface Geo {
   normals: Float32Array;
   uvs?: Float32Array;
   uvs1?: Float32Array;
+  uvs2?: Float32Array;
+  uvs3?: Float32Array;
   tangents?: Float32Array;
   colors?: Float32Array;
   colorSize: 3 | 4;
+  colors1?: Float32Array;
+  colors1Size?: 3 | 4;
   indices: Uint32Array;
   count: number;
   faceSizes?: Uint8Array;
@@ -598,6 +608,8 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
   }
   if (data.uvs !== undefined) geo.uvs = floats(data.uvs, count * 2, 'UVs');
   if (data.uvs1 !== undefined) geo.uvs1 = floats(data.uvs1, count * 2, 'UVs 1');
+  if (data.uvs2 !== undefined) geo.uvs2 = floats(data.uvs2, count * 2, 'UVs 2');
+  if (data.uvs3 !== undefined) geo.uvs3 = floats(data.uvs3, count * 2, 'UVs 3');
   if (data.tangents !== undefined) {
     const tangents = floats(data.tangents, count * 4, 'Tangents');
     for (let i = 0; i < count; i++) {
@@ -616,6 +628,13 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
     if (colors.some((v) => v < 0 || v > 1)) throw new RangeError('Colors must be in [0, 1]');
     geo.colors = colors;
     geo.colorSize = size;
+  }
+  if (data.colors1 !== undefined) {
+    const size = data.colors1?.length === count * 3 ? 3 : 4,
+      colors = floats(data.colors1, count * size, 'Colors 1');
+    if (colors.some((v) => v < 0 || v > 1)) throw new RangeError('Colors must be in [0, 1]');
+    geo.colors1 = colors;
+    geo.colors1Size = size;
   }
   if ((data.joints === undefined) !== (data.weights === undefined))
     fail('Joint indices and weights are required together');
@@ -680,8 +699,8 @@ export function checkTexture(texture: unknown, label: string): TextureData | und
     if (texture[key] !== undefined && !(values as readonly unknown[]).includes(texture[key]))
       fail(`${label} ${key} must be ${values.join(' or ')}`);
   if (texture.mipmaps !== undefined && typeof texture.mipmaps !== 'boolean') fail(`${label} mipmaps must be boolean`);
-  if (texture.texCoord !== undefined && texture.texCoord !== 0 && texture.texCoord !== 1)
-    throw new RangeError(`${label} texCoord must be 0 or 1`);
+  if (texture.texCoord !== undefined && ![0, 1, 2, 3].includes(texture.texCoord as number))
+    throw new RangeError(`${label} texCoord must be 0, 1, 2 or 3`);
   return texture as unknown as TextureData;
 }
 const filters = ['nearest', 'linear'] as const,

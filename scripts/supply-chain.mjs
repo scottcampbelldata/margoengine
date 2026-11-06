@@ -167,6 +167,10 @@ const ASSETS = [
   ['tools/create-margo/templates/game/public/pete-LICENSE.txt', 'game starter character (Kay Lousberg, KayKit, CC0)'],
   ['packages/environment/tests/fixtures/NOTICE.md', 'test fixtures: OpenEXR test images (BSD-3-Clause)'],
   [
+    'packages/fbx/test/fixtures/README.md',
+    'test fixtures: original FBX scenes exported for this project by Blender 5.3 from the scripts beside them (CC0 1.0)',
+  ],
+  [
     'packages/gltf-pro/tests/fixtures/bump/NOTICE.md',
     'test fixture: BumpMaterial.gltf, the EXT_materials_bump interoperability file from luma.gl (CC0-1.0, vis.gl contributors)',
   ],

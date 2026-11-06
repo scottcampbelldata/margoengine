@@ -114,8 +114,11 @@ interface GeometryData {
     normals: ArrayLike<number>;
     uvs?: ArrayLike<number>;
     uvs1?: ArrayLike<number>;
+    uvs2?: ArrayLike<number>;
+    uvs3?: ArrayLike<number>;
     tangents?: ArrayLike<number>;
     colors?: ArrayLike<number>;
+    colors1?: ArrayLike<number>;
     indices?: ArrayLike<number>;
     faceSizes?: ArrayLike<number>;
     joints?: ArrayLike<number>;
@@ -213,7 +216,7 @@ interface TextureData {
     mipmaps?: boolean;
     wrapS?: 'repeat' | 'clamp' | 'mirror';
     wrapT?: 'repeat' | 'clamp' | 'mirror';
-    texCoord?: 0 | 1;
+    texCoord?: 0 | 1 | 2 | 3;
     extras?: Extras;
 }
 ```

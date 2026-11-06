@@ -11,7 +11,7 @@ export async function attachMaterials(
   options: { fetch?: typeof fetch; allowedURLs?: readonly string[] } = {},
 ): Promise<void> {
   const textures = new Map<bigint, Promise<TextureData>>(),
-    materials = new Map<bigint, Promise<MaterialData>>();
+    materials = new Map<string, Promise<MaterialData>>();
   let bytes = 0;
   const content = (node: FBXNode | undefined): Uint8Array | undefined => {
     const value = node && findChild(node, 'Content')?.properties[0];
@@ -72,7 +72,12 @@ export async function attachMaterials(
     if (!png && !jpeg) throw new TypeError('FBX textures must be PNG or JPEG');
     return { name: objectName(source), mimeType: png ? 'image/png' : 'image/jpeg', image };
   };
-  const material = async (source: FBXNode): Promise<MaterialData> => {
+  // A texture names its UV set; which index that is depends on the mesh.
+  const uvSet = (source: FBXNode, names: readonly string[]): 0 | 1 | 2 | 3 => {
+    const index = names.indexOf(String(property(source, 'UVSet', '')));
+    return index > 0 ? (index as 1 | 2 | 3) : 0;
+  };
+  const material = async (source: FBXNode, uvNames: readonly string[]): Promise<MaterialData> => {
     const scalar = (name: string, fallback: number) => {
       const value = Number(property(source, name, fallback));
       if (!Number.isFinite(value) || value < 0 || value > 1)
@@ -121,7 +126,8 @@ export async function attachMaterials(
       const key = c.property === 'NormalMap' ? 'normalTexture' : 'baseColorTexture';
       if (out[key])
         throw new TypeError('Multiple FBX textures on one material property; keep one per target when exporting');
-      out[key] = await promise;
+      const set = uvSet(t, uvNames);
+      out[key] = set ? { ...(await promise), texCoord: set } : await promise;
     }
     return out;
   };
@@ -137,10 +143,10 @@ export async function attachMaterials(
     const source = sources[mesh.materialIndex];
     if (!source)
       throw new RangeError('FBX material index exceeds model materials; re-export the file, it looks damaged');
-    const key = id(source.properties[0]);
+    const key = `${id(source.properties[0])}/${mesh.uvNames}`;
     let promise = materials.get(key);
     if (!promise) {
-      promise = material(source);
+      promise = material(source, mesh.uvNames);
       materials.set(key, promise);
     }
     mesh.node.material = await promise;
