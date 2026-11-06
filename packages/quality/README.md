@@ -120,6 +120,46 @@ A first change of shadow filter compiles shader variants, so that frame hitches 
 measure. Options that only apply at construction (shadow `resolution`, `cascades`, `VolumetricFog` on or off) cannot be
 knobs: they are what the tier presets below set.
 
+## Battery and heat
+
+`@margoengine/quality/power` eases off when the machine is on battery or running hot.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {applyQualityTier, paceEngine} from 'margoengine/quality';
+import {watchFeatures, featureKnobs} from 'margoengine/quality/features';
+import {watchPower} from 'margoengine/quality/power';
+declare const canvas: HTMLCanvasElement;
+applyQualityTier();
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+paceEngine(engine);
+using features = watchFeatures(featureKnobs({camera: engine.camera}));
+using power = watchPower({
+  engine,                                  // capped while easing off, its own pace back after
+  features: features.scaler,               // budget cut while easing off
+  onChange: ({level, charging, battery, pressure, hot}) => console.log(level, charging, battery, pressure, hot),
+});
+console.log(power.reading.level);
+```
+
+| Level | When | Frame cap (`rates`) | Budget (`budgets`) |
+| --- | --- | --- | --- |
+| 0 | On mains, or the browser does not say | The engine's own | Full |
+| 1 | On battery | 60 | 75% |
+| 2 | Hot, CPU pressure `serious` or `critical`, or battery at `lowBattery` (20%) or under | 30 | 50% |
+
+- Battery comes from `navigator.getBattery` and CPU pressure from `PressureObserver`, where the browser has them. A
+  browser that has neither still gets the frame time reading. A source that refuses is left out; the others keep working.
+- Heat is read from frame times by `FrameDrift`: a GPU that throttles slows gradually, so the median frame cost creeps
+  25% over the coolest reading with no step above 15% between five-second readings, and stays there for six of them. A
+  new view or level moves the cost in one step and starts the measure over. Once hot it stays hot for 60 readings (five
+  minutes) or until the cost creeps back, because easing off lowers the cost by itself. Options: `window` 300, `rise`
+  1.25, `readings` 6, `jump` 0.15, `hold` 60. `power.restart()` forgets the measure after a change you know of.
+- The full tier cannot change while running (4x multisampling is built into the pipelines). On it, leaving level 0 sets
+  this tab's next load to the light tier, in sessionStorage, keeping what the page measured; back at level 0 the next load
+  is full again. The page is not reloaded unless you ask: pass `reload: () => location.reload()` to change tier at once.
+  `?quality=high` still wins. `currentTier()` from the root entry reads the tier.
+
 ## Tier presets
 
 The tier also scales optional features. `applyQualityTier()` publishes the tier's `QualityPreset` as

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5038834,
+  "total": 5041766,
   "history": [
     {
       "date": "2026-10-24",
@@ -2210,6 +2210,12 @@
       "commit": "52419a482",
       "reason": "gltf gains the scene-data entry; the root's refusal names it",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "b7bde42a9",
+      "reason": "New quality entry ./power: eases off on battery and heat; root reads the lowered tab flag. Core and core + stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -2566,8 +2572,9 @@
     "@margoengine/procedural/noise": 2314,
     "@margoengine/procedural/standin": 673,
     "@margoengine/procedural/voronoi": 5026,
-    "@margoengine/quality": 3663,
+    "@margoengine/quality": 3942,
     "@margoengine/quality/features": 2147,
+    "@margoengine/quality/power": 2653,
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 6480,

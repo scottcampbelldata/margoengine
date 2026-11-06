@@ -535,6 +535,13 @@ that cover the shortfall; a feature returns under 70% of budget if its saving le
 `packages/quality/test/features.test.js` on a modelled scene, and `features-browser.mjs` driving real `SSAO` and
 `Shadows` through every level. Missing: how good the savings are in a real scene under load, for the quiet pass.
 
+`watchPower` (`@margoengine/quality/power`) adds a third input to tiers. Level 1 (on battery) and level 2 (hot, CPU
+pressure or low battery) cap the frame rate and cut the `FeatureScaler` budget; on the full tier they set this tab's next
+load to light through `sessionStorage`, and that load measures nothing. `FrameDrift` tells heat from a heavier scene by
+shape: a gradual rise that stays, against a step. Evidence: `packages/quality/test/power.test.js` on modelled costs, and
+`power-browser.mjs` on the real battery manager. Missing: a run on a laptop really throttling, on battery, which should
+set `rise` and `readings`.
+
 ### 3.6 Warm-up and device loss
 
 `warmUp(engine)` renders offscreen delta-zero frames until two complete frames run with all asynchronously compiled

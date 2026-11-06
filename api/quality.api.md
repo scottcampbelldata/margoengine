@@ -27,6 +27,8 @@ export interface DeviceLike {
 
 export const FAST_GPU_MS = 8;
 
+export const LOWERED_KEY = "margoQualityLowered";
+
 export type Paced = EngineKernel | {
     pace?: (time: number) => boolean;
 };
@@ -39,6 +41,9 @@ export interface QualityOptions {
     storage?: {
         getItem(key: string): string | null;
         setItem(key: string, value: string): void;
+    };
+    session?: {
+        getItem(key: string): string | null;
     };
     userAgent?: string;
 }
@@ -114,9 +119,11 @@ export interface WatchResolutionOptions extends ResolutionOptions, FrameTimers {
     apply?: (scale: number) => void;
 }
 
-export function applyQualityTier({ search, page, storage, userAgent }?: QualityOptions): QualityTier;
+export function applyQualityTier({ search, page, storage, session, userAgent }?: QualityOptions): QualityTier;
 
 export function capFrameRate(engine: Paced, rate?: number): void;
+
+export const currentTier: () => QualityTier;
 
 export function frameDue(clock: Float64Array, now: number, targetRate: number): boolean;
 

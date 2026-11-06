@@ -146,11 +146,13 @@
     "imports": "import { FAST_GPU_MS } from '@margoengine/quality';",
     "exports": [
       "FAST_GPU_MS",
+      "LOWERED_KEY",
       "QUALITY_PRESETS",
       "ResolutionScaler",
       "SLOW_FPS",
       "applyQualityTier",
       "capFrameRate",
+      "currentTier",
       "frameDue",
       "frameStatus",
       "paceEngine",

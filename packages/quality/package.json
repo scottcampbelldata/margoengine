@@ -37,6 +37,10 @@
     "./features": {
       "types": "./dist/features.d.ts",
       "import": "./dist/features.js"
+    },
+    "./power": {
+      "types": "./dist/power.d.ts",
+      "import": "./dist/power.js"
     }
   },
   "files": [
@@ -53,7 +57,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js quality",
     "test": "npm run build && node --test test/*.test.js",
-    "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs && node packages/quality/test/ssaa-browser.mjs && node packages/quality/test/features-browser.mjs",
+    "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs && node packages/quality/test/ssaa-browser.mjs && node packages/quality/test/features-browser.mjs && node packages/quality/test/power-browser.mjs",
     "prepack": "npm run build"
   }
 }

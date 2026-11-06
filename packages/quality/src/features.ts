@@ -58,7 +58,7 @@ const REST = 120;
  * {@link FeatureScaler.push}.
  */
 export class FeatureScaler {
-  /** Current budget in milliseconds; set it to change it. */
+  /** Current budget in milliseconds; set it to change it, as `watchPower` does. */
   budget: number;
   private readonly knobs: Knob[];
   private readonly window: number;

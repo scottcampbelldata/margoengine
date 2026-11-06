@@ -1442,6 +1442,10 @@
       "types": "./dist/quality/features.d.ts",
       "import": "./dist/quality/features.js"
     },
+    "./quality/power": {
+      "types": "./dist/quality/power.d.ts",
+      "import": "./dist/quality/power.js"
+    },
     "./ragdoll": {
       "types": "./dist/ragdoll.d.ts",
       "import": "./dist/ragdoll.js"

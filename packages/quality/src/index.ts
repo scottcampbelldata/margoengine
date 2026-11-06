@@ -72,6 +72,8 @@ export interface QualityOptions {
   page?: string;
   /** Persistent storage for the measured result; defaults to localStorage. */
   storage?: { getItem(key: string): string | null; setItem(key: string, value: string): void };
+  /** This tab's storage, read for `LOWERED_KEY`; defaults to sessionStorage. */
+  session?: { getItem(key: string): string | null };
   /** User agent string; 'Mobi', 'Android' or 'iPhone' selects the phone tier. Default `navigator.userAgent`. */
   userAgent?: string;
 }
@@ -84,6 +86,9 @@ export const SLOW_FPS = 55;
  * and an Arc 140V 9 to 16.4 ms by the same queries, copies included, in `measure.mjs`. A limit for that scene, on those
  * GPUs; other scenes read their own cost against it. */
 export const FAST_GPU_MS = 8;
+/** Set in sessionStorage by `watchPower` (`@margoengine/quality/power`): this tab's next load starts light, whatever was
+ * measured, because 4x multisampling cannot change while a page runs. */
+export const LOWERED_KEY = 'margoQualityLowered';
 const KEY = 'margoQuality',
   // Written when the full tier ran slow on this browser. Unlike a slow light-tier reading it stays: measuring headroom
   // again on the light tier would send the page back to the full tier, slow, and back here, on every other load.
@@ -114,12 +119,19 @@ let state:
   // Set while this page's next device is to carry the timestamp feature.
   stopAsking: (() => void) | undefined;
 const local = (): QualityOptions['storage'] => {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined;
-  }
-};
+    try {
+      return globalThis.localStorage;
+    } catch {
+      return undefined;
+    }
+  },
+  tab = (): QualityOptions['session'] => {
+    try {
+      return globalThis.sessionStorage;
+    } catch {
+      return undefined;
+    }
+  };
 
 /** Choose this page's tier. Call once, before creating any engine: core reads `globalThis.margoLow` when it builds
  * pipelines and sizes the canvas, and feature packages read `globalThis.margoPreset` (this tier's `QualityPreset`) when
@@ -129,21 +141,33 @@ export function applyQualityTier({
   search = globalThis.location?.search,
   page = globalThis.location?.pathname,
   storage = local(),
+  session = tab(),
   userAgent = globalThis.navigator?.userAgent ?? '',
 }: QualityOptions = {}): QualityTier {
   const params = new URLSearchParams(search),
     forced = params.get('quality') ?? undefined,
     key = page ? `${KEY}:${page}` : KEY;
-  let stored: string | undefined;
+  let stored: string | undefined,
+    lowered = false;
   try {
     stored = storage?.getItem(key) ?? undefined;
   } catch {}
-  const choice = forced === 'high' || forced === 'low' ? forced : stored;
-  const tier: QualityTier = /Mobi|Android|iPhone/.test(userAgent) ? 'phone' : choice === 'high' ? 'high' : 'light';
+  try {
+    lowered = !!session?.getItem(LOWERED_KEY);
+  } catch {}
+  const pinned = forced === 'high' || forced === 'low' ? forced : undefined,
+    choice = pinned ?? stored,
+    // A page lowered for power keeps what it measured and measures nothing: unplugged says nothing about its cost.
+    down = lowered && !pinned && stored === 'high';
+  const tier: QualityTier = /Mobi|Android|iPhone/.test(userAgent)
+    ? 'phone'
+    : choice === 'high' && !down
+      ? 'high'
+      : 'light';
   if (tier === 'high') delete globalThis.margoLow;
   else globalThis.margoLow = tier === 'phone' ? 1 : Math.min(2, Math.max(1, Number(params.get('scale')) || 1));
   globalThis.margoPreset = QUALITY_PRESETS[tier];
-  const held = forced === 'high' || forced === 'low' ? forced : undefined;
+  const held = pinned ?? (down ? 'power' : undefined);
   state = { tier, stored: choice, forced: held, storage, key };
   stopAsking?.();
   stopAsking =
@@ -152,6 +176,9 @@ export function applyQualityTier({
       : undefined;
   return tier;
 }
+
+/** This page's tier (calls `applyQualityTier()` first if nothing has). */
+export const currentTier = (): QualityTier => (state ?? (applyQualityTier(), state!)).tier;
 
 /** An engine from `Engine.create` / `createStage` (EngineKernel) or the runtime `Engine` from core's extension API. */
 export type Paced = EngineKernel | { pace?: (time: number) => boolean };
