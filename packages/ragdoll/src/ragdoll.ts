@@ -4,7 +4,7 @@
 // Written clean room from the public descriptions cited in docs/clean-room.md (swing-twist decomposition, velocity
 // level limit impulses with a Baumgarte bias); no engine's source was read.
 import type { Engine, EnginePlugin, Mesh } from '@margoengine/core/extension';
-import type { Physics, PhysicsBody, PhysicsJoint } from '@margoengine/physics';
+import type { ColliderOptions, Physics, PhysicsBody, PhysicsJoint } from '@margoengine/physics';
 import { MargoError } from '@margoengine/math/errors';
 import {
   conjugateQuaternion,
@@ -28,6 +28,17 @@ export type RagdollJoint =
   | { type: 'hinge'; axis: Vec3; limits?: readonly [number, number] }
   | { type: 'free' };
 
+/**
+ * The collider of a bone, in the bone's own frame (the body's frame), in world units.
+ * - `capsule`: the capsule from the bone's `length` and `radius`.
+ * - `hull`: the convex hull of `points`, xyz each.
+ * - `box`: a box of `halfExtents` around `center`, turned by the unit quaternion `rotation`.
+ */
+export type RagdollShape =
+  | { type: 'capsule' }
+  | { type: 'hull'; points: ArrayLike<number> }
+  | { type: 'box'; center: Vec3; halfExtents: Vec3; rotation: readonly [number, number, number, number] };
+
 /** One bone of a ragdoll built from an explicit list ({@link RagdollOptions.bones}). Every field but `node` has a default. */
 export interface RagdollBone {
   /** The skeleton node (a glTF joint) this body moves. */
@@ -47,6 +58,8 @@ export interface RagdollBone {
   radius?: number;
   /** Mass in kilograms. Default: the capsule volume times {@link RagdollOptions.density}. */
   mass?: number;
+  /** The collider. Default `{type: 'capsule'}`. */
+  shape?: RagdollShape;
 }
 
 /** Options of {@link Ragdoll}. Pass `root` (every bone under it) or `bones` (an explicit list); the rest have defaults. */
@@ -91,6 +104,10 @@ export interface RagdollPart {
   readonly length: number;
   /** Capsule radius in metres. */
   readonly radius: number;
+  /** Mass in kilograms, as built. */
+  readonly mass: number;
+  /** The collider now, in the bone's own frame ({@link Ragdoll.setShape}). */
+  readonly shape: RagdollShape;
   /** Unit direction of the bone in its own frame (the body's frame), toward its children. */
   readonly axis: ArrayLike<number>;
   /** Rest rotation relative to the parent bone, xyzw; what the joint limits measure from. */
@@ -133,6 +150,7 @@ interface Bone extends RagdollPart {
   readonly target: [number, number, number, number, number, number, number];
   limp: boolean;
   weight: number;
+  shape: RagdollShape;
   /** Weight lost per second while blending back. */
   fade: number;
   /** The next kinematic target is a jump, not a sweep. */
@@ -227,6 +245,77 @@ function childMeshes(engine: Engine): Map<number, Mesh[]> {
   }
   return map;
 }
+/** Inverse inertia about the bone axis and across it, of the shape as a cylinder of its own length and radius. */
+function inverseInertia(
+  shape: RagdollShape,
+  axis: ArrayLike<number>,
+  length: number,
+  radius: number,
+  mass: number,
+): [number, number] {
+  let long = length,
+    wide = radius;
+  const corners = shapeCorners(shape);
+  if (corners) {
+    let low = Infinity,
+      high = -Infinity,
+      spread = 0;
+    const count = corners.length / 3,
+      centre = [0, 1, 2].map((k) => {
+        let sum = 0;
+        for (let i = k; i < corners.length; i += 3) sum += corners[i];
+        return sum / count;
+      });
+    for (let i = 0; i < corners.length; i += 3) {
+      const x = corners[i] - centre[0],
+        y = corners[i + 1] - centre[1],
+        z = corners[i + 2] - centre[2],
+        along = x * axis[0] + y * axis[1] + z * axis[2];
+      low = Math.min(low, along);
+      high = Math.max(high, along);
+      spread += x * x + y * y + z * z - along * along;
+    }
+    long = high - low;
+    wide = Math.sqrt(spread / count);
+  }
+  return [2 / (mass * wide * wide), 12 / (mass * (3 * wide * wide + long * long))];
+}
+/** The corners of a hull or a box in the bone's frame; null for a capsule. */
+function shapeCorners(shape: RagdollShape): ArrayLike<number> | null {
+  if (shape.type === 'hull') return shape.points;
+  if (shape.type === 'capsule') return null;
+  const out = new Float64Array(24);
+  for (let i = 0; i < 8; i++) {
+    const corner = rotateByQuaternion(
+      [0, 1, 2].map((k) => shape.halfExtents[k] * ((i >> k) & 1 ? 1 : -1)),
+      shape.rotation,
+    );
+    for (let k = 0; k < 3; k++) out[i * 3 + k] = corner[k] + shape.center[k];
+  }
+  return out;
+}
+function checkShape(shape: RagdollShape): RagdollShape {
+  const finite = (list: ArrayLike<number>): boolean => Array.prototype.every.call(list, Number.isFinite);
+  if (shape?.type === 'capsule') return shape;
+  if (shape?.type === 'hull') {
+    if (!shape.points || shape.points.length < 12 || shape.points.length % 3 || !finite(shape.points))
+      throw new RangeError('A ragdoll hull needs at least four finite xyz points; pass points that span a volume.');
+    return shape;
+  }
+  if (shape?.type === 'box') {
+    if (
+      !(shape.halfExtents?.length === 3 && finite(shape.halfExtents) && shape.halfExtents.every((v) => v > 0)) ||
+      !(shape.center?.length === 3 && finite(shape.center)) ||
+      !(shape.rotation?.length === 4 && finite(shape.rotation)) ||
+      Math.abs(Math.hypot(...shape.rotation) - 1) > 1e-3
+    )
+      throw new RangeError(
+        'A ragdoll box needs positive halfExtents, a finite center and a unit rotation; pass {center, halfExtents, rotation}.',
+      );
+    return shape;
+  }
+  throw new RangeError("A ragdoll shape must be of type 'capsule', 'hull' or 'box'.");
+}
 const positive = (value: unknown, name: string, fix: string): number => {
   if (typeof value !== 'number' || !(value > 0) || value === Infinity)
     throw new RangeError(`Ragdoll ${name} must be a positive finite number; ${fix}`);
@@ -252,6 +341,8 @@ export class Ragdoll implements EnginePlugin {
   private readonly parts: Bone[];
   private readonly engine: Engine;
   private readonly stiffness: number;
+  private readonly friction: number;
+  private readonly groups: number;
   private readonly unsubscribe: Array<() => void> = [];
   /** How many bones are limp. */
   private loose = 0;
@@ -344,6 +435,8 @@ export class Ragdoll implements EnginePlugin {
     const groups = options.collisionGroups ?? ((0x8000 << 16) | 0x7fff) >>> 0;
     if (!Number.isInteger(groups) || groups < 0 || groups > 0xffffffff)
       throw new RangeError('Ragdoll collisionGroups must be a packed 32-bit integer; build it with collisionGroups().');
+    this.groups = groups;
+    this.friction = options.friction ?? 0.6;
     try {
       for (const i of order) {
         const spec = list[i],
@@ -404,8 +497,7 @@ export class Ragdoll implements EnginePlugin {
             spec.radius !== undefined
               ? positive(spec.radius, 'bone radius', 'pass metres, or leave it out for thickness times the length.')
               : Math.max(length * thickness, spread / 2),
-          half = Math.max(length / 2 - radius, 1e-3),
-          volume = Math.PI * radius * radius * (2 * half + (4 / 3) * radius),
+          volume = Math.PI * radius * radius * (2 * Math.max(length / 2 - radius, 1e-3) + (4 / 3) * radius),
           mass =
             spec.mass !== undefined
               ? positive(
@@ -414,7 +506,8 @@ export class Ragdoll implements EnginePlugin {
                   'pass kilograms, or leave it out for the capsule volume times density.',
                 )
               : volume * density;
-        const axis = Float64Array.from(direction);
+        const axis = Float64Array.from(direction),
+          shape = checkShape(spec.shape ?? { type: 'capsule' });
         const body = physics.addBody(null, {
           type: options.active ? 'dynamic' : 'kinematicPosition',
           position: origin as unknown as Vec3,
@@ -422,16 +515,7 @@ export class Ragdoll implements EnginePlugin {
           linearDamping: options.linearDamping ?? 0.05,
           angularDamping: options.angularDamping ?? 0.8,
           userData: { ragdoll: this, node },
-          colliders: {
-            shape: 'capsule',
-            halfHeight: half,
-            radius,
-            offset: [axis[0] * (length / 2), axis[1] * (length / 2), axis[2] * (length / 2)],
-            rotation: [...arc([0, 1, 0], axis, new Float64Array(4))] as [number, number, number, number],
-            mass,
-            friction: options.friction ?? 0.6,
-            collisionGroups: groups,
-          },
+          colliders: this.collider(shape, axis, length, radius, mass),
         });
         created.push(body);
         const parent = parentOf[i] === -1 ? -1 : remap.get(parentOf[i])!;
@@ -450,9 +534,6 @@ export class Ragdoll implements EnginePlugin {
           const spec2 = spec.joint ?? options.joint ?? DEFAULT_JOINT;
           ({ joint, cone, spec: built } = this.join(up.body, body, spec2, anchor, rest));
         }
-        // Inverse inertia of a capsule (as a cylinder of the full length): across the axis and about it.
-        const across = (mass * (3 * radius * radius + length * length)) / 12,
-          about = (mass * radius * radius) / 2;
         const bone: Bone = {
           node,
           body,
@@ -460,11 +541,13 @@ export class Ragdoll implements EnginePlugin {
           parent,
           length,
           radius,
+          mass,
+          shape,
           axis,
           rest,
           spec: built,
           cone,
-          inertia: new Float64Array([1 / about, 1 / across]),
+          inertia: Float64Array.from(inverseInertia(shape, axis, length, radius, mass)),
           prev: world.slice(),
           cur: world.slice(),
           animated: new Float64Array(7),
@@ -514,6 +597,52 @@ export class Ragdoll implements EnginePlugin {
       throw error;
     }
     return ragdoll;
+  }
+
+  private collider(
+    shape: RagdollShape,
+    axis: ArrayLike<number>,
+    length: number,
+    radius: number,
+    mass: number,
+  ): ColliderOptions {
+    const settings = { mass, friction: this.friction, collisionGroups: this.groups };
+    if (shape.type === 'hull') return { shape: 'convexHull', points: shape.points, ...settings };
+    if (shape.type === 'box')
+      return {
+        shape: 'box',
+        halfExtents: shape.halfExtents,
+        offset: shape.center,
+        rotation: shape.rotation,
+        ...settings,
+      };
+    return {
+      shape: 'capsule',
+      halfHeight: Math.max(length / 2 - radius, 1e-3),
+      radius,
+      offset: [axis[0] * (length / 2), axis[1] * (length / 2), axis[2] * (length / 2)],
+      rotation: [...arc([0, 1, 0], axis, new Float64Array(4))] as [number, number, number, number],
+      ...settings,
+    };
+  }
+
+  /**
+   * Replaces a bone's collider. Its mass, friction, collision groups and joint stay; its inertia follows the new shape.
+   * Set shapes before `addRagdollMotors`, which reads each limb's inertia once.
+   * @throws RangeError for a node that is not a bone of this ragdoll, or a shape out of range; the old shape stays.
+   */
+  setShape(bone: Mesh | RagdollPart, shape: RagdollShape): this {
+    this.live();
+    const node = bone && 'body' in bone ? bone.node : bone,
+      part = this.parts.find((candidate) => candidate.node === node);
+    if (!part) throw new RangeError('That node is not a bone of this ragdoll; pass a node or part of ragdoll.bones.');
+    checkShape(shape);
+    const old = [...part.body.colliders];
+    part.body.addCollider(this.collider(shape, part.axis, part.length, part.radius, part.mass));
+    for (const collider of old) part.body.removeCollider(collider);
+    part.shape = shape;
+    part.inertia.set(inverseInertia(shape, part.axis, part.length, part.radius, part.mass));
+    return this;
   }
 
   private boneList(options: RagdollOptions, minLength: number): RagdollBone[] {

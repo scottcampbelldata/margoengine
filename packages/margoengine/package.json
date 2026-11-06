@@ -1658,6 +1658,10 @@
       "types": "./dist/ragdoll/getup.d.ts",
       "import": "./dist/ragdoll/getup.js"
     },
+    "./ragdoll/hulls": {
+      "types": "./dist/ragdoll/hulls.d.ts",
+      "import": "./dist/ragdoll/hulls.js"
+    },
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"

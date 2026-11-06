@@ -937,6 +937,7 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 | Bodies from bones and blending back | Our own design: one capsule per bone in the bone's world frame, joints at the bone origins, kinematic hit boxes that follow the animation, and a per-bone slerp from the frozen physics pose to the animated pose |
 | Powered ragdolls (`ragdoll/powered`) | Rapier's published joint motor API; J. Tan, K. Liu, G. Turk, "Stable Proportional-Derivative Controllers", IEEE CG&A 2011, for the implicit spring on the root bone; feeding a target's velocity to a PD controller is textbook control. Raising the mass and inertia of small bodies in a chain is our own measure on real rigs |
 | Getting up (`ragdoll/getup`) | Our own design from the public description of the technique (choose a clip by how the body lies, align the character to the body, blend from the ragdoll's pose); turn extraction is the swing-twist decomposition above |
+| Body shapes from the skin (`ragdoll/hulls`) | Reuses `rigging/hulls`, which is quickhull as already cited; the box is a plain search over turns about the bone, of our own design |
 
 ## 2D sprites: `@margoengine/sprites`
 

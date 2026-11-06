@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7675699,
+  "total": 7866534,
   "history": [
     {
       "date": "2026-10-24",
@@ -2636,6 +2636,12 @@
       "commit": "cf66cd230",
       "reason": "points/copc loads las.js with import() so potree can load it on demand too (an import() beside a static import splits nothing); same code, measured as a separate gzip chunk instead of one, 13792 to 15177",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "72fcc57f9",
+      "reason": "feat(ragdoll): body shapes from the skin (new entry @margoengine/ragdoll/hulls)",
+      "grew": 2
     }
   ],
   "items": {
@@ -2762,6 +2768,7 @@
     "@margoengine/culling/shadows": 20972,
     "@margoengine/cutscene": 6822,
     "@margoengine/decoders": 492515,
+    "@margoengine/decoders/brotli": 68932,
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/draco-points": 154011,
     "@margoengine/decoders/jxl": 902155,
@@ -3048,8 +3055,9 @@
     "@margoengine/quality/power": 2653,
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
-    "@margoengine/ragdoll": 6480,
+    "@margoengine/ragdoll": 7368,
     "@margoengine/ragdoll/getup": 1994,
+    "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
     "@margoengine/react": 8317,
     "@margoengine/react/animation": 3015,
@@ -3291,7 +3299,6 @@
     "margoengine": 308,
     "margoengine/game": 1030,
     "margoengine/viz": 800,
-    "margoengine/web": 599,
-    "@margoengine/decoders/brotli": 68932
+    "margoengine/web": 599
   }
 }

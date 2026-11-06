@@ -216,6 +216,31 @@ setTimeout(async () => {
 
 No facing convention is needed: only the turn about the up axis is free, and what is left over tells the clips apart. `addGetUp` reads each clip's first frame through the animator once, and puts it back as it was; a `statechange` listener sees that visit. The ground is found with a ray down from the hips that ignores moving bodies; with no ground the character keeps its height. The clip should loop off, or be a state with a later transition: the end of its first cycle is what ends the get-up.
 
+## Body shapes from the skin (`margoengine/ragdoll/hulls`)
+
+`fitRagdollShapes(ragdoll, model, options)` swaps each bone's capsule for a convex hull of the vertices it carries, or for the smallest box around them that lies along the bone. A vertex belongs to the bone that dominates its skin weights, and skin joints with no body (fingers, toes) count toward the bone above them. Hits land on what the player sees.
+
+```ts
+import { Ragdoll } from 'margoengine/ragdoll';
+import { fitRagdollShapes } from 'margoengine/ragdoll/hulls';
+
+const ragdoll = Ragdoll.attach(physics, { root: hips });
+const fitted = fitRagdollShapes(ragdoll, model);
+console.log(`${fitted.length} of ${ragdoll.bones.length} bones fit the mesh`);
+
+fitRagdollShapes(ragdoll, model, { shape: 'box', minWeight: 0.3 }); // boxes, with blended vertices counted
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `shape` | `'hull'` | `'hull'`, or `'box'`: cheaper, and looser. |
+| `minWeight` | `0.5` | A vertex counts toward a bone when the bone carries this share of it. |
+| `maxPoints` | `64` | Most corners a hull keeps, 8 to 1,024. |
+
+The source is the glTF model the skeleton belongs to, or a `RagdollSkin` of your own (`positions`, `joints`, `weights`, `nodes`, `inverseBindMatrices`). The result lists the bones that got a shape; a bone with no vertices that span a volume keeps its capsule. Mass, friction, groups and joints stay as they were, and each bone's inertia follows its new shape. Call it before `addRagdollMotors`, and give a leaf bone you want a hull for, such as a head with no child, a `length` so it is a bone.
+
+The same data goes in by hand: `ragdoll.setShape(bone, shape)`, or `shape` on an entry of `bones`, takes `{type: 'capsule'}`, `{type: 'hull', points}` or `{type: 'box', center, halfExtents, rotation}`, in the bone's own frame. `part.shape` reads it back and `part.mass` the mass as built.
+
 ## Clean room
 
 Written from public descriptions only, cited in [docs/clean-room.md](../../docs/clean-room.md); no engine's ragdoll code

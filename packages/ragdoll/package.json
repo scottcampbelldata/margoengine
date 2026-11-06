@@ -36,6 +36,10 @@
     "./getup": {
       "types": "./dist/getup.d.ts",
       "import": "./dist/getup.js"
+    },
+    "./hulls": {
+      "types": "./dist/hulls.d.ts",
+      "import": "./dist/hulls.js"
     }
   },
   "files": [
@@ -52,10 +56,14 @@
   "peerDependencies": {
     "@margoengine/animator": "^1.0.0",
     "@margoengine/core": "^1.0.0",
-    "@margoengine/physics": "^1.0.0"
+    "@margoengine/physics": "^1.0.0",
+    "@margoengine/rigging": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animator": {
+      "optional": true
+    },
+    "@margoengine/rigging": {
       "optional": true
     }
   },
