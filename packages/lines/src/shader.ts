@@ -2,6 +2,11 @@ import { MargoError } from '@margoengine/math/errors';
 import { BLOCK, FAN } from './geometry.js';
 import { fogWgsl } from '../../shared/fog.js';
 
+/** The fragment's cut by clipping planes, shared with the pick shader. */
+export const clipCut = /* wgsl */ `let clipCount=style.flags.w&0xffffu;var clipBehind=0u;
+  for(var p=0u;p<clipCount;p++){if(dot(style.planes[p].xyz,i.world)+style.planes[p].w<0.0){clipBehind++;}}
+  if(clipCount>0u&&select(clipBehind>0u,clipBehind==clipCount,(style.flags.w&65536u)!=0u)){discard;}`;
+
 /** Fat line shader. The expansion mirrors `expandLine` in geometry.ts; keep the two in step. */
 export const lineShader: string = /* wgsl */ `
 const FAN:u32=${FAN}u;
@@ -173,9 +178,7 @@ fn encode(c:vec3f)->vec3f{return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.05
   }
   // Clipping planes (flags.w & 0xffff of them): cut away where the centre line's world point is on a plane's negative
   // side, of any plane, or with bit 16 set (clipIntersection) of every plane.
-  let clipCount=style.flags.w&0xffffu;var clipBehind=0u;
-  for(var p=0u;p<clipCount;p++){if(dot(style.planes[p].xyz,i.world)+style.planes[p].w<0.0){clipBehind++;}}
-  if(clipCount>0u&&select(clipBehind>0u,clipBehind==clipCount,(style.flags.w&65536u)!=0u)){discard;}
+  ${clipCut}
   let alpha=i.color.a*cover;
   var rgb=max(i.color.rgb,vec3f(0.0));
   if(frame.extra.x>0.5){rgb=encode(min(rgb,vec3f(1.0)));}

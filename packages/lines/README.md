@@ -173,6 +173,45 @@ bones.dispose(); // removes it from the plugin and frees its buffers
 
 ## Picking
 
+Two routes. `@margoengine/lines/pick` picks on the GPU, in one depth test with the meshes. `intersectLines` from `margoengine/bvh/lines` picks on the CPU with a ray, and needs no readback.
+
+### GPU picking
+
+`LinePicking` from `margoengine/lines/pick` adds a `Lines` plugin to `Picking` from `margoengine/selection`. One `picking.pick` or `engine.pick` then answers whichever of lines and meshes is nearest at the pixel; a line behind a mesh is not hit, and `pickMany` works too. Only code that imports that entry pays for it.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {Lines, Line} from 'margoengine/lines';
+import {LinePicking} from 'margoengine/lines/pick';
+import {Picking} from 'margoengine/selection';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const lines = Lines.attach(engine);
+const path = lines.add(new Line({positions: [-2, 0, 0, 0, 1, 0, 2, 0, 0], width: 6}));
+engine.createMesh().setGeometry(box());
+
+const picking = Picking.attach(engine);
+const linePicking = LinePicking.attach(picking, lines);
+
+canvas.addEventListener('pointerdown', async (event) => {
+  const hit = await picking.pick(event.offsetX, event.offsetY);
+  if (hit?.line === path) console.log('segment', hit.segment);
+  else if (hit) console.log('mesh', hit.mesh);
+});
+
+// engine.pick answers meshes only: a line that follows no mesh answers an empty stand-in mesh.
+const mesh = await engine.pick(10, 20);
+console.log(linePicking.lineOf(mesh));
+```
+
+- `hit.line` is the line and `hit.segment` its segment index. `hit.mesh` is the mesh the line follows, or else an empty mesh made for that line, which draws nothing and which `lineOf` maps back. Stand-ins go when their line leaves the plugin or with `linePicking.dispose()`. Attach `Lines` to the engine before `LinePicking.attach`.
+- A line hits where it is drawn, at its width, without the antialiasing ramp. Like every pick, the 3 x 3 tile also finds a neighbouring pixel when the exact one is empty. Dash gaps hit, so a hover does not flicker along a dashed line; parts cut by clipping planes and hidden lines do not. `onTop` lines win over everything, as they draw.
+- One pick answers the nearest thing only. For everything under a pixel in order of distance, merge `intersectLines` with the `Raycaster` hits by `distance`.
+- Lines at most 268,435,456 segments in all per pick (the IDs of one overlay); lines past that do not pick. While an overlay is registered, picks use Picking's 3 x 3 pass, not its cached ID texture, so each pick draws the lines near the pixel's view again: all of each line's vertices, with no culling.
+
+### Ray picking
+
 `intersectLines` from `margoengine/bvh/lines` tests lines against a `Raycaster` ray, the same ray you test meshes with. Only code that imports that entry pays for it.
 
 ```ts
@@ -212,7 +251,7 @@ A hit gives the `line`, the `segment` index, the world `point` on the centre lin
 ## Limits
 
 - WebGPU only. On the WebGL2 backend the plugin warns once and draws nothing.
-- By default lines do not write depth, so crossing lines do not occlude each other unless they set [`depthWrite`](#depth-writing). They are not pickable through `engine.pick` (use [`intersectLines`](#picking)). Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
+- By default lines do not write depth, so crossing lines do not occlude each other unless they set [`depthWrite`](#depth-writing). `engine.pick` finds lines through [`LinePicking`](#gpu-picking) only. Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
 - Dashes run continuously through joins, and caps apply to line ends only, not to each dash. World-unit widths ignore the mesh scale.
 - `ArrowHelper` draws its head as a wire cone, and `PlaneHelper` draws an outline with diagonals; there are no filled meshes. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
 

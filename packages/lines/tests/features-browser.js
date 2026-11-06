@@ -1,6 +1,8 @@
 // Real-GPU checks of the optional line features, on a canvas of their own. Each check returns a line for the report.
-import { Engine } from '@margoengine/core';
+import { Engine, box } from '@margoengine/core';
 import { Lines, Line } from '@margoengine/lines';
+import { LinePicking } from '@margoengine/lines/pick';
+import { Picking } from '../../selection/dist/index.js';
 import { Capture } from './lines-browser.js';
 
 const assert = (condition, message) => {
@@ -91,8 +93,74 @@ async function depthWrite() {
   return 'Depth-writing lines occlude each other in either order, gaps and cuts write nothing, later passes respect them';
 }
 
+/** Canvas pixel of a world point under the rig's camera. */
+const pixel = (x, y, z) => [128 + (x * 221.7) / (10 - z), 128 - (y * 221.7) / (10 - z)];
+
+async function picking() {
+  for (const capture of [false, true]) {
+    const { engine, lines, done } = await rig();
+    const picker = Picking.attach(engine, { capture }),
+      linePicking = LinePicking.attach(picker, lines),
+      mesh = engine.createMesh().setGeometry(box(2, 2, 2));
+    const front = lines.add(new Line({ positions: [-3, 0, 3, 0, 0, 3, 3, 0, 3], width: 8 })),
+      back = lines.add(new Line({ positions: [-3, 2, -3, 3, 2, -3], width: 8 }));
+    engine.render();
+    await engine.gpu.queue.onSubmittedWorkDone();
+    let hit = await picker.pick(...pixel(1.5, 0, 3));
+    assert(hit?.line === front && hit.segment === 1, `Line in front of nothing: ${hit?.segment}`);
+    hit = await picker.pick(...pixel(-1.5, 0, 3));
+    assert(hit?.line === front && hit.segment === 0, 'First segment');
+    hit = await picker.pick(...pixel(0.5, 0.2, 3));
+    assert(!hit?.line || hit.line !== front, 'Off the line by more than its width');
+    // A line nearer than the mesh wins; behind it the mesh wins.
+    hit = await picker.pick(...pixel(0.5, 0, 3));
+    assert(hit?.line === front, 'The nearer line wins over the mesh behind it');
+    front.visible = false;
+    hit = await picker.pick(...pixel(0.5, 0, 3));
+    assert(hit?.mesh === mesh && !hit.line, 'A hidden line does not hit: the mesh behind it does');
+    front.visible = true;
+    back.setPositions([-3, 0.5, -3, 3, 0.5, -3]);
+    hit = await picker.pick(...pixel(0, 0.5, 1));
+    assert(hit?.mesh === mesh && !hit.line, 'A line behind the mesh is not hit');
+    back.material.onTop = true;
+    hit = await picker.pick(...pixel(0, 0.5, -3));
+    assert(hit?.line === back, 'An onTop line wins over the mesh in front of it');
+    back.material.onTop = false;
+    hit = await picker.pick(...pixel(3, 0.5, -3 + 0));
+    // Clipping planes: a cut part misses, the mesh or nothing answers.
+    front.material.clippingPlanes = [[1, 0, 0, 0]];
+    hit = await picker.pick(...pixel(-1.5, 0, 3));
+    assert(!hit?.line, 'A part cut by a clipping plane does not hit');
+    front.material.clippingPlanes = [];
+    // Dash gaps hit.
+    front.material.set({ dashed: true, dashSize: 0.1, gapSize: 10 });
+    hit = await picker.pick(...pixel(1.5, 0, 3));
+    assert(hit?.line === front, 'A dash gap hits');
+    front.material.dashed = false;
+    // engine.pick answers a stand-in, and the mesh of a line that follows one.
+    const answer = await engine.pick(...pixel(1.5, 0, 3));
+    assert(answer && linePicking.lineOf(answer) === front, 'engine.pick answers the stand-in of a line');
+    assert(!answer.geometry, 'A stand-in has no geometry');
+    front.attach(mesh);
+    const attached = await engine.pick(...pixel(1.5, 0, 3));
+    assert(attached === mesh, 'engine.pick answers the mesh a line follows');
+    front.attach(null);
+    const many = await picker.pickMany([pixel(1.5, 0, 3), pixel(0, 0.5, 1), [2, 2]]);
+    assert(many[0]?.line === front && many[1]?.mesh === mesh && many[2] === null, 'pickMany agrees with pick');
+    // A newly added line picks before any frame draws it.
+    const fresh = lines.add(new Line({ positions: [-3, -3, 3, 3, -3, 3], width: 8 }));
+    hit = await picker.pick(...pixel(0, -3, 3));
+    assert(hit?.line === fresh, 'A line added since the last frame picks');
+    linePicking.dispose();
+    hit = await picker.pick(...pixel(1.5, 0, 3));
+    assert(!hit?.line, 'After dispose lines do not pick');
+    done();
+  }
+  return 'Lines pick with meshes in one depth test, by segment, through picking.pick, engine.pick and pickMany';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite]) checks.push(await check());
+  for (const check of [depthWrite, picking]) checks.push(await check());
   return checks;
 };

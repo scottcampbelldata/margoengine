@@ -2562,7 +2562,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-080). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-083). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2613,6 +2613,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Graph algorithms (`@margoengine/compute/graph`, 2026-11-05) | Enforced by method: vertices below 2^30; distances in `shortestPaths` are f32 sums, exact up to 2^24 for whole weights. `bfs` and `shortestPaths` take up to one round per edge of the longest shortest path (`shortestPaths` at most the vertex count, plus one to tell a negative cycle apart), and `connectedComponents` takes about log(vertices) rounds on the graphs tested (2,000-vertex shuffled path: under 64). Speed is not measured. | Each round runs over every edge at once with an atomic minimum, so a graph needs no frontier queue, the code is the same on the GPU and the CPU backend, and negative weights work. | A round visits every edge whether or not its source changed, so a long thin graph costs edges x its depth: a frontier-based search would do less work there. With f32 sums, cycles of total weight 0 that round below it can read as negative; zero-weight cycles can loop `predecessors`. `graph()` builds on the CPU and uses memory for every edge twice over. Not included: strongly connected components, minimum spanning trees, centrality. | Use whole or dyadic weights for exact sums; raise `checkEvery` on deep graphs to read back less often. |
 | Render passes of a package's frame | One colour pass when only packages that `join` draw (`createInstancedMesh`, `CulledInstances`, runs of glTF models): 0.024 ms at 1,000 boxes against 0.039 before (RTX A6000, 2026-11-05, perf-history entry 51). A core mesh in the same scene keeps core's clear pass; a pass after the package keeps core's resolve pass; a glTF model alone in its segment takes core's clear but keeps core's resolve pass, which measured no slower than resolving in the package's pass. |
 | Depth-writing lines (`depthWrite` on `LineMaterial`, `@margoengine/lines`) | By method: two draws per line (solid part, then edge ramp) unless `antialias` is false; depth is written where a line is at least half covered, so a crossing line shows through the outer half of the ramp. Depth follows the centre line, not the round profile of a thick line. | Keeping the smooth edge needs the ramp to blend after every solid part. One draw would either cut the ramp or write depth through it. | Twice the vertex work for these lines; a translucent depth-writing line hides what is drawn behind it after it. | Leave `depthWrite` off where lines do not cross, or set `antialias: false` for one draw. |
+| GPU picking of lines (`LinePicking` in `@margoengine/lines/pick`) | Enforced: 268,435,456 segments per pick, 8 overlays per `Picking`. By method: a pick answers the nearest thing only; `engine.pick` can only answer meshes, so a line that follows no mesh answers an empty stand-in mesh (`lineOf` maps it back); with an overlay registered every pick draws the 3 x 3 pass with all line vertices, uncropped. | Core is frozen, so `engine.pick` keeps its mesh return type; lines share the pass and depth test of meshes. | Picks cost more with many segments; Picking's cached ID texture goes unused. | Read `hit.line` from `picking.pick`; use `intersectLines` from `@margoengine/bvh/lines` for a sorted list of ray hits. |
 
 ## Assets
 
@@ -8112,6 +8113,12 @@ const hits = await picking.pickMany([[10, 20], [64, 64], [120, 40]]);
 const meshes = hits.map((hit) => hit?.mesh ?? null);
 ```
 
+## Lines in picks
+
+`LinePicking.attach(picking, lines)` from `margoengine/lines/pick` makes fat lines answer `engine.pick`, `picking.pick` and `pickMany`, in one depth test with the meshes, with `hit.line` and `hit.segment` set. See the [lines README](../lines/README.md#gpu-picking).
+
+`picking.addOverlay(overlay)` is the hook it uses: an overlay draws into the 3 x 3 pick tile after every mesh, with IDs from `firstId`, and `pickHit(index)` turns an ID back into a hit. Up to 8 overlays; each owns 2^28 IDs. While one is registered, picks use the 3 x 3 pass rather than the cached ID texture.
+
 ## Marquee, lasso, hover and face/edge/vertex picking
 
 `SelectionTool` drags a rubber band (or, with `shape: 'lasso'`, a free-form outline) over the canvas: Shift + drag replaces
@@ -8124,25 +8131,6 @@ crossing window) or `'contain'` (a window).
 ```ts
 import {Picking, Selection, SelectionTool, HoverHighlight, pickElement} from 'margoengine/selection';
 import type {EngineKernel} from 'margoengine/core';
-
-function selectionTools(engine: EngineKernel, canvas: HTMLCanvasElement) {
-  const picking = Picking.attach(engine);
-  const chosen = Selection.attach(engine, {color: [1, 0.5, 0]});
-  const hover = HoverHighlight.attach(engine, {
-    picking,
-    outline: Selection.attach(engine, {name: 'hover', color: [1, 0.9, 0.3], width: 2}),
-  });
-  const tool = SelectionTool.attach(engine, {
-    shape: 'marquee',      // or 'lasso'
-    mode: 'overlap',       // touch any part of a mesh to select it
-    onSelect: meshes => chosen.set(meshes),
-  });
-  canvas.addEventListener('dblclick', event => {
-    const hit = pickElement(engine, event.offsetX, event.offsetY); // core meshes; walks their triangles
-    if (hit) console.log('face', hit.face, 'vertex', hit.vertex, 'edge', hit.edge, 'at', hit.point);
-  });
-  return () => { tool.dispose(); hover.dispose(); picking.dispose(); chosen.dispose(); };
-}
 ```
 
 [README continues: https://margoengine.com/llms/packages/selection.md]

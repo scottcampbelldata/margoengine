@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4567903,
+  "total": 4573568,
   "history": [
     {
       "date": "2026-10-24",
@@ -1718,6 +1718,12 @@
       "commit": "7bc4545a1",
       "reason": "New optional entry @margoengine/compute/graph: graph algorithms",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "1d561e76c",
+      "reason": "New lines entry ./pick: LinePicking; selection gains Picking.addOverlay; lines root gains depthWrite variants",
+      "grew": 1
     }
   ],
   "items": {
@@ -1922,6 +1928,7 @@
     "@margoengine/lightmap/refracted": 7846,
     "@margoengine/lines": 18423,
     "@margoengine/lines/edges": 4811,
+    "@margoengine/lines/pick": 5665,
     "@margoengine/loaders": 52602,
     "@margoengine/loaders dist/workers/usd.js": 8435,
     "@margoengine/loaders/common": 3417,

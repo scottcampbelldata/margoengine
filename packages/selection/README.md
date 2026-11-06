@@ -39,6 +39,12 @@ const hits = await picking.pickMany([[10, 20], [64, 64], [120, 40]]);
 const meshes = hits.map((hit) => hit?.mesh ?? null);
 ```
 
+## Lines in picks
+
+`LinePicking.attach(picking, lines)` from `margoengine/lines/pick` makes fat lines answer `engine.pick`, `picking.pick` and `pickMany`, in one depth test with the meshes, with `hit.line` and `hit.segment` set. See the [lines README](../lines/README.md#gpu-picking).
+
+`picking.addOverlay(overlay)` is the hook it uses: an overlay draws into the 3 x 3 pick tile after every mesh, with IDs from `firstId`, and `pickHit(index)` turns an ID back into a hit. Up to 8 overlays; each owns 2^28 IDs. While one is registered, picks use the 3 x 3 pass rather than the cached ID texture.
+
 ## Marquee, lasso, hover and face/edge/vertex picking
 
 `SelectionTool` drags a rubber band (or, with `shape: 'lasso'`, a free-form outline) over the canvas: Shift + drag replaces

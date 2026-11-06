@@ -38,6 +38,10 @@
     "./edges": {
       "types": "./dist/edges.d.ts",
       "import": "./dist/edges.js"
+    },
+    "./pick": {
+      "types": "./dist/pick.d.ts",
+      "import": "./dist/pick.js"
     }
   },
   "files": [

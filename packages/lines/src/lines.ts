@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
-import type { EngineKernel } from '@margoengine/core';
+import type { Camera, EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
@@ -58,6 +58,8 @@ export class Lines implements EnginePlugin {
   readonly stats = { lines: 0, segments: 0, drawCalls: 0 };
   private readonly members = new Set<Line>();
   private readonly resources = new Map<Line, Resources>();
+  /** Told when a line joins or leaves (LinePicking's stand-in meshes). */
+  private readonly watchers = new Set<{ added(line: Line): void; removed(line: Line): void }>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly modules = new Map<string, GPUShaderModule>();
   private engine?: Engine;
@@ -118,11 +120,13 @@ export class Lines implements EnginePlugin {
     if (!(line instanceof Line)) throw new TypeError('Expected a Line');
     line.bind(this);
     this.members.add(line);
+    for (const watcher of this.watchers) watcher.added(line);
     return line;
   }
 
   remove(line: Line): void {
     if (!this.members.delete(line)) return;
+    for (const watcher of this.watchers) watcher.removed(line);
     this.release(line);
     line.bind(undefined);
   }
@@ -294,13 +298,10 @@ export class Lines implements EnginePlugin {
     this.resources.delete(line);
   }
 
-  private readonly execute = (context: PassContext): void => {
-    this.stats.lines = this.stats.segments = this.stats.drawCalls = 0;
-    if (context.backend !== 'webgpu' || !this.device || !this.engine) return;
-    if (context.device !== this.device) return;
-    const engine = this.engine as unknown as EngineKernel,
-      device = this.device;
-    const lists = this.drawLists;
+  /** Updates every drawable line, uploads what changed and sorts the lines into `drawLists`. */
+  private collect(engine: EngineKernel): void {
+    const device = this.device!,
+      lists = this.drawLists;
     for (const list of lists) list.length = 0;
     for (const line of this.members) {
       if (!line.visible || line.update(engine) === false) continue;
@@ -357,24 +358,64 @@ export class Lines implements EnginePlugin {
         r.written.set(f);
       }
       lists[(material.onTop ? 2 : 0) + (material.depthWrite ? 0 : 1)].push([line, r]);
-      this.stats.lines++;
-      this.stats.segments += segments;
     }
-    if (!lists.some((list) => list.length)) return;
-    const canvas = engine.canvas,
-      data = this.frameData,
-      camera = context.camera,
-      m = camera.matrix;
-    data.set(m, 0);
-    data[16] = context.width;
-    data[17] = context.height;
-    data[18] = canvas.clientWidth ? context.width / canvas.clientWidth : 1;
+  }
+
+  /**
+   * The Frame uniform: `matrix`, the target size in pixels, CSS to target pixels, the camera's focal length for a view
+   * `viewHeight` pixels tall and whether to encode sRGB.
+   */
+  private fillFrame(
+    data: Float32Array,
+    matrix: ArrayLike<number>,
+    camera: Camera,
+    width: number,
+    height: number,
+    ratio: number,
+    viewHeight: number,
+    encode: number,
+  ): void {
+    const m = camera.matrix;
+    data.set(matrix, 0);
+    data[16] = width;
+    data[17] = height;
+    data[18] = ratio;
     // Pixels per world unit at clip w 1. Orthographic (clip w constant, e.g. @margoengine/cameras): from the y row's length.
     data[19] =
       m[3] || m[7] || m[11]
-        ? (0.5 * context.height) / Math.tan((camera.fov * Math.PI) / 360)
-        : 0.5 * context.height * Math.hypot(m[1], m[5], m[9]);
-    data[20] = context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1;
+        ? (0.5 * viewHeight) / Math.tan((camera.fov * Math.PI) / 360)
+        : 0.5 * viewHeight * Math.hypot(m[1], m[5], m[9]);
+    data[20] = encode;
+  }
+
+  private readonly execute = (context: PassContext): void => {
+    const stats = this.stats;
+    stats.lines = stats.segments = stats.drawCalls = 0;
+    if (context.backend !== 'webgpu' || !this.device || !this.engine) return;
+    if (context.device !== this.device) return;
+    const engine = this.engine as unknown as EngineKernel,
+      device = this.device,
+      lists = this.drawLists;
+    this.collect(engine);
+    for (const list of lists)
+      for (const [line] of list) {
+        stats.lines++;
+        stats.segments += line.segmentCount;
+      }
+    if (!stats.lines) return;
+    const canvas = engine.canvas,
+      data = this.frameData,
+      camera = context.camera;
+    this.fillFrame(
+      data,
+      camera.matrix,
+      camera,
+      context.width,
+      context.height,
+      canvas.clientWidth ? context.width / canvas.clientWidth : 1,
+      context.height,
+      context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1,
+    );
     device.queue.writeBuffer(this.frameBuffer!, 0, data);
     const fog = this.fogSource;
     let fogged = false;

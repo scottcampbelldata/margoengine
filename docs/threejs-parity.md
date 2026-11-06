@@ -8,9 +8,9 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 157 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 158 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 4 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 17 | Worth having and not written yet. Listed below with what to do. |
+| MISSING | 16 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 13 | Out of scope by decision. The note says why and what to use instead. |
 
 The earlier version of this table had 161 rows and hid several gaps inside one coarse row or inside a COVERED row's notes. Those gaps now have rows of their own, which is why the MISSING count went up while no feature was lost.
@@ -269,7 +269,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | --- | --- | --- | --- | --- |
 | Raycaster | COVERED | bvh `Raycaster.intersectEngine`, `intersectObjects` (`packages/bvh/src/raycaster.ts`) | | Core meshes and gltf-pro primitives (loaded models and materials meshes) with node transforms; model hits carry model, primitive, node and `uv`. Synchronous calls hit skinned and morphed primitives in bind pose; `intersectModel` (async, reads the GPU vertices) hits the current pose. LOD imposters hit their bounding sphere (`approximate: true`). Lines are never hit; points has its own `pickPoint`. |
 | GPU picking | COVERED | core `engine.pick`; selection `Picking` (`packages/selection/src/picking.ts`) | | Core meshes and gltf-pro models (deformed skinned buffers included); `picking.pick` names the model and primitive. LOD imposters pick their anchor approximately. Lines and splats are not pickable; points pick on the CPU (`PointsPlugin.pick`). WebGPU only. |
-| Picking fat lines | MISSING | lines, bvh | | Lines are not hit by the raycaster or GPU pick. |
+| Picking fat lines | COVERED | bvh `intersectLines` (`packages/bvh/src/lines.ts`), lines `LinePicking` (`packages/lines/src/pick.ts`), selection `Picking.addOverlay` | | Ray picks through the `Raycaster`; GPU picks in one depth test with meshes through `engine.pick` and `Picking`, by segment. WebGPU only. |
 | Oriented bounding boxes (OBB) | COVERED | math `OBB`, entry `@margoengine/math/obb` (`packages/math/src/obb.ts`) | | `center`, `halfSize`, `rotation` (Matrix3); `fromBox3`, `applyMatrix4` (scale along the box axes folds into `halfSize`; a shearing matrix throws `RangeError`), `containsPoint`, `clampPoint`, `distanceToPoint`, `intersectsBox3`, `intersectsSphere`, `intersectsPlane`, `intersectsOBB` (separating-axis test over 15 axes with an `epsilon` for parallel edges), `intersectRay` and `intersectsRay`. A ray that starts inside returns its origin, as `Ray.intersectBox` does. Checked against polygon clipping on 1,000 seeded pairs (`packages/math/test/obb.test.js`). |
 
 ### 17. Special objects
@@ -309,14 +309,14 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows (2026-11-05): 4 PARTIAL, 17 MISSING. Each fix goes in the optional package named; core stays frozen for features.
+Recounted from the rows (2026-11-05): 4 PARTIAL, 16 MISSING. Each fix goes in the optional package named; core stays frozen for features.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
 | Node materials / TSL | PARTIAL. No statement-level `If`, workgroup memory or light nodes. | Extend `@margoengine/shader`. |
 | WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. | Test on a device first, then the XR layers, locomotion and plugin-pass row, then controller and hand models. |
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel path tracer and XR refuse the layer, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
-| Shadows from alpha cut-outs, picking fat lines, soft particles, `alphaHash`, object-space normal maps, your own mip levels | MISSING. | Planned before v1.0.0, one landing per package. |
+| Shadows from alpha cut-outs, soft particles, `alphaHash`, object-space normal maps, your own mip levels | MISSING. | Planned before v1.0.0, one landing per package. |
 | Rendering in a worker, render into layers, compute writing textures, supersampling and upscaling, clip distances, environment blend and ground projection, KTX2 arrays and cubes, NRRD, subsurface blur | MISSING. | After v1.0.0, in the owning package. |
 
 ## Leave as the documented limit

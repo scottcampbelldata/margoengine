@@ -12,6 +12,7 @@ export default defineConfig({
       { find: /^@margoengine\/core\/extension$/, replacement: resolve(repository, 'packages/core/dist/extension.js') },
       { find: /^@margoengine\/core$/, replacement: resolve(repository, 'packages/core/dist/index.js') },
       { find: /^@margoengine\/lines$/, replacement: resolve(root, 'dist/index.js') },
+      { find: /^@margoengine\/lines\/(.+)$/, replacement: resolve(root, 'dist/$1.js') },
     ],
   },
   server: { host: '127.0.0.1', fs: { allow: [repository] } },

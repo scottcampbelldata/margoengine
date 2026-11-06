@@ -13,6 +13,7 @@ import {
   type DrawOptions,
   type RenderView,
 } from '@margoengine/core/extension';
+import type { Camera } from '@margoengine/core';
 import { meshVertex } from '../../shared/gpu.js';
 import { inView, layerRegistry, meshLayers } from '../../shared/view-rect.js';
 import { PickingPrimitives, type PickingSource } from './picking-primitives.js';
@@ -102,6 +103,31 @@ interface PickBatch {
   out: (PickHit | null)[];
   outside: number[];
 }
+/** First ID of Picking's overlays, and the IDs each one owns: above every mesh, model and proxy ID. */
+const overlayBase = 2 ** 31,
+  overlayIds = 2 ** 28;
+/** What an overlay draws with in a pick: the 3 x 3 tile, already holding every mesh's IDs and depth. */
+export interface PickingOverlayContext {
+  encoder: GPUCommandEncoder;
+  /** The r32uint ID tile; load it. */
+  color: GPUTextureView;
+  /** Its depth32float depth (reversed Z); load it and test with greater-equal to sort against the meshes. */
+  depth: GPUTextureView;
+  /** The view-projection matrix cropped to the tile. */
+  matrix: Float32Array;
+  camera: Camera;
+  /** The picked view's rectangle in drawing-buffer pixels. */
+  rect: readonly number[];
+  /** The ID of the overlay's item 0; it owns the next 2^28. */
+  firstId: number;
+}
+/** Something other than triangles (fat lines) that picks in the same depth test as meshes; register it with `addOverlay`. */
+export interface PickingOverlay {
+  /** Draws item `n` as ID `firstId + n`, after every mesh. */
+  drawPick(context: PickingOverlayContext): void;
+  /** The hit for item `index` of the last `drawPick`, or null. `mesh` must be a live mesh of the picked scene. */
+  pickHit(index: number): { mesh: Mesh; line?: object; segment?: number } | null;
+}
 /** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
 export interface PickHit {
   mesh: Mesh;
@@ -111,6 +137,10 @@ export interface PickHit {
   approximate?: boolean;
   /** Instanced primitives (gltf-pro PBRInstances): the instance index. */
   instanceId?: number;
+  /** A hit on `@margoengine/lines/pick`'s overlay: the line. `mesh` is then the mesh it follows or its stand-in. */
+  line?: object;
+  /** The line's segment index. */
+  segment?: number;
 }
 
 /** UV sphere scaled so its faces enclose the unit sphere (proxy picks cover at least the bounding sphere the bvh Raycaster tests), as 20-float gltf-pro vertices. */
@@ -216,6 +246,8 @@ export class Picking implements EnginePlugin {
   private original?: Context['draw'];
   private context?: Context;
   private readonly primitives = new PickingPrimitives();
+  /** Registered overlays by ID slot; a removed one leaves its slot empty. */
+  private readonly overlays: (PickingOverlay | undefined)[] = [];
   /** `capture:false` skips the per-frame ID target and snapshot; every pick then uses the culled 3x3 pass. */
   constructor(readonly options: { capture?: boolean } = {}) {}
   static attach(engine: EngineKernel, options: { capture?: boolean } = {}): Picking {
@@ -232,6 +264,22 @@ export class Picking implements EnginePlugin {
     if (this.disposed)
       throw new MargoError('disposed', 'Picking is disposed; create a new Picking to register sources.');
     return this.primitives.add(source);
+  }
+  /**
+   * Registers something that is not triangles, such as `@margoengine/lines/pick`, to pick in one depth test with the
+   * meshes. Picks then always use the 3 x 3 pass. Returns the function that removes it.
+   * @throws RangeError past 8 overlays.
+   */
+  addOverlay(overlay: PickingOverlay): () => void {
+    if (this.disposed)
+      throw new MargoError('disposed', 'Picking is disposed; create a new Picking to register overlays.');
+    let slot = this.overlays.indexOf(undefined);
+    if (slot < 0) slot = this.overlays.length;
+    if (slot >= 8) throw new RangeError('Picking takes at most 8 overlays; remove one first.');
+    this.overlays[slot] = overlay;
+    return () => {
+      if (this.overlays[slot] === overlay) this.overlays[slot] = undefined;
+    };
   }
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'Picking is disposed; create a new Picking to attach.');
@@ -363,6 +411,7 @@ export class Picking implements EnginePlugin {
     // shortcut: mutable clipping uniforms have no revision, use the micro pass while a `section` plugin is attached.
     if (
       this.primitives.hasSources ||
+      this.overlays.some(Boolean) ||
       !this.captured ||
       e.hasPlugin('section') ||
       this.graph !== e.frameGraph ||
@@ -529,7 +578,10 @@ export class Picking implements EnginePlugin {
         }
       }
     let hit: PickHit | null = null;
-    if (id > capacity + total + list.length) {
+    if (id >= overlayBase) {
+      const slot = Math.floor((id - overlayBase) / overlayIds);
+      hit = this.overlays[slot]?.pickHit(id - overlayBase - slot * overlayIds) ?? null;
+    } else if (id > capacity + total + list.length) {
       const [m, i, k] = tile.instances[id - capacity - total - list.length - 1] ?? [],
         model = models[m],
         primitive = model?.primitives[i];
@@ -806,8 +858,9 @@ export class Picking implements EnginePlugin {
       draws.draw(device, pass, this.modelPipeline, matrix);
     }
     pass.end();
-    if (this.primitives.hasSources)
-      return this.primitives.draw(c, matrix, {
+    const candidates = !this.primitives.hasSources
+      ? undefined
+      : this.primitives.draw(c, matrix, {
         format: 'r32uint',
         depthFormat: 'depth32float',
         filter: (node, _primitive, source, index) => {
@@ -824,6 +877,18 @@ export class Picking implements EnginePlugin {
           return owner < 0 ? node.id + 1 : e.store.capacity + 1 + starts[owner] + index;
         },
       });
+    this.overlays.forEach((overlay, slot) =>
+      overlay?.drawPick({
+        encoder,
+        color: c.color,
+        depth: c.depth,
+        matrix,
+        camera,
+        rect,
+        firstId: overlayBase + slot * overlayIds,
+      }),
+    );
+    return candidates;
   }
   private release(): void {
     if (this.engine && attachedPickers.get(this.engine) === this) attachedPickers.delete(this.engine);
