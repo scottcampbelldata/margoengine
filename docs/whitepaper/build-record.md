@@ -1156,7 +1156,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | ROBOT | Robot planning taken out of this repository, it stays private; /swept and /sdf kept | DONE | `d7ec4be35` | - |
 | HULL | GJK reads a flat parallelogram of the Minkowski difference as a gap, not a false contact | DONE | `943fe4751` | LIM-251 |
 | A2, C2 | README examples and the stage run in Node on the webgpu binding (dev dependency), same picture as the page | DONE | this commit | LIM-091 |
-| B3 | parse3DM draws surfaces with no render mesh through the one NURBS evaluator; opt-in rhino3dm fetch tool | DONE | this commit | LIM-208 |
+| B3 surfaces | parse3DM draws surfaces with no render mesh through the one NURBS evaluator; opt-in rhino3dm fetch tool | DONE | this commit | LIM-208 |
+| D1 | Core pass join: accepted limit documented, core unchanged (Scott's ruling) | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 
