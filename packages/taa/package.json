@@ -26,7 +26,7 @@
   "scripts": {
     "test": "node --test ../../tests/modern-temporal*.test.js ../../tests/deep-render-jitter.test.js ../../tests/deep-render-taa-failures.test.js test/*.test.js",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/taa/test/upscale-browser.mjs"
+    "test:gpu": "cd ../.. && node packages/taa/test/upscale-browser.mjs && node packages/taa/test/velocity-only-browser.mjs"
   },
   "sideEffects": false,
   "exports": {

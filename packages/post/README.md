@@ -265,7 +265,7 @@ ssgi.add(model); ssr.add(model);  // gltf-pro model or materials mesh: both may 
 
 `@margoengine/post/motion-blur` (6,861 B min+gzip, its own entry; it carries the stack) blurs along per-pixel motion
 vectors. It is an HDR `PostStack` effect fed by a velocity callback, like `TAA({depth})`: with `@margoengine/taa`,
-`new MotionBlur({velocity: () => taa.velocity})`; any viewport-sized two-channel float texture of uv motion works too.
+`new MotionBlur({velocity: () => taa.velocity})`; any viewport-sized two-channel float texture of uv motion works too. With no anti-aliasing wanted, `TAA.attach(engine, {velocityOnly: true, depth: () => stack.depthTexture})` makes the vectors alone and the blur runs inside the stack.
 
 ```ts
 import {TAA} from 'margoengine/taa';

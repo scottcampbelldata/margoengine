@@ -6,7 +6,7 @@ import { wgsl } from '../../core/src/shaders.ts';
 import { objectVelocity } from '../src/shader.ts';
 
 /** One TAA on the recording mock, a frame driver, and every pass context it saw. */
-function rig() {
+function rig(options, samples = 4) {
   const gpu = mockGPU(),
     engine = {
       gpu: gpu.device,
@@ -15,10 +15,10 @@ function rig() {
       removePlugin() {},
       store: { visible: new Uint8Array(1), hidden: new Uint8Array(1), parents: new Int32Array(1).fill(-1) },
     };
-  const taa = new TAA();
+  const taa = new TAA(options);
   taa.setup(engine);
   const run = passes(taa),
-    view = context(gpu, { samples: 4, shader: wgsl });
+    view = context(gpu, { samples, shader: wgsl });
   let index = 0;
   return {
     gpu,
@@ -74,4 +74,28 @@ test('taa.velocity: the velocity texture, the jitter part of every vector, and t
   assert.ok(r.taa.velocity.jitter[0] !== 0, 'then the difference returns, at the new size');
   r.taa.dispose();
   assert.equal(r.taa.velocity, undefined);
+});
+
+test('velocityOnly: motion vectors with no jitter, capture, history or resolve', () => {
+  const stackDepth = { width: 1280, height: 720, format: 'depth24plus', usage: 4, createView: () => ({}) },
+    r = rig({ velocityOnly: true, depth: () => stackDepth }, 1);
+  const log = r.gpu.record(() => r.frame());
+  assert.doesNotMatch(r.view.c.shader, /taaCamera/, 'the scene shader keeps its own camera');
+  const made = log.filter((c) => c[0] === 'texture');
+  assert.equal(made.filter((c) => c[2].format === 'rg16float').length, 1, 'one velocity target');
+  assert.equal(made.filter((c) => c[2].format === 'r32float').length, 1, 'expected depth, and no history depths');
+  assert.deepEqual(made.filter((c) => c[2].usage & 8), [], 'no storage textures: no history');
+  assert.ok(!log.some((c) => c[0] === 'beginComputePass'), 'no history resolve');
+  for (let f = 0; f < 3; f++) r.frame();
+  const v = r.taa.velocity;
+  assert.equal(v.texture.format, 'rg16float');
+  assert.equal(v.resolved, undefined, 'MotionBlur then blurs inside the PostStack');
+  assert.deepEqual([...v.jitter], [0, 0]);
+  assert.throws(() => r.taa.gpuState, { name: 'MargoError', code: 'state' });
+});
+
+test('velocityOnly needs depth and a boolean', () => {
+  assert.throws(() => new TAA({ velocityOnly: true }), /pass depth/);
+  assert.throws(() => new TAA({ velocityOnly: 1, depth: () => undefined }), /true or false/);
+  assert.doesNotThrow(() => new TAA({ velocityOnly: false }));
 });

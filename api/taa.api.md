@@ -32,12 +32,13 @@ export interface TAAOptions {
     historyWeight?: number;
     depthThreshold?: number;
     depth?: () => GPUTexture | undefined;
+    velocityOnly?: boolean;
 }
 
 export interface TAAVelocity {
     readonly texture: GPUTexture;
     readonly jitter: Float32Array;
-    readonly resolved: GPUTexture;
+    readonly resolved?: GPUTexture;
 }
 
 export interface VelocityPrimitive extends CasterCutout {

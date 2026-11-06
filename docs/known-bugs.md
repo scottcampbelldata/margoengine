@@ -614,11 +614,16 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 
 ### Motion blur needs TAA for velocity
 
-- **What:** `p-motion-blur`: GPU 0.63 ms a frame against three's WebGPU 0.25 (CPU is faster, 2.3 against 3.2).
+- **What:** `p-motion-blur`: GPU 0.63 ms a frame against three's WebGPU 0.25 in the last ledger run (CPU is faster, 2.3
+  against 3.2).
 - **Cause (timestamps per pass):** `MotionBlur` reads TAA's velocity, Margo's only motion-vector source, so the frame
   also runs TAA's velocity and resolve passes (about 0.3 ms); the blur itself is about 0.27 ms.
-- **Plan (taa package):** a velocity-only mode (the velocity pass without the history resolve) for effects that need
-  motion vectors but no anti-aliasing.
+- **Fixed for effects that need no anti-aliasing:** `TAA`'s `velocityOnly` option runs the velocity pass with no jitter,
+  capture, history or resolve: `p-motion-blur-velocity` 0.48 ms GPU and 1.2 ms CPU, against 0.63 and 2.8 for
+  `p-motion-blur` in the same run (busy machine, diagnostic). `p-motion-blur` keeps its full TAA frame.
+- **Still open:** three's WebGPU took 0.66 ms in that busy run against 0.25 in the ledger, so whether 0.48 still loses needs
+  a quiet run. three has no `p-motion-blur-velocity` scene yet, so that row compares with `p-motion-blur`'s three column.
+  `p-motion-blur`'s image has not matched three's since its first run (SSIM 0.656, delta E 13.2); the cause is not known.
 
 ### Rect area lights: main pass GPU time
 

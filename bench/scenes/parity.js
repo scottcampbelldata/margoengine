@@ -1324,6 +1324,14 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       params: {},
       data: () => yardEffect({ name: 'motionblur', samples: 16 }),
     },
+    'p-motion-blur-velocity': {
+      area: 'post',
+      rows: ['13.17'],
+      title: 'Motion blur, velocity only',
+      draws: 'The blur of p-motion-blur with TAA velocityOnly: motion vectors without anti-aliasing, as three draws it.',
+      params: {},
+      data: () => yardEffect({ name: 'motionblur', samples: 16 }),
+    },
     'p-color-grading': {
       area: 'post',
       rows: ['13.18'],
@@ -1725,7 +1733,7 @@ export const ROWS = {
   '13.14': { scenes: ['p-lut'] },
   '13.15': { scenes: ['p-tonemap'] },
   '13.16': { scenes: ['p-god-rays'] },
-  '13.17': { scenes: ['p-motion-blur'] },
+  '13.17': { scenes: ['p-motion-blur', 'p-motion-blur-velocity'] },
   '13.18': { scenes: ['p-color-grading'] },
   '13.19': { scenes: ['p-screen-effects'] },
   '13.20': { scenes: ['p-lensflare'] },

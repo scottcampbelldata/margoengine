@@ -34,6 +34,17 @@ frame's after order 40). The getter adds no GPU work: with it TAA makes exactly 
 velocity texture equals `jitter` within 2e-6 uv (`post-effects-gpu.mjs --only=motion`). An effect that changes the
 picture after TAA must not write `resolved`: TAA reads it as history next frame.
 
+`velocityOnly: true` gives an effect the motion vectors without anti-aliasing: no jitter, no scene capture, no history and no resolve, so the picture stays the scene's own, `taa.velocity.jitter` is zero and `taa.velocity.resolved` is undefined. It needs `depth`, and at 4x MSAA a PostStack to read the scene from; `gpuState` throws, as there is no history to show. Fixed at construction, default false.
+
+```ts
+import {TAA} from 'margoengine/taa';
+import {PostStack} from 'margoengine/post';
+import {MotionBlur} from 'margoengine/post/motion-blur';
+let taa;
+const stack = PostStack.attach(stage.engine, [new MotionBlur({velocity: () => taa?.velocity})]);
+taa = TAA.attach(stage.engine, {velocityOnly: true, depth: () => stack.depthTexture});
+```
+
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.
 
 ## Upscaling: `TAAUpscale`

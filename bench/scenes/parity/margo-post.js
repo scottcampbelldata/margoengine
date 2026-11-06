@@ -295,6 +295,29 @@ export const builders = {
     );
   },
 
+  async 'p-motion-blur-velocity'(canvas, data, marks) {
+    const { samples } = data.effect;
+    return yard(
+      canvas,
+      data,
+      marks,
+      async (engine) => {
+        const [{ MotionBlur }, { TAA }] = await Promise.all([
+          import('@margoengine/post/motion-blur'),
+          import('@margoengine/taa'),
+        ]);
+        let taa;
+        const s = await stack(engine, [
+          new MotionBlur({ velocity: () => taa?.velocity, samples }),
+          await post.tonemap(),
+        ]);
+        taa = TAA.attach(engine, { velocityOnly: true, depth: () => s.depthTexture });
+        return { note: `PostStack [MotionBlur {samples ${samples}, shutter 0.5}, Tonemap] fed by TAA velocityOnly` };
+      },
+      { spin: true },
+    );
+  },
+
   async 'p-color-grading'() {
     throw new Error(
       'unsupported: hue rotation (creative PostProcessing has contrast, saturation, gain and lift and tonemap has contrast, but no grading stage rotates hue)',

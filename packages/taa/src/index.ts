@@ -35,6 +35,12 @@ export interface TAAOptions {
   depthThreshold?: number;
   /** Scene depth when another plugin replaces it, e.g. `() => dof.depthTexture`; sampleable and viewport-sized. */
   depth?: () => GPUTexture | undefined;
+  /**
+   * Motion vectors only, for effects such as `MotionBlur` that need them without anti-aliasing: no jitter, no capture of
+   * the scene, no history and no resolve, so the picture stays the scene's own and `taa.velocity` has no `resolved`.
+   * Needs `depth`. Fixed at construction. Default false.
+   */
+  velocityOnly?: boolean;
 }
 /** A drawable whose per-vertex motion TAA tracks: the `shadowPrimitives` contract of core and gltf-pro meshes. */
 export interface VelocityPrimitive extends CasterCutout {
@@ -77,8 +83,9 @@ export interface TAAVelocity {
    * Zero on a frame without history (first frame, reset, resize). Updated in place every frame. */
   readonly jitter: Float32Array;
   /** The resolved frame TAA presented last (linear `rgba16float`, the frame graph's order 40); after order 40 it is this
-   * frame's. History reads it next frame, so an effect that changes the picture after TAA writes elsewhere. */
-  readonly resolved: GPUTexture;
+   * frame's. History reads it next frame, so an effect that changes the picture after TAA writes elsewhere. Undefined
+   * with `velocityOnly`, which resolves nothing. */
+  readonly resolved?: GPUTexture;
 }
 /** What `taa.add` takes: a model exposing its primitives (a gltf-pro `PBRModel`); dropped once `disposed` is true. */
 export interface VelocitySource {
@@ -186,10 +193,9 @@ export class TAA implements EnginePlugin {
   // Halton offsets in uv of this frame and of the last resolved one; `vectors.jitter` is their difference.
   private readonly offset = new Float32Array(2);
   private readonly lastOffset = new Float32Array(2);
-  private readonly vectors: { texture: GPUTexture; jitter: Float32Array; resolved: GPUTexture } = {
+  private readonly vectors: { texture: GPUTexture; jitter: Float32Array; resolved?: GPUTexture } = {
     texture: undefined!,
     jitter: new Float32Array(2),
-    resolved: undefined!,
   };
   private originalCamera?: Context['camera'];
   private cameraView?: Context['camera'];
@@ -199,6 +205,7 @@ export class TAA implements EnginePlugin {
   private disposed = false;
   private projection = '';
   private format?: GPUTextureFormat;
+  private samples = 0;
   constructor(readonly options: TAAOptions = {}) {
     this.validate();
   }
@@ -220,6 +227,12 @@ export class TAA implements EnginePlugin {
     )
       throw new RangeError(
         'Invalid TAA options; historyWeight must be in [0, 1), depthThreshold in [0, 1] and depth a function.',
+      );
+    if (o.velocityOnly !== undefined && typeof o.velocityOnly !== 'boolean')
+      throw new TypeError('Invalid TAA velocityOnly; pass true or false.');
+    if (o.velocityOnly && !o.depth)
+      throw new TypeError(
+        'TAA velocityOnly captures no scene depth; pass depth, e.g. () => stack.depthTexture from a PostStack.',
       );
   }
   add(source: VelocitySource): () => void {
@@ -301,19 +314,24 @@ export class TAA implements EnginePlugin {
   private capture(c: Context): void {
     this.validate();
     this.resize(c);
-    this.original = c.color;
-    this.captureTarget!.begin(c);
-    const camera = c.camera === this.cameraView ? this.originalCamera! : c.camera;
-    if (this.originalCamera !== camera || !this.cameraView)
-      this.cameraView = Object.assign(Object.create(camera), { matrix: this.jittered });
-    this.originalCamera = camera;
+    const only = this.options.velocityOnly;
+    if (!only) {
+      this.original = c.color;
+      this.captureTarget!.begin(c);
+      const camera = c.camera === this.cameraView ? this.originalCamera! : c.camera;
+      if (this.originalCamera !== camera || !this.cameraView)
+        this.cameraView = Object.assign(Object.create(camera), { matrix: this.jittered });
+      this.originalCamera = camera;
+    }
     try {
-      const [width, height] = viewSize(c);
-      jitterProjection(this.jittered, camera.matrix, this.frame, width, height);
-      c.camera = this.cameraView!;
-      // jitterProjection's NDC offset in uv; the velocity passes see it in both matrices only with history.
-      this.offset[0] = (halton((this.frame % 8) + 1, 2) - 0.5) / c.width;
-      this.offset[1] = (halton((this.frame % 8) + 1, 3) - 0.5) / c.height;
+      if (!only) {
+        const [width, height] = viewSize(c);
+        jitterProjection(this.jittered, this.originalCamera!.matrix, this.frame, width, height);
+        c.camera = this.cameraView!;
+        // jitterProjection's NDC offset in uv; the velocity passes see it in both matrices only with history.
+        this.offset[0] = (halton((this.frame % 8) + 1, 2) - 0.5) / c.width;
+        this.offset[1] = (halton((this.frame % 8) + 1, 3) - 0.5) / c.height;
+      }
       const projection = [c.camera.fov, c.camera.near, c.camera.far, ...(viewRect(c) ?? [])].join(':');
       if (projection !== this.projection) {
         this.reset();
@@ -330,6 +348,7 @@ export class TAA implements EnginePlugin {
       jitter[0] = this.valid ? this.offset[0] - this.lastOffset[0] : 0;
       jitter[1] = this.valid ? this.offset[1] - this.lastOffset[1] : 0;
       c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
+      if (only) return;
       // Core uploads its frame before extension passes; use the jittered matrix through an existing shader binding.
       c.shader =
         '@group(0) @binding(18) var<uniform> taaCamera:mat4x4f;\n' +
@@ -345,13 +364,15 @@ export class TAA implements EnginePlugin {
     if (c.camera === this.cameraView) c.camera = this.originalCamera!;
   }
   private resize(c: Context): void {
+    const only = this.options.velocityOnly,
+      samples = c.descriptor.multisample?.count ?? 4;
     if (
       this.captureReady &&
-      this.scene?.width === c.width &&
-      this.scene.height === c.height &&
+      this.velocityTarget?.width === c.width &&
+      this.velocityTarget.height === c.height &&
       this.format === c.format &&
-      this.depth?.format === c.descriptor.depthStencil!.format &&
-      this.captureTarget?.samples === (c.descriptor.multisample?.count ?? 4)
+      (only || this.depth?.format === c.descriptor.depthStencil!.format) &&
+      this.samples === samples
     )
       return;
     this.captureReady = false;
@@ -361,16 +382,18 @@ export class TAA implements EnginePlugin {
     this.histories = [];
     this.historyDepths = [];
     this.format = c.format;
+    this.samples = samples;
     // Unorm canvas shaders write sRGB themselves; sRGB attachments and floating-point HDR targets supply linear samples.
     const manualSRGB = +(c.format === 'rgba8unorm' || c.format === 'bgra8unorm');
-    this.resolvePipeline = c.device.createComputePipeline({
-      layout: 'auto',
-      compute: {
-        module: c.device.createShaderModule({ code: resolve }),
-        entryPoint: 'main',
-        constants: { manualSRGB },
-      },
-    });
+    if (!only)
+      this.resolvePipeline = c.device.createComputePipeline({
+        layout: 'auto',
+        compute: {
+          module: c.device.createShaderModule({ code: resolve }),
+          entryPoint: 'main',
+          constants: { manualSRGB },
+        },
+      });
     const texture = (format: GPUTextureFormat, usage: number) => {
       const t = c.device.createTexture({
         size: [c.width, c.height],
@@ -380,17 +403,21 @@ export class TAA implements EnginePlugin {
       this.textures.push(t);
       return t;
     };
-    this.scene = texture(c.format, GPUTextureUsage.RENDER_ATTACHMENT);
-    this.depth = texture(c.descriptor.depthStencil!.format, GPUTextureUsage.RENDER_ATTACHMENT);
+    if (!only) {
+      this.scene = texture(c.format, GPUTextureUsage.RENDER_ATTACHMENT);
+      this.depth = texture(c.descriptor.depthStencil!.format, GPUTextureUsage.RENDER_ATTACHMENT);
+    }
     this.velocityTarget = texture('rg16float', GPUTextureUsage.RENDER_ATTACHMENT);
     this.expected = texture('r32float', GPUTextureUsage.RENDER_ATTACHMENT);
-    for (let i = 0; i < 2; i++) {
-      this.histories.push(texture('rgba16float', GPUTextureUsage.STORAGE_BINDING));
-      this.historyDepths.push(texture('r32float', GPUTextureUsage.STORAGE_BINDING));
+    if (!only) {
+      for (let i = 0; i < 2; i++) {
+        this.histories.push(texture('rgba16float', GPUTextureUsage.STORAGE_BINDING));
+        this.historyDepths.push(texture('r32float', GPUTextureUsage.STORAGE_BINDING));
+      }
+      this.captureTarget = new SceneTarget(c.device, this.scene!, this.depth!, samples);
+      this.colorView = this.scene!.createView();
+      this.depthView = this.depth!.createView();
     }
-    this.captureTarget = new SceneTarget(c.device, this.scene, this.depth, c.descriptor.multisample?.count ?? 4);
-    this.colorView = this.scene.createView();
-    this.depthView = this.depth.createView();
     this.velocityView = this.velocityTarget.createView();
     this.expectedView = this.expected.createView();
     this.motionViews = [];
@@ -408,7 +435,7 @@ export class TAA implements EnginePlugin {
       },
       multisample: c.descriptor.multisample,
     });
-    if (this.captureTarget.samples === 4) {
+    if (samples === 4) {
       for (const format of ['rg16float', 'r32float'] as GPUTextureFormat[]) {
         const t = c.device.createTexture({
           size: [c.width, c.height],
@@ -437,26 +464,28 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
         fragment: { module, entryPoint: 'fragment', targets: [{ format: 'rg16float' }, { format: 'r32float' }] },
       });
     }
-    const module = c.device.createShaderModule({ code: present });
-    this.presentPipeline = c.device.createRenderPipeline({
-      layout: 'auto',
-      vertex: { module, entryPoint: 'vertex' },
-      fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }], constants: { manualSRGB } },
-      multisample: c.descriptor.multisample,
-    });
-    this.presentGroups = this.histories.map((t) =>
-      c.device.createBindGroup({
-        layout: this.presentPipeline!.getBindGroupLayout(0),
-        entries: [{ binding: 0, resource: t.createView() }],
-      }),
-    );
+    if (!only) {
+      const module = c.device.createShaderModule({ code: present });
+      this.presentPipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }], constants: { manualSRGB } },
+        multisample: c.descriptor.multisample,
+      });
+      this.presentGroups = this.histories.map((t) =>
+        c.device.createBindGroup({
+          layout: this.presentPipeline!.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: t.createView() }],
+        }),
+      );
+    }
     this.depthSource = undefined;
     this.reset();
     this.captureReady = true;
   }
   private motion(c: Context): void {
     resolveMSAA(c);
-    const depth = c.depth === this.captureTarget!.depth ? this.depth : this.options.depth?.();
+    const depth = this.captureTarget && c.depth === this.captureTarget.depth ? this.depth : this.options.depth?.();
     if (
       !depth ||
       depth.width !== c.width ||
@@ -476,19 +505,20 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
           entries: resources.map((resource, binding) => ({ binding, resource })),
         });
       this.cameraGroup = group(this.cameraPipeline!, [{ buffer: this.uniform! }, this.sampledDepth]);
-      this.resolveGroups = [0, 1].map((i) =>
-        group(this.resolvePipeline!, [
-          { buffer: this.uniform! },
-          this.colorView!,
-          this.velocityView!,
-          this.expectedView!,
-          this.sampledDepth!,
-          this.histories[i].createView(),
-          this.historyDepths[i].createView(),
-          this.histories[1 - i].createView(),
-          this.historyDepths[1 - i].createView(),
-        ]),
-      );
+      if (!this.options.velocityOnly)
+        this.resolveGroups = [0, 1].map((i) =>
+          group(this.resolvePipeline!, [
+            { buffer: this.uniform! },
+            this.colorView!,
+            this.velocityView!,
+            this.expectedView!,
+            this.sampledDepth!,
+            this.histories[i].createView(),
+            this.historyDepths[i].createView(),
+            this.histories[1 - i].createView(),
+            this.historyDepths[1 - i].createView(),
+          ]),
+        );
       this.depthSource = depth;
     }
     const views = this.motionViews.length ? this.motionViews : [this.velocityView!, this.expectedView!];
@@ -539,7 +569,12 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     }
     this.flushMotion(c, pending);
     if (this.motionViews.length) {
-      const depth = sceneTarget(c)!.depthSource!;
+      const depth = sceneTarget(c)?.depthSource;
+      if (!depth)
+        throw new MargoError(
+          'state',
+          'TAA velocityOnly at 4x MSAA reads the scene target; draw through a PostStack, or set its samples to 1',
+        );
       if (this.motionDepth !== depth) {
         this.motionGroup = c.device.createBindGroup({
           layout: this.motionResolve!.getBindGroupLayout(0),
@@ -827,27 +862,30 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
   }
   private finish(c: Context): void {
     try {
-      this.captureTarget!.resolve(c.encoder, true);
-      const compute = c.encoder.beginComputePass();
-      compute.setPipeline(this.resolvePipeline!);
-      compute.setBindGroup(0, this.resolveGroups[this.front]);
-      compute.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
-      compute.end();
-      const next = 1 - this.front;
-      const pass = c.encoder.beginRenderPass({
-        colorAttachments: [{ view: this.original!, loadOp: viewLoadOp(c, 'clear'), storeOp: 'store' }],
-      });
-      applyView(pass, c);
-      pass.setPipeline(this.presentPipeline!);
-      pass.setBindGroup(0, this.presentGroups[next]);
-      pass.draw(3);
-      pass.end();
-      this.front = next;
+      const only = this.options.velocityOnly;
+      if (!only) {
+        this.captureTarget!.resolve(c.encoder, true);
+        const compute = c.encoder.beginComputePass();
+        compute.setPipeline(this.resolvePipeline!);
+        compute.setBindGroup(0, this.resolveGroups[this.front]);
+        compute.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
+        compute.end();
+        const next = 1 - this.front;
+        const pass = c.encoder.beginRenderPass({
+          colorAttachments: [{ view: this.original!, loadOp: viewLoadOp(c, 'clear'), storeOp: 'store' }],
+        });
+        applyView(pass, c);
+        pass.setPipeline(this.presentPipeline!);
+        pass.setBindGroup(0, this.presentGroups[next]);
+        pass.draw(3);
+        pass.end();
+        this.front = next;
+      }
       this.previous.set(c.camera.matrix);
       this.lastOffset.set(this.offset);
       this.valid = true;
       this.frame++;
-      this.captureTarget!.restore(c);
+      if (!only) this.captureTarget!.restore(c);
     } catch (error) {
       this.reset();
       throw error;
@@ -859,13 +897,16 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
    * first resolved frame and after disposal. One object, updated in place. */
   get velocity(): TAAVelocity | undefined {
     if (this.activeView) return this.activeView.velocity;
-    if (!this.velocityTarget || !this.histories.length || !this.frame) return undefined;
+    const only = this.options.velocityOnly;
+    if (!this.velocityTarget || (!only && !this.histories.length) || !this.frame) return undefined;
     this.vectors.texture = this.velocityTarget;
-    this.vectors.resolved = this.histories[this.front];
+    this.vectors.resolved = only ? undefined : this.histories[this.front];
     return this.vectors;
   }
   get gpuState(): { velocity: GPUTexture; history: GPUTexture; depth: GPUTexture } {
     if (this.activeView) return this.activeView.gpuState;
+    if (this.options.velocityOnly)
+      throw new MargoError('state', 'TAA velocityOnly keeps no history; read taa.velocity for the motion vectors');
     if (!this.velocityTarget || !this.histories.length)
       throw new MargoError('state', 'TAA is not rendered; render a frame first');
     return {

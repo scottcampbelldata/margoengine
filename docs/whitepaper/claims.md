@@ -179,6 +179,7 @@ backs them yet:
 | LIM-075 | Neural networks: every layer's values match its definition and its gradients match central differences on the CPU backend, a convolutional network and a causal attention block give the same outputs and gradients on WebGPU within 1e-4, convolution gradients repeat exactly, and a training step leaves nothing allocated (docs/limits.md, Rendering) | `packages/compute/tests/nn.test.js`, `packages/compute/tests/compute-nn-browser.js` | `npm test --workspace packages/compute`; `node scripts/gpu-lock.mjs run --owner=<id> -- node packages/compute/tests/compute-browser.mjs` | PROVEN | Speed is not measured. |
 
 # Claims and evidence
+| LIM-078 | TAA velocityOnly: a moving box blurs through MotionBlur at 4x MSAA, stays sharp with the blur off, and a still view keeps its bytes from frame to frame; no history textures or resolve pass exist (docs/limits.md, Rendering) | `packages/taa/test/velocity.test.js`, `packages/taa/test/velocity-only-browser.mjs` | `npm run test:gpu --workspace packages/taa` | PROVEN | RTX A6000 only |
 
 **Clearcoat through `install` (2026-11-05).** The coat dims everything under it as KHR_materials_clearcoat defines, on opaque surfaces too. Clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; proof in `scripts/materials-clearcoat-tests.js`, which fails on the unfixed shader.
 

@@ -1375,6 +1375,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node bench/cli.mjs parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5
   --warmup=1 --no-compare --no-fail`.
 - **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, `packages/animation/tests/clone.test.js`.
+
 ### 50. Materials with no maps fetch only what they read
 
 - **Loss:** `createInstancedMesh` boxes at 50,000 took 0.615 ms of GPU against three's WebGL2 `InstancedMesh`, because
@@ -1640,6 +1641,19 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Difference:** a 100 Hz display now renders twice the frames it did on the light tier.
 - **Rerun:** `npm test --workspace @margoengine/quality`; on a 100 Hz display, the sandbox's HUD with `?seed=1`.
 - **Guard:** `packages/quality/test/quality.test.js`.
+
+### 65. TAA `velocityOnly`: motion vectors without the resolve
+
+- **Loss:** `p-motion-blur` 0.63 ms GPU against three's WebGPU 0.25 in the ledger. `MotionBlur` reads TAA's velocity, so the
+  frame also paid for the scene capture and the history resolve.
+- **Fix:** `velocityOnly` on `TAA`, in `@margoengine/taa`: no jitter, capture, history or resolve, and none of their
+  textures. The blur then runs inside the PostStack, a path it already had. Plain `TAA` makes the same GPU calls as before.
+- **After:** `p-motion-blur-velocity` 0.48 ms GPU and 1.2 ms CPU, `p-motion-blur` 0.63 and 2.8 in the same run (`--no-gate`,
+  other jobs running, diagnostic). `p-motion-blur` is unchanged and stays beside the new scene.
+- **Difference:** the new scene draws no anti-aliasing, so it does less than `p-motion-blur` by design, and is its own row.
+- **Open:** three's WebGPU took 0.66 ms in this run against 0.25 in the ledger, so the verdict needs a quiet run.
+- **Rerun:** `node bench/cli.mjs parity --cases=p-motion-blur --engines=margo,three-webgpu-parity --runs=3`.
+- **Guard:** `packages/taa/test/velocity.test.js`, `packages/taa/test/velocity-only-browser.mjs`.
 
 ## Open losses
 

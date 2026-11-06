@@ -244,7 +244,7 @@
     ]
   },
   "13.17": {
-    "cause": "Margo's CPU is faster (2.3 against three-webgpu's 3.2 ms). GPU 0.63 against 0.25 ms (timestamps per pass): Margo's only motion-vector source is TAA, so the frame also runs TAA's velocity and resolve passes (about 0.3 ms of the 0.63); MotionBlur itself is about 0.27 ms. Structural: a velocity pass without TAA's resolve is missing (known-bugs)",
+    "cause": "Margo's CPU is faster (2.3 against three-webgpu's 3.2 ms). GPU 0.63 against 0.25 ms (timestamps per pass): Margo's only motion-vector source is TAA, so the frame also runs TAA's velocity and resolve passes (about 0.3 ms of the 0.63); TAA's velocityOnly option (2026-11-05) leaves out the resolve for effects that need no anti-aliasing: p-motion-blur-velocity 0.48 ms GPU, 1.2 ms CPU, busy machine, diagnostic; three has no such scene yet. MotionBlur itself is about 0.27 ms. Structural: a velocity pass without TAA's resolve is missing (known-bugs)",
     "knownBug": "motion-blur-needs-taa-for-velocity"
   },
   "7.6": {
