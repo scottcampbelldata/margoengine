@@ -2,7 +2,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box } from '../../core/dist/extension.js';
-import { LOD, normalMatrix } from '@margoengine/lod';
+import { Engine, TransformStore } from '../../core/dist/extension.js';
+import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { LOD, LODSystem, normalMatrix } from '@margoengine/lod';
 import { autoLOD, creased, hierarchicalLOD, simplifyAttributes } from '@margoengine/lod/auto';
 
 const sphere = (segments) => {
@@ -227,6 +230,103 @@ test('autoLOD refuses skinned and morphed models', async () => {
   await assert.rejects(autoLOD({}, model), /without skins or morph targets/);
   model.disposed = true;
   await assert.rejects(autoLOD({}, model), /live model/);
+});
+
+const headless = async () =>
+  new Engine({ width: 64, height: 64, clientWidth: 64, clientHeight: 64 }, await TransformStore.create(256), {
+    backend: 'webgpu',
+    gpu: optionalGPU().engine.gpu,
+    add() {},
+    remove() {},
+    render() {},
+    dispose() {},
+  });
+/** A file of two nodes sharing one sphere, a lone triangle on a second material, and a points primitive. */
+const loadedModel = (engine) => {
+  const { positions, normals, indices } = sphere(12),
+    buffers = [],
+    bufferViews = [],
+    accessors = [],
+    add = (data, type, componentType = 5126) => {
+      bufferViews.push({ buffer: buffers.length, byteLength: data.byteLength });
+      accessors.push({
+        bufferView: buffers.length,
+        componentType,
+        count: data.length / { SCALAR: 1, VEC3: 3 }[type],
+        type,
+        ...(type === 'VEC3' ? { min: [-1, -1, -1], max: [1, 1, 1] } : {}),
+      });
+      buffers.push(data);
+      return buffers.length - 1;
+    },
+    attributes = { POSITION: add(new Float32Array(positions), 'VEC3'), NORMAL: add(new Float32Array(normals), 'VEC3') },
+    corner = add(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]), 'VEC3'),
+    doc = {
+      asset: { version: '2.0' },
+      scene: 0,
+      scenes: [{ nodes: [0, 1] }],
+      nodes: [{ mesh: 0, translation: [3, 0, 0] }, { mesh: 0 }],
+      materials: [{ name: 'a' }, { name: 'b' }],
+      meshes: [
+        {
+          primitives: [
+            { attributes, indices: add(new Uint32Array(indices), 'SCALAR', 5125), material: 0 },
+            { attributes: { POSITION: corner }, material: 1 },
+            { attributes: { POSITION: corner }, material: 1, mode: 0 },
+          ],
+        },
+      ],
+      accessors,
+      bufferViews,
+      buffers: buffers.map((b) => ({ byteLength: b.byteLength })),
+    };
+  const model = new PBRModel(engine, new GLTFAsset(doc, buffers));
+  engine.use(model);
+  return model;
+};
+
+test('autoLOD levels a loaded model: its nodes, materials and transforms, points left on level 0', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      model = loadedModel(engine),
+      triangles = (m) => m.primitives.reduce((n, p) => n + (p.topology ? 0 : p.indices.length / 3), 0),
+      lod = await autoLOD(system, model, { ratios: [0.5, 0.25], screens: [0.5, 0.25] }),
+      [, near, far] = lod.levels.map((l) => l.object);
+    assert.equal(lod.anchor, model.root);
+    assert.ok(triangles(near) < triangles(model) * 0.6 && triangles(far) < triangles(near));
+    assert.equal(near.primitives.length, 4, 'two nodes of a sphere and a triangle, no points');
+    assert.ok(near.primitives.every((p) => !p.topology));
+    assert.equal(near.primitives[0].vertices, near.primitives[2].vertices, 'a shared primitive simplifies once');
+    assert.deepEqual(
+      near.primitives.map((p) => p.material),
+      model.primitives.filter((p) => !p.topology).map((p) => p.material),
+    );
+    assert.equal(near.nodes[0].matrix[12], 3);
+    assert.equal(near.root.visible, false);
+    model.dispose();
+    assert.equal(near.disposed, true, 'levels go with the model');
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('hierarchicalLOD merges loaded models into one model per cell and file, a primitive per material', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      model = loadedModel(engine);
+    engine.store.tick(false);
+    const built = await hierarchicalLOD(system, [model], { cell: 1000 }),
+      far = built.lods[0].levels[1].object;
+    assert.equal(built.meshes.length, 1);
+    assert.equal(built.lods[0].anchor, built.meshes[0]);
+    assert.ok(far.visible === false);
+    built.remove();
+    assert.equal(model.root.visible, true);
+  } finally {
+    engine.dispose();
+  }
 });
 
 test('normalMatrix turns normals with the object, mirrored ones outward', () => {

@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { extname, resolve } from 'node:path';
 import { extendedMaterials } from '../dist/extended.js';
-import { GLTFAsset, PBRModel, parseGLTF, parseGLTFAsync } from '../dist/index.js';
+import { GLTFAsset, PBRModel, parseGLTF, parseGLTFAsync, validatePreparedGeometry } from '../dist/index.js';
 import {
   pbrShader,
   compactTests,
@@ -200,6 +200,30 @@ test('KHR_mesh_quantization admits integer positions, normals and texture coordi
     const v = new PBRModel(engine, new GLTFAsset(doc, buffers)).primitives[0].vertices;
     assert.deepEqual([...v.subarray(20, 27)], [100, -100, 0, 1, 0, 0, 1]);
     assert.deepEqual([...v.subarray(20 + 12, 20 + 14)], [2, 0]);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('quantized tangents pack at unit length, and a zero tangent falls back to the UV frame', async () => {
+  const engine = await headless(),
+    { doc, buffers, add } = triangle();
+  try {
+    doc.meshes[0].primitives[0].attributes.TANGENT = add(
+      new Int8Array([90, 90, 0, 127, 0, 0, 0, 127, 0, 127, 0, -127]),
+      'VEC4',
+      5120,
+      { accessor: { normalized: true } },
+    );
+    doc.buffers = buffers.map((b) => ({ byteLength: b.byteLength }));
+    doc.extensionsUsed = doc.extensionsRequired = ['KHR_mesh_quantization'];
+    const { vertices, indices } = new PBRModel(engine, new GLTFAsset(doc, buffers)).primitives[0];
+    assert.ok(Math.abs(Math.hypot(vertices[8], vertices[9], vertices[10]) - 1) < 1e-6);
+    assert.equal(vertices[11], 1);
+    assert.deepEqual([...vertices.subarray(28, 32)], [0, 0, 0, 0]);
+    assert.equal(vertices[51], -1);
+    // A prepared asset holds what packing wrote, so the packed vertices must pass its check.
+    assert.doesNotThrow(() => validatePreparedGeometry({ vertices, indices }));
   } finally {
     engine.dispose();
   }

@@ -2566,7 +2566,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-149). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-150). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2656,6 +2656,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | `LodInstances` | 1 to 4 levels; 96 bytes per instance per level, plus the 96-byte source record | Each level's list can hold every instance, and one thread appends to one of them | Shadows: not cast, as `shadows.add` takes no `LodInstances`. WebGL2 layer: every shown instance draws the first level. Instances of a level draw in no fixed order, which only shows between exactly coplanar faces | Use `CascadeInstances` for casters of the first level |
 | `MeshletMesh` | One mesh, one matrix; twice the mesh index memory on the GPU, plus 40 bytes per cluster | Kept clusters are written to one index buffer for that matrix | Instances of a clustered mesh are not supported. Shadows and picking draw the whole mesh. No Hi-Z per cluster. On the WebGL2 layer the whole mesh draws | Use `CulledParts` for many copies; split a large scene into several `MeshletMesh` |
 | Attributes in generated LOD levels (`autoLOD`, `hierarchicalLOD`, `simplifyAttributes`) | Per primitive: mesh-edit's limit of 200,000 vertices or faces. A level is a subset of the source's vertices, so a position can only be one the source has. Triangles mesh-edit cannot take (a third face on an edge, a flipped neighbour) simplify as separate sheets, up to 4, then alone. | Vertex-subset collapses keep every attribute exact with no interpolation; the price is less accuracy per triangle than placing new vertices. Primitives simplify one at a time, so an open edge between two primitives can slide apart a little. | A core mesh's levels hold positions and normals only, as core geometry does. A materials mesh's levels do not follow a material swapped on the source later, and `shadows.add` takes each level on its own. | Give the source's borders the same vertices in one primitive, or use `Imposter` for the farthest level. |
+| Generated levels of loaded models (`autoLOD`, `hierarchicalLOD` on a `loadGLTF` model) | Skinned and morphed models are refused. Per primitive: mesh-edit's 200,000 vertices or faces. Vertex memory of the default three levels: about 0.875 of the source's, on top of it; GPU textures are shared. | A level is a model of the same file, so shadows, picking and materials work as on any model, at the cost of a model per level. | Node transforms are copied at the call: a node animated afterwards moves on level 0 only. Points and lines stay on level 0, and out of a far model. `selectVariant` on the source does not reach its levels. | `MSFT_lod` levels in the file (`LOD.fromModel`), or an `Imposter`, for skinned models. |
 
 ## Geometry
 

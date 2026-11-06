@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4842929,
+  "total": 4843603,
   "history": [
     {
       "date": "2026-10-24",
@@ -2060,6 +2060,12 @@
       "commit": "b7399c619",
       "reason": "New input entry ./pen: pen pressure and tilt as action values and a full-rate sample stream. Core and core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "5f21472a0",
+      "reason": "lod: autoLOD and hierarchicalLOD on loaded glTF models; gltf-pro: tangents packed at unit length",
+      "grew": 1
     }
   ],
   "items": {
@@ -2309,7 +2315,7 @@
     "@margoengine/loaders/vrml": 5087,
     "@margoengine/loaders/worker": 8571,
     "@margoengine/lod": 11224,
-    "@margoengine/lod/auto": 4824,
+    "@margoengine/lod/auto": 5498,
     "@margoengine/materials": 61113,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,

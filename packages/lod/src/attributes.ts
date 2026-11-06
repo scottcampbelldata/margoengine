@@ -150,12 +150,15 @@ export function simplifyPacked(
     faces.push({ id: `f${t / 3}`, vertices: ids, uv: ids.map((id, k) => corner(id, source[k])) });
   }
   if (!faces.length) return ratios.map(() => ({ vertices: v, indices }));
-  let welded = points.map((_, i) => i);
+  let welded = points.map((_, i) => i),
+    last: PackedGeometry = { vertices: v, indices };
   return modeling
     .meshLODChain({ vertices: points, faces }, { ratios, mergeCoplanar: false, signal })
     .map(({ mesh, sourceVertices }) => {
       const ids = sourceVertices.map((i) => welded[i]);
       welded = ids;
+      // A part too small to reach the ratio keeps its last triangles, so no level loses it.
+      if (!mesh.faces.length) return last;
       const remap = new Map<number, number>(),
         order: number[] = [],
         out = new Uint32Array(mesh.faces.length * 3);
@@ -173,6 +176,6 @@ export function simplifyPacked(
       );
       const kept = new Float32Array(order.length * STRIDE);
       order.forEach((from, i) => kept.set(v.subarray(from * STRIDE, (from + 1) * STRIDE), i * STRIDE));
-      return { vertices: kept, indices: out };
+      return (last = { vertices: kept, indices: out });
     });
 }

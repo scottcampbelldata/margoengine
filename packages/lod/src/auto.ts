@@ -3,7 +3,7 @@
 // @margoengine/materials makes the levels of its own meshes, loaded the same way.
 import { Geometry, type Mesh } from '@margoengine/core';
 import { meshRuntime } from '@margoengine/core/extension';
-import type { PBRModel, PBRPrimitive } from '@margoengine/gltf-pro';
+import type { GLTFDocument, PBRModel, PBRPrimitive, PreparedGeometry } from '@margoengine/gltf-pro';
 import type { createMesh, Material, MaterialMesh, MeshGeometry } from '@margoengine/materials';
 import { MargoError } from '@margoengine/math/errors';
 import { normalMatrix, simplifyPacked, type Modeling, type PackedGeometry } from './attributes.js';
@@ -34,13 +34,13 @@ export interface HierarchicalLODOptions {
   /** Cancels the wait for the simplifier and the work after it. */
   signal?: AbortSignal;
 }
-/** A mesh `autoLOD` and `hierarchicalLOD` take: a core mesh, or a `createMesh` mesh of `@margoengine/materials`. */
-export type LODSource = Mesh | MaterialMesh<Material | readonly Material[]>;
+/** A mesh `autoLOD` and `hierarchicalLOD` take: a core mesh, a `createMesh` mesh of `@margoengine/materials`, or a loaded gltf-pro model. */
+export type LODSource = Mesh | MaterialMesh<Material | readonly Material[]> | PBRModel;
 /** What {@link hierarchicalLOD} built. */
 export interface HierarchicalLOD {
   /** One LOD per cell that holds a mesh. */
   readonly lods: readonly LOD[];
-  /** The far meshes made, per cell and material; for a materials mesh, its `root`. */
+  /** The far meshes made, per cell and material; for a materials mesh or model, its `root`. */
   readonly meshes: readonly Mesh[];
   /** Stops managing the cells, frees the far meshes and shows the source meshes again. */
   remove(): void;
@@ -218,6 +218,71 @@ function check(model: PBRModel): void {
       'autoLOD needs a model without skins or morph targets; give the file MSFT_lod levels, or bake an Imposter',
     );
 }
+/**
+ * A new model of `source`'s asset drawing `prepared` instead of its accessors, on the materials `source` draws with now
+ * (`records` per new primitive) and the GPU textures it holds. `doc` changes only what the geometry needs.
+ */
+async function modelFrom(
+  source: PBRModel,
+  doc: GLTFDocument,
+  prepared: readonly (readonly PreparedGeometry[])[],
+  records: readonly PBRPrimitive[],
+  signal?: AbortSignal,
+): Promise<PBRModel> {
+  const { GLTFAsset, PBRModel: Model, closeImages } = await import('@margoengine/gltf-pro');
+  signal?.throwIfAborted();
+  const { asset } = source,
+    images = source.shareImages();
+  let made: PBRModel;
+  try {
+    made = new Model(
+      source.root.engine,
+      new GLTFAsset(doc, asset.buffers, undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
+      images,
+      prepared,
+    );
+  } catch (error) {
+    closeImages(images);
+    throw error;
+  }
+  made.primitives.forEach((p, i) => {
+    p.material = records[i].material;
+    p.extension = records[i].extension;
+  });
+  source.root.engine.use(made);
+  return made;
+}
+/** One level of a loaded model: its node tree and transforms, its triangle primitives simplified, nothing else. */
+async function gltfLevel(
+  model: PBRModel,
+  simplified: ReadonlyMap<PBRPrimitive['definition'], PackedGeometry[]>,
+  level: number,
+  signal?: AbortSignal,
+): Promise<PBRModel> {
+  const doc = model.asset.doc,
+    prepared: PreparedGeometry[][] = [],
+    meshes = (doc.meshes ?? []).map((mesh, i) => {
+      const kept = mesh.primitives.filter((p) => simplified.has(p));
+      prepared[i] = kept.map((p) => simplified.get(p)![level]);
+      // Draco and variant mappings describe the source's own data; the level holds decoded triangles and the record.
+      return { ...mesh, primitives: kept.map(({ material }) => ({ attributes: {}, material })) };
+    }),
+    nodes = doc.nodes?.map((node) =>
+      node.mesh !== undefined && !meshes[node.mesh]?.primitives.length ? { ...node, mesh: undefined } : node,
+    ),
+    records = model.primitives.filter((p) => simplified.has(p.definition)),
+    made = await modelFrom(model, { ...doc, nodes, meshes }, prepared, records, signal),
+    t = model.root.engine.store.transforms;
+  model.nodes.forEach((from, i) => {
+    const a = from.id,
+      to = made.nodes[i];
+    to.setPosition([t.x[a], t.y[a], t.z[a]])
+      .setScale([t.sx[a], t.sy[a], t.sz[a]])
+      .setQuaternion([t.qx[a], t.qy[a], t.qz[a], t.qw[a]]);
+    to.visible = from.visible;
+  });
+  return made;
+}
 /** Radius of a model's bounds around their centre, in its root's units. */
 function modelRadius(model: PBRModel): number {
   const b = model.bounds,
@@ -235,11 +300,19 @@ async function modelLevels(
   count: number,
   signal?: AbortSignal,
 ): Promise<PBRModel[]> {
-  if (!isMaterialMesh(model)) throw new TypeError('autoLOD takes core meshes and materials meshes; pass one of those');
+  const made: PBRModel[] = [];
+  if (!isMaterialMesh(model)) {
+    for (let level = 0; level < count; level++) {
+      const next = await gltfLevel(model, simplified, level, signal);
+      next.root.setParent(model.root);
+      model.onDispose(() => next.dispose());
+      made.push(next);
+    }
+    return made;
+  }
   if ((model as { instances?: unknown }).instances)
     throw new TypeError('autoLOD needs one mesh, not instances; use LodInstances from @margoengine/culling/lod');
-  const { createMesh } = await materialsPackage(signal),
-    made: PBRModel[] = [];
+  const { createMesh } = await materialsPackage(signal);
   for (let level = 0; level < count; level++) {
     const parts = model.primitives.map((p) => simplified.get(p.definition)![level]);
     const mesh = createMesh(model.root.engine, meshGeometry(parts, slotsOf(model)), model.material, {
@@ -262,7 +335,8 @@ async function autoModelLOD(
   const simplify = await modeling(signal),
     simplified = new Map<PBRPrimitive['definition'], PackedGeometry[]>();
   for (const p of model.primitives)
-    if (!simplified.has(p.definition)) simplified.set(p.definition, simplifyPacked(simplify, p, ratios, signal));
+    if (!p.topology && !simplified.has(p.definition))
+      simplified.set(p.definition, simplifyPacked(simplify, p, ratios, signal));
   const made = await modelLevels(model, simplified, ratios.length, signal),
     levels: LODLevel[] = [{ object: ownNodes(model) }];
   made.forEach((object, i) => levels.push({ object, screen: screens[i] }));
@@ -276,10 +350,11 @@ const positionsOf = (geometry: Geometry, out = new Float32Array(geometry.vertice
 /**
  * Registers `mesh` in `system` with simplified copies of its own geometry as the lower levels. Loads
  * `@margoengine/mesh-edit` on first use. A core mesh's levels are core geometry, which holds positions and normals.
- * A materials mesh's levels are materials meshes on the same materials, keeping its UVs, tangents and colours; they
- * hang under its `root` and are disposed with it, and `shadows.add` and the like take each one like the source.
- * @throws TypeError for a mesh with no core geometry, or one with skins, morph targets or instances; RangeError for
- * ratios or screens that do not fit; the `signal`'s reason when it aborts.
+ * A materials mesh's or loaded model's levels are the same kind of object on the same materials, keeping its UVs,
+ * tangents and colours; they hang under its `root` and are disposed with it, a level of a model shares the source's GPU
+ * textures, and `shadows.add` and the like take each one like the source. Points and lines stay on level 0.
+ * @throws TypeError for a mesh with no core geometry, or one with skins or morph targets, or a materials mesh with
+ * instances; RangeError for ratios or screens that do not fit; the `signal`'s reason when it aborts.
  */
 export async function autoLOD(system: LODSystem, mesh: LODSource, options: AutoLODOptions = {}): Promise<LOD> {
   const { ratios = [0.5, 0.25, 0.125], crease = 60, signal } = options,
@@ -349,8 +424,9 @@ function mergePacked(
 /**
  * Hierarchical level of detail for still meshes: per cell of a world grid, one far mesh per material holds their
  * triangles in world space, and shows in place of those meshes past `distance`. Materials meshes merge with their UVs,
- * tangents and colours into one materials mesh per cell and material. Moving a source mesh afterwards does not move
- * its far mesh. The world matrices are read now: call it after a frame has placed the meshes.
+ * tangents and colours into one materials mesh per cell and material, and loaded models into one model per cell and
+ * asset, a primitive per material. Moving a source mesh afterwards does not move its far mesh. The world matrices are
+ * read now: call it after a frame has placed the meshes.
  * @throws TypeError when a mesh has no core geometry, or is a model with skins, morph targets or instances; RangeError
  * for options out of range; MargoError `'state'` for an empty list; the `signal`'s reason when it aborts.
  */
@@ -374,8 +450,8 @@ export async function hierarchicalLOD(
   for (const mesh of meshes) {
     if (isModel(mesh)) {
       check(mesh);
-      if (!isMaterialMesh(mesh) || (mesh as { instances?: unknown }).instances)
-        throw new TypeError('hierarchicalLOD takes core meshes and materials meshes without instances; pass one of those');
+      if ((mesh as { instances?: unknown }).instances || mesh.primitives.some((p) => p.instances))
+        throw new TypeError('hierarchicalLOD merges single meshes; pass models and meshes without instances');
       const b = mesh.bounds;
       for (let a = 0; a < 3; a++) point[a] = (b[a] + b[a + 3]) / 2;
     } else {
@@ -409,9 +485,54 @@ export async function hierarchicalLOD(
     const far: Mesh[] = [];
     let radius = 0;
     if (sources.length) {
-      const { createMesh } = await materialsPackage(signal),
-        byPart = new Map<Material, { primitive: PBRPrimitive; matrix: Float32Array }[]>();
-      for (const model of sources as (PBRModel & MaterialMesh<Material | readonly Material[]>)[]) {
+      const shaded = sources.filter(isMaterialMesh),
+        byPart = new Map<Material, { primitive: PBRPrimitive; matrix: Float32Array }[]>(),
+        byAsset = new Map<PBRModel['asset'], PBRModel[]>();
+      for (const model of sources)
+        if (!isMaterialMesh(model)) {
+          const list = byAsset.get(model.asset);
+          if (list) list.push(model);
+          else byAsset.set(model.asset, [model]);
+        }
+      // A loaded asset's far model: one primitive per material of the file, the file's textures shared.
+      for (const [asset, group] of byAsset) {
+        const parts = new Map<number | undefined, { primitive: PBRPrimitive; matrix: Float32Array }[]>();
+        for (const model of group)
+          for (const primitive of model.primitives) {
+            if (primitive.topology) continue;
+            const slot = primitive.definition.material,
+              list = parts.get(slot),
+              part = { primitive, matrix: primitive.node.matrix };
+            if (list) list.push(part);
+            else parts.set(slot, [part]);
+          }
+        const prepared: PackedGeometry[] = [],
+          records: PBRPrimitive[] = [];
+        for (const list of parts.values()) {
+          const whole = mergePacked(list, center),
+            kept = packedSimplify ? simplifyPacked(packedSimplify, whole, [ratio], signal)[0] : whole;
+          prepared.push(kept);
+          records.push(list[0].primitive);
+          for (let o = 0; o < kept.vertices.length; o += 20)
+            radius = Math.max(radius, Math.hypot(kept.vertices[o], kept.vertices[o + 1], kept.vertices[o + 2]));
+        }
+        const { scene: _scene, scenes: _scenes, skins: _skins, animations: _animations, ...doc } = asset.doc,
+          model = await modelFrom(
+            group[0],
+            {
+              ...doc,
+              nodes: [{ mesh: 0 }],
+              meshes: [{ primitives: [...parts.keys()].map((material) => ({ attributes: {}, material })) }],
+            },
+            [prepared],
+            records,
+            signal,
+          );
+        model.root.setPosition(center as [number, number, number]);
+        far.push(model.root);
+        models.push(model);
+      }
+      for (const model of shaded) {
         const material = model.material,
           list = Array.isArray(material) ? (material as readonly Material[]) : [material as Material];
         for (const primitive of model.primitives) {
@@ -422,10 +543,11 @@ export async function hierarchicalLOD(
           else byPart.set(slot, [part]);
         }
       }
+      const createMesh = shaded.length ? (await materialsPackage(signal)).createMesh : undefined;
       for (const [material, parts] of byPart) {
         const whole = mergePacked(parts, center),
           kept = packedSimplify ? simplifyPacked(packedSimplify, whole, [ratio], signal)[0] : whole,
-          mesh = createMesh(sources[0].root.engine, meshGeometry([kept]), material);
+          mesh = createMesh!(sources[0].root.engine, meshGeometry([kept]), material);
         for (let o = 0; o < kept.vertices.length; o += 20)
           radius = Math.max(radius, Math.hypot(kept.vertices[o], kept.vertices[o + 1], kept.vertices[o + 2]));
         mesh.root.setPosition(center as [number, number, number]);

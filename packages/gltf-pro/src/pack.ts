@@ -174,11 +174,16 @@ function pack(asset: GLTFAsset, p: GLTFPrimitive): PreparedGeometry {
       vertices[o + 6] = nz / length;
     }
     if (tangent) {
-      const t = i * 4;
-      vertices[o + 8] = tangent[t];
-      vertices[o + 9] = tangent[t + 1];
-      vertices[o + 10] = tangent[t + 2];
-      vertices[o + 11] = tangent[t + 3];
+      // Quantized tangents (KHR_mesh_quantization) come in about 1% off unit length. A zero one has no direction, so
+      // it gets sign 0, which makes the shader take the frame from the UV derivatives.
+      const t = i * 4,
+        size = Math.hypot(tangent[t], tangent[t + 1], tangent[t + 2]);
+      if (size) {
+        vertices[o + 8] = tangent[t] / size;
+        vertices[o + 9] = tangent[t + 1] / size;
+        vertices[o + 10] = tangent[t + 2] / size;
+        vertices[o + 11] = Math.sign(tangent[t + 3]);
+      }
     }
     if (uv0) {
       vertices[o + 12] = uv0[i * 2];

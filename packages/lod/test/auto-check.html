@@ -5,6 +5,7 @@ import {Engine,Geometry,box} from '/packages/core/dist/index.js';
 import {LODSystem} from '/packages/lod/dist/index.js';
 import {hierarchicalLOD,autoLOD} from '/packages/lod/dist/auto.js';
 import {createMesh,PbrMaterial,Texture} from '/packages/materials/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
 const sphere=(n)=>{const p=[],i=[];for(let y=0;y<=n;y++)for(let x=0;x<=n;x++){const a=x/n*Math.PI*2,b=y/n*Math.PI;p.push(Math.cos(a)*Math.sin(b),Math.cos(b),Math.sin(a)*Math.sin(b));}for(let y=0;y<n;y++)for(let x=0;x<n;x++){const c=y*(n+1)+x,d=c+n+1;i.push(c,d,c+1,c+1,d,d+1);}return new Geometry(p,p,i);};
 const canvas=document.querySelector('canvas'),camera={position:[0,20,20],target:[0,0,0],fov:60},errors=[];
 const engine=await Engine.create(canvas,{backend:'webgpu',camera}),device=engine.gpu;
@@ -58,6 +59,43 @@ const textured=async()=>{
   await frame();
   return {textured:out};
 };
+// A real file: many primitives, textures, shells that are not manifold. Levels draw lit, textured pixels, not black.
+const loaded=async()=>{
+  const model=await loadGLTF(engine,'/examples/assets/flight-helmet-mobile.glb');
+  const b=model.bounds,size=Math.hypot(b[3]-b[0],b[4]-b[1],b[5]-b[2]),centre=[0,1,2].map(i=>(b[i]+b[i+3])/2);
+  const triangles=m=>m.primitives.reduce((n,p)=>n+p.indices.length/3,0),before=triangles(model);
+  const started=performance.now(),lod=await autoLOD(system,model,{ratios:[0.5,0.1],screens:[0.5,0.1]}),build=performance.now()-started;
+  const image=()=>{
+    const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d');
+    engine.render();g.drawImage(canvas,0,0);
+    return g.getImageData(0,0,c.width,c.height).data;
+  };
+  // What `root` adds to the picture: the pixels that change when it hides, their mean colour and how much they vary.
+  const lit=(root=model.root)=>{
+    const d=image();root.visible=false;const empty=image();root.visible=true;
+    let n=0,colour=[0,0,0],square=0;
+    for(let i=0;i<d.length;i+=4)if(Math.abs(d[i]-empty[i])+Math.abs(d[i+1]-empty[i+1])+Math.abs(d[i+2]-empty[i+2])>12){
+      n++;colour[0]+=d[i];colour[1]+=d[i+1];colour[2]+=d[i+2];square+=d[i]*d[i];
+    }
+    const mean=colour.map(v=>v/(n||1));
+    return {pixels:n,colour:mean.map(Math.round),spread:Math.round(Math.sqrt(Math.max(0,square/(n||1)-mean[0]*mean[0])))};
+  };
+  const out={before,build:Math.round(build),triangles:lod.levels.slice(1).map(l=>triangles(l.object)),views:[]};
+  for(const far of [1.2,3,12]){
+    engine.camera.target=centre;engine.camera.position=[centre[0],centre[1],centre[2]+size*far];await frame();await frame();
+    out.views.push({level:lod.level,...lit()});
+  }
+  const second=await loadGLTF(engine,'/examples/assets/flight-helmet-mobile.glb');
+  lod.levels[0].object.visible=false;lod.levels[1].object.root.visible=false;lod.levels[2].object.root.visible=false;lod.remove();
+  second.root.setPosition([0,0,0]);await frame();
+  const built=await hierarchicalLOD(system,[second],{cell:1000,distance:size*2});
+  engine.camera.position=[centre[0],centre[1],centre[2]+size*1.2];await frame();await frame();
+  out.near={shown:second.root.visible};
+  engine.camera.position=[centre[0],centre[1],centre[2]+size*3];await frame();await frame();
+  out.far={shown:second.root.visible,meshes:built.meshes.length,...lit(built.meshes[0])};
+  built.remove();second.dispose();model.dispose();await frame();
+  return {loaded:out};
+};
 window.check={
   errors,
   async run(){
@@ -80,6 +118,7 @@ window.check={
     engine.camera.position=[0,400,400];await frame();await frame();result.ballFar=lod.level;
     ball.visible=false;
     Object.assign(result,await textured());
+    Object.assign(result,await loaded());
     return result;
   },
 };

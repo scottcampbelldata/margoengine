@@ -30,7 +30,7 @@ export interface HierarchicalLODOptions {
     signal?: AbortSignal;
 }
 
-export type LODSource = Mesh | MaterialMesh<Material | readonly Material[]>;
+export type LODSource = Mesh | MaterialMesh<Material | readonly Material[]> | PBRModel;
 
 export interface PackedGeometry {
     vertices: Float32Array;

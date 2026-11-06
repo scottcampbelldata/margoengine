@@ -171,4 +171,21 @@ const mesh = createMesh(stage.engine, sphereGeometry({radius: 1}), new PbrMateri
 const lod = await autoLOD(lods, mesh, {ratios: [0.5, 0.25]}); // levels hang under mesh.root and go with the mesh
 ```
 
+### Loaded models
+
+`autoLOD` and `hierarchicalLOD` take a `loadGLTF` model the same way. Each level is a model of the same file with the same node tree, its triangle primitives simplified: a primitive used by many nodes simplifies once, and every level holds the file's GPU textures, not a copy. Level 0 is the model's own nodes, so the model's `root` stays visible and you keep moving and hiding it as before. `hierarchicalLOD` makes one far model per cell and file, with a primitive per material.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {LODSystem} from 'margoengine/lod';
+import {autoLOD} from 'margoengine/lod/auto';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const lods = LODSystem.attach(stage.engine);
+const helmet = await loadGLTF(stage.engine, '/helmet.glb');
+const lod = await autoLOD(lods, helmet); // ratios 0.5, 0.25, 0.125
+```
+
+Skinned and morphed models are refused, since their levels would need a skeleton each: give the file `MSFT_lod` levels (`LOD.fromModel`) or bake an `Imposter`. A level copies the node transforms at the call and then stands still, so a node animated afterwards moves on level 0 only. Points and lines stay on level 0, and `hierarchicalLOD` leaves them out of the far model. A part too small to reach a ratio keeps its last triangles. A level's vertices are its own compact copy: three levels at the default ratios cost about 0.875 of the source's vertex memory. `selectVariant` on the source does not reach its levels.
+
 The levels are materials meshes of their own: pass each of `lod.levels.slice(1)` to `shadows.add` and the like as you do the source. `simplifyAttributes(geometry, ratios)` does the simplifying alone, on any packed `{vertices, indices}` such as a model's `primitive`. A material swapped on the source later does not reach its levels. A mesh with instances is refused: use `LodInstances` from `margoengine/culling/lod`. Faces mesh-edit cannot take (a third face on an edge, a flipped neighbour) simplify as separate sheets. mesh-edit's limit of 200,000 vertices or faces applies per primitive.

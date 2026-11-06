@@ -36,6 +36,18 @@ try {
   assert.equal(farAway.visible, false);
   assert.equal(farAway.meshes, 1, 'one material, one far mesh');
   assert.ok(farAway.red > 0 && farAway.green > 0, `the far mesh keeps the texture: ${JSON.stringify(farAway)}`);
+  const model = r.loaded;
+  assert.ok(model.triangles[0] < model.before * 0.65 && model.triangles[1] < model.triangles[0], `levels shrink: ${model.triangles}`);
+  assert.deepEqual(model.views.map((v) => v.level), [0, 1, 2], 'a loaded model walks its levels');
+  for (const v of model.views)
+    assert.ok(v.pixels > 0 && Math.max(...v.colour) > 40 && v.spread > 8, `lit and textured: ${JSON.stringify(v)}`);
+  assert.ok(model.views[0].pixels > model.views[1].pixels && model.views[1].pixels > model.views[2].pixels);
+  assert.equal(model.near.shown, true);
+  assert.equal(model.far.shown, false);
+  assert.ok(
+    model.far.meshes === 1 && model.far.pixels > 0 && model.far.spread > 8,
+    `the far model draws: ${JSON.stringify(model.far)}`,
+  );
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);
   assert.deepEqual(pageErrors, []);
 } finally {
