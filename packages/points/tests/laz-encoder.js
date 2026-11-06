@@ -406,7 +406,6 @@ class GpsEncoder {
       if (multi === 1) {
         enc.symbol(this.multi, 1);
         ic.compress(prev, d, 1);
-        if (!this.layered) this.diff[last] = d;
         this.extreme[last] = 0;
       } else if (multi > 1 && multi < MULTI) {
         enc.symbol(this.multi, multi);
