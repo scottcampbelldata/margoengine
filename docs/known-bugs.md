@@ -171,6 +171,13 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   pixel 96,142 reads 145 against 146; the close view adds a second. Same pixels on every run and in both culling modes. Without shadows 0 differ, and Chrome on
   the same M6 gives 0. Ruled out: matrices (positions sit on a grid of eighths, so a parent's sum is exact and both engines hold the same floats) and a shadow
   edge moving (that would be tens of levels). Likely the same per-module rounding as `sky`, not proved. No tolerance was raised.
+- **`scatter` `test:browser:shadow-cull`, Chrome on the M6 only: the blades frame flips between two images.** `blades: frame bytes differ`, 254 bytes most often (3 to
+  1,227 seen), failing about 3 runs in 4. Two draws in the same mode differ too: about 1,040 bytes, at most 4 levels, all in the distant grass (y 163 to 216 of the frame),
+  so it has nothing to do with shadow culling, and shadow map texels match in every run. WebKit and the A6000 pass. It fails the same with the colour clamp of 2026-11-05
+  taken out. Likely the order the cull pass's atomics write instances in, which decides depth ties among far blades. Not proved. Repro: `MARGO_BROWSER=chrome node packages/scatter/test/shadow-cull.browser.mjs`.
+- **`lines` on the WebGL2 compatibility layer crashes the Chrome tab on the M6 about 4 runs in 6.** `webgl2-compat` `test:gpu`, last steps; repro:
+  `cd packages/lines && MARGO_BROWSER=chrome node scripts/test-browser.js --compat`, `Target crashed` in `runGallery`. The gallery alone, without `runLineTests` first, ran 8 of 8,
+  so it depends on what the earlier tests leave alive. WebKit and the A6000 pass. It was hidden until now, as the chain stopped at the sRGB check. Cause not found.
 - **Playwright WebKit sometimes drops to 20 or 30 FPS after navigating in the same tab.** `examples/voxel-sandbox`, `quality=high`, 1920 x 1000, 60 Hz display:
   in chains of five same-tab loads, 7 of 30 loads ran at 30 FPS, then the rate came back by itself on a later load. Never on the first load of a browser (0 of 11 chains),
   and not at 1280 x 720 (0 of 11 loads). First seen as 20 (light then high) and 30 (high then high), with the rate of the page's own `requestAnimationFrame` the same, frame CPU
