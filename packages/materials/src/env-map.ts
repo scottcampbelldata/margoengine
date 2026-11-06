@@ -96,6 +96,8 @@ function edit(code: string, from: string | RegExp, to: string): string {
 }
 const surfaces = new Map<string, string>(),
   lit = new Map<string, string>();
+// gltf-pro evaluates an ambient term on changed surfaces for these two: the thin film's Fresnel, the anisotropic bent normal.
+const layeredLobes = (code: string) => code.includes('fn margoBent(') || code.includes('fn margoIridescence(');
 /**
  * `code` (a material's shader before lighting effects) reading the environment map: standard shading's ambient (and a
  * physical material's clearcoat and sheen ambient), or basic shading's output colour. Lambert and Phong combine in
@@ -105,16 +107,19 @@ export function envMapShader(code: string, group: number, shading: 'standard' | 
   const key = shading + group + ':' + code;
   let out = surfaces.get(key);
   if (out !== undefined) return out;
+  const layers = shading === 'standard' && layeredLobes(code);
   out = edit(
     code,
     'fn surface(i:Out,front:bool)->Surface {',
-    'fn surface(i:Out,front:bool)->Surface {\n  margoEnvEye=normalize(f.eye.xyz-i.position);_=margoEnvMap;_=margoEnvSampler;_=&margoEnv;',
+    `fn surface(i:Out,front:bool)->Surface {\n  margoEnvEye=normalize(f.eye.xyz-i.position);_=margoEnvMap;_=margoEnvSampler;_=&margoEnv;${layers ? 'margoEnvIn=i;' : ''}`,
   );
   if (shading === 'standard') {
     out = edit(
       out,
       /fn ambient\(s:Surface\)->vec3f \{[^}]*\}/,
-      'fn ambient(s:Surface)->vec3f {return margoEnvAmbient(s,margoEnvEye);}',
+      layers
+        ? 'fn ambient(s:Surface)->vec3f {return margoAmbientLayers(margoEnvIn,s,margoEnvEye);}'
+        : 'fn ambient(s:Surface)->vec3f {return margoEnvAmbient(s,margoEnvEye);}',
     );
     if (out.includes('fn margoCoatAmbient('))
       out = edit(
@@ -140,8 +145,11 @@ export function envMapShader(code: string, group: number, shading: 'standard' | 
     declarations(
       group,
       code.includes(' f0:vec3f') ? 's.f0' : 'vec3f(0.04)',
-      code.includes(' tr:f32') ? '(1-s.tr)' : '1.0',
-    ) + out;
+      // margoAmbientLayers passes the surface with the transmitted share already taken out.
+      code.includes(' tr:f32') && !layers ? '(1-s.tr)' : '1.0',
+    ) +
+    (layers ? 'var<private> margoEnvIn:Out;\n' : '') +
+    out;
   if (surfaces.size >= 64) surfaces.clear();
   surfaces.set(key, out);
   return out;
@@ -155,7 +163,19 @@ export function envMapLit(code: string, shading: 'standard' | 'basic' | 'lit'): 
   const key = shading + ':' + code;
   let out = lit.get(key);
   if (out !== undefined) return out;
-  if (shading === 'standard')
+  if (shading === 'standard' && layeredLobes(code))
+    // The map takes the term's place, so every changed surface reads it; the scene's term stays for its bindings.
+    out = code
+      .replace(
+        /fn margoAmbientTerm\(i:Out,s:Surface,v:vec3f\)->vec3f \{return ([^;]*);\}/,
+        (_, scene) =>
+          `fn margoSceneTerm(i:Out,s:Surface,v:vec3f)->vec3f {return ${scene};}\nfn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return margoEnvAmbient(s,v);}`,
+      )
+      .replace(
+        'let margoAmbient=margoAmbientLayers(i,s,v);',
+        'let margoSceneAmbient=margoSceneTerm(i,s,v);let margoAmbient=margoAmbientLayers(i,s,v);',
+      );
+  else if (shading === 'standard')
     out = code.replace(
       /let margoAmbient=([^;]*);/,
       (_, scene) => `let margoSceneAmbient=${scene};let margoAmbient=margoEnvAmbient(s,v);`,

@@ -6,6 +6,10 @@ import {Engine} from '/packages/core/dist/index.js';
 import {KTX2LayerDecoder} from '/packages/decoders/dist/ktx2-layers.js';
 import {CubeTexture,NormalMaterial,PbrMaterial,UnlitMaterial,Texture,WgslMaterial,createMesh,createInstancedMesh,loadKTX2Texture} from '/packages/materials/dist/index.js';
 import {alphaHash} from '/packages/materials/dist/alpha-hash.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {DirectionalLights} from '/packages/clustered/dist/directional.js';
+import {AreaLights} from '/packages/clustered/dist/area.js';
+import {physicalLobes} from '/packages/clustered/dist/physical-lobes.js';
 import {prefilterCube} from '/packages/materials/dist/prefilter.js';
 import {mipTexture} from '/packages/materials/dist/mips.js';
 import {layered} from '/packages/materials/dist/layered.js';
@@ -71,7 +75,61 @@ const specularRed=async(device,env,level,face=4)=>{
   const float=h=>{const e=(h>>10)&31,m=h&1023;return e?(1+m/1024)*2**(e-15):m/1024*2**-14;};
   return float(half[(edge/2)*row/2+(edge/2)*4]);
 };
+// The surfaces of the lobes checks: black under the lobe, so what shows is the lobe.
+const lobeSurfaces={
+  coat:{color:[0,0,0,1],clearcoat:1,clearcoatRoughness:0.3},
+  sheen:{color:[0,0,0,1],sheenColor:[1,1,1],sheenRoughness:0.5},
+  film:{color:[0.2,0.2,0.2,1],metalness:1,roughness:0.3,iridescence:1,iridescenceThicknessRange:[400,400]},
+  plainFilm:{color:[0.2,0.2,0.2,1],metalness:1,roughness:0.3},
+  grain:{color:[0.8,0.8,0.8,1],metalness:1,roughness:0.4,anisotropy:0.9},
+  plainGrain:{color:[0.8,0.8,0.8,1],metalness:1,roughness:0.4},
+};
+// Light from straight ahead, tilted a little, with no ambient: the sun, or a clustered light of the same illuminance at the
+// quad's middle. Each surface gets enough of it to stay above the tone curve's dark end.
+const toward=[0.3,0.2,1],lobePower={coat:16,sheen:64,film:2,grain:1};
 window.check={
+  // The linear colour at the quad's middle under one kind of light.
+  async lobe({surface,light,lobes}){
+    const made=await scene(front),{engine,errors,render}=made;
+    const power=lobePower[surface],away=toward.map(v=>-v),at2=toward.map(v=>v*2),far=at2.reduce((sum,v)=>sum+v*v,0)*power;
+    engine.lighting.direction.set([...toward,light==='sun'?power:0]);engine.lighting.radiance.set([1,1,1,0]);
+    const lights=light==='sun'?undefined:Clustered.attach(engine);
+    if(lights&&lobes)lights.lobes=physicalLobes;
+    if(light==='directional')DirectionalLights.attach(engine,{lights}).setLights([{direction:away,color:[1,1,1],intensity:power}]);
+    if(light==='point')lights.setLights([{position:at2,color:[1,1,1],intensity:far,range:1e6}]);
+    if(light==='spot')lights.setLights([{position:at2,direction:away,outerAngle:0.8,color:[1,1,1],intensity:far,range:1e6}]);
+    if(light==='area')AreaLights.attach(engine,{lights}).setLights([{position:at2,direction:away,width:1,height:1,color:[1,1,1],intensity:far}]);
+    const mesh=createMesh(engine,quad(),new PbrMaterial({...lobeSurfaces[surface],...(surface==='grain'?{anisotropyRotation:0.6}:{})}));
+    lights?.add(mesh);
+    await render();
+    const d=await pixels(made);engine.dispose();
+    return {color:at(d,128,128),errors};
+  },
+  // Every lobe, every kind of light and an envMap on one surface: the composed shader compiles, and `lobes` swaps live.
+  async lobeAll(){
+    const made=await scene(front),{engine,errors,render}=made,away=toward.map(v=>-v),at2=toward.map(v=>v*2);
+    engine.lighting.direction.set([...toward,1]);engine.lighting.radiance.set([1,1,1,0.2]);
+    const lights=Clustered.attach(engine);lights.lobes=physicalLobes;
+    DirectionalLights.attach(engine,{lights}).setLights([{direction:away,intensity:1}]);
+    AreaLights.attach(engine,{lights}).setLights([{position:at2,direction:away,width:1,height:1,intensity:4}]);
+    lights.setLights([{position:at2,color:[1,1,1],intensity:4,range:20}]);
+    const mesh=createMesh(engine,quad(),new PbrMaterial({color:[0.5,0.5,0.5,1],metalness:0.5,roughness:0.4,clearcoat:1,clearcoatRoughness:0.3,sheenColor:[1,1,1],sheenRoughness:0.5,iridescence:1,iridescenceThicknessRange:[400,400],anisotropy:0.7,transmission:0.3,envMap:cubeOf([0,1,2,3,4,5].map(()=>cubeFace(white,black)))}));
+    lights.add(mesh);
+    const seen=async()=>{await render();const d=await pixels(made);return at(d,128,128);};
+    const on=await seen();lights.lobes=undefined;const off=await seen();lights.lobes=physicalLobes;const back=await seen();
+    engine.dispose();return {on,off,back,errors};
+  },
+  // A striped sky reflected by a surface with an envMap: what the film and the grain change.
+  async lobeEnv(surface){
+    const made=await scene(front),{engine,errors,render}=made;
+    engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([1,1,1,0]);
+    const stripes=()=>{const n=64,d=new Uint8Array(n*n*4);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const v=(x>>4)%2?255:40;d.set([v,v,v,255],(y*n+x)*4);}return {data:d,width:n,height:n};};
+    const sky=new CubeTexture([0,1,2,3,4,5].map(stripes));
+    createMesh(engine,quad(),new PbrMaterial({...lobeSurfaces[surface],...(surface==='grain'?{anisotropyRotation:0.6}:{}),envMap:sky}));
+    await render();
+    const d=await pixels(made),grid=[];let sum=[0,0,0],n=0;for(let y=32;y<224;y+=8)for(let x=32;x<224;x+=8){const c=at(d,x,y);c.forEach((v,k)=>sum[k]+=v);grid.push(...c);n++;}
+    engine.dispose();return {color:sum.map(v=>v/n),grid,errors};
+  },
   // Other kinds of cube, seen as a mirror through the cube itself and through what prefilterCube made of it.
   async prefilterSource(kind){
     const made=await scene(front,compression),{engine,errors,render}=made,device=engine.gpu;

@@ -126,6 +126,8 @@ fn margoSkyHook(n:vec3f)->vec3f {return ${hooks.sky};}
     );
   }
   out = hooks.declarations + out;
+  // Last, on the composed text: it reads what the other hooks wrote.
+  if (hooks.finish) out = hooks.finish(out);
   if (!cache) lit.set(hooks, (cache = new Map()));
   if (cache.size >= 64) cache.clear();
   cache.set(code, out);

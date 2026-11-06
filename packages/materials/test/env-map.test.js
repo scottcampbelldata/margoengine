@@ -17,7 +17,7 @@ import {
   UnlitMaterial,
   createMesh,
 } from '../dist/index.js';
-import { pbrShader } from '../../gltf-pro/src/shader.ts';
+import { extendedShader, pbrShader } from '../../gltf-pro/src/shader.ts';
 
 async function scene() {
   const gpu = mockGPU(),
@@ -94,6 +94,25 @@ test('an envMap of 32-bit floats is refused without float32-filterable, instead 
   assert.throws(() => s.frame(), /float32-filterable.*prefilterCube/);
   s.gpu.device.features = new Set(['float32-filterable']);
   assert.ok(groups(s.frame()).some((b) => b.includes(188)));
+});
+
+test('a thin film or anisotropic surface reads its envMap through margoAmbientLayers, over a scene IBL too', async () => {
+  const s = await scene(),
+    own = s.gpu.device.createTexture({ size: [8, 8, 6], format: 'rgba16float', mipLevelCount: 4 }),
+    mesh = createMesh(s.engine, quad, new PbrMaterial({ envMap: own, iridescence: 1 })),
+    all = codes(s.frame()),
+    code = all.find((c) => c.includes('margoEnvIn'));
+  assert.ok(code.includes('fn ambient(s:Surface)->vec3f {return margoAmbientLayers(margoEnvIn,s,margoEnvEye);}'));
+  assert.ok(code.includes('margoEnvIn=i;'));
+  assert.ok(code.includes('fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return margoEnvAmbient(s,v);}'));
+  const shading = mesh.primitives[0].material.shading,
+    slots = new Array(32).fill(-1),
+    plan = { slots, iridescence: true, anisotropy: true, diffuseTransmission: false },
+    ibl = { declarations: '// ibl\n', ambient: 'iblShade(s.n,v)' },
+    lit = shading.lit(lightPBR(shading.shader(extendedShader(plan), 2), ibl));
+  assert.ok(lit.includes('fn margoSceneTerm(i:Out,s:Surface,v:vec3f)->vec3f {return iblShade(s.n,v);}'));
+  assert.ok(lit.includes('fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return margoEnvAmbient(s,v);}'));
+  assert.ok(lit.includes('let margoSceneAmbient=margoSceneTerm(i,s,v);let margoAmbient=margoAmbientLayers(i,s,v);'));
 });
 
 test('standard envMap replaces the ambient light, also over a scene IBL, and binds the cube and uniform', async () => {

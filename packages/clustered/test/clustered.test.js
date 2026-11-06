@@ -232,3 +232,21 @@ test('clustered: an offset view sizes the grid to its rectangle and offsets frag
     lights.dispose();
   }
 });
+
+test('physicalLobes leaves a shader without lobes alone, and weighs every light of one with them', async () => {
+  const { physicalLobes } = await import('../dist/physical-lobes.js');
+  const { clusterBrdf } = await import('../../shared/light-terms.js');
+  const term = 'result+=' + clusterBrdf + '*nl*';
+  const plain = `@fragment fn fragment(i:Out)->@location(0) vec4f {\n  let s=surface(i,front);\n  ${term}light.color.rgb;`;
+  assert.equal(physicalLobes.finish(plain), plain);
+  const physical = `fn layers(s:Surface,v:vec3f,l:vec3f,under:vec3f)->vec3f {}\n${plain}${term}falloff*cone;\n  color=layers(s,v,l,color);`;
+  const out = physicalLobes.finish(physical);
+  assert.equal(out.match(/clusterLobeLight\+=clusterLobes\(v,l\)\*clusterWeight;/g).length, 2);
+  assert.match(out, /let s=surface\(i,front\);clusterSurface=s;/);
+  assert.match(out, /color=layers\(s,v,l,color\);color\+=clusterLobeLight\*clusterFrame\.intensity\.x;/);
+  assert.doesNotMatch(out, /margoDirect/, 'isotropic physical shaders keep the loop BRDF');
+  assert.doesNotMatch(out, /clusterAreaLighting/);
+  const full = physicalLobes.finish(`fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {}\nfn clusterAreaLighting() {}\n${physical}`);
+  assert.match(full, /result\+=margoDirect\(clusterSurface,v,l\)\*clusterWeight;/);
+  assert.match(full, /if\(s\.cc>0\.0\)\{clusterLobeLight\+=s\.cc\*clusterAreaLighting\(/);
+});

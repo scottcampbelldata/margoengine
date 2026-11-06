@@ -107,6 +107,10 @@ export interface ClusteredArea {
   /** The castShadow area lights, for the `shadow` hook's maps. */
   shadowLights?(): readonly AreaShadowLight[];
 }
+/** The `Clustered.lobes` hook (`physicalLobes` from `@margoengine/clustered/physical-lobes`): edits a composed PBR shader. */
+export interface ClusteredLobes {
+  finish(code: string): string;
+}
 /** The `Clustered.directional` hook (`DirectionalLights`): WGSL defining `clusterDirectional` and its bindings. */
 export interface ClusteredDirectional {
   /** WGSL declarations in bind group `group`. */
@@ -180,7 +184,8 @@ export class Clustered implements EnginePlugin {
   private readonly view = this.values.subarray(0, 16);
   private readonly shaders = new Map<string, Map<string, string>>();
   private readonly localShadows?: LocalShadowMaps;
-  private readonly hooks = new Map<number, { declarations: string; light: string }>();
+  private lobesHook?: ClusteredLobes;
+  private readonly hooks = new Map<number, { declarations: string; light: string; finish?: (code: string) => string }>();
   private shadowHook?: ClusteredShadow;
   private areaHook?: ClusteredArea;
   private directionalHook?: ClusteredDirectional;
@@ -207,6 +212,14 @@ export class Clustered implements EnginePlugin {
   }
   set area(hook: ClusteredArea | undefined) {
     this.areaHook = hook;
+    this.reset();
+  }
+  /** Clearcoat, sheen, anisotropy and thin film under these lights (`@margoengine/clustered/physical-lobes`). */
+  get lobes(): ClusteredLobes | undefined {
+    return this.lobesHook;
+  }
+  set lobes(hook: ClusteredLobes | undefined) {
+    this.lobesHook = hook;
     this.reset();
   }
   /** Extra directional lights (`@margoengine/clustered/directional`), evaluated per fragment beside the point and spot lights. */
@@ -431,7 +444,7 @@ export class Clustered implements EnginePlugin {
     return joined![6]!;
   }
   /** gltf-pro lighting hooks in bind group `group`; `shadows: false` leaves out local-light shadows (see `add`). */
-  pbr(group: number, shadows = true): { declarations: string; light: string } {
+  pbr(group: number, shadows = true): { declarations: string; light: string; finish?: (code: string) => string } {
     // Hooks and shaders without shadows are cached under -1 - group.
     const key = shadows ? group : -1 - group;
     let hook = this.hooks.get(key);
@@ -439,6 +452,7 @@ export class Clustered implements EnginePlugin {
       hook = {
         declarations: this.sampling(group, shadows),
         light: 'clusterLighting(i.clip.xy,i.position,s.n,f.eye.xyz,s.base.rgb,s.roughness,s.metal,s.f0,s.sw)',
+        ...(this.lobesHook ? { finish: (code: string) => this.lobesHook!.finish(code) } : {}),
       };
       this.hooks.set(key, hook);
     }

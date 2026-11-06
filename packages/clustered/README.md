@@ -68,6 +68,32 @@ point lights' GGX and Lambert BRDF text, so materials' Lambert and Phong shade t
 shader's group) and the shader code exist only while the list is not empty: an empty or absent `DirectionalLights`
 leaves every GPU call unchanged. `lights.list` and `suns.list` return the lists last set (frozen copies).
 
+## Every lobe under every light
+
+A clustered light reaches a physical material as plain GGX on the base by default. `physicalLobes` lights its other
+layers too: clearcoat, sheen, anisotropy and the thin film answer every point, spot and extra directional light, with the
+same falloff, cone, profile and shadow as the base, and clearcoat answers every area light. Shaders without those lobes
+keep their text, and the code loads only if you import it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {physicalLobes} from 'margoengine/clustered/physical-lobes';
+import {PbrMaterial, createMesh} from 'margoengine/materials';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const lights = Clustered.attach(engine);
+lights.lobes = physicalLobes; // set it to undefined to go back
+lights.setLights([{position: [0, 2, 1], color: [1, 1, 1], intensity: 8, range: 20}]);
+const panel = {positions: [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2, 0, 2, 3]};
+lights.add(createMesh(engine, panel, new PbrMaterial({color: [0.1, 0, 0, 1], clearcoat: 1})));
+```
+
+Area lights light the coat through its own Linearly Transformed Cosines; their sheen, anisotropy and thin film stay out,
+because each would need its own fitted table. The `clearcoat()` model extension of `@margoengine/materials` keeps its coat
+under the directional light only. Cost: a second GGX and a sheen term per light, on physical materials alone. Set
+`lights.lobes` yourself: shaders compose synchronously, so the entry cannot load itself when a physical surface appears.
+
 ## Flicker and a shadow budget
 
 Two small entries that work on your light list, on the CPU.

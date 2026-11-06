@@ -27,6 +27,8 @@ export class Clustered implements EnginePlugin {
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
     set area(hook: ClusteredArea | undefined);
+    get lobes(): ClusteredLobes | undefined;
+    set lobes(hook: ClusteredLobes | undefined);
     get directional(): ClusteredDirectional | undefined;
     set directional(hook: ClusteredDirectional | undefined);
     get ies(): ClusteredLightTerm | undefined;
@@ -46,6 +48,7 @@ export class Clustered implements EnginePlugin {
     pbr(group: number, shadows?: boolean): {
         declarations: string;
         light: string;
+        finish?: (code: string) => string;
     };
     shader(source: string, group?: number, shadows?: boolean): string;
     setup(engine: Engine): void;
@@ -86,6 +89,10 @@ export interface ClusteredLighting {
     };
     shader(source: string, group?: number): string;
     bindings(): GPUBindGroupEntry[];
+}
+
+export interface ClusteredLobes {
+    finish(code: string): string;
 }
 
 export interface ClusteredOptions {

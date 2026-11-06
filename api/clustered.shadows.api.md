@@ -100,6 +100,8 @@ class Clustered implements EnginePlugin {
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
     set area(hook: ClusteredArea | undefined);
+    get lobes(): ClusteredLobes | undefined;
+    set lobes(hook: ClusteredLobes | undefined);
     get directional(): ClusteredDirectional | undefined;
     set directional(hook: ClusteredDirectional | undefined);
     get ies(): ClusteredLightTerm | undefined;
@@ -119,6 +121,7 @@ class Clustered implements EnginePlugin {
     pbr(group: number, shadows?: boolean): {
         declarations: string;
         light: string;
+        finish?: (code: string) => string;
     };
     shader(source: string, group?: number, shadows?: boolean): string;
     setup(engine: Engine): void;
@@ -159,6 +162,10 @@ interface ClusteredLighting {
     };
     shader(source: string, group?: number): string;
     bindings(): GPUBindGroupEntry[];
+}
+
+interface ClusteredLobes {
+    finish(code: string): string;
 }
 
 interface ClusteredOptions {

@@ -66,8 +66,9 @@ Batches 1 to 3 are phase 1. Batches 19 and 21 are partly done, each with one job
 | [30](#batch-30-lod) | lod | 7 | 7 | 0 | 0 | 0 |
 | [31](#batch-31-shader-part-1-of-2) | shader | 8 | 8 | 0 | 0 | 0 |
 | [32](#batch-32-shader-part-2-of-2) | shader | 4 | 4 | 0 | 0 | 0 |
+| [33](#batch-33-materials-part-1-of-2) | materials | 8 | 8 | 0 | 0 | 0 |
 | [38](#batch-38-gltf) | gltf | 6 | 6 | 0 | 0 | 0 |
-| Total | | 175 | 167 | 2 | 4 | 2 |
+| Total | | 183 | 175 | 2 | 4 | 2 |
 
 ## Batch 1: fixes (part 1 of 3)
 
@@ -810,6 +811,52 @@ the hardware's optional features.
   10.1 to 13.2 kB, recorded with its reason in the size gate. `noise-check` split its passes when job 2 took it past the 8
   storage buffers a stage binds by default. Job 3's first ship failed `verify`: `tests/compilation-info-at-creation.test.js`
   wants the request a few lines from `createShaderModule`, and the new module call had pushed it away. Nothing failed reached
+  `main`.
+
+## Batch 33: materials (part 1 of 2)
+
+Surfaces that stop looking like a special case: soft cut-outs with no sorting, normal maps straight from a baker, compressed
+cube and array textures, layers and detail, hand-made mips, and rough metal and coated paint that look the same under any light.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Hashed alpha | DONE | `46e511d4e` | `@margoengine/materials/alpha-hash` | LIM-214 |
+| 2 | Object-space normal maps | DONE | `689555928` | `/object-normal` | LIM-216 |
+| 3 | KTX2 cube and array textures | DONE | `cbfbe9393` | none (`loadKTX2Texture`, `KTX2LayerDecoder.upload`) | LIM-219 |
+| 4 | Layered materials and detail maps | DONE | `5e58458e2` | `/layered` | LIM-221 |
+| 5 | Your own mip levels | DONE | `c112c486c` | `/mips` | LIM-224 |
+| 6 | Alpha to coverage | DONE | `b86b29180` | none (`alphaToCoverage` option) | LIM-225 |
+| 7 | GGX-prefiltered CubeTexture | DONE | `45c31f1ab` | `/prefilter` | LIM-228 |
+| 8 | Every lobe lit by every light | DONE | this commit | `@margoengine/clustered/physical-lobes` | LIM-230 |
+
+- **Bugs:** `af185850f` fixes a hook order in the voxel-net server tests that left a server open and hung `verify`, 3 of 192 runs
+  before and 0 of 256 after (`packages/voxel-net/tests/server.test.js`). Two fixes sit in job 4's `feat` commit: a feature's
+  normal map on a mesh with no tangents had green pointing the wrong way, now set right by `MaterialFeature.tangentFrame` (compared
+  with a plain `normalMap`), and a clamped Texture on a tiled map smeared silently and is now refused (`features.test.js`). Job 3
+  corrected the decoders README, which called classic worker scripts module workers. Job 7 found that an `envMap` of 32-bit
+  float texels failed WebGPU validation on a device without `float32-filterable`; it now throws the coded error a map slot throws
+  (`env-map.test.js`).
+- **Proved:** a real GPU check per job in `packages/materials/test/features-browser.mjs`. Job 3 is on real KTX-Software files, each
+  image hashed against `ktx extract`. Job 5 is stand-in proof only: its chains are solid colours, no mip chain from a real tool
+  has been loaded. Jobs 2, 4 and 6 also draw stand-in maps. Job 7 reads the stored levels against a GGX integral worked out in the test: a
+  stand-in cube with one bright face holds 0.893 and 0.542 of it at roughness 0.5 and 1, against 0.897 and 0.554 integrated, where
+  a box-filtered cube stays at 1. A real sky from a KTX2 file, an equirectangular image and float faces are checked only to keep
+  their picture and range through the filter. Job 8 compares each lobe with the same illuminance from the sun at the
+  middle of a flat quad, within 0.02 under directional, point and spot lights, and each misses it without the hook. The coat under
+  an area light reads 0.537 against 0.516 summed over the panel, a 4% gap from the fitted table. Job 8's first draft of this
+  test could not fail: at its light levels the coat and sheen sat at the tone curve's dark end, under the tolerance, so the
+  powers were raised until each lobe showed.
+- **Limits:** area lights reach the coat only, since sheen, anisotropy and thin film would each need a fitted table. The `clearcoat()`
+  model extension keeps its coat under the directional light. `lights.lobes` is set by hand, because shaders compose
+  synchronously and the entry cannot load itself. A prefiltered cube does not follow later changes to its source and needs
+  `@margoengine/environment`, an optional peer of materials. The default TAA resolve cannot average hashed alpha; it needs
+  `stochastic`. Alpha to coverage needs a multisampled target and falls back to the plain test elsewhere.
+- **Unmeasured:** no timing was taken in this batch. The per-light cost of the coat, TAA's `stochastic` mode and layered materials
+  are queued for the quiet speed pass. Only an RTX A6000 has run these checks. No rough real sky has been compared with another
+  renderer, and physical lobes have run on a flat quad only.
+- **Gate:** core and stage were not touched. The new entries are recorded in the size gate; `/prefilter` is 1,933 B. A failed
+  `after` hook that leaves a server open can still hang `verify` with no test named: `--test-force-exit` was not added here, and
+  that hang is Lane G's. Job 7's first GPU run failed on `target`, a reserved word in WGSL, before anything was committed. Nothing failed reached
   `main`.
 
 ## Batch 38: gltf

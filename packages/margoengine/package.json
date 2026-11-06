@@ -342,6 +342,10 @@
       "types": "./dist/clustered/projector.d.ts",
       "import": "./dist/clustered/projector.js"
     },
+    "./clustered/physical-lobes": {
+      "types": "./dist/clustered/physical-lobes.d.ts",
+      "import": "./dist/clustered/physical-lobes.js"
+    },
     "./clustered/units": {
       "types": "./dist/clustered/units.d.ts",
       "import": "./dist/clustered/units.js"

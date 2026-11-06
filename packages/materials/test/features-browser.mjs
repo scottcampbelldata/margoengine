@@ -17,6 +17,77 @@ const check = (name, ...args) => page.evaluate(([n, a]) => window.check[n](...a)
 const near = (a, b, label, tolerance = 0.02) =>
   a.forEach((v, k) => assert.ok(Math.abs(v - b[k]) <= tolerance, `${label}: ${a} should be ${b}`));
 const jobs = {
+  async lobes() {
+    const run = async (o) => {
+      const r = await page.evaluate((v) => window.check.lobe(v), o);
+      assert.deepEqual(r.errors, [], JSON.stringify(o));
+      return r.color;
+    };
+    const luma = (c) => c[0] + c[1] + c[2];
+    // The same light as the sun and as each clustered kind: every lobe answers them alike at the quad's middle, and
+    // without the hook it does not, which is the gap this closes.
+    for (const surface of ['coat', 'sheen', 'film', 'grain']) {
+      const sun = await run({ surface, light: 'sun' });
+      assert.ok(luma(sun) > 0.05, `${surface} shows: ${sun}`);
+      for (const light of ['directional', 'point', 'spot']) {
+        const plain = await run({ surface, light }),
+          lit = await run({ surface, light, lobes: true });
+        near(lit, sun, `${surface} under a clustered ${light} light`, 0.02);
+        const gap = plain.reduce((sum, v, k) => sum + Math.abs(v - sun[k]), 0);
+        assert.ok(gap > 0.03, `${surface} under a ${light} light without the hook: ${plain} against ${sun}`);
+        console.log(`lobes ${surface} ${light}: sun ${sun}, plain ${plain}, lit ${lit}`);
+      }
+    }
+    // The coat under an area light, against the coat's GGX summed over the panel here, apart from the shader's fitted
+    // table. The tone curve takes 0.04 off above 0.08 and is 6.25 x^2 below it; the base under the coat keeps 96%.
+    const [dark] = await run({ surface: 'coat', light: 'area' }),
+      [coated] = await run({ surface: 'coat', light: 'area', lobes: true }),
+      panelCoat = () => {
+        const unit = (v) => v.map((x) => x / Math.hypot(...v)),
+          dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+          cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+          centre = [0.6, 0.4, 2],
+          facing = unit(centre),
+          right = unit(cross([0, 1, 0], facing)),
+          up = cross(facing, right),
+          a2 = 0.3 ** 4,
+          steps = 200;
+        let sum = 0;
+        for (let i = 0; i < steps; i++)
+          for (let j = 0; j < steps; j++) {
+            const a = (i + 0.5) / steps - 0.5,
+              b = (j + 0.5) / steps - 0.5,
+              p = centre.map((x, k) => x + a * right[k] + b * up[k]),
+              l = unit(p),
+              nl = l[2],
+              nh = unit([l[0], l[1], l[2] + 1])[2],
+              d = a2 / (Math.PI * (nh * nh * (a2 - 1) + 1) ** 2),
+              g = (2 / (1 + 1)) * ((2 * nl) / (nl + Math.sqrt(a2 + (1 - a2) * nl * nl)));
+            sum += ((d * g) / 4) * (dot(l, facing) / dot(p, p) / steps ** 2);
+          }
+        return 0.04 * sum * dot(centre, centre) * 16;
+      },
+      under = 0.96 * Math.sqrt(dark / 6.25),
+      seen = coated + 0.04 - under,
+      want = panelCoat();
+    assert.ok(Math.abs(seen / want - 1) < 0.1, `coat under an area light: ${seen}, summed ${want}`);
+    console.log(`lobes coat area: ${seen} against ${want}`);
+    const all = await page.evaluate(() => window.check.lobeAll());
+    assert.deepEqual(all.errors, []);
+    assert.ok(luma(all.on) > 0.05 && all.on.every(Number.isFinite), `${all.on}`);
+    assert.ok(all.on.some((v, k) => Math.abs(v - all.off[k]) > 0.01), `lobes off: ${all.on} -> ${all.off}`);
+    near(all.back, all.on, 'lobes back on', 0.001);
+    for (const [surface, plainSurface] of [['film', 'plainFilm'], ['grain', 'plainGrain']]) {
+      const seen = await page.evaluate((s) => window.check.lobeEnv(s), surface),
+        plain = await page.evaluate((s) => window.check.lobeEnv(s), plainSurface);
+      assert.deepEqual([...seen.errors, ...plain.errors], []);
+      const change = seen.grid.reduce((sum, v, k) => sum + Math.abs(v - plain.grid[k]), 0) / seen.grid.length;
+      assert.ok(change > 0.005, `${surface} reads the envMap: ${change}, ${plain.color} -> ${seen.color}`);
+      console.log(`lobes ${surface} on an envMap: ${change}, ${plain.color} -> ${seen.color}`);
+      // The film tints the map as it tints the sun's highlight: green over blue over red at this thickness.
+      if (surface === 'film') assert.ok(seen.color[1] > seen.color[2] && seen.color[2] > seen.color[0], `${seen.color}`);
+    }
+  },
   async prefilter() {
     const r = await page.evaluate(() => window.check.prefilter());
     assert.deepEqual(r.errors, []);

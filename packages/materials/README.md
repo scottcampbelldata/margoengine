@@ -39,7 +39,7 @@ The package supports clearcoat factor, roughness, and the optional clearcoat fac
 
 The [Khronos clearcoat specification](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_clearcoat) defines the metadata and texture channels: factor uses red, roughness uses green, and the coat normal uses RGB. Extension textures use linear data. Installed clearcoat, transmission and thickness textures support KTX2, `KHR_texture_transform`, and both UV sets; affine rows share group 3 with lobe factors.
 
-The coat receives directional lighting and its shadow visibility. Clustered point lights continue to illuminate the base lobe; this step does not add a clearcoat contribution from those lights.
+The coat receives directional lighting and its shadow visibility. Clustered lights illuminate the base lobe; `@margoengine/clustered/physical-lobes` adds the coat of a `Material` or a loaded physical surface under them, while this `clearcoat()` extension keeps its coat under the directional light only.
 
 ## Sheen, specular, anisotropy and iridescence
 
@@ -989,7 +989,7 @@ instead of the mirrored one.
   of its roughness (`roughness * (levels - 1)`) weighted by an analytic split-sum environment BRDF (Karis 2014), plus
   diffuse irradiance from the Environment's spherical harmonics or, for other cubes, a level about four texels across.
   It overrides the built-in hemisphere and an attached scene IBL for this material (their bindings stay). Physical
-  clearcoat and sheen layers read it too; the thin film and anisotropy do not.
+  clearcoat, sheen, thin film and anisotropy read it too.
 - **Basic, Lambert and Phong** combine the sharp reflection with their colour by `combine` (`'multiply'`, default:
   colour x reflection; `'mix'`: toward the reflection; `'add'`) and `reflectivity` (0-1, default 1).
 

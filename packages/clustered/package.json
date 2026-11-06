@@ -55,6 +55,10 @@
       "types": "./dist/projector.d.ts",
       "import": "./dist/projector.js"
     },
+    "./physical-lobes": {
+      "types": "./dist/physical-lobes.d.ts",
+      "import": "./dist/physical-lobes.js"
+    },
     "./units": {
       "types": "./dist/units.d.ts",
       "import": "./dist/units.js"
