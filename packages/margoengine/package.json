@@ -2018,6 +2018,10 @@
       "types": "./dist/webgl/restore.d.ts",
       "import": "./dist/webgl/restore.js"
     },
+    "./webgl/auto": {
+      "types": "./dist/webgl/auto.d.ts",
+      "import": "./dist/webgl/auto.js"
+    },
     "./webgl2-compat": {
       "types": "./dist/webgl2-compat.d.ts",
       "import": "./dist/webgl2-compat.js"

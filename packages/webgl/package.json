@@ -35,6 +35,10 @@
     "./restore": {
       "types": "./dist/restore.d.ts",
       "import": "./dist/restore.js"
+    },
+    "./auto": {
+      "types": "./dist/auto.d.ts",
+      "import": "./dist/auto.js"
     }
   },
   "files": [

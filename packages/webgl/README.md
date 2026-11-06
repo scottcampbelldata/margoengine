@@ -97,6 +97,38 @@ the plugin before the context can be lost: the browser only gives a context back
 the loss. An engine that draws on demand rather than with `engine.start()` should draw again from `onDeviceRestored`.
 `engine.removePlugin('webgl-restore')` gives the engine back core's answers.
 
+## Automatic escalation
+
+The preview draws plain core meshes, and other packages refuse it with code `unsupported`. `autoEngine` from
+`margoengine/webgl/auto` picks the path a page's own packages can draw on, so a visitor never gets half a scene: WebGPU
+when the browser has it, else this preview, else, when a package refuses the preview, the
+[compatibility layer](../webgl2-compat/README.md). One option turns that last step on: `loadCompat`, the layer's dynamic
+import. Each WebGL2 package is downloaded only if it is used.
+
+```ts
+import {box} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+import {autoEngine} from 'margoengine/webgl/auto';
+
+const engine = await autoEngine(
+  document.querySelector('canvas')!,
+  (engine) => {
+    engine.createMesh().setGeometry(box());
+    engine.use(new Shadows());
+  },
+  {loadCompat: () => import('margoengine/webgl2-compat')},
+);
+engine.canvas.addEventListener('click', () => console.log(engine.backend));
+engine.start();
+```
+
+`setup` builds the scene and runs twice when the page escalates, so it should start from nothing and use the engine it
+is given. The layer cannot draw to a canvas that holds the preview's context, so escalating replaces the element in the
+page with a copy: use `engine.canvas` afterwards, as above. The third argument takes every `Engine.create` option except
+`fallback`, plus `loadCompat` (default none: the refusal rejects). The app passes the import so that no package names the
+layer and a page that leaves it out never bundles it. Only refusals during `setup` escalate, and any other error rejects with the engine disposed. A browser whose WebGL2 is
+below what the layer needs rejects with the layer's `unsupported` error, which names what is missing.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/webgl

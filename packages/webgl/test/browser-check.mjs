@@ -3,6 +3,8 @@
 //   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl/test/browser-check.mjs
 // `/pick`: real read-pixels picks through CSS pixels, depth, faces, views and layers, with the canvas left as it was.
 // `/restore`: a really lost context comes back with the same pixels and working picks, and rebootDevice works.
+// `/auto`: without WebGPU a plain scene stays on the preview and a refused one moves to the compatibility layer;
+// with WebGPU neither WebGL2 package is fetched.
 // Results: test-results/webgl-browser.json.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -268,9 +270,121 @@ try {
   assert.equal(restore.lateRestore, true, 'a restore after the time limit still works');
   assert.equal(restore.removed, 'unsupported', 'removing the plugin gives the engine back its own rebootDevice');
   assert.deepEqual(restore.errors, ['timeout'], 'the automatic recovery reports the same time limit once');
+  // A page of its own: the layer installs for good, and the fetch lists must start empty.
+  const fresh = async (script) => {
+    const other = await (await page.context().browser().newContext()).newPage();
+    other.on('pageerror', (e) => pageErrors.push(e.message));
+    if (script) await other.addInitScript(script);
+    await other.goto(page.url());
+    return other;
+  };
+  const fetched = () =>
+    performance
+      .getEntriesByType('resource')
+      .map((entry) => new URL(entry.name).pathname)
+      .filter((path) => /packages\/webgl2?(-compat)?\/dist\//.test(path));
+  const withWebGPU = await fresh();
+  const native = await withWebGPU.evaluate(async (list) => {
+    const { autoEngine } = await import('/packages/webgl/dist/auto.js');
+    const { box } = await import('/packages/core/dist/index.js');
+    const canvas = document.getElementById('gl'),
+      engine = await autoEngine(canvas, (e) => void e.createMesh().setGeometry(box()));
+    const out = { backend: engine.backend, same: engine.canvas === canvas, fetched: eval(list)() };
+    engine.dispose();
+    return out;
+  }, `(${fetched})`);
+  await withWebGPU.context().close();
+  const without = await fresh(() => {
+    delete Navigator.prototype.gpu;
+  });
+  const auto = await without.evaluate(async (list) => {
+    const { autoEngine } = await import('/packages/webgl/dist/auto.js');
+    const { PbrMaterial, box } = await import('/packages/core/dist/index.js');
+    const { Shadows } = await import('/packages/shadows/dist/index.js');
+    const files = eval(list),
+      canvas = document.getElementById('gl'),
+      loadCompat = () => import('/packages/webgl2-compat/dist/index.js'),
+      out = {},
+      red = (engine) =>
+        engine
+          .createMesh()
+          .setGeometry(box(2, 2, 2))
+          .setMaterial(new PbrMaterial({ color: [1, 0.05, 0.05] }));
+    const camera = { position: [0, 0, 6], target: [0, 0, 0], near: 0.1, far: 100 };
+    // Plain scene: the preview is enough.
+    const plain = await autoEngine(document.createElement('canvas'), red, { camera, loadCompat });
+    out.plain = plain.backend;
+    plain.dispose();
+    out.previewOnly = !files().some((path) => path.includes('webgl2-compat'));
+    // Without the one option the refusal reaches the caller and setup ran once.
+    let runs = 0;
+    out.off = await autoEngine(
+      document.createElement('canvas'),
+      (engine) => {
+        runs++;
+        engine.use(new Shadows());
+      },
+      { camera },
+    ).catch((error) => [error.code, runs]);
+    // Any other failure is the app's own: no second try.
+    runs = 0;
+    out.other = await autoEngine(document.createElement('canvas'), () => {
+      runs++;
+      throw new TypeError('app bug');
+    }, { loadCompat }).catch((error) => [error.name, runs]);
+    out.stillPreview = !files().some((path) => path.includes('webgl2-compat'));
+    // A refused package: same page element position, on the layer, with the whole scene.
+    runs = 0;
+    const seen = [];
+    const engine = await autoEngine(
+      canvas,
+      (e) => {
+        runs++;
+        seen.push(e.backend);
+        red(e);
+        e.use(new Shadows());
+      },
+      { camera, loadCompat },
+    );
+    out.backend = engine.backend;
+    out.gpu = !!engine.gpu;
+    out.seen = seen;
+    out.replaced = engine.canvas !== canvas && !canvas.isConnected && engine.canvas.id === 'gl';
+    out.layer = files().some((path) => path.includes('webgl2-compat'));
+    engine.render();
+    await engine.gpu.queue.onSubmittedWorkDone();
+    const flat = new OffscreenCanvas(engine.canvas.width, engine.canvas.height).getContext('2d', {
+      willReadFrequently: true,
+    });
+    flat.drawImage(engine.canvas, 0, 0);
+    out.centre = [
+      ...flat.getImageData(engine.canvas.width >> 1, engine.canvas.height >> 1, 1, 1).data,
+    ];
+    engine.dispose();
+    return out;
+  }, `(${fetched})`);
+  await without.context().close();
+  assert.equal(native.backend, 'webgpu');
+  assert.equal(native.same, true, 'WebGPU keeps the canvas');
+  assert.deepEqual(
+    native.fetched.filter((path) => !path.endsWith('/auto.js')),
+    [],
+    'with WebGPU neither WebGL2 package is fetched',
+  );
+  assert.equal(auto.plain, 'webgl2', 'a scene the preview can draw stays on it');
+  assert.equal(auto.previewOnly, true, 'and the layer is not fetched');
+  assert.deepEqual(auto.off, ['unsupported', 1], 'without loadCompat the refusal comes through');
+  assert.deepEqual(auto.other, ['TypeError', 1], 'other failures are not retried');
+  assert.equal(auto.stillPreview, true);
+  assert.equal(auto.backend, 'webgpu', 'a refused package moves the page to the layer');
+  assert.equal(auto.gpu, true);
+  assert.deepEqual(auto.seen, ['webgl2', 'webgpu'], 'setup ran once on each path');
+  assert.equal(auto.replaced, true, 'the page holds a fresh copy of the canvas');
+  assert.equal(auto.layer, true);
+  assert.ok(auto.centre[0] > 60 && auto.centre[0] > 2 * auto.centre[2], `the layer draws the box: ${auto.centre}`);
   assert.deepEqual(pageErrors, []);
   await mkdir('test-results', { recursive: true });
-  await writeFile('test-results/webgl-browser.json', `${JSON.stringify({ picks, restore }, null, 2)}\n`);
+  await writeFile('test-results/webgl-browser.json', `${JSON.stringify({ picks, restore, native, auto }, null, 2)}\n`);
   console.log('WebGL2 preview browser check passed');
 } finally {
   await context.close();
