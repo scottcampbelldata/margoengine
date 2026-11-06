@@ -16,7 +16,7 @@ export const compatRun = () => process.env.MARGO_COMPAT === '1' || process.argv.
  * loads the layer from: pass it to `page.addInitScript(compatShim, compatUrl())`.
  */
 export const compatUrl = () =>
-  `/@fs/${join(dirname(fileURLToPath(import.meta.url)), '../../packages/webgl2-compat/dist/device.js').replaceAll('\\', '/')}`;
+  `/@fs/${join(dirname(fileURLToPath(import.meta.url)), '../../packages/webgl2-compat/dist/device.js').replaceAll('\\', '/').replace(/^\//, '')}`;
 
 /**
  * Page init script: `navigator.gpu` becomes a stub that installs the WebGL2 compatibility layer on first use, loaded
@@ -27,7 +27,8 @@ export function compatShim(url = '/packages/webgl2-compat/dist/device.js') {
   globalThis.__margoCompat = true;
   let loading;
   const load = () =>
-    (loading ??= import(url).then(async (m) => {
+    // WebKit resolves an import in an init script against no page at all, so the URL goes in whole.
+    (loading ??= import(new URL(url, location.href).href).then(async (m) => {
       const result = await m.installCompat({ force: true });
       if (!result.installed) throw new Error(`the WebGL2 compatibility layer did not install: ${result.reason}`);
       // Asynchronous pipeline creations in flight, as scripts/support/gpu-ready.js counts them on WebGPU.

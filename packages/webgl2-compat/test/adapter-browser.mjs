@@ -17,11 +17,13 @@ try {
   await writeFile('test-results/compat-adapter.json', JSON.stringify({ hardware, result }, null, 1));
   console.log(JSON.stringify(result, null, 1));
   assert.equal(result.fullLimits.core, true, 'the plain device has the full level');
-  assert.equal(result.limits.core, false, 'this device really is at compatibility level');
+  // WebKit has no compatibility level: a request for one gets a full device, which WebGPU allows.
+  const level = process.env.MARGO_BROWSER === 'webkit';
+  assert.equal(result.limits.core, level, 'this device really is at compatibility level');
   assert.equal(result.different, 0, 'the frame is the same at both levels');
   assert.equal(result.pick, true, 'pick finds the mesh');
   assert.equal(result.miss, true, 'pick finds nothing off the mesh');
-  assert.deepEqual(result.afterLoss.core, false, 'a restored device stays at compatibility level');
+  assert.deepEqual(result.afterLoss.core, level, 'a restored device stays at compatibility level');
   assert.equal(result.afterLoss.replaced, true);
   assert.ok(result.afterLoss.drew > 60, 'a restored device draws');
   assert.deepEqual(result.coreErrors, []);
