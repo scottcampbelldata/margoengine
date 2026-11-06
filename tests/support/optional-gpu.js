@@ -51,6 +51,7 @@ export function optionalGPU() {
   engine.gpu.queue.submit ??= () => {};
   engine.gpu.queue.onSubmittedWorkDone ??= () => Promise.resolve();
   engine.gpu.createSampler = () => ({});
+  engine.gpu.createBindGroupLayout = () => ({});
   engine.gpu.importExternalTexture = (descriptor) => descriptor;
   const pass = {
     setPipeline() {},
