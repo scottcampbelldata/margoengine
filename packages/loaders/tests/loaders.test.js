@@ -524,6 +524,12 @@ test('OFF: errors and real libigl files', (t) => {
   );
 });
 
+test('regression: an XYZ column name line, as swisstopo writes, is not a point', () => {
+  assert.deepEqual([...parseXYZ(text('X Y Z\n2600001 1199999 553.67\n')).positions].map(Math.round), [2600001, 1199999, 554]);
+  rejects(() => parseXYZ(text('X Y Z\n')), 'syntax');
+  rejects(() => parseXYZ(text('1 2 3\nX Y Z\n')), 'syntax');
+});
+
 test('XYZ: layouts, separators, labels, count lines and errors', (t) => {
   const xyz = parseXYZ(text('# points\n1 2 3\n4,5,6\n7;8;9\n'));
   assert.deepEqual([...xyz.positions], [1, 2, 3, 4, 5, 6, 7, 8, 9]);

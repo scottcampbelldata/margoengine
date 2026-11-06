@@ -74,6 +74,7 @@ export function parseXYZ(input: BinaryInput, options: XYZOptions = {}): LoadedGe
         continue;
       }
     }
+    if (columns < 0 && fields.every((field) => !numeric(field))) continue; // Column names, such as swisstopo's `X Y Z`.
     if (columns < 0) labelled = fields.length >= 4 && !numeric(fields[0]) && fields.slice(1, 4).every(numeric);
     if (labelled) fields = fields.slice(1);
     if (columns < 0) {
