@@ -1150,7 +1150,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B15 | Depth passes read the main camera; TAA velocity follows the graph | DONE | `d55780d05` | LIM-177 |
 | Cache | Result cache: a package build keys on the dist of what it depends on | DONE | `053eebfd0` | - |
 | B16 | React pointer handlers, Picking and HoverHighlight on the WebGL2 preview | DONE | `053eebfd0` | LIM-142 |
-| B18 | Shadow resolution, cascades and fog on or off scale by measured cost | DONE | this commit | - |
+| B18 | Shadow resolution, cascades and fog on or off scale by measured cost | DONE | `75a9990ef` | - |
+| B19 | Long-tail formats: 3DS cameras, lights, keyframes; every LWO map, image map and bone; placed KMZ; loadTextures; parsePCX | DONE | this commit | LIM-195 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

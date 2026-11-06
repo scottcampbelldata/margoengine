@@ -197,7 +197,7 @@ const ASSETS = [
   ],
   [
     'packages/loaders/tests/real-files/manifest.json',
-    'real-file test: 91 public sample files, downloaded by URL and never in the repository or a tarball; each one\'s source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices)',
+    'real-file test: 104 public sample files, downloaded by URL and never in the repository or a tarball; each one\'s source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices)',
   ],
   [
     'packages/loaders/tests/fixtures/SOURCES.txt',

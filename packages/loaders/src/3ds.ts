@@ -1,4 +1,5 @@
-// 3D Studio .3ds files: the chunk tree, triangle meshes, UVs, materials and the face lists that assign them.
+// 3D Studio .3ds files: the chunk tree, triangle meshes, UVs, materials, the face lists that assign them, cameras, lights
+// and the keyframer's nodes and tracks.
 import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } from './types.js';
 import { floats, latin1, limits, toBytes, uints, type BinaryInput } from './util.js';
 
@@ -23,6 +24,77 @@ export interface ThreeDSGroup extends LoadedGroup {
   material?: number;
 }
 
+/** A camera of a {@link ThreeDSResult}. */
+export interface ThreeDSCamera {
+  name: string;
+  position: [number, number, number];
+  /** The point it looks at. */
+  target: [number, number, number];
+  /** Bank about the view direction, in degrees. */
+  roll: number;
+  /** Lens focal length in millimetres, on 3D Studio's 35 mm film. */
+  lens: number;
+}
+
+/** A light of a {@link ThreeDSResult}. A light with no `spot` shines every way from `position`. */
+export interface ThreeDSLight {
+  name: string;
+  position: [number, number, number];
+  /** Linear `[r, g, b]`, as the file gives it. */
+  color: [number, number, number];
+  /** False when the file has the light switched off. */
+  on: boolean;
+  /** The file's multiplier, 1 when it has none. */
+  multiplier: number;
+  /** Spotlight data: the point aimed at and the two cone angles in degrees. */
+  spot?: { target: [number, number, number]; hotspot: number; falloff: number };
+}
+
+/** One key of a {@link ThreeDSTrack}. The spline values are there only when the file stores them. */
+export interface ThreeDSKey {
+  frame: number;
+  /** The track's value: xyz for `position` and `scale`, `[radians, x, y, z]` for `rotation`, rgb for `color`, else one number. */
+  value: number[];
+  tension?: number;
+  continuity?: number;
+  bias?: number;
+  easeTo?: number;
+  easeFrom?: number;
+}
+
+/** A keyframe track of a {@link ThreeDSNode}, in the order of its frames. */
+export interface ThreeDSTrack {
+  /** The file's track flags: bits 0 and 1 are 2 for a repeating track, 3 for a looping one. */
+  flags: number;
+  keys: ThreeDSKey[];
+}
+
+/** One node of the keyframer. Rotation keys are axis and angle, each relative to the key before it, as 3D Studio saves them. */
+export interface ThreeDSNode {
+  /** The file's node id, or the node's position in the list when it has none. */
+  id: number;
+  kind: 'ambient' | 'object' | 'camera' | 'cameraTarget' | 'light' | 'spotTarget' | 'spot';
+  /** The object, camera or light this node animates. `$$$DUMMY` is a dummy node, and `$AMBIENT$` the ambient light. */
+  name: string;
+  /** The instance name a dummy or a repeated object has. */
+  instance?: string;
+  /** The `id` of the parent node, -1 at the root. */
+  parent: number;
+  /** The pivot, in the object's coordinates. */
+  pivot: [number, number, number];
+  tracks: { [K in 'position' | 'rotation' | 'scale' | 'fov' | 'roll' | 'color' | 'hotspot' | 'falloff']?: ThreeDSTrack };
+}
+
+/** The keyframer's data of a {@link ThreeDSResult}. */
+export interface ThreeDSKeyframes {
+  /** The first and last frame of the active segment. */
+  start: number;
+  end: number;
+  /** Frames in the whole animation. */
+  length: number;
+  nodes: ThreeDSNode[];
+}
+
 /** What {@link parse3DS} returns. Coordinates are the file's: no unit, Z up, as 3D Studio saved them. */
 export interface ThreeDSResult extends LoadedGeometry {
   kind: 'mesh';
@@ -30,6 +102,12 @@ export interface ThreeDSResult extends LoadedGeometry {
   materials: ThreeDSMaterial[];
   /** The file's master scale, 1 when it has none. */
   masterScale: number;
+  cameras: ThreeDSCamera[];
+  lights: ThreeDSLight[];
+  /** The ambient light's linear `[r, g, b]`, when the file sets one. */
+  ambient?: [number, number, number];
+  /** The keyframer's data, when the file has any. */
+  keyframes?: ThreeDSKeyframes;
 }
 
 interface Chunk {
@@ -66,9 +144,9 @@ class Reader {
   }
 }
 
-function color(reader: Reader, chunk: Chunk): [number, number, number] | undefined {
+function color(reader: Reader, from: number, to: number): [number, number, number] | undefined {
   let found: [number, number, number] | undefined;
-  for (const { id, start, end } of reader.chunks(chunk.start, chunk.end)) {
+  for (const { id, start, end } of reader.chunks(from, to)) {
     // Prefer the gamma-corrected form when a file gives both, which is the one the artist saw.
     if (id === 0x0011 || id === 0x0012) {
       reader.need(start, 3, end, 'colour bytes');
@@ -101,7 +179,7 @@ function material(reader: Reader, chunk: Chunk): ThreeDSMaterial {
   for (const part of reader.chunks(chunk.start, chunk.end)) {
     if (part.id === 0xa000) [out.name] = reader.name(part.start, part.end);
     else if (part.id === 0xa020) {
-      const rgb = color(reader, part);
+      const rgb = color(reader, part.start, part.end);
       if (rgb) out.color = [...rgb, out.color[3]];
     } else if (part.id === 0xa050) out.color[3] = 1 - percent(reader, part);
     else if (part.id === 0xa200)
@@ -111,14 +189,149 @@ function material(reader: Reader, chunk: Chunk): ThreeDSMaterial {
   return out;
 }
 
+function vector(reader: Reader, at: number, end: number, what: string): [number, number, number] {
+  reader.need(at, 12, end, what);
+  const { view } = reader;
+  return [view.getFloat32(at, true), view.getFloat32(at + 4, true), view.getFloat32(at + 8, true)];
+}
+
+function camera(reader: Reader, name: string, chunk: Chunk): ThreeDSCamera {
+  reader.need(chunk.start, 32, chunk.end, 'camera values');
+  const { view } = reader;
+  return {
+    name,
+    position: vector(reader, chunk.start, chunk.end, 'camera values'),
+    target: vector(reader, chunk.start + 12, chunk.end, 'camera values'),
+    roll: view.getFloat32(chunk.start + 24, true),
+    lens: view.getFloat32(chunk.start + 28, true),
+  };
+}
+
+function light(reader: Reader, name: string, chunk: Chunk): ThreeDSLight {
+  const out: ThreeDSLight = {
+    name,
+    position: vector(reader, chunk.start, chunk.end, 'light values'),
+    color: color(reader, chunk.start + 12, chunk.end) ?? [1, 1, 1],
+    on: true,
+    multiplier: 1,
+  };
+  for (const part of reader.chunks(chunk.start + 12, chunk.end)) {
+    if (part.id === 0x4620) out.on = false;
+    else if (part.id === 0x465b) {
+      reader.need(part.start, 4, part.end, 'the light multiplier');
+      out.multiplier = reader.view.getFloat32(part.start, true);
+    } else if (part.id === 0x4610) {
+      reader.need(part.start, 20, part.end, 'spotlight values');
+      out.spot = {
+        target: vector(reader, part.start, part.end, 'spotlight values'),
+        hotspot: reader.view.getFloat32(part.start + 12, true),
+        falloff: reader.view.getFloat32(part.start + 16, true),
+      };
+    }
+  }
+  return out;
+}
+
+const NODE_KINDS: Record<number, ThreeDSNode['kind']> = {
+  0xb001: 'ambient',
+  0xb002: 'object',
+  0xb003: 'camera',
+  0xb004: 'cameraTarget',
+  0xb005: 'light',
+  0xb006: 'spotTarget',
+  0xb007: 'spot',
+};
+/** Each track chunk's name in {@link ThreeDSNode.tracks} and the floats one key's value holds. */
+const TRACKS: Record<number, [keyof ThreeDSNode['tracks'], number]> = {
+  0xb020: ['position', 3],
+  0xb021: ['rotation', 4],
+  0xb022: ['scale', 3],
+  0xb023: ['fov', 1],
+  0xb024: ['roll', 1],
+  0xb025: ['color', 3],
+  0xb027: ['hotspot', 1],
+  0xb028: ['falloff', 1],
+};
+const SPLINE = ['tension', 'continuity', 'bias', 'easeTo', 'easeFrom'] as const;
+
+function track(reader: Reader, chunk: Chunk, size: number): ThreeDSTrack {
+  const { view } = reader;
+  reader.need(chunk.start, 14, chunk.end, 'a track header');
+  // The flags, eight bytes that mean nothing, and the key count.
+  const flags = view.getUint16(chunk.start, true),
+    count = view.getUint32(chunk.start + 10, true),
+    keys: ThreeDSKey[] = [];
+  let at = chunk.start + 14;
+  for (let i = 0; i < count; i++) {
+    reader.need(at, 6, chunk.end, 'track keys');
+    const key: ThreeDSKey = { frame: view.getUint32(at, true), value: [] },
+      used = view.getUint16(at + 4, true);
+    at += 6;
+    SPLINE.forEach((name, bit) => {
+      if (!(used & (1 << bit))) return;
+      reader.need(at, 4, chunk.end, 'track keys');
+      key[name] = view.getFloat32(at, true);
+      at += 4;
+    });
+    reader.need(at, size * 4, chunk.end, 'track keys');
+    for (let k = 0; k < size; k++, at += 4) key.value.push(view.getFloat32(at, true));
+    keys.push(key);
+  }
+  return { flags, keys };
+}
+
+function keyframes(reader: Reader, chunk: Chunk): ThreeDSKeyframes {
+  const out: ThreeDSKeyframes = { start: 0, end: 0, length: 0, nodes: [] },
+    { view } = reader;
+  for (const part of reader.chunks(chunk.start, chunk.end)) {
+    if (part.id === 0xb00a) {
+      const [, after] = reader.name(part.start + 2, part.end);
+      reader.need(after, 4, part.end, 'the keyframer header');
+      out.length = view.getUint32(after, true);
+    } else if (part.id === 0xb008) {
+      reader.need(part.start, 8, part.end, 'the keyframer segment');
+      out.start = view.getUint32(part.start, true);
+      out.end = view.getUint32(part.start + 4, true);
+    } else if (NODE_KINDS[part.id]) {
+      const node: ThreeDSNode = {
+        id: out.nodes.length,
+        kind: NODE_KINDS[part.id],
+        name: '',
+        parent: -1,
+        pivot: [0, 0, 0],
+        tracks: {},
+      };
+      for (const field of reader.chunks(part.start, part.end)) {
+        if (field.id === 0xb030) {
+          reader.need(field.start, 2, field.end, 'a node id');
+          node.id = view.getUint16(field.start, true);
+        } else if (field.id === 0xb010) {
+          const [name, after] = reader.name(field.start, field.end);
+          reader.need(after, 6, field.end, 'a node header');
+          node.name = name;
+          node.parent = view.getInt16(after + 4, true);
+        } else if (field.id === 0xb011) [node.instance] = reader.name(field.start, field.end);
+        else if (field.id === 0xb013) node.pivot = vector(reader, field.start, field.end, 'a pivot');
+        else if (TRACKS[field.id]) {
+          const [name, size] = TRACKS[field.id];
+          node.tracks[name] = track(reader, field, size);
+        }
+      }
+      out.nodes.push(node);
+    }
+  }
+  return out;
+}
+
 /**
- * Reads a 3D Studio `.3ds` file: every triangle mesh with its UVs, one group per object and material, and the materials'
- * colours, transparency and diffuse map names. Vertices are saved in world space, so no transform applies. Cameras,
- * lights and keyframes are skipped.
+ * Reads a 3D Studio `.3ds` file: every triangle mesh with its UVs, one group per object and material, the materials'
+ * colours, transparency and diffuse map names, the cameras and lights, and the keyframer's nodes and tracks. Vertices are
+ * saved in world space, so no transform applies. Cameras, lights and keyframes are returned as the file holds them, in
+ * its coordinates. `loadTextures` from `@margoengine/loaders/textures` reads the maps the materials name.
  *
  * @param input The file's bytes.
  * @param options The shared size limits.
- * @returns The merged mesh, its materials and the master scale.
+ * @returns The merged mesh, its materials, the master scale, cameras, lights and keyframes.
  * @throws LoaderError with code `header`, `truncated`, `range`, `limit` or `syntax` (no mesh in the file).
  *
  * @example
@@ -126,8 +339,8 @@ function material(reader: Reader, chunk: Chunk): ThreeDSMaterial {
  * import { parse3DS } from '@margoengine/loaders/3ds';
  *
  * const bytes = await (await fetch('/models/teapot.3ds')).arrayBuffer();
- * const { groups, materials } = parse3DS(bytes);
- * console.log(groups.length, materials[0]?.texture);
+ * const { groups, materials, cameras, keyframes } = parse3DS(bytes);
+ * console.log(groups.length, materials[0]?.texture, cameras[0]?.lens, keyframes?.nodes.length);
  * ```
  */
 export function parse3DS(input: BinaryInput, options: ThreeDSOptions = {}): ThreeDSResult {
@@ -144,9 +357,13 @@ export function parse3DS(input: BinaryInput, options: ThreeDSOptions = {}): Thre
     indices = uints(),
     groups: ThreeDSGroup[] = [],
     materials: ThreeDSMaterial[] = [],
+    cameras: ThreeDSCamera[] = [],
+    lights: ThreeDSLight[] = [],
     pending: { name: string; base: number; faces: Uint32Array; lists: { material: string; faces: number[] }[] }[] = [];
   let masterScale = 1,
-    textured = false;
+    textured = false,
+    ambient: [number, number, number] | undefined,
+    keyframer: ThreeDSKeyframes | undefined;
 
   const trimesh = (name: string, chunk: Chunk): void => {
     const base = positions.length / 3;
@@ -211,12 +428,18 @@ export function parse3DS(input: BinaryInput, options: ThreeDSOptions = {}): Thre
     for (const chunk of reader.chunks(start, end)) {
       if (chunk.id === 0x3d3d) walk(chunk.start, chunk.end, depth + 1);
       else if (chunk.id === 0xafff) materials.push(material(reader, chunk));
+      else if (chunk.id === 0xb000) keyframer = keyframes(reader, chunk);
+      else if (chunk.id === 0x2100) ambient = color(reader, chunk.start, chunk.end);
       else if (chunk.id === 0x0100) {
         reader.need(chunk.start, 4, chunk.end, 'the master scale');
         masterScale = view.getFloat32(chunk.start, true);
       } else if (chunk.id === 0x4000) {
         const [name, after] = reader.name(chunk.start, chunk.end);
-        for (const part of reader.chunks(after, chunk.end)) if (part.id === 0x4100) trimesh(name, part);
+        for (const part of reader.chunks(after, chunk.end)) {
+          if (part.id === 0x4100) trimesh(name, part);
+          else if (part.id === 0x4600) lights.push(light(reader, name, part));
+          else if (part.id === 0x4700) cameras.push(camera(reader, name, part));
+        }
       }
     }
   };
@@ -255,7 +478,11 @@ export function parse3DS(input: BinaryInput, options: ThreeDSOptions = {}): Thre
     groups,
     materials,
     masterScale,
+    cameras,
+    lights,
   };
+  if (ambient) result.ambient = ambient;
+  if (keyframer) result.keyframes = keyframer;
   if (textured) {
     while (uvs.length < result.positions.length / 3 * 2) uvs.push(0);
     result.uvs = uvs.result();

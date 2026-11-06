@@ -52,6 +52,7 @@ import { parseNRRD } from '../dist/nrrd.js';
 import { evaluateNurbsCurve } from '../dist/nurbs.js';
 import { parsePDB } from '../dist/pdb.js';
 import { parseSVG } from '../dist/svg.js';
+import { loadTextures } from '../dist/textures.js';
 import { parseTTF, textGeometry } from '../dist/font.js';
 import { parseVRML, parseX3D } from '../dist/vrml.js';
 import { parseVTKXML } from '../dist/vtk-xml.js';
@@ -237,36 +238,66 @@ function indexedTriangles(string, pattern) {
 function threeDSFacts(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let vertices = 0,
-    triangles = 0;
+    triangles = 0,
+    cameras = 0,
+    lights = 0,
+    nodes = 0,
+    keys = 0;
   const walk = (start, end) => {
     for (let p = start; p + 6 <= end; ) {
       const id = view.getUint16(p, true),
         length = view.getUint32(p + 2, true);
       if (length < 6) break;
-      if (id === 0x4d4d || id === 0x3d3d || id === 0x4100) walk(p + 6, p + length);
+      if (id === 0x4d4d || id === 0x3d3d || id === 0x4100 || id === 0xb000 || (id >= 0xb001 && id <= 0xb007)) {
+        if (id >= 0xb001 && id <= 0xb007) nodes++;
+        walk(p + 6, p + length);
+      }
       else if (id === 0x4000) {
         let q = p + 6;
         while (bytes[q]) q++;
         walk(q + 1, p + length);
       } else if (id === 0x4110) vertices += view.getUint16(p + 6, true);
       else if (id === 0x4120) triangles += view.getUint16(p + 6, true);
+      else if (id === 0x4700) cameras++;
+      else if (id === 0x4600) lights++;
+      else if (id >= 0xb020 && id <= 0xb022) keys += view.getUint32(p + 6 + 10, true);
       p += length;
     }
   };
   walk(0, bytes.length);
-  return { vertices, triangles };
+  return { vertices, triangles, cameras, lights, nodes, keys };
 }
 
-/** Walks the IFF chunks of an LWO2 file: points, and faces fanned to triangles. */
+/** Walks the IFF chunks of an LWO2 file: points, faces and cage polygons fanned to triangles, UV and weight map names, still images. */
 function lwoFacts(bytes) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let points = 0,
-    triangles = 0;
+    triangles = 0,
+    stills = 0;
+  const uvMaps = new Set(),
+    weightMaps = new Set(),
+    old = text(bytes.subarray(8, 12)) === 'LWOB';
   for (let p = 12; p + 8 <= bytes.length; ) {
     const id = text(bytes.subarray(p, p + 4)),
       size = view.getUint32(p + 4);
     if (id === 'PNTS') points += size / 12;
-    if (id === 'POLS' && text(bytes.subarray(p + 8, p + 12)) === 'FACE') {
+    if (id === 'VMAP' || id === 'VMAD') {
+      const type = text(bytes.subarray(p + 8, p + 12));
+      let q = p + 14;
+      while (bytes[q]) q++;
+      if (type === 'TXUV') uvMaps.add(text(bytes.subarray(p + 14, q)));
+      if (type === 'WGHT') weightMaps.add(text(bytes.subarray(p + 14, q)));
+    }
+    if (id === 'CLIP' && text(bytes.subarray(p + 12, p + 16)) === 'STIL') stills++;
+    if (id === 'POLS' && old)
+      for (let q = p + 8; q < p + 8 + size; ) {
+        const n = view.getUint16(q);
+        if (n >= 3) triangles += n - 2;
+        q += 2 + n * 2;
+        // A negative surface has a count of detail polygons after it; those polygons follow in the same form.
+        q += view.getInt16(q) < 0 ? 4 : 2;
+      }
+    if (id === 'POLS' && !old && ['FACE', 'PTCH', 'SUBD'].includes(text(bytes.subarray(p + 8, p + 12)))) {
       for (let q = p + 12; q < p + 8 + size; ) {
         const n = view.getUint16(q) & 0x3ff;
         q += 2;
@@ -276,7 +307,20 @@ function lwoFacts(bytes) {
     }
     p += 8 + size + (size & 1);
   }
-  return { points, triangles };
+  return { points, triangles, stills, uvMaps: [...uvMaps].sort(), weightMaps: [...weightMaps].sort() };
+}
+
+/** A texture path as a real file wrote it reaches a folder that holds the file under its plain base name. */
+async function readsTexture(path) {
+  const base = path.split(/[\\/:]/).pop(),
+    asked = [],
+    { textures, missing } = await loadTextures([path], async (name) => {
+      asked.push(name);
+      if (name.toLowerCase() === base.toLowerCase()) return new Uint8Array(1);
+      throw new Error('not here');
+    });
+  assert.equal(textures.size, 1, `${path} reached the folder: asked ${asked.join(', ')}`);
+  assert.equal(missing.length, 0);
 }
 
 let runtimes;
@@ -673,12 +717,25 @@ const checks = {
       g = parse3DS(bytes),
       tds = parseTDS(bytes);
     assert.deepEqual(tds.positions, g.positions, 'parseTDS is the same reader');
-    return { result: `${checkGeometry(g, { triangles: expected.triangles })}, ${g.materials.length} materials, file ${expected.vertices} vertices`, draw: [mesh(g)] };
+    assert.equal(g.cameras.length, expected.cameras, 'cameras');
+    assert.equal(g.lights.length, expected.lights, 'lights');
+    assert.equal(g.keyframes?.nodes.length ?? 0, expected.nodes, 'keyframer nodes');
+    const tracks = g.keyframes?.nodes.flatMap((node) => [node.tracks.position, node.tracks.rotation, node.tracks.scale]) ?? [];
+    assert.equal(tracks.reduce((sum, track) => sum + (track?.keys.length ?? 0), 0), expected.keys, 'position, rotation and scale keys');
+    const texture = g.materials.find((material) => material.texture)?.texture;
+    if (texture) await readsTexture(texture);
+    return { result: `${checkGeometry(g, { triangles: expected.triangles })}, ${g.materials.length} materials, file ${expected.vertices} vertices, ${expected.cameras} cameras, ${expected.lights} lights, ${expected.nodes} nodes with ${expected.keys} keys`, draw: [mesh(g)] };
   },
   async lwo(bytes) {
     const expected = lwoFacts(bytes),
       g = parseLWO(bytes);
-    return { result: `${checkGeometry(g, { triangles: expected.triangles })}, file ${expected.points} points, warnings ${g.warnings?.join('; ').slice(0, 160)}`, draw: [mesh(g)] };
+    assert.deepEqual(Object.keys(g.uvMaps).sort(), expected.uvMaps, 'UV maps');
+    assert.deepEqual(Object.keys(g.weightMaps).sort(), expected.weightMaps, 'weight maps');
+    assert.equal(g.images.length, expected.stills, 'still images');
+    for (const map of Object.values(g.uvMaps)) assert.equal(map.length / 2, g.positions.length / 3, 'one uv per vertex');
+    const maps = g.surfaces.flatMap((surface) => surface.maps);
+    for (const map of maps) if (map.path) await readsTexture(map.path);
+    return { result: `${checkGeometry(g, { triangles: expected.triangles })}, file ${expected.points} points, ${expected.uvMaps.length} UV maps, ${expected.weightMaps.length} weight maps, ${g.images.length} images, ${maps.length} image maps, warnings ${g.warnings?.join('; ').slice(0, 160)}`, draw: [mesh(g)] };
   },
   async amf(bytes) {
     const string = text(bytes),
@@ -698,7 +755,16 @@ const checks = {
       frames = view.getInt32(40, true),
       g = parseMD2(bytes);
     assert.equal(g.frames.length, frames, 'frames');
+    for (const skin of g.skins) await readsTexture(skin);
     return { result: `${checkGeometry(g, { triangles })}, ${frames} frames, clips ${Object.keys(g.clips ?? {}).length || g.clips?.length}`, draw: [mesh(g)] };
+  },
+  async pcx(bytes, item) {
+    const { parsePCX } = await import('@margoengine/decoders/pcx'),
+      { width, height, data } = parsePCX(bytes),
+      pixels = createHash('sha256').update(data).digest('hex');
+    assert.deepEqual([width, height], item.facts.size, 'size');
+    assert.equal(pixels, item.facts.pixels, 'RGBA pixels equal the reference decoder');
+    return { result: `${width} x ${height}, every pixel equals ${item.facts.reference}`, draw: [] };
   },
   async pdb(bytes, item) {
     const string = text(bytes).split(/^ENDMDL/m)[0],
@@ -714,10 +780,11 @@ const checks = {
       kml = [...files].filter(([n]) => n.endsWith('.kml')).map(([, read]) => text(read())).join(''),
       models = count(kml, /<Model\b/g),
       latitude = Number(kml.match(/<Location>[\s\S]*?<latitude>([-\d.]+)/)?.[1]),
-      result = await parseKMZ(bytes);
+      result = await parseKMZ(bytes, { origin: 'first' });
     assert.equal(result.models.length, models, 'Model elements');
     const first = result.models[0];
     assert.equal(first.location?.latitude, latitude, 'latitude');
+    assert.ok(Math.hypot(...first.matrix.slice(12, 15)) < 1e-6, 'the first model sits at the origin');
     return { result: `${models} model, ${checkGeometry(first.mesh ?? first.geometry ?? first)}, at ${JSON.stringify(first.location)}`, draw: [mesh(first.mesh ?? first.geometry ?? first)] };
   },
   async las(bytes, item) {

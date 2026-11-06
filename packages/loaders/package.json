@@ -78,6 +78,10 @@
       "types": "./dist/gcode.d.ts",
       "import": "./dist/gcode.js"
     },
+    "./textures": {
+      "types": "./dist/textures.d.ts",
+      "import": "./dist/textures.js"
+    },
     "./nrrd": {
       "types": "./dist/nrrd.d.ts",
       "import": "./dist/nrrd.js"

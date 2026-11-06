@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9094076,
+  "total": 9070398,
   "history": [
     {
       "date": "2026-10-24",
@@ -2840,6 +2840,12 @@
       "commit": "b9b21f139",
       "reason": "new optional entry @margoengine/tween/custom-ease; the bezier solver moved to its own file",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "2ed2c3c59",
+      "reason": "B19: 3DS reads cameras, lights and keyframes; LWO reads every map, bones and images; KMZ places models; new entries pcx and textures",
+      "grew": 6
     }
   ],
   "items": {
@@ -3123,16 +3129,16 @@
     "@margoengine/loaders": 52602,
     "@margoengine/loaders dist/workers/usd.js": 8435,
     "@margoengine/loaders/3dm": 2218,
-    "@margoengine/loaders/3ds": 2684,
+    "@margoengine/loaders/3ds": 3642,
     "@margoengine/loaders/amf": 5645,
     "@margoengine/loaders/common": 3417,
     "@margoengine/loaders/font": 6577,
     "@margoengine/loaders/gcode": 1962,
-    "@margoengine/loaders/kmz": 16930,
+    "@margoengine/loaders/kmz": 17581,
     "@margoengine/loaders/las": 1466,
     "@margoengine/loaders/ldraw": 4126,
     "@margoengine/loaders/lottie": 7591,
-    "@margoengine/loaders/lwo": 3115,
+    "@margoengine/loaders/lwo": 4394,
     "@margoengine/loaders/materialx": 5082,
     "@margoengine/loaders/md2": 2265,
     "@margoengine/loaders/mocap": 2146,
@@ -3142,7 +3148,7 @@
     "@margoengine/loaders/pdb": 2464,
     "@margoengine/loaders/render": 3148,
     "@margoengine/loaders/svg": 11621,
-    "@margoengine/loaders/tds": 2685,
+    "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/threemf-materials": 7917,
     "@margoengine/loaders/usd": 7778,
     "@margoengine/loaders/vdb": 6406,
@@ -3521,6 +3527,8 @@
     "margoengine": 308,
     "margoengine/game": 1030,
     "margoengine/viz": 800,
-    "margoengine/web": 599
+    "margoengine/web": 599,
+    "@margoengine/decoders/pcx": 1460,
+    "@margoengine/loaders/textures": 702
   }
 }

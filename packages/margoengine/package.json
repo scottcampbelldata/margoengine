@@ -546,6 +546,10 @@
       "types": "./dist/decoders/tga.d.ts",
       "import": "./dist/decoders/tga.js"
     },
+    "./decoders/pcx": {
+      "types": "./dist/decoders/pcx.d.ts",
+      "import": "./dist/decoders/pcx.js"
+    },
     "./decoders/dds": {
       "types": "./dist/decoders/dds.d.ts",
       "import": "./dist/decoders/dds.js"
@@ -1169,6 +1173,10 @@
     "./loaders/gcode": {
       "types": "./dist/loaders/gcode.d.ts",
       "import": "./dist/loaders/gcode.js"
+    },
+    "./loaders/textures": {
+      "types": "./dist/loaders/textures.d.ts",
+      "import": "./dist/loaders/textures.js"
     },
     "./loaders/nrrd": {
       "types": "./dist/loaders/nrrd.d.ts",

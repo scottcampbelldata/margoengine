@@ -65,6 +65,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parse3DS` (`/3ds`), `parseTDS` (`/tds`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
 | `parseLWO` (`/lwo`), `parseAMF` (`/amf`, async), `parseMD2` (`/md2`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
 | `parsePDB` (`/pdb`), `parseKMZ` (`/kmz`, async) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
+| `loadTextures` (`/textures`, async) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
 | `evaluateNurbsCurve`, `tessellateNurbsCurve`, `evaluateNurbsSurface`, `tessellateNurbsSurface` (`/nurbs`) | See [NURBS curves and surfaces](#nurbs-curves-and-surfaces) |
 | `parseLAS` (`/las`, async) | See [LAS and LAZ](#las-and-laz) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
@@ -131,7 +132,7 @@ The repository's speed matrix (`docs/whitepaper`, row 10.11) measures this loade
 
 ## Real files
 
-`tests/real-files/manifest.json` names 91 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
+`tests/real-files/manifest.json` names 104 public files from the tools people use: Blender, 3ds Max, AutoCAD, Rhino, CATIA, PrusaSlicer, Tiled, LightWave and more, each with its URL, licence, author, size and SHA-256. The files are not in this repository.
 
 ```sh
 npm run test:real-files -w @margoengine/loaders
@@ -576,12 +577,28 @@ console.log(parsePDB(await (await fetch('/molecules/1crn.pdb')).text()).bonds.le
 console.log((await parseKMZ(await bytes('/maps/tower.kmz'))).models[0]?.location);
 ```
 
-- **3DS.** `parse3DS` reads every triangle mesh with UVs, one group per object and material, and each material's colour, transparency and diffuse map name. Vertices are saved in world space. Cameras, lights and keyframes are skipped. `parseTDS` from `/tds` is the same reader: a `.tds` file is the same 3D Studio format under another extension.
-- **LWO.** `parseLWO` reads LWO2 and the older LWOB: every layer's points and face polygons, `SURF` colours, and the first `TXUV` map with its `VMAD` values, which split a vertex along a seam. There is one group per layer and surface, and z changes sign to make the left-handed file right-handed. Curves, patches, bones and image maps are skipped with a warning.
+Textures and skins are named by the file, and `loadTextures` from `/textures` reads them through a resolver, the same kind `parseLDraw` takes. Old tools wrote paths from their own PC, so each path is asked for as written, then with forward slashes, in lower case, and by its base name. A file nobody has is listed in `missing`, so one lost skin does not lose the model.
+
+```ts
+import { resolveFromURL } from '@margoengine/loaders/ldraw';
+import { parseMD2 } from '@margoengine/loaders/md2';
+import { loadTextures } from '@margoengine/loaders/textures';
+import { parsePCX } from '@margoengine/decoders/pcx';
+
+const model = parseMD2(await (await fetch('/models/tank.md2')).arrayBuffer());
+const { textures, missing } = await loadTextures(model.skins, resolveFromURL('/models/'));
+for (const bytes of textures.values()) console.log(parsePCX(bytes).width);
+console.log(missing.map(({ path }) => path));
+```
+
+`parse3DS(...).materials[i].texture`, `parseLWO(...).images` and `parseMD2(...).skins` all feed it. Decode what comes back with `createImageBitmap` for PNG, JPEG and BMP, `parseTGA` from `@margoengine/decoders/tga` and `parsePCX` from `@margoengine/decoders/pcx`.
+
+- **3DS.** `parse3DS` reads every triangle mesh with UVs, one group per object and material, and each material's colour, transparency and diffuse map name. Vertices are saved in world space. `cameras` and `lights` hold position, target, lens, colour, multiplier and spot cones, `ambient` the ambient colour, and `keyframes` the keyframer's nodes with hierarchy, pivots and tracks. They come back as the file holds them: rotation keys are axis and angle, each relative to the key before, and nothing plays them for you. `parseTDS` from `/tds` is the same reader: a `.tds` file is the same 3D Studio format under another extension, so this is one format with two names.
+- **LWO.** `parseLWO` reads LWO2 and the older LWOB: every layer's points and face polygons, `SURF` colours and image maps in `surfaces`, still images in `images`, every `TXUV` map in `uvMaps` and every `WGHT` map in `weightMaps` with their `VMAD` values, which split a vertex along a seam in all maps at once. `uvs` is each layer's first map. `bones` holds the skelegons with names, parents and weight maps, in the coordinates of `positions`. There is one group per layer and surface, and z changes sign to make the left-handed file right-handed. Patch and subdivision polygons come in as their control cage with a warning. Curves, and clips that are not still images, are skipped with a warning.
 - **AMF.** `parseAMF` reads plain or zipped files: objects, volumes, material, object and vertex colours, and constellations, nested ones included. Positions are in metres unless `units: 'file'`. Curved edges and colour formulas are skipped with a warning.
-- **MD2.** `parseMD2` gives the first frame as a mesh with every frame beside it in one layout, so frames blend as morph targets. Frames named `run1`, `run2` form the clip `run`. Normals are computed from each frame's triangles.
+- **MD2.** `parseMD2` gives the first frame as a mesh with every frame beside it in one layout, so frames blend as morph targets. Frames named `run1`, `run2` form the clip `run`. Normals are computed from each frame's triangles. `skins` names the skin files, for `loadTextures` and `parsePCX`.
 - **PDB.** `parsePDB` returns atoms as a point cloud with element colours, radii and labels, plus `bonds` as index pairs from CONECT rows and from distance, which `guessBonds: false` turns off. Only the first MODEL loads, and an atom with alternate locations keeps its first.
-- **KMZ.** `parseKMZ` reads the KML document's `<Model>` elements and their COLLADA files, one mesh each, and an archive with no document gives every `.dae` it holds. `location` and `orientation` are returned, not applied, because the map projection is your app's choice. Placemark points, lines and polygons are not read. `read(path)` returns any other file in the archive.
+- **KMZ.** `parseKMZ` reads the KML document's `<Model>` elements and their COLLADA files, one mesh each, and an archive with no document gives every `.dae` it holds. `location`, `orientation`, `scale` and `altitudeMode` are returned. Pass `origin`, a place or `'first'`, and each located model also gets a column-major `matrix` that puts its geometry in a Y-up scene in metres, x east and z south at the origin, with the orientation, the scale and the Earth's curve between the two places. Without `origin` nothing is applied, for an app with a map projection of its own. Altitudes are taken as metres above the WGS84 ellipsoid, and `clampToGround`, the KML default, sits at height 0: no terrain or geoid is known here. Placemark points, lines and polygons are not read. `read(path)` returns any other file in the archive.
 
 ## NURBS curves and surfaces
 

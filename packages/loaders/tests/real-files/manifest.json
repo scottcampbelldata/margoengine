@@ -1852,6 +1852,199 @@
    "size": 70993,
    "sha256": "5a5dbcbab958dae19c8f5fd7c46dd5fc3100e35b4af54fcd4f3f62c38805764d",
    "note": "item version 1, which no published text describes"
+  },
+  {
+   "id": "3ds-camera-anim",
+   "format": "3ds",
+   "check": "threeds",
+   "variant": "camera and keyframes",
+   "entry": "@margoengine/loaders/3ds and @margoengine/loaders/tds",
+   "file": "TargetCameraAnim.3ds",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/3DS/TargetCameraAnim.3ds",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 1390,
+   "sha256": "33395c5e09c6d7fd27b5679fb905bff46dc307a05a374c4d7bbfe31a11a114ac"
+  },
+  {
+   "id": "3ds-child-anim",
+   "format": "3ds",
+   "check": "threeds",
+   "variant": "node hierarchy",
+   "entry": "@margoengine/loaders/3ds and @margoengine/loaders/tds",
+   "file": "CameraRollAnimWithChildObject.3ds",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/3DS/CameraRollAnimWithChildObject.3ds",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 4408,
+   "sha256": "470896dbcb5e0449e5e52e16855b0bcd849bffabee46101cd28e76967c8cc621"
+  },
+  {
+   "id": "3ds-rotation",
+   "format": "3ds",
+   "check": "threeds",
+   "variant": "182 rotation keys",
+   "entry": "@margoengine/loaders/3ds and @margoengine/loaders/tds",
+   "file": "RotatingCube.3DS",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/3DS/RotatingCube.3DS",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 5009,
+   "sha256": "55d0c540a059029fee276fb5e849aa34ebcfad37b619d87d53b5fee3094ea242"
+  },
+  {
+   "id": "3ds-texture",
+   "format": "3ds",
+   "check": "threeds",
+   "variant": "diffuse map",
+   "entry": "@margoengine/loaders/3ds and @margoengine/loaders/tds",
+   "file": "cube_with_diffuse_texture.3DS",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/3DS/cube_with_diffuse_texture.3DS",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 1423,
+   "sha256": "9cfce93003482aaffa378d1d61eb48d1d393fab24dae4388fcf018b9e416039d"
+  },
+  {
+   "id": "lwo-two-uv",
+   "format": "lwo",
+   "check": "lwo",
+   "variant": "two UV maps",
+   "entry": "@margoengine/loaders/lwo",
+   "file": "box_2uv_1unused.lwo",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/LWO/LWO2/box_2uv_1unused.lwo",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 1236,
+   "sha256": "2a9f4e7749e5f36e56ff80b02d48654ce08ea5b8c93ae46f9a991678d88061c8"
+  },
+  {
+   "id": "lwo-image-map",
+   "format": "lwo",
+   "check": "lwo",
+   "variant": "image map",
+   "entry": "@margoengine/loaders/lwo",
+   "file": "earth_uv_cylindrical_y.lwo",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/LWO/LWO2/MappingModes/earth_uv_cylindrical_y.lwo",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 12002,
+   "sha256": "4767f77290b59a9d430cb7fe896c26bad93a25ab604d8786e1a6f05af7ec5858"
+  },
+  {
+   "id": "lwo-old-texture",
+   "format": "lwo",
+   "check": "lwo",
+   "variant": "LWOB texture",
+   "entry": "@margoengine/loaders/lwo",
+   "file": "bluewithcylindrictexz.lwo",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/LWO/LWOB/MappingModes/bluewithcylindrictexz.lwo",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 600,
+   "sha256": "2f686f1bb3ff13c17194dce418d55051a266c2279ba7c7cff047b558cfc438d9"
+  },
+  {
+   "id": "lwo-weights",
+   "format": "lwo",
+   "check": "lwo",
+   "variant": "weight maps",
+   "entry": "@margoengine/loaders/lwo",
+   "file": "hierarchy.lwo",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/LWO/LWO2/hierarchy.lwo",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 13390,
+   "sha256": "aa440a69297b334f9f9d3679d50ef60f697b09421f8fdea321a1da4286aacfa2"
+  },
+  {
+   "id": "lwo-subdivision",
+   "format": "lwo",
+   "check": "lwo",
+   "variant": "subdivision cage",
+   "entry": "@margoengine/loaders/lwo",
+   "file": "Subdivision.lwo",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models/LWO/LWO2/Subdivision.lwo",
+   "licence": "BSD-3-Clause",
+   "author": "assimp test models",
+   "size": 1332,
+   "sha256": "bbebe6cc067f9ff231ed56c2be6420ea04a8545092fefcd1403fe7a38947b4f7"
+  },
+  {
+   "id": "pcx-pil184",
+   "format": "pcx",
+   "check": "pcx",
+   "variant": "2-colour",
+   "entry": "@margoengine/decoders/pcx",
+   "file": "pil184.pcx",
+   "url": "https://raw.githubusercontent.com/python-pillow/Pillow/main/Tests/images/pil184.pcx",
+   "licence": "MIT-CMU",
+   "author": "Pillow test images",
+   "size": 5364,
+   "sha256": "5a735c011ef048bda09f51f91cd5b994713b074eb10a433192918aa8c7b02352",
+   "facts": {
+    "size": [
+     447,
+     144
+    ],
+    "pixels": "c22e2037b6881bc71d7ead3615fb1b65501470952d02b2483107c28dfa74dd0a",
+    "reference": "Pillow 13.0.0"
+   }
+  },
+  {
+   "id": "pcx-odd-stride",
+   "format": "pcx",
+   "check": "pcx",
+   "variant": "256-colour palette",
+   "entry": "@margoengine/decoders/pcx",
+   "file": "odd_stride.pcx",
+   "url": "https://raw.githubusercontent.com/python-pillow/Pillow/main/Tests/images/odd_stride.pcx",
+   "licence": "MIT-CMU",
+   "author": "Pillow test images",
+   "size": 14313,
+   "sha256": "b7e6b331e9309e68e74f3daf11258976603b737b4b35e12a8a9fa5c7fd449a0d",
+   "facts": {
+    "size": [
+     371,
+     150
+    ],
+    "pixels": "1ddf23cd273bbecd4ff78a5168dad05959c35a56989643d71877405339542c5f",
+    "reference": "Pillow 13.0.0"
+   }
+  },
+  {
+   "id": "pcx-p-4-planes",
+   "format": "pcx",
+   "check": "pcx",
+   "variant": "4 planes",
+   "entry": "@margoengine/decoders/pcx",
+   "file": "p_4_planes.pcx",
+   "url": "https://raw.githubusercontent.com/python-pillow/Pillow/main/Tests/images/p_4_planes.pcx",
+   "licence": "MIT-CMU",
+   "author": "Pillow test images",
+   "size": 136,
+   "sha256": "fddf69e529bc4670f3b1338ebc94af22d049f8d7121102bce518d091bf480787",
+   "facts": {
+    "size": [
+     1,
+     1
+    ],
+    "pixels": "34aaa746c25a0f105c4316bbb1f009aa359f49582656ee97d73c58132d563423",
+    "reference": "Pillow 13.0.0"
+   }
+  },
+  {
+   "id": "3ds-spot-camera",
+   "format": "3ds",
+   "check": "threeds",
+   "variant": "spotlight and camera",
+   "entry": "@margoengine/loaders/3ds and @margoengine/loaders/tds",
+   "file": "pyramob.3DS",
+   "url": "https://raw.githubusercontent.com/assimp/assimp/master/test/models-nonbsd/3DS/pyramob.3DS",
+   "licence": "Free to use, commercial use by contact (notice in the source folder)",
+   "author": "VIRLUX",
+   "size": 693769,
+   "sha256": "a48e42fc330a0beb2cad52250adfd0d57cb4543c058dbd5a25ffd736ceb3f1eb"
   }
  ]
 }

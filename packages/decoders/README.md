@@ -2,7 +2,7 @@
 
 Import `margoengine/decoders` from the `margoengine` package, or `@margoengine/decoders` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT_meshopt_compression decoding, and synchronous PNG, TGA, TIFF, DDS and KTX 1 reading (`@margoengine/decoders/png`, `/tga`, `/tiff`, `/dds`, `/ktx`), for Margo Engine.
+Worker-pooled Draco geometry decoding, KTX2/Basis Universal texture transcoding and EXT_meshopt_compression decoding, and synchronous PNG, TGA, PCX, TIFF, DDS and KTX 1 reading (`@margoengine/decoders/png`, `/tga`, `/tiff`, `/dds`, `/ktx`), for Margo Engine.
 
 Build from source with `npm run build` in `packages/decoders`.
 
@@ -209,6 +209,25 @@ cube maps and arrays go through `uploadTexture` and are handed to materials as a
 `tests/tga.test.js`, `dds.test.js`, `ktx.test.js` and `tiff.test.js` build every supported variant with the encoders in
 `tests/support/texture-encoders.js` and check decoded pixels exactly. `scripts/texture-fixtures.mjs` uses the same
 encoders to write the 64x64 demo checkerboards in `examples/assets/texture-formats/`.
+
+## PCX (`@margoengine/decoders/pcx`)
+
+`parsePCX(bytes, {maxPixels?})` returns `{width, height, data}`, RGBA8 rows top first, like `parseTGA`. It is written from
+the ZSoft PCX technical reference: run-length encoded or plain scanlines of 8-bit images with 1, 3 or 4 planes (a palette
+after the image, RGB, RGBA) and of 16-colour and 2-colour images, with the header palette or, in version 3 files, the
+standard EGA colours. An 8-bit image with no palette reads as grey. Quake II skins are the 8-bit palette kind. Other
+layouts, and a header whose line size is too short for its width, throw `MargoError` `failed`.
+
+```ts
+import {parsePCX} from 'margoengine/decoders/pcx';
+
+declare const skinBytes: Uint8Array;
+const skin = parsePCX(skinBytes); // {width, height, data: RGBA8}
+console.log(skin.width, skin.height);
+```
+
+`tests/pcx.test.js` builds every layout and checks pixels exactly. `npm run test:real-files -w @margoengine/loaders` reads
+three real files and compares every pixel with Pillow 13.0.0.
 
 ## KTX2 cube maps and arrays (`@margoengine/decoders/ktx2-layers`)
 

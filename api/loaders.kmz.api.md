@@ -18,10 +18,17 @@ export interface KMZModel {
         roll: number;
     };
     scale?: [number, number, number];
+    altitudeMode?: string;
+    matrix?: number[];
 }
 
 export interface KMZOptions extends Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'>, DAEParseOptions {
     signal?: AbortSignal;
+    origin?: {
+        longitude: number;
+        latitude: number;
+        altitude?: number;
+    } | 'first';
 }
 
 export interface KMZResult {

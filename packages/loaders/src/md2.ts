@@ -33,7 +33,7 @@ export interface MD2Model extends LoadedGeometry {
   indices: Uint32Array;
   frames: MD2Frame[];
   clips: MD2Clip[];
-  /** The skin paths the file names. */
+  /** The skin paths the file names; `loadTextures` from `@margoengine/loaders/textures` reads them. */
   skins: string[];
 }
 
@@ -47,6 +47,8 @@ function text(bytes: Uint8Array, start: number, size: number): string {
  * Reads a Quake II `.md2` model. Corners that share a vertex but not a texture coordinate become separate vertices, so
  * every frame has the same layout as the mesh and frames can be blended as morph targets. Frames with one name and a
  * running number form a clip. Normals are computed from each frame's triangles. The GL command list is not needed.
+ * `loadTextures` from `@margoengine/loaders/textures` reads the skins, and `parsePCX` from `@margoengine/decoders/pcx`
+ * decodes the PCX files Quake II uses.
  *
  * @param input The file's bytes.
  * @param options The shared size limits.

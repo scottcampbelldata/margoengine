@@ -58,6 +58,10 @@
       "types": "./dist/tga.d.ts",
       "import": "./dist/tga.js"
     },
+    "./pcx": {
+      "types": "./dist/pcx.d.ts",
+      "import": "./dist/pcx.js"
+    },
     "./dds": {
       "types": "./dist/dds.d.ts",
       "import": "./dist/dds.js"
