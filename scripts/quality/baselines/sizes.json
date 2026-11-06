@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4513920,
+  "total": 4522687,
   "history": [
     {
       "date": "2026-10-24",
@@ -1676,6 +1676,12 @@
       "commit": "07dd09e7f",
       "reason": "New ecs entry ./relations: Relation with exclusive, cascade and acyclic rules; World.attach and detach; also exported from the ecs root",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "c27e461ce",
+      "reason": "mesh-edit entries ./bake and ./weights",
+      "grew": 3
     }
   ],
   "items": {
@@ -1928,11 +1934,13 @@
     "@margoengine/math/vector4": 919,
     "@margoengine/mcp": 8664,
     "@margoengine/mesh-edit": 30203,
+    "@margoengine/mesh-edit/bake": 4733,
     "@margoengine/mesh-edit/boolean-exact": 9657,
     "@margoengine/mesh-edit/modeling": 35469,
     "@margoengine/mesh-edit/modifiers": 8566,
     "@margoengine/mesh-edit/remesh": 8715,
     "@margoengine/mesh-edit/sculpt": 6286,
+    "@margoengine/mesh-edit/weights": 4033,
     "@margoengine/mixer": 6926,
     "@margoengine/navmesh": 7120,
     "@margoengine/navmesh/build": 11699,
@@ -2164,6 +2172,7 @@
     "leak @margoengine/materials -> @margoengine/gltf-pro": 1,
     "leak @margoengine/materials/batched -> @margoengine/gltf-pro": 1,
     "leak @margoengine/mesh-edit -> @margoengine/bvh/tree": 1,
+    "leak @margoengine/mesh-edit/bake -> @margoengine/bvh/tree": 1,
     "leak @margoengine/mesh-edit/remesh -> @margoengine/bvh/tree": 1,
     "leak @margoengine/oit/meshes -> @margoengine/gltf-pro": 1,
     "leak @margoengine/oit/meshes -> @margoengine/materials": 1,

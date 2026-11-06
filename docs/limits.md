@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-067). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-068). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -95,6 +95,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Sculpting (`@margoengine/mesh-edit/sculpt`) | Enforced: `undoLimit` 0 to 1,000. By method: each `pick` tests every triangle and each `dab` visits every vertex; each undo step stores the whole surface; output is triangles. | Dynamic topology rewrites adjacency, so plain arrays stay simpler and correct where an acceleration tree would need updating on every dab. | Dabs slow down in proportion to mesh size; memory grows with size times `undoLimit`. | Lower `undoLimit`, or sculpt parts of a mesh in separate sessions. |
 | Hole filling (`fillMeshHoles` in `@margoengine/mesh-edit/modeling`) | By method: holes above 256 edges start from a center fan, not the lowest-cost search; a grid needs an even edge count and warped grid quads are stored as two triangles; new faces get planar UVs of their own. | The search costs edges cubed, and faces must be planar. | A long border fills from its center; an odd one in grid mode gets triangles. | `maxEdges` leaves large holes open for manual work. |
 | High-to-low baking (`@margoengine/mesh-edit/bake`) | By method: one ray per texel at the texel center, no supersampling; overlapping UVs share texels, first triangle wins; colour reads the nearest texel; the bake runs on the calling thread. | Antialiasing would multiply ray cost, and a bake is an offline step. | Hard detail edges alias at low resolutions; `missed` counts texels whose ray found nothing. | Bake at twice the size and downscale; raise `distance` when `missed` is above zero. |
+| Vertex groups (`@margoengine/mesh-edit/weights`) | By method: a brush reaches by straight-line distance, not along the surface; `skinAttributes` keeps at most 8 joints per vertex and drops the weakest; `remap` needs every edit in order. | Straight-line distance needs no surface walk per dab, and 4 influences is what glTF skinning takes. | A brush can touch both sides of a thin part; a vertex with more groups than influences loses the weakest. | Paint with a smaller radius; raise `influences` up to 8. |
 
 ## Entities
 

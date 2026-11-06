@@ -406,6 +406,39 @@ Each covered texel casts one ray along the low surface's smooth normal, through 
 | `signal` | none | `AbortSignal`, checked per low triangle |
 
 Normals are tangent space with green up, the glTF convention, in a frame built from the low mesh's UVs. Overlapping UVs share texels, first triangle wins: run `unwrapMesh` first. `missed` counts texels that found nothing; raise `distance` when it is above zero. The bake runs on the calling thread.
+## Vertex groups and weight painting
+
+Named per-vertex weights that follow the mesh through edits, and a brush to paint them, so rigging can happen in the browser:
+
+```ts
+import { createPrimitiveMesh, extrudeMeshFace } from 'margoengine/mesh-edit';
+import { paintMeshWeights, VertexGroups } from 'margoengine/mesh-edit/weights';
+
+const mesh = createPrimitiveMesh('cube', 'body');
+const groups = new VertexGroups(mesh.vertices.length);
+paintMeshWeights(groups, mesh, 'hip', { center: [0, -0.5, 0], radius: 1 });
+paintMeshWeights(groups, mesh, 'chest', { center: [0, 0.5, 0], radius: 1, normalize: true });
+
+const edit = extrudeMeshFace(mesh, mesh.faces[0].id, 0.25);
+const after = groups.remap(edit);
+const { joints, weights } = after.skinAttributes();
+console.log(after.names, joints.length, weights.length);
+```
+
+`remap` takes any mesh-edit result. A kept vertex keeps its weight, each copy of a split vertex inherits it, welded vertices average, and created vertices take the mean of their edge neighbors, ring by ring. Call it once per edit, in order; a vertex map of the wrong size throws.
+
+`paintMeshWeights(groups, mesh, group, options)` is one dab and returns the vertices touched. Distance is straight-line.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `center`, `radius` | required | Brush position and size in mesh space |
+| `mode` | `'replace'` | `'replace'`, `'add'`, `'subtract'` or `'smooth'` |
+| `value` | 1 | Weight painted toward, or added and taken away |
+| `strength` | 1 | How much one dab applies, 0 to 1 |
+| `falloff` | `'smooth'` | `'smooth'`, `'linear'` or `'constant'` |
+| `normalize` | false | Rescale touched vertices so all groups sum to 1 |
+
+`skinAttributes({ influences, joints })` keeps each vertex's strongest `influences` groups (default 4), rescaled to sum to 1, as the `Uint16Array` joints and `Float32Array` weights that `Skin` in `@margoengine/animation` takes. `joints` maps group names to joint indices; by default a group's joint is its position in `names`. Vertices with no weight get joint 0 at full weight and are listed in `unweighted`. `toJSON` and `VertexGroups.fromJSON` save and restore sparse weights.
 
 
 ## UV unwrap and lightmap UVs

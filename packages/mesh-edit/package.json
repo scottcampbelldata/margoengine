@@ -50,6 +50,10 @@
     "./bake": {
       "types": "./dist/bake.d.ts",
       "import": "./dist/bake.js"
+    },
+    "./weights": {
+      "types": "./dist/weights.d.ts",
+      "import": "./dist/weights.js"
     }
   },
   "files": [

@@ -1034,6 +1034,10 @@
       "types": "./dist/mesh-edit/bake.d.ts",
       "import": "./dist/mesh-edit/bake.js"
     },
+    "./mesh-edit/weights": {
+      "types": "./dist/mesh-edit/weights.d.ts",
+      "import": "./dist/mesh-edit/weights.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"
