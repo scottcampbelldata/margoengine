@@ -5,7 +5,7 @@ import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
 import { fillFrame } from './math.js';
-import { foggedLineShader, lineShader, phasedShader, pointWidthShader } from './shader.js';
+import { biasedShader, foggedLineShader, lineShader, phasedShader, pointWidthShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 import { overlayDepthPass, overlayPass, alphaBlend } from '../../shared/pass.js';
@@ -35,14 +35,16 @@ let warned = false;
 const STYLE_BYTES = 224;
 
 /**
- * Pipeline variant bits: draw over the scene, fogged, write depth, a width per point; the draw step (shader.ts) sits
- * above them.
+ * Pipeline variant bits: draw over the scene, fogged, write depth, a width per point, only behind the scene, a depth
+ * bias; the draw step (shader.ts) sits above them.
  */
 const ON_TOP = 1,
   FOGGED = 2,
   WRITE = 4,
   WIDTHS = 8,
-  STEP = 16;
+  BEHIND = 16,
+  BIAS = 32,
+  STEP = 1024;
 
 /** Options for the `Lines` plugin. An empty name or non-finite order throws a TypeError. */
 export interface LinesOptions {
@@ -180,11 +182,12 @@ export class Lines implements EnginePlugin {
 
   /** The shader module of a variant, made when first used. */
   private module(variant: number): GPUShaderModule {
-    const key = variant & ~(ON_TOP | WRITE);
+    const key = variant & ~(ON_TOP | WRITE | BEHIND);
     let module = this.modules.get(key);
     if (!module) {
       let code = variant & FOGGED ? foggedLineShader() : lineShader;
       if (variant & WIDTHS) code = pointWidthShader(code);
+      if (variant & BIAS) code = biasedShader(code);
       code = phasedShader(code, Math.floor(variant / STEP));
       module = this.device!.createShaderModule({ code });
       this.modules.set(key, module);
@@ -222,7 +225,7 @@ export class Lines implements EnginePlugin {
         depthStencil: {
           format: depthFormat,
           depthWriteEnabled: (variant & WRITE) !== 0,
-          depthCompare: variant & ON_TOP ? 'always' : 'greater-equal',
+          depthCompare: variant & ON_TOP ? 'always' : variant & BEHIND ? 'less' : 'greater-equal',
         },
       });
       this.pipelines.set(key, pipeline);
@@ -340,7 +343,7 @@ export class Lines implements EnginePlugin {
       f[24] = material.dashOffset;
       f[25] = line.totalDistance;
       f[26] = material.antialias ? 1 : 0;
-      f[27] = 0;
+      f[27] = material.depthBias;
       const vertexColors = (material.vertexColors ?? true) && line.colors !== null;
       u[28] = MODES.indexOf(line.mode);
       u[29] = line.count;
@@ -365,7 +368,7 @@ export class Lines implements EnginePlugin {
         device.queue.writeBuffer(r.uniform, 0, r.style);
         r.written.set(f);
       }
-      lists[(material.onTop ? 2 : 0) + (material.depthWrite ? 0 : 1)].push([line, r]);
+      lists[(material.onTop ? 2 : 0) + (material.depthWrite && !material.behind ? 0 : 1)].push([line, r]);
     }
   }
 
@@ -438,10 +441,14 @@ export class Lines implements EnginePlugin {
       edge = variant >= 2 * STEP;
     let current: GPURenderPipeline | undefined;
     for (const [line, r] of list) {
-      const { fog, antialias, dashed } = line.material;
+      const { fog, antialias, dashed, behind, depthBias } = line.material;
       if (edge && !antialias) continue;
-      const widths = line['pointWidths'] && !dashed ? WIDTHS : 0,
-        next = this.pipeline(context.format, depthFormat, count, variant | widths | (fogged && fog ? FOGGED : 0));
+      const bits =
+          (line['pointWidths'] && !dashed ? WIDTHS : 0) |
+          (behind ? BEHIND : 0) |
+          (depthBias ? BIAS : 0) |
+          (fogged && fog ? FOGGED : 0),
+        next = this.pipeline(context.format, depthFormat, count, variant | bits);
       if (next !== current) pass.setPipeline((current = next));
       pass.setBindGroup(1, r.group);
       pass.draw(VERTICES_PER_SEGMENT, line.segmentCount);

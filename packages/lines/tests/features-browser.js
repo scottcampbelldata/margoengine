@@ -5,6 +5,8 @@ import { LinePicking } from '@margoengine/lines/pick';
 import { Trail } from '@margoengine/lines/trail';
 import { Picking } from '../../selection/dist/index.js';
 import { LineBatch, LineBatches } from '@margoengine/lines/batch';
+import { EdgesHelper } from '@margoengine/lines/edges';
+import { HiddenLine } from '@margoengine/lines/hidden';
 import { Capture } from './lines-browser.js';
 
 const assert = (condition, message) => {
@@ -253,8 +255,44 @@ async function batch() {
   return 'LineBatch draws two million segments in one draw at exact widths, depth tested, with partial updates';
 }
 
+async function hidden() {
+  const { engine, lines, frame, done } = await rig();
+  const geometry = box(2, 2, 2);
+  const mesh = engine.createMesh().setGeometry(geometry);
+  const edges = lines.add(new EdgesHelper(geometry, { mesh, color: RED, width: 3, cap: 'butt' }));
+  const back = lines.add(new HiddenLine(edges, { opacity: 1, dashSize: 0.2, gapSize: 0.2 }));
+  let image = await frame();
+  // Front face edge at z = 1 and back face edge at z = -1, both vertical at x = 1, inside the front face's rows.
+  const front = Math.round(pixel(1, 0, 1)[0]) - 1,
+    behind = Math.round(pixel(1, 0, -1)[0]);
+  const column = (x) => {
+    let on = 0,
+      runs = 0,
+      was = false;
+    for (let y = 112; y < 144; y++) {
+      const red = isRed(image.at(x, y));
+      if (red) on++;
+      if (red && !was) runs++;
+      was = red;
+    }
+    return { on, runs };
+  };
+  const seen = column(front),
+    dashed = column(behind);
+  assert(seen.on === 32 && seen.runs === 1, `An edge on the surface is solid: ${JSON.stringify(seen)}`);
+  assert(dashed.runs >= 3 && dashed.on < 28, `A hidden edge is dashed: ${JSON.stringify(dashed)}`);
+  // Faded: the hidden edge is a blend of the box and the line, never full colour, and has no gaps.
+  back.material.set({ dashed: false, opacity: 0.3 });
+  image = await frame();
+  const faded = image.at(behind, 128),
+    bare = image.at(behind + 6, 128);
+  assert(!isRed(faded) && faded[0] > bare[0] + 10, `A faded edge blends: ${faded} over ${bare}`);
+  done();
+  return 'HiddenLine draws edges behind a surface dashed or faded while edges on the surface stay solid';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking, trail, batch]) checks.push(await check());
+  for (const check of [depthWrite, picking, trail, batch, hidden]) checks.push(await check());
   return checks;
 };

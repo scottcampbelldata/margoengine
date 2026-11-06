@@ -50,6 +50,10 @@
     "./batch": {
       "types": "./dist/batch.d.ts",
       "import": "./dist/batch.js"
+    },
+    "./hidden": {
+      "types": "./dist/hidden.d.ts",
+      "import": "./dist/hidden.js"
     }
   },
   "files": [

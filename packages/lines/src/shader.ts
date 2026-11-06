@@ -203,6 +203,13 @@ export const pointWidthShader = (code: string): string =>
     'let rawA=halfWidth(ca)*mix(points[ia].w,points[ib].w,ta);let rawB=halfWidth(cb)*mix(points[ia].w,points[ib].w,tb);',
   );
 
+/** `code` for a line with a depth bias: the fourth value of `style.b` moves it that fraction of its distance nearer. */
+export const biasedShader = (code: string): string =>
+  code.replace(
+    'o.clip=vec4f(base.xy+cr.off/(0.5*frame.viewport.xy)*base.w,base.z,base.w);',
+    'o.clip=vec4f(base.xy+cr.off/(0.5*frame.viewport.xy)*base.w,min(base.z*(1.0+style.b.w),base.w),base.w);',
+  );
+
 const fogEdits: Array<[string, string]> = [
   // Lines blend alpha over the scene, so a fogged line fades toward the fog colour, in linear before any encoding.
   [

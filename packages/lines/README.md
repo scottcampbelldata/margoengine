@@ -74,6 +74,8 @@ dashed.dashOffset += 0.01;
 | `vertexColors` | when colors exist | |
 | `onTop` | `false` | Skip the depth test |
 | `depthWrite` | `false` | Write depth: crossing lines occlude each other and later passes respect them |
+| `behind` | `false` | Draw only where the scene is in front of the line; see [Hidden lines](#hidden-lines) |
+| `depthBias` | `0` | Fraction of its distance the line moves nearer for depth tests, 0 up to 1, so edges on a surface do not flicker |
 | `antialias` | `true` | |
 | `fog` | `true` | Fogged by the plugin's `setFog`; `false` keeps the line clear |
 
@@ -201,6 +203,31 @@ console.log(batches.stats); // {batches, segments, drawCalls} of the last frame
 A batch is one draw while it fits one GPU buffer: 8,388,608 segments at WebGPU's default `maxBufferSize` of 256 MiB, and one further draw for each buffer past that. A batch takes at most 67,108,864 segments. It keeps a CPU copy, 32 bytes a segment, to refill the GPU after a device loss.
 
 Segments are independent: square ends, so those that share a point overlap at the corner, and translucent corners are darker there. There are no joins, round caps, dashes, fog, clipping planes, depth writing or picking. Use `Line` where those matter. WebGPU only.
+
+## Hidden lines
+
+`HiddenLine` from `margoengine/lines/hidden` draws the part of another line that is behind a surface, dashed or faded: the standard technical drawing view.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {Lines} from 'margoengine/lines';
+import {EdgesHelper} from 'margoengine/lines/edges';
+import {HiddenLine} from 'margoengine/lines/hidden';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const lines = Lines.attach(engine);
+const geometry = box(2, 1, 1);
+const mesh = engine.createMesh().setGeometry(geometry);
+
+const edges = lines.add(new EdgesHelper(geometry, {mesh, color: '#20242a', width: 2}));
+lines.add(new HiddenLine(edges, {dashSize: 0.08, gapSize: 0.06}));   // dashed
+// Faded instead: lines.add(new HiddenLine(edges, {dashed: false, opacity: 0.2}));
+```
+
+A `HiddenLine` takes any `LineMaterial` option. It starts from its source's colour and width, dashes of 0.1 and gaps of 0.1 world units, opacity 0.5 and butt caps. It follows the source's points, mode, matrix, mesh and visibility, and draws while the source is in a plugin. Add the source first.
+
+Underneath it is a line with `behind: true`, which turns the depth test around. An edge lying on a surface sits at the surface's own depth, so a test either way flickers along it; `depthBias` (0.001 here, and given to the source too when it has none) moves both lines that fraction of their distance nearer, so edges on a surface count as seen. Raise it if a far, large model still flickers; too high and edges just behind a surface count as seen. Hidden lines test against what has drawn depth before them, so meshes count and transparent surfaces that write no depth do not. They do not pick.
 
 ## Fog
 

@@ -24,6 +24,7 @@ await build({
         pick: resolve(root, 'src/pick.ts'),
         trail: resolve(root, 'src/trail.ts'),
         batch: resolve(root, 'src/batch.ts'),
+        hidden: resolve(root, 'src/hidden.ts'),
       },
       formats: ['es'],
       fileName: (_, name) => name + '.js',

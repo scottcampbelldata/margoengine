@@ -80,6 +80,8 @@ class LineMaterial {
     vertexColors?: boolean;
     onTop: boolean;
     depthWrite: boolean;
+    behind: boolean;
+    depthBias: number;
     antialias: boolean;
     fog: boolean;
     clipIntersection: boolean;
@@ -106,6 +108,8 @@ interface LineMaterialOptions {
     vertexColors?: boolean;
     onTop?: boolean;
     depthWrite?: boolean;
+    behind?: boolean;
+    depthBias?: number;
     antialias?: boolean;
     fog?: boolean;
     clippingPlanes?: readonly (readonly number[])[];

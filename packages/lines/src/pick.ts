@@ -7,7 +7,7 @@ import { VERTICES_PER_SEGMENT } from './geometry.js';
 import type { Line } from './line.js';
 import type { Lines } from './lines.js';
 import { fillFrame } from './math.js';
-import { clipCut, lineShader, pointWidthShader } from './shader.js';
+import { biasedShader, clipCut, lineShader, pointWidthShader } from './shader.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUShaderStage: { FRAGMENT: number };
@@ -129,8 +129,8 @@ export class LinePicking {
         ],
       }),
       layout = device.createPipelineLayout({ bindGroupLayouts: [layouts.frame, layouts.style, baseLayout] }),
-      plain = device.createShaderModule({ code: linePickShader() }),
-      widths = device.createShaderModule({ code: pointWidthShader(linePickShader()) }),
+      plain = device.createShaderModule({ code: biasedShader(linePickShader()) }),
+      widths = device.createShaderModule({ code: biasedShader(pointWidthShader(linePickShader())) }),
       pipeline = (depthCompare: GPUCompareFunction, module: GPUShaderModule) =>
         device.createRenderPipeline({
           layout,
@@ -183,8 +183,10 @@ export class LinePicking {
     if (!device || !layouts || !engine) return;
     lines['collect'](engine, 0);
     const lists = lines['drawLists'],
-      depthTested = [...lists[0], ...lists[1]],
-      top = [...lists[2], ...lists[3]],
+      // The hidden part of a line repeats a line that picks, and is not on show where the pick lands.
+      shown = ([line]: [Line, unknown]) => !line.material.behind,
+      depthTested = [...lists[0], ...lists[1]].filter(shown),
+      top = [...lists[2], ...lists[3]].filter(shown),
       count = depthTested.length + top.length;
     if (count) {
       const gpu = this.resources(device, layouts),

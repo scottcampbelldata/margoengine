@@ -52,6 +52,16 @@ export interface LineMaterialOptions {
    * over it without writing. Dash gaps and clipped parts write nothing. Default false.
    */
   depthWrite?: boolean;
+  /**
+   * Draw only where something in the scene is in front of the line: its hidden part. `HiddenLine` from
+   * `@margoengine/lines/hidden` sets it up. Never writes depth, and onTop wins over it. Default false.
+   */
+  behind?: boolean;
+  /**
+   * Draw the line this fraction of its distance nearer the camera for depth tests, 0 up to 1, so edges lying on a surface
+   * do not flicker through it. 0.001 at 10 units away is 1 cm. Default 0.
+   */
+  depthBias?: number;
   /** One-pixel coverage ramp on edges, caps and dash ends. Default true. */
   antialias?: boolean;
   /** Fogged by the `Lines` plugin's fog (`setFog`); false keeps this material clear. Default true. */
@@ -81,6 +91,8 @@ export class LineMaterial {
   vertexColors?: boolean;
   onTop = false;
   depthWrite = false;
+  behind = false;
+  depthBias = 0;
   antialias = true;
   fog = true;
   /** false (default): `clippingPlanes` cut away what is behind any plane; true: only what is behind every plane. */
@@ -122,6 +134,7 @@ export class LineMaterial {
     if (numbers.some((v) => typeof v !== 'number' || !Number.isFinite(v)))
       throw new RangeError('Line material values must be finite numbers');
     if (this.opacity < 0 || this.opacity > 1) throw new RangeError('Line opacity must be 0..1');
+    if (!(this.depthBias >= 0 && this.depthBias < 1)) throw new RangeError('Line depthBias must be 0 up to 1');
     if (this.width <= 0) throw new RangeError('Line width must be positive');
     if (this.miterLimit < 1) throw new RangeError('Miter limit must be at least 1');
     if (this.dashSize <= 0 || this.gapSize < 0)
@@ -133,6 +146,7 @@ export class LineMaterial {
       this.dashed,
       this.onTop,
       this.depthWrite,
+      this.behind,
       this.antialias,
       this.fog,
       this.clipIntersection,
