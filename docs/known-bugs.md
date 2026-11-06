@@ -612,17 +612,6 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 The entries below are speed-matrix rows diagnosed on 2026-10-27 (item 47 phase 2, round 4; busy machine, RTX A6000,
 diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.json` and perf-history entry 36.
 
-### Raw meshes: native calls per draw
-
-- **What:** `p-custom-shader`, 10,000 `RawMesh`es of one `RawShaderMaterial`: 21.3 ms CPU a frame against three's
-  WebGL 7.6 (three's WebGPU backend 36.8; run `20261027-105724`).
-- **Cause (measured, timing wrapper on the render-pass methods):** of about 2.1 us per mesh, about 1.7 us is the
-  native encoding calls: its own object bind group, its vertex buffer, its index buffer and an indexed draw. The
-  meshes share one geometry's arrays but each uploads and binds its own buffers.
-- **Plan (shader package):** share GPU vertex and index buffers among raw meshes whose packed streams are byte-equal
-  (counted per device, copy on write), so consecutive draws skip rebinding them, and keep the object blocks in one
-  pooled uniform buffer bound with dynamic offsets.
-
 ### Motion blur needs TAA for velocity
 
 - **What:** `p-motion-blur`: GPU 0.63 ms a frame against three's WebGPU 0.25 (CPU is faster, 2.3 against 3.2).

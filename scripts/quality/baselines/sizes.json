@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4540718,
+  "total": 4541241,
   "history": [
     {
       "date": "2026-10-24",
@@ -1700,6 +1700,12 @@
       "commit": "8521bbfa2",
       "reason": "New compute entry ./subgroups: subgroup kernels for reductions, scans and the radix sort; root gains the kernel route hook and the subgroups feature request",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "6afa9d0df",
+      "reason": "shader/raw: meshes with equal bytes share GPU buffers, counted per device with copy on write, and a run binds them once (p-custom-shader, perf-history entry 63): 22.5 -> 3.4 ms CPU, diagnostic; 9,684 to 10,125 B gzip, +441 B",
+      "grew": 1
     }
   ],
   "items": {
@@ -2058,7 +2064,7 @@
     "@margoengine/shader/effects": 8306,
     "@margoengine/shader/graph": 11088,
     "@margoengine/shader/noise": 4753,
-    "@margoengine/shader/raw": 9906,
+    "@margoengine/shader/raw": 10429,
     "@margoengine/shader/readback": 7620,
     "@margoengine/shadows": 17321,
     "@margoengine/shadows/virtual": 14601,

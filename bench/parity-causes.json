@@ -220,11 +220,15 @@
   },
   "2.5": {
     "cause": "10,000 RawMeshes of one material, one draw each. Before: each mesh's frame rebuilt its normal matrix with temporary arrays and re-bound the material's group (CPU profile). Now the object block is recomputed only when the world matrix changed and the material group is bound once per run of draws: 28.8 -> 21.3 ms CPU (run 20261027-105724) against three-webgpu's 36.8 and three-webgl's 7.6. Left (measured with a timing wrapper on the pass methods): the native encoding calls themselves, per mesh a bind group (its own object block), a vertex buffer, an index buffer and an indexed draw, about 1.7 us of every 2.1 us a mesh; three's WebGL backend issues cheaper GL calls. Structural, plan in known-bugs (shared GPU buffers for identical raw geometry, one pooled object buffer with dynamic offsets)",
-    "knownBug": "raw-meshes-native-calls-per-draw",
     "fixes": [
       {
         "commit": "perf(shader): raw object blocks and material group",
         "tradeoff": "none; the same draws and buffer writes",
+        "rerun": "node bench/cli.mjs parity --cases=p-custom-shader --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
+      },
+      {
+        "commit": "perf(shader): raw meshes with equal bytes share their buffers",
+        "tradeoff": "same draws and image (SSIM 0.997 against three); one CPU copy of each shared buffer's bytes, 441 more gzip bytes in shader/raw (9,684 to 10,125)",
         "rerun": "node bench/cli.mjs parity --cases=p-custom-shader --engines=margo,three-webgpu-parity,three-webgl-parity --runs=3 --warmup=1 --no-compare --no-fail"
       }
     ]

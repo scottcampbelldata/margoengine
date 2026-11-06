@@ -535,3 +535,141 @@ test('meshes of one material bind its group once a pass; each mesh binds its own
     ['bind', 'draw', 'draw', 'draw', 'bind', 'draw', 'bind', 'draw'],
   );
 });
+
+test('raw meshes with equal bytes share their buffers, and a run of them binds each once', () => {
+  // p-custom-shader: 10,000 meshes of one geometry each uploaded and bound their own vertex and index buffers, two
+  // native calls per draw that changed nothing.
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    m = material(),
+    index = [0, 1, 2, 0, 2, 3];
+  const setup = h.gpu.record(() => {
+    for (let i = 0; i < 3; i++) raw.add(new RawMesh({ material: m, attributes: quad(), index }));
+    h.frame();
+  });
+  const made = (label) => named(setup, 'buffer').filter((c) => c[2].label === label).length;
+  assert.equal(made('shader:raw:vertex'), 1);
+  assert.equal(made('shader:raw:instance'), 1);
+  assert.equal(made('shader:raw:index'), 1);
+  assert.equal(made('shader:raw:mesh'), 3, 'each mesh keeps its own object block');
+  const log = h.gpu.record(() => h.frame());
+  assert.equal(named(log, 'pass.drawIndexed').length, 3);
+  assert.equal(named(log, 'pass.setVertexBuffer').length, 2, 'vertex and instance streams, once each');
+  assert.equal(named(log, 'pass.setIndexBuffer').length, 1);
+  assert.equal(named(log, 'pass.setBindGroup').filter((c) => c[1] === 0).length, 3);
+});
+
+test('different bytes never share, and a shared buffer is rebound when the next draw needs another', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    m = material(),
+    index = [0, 1, 2, 0, 2, 3],
+    other = quad();
+  other.position.data = other.position.data.map((v) => v * 2);
+  raw.add(new RawMesh({ material: m, attributes: quad(), index, renderOrder: 0 }));
+  raw.add(new RawMesh({ material: m, attributes: other, index, renderOrder: 1 }));
+  raw.add(new RawMesh({ material: m, attributes: quad(), index, renderOrder: 2 }));
+  h.frame();
+  const slot0 = named(
+    h.gpu.record(() => h.frame()),
+    'pass.setVertexBuffer',
+  )
+    .filter((c) => c[1] === 0)
+    .map((c) => c[2]);
+  assert.equal(slot0.length, 3, 'first, other, first again');
+  assert.notEqual(slot0[0], slot0[1]);
+  assert.equal(slot0[0], slot0[2]);
+});
+
+test('equal index bytes of another format share the buffer and still set the format', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    m = material();
+  raw.add(new RawMesh({ material: m, attributes: quad(), index: new Uint32Array([0, 1, 2, 3]), renderOrder: 0 }));
+  raw.add(new RawMesh({ material: m, attributes: quad(), index: new Uint16Array([0, 0, 1, 0, 2, 0, 3, 0]), renderOrder: 1 }));
+  h.frame();
+  const calls = named(
+    h.gpu.record(() => h.frame()),
+    'pass.setIndexBuffer',
+  );
+  assert.deepEqual(
+    calls.map((c) => c[2]),
+    ['uint32', 'uint16'],
+  );
+  assert.equal(calls[0][1], calls[1][1]);
+});
+
+test('a write copies a shared buffer for that mesh only', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    m = material();
+  let a, b;
+  const vertexIds = (log) =>
+    named(log, 'buffer')
+      .filter((c) => c[2].label === 'shader:raw:vertex')
+      .map((c) => c[1]);
+  const [sharedId, ...more] = vertexIds(
+    h.gpu.record(() => {
+      a = raw.add(new RawMesh({ material: m, attributes: quad() }));
+      b = raw.add(new RawMesh({ material: m, attributes: quad() }));
+      h.frame();
+    }),
+  );
+  assert.deepEqual(more, []);
+  const shared = a.gpu.vertex.buffer;
+  assert.equal(b.gpu.vertex.buffer, shared);
+  b.setAttribute('uv', [1, 1, 0, 1, 0, 0, 1, 0]);
+  const log = h.gpu.record(() => h.frame()),
+    [copyId] = vertexIds(log);
+  assert.equal(a.gpu.vertex.buffer, shared, 'the other mesh keeps the buffer');
+  assert.notEqual(b.gpu.vertex.buffer, shared);
+  assert.ok(copyId !== undefined && copyId !== sharedId);
+  assert.ok(!named(log, 'writeBuffer').some((c) => c[1] === sharedId), 'the shared bytes are not written');
+  assert.ok(!named(log, 'destroy').some((c) => c[1] === sharedId));
+  assert.equal(named(log, 'writeBuffer').filter((c) => c[1] === copyId).length, 1, 'the copy holds the new bytes');
+  // Alone now, each mesh writes in place, and a new mesh with the old bytes does not join a buffer that left the pool.
+  const own = b.gpu.vertex.buffer;
+  b.setAttribute('uv', [0, 0, 1, 0, 1, 1, 0, 1], [0, 2]);
+  assert.deepEqual(vertexIds(h.gpu.record(() => h.frame())), []);
+  assert.equal(b.gpu.vertex.buffer, own);
+  a.setAttribute('uv', [0, 1, 1, 0, 1, 1, 0, 1], [0, 1]);
+  const last = h.gpu.record(() => h.frame());
+  assert.equal(a.gpu.vertex.buffer, shared, 'the last holder takes the buffer over');
+  assert.equal(named(last, 'writeBuffer').filter((c) => c[1] === sharedId).length, 1);
+  const c = raw.add(new RawMesh({ material: m, attributes: quad() }));
+  h.frame();
+  assert.notEqual(c.gpu.vertex.buffer, shared);
+});
+
+test('a shared buffer lives until its last mesh lets go', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    m = material();
+  let a, b;
+  const setup = h.gpu.record(() => {
+      a = raw.add(new RawMesh({ material: m, attributes: quad() }));
+      b = raw.add(new RawMesh({ material: m, attributes: quad() }));
+      h.frame();
+    }),
+    id = named(setup, 'buffer').find((c) => c[2].label === 'shader:raw:vertex')[1],
+    shared = a.gpu.vertex.buffer;
+  assert.ok(!named(h.gpu.record(() => a.dispose()), 'destroy').some((c) => c[1] === id));
+  assert.ok(named(h.gpu.record(() => b.dispose()), 'destroy').some((c) => c[1] === id));
+  const c = raw.add(new RawMesh({ material: m, attributes: quad() }));
+  h.frame();
+  assert.notEqual(c.gpu.vertex.buffer, shared, 'a freed buffer is not handed out again');
+});
+
+test('a device swap leaves the old pool and shares again on the new device', () => {
+  const h = harness(),
+    raw = RawShaders.attach(h.engine),
+    m = material(),
+    a = raw.add(new RawMesh({ material: m, attributes: quad() })),
+    b = raw.add(new RawMesh({ material: m, attributes: quad() }));
+  h.frame();
+  const old = a.gpu.vertex.buffer;
+  h.swap();
+  h.frame();
+  assert.notEqual(a.gpu.vertex.buffer, old);
+  assert.equal(a.gpu.vertex.buffer, b.gpu.vertex.buffer);
+});

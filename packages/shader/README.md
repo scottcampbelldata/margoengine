@@ -187,7 +187,7 @@ read back exactly (65 ms on an NVIDIA Ampere GPU in Edge), a job on an engine th
 submit and while mapping, engine disposal and `device.destroy()` at both points, and a pipeline over the storage-binding
 limit; every job destroyed its buffers and no GPU error escaped.
 
-## Raw shaders (`@margoengine/shader/raw`, 9.6 kB min+gzip)
+## Raw shaders (`@margoengine/shader/raw`, 10.1 kB min+gzip)
 
 Your own WGSL vertex and fragment
 entry points, any named attributes per vertex or per instance, live uniforms and textures, drawn into the scene's colour
@@ -238,6 +238,11 @@ material.transparent = true;                      // render state is live too (a
   attribute (new layout, new pipeline). Optional index (`Uint16Array`, `Uint32Array` or numbers), `instanceCount`,
   `vertexCount` (no attributes: vertex pulling), `topology`, `drawRange`. `matrix` is the model matrix; `mesh: coreMesh`
   follows a core mesh (world = its world matrix x `matrix`) and hides with it.
+- **Shared buffers.** Meshes whose packed vertex, instance or index bytes are equal hold one GPU buffer, counted per
+  device, so 10,000 boxes built from one geometry upload it once and a run of them binds it once. Nothing to set:
+  `new RawMesh({material, attributes, index})` with the same data is enough. A mesh leaves on its first write
+  (`setAttribute`, `setIndex`), and the others keep drawing the old bytes. Each shared buffer keeps a CPU copy of its
+  bytes to compare new meshes with, until its meshes have left it.
 - **Render state.** `transparent` (drawn after the opaque scene, sorted back to front by distance), `blending`
   (`'normal'` blends only when transparent; `'additive'`, `'multiply'`, `'premultiplied'`, `'none'` or a
   `GPUBlendState`), `depthTest` (reversed-Z `greater-equal`), `depthWrite`, `cull` (`'back'`, `'front'`, `'none'`),

@@ -15,7 +15,21 @@ const field=storage(4,'vec4f'),fill=new ComputePass(4,i=>field.store(i,vec4(i.to
 // 1000 invocations: count, max and min of the index, and compaction of the even indices through an atomic slot counter.
 const counter=storage(new Uint32Array([0,0,0xffffffff,0]),'u32',{atomic:true}),kept=storage(1024,'u32');
 const tally=new ComputePass(1000,i=>{counter.atomicAdd(0,1);counter.atomicMax(1,i);counter.atomicMin(2,i);const even=i.mod(2).equal(0),slot=counter.atomicAdd(3,select(even,uint(1),uint(0)));return kept.store(select(even,slot,uint(1023)),i);});
+// Two raw meshes of equal bytes share a vertex buffer; rawWrite() changes one, which must leave the other alone.
+const rawShared=async()=>{
+  const {RawShaders,RawShaderMaterial,RawMesh}=await import('/packages/shader/dist/raw.js');
+  const raw=RawShaders.attach(engine),material=new RawShaderMaterial({vertexShader:`
+struct Out {@builtin(position) clip:vec4f,@location(0) color:vec3f}
+@vertex fn vertex(a:Attributes)->Out {return Out(mesh.world*vec4f(a.position,1.0),a.color);}
+@fragment fn fragment(i:Out)->@location(0) vec4f {return vec4f(i.color,1.0);}`});
+  const attributes=()=>({position:{data:[-.4,-.4,.5,.4,-.4,.5,.4,.4,.5,-.4,.4,.5],type:'vec3f'},color:{data:[1,0,0,1,0,0,1,0,0,1,0,0],type:'vec3f'}});
+  const at=x=>[1,0,0,0,0,1,0,0,0,0,1,0,x,0,0,1],index=[0,1,2,0,2,3];
+  const left=raw.add(new RawMesh({material,attributes:attributes(),index,matrix:at(-.5)})),right=raw.add(new RawMesh({material,attributes:attributes(),index,matrix:at(.5)}));
+  engine.render();await raw.ready();
+  return {left,right,shared:left.gpu.vertex.buffer===right.gpu.vertex.buffer,destroy(){engine.removePlugin(raw.name);}};
+};
 const scenarios={
+  rawShared,
   // Basic shading shows the node colour exactly (sRGB-encoded linear input).
   uniform:()=>plane(new NodeMaterial({shading:'basic',colorNode:tint})),
   gradient:()=>plane(new NodeMaterial({shading:'basic',colorNode:mix(color('#ff0000'),color('#0000ff'),step(0.5,uv().y))})),
@@ -44,6 +58,7 @@ async function readBack(buffer,Kind){
 window.check={
   async run(name){device.pushErrorScope('validation');const model=await scenarios[name]();window.current=model;engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),pipelines};},
   async setTint(hex){const before=pipelines;tint.value=hex;engine.render();await device.queue.onSubmittedWorkDone();return {errors:errors.splice(0),newPipelines:pipelines-before};},
+  async rawWrite(){const {left,right,shared}=window.current;right.setAttribute('color',[0,1,0,0,1,0,0,1,0,0,1,0]);engine.render();await device.queue.onSubmittedWorkDone();return {shared,split:left.gpu.vertex.buffer!==right.gpu.vertex.buffer,errors:errors.splice(0)};},
   readField:()=>readBack(field,Float32Array),
   async readAtomics(){const first=(await readBack(kept,Uint32Array)).slice(0,500).sort((a,b)=>a-b);return {counter:await readBack(counter,Uint32Array),evens:first.every((v,k)=>v===k*2)};},
   // Both gltf-pro variants (standard and KHR physical) with node overrides, including a vertex offset and a varying, must compile.

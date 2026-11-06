@@ -36,6 +36,7 @@ try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
   for (const name of [
+    'rawShared',
     'uniform',
     'gradient',
     'texture',
@@ -59,6 +60,14 @@ try {
       assert.deepEqual(step.errors, []);
       assert.equal(step.newPipelines, 0, 'uniform change recompiled');
       near(await pixel(), [0, 255, 0], 'uniform update');
+    }
+    if (name === 'rawShared') {
+      near(await pixel(0.5, 0.25), [255, 0, 0], 'left raw mesh');
+      near(await pixel(0.5, 0.75), [255, 0, 0], 'right raw mesh, same buffer');
+      const write = await page.evaluate(() => window.check.rawWrite());
+      assert.deepEqual(write, { shared: true, split: true, errors: [] });
+      near(await pixel(0.5, 0.25), [255, 0, 0], 'a write to the right mesh leaves the left one alone');
+      near(await pixel(0.5, 0.75), [0, 255, 0], 'the right mesh draws its new bytes');
     }
     if (name === 'gradient') {
       near(await pixel(0.3), [0, 0, 255], 'uv.y > 0.5 at the top');

@@ -50,7 +50,7 @@ export class RawMesh {
     release(): void;
     worldMatrix(engine: EngineKernel): Float32Array | null;
     upload(device: GPUDevice, camera: GPUBuffer, world: Float32Array): [number, number, number] | undefined;
-    draw(pass: GPURenderPassEncoder, first: number, count: number, instances: number): void;
+    draw(pass: GPURenderPassEncoder, first: number, count: number, instances: number, bound: BoundBuffers): void;
 }
 
 export interface RawMeshOptions {
@@ -163,6 +163,22 @@ interface BindableTexture {
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }
 
+interface BoundBuffers {
+    slots: (GPUBuffer | undefined)[];
+    index?: GPUBuffer;
+    format?: GPUIndexFormat;
+}
+
+interface HeldBuffer {
+    buffer: GPUBuffer;
+    users: number;
+    usage: number;
+    label: string;
+    key?: string;
+    words?: Uint32Array;
+    fresh?: boolean;
+}
+
 interface MaterialGpu {
     layout?: GPUBindGroupLayout;
     pipelineLayout: GPUPipelineLayout;
@@ -185,9 +201,9 @@ interface MeshGpu {
     device: GPUDevice;
     object: GPUBuffer;
     written?: Float32Array;
-    vertex?: GPUBuffer;
-    instance?: GPUBuffer;
-    index?: GPUBuffer;
+    vertex?: HeldBuffer;
+    instance?: HeldBuffer;
+    index?: HeldBuffer;
     group?: GPUBindGroup;
     camera?: GPUBuffer;
 }

@@ -642,6 +642,74 @@ interface Attribute {
   offset: number;
 }
 /** Interleaved CPU copy of one step mode's attributes, uploaded whole or by element range. */
+/**
+ * A mesh's GPU buffer. Meshes whose packed bytes are equal hold one, counted per device, so draws in a row skip
+ * rebinding it. `words` is a copy of those bytes, kept while others may join; a mesh leaves on its first write.
+ */
+interface HeldBuffer {
+  buffer: GPUBuffer;
+  users: number;
+  usage: number;
+  label: string;
+  key?: string;
+  words?: Uint32Array;
+  /** Set by {@link ownBuffer} on a new copy: it already holds the mesh's current bytes. */
+  fresh?: boolean;
+}
+const heldBuffers = new WeakMap<GPUDevice, Map<string, HeldBuffer[]>>();
+function newBuffer(device: GPUDevice, usage: number, label: string, words: Uint32Array): GPUBuffer {
+  const buffer = device.createBuffer({ label, size: words.byteLength, usage });
+  device.queue.writeBuffer(buffer, 0, words as Uint32Array<ArrayBuffer>);
+  return buffer;
+}
+/** A buffer holding `words`: the one already on the device with these bytes, or a new one others can join. */
+function holdBuffer(device: GPUDevice, usage: number, label: string, words: Uint32Array): HeldBuffer {
+  let pool = heldBuffers.get(device);
+  if (!pool) heldBuffers.set(device, (pool = new Map()));
+  // FNV-1a over the words picks the candidates; equality is always decided on the bytes.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < words.length; i++) hash = Math.imul(hash ^ words[i], 0x01000193);
+  const key = `${usage}:${words.length}:${hash}`;
+  let list = pool.get(key);
+  if (!list) pool.set(key, (list = []));
+  for (const held of list) {
+    const other = held.words!;
+    let i = 0;
+    while (i < words.length && other[i] === words[i]) i++;
+    if (i === words.length) {
+      held.users++;
+      return held;
+    }
+  }
+  const held = { buffer: newBuffer(device, usage, label, words), users: 1, usage, label, key, words: words.slice() };
+  list.push(held);
+  return held;
+}
+/** Takes `held` out of the pool, so nobody joins it. */
+function unlist(device: GPUDevice, held: HeldBuffer): void {
+  if (held.key === undefined) return;
+  const pool = heldBuffers.get(device)!,
+    list = pool.get(held.key)!;
+  list.splice(list.indexOf(held), 1);
+  if (!list.length) pool.delete(held.key);
+  held.key = held.words = undefined;
+}
+function dropBuffer(device: GPUDevice, held: HeldBuffer | undefined): void {
+  if (!held || --held.users) return;
+  unlist(device, held);
+  held.buffer.destroy();
+}
+/** Copy on write: a buffer only this mesh holds. A new copy is made from `words`, and says so with `fresh`. */
+function ownBuffer(device: GPUDevice, held: HeldBuffer, words: Uint32Array): HeldBuffer {
+  if (held.users === 1) {
+    unlist(device, held);
+    held.fresh = false;
+    return held;
+  }
+  held.users--;
+  const { usage, label } = held;
+  return { buffer: newBuffer(device, usage, label, words), users: 1, usage, label, fresh: true };
+}
 class Stream {
   attributes: Attribute[] = [];
   stride = 0;
@@ -679,43 +747,47 @@ class Stream {
     this.start = Math.min(this.start, start);
     this.end = Math.max(this.end, end);
   }
-  upload(device: GPUDevice, buffer: GPUBuffer | undefined): GPUBuffer | undefined {
+  upload(device: GPUDevice, held: HeldBuffer | undefined): HeldBuffer | undefined {
     if (!this.attributes.length) {
-      buffer?.destroy();
+      dropBuffer(device, held);
       return undefined;
     }
     const size = Math.max(4, this.capacity * this.stride);
-    if (!buffer || this.full || buffer.size < size) {
-      buffer?.destroy();
-      buffer = device.createBuffer({
-        label: 'shader:raw:' + this.step,
-        size,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      });
-      device.queue.writeBuffer(buffer, 0, this.words.buffer as ArrayBuffer, 0, size);
-    } else if (this.end > this.start)
-      device.queue.writeBuffer(
-        buffer,
-        this.start * this.stride,
-        this.words.buffer as ArrayBuffer,
-        this.start * this.stride,
-        (this.end - this.start) * this.stride,
-      );
+    if (!held || this.full || held.buffer.size < size) {
+      dropBuffer(device, held);
+      held = holdBuffer(device, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, 'shader:raw:' + this.step, this.words);
+    } else if (this.end > this.start) {
+      held = ownBuffer(device, held, this.words);
+      if (!held.fresh)
+        device.queue.writeBuffer(
+          held.buffer,
+          this.start * this.stride,
+          this.words.buffer as ArrayBuffer,
+          this.start * this.stride,
+          (this.end - this.start) * this.stride,
+        );
+    }
     this.full = false;
     this.start = Infinity;
     this.end = 0;
-    return buffer;
+    return held;
   }
 }
 interface MeshGpu {
   device: GPUDevice;
   object: GPUBuffer;
   written?: Float32Array;
-  vertex?: GPUBuffer;
-  instance?: GPUBuffer;
-  index?: GPUBuffer;
+  vertex?: HeldBuffer;
+  instance?: HeldBuffer;
+  index?: HeldBuffer;
   group?: GPUBindGroup;
   camera?: GPUBuffer;
+}
+/** What one render pass has bound, so draws in a row that share a buffer do not bind it again. */
+interface BoundBuffers {
+  slots: (GPUBuffer | undefined)[];
+  index?: GPUBuffer;
+  format?: GPUIndexFormat;
 }
 /** Options for `new RawMesh(options)`. */
 export interface RawMeshOptions {
@@ -934,7 +1006,8 @@ export class RawMesh {
   release(): void {
     const g = this.gpu;
     if (!g) return;
-    for (const b of [g.object, g.vertex, g.instance, g.index]) b?.destroy();
+    g.object.destroy();
+    for (const held of [g.vertex, g.instance, g.index]) dropBuffer(g.device, held);
     this.gpu = undefined;
     this.streams.vertex.full = this.streams.instance.full = this.indexDirty = true;
   }
@@ -1021,21 +1094,20 @@ export class RawMesh {
     g.instance = this.streams.instance.upload(device, g.instance);
     const index = this.indices;
     if (!index) {
-      g.index?.destroy();
+      dropBuffer(device, g.index);
       g.index = undefined;
     } else if (this.indexDirty || !g.index) {
-      const bytes = Math.ceil(index.byteLength / 4) * 4 || 4;
-      if (!g.index || g.index.size < bytes) {
-        g.index?.destroy();
-        g.index = device.createBuffer({
-          label: 'shader:raw:index',
-          size: bytes,
-          usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-        });
-      }
-      const padded = new Uint8Array(bytes);
+      const bytes = Math.ceil(index.byteLength / 4) * 4 || 4,
+        padded = new Uint8Array(bytes);
       padded.set(new Uint8Array(index.buffer, index.byteOffset, index.byteLength));
-      device.queue.writeBuffer(g.index, 0, padded);
+      const words = new Uint32Array(padded.buffer);
+      if (g.index?.users === 1 && g.index.buffer.size >= bytes) {
+        g.index = ownBuffer(device, g.index, words);
+        device.queue.writeBuffer(g.index.buffer, 0, padded);
+      } else {
+        dropBuffer(device, g.index);
+        g.index = holdBuffer(device, GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST, 'shader:raw:index', words);
+      }
     }
     this.indexDirty = false;
     const vs = this.streams.vertex,
@@ -1051,13 +1123,21 @@ export class RawMesh {
     return count > 0 && instances > 0 ? [start, count, Math.floor(instances)] : undefined;
   }
   /** @internal */
-  draw(pass: GPURenderPassEncoder, first: number, count: number, instances: number): void {
-    const g = this.gpu!;
+  draw(pass: GPURenderPassEncoder, first: number, count: number, instances: number, bound: BoundBuffers): void {
+    const g = this.gpu!,
+      vertex = g.vertex?.buffer,
+      instance = g.instance?.buffer,
+      index = g.index?.buffer;
     let slot = 0;
-    if (g.vertex) pass.setVertexBuffer(slot++, g.vertex);
-    if (g.instance) pass.setVertexBuffer(slot, g.instance);
-    if (g.index) {
-      pass.setIndexBuffer(g.index, this.indexFormat!);
+    if (vertex) {
+      if (bound.slots[0] !== vertex) pass.setVertexBuffer(0, (bound.slots[0] = vertex));
+      slot = 1;
+    }
+    if (instance && bound.slots[slot] !== instance) pass.setVertexBuffer(slot, (bound.slots[slot] = instance));
+    if (index) {
+      const format = this.indexFormat!;
+      if (bound.index !== index || bound.format !== format)
+        pass.setIndexBuffer((bound.index = index), (bound.format = format));
       pass.drawIndexed(count, instances, first);
     } else pass.draw(count, instances, first);
   }
@@ -1266,12 +1346,13 @@ export class RawShaders implements EnginePlugin {
         },
       });
     let current: GPURenderPipeline | undefined, materialGroup: GPUBindGroup | undefined;
+    const bound: BoundBuffers = { slots: [] };
     for (const d of draws) {
       if (d.pipeline !== current) pass.setPipeline((current = d.pipeline));
       pass.setBindGroup(0, d.mesh.gpu!.group!);
       // A bound group stays bound across draws and pipelines of one pass, so meshes of one material bind it once.
       if (d.group && d.group !== materialGroup) pass.setBindGroup(1, (materialGroup = d.group));
-      d.mesh.draw(pass, d.call[0], d.call[1], d.call[2]);
+      d.mesh.draw(pass, d.call[0], d.call[1], d.call[2], bound);
       this.stats.meshes++;
       this.stats.drawCalls++;
     }
