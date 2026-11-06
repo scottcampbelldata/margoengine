@@ -20,6 +20,7 @@ try {
     const { engineRuntime, PbrMaterial, Camera } = await import('/packages/core/dist/extension.js');
     const { parseGLTFAsync } = await import('/packages/gltf/dist/index.js');
     const { textured } = await import('/packages/gltf/dist/textured.js');
+    const { instancing } = await import('/packages/gltf/dist/instancing.js');
     const ensure = (condition, message) => {
       if (!condition) throw new Error(message);
     };
@@ -166,6 +167,23 @@ try {
     pair.dispose();
     ensure(!engine.plugins.has('gltf-textured'), 'The plugin leaves with its last part');
     ensure(near(pixels(left)[0], boxOnly, 0), 'A disposed model draws nothing');
+
+    // EXT_mesh_gpu_instancing: placements of one mesh are one core draw, each at its own place, the node's scale over them.
+    const offsets = new Float32Array([-1.5, 0, 0, 1.5, 0, 0, 0, 9, 0]),
+      forest = file({ pbrMetallicRoughness: pbr({ baseColorFactor: [0.2158, 0.0513, 0.5271, 1] }) }, undefined, [
+        { mesh: 0, scale: [0.5, 0.5, 0.5], extensions: { EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: 4 } } } },
+      ]);
+    forest.extensionsRequired = ['EXT_mesh_gpu_instancing'];
+    forest.buffers = [...forest.buffers, { byteLength: offsets.byteLength }];
+    forest.bufferViews = [...bufferViews, { buffer: 1, byteLength: offsets.byteLength }];
+    forest.accessors.push({ bufferView: 5, componentType: 5126, count: 3, type: 'VEC3' });
+    const grove = await parseGLTFAsync(instance, forest, [bytes, offsets], { extensions: [instancing] });
+    const [west, middle, east] = pixels(left, [32, 32], right);
+    ensure(near(west, expected) && near(east, expected), `Instances draw at their places: ${west} and ${east}`);
+    ensure(near(middle, boxOnly, 0), `Nothing draws between them: ${middle}`);
+    ensure(engine.stats.drawCalls === 2, `The box and one instanced draw: ${engine.stats.drawCalls}`);
+    result.instancing = { west, east, drawCalls: engine.stats.drawCalls };
+    grove.dispose();
 
     // Two views: each camera sees the quad from its own side of the frame.
     const views = await load(file({ alphaMode: 'MASK', pbrMetallicRoughness: pbr({ baseColorTexture: map }) }));

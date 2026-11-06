@@ -36,6 +36,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./instancing": {
+      "types": "./dist/instancing.d.ts",
+      "import": "./dist/instancing.js"
+    },
     "./meshopt": {
       "types": "./dist/meshopt.d.ts",
       "import": "./dist/meshopt.js"

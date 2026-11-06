@@ -90,6 +90,27 @@ engine.start();
 
 Decoded data may reach 64 MiB per file. For bytes in memory use `parseGLTFAsync`.
 
+### GPU instancing
+
+`@margoengine/gltf/instancing` reads `EXT_mesh_gpu_instancing`, for forests and repeated props. Each instance becomes a
+child node of the instanced node, on the shared mesh, and core draws all of them as one instanced draw per primitive.
+TRANSLATION, ROTATION and SCALE are read in float or quantized form; other instance attributes are ignored.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf';
+import { instancing } from 'margoengine/gltf/instancing';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
+const model = await loadGLTF(engine, '/forest.glb', { extensions: [instancing], maxNodes: 500_000 });
+engine.start();
+// On teardown: model.dispose(); engine.dispose();
+```
+
+An instance costs one core mesh plus one per primitive, shows up in `model.nodes` and `model.meshes`, can be moved like
+any node, and counts toward `maxNodes` (default 100,000).
+
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 
 Apache-2.0 licensed.

@@ -332,7 +332,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
     if (!node || node.skin !== undefined || node.camera !== undefined || node.extensions)
       throw new MargoError(
         'unsupported',
-        'Unsupported glTF node; remove cameras, lights and skins from it or load it with @margoengine/gltf-pro',
+        'Unsupported glTF node; add @margoengine/gltf/instancing for EXT_mesh_gpu_instancing, remove cameras, lights and skins from it, or load it with @margoengine/gltf-pro',
       );
     if (node.children !== undefined && !Array.isArray(node.children))
       throw new TypeError(

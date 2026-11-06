@@ -786,6 +786,10 @@
       "types": "./dist/gltf.d.ts",
       "import": "./dist/gltf.js"
     },
+    "./gltf/instancing": {
+      "types": "./dist/gltf/instancing.d.ts",
+      "import": "./dist/gltf/instancing.js"
+    },
     "./gltf/meshopt": {
       "types": "./dist/gltf/meshopt.d.ts",
       "import": "./dist/gltf/meshopt.js"
