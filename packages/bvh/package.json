@@ -68,6 +68,10 @@
     "./inside": {
       "types": "./dist/inside.d.ts",
       "import": "./dist/inside.js"
+    },
+    "./gpu-build": {
+      "types": "./dist/gpu-build.d.ts",
+      "import": "./dist/gpu-build.js"
     }
   },
   "files": [

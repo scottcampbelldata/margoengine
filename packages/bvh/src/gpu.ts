@@ -328,6 +328,17 @@ export function packRays(
   return packed;
 }
 
+/** @internal A tree over a vertex buffer the GPU writes; see `@margoengine/bvh/gpu-build`. */
+export interface GPUFollowedVertices {
+  vertices: GPUBuffer;
+  stride: number;
+  offset: number;
+  triangles: number;
+  nodes: number;
+  /** Uploads this topology; null leaves the tree blank for a GPU build. */
+  bvh: MeshBVH | null;
+}
+
 /**
  * A MeshBVH on the GPU. `await GPUMeshBVH.create(device, bvh)` uploads it; `raycast` traces rays and reads the answers
  * back, `encodeTrace` keeps rays and hits on the GPU, and {@link bvhWGSL} walks the tree inside your own shader.
@@ -345,7 +356,9 @@ export class GPUMeshBVH {
   readonly positions: GPUBuffer;
   /** Stride, offset and counts, read by the WGSL. */
   readonly params: GPUBuffer;
-  readonly bvh: MeshBVH;
+  /** The CPU tree it came from; null for a tree built on the GPU. */
+  readonly bvh: MeshBVH | null;
+  #followed: boolean;
   #pipeline: GPUComputePipeline;
   #tree: GPUBindGroup;
   #traces = new Map<string, GPUBuffer>();
@@ -357,35 +370,50 @@ export class GPUMeshBVH {
     return new GPUMeshBVH(device, bvh, await tracePipeline(device));
   }
 
-  private constructor(device: GPUDevice, bvh: MeshBVH, pipeline: GPUComputePipeline) {
+  /** @internal A tree whose positions stay in a GPU buffer the caller writes. */
+  static async follow(target: GPUTarget, followed: GPUFollowedVertices): Promise<GPUMeshBVH> {
+    const device = deviceOf(target);
+    return new GPUMeshBVH(device, followed.bvh, await tracePipeline(device), followed);
+  }
+
+  private constructor(
+    device: GPUDevice,
+    bvh: MeshBVH | null,
+    pipeline: GPUComputePipeline,
+    followed: GPUFollowedVertices | null = null,
+  ) {
     this.device = device;
     this.bvh = bvh;
+    this.#followed = !!followed;
     this.#pipeline = pipeline;
-    const nodes = packNodes(bvh),
-      positions = packPositions(bvh),
+    const nodes = bvh && packNodes(bvh),
+      positions = followed ? null : packPositions(bvh!),
+      triangles = followed?.triangles ?? bvh!.triangleCount,
+      nodeCount = followed?.nodes ?? bvh!.nodeCount,
       limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
     for (const [name, bytes] of [
-      ['nodes', nodes.byteLength],
-      ['positions', positions.byteLength],
-      ['indices', bvh.index.byteLength],
+      ['nodes', nodeCount * NODE_WORDS * 4],
+      ['positions', positions?.byteLength ?? followed!.vertices.size],
+      ['indices', triangles * 12],
     ] as const)
       if (bytes > limit)
         throw new RangeError(
           `BVH ${name} take ${bytes} bytes, over this device's ${limit}; request a higher maxStorageBufferBindingSize or split the mesh.`,
         );
-    const upload = (label: string, data: ArrayBuffer | ArrayBufferView, usage: number): GPUBuffer => {
-      const buffer = device.createBuffer({ label, size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
-      device.queue.writeBuffer(buffer, 0, data as BufferSource);
+    const upload = (label: string, data: ArrayBuffer | ArrayBufferView | null, size: number, usage: number): GPUBuffer => {
+      const buffer = device.createBuffer({ label, size, usage: usage | GPUBufferUsage.COPY_DST });
+      if (data) device.queue.writeBuffer(buffer, 0, data as BufferSource);
       return buffer;
     };
-    const storage = GPUBufferUsage.STORAGE;
-    this.nodes = upload('bvh nodes', nodes, storage);
-    this.index = upload('bvh index', bvh.index, storage);
-    this.faces = upload('bvh faces', bvh.triangles, storage);
-    this.positions = upload('bvh positions', positions, storage);
+    const storage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC;
+    this.nodes = upload('bvh nodes', nodes, nodeCount * NODE_WORDS * 4, storage);
+    this.index = upload('bvh index', bvh?.index ?? null, triangles * 12, storage);
+    this.faces = upload('bvh faces', bvh?.triangles ?? null, triangles * 4, storage);
+    this.positions = followed?.vertices ?? upload('bvh positions', positions, positions!.byteLength, storage);
     this.params = upload(
       'bvh params',
-      new Uint32Array([3, 0, bvh.triangleCount, bvh.nodeCount]),
+      new Uint32Array([followed?.stride ?? 3, followed?.offset ?? 0, triangles, nodeCount]),
+      16,
       GPUBufferUsage.UNIFORM,
     );
     this.#tree = device.createBindGroup({
@@ -410,6 +438,8 @@ export class GPUMeshBVH {
   /** Sends bounds and positions again after `bvh.refit()`. The topology must be the one uploaded. */
   update(): void {
     this.#live();
+    if (this.#followed || !this.bvh)
+      throw new MargoError('state', 'This tree follows a GPU buffer; update it with encode on its GPUDynamicBVH.');
     this.device.queue.writeBuffer(this.nodes, 0, packNodes(this.bvh));
     this.device.queue.writeBuffer(this.positions, 0, packPositions(this.bvh) as BufferSource);
   }
@@ -542,7 +572,8 @@ export class GPUMeshBVH {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    for (const buffer of [this.nodes, this.index, this.faces, this.positions, this.params]) buffer.destroy();
+    for (const buffer of [this.nodes, this.index, this.faces, this.params]) buffer.destroy();
+    if (!this.#followed) this.positions.destroy();
     for (const buffer of this.#traces.values()) buffer.destroy();
     this.#traces.clear();
   }

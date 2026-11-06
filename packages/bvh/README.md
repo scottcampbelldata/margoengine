@@ -259,6 +259,50 @@ The winding number is 1 inside a closed mesh wound counter-clockwise, 0 outside,
 
 `meshDistance` answers `null` past `maxDistance` (default `Infinity`) and stops at the first pair at or below `minDistance` (default 0), which is enough for a pass or fail check. Meshes that touch or cross answer 0. It measures surfaces: a mesh wholly inside another is the gap between the two surfaces away, not 0; add `pointInside` to tell the two apart.
 
+## GPU build for deforming meshes
+
+`GPUDynamicBVH` from `@margoengine/bvh/gpu-build` keeps a tree over a vertex buffer the GPU itself writes (a skin, a morph, a simulation), so queries see the animated pose with no readback. Its `tree` is a `GPUMeshBVH`: `raycast`, `encodeTrace`, `bindings` and `bvhWGSL` work on it as they do on an uploaded tree.
+
+```ts
+import {MeshBVH} from 'margoengine/bvh';
+import {GPUDynamicBVH} from 'margoengine/bvh/gpu-build';
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter!.requestDevice();
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0]);
+const indices = new Uint32Array([0, 1, 2, 1, 3, 2]);
+
+const vertices = device.createBuffer({size: positions.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST});
+device.queue.writeBuffer(vertices, 0, positions);
+
+using dynamic = await GPUDynamicBVH.create(device, {vertices, indices, mode: 'build'});
+
+// Each frame, after whatever writes the vertices, in the same encoder:
+const encoder = device.createCommandEncoder();
+dynamic.encode(encoder);
+device.queue.submit([encoder.finish()]);
+
+const hits = await dynamic.tree.raycast([{origin: [0.2, 0.2, 1], direction: [0, 0, -1]}]);
+console.log(hits.faceIndex[0], hits.distance[0]);
+
+// Or keep a rest-pose topology and refit it, which is cheaper and slower to query as the pose moves away:
+using refit = await GPUDynamicBVH.create(device, {
+  vertices,
+  indices,
+  mode: 'refit',
+  bvh: MeshBVH.build({positions, indices}),
+});
+```
+
+`'build'` makes a new linear BVH every update, with Morton codes, a sort and the parallel hierarchy of Karras (HPG 2012), so queries stay fast however far the mesh moves. `'refit'` keeps the tree of `bvh` and refits its bounds a level at a time. The vertex buffer stays the caller's and needs STORAGE usage. Indices never change. The tree's `update()` refuses, since it has no CPU source.
+
+| Option | Default |
+| --- | --- |
+| `mode` | `'build'` |
+| `bvh` | none; required by `'refit'`, a MeshBVH of the same triangles |
+| `stride` | 3 floats from one vertex to the next |
+| `offset` | 0 floats before the first position |
+
 ## GPU traversal
 
 `@margoengine/bvh/gpu` uploads a `MeshBVH` to storage buffers and traces rays in WGSL compute, for picking at scale, baking, path tracing and audio occlusion. `GPUMeshBVH.create` takes a `GPUDevice`, or an `Engine` on WebGPU. The tree is built on the CPU as usual; after `bvh.refit()` call `update()`.

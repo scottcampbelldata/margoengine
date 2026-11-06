@@ -10,6 +10,15 @@ export interface GPUBVHBindingOptions {
     binding?: number;
 }
 
+export interface GPUFollowedVertices {
+    vertices: GPUBuffer;
+    stride: number;
+    offset: number;
+    triangles: number;
+    nodes: number;
+    bvh: MeshBVH | null;
+}
+
 export class GPUMeshBVH {
     readonly device: GPUDevice;
     readonly nodes: GPUBuffer;
@@ -17,8 +26,9 @@ export class GPUMeshBVH {
     readonly faces: GPUBuffer;
     readonly positions: GPUBuffer;
     readonly params: GPUBuffer;
-    readonly bvh: MeshBVH;
+    readonly bvh: MeshBVH | null;
     static create(target: GPUTarget, bvh: MeshBVH): Promise<GPUMeshBVH>;
+    static follow(target: GPUTarget, followed: GPUFollowedVertices): Promise<GPUMeshBVH>;
     private constructor();
     get disposed(): boolean;
     bindings(first?: number): GPUBindGroupEntry[];

@@ -218,6 +218,10 @@
       "types": "./dist/bvh/inside.d.ts",
       "import": "./dist/bvh/inside.js"
     },
+    "./bvh/gpu-build": {
+      "types": "./dist/bvh/gpu-build.d.ts",
+      "import": "./dist/bvh/gpu-build.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4731846,
+  "total": 4750743,
   "history": [
     {
       "date": "2026-10-24",
@@ -1940,6 +1940,12 @@
       "commit": "926187e1f",
       "reason": "New input entry ./interactions: tap, hold, slow tap and double press rules. Input root keeps presses between updates and adds bindingValue. Core and core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "e269ee8ac",
+      "reason": "New optional entry bvh/gpu-build; bvh/gpu grows by the followed-buffer constructor path.",
+      "grew": 1
     }
   ],
   "items": {
@@ -1983,6 +1989,7 @@
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/bake": 2583,
     "@margoengine/bvh/gpu": 5208,
+    "@margoengine/bvh/gpu-build": 18897,
     "@margoengine/bvh/inside": 12903,
     "@margoengine/bvh/lines": 6113,
     "@margoengine/bvh/points": 17799,

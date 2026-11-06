@@ -374,6 +374,12 @@ each node's exit distance, so rounding never loses a hit. Evidence: `npm run tes
 RTX A6000 compares 100,000 rays with the float64 CPU tree and fires 123,200 rays at vertices and shared edges from
 inside a closed mesh.
 
+`@margoengine/bvh/gpu-build` follows a vertex buffer the GPU writes, on the same WebGPU-only terms. A build is Morton codes, a
+bitonic sort and the Karras hierarchy, then bounds climb one level a dispatch: a node's stamp names the dispatch that
+finished it, and a parent reads only children stamped by an earlier dispatch, because threads of one dispatch have no
+order. Evidence: trees read back and walked node by node, and rays through a pose only the GPU wrote, against a float64
+CPU tree, in `packages/bvh/tests/gpu-build-browser.js`.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback
@@ -666,4 +672,4 @@ The following remain technical gaps, not permission to weaken a check:
     no gate runs either one on Apple GPUs, and other GPUs are not checked. Its shadow lists still append atomically
     (depth only, so the same depth in any order).
 17. Subgroup kernels have run at subgroup sizes 32 and 4 only, and no gate runs size 4.
-18. GPU BVH traversal has no quiet speed measurement and no run on a GPU other than the RTX A6000.
+18. GPU BVH traversal and the GPU build have no quiet speed measurement and no run on a GPU other than the RTX A6000.
