@@ -1,6 +1,7 @@
 import { DracoDecoder, KTX2Decoder, createKTX2Texture, getSupportedTranscodeFormat } from '@margoengine/decoders';
 import { KTX2HDRDecoder } from '../dist/ktx2-hdr.js';
 import { KTX2LayerDecoder } from '../dist/ktx2-layers.js';
+import { KTX2GPUDecoder } from '../dist/ktx2-gpu.js';
 import { KTX2Streamer } from '../dist/ktx2-stream.js';
 
 const fixture = async (name) =>
@@ -66,6 +67,33 @@ async function layerMeans(device, texture, size, layers) {
   read.destroy();
   sums.destroy();
   return means;
+}
+
+// Every level of a texture as tight RGBA8 rows, layer after layer, in the shape of TextureFile.mipmaps.
+async function readLevels(device, texture) {
+  const levels = [],
+    layers = texture.depthOrArrayLayers;
+  for (let level = 0; level < texture.mipLevelCount; level++) {
+    const width = Math.max(1, texture.width >> level),
+      height = Math.max(1, texture.height >> level),
+      rowBytes = Math.ceil((width * 4) / 256) * 256,
+      read = device.createBuffer({ size: rowBytes * height * layers, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+      encoder = device.createCommandEncoder();
+    encoder.copyTextureToBuffer(
+      { texture, mipLevel: level },
+      { buffer: read, bytesPerRow: rowBytes, rowsPerImage: height },
+      [width, height, layers],
+    );
+    device.queue.submit([encoder.finish()]);
+    await read.mapAsync(GPUMapMode.READ);
+    const rows = new Uint8Array(read.getMappedRange()),
+      tight = new Uint8Array(width * height * layers * 4);
+    for (let y = 0; y < height * layers; y++)
+      tight.set(rows.subarray(y * rowBytes, y * rowBytes + width * 4), y * width * 4);
+    read.destroy();
+    levels.push(tight);
+  }
+  return levels;
 }
 
 window.runDecoderTests = async () => {
@@ -285,6 +313,75 @@ window.runDecoderTests = async () => {
   check(streamCube.residentLevel === 1 && streamCube.texture.width === 32, 'a smaller budget drops the finest level');
   streamer.dispose();
   checks.push(`KTX2 mips stream by Range reads from level ${firstLevel} up and equal the whole file on the GPU`);
+
+  // Basis on the GPU: every level, layer and face equals the Wasm transcoder's RGBA8, byte for byte, on real files.
+  const gpuDecoder = new KTX2GPUDecoder({ device }),
+    wasmRGBA = new KTX2LayerDecoder({ device, target: 'rgba8', workerLimit: 1 }),
+    gpuFiles = [
+      'ktx2-layers/cube-uastc-zstd.ktx2',
+      'ktx2-layers/array-uastc.ktx2',
+      'ktx2-layers/cube-etc1s.ktx2',
+      'ktx2-layers/cube-array-etc1s.ktx2',
+      'Dot_C.ktx2',
+      'Rib_N.ktx2',
+      'AnisotropyBarnLamp_normalbump.ktx2',
+      'ktx2-gpu/alpha-uastc-zstd.ktx2',
+      'ktx2-gpu/alpha-etc1s.ktx2',
+      'ktx2-gpu/odd-uastc-zstd.ktx2',
+      'ktx2-gpu/odd-etc1s.ktx2',
+    ];
+  report.gpuTranscode = [];
+  for (const name of gpuFiles) {
+    const bytes = await (await fetch(`/tests/fixtures/${name}`)).arrayBuffer(),
+      wasmStart = performance.now(),
+      expected = await wasmRGBA.decode(bytes.slice(0)),
+      wasmMs = performance.now() - wasmStart;
+    device.pushErrorScope('validation');
+    const gpuStart = performance.now(),
+      texture = await gpuDecoder.createTexture(bytes, { usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC });
+    await device.queue.onSubmittedWorkDone();
+    const gpuMs = performance.now() - gpuStart,
+      gpuError = await device.popErrorScope();
+    check(!gpuError, `${name} GPU transcode validation: ${gpuError?.message}`);
+    const levels = await readLevels(device, texture);
+    check(levels.length === expected.mipmaps.length, `${name} levels ${levels.length}`);
+    let differ = 0,
+      worst = 0;
+    levels.forEach((level, i) => {
+      const wanted = expected.mipmaps[i].data;
+      check(level.length === wanted.length, `${name} level ${i} holds ${level.length} bytes, not ${wanted.length}`);
+      for (let at = 0; at < level.length; at++)
+        if (level[at] !== wanted[at]) {
+          differ++;
+          worst = Math.max(worst, Math.abs(level[at] - wanted[at]));
+        }
+    });
+    report.gpuTranscode.push({ name, levels: levels.length, layers: texture.depthOrArrayLayers, differ, worst, wasmMs, gpuMs });
+    check(differ === 0, `${name}: ${differ} bytes differ from the Wasm transcoder, worst ${worst}`);
+    texture.destroy();
+    // A small storage buffer limit splits a level into bands; the bytes must not change.
+    if (name.includes('cube-')) {
+      const limits = { maxTextureDimension2D: 8192, maxStorageBufferBindingSize: 4096 },
+        small = new Proxy(device, {
+          get: (target, key) => {
+            if (key === 'limits') return limits;
+            const value = target[key];
+            return typeof value === 'function' ? value.bind(target) : value;
+          },
+        }),
+        banded = new KTX2GPUDecoder({ device: small }),
+        cut = await banded.createTexture(bytes, { usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC }),
+        cutLevels = await readLevels(device, cut);
+      cutLevels.forEach((level, i) => {
+        check(level.every((value, at) => value === levels[i][at]), `${name} level ${i} changes when it is cut into bands`);
+      });
+      cut.destroy();
+      banded.dispose();
+    }
+  }
+  gpuDecoder.dispose();
+  wasmRGBA.dispose();
+  checks.push('Basis on compute shaders equals the Wasm transcoder byte for byte on real UASTC and ETC1S files');
   rgba.dispose();
   negotiated.dispose();
   device.destroy();

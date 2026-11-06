@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6445177,
+  "total": 6459491,
   "history": [
     {
       "date": "2026-10-24",
@@ -2486,6 +2486,12 @@
       "commit": "ef49547b0",
       "reason": "feat(rigging): VRM 1.0 avatars (new entry @margoengine/rigging/vrm)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "eb1ba1f7f",
+      "reason": "ktx2-gpu entry, compute shaders and ETC1S reader",
+      "grew": 1
     }
   ],
   "items": {
@@ -2613,6 +2619,7 @@
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/ktx": 2851,
+    "@margoengine/decoders/ktx2-gpu": 14314,
     "@margoengine/decoders/ktx2-hdr": 378245,
     "@margoengine/decoders/ktx2-layers": 385718,
     "@margoengine/decoders/ktx2-stream": 389637,

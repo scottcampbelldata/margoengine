@@ -209,6 +209,28 @@ sets `error`; clear it to try again. Block formats start at the coarsest level w
 WebGPU wants that of level 0; `bytes()` and `usedBytes` report what the streams hold, and `dispose` frees it all. Lower
 `budgetBytes` under memory pressure and the next `update` drops levels to fit.
 
+## Basis on the GPU (`@margoengine/decoders/ktx2-gpu`)
+
+`KTX2GPUDecoder` transcodes Basis Universal KTX2 files with compute shaders, so a page that only needs textures skips the Wasm
+transcoder and its worker: 13,579 B gzip of JavaScript and WGSL against 260,468 B gzip (527,333 B of Wasm and 57,529 B of
+JavaScript raw). Zstandard files add 7,774 B on first use. UASTC blocks decode on the GPU; ETC1S streams are Huffman coded, so
+the CPU reads them to codebook indices and the GPU expands those.
+
+```ts
+import {KTX2GPUDecoder} from 'margoengine/decoders/ktx2-gpu';
+
+declare const device: GPUDevice;
+declare const file: ArrayBuffer;
+
+const decoder = new KTX2GPUDecoder({device});
+const texture = await decoder.createTexture(file);
+```
+
+2D, array and cube files work, every level, sRGB when the file says so. The output is RGBA8, byte for byte what the Wasm `rgba8`
+target gives, which costs 4 bytes a texel on the GPU where BC7 costs 1. Use `KTX2Decoder` or `KTX2LayerDecoder` where GPU memory
+matters more than the download. Texture video, HDR files and files that store a GPU format are refused; a device with a small
+`maxStorageBufferBindingSize` gets the level in bands.
+
 ## How it works
 
 - **Workers, not the main thread.** Each decoder owns a lazily grown pool of classic workers, by default `Math.min(navigator.hardwareConcurrency || 4, 4)`. Jobs go to an idle worker, then a new one while under the limit, then the least loaded. A crashed worker rejects only its own jobs and is replaced on the next call.

@@ -558,6 +558,10 @@
       "types": "./dist/decoders/ktx2-hdr.d.ts",
       "import": "./dist/decoders/ktx2-hdr.js"
     },
+    "./decoders/ktx2-gpu": {
+      "types": "./dist/decoders/ktx2-gpu.d.ts",
+      "import": "./dist/decoders/ktx2-gpu.js"
+    },
     "./decoders/ktx2-stream": {
       "types": "./dist/decoders/ktx2-stream.d.ts",
       "import": "./dist/decoders/ktx2-stream.js"

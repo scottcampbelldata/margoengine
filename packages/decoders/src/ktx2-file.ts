@@ -1,6 +1,8 @@
 // The KTX 2.0 header and level index (KTX 2.0 specification, section 3), read without the transcoder. Worker jobs check
 // a file with it before Basis sees the bytes; the native, streaming and GPU paths read levels from it.
 
+import { decodeFailed } from './errors.js';
+
 /** One entry of a KTX2 level index: where a mip level's bytes sit in the file. */
 export interface KTX2Level {
   offset: number;
@@ -87,4 +89,20 @@ export function readKTX2Index(bytes: Uint8Array, fileLength = bytes.length): KTX
     globalData: { offset: u64(64), length: u64(72) },
     levels,
   };
+}
+
+/** A level's bytes with zlib or Zstandard undone; the code for either loads on first use. */
+export async function levelData(bytes: Uint8Array, index: KTX2Index, level: number, signal?: AbortSignal): Promise<Uint8Array> {
+  const { offset, length, uncompressedLength } = index.levels[level],
+    stored = bytes.subarray(offset, offset + length);
+  if (index.supercompression === 0) return stored;
+  if (index.supercompression === 3) {
+    const { inflateZlib } = await import('./ktx2-inflate.js');
+    return inflateZlib(stored, uncompressedLength);
+  }
+  if (index.supercompression === 2) {
+    const { decompressZstd } = await import('../../shared/zstd.js');
+    return decompressZstd(stored, { signal, maxOutputSize: uncompressedLength });
+  }
+  throw decodeFailed(`KTX2: supercompression scheme ${index.supercompression} on a vkFormat file; re-encode the file`);
 }

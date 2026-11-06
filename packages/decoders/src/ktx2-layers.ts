@@ -5,7 +5,7 @@
 import { decodeFailed } from './errors.js';
 import { KTX2Decoder, type KTX2DecodeOptions } from './ktx2.js';
 import type { TranscodeTarget } from './protocol.js';
-import { ASTC_4X4_SFLOAT, readKTX2Index, type KTX2Index } from './ktx2-file.js';
+import { ASTC_4X4_SFLOAT, levelData, readKTX2Index, type KTX2Index } from './ktx2-file.js';
 import { formatBlock, levelBytes, uploadTexture, type TextureFile, type UploadTextureOptions } from './texture-file.js';
 
 export type { TextureFile, TextureFileLevel, UploadTextureOptions } from './texture-file.js';
@@ -75,21 +75,6 @@ const ASTC = ['4x4', '5x4', '5x5', '6x5', '6x6', '8x5', '8x6', '8x8', '10x5', '1
 
 const refuse = (what: string): Error =>
   decodeFailed(`KTX2 ${what} is not supported; convert the file to a 2D, array or cube texture in a WebGPU format`);
-
-async function levelData(bytes: Uint8Array, index: KTX2Index, level: number, signal?: AbortSignal): Promise<Uint8Array> {
-  const { offset, length, uncompressedLength } = index.levels[level],
-    stored = bytes.subarray(offset, offset + length);
-  if (index.supercompression === 0) return stored;
-  if (index.supercompression === 3) {
-    const { inflateZlib } = await import('./ktx2-inflate.js');
-    return inflateZlib(stored, uncompressedLength);
-  }
-  if (index.supercompression === 2) {
-    const { decompressZstd } = await import('../../shared/zstd.js');
-    return decompressZstd(stored, { signal, maxOutputSize: uncompressedLength });
-  }
-  throw refuse(`supercompression scheme ${index.supercompression} on a vkFormat file`);
-}
 
 // Adds an alpha channel after each three-channel texel: WebGPU has no RGB formats.
 function expandRGB(data: Uint8Array, channel: number, alpha: number[]): Uint8Array {
