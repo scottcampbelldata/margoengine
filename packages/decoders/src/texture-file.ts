@@ -17,7 +17,7 @@ export interface TextureFileLevel {
 }
 
 /**
- * A texture read from a DDS or KTX file in a WebGPU format, for {@link uploadTexture}. A single-layer 2D result in
+ * A texture read from a DDS, KTX or KTX2 file in a WebGPU format, for {@link uploadTexture}. A single-layer 2D result in
  * `rgba8unorm`, `bc7-rgba-unorm`, `astc-4x4-unorm` or `etc2-rgba8unorm` (with or without `-srgb`) is also a
  * `@margoengine/materials` `TranscodedTexture`, so `new Texture(file)` takes it as it takes `KTX2Decoder.transcode`
  * output.
@@ -36,7 +36,9 @@ export interface TextureFile {
   /** The device feature `format` needs (`texture-compression-bc`, `-etc2` or `-astc`), or undefined for none. */
   feature?: GPUFeatureName;
   /** The file type read. */
-  target: 'dds' | 'ktx';
+  target: 'dds' | 'ktx' | 'ktx2';
+  /** For a KTX2 file: the transcode target used, or 'native' when the file already stored `format`. */
+  transcoded?: string;
   srgb: boolean;
   hasAlpha: boolean;
 }
@@ -56,6 +58,8 @@ const TEXEL: Record<string, number> = {
   'rgba8unorm': 4,
   'rgba8unorm-srgb': 4,
   'rgba8snorm': 4,
+  'bgra8unorm': 4,
+  'bgra8unorm-srgb': 4,
   'r16float': 2,
   'rg16float': 4,
   'rgba16float': 8,

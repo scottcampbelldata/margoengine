@@ -73,7 +73,7 @@ async function unpackV4(file: Uint8Array, signal?: AbortSignal): Promise<Uint8Ar
     throw new RangeError('The SPZ table of contents lies outside the file; check that the file is complete.');
   const body = new Uint8Array(16 + sizes.reduce((a, b) => a + b, 0));
   body.set(file.subarray(0, 16));
-  const { decompressZstd } = await import('./zstd.js');
+  const { decompressZstd } = await import('../../shared/zstd.js');
   let at = toc + streams * 16,
     to = 16;
   for (let i = 0; i < streams; i++) {

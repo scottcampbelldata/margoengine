@@ -965,7 +965,7 @@ fetches and transcodes it, and `new Texture(await decoder.transcode(bytes))` tak
 its own upload of every mip level, in the compressed format the decoder chose (BC7, ASTC 4x4, ETC2 or RGBA8); a device
 without that format's feature throws `MargoError('unsupported')`, so create the decoder with the engine's device. Colour
 slots decode sRGB unless `colorSpace` says otherwise. `new Texture(await decoder.createTexture(bytes))` borrows the
-decoder's GPUTexture instead (one device, its own format). The decoder rejects KTX2 cube maps, arrays and UASTC HDR.
+decoder's GPUTexture instead (one device, its own format). The decoder rejects KTX2 cube maps, arrays and UASTC HDR; `KTX2LayerDecoder` from `@margoengine/decoders/ktx2-layers` reads cube maps and arrays, and its six-layer GPUTexture goes on `Material.envMap`.
 
 ```ts
 import {KTX2Decoder} from 'margoengine/decoders';

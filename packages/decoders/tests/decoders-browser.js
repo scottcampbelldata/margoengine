@@ -1,4 +1,5 @@
 import { DracoDecoder, KTX2Decoder, createKTX2Texture, getSupportedTranscodeFormat } from '@margoengine/decoders';
+import { KTX2LayerDecoder } from '../dist/ktx2-layers.js';
 
 const fixture = async (name) =>
   new Uint8Array(await (await fetch(new URL(`./fixtures/${name}`, import.meta.url))).arrayBuffer());
@@ -24,6 +25,45 @@ async function longestFrameGap(work) {
     running = false;
   }
   return { longest, elapsed: performance.now() - started };
+}
+
+/** Mean RGB of each layer of a 2D-array view of `texture`, read through the sampler path by a compute shader. */
+async function layerMeans(device, texture, size, layers) {
+  const code = `@group(0) @binding(0) var image: texture_2d_array<f32>;
+    @group(0) @binding(1) var<storage, read_write> sums: array<vec4f>;
+    @compute @workgroup_size(1) fn main(@builtin(global_invocation_id) id: vec3u) {
+      var total = vec4f(0);
+      for (var y = 0u; y < ${size}u; y++) {
+        for (var x = 0u; x < ${size}u; x++) { total += textureLoad(image, vec2u(x, y), id.x, 0); }
+      }
+      sums[id.x] = total / f32(${size * size});
+    }`;
+  const pipeline = device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: device.createShaderModule({ code }), entryPoint: 'main' },
+    }),
+    sums = device.createBuffer({ size: layers * 16, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }),
+    read = device.createBuffer({ size: layers * 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+    group = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: texture.createView({ dimension: '2d-array' }) },
+        { binding: 1, resource: { buffer: sums } },
+      ],
+    }),
+    encoder = device.createCommandEncoder(),
+    pass = encoder.beginComputePass();
+  pass.setPipeline(pipeline);
+  pass.setBindGroup(0, group);
+  pass.dispatchWorkgroups(layers);
+  pass.end();
+  encoder.copyBufferToBuffer(sums, 0, read, 0, layers * 16);
+  device.queue.submit([encoder.finish()]);
+  await read.mapAsync(GPUMapMode.READ);
+  const means = new Float32Array(read.getMappedRange().slice(0));
+  read.destroy();
+  sums.destroy();
+  return means;
 }
 
 window.runDecoderTests = async () => {
@@ -155,6 +195,28 @@ window.runDecoderTests = async () => {
   );
   readback.unmap();
   checks.push('RGBA8 upload reads back byte-identical from the GPU');
+
+  // KTX2 cube maps: transcoded in workers, uploaded on the real device, every face where the file put it.
+  const layerFile = async (name) => (await fetch(`/tests/fixtures/ktx2-layers/${name}`)).arrayBuffer(),
+    cubeFile = await layerFile('cube-uastc-zstd.ktx2'),
+    plain = new KTX2LayerDecoder({ device, target: 'rgba8', workerLimit: 1 }),
+    packed = new KTX2LayerDecoder({ device, workerLimit: 1 }),
+    plainCube = await plain.createTexture(cubeFile),
+    _scope = device.pushErrorScope('validation'),
+    packedCube = await packed.createTexture(cubeFile),
+    packedError = await device.popErrorScope(),
+    plainMeans = await layerMeans(device, plainCube, 64, 6),
+    packedMeans = await layerMeans(device, packedCube, 64, 6);
+  check(!packedError, `compressed cube validation: ${packedError?.message}`);
+  check(plainCube.depthOrArrayLayers === 6 && plainCube.mipLevelCount === 7, 'cube texture has 6 layers and 7 mips');
+  check(new Set(Array.from(plainMeans, (v) => v.toFixed(3))).size > 6, 'cube faces differ');
+  check(
+    packedMeans.every((v, i) => Math.abs(v - plainMeans[i]) < 2 / 255),
+    `${packed.target} cube faces match the rgba8 faces: ${[...packedMeans]} vs ${[...plainMeans]}`,
+  );
+  plain.dispose();
+  packed.dispose();
+  checks.push(`KTX2 cube map transcodes to ${packed.target} in workers and each face reads back on the GPU`);
   rgba.dispose();
   negotiated.dispose();
   device.destroy();

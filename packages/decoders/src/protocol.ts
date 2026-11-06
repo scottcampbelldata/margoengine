@@ -104,7 +104,14 @@ export interface TranscodedKTX2Result {
 
 export type WorkerRequest =
   | { id: number; type: 'draco'; buffer: ArrayBuffer; request: DracoRequest; wrapperURL: string; wasmURL: string }
-  | { id: number; type: 'ktx2'; buffer: ArrayBuffer; target: TranscodeTarget; transcoderURL: string; wasmURL: string };
+  | {
+      id: number;
+      type: 'ktx2' | 'ktx2-layers';
+      buffer: ArrayBuffer;
+      target: TranscodeTarget;
+      transcoderURL: string;
+      wasmURL: string;
+    };
 
 export type WorkerResponse =
   | { id: number; result: unknown; error?: undefined }

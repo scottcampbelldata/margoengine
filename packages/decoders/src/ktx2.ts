@@ -53,13 +53,23 @@ export class KTX2Decoder {
 
   /** Transcode every mip level in a worker. Mip data arrives as views of one transferred buffer. */
   transcode(data: ArrayBuffer | ArrayBufferView, options: KTX2DecodeOptions = {}): Promise<TranscodedKTX2Result> {
+    return this.job<TranscodedKTX2Result>('ktx2', this.target, data, options);
+  }
+
+  /** Runs one worker job of `type`; the entries built on this decoder add their job types through it. */
+  protected job<T>(
+    type: 'ktx2' | 'ktx2-layers',
+    target: TranscodeTarget,
+    data: ArrayBuffer | ArrayBufferView,
+    options: KTX2DecodeOptions,
+  ): Promise<T> {
     try {
       requireWorkers('KTX2Decoder');
       if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
       const buffer = payload(data, options.transfer ?? false);
       this.pool ??= new WorkerPool(this.workerLimit);
-      return this.pool.run<TranscodedKTX2Result>(
-        { type: 'ktx2', buffer, target: this.target, ...this.urls() },
+      return this.pool.run<T>(
+        { type, buffer, target, ...this.urls() },
         [buffer],
         options.signal,
         this.timeout ?? jobTimeout(buffer.byteLength),

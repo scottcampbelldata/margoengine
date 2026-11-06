@@ -59,7 +59,7 @@ export interface DracoModule extends Record<DracoDataType | DracoSemantic, numbe
   _free(pointer: number): void;
   destroy(handle: object): void;
 }
-interface BasisFile {
+export interface BasisFile {
   isValid(): boolean;
   isHDR?(): boolean;
   getFaces(): number;

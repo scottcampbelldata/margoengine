@@ -50,10 +50,10 @@ await writeFile(basis, staticEmbind(await readFile(basis, 'utf8'), 'basis_transc
 await copyFile(resolve(root, 'vendor/NOTICE.md'), resolve(dist, 'THIRD-PARTY-NOTICE.md'));
 // The PNG reader's shared helpers ship in dist/shared (dist/errors.js is the package's own).
 await mkdir(resolve(dist, 'shared'), { recursive: true });
-for (const name of ['crc32', 'errors', 'inflate', 'png'])
+for (const name of ['crc32', 'errors', 'inflate', 'png', 'zstd'])
   await copyFile(resolve(repository, `packages/shared/${name}.js`), resolve(dist, `shared/${name}.js`));
 // The TIFF reader shares the zlib inflater for its Deflate strips.
-for (const name of ['png', 'tiff']) {
+for (const name of ['png', 'tiff', 'ktx2-layers', 'ktx2-inflate']) {
   const file = resolve(dist, `${name}.js`);
   await writeFile(file, (await readFile(file, 'utf8')).replaceAll('../../shared/', './shared/'));
 }

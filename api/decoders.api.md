@@ -68,6 +68,7 @@ export class KTX2Decoder {
     readonly device?: GPUDevice;
     constructor(options?: KTX2Options);
     transcode(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions): Promise<TranscodedKTX2Result>;
+    protected job<T>(type: 'ktx2' | 'ktx2-layers', target: TranscodeTarget, data: ArrayBuffer | ArrayBufferView, options: KTX2DecodeOptions): Promise<T>;
     createTexture(data: ArrayBuffer | ArrayBufferView, options?: KTX2DecodeOptions & KTX2TextureOptions): Promise<GPUTexture>;
     dispose(): void;
     [Symbol.dispose]: () => void;

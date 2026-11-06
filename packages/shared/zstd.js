@@ -1,19 +1,9 @@
 // Zstandard decompressor (frames, raw/RLE/compressed blocks, Huffman literals, FSE sequences, repeat offsets,
 // xxHash64 content checksums, skippable frames). Written clean room from RFC 8878 and the public xxHash64
 // description; no other implementation was read. Dictionaries are refused with a coded error.
-import { MargoError } from '@margoengine/math/errors';
+import { margoError } from './errors.js';
 
-/** Options for {@link decompressZstd}. */
-export interface ZstdOptions {
-  /** Aborts decoding between blocks; the promise rejects with the signal's reason. */
-  signal?: AbortSignal;
-  /** Largest total output in bytes; more throws a RangeError. Default 268,435,456 (256 MiB). */
-  maxOutputSize?: number;
-  /** Largest frame window in bytes a frame may declare; more throws a RangeError. Default 134,217,728 (128 MiB). */
-  maxWindowSize?: number;
-}
-
-const damaged = (what: string) =>
+const damaged = (what) =>
   new RangeError(`The Zstandard data is damaged (${what}); check that the file is complete.`);
 
 const MAX_BLOCK = 1 << 17;
@@ -50,23 +40,21 @@ const OF_DEFAULT = [1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 
 
 /** Reads a little-endian backward bitstream (RFC 8878 4.1): bits are taken from the end towards the start. */
 class BackwardBits {
-  /** Bits still unread; negative once more bits were read than the stream holds (they read as zero). */
-  pos: number;
-  constructor(
-    private readonly data: Uint8Array,
-    private readonly start: number,
-    private readonly length: number,
-  ) {
+  constructor(data, start, length) {
+    this.data = data;
+    this.start = start;
+    this.length = length;
     if (length < 1) throw damaged('an empty bitstream');
     const last = data[start + length - 1];
     if (last === 0) throw damaged('a bitstream without its end marker');
+    // Bits still unread; negative once more bits were read than the stream holds (they read as zero).
     this.pos = length * 8 - 8 + (31 - Math.clz32(last));
   }
-  private byte(i: number): number {
+  byte(i) {
     return i >= 0 && i < this.length ? this.data[this.start + i] : 0;
   }
   /** The `n` (at most 25) bits below the read position, without consuming them. */
-  peek(n: number): number {
+  peek(n) {
     if (n === 0) return 0;
     const p = this.pos - n,
       i = p >> 3,
@@ -74,7 +62,7 @@ class BackwardBits {
     return (word >>> (p & 7)) & ((1 << n) - 1);
   }
   /** Reads `n` bits, 0 to 31. */
-  read(n: number): number {
+  read(n) {
     if (n > 24) {
       const high = this.read(n - 16);
       return high * 65536 + this.read(16);
@@ -86,15 +74,9 @@ class BackwardBits {
 }
 
 /** An FSE decoding table: per state, its symbol, bits to read and the baseline of the next state. */
-interface Fse {
-  log: number;
-  symbol: Uint8Array;
-  bits: Uint8Array;
-  base: Uint32Array;
-}
 
 /** Builds a decoding table from normalised probabilities (RFC 8878 4.1.1). */
-function buildFse(probabilities: ArrayLike<number>, symbols: number, log: number): Fse {
+function buildFse(probabilities, symbols, log) {
   const size = 1 << log,
     symbol = new Uint8Array(size),
     bits = new Uint8Array(size),
@@ -126,14 +108,14 @@ function buildFse(probabilities: ArrayLike<number>, symbols: number, log: number
 }
 
 /** A table that always yields `value` (RLE mode). */
-function rleFse(value: number): Fse {
+function rleFse(value) {
   return { log: 0, symbol: Uint8Array.of(value), bits: new Uint8Array(1), base: new Uint32Array(1) };
 }
 
 /** Reads an FSE table description (RFC 8878 4.1.1) at `at`; returns the table and the bytes it used. */
-function readFse(data: Uint8Array, at: number, end: number, maxLog: number, maxSymbol: number): [Fse, number] {
+function readFse(data, at, end, maxLog, maxSymbol) {
   let bit = 0;
-  const bitsAt = (n: number) => {
+  const bitsAt = (n) => {
     const p = at * 8 + bit,
       i = p >> 3;
     if (i >= end) throw damaged('a truncated FSE table description');
@@ -143,7 +125,7 @@ function readFse(data: Uint8Array, at: number, end: number, maxLog: number, maxS
   const log = bitsAt(4) + 5;
   bit = 4;
   if (log > maxLog) throw damaged(`an FSE accuracy log of ${log} (at most ${maxLog})`);
-  const probabilities: number[] = [];
+  const probabilities = [];
   let remaining = (1 << log) + 1,
     threshold = 1 << log,
     width = log + 1;
@@ -179,19 +161,14 @@ function readFse(data: Uint8Array, at: number, end: number, maxLog: number, maxS
 }
 
 /** A Huffman decoding table indexed by the next `bits` bits. */
-interface Huffman {
-  bits: number;
-  symbol: Uint8Array;
-  length: Uint8Array;
-}
 
 /** Reads a Huffman tree description (RFC 8878 4.2.1); returns the table and the bytes it used. */
-function readHuffman(data: Uint8Array, at: number, end: number): [Huffman, number] {
+function readHuffman(data, at, end) {
   if (at >= end) throw damaged('a missing Huffman tree');
   const header = data[at],
     weights = new Uint8Array(256);
   let count = 0,
-    used: number;
+    used;
   if (header >= 128) {
     count = header - 127;
     used = 1 + ((count + 1) >> 1);
@@ -250,13 +227,13 @@ function readHuffman(data: Uint8Array, at: number, end: number): [Huffman, numbe
 
 /** Decodes one Huffman-coded stream of `size` literals into `out` at `to`. */
 function huffmanStream(
-  table: Huffman,
-  data: Uint8Array,
-  at: number,
-  length: number,
-  out: Uint8Array,
-  to: number,
-  size: number,
+  table,
+  data,
+  at,
+  length,
+  out,
+  to,
+  size,
 ) {
   const stream = new BackwardBits(data, at, length),
     { bits, symbol, length: lengths } = table;
@@ -269,24 +246,17 @@ function huffmanStream(
 }
 
 /** Per-frame decoder state that later blocks may reuse. */
-interface FrameState {
-  huffman?: Huffman;
-  ll?: Fse;
-  of?: Fse;
-  ml?: Fse;
-  repeats: [number, number, number];
-}
 
-let LL_PREDEFINED: Fse | undefined, ML_PREDEFINED: Fse | undefined, OF_PREDEFINED: Fse | undefined;
+let LL_PREDEFINED, ML_PREDEFINED, OF_PREDEFINED;
 
 /** Growable output with a hard limit. */
 class Output {
-  bytes: Uint8Array<ArrayBuffer>;
   length = 0;
-  constructor(private readonly limit: number) {
+  constructor(limit) {
+    this.limit = limit;
     this.bytes = new Uint8Array(Math.min(limit, 1 << 16));
   }
-  reserve(extra: number) {
+  reserve(extra) {
     const need = this.length + extra;
     if (need > this.limit)
       throw new RangeError(
@@ -301,17 +271,17 @@ class Output {
 
 /** Decodes the literals section of a compressed block; returns the literals and where the sequences start. */
 function readLiterals(
-  data: Uint8Array,
-  at: number,
-  end: number,
-  state: FrameState,
-  scratch: Uint8Array,
-): [Uint8Array, number] {
+  data,
+  at,
+  end,
+  state,
+  scratch,
+) {
   const b0 = data[at],
     type = b0 & 3,
     format = (b0 >> 2) & 3;
   if (type < 2) {
-    let size: number, header: number;
+    let size, header;
     if ((format & 1) === 0) {
       size = b0 >> 3;
       header = 1;
@@ -332,7 +302,7 @@ function readLiterals(
     scratch.fill(data[from], 0, size);
     return [scratch.subarray(0, size), from + 1];
   }
-  let size: number, compressed: number, header: number;
+  let size, compressed, header;
   const b1 = data[at + 1],
     b2 = data[at + 2];
   if (format < 2) {
@@ -357,7 +327,7 @@ function readLiterals(
     state.huffman = table;
     from += used;
   } else if (!state.huffman) throw damaged('treeless literals with no earlier Huffman tree');
-  const table = state.huffman as Huffman;
+  const table = state.huffman;
   if (format === 0) huffmanStream(table, data, from, stop - from, scratch, 0, size);
   else {
     if (from + 6 > stop) throw damaged('a truncated literals jump table');
@@ -382,15 +352,15 @@ function readLiterals(
 
 /** Picks the FSE table for one symbol type from its compression mode (RFC 8878 3.1.1.3.2.1). */
 function sequenceTable(
-  mode: number,
-  data: Uint8Array,
-  at: number,
-  end: number,
-  previous: Fse | undefined,
-  predefined: () => Fse,
-  maxLog: number,
-  maxSymbol: number,
-): [Fse, number] {
+  mode,
+  data,
+  at,
+  end,
+  previous,
+  predefined,
+  maxLog,
+  maxSymbol,
+) {
   if (mode === 0) return [predefined(), 0];
   if (mode === 1) {
     if (at >= end) throw damaged('a missing RLE sequence symbol');
@@ -404,14 +374,14 @@ function sequenceTable(
 
 /** Decodes one compressed block (RFC 8878 3.1.1.3) and appends it to `out`. */
 function compressedBlock(
-  data: Uint8Array,
-  at: number,
-  end: number,
-  out: Output,
-  frameStart: number,
-  window: number,
-  state: FrameState,
-  scratch: Uint8Array,
+  data,
+  at,
+  end,
+  out,
+  frameStart,
+  window,
+  state,
+  scratch,
 ) {
   const [literals, seqAt] = readLiterals(data, at, end, state, scratch);
   let p = seqAt;
@@ -430,7 +400,7 @@ function compressedBlock(
     if (p >= end) throw damaged('a truncated sequences header');
     const modes = data[p++];
     if (modes & 3) throw damaged('reserved bits set in the sequence compression modes');
-    let used: number;
+    let used;
     [state.ll, used] = sequenceTable(
       modes >> 6,
       data,
@@ -481,7 +451,7 @@ function compressedBlock(
       const offsetValue = 2 ** ofCode + stream.read(ofCode),
         matchLength = ML_BASE[mlCode] + stream.read(ML_BITS[mlCode]),
         literalLength = LL_BASE[llCode] + stream.read(LL_BITS[llCode]);
-      let offset: number;
+      let offset;
       if (offsetValue > 3) {
         offset = offsetValue - 3;
         repeats[2] = repeats[1];
@@ -535,7 +505,7 @@ function compressedBlock(
  * @example
  * const bytes = await decompressZstd(compressed, { maxOutputSize: 1 << 24 });
  */
-export async function decompressZstd(input: Uint8Array, options: ZstdOptions = {}): Promise<Uint8Array<ArrayBuffer>> {
+export async function decompressZstd(input, options = {}) {
   if (!(input instanceof Uint8Array)) throw new TypeError('Expected Zstandard bytes as a Uint8Array');
   const { signal, maxOutputSize = 1 << 28, maxWindowSize = 1 << 27 } = options;
   if (!(maxOutputSize >= 0) || !(maxWindowSize >= 0))
@@ -578,7 +548,7 @@ export async function decompressZstd(input: Uint8Array, options: ZstdOptions = {
     let dictionary = 0;
     for (let k = 0, n = [0, 1, 2, 4][dictFlag]; k < n; k++) dictionary += data[at++] * 2 ** (8 * k);
     if (dictionary !== 0)
-      throw new MargoError(
+      throw margoError(
         'unsupported',
         `This Zstandard frame needs dictionary ${dictionary}, and dictionaries are not supported; compress without a dictionary.`,
       );
@@ -597,7 +567,7 @@ export async function decompressZstd(input: Uint8Array, options: ZstdOptions = {
     if (contentSize >= 0) out.reserve(contentSize);
     const frameStart = out.length,
       blockLimit = Math.min(window, MAX_BLOCK),
-      state: FrameState = { repeats: [1, 4, 8] };
+      state = { repeats: [1, 4, 8] };
     for (let last = 0; !last; ) {
       signal?.throwIfAborted();
       if (out.length >= nextYield) {
@@ -661,7 +631,7 @@ const P1H = 0x9e3779b1,
   P5H = 0x27d4eb2f,
   P5L = 0x165667c5;
 
-function mul(ah: number, al: number, bh: number, bl: number) {
+function mul(ah, al, bh, bl) {
   const a0 = al & 0xffff,
     a1 = al >>> 16,
     b0 = bl & 0xffff,
@@ -673,12 +643,12 @@ function mul(ah: number, al: number, bh: number, bl: number) {
   rl = ((mid << 16) | (p00 & 0xffff)) >>> 0;
   rh = (a1 * b1 + (p01 >>> 16) + (p10 >>> 16) + (mid >>> 16) + Math.imul(al, bh) + Math.imul(ah, bl)) >>> 0;
 }
-function add(ah: number, al: number, bh: number, bl: number) {
+function add(ah, al, bh, bl) {
   const low = al + bl;
   rl = low >>> 0;
   rh = (ah + bh + (low > 0xffffffff ? 1 : 0)) >>> 0;
 }
-function rotl(h: number, l: number, r: number) {
+function rotl(h, l, r) {
   if (r >= 32) {
     const t = h;
     h = l;
@@ -694,20 +664,20 @@ function rotl(h: number, l: number, r: number) {
   }
 }
 /** acc = rotl(acc + lane * P2, 31) * P1 */
-function round(ah: number, al: number, lh: number, ll: number) {
+function round(ah, al, lh, ll) {
   mul(lh, ll, P2H, P2L);
   add(ah, al, rh, rl);
   rotl(rh, rl, 31);
   mul(rh, rl, P1H, P1L);
 }
-const u32 = (b: Uint8Array, i: number) => (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0;
+const u32 = (b, i) => (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0;
 
 /** The low 32 bits of xxHash64 (seed 0) of `bytes[start, end)`, which a Zstandard content checksum stores. */
-function xxh64Low(bytes: Uint8Array, start: number, end: number): number {
+function xxh64Low(bytes, start, end) {
   const length = end - start;
   let p = start,
-    h: number,
-    l: number;
+    h,
+    l;
   if (length >= 32) {
     add(P1H, P1L, P2H, P2L);
     let v1h = rh,

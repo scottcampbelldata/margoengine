@@ -8,6 +8,7 @@ import {
   initDraco,
   isDecoderCrash,
   transcodeKTX2,
+  transcodeKTX2Layers,
   type ScriptLoader,
 } from './codec.js';
 import type { WorkerRequest } from './protocol.js';
@@ -32,12 +33,13 @@ self.onmessage = async ({ data }) => {
       });
       const result = decodeDraco((await draco).module, new Uint8Array(data.buffer), data.request);
       self.postMessage({ id, result }, dracoTransferables(result));
-    } else if (data.type === 'ktx2') {
+    } else if (data.type === 'ktx2' || data.type === 'ktx2-layers') {
       basis ??= initBasis(data.transcoderURL, data.wasmURL, load).catch((error) => {
         basis = undefined;
         throw error;
       });
-      const result = transcodeKTX2((await basis).module, new Uint8Array(data.buffer), data.target);
+      const transcode = data.type === 'ktx2' ? transcodeKTX2 : transcodeKTX2Layers,
+        result = transcode((await basis).module, new Uint8Array(data.buffer), data.target);
       self.postMessage({ id, result }, [result.mipmaps[0].data.buffer as ArrayBuffer]);
     } else throw new TypeError('Unknown decoder job; post a job made by the decoders package');
   } catch (error) {

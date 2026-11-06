@@ -65,6 +65,10 @@
     "./tiff": {
       "types": "./dist/tiff.d.ts",
       "import": "./dist/tiff.js"
+    },
+    "./ktx2-layers": {
+      "types": "./dist/ktx2-layers.d.ts",
+      "import": "./dist/ktx2-layers.js"
     }
   },
   "files": [

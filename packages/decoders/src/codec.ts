@@ -1,9 +1,12 @@
 // Worker-side decode functions. Kept free of worker globals so unit tests can drive them with real or mock modules.
 import { decodeFailed } from './errors.js';
 import { transcodeFormats } from './formats.js';
+import { readKTX2Index, type KTX2Index } from './ktx2-file.js';
+import { formatBlock, type TextureFile } from './texture-file.js';
 import type { DecodedDracoGeometry, DracoRequest, KTX2Mip, TranscodeTarget, TranscodedKTX2Result } from './protocol.js';
 import { validatedDracoLimits } from './protocol.js';
 import type {
+  BasisFile,
   BasisModule,
   DracoModule,
   DracoGeometry,
@@ -342,62 +345,41 @@ export function dracoTransferables(result: DecodedDracoGeometry): ArrayBuffer[] 
 
 const transferSRGB = 2;
 
-const ktx2Identifier = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a];
-/**
- * KTX 2.0 header and index checks (KTX 2.0 specification, section 3) before the transcoder reads the file: the level
- * count fits the size, and every byte range the index declares (levels, DFD, key/value data, supercompression global
- * data) lies inside the file. A truncated or corrupted file throws `Error('KTX2: invalid file (...)')` here.
- */
-function checkKTX2(bytes: Uint8Array): void {
-  const fail = (what: string) => {
-    throw new TypeError(`KTX2: invalid file (${what}); pass an unmodified .ktx2 file`);
-  };
-  if (bytes.length < 80) fail('truncated header');
-  if (ktx2Identifier.some((b, i) => bytes[i] !== b)) fail('not KTX 2.0');
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
-    u32 = (at: number) => view.getUint32(at, true),
-    // 64-bit offsets and lengths: a high word means past 4 GiB, outside any file this can be given.
-    u64 = (at: number) => (u32(at + 4) ? Number.POSITIVE_INFINITY : u32(at)),
-    inside = (offset: number, length: number) => offset + length <= bytes.length;
-  const levels = Math.max(1, u32(40)),
-    size = Math.max(u32(20), u32(24), 1);
-  if (levels > 1 + Math.floor(Math.log2(size))) fail('level count');
-  if (!inside(80, levels * 24)) fail('truncated level index');
-  for (let i = 0; i < levels; i++) if (!inside(u64(80 + i * 24), u64(88 + i * 24))) fail(`level ${i} out of bounds`);
-  // Zstandard-supercompressed levels (UASTC) inflate to the level's 16-byte 4x4 blocks: a larger declared size made the
-  // transcoder read past its buffer (a Wasm trap, or stale memory read as texels).
-  if (u32(44) === 2)
-    for (let i = 0; i < levels; i++) {
-      const blocks =
-        Math.ceil(Math.max(1, u32(20) >> i) / 4) *
-        Math.ceil(Math.max(1, u32(24) >> i) / 4) *
-        Math.max(1, u32(28) >> i) *
-        Math.max(1, u32(32)) *
-        u32(36);
-      if (u64(96 + i * 24) > blocks * 16) fail(`level ${i} size`);
-    }
-  if (!inside(u32(48), u32(52)) || !inside(u32(56), u32(60)) || !inside(u64(64), u64(72))) fail('index out of bounds');
+// Opens a checked KTX2 file for `use`, turning a Wasm trap into the decoder's own error and always freeing the handle.
+function withKTX2<T>(basis: BasisModule, bytes: Uint8Array, use: (file: BasisFile) => T): T {
+  const file = guard('KTX2', () => new basis.KTX2File(bytes));
+  let failure: unknown;
+  try {
+    if (!file.isValid()) throw decodeFailed('KTX2: invalid or unsupported file; pass an unmodified .ktx2 file');
+    return use(file);
+  } catch (error) {
+    throw (failure = trapped('KTX2', error));
+  } finally {
+    release(failure, () => {
+      file.close();
+      file.delete();
+    });
+  }
 }
 
 /**
  * Transcode every mip level of a 2D KTX2 file into one buffer. The Basis file handle is closed and deleted on every path.
- * The header and level index are checked first (checkKTX2); a Wasm trap on corrupt data throws `Error('KTX2: ...')`
+ * The header and level index are checked first (readKTX2Index); a Wasm trap on corrupt data throws `Error('KTX2: ...')`
  * with the trap as its cause (isDecoderCrash).
  */
 export function transcodeKTX2(basis: BasisModule, bytes: Uint8Array, target: TranscodeTarget): TranscodedKTX2Result {
   if (!transcodeFormats[target])
     throw new TypeError(`Unknown transcode target ${target}; use one of the targets listed in KTX2Options.target`);
-  checkKTX2(bytes);
-  const file = guard('KTX2', () => new basis.KTX2File(bytes));
-  let failure: unknown;
-  try {
-    if (!file.isValid()) throw decodeFailed('KTX2: invalid or unsupported file; pass an unmodified .ktx2 file');
+  readKTX2Index(bytes);
+  return withKTX2(basis, bytes, (file) => {
     if (file.isHDR?.())
       throw decodeFailed(
-        'KTX2: HDR textures are not supported; use an 8-bit KTX2 texture, or decode HDR data another way',
+        'KTX2: HDR textures are not supported here; use KTX2HDRDecoder from @margoengine/decoders/ktx2-hdr',
       );
     if (file.getFaces() > 1 || file.getLayers() > 1)
-      throw decodeFailed('KTX2: cube maps and texture arrays are not supported; use a single 2D KTX2 texture');
+      throw decodeFailed(
+        'KTX2: cube maps and texture arrays are not supported here; use KTX2LayerDecoder from @margoengine/decoders/ktx2-layers',
+      );
     const width: number = file.getWidth(),
       height: number = file.getHeight(),
       levels: number = file.getLevels();
@@ -433,12 +415,93 @@ export function transcodeKTX2(basis: BasisModule, bytes: Uint8Array, target: Tra
       hasAlpha: !!file.getHasAlpha(),
       srgb,
     };
-  } catch (error) {
-    throw (failure = trapped('KTX2', error));
-  } finally {
-    release(failure, () => {
-      file.close();
-      file.delete();
+  });
+}
+
+/** What transcodeImages writes: the Basis enum, the WebGPU format and the name the result reports. */
+interface ImageTarget {
+  basis: number;
+  gpu: string;
+  name: string;
+}
+
+// Every image of every level into one buffer: a level's images back to back in WebGPU layer order (layer * faces + face),
+// so one writeTexture per level uploads them.
+function transcodeImages(
+  file: BasisFile,
+  index: KTX2Index,
+  target: ImageTarget,
+  srgb: boolean,
+  hasAlpha: boolean,
+): TextureFile {
+  const { width, height, layerCount, faceCount } = index,
+    arrayLayers = Math.max(1, layerCount),
+    images = arrayLayers * faceCount,
+    levels = index.levels.length;
+  if (index.depth > 1) throw decodeFailed('KTX2: 3D textures are not supported; re-encode the file as a 2D array');
+  if (!width || !height || width > 16384 || height > 16384 || images > 2048)
+    throw new RangeError('KTX2: invalid dimensions; re-encode the texture with non-zero dimensions');
+  if (faceCount !== 1 && faceCount !== 6) throw new RangeError(`KTX2: invalid face count ${faceCount}; use 1 or 6`);
+  if (faceCount === 6 && width !== height) throw new RangeError('KTX2: cube faces are not square; re-encode the file');
+  if (!file.startTranscoding())
+    throw decodeFailed('KTX2: startTranscoding failed; re-encode the file with Basis Universal');
+  const sizes: number[] = [];
+  for (let level = 0; level < levels; level++) sizes.push(file.getImageTranscodedSizeInBytes(level, 0, 0, target.basis));
+  const out = new Uint8Array(sizes.reduce((a, b) => a + b * images, 0)),
+    mipmaps: TextureFile['mipmaps'] = [];
+  for (let level = 0, offset = 0; level < levels; level++) {
+    const start = offset;
+    for (let layer = 0; layer < arrayLayers; layer++)
+      for (let face = 0; face < faceCount; face++, offset += sizes[level]) {
+        const image = out.subarray(offset, offset + sizes[level]);
+        if (!file.transcodeImage(image, level, layer, face, target.basis, 0, -1, -1))
+          throw decodeFailed(
+            `KTX2: could not transcode level ${level} layer ${layer} face ${face}; re-encode the file, the data is damaged`,
+          );
+      }
+    mipmaps.push({
+      data: out.subarray(start, offset),
+      width: Math.max(1, width >> level),
+      height: Math.max(1, height >> level),
+      byteLength: offset - start,
     });
   }
+  const feature = formatBlock(target.gpu)?.[3];
+  return {
+    width,
+    height,
+    layers: images,
+    dimension: faceCount === 6 ? (layerCount ? 'cube-array' : 'cube') : layerCount ? '2d-array' : '2d',
+    mipmaps,
+    format: target.gpu as GPUTextureFormat,
+    ...(feature ? { feature } : {}),
+    target: 'ktx2',
+    transcoded: target.name,
+    srgb,
+    hasAlpha,
+  };
+}
+
+/**
+ * Transcode every level, array layer and cube face of an 8-bit KTX2 file. A 2D file comes back as a one-layer texture.
+ * Checks, handle release and trap handling as in {@link transcodeKTX2}.
+ */
+export function transcodeKTX2Layers(basis: BasisModule, bytes: Uint8Array, target: TranscodeTarget): TextureFile {
+  if (!transcodeFormats[target])
+    throw new TypeError(`Unknown transcode target ${target}; use one of the targets listed in KTX2Options.target`);
+  const index = readKTX2Index(bytes);
+  return withKTX2(basis, bytes, (file) => {
+    if (file.isHDR?.())
+      throw decodeFailed('KTX2: HDR textures need KTX2HDRDecoder from @margoengine/decoders/ktx2-hdr');
+    const chosen: TranscodeTarget = target !== 'rgba8' && (index.width % 4 || index.height % 4) ? 'rgba8' : target,
+      format = transcodeFormats[chosen],
+      srgb = file.getDFDTransferFunc?.() === transferSRGB;
+    return transcodeImages(
+      file,
+      index,
+      { basis: format.basis, gpu: format.gpu + (srgb ? '-srgb' : ''), name: chosen },
+      srgb,
+      !!file.getHasAlpha(),
+    );
+  });
 }

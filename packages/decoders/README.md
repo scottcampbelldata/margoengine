@@ -111,6 +111,41 @@ cube maps and arrays go through `uploadTexture` and are handed to materials as a
 `tests/support/texture-encoders.js` and check decoded pixels exactly. `scripts/texture-fixtures.mjs` uses the same
 encoders to write the 64x64 demo checkerboards in `examples/assets/texture-formats/`.
 
+## KTX2 cube maps and arrays (`@margoengine/decoders/ktx2-layers`)
+
+`KTX2LayerDecoder` reads every level, face and layer of a KTX2 file, so skyboxes, reflection probes and terrain layer
+stacks can ship compressed. Basis Universal files (ETC1S and UASTC, with or without Zstandard) transcode in the decoder
+workers to BC7, ASTC 4x4, ETC2 or RGBA8, as `KTX2Decoder` does. Files that store a GPU format (`vkFormat` set: BC, ETC2,
+ASTC, float and the rest of the table in `parseKTX2`) need no Wasm: `parseKTX2(bytes)` reads them, undoing zlib or
+Zstandard, and adds an opaque alpha to 8-, 16- and 32-bit RGB files, because WebGPU has no three-channel formats.
+`decode` picks the route.
+
+```ts
+import {KTX2LayerDecoder} from 'margoengine/decoders/ktx2-layers';
+
+declare const device: GPUDevice;
+declare const skyBytes: Uint8Array, terrainBytes: Uint8Array;
+
+const decoder = new KTX2LayerDecoder({device});
+
+const sky = await decoder.createTexture(skyBytes); // a cube file: six layers, every mip, BC7 on a desktop GPU
+const skyView = sky.createView({dimension: 'cube'});
+
+const file = await decoder.decode(terrainBytes); // a TextureFile, before any upload
+file.dimension; // '2d-array'
+file.layers; // layers, counting each cube face
+file.transcoded; // 'bc7', or 'native' when the file stored a GPU format
+
+decoder.dispose();
+```
+
+The result is the `TextureFile` the DDS and KTX readers return, with `target: 'ktx2'`; each level holds its images back to
+back in WebGPU layer order, so `uploadTexture` writes one level in one call. A six-layer GPUTexture goes straight on
+`Material.envMap` in `@margoengine/materials`, and `new Texture(gpuTexture, {dimension: 'cube'})` or `'2d-array'`
+binds it on a map. 3D textures are refused. `KTX2Decoder` stays 2D and points here if it is given layers.
+`tests/ktx2-layers.test.js` checks every image of eight real files against `ktx extract`; `scripts/ktx2-oracle.mjs`
+rewrites those records.
+
 ## How it works
 
 - **Workers, not the main thread.** Each decoder owns a lazily grown pool of module workers, by default `Math.min(navigator.hardwareConcurrency || 4, 4)`. Jobs go to an idle worker, then a new one while under the limit, then the least loaded. A crashed worker rejects only its own jobs and is replaced on the next call.
@@ -158,7 +193,7 @@ until it ends or times out, so no new decode queues behind it unknowingly.
 
 ## Limits
 
-KTX2 cube maps, texture arrays and HDR (UASTC HDR) files are rejected. Draco point clouds return no `indices`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
+`KTX2Decoder` reads one 2D texture; cube maps and arrays go through `@margoengine/decoders/ktx2-layers`. HDR (UASTC HDR) files are rejected. Draco point clouds return no `indices`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. KTX2 remains a standalone decoder and is not wired into glTF texture loading. The basic `@margoengine/gltf` loader is unchanged.
 
 ## Tests
 

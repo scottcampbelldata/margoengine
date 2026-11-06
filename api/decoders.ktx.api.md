@@ -11,7 +11,8 @@ export interface TextureFile {
     mipmaps: TextureFileLevel[];
     format: GPUTextureFormat;
     feature?: GPUFeatureName;
-    target: 'dds' | 'ktx';
+    target: 'dds' | 'ktx' | 'ktx2';
+    transcoded?: string;
     srgb: boolean;
     hasAlpha: boolean;
 }

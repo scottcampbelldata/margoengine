@@ -542,6 +542,10 @@
       "types": "./dist/decoders/tiff.d.ts",
       "import": "./dist/decoders/tiff.js"
     },
+    "./decoders/ktx2-layers": {
+      "types": "./dist/decoders/ktx2-layers.d.ts",
+      "import": "./dist/decoders/ktx2-layers.js"
+    },
     "./dof": {
       "types": "./dist/dof.d.ts",
       "import": "./dist/dof.js"
