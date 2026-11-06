@@ -669,7 +669,7 @@ Known rendering gaps:
 | Consumer packaging | `modern:test:packages`, bundler matrix, quickstart | Packed declarations, docs examples, browser packages, bundlers, licenses, and documented first use work. |
 | Release rehearsal | `publish:rehearsal` (in `publish:dry-run` and the publish workflow) | Every tarball audited, then the one-line install, every entry imported and type-checked, and every template built, from a stand-in registry that refuses writes. |
 | Public truth | `tests/public-truth.test.js` | Structured license and package-count statements match their canonical sources. |
-| Timing-test hygiene | fixed-wait and wall-budget tests | Tests wait for readiness; code speed uses CPU time; justified real-time bounds are marked. |
+| Timing-test hygiene | fixed-wait and wall-budget tests | Tests wait for readiness; code speed uses CPU time; justified real-time bounds are marked. Both read tracked files only (`git ls-files`), so git-ignored scratch builds cannot fail them. |
 | Async hygiene | support async call test | Async helpers in tests/scripts are awaited or returned. |
 | Node compatibility | CI matrix and proof-golden tests | Minimum and supported Node APIs and proof results stay compatible. |
 | Rust kernel | `npm run test:kernel` | Native kernel invariants. |

@@ -2,7 +2,10 @@
 // holds no more of them than its baseline.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { scan, wallBudgets } from '../scripts/check-wall-budgets.mjs';
 
 const lines = (source) => wallBudgets(source).map((b) => b.line);
@@ -47,4 +50,31 @@ test('the tree holds no more wall-clock budgets than the baseline', () => {
     [],
     'use cpuTimer() from scripts/support/cpu-budget.mjs, move the budget to a bench, or mark a bound on a wait // wall-clock: <reason>',
   );
+});
+
+test('a budget in a git-ignored scratch build is not scanned; every tracked file is, ignored or dotted path or not', (t) => {
+  const repo = mkdtempSync(join(tmpdir(), 'wall-budgets-'));
+  t.after(() => rmSync(repo, { recursive: true, force: true }));
+  const budget = 'const t = performance.now();\nassert.ok(performance.now() - t < 500);\n';
+  const put = (file, text) => {
+    mkdirSync(dirname(join(repo, file)), { recursive: true });
+    writeFileSync(join(repo, file), text);
+  };
+  put('.gitignore', '.lane/\n');
+  put('.lane/p/dry/tests/scratch.test.js', budget);
+  put('tests/tracked.test.js', budget);
+  put('.tools/tests/dotted.test.js', budget);
+  put('.lane/tests/forced.test.js', budget);
+  put('tests/removed.test.js', budget);
+  const git = (...args) => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  git('init', '-q');
+  git('add', '.gitignore', 'tests', '.tools');
+  // Tracked in spite of the ignore rule: git holds it, so it can reach main.
+  git('add', '-f', '.lane/tests/forced.test.js');
+  rmSync(join(repo, 'tests/removed.test.js'));
+  assert.deepEqual(Object.keys(scan(repo)), [
+    '.lane/tests/forced.test.js',
+    '.tools/tests/dotted.test.js',
+    'tests/tracked.test.js',
+  ]);
 });

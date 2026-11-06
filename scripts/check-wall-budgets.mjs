@@ -59,12 +59,12 @@ export function wallBudgets(source) {
 }
 
 /** { file: [budgets] } for every check file with a wall-clock budget. */
-export function scan() {
+export function scan(base = root) {
   const result = {};
-  for (const file of checkFiles()) {
+  for (const file of checkFiles(base)) {
     // Its own test spells out what it must catch.
     if (file.endsWith('check-wall-budgets.test.js')) continue;
-    const budgets = wallBudgets(readFileSync(join(root, file), 'utf8'));
+    const budgets = wallBudgets(readFileSync(join(base, file), 'utf8'));
     if (budgets.length) result[file] = budgets;
   }
   return result;

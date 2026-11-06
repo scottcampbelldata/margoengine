@@ -2,7 +2,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixedWaits, isCheckFile, scan } from '../scripts/check-fixed-waits.mjs';
-import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 const kinds = (source) => fixedWaits(source).map((w) => `${w.line}:${w.kind}`);
 
@@ -90,4 +93,20 @@ test('every GPU and browser check has exactly the fixed waits its baseline count
         (found[file]?.length ?? 0) >= count,
         `${file} has fewer fixed waits than its baseline (${count}): run node scripts/check-fixed-waits.mjs --update`,
       );
+});
+
+test('a wait in a git-ignored scratch build is not scanned; a tracked one is', (t) => {
+  const repo = mkdtempSync(join(tmpdir(), 'fixed-waits-'));
+  t.after(() => rmSync(repo, { recursive: true, force: true }));
+  const put = (file) => {
+    mkdirSync(dirname(join(repo, file)), { recursive: true });
+    writeFileSync(join(repo, file), 'await page.waitForTimeout(300);\n');
+  };
+  put('.lane/tests/scratch.test.js');
+  put('tests/tracked.test.js');
+  writeFileSync(join(repo, '.gitignore'), '.lane/\n');
+  const git = (...args) => execFileSync('git', args, { cwd: repo, stdio: 'ignore' });
+  git('init', '-q');
+  git('add', '.gitignore', 'tests');
+  assert.deepEqual(Object.keys(scan(repo)), ['tests/tracked.test.js']);
 });

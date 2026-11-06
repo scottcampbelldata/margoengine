@@ -16,8 +16,9 @@
 // may not gain one, and when one goes the count must go down with it (`--update` writes the lower counts). Unit tests
 // and helper-named sleeps joined on 2026-10-31, with what was there then.
 //   node scripts/check-fixed-waits.mjs [--update]   (tests/check-fixed-waits.test.js runs the same check in verify)
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const BASELINE = join(root, 'scripts/fixed-waits-baseline.json');
@@ -97,25 +98,22 @@ export function fixedWaits(source) {
   return found.sort((a, b) => a.line - b.line);
 }
 
-function walk(dir, out = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name),
-      rel = relative(root, path).replaceAll('\\', '/');
-    if (SKIP.test(rel)) continue;
-    if (entry.isDirectory()) walk(path, out);
-    else if (isCheckFile(rel)) out.push(rel);
-  }
-  return out;
-}
-
-/** Every check file in the tree, as repository paths, sorted. */
-export const checkFiles = () => walk(root).sort();
+/**
+ * Every check file git tracks under `base`, as paths from there, sorted. Tracked files only: what a change can bring
+ * to main is what git holds, and a helper's scratch build in a git-ignored folder (.lane/, .mutation/) is not part of
+ * it, so it must not fail the check for anyone. A tracked file deleted in the working tree has nothing to read.
+ */
+export const checkFiles = (base = root) =>
+  execFileSync('git', ['ls-files', '-z'], { cwd: base, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    .split('\0')
+    .filter((file) => isCheckFile(file) && existsSync(join(base, file)))
+    .sort();
 
 /** { file: [waits] } for every check file with a fixed wait. */
-export function scan() {
+export function scan(base = root) {
   const result = {};
-  for (const file of checkFiles()) {
-    const waits = fixedWaits(readFileSync(join(root, file), 'utf8')).filter(
+  for (const file of checkFiles(base)) {
+    const waits = fixedWaits(readFileSync(join(base, file), 'utf8')).filter(
       (wait) => wait.kind !== 'frames' || !file.endsWith('.test.js'),
     );
     if (waits.length) result[file] = waits;
