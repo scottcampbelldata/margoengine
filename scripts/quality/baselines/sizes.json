@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6462067,
+  "total": 6481458,
   "history": [
     {
       "date": "2026-10-24",
@@ -2504,6 +2504,12 @@
       "commit": "82eeef13e",
       "reason": "fix(animator): IK, foot tools and look-at take scales a little off uniform",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "26f06a45d",
+      "reason": "new entry meshopt-simd embeds a 25 KB Wasm module",
+      "grew": 1
     }
   ],
   "items": {
@@ -2636,6 +2642,7 @@
     "@margoengine/decoders/ktx2-layers": 385718,
     "@margoengine/decoders/ktx2-stream": 389637,
     "@margoengine/decoders/meshopt": 3309,
+    "@margoengine/decoders/meshopt-simd": 19391,
     "@margoengine/decoders/png": 3813,
     "@margoengine/decoders/texture": 914,
     "@margoengine/decoders/tga": 1614,

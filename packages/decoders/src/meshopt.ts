@@ -3,6 +3,7 @@
 // in versions 0 and 1, the triangle and index-sequence codecs, and the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR
 // filters. Synchronous, dependency-free, and every read is bounds checked before it happens.
 import { decodeFailed } from './errors.js';
+import { meshoptMostElements } from './meshopt-limit.js';
 
 const PREFIX = 'EXT_meshopt_compression: ';
 const fail = (message: string): never => {
@@ -500,19 +501,8 @@ export function meshoptDecodeGltfBuffer(
     count * stride > 2 ** 31
   )
     failRange('invalid count or byteStride');
-  // The most elements each mode could describe in src.length bytes. A group of 16 attributes needs at least
-  // stride / 4 bytes (one 2-bit header per byte lane, each covering 4 groups); a triangle needs a code byte; a
-  // sequence index needs a varint byte.
   const length = src.length;
-  const most =
-    mode === 'ATTRIBUTES'
-      ? 256 * (Math.floor((4 * length) / stride) + 1)
-      : mode === 'TRIANGLES'
-        ? 3 * length
-        : mode === 'INDICES'
-          ? length
-          : Number.POSITIVE_INFINITY;
-  if (count > most) failRange(`truncated stream (${count} elements cannot fit in ${length} bytes)`);
+  if (count > meshoptMostElements(mode, length, stride)) failRange(`truncated stream (${count} elements cannot fit in ${length} bytes)`);
 
   let out: Uint8Array;
   if (mode === 'ATTRIBUTES') {

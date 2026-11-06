@@ -566,6 +566,10 @@
       "types": "./dist/decoders/ktx2-stream.d.ts",
       "import": "./dist/decoders/ktx2-stream.js"
     },
+    "./decoders/meshopt-simd": {
+      "types": "./dist/decoders/meshopt-simd.d.ts",
+      "import": "./dist/decoders/meshopt-simd.js"
+    },
     "./dof": {
       "types": "./dist/dof.d.ts",
       "import": "./dist/dof.js"

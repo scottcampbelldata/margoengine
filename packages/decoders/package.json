@@ -81,6 +81,10 @@
     "./ktx2-stream": {
       "types": "./dist/ktx2-stream.d.ts",
       "import": "./dist/ktx2-stream.js"
+    },
+    "./meshopt-simd": {
+      "types": "./dist/meshopt-simd.d.ts",
+      "import": "./dist/meshopt-simd.js"
     }
   },
   "files": [

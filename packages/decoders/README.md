@@ -31,6 +31,26 @@ or `new Texture(await ktx2.transcode(bytes))`, which uploads the transcoded mips
 
 `decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` or `KHR_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR filters) and returns a `Uint8Array`. It is pure TypeScript, written from the two extension specifications, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit. Attribute streams of vertex codec version 0 (the only one `EXT_meshopt_compression` defines) and version 1 (added by `KHR_meshopt_compression`) are both decoded, whichever extension names the bufferView; any other version is rejected with a clear error. `MeshoptDecoder` has the members of the meshoptimizer project's own decoder object (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged.
 
+## Meshopt on Wasm SIMD (`@margoengine/decoders/meshopt-simd`)
+
+`meshoptDecodeGltfBufferSIMD` takes the arguments of `meshoptDecodeGltfBuffer` and gives the same bytes and the same errors, on a
+25 KB Wasm module built from `native/meshopt-simd` in this package. It is embedded in the entry, so importing it costs nothing
+elsewhere and nobody who installs the package needs Rust. Until `ready` resolves, on a runtime without Wasm SIMD, and on any
+stream the module will not read, the TypeScript decoder runs instead.
+
+```ts
+import {MeshoptSIMDDecoder, meshoptDecodeGltfBufferSIMD} from 'margoengine/decoders/meshopt-simd';
+
+declare const bytes: Uint8Array;
+
+await MeshoptSIMDDecoder.ready;
+const positions = meshoptDecodeGltfBufferSIMD(bytes, 1000, 12, 'ATTRIBUTES');
+```
+
+`MeshoptSIMDDecoder` has the members of `MeshoptDecoder` (`supported`, `ready`, `decodeGltfBuffer`), so a loader written against
+that interface can take either. After changing the Rust source run `node scripts/meshopt-simd-build.mjs`; a test fails while the
+embedded module and the source differ. To time both decoders on a file: `node scripts/meshopt-simd-bench.mjs <file.glb>`.
+
 ## Texture upload (`@margoengine/decoders/texture`)
 
 `getSupportedTranscodeFormat`, `getBytesPerRow` and `createKTX2Texture` (also on the root) without the transcoder or the

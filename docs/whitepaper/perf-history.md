@@ -1810,6 +1810,18 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `npm run build --workspace packages/ecs`, then `node packages/ecs/scripts/bridge-bench.mjs`.
 - **Guard:** `packages/ecs/test/engine.test.js`, "one pass finds what moved".
 
+### 75. meshopt on Wasm SIMD (diagnostic)
+
+- **Before:** `meshoptDecodeGltfBuffer` in TypeScript, the only decoder.
+- **Change:** `@margoengine/decoders/meshopt-simd`, a new optional entry, does the same work in a Wasm SIMD module and gives the
+  same bytes and errors. The TypeScript decoder stays, and the gltf `meshopt` extension still uses it.
+- **After:** diagnostic, other lanes running (Node 26, Ryzen 9 9950X, CPU only, median of 15 passes over every compressed view).
+  Khronos ABeautifulGame through gltfpack 1.3.0: with `-cc`, 5 views and 6,484,272 bytes out, TypeScript 41.26 ms, Wasm SIMD
+  6.05 ms; with the KHR extension, 5 views and 5,736,744 bytes out, 29.72 ms and 5.78 ms. Most of that 20 MB file is textures.
+  The module's first compile is not in these figures.
+- **Rerun:** `npm run build --workspace packages/decoders`, then `node packages/decoders/scripts/meshopt-simd-bench.mjs <file.glb>`.
+- **Guard:** `packages/decoders/tests/meshopt-simd.test.js`, equal bytes and errors on real files and damaged streams.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1869,5 +1881,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 19. Parity scenes added since the last ledger run, `p-morph-compiled`, `p-motion-blur-velocity` and `p-pmrem-refresh`, have no
     row in `perf-vs-threejs.json` yet: `npm run bench:parity` adds them. Every row's after number in
     [perf-vs-threejs.md](perf-vs-threejs.md) since 2026-10-27 is in its cause text, not in the ledger.
+20. meshopt on Wasm SIMD (entry 75): a quiet run, including the first compile.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.
