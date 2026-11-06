@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-158). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-159). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -229,6 +229,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Output formats (`@margoengine/headless/formats`, 2026-11-05) | JPEG is baseline with fixed standard tables, so files are larger than an optimized encoder's. Lossless WebP is a plain encoder (subtract green and three predictors, no colour cache), so files are larger than libwebp's. Lossy WebP needs a browser or worker. EXR is uncompressed. The engine's output is tone-mapped sRGB, so true HDR needs `PostStack`'s `sceneTexture`. | Previews and captures are small and written once, and plain code runs in Node with no codec to install. Every file is decoded by the browser's own decoders in the GPU check. | Bigger files than the best encoders; sizes have not been compared. | Use lossy WebP in a browser for the smallest previews, or run the file through a dedicated optimizer. |
 | Pipeline compile tracking (`@margoengine/stats/compile`, 2026-11-06) | Sees compiles made after attach, so not the engine's startup pipelines. Times are CPU time around each call: browsers compile in another process, so a blocking call can return quickly and the stall lands later. A hitch means a compile ran in a slow frame or the frame before it, which is evidence, not proof of the cause. Unlabelled compiles show an empty label; the `stacks` option finds them. Keeps the newest 256 records and hitches by default. |
 | CPU phase breakdown (`@margoengine/stats/phases`, 2026-11-06) | CPU time only, with the clock the browser gives: `performance.now()` steps by 5 to 100 microseconds, so a short phase in one frame can read 0 and the averages are the numbers to trust. The frustum test runs inside the one Wasm kernel call, so it is timed in `tick` and cannot be split from world matrices; `cull` is the visible-instance collection after it. `onFrame` callbacks added before attach fall outside the frame. Other scenes in a multi-view frame have no end pass, so time after their submit reads as `encode`. |
+| Leak alerts (`@margoengine/stats/leaks`, 2026-11-06) | Sees what `GPUMemory` sees: objects made after its attach, sized from their descriptors, and a buffer dropped without `destroy()` counts as live. Needs one full window before it can alert, four minutes by default. Growth slower than `minBytes` or `minCount` per window is not reported, and a cycle longer than a quarter of the window can look like growth. After a device loss the old objects stay counted, so make a new `GPUMemory` and `LeakWatch` for the new device. Follows 64 numbers by default; labels past that are not followed, the totals are. |
 
 ### React page
 

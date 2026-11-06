@@ -21,6 +21,8 @@ try {
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
     const { PipelineCompiles } = await import('/packages/stats/dist/compile.js');
     const { FramePhases } = await import('/packages/stats/dist/phases.js');
+    const { GPUMemory } = await import('/packages/stats/dist/report.js');
+    const { LeakWatch } = await import('/packages/stats/dist/leaks.js');
     const ensure = (condition, message) => {
       if (!condition) throw new Error(message);
     };
@@ -114,6 +116,24 @@ try {
     ensure(device.queue.submit === slowSubmit, 'Submit restored');
     delete device.queue.submit;
     result.phases = average;
+
+    // Real buffers that are never destroyed, then a label that is: only the first may alert.
+    const memory = GPUMemory.attach(device),
+      leaks = LeakWatch.attach(memory, { intervalMilliseconds: 0, window: 8, minBytes: 1024, minCount: 4, warn: null }),
+      usage = GPUBufferUsage.COPY_DST,
+      kept = [];
+    for (let i = 0; i < 8; i++) {
+      kept.push(device.createBuffer({ label: 'leaking', size: 1024, usage }));
+      kept.push(device.createBuffer({ label: 'leaking', size: 1024, usage }));
+      device.createBuffer({ label: 'released', size: 1024, usage }).destroy();
+      leaks.sample(i * 1000);
+    }
+    ensure(leaks.leaking.includes('label leaking count'), 'A growing label on a real device alerts');
+    ensure(!leaks.leaking.some((name) => name.includes('released')), 'A released label does not');
+    result.leaks = leaks.leaking;
+    leaks.dispose();
+    memory.dispose();
+    for (const buffer of kept) buffer.destroy();
 
     engine.stop();
     await frames(2);

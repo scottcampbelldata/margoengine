@@ -82,6 +82,36 @@ All numbers are CPU milliseconds, and they add up to `total`:
 
 The frustum test is part of the kernel call, so it counts as `tick`. Browsers round `performance.now()` to 5 to 100 microseconds, so trust the averages over a single short phase.
 
+Leak alerts warn when GPU memory or a resource count keeps growing:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Stats} from 'margoengine/stats';
+import {GPUMemory} from 'margoengine/stats/report';
+import {LeakWatch} from 'margoengine/stats/leaks';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const memory = GPUMemory.attach(engine.gpu!);
+const leaks = LeakWatch.attach(memory);         // totals and every label, sampled each 5 s
+leaks.watch('meshes', () => engine.stats.visible, {min: 100}); // or any number of your own
+leaks.view(Stats.attach(engine));               // what is growing, in the panel
+leaks.onLeak((alert) => console.error(alert.name, alert.perMinute));
+engine.start();
+```
+
+Each window of samples is cut into quarters and the lowest value of each is taken. A leak raises all four. A load, a level change or a pool that fills and empties does not, however high it peaks. An alert has `name`, `from`, `to` (the first and last low point), `perMinute` and `at`, and goes to `console.warn` unless you pass `warn` (null for none). It fires once, and can fire again after the growth stops. `leaks.leaking` names what is growing now, and `JSON.stringify(leaks)` gives every alert. Label your buffers and textures: the growing label is named, as `label <name> bytes` and `label <name> count`.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `intervalMilliseconds` | 5000 | Time between samples; 0 means you call `leaks.sample()` |
+| `window` | 48 | Samples judged together, 8 to 4096, a multiple of 4 |
+| `minBytes` | 1048576 | Bytes a low point must grow by to alert |
+| `minCount` | 16 | Objects a low point must grow by to alert |
+| `maxSeries` | 64 | Numbers followed at most; each label is two |
+| `warn` | `console.warn` | Called for each alert; null for none |
+
+It needs a full window before it can alert: four minutes by default. After a device loss the old objects stay counted, so make a new `GPUMemory` and `LeakWatch` for the new device.
+
 The engine plugin samples actual frame intervals and counts direct/indirect draw
 and dispatch commands in its frame graph. Render bundle contents and commands
 recorded on other encoders are outside these counters. For a custom encoder,

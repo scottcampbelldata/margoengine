@@ -22,6 +22,16 @@ test('textureBytes counts mips, layers, samples and compressed blocks', () => {
   assert.equal(textureBytes({ size: [4, 4], format: 'astc-4x4-unorm' }), 16);
   assert.equal(textureBytes({ size: [4, 4, 4], format: 'r8unorm', dimension: '3d', mipLevelCount: 2 }), 72);
 });
+test('textureBytes reads the block of each compressed family', () => {
+  assert.equal(textureBytes({ size: [4, 4], format: 'etc2-rgb8unorm' }), 8);
+  assert.equal(textureBytes({ size: [4, 4], format: 'etc2-rgb8a1unorm' }), 8);
+  assert.equal(textureBytes({ size: [4, 4], format: 'etc2-rgba8unorm' }), 16);
+  assert.equal(textureBytes({ size: [4, 4], format: 'eac-r11unorm' }), 8);
+  assert.equal(textureBytes({ size: [4, 4], format: 'eac-rg11unorm' }), 16);
+  assert.equal(textureBytes({ size: [8, 8], format: 'astc-8x8-unorm' }), 16);
+  assert.equal(textureBytes({ size: [12, 10], format: 'astc-12x10-unorm-srgb' }), 16);
+  assert.equal(textureBytes({ size: [9, 9], format: 'astc-8x5-unorm' }), 64);
+});
 test('GPUMemory follows creates and destroys once each, by label, and restores the device', () => {
   const d = device(),
     { createBuffer } = d,

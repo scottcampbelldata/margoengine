@@ -1762,6 +1762,10 @@
       "types": "./dist/stats/compile.d.ts",
       "import": "./dist/stats/compile.js"
     },
+    "./stats/leaks": {
+      "types": "./dist/stats/leaks.d.ts",
+      "import": "./dist/stats/leaks.js"
+    },
     "./stats/phases": {
       "types": "./dist/stats/phases.d.ts",
       "import": "./dist/stats/phases.js"

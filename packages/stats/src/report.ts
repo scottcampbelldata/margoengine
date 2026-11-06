@@ -32,11 +32,13 @@ const SIZES: readonly [RegExp, number][] = [
   [/^(rgba16|rg32|depth32float-stencil8)/, 8],
   [/^rgba32/, 16],
 ];
-/** Bytes of one texel of a format, or of one 4x4 block of a compressed one (`block` true). */
-function texel(format: string): { size: number; block: boolean } {
-  if (/^(bc1|bc4|etc2-rgb|etc2-rgb8|eac-r11)/.test(format)) return { size: 8, block: true };
-  if (/^(bc|etc2|eac|astc)/.test(format)) return { size: 16, block: true };
-  return { size: SIZES.find(([test]) => test.test(format))?.[1] ?? 4, block: false };
+/** Bytes of one block of a format and the block's size in texels; an uncompressed format's block is one texel. */
+function texel(format: string): { size: number; width: number; height: number } {
+  const astc = /^astc-(\d+)x(\d+)/.exec(format);
+  if (astc) return { size: 16, width: +astc[1], height: +astc[2] };
+  if (/^(bc1|bc4|etc2-rgb8|eac-r11)/.test(format)) return { size: 8, width: 4, height: 4 };
+  if (/^(bc|etc2|eac)/.test(format)) return { size: 16, width: 4, height: 4 };
+  return { size: SIZES.find(([test]) => test.test(format))?.[1] ?? 4, width: 1, height: 1 };
 }
 /** The bytes a texture holds, every mip and sample; drivers may pad it. */
 export function textureBytes(descriptor: GPUTextureDescriptor): number {
@@ -48,14 +50,14 @@ export function textureBytes(descriptor: GPUTextureDescriptor): number {
           (size as { height?: number }).height,
           (size as { depthOrArrayLayers?: number }).depthOrArrayLayers,
         ],
-    { size: bytes, block } = texel(descriptor.format as string),
+    { size: bytes, width, height } = texel(descriptor.format as string),
     volume = descriptor.dimension === '3d';
   let total = 0;
   for (let mip = 0; mip < (descriptor.mipLevelCount ?? 1); mip++) {
     const x = Math.max(w >> mip, 1),
       y = Math.max(h >> mip, 1),
       z = volume ? Math.max(d >> mip, 1) : d;
-    total += (block ? Math.ceil(x / 4) * Math.ceil(y / 4) : x * y) * z * bytes;
+    total += Math.ceil(x / width) * Math.ceil(y / height) * z * bytes;
   }
   return total * (descriptor.sampleCount ?? 1);
 }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4984515,
+  "total": 4986436,
   "history": [
     {
       "date": "2026-10-24",
@@ -2114,6 +2114,12 @@
       "commit": "fa132e6e8",
       "reason": "lod/auto: HierarchicalLOD.update and follow",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "683fad9f7",
+      "reason": "New stats entry ./leaks: alerts when GPU memory or a count keeps growing; ./report reads ASTC and ETC2 blocks correctly. Core and core + stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -2555,6 +2561,7 @@
     "@margoengine/staging": 7875,
     "@margoengine/stats": 4934,
     "@margoengine/stats/compile": 1882,
+    "@margoengine/stats/leaks": 1921,
     "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
     "@margoengine/taa": 11747,
