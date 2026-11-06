@@ -108,6 +108,10 @@ fn unoccluded(s:vec4f)->bool {
   let row2=vec3f(m[0].z,m[1].z,m[2].z);let row3=vec3f(m[0].w,m[1].w,m[2].w);
   if(u.mode.z==1u){let q=m*vec4f(s.xyz-s.w*normalize(row3),1.0);if(q.w>1e-6){near=min(near,q.z/q.w);}}
   if(u.mode.z==2u){let q=m*vec4f(s.xyz,1.0);near=min(near,(q.z+s.w*length(row2))/q.w);}
+  return reaches(lo,hi,near);
+}
+// Whether depth near is not behind the farthest occluder sample in the screen rectangle lo to hi (clip x and y).
+fn reaches(lo:vec2f,hi:vec2f,near:f32)->bool {
   if(near>=1.0){return true;}
   let size=vec2f(u.size.xy);
   let p0=vec2u(clamp(vec2f(lo.x*0.5+0.5,0.5-hi.y*0.5)*size,vec2f(0.0),size-1.0));
@@ -120,8 +124,37 @@ fn unoccluded(s:vec4f)->bool {
 }
 `;
 
-/** Compute stages. `samples` picks the depth texture type the Hi-Z pyramid is built from. */
-export const computeShader = (samples: number): string =>
+// The tests of bounds: 'box': part i's local box under its matrix, an oriented box in world space, padded for float32.
+// Its radius along a plane normal is exact, and the nearest depth of a convex shape is at one of its corners.
+const boxCode = `
+fn boxInside(i:u32)->bool {
+  let m=records[i].m;let k=u.mode.y+batchOf[i]*2u;let h=bounds[k+1u].xyz;let c=(m*vec4f(bounds[k].xyz,1.0)).xyz;
+  let x=m[0].xyz*h.x;let y=m[1].xyz*h.y;let z=m[2].xyz*h.z;let pad=1e-5*(length(c)+length(x)+length(y)+length(z));
+  for(var p=0u;p<6u;p++){
+    let n=u.planes[p].xyz;let r=abs(dot(n,x))+abs(dot(n,y))+abs(dot(n,z))+pad;
+    if(dot(n,c)+u.planes[p].w< -r){return false;}
+  }
+  return true;
+}
+fn boxUnoccluded(i:u32)->bool {
+  let m=records[i].m;let k=u.mode.y+batchOf[i]*2u;let h=bounds[k+1u].xyz;let c=(m*vec4f(bounds[k].xyz,1.0)).xyz;
+  let x=m[0].xyz*h.x;let y=m[1].xyz*h.y;let z=m[2].xyz*h.z;let pad=1e-5*(length(c)+length(x)+length(y)+length(z));
+  var lo=vec2f(3.0e38);var hi=vec2f(-3.0e38);var near=0.0;
+  for(var e=0u;e<8u;e++){
+    let s=vec3f(f32(e&1u),f32((e>>1u)&1u),f32(e>>2u))*2.0-1.0;
+    let q=u.camera*vec4f(c+s.x*x+s.y*y+s.z*z+s*pad,1.0);
+    if(q.w<=1e-6){return true;}
+    let n=q.xyz/q.w;lo=min(lo,n.xy);hi=max(hi,n.xy);near=max(near,n.z);
+  }
+  return reaches(lo,hi,near);
+}
+`;
+
+/**
+ * Compute stages. `samples` picks the depth texture type the Hi-Z pyramid is built from; `boxes` adds the oriented box
+ * tests after the sphere's. `bounds` holds each batch's local sphere, then with boxes each one's centre and half size.
+ */
+export const computeShader = (samples: number, boxes = false): string =>
   common +
   `
 @group(0) @binding(1) var<storage,read> hidden:array<u32>;
@@ -157,7 +190,7 @@ fn inside(s:vec4f)->bool {
   for(var p=0u;p<6u;p++){if(dot(u.planes[p].xyz,s.xyz)+u.planes[p].w< -s.w){return false;}}
   return true;
 }
-${occlusionCode}
+${occlusionCode}${boxes ? boxCode : ''}
 // Pass 1 (occlusion only): large parts drawn last frame and still in the frustum, appended per batch for the depth
 // prepass. Any subset of real geometry is a valid occluder set; small parts cost vertex work and hide little.
 @compute @workgroup_size(256) fn early(@builtin(global_invocation_id) g:vec3u) {
@@ -180,7 +213,7 @@ ${occlusionCode}
 // Pass 2: visibility of every part, then an exclusive scan inside each workgroup of 256.
 @compute @workgroup_size(256) fn cull(@builtin(global_invocation_id) g:vec3u,@builtin(local_invocation_index) l:u32,@builtin(workgroup_id) w:vec3u) {
   let i=g.x;var f=0u;
-  if(i<u.size.w){let s=sphereOf(i);if(inside(s)&&(u.mode.x<2u||unoccluded(s))){f=1u;}visible[i]=f;}
+  if(i<u.size.w){let s=sphereOf(i);if(inside(s)&&${boxes ? '(u.mode.x==0u||boxInside(i))&&(u.mode.x<2u||boxUnoccluded(i))' : '(u.mode.x<2u||unoccluded(s))'}){f=1u;}visible[i]=f;}
   scratch[l]=f;workgroupBarrier();
   for(var o=1u;o<256u;o=o<<1u){var v=0u;if(l>=o){v=scratch[l-o];}workgroupBarrier();scratch[l]+=v;workgroupBarrier();}
   if(i<u.size.w){local[i]=scratch[l]-f;}

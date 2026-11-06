@@ -27,6 +27,8 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** `frustum` (default): bounding spheres against the view frustum. `occlusion`: frustum + Hi-Z occlusion (dense or enclosed assemblies). `none`: draw everything. */
 export type CullingMode = 'none' | 'frustum' | 'occlusion';
+/** `sphere` (default): bounding spheres only. `box`: each part's oriented box too, tighter for long or thin parts. */
+export type CullingBounds = 'sphere' | 'box';
 /** One (geometry, material) group of static parts; uploaded once at attach. */
 export interface CulledBatch {
   /** Shared by every part of the batch. */
@@ -42,6 +44,12 @@ export interface CulledInstancesOptions {
   culling?: CullingMode;
   /** Parts whose bounding sphere spans at least this many pixels in radius become occluders for the next frame (default 8). */
   occluderSize?: number;
+  /**
+   * What the frustum and occlusion tests use. `'box'` tests each part's oriented box after its sphere, so a long or thin
+   * part just behind a surface or just outside the view is dropped; it costs more maths per part. Fixed. Default
+   * `'sphere'`.
+   */
+  bounds?: CullingBounds;
 }
 
 const modes: readonly CullingMode[] = ['none', 'frustum', 'occlusion'];
@@ -69,6 +77,9 @@ export class CulledInstances implements EnginePlugin {
   protected readonly records: Float32Array;
   // Per batch: the geometry's local bounding sphere (the cull pass places it under each part's matrix).
   private readonly bounds: Float32Array;
+  // What the kernels read, three vec4f per batch: that sphere, then the geometry's box as centre and half size.
+  private readonly shapes: Float32Array;
+  private readonly boxes: boolean;
   protected readonly batchOf: Uint32Array;
   protected readonly table: Uint32Array;
   private readonly args: Uint32Array;
@@ -132,9 +143,14 @@ export class CulledInstances implements EnginePlugin {
     engine.use(value);
     return value;
   }
-  constructor(batches: readonly CulledBatch[], { culling = 'frustum', occluderSize = 8 }: CulledInstancesOptions = {}) {
+  constructor(
+    batches: readonly CulledBatch[],
+    { culling = 'frustum', occluderSize = 8, bounds = 'sphere' }: CulledInstancesOptions = {},
+  ) {
     if (!Array.isArray(batches) || !batches.length) throw new TypeError('Expected culled batches');
     if (!modes.includes(culling)) throw new TypeError('Invalid culling mode; use "none", "frustum" or "occlusion"');
+    if (bounds !== 'sphere' && bounds !== 'box') throw new TypeError('Invalid culling bounds; use "sphere" or "box"');
+    this.boxes = bounds === 'box';
     this.culling = culling;
     this.occluderSize = occluderSize;
     const starts: number[] = [];
@@ -159,6 +175,7 @@ export class CulledInstances implements EnginePlugin {
     this.starts = starts;
     this.records = new Float32Array(count * 24);
     this.bounds = new Float32Array(batches.length * 4);
+    this.shapes = new Float32Array(batches.length * (this.boxes ? 12 : 4));
     this.batchOf = new Uint32Array(count);
     this.hidden = new Uint32Array(count);
     this.flipped = new Uint8Array(count);
@@ -171,6 +188,8 @@ export class CulledInstances implements EnginePlugin {
         end = start + b.transforms.length / 16;
       this.table.set([start, end, b.geometry.indices.length, 0], batch * 4);
       this.bounds.set(b.geometry.bounds, batch * 4);
+      this.shapes.set(b.geometry.bounds, batch * 4);
+      if (this.boxes) localBox(b.geometry.vertices, this.shapes, (batches.length + batch * 2) * 4);
       this.args[batch * 5] = this.earlyReset[batch * 5] = b.geometry.indices.length;
       for (let i = start; i < end; i++) {
         this.batchOf[i] = batch;
@@ -264,7 +283,7 @@ export class CulledInstances implements EnginePlugin {
       buffer('records', n * 96, S | GPUBufferUsage.VERTEX, this.records);
       buffer('drawn', n * 96, S | GPUBufferUsage.VERTEX);
       buffer('hidden', n * 4, S | GPUBufferUsage.VERTEX, this.hidden);
-      buffer('bounds', B * 16, S, this.bounds);
+      buffer('bounds', this.shapes.byteLength, S, this.shapes);
       buffer('visible', n * 4, S);
       buffer('local', n * 4, S);
       buffer('groups', Math.ceil(n / 256) * 4, S);
@@ -412,7 +431,7 @@ export class CulledInstances implements EnginePlugin {
     const d = c.device,
       samples = c.descriptor.multisample?.count ?? 1,
       b = this.buffers,
-      module = d.createShaderModule({ code: computeShader(samples) });
+      module = d.createShaderModule({ code: computeShader(samples, this.boxes) });
     const entry = (entryPoint: string) => d.createComputePipeline({ layout: 'auto', compute: { module, entryPoint } });
     this.compute = {
       early: entry('early'),
@@ -645,6 +664,19 @@ export class CulledInstances implements EnginePlugin {
   }
 }
 
+// The box of 24-byte vertices into `out` from `at`: centre at 0, half size at 4.
+function localBox(vertices: Float32Array, out: Float32Array, at: number): void {
+  for (let k = 0; k < 3; k++) {
+    let low = Infinity,
+      high = -Infinity;
+    for (let i = k; i < vertices.length; i += 6) {
+      if (vertices[i] < low) low = vertices[i];
+      if (vertices[i] > high) high = vertices[i];
+    }
+    out[at + k] = (low + high) / 2;
+    out[at + 4 + k] = (high - low) / 2;
+  }
+}
 function sameBindings(previous: readonly GPUBindGroupEntry[], entries: readonly GPUBindGroupEntry[]): boolean {
   return (
     previous.length === entries.length &&

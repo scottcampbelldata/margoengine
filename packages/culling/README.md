@@ -269,6 +269,31 @@ above a plain instanced draw with no culling: [known-bugs.md](../../docs/known-b
   layout the depth prepass and pyramid cost more than they save (numbers below).
 - `'none'`: draw every part that is not hidden.
 
+Both tests start from a part's bounding sphere. `bounds: 'box'` adds its oriented box, the geometry's box under the part's
+matrix, for assemblies of long or thin parts, whose spheres reach far past them:
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {CulledInstances} from 'margoengine/culling';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const at = (x: number, y: number, z: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1];
+const rods = new Float32Array(16 * 400);
+for (let i = 0; i < 400; i++) rods.set(at((i % 20) - 10, -0.3, Math.floor(i / 20) - 10), i * 16);
+const parts = CulledInstances.attach(engine, [
+  {geometry: box(40, 0.05, 40), material: new PbrMaterial({color: '#8d99a6'}), transforms: new Float32Array(at(0, 0, 0))},
+  {geometry: box(6, 0.1, 0.1), material: new PbrMaterial({color: '#c9ccd1'}), transforms: rods},   // under the plate
+], {culling: 'occlusion', bounds: 'box'});
+engine.camera.position = [0, 12, 20];
+engine.camera.target = [0, 0, 0];
+engine.start();
+setTimeout(async () => console.log(await parts.readCounts()), 1000);   // [1, 0]: spheres would keep the rods
+```
+
+The box test runs on parts that pass the sphere test, so it only ever drops more, and images stay the same
+(`test/gpu/bounds-check.mjs`). It reads the geometry's vertices once, at attach. `CulledParts` takes the same option.
+`CulledMeshes`, `DynamicInstances` and `CulledModels` use spheres, and so does the WebGL2 compatibility layer's route.
+
 ## Any geometry as occluder
 
 In `'occlusion'` mode only parts hide parts until you say otherwise. `addOccluder` adds a core mesh, a gltf-pro model, a
@@ -361,7 +386,7 @@ layouts), no WebGPU errors; occlusion drew as few as 4,770 of 28,672 parts where
 
 - Static parts, one geometry per batch; `CulledInstances` has one `PbrMaterial` per batch, and `CulledParts` holds one per
   part. At most 1,000,000 parts and 96 bytes x parts within `maxStorageBufferBindingSize`.
-- Bounding spheres: thin parts just behind a surface (a nut under a plate, seen obliquely) are rarely culled, and on an
-  open layout the depth prepass and pyramid cost more GPU time than occlusion saves; use `'frustum'` there.
+- With bounding spheres, thin parts just behind a surface (a rod under a plate) are rarely culled: use `bounds: 'box'`.
+  On an open layout the depth prepass and pyramid cost more GPU time than occlusion saves; use `'frustum'` there.
 - Occluders are the package's own parts plus what `addOccluder` names; everything else draws but does not occlude.
 - One frame shader variant is cached; changing `PassContext.shader` every frame recompiles.

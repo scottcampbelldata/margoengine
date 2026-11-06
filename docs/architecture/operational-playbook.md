@@ -398,6 +398,12 @@ so only front faces draw, by the sign of the matrix, and cut-out, blended, displ
 Evidence: `packages/culling/test/gpu/occluders-check.mjs`, 0 differing pixels against core, 0 of 576 parts drawn behind a
 core wall, a materials wall and a terrain ridge, RTX A6000.
 
+`bounds: 'box'` on `CulledInstances` adds each geometry's local box after the sphere tests: the box under the part's matrix
+is an oriented box, its radius along a plane normal is exact, and its nearest depth is at a corner. It can only drop more than
+the sphere, so a part it keeps is unchanged. Hi-Z still compares one nearest depth with the farthest occluder depth in a
+screen rectangle, so a long part behind a slanted surface stays in. Evidence: `packages/culling/test/gpu/bounds-check.mjs`,
+0 differing pixels against core, 0 of 900 rods drawn by box and 900 by sphere under a plate from above, RTX A6000.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback

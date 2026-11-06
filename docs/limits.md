@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-138). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-139). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -99,6 +99,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Occlusion for core meshes (`CulledMeshes`, `occlusion: true`, `@margoengine/culling`) | By method: occluders are last frame's kept instances of at least `occluderSize` pixels (default 8), redrawn with this frame's camera; only core's own batches occlude; a frame whose shader moves or discards surfaces (section planes) culls by frustum alone. | Hi-Z needs a depth the package can read, and core's depth target has no texture binding, so occluders are drawn a second time. | Hidden instances stop drawing from the second frame; the image matches core's. Each frame pays one depth pass and one pyramid. | Leave it off on open layouts, where the pass costs more than it saves. |
 | GPU culling of models (`CulledModels` in `@margoengine/culling/models`) | By method: covers primitives with `instances` (EXT_mesh_gpu_instancing, `PBRInstances`, `createInstancedMesh`), against the frustum and screen size. Skinned, morphed and non-instanced primitives are not culled; a displacing shader needs `padding`; the WebGL2 layer culls nothing. | Bounds of a deformed primitive are only known on the GPU, and a primitive without `instances` is one draw with no rows to compact. | Rows cost no CPU per frame; each culled primitive costs one uniform write and three dispatches. Non-instanced primitives still cost one draw each. | Give repeated objects `instances`. |
 | Occluders that are not parts (`addOccluder` on `CulledInstances` and `CulledParts`) | By method: takes core meshes, gltf-pro models, materials meshes and `Terrain`, drawn whole each frame. Back faces, cut-outs, blended, transmissive, displaced and clipped primitives do not occlude; a material extension that moves vertices cannot be detected. Not on `CulledMeshes`, which runs before the frame's deformers. | Core's depth has no texture binding, so an occluder is drawn a second time, and it must be a surface the frame really shows. | Parts behind a building stop drawing; the image is unchanged. Each occluder costs its triangles again every frame. | Add large things only, and never a model whose extension moves vertices. |
+| Hi-Z with `bounds: 'box'` on slanted occluders | Any long part behind a surface seen at an angle | The test compares the part's nearest corner with the farthest occluder depth in its screen rectangle, and a slanted surface spans a range of depth | The part draws though it is hidden: extra work, never a wrong pixel | Split long parts, or accept it |
 
 ## Geometry
 

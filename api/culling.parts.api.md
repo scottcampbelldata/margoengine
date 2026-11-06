@@ -94,7 +94,7 @@ class CulledInstances implements EnginePlugin {
         index: GPUBuffer;
     }>;
     static attach(engine: EngineKernel, batches: readonly CulledBatch[], options?: CulledInstancesOptions): CulledInstances;
-    constructor(batches: readonly CulledBatch[], { culling, occluderSize }?: CulledInstancesOptions);
+    constructor(batches: readonly CulledBatch[], { culling, occluderSize, bounds }?: CulledInstancesOptions);
     get count(): number;
     setTransform(batch: number, index: number, matrix: ArrayLike<number>): void;
     setVisible(batch: number, index: number, visible: boolean): void;
@@ -121,7 +121,10 @@ class CulledInstances implements EnginePlugin {
 interface CulledInstancesOptions {
     culling?: CullingMode;
     occluderSize?: number;
+    bounds?: CullingBounds;
 }
+
+type CullingBounds = 'sphere' | 'box';
 
 type CullingMode = 'none' | 'frustum' | 'occlusion';
 

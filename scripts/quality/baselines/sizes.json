@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4786244,
+  "total": 4787230,
   "history": [
     {
       "date": "2026-10-24",
@@ -2000,6 +2000,12 @@
       "commit": "d3d70887b",
       "reason": "culling: addOccluder (occluders.ts) in the root, where the occlusion pass lives; terrain gains drawOccluder",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "55578d887",
+      "reason": "culling: bounds box adds the oriented box tests to the root's compute shader",
+      "grew": 2
     }
   ],
   "items": {
@@ -2103,10 +2109,10 @@
     "@margoengine/creative/stars": 2909,
     "@margoengine/creative/targets": 2821,
     "@margoengine/creative/toon": 1188,
-    "@margoengine/culling": 13600,
+    "@margoengine/culling": 14096,
     "@margoengine/culling/dynamic": 7461,
     "@margoengine/culling/models": 3624,
-    "@margoengine/culling/parts": 14537,
+    "@margoengine/culling/parts": 15027,
     "@margoengine/cutscene": 6822,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,
