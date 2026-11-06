@@ -1112,6 +1112,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B11 | autoLOD levels skinned, morphed and flat-shaded models, node animation follows | DONE | `d34fd6c26` | LIM-147, LIM-252 |
 | B12 | MeshletMesh parts, Hi-Z, shadow clusters | DONE | `e3e3d5958` | LIM-145 |
 | B13 | addScene lights, cameras, one load per URL | DONE | this commit | LIM-131 |
+| B14 | sceneColor reads the frame; ScenePass shares models with SSR | DONE | this commit | LIM-192 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

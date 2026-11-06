@@ -16,6 +16,13 @@ export interface PassMaterialOptions extends NodeMaterialOptions {
     outputs?: Record<string, Node<'vec4f'>>;
 }
 
+export interface SceneColor {
+    readonly texture: BindableTexture;
+    read(coord?: NodeInput<'vec2f'>): Node<'vec3f'>;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
 export class ScenePass implements EnginePlugin {
     readonly name: string;
     readonly order: number;
@@ -40,6 +47,8 @@ export interface ScenePassOptions {
     outputs: Record<string, GPUTextureFormat>;
     order?: number;
 }
+
+export function sceneColor(engine: EngineKernel): SceneColor;
 
 // Not exported from this entry, but used by the exports above:
 

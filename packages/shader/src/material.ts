@@ -155,6 +155,7 @@ export const fragmentStage: ShaderStage = {
     instanceColor: (b) => b.stage.varying!(b, builtin('instanceColor', 'vec4f')),
     instanceUV: (b) => b.stage.varying!(b, builtin('instanceUV', 'vec4f')),
     ...camera,
+    hdrTarget: 'f.settings.w',
     materialColor: 's.base',
     materialNormal: 's.n',
     materialRoughness: 's.roughness',

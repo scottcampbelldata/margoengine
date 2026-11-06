@@ -3,12 +3,17 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
+import { acquireOpaqueColor } from '@margoengine/materials';
+import { captureModel, drawCapture } from '../../shared/capture.js';
 import { applyView } from '../../shared/view-rect.js';
 import { NodeMaterial, fragmentStage, type NodeMaterialOptions } from './material.js';
 import {
   cast,
+  hdrTarget,
   positionWorld,
   projectionMatrix,
+  screenUV,
+  select,
   uniform,
   vec2,
   vec4,
@@ -17,7 +22,7 @@ import {
   type NodeInput,
   type Program,
 } from './node.js';
-import type { BindableTexture } from './texture.js';
+import { texture, type BindableTexture } from './texture.js';
 
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -185,23 +190,10 @@ export class ScenePass implements EnginePlugin {
     applyView(pass, c);
     return pass;
   }
-  /** Draws `model` in this pass from the next frame. A model holds one capture hook, so it cannot also be in SSR. Returns a remover. */
+  /** Draws `model` in this pass from the next frame, beside any SSR, SSGI or other ScenePass that captures it. Returns a remover. */
   add(model: ScenePassModel): () => void {
     if (this.disposed) throw new MargoError('disposed', 'ScenePass is disposed; create a new ScenePass.');
-    let release = this.models.get(model);
-    if (!release) {
-      const restore = model.setCapture(this.hook),
-        forget = model.onDispose(() => this.models.delete(model));
-      release = () => {
-        if (this.models.get(model) === release) {
-          this.models.delete(model);
-          forget();
-          restore();
-        }
-      };
-      this.models.set(model, release);
-    }
-    return release;
+    return captureModel(this.models, model, this.hook);
   }
   /** Output `name` as a texture for `texture()` in a NodeMaterial or NodePass. Linear, the size of the drawing buffer. */
   texture(name: string): BindableTexture {
@@ -269,7 +261,7 @@ export class ScenePass implements EnginePlugin {
     this.context = single;
     const pass = this.hook.begin();
     try {
-      for (const model of this.models.keys()) model.draw(single, 'capture', c.color, c.depth);
+      for (const model of this.models.keys()) drawCapture(model, this.hook, single);
     } finally {
       pass.end();
       this.pass = this.context = undefined;
@@ -293,4 +285,48 @@ export class ScenePass implements EnginePlugin {
   [Symbol.dispose](): void {
     this.dispose();
   }
+}
+
+/** What {@link sceneColor} returns. */
+export interface SceneColor {
+  /** The frame as it stands, in the format it is drawn in, for `texture()`. Display-encoded without an HDR PostStack. */
+  readonly texture: BindableTexture;
+  /** The frame at `coord` (default the pixel itself) in linear light, whatever the target encodes. */
+  read(coord?: NodeInput<'vec2f'>): Node<'vec3f'>;
+  /** Lets go of the shared snapshot; the frame stops paying for it with the last holder. */
+  dispose(): void;
+  [Symbol.dispose](): void;
+}
+/**
+ * The finished frame behind a surface: core meshes, sky, water, fog and every plugin drawn so far, resolved from MSAA, in the
+ * snapshot `@margoengine/materials` transmission uses. It is taken after the opaque phase, so a surface reading it is
+ * `transparent: true`, which draws after the snapshot; other blended surfaces are not in it.
+ * @example new NodeMaterial({ transparent: true, toneMapped: false, emissiveNode: sceneColor(engine).read(screenUV.add(wobble)) })
+ * @throws MargoError on an engine without WebGPU.
+ */
+export function sceneColor(engine: EngineKernel): SceneColor {
+  const capture = acquireOpaqueColor(engine as unknown as Engine, () => {}),
+    samplers = new WeakMap<GPUDevice, GPUSampler>(),
+    source: BindableTexture = {
+      bind(device) {
+        let sampler = samplers.get(device);
+        if (!sampler) samplers.set(device, (sampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' })));
+        return [capture.view, sampler];
+      },
+    },
+    dispose = () => capture.release();
+  return {
+    texture: source,
+    read(coord = screenUV) {
+      const c = texture(source, cast(coord, 'vec2f', 'sceneColor coordinate')).rgb;
+      // The exact sRGB curve, undone only where the target is display-encoded.
+      return select(
+        hdrTarget.greaterThan(0.5),
+        c,
+        select(c.lessThanEqual(0.04045), c.div(12.92), c.add(0.055).div(1.055).pow(2.4)),
+      );
+    },
+    dispose,
+    [Symbol.dispose]: dispose,
+  };
 }

@@ -5,7 +5,10 @@ import {planeGeometry} from '/packages/geometry/dist/index.js';
 import {Material,createMesh} from '/packages/materials/dist/index.js';
 import {PostStack} from '/packages/post/dist/index.js';
 import {NodeMaterial,NodePass,inputColor,materialEmissive,screenUV,select,texture,uniform,uv,vec2,vec3,vec4} from '/packages/shader/dist/index.js';
-import {PassMaterial,ScenePass} from '/packages/shader/dist/pass.js';
+import {PassMaterial,ScenePass,sceneColor} from '/packages/shader/dist/pass.js';
+import {box} from '/packages/core/dist/index.js';
+import {SSR} from '/packages/post/dist/ssr.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -58,6 +61,24 @@ const scenarios={
   refraction:()=>{const pass=ScenePass.attach(engine,{outputs:{color:'rgba16float'}}),wall=plane(8,8,halves());pass.add(wall);
     const pane=plane(1,1,new NodeMaterial({...black,emissiveNode:texture(pass.texture('color'),screenUV.add(vec2(0.25,0))).rgb}),[0,0,0.5]);
     return cleanup(remove(pass),wall,pane);},
+  // The frame itself behind a pane: a core mesh and the clear colour, which a ScenePass does not hold.
+  frameBehind:()=>{const off=sun(Math.PI*2),behind=sceneColor(engine),core=engine.createMesh().setGeometry(box(1,1,1));core.setPosition([0,0,-1]);engine.scene.background='#305070';
+    const pane=plane(4,4,new NodeMaterial({...black,shading:'basic',transparent:true,emissiveNode:behind.read()}),[0,0,1]);
+    return cleanup(pane,()=>core.dispose(),()=>behind.dispose(),off,()=>{engine.scene.background=undefined;});},
+  frameBare:()=>{const off=sun(Math.PI*2),core=engine.createMesh().setGeometry(box(1,1,1));core.setPosition([0,0,-1]);engine.scene.background='#305070';return cleanup(()=>core.dispose(),off,()=>{engine.scene.background=undefined;});},
+  // The same pane under an HDR stack, where the snapshot holds linear light, shifted a quarter to the right.
+  frameShifted:()=>{const stack=PostStack.attach(engine,[new Tonemap()]),behind=sceneColor(engine),wall=plane(8,8,halves());
+    const pane=plane(1,1,new NodeMaterial({...black,transparent:true,emissiveNode:behind.read(screenUV.add(vec2(0.25,0)))}),[0,0,1]);
+    return cleanup(pane,wall,()=>behind.dispose(),()=>engine.removePlugin(stack.name));},
+  frameResized:async()=>{const behind=sceneColor(engine),wall=plane(8,8,halves()),pane=plane(4,4,new NodeMaterial({...black,transparent:true,emissiveNode:behind.read()}),[0,0,1]);
+    engine.render();await device.queue.onSubmittedWorkDone();
+    document.getElementById('host').style.width='300px';document.getElementById('host').style.height='300px';
+    await new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done)));
+    return cleanup(pane,wall,()=>behind.dispose(),()=>{document.getElementById('host').style.width='400px';document.getElementById('host').style.height='400px';});},
+  // One mesh in a ScenePass and in SSR at once: each draws it with its own capture.
+  sharedHook:()=>{const pass=ScenePass.attach(engine,{outputs:{glow:'rgba16float'}}),lit=plane(1,1,new PassMaterial({...black,outputs:{glow:vec4(1,0,0,1)}}));pass.add(lit);
+    const ssr=SSR.attach(engine),out=ssr.add(lit),shown=viewer(texture(pass.texture('glow'),screenUV).rgb);
+    return cleanup(remove(pass),lit,shown,()=>out(),()=>engine.removePlugin(ssr.name));},
   // A plain NodePass reads an output: selective glow added to the picture.
   post:()=>{const pass=ScenePass.attach(engine,{outputs:{glow:'rgba16float'}}),lit=plane(1,1,new PassMaterial({...black,outputs:{glow:vec4(0,1,0,1)}}));pass.add(lit);
     const add=new NodePass(inputColor().rgb.add(texture(pass.texture('glow'),uv()).rgb)),stack=PostStack.attach(engine,[add]);

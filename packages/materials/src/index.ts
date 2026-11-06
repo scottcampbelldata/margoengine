@@ -15,6 +15,7 @@ import { clearcoatShader, type ClearcoatShaderTextures } from './shader.js';
 import { MaterialTextures, validateTextureInfo, type TextureInfo } from './textures.js';
 import { createTransmission, validateTransmission, type TransmissionOptions } from './transmission.js';
 import { acquireOpaqueColor } from './opaque-color.js';
+export { acquireOpaqueColor };
 import { materialLobes, validateLobes, lobeMaps, type MaterialLobeOptions } from './lobes.js';
 export { materialLobes, sheen, specular, anisotropy, iridescence } from './lobes.js';
 export type {

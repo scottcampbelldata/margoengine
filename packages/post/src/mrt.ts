@@ -7,7 +7,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { margoError } from '../../shared/errors.js';
-import { shareCapture, drawCapture } from './capture.js';
+import { captureModel, drawCapture } from '../../shared/capture.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
 import type { SSRCapture, SSRModel } from './ssr.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
@@ -212,19 +212,7 @@ export class SceneTargets implements EnginePlugin {
     if (this.disposed) throw margoError('disposed', 'SceneTargets is disposed; create new SceneTargets');
     if (!model || typeof model.setCapture !== 'function')
       throw new TypeError('SceneTargets.add needs a gltf-pro model or materials mesh');
-    let release = this.models.get(model);
-    if (!release) {
-      const restore = shareCapture(model, this.hook),
-        forget = model.onDispose(() => this.models.delete(model));
-      release = () => {
-        if (this.models.get(model) !== release) return;
-        this.models.delete(model);
-        forget();
-        restore();
-      };
-      this.models.set(model, release);
-    }
-    return release;
+    return captureModel(this.models, model, this.hook);
   }
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'SceneTargets is disposed; create new SceneTargets');

@@ -10,7 +10,7 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { PostStack } from './stack.js';
 import { displayShader } from '../../shared/display.js';
 import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
-import { shareCapture, drawCapture } from './capture.js';
+import { captureModel, drawCapture } from '../../shared/capture.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { MaterialClear, partialMaterialView } from './material-clear.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
@@ -236,20 +236,7 @@ export class SSR implements EnginePlugin {
    * into SSR's material targets. Returns a remover; models not added are still reflected but do not reflect. */
   add(model: SSRModel): () => void {
     if (this.disposed) throw margoError('disposed', 'SSR is disposed; create a new SSR');
-    let release = this.models.get(model);
-    if (!release) {
-      const restore = shareCapture(model, this.hook),
-        forget = model.onDispose(() => this.models.delete(model));
-      release = () => {
-        if (this.models.get(model) === release) {
-          this.models.delete(model);
-          forget();
-          restore();
-        }
-      };
-      this.models.set(model, release);
-    }
-    return release;
+    return captureModel(this.models, model, this.hook);
   }
   get enabled(): boolean {
     return this.options.enabled ?? true;

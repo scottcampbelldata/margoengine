@@ -72,6 +72,29 @@ try {
   near(refraction.at(0.5, 0.1), [255, 0, 0], 'the wall itself is unchanged');
   console.log('ok refraction');
 
+  const bare = await grab('frameBare'),
+    behind = await grab('frameBehind');
+  assert.ok(bare.at(0.5, 0.5)[0] > 40, `the core mesh is lit: ${bare.at(0.5, 0.5)}`);
+  for (const [y, x] of [[0.5, 0.5], [0.1, 0.1], [0.5, 0.2]])
+    near(behind.at(y, x), bare.at(y, x), 'a pane reading the frame shows a core mesh and the clear colour as they are', 1);
+  assert.ok(bare.at(0.1, 0.1)[2] > 60, `the clear colour shows: ${bare.at(0.1, 0.1)}`);
+  console.log('ok frame behind', bare.at(0.5, 0.5), bare.at(0.1, 0.1));
+
+  const shifted = await grab('frameShifted');
+  assert.ok(shifted.at(0.5, 0.9)[2] > 200 && shifted.at(0.5, 0.1)[0] > 200, 'the wall shows its two halves');
+  near(shifted.at(0.5, 0.4), shifted.at(0.5, 0.9), 'the pane shows the wall a quarter to its right, tone mapped once');
+  console.log('ok frame shifted');
+
+  const frameResized = await grab('frameResized');
+  assert.equal(frameResized.width, 300, 'the canvas did change size');
+  near(frameResized.at(0.5, 0.1), [255, 0, 0], 'a resized canvas reads the new snapshot');
+  near(frameResized.at(0.5, 0.9), [0, 0, 255], 'a resized canvas reads the new snapshot');
+  console.log('ok frame resized');
+
+  // SSR draws through an HDR stack, whose display curve takes pure red to 241, 33, 33.
+  near((await grab('sharedHook')).at(0.5, 0.5), [241, 33, 33], 'a mesh in a ScenePass and in SSR keeps its pass output');
+  console.log('ok shared hook');
+
   const alone = await grab('alone');
   near(alone.at(0.5, 0.5), [0, 0, 255], 'a PassMaterial in no pass');
   console.log('ok alone');

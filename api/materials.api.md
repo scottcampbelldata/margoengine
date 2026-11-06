@@ -924,6 +924,12 @@ export interface WgslMaterialOptions extends MaterialOptions {
 
 export type Wrap = 'repeat' | 'clamp' | 'mirror';
 
+export function acquireOpaqueColor(engine: Engine, update: Update): {
+    readonly view: GPUTextureView;
+    texture(): GPUTexture | undefined;
+    release(): void;
+};
+
 export function anisotropy(options?: AnisotropyOptions, base?: MaterialExtension): MaterialExtension;
 
 export function clearcoat(options?: ClearcoatOptions): MaterialExtension;
@@ -1043,6 +1049,8 @@ type SubsurfaceKeys = 'subsurface' | 'subsurfaceMode' | 'subsurfaceColor' | 'sub
 interface TransmissionPassOptions {
     order?: number;
 }
+
+type Update = (view: GPUTextureView) => void;
 
 const featureMaps: readonly ['alphaMap', 'bumpMap', 'displacementMap', 'lightMap'];
 

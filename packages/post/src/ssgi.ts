@@ -10,7 +10,7 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
 import { PostStack } from './stack.js';
 import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
-import { shareCapture, drawCapture } from './capture.js';
+import { captureModel, drawCapture } from '../../shared/capture.js';
 import type { SSRCapture, SSRModel } from './ssr.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { MaterialClear, partialMaterialView } from './material-clear.js';
@@ -276,20 +276,7 @@ export class SSGI implements EnginePlugin {
    * bounce, not only bounced from). Returns a remover; a model may be added to SSR as well. */
   add(model: SSRModel): () => void {
     if (this.disposed) throw margoError('disposed', 'SSGI is disposed; create a new SSGI');
-    let release = this.models.get(model);
-    if (!release) {
-      const restore = shareCapture(model, this.hook),
-        forget = model.onDispose(() => this.models.delete(model));
-      release = () => {
-        if (this.models.get(model) === release) {
-          this.models.delete(model);
-          forget();
-          restore();
-        }
-      };
-      this.models.set(model, release);
-    }
-    return release;
+    return captureModel(this.models, model, this.hook);
   }
   get enabled(): boolean {
     return this.options.enabled ?? true;

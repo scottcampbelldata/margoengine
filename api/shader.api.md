@@ -478,6 +478,8 @@ export const fwidth: <A extends NodeInput[]>(...a: A) => Node<Widest<A>>;
 
 export const globalId: Node<"vec3u">;
 
+export const hdrTarget: Node<"f32">;
+
 export function inputColor(coord?: NodeInput<'vec2f'>): Node<'vec4f'>;
 
 export function inputDepth(coord?: NodeInput<'vec2f'>): Node<'f32'>;

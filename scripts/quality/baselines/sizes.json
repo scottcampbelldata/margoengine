@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8955824,
+  "total": 8956865,
   "history": [
     {
       "date": "2026-10-24",
@@ -2756,6 +2756,12 @@
       "commit": "e3e3d5958",
       "reason": "addScene gains the light and camera components and one load per URL, the B13 gap; the entry is optional and core plus stage root do not change",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "4807240f2",
+      "reason": "sceneColor and shared capture hooks, the B14 gap; optional entries of shader and post",
+      "grew": 1
     }
   ],
   "items": {
@@ -3243,7 +3249,7 @@
     "@margoengine/shader/graph": 13977,
     "@margoengine/shader/lighting": 9827,
     "@margoengine/shader/noise": 5772,
-    "@margoengine/shader/pass": 11323,
+    "@margoengine/shader/pass": 12364,
     "@margoengine/shader/raw": 13652,
     "@margoengine/shader/readback": 8876,
     "@margoengine/shader/subgroups": 3517,

@@ -444,7 +444,25 @@ const pane = createMesh(stage.engine, planeGeometry(1, 1), new NodeMaterial({emi
 pane.root.setPosition([0, 0, 0.5]);
 ```
 
-The pass draws each model a second time, and shading runs again only for `color`. The sky and other plugins are not in it. A model holds one capture hook, so it cannot be in a `ScenePass` and `SSR` at once.
+The pass draws each model a second time, and shading runs again only for `color`, single-sampled. The sky, core meshes, blended surfaces and other plugins are not in it. A model can be in a `ScenePass`, `SSR` and `SSGI` at once: each draws it with its own capture.
+
+**The frame itself.** `sceneColor(engine)` reads what the frame has drawn so far, so core meshes, the sky, water, fog and other plugins are all there, resolved from MSAA, with no second draw. It is the snapshot `@margoengine/materials` transmission takes after the opaque phase, so the surface reading it is `transparent: true`, which draws after the snapshot, and other blended surfaces are not in it:
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {NodeMaterial, screenUV, sin, time, vec2} from 'margoengine/shader';
+import {sceneColor} from 'margoengine/shader/pass';
+const stage = await createStage('#app');
+const behind = sceneColor(stage.engine);
+stage.box({color: '#c04030'});
+const wobble = vec2(sin(screenUV.y.mul(40).add(time)).mul(0.01), 0);
+const pane = createMesh(stage.engine, planeGeometry(2, 2), new NodeMaterial({shading: 'basic', transparent: true, toneMapped: false, emissiveNode: behind.read(screenUV.add(wobble))}));
+pane.root.setPosition([0, 0, 1]);
+```
+
+`behind.read(uv)` gives linear light, whatever the target encodes: on a display-encoded canvas it undoes the sRGB curve, and `toneMapped: false` encodes it back to the same value. A lit or tone-mapped surface adds its own light on top. `behind.texture` is the raw snapshot, in the frame's format. The frame pays for the snapshot from the first `sceneColor` until the last `dispose()`, and `hdrTarget` is the node telling which kind of target is bound.
 
 `node packages/shader/test/pass-check.mjs` (real GPU, under the GPU lock) reads these back as pixels: two outputs with a plain mesh hiding one part, an output from a graph, a live uniform and the final emissive, the lit colour against the picture (sunlit and tone mapped too), a mesh moved in the same frame, a pane showing the wall behind it, a NodePass adding an output, a camera step as velocity, and a canvas resize.
 

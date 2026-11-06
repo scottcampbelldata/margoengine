@@ -622,6 +622,8 @@ export const vertexIndex = /*@__PURE__*/ builtin('vertexIndex', 'u32');
 export const instanceMatrix = /*@__PURE__*/ builtin('instanceMatrix', 'mat4x4f'),
   instanceColor = /*@__PURE__*/ builtin('instanceColor', 'vec4f'),
   instanceUV = /*@__PURE__*/ builtin('instanceUV', 'vec4f');
+/** Above 0.5 where the target holds linear light, as under an HDR PostStack; below it the frame is display-encoded. Fragment stage. */
+export const hdrTarget = /*@__PURE__*/ builtin('hdrTarget', 'f32');
 /** Unit vector from the surface to the camera. */
 export const viewDirection = /*@__PURE__*/ builtin('viewDirection', 'vec3f'),
   cameraPosition = /*@__PURE__*/ builtin('cameraPosition', 'vec3f');

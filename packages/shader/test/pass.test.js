@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NodeMaterial, uv, vec3, vec4 } from '../dist/index.js';
-import { PassMaterial, ScenePass } from '../dist/pass.js';
+import { PassMaterial, ScenePass, sceneColor } from '../dist/pass.js';
+import { drawCapture, shareCapture } from '../../shared/capture.js';
 
 const { capturePBR, pbrShader } = await import('../../gltf-pro/src/shader.ts');
 
@@ -78,4 +79,50 @@ test('a disposed pass takes no models and draws nothing, and `using` disposes it
   assert.throws(() => hook(pass), /disposed/);
   frame.execute({ backend: 'webgpu' });
   assert.equal(pass.texture('glow').bind(), undefined, 'no targets came back');
+});
+
+test('two effects share a model: each draw uses its own hook, and the last remover gives the model back', () => {
+  const calls = [],
+    hook = (name) => ({ targets: [{ format: name }], declarations: () => name, begin: () => name }),
+    [a, b] = [hook('a'), hook('b')];
+  let held;
+  const model = {
+      setCapture(h) {
+        held = h;
+        calls.push('set');
+        return () => calls.push('restore');
+      },
+      draw: () => calls.push(held.begin() + held.declarations('') + held.targets[0].format),
+    },
+    outA = shareCapture(model, a),
+    outB = shareCapture(model, b);
+  drawCapture(model, a, {});
+  drawCapture(model, b, {});
+  assert.deepEqual(calls, ['set', 'aaa', 'bbb']);
+  outA();
+  drawCapture(model, a, {});
+  assert.equal(calls.length, 3, 'a removed effect draws nothing');
+  outB();
+  assert.equal(calls.at(-1), 'restore');
+});
+
+test('a ScenePass takes a model an SSR-like effect already captures', () => {
+  let sets = 0;
+  const model = { setCapture: () => (sets++, () => undefined), onDispose: () => () => undefined, draw() {} },
+    other = shareCapture(model, { targets: [], declarations: () => '', begin: () => undefined }),
+    pass = new ScenePass({ outputs: { glow: 'rgba16float' } });
+  pass.add(model);
+  assert.equal(sets, 1, 'the model keeps one hook');
+  pass.dispose();
+  other();
+});
+
+test('sceneColor reads linear light and undoes the sRGB curve only on an encoded target', () => {
+  const engine = { gpu: {}, use() {}, removePlugin() {} };
+  assert.throws(() => sceneColor({ use() { throw new Error('needs WebGPU'); } }), /needs WebGPU/);
+  const behind = sceneColor(engine),
+    code = new NodeMaterial({ transparent: true, emissiveNode: behind.read() }).fragmentCode;
+  assert.match(code, /f\.settings\.w/);
+  assert.match(code, /0\.04045/);
+  behind.dispose();
 });
