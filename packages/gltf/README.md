@@ -111,6 +111,29 @@ engine.start();
 An instance costs one core mesh plus one per primitive, shows up in `model.nodes` and `model.meshes`, can be moved like
 any node, and counts toward `maxNodes` (default 100,000).
 
+### Any file, without choosing a loader
+
+`loadAuto` from `@margoengine/gltf/auto` reads the file, runs the light loader with only the entries that file calls for,
+and imports `@margoengine/gltf-pro` only if the light loader refuses it as unsupported. Each URL is downloaded once,
+whichever loader runs. A malformed file is an error either way. Install `@margoengine/gltf-pro` beside this package for
+files that need it; without it such a file rejects with a message that says so. It also takes `signal`, `fetch`,
+`maxNodes` and `allowedURLs`.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadAuto } from 'margoengine/gltf/auto';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
+const { model, loader } = await loadAuto(engine, '/any.glb');
+console.log(`Loaded by ${loader}`);
+engine.start();
+// On teardown: model.dispose(); engine.dispose();
+```
+
+`model` is a light `Model` or a `PBRModel`; `loader` tells them apart, and with `'gltf-pro'` the result also holds the
+`reason` the light loader gave.
+
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 
 Apache-2.0 licensed.

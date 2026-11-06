@@ -21,6 +21,7 @@ try {
     const { parseGLTFAsync } = await import('/packages/gltf/dist/index.js');
     const { textured } = await import('/packages/gltf/dist/textured.js');
     const { instancing } = await import('/packages/gltf/dist/instancing.js');
+    const { loadAuto } = await import('/packages/gltf/dist/auto.js');
     const ensure = (condition, message) => {
       if (!condition) throw new Error(message);
     };
@@ -184,6 +185,33 @@ try {
     ensure(engine.stats.drawCalls === 2, `The box and one instanced draw: ${engine.stats.drawCalls}`);
     result.instancing = { west, east, drawCalls: engine.stats.drawCalls };
     grove.dispose();
+
+    // loadAuto: a masked map stays light; emission needs gltf-pro, whose real loader draws the file from the same bytes.
+    const serve = (doc) => {
+      const asked = [],
+        embedded = { ...doc, buffers: [{ byteLength: length, uri: 'quad.bin' }] };
+      return {
+        asked,
+        fetch: async (url) => {
+          asked.push(String(url));
+          return new Response(String(url).endsWith('.bin') ? bytes : JSON.stringify(embedded));
+        },
+      };
+    };
+    const url = `${location.origin}/virtual/quad.gltf`,
+      lightFile = serve(file({ alphaMode: 'MASK', pbrMetallicRoughness: pbr({ baseColorTexture: map }) })),
+      light = await loadAuto(instance, url, lightFile);
+    ensure(light.loader === 'gltf', `A masked map stays light: ${light.loader}`);
+    ensure(near(pixels(left)[0], expected), 'The light result draws');
+    light.model.dispose();
+    const proFile = serve(file({ emissiveFactor: [0, 1, 0], pbrMetallicRoughness: pbr({ baseColorFactor: [0, 0, 0, 1] }) })),
+      pro = await loadAuto(instance, url, proFile);
+    ensure(pro.loader === 'gltf-pro', `Emission moves to gltf-pro: ${pro.loader}`);
+    ensure(proFile.asked.length === 2, `Each URL once: ${proFile.asked}`);
+    const [glow] = pixels(left);
+    ensure(glow[1] > 200 && glow[0] < 60 && glow[2] < 60, `gltf-pro draws the file: ${glow}`);
+    result.auto = { light: light.loader, pro: pro.loader, reason: pro.reason, glow };
+    pro.model.dispose();
 
     // Two views: each camera sees the quad from its own side of the frame.
     const views = await load(file({ alphaMode: 'MASK', pbrMetallicRoughness: pbr({ baseColorTexture: map }) }));

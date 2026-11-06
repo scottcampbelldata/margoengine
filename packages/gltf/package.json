@@ -36,6 +36,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./auto": {
+      "types": "./dist/auto.d.ts",
+      "import": "./dist/auto.js"
+    },
     "./instancing": {
       "types": "./dist/instancing.d.ts",
       "import": "./dist/instancing.js"
@@ -59,15 +63,20 @@
   ],
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0"
+    "@margoengine/decoders": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/decoders": {
+      "optional": true
+    },
+    "@margoengine/gltf-pro": {
       "optional": true
     }
   },
   "devDependencies": {
     "@margoengine/decoders": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   }
 }
