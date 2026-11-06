@@ -1015,20 +1015,20 @@ Characters can now swing their hair, come in as VRM avatars, take weights on mes
 
 | # | Job | Status | Commit | New entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Spring bones and jiggle | DONE | `2d2840ff4` | `@margoengine/rigging/springs` | LIM-219 |
+| 1 | Spring bones and jiggle | DONE | `2d2840ff4` | `@margoengine/rigging/springs` | LIM-223 |
 | 2 | VRM avatars | DONE | `4fccde3b6` | `/vrm` | LIM-226 |
 | 3 | Automatic rig from mesh | HELD | none | none | none |
 | 4 | Geodesic voxel weights | DONE | `13131c625` | `/voxel-weights` | LIM-231 |
 | 5 | Corrective shapes | DONE | `59afd6c39` | `/correctives` | LIM-232 |
 | 6 | Weight transfer | DONE | `53f549c38` | `/transfer` | LIM-234 |
-| 7 | Face blend shape mapping | DONE | this commit | `/face` | LIM-235 |
+| 7 | Face blend shape mapping | DONE | `71b8afd93` | `/face` | LIM-237 |
 
 - **Held:** job 3 was never started. Scott decides whether an automatic rig stays open source.
 - **Bugs:** one reached `main` before this batch: IK, foot tools and look-at threw on scales such as 0.9995, 1, 0.9986, which real exporters write, found on Seed-san's hair. Fixed in `35dac4b0f` by reading each axis's own scale, with "off uniform" tests in `packages/rigging/tests/ik.test.js`, `ik-animator.test.js`, `tests/modern-animator-ccd.test.js`, `tests/modern-animator-look-at.test.js` and `tests/modern-animator-depth.test.js`. The ragdoll check has the same limit and a test that pins its refusal of `[1, 2, 1]`, so it is in `docs/known-bugs.md` for a decision. Caught before landing: the voxel search compared a double against a rounded 32-bit distance, which dropped voxels and held the first test run to its 170 s limit; the distances are now doubles. The voxel draft also flooded every open mesh out and fused limbs with its default closing; a fill from the bones and a default of 0 replaced both.
 - **Proved:** on real files: spring bones and VRM on the VRM Consortium's Seed-san and Twist sample, drawn on a real GPU; voxel weights on RiggedFigure, Fox and Seed-san against authored weights, strongest bone or its neighbour on over 95% of vertices, the same with a fifth of the faces gone, and 95.8% against bone heat's 48.8% on the Fox with a coat over it; transfer on Seed-san's clothes and the Twist sample against authored weights.
-- **Limits:** LIM-232 and LIM-235 read PROVEN (STAND-IN): the corrective's rig and clip are real and its morph target is not, since no real file with correctives was found; the face's name matching runs on stand-in targets and its frames are written by the test, as no real model with those names and no live tracker was run, though the avatar path is a real avatar. The VRM write side is a stand-in: no outside VRM tool has read a written file. No speed was measured in a quiet run; one line per job is on the quiet-pass list.
+- **Limits:** LIM-232 and LIM-237 read PROVEN (STAND-IN): the corrective's rig and clip are real and its morph target is not, since no real file with correctives was found; the face's name matching runs on stand-in targets and its frames are written by the test, as no real model with those names and no live tracker was run, though the avatar path is a real avatar. The VRM write side is a stand-in: no outside VRM tool has read a written file. No speed was measured in a quiet run; one line per job is on the quiet-pass list.
 - **Gate:** lint, hygiene, verify, the rigging tests and browser test and `tests/claims-file.test.js`, from one script gated on exit codes, with the animator's tests added for the scale fix.
-- **Slips:** job 1's first landing never started, because `setsid` is missing on this PC, and nothing said so. Job 2's first landing failed verify: its docs script edited `THIRD-PARTY-NOTICES.md` by hand, which is generated from `scripts/supply-chain.mjs`. Job 5's first landing failed `quality api` on an error message with no fix, which the helper should have run before starting the landing; jobs 6 and 7 ran that gate first.
+- **Slips:** job 1's first landing never started, because `setsid` is missing on this PC, and nothing said so. Job 2's first landing failed verify: its docs script edited `THIRD-PARTY-NOTICES.md` by hand, which is generated from `scripts/supply-chain.mjs`. Job 5's first landing failed `quality api` on an error message with no fix, which the helper should have run before starting the landing; jobs 6 and 7 ran that gate first. Job 7's first landing failed verify on a pointer into the private folder in this section. A rebase then renumbered job 7's claim, so its number here was wrong until a docs commit after it; that commit corrected job 1's number too.
 
 ## Real files: every loader on a file from a real tool
 
