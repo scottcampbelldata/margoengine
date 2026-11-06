@@ -389,6 +389,14 @@ export class CulledInstances implements EnginePlugin {
       throw new RangeError('Expected nonsingular affine instance transforms');
     return det;
   }
+  /** Whether some part of a batch can show back faces, which rules out core's back-culled pipeline. */
+  protected backFaces(batch: number): boolean {
+    return this.batches[batch].material.data[6] >= 0.5 || this.flips[batch] > 0;
+  }
+  /** Whether the depth prepass applies the single-sided rule, which it reads per part, to a batch. */
+  protected singleSided(batch: number): boolean {
+    return this.batches[batch].material.data[6] < 0.5;
+  }
   protected write(i: number, m: ArrayLike<number>): void {
     const det = this.determinant(m),
       records = this.records,
@@ -589,7 +597,7 @@ export class CulledInstances implements EnginePlugin {
         // The target may be larger than this view (shared with a larger one).
         if (c.view) pass.setViewport(0, 0, width, height, 0, 1);
         this.batches.forEach((batch, i) => {
-          const sided = batch.material.data[6] < 0.5;
+          const sided = this.singleSided(i);
           pass.setPipeline(sided ? this.prepass!.sided : this.prepass!.plain);
           pass.setBindGroup(0, sided ? this.groups.sided : this.groups.prepass);
           const g = this.geometryBuffers.get(batch.geometry)!;
@@ -664,7 +672,7 @@ export class CulledInstances implements EnginePlugin {
     let current: GPURenderPipeline | undefined;
     this.batches.forEach((batch, i) => {
       // The back faces of a single-sided batch without mirrored parts are exactly what core's discard removes.
-      const culled = this.culledPipeline && batch.material.data[6] < 0.5 && !this.flips[i],
+      const culled = this.culledPipeline && !this.backFaces(i),
         pipeline = culled ? this.culledPipeline! : this.pipeline!;
       if (pipeline !== current) {
         current = pipeline;

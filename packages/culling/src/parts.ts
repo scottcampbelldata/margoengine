@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { EngineKernel } from '@margoengine/core';
+import { PbrMaterial, type EngineKernel, type Geometry, type PbrMaterialOptions } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { CulledInstances, type CulledBatch, type CulledInstancesOptions } from './index.js';
 
@@ -15,11 +15,55 @@ export interface CulledPartsBatch extends CulledBatch {
    * and one test per frame. Default: the parts in `transforms`, so nothing can be added.
    */
   capacity?: number;
+  /**
+   * Each part's own material, one per part of `transforms` and in the same order; `material` stays the default for
+   * parts added later. Values are copied into the part's record, so a later `material.set` changes nothing here: use
+   * {@link CulledParts.setMaterial}. Default: every part takes `material`.
+   */
+  materials?: readonly PbrMaterial[];
 }
 /** One part: its batch, and its index inside that batch. */
 export interface CulledPart {
   batch: number;
   index: number;
+}
+/** One part's values, as {@link CulledParts.getMaterial} reads them. */
+export interface CulledPartMaterial {
+  /** Linear rgb. */
+  color: [number, number, number];
+  roughness: number;
+  metalness: number;
+  doubleSided: boolean;
+}
+/** One item of an assembly for {@link groupParts}. */
+export interface CulledPartItem {
+  geometry: Geometry;
+  material: PbrMaterial;
+  /** Column-major affine world matrix, 16 floats. */
+  matrix: ArrayLike<number>;
+}
+
+/**
+ * Turns a flat list of an assembly's items into batches: one per geometry, however many materials the items use, each
+ * part keeping its own material. `places[n]` is where item n went, for {@link CulledParts.setTransform} and the like.
+ */
+export function groupParts(items: readonly CulledPartItem[]): { batches: CulledPartsBatch[]; places: CulledPart[] } {
+  const found = new Map<Geometry, { batch: number; matrices: ArrayLike<number>[]; materials: PbrMaterial[] }>(),
+    places: CulledPart[] = [];
+  for (const { geometry, material, matrix } of items) {
+    if (matrix?.length !== 16) throw new TypeError('Invalid culled part; give each item 16 matrix values');
+    let group = found.get(geometry);
+    if (!group) found.set(geometry, (group = { batch: found.size, matrices: [], materials: [] }));
+    places.push({ batch: group.batch, index: group.matrices.length });
+    group.matrices.push(matrix);
+    group.materials.push(material);
+  }
+  const batches = [...found].map(([geometry, { matrices, materials }]) => {
+    const transforms = new Float32Array(matrices.length * 16);
+    matrices.forEach((matrix, i) => transforms.set(matrix, i * 16));
+    return { geometry, material: materials[0], transforms, materials };
+  });
+  return { batches, places };
 }
 
 // Caster and id draws of the whole part list: hidden and free slots collapse to a point outside clip space.
@@ -75,8 +119,16 @@ const FREE = 2; // A slot's word in `hidden`: 0 shown, 1 hidden by setVisible, 2
 function reserve(batches: readonly CulledPartsBatch[]): readonly CulledBatch[] {
   if (!Array.isArray(batches)) return batches;
   return batches.map((b: CulledPartsBatch) => {
-    if (b?.capacity === undefined || !(b.transforms instanceof Float32Array) || b.transforms.length % 16) return b;
+    if (!(b?.transforms instanceof Float32Array) || b.transforms.length % 16) return b;
     const parts = b.transforms.length / 16;
+    if (
+      b.materials !== undefined &&
+      (!Array.isArray(b.materials) ||
+        b.materials.length !== parts ||
+        b.materials.some((material) => !(material instanceof PbrMaterial)))
+    )
+      throw new TypeError('Invalid culled batch materials; pass one PbrMaterial per part of transforms');
+    if (b.capacity === undefined) return b;
     if (!Number.isInteger(b.capacity) || b.capacity < parts)
       throw new RangeError('Invalid culled batch capacity; pass a whole number no smaller than its part count');
     const transforms = new Float32Array(b.capacity * 16);
@@ -96,6 +148,9 @@ export class CulledParts extends CulledInstances {
   private live = 0;
   // Per batch, the free indices inside it, the lowest last.
   private readonly free: number[][];
+  // Per batch: live parts whose double-sided value differs from the batch material's.
+  private readonly odd: Uint32Array;
+  private readonly scratch = new PbrMaterial();
   // Allocated by the first setParent. Per slot: the parent's slot or -1, and the matrix relative to that parent.
   private parents?: Int32Array;
   private locals?: Float32Array;
@@ -124,6 +179,7 @@ export class CulledParts extends CulledInstances {
   }
   constructor(batches: readonly CulledPartsBatch[], options?: CulledInstancesOptions) {
     super(reserve(batches), options);
+    this.odd = new Uint32Array(batches.length);
     this.free = batches.map((b, batch) => {
       const parts = b.transforms.length / 16,
         free: number[] = [];
@@ -132,6 +188,7 @@ export class CulledParts extends CulledInstances {
         free.push(i);
       }
       this.live += parts;
+      b.materials?.forEach((material, i) => this.paint(this.starts[batch] + i, material.data));
       return free;
     });
   }
@@ -141,6 +198,38 @@ export class CulledParts extends CulledInstances {
   }
   override setTransform(batch: number, index: number, matrix: ArrayLike<number>): void {
     this.place(this.index(batch, index), matrix);
+  }
+  /**
+   * Gives one part its own material values, with no new batch or draw: a batch holds any number of colours and finishes.
+   * Options leave out what they do not change; a `PbrMaterial` sets everything, and later changes to it do not follow.
+   * One record write, uploaded with the next frame like {@link setTransform}.
+   * @throws RangeError for a part not alive or a value outside 0 to 1.
+   */
+  setMaterial(batch: number, index: number, material: PbrMaterial | PbrMaterialOptions): void {
+    const i = this.index(batch, index);
+    if (material instanceof PbrMaterial) {
+      this.paint(i, material.data);
+      return;
+    }
+    const scratch = this.scratch;
+    scratch.data.set(this.records.subarray(i * 24 + 16, i * 24 + 23));
+    scratch.set(material);
+    this.paint(i, scratch.data);
+  }
+  /** Sets one part's colour: '#rrggbb' (sRGB) or linear [r, g, b]. See {@link setMaterial}. */
+  setColor(batch: number, index: number, color: string | readonly number[]): void {
+    this.setMaterial(batch, index, { color });
+  }
+  /** One part's values, as last set. */
+  getMaterial(batch: number, index: number): CulledPartMaterial {
+    const at = this.index(batch, index) * 24 + 16,
+      r = this.records;
+    return {
+      color: [r[at], r[at + 1], r[at + 2]],
+      roughness: r[at + 4],
+      metalness: r[at + 5],
+      doubleSided: r[at + 6] >= 0.5,
+    };
   }
   /**
    * Makes a part follow another: from now on its matrix (the one it has, and each later {@link setTransform}) is relative
@@ -175,10 +264,11 @@ export class CulledParts extends CulledInstances {
   }
   /**
    * Adds parts to a batch's free slots, shown, without touching the rest: one upload per changed range with the next
-   * frame, as for {@link setTransform}. Returns each new part's index inside the batch.
+   * frame, as for {@link setTransform}. `materials` gives each new part its own, as on the batch; default the batch's
+   * `material`. Returns each new part's index inside the batch.
    * @throws RangeError when the batch has too few free slots; reserve them with {@link CulledBatch.capacity}.
    */
-  addParts(batch: number, transforms: Float32Array): number[] {
+  addParts(batch: number, transforms: Float32Array, materials?: readonly PbrMaterial[]): number[] {
     const free = this.free[batch];
     if (!free) throw new RangeError('Invalid culled batch index; pass a batch index from 0 up to the batch count');
     if (!(transforms instanceof Float32Array) || transforms.length % 16)
@@ -188,6 +278,8 @@ export class CulledParts extends CulledInstances {
       throw new RangeError(
         `Culled batch ${batch} has ${free.length} free slots for ${n} parts; set a larger capacity on the batch`,
       );
+    if (materials && (materials.length !== n || materials.some((material) => !(material instanceof PbrMaterial))))
+      throw new TypeError('Invalid culled part materials; pass one PbrMaterial per new part');
     for (let k = 0; k < n; k++) this.determinant(transforms.subarray(k * 16, k * 16 + 16));
     const added: number[] = [];
     for (let k = 0; k < n; k++) {
@@ -195,6 +287,7 @@ export class CulledParts extends CulledInstances {
         i = this.starts[batch] + index;
       this.show(i, 0);
       this.place(i, transforms.subarray(k * 16, k * 16 + 16));
+      if (materials) this.paint(i, materials[k].data);
       added.push(index);
     }
     this.live += n;
@@ -217,6 +310,8 @@ export class CulledParts extends CulledInstances {
       if (this.parents) this.parents[i] = -1;
       this.flips[batch] -= this.flipped[i];
       this.flipped[i] = 0;
+      // The slot's next part starts from the batch's material.
+      this.paint(i, this.batches[batch].material.data);
       this.show(i, FREE);
       this.free[batch].push(indices[k]);
     });
@@ -362,6 +457,22 @@ export class CulledParts extends CulledInstances {
     } finally {
       read.destroy();
     }
+  }
+  // The seven material values of a part's record (its core mesh id stays), from a PbrMaterial's `data`.
+  private paint(i: number, data: ArrayLike<number>): void {
+    const at = i * 24 + 16,
+      r = this.records,
+      batch = this.batchOf[i],
+      plain = this.batches[batch].material.data[6] >= 0.5;
+    this.odd[batch] += +(data[6] >= 0.5 !== plain) - +(r[at + 6] >= 0.5 !== plain);
+    for (let k = 0; k < 7; k++) r[at + k] = data[k];
+    this.dirty(i);
+  }
+  protected override backFaces(batch: number): boolean {
+    return this.odd[batch] > 0 || super.backFaces(batch);
+  }
+  protected override singleSided(batch: number): boolean {
+    return this.odd[batch] > 0 || super.singleSided(batch);
   }
   private unlink(i: number, parent: number): void {
     const list = this.children!.get(parent)!;

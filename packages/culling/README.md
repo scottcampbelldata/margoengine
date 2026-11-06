@@ -63,8 +63,42 @@ parts.removeParts(0, [hand]);
   so it costs more than `engine.pick` on a large list.
 - A part with a parent stores a local matrix on the CPU. The fold runs when a matrix is set and costs one record write per
   part in the subtree; parts that never call `setParent` cost nothing. A part with children cannot be removed alone.
-- `addParts` past `capacity` throws: buffers are sized at attach. New geometry or materials need a new
-  `CulledParts`. Each free slot still costs its record and one test per frame.
+- `addParts` past `capacity` throws: buffers are sized at attach. New geometry needs a new `CulledParts`. Each free
+  slot still costs its record and one test per frame.
+
+### Many materials in one batch
+
+Every part's colour, roughness, metalness and sidedness live in its own 96-byte record, so a batch is one geometry, not
+one material. A CAD assembly with hundreds of colours costs one batch per distinct shape. `groupParts` turns a flat list
+of items into those batches and says where each item went:
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {CulledParts, groupParts} from 'margoengine/culling/parts';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const bolt = box(0.2, 0.2, 1);
+const items = Array.from({length: 500}, (_, n) => ({
+  geometry: bolt,
+  material: new PbrMaterial({color: [n / 500, 0.4, 1 - n / 500], metalness: 0.8}),
+  matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, n % 25, 0, Math.floor(n / 25), 1],
+}));
+const {batches, places} = groupParts(items);   // one batch: 500 colours, one draw
+const parts = CulledParts.attach(engine, batches);
+engine.start();
+
+const {batch, index} = places[42];
+parts.setColor(batch, index, '#ff8000');                     // selection highlight: one record write
+parts.setMaterial(batch, index, {roughness: 0.2});           // leaves the other values alone
+console.log(parts.getMaterial(batch, index).roughness);      // 0.2
+```
+
+- By hand: `materials` on a batch gives one `PbrMaterial` per part, and `addParts(batch, transforms, materials)` does
+  the same for new parts. A part added without one takes the batch's `material`, also in a slot a coloured part left.
+- The values are copied: a later `material.set` does not reach a part, `setMaterial` does.
+- Per part means the values in the record. Textures are not per part: core's `PbrMaterial` has none.
+- A batch that mixes single-sided and double-sided parts leaves core's back-culled pipeline, as a batch with mirrored
+  parts does, and applies the single-sided rule per part in the fragment shader.
 
 ## Core meshes: `CulledMeshes`
 
@@ -216,8 +250,8 @@ layouts), no WebGPU errors; occlusion drew as few as 4,770 of 28,672 parts where
 
 ## Limits
 
-- Static parts with one `PbrMaterial` per batch (per-part colours mean one batch per colour); at most 1,000,000 parts
-  and 96 bytes x parts within `maxStorageBufferBindingSize`.
+- Static parts, one geometry per batch; `CulledInstances` has one `PbrMaterial` per batch, and `CulledParts` holds one per
+  part. At most 1,000,000 parts and 96 bytes x parts within `maxStorageBufferBindingSize`.
 - Bounding spheres: thin parts just behind a surface (a nut under a plate, seen obliquely) are rarely culled, and on an
   open layout the depth prepass and pyramid cost more GPU time than occlusion saves; use `'frustum'` there.
 - Occluders are this package's own parts; core meshes and other plugins' geometry do not occlude.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4775327,
+  "total": 4775912,
   "history": [
     {
       "date": "2026-10-24",
@@ -1970,6 +1970,12 @@
       "commit": "1ecd08ddc",
       "reason": "New input entry ./players: local multiplayer, devices assigned to players with an Input each. Core and core + stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "7aca87fb1",
+      "reason": "culling/parts: per-part materials (setMaterial, setColor, getMaterial, groupParts) for CAD assemblies; root gains two small hooks",
+      "grew": 1
     }
   ],
   "items": {
@@ -2075,7 +2081,7 @@
     "@margoengine/creative/toon": 1188,
     "@margoengine/culling": 11066,
     "@margoengine/culling/dynamic": 7461,
-    "@margoengine/culling/parts": 11866,
+    "@margoengine/culling/parts": 12451,
     "@margoengine/cutscene": 6822,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,

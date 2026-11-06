@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-132). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-133). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -95,6 +95,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Wide-angle projections (`@margoengine/cameras/panini`, 2026-11-05) | By method: one rectilinear picture is resampled, so the source must be drawn at a wide field of view first (about 120 to 150 degrees across at most) and the rest of the sphere is not available. The stage runs after tone mapping, on display colour, and needs WebGPU and a perspective camera. Picking and screen-space overlays still use the source picture: map them with `WideAngle.map`. | A cube capture for a full 180 degree fisheye costs six scene draws and belongs in its own entry. A matrix cannot do these projections, because they bend straight lines. | A fisheye or Panini wider than the source shows black or is cropped (`crop`). Pixels at the far edge of a very wide source are stretched before they are resampled, so the sides are softer than the middle. | Draw the source wider, or use `crop: true`; for a full circle render a cube map with `@margoengine/environment` and sample it yourself. |
 | HDR point colours (`colorFormat: 'float'`) | Enforced: 16 bytes a point against 4; a colour must be finite and 0 or more, or `RangeError`. By method: an 8-bit canvas still clips above 1 at the end. | Four float32 a point keep the values through the shader. | Colour memory and upload are four times RGBA8. | Keep the default `'rgba8'` for colours inside 0..1. |
 | Mipmaps on point and sprite maps (`mipmaps`) | Enforced: an uploaded image gets a full chain, default on for points, off for sprites. By method: sprite atlases are left without mips as levels bleed between cells; `alphaTest` tests the filtered alpha. | One chain a map, made at upload. | An atlas sprite drawn small still shimmers, and a video map pays for a chain per upload. | Use a gutter around atlas cells with `mipmaps: true`, or `mipmaps: false` on a video. |
+| Materials per part (`CulledParts` in `@margoengine/culling/parts`) | By method: a batch is one geometry, and each part's record holds its own colour, roughness, metalness and sidedness. No textures per part. | Core's `PbrMaterial` has no textures, and the record is what the draw reads, so colours cost no extra batch or draw. | A CAD assembly with hundreds of colours stays one batch per shape. A batch mixing single-sided and double-sided parts leaves the back-culled pipeline. | Build batches with `groupParts`; keep sidedness uniform inside a batch where the back-culled pipeline matters. |
 
 ## Geometry
 

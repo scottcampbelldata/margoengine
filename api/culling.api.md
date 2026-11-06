@@ -46,6 +46,8 @@ export class CulledInstances implements EnginePlugin {
     protected dirty(i: number): void;
     protected flush(d: GPUDevice): void;
     protected determinant(m: ArrayLike<number>): number;
+    protected backFaces(batch: number): boolean;
+    protected singleSided(batch: number): boolean;
     protected write(i: number, m: ArrayLike<number>): void;
     protected bind(pipeline: GPUComputePipeline | GPURenderPipeline, entries: [number, GPUBindingResource][]): GPUBindGroup;
     protected release(): void;

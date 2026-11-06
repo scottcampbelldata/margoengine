@@ -149,6 +149,21 @@ const steps = [
       }
     },
   ],
+  [
+    'every box its own colour and finish, one in nine double-sided, all in the same four batches',
+    () => {
+      live().forEach((entry, n) => {
+        const material = new PbrMaterial({
+          color: [(n % 17) / 16, (n % 5) / 4, (n % 11) / 10],
+          roughness: 0.25 + (n % 3) / 4,
+          metalness: (n % 2) / 2,
+          doubleSided: n % 9 === 0,
+        });
+        entry.mesh.setMaterial(material);
+        parts.setMaterial(entry.batch, entry.index, material);
+      });
+    },
+  ],
   ['close view', () => look([2, 3, 6], [1, 1, 1])],
 ];
 async function step(i) {
