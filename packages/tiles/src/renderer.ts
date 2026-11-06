@@ -3,8 +3,7 @@
 // pnts content becomes @margoengine/points clouds; both are optional peers loaded with import() on the first tile
 // that needs them. Tileset coordinates (ECEF, z-up, float64) map to the engine's y-up float32 world through a
 // float64 frame matrix; see the README's "Coordinates and precision".
-import type { EngineKernel, Mesh, Vec3 } from '@margoengine/core';
-import type { EnginePlugin } from '@margoengine/core/extension';
+import type { EngineKernel, EnginePlugin, Mesh, Vec3 } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import type { TileContent } from './formats.js';
 import {

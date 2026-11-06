@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Packaging
+
+- `npm run publish:rehearsal` proves a release without making one: it audits all 102 tarballs, then runs `npm install margoengine` and `npm create margo` in clean projects against a stand-in registry on 127.0.0.1 that refuses every write. `npm run publish:dry-run` and the publish workflow run it.
+- `FloatingOrigin`, `OctreeCloud` and `TilesRenderer` now implement the `EnginePlugin` their `setup` takes, so their published types compile in an app with `skipLibCheck` off.
+- The `create-margo` description no longer lists a `cad` template that does not exist.
+
 ### Apple GPUs
 
 - glTF PBR materials without textures or effects draw in WebKit: it gives an invalid layout for an empty group past the last one a shader uses, so `@margoengine/gltf-pro` now binds one explicit empty group there.

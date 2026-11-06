@@ -54,6 +54,8 @@ jobs:
           npm run build:packages
           node scripts/supply-chain.mjs --check
           node --test --test-concurrency=2 tests/supply-chain.test.js tests/versions.test.js
+      - name: Rehearse the install from the tarballs (stand-in registry on 127.0.0.1, publishes nothing)
+        run: npm run publish:rehearsal -- --no-build
       - name: Bootstrap token (first release only)
         env:
           TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}

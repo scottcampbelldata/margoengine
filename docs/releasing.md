@@ -3,6 +3,14 @@
 Nothing is published without the maintainer's go-ahead for that release. The only publish path is the manual
 `.github/workflows/publish.yml` workflow; `npm run publish:dry-run` runs the same checks locally and publishes nothing.
 
+## Where the names stand
+
+`margoengine`, `create-margo` and `margo-convert` are on npm as 0.0.1 name placeholders owned by the maintainer, so
+they already exist and can take a trusted publisher before the first release; `npm install margoengine` gets the
+placeholder until then. No `@margoengine/*` package exists on npm yet: the `margoengine` organization must exist on
+npmjs.com, with the maintainer as owner, before the first publish. Nothing here can be published under a scope nobody
+owns.
+
 ## Accounts and credentials
 
 - **2FA on every npm account with publish rights** (authorization and writes), and on the GitHub account that owns the
@@ -17,7 +25,9 @@ Nothing is published without the maintainer's go-ahead for that release. The onl
   (days, not months), stored only as the `NPM_BOOTSTRAP_TOKEN` secret of the `npm-publish` environment. Revoke it
   and delete the secret right after that first release, then switch every package to trusted publishing.
 - **Provenance:** every publish uses `--provenance`, so npm shows which commit and workflow built each tarball. It
-  requires each package's `repository.url` to be this GitHub repository (`scripts/supply-chain.mjs` checks it).
+  requires each package's `repository.url` to be this GitHub repository (`scripts/supply-chain.mjs` checks it), and npm
+  accepts provenance only from a public repository: while this repository is private, the workflow's publish step
+  fails at its first package. Make the repository public first, or decide to drop `--provenance` for that release.
 - One-time GitHub setup (maintainer): an `npm-publish` environment with the maintainer as required reviewer and `main` as the only
   allowed branch; the repository variable `NPM_PUBLISH_ENABLED=true` when a release is due (the workflow does nothing
   without it); private vulnerability reporting enabled (Settings, Security), which SECURITY.md points to.
@@ -36,6 +46,12 @@ Nothing is published without the maintainer's go-ahead for that release. The onl
    allowed licence and no install script. For every runtime dependency and peer, check it is still maintained
    (`npm view <name> time.modified repository.url`) and record anything worrying in the release notes.
 6. `npm run check:merge` passes, then `npm run publish:dry-run` and read the file lists.
+7. `npm run publish:rehearsal` (part of `publish:dry-run` and of the workflow) proves the release without making it. It
+   packs all 100 packages and the two npm tools and audits each tarball: every file the manifest names is shipped, LICENSE, NOTICE and README
+   are present, no test or private file, install script or local dependency spec, no maintainer path or email, every
+   import declared. It then serves them from a stand-in registry on 127.0.0.1 that refuses every write, and in a clean
+   temp project with an empty cache runs `npm install margoengine`, imports every entry in Node, type-checks every entry
+   with `skipLibCheck` off, builds the README example with Vite, and runs `npm create margo` for every template.
 
 ## Publishing
 

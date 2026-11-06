@@ -28,7 +28,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/controls | `.` 58, `./orbit` 8, `./fly` 2, `./trackball` 2, `./arcball` 9, `./transform` 6, `./drag` 4, `./profiles` 13, `./third-person` 5, `./walk` 6 | 96 |  | 26,715 |
 | @margoengine/core | `.` 17, `./extension` 26 | 18 |  | 21,468 |
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 18,976 |
-| @margoengine/culling | `.` 6, `./dynamic` 2, `./parts` 6, `./models` 6 | 4 |  | 10,743 |
+| @margoengine/culling | `.` 6, `./dynamic` 2, `./parts` 6, `./models` 6 | 4 |  | 11,893 |
 | @margoengine/cutscene | `.` 43 |  |  | 6,566 |
 | @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3, `./tga` 3, `./dds` 5, `./ktx` 5, `./tiff` 3 | 5 |  | 478,188 |
 | @margoengine/dof | `.` 2, `./lens` 3, `./autofocus` 2 | 8 |  | 7,710 |
@@ -43,7 +43,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/headless | `.` 11, `./video` 11, `./ffmpeg` 4, `./stage` 3, `./compare` 11, `./formats` 9 | 8 |  | 2,611 |
 | @margoengine/html | `.` 7 |  |  | 4,808 |
 | @margoengine/ifc | `.` 4, `./worker` 2 | 3 |  | 2,568 |
-| @margoengine/input | `.` 12, `./interactions` 6, `./players` 6, `./motion` 3 | 7 |  | 5,024 |
+| @margoengine/input | `.` 12, `./interactions` 6, `./players` 6, `./motion` 3 | 7 |  | 5,158 |
 | @margoengine/inspector | `.` 12, `./frame` 16, `./history` 2, `./snapshot` 6, `./resources` 2 | 1 |  | 9,031 |
 | @margoengine/kinematics-constraints | `.` 21 |  |  | 11,581 |
 | @margoengine/labels | `.` 19 | 2 |  | 4,502 |

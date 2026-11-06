@@ -52,6 +52,7 @@ copy-pasting the README. `npm run check:quickstart` measures the machine part an
 
 ```sh
 npm run check:quickstart                                   # route 2: an own project from local tarballs
+npm run publish:rehearsal                                  # the one-line install from a stand-in registry; publishes nothing
 node scripts/quickstart-timing.mjs --route=1 --keep --dir=<folder>   # route 1 (the clone's page); keep the folder
 ```
 

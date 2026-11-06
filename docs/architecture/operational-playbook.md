@@ -505,6 +505,7 @@ Known rendering gaps:
 | Site and visual checks | site build, `visual:check`, compatibility visual budget | Built demos render against the correct per-hardware evidence. |
 | GPU/package checks | `check:views`, `check:gpu-packages`, `check:depth`, `check:wgsl`, `check:no-webgpu` | Scoped rendering, shader, package, depth, fallback, and view behavior. |
 | Consumer packaging | `modern:test:packages`, bundler matrix, quickstart | Packed declarations, docs examples, browser packages, bundlers, licenses, and documented first use work. |
+| Release rehearsal | `publish:rehearsal` (in `publish:dry-run` and the publish workflow) | Every tarball audited, then the one-line install, every entry imported and type-checked, and every template built, from a stand-in registry that refuses writes. |
 | Public truth | `tests/public-truth.test.js` | Structured license and package-count statements match their canonical sources. |
 | Timing-test hygiene | fixed-wait and wall-budget tests | Tests wait for readiness; code speed uses CPU time; justified real-time bounds are marked. |
 | Async hygiene | support async call test | Async helpers in tests/scripts are awaited or returned. |

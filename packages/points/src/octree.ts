@@ -4,8 +4,7 @@
 // nodes the camera needs, largest on screen first, under a point budget, loading them from any `OctreeSource` (the
 // built octree, or your own streamed one) and evicting the least recently used past a memory budget. The octree is
 // additive: a parent's points stay drawn under its children, so detail only ever adds and nothing leaves a hole.
-import type { EngineKernel, Mesh } from '@margoengine/core';
-import type { EnginePlugin } from '@margoengine/core/extension';
+import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { PointCloud, type PointCloudOptions } from './cloud.js';

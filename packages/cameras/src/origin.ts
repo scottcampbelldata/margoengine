@@ -1,12 +1,11 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { margoError } from '../../shared/errors.js';
-import type { EngineKernel, Mesh } from '@margoengine/core';
+import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import {
   engineRuntime,
   meshRuntime,
   type Camera,
   type Engine,
-  type EnginePlugin,
   type Mesh as RuntimeMesh,
   type Vec3,
 } from '@margoengine/core/extension';
