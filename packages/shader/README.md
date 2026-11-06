@@ -299,6 +299,54 @@ Update the pose by writing the buffer's `data` and calling `update()`, or write 
 
 `node packages/shader/test/deform-check.mjs` (real GPU, under the GPU lock) compares each of these with the same mesh deformed on the CPU: position, morph into skin, an effect on top, lit normals (also on a stretched, mirrored mesh, and from neighbours), a new pose, the shadow, and an effect on vertices a compute deformer moved.
 
+## Extra outputs and scene passes (`@margoengine/shader/pass`)
+
+A `ScenePass` draws its models into textures of its own before the frame's colour pass, and a `PassMaterial` writes extra outputs into them. Anything drawn later in the frame samples those textures with `texture()`: selective bloom, refraction, custom post chains.
+
+```ts
+import {createStage} from 'margoengine';
+import {Material, createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {PostStack} from 'margoengine/post';
+import {NodePass, inputColor, texture, uv, vec4} from 'margoengine/shader';
+import {PassMaterial, ScenePass} from 'margoengine/shader/pass';
+const stage = await createStage('#app');
+const pass = ScenePass.attach(stage.engine, {outputs: {glow: 'rgba16float'}});
+const lamp = createMesh(stage.engine, planeGeometry(1, 1), new PassMaterial({outputs: {glow: vec4(4, 2, 1, 1)}}));
+const wall = createMesh(stage.engine, planeGeometry(4, 4), new Material({color: [0.5, 0.5, 0.5]}));
+pass.add(lamp);
+pass.add(wall);                                                           // a plain mesh hides the glow it covers
+PostStack.attach(stage.engine, [new NodePass(inputColor().rgb.add(texture(pass.texture('glow'), uv()).rgb))]);
+```
+
+| Name | What it does |
+| --- | --- |
+| `ScenePass.attach(engine, {outputs, order?})` | `outputs` maps names to filterable colour formats such as `rgba16float` or `rgba8unorm`. `order` defaults to 0.5, before the colour pass. |
+| `pass.add(model)` | Draws a gltf-pro model or a mesh in the pass, opaque and masked surfaces only. Returns a remover. |
+| `pass.texture(name)` | The output for `texture()`, the size of the drawing buffer. Transparent black where nothing was drawn. |
+| `pass.velocity(previous?)` | A `vec2f` node for an output: how far the surface moved on screen since the last frame, in UV units. It covers camera motion; a moving mesh passes where it was as a world position. |
+| `new PassMaterial({outputs, ...})` | A `NodeMaterial` with a `vec4f` node per output name, worked out after the surface, so `materialEmissive` and `materialNormal` hold the final values: `{emissive: vec4(materialEmissive, 1)}` is the glow of a surface alone. It draws as usual in the frame. |
+
+**The lit colour.** The output name `color` holds the shaded colour of each surface, in linear light before tone mapping, whatever the canvas encodes, so a surface left out of the pass can show what is behind it and the frame encodes that light once:
+
+```ts
+import {createStage} from 'margoengine';
+import {Material, createMesh} from 'margoengine/materials';
+import {planeGeometry} from 'margoengine/geometry';
+import {NodeMaterial, screenUV, sin, texture, time, vec2} from 'margoengine/shader';
+import {ScenePass} from 'margoengine/shader/pass';
+const stage = await createStage('#app');
+const pass = ScenePass.attach(stage.engine, {outputs: {color: 'rgba16float'}});
+pass.add(createMesh(stage.engine, planeGeometry(4, 4), new Material({color: [0.8, 0.3, 0.2]})));
+const wobble = vec2(sin(screenUV.y.mul(40).add(time)).mul(0.01), 0);
+const pane = createMesh(stage.engine, planeGeometry(1, 1), new NodeMaterial({emissiveNode: texture(pass.texture('color'), screenUV.add(wobble)).rgb}));
+pane.root.setPosition([0, 0, 0.5]);
+```
+
+The pass draws each model a second time, and shading runs again only for `color`. The sky and other plugins are not in it. A model holds one capture hook, so it cannot be in a `ScenePass` and `SSR` at once.
+
+`node packages/shader/test/pass-check.mjs` (real GPU, under the GPU lock) reads these back as pixels: two outputs with a plain mesh hiding one part, an output from a graph, a live uniform and the final emissive, the lit colour against the picture (sunlit and tone mapped too), a mesh moved in the same frame, a pane showing the wall behind it, a NodePass adding an output, a camera step as velocity, and a canvas resize.
+
 ## Node output in every pass
 
 A graph is one description of a surface, so every pass draws it. Each pass gets its own variant, compiled from the same nodes when the material is made:

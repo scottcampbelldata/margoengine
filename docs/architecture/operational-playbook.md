@@ -828,6 +828,7 @@ slower baseline is invalid; compare the run's baseline against the recorded base
 | A pass other than the colour pass drew a material's whole surface | `packages/materials/test/cutout-passes-browser.mjs` (picking, contact shadows, TAA velocity) and `packages/shadows/test/cutout-casters-browser.mjs` (every shadow map pass, virtual included) read pixels and velocities through a cut-out, a displaced surface and a clipping plane. |
 | A node graph's vertex offset and discards reached only the colour pass | `packages/shader/test/passes-check.mjs` compares a moved caster with a plain mesh placed there in `Shadows`, `VirtualShadows`, `LocalShadows` and integrated clustered shadows, and a cut caster with a half-sized one. Depth passes take the graph through the `displacement` record of a primitive (`CasterDisplacement` in `packages/shared/caster.d.ts`), so caster caches treat it as moving. Still missing: TAA velocity for such a surface (docs/limits.md). |
 | Skinning and morphing written in a node graph could drift from the CPU maths or lose the normal | `packages/shader/test/deform-check.mjs` compares `@margoengine/shader/deform` with the same mesh deformed on the CPU, lit, so a stale normal changes the picture: a slanted bone turn, morph into skin, a stretched and mirrored mesh (`worldNormal` uses the model matrix's cofactors), a new pose and the shadow. |
+| A scene pass runs before the colour pass, where uniforms upload ahead of the frame's commands and the canvas may be display-encoded | `packages/shader/test/pass-check.mjs` reads pixels back: `ScenePass` writes last frame's matrix before any draw of the frame (a write after its draws lands first in queue order and gives zero velocity), and shades into linear targets through a view block of its own (the sunlit and tone-mapped rows fail if the canvas encoding reaches the target). Multi-view frames have no such check yet. |
 
 ## 5. Current evidence gaps
 
@@ -868,3 +869,4 @@ The following remain technical gaps, not permission to weaken a check:
 23. `@margoengine/shader` compute passes have no check on the WebGL2 layer, and `@margoengine/compute/nn` and `/graph` no speed measurement.
 24. The headless stage has not run in Node: no WebGPU binding is in the repository.
 25. Draw counts in LIM rows are printed by GPU checks and asserted only as bounds, and no result file holds them.
+26. `ScenePass` (`@margoengine/shader/pass`) has no check in a multi-view frame, and its `velocity()` follows one camera.

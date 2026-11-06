@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5088180,
+  "total": 5099505,
   "history": [
     {
       "date": "2026-10-24",
@@ -2270,6 +2270,12 @@
       "commit": "49edccf4f",
       "reason": "feat(animation): far and hidden characters update less often (new entry @margoengine/animation/lod)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "3de089fdc",
+      "reason": "shader: new pass entry; gltf-pro: lit colour in capture",
+      "grew": 3
     }
   ],
   "items": {
@@ -2688,6 +2694,7 @@
     "@margoengine/shader/graph": 13977,
     "@margoengine/shader/lighting": 9827,
     "@margoengine/shader/noise": 4753,
+    "@margoengine/shader/pass": 11323,
     "@margoengine/shader/raw": 10429,
     "@margoengine/shader/readback": 8876,
     "@margoengine/shadows": 17321,
@@ -2855,6 +2862,8 @@
     "leak @margoengine/shader/graph -> @margoengine/materials": 1,
     "leak @margoengine/shader/lighting -> @margoengine/gltf-pro": 1,
     "leak @margoengine/shader/lighting -> @margoengine/materials": 1,
+    "leak @margoengine/shader/pass -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/shader/pass -> @margoengine/materials": 1,
     "leak @margoengine/ui -> @margoengine/text": 1,
     "leak @margoengine/ui/react -> @margoengine/text": 1,
     "leak @margoengine/usdz -> @margoengine/gltf-pro": 1,

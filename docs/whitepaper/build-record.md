@@ -64,8 +64,9 @@ Batches 1 to 3 are phase 1. Batches 19 and 21 are partly done, each with one job
 | [28](#batch-28-bvh) | bvh | 7 | 7 | 0 | 0 | 0 |
 | [29](#batch-29-culling) | culling | 8 | 8 | 0 | 0 | 0 |
 | [30](#batch-30-lod) | lod | 7 | 7 | 0 | 0 | 0 |
+| [31](#batch-31-shader-part-1-of-2) | shader | 8 | 8 | 0 | 0 | 0 |
 | [38](#batch-38-gltf) | gltf | 6 | 6 | 0 | 0 | 0 |
-| Total | | 163 | 155 | 2 | 4 | 2 |
+| Total | | 171 | 163 | 2 | 4 | 2 |
 
 ## Batch 1: fixes (part 1 of 3)
 
@@ -729,6 +730,49 @@ Level of detail end to end.
 - **Limits:** skinned and morphed models are refused. Cross-fades are WebGPU only and instant to or from an imposter. Other
   GPUs have not run these, and the cost per cascade of imposter shadows is not measured. The imposter shadow bind group is
   rebuilt every frame.
+
+## Batch 31: shader (part 1 of 2)
+
+Node graphs gain what used to need hand-written WGSL: statements, the full compute model, lighting, deformation and extra
+outputs.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Statement-level control flow | DONE | `c9010cf77` | none (root) | LIM-167 |
+| 2 | Compute that writes textures | DONE | `5ad6bf901` | `@margoengine/shader/compute-texture` | LIM-170 |
+| 3 | Full compute model | DONE | `182621112` | none (`ComputePass` options) | LIM-171 |
+| 4 | Light, shadow and environment nodes | DONE | `6bb63f66b` | `/lighting` | LIM-173 |
+| 5 | Node output in every pass | DONE | `b1ddc626c` | none (per-pass variants) | LIM-177 |
+| 6 | Missing input nodes | DONE | `6b7de8319` | none (root) | LIM-186 |
+| 7 | Skinning and morph nodes | DONE | `ba3c339bd` | `/deform` | LIM-188 |
+| 8 | MRT outputs and scene pass nodes | DONE | this commit | `/pass` | LIM-192 |
+
+- **Bugs:** jobs 1 to 3: a store the body made and did not return was lost, two writes in one body read inline so the second
+  saw the first, and storage reads kept in a `let` survived statements that wrote the buffer
+  (`packages/shader/test/control.test.js`, `compute-model.test.js`). Job 5: `instancedShader`'s normal anchor missed
+  `margoNormal` (`packages/shader/test/passes.test.js`). Job 6: gltf-pro's `vertexInputs` dropped every `@builtin` field when it trimmed attributes
+  (`packages/gltf-pro/tests/vertex-inputs.test.js`), and a mesh without tangents gave a NaN from `normalize(0)`. Caught
+  before landing in job 8: `previous` was written after the draws, which gave zero velocity because uniforms upload ahead
+  of the frame's commands, and the `color` output held display-encoded light on an encoded canvas. Undoing either fix fails
+  `packages/shader/test/pass-check.mjs`. These fixes sit in `feat` commits under the one-commit-per-job rule.
+- **Proved:** real GPU checks for all eight jobs, one `*-check.mjs` per job, with `browser-check.mjs` for job 1. Job 7
+  compares each deformation with the same mesh deformed on the CPU, lit, under a slanted bone turn; the first draft turned
+  bones about z only, which leaves a plane's normals alone, so its normal rows proved nothing until the pose changed. Job 8
+  reads pixels back, and the expected velocity was worked out by hand. `instanceIndex` now works in a NodeMaterial, so its
+  old refusal test moved to `globalId`: a feature change, not a loosened check.
+- **Limits:** TAA velocity does not follow `positionNode` or `discard()`, and CPU raycasts and BVH picking see the bind pose
+  of a mesh skinned in the graph. A mesh without tangents gets a fixed frame. Scene passes draw opaque and masked gltf-pro
+  surfaces only, draw each model a second time, are single-sampled, and hold one capture hook per model, so a model cannot
+  also be in `SSR`. `velocity()` covers camera motion unless a mesh passes its previous position.
+- **Unmeasured:** no timing was taken in this batch, so the cost of 16 storage reads per vertex per pass against
+  `@margoengine/animation`'s one compute pass, and of a scene pass's second draw, are unknown. `ScenePass` has no multi-view
+  check, compute passes have no WebGL2 check, and no other GPU has run these.
+- **Gate:** the whole-package budget in `shader.test.js` went from 12,500 to 18,500 B and the minimal NodeMaterial one from
+  6,500 to 8,700 B over jobs 1 to 6, each raise documented in its commit (17,918 and 8,427 B measured at job 6); jobs 7 and 8
+  are new entries. Job 6's first ship was stopped after a wrong `EXTRA_GPU`, and its next failed on quality duplicates, fixed
+  by `packages/shared/white-texture.js`, now used by materials too. Job 8's first ship failed `verify` on a `ScenePass` with no
+  `[Symbol.dispose]()`. Nothing failed reached `main`. A job whose last rebase
+  moved `main` reran the package, API, quality, claims and quick GPU checks, not `verify`; job 7 was one.
 
 ## Batch 38: gltf
 

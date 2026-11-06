@@ -288,7 +288,8 @@ export function transparentPBR(code: string, declarations: string): string {
  * MASK primitives (not BLEND, transmission or unlit) into `begin()`'s pass with these `targets`, depth tested
  * (greater-equal) and written. The shader is the lit beauty shader, its lighting in a dead block (every binding stays,
  * nothing is lit), with an entry point `capture` returning `margoCapture(s, v, k)`: `s` the Surface, `v` toward the eye,
- * `k` the share of the base layer's light left after clearcoat and sheen (vec3f(1) for standard materials).
+ * `k` the share of the base layer's light left after clearcoat and sheen (vec3f(1) for standard materials). Declarations
+ * holding `var<private> margoBeauty:vec4f` turn the block on: the entry point stores the beauty colour there first.
  */
 export interface PBRCapture {
   /** Module-scope WGSL for the lit shader `code`: `struct MargoCapture` (one output per target) and `fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture`. Return the same string for the same code. */
@@ -316,7 +317,7 @@ export function capturePBR(code: string, declarations: string): string {
   out =
     declarations +
     code.replace(head, 'fn margoShade(i:Out,front:bool)->vec4f {') +
-    `\n@fragment fn capture(i:Out,@builtin(front_facing) front:bool)->MargoCapture {if(false){_=margoShade(i,front);}let s=surface(i,front);let v=normalize(f.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoCapture(s,v,${k});}\n`;
+    `\n@fragment fn capture(i:Out,@builtin(front_facing) front:bool)->MargoCapture {${declarations.includes('var<private> margoBeauty:') ? 'margoBeauty=margoShade(i,front);' : 'if(false){_=margoShade(i,front);}'}let s=surface(i,front);let v=normalize(f.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoCapture(s,v,${k});}\n`;
   if (!cache) {
     if (captured.size >= 8) captured.clear();
     captured.set(declarations, (cache = new Map()));

@@ -1682,6 +1682,10 @@
       "types": "./dist/shader/deform.d.ts",
       "import": "./dist/shader/deform.js"
     },
+    "./shader/pass": {
+      "types": "./dist/shader/pass.d.ts",
+      "import": "./dist/shader/pass.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"
