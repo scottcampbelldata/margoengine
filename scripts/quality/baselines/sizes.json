@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4655432,
+  "total": 4656211,
   "history": [
     {
       "date": "2026-10-24",
@@ -1862,6 +1862,12 @@
       "commit": "b60bef692",
       "reason": "cameras gains the panini entry (WideAngle)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "172c641e1",
+      "reason": "webgl2-compat adapter entry: compatibility level adapters",
+      "grew": 1
     }
   ],
   "items": {
@@ -2346,11 +2352,12 @@
     "@margoengine/weather": 5230,
     "@margoengine/weather/hail": 4278,
     "@margoengine/webgl": 3277,
-    "@margoengine/webgl2-compat": 96449,
+    "@margoengine/webgl2-compat": 96428,
     "@margoengine/webgl2-compat base (without compute runtime)": 73000,
     "@margoengine/webgl2-compat lazy compute runtime": 22701,
+    "@margoengine/webgl2-compat/adapter": 880,
     "@margoengine/webgl2-compat/compute": 42734,
-    "@margoengine/webgl2-compat/device": 96216,
+    "@margoengine/webgl2-compat/device": 96136,
     "@margoengine/webgl2-compat/glsl": 43584,
     "@margoengine/webgl2-compat/wgsl": 27240,
     "@margoengine/wfc": 1878,

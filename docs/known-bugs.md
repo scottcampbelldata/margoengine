@@ -191,6 +191,21 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   24% busy. Rerun in a fresh browser: light then high held 60, with or without an `unload` listener or destroying the device on `pagehide`, and going
   through `about:blank` gave 30. Ruled out: GPU load, CPU load, the back-forward cache as the only cause. Cause not found. Safari not run.
 
+### Three packages fail on a WebGPU compatibility-level device
+
+- **What:** with `allowCompatibilityAdapters` from `@margoengine/webgl2-compat/adapter`, core and `@margoengine/materials`
+  run, but `Shadows`, `CulledInstances` and a `PostStack` with HDR effects stop at their first frame with a validation
+  error. A page can use the WebGL2 layer instead, where all three work.
+- **Repro:** `npm run build:packages`, then `node scripts/gpu-lock.mjs run --owner=<you> -- node
+  packages/webgl2-compat/test/adapter-browser.mjs`, and read `packages` in `test-results/compat-adapter.json`.
+- **Cause:** the level forbids two things these use. `textureLoad` of a depth texture in a compute shader: Shadows'
+  `nearestDepth` (`packages/shadows/src/shader.ts`) and the culling depth pyramid's `depth0`
+  (`packages/culling/src/shaders.ts`). Multisampled `rgba16float`: the HDR scene capture in
+  `packages/post/src/stack.ts`.
+- **Needed to close:** each package takes a route for the level, as they do on the WebGL2 layer: a render pass that copies
+  depth to `r32float` before the compute step, and for post a resolve into a 1x capture from a format the level can
+  multisample. Then add the three names to the list `adapter-browser.mjs` asserts.
+
 ### Native glass on a display-encoded target adds its lit draw in encoded values
 
 - **What:** without an HDR scene target (`f.settings.w` below 0.5), the lit draw of gltf-pro's native glass blends over

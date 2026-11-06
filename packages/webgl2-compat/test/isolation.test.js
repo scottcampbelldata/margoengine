@@ -11,7 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..', '..', '..');
 const NAME = '@margoengine/webgl2-compat';
 /** The umbrella's generated alias of each entry, and what each one re-exports. */
-const ENTRIES = ['', '/compute', '/device', '/glsl', '/wgsl'];
+const ENTRIES = ['', '/adapter', '/compute', '/device', '/glsl', '/wgsl'];
 const UMBRELLA = ENTRIES.map((e) => `packages/margoengine/src/webgl2-compat${e}.ts`);
 const ALIASED = ENTRIES.map((e) => NAME + e);
 

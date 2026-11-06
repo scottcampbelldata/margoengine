@@ -107,6 +107,34 @@ What it does:
 - In the repository, not in the package: the WGSL corpus, every shader module the packages create in their real-GPU
   checks (`npm run record:wgsl-corpus`), which the translator is tested against.
 
+### Native WebGPU on older GPUs (`margoengine/webgl2-compat/adapter`)
+
+Before falling to WebGL2, a browser can offer WebGPU at compatibility level on OpenGL ES and Direct3D 11 class devices.
+Core asks for the full level only, so `allowCompatibilityAdapters()` adds that request. Call it before `Engine.create`:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { allowCompatibilityAdapters } from 'margoengine/webgl2-compat/adapter';
+
+const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+allowCompatibilityAdapters();
+const engine = await Engine.create(canvas);
+engine.render();
+```
+
+`navigator.gpu.requestAdapter` keeps asking for the full level first, so a device that has it never changes; only when
+that finds nothing does it ask again with `featureLevel: 'compatibility'`. Device restore goes through the same call and
+comes back at the same level. To use the WebGL2 layer below it, call this first and test `requestAdapter` for `null`
+before `install()`. A compatibility device takes every limit its adapter has, because core and the packages ask for
+none, and its shaders' `@interpolate(flat)` becomes `@interpolate(flat, either)`, which is all the level allows.
+`{ force: true }` asks for compatibility level first, to try a scene against that validation on any GPU. `dispose()`
+(or `using`) puts the browser's method back; a second call before that throws MargoError `state`, and a page with no
+`navigator.gpu` gets `unsupported`.
+
+Core, picking, device restore and `@margoengine/materials` run on the level. `Shadows`, `CulledInstances` occlusion and
+an HDR `PostStack` do not yet: the table is in [limits.md](../../docs/limits.md) and the causes are in
+[known-bugs.md](../../docs/known-bugs.md). The check is `test/adapter-browser.mjs`, in `test:gpu`.
+
 ### GLSL back end (`margoengine/webgl2-compat/glsl`)
 
 ```ts

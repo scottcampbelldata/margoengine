@@ -281,6 +281,15 @@ features are filtered against adapter support. Desktop scenes default to 4x MSAA
 size use 1x. `Engine.create` records the native failure before invoking an app-supplied fallback. `exactSize` fixes the
 canvas dimensions, disables resizing, and forces one sample.
 
+**Native compatibility level (2026-11-05).** `allowCompatibilityAdapters` in `@margoengine/webgl2-compat/adapter` adds a
+rung between native WebGPU and the layers: `navigator.gpu.requestAdapter` retries with `featureLevel: 'compatibility'`
+when the full level finds nothing. Core changes by 0 bytes: it calls `requestAdapter` at creation and in `rebootDevice`,
+so answering there covers both. Compatibility devices take the adapter's limits and rewrite `@interpolate(flat)` to
+`either`, which core's pick needs. Evidence: `packages/webgl2-compat/test/adapter-browser.mjs` on a forced device on the
+RTX A6000 (D3D12, Chromium): same pixels as the full level, pick hits and misses, restore keeps the level. Missing: a run
+on a real OpenGL ES or Direct3D 11 class device, so forced runs prove the validation, not the older GPU's limits;
+`Shadows`, occlusion culling and HDR `PostStack` fail there (known-bugs.md).
+
 App-side detection must test both presence of `navigator.gpu` and a non-null adapter. The compatibility layer does not
 silently install itself and changes no globals at import time.
 
