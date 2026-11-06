@@ -2,7 +2,7 @@
 import { Engine as Runtime } from './engine.js';
 import type { EngineOptions } from './engine.js';
 import type { Camera, Vec3 } from './camera.js';
-import type { RenderView } from './renderer.js';
+import type { RenderTarget, RenderView } from './renderer.js';
 import type { Geometry, PbrMaterial } from './geometry.js';
 /**
  * Live x/y/z view of a mesh's position (world units), rotation (Euler radians) or scale. Writes must be finite as
@@ -90,6 +90,12 @@ export interface EngineKernel {
   readonly backend: 'webgpu' | 'webgl2';
   readonly fallbackReason: string | null;
   readonly disposed: boolean;
+  /** The WebGPU device; null on the WebGL2 preview and while the device is lost. */
+  readonly gpu: GPUDevice | null;
+  /** Formats and samples of the frame's colour target; null on the WebGL2 preview. */
+  readonly renderTarget: RenderTarget | null;
+  /** Lighting of the scene being drawn or set up: see {@link Scene.lighting}. */
+  readonly lighting: Scene['lighting'];
   readonly stats: { visible: number; drawCalls: number };
   onError: (error: unknown) => void;
   /** A mesh in the scene being drawn or set up (the default scene otherwise). */

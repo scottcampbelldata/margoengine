@@ -54,6 +54,9 @@ export interface EngineKernel {
     readonly backend: 'webgpu' | 'webgl2';
     readonly fallbackReason: string | null;
     readonly disposed: boolean;
+    readonly gpu: GPUDevice | null;
+    readonly renderTarget: RenderTarget | null;
+    readonly lighting: Scene['lighting'];
     readonly stats: {
         visible: number;
         drawCalls: number;

@@ -379,6 +379,9 @@ interface EngineKernel {
     readonly backend: 'webgpu' | 'webgl2';
     readonly fallbackReason: string | null;
     readonly disposed: boolean;
+    readonly gpu: GPUDevice | null;
+    readonly renderTarget: RenderTarget | null;
+    readonly lighting: Scene['lighting'];
     readonly stats: {
         visible: number;
         drawCalls: number;
@@ -442,6 +445,38 @@ interface Mesh {
     setMaterial(value: PbrMaterial): this;
     dispose(): void;
     [Symbol.dispose](): void;
+}
+
+class Mesh {
+    readonly engine: Engine;
+    readonly id: number;
+    readonly scene: Scene;
+    [Symbol.dispose]: () => void;
+    name: string;
+    kids?: Set<number>;
+    readonly position: VectorRef;
+    readonly rotation: VectorRef;
+    readonly scale: VectorRef;
+    readonly matrix: Float32Array;
+    geometry: Geometry | null;
+    get material(): PbrMaterial;
+    set material(value: PbrMaterial);
+    get receiveShadow(): boolean;
+    set receiveShadow(value: boolean);
+    constructor(engine: Engine, id: number,
+    scene?: Scene);
+    get visible(): boolean;
+    set visible(value: boolean);
+    check(): void;
+    setPosition(value: Vec3): this;
+    setScale(value: Vec3): this;
+    setRotation(value: Vec3): this;
+    syncRotation(): void;
+    setQuaternion(value: readonly number[]): this;
+    setParent(parent: Mesh | null): this;
+    setGeometry(geometry: Geometry | null): this;
+    setMaterial(material: PbrMaterial): this;
+    dispose(): void;
 }
 
 interface PbrMaterialOptions {
