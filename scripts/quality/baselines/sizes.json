@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4992431,
+  "total": 4994672,
   "history": [
     {
       "date": "2026-10-24",
@@ -2144,6 +2144,12 @@
       "commit": "093528f60",
       "reason": "read-back chunk moved from the base to the lazy part, base falls from 72,354 B to 70,274 B",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "56dd458ac",
+      "reason": "New quality entry ./ssaa: supersampled stills averaged in linear light. Core and core + stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -2496,6 +2502,7 @@
     "@margoengine/procedural/standin": 673,
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 3663,
+    "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 6480,
     "@margoengine/react": 8317,

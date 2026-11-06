@@ -29,6 +29,10 @@
     "./warm": {
       "types": "./dist/warm.d.ts",
       "import": "./dist/warm.js"
+    },
+    "./ssaa": {
+      "types": "./dist/ssaa.d.ts",
+      "import": "./dist/ssaa.js"
     }
   },
   "files": [
@@ -45,7 +49,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js quality",
     "test": "npm run build && node --test test/*.test.js",
-    "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs",
+    "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs && node packages/quality/test/ssaa-browser.mjs",
     "prepack": "npm run build"
   }
 }

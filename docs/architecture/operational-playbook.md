@@ -522,6 +522,12 @@ more than 30% at once. A rise needs sustained cost below 70% of budget; an immed
 up to 32 decisions. Core sizes to the lower of device pixel ratio, quality cap, sample-count cap, and 4096 pixels per
 side. Exact-size mode bypasses resizing.
 
+`supersample` (`@margoengine/quality/ssaa`) makes stills: it renders whole frames into a view target with the camera's
+clip-space x and y moved along a Halton (2, 3) sequence, keeps running sums in linear light in `rgba32float`, and encodes
+once. The offset exists only inside each `engine.render` call and the frustum planes stay unmoved. Evidence:
+`packages/quality/test/ssaa-browser.mjs` on a real GPU, single-sampled and at 4x MSAA. Missing: Safari, and stills at
+the texture limit.
+
 ### 3.6 Warm-up and device loss
 
 `warmUp(engine)` renders offscreen delta-zero frames until two complete frames run with all asynchronously compiled

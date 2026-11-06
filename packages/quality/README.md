@@ -150,6 +150,44 @@ redrawAfterRestore(engine, () => engine.render({delta: 0})); // only for apps th
 - First-use hitch per feature (`node examples/package-benchmarks/warm-up-gpu.mjs`, results
   `examples/package-benchmarks/results/warm-up-gpu.json`): see the table there.
 
+## Supersampling: stills and screenshots
+
+```ts
+import {Engine} from 'margoengine/core';
+import {supersample, supersampleBlob} from 'margoengine/quality/ssaa';
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+
+const image = await supersample(engine, {samples: 16});
+// image.width, image.height, image.data: RGBA bytes, top row first
+const pixels = new ImageData(image.data, image.width, image.height);
+console.log(pixels.width);
+
+const poster = await supersampleBlob(engine, {samples: 64, width: 3840, height: 2160});
+const link = URL.createObjectURL(poster); // PNG; pass type and quality for another format
+console.log(link);
+```
+
+`supersample` renders `samples` whole frames, each moved by a fraction of a pixel along a Halton (2, 3) sequence, and
+averages them in linear light in 32-bit floats. Every edge, thin line, shadow boundary and shader highlight gets that
+many samples per pixel, which MSAA alone does not give. It works on every tier and at 4x MSAA it multiplies.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `samples` | `16` | Frames averaged, 1 to 1024. Each costs one render; memory does not grow with it |
+| `width`, `height` | canvas size | Picture size, up to the device's texture limit. Larger than the canvas works |
+| `camera` | `engine.camera` | Camera to shoot through |
+| `signal` | none | Rejects with `signal.reason`, checked every 4 frames and after the read |
+
+Time stands still during a still (delta 0) and the same call gives the same picture. The engine's own loop keeps
+running between batches and never sees the moved camera; the canvas ends on an ordinary frame. Effects with history
+(`TAA`) run in the still and soften it: remove them first for the sharpest picture. `TAAUpscale` and other effects that
+refuse views (`c.view`) throw. Measured on `packages/quality/test/ssaa-browser.mjs`: 64 samples read 45.3 dB against the
+same scene drawn 8 times larger and box-filtered, a plain frame 26.1 dB (single-sampled, 160 x 120).
+
+For live frames rather than stills, `@margoengine/taa/upscale` renders below output size and rebuilds the full frame
+with Lanczos and sharpening or from jittered history.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/quality

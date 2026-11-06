@@ -1414,6 +1414,10 @@
       "types": "./dist/quality/warm.d.ts",
       "import": "./dist/quality/warm.js"
     },
+    "./quality/ssaa": {
+      "types": "./dist/quality/ssaa.d.ts",
+      "import": "./dist/quality/ssaa.js"
+    },
     "./ragdoll": {
       "types": "./dist/ragdoll.d.ts",
       "import": "./dist/ragdoll.js"

@@ -8,9 +8,9 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 158 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 159 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 5 | Some of it exists, but a common use case is missing. The notes say what. |
-| MISSING | 16 | Worth having and not written yet. Listed below with what to do. |
+| MISSING | 15 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 12 | Out of scope by decision. The note says why and what to use instead. |
 
 The earlier version of this table had 161 rows and hid several gaps inside one coarse row or inside a COVERED row's notes. Those gaps now have rows of their own, which is why the MISSING count went up while no feature was lost.
@@ -55,7 +55,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Render into cube mip levels, array layers or 3D texture slices | MISSING | creative `HDRRenderTarget` | | Render targets are 2D and single layer today. |
 | Compute writing textures, texture ping-pong | MISSING | shader `ComputePass` | | Compute works on storage buffers only (see the Compute row). |
 | Hardware clip and cull distances | MISSING | materials `clippingPlanes` | | WGSL `clip_distances` is an optional feature. Material clipping planes cover the use. |
-| Supersampling and upscaling (SSAA, FSR 1, TAA upscale) | MISSING | quality, taa | | `quality` lowers resolution with no upscale filter; TAA has no upscaling mode. |
+| Supersampling and upscaling (SSAA, FSR 1, TAA upscale) | COVERED | quality `supersample` (`packages/quality/src/ssaa.ts`); taa `TAAUpscale` (`packages/taa/src/upscale.ts`) | | Stills average jittered frames in linear light. Live frames upscale with Lanczos and sharpening or from history; the spatial filter is not FSR 1. |
 | Deferred shading pipeline | NOT PLANNED | clustered, post `SceneTargets` | | Clustered forward lighting is the architecture; MRT serves G-buffer uses. |
 | Meshlet (cluster) rendering with per-cluster culling | PARTIAL | culling | `MeshletMesh` | One mesh, one matrix; no instancing or Hi-Z per cluster ([limits](limits.md)). |
 | SVGRenderer (vector output of a scene) | NOT PLANNED |  | | Margo draws with WebGPU. SVG is read, not written as a frame. |
@@ -309,7 +309,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows (2026-11-06): 5 PARTIAL, 16 MISSING. Each fix goes in the optional package named; core stays frozen for features.
+Recounted from the rows (2026-11-06): 5 PARTIAL, 15 MISSING. Each fix goes in the optional package named; core stays frozen for features.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
@@ -318,7 +318,7 @@ Recounted from the rows (2026-11-06): 5 PARTIAL, 16 MISSING. Each fix goes in th
 | WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. | Test on a device first, then the XR layers, locomotion and plugin-pass row, then controller and hand models. |
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel path tracer runs on it, slowly compiled on ANGLE Direct3D, XR runs on it through `/xr`, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
 | Shadows from alpha cut-outs, soft particles, `alphaHash`, object-space normal maps, your own mip levels | MISSING. | Planned before v1.0.0, one landing per package. |
-| Rendering in a worker, render into layers, compute writing textures, supersampling and upscaling, clip distances, environment blend and ground projection, KTX2 arrays and cubes, NRRD, subsurface blur | MISSING. | After v1.0.0, in the owning package. |
+| Rendering in a worker, render into layers, compute writing textures, clip distances, environment blend and ground projection, KTX2 arrays and cubes, NRRD, subsurface blur | MISSING. | After v1.0.0, in the owning package. |
 
 ## Leave as the documented limit
 
