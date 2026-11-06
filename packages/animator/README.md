@@ -415,6 +415,42 @@ Each limb takes `target`, `rotation`, `pole`, `weight` (default 1), `pinned` (ho
 
 The torso is a damped Gauss-Newton solve (Levenberg 1944, Marquardt 1963); the centre of mass uses Winter's segment shares. A target past what the pinned feet allow leaves the arm straight toward it and `reached` false, with the feet still down. Balance is about world +Y, and a limb must be a direct chain of three joints.
 
+## Motion matching (`margoengine/animator/motion-matching`)
+
+Motion matching needs no state graph. `MotionDatabase.build` turns every frame of your clips into a row of features; `addMotionMatching` then finds, a few times a second, the row that best continues the current pose along the path the character is asked to take, and jumps there with an inertialized blend. Add more clips and the character gets better, with no transitions to wire.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {Animator} from 'margoengine/animator';
+import {addMotionMatching, MotionDatabase, motionStates} from 'margoengine/animator/motion-matching';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const model = await loadGLTF(engine, '/hero.glb'); // clips named Idle, Walk, Run
+const animation = Animation.attach(model);
+const animator = Animator.attach(animation, {initial: 'Idle', states: motionStates(animation)}); // one state per clip
+const joint = (name: string) => model.asset.doc.nodes!.findIndex((node) => node.name === name);
+const database = MotionDatabase.build(animator, {
+  root: joint('Hips'),
+  bones: [joint('LeftFoot'), joint('RightFoot')],
+});
+const velocity: [number, number, number] = [0, 0, 0];
+const matcher = addMotionMatching(animator, {database, velocity});
+velocity[2] = 3; // where to go, world units a second; write into it every frame
+engine.start();
+console.log(matcher.clip, matcher.cost, matcher.jumps);
+const bytes = database.toBinary();               // build offline, ship the bytes
+const same = MotionDatabase.fromBinary(bytes);
+console.log(same.rows, same.search(same.features.subarray(0, same.width)).clip);
+```
+
+- **Database.** `root` is the hips: their path on the ground, averaged over `smoothing` seconds (default 0.5), is the character's root, so a walk's sway stays in the pose. `bones` are the bones to match (1-8, usually the feet). `clips` defaults to every clip; give `{clip, loop, speed}` to say a clip does not loop or to tell an in-place clip how fast it travels. `rate` (default 30 rows a second), `trajectory` (default a third, two thirds and one second ahead), `forward` (the rest pose's facing, default +Z) and `weights` set the rest. A row of a clip that does not loop whose path runs past its end can be played but not landed on.
+- **Features.** Each row holds the bones' places and speeds, the hips' speed, and the root's future places and facings, all in the root's own frame. Each group is centred and scaled by its spread, then weighted: `position` 0.5, `velocity` 0.5, `hips` 1, `trajectory` 2, `facing` 1.5. The path counts most, so a request is answered even with no clip that eases into it.
+- **Search.** `database.search(query)` is exact: boxes around 16 and 64 rows are skipped when their nearest corner cannot win, and the answer is what comparing every row gives.
+- **Matching.** `velocity` and `facing` (default the way `velocity` points) are smoothed into a predicted path over `response` seconds (default 0.5). Every `interval` (default 0.1 s) the search runs; a row must beat the current one by `stickiness` (default 0.05) and be over 0.2 s away. `blend` (default 0.2 s) is the inertialization. The clips play in place and `character` (default the model's root) moves along the predicted path; `drive: false` leaves that to the game. `matcher.search()` searches on the next frame.
+
+The Animator needs one state per clip, named after it, and `motionStates(animation)` gives that. The search is on the CPU, and the database holds what you put in it: it has no clip for a move you did not record, and a character asked for one plays the nearest it has.
+
 ## Explicit rotation writer
 
 `AnimatorOptions.writeRotation?: (node: Mesh, rotation: readonly number[]) => void` is an optional, explicit commit hook for applications that own their transform writer. It is captured and validated once during construction. Omit it to keep the current dynamic `Mesh.setQuaternion` call, including method overrides. This is an additive public API option; it does not change core/stage.

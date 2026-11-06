@@ -98,6 +98,8 @@ class Animator implements EnginePlugin {
     clipTime(clip: string, time: number, state?: string): number;
     cancelFade(): void;
     restRotation(index: number): readonly number[];
+    restPosition(index: number): readonly number[];
+    restScale(index: number): readonly number[];
     writeNodeRotation(node: Mesh, rotation: readonly number[]): void;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;

@@ -545,6 +545,14 @@ export class Animator implements EnginePlugin {
   restRotation(index: number): readonly number[] {
     return this.rest.rotation[index];
   }
+  /** @internal Node `index`'s rest (loaded) translation; read-only. */
+  restPosition(index: number): readonly number[] {
+    return this.rest.position[index];
+  }
+  /** @internal Node `index`'s rest (loaded) scale; read-only. */
+  restScale(index: number): readonly number[] {
+    return this.rest.scale[index];
+  }
   /** @internal Commits a node rotation through `writeRotation` (or `Mesh.setQuaternion`), as the pose and foot IK do. */
   writeNodeRotation(node: Mesh, rotation: readonly number[]): void {
     this.commitRotation(node, rotation);

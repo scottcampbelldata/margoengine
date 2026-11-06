@@ -106,6 +106,10 @@
       "types": "./dist/animator/fbik.d.ts",
       "import": "./dist/animator/fbik.js"
     },
+    "./animator/motion-matching": {
+      "types": "./dist/animator/motion-matching.d.ts",
+      "import": "./dist/animator/motion-matching.js"
+    },
     "./audio": {
       "types": "./dist/audio.d.ts",
       "import": "./dist/audio.js"

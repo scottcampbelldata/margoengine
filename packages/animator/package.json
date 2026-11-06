@@ -52,6 +52,10 @@
     "./fbik": {
       "types": "./dist/fbik.d.ts",
       "import": "./dist/fbik.js"
+    },
+    "./motion-matching": {
+      "types": "./dist/motion-matching.d.ts",
+      "import": "./dist/motion-matching.js"
     }
   },
   "files": [
