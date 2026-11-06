@@ -37,7 +37,7 @@ export class Player {
     rumble(duration: number, strength?: number): Promise<boolean>;
 }
 
-export type PlayerDevice = 'keyboard' | 'touch' | `keyboard:${string}` | `gamepad:${number}`;
+export type PlayerDevice = 'keyboard' | 'touch' | `keyboard:${string}` | `gamepad:${number}` | `control:${string}`;
 
 export interface PlayerEvent {
     type: PlayerEventType;
@@ -79,6 +79,11 @@ type Binding = {
     id: string;
     axis?: 'x' | 'y';
     scale?: number;
+} | {
+    type: 'control';
+    id: string;
+    axis?: string;
+    scale?: number;
 };
 
 type BindingMap = Record<string, Binding[]>;
@@ -89,6 +94,8 @@ class Input {
     state(action: string): Readonly<ActionState>;
     bindingValue(action: string, binding: number): number;
     update(): void;
+    control(id: string): Record<string, number>;
+    removeControl(id: string): void;
     createStick(parent: HTMLElement, id: string): HTMLDivElement;
     bindTouchButton(element: HTMLElement, id: string): void;
     rumble(duration: number, strength?: number, gamepad?: number): Promise<boolean>;

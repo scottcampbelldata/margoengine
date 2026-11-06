@@ -19,13 +19,16 @@ const MODIFIER_CODES: Record<Modifier, readonly string[]> = {
  * - `gamepad-axis` / `gamepad-button`: axis or button `index` (integer >= 0) of gamepad `gamepad` (default 0);
  *   axes get the deadzone applied.
  * - `touch`: a control from `createStick`/`bindTouchButton` by `id`; `axis` reads a stick in [-1, 1], otherwise 1 while down.
+ * - `control`: a number published by code through {@link Input.control}: `axis` of control `id`, default `'value'`.
+ *   `Gyro` and `Pen` publish this way.
  */
 export type Binding =
   | { type: 'key'; code: string; modifiers?: readonly Modifier[]; scale?: number }
   | { type: 'mouse'; button: number; scale?: number }
   | { type: 'pointer'; axis: 'x' | 'y' | 'wheel'; scale?: number }
   | { type: 'gamepad-axis' | 'gamepad-button'; index: number; gamepad?: number; scale?: number }
-  | { type: 'touch'; id: string; axis?: 'x' | 'y'; scale?: number };
+  | { type: 'touch'; id: string; axis?: 'x' | 'y'; scale?: number }
+  | { type: 'control'; id: string; axis?: string; scale?: number };
 /** Per-action result of the last {@link Input.update}. The object is reused across updates. */
 export interface ActionState {
   /** Sum of the scaled binding samples, clamped to [-1, 1]. */
@@ -55,7 +58,7 @@ export interface InputOptions {
 /** Plain, JSON-safe snapshot of every action's bindings, as written by {@link Input.exportBindings}. */
 export type BindingMap = Record<string, Binding[]>;
 
-const BINDING_TYPES = ['key', 'mouse', 'pointer', 'gamepad-axis', 'gamepad-button', 'touch'];
+const BINDING_TYPES = ['key', 'mouse', 'pointer', 'gamepad-axis', 'gamepad-button', 'touch', 'control'];
 function validateBinding(binding: Binding): void {
   if (!binding || typeof binding !== 'object')
     throw new TypeError(
@@ -78,7 +81,9 @@ function validateBinding(binding: Binding): void {
         (binding.gamepad ?? 0) < 0)) ||
     (binding.type === 'pointer' && !['x', 'y', 'wheel'].includes(binding.axis)) ||
     (binding.type === 'touch' &&
-      (!binding.id || (binding.axis !== undefined && binding.axis !== 'x' && binding.axis !== 'y')))
+      (!binding.id || (binding.axis !== undefined && binding.axis !== 'x' && binding.axis !== 'y'))) ||
+    (binding.type === 'control' &&
+      (!binding.id || typeof binding.id !== 'string' || (binding.axis !== undefined && !binding.axis)))
   )
     throw new TypeError(
       'Invalid action binding; bind an action to key, mouse, gamepad or touch codes (see InputOptions)',
@@ -99,6 +104,7 @@ export class Input {
     string,
     { x: number; y: number; down: boolean; tapped?: boolean; reset?: () => void }
   >();
+  private readonly controls = new Map<string, Record<string, number>>();
   private readonly cleanups: (() => void)[] = [];
   private readonly gamepads: () => readonly (Gamepad | null)[];
   private readonly deadzone: number;
@@ -256,6 +262,9 @@ export class Input {
             sample = binding.axis ? (stick?.[binding.axis] ?? 0) : +!!(stick?.down || stick?.tapped);
             break;
           }
+          case 'control':
+            sample = this.controls.get(binding.id)?.[binding.axis ?? 'value'] ?? 0;
+            break;
           case 'gamepad-button':
             sample = pads[binding.gamepad ?? 0]?.buttons[binding.index]?.value ?? 0;
             break;
@@ -287,6 +296,23 @@ export class Input {
     this.tapped.clear();
     this.tappedButtons = 0;
     for (const state of this.touch.values()) state.tapped = false;
+  }
+  /**
+   * The numbers of control `id`, made on first use. Write to them and `{ type: 'control', id, axis }` bindings read
+   * them at each update, so any code can feed an action. Values go to 0 on {@link Input.reset}.
+   * @throws TypeError for an empty id.
+   * @throws MargoError `'disposed'` after {@link Input.dispose}.
+   */
+  control(id: string): Record<string, number> {
+    if (this.disposed) throw new MargoError('disposed', 'Input is disposed; create a new Input');
+    if (!id || typeof id !== 'string') throw new TypeError('Control ids must be non-empty strings');
+    let values = this.controls.get(id);
+    if (!values) this.controls.set(id, (values = Object.create(null) as Record<string, number>));
+    return values;
+  }
+  /** Remove control `id`; bindings to it read 0. */
+  removeControl(id: string): void {
+    this.controls.delete(id);
   }
   /**
    * Append a 120 px on-screen touch stick to `parent`, readable through `touch` bindings with this `id`.
@@ -546,6 +572,7 @@ export class Input {
     this.buttons = 0;
     this.motion.x = this.motion.y = this.motion.wheel = 0;
     this.clearTapped();
+    for (const values of this.controls.values()) for (const axis in values) values[axis] = 0;
     for (const state of this.touch.values()) {
       state.reset?.();
       state.down = false;

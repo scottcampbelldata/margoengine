@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4775912,
+  "total": 4778000,
   "history": [
     {
       "date": "2026-10-24",
@@ -1976,6 +1976,12 @@
       "commit": "7aca87fb1",
       "reason": "culling/parts: per-part materials (setMaterial, setColor, getMaterial, groupParts) for CAD assemblies; root gains two small hooks",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "7a9344d1e",
+      "reason": "New input entry ./motion: gyro aiming and tilt steering. Input root gains control bindings; players gains control devices. Core and core + stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -2185,8 +2191,9 @@
     "@margoengine/ifc": 2819,
     "@margoengine/ifc dist/workers/ifc.js": 3443,
     "@margoengine/ifc/worker": 1470,
-    "@margoengine/input": 5132,
+    "@margoengine/input": 5414,
     "@margoengine/input/interactions": 1614,
+    "@margoengine/input/motion": 1806,
     "@margoengine/input/players": 5248,
     "@margoengine/inspector": 9302,
     "@margoengine/inspector/frame": 8897,

@@ -7,8 +7,9 @@ import { Input, type Binding, type InputOptions } from './index.js';
  * - `'keyboard:<scheme>'`: the bindings of that entry of the `schemes` option, for two players on one keyboard.
  * - `'gamepad:<n>'`: the gamepad bindings of the actions, pointed at gamepad `n`.
  * - `'touch'`: the touch bindings of the actions.
+ * - `'control:<id>'`: the bindings of the actions to that control, such as a `Gyro` attached to this player's `Input`.
  */
-export type PlayerDevice = 'keyboard' | 'touch' | `keyboard:${string}` | `gamepad:${number}`;
+export type PlayerDevice = 'keyboard' | 'touch' | `keyboard:${string}` | `gamepad:${number}` | `control:${string}`;
 
 /** What a {@link LocalPlayers} handler hears. */
 export type PlayerEventType = 'join' | 'leave' | 'lost' | 'regained';
@@ -257,9 +258,9 @@ export class LocalPlayers {
   private check(device: PlayerDevice, player?: Player): void {
     const scheme = /^keyboard:(.+)$/.exec(device)?.[1];
     if (
-      !(scheme !== undefined ? Object.hasOwn(this.schemes, scheme) : /^(keyboard|touch|gamepad:\d+)$/.test(device))
+      !(scheme !== undefined ? Object.hasOwn(this.schemes, scheme) : /^(keyboard|touch|gamepad:\d+|control:.+)$/.test(device))
     )
-      throw new TypeError(`Unknown device ${device}; use keyboard, keyboard:<scheme>, gamepad:<n> or touch`);
+      throw new TypeError(`Unknown device ${device}; use keyboard, keyboard:<scheme>, gamepad:<n>, control:<id> or touch`);
     const owner = this.owners.get(device);
     if (owner && owner !== player) throw new TypeError(`Player ${owner.index} already owns ${device}; unassign it first`);
   }
@@ -274,6 +275,8 @@ export class LocalPlayers {
     for (const device of devices) {
       if (device === 'keyboard') out.push(...all.filter((binding) => KEYBOARD.has(binding.type)));
       else if (device === 'touch') out.push(...all.filter((binding) => binding.type === 'touch'));
+      else if (device.startsWith('control:'))
+        out.push(...all.filter((binding) => binding.type === 'control' && binding.id === device.slice(8)));
       else if (device.startsWith('keyboard:')) out.push(...(this.schemes[device.slice(9)][action] ?? []));
       else
         for (const binding of all)

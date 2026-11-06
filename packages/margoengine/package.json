@@ -854,6 +854,10 @@
       "types": "./dist/input/players.d.ts",
       "import": "./dist/input/players.js"
     },
+    "./input/motion": {
+      "types": "./dist/input/motion.d.ts",
+      "import": "./dist/input/motion.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"

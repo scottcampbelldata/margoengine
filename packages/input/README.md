@@ -124,7 +124,7 @@ function tick() {
 tick();
 ```
 
-A device is `'keyboard'` (the key, mouse and pointer bindings), `'keyboard:<scheme>'` (that entry of `schemes`, for two players on one keyboard), `'gamepad:<n>'` (the gamepad bindings, pointed at gamepad `n`) or `'touch'`. A device has one owner; a player can own several.
+A device is `'keyboard'` (the key, mouse and pointer bindings), `'keyboard:<scheme>'` (that entry of `schemes`, for two players on one keyboard), `'gamepad:<n>'` (the gamepad bindings, pointed at gamepad `n`), `'touch'` or `'control:<id>'` (the bindings to that control). A device has one owner; a player can own several.
 
 - `party.add(device?)`, `party.remove(player)`: add in the lowest free slot, or remove. `player.index` stays put while others come and go.
 - `party.assign(player, device)`, `party.unassign(device)`, `party.owner(device)`: move devices at any time. `assign` rebuilds that player's bindings from the shared map, so apply saved bindings after it.
@@ -132,6 +132,44 @@ A device is `'keyboard'` (the key, mouse and pointer bindings), `'keyboard:<sche
 - `party.on(type, handler)` hears `join`, `leave`, `lost` and `regained`, and returns the function that stops listening. An unplugged gamepad keeps its owner and comes back to them on the same index.
 - The press that joins does not read as `pressed`, so Start does not also pause.
 - Options: `maxPlayers` (default 4), `schemes` (default none), `joinAction` (default none: only `add` adds), `gamepadSlots` (gamepad indices `joinAction` watches, default 4), and `target`, `gamepads`, `deadzone` and `contexts`, which go to every player's `Input`.
+
+## Gyro aiming and steering
+
+`@margoengine/input/motion` turns the device's gyroscope and tilt into aim and steering, in the screen's frame, so portrait and landscape read alike:
+
+```ts
+import {Input} from 'margoengine/input';
+import {Gyro} from 'margoengine/input/motion';
+
+declare const button: HTMLButtonElement;
+const input = new Input({
+  aimX: [{type: 'pointer', axis: 'x', scale: 0.01}, {type: 'control', id: 'gyro', axis: 'yaw'}],
+  steer: [{type: 'key', code: 'KeyD'}, {type: 'control', id: 'gyro', axis: 'steer'}],
+  aiming: [{type: 'mouse', button: 2}],
+});
+using gyro = new Gyro();
+gyro.attach(input);
+button.onclick = async () => {
+  if (await Gyro.requestPermission()) await gyro.calibrate({duration: 500}); // iOS asks only from a tap
+};
+let heading = 0;
+function tick() {
+  gyro.enabled = input.state('aiming').down; // aim with the gyro only while aiming, as console games do
+  gyro.update(); // before input.update()
+  input.update();
+  heading += gyro.yaw; // radians turned since the last update: add them straight onto the camera
+  console.log(heading, input.state('steer').value);
+}
+tick();
+```
+
+- `gyro.yaw`, `pitch`, `roll`: radians turned since the last update; positive is right, up and clockwise. Use these for aiming, as they do not clamp.
+- `gyro.steer`: tilt like a wheel, -1 to 1, reaching 1 at `maxTilt`. `recenter()` takes the present tilt as straight ahead. Reads 0 while the device lies flat.
+- Bindings: `{type: 'control', id: 'gyro', axis}` with `axis` `'yaw'`, `'pitch'` or `'roll'` (rate as a share of `maxRate`) or `'steer'`.
+- `calibrate({duration, signal})` measures the gyroscope's resting error with the device still, and subtracts it. `enabled = false` ignores the sensors. `available` turns true once a real reading arrives; `Gyro.supported()` says whether the browser has the events at all.
+- Options: `maxRate` (degrees per second reading 1, default 180), `maxTilt` (degrees reading 1, default 45), `deadzone` (degrees per second reading 0, default 1), `target` (default `window`), `screenAngle` and `now`.
+
+`input.control(id)` is the general form of this: it returns an object of numbers that `{type: 'control', id, axis}` bindings read (`axis` defaults to `'value'`), so any code can feed an action. `input.removeControl(id)` removes it.
 
 ## Gestures
 

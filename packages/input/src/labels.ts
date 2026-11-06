@@ -74,5 +74,7 @@ export function bindingLabel(binding: Binding, layout: GlyphLayout = 'xbox'): st
       return AXES[binding.index] ?? `Axis ${binding.index}`;
     case 'touch':
       return binding.axis ? `${binding.id} ${binding.axis.toUpperCase()}` : binding.id;
+    case 'control':
+      return binding.axis ? `${binding.id} ${binding.axis}` : binding.id;
   }
 }

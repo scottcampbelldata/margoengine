@@ -33,6 +33,11 @@ export type Binding = {
     id: string;
     axis?: 'x' | 'y';
     scale?: number;
+} | {
+    type: 'control';
+    id: string;
+    axis?: string;
+    scale?: number;
 };
 
 export type BindingMap = Record<string, Binding[]>;
@@ -74,6 +79,8 @@ export class Input {
     state(action: string): Readonly<ActionState>;
     bindingValue(action: string, binding: number): number;
     update(): void;
+    control(id: string): Record<string, number>;
+    removeControl(id: string): void;
     createStick(parent: HTMLElement, id: string): HTMLDivElement;
     bindTouchButton(element: HTMLElement, id: string): void;
     rumble(duration: number, strength?: number, gamepad?: number): Promise<boolean>;

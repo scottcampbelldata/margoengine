@@ -283,6 +283,26 @@ test('dispose removes every listener and later calls throw', () => {
   assert.throws(() => party.add('keyboard'), /disposed/);
 });
 
+test('a control device carries the bindings of that control alone', () => {
+  const target = new EventTarget(),
+    party = new LocalPlayers(
+      {
+        aim: [
+          { type: 'control', id: 'gyro', axis: 'yaw' },
+          { type: 'control', id: 'other' },
+          { type: 'key', code: 'KeyA' },
+        ],
+      },
+      { target, gamepads: () => [] },
+    ),
+    player = party.add('control:gyro');
+  player.input.control('gyro').yaw = 0.5;
+  player.input.control('other').value = 0.25;
+  party.update();
+  assert.equal(player.input.state('aim').value, 0.5);
+  party.dispose();
+});
+
 test('options, devices and owners are checked', () => {
   const options = { target: new EventTarget(), gamepads: () => [] };
   assert.throws(() => new LocalPlayers(ACTIONS, { ...options, maxPlayers: 0 }), RangeError);
