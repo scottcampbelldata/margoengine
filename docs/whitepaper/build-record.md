@@ -928,3 +928,11 @@ Batch 39 proved its formats on files the tests built. A file built by the same m
 - **Proved:** 82 files, 82 passed: 76 read and checked, 6 refused as documented. Every file with more than one point of geometry was drawn on the GPU with no blank picture, 65 pictures, 2 of them through `/render`. LAZ records equal laz-perf byte for byte in formats 3, 6 and 8, and equal their LAS twins in format 3. NURBS curves equal rhino3dm, difference 0, on 3 curves. Each regression test was run against the old source and failed.
 - **Limits:** one or two files a format is a sample, not a survey. Variants with no real file, and every refusal, are in `docs/limits.md`. LASzip 1.x's compressor is refused. The licences are mostly BSD, MIT and Apache files from test folders, treated as explicit permission; one, McNeel's `RhinoLogo.3dm`, has only a sample-file statement. The third-party runtimes stayed in a scratch folder, through the caller-owned hooks, with their source unread.
 - **Gate:** lint, hygiene, verify, the loaders and points tests and `tests/claims-file.test.js`, from one script gated on exit codes. The run itself is opt-in, as it needs the network and a GPU.
+
+## Lane G: closing the audit's gaps
+
+An audit of the finished batches against their job text listed 70 gaps for the Hacker News launch. Lane G closes them one at a time, worst first (Scott, 2026-11-06). Gaps that need a device no machine here has stay parked in `docs/known-bugs.md`.
+
+| Gap | Job | Status | Commit | Claim |
+| --- | --- | --- | --- | --- |
+| C20 | Claims read PROVEN on stand-in proof: seven now read PROVEN (STAND-IN) and say what stood in; LIM-193 and LIM-197 name the real run in LIM-208 | DONE | this commit | LIM-091, 109, 120, 129, 134, 149, 151, 193, 197 |
