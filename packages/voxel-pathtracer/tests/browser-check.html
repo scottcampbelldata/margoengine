@@ -184,7 +184,12 @@ window.check={
   });
   const create=device().createShaderModule;
   try{
-   device().createShaderModule=(desc)=>create.call(device(),{...desc,code:desc.code.replaceAll('p.y=f.ground.w;','')});
+   // The control is the old point, o+d*t, with the product rounded on its own as the WGSL reads. Apple's compiler fuses
+   // the sum into one rounding (all of 65,536 sums measured; the A6000 fused none), and the old point then misses its
+   // plane by less: the same code showed 280 dim pixels on an M6 and 4,763 on the A6000. f.config.z's top bit is never
+   // set, so the xor changes nothing, but the compiler cannot see that and has to round the product first.
+   const oldPoint='p.y=o.y+bitcast<f32>(bitcast<u32>(d.y*h.t)^(f.config.z&0x80000000u));';
+   device().createShaderModule=(desc)=>create.call(device(),{...desc,code:desc.code.replace(/p\.y=f\.ground\.w;(?=\s*n=vec3f)/,oldPoint)});
    result.control=await withTracer(scene,{},async(t)=>{const im=await t.renderImage({width:384,height:190,samples:128,seed:0,jitter:false});let dim=0;for(let i=0;i<384*190;i++)if(im.color[i*3]<.19)dim++;return {dim};});
   }finally{device().createShaderModule=create;}
   const sunScene={...scene,models:[model('block',[8,8,8],()=>1)],instances:[{id:'block',modelId:'block',matrix:translate(78,0,70)}],materials:[{id:1,type:'diffuse',color:[.2,.2,.2]}],environment:{skyIntensity:0,groundColor:[.2,.2,.2],sunDirection:[1,1,0],sunIntensity:Math.PI,sunAngularSize:0}};
