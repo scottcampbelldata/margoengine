@@ -348,6 +348,37 @@ const back = dequantizeTrack(packed);
 const x = sampleTrack(back.times, back.values, 1, 0.5, 'LINEAR'); // within 0.001 plus half a step of sin(1.5)
 ```
 
+## GPU morph weights (`@margoengine/animation/morph-gpu`)
+
+The deformation pass always blends morph targets on the GPU. `MorphWeightPlayer` moves the rest of the work there too:
+a clip's weight tracks upload once, and one compute dispatch per deformation buffer page samples every copy's weights
+each frame, so the CPU writes 16 bytes a frame however many faces play.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {MorphWeightPlayer} from 'margoengine/animation/morph-gpu';
+import {cloneModel} from 'margoengine/animation/skeleton-utils';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const source = await loadGLTF(stage.engine, '/face.glb');
+const models = [source, ...(await Promise.all(Array.from({length: 99}, () => cloneModel(source))))];
+const talk = MorphWeightPlayer.attach(stage.engine, 'Talk'); // a clip name or index; {loop: false} holds the ends
+for (const [i, model] of models.entries()) {
+  const animation = Animation.attach(model);
+  animation.playing = false; // or keep it playing a body clip: only weights are driven here
+  talk.add(animation, {offset: i * 0.13, speed: 1}); // defaults 0 and 1; add again to change them
+}
+talk.speed = 0.5; // every copy; talk.time, talk.playing and talk.remove(animation) work as you would expect
+talk.dispose();
+```
+
+A copy samples `time * speed + offset`, with `sampleTrack`'s arithmetic for STEP, LINEAR and CUBICSPLINE. Copies must
+share one asset (`cloneModel`), because they share the tracks; a disposed copy leaves by itself. Weights the player
+drives are overwritten every frame, so `setMorph` has no effect on them, and `primitive.weights` on the CPU does not
+follow them. `scripts/animation-morph-gpu-tests.js` reads the weights back on real WebGPU and matches `sampleTrack`
+within 1e-5 on 70 copies, looping and held.
+
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:

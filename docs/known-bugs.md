@@ -635,7 +635,9 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   (`setMorph`, validation, weight writes, `upload`, `deformAll`). A multi-primitive model joining a run would not help this
   scene: deformed primitives cannot join an instanced batch (`batchable`).
 - **Plan:** write the weights of every Animation of a device in one upload (`packages/animation/src/index.ts`, `upload`),
-  then profile again. No core change.
+  then profile again. No core change. For copies playing one clip, `MorphWeightPlayer`
+  (`@margoengine/animation/morph-gpu`, 2026-11-06) samples and writes the weights on the GPU; its effect on `p-morph`
+  is not measured yet (quiet pass).
 
 ### cloneModel: one engine-wide tick per copy
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5075210,
+  "total": 5078475,
   "history": [
     {
       "date": "2026-10-24",
@@ -2252,10 +2252,17 @@
       "commit": "10594d01e",
       "reason": "shader: new deform entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "f297322d6",
+      "reason": "feat(animation): morph weights sampled on the GPU (new entry @margoengine/animation/morph-gpu)",
+      "grew": 1
     }
   ],
   "items": {
     "@margoengine/animation": 22595,
+    "@margoengine/animation/morph-gpu": 3265,
     "@margoengine/animation/pointer": 7146,
     "@margoengine/animation/sampling": 2798,
     "@margoengine/animation/skeleton-utils": 8891,

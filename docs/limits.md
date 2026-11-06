@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-188). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-189). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -193,6 +193,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | --- | --- |
 | Textures of `cloneModel` copies | Shared: one GPU texture per device, image and format, freed with its last holder (`p-morph`: 7 textures for 100 copies, not 700). A second model loaded from the same file holds its own images, so it uploads its own textures. |
 | Geometry of `cloneModel` copies (2026-11-06) | Shared: vertex and index buffers per device, asset and array, and in the deformation arena one copy of the bind-pose vertices, morph deltas and skin influences per page. Each animated copy still adds 80 B per vertex of deformed output, 64 B per bone and its morph weights, because those are what differ between copies. A second model loaded from the same file packs and uploads its own. |
+| GPU morph weights (`@margoengine/animation/morph-gpu`, 2026-11-06) | Not measured for speed yet: the 16 B a frame and one dispatch per page are counted, the frame time is not. `Animation.upload` still loops over each copy to check its weights and bones, so CPU work is smaller per copy, not zero. Time is float32 in the shader: steps of about 0.24 ms after an hour of play. Copies must share one asset. Driven weights ignore `setMorph`, and `primitive.weights` on the CPU does not follow them. | The tracks are shared, and reading weights back would stall the frame. | A long-running crowd loses fine timing slowly. CPU code that reads `primitive.weights` sees old values. | Set `player.time` back by whole loops of the clip. Use `Animation` for a character whose weights you read or set by hand. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 
