@@ -210,6 +210,10 @@
       "types": "./dist/bvh/points.d.ts",
       "import": "./dist/bvh/points.js"
     },
+    "./bvh/sdf": {
+      "types": "./dist/bvh/sdf.d.ts",
+      "import": "./dist/bvh/sdf.js"
+    },
     "./cache": {
       "types": "./dist/cache.d.ts",
       "import": "./dist/cache.js"

@@ -202,6 +202,36 @@ A point hits when the ray passes within `threshold` of its centre, or within its
 | `threshold` | 3 |
 | `thresholdUnits` | `'pixels'` (CSS pixels); or `'world'` |
 
+## Mesh distance fields
+
+`bakeSDF` from `@margoengine/bvh/sdf` samples a mesh's signed distance on a regular grid: negative inside, positive outside, in the mesh's own space. Distance comes from the tree's closest-point query and the sign from the winding number, so a mesh with small holes still bakes a clean inside. The result answers distance, gradient and projection on the CPU and uploads as a 3D texture for shaders.
+
+```ts
+import {bakeSDFAsync} from 'margoengine/bvh/sdf';
+import {MeshBVH} from 'margoengine/bvh';
+
+const bvh = MeshBVH.build({
+  positions: [-1, -1, -1, 1, -1, -1, 0, 1, -1, 0, 0, 1],
+  indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3],
+});
+const controller = new AbortController();
+const sdf = await bakeSDFAsync(bvh, {resolution: 48, signal: controller.signal, onProgress: (done) => console.log(done)});
+
+console.log(sdf.distance([0, 0, 0]));   // negative: inside
+console.log(sdf.gradient([0, 0, 2]));   // away from the surface
+console.log(sdf.project([0, 0, 2]));    // back onto the surface
+```
+
+`bakeSDF` is the same bake on the calling thread; each sample costs one closest-point and one winding query, so `bakeSDFAsync` runs in short slices and keeps the page drawing. `sdf.toTexture(device)` uploads an `r16float` 3D texture that the caller owns (`{format: 'r32float'}` keeps full precision but needs `float32-filterable` to filter). Samples sit on cell corners from `sdf.min` to `sdf.max` inclusive, x fastest in `sdf.data`. Past the grid, `distance` adds the way to the grid.
+
+| Option | Default |
+| --- | --- |
+| `resolution` | 32 samples along the longest side, cells cubic; or `[x, y, z]`, each 2 to 2048 |
+| `bounds` | the mesh's box grown by `padding` |
+| `padding` | 0.1 of the longest side |
+| `signed` | `true`; `false` bakes plain distance, for open meshes such as terrain or cloth |
+| `accuracy` | 2; higher is closer to the exact winding sum and slower, `Infinity` is exact |
+
 ## GPU traversal
 
 `@margoengine/bvh/gpu` uploads a `MeshBVH` to storage buffers and traces rays in WGSL compute, for picking at scale, baking, path tracing and audio occlusion. `GPUMeshBVH.create` takes a `GPUDevice`, or an `Engine` on WebGPU. The tree is built on the CPU as usual; after `bvh.refit()` call `update()`.

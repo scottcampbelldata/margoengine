@@ -387,8 +387,12 @@ export class MeshBVH {
     return buffer;
   }
 
+  /** Counts refits, so anything derived from the positions can tell it is stale. */
+  revision = 0;
+
   /** Recomputes every node bound bottom-up after vertex positions changed. Topology must be unchanged. */
   refit(): void {
+    this.revision++;
     const f = this.nodeBounds,
       u = this.nodeData,
       index = this.index,

@@ -127,6 +127,7 @@ class MeshBVH {
         copy?: boolean;
     }): SerializedBVH;
     toArrayBuffer(): ArrayBuffer;
+    revision: number;
     refit(): void;
     intersectsSegment(start: ArrayLike<number>, end: ArrayLike<number>, options?: SegmentOptions): boolean;
     raycastFirst(ray: RayLike, options?: RaycastOptions): BVHHit | null;

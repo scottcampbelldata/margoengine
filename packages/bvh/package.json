@@ -60,6 +60,10 @@
     "./points": {
       "types": "./dist/points.d.ts",
       "import": "./dist/points.js"
+    },
+    "./sdf": {
+      "types": "./dist/sdf.d.ts",
+      "import": "./dist/sdf.js"
     }
   },
   "files": [
