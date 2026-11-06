@@ -51,6 +51,8 @@ async function entriesFor(doc: GLTFDocument): Promise<GLTFExtension[]> {
     wanted.push(import('./textured.js').then((m) => m.textured));
   if (uses(doc, 'EXT_mesh_gpu_instancing'))
     wanted.push(import('./instancing.js').then((m) => m.instancing));
+  if (uses(doc, 'KHR_lights_punctual') || list(doc.nodes).some((n) => n?.camera !== undefined))
+    wanted.push(import('./scene-data.js').then((m) => m.sceneExtras));
   return Promise.all(wanted);
 }
 function documentOf(data: Uint8Array): GLTFDocument {

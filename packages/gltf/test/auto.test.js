@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { registerHooks } from 'node:module';
 import { loadAuto } from '../dist/auto.js';
+import { sceneData } from '../dist/scene-data.js';
 import { encodeAttributes } from '../../decoders/tests/support/meshopt-encode.js';
 import { documentOf, headlessEngine, vertexData, withBitmaps } from './helpers.js';
 
@@ -166,6 +167,25 @@ test('the file decides the entries: quantized, meshopt and instancing all load l
   }
 });
 
+test('a camera and a light stay light too, and read back with sceneData', async () => {
+  const { engine } = await headlessEngine();
+  try {
+    const shot = plain({
+        cameras: [{ type: 'perspective', perspective: { yfov: 1, znear: 0.1 } }],
+        extensions: { KHR_lights_punctual: { lights: [{ type: 'point' }] } },
+        extensionsUsed: ['KHR_lights_punctual'],
+        nodes: [{ mesh: 0 }, { camera: 0 }, { extensions: { KHR_lights_punctual: { light: 0 } } }],
+      }),
+      { loader, model } = await loadAuto(engine, url, server(fileOf(shot)));
+    assert.equal(loader, 'gltf');
+    assert.equal(sceneData(model).cameras.length, 1);
+    assert.equal(sceneData(model).lights.length, 1);
+    model.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
 test('an unsupported file moves to gltf-pro from the bytes already downloaded', async (t) => {
   const model = { dispose() {} },
     calls = [];
@@ -260,6 +280,6 @@ test('gltf-pro and the other entries stay out of what the entry imports at load'
   const code = await readFile(new URL('../dist/auto.js', import.meta.url), 'utf8');
   assert.match(code, /import\(["`]@margoengine\/gltf-pro["`]\)/);
   assert.doesNotMatch(code, /from\s*["`]@margoengine\/gltf-pro/);
-  for (const name of ['meshopt', 'quantized', 'textured', 'instancing'])
+  for (const name of ['meshopt', 'quantized', 'textured', 'instancing', 'scene-data'])
     assert.doesNotMatch(code, new RegExp(`from\\s*["\`]\\./${name}`));
 });

@@ -802,6 +802,10 @@
       "types": "./dist/gltf/quantized.d.ts",
       "import": "./dist/gltf/quantized.js"
     },
+    "./gltf/scene-data": {
+      "types": "./dist/gltf/scene-data.d.ts",
+      "import": "./dist/gltf/scene-data.js"
+    },
     "./gltf/textured": {
       "types": "./dist/gltf/textured.d.ts",
       "import": "./dist/gltf/textured.js"

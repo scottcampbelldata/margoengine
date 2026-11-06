@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-174). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-175). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -265,6 +265,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | Meshopt glTF on the light path (`@margoengine/gltf/meshopt`, 2026-11-06) | Enforced: decoded views may reach 64 MiB per file, checked before each decode, and a stream shorter than its bufferView is a RangeError. Decoding runs on the calling thread. | The light path has no worker, and the decoder is synchronous. | A small compressed file loads with no gltf-pro, and the decoder is fetched only for files that use it. | `@margoengine/gltf-pro/worker` parses in a worker. |
 | Instanced glTF on the light path (`@margoengine/gltf/instancing`, 2026-11-06) | Enforced: every instance counts toward `maxNodes` (default 100,000), checked before its nodes are made. By method: an instance costs one core mesh plus one per primitive, and TRANSLATION, ROTATION and SCALE are read, other instance attributes ignored. | Core batches every mesh of one geometry into one instanced draw, so each instance is a node and the file needs no draw path of its own. | Instances move, pick and dispose like any node; the price is memory per instance. | `@margoengine/gltf-pro` keeps instances as rows of one GPU buffer (`PBRInstances`) for scenes with far more copies than nodes. |
 | One-call glTF loading (`loadAuto` in `@margoengine/gltf/auto`, 2026-11-06) | By method: moves to `@margoengine/gltf-pro` only on an `unsupported` refusal. A file over a light limit (one million vertices, `maxNodes`) rejects with that limit and does not move. The light attempt may reach the point of refusal, so a refused file costs that parse as well; each URL is still downloaded once. | The move is keyed on the `unsupported` code alone, so a limit error reaches the caller and names its fix. | No guessing which loader to pick; a plain file loads no gltf-pro code. | Raise `maxNodes`, or call gltf-pro directly for a file known to need it. |
+| glTF cameras and lights as data (`@margoengine/gltf/scene-data`, 2026-11-06) | By method: values only, nothing is created in the engine; `position`, `direction` and `matrix` are as loaded and do not follow later moves (the `node` handle does). A file with only cameras and lights, and no mesh, is refused. `sceneData` holds nothing for a model gltf-pro loaded. | Core has no scene camera or light object to fill, and which camera wins is the app's choice. | A scene file sets its own view and sun on the light path with no gltf-pro. | gltf-pro's `viewGLTFCamera` and `applyGLTFLights` for a model it loaded. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in

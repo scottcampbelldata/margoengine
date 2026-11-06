@@ -134,6 +134,32 @@ engine.start();
 `model` is a light `Model` or a `PBRModel`; `loader` tells them apart, and with `'gltf-pro'` the result also holds the
 `reason` the light loader gave.
 
+### Cameras and lights as data
+
+`@margoengine/gltf/scene-data` accepts nodes with a glTF camera or a `KHR_lights_punctual` light, and hands them back as
+plain data, so a scene file can set up its own view and sun. Nothing is created in the engine: the app decides what to do
+with them. `loadAuto` adds the entry for you, and `sceneData` reads its result too.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf';
+import { sceneData, sceneExtras } from 'margoengine/gltf/scene-data';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas);
+const model = await loadGLTF(engine, '/shot.glb', { extensions: [sceneExtras] });
+const { cameras, lights } = sceneData(model);
+const view = cameras[0];
+if (view) console.log(view.position, view.direction, view.type === 'perspective' ? view.yfov : view.ymag);
+for (const light of lights) console.log(light.type, light.color, light.intensity);
+engine.start();
+// On teardown: model.dispose(); engine.dispose();
+```
+
+Each entry holds the node's `name`, its `node` handle, and its world `position`, `direction` and `matrix` at load with the
+model at its origin; the projection or light values follow glTF's names and units, with the defaults filled in. Only
+nodes of the loaded scene count. A file still needs a mesh: one with only cameras and lights is refused.
+
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 
 Apache-2.0 licensed.

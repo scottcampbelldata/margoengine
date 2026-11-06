@@ -52,6 +52,10 @@
       "types": "./dist/quantized.d.ts",
       "import": "./dist/quantized.js"
     },
+    "./scene-data": {
+      "types": "./dist/scene-data.d.ts",
+      "import": "./dist/scene-data.js"
+    },
     "./textured": {
       "types": "./dist/textured.d.ts",
       "import": "./dist/textured.js"
