@@ -625,15 +625,6 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   a quiet run. three has no `p-motion-blur-velocity` scene yet, so that row compares with `p-motion-blur`'s three column.
   `p-motion-blur`'s image has not matched three's since its first run (SSIM 0.656, delta E 13.2); the cause is not known.
 
-### Environment.create does work three's PMREM does not, and recomputes its BRDF LUT
-
-- **What:** `p-pmrem`: 10.9 ms a call against three's 5.0 (run `20261027-105122`; 14.6 before the half-float fix).
-- **Cause (browser CPU profile: 70% of the call idle, waiting for the GPU):** each call uploads the equirect, builds a
-  source cube with mips, prefilters the specular levels, computes L2 SH and reads it back to the CPU, and computes a
-  128 x 128 BRDF LUT; three's timed call reuses its uploaded texture and computes the specular levels only.
-- **Plan:** the LUT depends only on its size and sample count: share one per device (counted, freed with the last
-  environment). Then time the passes to state the rest as an accepted difference with its parts.
-
 ### Build plus first frame of 100 morphed copies is still slower than three's WebGL backend
 
 - **What:** with `PBRModel.compile()` (`p-morph-compiled`) the first frame is 17 ms, ahead of three's WebGL 30 and WebGPU

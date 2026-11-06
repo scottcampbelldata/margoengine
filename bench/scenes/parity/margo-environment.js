@@ -100,6 +100,33 @@ export const builders = {
     };
   },
 
+  async 'p-pmrem-refresh'(canvas, data, marks) {
+    const engine = await engineFor(canvas, stillCamera, 16, marks),
+      s = performance.now(),
+      { parseHDR, Environment } = await import('@margoengine/environment'),
+      image = parseHDR(await fetchBytes(data.url)),
+      // The HDR goes to the GPU once, outside the timing, and its cube is the source of the environment under test.
+      decoded = await Environment.create(engine, image),
+      environment = await Environment.create(engine, { texture: decoded.cubeTexture }, { keepSource: true });
+    await environment.refresh();
+    await engine.gpu.queue.onSubmittedWorkDone();
+    marks.buildMs = ms(s);
+    return {
+      async task() {
+        await environment.refresh();
+        await engine.gpu.queue.onSubmittedWorkDone();
+      },
+      output: () => ({
+        width: image.width,
+        height: image.height,
+        irradianceSH: environment.sh.irradiance.length,
+      }),
+      info: () => ({
+        note: 'Environment.refresh: mips, GGX-prefiltered specular and L2 SH from a GPU cube (three PMREM: specular cubeUV only)',
+      }),
+    };
+  },
+
   async 'p-fog'(canvas, data, marks) {
     const engine = await engineFor(canvas, data.camera, data.items.length + 8, marks),
       s = performance.now(),

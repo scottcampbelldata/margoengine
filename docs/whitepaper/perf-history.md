@@ -1679,6 +1679,25 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   A quiet run is still owed.
 - **Guard:** `packages/clustered/test/ltc-edge.test.js`, `examples/package-benchmarks/area-lights-gpu.mjs`.
 
+### 68. Environments of a device share one BRDF LUT (accepted difference in work)
+
+- **Loss:** `p-pmrem`: 10.9 ms a call against three's 5.0 in the ledger. Each environment computed its own 128 x 128 LUT,
+  though it depends on nothing but its size and sample count.
+- **Fix:** `@margoengine/environment` keeps one LUT per device, size and sample count, counted and freed with the last
+  environment that holds it. It is taken right at the dispatch, so nothing awaits before the submit and a later
+  environment queues behind the fill. A failed create drops its count and nothing joins that LUT again.
+- **After:** 9.8 ms against three's WebGL 5.2 (`--no-gate`, other jobs running, diagnostic; RTX A6000, Edge 156). Refilling
+  the LUT each call measured 11.5 in the same round, and two plain runs of that round gave 9.5 and 11.3, so the saving is
+  within the noise here. The app that keeps one environment while it builds the next is the one that gains.
+- **Difference:** three's timed call starts from an uploaded texture and makes the specular levels. `Environment.create`
+  starts from the CPU image. New scene `p-pmrem-refresh`, the same job from a GPU cube: 4.1 ms, faster than three's 5.2
+  while still making the mips and the SH, and reading the SH back. So the other 5.7 ms of `create` is the half-float
+  conversion and upload, the new textures and buffers, and the equirect to cube pass. Removing one part at a time, only the
+  specular draws (about 2 ms) moved the total past the noise of about 1 ms.
+- **Rerun:** `node bench/cli.mjs parity --cases=p-pmrem,p-pmrem-refresh --engines=margo,three-webgl-parity --runs=5`.
+  A quiet run is still owed. three has no `p-pmrem-refresh` scene: that row compares with `p-pmrem`'s three column.
+- **Guard:** `packages/environment/tests/brdf-share.test.js`, `packages/environment/tests/environment-browser.js` (4b).
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1730,5 +1749,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 10. Subgroup kernels (entry 62): a quiet run, and a GPU with another subgroup size.
 11. `helmet` split (entry 63): a quiet run.
 12. Rect area lights (entry 67): a quiet run, and the 0.26 against 0.15 ms left like for like.
+13. `p-pmrem` parts (entry 68): a quiet run, one part at a time.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

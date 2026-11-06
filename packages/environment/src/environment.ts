@@ -88,6 +88,7 @@ interface Resources {
   specular: GPUTexture;
   specularView: GPUTextureView;
   brdf: GPUBuffer;
+  lut: SharedLut;
   equirect?: GPUTexture;
   equirectView?: GPUTextureView;
   sampler: GPUSampler;
@@ -97,6 +98,19 @@ interface Resources {
   irradiance: Float32Array;
 }
 
+/** One BRDF LUT, shared by every environment of a device with the same size and sample count, which are all it reads. */
+interface SharedLut {
+  buffer: GPUBuffer;
+  users: number;
+  key: string;
+}
+const sharedLuts = new WeakMap<GPUDevice, Map<string, SharedLut>>();
+function dropLut(device: GPUDevice, lut: SharedLut): void {
+  if (--lut.users) return;
+  const pool = sharedLuts.get(device);
+  if (pool?.get(lut.key) === lut) pool.delete(lut.key);
+  lut.buffer.destroy();
+}
 type ComputeKey = 'equirectToCube' | 'downsample' | 'sphericalHarmonics' | 'brdfLut';
 const pipelineCache = /* @__PURE__ */ new WeakMap<GPUDevice, Map<string, GPUComputePipeline | GPURenderPipeline>>();
 function cached<T extends GPUComputePipeline | GPURenderPipeline>(device: GPUDevice, key: string, create: () => T): T {
@@ -306,6 +320,7 @@ async function build(
   let cube!: GPUTexture,
     specular!: GPUTexture,
     brdf!: GPUBuffer,
+    lut: SharedLut | undefined,
     sh!: GPUBuffer,
     params!: GPUBuffer,
     sampler!: GPUSampler,
@@ -315,7 +330,7 @@ async function build(
   try {
     // Phase 1: upload and build the source cube with its mip chain.
     await guarded(device, () => {
-      if (reuse) ({ sampler, cube, specular, brdf, sh, params } = reuse);
+      if (reuse) ({ sampler, cube, specular, brdf, lut, sh, params } = reuse);
       else {
         sampler = device.createSampler({
           label: 'environment',
@@ -339,13 +354,6 @@ async function build(
             mipLevelCount: specularMips,
             format: 'rgba16float',
             usage: renderUsage,
-          }),
-        );
-        brdf = track(
-          device.createBuffer({
-            label: 'environment BRDF LUT',
-            size: settings.brdfSize * settings.brdfSize * 4,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
           }),
         );
         sh = track(
@@ -512,19 +520,35 @@ async function build(
         1,
       );
       if (!reuse) {
-        const brdfUnit = uniform(new Uint32Array([settings.brdfSamples, settings.brdfSize, 0, 0]));
-        temporary.push(brdfUnit);
-        dispatch(
-          encoder,
-          'brdfLut',
-          [
-            { binding: 0, resource: { buffer: brdf } },
-            { binding: 1, resource: { buffer: brdfUnit } },
-          ],
-          groups(settings.brdfSize),
-          groups(settings.brdfSize),
-          1,
-        );
+        // Taken here, not earlier: from this line to the submit below nothing awaits, so an environment that joins this
+        // LUT later is queued behind the dispatch that fills it.
+        let pool = sharedLuts.get(device);
+        if (!pool) sharedLuts.set(device, (pool = new Map()));
+        const key = `${settings.brdfSize}:${settings.brdfSamples}`;
+        lut = pool.get(key);
+        if (lut) lut.users++;
+        else {
+          const buffer = device.createBuffer({
+            label: 'environment BRDF LUT',
+            size: settings.brdfSize * settings.brdfSize * 4,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+          });
+          pool.set(key, (lut = { buffer, users: 1, key }));
+          const brdfUnit = uniform(new Uint32Array([settings.brdfSamples, settings.brdfSize, 0, 0]));
+          temporary.push(brdfUnit);
+          dispatch(
+            encoder,
+            'brdfLut',
+            [
+              { binding: 0, resource: { buffer } },
+              { binding: 1, resource: { buffer: brdfUnit } },
+            ],
+            groups(settings.brdfSize),
+            groups(settings.brdfSize),
+            1,
+          );
+        }
+        brdf = lut.buffer;
       }
       encoder.copyBufferToBuffer(sh, 0, readback, 0, 512);
       device.queue.submit([encoder.finish()]);
@@ -563,6 +587,7 @@ async function build(
       specular,
       specularView: specular.createView({ dimension: 'cube' }),
       brdf,
+      lut: lut!,
       equirect,
       equirectView,
       sampler,
@@ -573,6 +598,12 @@ async function build(
     };
   } catch (error) {
     for (const resource of created) resource.destroy();
+    // The fill may be what failed, so nothing joins this LUT again; an environment already holding it keeps it.
+    if (lut && !reuse) {
+      const pool = sharedLuts.get(device);
+      if (pool?.get(lut.key) === lut) pool.delete(lut.key);
+      dropLut(device, lut);
+    }
     throw error;
   }
 }
@@ -581,7 +612,7 @@ function destroy(resources: Resources | undefined): void {
   if (!resources) return;
   resources.cube.destroy();
   resources.specular.destroy();
-  resources.brdf.destroy();
+  dropLut(resources.device, resources.lut);
   resources.equirect?.destroy();
   resources.sh.destroy();
   resources.params.destroy();
@@ -697,6 +728,7 @@ export class Environment implements EnginePlugin {
   /**
    * Split-sum BRDF LUT: a STORAGE buffer of brdfSize x brdfSize u32, row-major (x = NdotV, y = perceptual roughness at
    * texel centers), each `pack2x16float(scale, bias)`. A buffer, not a texture, so IBL binds one sampled texture per stage.
+   * Environments of one device with the same `brdfSize` and `brdfSamples` share it; it is freed with the last of them.
    */
   get brdfLut(): GPUBuffer {
     return this.live.brdf;

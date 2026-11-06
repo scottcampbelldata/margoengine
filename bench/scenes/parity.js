@@ -839,6 +839,16 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       params: {},
       data: (p, { assets }) => ({ url: `${assets}skinning-ik-workshop.hdr` }),
     },
+    'p-pmrem-refresh': {
+      area: 'environment',
+      kind: 'task',
+      rows: ['9.3'],
+      title: 'Environment prefilter from a GPU cube',
+      draws:
+        'p-pmrem from a source already on the GPU, as three times it: refresh() makes the mips, specular levels and irradiance again, with no upload and no new resources.',
+      params: {},
+      data: (p, { assets }) => ({ url: `${assets}skinning-ik-workshop.hdr` }),
+    },
     'p-fog': {
       area: 'environment',
       rows: ['9.4'],
@@ -1675,7 +1685,7 @@ export const ROWS = {
   '9.1': { scenes: ['p-hdr-load'] },
   '9.2': { scenes: ['p-exr-load'] },
   // helmet with Margo's default shadows (4 PCSS cascades), and with the setup closest to three's one PCFSoftShadowMap.
-  '9.3': { scenes: ['p-pmrem', 'helmet', { scene: 'helmet', params: { filter: 'pcf', cascades: 1 } }] },
+  '9.3': { scenes: ['p-pmrem', 'p-pmrem-refresh', 'helmet', { scene: 'helmet', params: { filter: 'pcf', cascades: 1 } }] },
   '9.4': { scenes: ['p-fog'] },
   '9.5': { scenes: ['p-volumetric'] },
   '9.6': { scenes: ['p-sky'] },

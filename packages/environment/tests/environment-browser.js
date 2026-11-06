@@ -459,6 +459,27 @@ window.runEnvironmentTests = async () => {
     report.checks.push('BRDF LUT matches quadrature, the smooth analytic limit and the Karis mobile fit');
   }
 
+  // 4b. The shared LUT: two environments hold one buffer, it outlives the first, and it equals a LUT filled on its own.
+  {
+    const lutOptions = { size: 16, ...small, brdfSize: 8, brdfSamples: 128 },
+      flat = equirect(64, 32, () => [1, 1, 1]),
+      bits = async (buffer) => {
+        const { width, at } = await readLut(device, buffer);
+        return Array.from({ length: width * width }, (_, i) => at(0, i % width, Math.floor(i / width)));
+      },
+      first = await Environment.create(device, flat, lutOptions),
+      alone = await bits(first.brdfLut),
+      second = await Environment.create(device, flat, lutOptions);
+    assert(first.brdfLut === second.brdfLut, 'two environments of one device hold one BRDF LUT');
+    first.dispose();
+    assert(JSON.stringify(await bits(second.brdfLut)) === JSON.stringify(alone), 'the LUT changed when its first holder went');
+    second.dispose();
+    const third = await Environment.create(device, flat, lutOptions);
+    assert(JSON.stringify(await bits(third.brdfLut)) === JSON.stringify(alone), 'a fresh fill differs from the shared LUT');
+    third.dispose();
+    report.checks.push('Environments of one device share one BRDF LUT, which outlives its first holder and equals a fresh fill');
+  }
+
   // 5. Background pass rendered directly: directions, rotation, exposure, blur, HDR and 8-bit outputs, depth.
   {
     const size = 48,
