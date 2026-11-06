@@ -5,7 +5,8 @@ status. If a number in the README, on margoengine.com or in `docs/` is not here 
 treat it as unverified and open an issue.
 
 Commands for rerunning everything are in [reproduce.md](reproduce.md). Every past performance loss and significant
-bug the checks caught, with its cause, fix, after number and guard, is in [perf-history.md](perf-history.md).
+bug the checks caught, with its cause, fix, after number and guard, is in [perf-history.md](perf-history.md). What each
+finished batch of work landed, how it was proved and what is still unproved is in [build-record.md](build-record.md).
 
 Status:
 
@@ -322,7 +323,7 @@ quiet run. The engine reference ([operational-playbook.md](../architecture/opera
 | An entity system a game can live in | Ordered schedules with fixed steps, change tracking, queries with excluded and optional terms, relations with cascade rules, a bridge to core meshes, worlds that grow on demand. | Results equal plain references over seeded work: LIM-056 to LIM-059, LIM-066, LIM-069. | A growable world's loops cost about twice a fixed one's (accepted difference, perf-history entry 61). A quiet run. |
 | Input, cameras and controls people already know | Interactions, local players, gyro, pen, replay; lens, exposure, off-axis, wide-angle and view offset; roll, arcball, gizmos, third person and moving platforms. | Synthetic events on real core objects; closed forms for lens and exposure maths: LIM-098, LIM-099, LIM-102, LIM-105, LIM-107, LIM-112 to LIM-119, LIM-127, LIM-132, LIM-134, LIM-148, LIM-149. | No photometric accuracy claim. CPU cost of the third-person camera is not measured. |
 | Knowing what a running engine costs | Frame phases, pipeline compile tracking linked to slow frames, leak alerts, field telemetry, feature scaling by measured cost, supersampled stills. | Phases add up to the frame total; percentiles within 4.6%; real `SSAO` and `Shadows` driven through every level: LIM-153, LIM-156, LIM-159, LIM-160, LIM-165, LIM-168. | How good the measured savings are in a real scene under load. |
-| Release readiness | A rehearsal of the first npm release that installs from a stand-in registry and type-checks every entry with `skipLibCheck` off, and the browser suites in Playwright WebKit on an Apple GPU. | All 102 tarballs and 502 entries, one published-types defect found and fixed: LIM-137, LIM-140. | The npm organization, a public repository for provenance, Safari itself. |
+| Release readiness | A rehearsal of the first npm release that installs from a stand-in registry and type-checks every entry with `skipLibCheck` off, and the browser suites in Playwright WebKit on an Apple GPU. | All 102 tarballs and 502 entries, one published-types defect found and fixed: LIM-137. | The npm organization, a public repository for provenance, Safari itself. |
 
 ## Optimization proofs
 

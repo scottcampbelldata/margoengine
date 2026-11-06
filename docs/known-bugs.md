@@ -687,8 +687,9 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 - **Cause:** one-off WebGPU work that does not grow with the copies: 58 ms for the first load (mip pipelines and the
   1024 x 1024 mip chain), 31 ms for the deformation buffers (25 MB written, the bind-pose vertices once per copy, and the
   compute pipeline), and the render pipeline's compile, which overlaps the build by only 11 to 29 ms.
-- **Plan:** share the bind-pose block between copies in `DeformArena`, as the morph deltas are. If that does not close the
-  gap, record what is left as an accepted difference.
+- **Plan:** `1342d03dc` now shares the bind-pose block between copies in `DeformArena`, as the morph deltas are; its effect
+  on these numbers is not remeasured yet. If a quiet rerun does not close the gap, record what is left as an accepted
+  difference.
 
 ## Fixed 2026-11-06
 
