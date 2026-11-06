@@ -62,6 +62,25 @@ interface Model {
   metadata: Record<string, string>;
 }
 
+/** A parsed model part, as an extension of the 3MF reader sees it. */
+export type ThreeMFModel = Model;
+
+/** What the materials entry adds to the 3MF reader: more elements, and one call per written triangle corner. */
+export interface ThreeMFExtension {
+  /** An element the reader does not know, with its attributes. */
+  open?(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
+  /** The end of any element. */
+  close?(model: ThreeMFModel, name: string): void;
+  /** Every model part is parsed; `read` returns a package part's bytes. */
+  ready?(read: (path: string) => Promise<Uint8Array>): Promise<void>;
+  /** Extra text for a triangle's group key: triangles with different keys get different groups. */
+  bucket(model: ThreeMFModel, object: ObjectData, mesh: MeshData, triangle: number): string;
+  /** Corner `corner` of `triangle` has just been written as the next vertex. */
+  corner(model: ThreeMFModel, object: ObjectData, mesh: MeshData, triangle: number, corner: number): void;
+  /** A group is finished; `triangle` is its first triangle. */
+  group(group: LoadedGroup, model: ThreeMFModel, object: ObjectData, mesh: MeshData, triangle: number): void;
+}
+
 const IDENTITY = new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]);
 
 function parseColor(value: string | undefined): Color {
@@ -101,7 +120,11 @@ function index(value: string | undefined, what: string): number {
   return number;
 }
 
-function parseModel(xml: string, limit: { maxVertices: number; maxTriangles: number }): Model {
+function parseModel(
+  xml: string,
+  limit: { maxVertices: number; maxTriangles: number },
+  extension?: ThreeMFExtension,
+): Model {
   const model: Model = {
     unit: 'millimeter',
     objects: new Map(),
@@ -217,9 +240,12 @@ function parseModel(xml: string, limit: { maxVertices: number; maxTriangles: num
             if (!a.objectid) throw new LoaderError(F, 'syntax', '<item> without objectid');
             model.items.push({ objectId: a.objectid, path: a['p:path'], transform: parseTransform(a.transform) });
             break;
+          default:
+            extension?.open?.(model, name, a);
         }
       },
       close(name) {
+        extension?.close?.(model, name);
         if (name === 'object') object = undefined;
         else if (name === 'basematerials' || name === 'colorgroup') colors = undefined;
         else if (name === 'metadata' && metadataName) {
@@ -237,6 +263,27 @@ function parseModel(xml: string, limit: { maxVertices: number; maxTriangles: num
   return model;
 }
 
+/**
+ * The property a triangle corner names: the triangle's own `pid`, else its object's, and the corner's index, else the
+ * triangle's first, else the object's `pindex`.
+ */
+export function cornerProperty(
+  model: ThreeMFModel,
+  object: ObjectData,
+  mesh: MeshData,
+  triangle: number,
+  corner: number,
+): { id: string; index: number } | undefined {
+  const pid = mesh.pid.array[triangle],
+    id = pid === NONE ? object.pid : pid === NONE - 1 ? undefined : model.propertyIds[pid];
+  if (id === undefined) return undefined;
+  const first = mesh.p.array[triangle * 3],
+    fallback = first !== NONE ? first : (object.pindex ?? NONE),
+    own = mesh.p.array[triangle * 3 + corner],
+    index = own === NONE ? fallback : own;
+  return index === NONE ? undefined : { id, index };
+}
+
 const normalizePath = (path: string): string => path.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase();
 
 /**
@@ -246,6 +293,15 @@ const normalizePath = (path: string): string => path.replace(/\\/g, '/').replace
  * group per build item object and color; `colors` is present only when some triangle has per-corner colors.
  */
 export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {}): Promise<ThreeMFResult> {
+  return read3MF(input, options);
+}
+
+/** The reader behind {@link parse3MF}, with the hooks `@margoengine/loaders/threemf-materials` uses. */
+export async function read3MF(
+  input: BinaryInput,
+  options: ThreeMFOptions,
+  extension?: ThreeMFExtension,
+): Promise<ThreeMFResult> {
   const bytes = toBytes(input, F),
     limit = limits(options, F),
     maxDepth = options.maxDepth ?? 32;
@@ -283,7 +339,7 @@ export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {})
     let model = models.get(key);
     if (!model) {
       if (models.size >= 1024) throw new LoaderError(F, 'limit', 'too many model parts');
-      model = parseModel(decodeXML(await read(path)), limit);
+      model = parseModel(decodeXML(await read(path)), limit, extension);
       models.set(key, model);
     }
     return model;
@@ -299,30 +355,23 @@ export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {})
     ];
     for (const path of paths) if (path && !models.has(normalizePath(path))) pending.push(await load(path));
   }
+  await extension?.ready?.(read);
   throwIfAborted(options.signal, F);
 
   const scale = options.units === 'file' ? 1 : THREEMF_UNITS[root.unit];
-  const resolveColors = (model: Model, object: ObjectData, mesh: MeshData, t: number): (Color | undefined)[] => {
-    const ids = model.propertyIds;
-    const pidIndex = mesh.pid.array[t];
-    const groupId = pidIndex === NONE ? object.pid : pidIndex === NONE - 1 ? undefined : ids[pidIndex];
-    const group = groupId === undefined ? undefined : model.properties.get(groupId);
-    if (!group) return [undefined, undefined, undefined];
-    const p1 = mesh.p.array[t * 3];
-    const fallback = p1 !== NONE ? p1 : (object.pindex ?? NONE);
-    return [0, 1, 2].map((k) => {
-      const p = mesh.p.array[t * 3 + k],
-        i = p === NONE ? fallback : p;
-      if (i === NONE) return undefined;
-      if (i >= group.length)
+  const resolveColors = (model: Model, object: ObjectData, mesh: MeshData, t: number): (Color | undefined)[] =>
+    [0, 1, 2].map((k) => {
+      const property = cornerProperty(model, object, mesh, t, k),
+        group = property && model.properties.get(property.id);
+      if (!group) return undefined;
+      if (property.index >= group.length)
         throw new LoaderError(
           F,
           'range',
-          `property index ${i} is outside property group ${groupId} (${group.length} entries)`,
+          `property index ${property.index} is outside property group ${property.id} (${group.length} entries)`,
         );
-      return group[i];
+      return group[property.index];
     });
-  };
   const object = (model: Model, id: string, path: string | undefined): [Model, ObjectData] => {
     const owner = path ? models.get(normalizePath(path))! : model;
     const found = owner.objects.get(id);
@@ -375,19 +424,20 @@ export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {})
     };
     const flip = determinant(m) < 0;
     // Bucket triangles by their first-corner color so each group has one uniform color.
-    const buckets = new Map<string, { color?: Color; triangles: number[] }>();
+    const buckets = new Map<string, { color?: Color; triangles: number[] }>(),
+      suffix = (t: number): string => (extension ? `|${extension.bucket(model, o, mesh, t)}` : '');
     const triangleColors: (Color | undefined)[][] = [];
     let colored = false;
     for (let t = 0; t < triangleCount; t++) {
       const c = resolveColors(model, o, mesh, t);
       triangleColors.push(c);
       if (c[0]) colored = true;
-      const key = c[0] ? c[0].join(',') : '';
+      const key = (c[0] ? c[0].join(',') : '') + suffix(t);
       let bucket = buckets.get(key);
       if (!bucket) buckets.set(key, (bucket = { color: c[0], triangles: [] }));
       bucket.triangles.push(t);
     }
-    const unweld = !!colors && colored;
+    const unweld = (!!colors && colored) || !!extension;
     const base = positions.length / 3;
     if (base + (unweld ? triangleCount * 3 : vertexCount) > limit.maxVertices)
       throw new LoaderError(F, 'limit', `vertex count after instancing exceeds the limit of ${limit.maxVertices}`);
@@ -408,13 +458,15 @@ export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {})
             indices.push(positions.length / 3);
             positions.push3(...corner(v));
             const color = triangleColors[t][k] ?? [1, 1, 1, 1];
-            colors!.push3(color[0], color[1], color[2]);
+            colors?.push3(color[0], color[1], color[2]);
+            extension?.corner(model, o, mesh, t, k);
           } else indices.push(base + v);
         }
       }
       const group: LoadedGroup = { start, count: indices.length - start, objectId: o.id };
       if (o.name) group.name = o.name;
       if (bucket.color) group.color = [...bucket.color];
+      extension?.group(group, model, o, mesh, bucket.triangles[0]);
       groups.push(group);
     }
   };

@@ -84,6 +84,10 @@
     "./ldraw": {
       "types": "./dist/ldraw.d.ts",
       "import": "./dist/ldraw.js"
+    },
+    "./threemf-materials": {
+      "types": "./dist/threemf-materials.d.ts",
+      "import": "./dist/threemf-materials.js"
     }
   },
   "files": [

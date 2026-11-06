@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5063707,
+  "total": 5071624,
   "history": [
     {
       "date": "2026-10-24",
@@ -2240,6 +2240,12 @@
       "commit": "74712a1cb",
       "reason": "shader root: input nodes, tangent frames and cube and 3D sampling; gltf-pro: instance inputs and kept built-ins",
       "grew": 5
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "d8b2f163d",
+      "reason": "loaders/threemf-materials, new optional entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2493,6 +2499,7 @@
     "@margoengine/loaders/nrrd": 4978,
     "@margoengine/loaders/render": 3148,
     "@margoengine/loaders/svg": 11621,
+    "@margoengine/loaders/threemf-materials": 7917,
     "@margoengine/loaders/usd": 7778,
     "@margoengine/loaders/vrml": 5087,
     "@margoengine/loaders/worker": 8571,

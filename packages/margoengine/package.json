@@ -1026,6 +1026,10 @@
       "types": "./dist/loaders/ldraw.d.ts",
       "import": "./dist/loaders/ldraw.js"
     },
+    "./loaders/threemf-materials": {
+      "types": "./dist/loaders/threemf-materials.d.ts",
+      "import": "./dist/loaders/threemf-materials.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"

@@ -52,6 +52,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
 | `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
+| `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
@@ -431,6 +432,24 @@ console.log(model.groups[0].name, model.lines.length, model.missing);
 - **Units.** By default 1 LDraw unit is 0.4 mm and the model turns Y up. `units: 'file'` keeps LDraw units with -Y up.
 - **Lines.** `lines` and `lineColors` go to `@margoengine/lines` in `segments` mode. `conditionalLines` holds four points each: the two ends, then the two control points that decide whether to draw it. `edges: false` drops them all.
 - **Limits.** `maxDepth` (64), `maxInstances` (4,000,000) and the shared vertex and triangle limits stop a file of doubling references. Texture maps (`!TEXMAP`) are skipped with a warning.
+
+## 3MF textures and colour groups
+
+`parse3MFMaterials` from `@margoengine/loaders/threemf-materials` reads a 3MF package like `parse3MF` and adds the materials extension: `texture2d` images, `texture2dgroup` coordinates, `compositematerials` and `multiproperties`. The plain `parse3MF` stays as small as it was.
+
+```ts
+import { parse3MFMaterials } from '@margoengine/loaders/threemf-materials';
+
+const bytes = await (await fetch('/prints/lithophane.3mf')).arrayBuffer();
+const { groups, textures, uvs } = await parse3MFMaterials(bytes);
+const image = await createImageBitmap(new Blob([textures[groups[0].texture ?? 0].data]));
+console.log(image.width, uvs?.length);
+```
+
+- **Vertices.** Every triangle corner gets its own vertex, so `uvs` and `colors` can differ across a seam. `uvs` use v = 1 minus the file's v, and a mirrored build item keeps each coordinate on its corner.
+- **Groups.** A group's `texture` indexes `textures`; a triangle without one falls in a separate group. Each texture carries its image bytes, `contentType`, `tileStyleU`, `tileStyleV` and `filter`.
+- **Composites.** `compositematerials` mix their base colours by weight into one colour.
+- **Layers.** In `multiproperties`, colour layers mix by their alpha and the first texture layer sets the group's texture, so draw `colors` as a tint over it. Blend methods other than mix are read as mix.
 
 ## Tiled TMX
 

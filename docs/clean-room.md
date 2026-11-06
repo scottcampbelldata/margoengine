@@ -617,6 +617,7 @@ File formats written from their public descriptions; no reader of another projec
 | LF7 | MPD packs, `0 FILE` and `0 NOFILE` | loaders/src/ldraw.ts | LDraw.org, "MPD Language Extension" |
 | LF8 | BFC certification, winding and INVERTNEXT | loaders/src/ldraw.ts | LDraw.org, "Language Extension for Back Face Culling" |
 | LF9 | `!COLOUR` lines and the classic colour values | loaders/src/ldraw.ts | LDraw.org, "Colour Definition Language Extension" and the published LDConfig.ldr values |
+| LF10 | `texture2d`, `texture2dgroup`, `compositematerials`, `multiproperties` | loaders/src/threemf-materials.ts | 3MF Consortium, "Materials and Properties Extension" specification |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 
