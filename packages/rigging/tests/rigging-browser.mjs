@@ -63,6 +63,12 @@ try {
   check('the GPU-skinned tip is drawn at the target, not upright', k.drawnNearTarget && !k.straightTipDrawn, k);
   check('the drawn IK pose matches the CPU pose (97% of centroids)', k.inside >= 0.97 * k.total && k.total > 100, k);
 
+  const v = await run('vrm');
+  check('the real VRM is drawn', v.drawn > 2000, v);
+  check('its expressions reach the picture: morphs and the moved face texture', v.face > 20, v);
+  check('back at neutral the picture returns', v.restored <= 2, v);
+  check('its spring bones swing the drawn hair', v.swung > 10, v);
+
   assert.deepEqual(pageErrors, []);
   for (const name of checks) console.log(`ok - ${name}`);
   console.log(`${checks.length} rigging browser checks passed (bone heat ${results.weights.solveMs.toFixed(1)} ms)`);

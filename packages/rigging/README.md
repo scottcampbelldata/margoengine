@@ -256,7 +256,69 @@ hair[Symbol.dispose]();
 | `limit` | `0.05` | Farthest the bone strays from its animated position. |
 | `amount` | `1` | Share of the movement shown. |
 
-A model scaled up swings the same, only larger: forces, `radius`, collider radii and `limit` follow the bones' world scale. Joints and their ancestors need positive uniform scales. A `delta` of 0 holds the motion, and a long frame takes at most 8 steps of 1/60 s, so a stall slows the swing and cannot blow it up. Spring bones run after other solvers in the order they were added.
+A model scaled up swings the same, only larger: forces, `radius`, collider radii and `limit` follow the bones' world scale. Joints and their ancestors need positive scales; a scale a little off uniform, as exported rigs often have, reads as its mean. A `delta` of 0 holds the motion, and a long frame takes at most 8 steps of 1/60 s, so a stall slows the swing and cannot blow it up. Spring bones run after other solvers in the order they were added.
+
+## VRM avatars (`margoengine/rigging/vrm`)
+
+VRM 1.0 avatars from any tool that writes them. `readVRM` takes a `.vrm` file's bytes and gives the avatar's data; `addVRM` puts it to work on the model: the 18 preset expressions and any custom ones, the look-at, the spring bones and a mouth and blink channel for your own lip sync. `writeVRM` puts an avatar back into a `.vrm`, and `createVRM` makes one from any rigged glTF.
+
+```ts
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Animation } from 'margoengine/animation';
+import { addVRM, readVRM } from 'margoengine/rigging/vrm';
+import type { Engine } from 'margoengine';
+
+declare const engine: Engine;
+const url = 'Seed-san.vrm';
+const avatar = readVRM(new Uint8Array(await (await fetch(url)).arrayBuffer()));
+console.log(avatar.meta.name, avatar.meta.authors, avatar.meta.commercialUsage); // what its author allows
+
+const model = await loadGLTF(engine, url); // a .vrm is a binary glTF
+const animation = new Animation(model);
+const vrm = addVRM(animation, avatar);
+vrm.expressions.set('happy', 1); // 0 to 1, shown from the next frame
+vrm.lookAtTarget = [0, 1.5, 2]; // the eyes follow this world point
+console.log(vrm.unsupported); // what this renderer cannot show, by expression
+vrm[Symbol.dispose](); // back to neutral
+```
+
+Read `avatar.meta` before you use someone's avatar: it is the author's own statement of what may be done with it (`avatarPermission`, `commercialUsage`, `allowRedistribution` and the rest), and the licence named in `licenseUrl` applies. Margo reads it and keeps it; it enforces nothing.
+
+Pass an `Animator` from `margoengine/animator` as `animator` and the avatar runs inside its frame, after your clips, in the order the specification recommends: look-at, expressions, then spring bones. With none, it runs by itself as an engine plugin. `update(delta)` runs one frame by hand. Dispose the avatar before its `Animation`; disposing the model stops the avatar by itself.
+
+```ts
+import { createVRM, readVRM, writeVRM } from 'margoengine/rigging/vrm';
+
+declare const rigged: Uint8Array; // any .glb with a skin
+const out = writeVRM(
+  rigged,
+  createVRM({
+    name: 'Scout',
+    authors: ['Sam'],
+    bones: { hips: 1, spine: 2, head: 3 /* and the rest of VRM_REQUIRED_BONES */ },
+    expressions: { preset: { blink: { morphTargetBinds: [{ node: 3, index: 0, weight: 1 }] } } },
+  }),
+); // a .vrm
+console.log(readVRM(out).humanoid.humanBones.head?.node); // 3
+```
+
+| Name | Meaning |
+| --- | --- |
+| `readVRM(bytes or doc)` | The avatar: `meta`, `humanoid`, `expressions`, `lookAt`, `firstPerson`, `springBone`, as the file's own JSON, so nothing is lost. Refuses VRM 0.x and a file with no `VRMC_vrm`. |
+| `checkVRM(avatar, doc)` | Problems as strings: a missing required bone, a node or morph index out of range. Empty when sound. |
+| `writeVRM(glb, avatar)` | A new `.vrm`: the glTF's own bytes and extensions kept, with the avatar in place of any earlier one. |
+| `createVRM(options)` | An avatar from a bone map; `licenseUrl` defaults to VRM Public License 1.0, `lookAt`, `expressions` and `springBone` are optional. |
+| `vrmSprings(avatar)` | The file's spring bones as `addSpringBones` options. |
+| `VRMExpressions` | The expression rules with no engine: `set`, `get`, `resolve`, `evaluate`, `names`; `isBinary` and the `override*` blocks act as the specification says. |
+| `vrmGaze`, `vrmEyeAngles`, `vrmLookWeights` | The look-at maths: yaw and pitch from the head to a point, then bone angles or expression weights through the file's range maps. |
+
+| `addVRM` option | Default | Meaning |
+| --- | --- | --- |
+| `animator` | none | Run inside this `Animator`; with none, run as an engine plugin. |
+| `springs` | `true` | Run the file's spring bones. |
+| `mouth`, `blink`, `lookAt` | none | Custom expression names that an expression's `overrideMouth`, `overrideBlink` or `overrideLookAt` also holds back, beside the presets the specification names. |
+
+Expressions drive morph targets, `color` and `emissionColor` of materials, and texture moves. The other colour binds exist only in MToon and land in `unsupported`, because Margo draws MToon materials by their plain glTF fallback: no toon shading or outlines. `VRMC_node_constraint` data stays in the file through `writeVRM` and does not run.
 
 ## Retarget presets (`margoengine/rigging/retarget`)
 

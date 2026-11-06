@@ -1,14 +1,15 @@
 {
   "name": "@margoengine/rigging",
   "version": "1.0.0",
-  "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets.",
+  "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars.",
   "keywords": [
     "margoengine",
     "webgpu",
     "3d",
     "rigging",
     "skinning",
-    "weights"
+    "weights",
+    "vrm"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {
@@ -43,6 +44,10 @@
     "./springs": {
       "types": "./dist/springs.d.ts",
       "import": "./dist/springs.js"
+    },
+    "./vrm": {
+      "types": "./dist/vrm.d.ts",
+      "import": "./dist/vrm.js"
     }
   },
   "files": [

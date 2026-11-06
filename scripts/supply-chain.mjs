@@ -94,6 +94,10 @@ const ASSETS = [
     'examples/assets/ATTRIBUTION.md',
     'demo models: RobotExpressive (CC0), FlightHelmet (CC0), Tokyo diorama (Apache-2.0)',
   ],
+  [
+    'examples/assets/vrm/README.md',
+    'sample avatars for the VRM tests: Seed-san and VRM1_Constraint_Twist_Sample (VRM Consortium samples, VRM Public License 1.0; Seed-san model by VirtualCast, Inc.; (c) 2022 pixiv Inc.)',
+  ],
   ['examples/assets/robot-CREDITS.md', 'RobotExpressive upstream credits (Tomás Laulhé, Don McCurdy; CC0)'],
   [
     'examples/assets/tokyo-diorama-CREDITS.md',

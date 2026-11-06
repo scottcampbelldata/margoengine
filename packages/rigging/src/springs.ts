@@ -145,18 +145,24 @@ function vector(value: unknown, label: string): void {
     throw new RangeError(`${label} must be three finite numbers`);
 }
 
-/** Uniform scale of a world matrix. @throws MargoError when it is not positive and uniform. */
-function scaleOf(m: ArrayLike<number>): number {
+/** The scale along each axis of a world matrix. @throws MargoError for one that is flat or mirrored. */
+function scales(m: ArrayLike<number>): [number, number, number] {
   const sx = Math.hypot(m[0], m[1], m[2]),
     sy = Math.hypot(m[4], m[5], m[6]),
-    sz = Math.hypot(m[8], m[9], m[10]);
-  if (!(sx > 0) || Math.abs(sx - sy) > 1e-5 * sx || Math.abs(sx - sz) > 1e-5 * sx)
-    throw new MargoError('state', 'Spring bones need positive uniform scales; remove non-uniform scales on the chain');
-  return sx;
+    sz = Math.hypot(m[8], m[9], m[10]),
+    det =
+      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
+  if (!(det > 0)) throw new MargoError('state', 'Spring bones need positive scales; remove zero or mirrored scales');
+  return [sx, sy, sz];
+}
+// Exported rigs carry scales a little off uniform, so the mean stands for the three.
+function scaleOf(m: ArrayLike<number>): number {
+  const [sx, sy, sz] = scales(m);
+  return (sx + sy + sz) / 3;
 }
 function rotationOf(m: ArrayLike<number>): number[] {
-  const s = scaleOf(m);
-  return normalizeQuaternion(rotationToQuaternion(m, [0, 0, 0, 0], s, s, s));
+  const [sx, sy, sz] = scales(m);
+  return normalizeQuaternion(rotationToQuaternion(m, [0, 0, 0, 0], sx, sy, sz));
 }
 
 /** The shortest rotation taking unit vector `a` to unit vector `b`. */
@@ -311,6 +317,11 @@ export class SpringBones {
     for (const collider of options?.colliders ?? [])
       if (collider?.node !== undefined && collider?.node !== null) bone(collider.node, 'Spring collider node');
     this.settings();
+  }
+
+  /** The bones this simulation turns or moves, each once. */
+  bones(): number[] {
+    return [...new Set([...this.chains.flatMap((chain) => chain.heads), ...this.jiggles.map((j) => j.spec.joint)])];
   }
 
   /** Forgets all motion: the next step starts from the animated pose. Call it after moving a character by hand. */
@@ -687,15 +698,45 @@ export class SpringBones {
       local.set(scale, b * 10 + 7);
     }
     this.stepPose({ parents: this.parents, local }, delta, root);
-    const moved = new Set<number>();
-    for (const chain of this.chains) for (const bone of chain.heads) moved.add(bone);
-    for (const jiggle of this.jiggles) moved.add(jiggle.spec.joint);
-    for (const b of moved)
+    for (const b of this.bones())
       skeleton.setPose(b, {
         translation: Array.from(local.subarray(b * 10, b * 10 + 3)),
         rotation: Array.from(local.subarray(b * 10 + 3, b * 10 + 7)),
       });
   }
+}
+
+/** What {@link springAccess} reads of a model: `animation.model` fits. */
+export interface SpringModel {
+  readonly nodes: readonly Mesh[];
+  readonly root: Mesh;
+}
+
+/**
+ * The {@link SpringAccess} of a model's glTF nodes, for running {@link SpringBones.step} by hand. `writeRotation`
+ * replaces `setQuaternion`, as `animator.writeNodeRotation` does on an animated model.
+ */
+export function springAccess(
+  model: SpringModel,
+  writeRotation?: (bone: number, rotation: readonly number[]) => void,
+): SpringAccess {
+  const { nodes } = model,
+    engine = model.root.engine,
+    store = engine.store,
+    t = store.transforms;
+  return {
+    world: (bone) => nodes[bone].matrix,
+    parentWorld: (bone) => {
+      const parent = store.parents[nodes[bone].id];
+      return parent === -1 ? null : engine.meshes.get(parent)!.matrix;
+    },
+    rotate: writeRotation ?? ((bone, rotation) => nodes[bone].setQuaternion(rotation)),
+    move: (bone, offset) => {
+      const id = nodes[bone].id;
+      nodes[bone].setPosition([t.x[id] + offset[0], t.y[id] + offset[1], t.z[id] + offset[2]]);
+    },
+    flush: () => store.tick(false),
+  };
 }
 
 /** A running {@link addSpringBones}. */
@@ -712,30 +753,19 @@ export interface SpringBonesHandle {
 /**
  * Runs spring bones on `animator` (`@margoengine/animator`), every frame after the pose, layers, foot IK and the solvers
  * added before it. Joints, centers and collider nodes are glTF node indices of the animator's model. Joints and their
- * ancestors need positive uniform scales. Returns the handle; dispose it to stop.
+ * ancestors need positive scales. Returns the handle; dispose it to stop.
  * @throws RangeError for bad bones or settings, TypeError for chains that are not ancestor lines.
  */
 export function addSpringBones(animator: Animator, options: SpringBonesOptions): SpringBonesHandle {
-  const nodes: readonly Mesh[] = animator.animation.model.nodes,
-    engine = animator.animation.model.root.engine,
-    store = engine.store,
+  const model = animator.animation.model,
+    { nodes } = model,
+    parents = model.root.engine.store.parents,
     index = new Map(nodes.map((node, i) => [node.id, i])),
-    parents = nodes.map((node) => index.get(store.parents[node.id]) ?? -1),
-    springs = new SpringBones(parents, options),
-    t = store.transforms,
-    access: SpringAccess = {
-      world: (bone) => nodes[bone].matrix,
-      parentWorld: (bone) => {
-        const parent = store.parents[nodes[bone].id];
-        return parent === -1 ? null : engine.meshes.get(parent)!.matrix;
-      },
-      rotate: (bone, rotation) => animator.writeNodeRotation(nodes[bone], rotation),
-      move: (bone, offset) => {
-        const id = nodes[bone].id;
-        nodes[bone].setPosition([t.x[id] + offset[0], t.y[id] + offset[1], t.z[id] + offset[2]]);
-      },
-      flush: () => store.tick(false),
-    };
+    springs = new SpringBones(
+      nodes.map((node) => index.get(parents[node.id]) ?? -1),
+      options,
+    ),
+    access = springAccess(model, (bone, rotation) => animator.writeNodeRotation(nodes[bone], rotation));
   let remove: (() => void) | null = animator.addSolver((delta) => springs.step(delta, access));
   const dispose = (): void => {
     remove?.();

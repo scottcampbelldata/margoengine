@@ -9,6 +9,9 @@ import { Tonemap } from '../../tonemap/dist/index.js';
 import { Skeleton, Skin } from '../../animation/dist/index.js';
 import { boneHeatWeights, checkSkin, type RigJoint } from '../dist/index.js';
 import { solveSkeletonIK } from '../dist/ik.js';
+import { loadGLTF } from '../../gltf-pro/dist/index.js';
+import { Animation as ModelAnimation } from '../../animation/dist/index.js';
+import { addVRM, readVRM } from '../dist/vrm.js';
 import { tube } from './fixtures.js';
 
 declare const GPUBufferUsage: { COPY_DST: number; MAP_READ: number };
@@ -209,6 +212,51 @@ const fixture = {
       inside,
       total,
     };
+    clear();
+    return result;
+  },
+  /**
+   * A real VRM 1.0 file, the VRM Consortium's Seed-san: its expressions reach the drawn morph targets and the moved face
+   * texture, and a walk swings its hair on the GPU-skinned mesh.
+   */
+  async vrm() {
+    const model = await loadGLTF(engine, '/examples/assets/vrm/Seed-san.vrm'),
+      animation = new ModelAnimation(model);
+    engine.use(animation);
+    model.root.setPosition([0, -0.8, 0]);
+    const vrm = addVRM(animation, readVRM(model.asset.doc));
+    disposers.push(
+      () => model.dispose(),
+      () => animation.dispose(),
+      () => vrm.dispose(),
+    );
+    const changed = (a: Float32Array, b: Float32Array): number => {
+      let count = 0;
+      for (let i = 0; i < a.length; i += 4)
+        if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 0.05) count++;
+      return count;
+    };
+    let drawn = 0;
+    vrm.update(1 / 60);
+    const neutral = await read();
+    for (let i = 0; i < neutral.length; i += 4) if (neutral[i] + neutral[i + 1] + neutral[i + 2] > 0.05) drawn++;
+    vrm.expressions.set('happy', 1).set('aa', 1);
+    vrm.update(1 / 60);
+    const smiling = await read();
+    vrm.expressions.set('happy', 0).set('aa', 0);
+    vrm.update(1 / 60);
+    const back = await read();
+    // The body stays put while the root moves back and forth, so what changes in the picture is what lags.
+    for (let frame = 0; frame < 20; frame++) {
+      model.root.setPosition([0.012 * frame, -0.8, 0]);
+      vrm.update(1 / 60);
+    }
+    for (let frame = 0; frame < 3; frame++) {
+      model.root.setPosition([0, -0.8, 0]);
+      vrm.update(1 / 60);
+    }
+    const swung = await read(),
+      result = { drawn, face: changed(neutral, smiling), restored: changed(neutral, back), swung: changed(neutral, swung) };
     clear();
     return result;
   },

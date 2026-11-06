@@ -5,6 +5,7 @@
 ```ts
 import { Animator } from "@margoengine/animator";
 import { Vec3 } from "@margoengine/core";
+import { Mesh } from "@margoengine/core/extension";
 
 export interface Jiggle {
     joint: number;
@@ -25,6 +26,7 @@ export interface SpringAccess {
 export class SpringBones {
     readonly options: SpringBonesOptions;
     constructor(parents: readonly number[], options: SpringBonesOptions);
+    bones(): number[];
     reset(): void;
     step(delta: number, access: SpringAccess): void;
     stepPose(pose: SpringPose, delta: number, root?: ArrayLike<number>): void;
@@ -62,6 +64,11 @@ export interface SpringCollider {
     radius: number;
 }
 
+export interface SpringModel {
+    readonly nodes: readonly Mesh[];
+    readonly root: Mesh;
+}
+
 export interface SpringPose {
     readonly parents: readonly number[];
     readonly local: Float64Array | number[];
@@ -89,4 +96,6 @@ export interface SpringSkeleton {
 }
 
 export function addSpringBones(animator: Animator, options: SpringBonesOptions): SpringBonesHandle;
+
+export function springAccess(model: SpringModel, writeRotation?: (bone: number, rotation: readonly number[]) => void): SpringAccess;
 ```

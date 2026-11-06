@@ -409,7 +409,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/animation`](packages/animation/README.md) | Storage-buffer skinning and compute morph targets for Margo Engine. |
 | [`@margoengine/animator`](packages/animator/README.md) | Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints. |
 | [`@margoengine/kinematics-constraints`](packages/kinematics-constraints/README.md) | Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance. |
-| [`@margoengine/rigging`](packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets. |
+| [`@margoengine/rigging`](packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars. |
 | [`@margoengine/tween`](packages/tween/README.md) | Allocation-free numeric tween updates and easing timelines. |
 | [`@margoengine/cinematic`](packages/cinematic/README.md) | Critically damped camera follow, look-at and screen shake. |
 | [`@margoengine/cutscene`](packages/cutscene/README.md) | Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing and a player that fires events in order. |
@@ -2571,7 +2571,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-225). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-226). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2776,6 +2776,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Runtime mirroring (`@margoengine/animator/mirror`, 2026-11-06) | By method: partners need the same place in the tree on both sides, or `addMirror` refuses them. A rig whose rest pose is not symmetric keeps its own proportions, so the mirrored pose lands that far from an exact reflection. Scale tracks trade between partners as they are. Switching `enabled` is a hard cut. Speed not yet measured. |
 | Spline IK (`@margoengine/animator/spline-ik`, 2026-11-06) | By method: bones are chords, so a bend tighter than a bone is cut across, and a chain longer than the curve carries on straight past its end. The curve's frames are rebuilt every frame, and a curve of points is rebuilt too, so a very long chain costs more than one on a fixed `Spline`. `space` needs a uniform scale. Speed not yet measured. |
 | Spring bones (`@margoengine/rigging/springs`, 2026-11-06) | Enforced: 256 joints a chain, a joint in one chain only, 8 steps a frame (longer frames slow the swing), jiggle up to 15 Hz. By method: a tail can pass through a collider it crosses within one step, as in the specification; after the push the length hold can leave up to 1 mm of overlap; colliders hold their pose for the frame during a long frame's steps; spheres and capsules only, no planes or inside shapes; a chain has no twist, each bone turns by the shortest arc; strips do not pull on their neighbours, so a skirt of chains can part. 144 Hz differs from 60 Hz by up to 2% of the chain's length. Speed not yet measured. |
+| VRM avatars (`@margoengine/rigging/vrm`, 2026-11-06) | Enforced: VRM 1.0 only; VRM 0.x files are refused with a coded error. By method: MToon draws as its glTF fallback, and a colour bind only MToon has is listed in `unsupported` and not shown; `VRMC_node_constraint` is kept on write and does not run; `firstPerson` is data only; colour binds are checked by value, not in a picture. Not proven: no outside VRM tool has read a file `writeVRM` made (stand-in: read back by Margo only). Not measured: speed. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 

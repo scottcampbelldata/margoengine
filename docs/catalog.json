@@ -1931,7 +1931,7 @@
     "package": "@margoengine/rigging",
     "version": "1.0.0",
     "published": false,
-    "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets.",
+    "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "rigging",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/rigging@1.0.0",

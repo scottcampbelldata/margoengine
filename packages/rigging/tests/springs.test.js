@@ -367,6 +367,22 @@ test('jiggle lags, wobbles back, stays inside its limit and leaves no lag at a s
   );
 });
 
+test('a scale a little off uniform, as exported rigs have, swings; a mirrored one is refused', () => {
+  // Regression: real VRM hair bones carry scales such as 0.9995, 1, 0.9986, and the first version refused them.
+  const pose = rope(2);
+  pose.local.set([0.9995, 1, 0.9986], 17);
+  const springs = new SpringBones(pose.parents, { chains: [{ joints: pose.joints, gravity: 1 }] });
+  for (let frame = 0; frame < 30; frame++) {
+    pose.local[0] = frame * 0.02;
+    pose.local.set([0, 0, 0, 1], 13);
+    pose.local.set([0, 0, 0, 1], 23);
+    springs.stepPose(pose, 1 / 60);
+  }
+  assert.ok(positions(pose)[2].every(Number.isFinite));
+  pose.local.set([-1, 1, 1], 7);
+  assert.throws(() => springs.stepPose(pose, 1 / 60), { code: 'state' });
+});
+
 test('stepSkeleton poses a Skeleton', () => {
   const skeleton = new Skeleton(
     [

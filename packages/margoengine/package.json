@@ -1706,6 +1706,10 @@
       "types": "./dist/rigging/springs.d.ts",
       "import": "./dist/rigging/springs.js"
     },
+    "./rigging/vrm": {
+      "types": "./dist/rigging/vrm.d.ts",
+      "import": "./dist/rigging/vrm.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"
