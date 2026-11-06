@@ -884,7 +884,7 @@ Crowds of animated characters got cheaper and more varied, and baked simulations
 | 5 | Cheaper clone ticks | DONE | `1a61c13b0` | none, `cloneModel` and gltf-pro `adoptStaticBatches` | LIM-199 |
 | 6 | Dual quaternion skinning | DONE | `8a7fce1de` | `/dqs` | LIM-201 |
 | 7 | Bone-texture GPU instancing | DONE | `651cb62ae` | `/instanced-skin` | LIM-203 |
-| 8 | Geometry cache playback | DONE | this commit | `/geometry-cache` | LIM-207 |
+| 8 | Geometry cache playback | DONE | `b09c5e2d5` | `/geometry-cache` | LIM-207 |
 
 - **Bugs:** a shared page held dead assets and arrays (`packages/animation/tests/batch.test.js`). A morph loop wrapped wrongly
   at an exact lap, off by 0.63 (`scripts/animation-morph-gpu-tests.js`, `tests/morph-gpu.test.js`). `PBRModel.compile()` read a
@@ -906,12 +906,13 @@ Crowds of animated characters got cheaper and more varied, and baked simulations
   tests write their own files.
 - **Gate:** job 1 failed once on a stale `llms-full.txt`, job 2 once on the heat-containment step, job 4 once on an error with
   no fix text, and job 5 on a stale anchor in `docs:links` and on kit sizes past `docs/guides/kits.md`, which were updated to the
-  measured figures with the tolerance unchanged. Conflict markers once got amended into a local commit, and the landing stopped
+  measured figures with the tolerance unchanged. Job 8 failed once on `tests/api-conventions.test.js`, because the player opened
+  with `open` and not `attach`, and the API was renamed. Conflict markers once got amended into a local commit, and the landing stopped
   before the push. Nothing failed reached `main`. When `main` moved during a landing, the job reran its package and claims tests
   after the rebase, not `verify` or the GPU checks.
 - **Slips:** the helper twice picked process ids by script name instead of by a recorded id; both were its own and no other
   lane was hit. It leaked 467 `tail` processes from a wait loop and killed them after checking their folder. It ran
-  `npx --no-install` once in a worktree, which fetched nothing. Job 5's commit carries an 845 line diff in
+  `npx` twice in a worktree against the rule, `--no-install` and `--version`, which fetched nothing. Job 5's commit carries an 845 line diff in
   `packages/gltf-pro/README.md` from normalized line endings.
 
 ## Real files: every loader on a file from a real tool
