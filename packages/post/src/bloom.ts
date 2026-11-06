@@ -1,4 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
+import { ditherShader } from '../../shared/dither.js';
 import { SceneTarget } from '../../shared/msaa.js';
 import { compatibilityLevel } from '../../shared/compat.js';
 import type { EngineKernel } from '@margoengine/core';
@@ -109,8 +110,6 @@ export function bloomWeights(radius: number, levels: number): number[] {
 // 8-bit step (settings.z; 0 for float targets), hashed from the pixel position so a frame repeats exactly. The noise
 // also stays within each channel's distance to 0 and 1, so black stays black, nothing clips (no bias) and a
 // transparent pixel stays transparent.
-// Dither hash: C. Wellons' "lowbias32" ("Prospecting for Hash Functions", 2018, public domain), seeded with the
-// golden-ratio and MurmurHash3 fmix constants.
 const composite =
   displayShader +
   tent +
@@ -122,10 +121,7 @@ const composite =
 @vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{
  let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(p[i],0,1);
 }
-fn dither(p:vec2f)->f32{
- var x=(u32(p.x)*0x9e3779b9u)^(u32(p.y)*0x85ebca6bu);x=(x^(x>>16u))*0x7feb352du;x=(x^(x>>15u))*0x846ca68bu;x^=x>>16u;
- return f32(x&0xffffu)/65536.0+f32(x>>16u)/65536.0-1.0;
-}
+${ditherShader}
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{
  let s=textureLoad(scene,vec2i(p.xy),0);let hdr=s.rgb+tent(bloom,bilinear,p.xy/vec2f(textureDimensions(scene)))*settings.x;
  let o=toDisplay(hdr*exp2(settings.y));let a=max(s.a,max(o.r,max(o.g,o.b)));return vec4f(min(o+dither(p.xy)*min(vec3f(settings.z),min(o,1-o)),vec3f(a)),a);

@@ -102,6 +102,17 @@ const lobeSurfaces={
 // quad's middle. Each surface gets enough of it to stay above the tone curve's dark end.
 const toward=[0.3,0.2,1],lobePower={coat:16,sheen:64,film:2,grain:1};
 window.check={
+  // A dark gradient across the whole canvas, drawn alike down every column. Returns each column's mean in 8-bit steps.
+  async dithering({from,to,dithering,lit}){
+    const half=5*Math.tan(Math.PI/6),geometry={...quad(half),colors:[from,from,from,1,to,to,to,1,to,to,to,1,from,from,from,1]};
+    const made=await scene(front),{engine,errors,render}=made;
+    engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([1,1,1,1]);
+    createMesh(engine,geometry,lit?new PbrMaterial({roughness:1,dithering}):new UnlitMaterial({dithering}));await render();
+    const data=await pixels(made),again=await pixels(made),columns=new Float64Array(size);let low=255,high=0,moved=0;
+    for(let y=0;y<size;y++)for(let x=0;x<size;x++){const v=data[(y*size+x)*4];columns[x]+=v/size;low=Math.min(low,v);high=Math.max(high,v);moved+=v!==again[(y*size+x)*4];}
+    engine.dispose();
+    return {columns:Array.from(columns),low,high,moved,errors};
+  },
   // Strand highlights on a flat quad (a stand-in), its strands up the V axis, seen from `height` units away.
   async hair({shift,width}){
     const d=3,made=await scene({position:[0,0,d],target:[0,0,0],fov:60}),{engine,errors,render}=made;

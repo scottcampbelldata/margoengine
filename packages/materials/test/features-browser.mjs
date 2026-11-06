@@ -17,6 +17,39 @@ const check = (name, ...args) => page.evaluate(([n, a]) => window.check[n](...a)
 const near = (a, b, label, tolerance = 0.02) =>
   a.forEach((v, k) => assert.ok(Math.abs(v - b[k]) <= tolerance, `${label}: ${a} should be ${b}`));
 const jobs = {
+  async dithering() {
+    const encode = (v) => 255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055),
+      from = 0.004,
+      to = 0.02,
+      run = (o) => page.evaluate((v) => window.check.dithering(v), o),
+      worst = ({ columns }) => {
+        let most = 0;
+        columns.forEach((v, x) => {
+          // The gradient is linear in the columns from edge to edge of the canvas.
+          if (x > 2 && x < 253) most = Math.max(most, Math.abs(v - encode(from + ((to - from) * (x + 0.5)) / 256)));
+        });
+        return most;
+      };
+    const plain = await run({ from, to, dithering: false }),
+      soft = await run({ from, to, dithering: true });
+    assert.deepEqual([...plain.errors, ...soft.errors], []);
+    console.log('dithering', worst(plain), worst(soft));
+    // Rounding to 8 bits leaves a column up to half a step off, and the bands are that error.
+    assert.ok(worst(plain) > 0.4, `plain bands: ${worst(plain)}`);
+    // Triangular noise of deviation 0.41 steps and rounding of 0.29, averaged over 256 rows: 0.03. 0.15 allows five of those.
+    assert.ok(worst(soft) < 0.15, `dithered columns keep the true level: ${worst(soft)}`);
+    assert.equal(soft.moved, 0, 'a frame repeats exactly');
+    // The noise stays within each channel's distance to 0 and 1.
+    const black = await run({ from: 0, to: 0, dithering: true }),
+      white = await run({ from: 1, to: 1, dithering: true });
+    assert.deepEqual([black.low, black.high, white.low, white.high], [0, 0, 255, 255]);
+    // A lit surface goes through the same step.
+    const lit = await run({ from, to, dithering: true, lit: true }),
+      flat = await run({ from, to, dithering: false, lit: true });
+    assert.deepEqual([...lit.errors, ...flat.errors], []);
+    assert.ok(worst({ columns: lit.columns.map((v, x) => v - flat.columns[x] + encode(from + ((to - from) * (x + 0.5)) / 256)) }) < 0.6);
+    assert.ok(lit.columns.some((v, x) => Math.abs(v - flat.columns[x]) > 0.01), 'the lit colour moved');
+  },
   async hair() {
     // Flat quad, strand T = +Y, normal N = +Z, sun along +Z, camera at height d. Each row's lobe follows from the point it
     // sees: h is the half vector there, and along is h on the strand tilted by the shift.

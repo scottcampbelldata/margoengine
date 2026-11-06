@@ -639,6 +639,7 @@ while it is in use: a material that never sets one keeps exactly its shader, bin
 | `vertexColors` | Geometry `colors` multiply colour and opacity while true (the default, Margo's behaviour so far); false ignores them. Instance tints (`setColorAt`) still apply |
 | `fog` | Lit shadings: false leaves the material out of `@margoengine/environment`'s `Fog` (default true). Unlit, normal, matcap, depth and distance output are never fogged |
 | `toneMapped` | Lit shadings: false skips the display tone map (PBR Neutral) and only clamps before sRGB encoding, as unlit output does; default true for lit shadings, false for the others (which never tone map). On an HDR target (a post stack's tone map runs later) it changes nothing |
+| `dithering` | A step of per-pixel noise before 8-bit output, which removes banding in dark gradients, compiled in only while true. Black and white stay exact, and a frame repeats exactly; default false, live |
 
 Each map has its own UV transform slot (`material.setUVTransform(t, 'alphaMap')`); `uvTransform` and
 `setUVTransform(t)` without a slot set it with the other maps'.

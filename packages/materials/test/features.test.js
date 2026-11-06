@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
-import { LambertMaterial, Material, PbrMaterial, Texture, createInstancedMesh, createMesh } from '../dist/index.js';
+import { LambertMaterial, Material, PbrMaterial, Texture, UnlitMaterial, createInstancedMesh, createMesh } from '../dist/index.js';
 import { alphaHash } from '../dist/alpha-hash.js';
 import { objectNormal } from '../dist/object-normal.js';
 import { stochasticTiling } from '../dist/stochastic.js';
@@ -357,4 +357,23 @@ test('the skin profile is the published fit, and the table holds it', () => {
   const flat = skinTable(64);
   for (const column of [8, 20, 44, 60])
     assert.ok(Math.abs(flat[column * 4] - Math.max(0, ((column + 0.5) / 64) * 2 - 1)) < 0.02, `column ${column}`);
+});
+
+test('dithering compiles in only while set, on the 8-bit path, and is live', async () => {
+  const { engine, frame } = await scene(),
+    material = new PbrMaterial();
+  createMesh(engine, quad, material);
+  assert.ok(modules(frame()).every((c) => !c.includes('margoDither')));
+  material.dithering = true;
+  const lit = modules(frame()).find((c) => c.includes('fn surface('));
+  assert.match(lit, /color=margoDither\(color,i\.clip\.xy\);\s*return vec4f\(color,/);
+  assert.match(lit, /c,margoView\.flags\.x>0\.5\)/, 'a float scene target keeps its values');
+  material.dithering = false;
+  assert.ok(modules(frame()).every((c) => !c.includes('margoDither')));
+  const { engine: second, frame: draw } = await scene();
+  createMesh(second, quad, new UnlitMaterial({ dithering: true }));
+  assert.match(modules(draw()).find((c) => c.includes('fn surface(')), /return vec4f\(margoDither\(mat_out\(/);
+  const clone = new PbrMaterial({ dithering: true }).clone();
+  assert.equal(clone.dithering, true);
+  assert.throws(() => (material.dithering = 1), TypeError);
 });

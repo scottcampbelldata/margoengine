@@ -273,6 +273,8 @@ class Material {
     set vertexColors(v: boolean);
     get fog(): boolean;
     set fog(v: boolean);
+    get dithering(): boolean;
+    set dithering(v: boolean);
     get toneMapped(): boolean;
     set toneMapped(v: boolean);
     get emissiveIntensity(): number;
@@ -403,6 +405,7 @@ interface MaterialOptions extends PhysicalOptions {
     vertexColors?: boolean;
     fog?: boolean;
     toneMapped?: boolean;
+    dithering?: boolean;
     map?: Texture | null;
     metalRoughnessMap?: Texture | null;
     normalMap?: Texture | null;

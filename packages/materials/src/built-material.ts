@@ -1264,6 +1264,8 @@ export interface MaterialOptions extends PhysicalOptions {
    * output does (default true; unlit, normal, matcap, depth and distance output never tone map). Live.
    */
   toneMapped?: boolean;
+  /** A step of per-pixel noise before 8-bit output, which removes banding in dark gradients. Default false. Live. */
+  dithering?: boolean;
   map?: Texture | null;
   metalRoughnessMap?: Texture | null;
   normalMap?: Texture | null;
@@ -1827,9 +1829,12 @@ function featureKey(m: Material, code: string): string {
     m['added'].some((v) => v.tangentFrame)
       ? 'n'
       : '') +
-    surfaceKey(m)
+    surfaceKey(m) +
+    (m.dithering && !unencoded.includes(m.shading) ? 'q' : '')
   );
 }
+/** Shadings that write data rather than a colour for the screen, so output dithering has nothing to do. */
+const unencoded: readonly Shading[] = ['normal', 'depth', 'distance'];
 /** The surface maps (surface-features.ts bindings 171-174), in uniform-row order. */
 const surfaceMaps = ['parallaxMap', 'subsurfaceThicknessMap'] as const;
 const parallaxModes: readonly ParallaxMode[] = ['offset', 'occlusion', 'relief'];
@@ -2167,7 +2172,7 @@ export class Material {
   /** Optional features and the stamp of their last assignment (their shader text is fixed, so it names the variant). */
   private added: readonly MaterialFeature[] = [];
   private addedStamp = 0;
-  private readonly switches = { flatShading: false, vertexColors: true, fog: true, toneMapped: true };
+  private readonly switches = { flatShading: false, vertexColors: true, fog: true, toneMapped: true, dithering: false };
   /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
   readonly settings: number[];
@@ -2701,6 +2706,7 @@ export class Material {
       'vertexColors',
       'fog',
       'toneMapped',
+      'dithering',
       'clippingPlanes',
       'clipShadows',
       'clipIntersection',
@@ -2901,6 +2907,13 @@ export class Material {
     this.switches.fog = flag(v, 'fog');
   }
   /** The display tone map, while true (the default for lit shadings, false for the others, which never tone map). */
+  /** A step of per-pixel noise before 8-bit output while true (default false), compiled in only then. Live. */
+  get dithering(): boolean {
+    return this.switches.dithering;
+  }
+  set dithering(v: boolean) {
+    this.switches.dithering = flag(v, 'dithering');
+  }
   get toneMapped(): boolean {
     return this.switches.toneMapped;
   }
@@ -4160,8 +4173,9 @@ function shaderRevision(m: Material): number {
       (+surface[0] << 14) |
       (+surface[1] << 15) |
       (+surface[2] << 16) |
-      (+surface[3] << 17),
-    variant = key + m['addedStamp'] * 262144;
+      (+surface[3] << 17) |
+      (+m.dithering << 18),
+    variant = key + m['addedStamp'] * 524288;
   let state = shaderRevisions.get(m);
   if (!state) shaderRevisions.set(m, (state = { key: variant, revision: nextShaderRevision++ }));
   else if (state.key !== variant) {

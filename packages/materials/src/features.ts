@@ -7,10 +7,17 @@ import { MargoError } from '@margoengine/math/errors';
 // map) and the displacement are shared with the shadow casters' depth shaders.
 import { featureStruct, displacementWgsl } from '../../shared/displacement.js';
 import { parallaxShader, subsurfaceShader, surfaceDeclarations, triplanarShader } from './surface-features.js';
+import { ditherShader } from '../../shared/dither.js';
 /** Feature maps in UV-row (and binding) order, with their WGSL names. */
 export const featureMaps = ['alphaMap', 'bumpMap', 'displacementMap', 'lightMap'] as const;
 const names = ['Alpha', 'Bump', 'Displacement', 'Light'];
 const sample = (k: number) => `textureSample(margo${names[k]}Map,margo${names[k]}Sampler,margoFeatureUV(i.uv,${k}u))`;
+// Output dithering: a step of noise on the display-encoded colour just before it goes to the 8-bit target, kept within each
+// channel's distance to 0 and 1 so black stays black, nothing clips and there is no bias. A float scene target (settings.w)
+// keeps its values: the pass that presents it owns the 8-bit output.
+const dither = `${ditherShader.replace('fn dither(', 'fn margoDitherNoise(')}
+fn margoDither(c:vec3f,p:vec2f)->vec3f {return select(c+margoDitherNoise(p)*min(vec3f(1.0/255.0),min(c,1.0-c)),c,f.settings.w>0.5);}
+`;
 const cache = new Map<string, Map<string, string>>();
 function edit(code: string, from: string | RegExp, to: string | ((match: string, ...groups: string[]) => string)) {
   const next = code.replace(from, to as string);
@@ -34,7 +41,7 @@ const bump = `fn margoBump(n:vec3f,p:vec3f,height:f32,facing:bool)->vec3f {
  * `code` with the features `key` names: `a` alphaMap, `b` bumpMap, `d` displacementMap, `f` flatShading, `v`
  * vertexColors false, `g` fog false, `t` toneMapped false, `l` lightMap on a lit shading (baked irradiance: diffuse colour times the map, added like
  * emissive) or `u` on an unlit one (the map multiplies the colour), `n` a tangent-space map, anisotropy or an extension
- * lobe sampling one (the derived normal-map frame follows this package's UV orientation).
+ * lobe sampling one (the derived normal-map frame follows this package's UV orientation), `q` output dithering.
  */
 export function featureShader(code: string, group: number, key: string): string {
   let inner = cache.get(code);
@@ -97,6 +104,11 @@ export function featureShader(code: string, group: number, key: string): string 
       /let p=f\.model\*vec4f\(([^;]*),1\);/,
       (_, position) => `let p=f.model*vec4f(${position}+i.normal.xyz*margoDisplacement(i.uv),1);`,
     );
+  if (has('q'))
+    out = edit(out, 'return vec4f(color,', 'color=margoDither(color,i.clip.xy);\n  return vec4f(color,').replace(
+      /return vec4f\(mat_out\(([^;]*)\),alpha\);/,
+      (_, value: string) => `return vec4f(margoDither(mat_out(${value}),i.clip.xy),alpha);`,
+    );
   const declarations = maps.some(Boolean)
     ? `${featureStruct}
 @group(${group}) @binding(198) var<uniform> margoFeatures:MargoFeatures;
@@ -108,7 +120,7 @@ ${maps[1] ? bump : ''}${maps[2] ? displacementWgsl : ''}`
   if (has('p')) out = parallaxShader(out);
   if (has('x')) out = triplanarShader(out);
   const surface = has('p') || has('x') || has('s');
-  out = declarations + (surface ? surfaceDeclarations(group, has('p'), has('s'), has('k')) : '') + out;
+  out = (has('q') ? dither : '') + declarations + (surface ? surfaceDeclarations(group, has('p'), has('s'), has('k')) : '') + out;
   if (!inner) {
     if (cache.size >= 64) cache.clear();
     cache.set(code, (inner = new Map()));
