@@ -1678,6 +1678,10 @@
       "types": "./dist/stage/xr.d.ts",
       "import": "./dist/stage/xr.js"
     },
+    "./stage/viewer": {
+      "types": "./dist/stage/viewer.d.ts",
+      "import": "./dist/stage/viewer.js"
+    },
     "./staging": {
       "types": "./dist/staging.d.ts",
       "import": "./dist/staging.js"

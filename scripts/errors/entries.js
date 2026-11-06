@@ -46,7 +46,7 @@ export const entries = [
     id: 'state',
     title: 'state: not valid right now',
     kind: 'code',
-    messages: ['XR button needs a canvas on the page or the parent option'],
+    messages: ['XR button needs a canvas on the page or the parent option', 'Viewer model has no geometry to frame'],
     cause:
       'The call is valid in general but not at this moment: a re-entrant call from a callback, a missing prerequisite, or a device that is being restored. The re-entrancy, device restore and install entries list the messages.',
     fix: 'Retry later, from outside the callback, or after the prerequisite is in place.',
@@ -457,6 +457,8 @@ export const entries = [
       'fit: boolean',
       'Invalid stage options',
       'Expected element',
+      'shadows: contact, cascaded or false',
+      'Turntable: seconds not 0, resumeAfter 0 or more',
     ],
     cause:
       'An argument had the wrong type: not a canvas or element, an unknown backend, a camera, geometry or material not from core, a plugin without a unique name and `setup`, a pass without a unique name, finite order and `execute`, a frame delta outside 0..1 seconds, or a non-boolean flag.',

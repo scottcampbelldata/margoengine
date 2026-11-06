@@ -4,7 +4,7 @@ You normally use this package as [`margoengine`](../margoengine/README.md): `imp
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/environment`, `@margoengine/shadows` and `@margoengine/xr` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging`, `@margoengine/shadows`, `@margoengine/tonemap` and `@margoengine/xr` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
@@ -49,6 +49,7 @@ the ones it imports. With `margoengine` the entries are `margoengine/stage/<entr
 | `@margoengine/stage/environment` | `await addEnvironment(app, source, options)`: image-based lighting from an HDR, EXR or UltraHDR JPEG | `@margoengine/environment` |
 | `@margoengine/stage/shadows` | `await addShadows(app, options)`: cascaded shadows; the meshes present now cast | `@margoengine/shadows` |
 | `@margoengine/stage/xr` | `await addXRButton(app, options)`: an accessible Enter VR or Enter AR button that starts an XR session | `@margoengine/xr` |
+| `@margoengine/stage/viewer` | `await addViewer(app, url, options)`: a product viewer: model, image-based light, backdrop, shadow, tone mapping, fit and turntable tuned together | `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging` or `@margoengine/shadows`, `@margoengine/tonemap` |
 
 ```ts
 import {createStage} from 'margoengine';
@@ -125,6 +126,40 @@ Where the session cannot start (no WebXR, no WebGPU binding, a WebGL2 stage, a p
 
 Buttons of one stage share one `XR` plugin (`button.xr`, with `controllers`, `session` and `HitTest`), so a VR and an AR button work side by side. `button.dispose()` removes the button; the last one ends its session and frees the XR device, and the stage's disposal does the same. After the XR device is lost, a click reports through `onError`: dispose the button and add a new one. An `XR` you made yourself with `XR.create` takes the stage's one plugin slot, so `addXRButton` then rejects with `state`.
 
+## Model viewer
+
+`addViewer` is the one call for a product page: it loads a glTF with `@margoengine/gltf-pro` and sets up everything around it, sized to the model. Each part imports its package on first use, and `false` leaves the part and its package out.
+
+```ts
+import {createStage} from 'margoengine';
+import {addViewer} from 'margoengine/stage/viewer';
+
+const app = await createStage('#scene', {backend: 'webgpu'});
+const viewer = await addViewer(app, '/shoe.glb', {
+  environment: '/studio.hdr', // leave it out for the built-in soft studio
+  shadows: 'contact',
+  tonemap: {exposure: 0.2},
+});
+viewer.turntable = false; // stop the camera; set true to start again
+viewer.tonemap!.options.exposure = 0.4; // live
+viewer.dispose(); // removes the model and everything the viewer added
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `environment` | a built-in soft studio | `.hdr`, `.exr` or UltraHDR `.jpg` URL, or a decoded source, for the image-based light; `false` for none |
+| `lighting` | none | `EnvironmentLighting.load` options, such as `intensity` |
+| `background` | `'#dfe1e4'` | Colour behind the model, light because a ground shadow needs something to darken; `false` for none |
+| `shadows` | `'contact'` | `'contact'` is a soft shadow under the model, `'cascaded'` a cast shadow on a floor the viewer adds; `false` for none |
+| `shadow` | sized to the model | Options of the chosen shadow, over the viewer's values |
+| `tonemap` | `{}`, the package's neutral settings | `Tonemap` options; `false` for none |
+| `turntable` | `true` | `{seconds: 30, resumeAfter: 3}`: seconds per turn, negative to turn the other way, and seconds after a drag or wheel before it turns again; off for a visitor who asks for reduced motion, until the page sets `viewer.turntable = true` |
+| `fit` | `true` | Frames the model from a three-quarter view and sets the camera's near and far to its size |
+| `gltf` | none | `loadGLTF` options, such as a shared `draco` decoder |
+| `signal` | none | Cancels the load; the stage's disposal cancels it too |
+
+The turntable orbits the camera about the world's Y axis, not the model, so a model root off centre stays framed and shadows stay cached. A drag holds it. On any failure nothing stays behind; a file with nothing to draw rejects with `Viewer model has no geometry to frame`. `viewer.dispose()` leaves the camera where it is. Needs WebGPU. The `@margoengine/gltf-pro` model is a `PBRModel` (`viewer.model`), not the `LoadedModel` of `addGLTF`.
+
 All core exports are also available from this package. React applications can use the existing `@margoengine/react` components or wrap the engine received by Canvas `onCreated` with `new Stage(engine)`. The existing Canvas component retains ownership of rendering and teardown in that case.
 
-Run `npm run modern:dev` and open `/quickstart.html` for the five-line demo. Verification: `npm test` and `npm run modern:test:wrapper` after building packages.
+Run `npm run modern:dev` and open `/quickstart.html` for the five-line demo. Verification: `npm test` and `npm run modern:test:wrapper` after building packages; `npm run test:gpu --workspace packages/stage` runs the model viewer on real WebGPU.

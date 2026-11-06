@@ -72,6 +72,7 @@ export class EnvironmentBackground {
   source: 'auto' | 'equirect' | 'cube';
   private state?: DeviceState;
   private disposed = false;
+  private engine?: EngineKernel;
   private readonly uniformData = new ArrayBuffer(112);
   private readonly floats = new Float32Array(this.uniformData);
   private readonly uints = new Uint32Array(this.uniformData);
@@ -140,6 +141,7 @@ export class EnvironmentBackground {
         'unsupported',
         'EnvironmentBackground requires the WebGPU backend; use an engine on the WebGPU backend',
       );
+    this.engine = engine;
     const device = engineRuntime(engine).gpu;
     if (device && this.environment.device !== device && !this.environment.disposed)
       this.environment.restore(device).catch((error) => engine.onError(error));
@@ -163,6 +165,8 @@ export class EnvironmentBackground {
     if (this.disposed) return;
     this.disposed = true;
     this.releaseState();
+    this.engine?.removePlugin(this.name);
+    this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
@@ -399,6 +403,7 @@ export class ImageBackground {
   private rotationValue = 0;
   private state?: ImageState;
   private disposed = false;
+  private engine?: EngineKernel;
   private readonly floats = new Float32Array(24);
   private readonly inverse = new Float64Array(16);
   private readonly colorAttachment: GPURenderPassColorAttachment = {
@@ -489,6 +494,7 @@ export class ImageBackground {
     if (this.disposed) throw new MargoError('disposed', 'ImageBackground is disposed; create a new one');
     if (engine.backend !== 'webgpu')
       throw new MargoError('unsupported', 'ImageBackground requires the WebGPU backend; create the engine with WebGPU');
+    this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -502,9 +508,13 @@ export class ImageBackground {
   onDeviceRestored(): void {
     this.release();
   }
+  /** Frees the GPU state and detaches from the engine. Safe to call twice. */
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
     this.release();
+    this.engine?.removePlugin(this.name);
+    this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

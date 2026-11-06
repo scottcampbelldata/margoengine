@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EngineKernel, box } from '@margoengine/core';
-import { TransparentCanvas, ColorBackground } from '../dist/index.js';
+import { TransparentCanvas, ColorBackground, EnvironmentBackground, ImageBackground } from '../dist/index.js';
 
 function fakeGPU(t) {
   const saved = Object.fromEntries(
@@ -122,4 +122,36 @@ test('TransparentCanvas does nothing on the WebGL2 fallback; ColorBackground out
     engine.dispose();
   }
   assert.equal(new ColorBackground({ color: '#ff0000' }).color[0], 1);
+});
+
+// Regression (2026-11-05): the backgrounds freed their GPU state on dispose() but stayed registered, so the frame graph
+// kept their pass, and attaching a replacement under the same name threw.
+test('dispose() detaches every background from the engine, so a replacement can attach', async (t) => {
+  const { canvas } = fakeGPU(t),
+    engine = await EngineKernel.create(canvas, { capacity: 2, backend: 'webgpu' }),
+    pixels = { width: 1, height: 1, data: new Uint8ClampedArray(4) };
+  try {
+    const color = ColorBackground.attach(engine, { color: '#102030' });
+    engine.render();
+    color.dispose();
+    color.dispose();
+    assert.equal(engine.hasPlugin('background'), false);
+    const image = new ImageBackground({ shape: 'sphere', images: [pixels] });
+    engine.use(image);
+    image.dispose();
+    assert.equal(engine.hasPlugin('background'), false);
+    const next = ColorBackground.attach(engine);
+    engine.removePlugin('background');
+    assert.equal(engine.hasPlugin('background'), false);
+    next.dispose();
+    const environment = { device: undefined, disposed: true },
+      sky = EnvironmentBackground.attach(engine, environment);
+    sky.dispose();
+    assert.equal(engine.hasPlugin('environment:background'), false);
+    const last = ColorBackground.attach(engine);
+    engine.dispose();
+    last.dispose();
+  } finally {
+    engine.dispose();
+  }
 });

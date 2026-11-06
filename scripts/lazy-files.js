@@ -74,6 +74,33 @@ export const LAZY_FILES = [
     external: core,
     when: '`addXRButton(stage)` (`margoengine/stage/xr`), first call',
   },
+  {
+    package: 'margoengine',
+    file: 'packages/gltf-pro/dist/index.js',
+    label: '@margoengine/gltf-pro',
+    kind: 'Chunk',
+    measure: 'bundle',
+    external: core,
+    when: '`addViewer(stage, url)` (`margoengine/stage/viewer`), first call',
+  },
+  {
+    package: 'margoengine',
+    file: 'packages/staging/dist/index.js',
+    label: '@margoengine/staging',
+    kind: 'Chunk',
+    measure: 'bundle',
+    external: core,
+    when: '`addViewer(stage, url)` (`margoengine/stage/viewer`), first call with contact shadows',
+  },
+  {
+    package: 'margoengine',
+    file: 'packages/tonemap/dist/index.js',
+    label: '@margoengine/tonemap',
+    kind: 'Chunk',
+    measure: 'bundle',
+    external: core,
+    when: '`addViewer(stage, url)` (`margoengine/stage/viewer`), first call with tone mapping',
+  },
   // Draco and KTX2/Basis: a pool of classic workers, each loading the decoder it is asked for once.
   {
     package: '@margoengine/decoders',

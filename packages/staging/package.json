@@ -38,6 +38,9 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
   },
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "scripts": {
     "build": "node ../../scripts/build-optional.js staging",
     "test": "npm run build && node --test test/*.test.js",

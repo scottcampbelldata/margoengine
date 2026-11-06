@@ -96,6 +96,7 @@ export class ColorBackground {
     pipelines: Map<string, { pipeline: GPURenderPipeline; group: GPUBindGroup }>;
   };
   protected disposed = false;
+  protected engine?: EngineKernel;
   /** Written premultiplied: colour times alpha, alpha. */
   protected alpha = 1;
   private readonly values = new Float32Array(8);
@@ -150,6 +151,7 @@ export class ColorBackground {
         'unsupported',
         'ColorBackground requires the WebGPU backend; use an engine on the WebGPU backend',
       );
+    this.engine = engine;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -163,9 +165,13 @@ export class ColorBackground {
   onDeviceRestored(): void {
     this.release();
   }
+  /** Frees the GPU state and detaches from the engine. Safe to call twice. */
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
     this.release();
+    this.engine?.removePlugin(this.name);
+    this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
@@ -249,7 +255,6 @@ export class ColorBackground {
  * renderer transparent instead, `fallback: canvas => webglRenderer(canvas, {transparent: true})`.
  */
 export class TransparentCanvas extends ColorBackground {
-  private engine?: EngineKernel;
   /** Same as `engine.use(new TransparentCanvas(...))`; returns the TransparentCanvas. */
   static override attach(
     engine: EngineKernel,
@@ -278,10 +283,6 @@ export class TransparentCanvas extends ColorBackground {
     if (this.disposed) return;
     this.configure('opaque');
     super.dispose();
-    const engine = this.engine;
-    this.engine = undefined;
-    if (engine && !engine.disposed && engineRuntime(engine).plugins.get(this.name) === this)
-      engine.removePlugin(this.name);
   }
   // Core configured this context with the same device and preferred format; only alphaMode changes (the rest of the
   // current configuration, e.g. ColorOutput's P3/HDR, is kept where the browser can report it).

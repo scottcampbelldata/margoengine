@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
+import { sep } from 'node:path';
 import test from 'node:test';
 import { buildInDependencyOrder, packageDependencies, packageOrder } from '../scripts/package-order.js';
 
@@ -8,6 +9,41 @@ const manifest = (name, peers = [], deps = [], dev = []) => ({
   peerDependencies: Object.fromEntries(peers.map((peer) => [peer, '*'])),
   dependencies: Object.fromEntries(deps.map((dep) => [dep, '*'])),
   devDependencies: Object.fromEntries(dev.map((dep) => [dep, '*'])),
+});
+
+// Regression (2026-11-05): staging's bundle takes packages/shared/caster.js, which imports @margoengine/math, without
+// declaring math, so a parallel build started it while math's dist was being rewritten and failed now and then.
+test('a package declares every package its packages/shared imports reach', async () => {
+  const root = new URL('../', import.meta.url),
+    shared = new URL('packages/shared/', root),
+    reached = new Map();
+  const reach = async (file) => {
+    if (reached.has(file)) return reached.get(file);
+    const names = new Set();
+    reached.set(file, names);
+    const text = await readFile(new URL(file, shared), 'utf8').catch((error) => {
+      if (error.code === 'ENOENT') return '';
+      throw error;
+    });
+    for (const [, name] of text.matchAll(/from '(@margoengine\/[\w-]+)/g)) names.add(name);
+    for (const [, next] of text.matchAll(/from '\.\/([\w.-]+\.js)'/g)) for (const name of await reach(next)) names.add(name);
+    return names;
+  };
+  const missing = [];
+  for (const dir of await readdir(new URL('packages/', root))) {
+    const manifest = await readFile(new URL(`packages/${dir}/package.json`, root), 'utf8').catch(() => null);
+    if (!manifest) continue;
+    const { name, dependencies, peerDependencies, devDependencies } = JSON.parse(manifest),
+      declared = { ...dependencies, ...peerDependencies, ...devDependencies };
+    const sources = await readdir(new URL(`packages/${dir}/src/`, root), { recursive: true }).catch(() => []);
+    for (const source of sources.filter((file) => /\.tsx?$/.test(file))) {
+      const text = await readFile(new URL(`packages/${dir}/src/${source.split(sep).join('/')}`, root), 'utf8');
+      for (const [, file] of text.matchAll(/'(?:\.\.\/)+shared\/([\w.-]+\.js)'/g))
+        for (const needed of await reach(file))
+          if (needed !== name && !(needed in declared)) missing.push(`${name} needs ${needed} through shared/${file}`);
+    }
+  }
+  assert.deepEqual([...new Set(missing)], []);
 });
 
 test('every workspace package builds after the packages it declares', async () => {

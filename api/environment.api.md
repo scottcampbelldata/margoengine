@@ -23,6 +23,7 @@ export class ColorBackground {
     readonly name: string;
     readonly order: number;
     protected disposed: boolean;
+    protected engine?: EngineKernel;
     protected alpha: number;
     static attach(engine: EngineKernel, options?: ColorBackgroundOptions): ColorBackground;
     constructor(options?: ColorBackgroundOptions);

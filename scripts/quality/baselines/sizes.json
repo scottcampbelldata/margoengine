@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4711759,
+  "total": 4714239,
   "history": [
     {
       "date": "2026-10-24",
@@ -1916,6 +1916,12 @@
       "commit": "a8cdc393f",
       "reason": "New optional entry bvh/points.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "50062d9ac",
+      "reason": "New stage viewer entry; environment gains plugin detach on dispose",
+      "grew": 1
     }
   ],
   "items": {
@@ -2335,6 +2341,7 @@
     "@margoengine/stage/particles": 724,
     "@margoengine/stage/shadows": 750,
     "@margoengine/stage/sky": 719,
+    "@margoengine/stage/viewer": 2480,
     "@margoengine/stage/xr": 1741,
     "@margoengine/staging": 7875,
     "@margoengine/stats": 4934,

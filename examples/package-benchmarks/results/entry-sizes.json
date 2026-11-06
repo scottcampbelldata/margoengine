@@ -1,5 +1,5 @@
 {
-  "commit": "f391c8d0b",
+  "commit": "50062d9ac",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -170,8 +170,8 @@
     },
     "@margoengine/bvh": {
       ".": {
-        "raw": 65388,
-        "gzip": 23002
+        "raw": 66064,
+        "gzip": 23248
       },
       "./tree": {
         "raw": 26457,
@@ -184,6 +184,18 @@
       "./lines": {
         "raw": 13216,
         "gzip": 5857
+      },
+      "./gpu": {
+        "raw": 13051,
+        "gzip": 4952
+      },
+      "./scene": {
+        "raw": 8423,
+        "gzip": 3526
+      },
+      "./points": {
+        "raw": 45157,
+        "gzip": 17280
       }
     },
     "@margoengine/cache": {
@@ -510,8 +522,8 @@
     },
     "@margoengine/environment": {
       ".": {
-        "raw": 90385,
-        "gzip": 29637
+        "raw": 90507,
+        "gzip": 29642
       },
       "./probes": {
         "raw": 40397,
@@ -1812,6 +1824,10 @@
       "./xr": {
         "raw": 2632,
         "gzip": 1485
+      },
+      "./viewer": {
+        "raw": 4565,
+        "gzip": 2224
       }
     },
     "@margoengine/staging": {
@@ -2223,9 +2239,9 @@
       "brotli": 6171
     },
     "packages/environment/dist/index.js": {
-      "raw": 90385,
-      "gzip": 29637,
-      "brotli": 26257
+      "raw": 90507,
+      "gzip": 29642,
+      "brotli": 26250
     },
     "packages/shadows/dist/index.js": {
       "raw": 52204,
@@ -2236,6 +2252,21 @@
       "raw": 19185,
       "gzip": 6492,
       "brotli": 5795
+    },
+    "packages/gltf-pro/dist/index.js": {
+      "raw": 1317481,
+      "gzip": 536542,
+      "brotli": 438886
+    },
+    "packages/staging/dist/index.js": {
+      "raw": 20835,
+      "gzip": 7619,
+      "brotli": 6884
+    },
+    "packages/tonemap/dist/index.js": {
+      "raw": 31001,
+      "gzip": 10736,
+      "brotli": 9527
     },
     "packages/decoders/dist/decoder.worker.js": {
       "raw": 10691,
