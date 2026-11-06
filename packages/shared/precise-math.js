@@ -33,7 +33,9 @@
 // step whose rounding error matters takes its operands through pmHide, which rebuilds a value from its bits in
 // integers: a compiler cannot see what a hidden value is made of, so the step is one operation it can only commute.
 // The error terms (pmFastTwoSum, pmProductError) are hidden on the way out too, so they are not regrouped with the
-// large terms they came from. A bitcast round trip does not hide anything (compilers see through it). What is left
+// large terms they came from. Apple's compiler (M6, Chrome and WebKit) lost an unhidden last product in
+// pmProductError: the result was the sum without it, which left precisePow 97 ulp out and tan and division off too.
+// A bitcast round trip does not hide anything (compilers see through it). What is left
 // to the compiler are the polynomials and the small correction terms, where a regrouping moves a result by a small
 // fraction of an ulp. `test:browser:reassociate` (compute) runs the GPU check with every self-cancelling sum folded
 // and every sum factored by a term of its own (h + h w p to h (1 + w p), which Mesa did to the sine kernel: bug 29)
@@ -129,7 +131,7 @@ fn pmHide(v: f32) -> f32 {
 fn pmFastTwoSum(a: f32, b: f32) -> vec2f { let s = a + b; return vec2f(s, pmHide(b - pmHide(pmHide(s) - a))); }
 fn pmProductError(a: f32, b: f32, p: f32) -> f32 {
  let x = pmSplit(a); let y = pmSplit(b);
- return pmHide((((pmHide(x.x * y.x) - p) + pmHide(x.x * y.y)) + pmHide(x.y * y.x)) + x.y * y.y);
+ return pmHide((((pmHide(x.x * y.x) - p) + pmHide(x.x * y.y)) + pmHide(x.y * y.x)) + pmHide(x.y * y.y));
 }
 const PM_PIO2_HI: f32 = ${lit(P.halfPi[0])};
 const PM_PIO2_LO: f32 = ${lit(P.halfPi[1])};
@@ -445,6 +447,8 @@ fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h),
 }
 `,
     ],
+    // Near the top of the range 0.5 t is hidden: Apple's compiler otherwise regroups the product as 0.5 (t t), and t t
+    // overflows where the answer does not (sinh(-89) came out as infinity).
     preciseSinh: [
       ['preciseExpm1', 'preciseDiv'],
       `fn preciseSinh(x: f32) -> f32 {
@@ -453,7 +457,7 @@ fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h),
  if (a < 0.000244140625) { return x; }
  var r: f32;
  if (a <= 1.0) { let w = a * a; r = a + pmHide((a * w) * ${horner('w', P.sinh)}); }
- else if (a > 88.72284) { let t = preciseExp(0.5 * a); r = (0.5 * t) * t; }
+ else if (a > 88.72284) { let t = preciseExp(0.5 * a); r = pmHide(0.5 * t) * t; }
  else if (a > 9.0) { r = 0.5 * preciseExp(a); }
  else { let e = preciseExpm1(a); r = 0.5 * (e + preciseDiv(e, e + 1.0)); }
  return pmWithSign(r, x);
@@ -467,7 +471,7 @@ fn pmScale(v: f32, k: i32) -> f32 { let h = k / 2; return ldexp(ldexp(v, k - h),
  if (pmIsNan(x)) { return x; }
  if (a < 0.000244140625) { return 1.0; }
  if (a <= 1.0) { let w = a * a; return 1.0 + pmHide((w * w) * ${horner('w', P.cosh)} + 0.5 * w); }
- if (a > 88.72284) { let t = preciseExp(0.5 * a); return (0.5 * t) * t; }
+ if (a > 88.72284) { let t = preciseExp(0.5 * a); return pmHide(0.5 * t) * t; }
  let t = preciseExp(a);
  return 0.5 * (t + preciseDiv(1.0, t));
 }
@@ -529,7 +533,8 @@ fn pmLogSpecialValue(kind: u32, x: f32) -> f32 {
 }
 `,
     ],
-    // f log2(e) exactly as ah + al (f is exact, so are the products of 12-bit halves).
+    // f log2(e) exactly as ah + al (f is exact, so are the products of 12-bit halves). The tail is hidden: Apple's compiler
+    // otherwise adds its terms to the large part one by one, which rounds twice and came out 1.77 ulp off (bound 1.5).
     preciseLog2: [
       ['pmLog'],
       `fn preciseLog2(x: f32) -> f32 {
@@ -540,7 +545,7 @@ fn pmLogSpecialValue(kind: u32, x: f32) -> f32 {
  let ah = pmHide(d.y * PM_LOG2E);
  let al = pmProductError(d.y, PM_LOG2E, ah);
  let tail = (al + d.y * PM_LOG2E_LO) - (k.hfsq - k.t) * PM_LOG2E;
- return pmHide(d.x + ah) + tail;
+ return pmHide(d.x + ah) + pmHide(tail);
 }
 `,
     ],
@@ -563,6 +568,9 @@ fn pmLogSpecialValue(kind: u32, x: f32) -> f32 {
     // t = s hh (exact pair) + (s hl + sl hh + s R).
     // x^y with Math.pow's special cases (x < 0 needs an integer y).
     // 2^f = e^(f ln2), f ln2 = r + rl to about 2^-40.
+    // pmLog2Pair carries s R as a pair too: in one float it was good to about 1.5e-9, and y multiplies that (over 5 ulp on
+    // every GPU tried, near the top of the range). R = z (2/3 + 2/5 z + ... + 2/15 z^6), the rest of the series being
+    // under 1e-13 for this f. f - sd is hidden or Apple's compiler merges it into the residual and loses rho.
     precisePow: [
       ['pmLog', 'pmExp'],
       `fn pmLog2Pair(x: f32) -> vec2f {
@@ -574,15 +582,22 @@ fn pmLogSpecialValue(kind: u32, x: f32) -> f32 {
  let hl = 0.5 * pmProductError(f, f, q);
  let d2 = pmFastTwoSum(2.0, f); let dh = d2.x; let dl = d2.y;
  let sd = pmHide(k.s * dh);
- let rho = (f - sd) - pmProductError(k.s, dh, sd);
+ let rho = pmHide(f - sd) - pmProductError(k.s, dh, sd);
  let sl = (rho - k.s * dl) / dh;
  let th = pmHide(k.s * hh);
- let tl = ((pmProductError(k.s, hh, th) + k.s * hl) + sl * hh) + k.s * k.R;
+ let z = pmHide(k.s * k.s);
+ let zl = pmProductError(k.s, k.s, z) + (2.0 * k.s) * sl;
+ let w = pmFastTwoSum(${lit(Math.fround(2 / 3))}, ${lit(Math.fround(2 / 3 - Math.fround(2 / 3)))} + z * ${horner('z', [2 / 5, 2 / 7, 2 / 9, 2 / 11, 2 / 13, 2 / 15].map((c) => Math.fround(c)))});
+ let rh = pmHide(z * w.x);
+ let rl = (pmProductError(z, w.x, rh) + z * w.y) + zl * w.x;
+ let uh = pmHide(k.s * rh);
+ let u = pmFastTwoSum(th, uh);
+ let tl = (((pmProductError(k.s, hh, th) + k.s * hl) + sl * hh) + ((pmProductError(k.s, rh, uh) + k.s * rl) + sl * rh)) + u.y;
  let ah = pmHide(f * PM_LOG2E); let al = pmProductError(f, PM_LOG2E, ah);
  let bh = pmHide(hh * PM_LOG2E); let bl = pmProductError(hh, PM_LOG2E, bh);
- let ch = pmHide(th * PM_LOG2E); let cl = pmProductError(th, PM_LOG2E, ch);
+ let ch = pmHide(u.x * PM_LOG2E); let cl = pmProductError(u.x, PM_LOG2E, ch);
  let s1 = pmFastTwoSum(e, ah); let s2 = pmFastTwoSum(s1.x, -bh); let s3 = pmFastTwoSum(s2.x, ch);
- let small = ((f - hh) + th) * PM_LOG2E_LO;
+ let small = ((f - hh) + u.x) * PM_LOG2E_LO;
  let tail = (((s1.y + s2.y) + s3.y) + ((al - bl) + cl)) + ((tl - hl) * PM_LOG2E + small);
  return pmFastTwoSum(s3.x, tail);
 }

@@ -183,6 +183,28 @@ test('the spec-math stand-in moves each builtin result by the WGSL bound and lea
   }
 });
 
+test('pow\'s log pair carries s R as a pair and hides f - sd: its low word is what y multiplies', () => {
+  const pair = /fn pmLog2Pair[\s\S]*?\n}/.exec(preciseMathWgsl(['precisePow']))[0];
+  assert.match(pair, /let rho = pmHide\(f - sd\) - /);
+  assert.match(pair, /let u = pmFastTwoSum\(th, uh\);/);
+  assert.doesNotMatch(pair, /k\.s \* k\.R/);
+});
+
+test('sinh and cosh hide 0.5 t near the top of the range: t t overflows where the answer does not', () => {
+  for (const name of ['preciseSinh', 'preciseCosh'])
+    assert.match(preciseMathWgsl([name]), /pmHide\(0\.5 \* t\) \* t;/, name);
+});
+
+test('the tail of preciseLog2 is hidden: Apple\'s compiler spread an unhidden one over the large part', () => {
+  assert.match(preciseMathWgsl(['preciseLog2']), /return pmHide\(d\.x \+ ah\) \+ pmHide\(tail\);/);
+});
+
+test('every product of pmProductError is hidden: Apple\'s compiler lost the last one when it was not', () => {
+  const body = /fn pmProductError[\s\S]*?\n}/.exec(preciseMathWgsl(['precisePow']))[0];
+  for (const product of ['x.x * y.x', 'x.x * y.y', 'x.y * y.x', 'x.y * y.y'])
+    assert.ok(body.includes(`pmHide(${product})`), `${product} is hidden in ${body}`);
+});
+
 test('no sum in the precise maths is cancelled by its own operand, which WGSL lets a compiler fold (bug 22)', () => {
   const previous = globalThis.GPUDevice;
   try {

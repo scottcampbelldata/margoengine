@@ -1,7 +1,8 @@
 // The precise trig functions over every binade they reduce and precisePow at extreme exponents, on the real GPU,
 // against double precision (bug 29): preciseSin, preciseCos and preciseTan on 4,096 random mantissas per binade from
 // 2^-12 to 2^127 plus each binade's ends (573,720 inputs), precisePow on 400,000 pairs: results across the f32 range,
-// x near 1 with |y| up to 2^30, negative x with whole y, and tiny to huge |y|. Each line says how many inputs are over
+// x near 1 with |y| up to 2^30, negative x with whole y, large results from x up to 1.41, and tiny to huge |y|. Each
+// line says how many inputs are over
 // the function's bound in ulp (the bounds of tests/precise-math-reference.js); window.runPreciseSweep throws when any is.
 import { preciseMathWgsl } from '../../shared/precise-math.js';
 import { ulpOf } from '../../../tests/precise-math-reference.js';
@@ -28,7 +29,7 @@ function powInputs(n, random) {
     y = [];
   for (let i = 0; i < n; i++) {
     let a, b;
-    switch (i % 4) {
+    switch (i % 5) {
       case 0: // y log2 x from -150 to 128: every result size
         a = F(2 ** (random() * 252 - 126) * (1 + random()));
         b = (random() * 278 - 150) / Math.log2(a);
@@ -40,6 +41,10 @@ function powInputs(n, random) {
       case 2: // negative x, whole y
         a = F(-(random() * 100));
         b = Math.round(random() * 60 - 30);
+        break;
+      case 3: // x from 1 to the top of pow's log reduction, the result near the top of the range: y multiplies any error in the log
+        a = F(1 + random() * 0.4142);
+        b = (100 + random() * 28) / Math.log2(a);
         break;
       default: // any x, |y| from 2^-20 to 2^20
         a = F(2 ** (random() * 252 - 126));

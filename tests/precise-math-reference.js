@@ -474,7 +474,7 @@ export function preciseReference({ fused = false, divUlps = 0, sqrtUlps = 0 } = 
   /** log2(x), x > 0 finite, as hi + lo to about 2^-30 relative: pow's exponent needs it. */
   function log2Pair(x) {
     const [e, f] = decompose(x),
-      { s, R } = logK(f);
+      { s } = logK(f);
     const q = F(f * f),
       hh = F(0.5 * q),
       hl = F(0.5 * productError(f, f, q)); // hfsq = hh + hl exactly
@@ -484,20 +484,32 @@ export function preciseReference({ fused = false, divUlps = 0, sqrtUlps = 0 } = 
       sd = F(s * dh),
       rho = F(F(f - sd) - productError(s, dh, sd)),
       sl = div(F(rho - F(s * dl)), dh);
-    // t = s (hfsq + R) = s hh (exact pair) + (s hl + sl hh + s R).
+    // t = s (hfsq + R) = s hh (exact pair) + s R (a pair too, from the series of R) + the small rest.
     const th = F(s * hh),
-      tl = F(F(F(productError(s, hh, th) + F(s * hl)) + F(sl * hh)) + F(s * R));
+      z = F(s * s),
+      zl = F(productError(s, s, z) + F(F(2 * s) * sl));
+    let poly = F(2 / 15);
+    for (const c of [2 / 13, 2 / 11, 2 / 9, 2 / 7, 2 / 5]) poly = ma(z, poly, F(c));
+    const third = F(2 / 3),
+      [wh, wl] = twoSum(third, ma(z, poly, F(2 / 3 - third))),
+      rh = F(z * wh),
+      rl = F(F(productError(z, wh, rh) + F(z * wl)) + F(zl * wh)),
+      uh = F(s * rh),
+      [ux, uy] = twoSum(th, uh),
+      tl = F(
+        F(F(F(productError(s, hh, th) + F(s * hl)) + F(sl * hh)) + F(F(productError(s, rh, uh) + F(s * rl)) + F(sl * rh))) + uy,
+      );
     // log2(x) = e + log2(e) (f - hfsq + t), each product with log2(e) as an exact pair plus the small rest.
     const ah = F(f * LOG2E),
       al = productError(f, LOG2E, ah),
       bh = F(hh * LOG2E),
       bl = productError(hh, LOG2E, bh),
-      ch = F(th * LOG2E),
-      cl = productError(th, LOG2E, ch);
+      ch = F(ux * LOG2E),
+      cl = productError(ux, LOG2E, ch);
     const [s1, e1] = twoSum(e, ah),
       [s2, e2] = twoSum(s1, -bh),
       [s3, e3] = twoSum(s2, ch);
-    const small = F(F(F(f - hh) + th) * LOG2E_LO),
+    const small = F(F(F(f - hh) + ux) * LOG2E_LO),
       tail = F(F(F(F(e1 + e2) + e3) + F(F(al - bl) + cl)) + F(F(F(tl - hl) * LOG2E) + small));
     const hi = F(s3 + tail);
     return [hi, F(tail - F(hi - s3))];
