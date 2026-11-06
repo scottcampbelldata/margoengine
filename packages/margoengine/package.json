@@ -670,6 +670,10 @@
       "types": "./dist/exporters/usdz-anim.d.ts",
       "import": "./dist/exporters/usdz-anim.js"
     },
+    "./exporters/threemf": {
+      "types": "./dist/exporters/threemf.d.ts",
+      "import": "./dist/exporters/threemf.js"
+    },
     "./exporters/model": {
       "types": "./dist/exporters/model.d.ts",
       "import": "./dist/exporters/model.js"

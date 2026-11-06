@@ -1,5 +1,5 @@
 {
-  "commit": "d4534b505",
+  "commit": "736692cd3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -686,6 +686,10 @@
       "./usdz-anim": {
         "raw": 48490,
         "gzip": 17297
+      },
+      "./threemf": {
+        "raw": 38045,
+        "gzip": 13872
       },
       "./model": {
         "raw": 24235,
@@ -2190,8 +2194,8 @@
         "gzip": 3222
       },
       "./mesh": {
-        "raw": 7029,
-        "gzip": 2957
+        "raw": 7124,
+        "gzip": 2987
       },
       "./fit": {
         "raw": 7115,
@@ -2370,6 +2374,14 @@
       ".": {
         "raw": 13424,
         "gzip": 5210
+      },
+      "./stagger": {
+        "raw": 2328,
+        "gzip": 1179
+      },
+      "./motion-path": {
+        "raw": 2134,
+        "gzip": 1007
       }
     },
     "@margoengine/ui": {

@@ -438,7 +438,7 @@
     "package": "@margoengine/exporters",
     "version": "1.0.0",
     "published": false,
-    "description": "glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data.",
+    "description": "glTF/GLB, STL, OBJ, PLY, USDZ, COLLADA and 3MF exporters for Margo Engine scenes and geometry data.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "exporters",
     "install": "npm install @margoengine/core@1.0.0 @margoengine/exporters@1.0.0",

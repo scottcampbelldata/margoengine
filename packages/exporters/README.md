@@ -2,7 +2,7 @@
 
 Import `margoengine/exporters` from the `margoengine` package, or `@margoengine/exporters` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static and [animated USDZ](#animated-usdz-margoengineexportersusdz-anim) and static COLLADA 1.4.1 (`.dae`) export for Margo Engine scenes
+glTF 2.0 / GLB, STL, OBJ (with MTL), PLY, static and [animated USDZ](#animated-usdz-margoengineexportersusdz-anim) static COLLADA 1.4.1 (`.dae`) and [3MF](#3mf-for-3d-printing-margoengineexportersthreemf) export for Margo Engine scenes
 and plain geometry data, plus SHA-256 for checking exported files. [Compressed GLB files](#compressed-glb-files) are optional entries.
 
 Build from source with `npm run build` in `packages/exporters`.
@@ -934,6 +934,39 @@ Tracks are sampled at `fps`, as USD stores them, and the viewer blends between f
 `skipped` lists what the file does not carry: `'morph-weights'` channels, as the mesh stays in its base shape, `'not-exported'` channels of a node the scene left out, and for GLB input `'primitive'` not triangles, `'texture'` not PNG or JPEG, `'colors'` under a base colour texture and `'channel'` with no node, such as one of `KHR_animation_pointer`.
 
 A joint under nodes that are not joints takes their motion, and a joint scaled to zero, as a clip that makes a character appear does, keeps its rotation. What cannot be held is refused: a shear in the nodes above a joint, since a joint is a translation, rotation and scale. A mirrored node draws a reflected shape as in `exportUSDZ`, chosen at frame 0, so a clip that turns a scale negative part way keeps the winding it started with.
+
+## 3MF for 3D printing (`@margoengine/exporters/threemf`)
+
+`export3MF(source, options)` writes a scene or GLB bytes as a 3MF file, which slicers prefer over STL because it holds its unit, its colours and one object placed many times.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+// A tetrahedron 40 mm across, closed, so it prints.
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  normals: new Float32Array(12),
+  indices: [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3],
+};
+
+const file = await export3MF(
+  { nodes: [{ name: 'Peg', geometry, material: { color: [1, 0.2, 0, 1] } }] },
+  { unit: 'millimeter', upAxis: 'z', title: 'Peg' },
+);
+console.log(`${file.length} bytes`);
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `unit` | `'millimeter'` | `micron`, `millimeter`, `centimeter`, `inch`, `foot` or `meter`. Scene lengths are metres, as in glTF, and are converted, so a 1 m cube is 1000 long in `'millimeter'` |
+| `upAxis` | `'y'` | The scene's up axis. A printer's Z is up, so `'y'` turns the scene to stand on the bed; `'z'` leaves it as it is |
+| `title` | none | The file's Title metadata |
+| `signal` | none | Stops the archive step |
+| The collector's options | as `exportGLB` | What the scene collects |
+
+Each geometry and material pair is one object, and each node a build item that places it, so a part drawn fifty times is stored once. Vertices are welded by position, in the file's unit and at Float32, because a slicer needs triangles that share their edges; a triangle that leaves with no area goes. A node with a reflection in its matrix places a reflected object, shared by the nodes that mirror that geometry, so no item carries a reflection and nothing turns inside out.
+
+Base colours become `basematerials` and vertex colours a `colorgroup`, corner by corner, both in sRGB with alpha when it is not 1. Textures are not written; the material's base colour stands for them. Welding closes seams but does not repair a mesh: an open one is written as it is, and a slicer will say so.
 
 ## Collision and UV animation per engine
 

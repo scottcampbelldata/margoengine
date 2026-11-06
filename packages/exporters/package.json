@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/exporters",
   "version": "1.0.0",
-  "description": "glTF/GLB, STL, OBJ, PLY, USDZ and COLLADA exporters for Margo Engine scenes and geometry data.",
+  "description": "glTF/GLB, STL, OBJ, PLY, USDZ, COLLADA and 3MF exporters for Margo Engine scenes and geometry data.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -44,6 +44,10 @@
     "./usdz-anim": {
       "types": "./dist/usdz-anim.d.ts",
       "import": "./dist/usdz-anim.js"
+    },
+    "./threemf": {
+      "types": "./dist/threemf.d.ts",
+      "import": "./dist/threemf.js"
     },
     "./model": {
       "types": "./dist/model.d.ts",

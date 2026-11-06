@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9070874,
+  "total": 9085163,
   "history": [
     {
       "date": "2026-10-24",
@@ -2816,6 +2816,12 @@
       "commit": "a7b6598d1",
       "reason": "new optional entry @margoengine/tween/motion-path; splines/mesh gains frameBasis",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "736692cd3",
+      "reason": "exporters/threemf: new entry for 3MF export",
+      "grew": 1
     }
   ],
   "items": {
@@ -3001,6 +3007,7 @@
     "@margoengine/exporters/roblox-runtime-restore": 6130,
     "@margoengine/exporters/roblox-uv": 3602,
     "@margoengine/exporters/skin": 2459,
+    "@margoengine/exporters/threemf": 14289,
     "@margoengine/exporters/unity": 41842,
     "@margoengine/exporters/unity-2d": 7318,
     "@margoengine/exporters/unity-pixel-art": 931,
