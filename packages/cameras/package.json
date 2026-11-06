@@ -33,6 +33,10 @@
     "./layers": {
       "types": "./dist/layers.d.ts",
       "import": "./dist/layers.js"
+    },
+    "./offaxis": {
+      "types": "./dist/offaxis.d.ts",
+      "import": "./dist/offaxis.js"
     }
   },
   "files": [

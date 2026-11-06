@@ -68,6 +68,32 @@ try {
   px = await shot();
   assert.ok(is(px(300, 200), 0) && is(px(200, 100), 2), 'ortho with shadows and TAA');
   console.log('ok shadows + taa', px(300, 200), px(200, 200));
+  // Off-axis: the 8 x 8 screen at y = 0 is a window, so the box centres at y = 0 stay put when the eye moves sideways.
+  await page.reload();
+  await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
+  for (const eyeX of [0, 2]) {
+    result = await page.evaluate((x) => window.check.offAxis(x), eyeX);
+    assert.equal(result.error, null);
+    assert.deepEqual(result.errors, []);
+    px = await shot();
+    assert.ok(
+      is(px(200, 200), 1) && is(px(300, 200), 0) && is(px(200, 100), 2),
+      `off-axis eye ${eyeX}: ${px(200, 200)} ${px(300, 200)} ${px(200, 100)}`,
+    );
+  }
+  console.log('ok off-axis window');
+  // Oblique near plane: keeping y <= 1 shows the boxes (they reach y = 0.5); keeping y <= -1 clips all of them.
+  result = await page.evaluate(() => window.check.offAxis(0, 1));
+  px = await shot();
+  assert.ok(result.error === null && is(px(200, 200), 1) && is(px(300, 200), 0), 'oblique plane above the boxes');
+  result = await page.evaluate(() => window.check.offAxis(0, -1));
+  assert.equal(result.error, null);
+  px = await shot();
+  assert.ok(
+    dark(px(200, 200)) && dark(px(300, 200)) && dark(px(200, 100)),
+    `oblique plane below the boxes ${px(200, 200)}`,
+  );
+  console.log('ok oblique near plane');
   assert.deepEqual(pageErrors, []);
   console.log('cameras browser check passed');
 } finally {

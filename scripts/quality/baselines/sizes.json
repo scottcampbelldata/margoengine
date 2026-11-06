@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4638598,
+  "total": 4640676,
   "history": [
     {
       "date": "2026-10-24",
@@ -1826,6 +1826,12 @@
       "commit": "8006a420c",
       "reason": "new optional package @margoengine/worker: canvas transfer, resize and input forwarding (Batch 17 job 1)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8ea369bb2",
+      "reason": "cameras gains the offaxis entry (OffAxisProjection, ObliqueNearPlane)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1875,6 +1881,7 @@
     "@margoengine/cache/manager": 1985,
     "@margoengine/cameras": 3008,
     "@margoengine/cameras/layers": 1135,
+    "@margoengine/cameras/offaxis": 2078,
     "@margoengine/cameras/origin": 1514,
     "@margoengine/cinematic": 2076,
     "@margoengine/clustered": 13989,

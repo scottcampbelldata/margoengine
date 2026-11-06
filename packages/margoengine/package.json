@@ -222,6 +222,10 @@
       "types": "./dist/cameras/layers.d.ts",
       "import": "./dist/cameras/layers.js"
     },
+    "./cameras/offaxis": {
+      "types": "./dist/cameras/offaxis.d.ts",
+      "import": "./dist/cameras/offaxis.js"
+    },
     "./cinematic": {
       "types": "./dist/cinematic.d.ts",
       "import": "./dist/cinematic.js"

@@ -184,6 +184,38 @@ fovToLens(40, 16 / 9, {filmGauge: 36}); // the focal length that gives a 40 degr
 - **Errors**: `Invalid projection lens; ...` for a focal length, gauge or aspect that is not above 0 or an unknown
   `sensorFit`.
 
+## Off-axis and oblique projection: `@margoengine/cameras/offaxis`
+
+Head-tracked displays, CAVE walls and portals need a frustum that is not centred on the view axis. 0 core bytes.
+
+```ts
+import {ObliqueNearPlane, OffAxisProjection, offAxisFrustum} from 'margoengine/cameras/offaxis';
+
+// A 1.2 x 0.7 m monitor standing on the desk at the origin, facing +z; corners counter clockwise from the viewer.
+const screen = {lowerLeft: [-0.6, 0, 0], lowerRight: [0.6, 0, 0], upperLeft: [-0.6, 0.7, 0]};
+const window = OffAxisProjection.attach(engine, screen, [0, 0.4, 0.8]);
+tracker.onmove = (head) => window.setEye(head);     // world metres; the screen stays a window onto the scene
+
+offAxisFrustum(screen, [0, 0.4, 0.8], 0.1);         // {left, right, bottom, top, xAxis, yAxis, normal, distance}
+
+// Portals and mirrors: clip everything in front of a plane with no extra clip plane.
+window.dispose();
+const oblique = new ObliqueNearPlane([0, 0, -1, 0.5]).attach(engine.camera); // keeps z <= 0.5
+oblique.plane = [0, -1, 0, 2];                      // change it every frame; undefined clips nothing
+```
+
+- **Off-axis**: `OffAxisProjection(screen, eye)` aims the camera straight into the screen from the eye and builds the
+  asymmetric frustum from the three corners, so a point on the screen plane shows at the same place for any eye
+  position, and anything behind it moves with parallax. The canvas aspect is ignored; size the canvas like the screen.
+  Give each wall of a CAVE its own camera, view and `OffAxisProjection`. The eye must be in front of the screen;
+  `camera.near` should not exceed the eye's distance to the screen or the screen's near corners are clipped.
+- **Oblique**: `ObliqueNearPlane` replaces the near plane of the camera's projection with a plane in world space
+  (`[nx, ny, nz, d]`, points with `n·p + d >= 0` are kept). It works with core's perspective camera, `CameraProjection`
+  (orthographic too) and `OffAxisProjection`, on both depth conventions, and culling sees the same plane. Attach it
+  last and `dispose()` it first. The camera must be on the clipped side; the oblique plane trades depth precision for the
+  extra slant, so keep it away from edge-on views of the camera.
+- `obliqueProjection(matrix, planeInEyeSpace, webgpu)` does the matrix part on its own.
+
 Apache-2.0. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras

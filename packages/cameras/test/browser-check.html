@@ -8,9 +8,11 @@ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const projection=new CameraProjection({height:8});engine.use(projection);
 const meshes={};for(const [name,color,position] of [['red','#ff0000',[2,0,0]],['blue','#0000ff',[0,0,-2]],['green','#00ff00',[0,0,0]]])meshes[name]=engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color})).setPosition(position);
 const frame=async()=>{engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();};
+const settle=async()=>{device.pushErrorScope('validation');for(let i=0;i<4;i++)await frame();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),position:[...engine.camera.position]};};
 window.check={
-  async render(mode,height){projection.mode=mode;projection.height=height;device.pushErrorScope('validation');for(let i=0;i<4;i++)await frame();const e=await device.popErrorScope();return {error:e?.message??null,errors:errors.splice(0),position:[...engine.camera.position]};},
+  async render(mode,height){projection.mode=mode;projection.height=height;return settle();},
   async offset(on){if(on)projection.setViewOffset(400,400,200,0,200,400);else projection.clearViewOffset();return window.check.render('orthographic',8);},
+  async offAxis(eyeX,oblique){const {OffAxisProjection,ObliqueNearPlane}=await import('/packages/cameras/dist/offaxis.js');projection.dispose();window.off??=new OffAxisProjection({lowerLeft:[-4,0,4],lowerRight:[4,0,4],upperLeft:[-4,0,-4]},[0,20,0]);if(!window.attached){window.off.attach(engine.camera);window.attached=true;}window.off.setEye([eyeX,20,0]);window.obl?.dispose();if(oblique!==undefined)window.obl=new ObliqueNearPlane([0,-1,0,oblique]).attach(engine.camera);return settle();},
   async pick(x,y){const m=await engine.pick(x,y);return Object.entries(meshes).find(([,v])=>v===m)?.[0]??null;},
   async effects(){const [{Shadows},{TAA}]=await Promise.all([import('/packages/shadows/dist/index.js'),import('/packages/taa/dist/index.js')]);const shadows=Shadows.attach(engine);for(const m of Object.values(meshes))shadows.add?.(m);TAA.attach(engine);return window.check.render('orthographic',8);},
 };
