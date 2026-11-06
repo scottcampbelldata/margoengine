@@ -39,6 +39,10 @@
     "./hulls": {
       "types": "./dist/hulls.d.ts",
       "import": "./dist/hulls.js"
+    },
+    "./springs": {
+      "types": "./dist/springs.d.ts",
+      "import": "./dist/springs.js"
     }
   },
   "files": [

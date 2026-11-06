@@ -14,11 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-222). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-221). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-221). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-222). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-217). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-223). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -220,6 +216,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Motion matching (`@margoengine/animator/motion-matching`, 2026-11-06) | By method: the character does what its clips show, so a request with no matching clip plays the nearest row; the weights are defaults made for loops with no start or stop clips, so a real set may want its own. The root is the hips' smoothed ground path about +Y, with a yaw-only character; ground slope is left to foot placement. Scale tracks on the hips' ancestors are read at build but not in the running pose step. Proved on stand-in walk, run, strafe and idle clips and on Fox.glb's real clips with hand-labelled speeds; no motion capture set has been run. Speed not yet measured on a large table. |
 | Runtime mirroring (`@margoengine/animator/mirror`, 2026-11-06) | By method: partners need the same place in the tree on both sides, or `addMirror` refuses them. A rig whose rest pose is not symmetric keeps its own proportions, so the mirrored pose lands that far from an exact reflection. Scale tracks trade between partners as they are. Switching `enabled` is a hard cut. Speed not yet measured. |
 | Spline IK (`@margoengine/animator/spline-ik`, 2026-11-06) | By method: bones are chords, so a bend tighter than a bone is cut across, and a chain longer than the curve carries on straight past its end. The curve's frames are rebuilt every frame, and a curve of points is rebuilt too, so a very long chain costs more than one on a fixed `Spline`. `space` needs a uniform scale. Speed not yet measured. |
+| Spring bones (`@margoengine/rigging/springs`, 2026-11-06) | Enforced: 256 joints a chain, a joint in one chain only, 8 steps a frame (longer frames slow the swing), jiggle up to 15 Hz. By method: a tail can pass through a collider it crosses within one step, as in the specification; after the push the length hold can leave up to 1 mm of overlap; colliders hold their pose for the frame during a long frame's steps; spheres and capsules only, no planes or inside shapes; a chain has no twist, each bone turns by the shortest arc; strips do not pull on their neighbours, so a skirt of chains can part. 144 Hz differs from 60 Hz by up to 2% of the chain's length. Speed not yet measured. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 

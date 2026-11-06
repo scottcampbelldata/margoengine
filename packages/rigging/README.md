@@ -186,6 +186,78 @@ for (const hull of jointHulls({ positions, skin }, { inverseBindMatrices }))
 
 The model is `{positions, skin}`: bind-pose `positions` (xyz per vertex) and `skin` as a `WeightMap` or per-vertex influences (`{joints, weights, influences?}`). A joint repeated in several slots of one vertex counts its weights together. Joints that own fewer than four vertices, or whose vertices lie on a line or plane, have no hull and are left out of the result. Positions or weights that are not finite, a skin whose vertex count differs from the positions, and a joint with no inverse bind matrix throw a `RangeError` that names the fix.
 
+## Spring bones and jiggle (`margoengine/rigging/springs`)
+
+Secondary motion for hair, tails, cloth strips and accessories with no physics world: `addSpringBones(animator, options)` swings chains of bones after the frame's animation, against sphere and capsule colliders. The settings mean what `VRMC_springBone` 1.0's mean, so a VRM's values work as authored. Tails follow the animated pose, so a clip keeps its say and the chain settles back on it. The step is corrected for time: the same character swings the same at 30, 60 or 144 frames a second.
+
+```ts
+import { SpringBones } from 'margoengine/rigging/springs';
+
+// Plain data: a bone at the top and a rope of two bones hanging from it.
+const parents = [-1, 0, 1];
+const bone = (y: number) => [0, y, 0, 0, 0, 0, 1, 1, 1, 1];
+const springs = new SpringBones(parents, {
+  chains: [{ joints: [0, 1, 2], stiffness: 1, drag: 0.4, gravity: 0.5, radius: 0.02 }],
+  colliders: [{ offset: [0.4, -1, 0], radius: 0.25 }],
+});
+for (let frame = 0; frame < 60; frame++) {
+  const local = Float64Array.from([...bone(0), ...bone(-1), ...bone(-1)]); // this frame's animated pose
+  local[0] = frame * 0.02;
+  springs.stepPose({ parents, local }, 1 / 60); // rotations swing in place
+}
+```
+
+On a character, joints and collider nodes are glTF node indices:
+
+```ts
+import type { Animator } from 'margoengine/animator';
+import { addSpringBones } from 'margoengine/rigging/springs';
+
+declare const animator: Animator; // of a loaded model
+const hair = addSpringBones(animator, {
+  chains: [
+    { joints: [15, 16, 17], stiffness: 1.5, drag: 0.4, gravity: 0.3, center: 8 }, // measured against the head
+    { joints: [21], tail: [0, -0.06, 0], stiffness: 0.8 }, // an earring: one joint and an end point
+  ],
+  colliders: [{ node: 8, radius: 0.09 }, { node: 5, tail: [0, 0.3, 0], radius: 0.12 }],
+  jiggles: [{ joint: 30, frequency: 3, damping: 0.3, limit: 0.03 }], // lags and wobbles in place
+});
+hair.reset(); // after moving the character by hand
+hair[Symbol.dispose]();
+```
+
+`options` is kept and read every frame, so settings change live. `SpringBones` runs without an engine: `stepPose` for plain data, `stepSkeleton` for a `Skeleton` from `@margoengine/animation`, `step` for your own bones.
+
+| Chain field | Default | Meaning |
+| --- | --- | --- |
+| `joints` | required | Bones root to tip, each an ancestor of the next (up to 256). Bones left out ride along. The last is only a tail and does not turn, unless `tail` is set. A joint belongs to one chain. |
+| `stiffness` | `1` | Pull back toward the animated direction, 0 or more. |
+| `drag` | `0.5` | Share of the speed lost each 1/60 s, 0 to 1. |
+| `gravity` | `0` | Strength of gravity on the tail. |
+| `gravityDirection` | `[0, -1, 0]` | World direction of gravity. |
+| `radius` | `0` | Size of the tail against colliders. |
+| `settings` | none | Any of the five above per joint, by position in `joints`. |
+| `tail` | none | End point past the last joint, in its local space, so that joint turns too. |
+| `center` | none | `joints[0]` or an ancestor: motion of this bone does not swing the chain. Gravity stays in world space. |
+| `colliders` | all | Indices into `options.colliders` this chain hits. |
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `chains`, `colliders`, `jiggles` | none | What to simulate. A collider is `{node, offset, tail, radius}`: a sphere, or a capsule when `tail` is set; with no `node` its points are world points. |
+| `force` | none | Extra world force on every tail, such as wind, in `gravity` units. |
+| `weight` | `1` | Blend from the animated pose (0) to the simulated one (1). |
+| `teleportSpeed` | `100` | World speed in units a second above which a chain restarts from the animated pose instead of whipping across the gap. |
+
+| Jiggle field | Default | Meaning |
+| --- | --- | --- |
+| `joint` | required | The bone. Its position trails the animated one on a damped spring; steady motion leaves no lag. |
+| `frequency` | `4` | Wobbles a second, up to 15. |
+| `damping` | `0.35` | Share of critical damping: 1 stops without a wobble. |
+| `limit` | `0.05` | Farthest the bone strays from its animated position. |
+| `amount` | `1` | Share of the movement shown. |
+
+A model scaled up swings the same, only larger: forces, `radius`, collider radii and `limit` follow the bones' world scale. Joints and their ancestors need positive uniform scales. A `delta` of 0 holds the motion, and a long frame takes at most 8 steps of 1/60 s, so a stall slows the swing and cannot blow it up. Spring bones run after other solvers in the order they were added.
+
 ## Retarget presets (`margoengine/rigging/retarget`)
 
 Clips made for one skeleton play on another: `prepareRetarget(source, target)` recognises each rig's naming (Mixamo with any `mixamorig` prefix, Godot's humanoid profile, Roblox R15, the joints of `@margoengine/exporters/skin`'s `humanoidJoints()`, or the 55 humanoid bone names themselves), maps every target bone to its source bone, and by default turns the target's reference pose so each bone points the way the source's does at rest (an A-pose character driven by T-pose clips). Pass the result to `@margoengine/animation`'s `Retarget`:

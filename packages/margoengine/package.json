@@ -1698,6 +1698,10 @@
       "types": "./dist/rigging/hulls.d.ts",
       "import": "./dist/rigging/hulls.js"
     },
+    "./rigging/springs": {
+      "types": "./dist/rigging/springs.d.ts",
+      "import": "./dist/rigging/springs.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

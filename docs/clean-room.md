@@ -692,6 +692,7 @@ Maya, Pinocchio, libigl, three.js, Babylon, Godot, Unity, Unreal and the like) w
 | Root motion (`animator`) | Integration of a sampled track over an interval split into whole loop cycles and partial ones (elementary); the travel carried through the node hierarchy's local rotations and scales (glTF 2.0 section 3.5.3, transformations) |
 | Look-at and aim (`animator`) | Shortest-arc turns of the look axis toward the target shared along a bone chain, a roll about the look axis taking the up axis's projection to world up's (vector rejection), and slerp (K. Shoemake, "Animating rotation with quaternion curves", SIGGRAPH 1985) for weights |
 | Retarget presets (`rigging/retarget`) | Bone names from public documentation only: the VRM 1.0 humanoid bone list (VRM Consortium specification, `VRMC_vrm` humanoid), Godot's documented `SkeletonProfileHumanoid` bone names, Roblox's documented R15 body parts, and the bone names visible in Mixamo-exported files; rest-pose alignment is a shortest-arc turn per bone (quaternion algebra above), parents first |
+| Spring bones (`rigging/springs`) | The VRMC_springBone 1.0 specification (VRM Consortium), its fields and its non-normative algorithm section; L. Verlet, "Computer experiments on classical fluids", Physical Review 159, 1967; the time-corrected step and the damped spring are elementary mechanics |
 
 ## Game AI: `@margoengine/behavior`
 

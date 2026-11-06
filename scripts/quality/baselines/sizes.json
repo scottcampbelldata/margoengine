@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6418578,
+  "total": 6423647,
   "history": [
     {
       "date": "2026-10-24",
@@ -2462,6 +2462,12 @@
       "commit": "58f30b676",
       "reason": "layered entry and a tangentFrame field on the feature list",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "3c76a4407",
+      "reason": "feat(rigging): spring bones and jiggle (new entry @margoengine/rigging/springs)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2888,6 +2894,7 @@
     "@margoengine/rigging/hulls": 2759,
     "@margoengine/rigging/ik": 3740,
     "@margoengine/rigging/retarget": 2862,
+    "@margoengine/rigging/springs": 5069,
     "@margoengine/road": 1171,
     "@margoengine/save": 6952,
     "@margoengine/save/node": 939,
