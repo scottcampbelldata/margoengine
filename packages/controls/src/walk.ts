@@ -22,7 +22,7 @@ import {
   type ControlDocument,
 } from './controls.js';
 import { OrbitControls } from './orbit.js';
-import { MAX_PITCH, turn } from './fly.js';
+import { MAX_PITCH, turn } from './steer.js';
 import { basis } from './view.js';
 import type { V3 } from './math.js';
 import { hiddenInTree } from '../../shared/visibility.js';

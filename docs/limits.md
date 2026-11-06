@@ -14,7 +14,8 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-111). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-112). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-112). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -143,6 +144,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Engine bridge (`@margoengine/ecs/engine`) | Enforced: one way, component to mesh, and one mesh per entity. Each group is whole or absent. Values pass the mesh's own setters; `sync` costs one lookup per link even when nothing moved. Parents are not copied. | The setters' checks and the Euler view of `mesh.rotation` must hold, so the bridge cannot write the store columns blindly. | `TypeError`, `RangeError` or MargoError `'disposed'` from `link`, `sync` or the constructor. | Read a mesh back by hand when something else moves it. |
 | Relationships (`@margoengine/ecs/relations`) | Enforced by method: pairs carry no data of their own and live in Maps and Sets, not typed arrays. `acyclic` pays a walk up from the target on every `add`. | Pairs change rarely next to component rows, and Sets keep both directions direct to read. | A loop on an `acyclic` relation throws `TypeError`. | Keep per-pair numbers in a component on the source. |
 | Growable worlds (`@margoengine/ecs/growable`, accepted difference in speed, 2026-11-05) | Enforced: at most `limit` slots, 1,000,000 at most, and a slot retires after about 4,294,967,295 / `limit` reuses. Measured ([ecs-growable.mjs](../examples/package-benchmarks/ecs-growable.mjs), Node 26, three runs on a busy machine, diagnostic): a loop over 100,000 rows takes about twice as long as on a fixed `World`, ratio 2.02 to 2.09. | Ids are 32 bits and spaced by `limit`, so they survive growth. Resizable buffers keep every array reference valid while growing; plain arrays would be replaced, and a cached `fields.x` would silently write to the old copy. A fixed `World` pays nothing. | `create` throws `RangeError` at the limit. | Use a fixed `World` when a bound is known; lower `limit` for more reuses per slot. |
+| Roll in `FlyControls` and `TrackballControls` (`enableRoll`, 2026-11-05) | By method: off by default, so the horizon stays level. With it on, the control owns `camera.up`. Orbit, map, first-person, pointer-lock and walk controls do not roll. Not checked: an engine `CameraProjection` answers `camera.up` with its own `up` for an exactly vertical view, so a roll is not kept at that one orientation. | The level controls read their frame from world +Y; a roll would fight it. | Turning `enableRoll` off leaves the camera rolled, and `camera.up = [0, 1, 0]` throws at an exact vertical view. | Level the horizon with the view off the vertical, or use `ArcballControls`. |
 
 ## Copies of a model
 

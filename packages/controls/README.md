@@ -136,9 +136,9 @@ up direction and angular motion retain the small pole safety gap; rotating away 
 | --- | --- |
 | `OrbitControls` | Left drag rotates, middle drag or wheel dollies, right drag (or shift/ctrl + left) pans, arrows pan after `listenToKeyEvents(target)`. One finger rotates, two fingers dolly and pan. |
 | `MapControls` | Left drag pans along the ground, right drag rotates, two fingers dolly and rotate. |
-| `TrackballControls` | Left rotates freely, middle zooms, right pans; hold A, S or D to switch the left button. Coasts with `dynamicDampingFactor`. |
+| `TrackballControls` (`/trackball`) | Left rotates freely, middle zooms, right pans; hold A, S or D to switch the left button. Coasts with `dynamicDampingFactor`. With `enableRoll`, a drag near the edge rolls and the view passes over the poles. |
 | `ArcballControls` (`/arcball`) | Left drag turns freely on Shoemake's arcball (rolls, passes over the poles), right drag or Shift + left pans, middle drag, the wheel and a pinch zoom toward the cursor. One finger rotates, two fingers pinch and pan. |
-| `FlyControls` | WASD moves, R/F up and down, arrows yaw and pitch, pointer offset from center steers (or `dragToLook`). |
+| `FlyControls` (`/fly`) | WASD moves, R/F up and down, arrows yaw and pitch, pointer offset from center steers (or `dragToLook`). With `enableRoll`, Q and E roll. |
 | `FirstPersonControls` | Pointer offset from center turns, WASD or arrows move, R/F up and down, left/right button walks. |
 | `PointerLockControls` | `lock()` from a click, mouse look while locked, WASD/arrows/R/F through `update(delta)`, plus `moveForward`, `moveRight`, `moveUp`. |
 | `TransformControls` | Translate (axis arrows, plane squares, center screen-plane handle), rotate (axis rings, view ring, free trackball disc), scale (axis handles, uniform center). |
@@ -152,6 +152,8 @@ Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)`
 The root exports every control. An app that uses a few imports their entries instead, so the others stay out of its
 module graph: `@margoengine/controls/orbit` (`OrbitControls`, `MapControls`, `MOUSE`, `TOUCH`, the `Controls` base),
 `@margoengine/controls/arcball` (`ArcballControls`, `arcballPoint`, the `Controls` base),
+`@margoengine/controls/fly` and `@margoengine/controls/trackball` (`FlyControls` and `TrackballControls`, each with the
+`Controls` base),
 `@margoengine/controls/transform` (`TransformControls` and its types), `@margoengine/controls/drag` (`DragControls`;
 loads bvh) and `@margoengine/controls/profiles` (the navigation profiles). They are the same classes as the root's.
 
@@ -189,6 +191,37 @@ Programmatic motion: `rotate(axis, angle)` (world axis through the target), `pan
 `dollyOut`. Pass `{projection}` as the third constructor argument to name the projection when the camera is not an
 engine's. A `CameraProjection` answers `camera.up` with its own `up` for an exactly vertical view, so a roll is not kept
 at that one orientation.
+
+## Roll: `@margoengine/controls/fly` and `@margoengine/controls/trackball`
+
+Both keep the horizon level until you ask for roll. With `enableRoll`, `FlyControls` flies like an aircraft: Q rolls left,
+E rolls right at `rollSpeed`, yaw and pitch turn about the camera's own axes, and looping over the top works. W follows
+the view and R and F follow the rolled screen up. `TrackballControls` applies the whole ball rotation, so a drag near the
+edge of the element rolls the view, and a drag through the top carries the eye over the pole. Both write `camera.up` and
+keep it at right angles to the view. Turning `enableRoll` off leaves `camera.up` where it was; `camera.up = [0, 1, 0]`
+levels the horizon (with the view off the vertical, which core refuses as parallel to `up`).
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {FlyControls} from 'margoengine/controls/fly';
+import {TrackballControls} from 'margoengine/controls/trackball';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.createMesh().setGeometry(box());
+
+const flight = FlyControls.attach(engine);
+flight.enableRoll = true;
+flight.rollSpeed = 1;                                                // radians per second
+flight.dragToLook = true;
+
+// Or inspect freely instead:
+flight.dispose();
+const ball = TrackballControls.attach(engine);
+ball.enableRoll = true;
+ball.saveState();
+addEventListener('keydown', event => {if (event.key === 'Home') ball.reset();}); // also restores camera.up
+engine.start();
+```
 
 ## Keep the target in bounds, snap and shortcuts
 
@@ -291,7 +324,7 @@ any of them.
 ## How it works
 
 - **Camera model.** The Margo Engine `Camera` is a position, a target, `fov`, `near`, `far` and an `up` vector (default world +Y). All controls write `camera.position` and `camera.target` and nothing else. `OrbitControls.target` reads and writes `camera.target`. The core camera rejects a view parallel to its `up`, so with the default +Y every control keeps the view at least a hair off the poles (orbit uses an epsilon on the polar angle, the walk controls cap pitch just under 90 degrees).
-- **Roll.** Apart from `ArcballControls`, these controls keep world +Y up and do not roll (core's `camera.up` exists, but they don't drive it; on an exact pole, such as a ViewCube top view, OrbitControls reads its heading from `camera.up`). `TrackballControls` computes its rotation axis from the rendered frame (screen right and up derived from +Y), drops any roll of `camera.up`, and stops the eye just short of a pole instead of tumbling over it, which would flip the image. `FlyControls` ignores Q and E (roll) and yaws around world +Y. `ArcballControls` drives `camera.up` and rolls freely.
+- **Roll.** `ArcballControls` rolls freely, and `FlyControls` and `TrackballControls` roll with `enableRoll`; each of these then drives `camera.up`. The others keep world +Y up and do not roll (on an exact pole, such as a ViewCube top view, OrbitControls reads its heading from `camera.up`). By default `TrackballControls` computes its rotation axis from the rendered frame (screen right and up derived from +Y), drops any roll of `camera.up`, and stops the eye just short of a pole instead of tumbling over it, and `FlyControls` ignores Q and E and yaws around world +Y.
 - **Damping.** The factors are applied per 1/60 s (`1 - (1 - factor)^(delta * 60)`), so 30 and 60 fps settle identically. Without damping, pointer input is applied immediately.
 - **Zoom to cursor.** The dolly is a scaling about the point under the cursor on the plane through the target facing the camera, so the view direction is unchanged and that point keeps its pixel exactly. A fixed-size orthographic projection keeps its target instead, since its visible size does not change.
 - **Engine integration.** Constructed with an engine, a control registers a small plugin whose `onPreUpdate` calls `update(delta)` before each render, and `engine.dispose()` disposes it. Rendering manually with `engine.render()` passes `delta = 0`, which still applies direct input but does not advance damping, auto-rotate or key movement; pass `{delta}` to advance them.
@@ -314,9 +347,9 @@ any of them.
 | `autoRotate`, `autoRotateSpeed` | Orbit, Map | `false`, `2` (one turn per 30 s) |
 | `mouseButtons`, `touches`, `keys` | Orbit, Map, Trackball | Left rotates, middle dollies, right pans (Map: left pans, right rotates); one finger rotates, two dolly and pan (Map: pan, dolly and rotate); arrow keys (Trackball: A, S, D), using the exported `MOUSE` and `TOUCH` |
 | `setProfile(profile)`, `profile` | Orbit, Map | `null` (same as `MARGO`); see Navigation profiles |
-| `rotateSpeed`, `zoomSpeed`, `panSpeed`, `staticMoving`, `dynamicDampingFactor`, `noRotate`, `noZoom`, `noPan` | Trackball | `1`, `1.2`, `0.3`, `false`, `0.2`, `false` |
+| `rotateSpeed`, `zoomSpeed`, `panSpeed`, `staticMoving`, `dynamicDampingFactor`, `noRotate`, `noZoom`, `noPan`, `enableRoll` | Trackball | `1`, `1.2`, `0.3`, `false`, `0.2`, `false`, `false`, `false`, `false` |
 | `enableRotate`, `enableZoom`, `enablePan`, `rotateSpeed`, `zoomSpeed`, `panSpeed`, `enableDamping`, `dampingFactor`, `zoomToCursor`, `minZoom`, `maxZoom` | Arcball | `true`, `true`, `true`, `1`, `1`, `1`, `false`, `0.05`, `true`, `0`, `Infinity` |
-| `movementSpeed`, `rollSpeed`, `dragToLook`, `autoForward` | Fly | `1`, `0.005`, `false`, `false` |
+| `movementSpeed`, `rollSpeed`, `dragToLook`, `autoForward`, `enableRoll` | Fly | `1`, `0.01`, `false`, `false`, `false` |
 | `movementSpeed`, `lookSpeed`, `lookVertical`, `activeLook`, `heightSpeed`, `constrainVertical`, `verticalMin`, `verticalMax` | FirstPerson | `1`, `0.005`, `true`, `true`, `false`, `false`, `0`, `PI` |
 | `pointerSpeed`, `movementSpeed`, `requireLock`, `keys` | PointerLock | `1`, `1`, `true`, WASD/arrows/R/F |
 | `mode`, `space`, `size` | Transform | `'translate'`, `'world'`, `1` |
@@ -328,7 +361,7 @@ any of them.
 
 ## Limits
 
-- No roll except in `ArcballControls` (see above). Trackball rotation therefore cannot pass over the poles.
+- Orbit, map, first-person, pointer-lock and walk controls do not roll (see above). Without `enableRoll`, trackball rotation cannot pass over the poles.
 - Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`); an orbit `zoom` property is not implemented. `minTargetRadius`, `maxTargetRadius` and `cursor` are not implemented (use `targetBounds` to limit the target).
 - `TransformControls` does not flip arrows toward the camera and draws no start-to-current delta helper lines. A parent with non-uniform scale and rotation shears its children; drags use the parent's rotation without the shear.
 - The gizmo is always on top of the scene (no occlusion by scene geometry).
@@ -336,7 +369,7 @@ any of them.
 
 ## Tests
 
-`npm test` in `packages/controls` runs Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, the arcball (sphere mapping continuity, the angle and axis of a drag across the centre, roll and passing over the pole, an orthonormal frame after 1000 drags, pan and zoom keeping the cursor point on its pixel under perspective and fixed-size orthographic cameras, distance and zoom limits, damping coming to rest at 30 and 60 fps, enable flags and reset), fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, constant screen size, picking, drags and orbit pan under an orthographic camera at several zooms, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup. Drag tests move a box under a scaled parent on the view plane (checked against an independent ray-plane intersection), along an axis and on the ground plane, a gltf-pro model by touch under an orthographic camera (600 CSS pixels for 6 world units), and check events, hover, misses falling through to later listeners, other fingers, disposed meshes and models, and cleanup.
+`npm test` in `packages/controls` runs Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, roll in fly and trackball (Q and E at `rollSpeed`, the body axes, looping past the vertical, an orthonormal frame after long flights and tumbles, the rendered matrix, reset), the arcball (sphere mapping continuity, the angle and axis of a drag across the centre, roll and passing over the pole, an orthonormal frame after 1000 drags, pan and zoom keeping the cursor point on its pixel under perspective and fixed-size orthographic cameras, distance and zoom limits, damping coming to rest at 30 and 60 fps, enable flags and reset), fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, constant screen size, picking, drags and orbit pan under an orthographic camera at several zooms, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup. Drag tests move a box under a scaled parent on the view plane (checked against an independent ray-plane intersection), along an axis and on the ground plane, a gltf-pro model by touch under an orthographic camera (600 CSS pixels for 6 world units), and check events, hover, misses falling through to later listeners, other fingers, disposed meshes and models, and cleanup.
 
 `tests/walk.test.js` covers `WalkControls` on real core engines with generated geometry, at fixed time steps: a 12-step
 stair of 0.18 m risers climbed and descended with the eye never jumping more than 6 cm a frame, 0.19 m climbed and 0.25 m

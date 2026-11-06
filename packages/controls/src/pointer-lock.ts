@@ -9,7 +9,7 @@ import {
 } from './controls.js';
 import { madd, type V3 } from './math.js';
 import { basis } from './view.js';
-import { MAX_PITCH, translate, turn } from './fly.js';
+import { MAX_PITCH, translate, turn } from './steer.js';
 
 // Look sensitivity at pointerSpeed 1, in radians per pixel (mouse count) of locked movement. Derived so that 2 inches
 // (5.08 cm) of travel on an 800 DPI mouse (1600 counts) turns the view a quarter turn (90 degrees): a full turn

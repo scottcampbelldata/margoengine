@@ -41,6 +41,14 @@
       "types": "./dist/orbit.d.ts",
       "import": "./dist/orbit.js"
     },
+    "./fly": {
+      "types": "./dist/fly.d.ts",
+      "import": "./dist/fly.js"
+    },
+    "./trackball": {
+      "types": "./dist/trackball.d.ts",
+      "import": "./dist/trackball.js"
+    },
     "./arcball": {
       "types": "./dist/arcball.d.ts",
       "import": "./dist/arcball.js"

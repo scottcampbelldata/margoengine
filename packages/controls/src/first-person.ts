@@ -8,7 +8,7 @@ import {
 } from './controls.js';
 import { EPS, madd } from './math.js';
 import { basis } from './view.js';
-import { moved, translate } from './fly.js';
+import { moved, translate } from './steer.js';
 
 const DEGREES = 180 / Math.PI;
 // Latitude limit in degrees: one degree short of straight up or down. Any value below 90 keeps the world-up camera's

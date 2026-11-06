@@ -204,6 +204,7 @@ export class FirstPersonControls extends Controls {
 export class FlyControls extends Controls {
     movementSpeed: number;
     rollSpeed: number;
+    enableRoll: boolean;
     dragToLook: boolean;
     autoForward: boolean;
     movementSpeedMultiplier: number;
@@ -218,6 +219,8 @@ export class FlyControls extends Controls {
         pitchDown: number;
         yawLeft: number;
         yawRight: number;
+        rollLeft: number;
+        rollRight: number;
     };
     constructor(source: Camera | EngineKernel, element?: ControlElement | null, options?: {
         keyTarget?: EventTargetLike | null;
@@ -433,6 +436,7 @@ export class TrackballControls extends Controls {
     noPan: boolean;
     staticMoving: boolean;
     dynamicDampingFactor: number;
+    enableRoll: boolean;
     minDistance: number;
     maxDistance: number;
     keys: string[];

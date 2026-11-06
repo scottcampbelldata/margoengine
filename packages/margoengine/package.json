@@ -334,6 +334,14 @@
       "types": "./dist/controls/orbit.d.ts",
       "import": "./dist/controls/orbit.js"
     },
+    "./controls/fly": {
+      "types": "./dist/controls/fly.d.ts",
+      "import": "./dist/controls/fly.js"
+    },
+    "./controls/trackball": {
+      "types": "./dist/controls/trackball.d.ts",
+      "import": "./dist/controls/trackball.js"
+    },
     "./controls/arcball": {
       "types": "./dist/controls/arcball.d.ts",
       "import": "./dist/controls/arcball.js"

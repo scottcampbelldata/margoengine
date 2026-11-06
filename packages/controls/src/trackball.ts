@@ -7,10 +7,15 @@ import {
   type InputEventListener,
 } from './controls.js';
 import { EPS, madd, rotateAxis, type V3 } from './math.js';
-import { cross, normalize, sub } from '@margoengine/math/vec3';
-import { basis } from './view.js';
-import { MOUSE } from './orbit.js';
-import { moved } from './fly.js';
+import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
+import { basis, rollFrame } from './view.js';
+import { moved } from './steer.js';
+export { Controls };
+
+/** `MOUSE` values (kept local so this entry does not load the orbit module). */
+const ROTATE = 0,
+  DOLLY = 1,
+  PAN = 2;
 
 type State = 'none' | 'rotate' | 'zoom' | 'pan' | 'touch-rotate' | 'touch-zoom-pan';
 type Pointer = { x: number; y: number; touch: boolean };
@@ -43,17 +48,17 @@ function onBall(x: number, y: number): V3 {
 }
 
 /**
- * Rotation vector (camera frame: x right, y up) that turns the trackball from circle point `a` to `b`, with the roll
- * part about the view axis removed because the world-up camera cannot roll.
+ * Rotation vector (camera frame: x right, y up, z toward the viewer) that turns the trackball from circle point `a`
+ * to `b`. The z part is the roll about the view axis, which only `enableRoll` uses.
  */
-function ballTurn(a: readonly number[], b: readonly number[]): [number, number] {
+function ballTurn(a: readonly number[], b: readonly number[]): V3 {
   const p = onBall(a[0], a[1]),
     q = onBall(b[0], b[1]),
     axis = cross(p, q),
     length = Math.hypot(...axis);
-  if (length < 1e-15) return [0, 0];
+  if (length < 1e-15) return [0, 0, 0];
   const angle = Math.atan2(length, p[0] * q[0] + p[1] * q[1] + p[2] * q[2]) / length;
-  return [axis[0] * angle, axis[1] * angle];
+  return [axis[0] * angle, axis[1] * angle, axis[2] * angle];
 }
 
 /**
@@ -89,9 +94,10 @@ function rotateClear(eye: V3, axis: readonly number[], angle: number): V3 {
  * (see `mouseButtons`); holding `keys[0..2]` (A, S, D) makes the left button rotate, zoom or pan. One finger
  * rotates, two fingers pinch to zoom and move to pan. With `staticMoving` off, the view keeps turning after a fling
  * and zoom and pan ease in; the easing is frame-rate independent and eased zoom and pan end where the static ones
- * would. The camera has no roll: the screen axes come from world +Y every frame, the roll part of the trackball
- * rotation is dropped, and the eye stops just short of the poles instead of tumbling over them. `keyTarget` is where
- * key events are read (default: the element's document, else the element). Events: `start`, `change`, `end`.
+ * would. By default the camera has no roll: the screen axes come from world +Y every frame, the roll part of the
+ * trackball rotation is dropped, and the eye stops just short of the poles instead of tumbling over them. With
+ * `enableRoll` the whole rotation applies, the view passes over the poles and the control drives `camera.up`.
+ * `keyTarget` is where key events are read (default: the element's document, else the element). Events: `start`, `change`, `end`.
  */
 export class TrackballControls extends Controls {
   /** Rotation rate multiplier. Default 1. */
@@ -113,17 +119,23 @@ export class TrackballControls extends Controls {
    * feel does not depend on the frame rate). Default 0.2.
    */
   dynamicDampingFactor = 0.2;
+  /**
+   * Apply the whole ball rotation: dragging near the edge rolls the view, the eye passes over the poles and the control
+   * writes `camera.up`. Default false. Turning it off leaves `camera.up` as it is: set `camera.up = [0, 1, 0]` to
+   * level the horizon.
+   */
+  enableRoll = false;
   /** Closest distance to the target. Default 0. */
   minDistance = 0;
   /** Farthest distance from the target. Default Infinity. */
   maxDistance = Infinity;
   /** `KeyboardEvent.code` values that, while held, make the left button rotate, zoom or pan. Default A, S, D. */
   keys = ['KeyA', 'KeyS', 'KeyD'];
-  /** Action of each mouse button: `MOUSE.ROTATE`, `MOUSE.DOLLY` (zoom), `MOUSE.PAN` or null. */
+  /** Action of each mouse button: a `MOUSE` value (`ROTATE`, `DOLLY` for zoom, `PAN`) or null. */
   mouseButtons: { LEFT: number | null; MIDDLE: number | null; RIGHT: number | null } = {
-    LEFT: MOUSE.ROTATE,
-    MIDDLE: MOUSE.DOLLY,
-    RIGHT: MOUSE.PAN,
+    LEFT: ROTATE,
+    MIDDLE: DOLLY,
+    RIGHT: PAN,
   };
   /** Current gesture. */
   state: State = 'none';
@@ -135,7 +147,7 @@ export class TrackballControls extends Controls {
   private previousTouchAction = '';
   // Rotation: last circle point, rotation vector gathered from moves since the last update, and the coast.
   private ball: [number, number] = [0, 0];
-  private spin: [number, number] = [0, 0];
+  private spin: V3 = [0, 0, 0];
   private coastAxis: V3 = [0, 1, 0];
   private coastRate = 0; // radians per 1/60 s
   // Zoom (screen y units), pan (screen units) and pinch spread (CSS px): start chases end.
@@ -145,7 +157,7 @@ export class TrackballControls extends Controls {
   private panEnd: [number, number] = [0, 0];
   private spreadStart = 0;
   private spreadEnd = 0;
-  private saved: { position: V3; target: V3 };
+  private saved: { position: V3; target: V3; up: V3 };
 
   constructor(
     source: Camera | EngineKernel,
@@ -154,7 +166,7 @@ export class TrackballControls extends Controls {
   ) {
     super(source, element);
     this.keyTarget = options.keyTarget ?? null;
-    this.saved = { position: [...this.camera.position] as V3, target: [...this.camera.target] as V3 };
+    this.saved = this.snapshot();
     this.init();
   }
   protected override get kind(): string {
@@ -185,16 +197,21 @@ export class TrackballControls extends Controls {
     if (this.element?.style) this.element.style.touchAction = this.previousTouchAction;
   }
 
-  /** Remembers the camera position and target for `reset`. */
-  saveState(): void {
-    this.saved = { position: [...this.camera.position] as V3, target: [...this.camera.target] as V3 };
+  private snapshot(): { position: V3; target: V3; up: V3 } {
+    const c = this.camera;
+    return { position: [...c.position] as V3, target: [...c.target] as V3, up: [...c.up] as V3 };
   }
-  /** Restores the saved position and target and drops any pending or coasting motion. Dispatches `change`. */
+  /** Remembers the camera position, target and up for `reset`. */
+  saveState(): void {
+    this.saved = this.snapshot();
+  }
+  /** Restores the saved position, target and up and drops any pending or coasting motion. Dispatches `change`. */
   reset(): void {
     this.camera.target = [...this.saved.target];
     this.camera.position = [...this.saved.position];
+    this.camera.up = [...this.saved.up];
     this.state = 'none';
-    this.spin = [0, 0];
+    this.spin = [0, 0, 0];
     this.coastRate = 0;
     this.zoomStart = this.zoomEnd;
     this.panStart = [...this.panEnd];
@@ -210,20 +227,34 @@ export class TrackballControls extends Controls {
       damping = Math.min(1, Math.max(1e-6, this.dynamicDampingFactor)),
       // Share of a remaining zoom or pan gap taken this update: dynamicDampingFactor per 1/60 s, compounded.
       share = this.staticMoving ? 1 : 1 - (1 - damping) ** frames,
-      frame = basis(camera);
+      free = this.enableRoll,
+      frame = free ? rollFrame(camera) : basis(camera);
     let target = [...camera.target] as V3,
-      eye = sub(camera.position, target) as V3;
+      eye = sub(camera.position, target) as V3,
+      up = frame.up,
+      turned = false;
+    // With roll the eye and the up vector turn together with no stop; without it the eye stops short of the poles.
+    const swing = (axis: readonly number[], angle: number): void => {
+      if (!free) {
+        eye = rotateClear(eye, axis, angle);
+        return;
+      }
+      eye = rotateAxis(eye, axis, angle);
+      up = rotateAxis(up, axis, angle);
+      turned = true;
+    };
 
     // 1. Rotation.
-    const [sx, sy] = this.spin;
-    this.spin = [0, 0];
+    const [sx, sy, sz] = this.spin,
+      twist = free ? sz : 0;
+    this.spin = [0, 0, 0];
     if (!this.noRotate && Math.hypot(...eye) > EPS) {
-      if (sx || sy) {
+      if (sx || sy || twist) {
         // The scene turns about the camera-frame axis; the eye turns the opposite way about the same world axis.
-        const turnAxis = madd(madd([0, 0, 0], frame.right, -sx), frame.up, -sy),
-          angle = Math.hypot(sx, sy) * this.rotateSpeed;
+        const turnAxis = madd(madd(madd([0, 0, 0], frame.right, -sx), frame.up, -sy), frame.forward, twist),
+          angle = Math.hypot(sx, sy, twist) * this.rotateSpeed;
         this.coastAxis = normalize(turnAxis) as V3;
-        eye = rotateClear(eye, this.coastAxis, angle);
+        swing(this.coastAxis, angle);
         if (this.staticMoving) this.coastRate = 0;
         else if (frames > 0) this.coastRate = angle / frames;
       } else if (!this.staticMoving && this.coastRate > 0) {
@@ -245,7 +276,7 @@ export class TrackballControls extends Controls {
             this.coastRate = 0;
           }
         } else this.coastRate = 0;
-        if (angle) eye = rotateClear(eye, this.coastAxis, angle);
+        if (angle) swing(this.coastAxis, angle);
       }
     } else if (this.noRotate) this.coastRate = 0;
 
@@ -278,9 +309,9 @@ export class TrackballControls extends Controls {
           tx = whole ? gx : gx * share,
           ty = whole ? gy : gy * share,
           scale = Math.hypot(...eye) * this.panSpeed,
-          leftward = cross(eye, frame.up),
+          leftward = cross(eye, up),
           left = Math.hypot(...leftward) > 0 ? normalize(leftward) : frame.right.map((v) => -v);
-        target = madd(madd(target, left, tx * scale), frame.up, ty * scale);
+        target = madd(madd(target, left, tx * scale), up, ty * scale);
         this.panStart = whole ? [...this.panEnd] : [this.panStart[0] + tx, this.panStart[1] + ty];
       }
     }
@@ -294,7 +325,15 @@ export class TrackballControls extends Controls {
 
     camera.target = target;
     camera.position = madd(target, eye, 1);
-    const changed = moved(before, camera);
+    // Taken off the view again, so rounding cannot tilt the frame over a long tumble.
+    let rolled = false;
+    if (turned) {
+      const back = normalize(eye),
+        next = normalize(madd(up, back, -dot(up, back)));
+      rolled = Math.hypot(...sub(next, frame.up)) > EPS;
+      camera.up = next;
+    }
+    const changed = moved(before, camera) || rolled;
     if (changed) this.dispatchEvent({ type: 'change' });
     return changed;
   }
@@ -317,7 +356,7 @@ export class TrackballControls extends Controls {
   }
   private grab(p: { x: number; y: number }): void {
     this.ball = this.circle(p);
-    this.spin = [0, 0];
+    this.spin = [0, 0, 0];
     this.coastRate = 0; // taking hold of the ball stops it
   }
   private touches(): Pointer[] {
@@ -358,7 +397,7 @@ export class TrackballControls extends Controls {
           : button === 2
             ? this.mouseButtons.RIGHT
             : null;
-    return action === MOUSE.ROTATE ? 'rotate' : action === MOUSE.DOLLY ? 'zoom' : action === MOUSE.PAN ? 'pan' : 'none';
+    return action === ROTATE ? 'rotate' : action === DOLLY ? 'zoom' : action === PAN ? 'pan' : 'none';
   }
 
   private readonly onDown = (event: PointerEvent): void => {
@@ -406,8 +445,8 @@ export class TrackballControls extends Controls {
     if (!mine) return;
     if (state === 'rotate' || state === 'touch-rotate') {
       const next = this.circle(p),
-        [dx, dy] = ballTurn(this.ball, next);
-      this.spin = [this.spin[0] + dx, this.spin[1] + dy];
+        [dx, dy, dz] = ballTurn(this.ball, next);
+      this.spin = [this.spin[0] + dx, this.spin[1] + dy, this.spin[2] + dz];
       this.ball = next;
     } else if (state === 'zoom') this.zoomEnd = this.screen(p)[1];
     else if (state === 'pan') this.panEnd = this.screen(p);

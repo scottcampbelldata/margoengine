@@ -47,6 +47,21 @@ export function basis(
   };
 }
 
+/**
+ * {@link basis} with the screen axes taken from `camera.up` instead of world +Y, for controls that roll. When `up` is
+ * parallel to the view the world-up frame stands in.
+ */
+export function rollFrame(
+  camera: Pick<Camera, 'position' | 'target' | 'fov' | 'up'> & Partial<Pick<Camera, 'matrix' | 'far'>>,
+): Basis {
+  const b = basis(camera),
+    side = cross(b.forward, camera.up);
+  if (Math.hypot(...side) < EPS) return b;
+  b.right = normalize(side);
+  b.up = cross(b.right, b.forward);
+  return b;
+}
+
 /** Projects a world point to CSS pixels inside a viewport. `depth` is the view-space distance along forward. */
 export function project(
   b: Basis,

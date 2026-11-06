@@ -6,72 +6,24 @@ import {
   type EventTargetLike,
   type InputEventListener,
 } from './controls.js';
-import { EPS, madd } from './math.js';
-import { basis } from './view.js';
-
-/**
- * Largest elevation of the view direction above or below the horizon, in radians: a milliradian short of straight
- * up or down, so the world-up camera always has a defined screen frame.
- */
-export const MAX_PITCH = Math.PI / 2 - 1e-3;
+import { EPS, madd, rotateAxis } from './math.js';
+import { dot, normalize } from '@margoengine/math/vec3';
+import { basis, rollFrame } from './view.js';
+import { moved, translate, turn } from './steer.js';
+export { Controls };
 
 // Shift multiplies the flight speed by this (public, documented on `movementSpeedMultiplier`).
 const SLOW = 0.1;
 
-/**
- * Turns the camera by `yaw` radians around world +Y (positive turns left, counterclockwise seen from above) and
- * raises the view by `pitch` radians (positive looks up), with the elevation clamped to plus or minus
- * {@link MAX_PITCH}. The eye stays where it is and the target keeps its distance from it.
- */
-export function turn(camera: Pick<Camera, 'position' | 'target' | 'fov'>, yaw: number, pitch: number): void {
-  const p = camera.position,
-    t = camera.target,
-    distance = Math.max(Math.hypot(t[0] - p[0], t[1] - p[1], t[2] - p[2]), EPS),
-    view = basis(camera).forward;
-  // Heading on the ground plane, then the yaw about +Y: a turn by `a` maps (x, z) to (x cos a + z sin a, z cos a - x sin a).
-  let hx = view[0],
-    hz = view[2],
-    flat = Math.hypot(hx, hz);
-  if (flat < 1e-12) {
-    // Looking straight up or down: leave the pole toward the screen top (looking down) or bottom (looking up).
-    const up = (camera as { up?: readonly number[] }).up,
-      side = view[1] > 0 ? -1 : 1;
-    hx = up ? up[0] * side : 0;
-    hz = up ? up[2] * side : -1;
-    flat = Math.hypot(hx, hz);
-    if (flat < 1e-12) (hx = 0), (hz = -1), (flat = 1);
-  }
-  hx /= flat;
-  hz /= flat;
-  const c = Math.cos(yaw),
-    s = Math.sin(yaw),
-    x = hx * c + hz * s,
-    z = hz * c - hx * s;
-  const elevation = Math.asin(Math.max(-1, Math.min(1, view[1]))),
-    next = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, elevation + pitch)),
-    across = Math.cos(next);
-  camera.target = [p[0] + x * across * distance, p[1] + Math.sin(next) * distance, p[2] + z * across * distance];
-}
-
-/** Moves the camera position and target together by `offset`. */
-export function translate(camera: Pick<Camera, 'position' | 'target'>, offset: readonly number[]): void {
-  camera.position = madd(camera.position, offset, 1);
-  camera.target = madd(camera.target, offset, 1);
-}
-
-/** Largest change of any coordinate between two snapshots of position and target. */
-export function moved(before: readonly number[], camera: Pick<Camera, 'position' | 'target'>): boolean {
-  const now = [...camera.position, ...camera.target];
-  for (let i = 0; i < 6; i++) if (Math.abs(now[i] - before[i]) > EPS) return true;
-  return false;
-}
 
 /**
  * Free flight. W/S fly forward and back along the view, A/D strafe, R/F rise and sink along the screen up axis, the
  * arrow keys yaw and pitch, and the pointer's offset from the element centre steers (proportionally, 1 at the edge).
  * Without `dragToLook` the pointer steers whenever it moves and the left and right buttons fly forward and back;
- * with `dragToLook` it steers only while a button is held. The camera always renders with world +Y up, so there is
- * no roll: Q and E do nothing, yaw turns around world +Y and pitch stops short of the poles ({@link MAX_PITCH}).
+ * with `dragToLook` it steers only while a button is held. By default the camera renders with world +Y up, so there
+ * is no roll: Q and E do nothing, yaw turns around world +Y and pitch stops short of the poles. With `enableRoll` it
+ * flies like an aircraft: Q and E roll, yaw and pitch turn about the camera's own axes, nothing stops at the poles, and
+ * the control drives `camera.up`.
  * Keys are read from `keyTarget` (default the element's document); key presses with Alt held are ignored.
  * Events: `change`.
  */
@@ -80,9 +32,15 @@ export class FlyControls extends Controls {
   movementSpeed = 1;
   /**
    * Turn rate in radians per second at full steering input (an arrow key, or the pointer at the element edge).
-   * Default 0.01. The name is kept for compatibility; the camera does not roll.
+   * Default 0.01. With `enableRoll`, Q and E roll at this rate too.
    */
   rollSpeed = 0.01;
+  /**
+   * Q rolls left, E rolls right, and yaw and pitch turn about the camera's own axes with no stop at the poles; the
+   * control writes `camera.up`. Default false. Turning it off leaves `camera.up` as it is: set `camera.up = [0, 1, 0]`
+   * to level the horizon.
+   */
+  enableRoll = false;
   /** Steer only while a pointer button is held. Default false. */
   dragToLook = false;
   /** Keep flying forward unless the back input is held. Default false. */
@@ -101,6 +59,8 @@ export class FlyControls extends Controls {
     pitchDown: 0,
     yawLeft: 0,
     yawRight: 0,
+    rollLeft: 0,
+    rollRight: 0,
   };
   private readonly keyTarget: EventTargetLike | null;
   private presses = 0;
@@ -148,7 +108,8 @@ export class FlyControls extends Controls {
       slow = this.shiftLeft || this.shiftRight ? SLOW : 1,
       step = delta * this.movementSpeed * this.movementSpeedMultiplier * slow,
       forward = this.autoForward && !s.back ? 1 : s.forward;
-    const frame = basis(camera),
+    const free = this.enableRoll,
+      frame = free ? rollFrame(camera) : basis(camera),
       across = (s.right - s.left) * step,
       lift = (s.up - s.down) * step,
       along = (forward - s.back) * step;
@@ -156,9 +117,20 @@ export class FlyControls extends Controls {
       translate(camera, madd(madd(madd([0, 0, 0], frame.right, across), frame.up, lift), frame.forward, along));
     const rate = delta * this.rollSpeed,
       yaw = (s.yawLeft - s.yawRight) * rate,
-      pitch = (s.pitchUp - s.pitchDown) * rate;
-    if (yaw || pitch) turn(camera, yaw, pitch);
-    const changed = moved(before, camera);
+      pitch = (s.pitchUp - s.pitchDown) * rate,
+      roll = free ? (s.rollRight - s.rollLeft) * rate : 0;
+    if (free) {
+      if (yaw || pitch || roll) {
+        // Body axes, as an aircraft turns: yaw about up, pitch about right, roll about the view. The eye stays put.
+        const side = rotateAxis(frame.right, frame.up, yaw),
+          forward = normalize(rotateAxis(rotateAxis(frame.forward, frame.up, yaw), side, pitch)),
+          up = rotateAxis(rotateAxis(frame.up, side, pitch), forward, roll);
+        camera.target = madd(camera.position, forward, frame.distance);
+        // Taken off the view again, so rounding cannot tilt the frame over a long flight.
+        camera.up = normalize(madd(up, forward, -dot(up, forward)));
+      }
+    } else if (yaw || pitch) turn(camera, yaw, pitch);
+    const changed = moved(before, camera) || Math.abs(roll) > EPS;
     if (changed) this.dispatchEvent({ type: 'change' });
     return changed;
   }
@@ -196,6 +168,12 @@ export class FlyControls extends Controls {
         break;
       case 'KeyF':
         s.down = value;
+        break;
+      case 'KeyQ':
+        s.rollLeft = value;
+        break;
+      case 'KeyE':
+        s.rollRight = value;
         break;
       case 'ArrowUp':
         s.pitchUp = value;
