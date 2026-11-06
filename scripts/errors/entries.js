@@ -46,7 +46,9 @@ export const entries = [
     id: 'state',
     title: 'state: not valid right now',
     kind: 'code',
-    messages: ['XR button needs a canvas on the page or the parent option', 'Viewer model has no geometry to frame'],
+    messages: ['XR button needs a canvas on the page or the parent option', 'Viewer model has no geometry to frame',
+      'Physics exists on this stage: pass its options on the first call or set them on the world',
+    ],
     cause:
       'The call is valid in general but not at this moment: a re-entrant call from a callback, a missing prerequisite, or a device that is being restored. The re-entrancy, device restore and install entries list the messages.',
     fix: 'Retry later, from outside the callback, or after the prerequisite is in place.',

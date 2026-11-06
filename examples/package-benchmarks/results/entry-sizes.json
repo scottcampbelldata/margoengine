@@ -1,5 +1,5 @@
 {
-  "commit": "50062d9ac",
+  "commit": "9d230c248",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -42,8 +42,8 @@
     },
     "@margoengine/audio": {
       ".": {
-        "raw": 24600,
-        "gzip": 7467
+        "raw": 24719,
+        "gzip": 7508
       }
     },
     "@margoengine/behavior": {
@@ -170,12 +170,12 @@
     },
     "@margoengine/bvh": {
       ".": {
-        "raw": 66064,
-        "gzip": 23248
+        "raw": 66096,
+        "gzip": 23264
       },
       "./tree": {
-        "raw": 26457,
-        "gzip": 10367
+        "raw": 26489,
+        "gzip": 10381
       },
       "./bake": {
         "raw": 4994,
@@ -186,16 +186,28 @@
         "gzip": 5857
       },
       "./gpu": {
-        "raw": 13051,
-        "gzip": 4952
+        "raw": 13421,
+        "gzip": 5132
       },
       "./scene": {
         "raw": 8423,
         "gzip": 3526
       },
       "./points": {
-        "raw": 45157,
-        "gzip": 17280
+        "raw": 45189,
+        "gzip": 17295
+      },
+      "./sdf": {
+        "raw": 5990,
+        "gzip": 2834
+      },
+      "./inside": {
+        "raw": 31787,
+        "gzip": 12527
+      },
+      "./gpu-build": {
+        "raw": 51485,
+        "gzip": 18346
       }
     },
     "@margoengine/cache": {
@@ -284,8 +296,8 @@
     },
     "@margoengine/compute": {
       ".": {
-        "raw": 129597,
-        "gzip": 38614
+        "raw": 130074,
+        "gzip": 38759
       },
       "./linalg": {
         "raw": 16166,
@@ -300,8 +312,8 @@
         "gzip": 7436
       },
       "./random": {
-        "raw": 23927,
-        "gzip": 8178
+        "raw": 24404,
+        "gzip": 8319
       },
       "./autodiff": {
         "raw": 16913,
@@ -316,16 +328,16 @@
         "gzip": 1166
       },
       "./frame": {
-        "raw": 106727,
-        "gzip": 31251
+        "raw": 107204,
+        "gzip": 31398
       },
       "./subgroups": {
         "raw": 7102,
         "gzip": 2281
       },
       "./nn": {
-        "raw": 57062,
-        "gzip": 18579
+        "raw": 57539,
+        "gzip": 18732
       },
       "./graph": {
         "raw": 21842,
@@ -878,8 +890,12 @@
     },
     "@margoengine/input": {
       ".": {
-        "raw": 13694,
-        "gzip": 4876
+        "raw": 14308,
+        "gzip": 5024
+      },
+      "./interactions": {
+        "raw": 3147,
+        "gzip": 1358
       }
     },
     "@margoengine/inspector": {
@@ -918,8 +934,8 @@
     },
     "@margoengine/lighting2d": {
       ".": {
-        "raw": 10199,
-        "gzip": 4133
+        "raw": 10502,
+        "gzip": 4248
       }
     },
     "@margoengine/lightmap": {
@@ -1592,8 +1608,8 @@
     },
     "@margoengine/scatter": {
       ".": {
-        "raw": 62378,
-        "gzip": 18691
+        "raw": 62553,
+        "gzip": 18766
       },
       "./tiles": {
         "raw": 7525,
@@ -1828,6 +1844,10 @@
       "./viewer": {
         "raw": 4565,
         "gzip": 2224
+      },
+      "./physics": {
+        "raw": 2262,
+        "gzip": 1202
       }
     },
     "@margoengine/staging": {
@@ -2134,8 +2154,8 @@
     },
     "@margoengine/voxel-pathtracer": {
       ".": {
-        "raw": 222569,
-        "gzip": 78674
+        "raw": 223047,
+        "gzip": 78817
       },
       "./studio": {
         "raw": 2228,
@@ -2166,8 +2186,8 @@
     },
     "@margoengine/webgl2-compat": {
       ".": {
-        "raw": 310837,
-        "gzip": 93619
+        "raw": 310944,
+        "gzip": 93661
       },
       "./adapter": {
         "raw": 1123,
@@ -2178,8 +2198,8 @@
         "gzip": 42136
       },
       "./device": {
-        "raw": 309766,
-        "gzip": 93335
+        "raw": 309873,
+        "gzip": 93376
       },
       "./glsl": {
         "raw": 145692,
@@ -2267,6 +2287,11 @@
       "raw": 31001,
       "gzip": 10736,
       "brotli": 9527
+    },
+    "packages/physics/dist/index.js": {
+      "raw": 46775,
+      "gzip": 15748,
+      "brotli": 14004
     },
     "packages/decoders/dist/decoder.worker.js": {
       "raw": 10691,
@@ -2368,14 +2393,14 @@
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {
-        "raw": 241502,
-        "gzip": 72122,
+        "raw": 241609,
+        "gzip": 72163,
         "target": 73000
       },
       "lazy": {
         "name": "compute runtime",
         "raw": 69334,
-        "gzip": 22041,
+        "gzip": 22040,
         "loadedBy": "the first compute pipeline on the layer (import() of compute/runtime.js in device/device.ts)"
       }
     }

@@ -66,6 +66,10 @@
     "./viewer": {
       "types": "./dist/viewer.d.ts",
       "import": "./dist/viewer.js"
+    },
+    "./physics": {
+      "types": "./dist/physics.d.ts",
+      "import": "./dist/physics.js"
     }
   },
   "files": [
@@ -84,7 +88,9 @@
     "@margoengine/xr": "^1.0.0",
     "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/staging": "^1.0.0",
-    "@margoengine/tonemap": "^1.0.0"
+    "@margoengine/tonemap": "^1.0.0",
+    "@margoengine/physics": "^1.0.0",
+    "@dimforge/rapier3d-compat": ">=0.14.0 <1"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -112,6 +118,12 @@
       "optional": true
     },
     "@margoengine/tonemap": {
+      "optional": true
+    },
+    "@margoengine/physics": {
+      "optional": true
+    },
+    "@dimforge/rapier3d-compat": {
       "optional": true
     }
   }

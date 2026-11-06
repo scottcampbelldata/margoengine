@@ -1698,6 +1698,10 @@
       "types": "./dist/stage/viewer.d.ts",
       "import": "./dist/stage/viewer.js"
     },
+    "./stage/physics": {
+      "types": "./dist/stage/physics.d.ts",
+      "import": "./dist/stage/physics.js"
+    },
     "./staging": {
       "types": "./dist/staging.d.ts",
       "import": "./dist/staging.js"

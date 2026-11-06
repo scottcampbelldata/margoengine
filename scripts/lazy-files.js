@@ -101,6 +101,15 @@ export const LAZY_FILES = [
     external: core,
     when: '`addViewer(stage, url)` (`margoengine/stage/viewer`), first call with tone mapping',
   },
+  {
+    package: 'margoengine',
+    file: 'packages/physics/dist/index.js',
+    label: '@margoengine/physics',
+    kind: 'Chunk',
+    measure: 'bundle',
+    external: core,
+    when: '`addPhysics(stage)` or `addBody(stage, mesh)` (`margoengine/stage/physics`), first call',
+  },
   // Draco and KTX2/Basis: a pool of classic workers, each loading the decoder it is asked for once.
   {
     package: '@margoengine/decoders',

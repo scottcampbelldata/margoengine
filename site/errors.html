@@ -36,7 +36,7 @@
     </section>
     <section id="state">
       <h2><a href="#state">state: not valid right now</a></h2>
-      <p class="messages"><code>XR button needs a canvas on the page or the parent option</code> <code>Viewer model has no geometry to frame</code></p>
+      <p class="messages"><code>XR button needs a canvas on the page or the parent option</code> <code>Viewer model has no geometry to frame</code> <code>Physics exists on this stage: pass its options on the first call or set them on the world</code></p>
       <p><strong>Cause.</strong> The call is valid in general but not at this moment: a re-entrant call from a callback, a missing prerequisite, or a device that is being restored. The re-entrancy, device restore and install entries list the messages.</p>
       <p><strong>Fix.</strong> Retry later, from outside the callback, or after the prerequisite is in place.</p>
     </section>

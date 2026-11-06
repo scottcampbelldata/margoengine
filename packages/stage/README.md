@@ -4,7 +4,7 @@ You normally use this package as [`margoengine`](../margoengine/README.md): `imp
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging`, `@margoengine/shadows`, `@margoengine/tonemap` and `@margoengine/xr` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging`, `@margoengine/shadows`, `@margoengine/tonemap`, `@margoengine/xr`, `@margoengine/physics` and `@dimforge/rapier3d-compat` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
@@ -49,6 +49,7 @@ the ones it imports. With `margoengine` the entries are `margoengine/stage/<entr
 | `@margoengine/stage/environment` | `await addEnvironment(app, source, options)`: image-based lighting from an HDR, EXR or UltraHDR JPEG | `@margoengine/environment` |
 | `@margoengine/stage/shadows` | `await addShadows(app, options)`: cascaded shadows; the meshes present now cast | `@margoengine/shadows` |
 | `@margoengine/stage/xr` | `await addXRButton(app, options)`: an accessible Enter VR or Enter AR button that starts an XR session | `@margoengine/xr` |
+| `@margoengine/stage/physics` | `await addBody(app, mesh, options)`: a rigid body and a fitted collider, loading physics on first use; `await addPhysics(app, options)` for the world | `@margoengine/physics`, `@dimforge/rapier3d-compat` |
 | `@margoengine/stage/viewer` | `await addViewer(app, url, options)`: a product viewer: model, image-based light, backdrop, shadow, tone mapping, fit and turntable tuned together | `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging` or `@margoengine/shadows`, `@margoengine/tonemap` |
 
 ```ts
@@ -159,6 +160,38 @@ viewer.dispose(); // removes the model and everything the viewer added
 | `signal` | none | Cancels the load; the stage's disposal cancels it too |
 
 The turntable orbits the camera about the world's Y axis, not the model, so a model root off centre stays framed and shadows stay cached. A drag holds it. On any failure nothing stays behind; a file with nothing to draw rejects with `Viewer model has no geometry to frame`. `viewer.dispose()` leaves the camera where it is. Needs WebGPU. The `@margoengine/gltf-pro` model is a `PBRModel` (`viewer.model`), not the `LoadedModel` of `addGLTF`.
+
+## Physics in one call
+
+`addBody` gives a stage mesh a rigid body and a collider. The first call imports `@margoengine/physics` and Rapier, initializes Rapier and attaches one world to the stage, which then steps with the frame loop. Install both: `npm i @margoengine/physics @dimforge/rapier3d-compat`.
+
+```ts
+import {createStage} from 'margoengine';
+import {addBody, addPhysics} from 'margoengine/stage/physics';
+
+const app = await createStage('#scene');
+const floor = app.box({size: [20, 1, 20], position: [0, -0.5, 0]});
+const ball = app.sphere({radius: 0.5, position: [0, 5, 0]});
+
+await addBody(app, floor, {type: 'fixed'});
+const body = await addBody(app, ball, {collider: {restitution: 0.6}});
+body.applyImpulse([1, 0, 0]);
+
+const physics = await addPhysics(app); // the same world, for joints, queries and events
+physics.on('contactstart', ({meshA, meshB}) => console.log(meshA, meshB));
+```
+
+Without `colliders` the shape comes from the geometry: a box, a sphere (uniformly scaled), otherwise a convex hull for a dynamic body and the exact triangles for a fixed or kinematic one. A mesh without geometry, such as a model's root, gets a box around what it holds.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `addBody`: `collider` | none | Friction, restitution, density and so on of the collider picked for the mesh; ignored with `colliders` |
+| `addBody`: `colliders` and the rest | a fitted collider | As `physics.addBody`: `type` (`'dynamic'`), velocities, damping, `ccd` |
+| `addPhysics`: `rapier` | `@dimforge/rapier3d-compat`, imported and initialized | An initialized Rapier module of your own |
+| `addPhysics`: `gravity`, `fixedTimestep` and the rest | as `Physics` | World options, on the first call only; afterwards set them on the world, and options reject with `state` |
+| `addPhysics`: `signal` | none | Cancels the wait; the stage's disposal cancels it too |
+
+The convex hull of a concave dynamic mesh fills its hollows: pass `colliders: {shape: 'convexDecomposition'}` to keep them. A world you dispose yourself is replaced on the next call.
 
 All core exports are also available from this package. React applications can use the existing `@margoengine/react` components or wrap the engine received by Canvas `onCreated` with `new Stage(engine)`. The existing Canvas component retains ownership of rendering and teardown in that case.
 
