@@ -17,6 +17,216 @@ const check = (name, ...args) => page.evaluate(([n, a]) => window.check[n](...a)
 const near = (a, b, label, tolerance = 0.02) =>
   a.forEach((v, k) => assert.ok(Math.abs(v - b[k]) <= tolerance, `${label}: ${a} should be ${b}`));
 const jobs = {
+  async hair() {
+    // Flat quad, strand T = +Y, normal N = +Z, sun along +Z, camera at height d. Each row's lobe follows from the point it
+    // sees: h is the half vector there, and along is h on the strand tilted by the shift.
+    const d = 3,
+      lobe = (shift, width) =>
+        Array.from({ length: 256 }, (_, k) => {
+          const y = (1 - (k + 0.5) / 128) * d * Math.tan(Math.PI / 6),
+            r = Math.hypot(y, d),
+            half = [-y / r, d / r + 1],
+            length = Math.hypot(...half),
+            tilt = Math.hypot(1, shift),
+            along = (half[0] / length + (shift * half[1]) / length) / tilt,
+            power = 1 / (width * width);
+          return Math.sqrt(power / (2 * Math.PI)) * (1 - along * along) ** (power / 2);
+        }),
+      peak = (values) => {
+        const top = Math.max(...values);
+        let sum = 0,
+          weight = 0;
+        values.forEach((v, k) => {
+          if (v > top * 0.8) {
+            sum += k * v;
+            weight += v;
+          }
+        });
+        return { row: sum / weight, top, width: values.filter((v) => v > top / 2).length };
+      };
+    const shift = 0.1,
+      width = 0.1,
+      specular = 3,
+      got = await page.evaluate((v) => window.check.hair(v), { shift, width });
+    assert.deepEqual(got.errors, []);
+    // Blue: base blue is 0, so only the white lobe. Red less blue: the flat diffuse, the 0.4 of the base, and the tinted lobe.
+    const white = peak(got.rows.map((c) => c[2])),
+      tinted = peak(got.rows.map((c) => Math.max(c[0] - c[2] - 0.4, 0))),
+      wantWhite = peak(lobe(shift, width)),
+      wantTinted = peak(lobe(-1.5 * shift, 2 * width));
+    console.log('hair', JSON.stringify({ white, tinted, wantWhite, wantTinted }));
+    // The 8-bit steps across a lobe's flat top move its centre by up to two rows.
+    assert.ok(Math.abs(white.row - wantWhite.row) < 2, `white highlight at ${white.row}, want ${wantWhite.row}`);
+    assert.ok(Math.abs(tinted.row - wantTinted.row) < 2, `tinted highlight at ${tinted.row}, want ${wantTinted.row}`);
+    // A half-height edge moves by half an 8-bit step over the lobe's slope there. For white that is 0.0018 at 0.0041 a row.
+    assert.ok(Math.abs(white.width - wantWhite.width) <= 2, `white width ${white.width}, want ${wantWhite.width}`);
+    // The tinted lobe's one edge in the picture lies under the white peak, so it is read as a difference of red near 0.85 and
+    // blue near 0.43: half a step of each, 0.0045, at 0.00054 a row, is 9 rows. With the white lobe's width it would be 55 off.
+    assert.ok(Math.abs(tinted.width - wantTinted.width) <= 9, `tinted width ${tinted.width}, want ${wantTinted.width}`);
+    // The white lobe's height: Marschner's F / 4 of the 1.55 cuticle, under a sun of pi, within two 8-bit steps at this level.
+    const height = wantWhite.top * (0.0465 / 4) * specular * Math.PI;
+    assert.ok(Math.abs(white.top - height) < 0.008, `white height ${white.top}, want ${height}`);
+    // The white one has no colour of its own: green follows blue.
+    got.rows.forEach((c, k) => assert.ok(Math.abs(c[1] - c[2]) < 0.01, `row ${k}: ${c}`));
+    const real = await check('hairAvatar');
+    console.log('hair on Seed-san', JSON.stringify(real));
+    assert.deepEqual(real.errors, []);
+    assert.ok(real.drawn > 3000, `the hair covers part of the picture: ${real.drawn}`);
+    // Blue is the white lobe alone, the base having none. Its height at the default width is sqrt(p / 2 pi) F / 4 pi, 0.121,
+    // at most one 8-bit step over, and a lit strand facing the sun reaches at least half of it.
+    assert.ok(real.peak > 0.06 && real.peak < 0.125, `the highlight shows on the real hair mesh: ${real.peak}`);
+    // The highlight follows the strands: the same direction would correlate 1, and strands at a right angle only share the
+    // surface's shape, so turned 90 degrees it falls elsewhere on the same mesh.
+    assert.ok(real.correlation < 0.5, `strand direction moves the highlight: ${real.correlation}`);
+  },
+  async character() {
+    // Every model answers a clustered light as it answers the sun, within the 8-bit step around these colours.
+    for (const model of ['hair', 'skin', 'eye']) {
+      const run = (light) => page.evaluate((v) => window.check.character(v), { model, light }),
+        sun = await run('sun');
+      assert.deepEqual(sun.errors, []);
+      assert.ok(sun.color[0] > 0.02, `${model} shows: ${sun.color}`);
+      for (const light of ['directional', 'point']) {
+        const got = await run(light);
+        console.log(model, light, sun.color, got.color);
+        assert.deepEqual(got.errors, []);
+        near(got.color, sun.color, `${model} under a clustered ${light} light`, 0.01);
+      }
+    }
+  },
+  async skin() {
+    const size = 64,
+      read = (table, nl, y, c) => {
+        const fx = (nl * 0.5 + 0.5) * size - 0.5,
+          fy = y * size - 0.5,
+          x = Math.max(0, Math.min(size - 2, Math.floor(fx))),
+          r = Math.max(0, Math.min(size - 2, Math.floor(fy))),
+          tx = Math.min(1, Math.max(0, fx - x)),
+          ty = Math.min(1, Math.max(0, fy - r)),
+          at = (a, b) => table[(b * size + a) * 4 + c];
+        return (at(x, r) * (1 - tx) + at(x + 1, r) * tx) * (1 - ty) + (at(x, r + 1) * (1 - tx) + at(x + 1, r + 1) * tx) * ty;
+      };
+    // Past the terminator the only light is the diffusion, (1 - F) D(n.l, 1 / r) times the sun's power over pi, with F the
+    // Schlick term of skin's 0.028 at the half vector of the ray and the sun. Eight times the usual sun lifts the dark band
+    // clear of the 8-bit floor; samples at or above white are left out.
+    const boost = 8,
+      decode = (e) => ((e /= 255) <= 0.04045 ? e / 12.92 : ((e + 0.055) / 1.055) ** 2.4),
+      encode = (v) => 255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055),
+      compare = (got, row, label) => {
+        let seen = 0;
+        for (const { nl, ray, color } of got.samples.filter((v) => v.nl < -0.02))
+          color.forEach((v, c) => {
+            const fresnel = 0.028 + 0.972 * (1 - Math.sqrt((1 - ray) / 2)) ** 5,
+              want = boost * (1 - fresnel) * read(got.table, nl, row, c);
+            if (want > 0.9) return;
+            seen++;
+            // One 8-bit step at this level, and one percent: half floats in the table 0.05, the filter's 8-bit weight on
+            // neighbouring texels 0.1, and the sphere's facets, whose n.l and curvature are off by about 1e-4, 0.1.
+            const e = Math.round(encode(want)),
+              bound = decode(e + 1) - decode(e) + 0.01 * want;
+            assert.ok(Math.abs(v - want) < bound, `${label} n.l ${nl} channel ${c}: ${v}, want ${want}, within ${bound}`);
+          });
+        return seen;
+      };
+    // 2 units at 400 units a metre is a radius of 5 mm: the table's row sqrt(1 / 5).
+    const small = await page.evaluate((v) => window.check.skinSphere(v), { unitsPerMeter: 400, power: Math.PI * boost });
+    assert.deepEqual(small.errors, []);
+    assert.ok(compare(small, Math.sqrt(1 / 5), '5 mm') > 30, 'samples compared');
+    // Red reaches furthest, then green, then blue, at every curvature: the profile's widths say so, and the picture shows it.
+    const table = small.table;
+    for (let row = 0; row < size; row++)
+      for (let column = 0; column < size / 2; column++) {
+        const at = (row * size + column) * 4;
+        assert.ok(table[at] >= table[at + 1] && table[at + 1] >= table[at + 2], `table row ${row} column ${column}`);
+      }
+    const edge = small.samples.find((v) => v.nl > -0.1);
+    console.log('skin 5 mm', edge.nl, edge.color);
+    assert.ok(edge.color[0] > edge.color[1] && edge.color[1] > edge.color[2] && edge.color[2] > 0, `red bleeds furthest: ${edge.color}`);
+    // 2 units at 1 unit a metre: a radius of 2 m, close to flat, so the terminator stays where n.l says.
+    const large = await page.evaluate((v) => window.check.skinSphere(v), { unitsPerMeter: 1, power: Math.PI * boost });
+    assert.deepEqual(large.errors, []);
+    compare(large, Math.sqrt(1 / 2000), '2 m');
+    const real = await check('skinAvatar', { power: Math.PI * boost });
+    console.log('skin on Seed-san', JSON.stringify(real));
+    assert.deepEqual(real.errors, []);
+    // Past the terminator plain shading has nothing at all, but for pixels shared with another surface at an edge, a small
+    // share of a head. Where it is black, every row of the table above orders red, green, blue, and one 8-bit step above
+    // black is 1 / (255 * 12.92).
+    assert.ok(real.black > real.band * 0.8 && real.black > 500, `plain shading stops at the terminator: ${real.black} of ${real.band}`);
+    assert.ok(real.soft[0] > real.soft[1] && real.soft[1] >= real.soft[2] && real.soft[2] > 1 / (255 * 12.92), `real head: ${real.soft}`);
+  },
+  async eye() {
+    // The pupil's edges on the middle row, traced here by Snell's law through a unit sphere to the iris plane z = 1 - depth.
+    const t = Math.tan(Math.PI / 12),
+      trace = ({ angle, ior, pupil, depth = 0.25 }) => {
+        const camera = [5 * Math.sin(angle), 5 * Math.cos(angle)],
+          hit = (a) => {
+            const p = [Math.sin(a), Math.cos(a)],
+              l = Math.hypot(camera[0] - p[0], camera[1] - p[1]),
+              v = [(camera[0] - p[0]) / l, (camera[1] - p[1]) / l],
+              cos = v[0] * p[0] + v[1] * p[1],
+              eta = 1 / ior,
+              k = Math.sqrt(1 - eta * eta * (1 - cos * cos)),
+              r = [-eta * v[0] + (eta * cos - k) * p[0], -eta * v[1] + (eta * cos - k) * p[1]];
+            return p[0] + (r[0] * (1 - depth - p[1])) / r[1];
+          },
+          solve = (x) => {
+            let low = -0.55,
+              high = 0.55;
+            for (let k = 0; k < 60; k++) {
+              const mid = (low + high) / 2;
+              if (hit(mid) < x) low = mid;
+              else high = mid;
+            }
+            return low;
+          },
+          // The pixel of a point on the sphere: the camera looks at the origin along -camera.
+          pixel = (a) => {
+            const p = [Math.sin(a), Math.cos(a)],
+              right = [Math.cos(angle), -Math.sin(angle)],
+              back = [Math.sin(angle), Math.cos(angle)],
+              x = p[0] * right[0] + p[1] * right[1],
+              z = 5 - (p[0] * back[0] + p[1] * back[1]);
+            return (x / z / t + 1) * 128;
+          },
+          rho = pupil * 0.49;
+        return [pixel(solve(-rho)), pixel(solve(rho))];
+      },
+      run = async (o) => {
+        const got = await page.evaluate((v) => window.check.eyeRun(v), o);
+        assert.deepEqual(got.errors, []);
+        const want = trace(o),
+          middle = Math.round((want[0] + want[1]) / 2),
+          edges = [middle, middle + 1];
+        while (got.row[edges[0] - 1] < 64) edges[0]--;
+        while (got.row[edges[1]] < 64) edges[1]++;
+        console.log('eye', JSON.stringify(o), edges, want.map((v) => +v.toFixed(1)));
+        // A pixel of rounding each side, and the soft edge of the pupil, a pixel wide.
+        edges.forEach((v, k) => assert.ok(Math.abs(v - want[k]) < 2.5, `${JSON.stringify(o)}: ${edges}, want ${want}`));
+        return edges;
+      };
+    const ahead = await run({ angle: 0, ior: 1.376, pupil: 0.3 }),
+      side = await run({ angle: 0.6, ior: 1.376, pupil: 0.3 }),
+      straight = await run({ angle: 0.6, ior: 1.0001, pupil: 0.3 });
+    // The cornea moves what is behind it, by more than the bound on the check above.
+    assert.ok(Math.abs(side[0] - straight[0]) > 5, `refraction shows: ${side} ${straight}`);
+    const wide = await run({ angle: 0, ior: 1.376, pupil: 0.6 });
+    assert.ok(wide[1] - wide[0] > (ahead[1] - ahead[0]) * 1.7, 'the pupil opens live');
+    await run({ angle: 0.3, ior: 1.376, pupil: 0.3, depth: 0.4 });
+    const real = await check('eyeAvatar', { pupil: 0.3 });
+    console.log('eye on Seed-san', JSON.stringify(real));
+    assert.deepEqual(real.errors, []);
+    assert.ok(real.drawn > 1000, 'the plate fills part of the picture');
+    assert.equal(real.plain.n, 0, 'no pupil without the feature');
+    // A ray along the axis meets the cornea square on and does not bend, so the pupil's centre is the middle of the picture.
+    // The plate is about 6 percent off a sphere, which moves the edges, so the bound is the pupil's own radius.
+    const reach = Math.sqrt(real.small.n / Math.PI);
+    assert.ok(reach > 3, `a pupil shows on the real mesh: ${real.small.n} pixels`);
+    assert.ok(Math.hypot(real.small.x - 128, real.small.y - 128) < reach, `the pupil sits on the axis: ${JSON.stringify(real.small)}`);
+    // Twice the radius is four times the area on a sphere. The same plate's error applies to both; 3 to 5 leaves it a quarter.
+    const opened = real.large.n / real.small.n;
+    assert.ok(opened > 3 && opened < 5, `the pupil opens on the real mesh: ${opened}`);
+  },
   async stochastic() {
     // A real polyhaven floor texture tiled four times. Independent patches correlate at the repeat by the texture's own
     // autocorrelation at a random shift, whose mean over all shifts is 0 once the mean is taken off; the 75 or so patches

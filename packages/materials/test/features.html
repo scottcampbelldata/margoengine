@@ -15,8 +15,21 @@ import {mipTexture} from '/packages/materials/dist/mips.js';
 import {layered} from '/packages/materials/dist/layered.js';
 import {objectNormal} from '/packages/materials/dist/object-normal.js';
 import {stochasticTiling} from '/packages/materials/dist/stochastic.js';
+import {hair} from '/packages/materials/dist/hair.js';
+import {eye} from '/packages/materials/dist/eye.js';
+import {skin,skinTable} from '/packages/materials/dist/skin.js';
+import {sphereGeometry} from '/packages/geometry/dist/index.js';
 import {TAA} from '/packages/taa/dist/index.js';
 const size=256;
+// The real Seed-san avatar: one primitive of a mesh as geometry in its bind pose, UVs turned to this package's origin.
+let avatar;
+const seedSan=async(mesh,k)=>{
+  if(!avatar){const bytes=await (await fetch('/examples/assets/vrm/Seed-san.vrm')).arrayBuffer(),n=new DataView(bytes).getUint32(12,true);avatar={bytes,json:JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,20,n))),bin:20+n+8};}
+  const {bytes,json,bin}=avatar,p=json.meshes.find(m=>m.name===mesh).primitives[k];
+  const read=(index,Type,width)=>{const a=json.accessors[index],v=json.bufferViews[a.bufferView],start=bin+(v.byteOffset??0)+(a.byteOffset??0);return Array.from(new Type(bytes.slice(start,start+a.count*width*Type.BYTES_PER_ELEMENT)));};
+  const indexType=json.accessors[p.indices].componentType===5125?Uint32Array:Uint16Array,uvs=read(p.attributes.TEXCOORD_0,Float32Array,2).map((v,j)=>j%2?1-v:v);
+  return {positions:read(p.attributes.POSITION,Float32Array,3),normals:read(p.attributes.NORMAL,Float32Array,3),uvs,indices:read(p.indices,indexType,1)};
+};
 const scene=async(camera,options={})=>{
   document.querySelector('canvas')?.remove();
   const canvas=document.createElement('canvas');canvas.width=canvas.height=size;document.body.append(canvas);
@@ -89,6 +102,101 @@ const lobeSurfaces={
 // quad's middle. Each surface gets enough of it to stay above the tone curve's dark end.
 const toward=[0.3,0.2,1],lobePower={coat:16,sheen:64,film:2,grain:1};
 window.check={
+  // Strand highlights on a flat quad (a stand-in), its strands up the V axis, seen from `height` units away.
+  async hair({shift,width}){
+    const d=3,made=await scene({position:[0,0,d],target:[0,0,0],fov:60}),{engine,errors,render}=made;
+    engine.lighting.direction.set([0,0,1,Math.PI]);engine.lighting.radiance.set([1,1,1,0]);
+    createMesh(engine,quad(),new PbrMaterial({color:[0.4,0,0,1],toneMapped:false,features:[hair({shift,width,specular:3,jitter:0})]}));await render();
+    const data=await pixels(made),rows=[];for(let y=0;y<size;y++)rows.push(at(data,size/2,y));engine.dispose();
+    return {rows,errors};
+  },
+  // The same light as the sun and as clustered lights, on one model.
+  async character({model,light}){
+    const made=await scene(front),{engine,errors,render}=made,power=2,away=toward.map(v=>-v),at2=toward.map(v=>v*50),far=at2.reduce((sum,v)=>sum+v*v,0)*power;
+    engine.lighting.direction.set([...toward,light==='sun'?power:0]);engine.lighting.radiance.set([1,1,1,0]);
+    const lights=light==='sun'?undefined:Clustered.attach(engine);
+    if(light==='directional')DirectionalLights.attach(engine,{lights}).setLights([{direction:away,color:[1,1,1],intensity:power}]);
+    if(light==='point')lights.setLights([{position:at2,color:[1,1,1],intensity:far,range:1e6}]);
+    const feature={hair:()=>hair({jitter:0}),skin:()=>skin(),eye:()=>eye()}[model]();
+    const mesh=createMesh(engine,model==='eye'?sphereGeometry(1.5,64,48):quad(),new PbrMaterial({color:[0.8,0.6,0.5,1],roughness:0.5,toneMapped:false,features:[feature]}));
+    lights?.add(mesh);await render();
+    const d=await pixels(made);engine.dispose();
+    return {color:at(d,model==='eye'?160:128,128),errors};
+  },
+  // Strand highlights on the real avatar's hair mesh: the way the strands run moves them.
+  async hairAvatar(){
+    const geometry=await seedSan('hair',0),view={position:[0,1.46,0.8],target:[0,1.46,0],fov:30},out={};
+    const draw=async(material)=>{const made=await scene(view),{engine,errors,render}=made;engine.lighting.direction.set([0.3,0.5,0.8,Math.PI]);engine.lighting.radiance.set([1,1,1,0]);createMesh(engine,geometry,material);await render();const data=await pixels(made);engine.dispose();return {data,errors};};
+    // White where the mesh is: the background is not black, so it has to be left out of everything below.
+    const mask=await draw(new UnlitMaterial({color:[1,1,1,1],side:'double'})),inside=[];
+    for(let k=0;k<size*size;k++)if(mask.data[k*4]===255&&mask.data[k*4+2]===255)inside.push(k);
+    for(const [name,direction] of [['down',[0,-1,0]],['across',[1,0,0]]]){
+      const {data,errors}=await draw(new PbrMaterial({color:[0.5,0.25,0,1],toneMapped:false,side:'double',features:[hair({direction})]}));
+      out[name]={blue:inside.map(k=>light(data[k*4+2])),errors};
+    }
+    let sum=0,sa=0,sb=0,aa=0,bb=0;const a=out.down.blue,b=out.across.blue,n=a.length;for(let k=0;k<n;k++){sum+=a[k]*b[k];sa+=a[k];sb+=b[k];aa+=a[k]*a[k];bb+=b[k]*b[k];}
+    const correlation=(sum/n-sa/n*sb/n)/Math.sqrt((aa/n-(sa/n)**2)*(bb/n-(sb/n)**2));
+    return {drawn:n,peak:Math.max(...a),correlation,errors:[...mask.errors,...out.down.errors,...out.across.errors]};
+  },
+  // A sphere of radius 2 scene units lit from the side by a strong sun, along the middle row: its colour there, n.l, and the
+  // x of the ray, which fixes the half vector.
+  async skinSphere({unitsPerMeter,power}){
+    const camera=8,made=await scene({position:[0,0,camera],target:[0,0,0],fov:30}),{engine,errors,render}=made;
+    engine.lighting.direction.set([1,0,0,power]);engine.lighting.radiance.set([1,1,1,0]);
+    createMesh(engine,sphereGeometry(2,256,128),new PbrMaterial({color:[1,1,1,1],roughness:1,toneMapped:false,features:[skin({unitsPerMeter})]}));await render();
+    const data=await pixels(made);engine.dispose();
+    const samples=[],t=Math.tan(Math.PI/12);
+    for(let x=size/2-64;x<size/2;x+=2){
+      // The ray through the pixel's centre meets the sphere; its normal is the point over the radius.
+      const u=((x+0.5)/size*2-1)*t,w=[u,((size/2+0.5)/size*2-1)*-t,-1],l=Math.hypot(...w),r=w.map(v=>v/l),b=camera*r[2],c=camera*camera-4,hit=-b-Math.sqrt(b*b-c);
+      samples.push({nl:(r[0]*hit)/2,ray:r[0],color:at(data,x,size/2)});
+    }
+    return {samples,errors,table:Array.from(skinTable())};
+  },
+  // Skin on the real avatar's head, lit from the side, against the plain material, with each pixel's n.l from a normal pass.
+  async skinAvatar({power}){
+    const geometry=await seedSan('head',0),view={position:[0,1.43,0.9],target:[0,1.43,0],fov:30},lit=[0,0,0],seen=[];
+    const draw=async(material)=>{const made=await scene(view),{engine,errors,render}=made;engine.lighting.direction.set([1,0,0,power]);engine.lighting.radiance.set([1,1,1,0]);createMesh(engine,geometry,material);await render();const data=await pixels(made);engine.dispose();return {data,errors};};
+    const normals=await draw(new NormalMaterial()),options={color:[1,1,1,1],roughness:1,toneMapped:false},plain=await draw(new PbrMaterial(options)),soft=await draw(new PbrMaterial({...options,features:[skin()]}));
+    const sum=[0,0,0];let band=0,black=0;
+    for(let k=0;k<size*size;k++){
+      if(normals.data[k*4+3]<255||normals.data[k*4+2]===0)continue;
+      const nl=normals.data[k*4]/255*2-1;if(!(nl>-0.12&&nl<-0.01))continue;
+      band++;if(plain.data[k*4]+plain.data[k*4+1]+plain.data[k*4+2]>0)continue;
+      black++;for(let c=0;c<3;c++)sum[c]+=light(soft.data[k*4+c]);
+    }
+    return {band,black,soft:sum.map(v=>v/black),errors:[...normals.errors,...plain.errors,...soft.errors]};
+  },
+  // A sphere as an eye (a stand-in for a real eyeball), its colour alone: the dark run along the middle row is the pupil.
+  async eyeRun({angle,ior,pupil,depth=0.25}){
+    const camera=[5*Math.sin(angle),0,5*Math.cos(angle)],made=await scene({position:camera,target:[0,0,0],fov:30}),{engine,errors,render}=made;
+    engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([1,1,1,0]);
+    const seeBase={name:'peek',shader:code=>code.replace('  return s;\n}','  s.emissive=s.base.rgb;\n  return s;\n}')},feature=eye({ior,pupil:0.3,depth,irisColor:[1,1,1]});
+    createMesh(engine,sphereGeometry(1,256,128),new PbrMaterial({color:[1,1,1,1],toneMapped:false,features:[feature,seeBase]}));await render();
+    feature.pupil=pupil;await render();
+    const data=await pixels(made);engine.dispose();
+    const row=[];for(let x=0;x<size;x++)row.push(data[(size/2*size+x)*4]);
+    return {row,errors};
+  },
+  // The real avatar's iris: a shallow plate of 65 vertices with no eyeball behind it, on a sphere of about 65 mm fitted from
+  // its own points and normals. Seen along that sphere's axis, colour alone, against the same plate without the feature.
+  async eyeAvatar({pupil}){
+    const whole=await seedSan('head',1),{positions,normals,indices}=whole,count=positions.length/3,parent=Array.from({length:count},(_,k)=>k),root=k=>parent[k]===k?k:(parent[k]=root(parent[k]));
+    for(let t=0;t<indices.length;t+=3){parent[root(indices[t+1])]=root(indices[t]);parent[root(indices[t+2])]=root(indices[t]);}
+    const parts=new Map();for(let k=0;k<count;k++)(parts.get(root(k))??parts.set(root(k),[]).get(root(k))).push(k);
+    const part=[...parts.values()].find(g=>g.length===65&&positions[g[0]*3]>0),keep=new Map(part.map((v,k)=>[v,k]));
+    const mean=v=>[0,1,2].map(j=>part.reduce((sum,k)=>sum+v[k*3+j],0)/part.length),mid=mean(positions),axis=mean(normals);
+    let dot=0,square=0;for(const k of part)for(let j=0;j<3;j++){const n=normals[k*3+j]-axis[j];dot+=n*(positions[k*3+j]-mid[j]);square+=n*n;}
+    const radius=dot/square,center=mid.map((v,j)=>v-radius*axis[j]),length=Math.hypot(...axis),look=axis.map(v=>v/length);
+    const geometry={positions:part.flatMap(k=>positions.slice(k*3,k*3+3)),normals:part.flatMap(k=>normals.slice(k*3,k*3+3)),uvs:part.flatMap(k=>whole.uvs.slice(k*2,k*2+2)),indices:[]};
+    for(let t=0;t<indices.length;t+=3)if(keep.has(indices[t]))geometry.indices.push(keep.get(indices[t]),keep.get(indices[t+1]),keep.get(indices[t+2]));
+    const far=radius+0.2,view={position:center.map((v,j)=>v+look[j]*far),target:center,fov:20},seeBase={name:'peek',shader:code=>code.replace('  return s;\n}','  s.emissive=s.base.rgb;\n  return s;\n}')};
+    const draw=async(features)=>{const made=await scene(view),{engine,errors,render}=made;engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([1,1,1,0]);createMesh(engine,geometry,new PbrMaterial({color:[1,1,1,1],toneMapped:false,side:'double',features}));await render();const data=await pixels(made);engine.dispose();return {data,errors};};
+    const plain=await draw([seeBase]),options={center,axis:look,irisRadius:0.25,irisColor:[1,1,1]},small=await draw([eye({...options,pupil}),seeBase]),large=await draw([eye({...options,pupil:pupil*2}),seeBase]);
+    const pupilOf=(data)=>{let n=0,x=0,y=0;for(let k=0;k<size*size;k++)if(plain.data[k*4]>64&&data[k*4]<64){n++;x+=k%size+0.5;y+=Math.floor(k/size)+0.5;}return {n,x:x/n,y:y/n};};
+    let drawn=0;for(let k=0;k<size*size;k++)drawn+=plain.data[k*4]>64;
+    return {radius,drawn,plain:pupilOf(plain.data),small:pupilOf(small.data),large:pupilOf(large.data),errors:[...plain.errors,...small.errors,...large.errors]};
+  },
   // A real floor texture tiled four times across the whole canvas, so one repeat is 64 pixels exactly.
   async stochastic(kind){
     const url='/examples/assets/source/skinning_ik/textures/polyhaven/concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.jpg',

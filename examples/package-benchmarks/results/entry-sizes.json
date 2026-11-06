@@ -1,5 +1,5 @@
 {
-  "commit": "941599097",
+  "commit": "fa44286ac",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1270,8 +1270,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 198061,
-        "gzip": 61542
+        "raw": 198126,
+        "gzip": 61540
       },
       "./atlas": {
         "raw": 4025,
@@ -1282,12 +1282,12 @@
         "gzip": 7399
       },
       "./batched": {
-        "raw": 118829,
-        "gzip": 36530
+        "raw": 118895,
+        "gzip": 36528
       },
       "./mips": {
         "raw": 31740,
-        "gzip": 10418
+        "gzip": 10421
       },
       "./prefilter": {
         "raw": 3364,
@@ -1304,6 +1304,18 @@
       "./object-normal": {
         "raw": 1529,
         "gzip": 694
+      },
+      "./hair": {
+        "raw": 3397,
+        "gzip": 1755
+      },
+      "./eye": {
+        "raw": 7264,
+        "gzip": 3373
+      },
+      "./skin": {
+        "raw": 32735,
+        "gzip": 10855
       },
       "./stochastic": {
         "raw": 4527,

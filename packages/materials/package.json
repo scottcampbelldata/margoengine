@@ -71,6 +71,18 @@
       "types": "./dist/object-normal.d.ts",
       "import": "./dist/object-normal.js"
     },
+    "./hair": {
+      "types": "./dist/hair.d.ts",
+      "import": "./dist/hair.js"
+    },
+    "./eye": {
+      "types": "./dist/eye.d.ts",
+      "import": "./dist/eye.js"
+    },
+    "./skin": {
+      "types": "./dist/skin.d.ts",
+      "import": "./dist/skin.js"
+    },
     "./stochastic": {
       "types": "./dist/stochastic.d.ts",
       "import": "./dist/stochastic.js"

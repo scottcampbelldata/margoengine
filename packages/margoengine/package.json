@@ -1226,6 +1226,18 @@
       "types": "./dist/materials/object-normal.d.ts",
       "import": "./dist/materials/object-normal.js"
     },
+    "./materials/hair": {
+      "types": "./dist/materials/hair.d.ts",
+      "import": "./dist/materials/hair.js"
+    },
+    "./materials/eye": {
+      "types": "./dist/materials/eye.d.ts",
+      "import": "./dist/materials/eye.js"
+    },
+    "./materials/skin": {
+      "types": "./dist/materials/skin.d.ts",
+      "import": "./dist/materials/skin.js"
+    },
     "./materials/stochastic": {
       "types": "./dist/materials/stochastic.d.ts",
       "import": "./dist/materials/stochastic.js"

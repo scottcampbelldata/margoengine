@@ -10,6 +10,9 @@ import { alphaHash } from '../dist/alpha-hash.js';
 import { objectNormal } from '../dist/object-normal.js';
 import { stochasticTiling } from '../dist/stochastic.js';
 import { layered } from '../dist/layered.js';
+import { hair } from '../dist/hair.js';
+import { eye } from '../dist/eye.js';
+import { skin, skinProfile, skinTable } from '../dist/skin.js';
 
 async function scene() {
   const gpu = mockGPU(),
@@ -285,4 +288,73 @@ test('stochasticTiling reads a layer through the grid and leaves its mask alone'
   const code = modules(frame()).find((c) => c.includes('fn surface('));
   assert.match(code, /margoTile_margoLayerMap\d\(margoLayerUV0\)/);
   assert.match(code, /textureSample\(margoLayerMap\d,margoLayerSampler\d,i\.uv\.xy\)\.r/);
+});
+
+test('hair, eye and skin compile in only while listed, and take every light through their model', async () => {
+  for (const [make, light] of [
+    [() => hair(), 'margoHairLight'],
+    [() => hair({ direction: [0, -1, 0] }), 'margoHairLight'],
+    [() => eye(), 'margoEyeLight'],
+    [() => skin(), 'margoSkinLight'],
+  ]) {
+    const { engine, frame } = await scene(),
+      material = new PbrMaterial();
+    createMesh(engine, quad, material);
+    const plain = modules(frame()).filter((c) => c.includes('fn surface('));
+    assert.ok(plain.every((c) => !c.includes(light)));
+    material.features = [make()];
+    const code = modules(frame()).find((c) => c.includes('fn surface('));
+    assert.ok(code.includes(`return ${light}(s.n,v,l,s.base.rgb)*`));
+    material.features = [];
+    assert.ok(modules(frame()).every((c) => !c.includes(light)));
+  }
+});
+
+test('hair, eye and skin refuse a physical material and bad options', async () => {
+  const { engine, frame } = await scene(),
+    material = new PbrMaterial({ anisotropy: 0.5, features: [hair()] });
+  createMesh(engine, quad, material);
+  assert.throws(() => frame(), { name: 'TypeError', message: /hair needs a PbrMaterial without anisotropy/ });
+  assert.throws(() => hair({ width: 0 }), RangeError);
+  assert.throws(() => hair({ direction: [0, 0, 0] }), TypeError);
+  assert.throws(() => hair({ specular: -1 }), RangeError);
+  assert.throws(() => eye({ ior: 1 }), RangeError);
+  assert.throws(() => eye({ pupil: 1 }), RangeError);
+  assert.throws(() => eye({ axis: [0, 0] }), TypeError);
+  assert.throws(() => skin({ unitsPerMeter: 0 }), RangeError);
+});
+
+test('the skin profile is the published fit, and the table holds it', () => {
+  // The weights of each colour sum to 1, so the profile integrates to 1 over the plane: sum of w G(v, r) 2 pi r dr.
+  for (let c = 0; c < 3; c++) {
+    let total = 0;
+    for (let r = 0.0005; r < 40; r += 0.001) total += skinProfile(r)[c] * 2 * Math.PI * r * 0.001;
+    assert.ok(Math.abs(total - 1) < 0.002, `channel ${c}: ${total}`);
+  }
+  const size = 16,
+    table = skinTable(size),
+    at = (column, row, c) => table[(row * size + column) * 4 + c],
+    nl = (column) => ((column + 0.5) / size) * 2 - 1;
+  // Convolving on the ring moves light around it and loses none: the integral of D over the circle is that of cos+, 2.
+  for (let row = 0; row < size; row++)
+    for (let c = 0; c < 3; c++) {
+      let sum = 0;
+      const fine = 2048;
+      for (let k = 0; k < fine; k++) {
+        const theta = ((k + 0.5) / fine) * Math.PI,
+          x = ((Math.cos(theta) + 1) / 2) * size - 0.5,
+          low = Math.max(0, Math.min(size - 2, Math.floor(x))),
+          t = Math.min(1, Math.max(0, x - low));
+        sum += (at(low, row, c) * (1 - t) + at(low + 1, row, c) * t) * (Math.PI / fine);
+      }
+      // Half the circle, as the table is symmetric: 1, less what a table of 16 columns rounds off the kink at n.l = 0.
+      assert.ok(Math.abs(sum - 1) < 0.03, `row ${row} channel ${c}: ${sum}`);
+    }
+  // Sharply curved: at the terminator red has crept furthest, blue least. Nearly flat: D is n.l.
+  const curved = size - 1,
+    middle = size / 2;
+  assert.ok(at(middle, curved, 0) > at(middle, curved, 1) && at(middle, curved, 1) > at(middle, curved, 2));
+  const flat = skinTable(64);
+  for (const column of [8, 20, 44, 60])
+    assert.ok(Math.abs(flat[column * 4] - Math.max(0, ((column + 0.5) / 64) * 2 - 1)) < 0.02, `column ${column}`);
 });

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7569542,
+  "total": 7586362,
   "history": [
     {
       "date": "2026-10-24",
@@ -2594,6 +2594,12 @@
       "commit": "27bf48091",
       "reason": "new entry draco-points ships the 285 KB full Draco Wasm, fetched only on a point cloud decode",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "fa44286ac",
+      "reason": "hair, eye and skin models are three new entries of materials",
+      "grew": 4
     }
   ],
   "items": {
@@ -2894,11 +2900,14 @@
     "@margoengine/materials": 63050,
     "@margoengine/materials/alpha-hash": 1309,
     "@margoengine/materials/atlas": 2014,
-    "@margoengine/materials/batched": 37626,
+    "@margoengine/materials/batched": 37624,
+    "@margoengine/materials/eye": 3629,
+    "@margoengine/materials/hair": 2011,
     "@margoengine/materials/layered": 3230,
     "@margoengine/materials/mips": 10731,
     "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/prefilter": 1933,
+    "@margoengine/materials/skin": 11181,
     "@margoengine/materials/stochastic": 2402,
     "@margoengine/materials/transmission": 7416,
     "@margoengine/math": 20105,
@@ -3219,6 +3228,7 @@
     "leak @margoengine/materials -> @margoengine/gltf-pro": 1,
     "leak @margoengine/materials/batched -> @margoengine/gltf-pro": 1,
     "leak @margoengine/materials/mips -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/materials/skin -> @margoengine/gltf-pro": 1,
     "leak @margoengine/materials/stochastic -> @margoengine/gltf-pro": 1,
     "leak @margoengine/mesh-edit -> @margoengine/bvh/tree": 1,
     "leak @margoengine/mesh-edit/bake -> @margoengine/bvh/tree": 1,

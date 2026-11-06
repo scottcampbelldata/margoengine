@@ -749,6 +749,82 @@ do not run the colour shader (shadow maps, picking, contact shadows, TAA velocit
 plainly, and `displacementMap` is read plainly in the vertex stage, so a cut-out or displaced surface should leave those
 out of `maps`. A texture with no 1 x 1 mip (`mipmaps: false`, a short `mipTexture` chain) blends without the contrast gain.
 
+### Hair, eyes and skin (`@margoengine/materials/hair`, `/eye`, `/skin`)
+
+Three shading models for characters, each its own entry, assigned through `features` on a `PbrMaterial`. Each puts its own
+response to a light in place of the standard one, for the sun and for `Clustered` point, spot and directional lights.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh } from 'margoengine/materials';
+import { eye } from 'margoengine/materials/eye';
+import { hair } from 'margoengine/materials/hair';
+import { skin } from 'margoengine/materials/skin';
+import { sphereGeometry } from 'margoengine/geometry';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const ball = sphereGeometry(0.012, 64, 48); // an eyeball 24 mm across
+createMesh(engine, ball, new PbrMaterial({ color: [0.3, 0.17, 0.08, 1], features: [hair({ direction: [0, -1, 0] })] }));
+createMesh(engine, ball, new PbrMaterial({ color: [0.8, 0.55, 0.45, 1], roughness: 0.45, features: [skin()] }));
+const iris = eye({ irisColor: [0.1, 0.25, 0.2], pupil: 0.35 });
+createMesh(engine, ball, new PbrMaterial({ color: [0.9, 0.87, 0.85, 1], features: [iris] }));
+iris.pupil = 0.5; // live: the pupil opens
+```
+
+`hair()` draws the two highlights of a real fibre (Kajiya and Kay 1989; Marschner et al. 2003; Scheuermann 2004): a white
+one shifted toward the root and a wider one, tinted by `color`, shifted the other way. A hash per strand breaks them up.
+Both run across the strands, so they follow the way the hair runs, not the surface. `color` and `map` stay; the highlights
+replace `roughness` and `metalness`. Pair it with `alphaHash()` for soft card edges.
+
+| Option | Meaning |
+| --- | --- |
+| `direction` | The way strands run, root to tip: `'u'`, `'v'` (the UV's, default `'v'`), or a direction in the mesh's axes, such as `[0, -1, 0]`. A UV direction needs tangents, which the feature derives |
+| `shift` | Angle in radians of the white highlight toward the root, -1 to 1 (default 0.09); the tinted one goes 1.5 times as far the other way |
+| `width` | Width in radians of the white highlight, above 0, at most 1 (default 0.12); the tinted one is twice as wide |
+| `specular` | Strength of both highlights, from 0 (default 1) |
+| `strands` | Strands across one unit of UV (default 200), each with its own highlight |
+| `jitter` | How far a strand's shift wanders in radians, -1 to 1 (default 0.06) |
+
+`skin()` bleeds light past shadow edges, red furthest, on thin and curved parts more than on broad ones: the published
+three-layer diffusion profile (d'Eon and Luebke 2007), integrated around a circle once for every angle and curvature into
+a table (Penner and Borshukov 2011) and read per pixel with the curvature from screen derivatives. It takes one pass with
+nothing to blur. A normal map scatters too: red reads a softer normal than green, and blue the map's. `color`, `map`,
+`normalMap` and `roughness` stay; metalness is ignored; the highlight is GGX with skin's index of 1.4.
+
+| Option | Meaning |
+| --- | --- |
+| `unitsPerMeter` | Scene units in a metre, above 0 (default 1, the unit of glTF). The profile is in real lengths, so a model in centimetres needs 100 |
+
+`eye()` is for a sphere mesh. The view ray refracts at a clear cornea by Snell's law and meets a flat iris set back inside,
+so the iris shifts with the view instead of being painted on the ball, and the light refracts the same way. Outside the
+cornea the material is the white of the eye: `color`, `map` and `roughness` stay there, and a normal map shows there only.
+The default sizes are those of Gullstrand's schematic eye as usually quoted.
+
+| Option | Meaning |
+| --- | --- |
+| `irisMap` | Iris picture, its centre at the middle of the map (default none: fibres drawn in `irisColor`) |
+| `irisMapPupil` | Pupil radius in `irisMap`, as a share of the iris's radius (default 0.3) |
+| `irisColor` | Linear colour of the iris; it multiplies `irisMap`. Live on the feature (default a grey blue) |
+| `pupil` | Pupil radius as a share of the iris's radius, above 0, below 1. Live on the feature (default 0.3) |
+| `irisRadius` | Iris radius as a share of the eyeball's radius (default 0.49) |
+| `depth` | How far the iris sits behind the front of the eyeball, as a share of its radius (default 0.25) |
+| `ior` | Index of refraction of the cornea, above 1, at most 3 (default 1.376) |
+| `axis` | The way the eye looks, in the mesh's axes (default `[0, 0, 1]`) |
+| `center` | The centre of the eyeball, in the mesh's axes (default `[0, 0, 0]`) |
+
+On an RTX A6000 the highlights land within a row of the formula on a flat stand-in and reach 0.117 of the 0.121 possible
+on the real hair mesh of the Seed-san avatar, where turning the strands 90 degrees moves them completely (correlation
+0.005). Skin matches the table within one percent and an 8-bit step on stand-in spheres of 5 mm and 2 m, and shows red past
+the terminator on the avatar's head, where plain shading is black. The pupil's edges match a Snell trace within 1.5 pixels
+on a stand-in sphere. The avatar has no eyeball, only a shallow iris plate on a sphere of about 65 mm and 6 percent off it;
+with `center` and `axis` fitted to that plate the pupil sits on the axis and opens as it should.
+
+Area lights, ambient light and environment reflections keep the plain model. A shadow map cuts skin's bleed past the
+terminator, because it multiplies the whole response. `anisotropy` and a thin film are refused at the first draw. The skin
+table's 64 columns blur the terminator by 0.016 of n.l in all three colours. Each is one more shader variant; cost not
+timed. `eye()` on a mesh far from a sphere refracts by its own normals, so the iris bends with them.
+
 ### Object-space normal maps (`@margoengine/materials/object-normal`)
 
 `objectNormal()` reads `normalMap` as an object-space map: RGB is the normal in the mesh's own axes (0.5 at zero), the
