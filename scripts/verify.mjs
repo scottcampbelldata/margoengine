@@ -34,6 +34,13 @@ export const SERIAL = ['node scripts/hygiene.js --verify', 'npm run build:packag
 /** Half the machine's threads for the unit tests (the no-burn rule), at least the 4 they always had and at most 8. */
 export const TEST_CONCURRENCY = Math.min(8, Math.max(4, availableParallelism() >> 1));
 
+/**
+ * Limit of one unit test. The longest measured was 32 s on 2026-11-06, in a step that takes 166 to 380 s by load, so this
+ * leaves room for a machine five times busier and still names a hang well inside a gate's limit for the step. A hang the
+ * test's own process cannot report is named by scripts/support/test-watch.mjs.
+ */
+export const TEST_TIMEOUT_MS = 300_000;
+
 /** Stage 2: each entry is a chain of commands run one after another; the chains run side by side. */
 export const PARALLEL = [
   ['npm run api:check'],
@@ -42,7 +49,7 @@ export const PARALLEL = [
   ['npm run build --workspace examples/gameplay-sandbox', 'npm run test --workspace examples/gameplay-sandbox'],
   ['npm run build --workspace examples/voxel-sandbox', 'npm run test --workspace examples/voxel-sandbox'],
   [
-    `node --experimental-test-module-mocks --test --test-concurrency=${TEST_CONCURRENCY} tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js`,
+    `node --experimental-test-module-mocks --test --test-concurrency=${TEST_CONCURRENCY} --test-timeout=${TEST_TIMEOUT_MS} --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/support/test-watch.mjs --test-reporter-destination=stderr tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js`,
   ],
   ['npm run docs:links'],
   ['npm run measure:size'],

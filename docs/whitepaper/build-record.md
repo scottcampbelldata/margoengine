@@ -961,7 +961,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B17 | engine.onFrame callbacks run on a headless stage's step | DONE | `8fdc212d4` | - |
 | A9 | resolveFromURL reads LDraw parts from a hosted library, and the README says where to get it | DONE | `69ad9dc6d` | - |
 | A8 | The headless README opens with the ffmpeg need for video in Node | DONE | `22b5cdaa7` | - |
-| B9 | MeshBridge.sync pays one pass when nothing moved (regression of e1daa8a3e) | DONE | this commit | - |
+| B9 | MeshBridge.sync pays one pass when nothing moved (regression of e1daa8a3e) | DONE | `71d56976e` | - |
+| verify | The unit test step names a hung test: 300 s a test, a watch in the runner for a silent file | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

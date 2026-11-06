@@ -15,7 +15,7 @@ import {
   planSteps,
 } from '../scripts/check-merge.mjs';
 import { MATRIX_DIRS, packageScopes } from '../scripts/support/affected-packages.mjs';
-import { PARALLEL, SERIAL, TEST_CONCURRENCY } from '../scripts/verify.mjs';
+import { PARALLEL, SERIAL, TEST_CONCURRENCY, TEST_TIMEOUT_MS } from '../scripts/verify.mjs';
 import { PREPARE, RUNNER_SMOKE, splitSteps, testId } from '../scripts/gpu-package-tests.mjs';
 import {
   analyse,
@@ -525,7 +525,7 @@ test('verify runs the same checks as before plus the parity count, hygiene first
       'npm run test --workspace examples/gameplay-sandbox',
       'npm run build --workspace examples/voxel-sandbox',
       'npm run test --workspace examples/voxel-sandbox',
-      `node --experimental-test-module-mocks --test --test-concurrency=${TEST_CONCURRENCY} tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js`,
+      `node --experimental-test-module-mocks --test --test-concurrency=${TEST_CONCURRENCY} --test-timeout=${TEST_TIMEOUT_MS} --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/support/test-watch.mjs --test-reporter-destination=stderr tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js`,
       'npm run docs:links',
       'npm run measure:size',
       'npm run proofs -- --current',

@@ -162,8 +162,8 @@ does not own. Each entry says exactly what is needed to close it.
 
 - **What:** on 2026-11-06 one `npm run verify` run in a worktree passed every other step and then sat in the unit test step until its 1,500 s limit, where the same tree took 166 s minutes before and the next run passed in 380 s. Nothing named the test, because the step prints only when it ends.
 - **Repro:** none yet. Other lanes were running their own checks on the machine at the time.
-- **Cause:** not found. Only a test with no time limit of its own could do this, so `--test-timeout` on that step would name it the next time.
-- **Needed to close:** give the step a per-test limit, then fix the test it names.
+- **Cause:** not found. The step now names a hang (see Fixed 2026-11-06), so the next one prints `HUNG TEST:` with its file and test.
+- **Needed to close:** a run that prints that line, and a fix of the test it names. Every verify run since is a run of this watch.
 
 ### Apple M6 sweep, 2026-11-05 (Chrome 157 and Playwright WebKit; Safari not run)
 
@@ -704,6 +704,7 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 
 | Bug | Cause | Fix | Regression test |
 | --- | --- | --- | --- |
+| A hung test in the verify unit step named nothing and sat until the step's outer limit | The step prints only when it ends, tests had no time limit, and `--test-timeout` alone cannot reach a blocked event loop or a process that stays alive after its tests | Each test has 300 s (32 s measured for the longest), and a reporter in the runner's process names a file silent for 360 s and ends the run with its children | `tests/test-watch.test.js` |
 | MeshBridge.sync made a world with nothing moving slower than the setter loop it replaced | One walk of the links for the mesh checks, then one per group whether it moved or not, and a read past the end of the row arrays to end a run | One pass checks the meshes and marks the groups that moved; only those get a second walk. A run ends after the loop | `packages/ecs/test/engine.test.js`, "one pass finds what moved" |
 | The light glTF loader called a valid accessor over one million values not valid glTF | The count limit shared one error with the bounds checks | Its own `unsupported` error naming gltf-pro, so `loadAuto` moves on | `packages/gltf/test/auto.test.js` |
 | `loadAuto` drew each instanced node once on gltf-pro, or refused the file | It passed gltf-pro no `decoders.instancing`, which gltf-pro does not import itself | `loadAuto` imports the reader when the file uses `EXT_mesh_gpu_instancing` | `packages/gltf/test/auto.test.js` |

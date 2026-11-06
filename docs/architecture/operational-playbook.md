@@ -723,6 +723,9 @@ are the enforceable non-regression layer for the overlapping categories.
 `scripts/verify.mjs` runs fast hygiene and one package build in order, then independent chains in parallel: API,
 quality, parity, sandbox build/tests, unit tests at bounded concurrency, documentation links, size measurement, and
 current proofs. A chain failure terminates the other process trees. Serial mode remains available for diagnosis.
+The unit test step gives each test 300 s (`TEST_TIMEOUT_MS`, against 32 s for the longest measured), and
+`scripts/support/test-watch.mjs` watches from the runner's process: a test file silent for 360 s, through a blocked event
+loop or a process that stays alive after its tests, prints `HUNG TEST:` with the file and test and ends the run.
 
 `scripts/check-merge.mjs` classifies the actual changed files and runs only checks the change can affect. It expands
 package dependents transitively and chooses full validation when shared/core/build/check infrastructure changes, a
