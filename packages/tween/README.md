@@ -212,6 +212,30 @@ const drawn = easeFromStroke([[10, 300], [60, 280], [120, 120], [200, 100]]);
 - A custom ease is a plain easing function with `curve` holding its data. It works anywhere an `easing` goes.
 - `easeFromStroke(samples, tolerance?)` scales a stroke to 0..1 from its first and last sample, drops samples that went back in x, and keeps the few points that hold the shape within `tolerance`, default 0.005 of its height. A stroke that ends at the y it began throws, as there is no height to scale by.
 
+## Springs by duration and bounce
+
+Give a `Spring` the feel you want instead of its physics. `duration` is how long one swing takes in seconds, and `bounce` how much of the damping is taken away:
+
+```ts
+import {Spring, springOptions} from 'margoengine/tween';
+
+const snappy = new Spring({duration: 0.3, bounce: 0, target: 1}); // no overshoot, the fastest that has none
+const playful = new Spring({duration: 0.5, bounce: 0.4, target: 1}); // overshoots by 9.5%, then settles
+const heavy = new Spring({duration: 0.8, bounce: -0.5, target: 1}); // creeps in, slower than bounce 0
+playful.update(1 / 60);
+
+// The same numbers, for anything that takes stiffness and damping.
+const {stiffness, damping} = springOptions(0.5, 0.4);
+```
+
+| `bounce` | Motion | Damping ratio |
+| --- | --- | --- |
+| above 0, below 1 | Overshoots, more as it nears 1, by `exp(-pi * r / sqrt(1 - r * r))` of the move from rest | `r = 1 - bounce` |
+| 0 (default) | Critically damped: no overshoot | 1 |
+| below 0, above -1 | Overdamped: no overshoot, slower | `1 / (1 + bounce)` |
+
+`duration` is the period of the same spring with no damping, `2 * pi * sqrt(mass / stiffness)`, the meaning SwiftUI gives it. Doubling it plays the same curve at half speed, and `mass` does not change the motion. A spring moving from rest takes longer than `duration` to settle; `spring.settled` says when. Give `duration` and `bounce`, or `stiffness` and `damping`, not both.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/tween

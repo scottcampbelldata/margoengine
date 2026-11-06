@@ -3,7 +3,7 @@ import { lerpArray } from './interpolate.js';
 export * from './easings.js';
 export * from './interpolate.js';
 export { smoothDamp, type DampArray } from './damp.js';
-export { Spring, type SpringOptions } from './spring.js';
+export { Spring, springOptions, type SpringOptions } from './spring.js';
 export { Timeline, type TimelineOptions, type TimelineTweenOptions } from './timeline.js';
 /** Maps normalized progress `time` in [0, 1) to eased progress; must return a finite number. */
 export type Easing = (time: number) => number;

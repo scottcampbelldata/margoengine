@@ -2002,6 +2002,7 @@
       "parseHexColor",
       "slerpArray",
       "smoothDamp",
+      "springOptions",
       "steps",
       "toHexColor"
     ],

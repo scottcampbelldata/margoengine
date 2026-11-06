@@ -19,7 +19,7 @@ export class Spring {
     readonly damping: number;
     readonly mass: number;
     readonly precision: number;
-    constructor({ value, target, velocity, stiffness, damping, mass, precision }?: SpringOptions);
+    constructor({ value, target, velocity, stiffness, damping, duration, bounce, mass, precision }?: SpringOptions);
     get dampingRatio(): number;
     get settled(): boolean;
     update(delta: number): number;
@@ -31,6 +31,8 @@ export interface SpringOptions {
     velocity?: number;
     stiffness?: number;
     damping?: number;
+    duration?: number;
+    bounce?: number;
     mass?: number;
     precision?: number;
 }
@@ -159,6 +161,11 @@ export function parseHexColor(hex: string): [number, number, number, number];
 export function slerpArray(out: number[] | Float32Array | Float64Array, a: ArrayLike<number>, b: ArrayLike<number>, t: number): void;
 
 export function smoothDamp<T extends DampArray>(current: ArrayLike<number>, target: ArrayLike<number>, velocity: DampArray, smoothTime: number, maxSpeed: number, dt: number, out: T): T;
+
+export function springOptions(duration: number, bounce?: number, mass?: number): {
+    stiffness: number;
+    damping: number;
+};
 
 export function steps(count: number, jumpStart?: boolean): Easing;
 

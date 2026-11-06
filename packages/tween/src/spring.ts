@@ -8,14 +8,32 @@ export interface SpringOptions {
   target?: number;
   /** Start velocity in units per second. Default 0. */
   velocity?: number;
-  /** Spring constant `k`, > 0. Default 170. */
+  /** Spring constant `k`, > 0. Default 170. Not with `duration`. */
   stiffness?: number;
-  /** Damping coefficient `c`, >= 0. Default 14. Critical damping is `2 * sqrt(stiffness * mass)`. */
+  /** Damping coefficient `c`, >= 0. Default 14. Critical damping is `2 * sqrt(stiffness * mass)`. Not with `duration`. */
   damping?: number;
+  /** Seconds one swing takes: the period of this spring with no damping, > 0. Replaces `stiffness` and `damping`. */
+  duration?: number;
+  /** With `duration`: above 0 overshoots, 0 is critically damped, below 0 is overdamped; between -1 and 1. Default 0. */
+  bounce?: number;
   /** Mass, > 0. Default 1. */
   mass?: number;
   /** The spring counts as settled when both |value - target| and |velocity| fall below this. Default 0.001. */
   precision?: number;
+}
+
+/**
+ * The `stiffness` and `damping` of a spring given by feel: `duration` is the period with no damping in seconds, and the
+ * damping ratio is `1 - bounce`, or `1 / (1 + bounce)` below 0.
+ * @throws RangeError for a `duration` not finite and above 0, a `bounce` not between -1 and 1, or a `mass` not above 0.
+ */
+export function springOptions(duration: number, bounce = 0, mass = 1): { stiffness: number; damping: number } {
+  if (!(Number.isFinite(duration) && duration > 0 && bounce > -1 && bounce < 1 && Number.isFinite(mass) && mass > 0))
+    throw new RangeError('Invalid spring; use a finite duration above 0, a bounce between -1 and 1 and a mass above 0');
+  const omega = (2 * Math.PI) / duration,
+    stiffness = mass * omega * omega,
+    ratio = bounce < 0 ? 1 / (1 + bounce) : 1 - bounce;
+  return { stiffness, damping: 2 * ratio * Math.sqrt(stiffness * mass) };
 }
 
 /**
@@ -27,6 +45,7 @@ export interface SpringOptions {
  * const spring = new Spring({value: 0, stiffness: 120, damping: 12});
  * spring.target = 1;
  * spring.update(1 / 60); // spring.value moves toward 1
+ * new Spring({duration: 0.5, bounce: 0.3}); // the same by feel
  * ```
  */
 export class Spring {
@@ -38,17 +57,25 @@ export class Spring {
   readonly mass: number;
   readonly precision: number;
   /**
-   * @throws RangeError for a non-finite number, `stiffness` or `mass` not above 0, or `damping` or `precision` below 0.
+   * @throws RangeError for a non-finite number, `stiffness` or `mass` not above 0, `damping` or `precision` below 0, a bad
+   * `duration` or `bounce`, `bounce` without `duration`, or `duration` with `stiffness` or `damping`.
    */
   constructor({
     value = 0,
     target = value,
     velocity = 0,
-    stiffness = 170,
-    damping = 14,
+    stiffness,
+    damping,
+    duration,
+    bounce,
     mass = 1,
     precision = 0.001,
   }: SpringOptions = {}) {
+    if (duration === undefined ? bounce !== undefined : stiffness !== undefined || damping !== undefined)
+      throw new RangeError('Give a spring duration and bounce, or stiffness and damping, not both');
+    if (duration !== undefined) ({ stiffness, damping } = springOptions(duration, bounce, mass));
+    stiffness ??= 170;
+    damping ??= 14;
     if (
       ![value, target, velocity, stiffness, damping, mass, precision].every(Number.isFinite) ||
       stiffness <= 0 ||

@@ -947,6 +947,7 @@ only its published API (`setBodyType`, the joint frames of `ImpulseJoint`) is us
 | Kinematics URDF import (`kinematics-constraints/urdf`) | The public URDF specification (ROS wiki pages on the robot, link and joint elements); forward kinematics checked against the modified DH table Franka Emika publishes in its robot documentation. No ROS, MoveIt, Pinocchio or other library's source was read |
 | Kinematics batched GPU clearance (`kinematics-constraints/gpu`) | GJK from E. G. Gilbert, D. W. Johnson, S. S. Keerthi, IEEE J. Robotics and Automation 4(2), 1988, in WGSL from the repository's own `hull.ts`; `preciseSin` and `preciseCos` from `packages/shared/precise-math.js`; Lipschitz pruning as in `kinematics-constraints/sdf`. No other engine's or library's source was read |
 | Custom ease curves (`tween/custom-ease`) | Monotone cubic from F. N. Fritsch and R. E. Carlson, SIAM J. Numer. Anal. 17(2), 1980; stroke thinning from U. Ramer, 1972, and D. Douglas and T. Peucker, 1973; the JSON shape is Margo's own. |
+| Springs by duration and bounce (`tween` `springOptions`) | The damped oscillator from any mechanics text; `duration` and `bounce` as Apple's public SwiftUI documentation describes them. |
 
 ## 2D sprites: `@margoengine/sprites`
 
