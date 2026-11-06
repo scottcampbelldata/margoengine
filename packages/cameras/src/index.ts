@@ -267,12 +267,11 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
   onPreUpdate(delta: number): void {
     const a = this.animation,
       camera = this.camera;
-    if (this.canvas)
-      this.applyLens(
-        this.viewOffset
-          ? this.viewOffset.fullWidth / this.viewOffset.fullHeight
-          : this.canvas.width / this.canvas.height,
-      );
+    if (camera && this.canvas && this.focalLength !== undefined) {
+      const o = this.viewOffset,
+        aspect = o ? o.fullWidth / o.fullHeight : this.canvas.width / this.canvas.height;
+      if (aspect > 0 && aspect < Infinity) this.applyLens(aspect);
+    }
     if (!a || !camera) return;
     const k = a.duration ? Math.min(1, (a.elapsed += delta) / a.duration) : 1,
       s = k * k * (3 - 2 * k),

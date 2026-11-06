@@ -115,3 +115,15 @@ test('lens errors say what to pass', () => {
     (e) => e.code === 'state',
   );
 });
+
+test('a disposed projection that is still a registered plugin does not throw on the next frame', () => {
+  // The browser check found this: dispose() leaves the plugin in the engine, whose onPreUpdate ran applyLens on nothing.
+  const camera = new Camera({ position: [0, 0, 10], target: [0, 0, 0] });
+  const p = new CameraProjection({ mode: 'perspective', focalLength: 50 });
+  p.setup({ camera, canvas: { width: 300, height: 200 } });
+  p.dispose();
+  assert.doesNotThrow(() => p.onPreUpdate(1 / 60));
+  const q = new CameraProjection({ focalLength: 50 });
+  q.setup({ camera, canvas: { width: 0, height: 0 } });
+  assert.doesNotThrow(() => q.onPreUpdate(1 / 60), 'a zero size canvas leaves the report to core');
+});
