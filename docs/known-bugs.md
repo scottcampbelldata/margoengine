@@ -800,3 +800,12 @@ Each is described with its cause and guard in
 | Audit F14, F15: voxel-net dropped a hello sent with the upgrade; failed chunks were never retried | `8c8b51a0` | `packages/voxel-net/tests/websocket.test.js`, `server.test.js` |
 | Audit F03, F13, F16: voxel-net had no authentication, no cap before the hello and no bound on edited chunks | `ddc5c5ff` | `packages/voxel-net/tests/limits.test.js` |
 | Audit E-01 (bug 61): partial-view clears drew black at 4x MSAA on Intel Arc 140V (D3D12) because the colour came only from the blend constant | `64034d95` | `tests/clear-draw.test.js` |
+
+## Loaders
+
+### parse3DM is not yet run against the real rhino3dm runtime
+
+- **What:** `@margoengine/loaders/3dm` is tested against a stand-in with rhino3dm's shape. The real module was not installed, because adding it needs Scott's approval, so a difference between its API and the stand-in would only show on a real file.
+- **Repro:** install rhino3dm, load a `.3dm` file and call `parse3DM(await rhino3dm(), bytes)`.
+- **Cause:** no real runtime or sample file in the repository.
+- **Needed to close:** add rhino3dm as a dev dependency, add a sample file to `THIRD-PARTY-NOTICES.md`, and run the entry's test against both.

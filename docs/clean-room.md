@@ -621,6 +621,7 @@ File formats written from their public descriptions; no reader of another projec
 | LF11 | VTK XML layout, `DataArray` encodings, appended data and block headers | loaders/src/vtk-xml.ts | Kitware, "VTK File Formats" (VTK User's Guide) |
 | LF12 | Cell type numbers and point order | loaders/src/vtk-xml.ts | Kitware, "VTK File Formats" cell diagrams |
 | LF13 | LZ4 block decoding | loaders/src/vtk-xml.ts | "LZ4 Block Format Description" |
+| LF14 | Unit system numbers, the object, layer and mesh tables a 3DM file exposes | loaders/src/3dm.ts | Robert McNeel & Associates, published rhino3dm API reference |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 

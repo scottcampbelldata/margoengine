@@ -1,5 +1,5 @@
 {
-  "commit": "3de089fdc",
+  "commit": "69505e4e9",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1106,6 +1106,10 @@
       "./vtk-xml": {
         "raw": 17116,
         "gzip": 6681
+      },
+      "./3dm": {
+        "raw": 4226,
+        "gzip": 1962
       },
       "dist/workers/usd.js": {
         "raw": 21673,

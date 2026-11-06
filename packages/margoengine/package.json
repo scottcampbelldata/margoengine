@@ -1042,6 +1042,10 @@
       "types": "./dist/loaders/vtk-xml.d.ts",
       "import": "./dist/loaders/vtk-xml.js"
     },
+    "./loaders/3dm": {
+      "types": "./dist/loaders/3dm.d.ts",
+      "import": "./dist/loaders/3dm.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"

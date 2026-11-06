@@ -54,6 +54,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
 | `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
 | `parseVTKXML` (`/vtk-xml`, async) | See [VTK XML](#vtk-xml) |
+| `parse3DM` (`/3dm`) | See [Rhino 3DM](#rhino-3dm) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
@@ -472,6 +473,28 @@ console.log(positions.length, indices);
 - **Cells.** Polygons and strips become triangles over the file's points, and polylines become `lines`. Volume cells are reduced to the faces only one cell owns, their outer surface; `surface: 'all'` keeps every face. `triangleCells` names the cell each triangle came from, so a cell field can colour them.
 - **Data.** Every array is in `pointData` or `cellData` by name. `Normals`, `TCoords` and a 3 or 4 component `UInt8` `Scalars` array also fill `normals`, `uvs` and `colors`.
 - **Not read.** Other dataset types, such as image and structured grids, and LZMA blocks are `unsupported` errors. The legacy text format is `parseVTK`.
+
+## Rhino 3DM
+
+`parse3DM` from `@margoengine/loaders/3dm` reads the meshes, layers and attributes of a Rhino `.3dm` file through a rhino3dm runtime you install, host and load, the same pattern as `parseIFC`. Its Wasm file is never part of this package.
+
+```ts
+import { parse3DM, type RhinoRuntime } from '@margoengine/loaders/3dm';
+
+// `rhino` is `await rhino3dm()`, from the rhino3dm package you install and host.
+export async function loadChair(rhino: RhinoRuntime) {
+  const bytes = await (await fetch('/models/chair.3dm')).arrayBuffer();
+  const { groups, layers } = parse3DM(rhino, bytes);
+  console.log(groups[0].name, layers[groups[0].layer ?? 0].name);
+}
+```
+
+- **Geometry.** Each object is a group of one merged mesh: a mesh as it is, and any other surface object through the render mesh saved in the file. The runtime meshes nothing on its own, so an object saved without a render mesh is counted in `skipped`. Save the file from Rhino with render meshes kept.
+- **Attributes.** A group has the object's `name`, `id`, `layer`, `material` and `userStrings`, and its colour, from the object or else its layer. `layers` lists each layer's name, full path, colour and visibility.
+- **Units.** Metres by the file's unit system; `units: 'file'` keeps the file's own numbers. A file with no known unit keeps them too, and `metersPerUnit` is left unset.
+- **Hidden.** Hidden objects and objects on hidden layers stay out unless `hidden: true`.
+- **Memory.** Every handle the runtime gives out is freed before `parse3DM` returns, failures included.
+- **Tested.** Against a stand-in with rhino3dm's shape, not yet against the real runtime: see [known bugs](../../docs/known-bugs.md).
 
 ## Tiled TMX
 

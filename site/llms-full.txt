@@ -332,7 +332,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | --- | --- |
 | [`@margoengine/gltf`](packages/gltf/README.md) | Lazy static glTF/GLB loading for Margo Engine. |
 | [`@margoengine/gltf-pro`](packages/gltf-pro/README.md) | Opt-in glTF 2.0 metallic-roughness rendering for Margo Engine WebGPU. |
-| [`@margoengine/loaders`](packages/loaders/README.md) | PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine. |
+| [`@margoengine/loaders`](packages/loaders/README.md) | PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine. |
 | [`@margoengine/decoders`](packages/decoders/README.md) | Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG, TGA, TIFF, DDS and KTX reading, for Margo Engine. |
 | [`@margoengine/fbx`](packages/fbx/README.md) | Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline. |
 | [`@margoengine/usdz`](packages/usdz/README.md) | Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR. |
@@ -2571,7 +2571,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-192). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-193). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2837,6 +2837,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | LDraw models (`@margoengine/loaders/ldraw`, 2026-11-06) | By method: at most 4,000,000 sub-file references (`maxInstances`) and 64 levels (`maxDepth`). Texture maps (`!TEXMAP`) are skipped with a warning, the legacy dithered colours 256 to 511 draw light grey, and `0 !COLOUR` lines apply file-wide. Uncertified polygons cost twice the triangles, being written on both sides. | One merged mesh has no per-group double-sided flag, and textured parts are a small share of the library. | Models expand to plain triangles: no instancing of repeated parts. | Certified parts cost one side; `edges: false` drops the lines. |
 | 3MF materials (`@margoengine/loaders/threemf-materials`, 2026-11-06) | By method: `multiproperties` blend methods are read as mix, and only the first texture layer of a row is kept. Each corner gets its own vertex, so a mesh costs three vertices per triangle. | One group draws one texture; layered textures need a material the shared loader result does not hold. | A package with stacked texture layers shows the first over the mixed colours. | `parse3MF` keeps welded vertices when textures are not needed. |
 | VTK XML (`@margoengine/loaders/vtk-xml`, 2026-11-06) | By method: `.vtp` and `.vtu` only, so image, rectilinear and structured grids and LZMA blocks are `unsupported`. Every array is widened to `Float32Array`, and the outer surface of volume cells is found by matching faces, one map entry per face. Tested on files built by the test, not on ParaView output. | Geometry is what the engine draws, and the other datasets are volumes or grids with another shape. | 64-bit field values lose precision past 24 bits. | Convert other datasets to PolyData in ParaView; `surface: 'all'` keeps inner faces. |
+| Rhino 3DM (`@margoengine/loaders/3dm`, 2026-11-06) | By method: reads meshes and saved render meshes only. Surface objects saved without a render mesh are counted in `skipped`, and materials are indices, not read. Needs a rhino3dm runtime from the caller, and is tested against a stand-in, not the real runtime. | Meshing a surface needs a solid modelling kernel, which this repository does not hold. | A file saved with small-file options loads with objects skipped. | Save with render meshes kept, or export a mesh format. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in
@@ -3665,6 +3666,15 @@ Each is described with its cause and guard in
 | Audit F14, F15: voxel-net dropped a hello sent with the upgrade; failed chunks were never retried | `8c8b51a0` | `packages/voxel-net/tests/websocket.test.js`, `server.test.js` |
 | Audit F03, F13, F16: voxel-net had no authentication, no cap before the hello and no bound on edited chunks | `ddc5c5ff` | `packages/voxel-net/tests/limits.test.js` |
 | Audit E-01 (bug 61): partial-view clears drew black at 4x MSAA on Intel Arc 140V (D3D12) because the colour came only from the blend constant | `64034d95` | `tests/clear-draw.test.js` |
+
+## Loaders
+
+### parse3DM is not yet run against the real rhino3dm runtime
+
+- **What:** `@margoengine/loaders/3dm` is tested against a stand-in with rhino3dm's shape. The real module was not installed, because adding it needs Scott's approval, so a difference between its API and the stand-in would only show on a real file.
+- **Repro:** install rhino3dm, load a `.3dm` file and call `parse3DM(await rhino3dm(), bytes)`.
+- **Cause:** no real runtime or sample file in the repository.
+- **Needed to close:** add rhino3dm as a dev dependency, add a sample file to `THIRD-PARTY-NOTICES.md`, and run the entry's test against both.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
@@ -4607,7 +4617,8 @@ Every parser returns the same `LoadedGeometry`:
 | `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
 | `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
 | `parseVTKXML` (`/vtk-xml`, async) | See [VTK XML](#vtk-xml) |
-| `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
+| `parse3DM` (`/3dm`) | See [Rhino 3DM](#rhino-3dm) |
+| `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ mesh
 
 [README continues: https://margoengine.com/llms/packages/loaders.md]
 

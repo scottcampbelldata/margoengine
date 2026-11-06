@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5099505,
+  "total": 5101723,
   "history": [
     {
       "date": "2026-10-24",
@@ -2276,6 +2276,12 @@
       "commit": "3de089fdc",
       "reason": "shader: new pass entry; gltf-pro: lit colour in capture",
       "grew": 3
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "69505e4e9",
+      "reason": "loaders/3dm, new optional entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2522,6 +2528,7 @@
     "@margoengine/lines/trail": 5197,
     "@margoengine/loaders": 52602,
     "@margoengine/loaders dist/workers/usd.js": 8435,
+    "@margoengine/loaders/3dm": 2218,
     "@margoengine/loaders/common": 3417,
     "@margoengine/loaders/font": 6577,
     "@margoengine/loaders/gcode": 1966,
