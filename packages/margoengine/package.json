@@ -450,6 +450,10 @@
       "types": "./dist/culling/models.d.ts",
       "import": "./dist/culling/models.js"
     },
+    "./culling/shadows": {
+      "types": "./dist/culling/shadows.d.ts",
+      "import": "./dist/culling/shadows.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

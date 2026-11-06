@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4787230,
+  "total": 4808202,
   "history": [
     {
       "date": "2026-10-24",
@@ -2006,6 +2006,12 @@
       "commit": "55578d887",
       "reason": "culling: bounds box adds the oriented box tests to the root's compute shader",
       "grew": 2
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "794c8fa6c",
+      "reason": "culling: new shadows entry; dynamic members opened to subclasses",
+      "grew": 1
     }
   ],
   "items": {
@@ -2113,6 +2119,7 @@
     "@margoengine/culling/dynamic": 7461,
     "@margoengine/culling/models": 3624,
     "@margoengine/culling/parts": 15027,
+    "@margoengine/culling/shadows": 20972,
     "@margoengine/cutscene": 6822,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,

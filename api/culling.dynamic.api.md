@@ -14,6 +14,12 @@ export class DynamicInstances implements EnginePlugin {
     readonly mirrored: boolean;
     readonly material: PbrMaterial;
     disposed: boolean;
+    protected readonly geometry: Geometry;
+    protected readonly own: Geometry;
+    protected high: number;
+    protected engine?: Engine;
+    protected device?: GPUDevice;
+    protected buffers?: Buffers;
     static attach(engine: EngineKernel, options: DynamicInstancesOptions): DynamicInstances;
     constructor({ geometry, material, capacity, minRadius, mirrored }: DynamicInstancesOptions);
     get count(): number;
@@ -43,6 +49,7 @@ export class DynamicInstances implements EnginePlugin {
     }): void;
     pick(x: number, y: number): Promise<number | null>;
     readCount(): Promise<number>;
+    protected release(): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -54,5 +61,19 @@ export interface DynamicInstancesOptions {
     capacity: number;
     minRadius?: number;
     mirrored?: boolean;
+}
+
+// Not exported from this entry, but used by the exports above:
+
+interface Buffers {
+    frame: GPUBuffer;
+    part: GPUBuffer;
+    matrices: GPUBuffer;
+    rows: GPUBuffer;
+    world: GPUBuffer;
+    local: GPUBuffer;
+    groups: GPUBuffer;
+    drawn: GPUBuffer;
+    args: GPUBuffer;
 }
 ```

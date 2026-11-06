@@ -194,6 +194,29 @@ A glTF with EXT_mesh_gpu_instancing, a `PBRInstances` you assign and `createInst
 - WebGL2 compatibility layer: nothing is culled and every row draws, the same image. The `@margoengine/webgl` renderer
   is not supported (`MargoError` `'unsupported'`).
 
+## Shadows per cascade: `CascadeParts` and `CascadeInstances`
+
+`shadows.add(parts)` draws every part into every cascade. `CascadeParts` and `CascadeInstances` from
+`margoengine/culling/shadows` are `CulledParts` and `DynamicInstances` that test each caster against each cascade's light box
+on the GPU, so a cascade draws only what reaches it. The shadow map is the same: a caster outside the box clips away there.
+
+```js
+import { Engine, box, PbrMaterial } from 'margoengine';
+import { Shadows } from 'margoengine/shadows';
+import { CascadeParts } from 'margoengine/culling/shadows';
+
+const engine = await Engine.create(document.querySelector('canvas'));
+const transforms = new Float32Array(16 * 1000);
+for (let i = 0; i < 1000; i++) transforms.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i * 3, 0, 0, 1], i * 16);
+const parts = CascadeParts.attach(engine, [{ geometry: box(), material: new PbrMaterial(), transforms }]);
+Shadows.attach(engine).add(parts);
+```
+
+`readCascades()` resolves the casters kept per cascade in the last shadow frame. Each list costs one u32 per slot per cascade.
+Lists too large to bind, the WebGL2 layer, and a pass with no `prepareShadow` in its frame all draw every caster, as the
+plain classes do. Parts keep their sphere for this test whatever `bounds` says.
+
+
 ## Moving objects: `DynamicInstances`
 
 Tens or hundreds of thousands of objects that move, hide, appear and go, with a fixed amount of engine CPU work per

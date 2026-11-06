@@ -408,6 +408,13 @@ the sphere, so a part it keeps is unchanged. Hi-Z still compares one nearest dep
 screen rectangle, so a long part behind a slanted surface stays in. Evidence: `packages/culling/test/gpu/bounds-check.mjs`,
 0 differing pixels against core, 0 of 900 rods drawn by box and 900 by sphere under a plate from above, RTX A6000.
 
+`@margoengine/culling/shadows` culls casters per cascade: `prepareShadow` runs one thread per row, tests its sphere against the
+six planes of each light matrix (Gribb and Hartmann rows, padded for float32) and appends the row to that cascade's list by
+atomic add. List order is free, because a depth-only pass keeps the nearest depth in any order. A caster outside a light box
+clips away in that pass, so the map is unchanged. The draw reads rows through an instance-rate u32 vertex buffer, so a batch's
+list is a plain vertex buffer offset. Evidence: `packages/culling/test/gpu/shadows-cull-check.mjs`, 0 differing pixels against
+every caster drawn in every cascade, RTX A6000. Still missing: a timed run.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback

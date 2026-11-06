@@ -183,9 +183,9 @@ export class DynamicInstances implements EnginePlugin {
   /** See {@link DynamicInstancesOptions.material}. */
   readonly material: PbrMaterial;
   disposed = false;
-  private readonly geometry: Geometry;
+  protected readonly geometry: Geometry;
   /** Own batch identity: a geometry inheriting the caller's arrays, so core meshes of that geometry keep their batch. */
-  private readonly own: Geometry;
+  protected readonly own: Geometry;
   /** Per row: rgb tint as floats and the state word (0 free, 1 shown, 2 hidden), as the GPU reads it (`vec4u`). */
   private readonly attributes: ArrayBuffer;
   private readonly tints: Float32Array;
@@ -193,15 +193,15 @@ export class DynamicInstances implements EnginePlugin {
   private readonly free: Int32Array;
   private freeCount = 0;
   /** Rows the kernels visit: one past the highest row ever added. */
-  private high = 0;
+  protected high = 0;
   private live = 0;
   private readonly dirtyMatrices: Uint8Array;
   private readonly dirtyRows: Uint8Array;
   private dirty = false;
   private filled = false;
-  private engine?: Engine;
-  private device?: GPUDevice;
-  private buffers?: Buffers;
+  protected engine?: Engine;
+  protected device?: GPUDevice;
+  protected buffers?: Buffers;
   private pipelines?: {
     cull: GPUComputePipeline;
     scan: GPUComputePipeline;
@@ -780,7 +780,7 @@ export class DynamicInstances implements EnginePlugin {
     }
   }
 
-  private release(): void {
+  protected release(): void {
     if (this.batch?.redirect === this.redirect) this.batch.redirect = undefined;
     this.batch = undefined;
     if (this.buffers) for (const buffer of Object.values(this.buffers)) buffer.destroy();
