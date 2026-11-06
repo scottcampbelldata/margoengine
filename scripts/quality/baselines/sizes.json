@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5078475,
+  "total": 5085412,
   "history": [
     {
       "date": "2026-10-24",
@@ -2258,6 +2258,12 @@
       "commit": "f297322d6",
       "reason": "feat(animation): morph weights sampled on the GPU (new entry @margoengine/animation/morph-gpu)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "6b54522d1",
+      "reason": "loaders/vtk-xml, new optional entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2515,6 +2521,7 @@
     "@margoengine/loaders/threemf-materials": 7917,
     "@margoengine/loaders/usd": 7778,
     "@margoengine/loaders/vrml": 5087,
+    "@margoengine/loaders/vtk-xml": 6937,
     "@margoengine/loaders/worker": 8571,
     "@margoengine/lod": 14316,
     "@margoengine/lod/auto": 5831,

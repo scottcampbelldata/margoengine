@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-189). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-190). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -277,6 +277,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | NRRD volumes (`@margoengine/loaders/nrrd`, 2026-11-06) | By method: raw, ascii, hex and gzip data; `bzip2` data and the `block` type are refused with code `unsupported`. 64-bit integers become `Float64Array`, exact up to 2^53. At most 536,870,912 samples by default (`maxSamples`), and the header at most 1 MiB. `bounds` ignores rotation and origin; `matrix` holds them. | `DecompressionStream` has no bzip2, and sciviz takes numbers, not BigInts. | A bzip2 file must be saved again as raw or gzip. | `unu save -e gzip`, or raise `maxSamples`. |
 | LDraw models (`@margoengine/loaders/ldraw`, 2026-11-06) | By method: at most 4,000,000 sub-file references (`maxInstances`) and 64 levels (`maxDepth`). Texture maps (`!TEXMAP`) are skipped with a warning, the legacy dithered colours 256 to 511 draw light grey, and `0 !COLOUR` lines apply file-wide. Uncertified polygons cost twice the triangles, being written on both sides. | One merged mesh has no per-group double-sided flag, and textured parts are a small share of the library. | Models expand to plain triangles: no instancing of repeated parts. | Certified parts cost one side; `edges: false` drops the lines. |
 | 3MF materials (`@margoengine/loaders/threemf-materials`, 2026-11-06) | By method: `multiproperties` blend methods are read as mix, and only the first texture layer of a row is kept. Each corner gets its own vertex, so a mesh costs three vertices per triangle. | One group draws one texture; layered textures need a material the shared loader result does not hold. | A package with stacked texture layers shows the first over the mixed colours. | `parse3MF` keeps welded vertices when textures are not needed. |
+| VTK XML (`@margoengine/loaders/vtk-xml`, 2026-11-06) | By method: `.vtp` and `.vtu` only, so image, rectilinear and structured grids and LZMA blocks are `unsupported`. Every array is widened to `Float32Array`, and the outer surface of volume cells is found by matching faces, one map entry per face. Tested on files built by the test, not on ParaView output. | Geometry is what the engine draws, and the other datasets are volumes or grids with another shape. | 64-bit field values lose precision past 24 bits. | Convert other datasets to PolyData in ParaView; `surface: 'all'` keeps inner faces. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in

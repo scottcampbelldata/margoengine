@@ -618,6 +618,9 @@ File formats written from their public descriptions; no reader of another projec
 | LF8 | BFC certification, winding and INVERTNEXT | loaders/src/ldraw.ts | LDraw.org, "Language Extension for Back Face Culling" |
 | LF9 | `!COLOUR` lines and the classic colour values | loaders/src/ldraw.ts | LDraw.org, "Colour Definition Language Extension" and the published LDConfig.ldr values |
 | LF10 | `texture2d`, `texture2dgroup`, `compositematerials`, `multiproperties` | loaders/src/threemf-materials.ts | 3MF Consortium, "Materials and Properties Extension" specification |
+| LF11 | VTK XML layout, `DataArray` encodings, appended data and block headers | loaders/src/vtk-xml.ts | Kitware, "VTK File Formats" (VTK User's Guide) |
+| LF12 | Cell type numbers and point order | loaders/src/vtk-xml.ts | Kitware, "VTK File Formats" cell diagrams |
+| LF13 | LZ4 block decoding | loaders/src/vtk-xml.ts | "LZ4 Block Format Description" |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 

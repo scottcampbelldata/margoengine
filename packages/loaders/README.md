@@ -53,6 +53,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
 | `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
 | `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
+| `parseVTKXML` (`/vtk-xml`, async) | See [VTK XML](#vtk-xml) |
 | `loadOBJ`, `createMTLMaterials`, `createOBJMesh` (`/mtl`) | See [Textured OBJ meshes](#textured-obj-meshes) |
 
 Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per group), `pointsToGeometry` (octahedron markers for clouds), `createMeshes` (engine meshes with `PbrMaterial` colors), `load` / `fetchBytes`, `detectFormat` / `parseAny`, `computeVertexNormals`, `decompressLZF`, `readZipDirectory` / `readZipEntry` / `crc32`, `parsePLYHeader`, `parsePCDHeader`.
@@ -450,6 +451,27 @@ console.log(image.width, uvs?.length);
 - **Groups.** A group's `texture` indexes `textures`; a triangle without one falls in a separate group. Each texture carries its image bytes, `contentType`, `tileStyleU`, `tileStyleV` and `filter`.
 - **Composites.** `compositematerials` mix their base colours by weight into one colour.
 - **Layers.** In `multiproperties`, colour layers mix by their alpha and the first texture layer sets the group's texture, so draw `colors` as a tint over it. Blend methods other than mix are read as mix.
+
+## VTK XML
+
+`parseVTKXML` from `@margoengine/loaders/vtk-xml` reads the XML files ParaView and most simulation tools write: `.vtp` PolyData and `.vtu` unstructured grids.
+
+```ts
+import { parseVTKXML } from '@margoengine/loaders/vtk-xml';
+
+const file = `<VTKFile type="PolyData"><PolyData><Piece NumberOfPoints="3" NumberOfPolys="1">
+  <Points><DataArray type="Float32" NumberOfComponents="3" format="ascii">0 0 0 1 0 0 0 1 0</DataArray></Points>
+  <Polys><DataArray type="Int32" Name="connectivity" format="ascii">0 1 2</DataArray>
+  <DataArray type="Int32" Name="offsets" format="ascii">3</DataArray></Polys>
+</Piece></PolyData></VTKFile>`;
+const { positions, indices } = await parseVTKXML(new TextEncoder().encode(file));
+console.log(positions.length, indices);
+```
+
+- **Encodings.** ascii, binary and appended arrays, raw or base64, either byte order, 32 or 64-bit headers, and zlib or LZ4 blocks. Several pieces in a file are merged.
+- **Cells.** Polygons and strips become triangles over the file's points, and polylines become `lines`. Volume cells are reduced to the faces only one cell owns, their outer surface; `surface: 'all'` keeps every face. `triangleCells` names the cell each triangle came from, so a cell field can colour them.
+- **Data.** Every array is in `pointData` or `cellData` by name. `Normals`, `TCoords` and a 3 or 4 component `UInt8` `Scalars` array also fill `normals`, `uvs` and `colors`.
+- **Not read.** Other dataset types, such as image and structured grids, and LZMA blocks are `unsupported` errors. The legacy text format is `parseVTK`.
 
 ## Tiled TMX
 

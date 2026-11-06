@@ -1,5 +1,5 @@
 {
-  "commit": "10594d01e",
+  "commit": "6b54522d1",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -26,8 +26,12 @@
         "gzip": 6890
       },
       "./skeleton-utils": {
-        "raw": 25035,
-        "gzip": 8632
+        "raw": 25031,
+        "gzip": 8635
+      },
+      "./morph-gpu": {
+        "raw": 7256,
+        "gzip": 3009
       }
     },
     "@margoengine/animator": {
@@ -1094,6 +1098,10 @@
       "./threemf-materials": {
         "raw": 20071,
         "gzip": 7661
+      },
+      "./vtk-xml": {
+        "raw": 17116,
+        "gzip": 6681
       },
       "dist/workers/usd.js": {
         "raw": 21673,

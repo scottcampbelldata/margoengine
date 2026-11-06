@@ -1034,6 +1034,10 @@
       "types": "./dist/loaders/threemf-materials.d.ts",
       "import": "./dist/loaders/threemf-materials.js"
     },
+    "./loaders/vtk-xml": {
+      "types": "./dist/loaders/vtk-xml.d.ts",
+      "import": "./dist/loaders/vtk-xml.js"
+    },
     "./lod": {
       "types": "./dist/lod.d.ts",
       "import": "./dist/lod.js"
