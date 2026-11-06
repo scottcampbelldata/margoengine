@@ -13,6 +13,14 @@ window.check={
   async render(mode,height){projection.mode=mode;projection.height=height;return settle();},
   async offset(on){if(on)projection.setViewOffset(400,400,200,0,200,400);else projection.clearViewOffset();return window.check.render('orthographic',8);},
   async offAxis(eyeX,oblique){const {OffAxisProjection,ObliqueNearPlane}=await import('/packages/cameras/dist/offaxis.js');projection.dispose();window.off??=new OffAxisProjection({lowerLeft:[-4,0,4],lowerRight:[4,0,4],upperLeft:[-4,0,-4]},[0,20,0]);if(!window.attached){window.off.attach(engine.camera);window.attached=true;}window.off.setEye([eyeX,20,0]);window.obl?.dispose();if(oblique!==undefined)window.obl=new ObliqueNearPlane([0,-1,0,oblique]).attach(engine.camera);return settle();},
+  async wide(mode,distance){const {WideAngle}=await import('/packages/cameras/dist/panini.js');
+    if(!window.wideEffect){projection.dispose();engine.camera.position=[0,0,0];engine.camera.target=[0,0,-1];engine.camera.fov=100;engine.camera.near=0.1;engine.camera.far=100;window.wideEffect=await WideAngle.attach(engine,{mode,distance});}
+    Object.assign(window.wideEffect.options,{mode,distance});
+    const map=window.wideEffect.map(100,1),ty=Math.tan(50*Math.PI/180);
+    // the source picture is square; each box front face (z = -4.5) sits at a chosen source position
+    const want={red:0.7,blue:-0.7,green:0};const columns={};
+    for(const [name,nx] of Object.entries(want)){meshes[name].setPosition([nx*4.5*ty,0,-5]);columns[name]=(map.toOutput(nx,0)[0]+1)/2*400;}
+    const r=await settle();return {...r,columns};},
   async pick(x,y){const m=await engine.pick(x,y);return Object.entries(meshes).find(([,v])=>v===m)?.[0]??null;},
   async effects(){const [{Shadows},{TAA}]=await Promise.all([import('/packages/shadows/dist/index.js'),import('/packages/taa/dist/index.js')]);const shadows=Shadows.attach(engine);for(const m of Object.values(meshes))shadows.add?.(m);TAA.attach(engine);return window.check.render('orthographic',8);},
 };

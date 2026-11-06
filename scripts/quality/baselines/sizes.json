@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4646605,
+  "total": 4655432,
   "history": [
     {
       "date": "2026-10-24",
@@ -1850,6 +1850,18 @@
       "commit": "e9b71d40e",
       "reason": "cameras gains the physical entry (PhysicalCamera)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "2144e9654",
+      "reason": "cameras gains the panini entry (WideAngle)",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "b60bef692",
+      "reason": "cameras gains the panini entry (WideAngle)",
+      "grew": 2
     }
   ],
   "items": {
@@ -1901,6 +1913,7 @@
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/offaxis": 2078,
     "@margoengine/cameras/origin": 1514,
+    "@margoengine/cameras/panini": 3289,
     "@margoengine/cameras/physical": 1349,
     "@margoengine/cinematic": 2076,
     "@margoengine/clustered": 13989,
@@ -2064,7 +2077,7 @@
     "@margoengine/lines/batch": 6524,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/hidden": 4136,
-    "@margoengine/lines/pick": 5665,
+    "@margoengine/lines/pick": 5929,
     "@margoengine/lines/trail": 5197,
     "@margoengine/loaders": 52602,
     "@margoengine/loaders dist/workers/usd.js": 8435,
@@ -2149,6 +2162,7 @@
     "@margoengine/points/las": 5116,
     "@margoengine/points/laz": 8046,
     "@margoengine/points/octree": 8978,
+    "@margoengine/points/pick": 5274,
     "@margoengine/points/potree": 3670,
     "@margoengine/points/surfels": 14337,
     "@margoengine/post": 40110,

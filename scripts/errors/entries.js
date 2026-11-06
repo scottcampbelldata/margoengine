@@ -139,6 +139,9 @@ export const entries = [
       'Invalid off-axis eye',
       'Invalid oblique plane',
       'Invalid physical camera',
+      'Invalid wide angle mode',
+      'Invalid wide angle distance',
+      'Invalid wide angle view',
     ],
     cause:
       'The camera cannot build a view: `fov` outside 0-180, `near` not above 0 or `far` not above `near`, the position equal to the target, a view parallel to `camera.up`, or non-finite values. `fitToBoundingBox` needs min <= max, aspect > 0, duration >= 0 and padding >= 1, and a box that fits inside `far`. Controls need finite input and a camera off its target. `@margoengine/cameras` also refuses a view offset or tile size that is not above 0, a focal length, film gauge or aspect that is not above 0, an off-axis screen with collinear corners or an eye behind it, an oblique plane the camera is not behind, and a physical camera with an aperture, shutter, ISO, focal length, focus distance or frame rate that is not above 0.',

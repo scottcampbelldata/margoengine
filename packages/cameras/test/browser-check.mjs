@@ -94,6 +94,28 @@ try {
     `oblique plane below the boxes ${px(200, 200)}`,
   );
   console.log('ok oblique near plane');
+  // Wide angle: the pixels of the shader land where the CPU map says. Boxes at source positions 0.7, 0 and -0.7 across.
+  await page.reload();
+  await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
+  for (const [mode, distance] of [
+    ['panini', 1],
+    ['equidistant', 1],
+    ['stereographic', 1],
+  ]) {
+    result = await page.evaluate(([m, d]) => window.check.wide(m, d), [mode, distance]);
+    assert.equal(result.error, null);
+    assert.deepEqual(result.errors, []);
+    px = await shot();
+    const hit = (name, channel) => {
+      const c = Math.round(result.columns[name]);
+      return [c - 1, c, c + 1].some((x) => is(px(x, 200), channel));
+    };
+    assert.ok(
+      hit('red', 0) && hit('green', 1) && hit('blue', 2),
+      `${mode} columns ${JSON.stringify(result.columns)}: ${[0, 1, 2].map((i) => px(Math.round(Object.values(result.columns)[i]), 200))}`,
+    );
+  }
+  console.log('ok wide angle (panini, equidistant, stereographic)');
   assert.deepEqual(pageErrors, []);
   console.log('cameras browser check passed');
 } finally {

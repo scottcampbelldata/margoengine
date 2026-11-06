@@ -251,6 +251,41 @@ camera.blurDiameter(10);                // mm of blur on the sensor for a point 
   (`Tonemap`, `Bloom`, `PostStack`), whose own ranges apply. Errors: `Invalid physical camera; ...` for a value that is
   not finite and above 0, or a focus distance inside the focal length.
 
+## Wide-angle projections: `@margoengine/cameras/panini`
+
+A plain perspective stretches the edges of a wide view. `WideAngle` draws the scene rectilinear at a wide field of view
+and resamples it as a Panini or a fisheye picture, in a `PostStack`. WebGPU, perspective cameras. 0 core bytes.
+
+```ts
+import {PostStack} from 'margoengine/post';
+import {WideAngle} from 'margoengine/cameras/panini';
+
+engine.camera.fov = 100;                                   // the rectilinear picture the stage resamples
+const wide = new WideAngle({mode: 'panini', distance: 1}); // 'panini' | 'equidistant' | 'equisolid' | 'stereographic' | 'orthographic'
+PostStack.attach(engine, [wide]);                          // after the display effect: [new Tonemap(), wide]
+// or alone: const wide = await WideAngle.attach(engine, {mode: 'panini'}); (needs @margoengine/post)
+wide.options.distance = 0.6;                               // read every frame, like mode and crop
+wide.enabled = false;                                      // the plain picture
+
+// Where a click on the projected picture lands on the source picture, for engine.pick or overlays:
+const map = wide.map(engine.camera.fov, canvas.width / canvas.height);
+const [x, y] = map.toSource(2 * px / canvas.width - 1, 1 - 2 * py / canvas.height); // normalised, y up; null outside
+map.toOutput(x, y);                                        // and back
+```
+
+- **Panini** keeps vertical lines vertical and straight lines through the centre straight, and compresses the sides
+  of a wide view toward the centre. `distance` 0 is the plain picture, 1 the classic Panini, larger values bend toward
+  a cylinder. Projection after Sharpless, Postle and German (2010).
+- **Fisheye** modes follow r = f·g(θ): equidistant θ, equisolid 2 sin(θ/2), stereographic 2 tan(θ/2), orthographic
+  sin θ. The source is one rectilinear picture, so a fisheye reaches only as far as that picture does: under 180
+  degrees across, in practice 120 to 150. A full 180 degree circle needs a cube capture, which this does not do.
+- **Crop**: the output plane is zoomed in just enough that no pixel falls outside the source (`crop`, default true);
+  `map.zoom` says by how much. With `crop: false` the uncovered corners are black.
+- **Camera**: it reads `engine.camera.fov` and the frame's shape each frame, so a lens set with `focalLength` works.
+  Draw the source at the field of view you want to see across.
+- **Errors**: `Invalid wide angle mode; ...`, `Invalid wide angle distance; ...`, `Invalid wide angle view; ...`;
+  MargoError `state` outside a PostStack, `unsupported` on WebGL2, `attached` and `disposed`.
+
 Apache-2.0. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras

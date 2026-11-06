@@ -230,6 +230,10 @@
       "types": "./dist/cameras/physical.d.ts",
       "import": "./dist/cameras/physical.js"
     },
+    "./cameras/panini": {
+      "types": "./dist/cameras/panini.d.ts",
+      "import": "./dist/cameras/panini.js"
+    },
     "./cinematic": {
       "types": "./dist/cinematic.d.ts",
       "import": "./dist/cinematic.js"
