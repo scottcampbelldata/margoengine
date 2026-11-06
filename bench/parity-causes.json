@@ -147,7 +147,7 @@
     ]
   },
   "16.2": {
-    "cause": "core GPURenderer.pick compiled a shader module and pipeline on every call and rewrote every instance (960 KB for 10,000 boxes); both fixed. Still slower, measured (CPU profile: 0.15 ms of JS a pick, the main thread idle the rest): each pick waits for its own GPU pass and mapAsync readback, about 3.1 ms here, and engine.pick answers overlapping calls one at a time by contract (each reads the scene when its turn comes). three's WebGL readRenderTargetPixels is a synchronous readPixels; three's WebGPU readback is slower than Margo's (423 ms)",
+    "cause": "Many points now have Picking.pickMany (perf-history entry 60): the same 100 pixels from one readback in 83 ms, p-gpu-pick-batch, Margo only; one engine.pick per point keeps its round trip. Before that: core GPURenderer.pick compiled a shader module and pipeline on every call and rewrote every instance (960 KB for 10,000 boxes); both fixed. Still slower, measured (CPU profile: 0.15 ms of JS a pick, the main thread idle the rest): each pick waits for its own GPU pass and mapAsync readback, about 3.1 ms here, and engine.pick answers overlapping calls one at a time by contract (each reads the scene when its turn comes). three's WebGL readRenderTargetPixels is a synchronous readPixels; three's WebGPU readback is slower than Margo's (423 ms)",
     "knownBug": "gpu-picking-waits-for-one-readback-per-pick",
     "fixes": [
       {

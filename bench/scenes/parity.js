@@ -1459,6 +1459,16 @@ export function parityScenes({ PALETTE, boxes, orbit, random, yard }) {
       data: () => boxes(10_000),
     },
 
+    'p-gpu-pick-batch': {
+      area: 'queries',
+      kind: 'task',
+      rows: ['16.2'],
+      title: 'GPU picking, batched',
+      draws: 'One call: the same 100 pixels of p-gpu-pick through Picking.pickMany, one readback. Margo only.',
+      params: {},
+      data: () => boxes(10_000),
+    },
+
     // 17. Special objects
     'p-lod': {
       area: 'objects',
@@ -1728,7 +1738,7 @@ export const ROWS = {
   '15.3': { scenes: ['p-skeleton-helper'] },
   '15.4': { scenes: ['p-view-helper'] },
   '16.1': { scenes: ['p-raycast', 'p-raycast-mesh'] },
-  '16.2': { scenes: ['p-gpu-pick'] },
+  '16.2': { scenes: ['p-gpu-pick', 'p-gpu-pick-batch'] },
   '17.1': {
     owner: 'margo-bench (docs/whitepaper/boxes-vs-threejs.md)',
     scenes: [{ scene: 'boxes', params: { n: 10_000, mode: 'instanced' } }],

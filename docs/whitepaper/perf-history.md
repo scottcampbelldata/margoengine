@@ -1573,6 +1573,20 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `node bench/cli.mjs parity --cases=p-skeleton-clone --engines=margo,three-webgl-parity --runs=3`.
 - **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, "a model with a static batch costs one engine tick to set up".
 
+### 60. `Picking.pickMany`: many picks, one readback
+
+- **Loss:** `p-gpu-pick`, 100 `engine.pick` calls, 369 ms against three's WebGL 67: each pick waits for its own GPU pass
+  and `mapAsync`.
+- **Fix:** `Picking.pickMany` in `@margoengine/selection`, an optional package, so core is untouched. It takes one turn in
+  `engine.pick`'s queue through the `onPick` hook, so the scene refreshes once and overlapping picks keep their order. Every
+  point's pass and copy are then submitted with no wait, into one staging buffer, and read with one `mapAsync`.
+- **After:** `p-gpu-pick-batch` 83 ms, 27 hits and the same index sum as `p-gpu-pick` (`--no-gate`, busy machine, diagnostic).
+  Margo only: three has no matching call. `p-gpu-pick` itself is unchanged, so the row stays a loss for one-at-a-time picks.
+- **Difference:** all points read the scene as it is at the batch's turn, where separate picks each read it at their own.
+- **Rerun:** `node bench/cli.mjs parity --cases=p-gpu-pick --engines=margo,three-webgl-parity --runs=3` (the case name also
+  selects `p-gpu-pick-batch`).
+- **Guard:** `packages/selection/test/pick-many.browser.mjs`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

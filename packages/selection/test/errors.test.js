@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Picking, Selection } from '../dist/index.js';
 
+test('pickMany on a detached Picking rejects with the same coded error as pick', async () => {
+  await assert.rejects(new Picking().pickMany([[1, 1]]), { name: 'MargoError', code: 'state', message: /attach/ });
+});
+
 test('selection and picking throw coded errors that name the fix', () => {
   assert.throws(() => new Selection().setup({ gpu: null }), {
     name: 'MargoError',

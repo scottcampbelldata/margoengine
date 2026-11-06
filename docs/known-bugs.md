@@ -598,16 +598,16 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
 
 ### GPU picking waits for one readback per pick
 
-- **What:** `p-gpu-pick`, 100 `engine.pick` calls: 325 ms against three's WebGL 61 ms (407 before entry 29; three's
-  WebGPU backend takes 423 ms).
-- **Cause (measured, CPU profile):** 0.15 ms of JavaScript a pick; the main thread is idle the rest of the 3.25 ms,
-  waiting for the pick's GPU pass and its `mapAsync` readback. `engine.pick` answers overlapping calls one at a time by
-  contract, each reading the scene as it is when its turn comes, so 100 picks wait for 100 round trips. three's WebGL
-  `readRenderTargetPixels` is a synchronous `readPixels`. Entry 29 removed the per-pick shader compile and pipeline
-  and the full instance upload.
-- **Plan:** a batch query that answers many points from one ID pass and one readback (an optional package, or a core
-  change once core has bytes for it: core is at 20,479 of its 20,480 B cap). Changing `engine.pick` to start queued
-  picks before the previous readback would break its documented turn order.
+- **What:** `p-gpu-pick`, 100 `engine.pick` calls: 369 ms against three's WebGL 67 (run `20261105-234620` and later, busy
+  machine, diagnostic; three's WebGPU backend took 423 ms when measured).
+- **Cause (measured, CPU profile):** 0.15 ms of JavaScript a pick; the main thread is idle the rest of the time, waiting
+  for the pick's GPU pass and its `mapAsync` readback. `engine.pick` answers overlapping calls one at a time by contract,
+  each reading the scene as it is when its turn comes, so 100 picks wait for 100 round trips. three's WebGL
+  `readRenderTargetPixels` is a synchronous `readPixels`.
+- **Fixed for many points (perf-history entry 60):** `Picking.pickMany` in `@margoengine/selection` answers the same 100
+  pixels from one readback: 83 ms, same hits (`p-gpu-pick-batch`, Margo only).
+- **Still open:** one `engine.pick` per point keeps its round trip. Starting queued picks early would break its documented
+  turn order, so code that picks many points should call `pickMany`.
 
 ### SciFiHelmet: default soft shadows cost the GPU time
 

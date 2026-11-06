@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4474683,
+  "total": 4475403,
   "history": [
     {
       "date": "2026-10-24",
@@ -1640,6 +1640,12 @@
       "commit": "406af9caf",
       "reason": "New ecs entry ./engine: MeshBridge and transformSchema, one sync a frame from a transform component to core meshes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "285171a76",
+      "reason": "Picking.pickMany: a new public method on the selection root, 124 B gzip; it reads Picking's private pick path, so it cannot be a separate entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -1983,7 +1989,7 @@
     "@margoengine/sciviz/bricks": 14265,
     "@margoengine/sciviz/colormaps": 4427,
     "@margoengine/sciviz/maths": 5638,
-    "@margoengine/selection": 19726,
+    "@margoengine/selection": 20446,
     "@margoengine/shader": 12502,
     "@margoengine/shader/editor": 21836,
     "@margoengine/shader/effects": 8306,

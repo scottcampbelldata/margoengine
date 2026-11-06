@@ -14,7 +14,7 @@ import {
   type RenderView,
 } from '@margoengine/core/extension';
 import { meshVertex } from '../../shared/gpu.js';
-import { inView } from '../../shared/view-rect.js';
+import { inView, layerRegistry, meshLayers } from '../../shared/view-rect.js';
 import { PickingPrimitives, type PickingSource } from './picking-primitives.js';
 import { coreMeshBuffers as buffers } from '../../shared/draw-cache.js';
 export type { PickingSource, PickingPrimitive } from './picking-primitives.js';
@@ -73,6 +73,35 @@ struct PickPixel {@location(0) color:vec4f,@location(1) id:u32}
 }
 
 const idFragment = `@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) u32 {if(culled(i,front)){discard;}return i.info.x;}`;
+/** Bytes of one point's 3 x 3 tile in a staging buffer, at WebGPU's 256-byte row pitch. */
+const tileBytes = 768;
+/** What one pick reads, taken before its first await. */
+interface PickScene {
+  device: GPUDevice;
+  live: Engine['meshes'];
+  meshes: Map<number, Mesh>;
+  models: ModelLike[];
+  starts: number[];
+  total: number;
+  list: readonly PickProxy[];
+  capacity: number;
+}
+/** One point's tile in a staging buffer: where it starts (in u32s), the point in it and what its pass drew. */
+interface PickTile {
+  at: number;
+  cx: number;
+  cy: number;
+  width: number;
+  height: number;
+  candidates: Map<Mesh, PickingSource[]> | undefined;
+  instances: number[][];
+}
+/** A `pickMany` call waiting for its turn in `engine.pick`; `outside` lists points beyond the chosen view. */
+interface PickBatch {
+  points: readonly (readonly [number, number])[];
+  out: (PickHit | null)[];
+  outside: number[];
+}
 /** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
 export interface PickHit {
   mesh: Mesh;
@@ -173,6 +202,7 @@ export class Picking implements EnginePlugin {
   private depth?: GPUTexture;
   private uniform?: GPUBuffer;
   private read?: GPUBuffer;
+  private batch?: PickBatch;
   private instances?: GPUBuffer;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly groups = new Map<GPURenderPipeline, { entries: GPUBindGroupEntry[]; group: GPUBindGroup }>();
@@ -357,6 +387,12 @@ export class Picking implements EnginePlugin {
   }
   /** `engine.pick` hook: the core mesh, or the glTF node of a gltf-pro model, at a canvas CSS pixel, in `view` when given. */
   async onPick(x: number, y: number, view?: PickView): Promise<Mesh | null> {
+    const { batch } = this;
+    if (batch) {
+      this.batch = undefined;
+      await this.resolveBatch(batch, view);
+      return null;
+    }
     const hit = await this.resolve(x, y, view);
     this.last = hit;
     return hit?.mesh ?? null;
@@ -366,142 +402,205 @@ export class Picking implements EnginePlugin {
    * picks inside that view with its camera, scene and layers.
    */
   async pick(x: number, y: number, view?: RenderView): Promise<PickHit | null> {
-    if (this.disposed) throw new MargoError('disposed', 'Picking is disposed; create a new Picking to pick.');
-    if (!this.engine)
-      throw new MargoError('state', 'Picking is not attached; call Picking.attach(engine) before picking.');
+    this.ready();
     this.last = null;
-    const mesh = await this.engine.pick(x, y, view),
+    const mesh = await this.engine!.pick(x, y, view),
       hit = this.last as PickHit | null;
     this.last = null;
     return mesh && hit?.mesh === mesh ? hit : null;
   }
-  private async resolve(x: number, y: number, view?: PickView): Promise<PickHit | null> {
+  /**
+   * The picks of `engine.pick` for many canvas CSS pixels, answered from one readback: one turn in the engine's pick
+   * queue (so overlapping picks keep their order), one refresh of the scene, then every point's pass submitted with no
+   * wait between them. All points read the same scene. A point outside the canvas answers null. With several views on
+   * the canvas and no `view`, points outside the first point's view are picked one at a time.
+   */
+  async pickMany(points: readonly (readonly [number, number])[], view?: RenderView): Promise<(PickHit | null)[]> {
+    this.ready();
+    for (const [x, y] of points)
+      if (!Number.isFinite(x) || !Number.isFinite(y))
+        throw new RangeError('Invalid pick coordinates; pass finite x and y in canvas pixels.');
+    const out = new Array<PickHit | null>(points.length).fill(null),
+      canvas = this.engine!.canvas,
+      width = canvas.clientWidth || canvas.width,
+      height = canvas.clientHeight || canvas.height,
+      inside = ([x, y]: readonly [number, number]) => x >= 0 && y >= 0 && x < width && y < height,
+      first = points.find(inside);
+    if (!first) return out;
+    const batch: PickBatch = { points, out, outside: [] };
+    this.batch = batch;
+    try {
+      await this.engine!.pick(first[0], first[1], view);
+    } finally {
+      if (this.batch === batch) this.batch = undefined;
+    }
+    if (!view) for (const i of batch.outside) out[i] = await this.pick(points[i][0], points[i][1]);
+    return out;
+  }
+  /** Throws unless a pick can run now. */
+  private ready(): void {
     if (this.disposed) throw new MargoError('disposed', 'Picking is disposed; create a new Picking to pick.');
     if (!this.engine)
       throw new MargoError('state', 'Picking is not attached; call Picking.attach(engine) before picking.');
+  }
+  /** The scene one pick or batch reads, taken before its first await. */
+  private scene(): PickScene {
+    const e = this.engine!,
+      // The picked scene's live meshes (engine.pick enters that scene until this first await) and a snapshot.
+      live = e.meshes,
+      meshes = new Map(live),
+      models = this.models.update(e);
+    return {
+      device: this.device!,
+      live,
+      meshes,
+      models,
+      starts: this.models.starts,
+      total: this.models.total,
+      list: engineProxies(e),
+      capacity: e.store.capacity,
+    };
+  }
+  /** Submits the pass and copy of one point into `read` at `offset`, or returns null outside the pick's rectangle. */
+  private submit(
+    scene: PickScene,
+    x: number,
+    y: number,
+    view: PickView | undefined,
+    read: GPUBuffer,
+    offset: number,
+  ): PickTile | null {
+    const e = this.engine!,
+      { device, models, list } = scene,
+      canvas = e.canvas,
+      cssWidth = canvas.clientWidth || canvas.width,
+      cssHeight = canvas.clientHeight || canvas.height,
+      // The view's rectangle, clipped by its scissor; the whole canvas without a view.
+      rect = view?.viewport ?? [0, 0, e.canvas.width, e.canvas.height],
+      clip = view?.scissor ?? rect,
+      left = Math.max(0, rect[0], clip[0]),
+      top = Math.max(0, rect[1], clip[1]),
+      right = Math.min(e.canvas.width, rect[0] + rect[2], clip[0] + clip[2]),
+      bottom = Math.min(e.canvas.height, rect[1] + rect[3], clip[1] + clip[3]),
+      px = Math.floor((x * e.canvas.width) / cssWidth),
+      py = Math.floor((y * e.canvas.height) / cssHeight),
+      x0 = Math.max(left, px - 1),
+      y0 = Math.max(top, py - 1),
+      width = Math.min(right, px + 2) - x0,
+      height = Math.min(bottom, py + 2) - y0;
+    if (px < left || px >= right || py < top || py >= bottom) return null;
+    const encoder = device.createCommandEncoder();
+    let texture: GPUTexture, origin: number[], candidates: Map<Mesh, PickingSource[]> | undefined;
+    // ModelLike and proxy IDs are not in the forward pass (gltf-pro and imposters draw their own pipelines), so those scenes use the micro pass.
+    if (!view && !models.length && !list.length && this.fresh()) {
+      texture = this.ids!;
+      origin = [x0, y0];
+    } else {
+      candidates = this.renderMicro(encoder, px, py, list, rect, view);
+      texture = this.micro!;
+      origin = [1 + x0 - px, 1 + y0 - py];
+    }
+    encoder.copyTextureToBuffer({ texture, origin }, { buffer: read, offset, bytesPerRow: 256 }, [width, height]);
+    device.queue.submit([encoder.finish()]);
+    return { at: offset / 4, cx: px - x0, cy: py - y0, width, height, candidates, instances: this.instanceHits };
+  }
+  /** The hit of one mapped tile: the center's ID, else the nearest neighbor's, resolved and checked against the scene. */
+  private decode(scene: PickScene, data: Uint32Array, tile: PickTile, view: PickView | undefined): PickHit | null {
+    const e = this.engine!,
+      { device, live, meshes, models, starts, total, list, capacity } = scene,
+      { at, cx, cy, width, height, candidates } = tile;
+    let id = data[at + cy * 64 + cx];
+    if (!id)
+      for (const [dx, dy] of [
+        [0, -1],
+        [-1, 0],
+        [1, 0],
+        [0, 1],
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+        [1, 1],
+      ]) {
+        const nx = cx + dx,
+          ny = cy + dy;
+        if (nx >= 0 && ny >= 0 && nx < width && ny < height && data[at + ny * 64 + nx]) {
+          id = data[at + ny * 64 + nx];
+          break;
+        }
+      }
+    let hit: PickHit | null = null;
+    if (id > capacity + total + list.length) {
+      const [m, i, k] = tile.instances[id - capacity - total - list.length - 1] ?? [],
+        model = models[m],
+        primitive = model?.primitives[i];
+      if (primitive && !model.disposed)
+        hit = { mesh: primitive.node, model, primitive, primitiveIndex: i, instanceId: k };
+    } else if (id > capacity + total) {
+      const proxy = list[id - capacity - 1 - total];
+      if (proxy)
+        hit = { mesh: proxy.anchor, ...(isModel(proxy.model) ? { model: proxy.model } : {}), approximate: true };
+    } else if (id > capacity) {
+      // ModelLike slots follow the core slots: capacity + 1 + the model's first slot + primitive index.
+      const slot = id - capacity - 1;
+      let m = models.length - 1;
+      while (m > 0 && starts[m] > slot) m--;
+      const model = models[m],
+        primitiveIndex = slot - (starts[m] ?? 0),
+        primitive = model?.primitives[primitiveIndex];
+      if (primitive && !model.disposed) hit = { mesh: primitive.node, model, primitive, primitiveIndex };
+    } else {
+      const mesh = meshes.get(id - 1);
+      if (mesh) hit = { mesh };
+    }
+    if (
+      this.disposed ||
+      device !== this.device ||
+      !hit ||
+      live.get(hit.mesh.id) !== hit.mesh ||
+      hidden(e, hit.mesh.id) ||
+      !inView({ view }, hit.mesh)
+    )
+      return null;
+    if (
+      !hit.mesh.geometry &&
+      candidates?.has(hit.mesh) &&
+      !candidates.get(hit.mesh)!.some((source) => this.primitives.contains(source, hit.mesh))
+    )
+      return null;
+    if (!hit.model) {
+      const source = meshTriangles(hit.mesh);
+      if (source?.kind === 'pbr') {
+        const model = source.source.model as unknown as ModelLike,
+          primitiveIndex = model.primitives.findIndex((p) => p.node === hit!.mesh);
+        if (primitiveIndex >= 0)
+          Object.assign(hit, { model, primitive: model.primitives[primitiveIndex], primitiveIndex });
+      }
+    }
+    return hit;
+  }
+  private async resolve(x: number, y: number, view?: PickView): Promise<PickHit | null> {
+    this.ready();
     if (this.pending)
       throw new MargoError('state', 'A pick is already pending; await the previous pick before starting another.');
     if (![x, y].every(Number.isFinite))
       throw new RangeError('Invalid pick coordinates; pass finite x and y in canvas pixels.');
     // CSS pixels; an OffscreenCanvas (worker) has no client size, so its coordinates are canvas pixels.
-    const canvas = this.engine.canvas,
+    const canvas = this.engine!.canvas,
       cssWidth = canvas.clientWidth || canvas.width,
       cssHeight = canvas.clientHeight || canvas.height;
     if (x < 0 || y < 0 || x >= cssWidth || y >= cssHeight) return null;
     this.pending = true;
-    const e = this.engine,
-      device = this.device!,
+    const e = this.engine!,
       read = this.read!,
-      // The picked scene's live meshes (engine.pick enters that scene until this first await) and a snapshot.
-      live = e.meshes,
-      meshes = new Map(live),
-      models = this.models.update(e),
-      starts = this.models.starts,
-      total = this.models.total,
-      list = engineProxies(e),
-      capacity = e.store.capacity;
+      scene = this.scene(),
+      { device } = scene;
     try {
       this.primitives.discover(e.meshes.values());
-      // The view's rectangle, clipped by its scissor; the whole canvas without a view.
-      const rect = view?.viewport ?? [0, 0, e.canvas.width, e.canvas.height],
-        clip = view?.scissor ?? rect,
-        left = Math.max(0, rect[0], clip[0]),
-        top = Math.max(0, rect[1], clip[1]),
-        right = Math.min(e.canvas.width, rect[0] + rect[2], clip[0] + clip[2]),
-        bottom = Math.min(e.canvas.height, rect[1] + rect[3], clip[1] + clip[3]),
-        px = Math.floor((x * e.canvas.width) / cssWidth),
-        py = Math.floor((y * e.canvas.height) / cssHeight),
-        x0 = Math.max(left, px - 1),
-        y0 = Math.max(top, py - 1),
-        width = Math.min(right, px + 2) - x0,
-        height = Math.min(bottom, py + 2) - y0;
-      if (px < left || px >= right || py < top || py >= bottom) return null;
-      const encoder = device.createCommandEncoder();
-      let texture: GPUTexture, origin: number[], candidates: Map<Mesh, PickingSource[]> | undefined;
-      // ModelLike and proxy IDs are not in the forward pass (gltf-pro and imposters draw their own pipelines), so those scenes use the micro pass.
-      if (!view && !models.length && !list.length && this.fresh()) {
-        texture = this.ids!;
-        origin = [x0, y0];
-      } else {
-        candidates = this.renderMicro(encoder, px, py, list, rect, view);
-        texture = this.micro!;
-        origin = [1 + x0 - px, 1 + y0 - py];
-      }
-      encoder.copyTextureToBuffer({ texture, origin }, { buffer: read, bytesPerRow: 256 }, [width, height]);
-      device.queue.submit([encoder.finish()]);
+      const tile = this.submit(scene, x, y, view, read, 0);
+      if (!tile) return null;
       await read.mapAsync(GPUMapMode.READ);
       try {
-        const data = new Uint32Array(read.getMappedRange()),
-          cx = px - x0,
-          cy = py - y0;
-        let id = data[cy * 64 + cx];
-        if (!id)
-          for (const [dx, dy] of [
-            [0, -1],
-            [-1, 0],
-            [1, 0],
-            [0, 1],
-            [-1, -1],
-            [1, -1],
-            [-1, 1],
-            [1, 1],
-          ]) {
-            const nx = cx + dx,
-              ny = cy + dy;
-            if (nx >= 0 && ny >= 0 && nx < width && ny < height && data[ny * 64 + nx]) {
-              id = data[ny * 64 + nx];
-              break;
-            }
-          }
-        let hit: PickHit | null = null;
-        if (id > capacity + total + list.length) {
-          const [m, i, k] = this.instanceHits[id - capacity - total - list.length - 1] ?? [],
-            model = models[m],
-            primitive = model?.primitives[i];
-          if (primitive && !model.disposed)
-            hit = { mesh: primitive.node, model, primitive, primitiveIndex: i, instanceId: k };
-        } else if (id > capacity + total) {
-          const proxy = list[id - capacity - 1 - total];
-          if (proxy)
-            hit = { mesh: proxy.anchor, ...(isModel(proxy.model) ? { model: proxy.model } : {}), approximate: true };
-        } else if (id > capacity) {
-          // ModelLike slots follow the core slots: capacity + 1 + the model's first slot + primitive index.
-          const slot = id - capacity - 1;
-          let m = models.length - 1;
-          while (m > 0 && starts[m] > slot) m--;
-          const model = models[m],
-            primitiveIndex = slot - (starts[m] ?? 0),
-            primitive = model?.primitives[primitiveIndex];
-          if (primitive && !model.disposed) hit = { mesh: primitive.node, model, primitive, primitiveIndex };
-        } else {
-          const mesh = meshes.get(id - 1);
-          if (mesh) hit = { mesh };
-        }
-        if (
-          this.disposed ||
-          device !== this.device ||
-          !hit ||
-          live.get(hit.mesh.id) !== hit.mesh ||
-          hidden(e, hit.mesh.id) ||
-          !inView({ view }, hit.mesh)
-        )
-          return null;
-        if (
-          !hit.mesh.geometry &&
-          candidates?.has(hit.mesh) &&
-          !candidates.get(hit.mesh)!.some((source) => this.primitives.contains(source, hit.mesh))
-        )
-          return null;
-        if (!hit.model) {
-          const source = meshTriangles(hit.mesh);
-          if (source?.kind === 'pbr') {
-            const model = source.source.model as unknown as ModelLike,
-              primitiveIndex = model.primitives.findIndex((p) => p.node === hit!.mesh);
-            if (primitiveIndex >= 0)
-              Object.assign(hit, { model, primitive: model.primitives[primitiveIndex], primitiveIndex });
-          }
-        }
-        return hit;
+        return this.decode(scene, new Uint32Array(read.getMappedRange()), tile, view);
       } finally {
         read.unmap();
       }
@@ -510,6 +609,47 @@ export class Picking implements EnginePlugin {
       throw error;
     } finally {
       this.pending = false;
+    }
+  }
+  /** `pickMany`'s turn: every point of `batch`, under the view `engine.pick` chose and the scene it just refreshed. */
+  private async resolveBatch(batch: PickBatch, view?: PickView): Promise<void> {
+    if (this.pending)
+      throw new MargoError('state', 'A pick is already pending; await the previous pick before starting another.');
+    this.pending = true;
+    const e = this.engine!,
+      scene = this.scene(),
+      { device } = scene,
+      canvas = e.canvas,
+      cssWidth = canvas.clientWidth || canvas.width,
+      cssHeight = canvas.clientHeight || canvas.height,
+      // engine.pick answers with the same filter: the layers it set for this pick, from the camera or the view.
+      layers = view?.layers ?? layerRegistry()?.cameras.get(view?.camera ?? e.camera),
+      // One tile per point, for this call only: it outlives no device.
+      read = device.createBuffer({
+        size: batch.points.length * tileBytes,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      }),
+      tiles: (PickTile | null)[] = [];
+    try {
+      this.primitives.discover(e.meshes.values());
+      batch.points.forEach(([x, y], i) => {
+        const onCanvas = x >= 0 && y >= 0 && x < cssWidth && y < cssHeight,
+          tile = onCanvas ? this.submit(scene, x, y, view, read, i * tileBytes) : null;
+        tiles.push(tile);
+        if (onCanvas && !tile) batch.outside.push(i);
+      });
+      await read.mapAsync(GPUMapMode.READ);
+      const data = new Uint32Array(read.getMappedRange());
+      tiles.forEach((tile, i) => {
+        const hit = tile && this.decode(scene, data, tile, view);
+        if (hit && (layers === undefined || layers === -1 || meshLayers(hit.mesh) & layers)) batch.out[i] = hit;
+      });
+    } catch (error) {
+      if (this.disposed || device !== this.device || e.gpu !== device) return;
+      throw error;
+    } finally {
+      this.pending = false;
+      read.destroy();
     }
   }
   private renderMicro(

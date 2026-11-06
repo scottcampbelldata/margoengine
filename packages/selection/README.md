@@ -24,6 +24,21 @@ The center wins. For an empty center, orthogonal neighbors win before diagonals,
 
 `Picking.attach(engine, {capture: false})` leaves the frame untouched (no second color target, no per-frame mesh snapshot) and renders the culled 3x3 pass for every pick; use it when picks are rare and frame rate matters more. Custom scene pipelines fall back to the micro pass; sections also use that pass so mutable core clipping uniforms stay current. Other mutable custom shader effects should render their changed state before picking. The cached ID texture costs four bytes per viewport pixel; the package remains optional and tree-shakable.
 
+## Many points at once
+
+`picking.pickMany(points)` answers many canvas CSS pixels from one GPU readback, where a loop of `engine.pick` waits for one
+readback each. It answers what `engine.pick` answers, as `PickHit`s, in
+order, with null for a miss or a point off the canvas. All points read the scene as it is at the call's turn in the pick
+queue. Pass a `view` as the second argument to pick through it; with several views and no `view`, points outside the first
+point's view are picked one at a time.
+
+```ts
+import {Picking} from 'margoengine/selection';
+const picking = Picking.attach(engine);
+const hits = await picking.pickMany([[10, 20], [64, 64], [120, 40]]);
+const meshes = hits.map((hit) => hit?.mesh ?? null);
+```
+
 ## Marquee, lasso, hover and face/edge/vertex picking
 
 `SelectionTool` drags a rubber band (or, with `shape: 'lasso'`, a free-form outline) over the canvas: Shift + drag replaces

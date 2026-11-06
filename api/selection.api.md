@@ -93,6 +93,7 @@ export class Picking implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     onPick(x: number, y: number, view?: PickView): Promise<Mesh | null>;
     pick(x: number, y: number, view?: RenderView): Promise<PickHit | null>;
+    pickMany(points: readonly (readonly [number, number])[], view?: RenderView): Promise<(PickHit | null)[]>;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

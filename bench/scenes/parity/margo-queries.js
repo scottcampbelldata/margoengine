@@ -90,6 +90,31 @@ export const builders = {
     };
   },
 
+  async 'p-gpu-pick-batch'(canvas, data, marks) {
+    const engine = await engineFor(canvas, data.camera, data.items.length + 8, marks),
+      s = performance.now(),
+      list = meshes(engine, data, palette(data)),
+      index = new Map(list.map((m, i) => [m, i])),
+      { Picking } = await import('@margoengine/selection'),
+      picking = Picking.attach(engine),
+      points = [];
+    for (let j = 0; j < 10; j++) for (let i = 0; i < 10; i++) points.push([64 + 128 * i, 36 + 72 * j]);
+    engine.render();
+    await engine.gpu.queue.onSubmittedWorkDone();
+    marks.buildMs = +(performance.now() - s).toFixed(1);
+    let picked = [];
+    return {
+      async task() {
+        picked = await picking.pickMany(points);
+      },
+      output: () => {
+        const ids = picked.filter(Boolean).map((hit) => index.get(hit.mesh));
+        return { pixels: points.length, hits: ids.length, indexSum: ids.reduce((a, b) => a + b, 0) };
+      },
+      info: () => ({ note: 'selection Picking.pickMany: the same 100 pixels from one readback' }),
+    };
+  },
+
   async 'p-gpu-pick'(canvas, data, marks) {
     const engine = await engineFor(canvas, data.camera, data.items.length + 8, marks),
       s = performance.now(),
