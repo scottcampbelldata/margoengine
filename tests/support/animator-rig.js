@@ -76,7 +76,7 @@ export function animatorDocument(joints, clips) {
       channels = [];
     for (const [key, curve] of Object.entries(clip.tracks)) {
       const [joint, path] = key.split('.'),
-        output = add(stamps.flatMap(curve), path === 'rotation' ? 'VEC4' : 'VEC3');
+        output = add(stamps.flatMap(curve), path === 'rotation' ? 'VEC4' : path === 'weights' ? 'SCALAR' : 'VEC3');
       if (!index.has(joint)) throw new Error(`No joint ${joint}`);
       channels.push({ sampler: samplers.length, target: { node: index.get(joint), path } });
       samplers.push({ input: times, output });

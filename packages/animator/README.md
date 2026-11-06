@@ -451,6 +451,26 @@ console.log(same.rows, same.search(same.features.subarray(0, same.width)).clip);
 
 The Animator needs one state per clip, named after it, and `motionStates(animation)` gives that. The search is on the CPU, and the database holds what you put in it: it has no clip for a move you did not record, and a character asked for one plays the nearest it has.
 
+## Runtime mirroring (`margoengine/animator/mirror`)
+
+`addMirror(animator, mirror)` plays any clip on the other side at run time, so one left-handed swing serves both hands and you author half the clips. It mirrors the finished pose, so blends and layers mirror too, and foot IK and solvers still meet their targets.
+
+```ts
+import {Animator} from 'margoengine/animator';
+import {addMirror, mirrorPairs} from 'margoengine/animator/mirror';
+
+const animator = Animator.attach(animation, {initial: 'swing', states: {swing: 'SwingLeft', idle: 'Idle'}});
+const mirror = {enabled: true, states: ['swing']}; // read every frame
+const handle = addMirror(animator, mirror);
+console.log(handle.pairs);                    // each node's partner, by glTF node index
+mirror.enabled = false;                       // back to the clip as authored
+console.log(mirrorPairs(['arm.L', 'arm.R', 'spine'])); // [1, 0, 2]
+```
+
+Partners come from node names: `LeftArm` and `RightArm`, `arm.L` and `arm.R`, `leg_joint_L_1` and `leg_joint_R_1`, and ids at the end are ignored when names do not pair with them (`b_LeftArm_09` and `b_RightArm_06`). A node with no partner mirrors onto itself. Pass `pairs` (a partner per glTF node index) to set them by hand.
+
+`axis` is the axis across the plane of symmetry in the model's space (default `'x'`, for a glTF character facing +Z). `enabled` defaults to true, `states` to every state, and `morphs` (default true) trades morph targets by name, from each mesh's `extras.targetNames`. Each bone's local axes are accounted for from the rest pose, so the two sides of a rig need not share them, and the rest pose stays the rest pose. Root motion travels mirrored and turns the other way. Switching `enabled` is a hard cut; call `smooth()` on an inertialization first for a soft one.
+
 ## Explicit rotation writer
 
 `AnimatorOptions.writeRotation?: (node: Mesh, rotation: readonly number[]) => void` is an optional, explicit commit hook for applications that own their transform writer. It is captured and validated once during construction. Omit it to keep the current dynamic `Mesh.setQuaternion` call, including method overrides. This is an additive public API option; it does not change core/stage.

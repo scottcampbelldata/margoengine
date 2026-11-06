@@ -226,6 +226,7 @@ export class Animator implements EnginePlugin {
   private readonly solvers: Array<(step: number) => void> = [];
   private readonly poseSteps: Array<(position: number[][], rotation: number[][]) => void> = [];
   private readonly lateSteps: Array<(pose: Pose, step: number) => void> = [];
+  private readonly travelSteps: Array<(travel: number[], joint: number) => void> = [];
   private readonly fadeSteps: Array<(position: number[][], rotation: number[][], state: string, time: number) => void> =
     [];
   private disposed = false;
@@ -513,6 +514,22 @@ export class Animator implements EnginePlugin {
       const index = this.lateSteps.indexOf(step);
       if (index !== -1) this.lateSteps.splice(index, 1);
     };
+  }
+  /**
+   * @internal A step that edits root motion's travel this frame, x y z in the joint's parent space and a turn about +Y,
+   * before it moves anything ({@link addRootMotion} runs them). Returns its remover.
+   */
+  addTravelStep(step: (travel: number[], joint: number) => void): () => void {
+    if (this.disposed) throw new MargoError('disposed', 'Animator is disposed; attach a new Animator');
+    this.travelSteps.push(step);
+    return () => {
+      const index = this.travelSteps.indexOf(step);
+      if (index !== -1) this.travelSteps.splice(index, 1);
+    };
+  }
+  /** @internal Runs the travel steps on `travel`. */
+  editTravel(travel: number[], joint: number): void {
+    for (let i = 0; i < this.travelSteps.length; i++) this.travelSteps[i](travel, joint);
   }
   /** @internal Gives `state` its own clock, or takes it away with null. */
   setStateClock(state: string, clock: StateClock | null): void {
@@ -918,6 +935,7 @@ export class Animator implements EnginePlugin {
     this.solvers.length = 0;
     this.poseSteps.length = 0;
     this.lateSteps.length = 0;
+    this.travelSteps.length = 0;
     this.fadeSteps.length = 0;
     this.clocks.clear();
     this.engine = undefined;

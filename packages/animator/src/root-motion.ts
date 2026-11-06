@@ -158,6 +158,7 @@ export function addRootMotion(animator: Animator, options: RootMotionOptions): R
       offset = [0, 0, 0, 0];
     if (!measure(state, from, time, sum, offset)) return;
     inPlace(position[joint], rotation[joint], offset);
+    animator.editTravel(sum, joint);
     if (axes === 'xz') sum[1] = 0;
     // The bone's travel is in its parent's space; carry it through world space into the target's parent space.
     const store = model.root.engine.store,
