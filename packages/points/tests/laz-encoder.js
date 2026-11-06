@@ -235,7 +235,10 @@ const MAP14_ROWS = [
   [4, 4, 4, 4, 4, 4, 4, 4, 5, 5],
   [4, 4, 5, 5, 5, 5, 5, 5, 5, 5],
 ];
-const map14 = (n, r) => (n < MAP14_ROWS.length && r < 10 ? MAP14_ROWS[n][r] : 5);
+const map14 = (n, r) => {
+  if (n >= 4 && r >= 1 && r <= n) return r === 1 ? 3 : r === n ? 5 : 4;
+  return n < MAP14_ROWS.length && r < 10 ? MAP14_ROWS[n][r] : 5;
+};
 const level = (n, r, max) => Math.min(Math.abs(n - r), max);
 const clamp = (n) => Math.max(0, Math.min(255, n));
 const model = (list, i, symbols) => (list[i] ??= new SymbolModel(symbols));
