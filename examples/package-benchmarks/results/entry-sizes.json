@@ -1,5 +1,5 @@
 {
-  "commit": "fcbc6f46b",
+  "commit": "8d84baca2",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1282,8 +1282,8 @@
     },
     "@margoengine/points": {
       ".": {
-        "raw": 62317,
-        "gzip": 21320
+        "raw": 64450,
+        "gzip": 21989
       },
       "./las": {
         "raw": 11572,
@@ -1302,20 +1302,20 @@
         "gzip": 11401
       },
       "./octree": {
-        "raw": 24941,
-        "gzip": 8972
+        "raw": 25047,
+        "gzip": 8997
       },
       "./surfels": {
-        "raw": 40271,
-        "gzip": 14295
+        "raw": 40576,
+        "gzip": 14423
       },
       "./potree": {
         "raw": 8260,
         "gzip": 3414
       },
       "./pick": {
-        "raw": 12098,
-        "gzip": 5096
+        "raw": 12297,
+        "gzip": 5195
       }
     },
     "@margoengine/post": {
@@ -1584,6 +1584,10 @@
       ".": {
         "raw": 3554,
         "gzip": 1713
+      },
+      "./bulk": {
+        "raw": 2963,
+        "gzip": 1508
       },
       "./mesh": {
         "raw": 4154,

@@ -35,6 +35,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./bulk": {
+      "types": "./dist/bulk.d.ts",
+      "import": "./dist/bulk.js"
+    },
     "./mesh": {
       "types": "./dist/mesh.d.ts",
       "import": "./dist/mesh.js"

@@ -1462,6 +1462,10 @@
       "types": "./dist/scene.d.ts",
       "import": "./dist/scene.js"
     },
+    "./scene/bulk": {
+      "types": "./dist/scene/bulk.d.ts",
+      "import": "./dist/scene/bulk.js"
+    },
     "./scene/mesh": {
       "types": "./dist/scene/mesh.d.ts",
       "import": "./dist/scene/mesh.js"

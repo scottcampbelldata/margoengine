@@ -1719,6 +1719,17 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   --no-compare --no-fail`. A quiet run is still owed.
 - **Guard:** `packages/exporters/tests/usdz-shared.test.js`.
 
+### 70. `TransformWriter`: one validation pass for many moving meshes
+
+- **Loss:** a scene moving thousands of meshes pays each setter's mesh check, validation and column lookups once per value.
+- **Fix:** `TransformWriter` in `@margoengine/scene/bulk` checks the rows once, looks the columns up once, and writes the
+  same store with the same maths. Same work, same output: the tests compare it bit for bit with the setters. Core is unchanged.
+- **After:** diagnostic, other jobs running (Node 26, Ryzen 9 9950X, CPU only, median of 300 calls), setters then writer.
+  10,000 meshes: positions 0.588 ms, 0.122; positions and quaternions 1.603 ms, 0.837; positions and Euler 1.688 ms, 0.799.
+  1,000 meshes: 0.053 ms, 0.010; 0.139 ms, 0.075; 0.146 ms, 0.071. Not a comparison with three.js. A quiet run is still owed.
+- **Rerun:** `npm run build --workspace packages/scene`, then `node packages/scene/scripts/bulk-bench.mjs 10000`.
+- **Guard:** `packages/scene/tests/bulk.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1769,5 +1780,6 @@ These entries lack a recorded number, a named machine or a quiet run:
 11. `helmet` split (entry 63): a quiet run.
 12. Rect area lights (entry 67): a quiet run, and the 0.26 against 0.15 ms left like for like.
 13. `p-pmrem` parts (entry 68): a quiet run, one part at a time.
+14. `TransformWriter` (entry 70): a quiet run, and the whole frame with thousands of moving meshes.
 
 [reproduce.md](reproduce.md) has the commands for the rest of the measured claims.

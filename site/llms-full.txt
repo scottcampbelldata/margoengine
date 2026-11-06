@@ -2565,7 +2565,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-110). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-111). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2686,6 +2686,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
+| Bulk transform writes (`TransformWriter`, `@margoengine/scene/bulk`, 2026-11-05) | The mesh list is fixed when the writer is made. Measured diagnostic, 10,000 meshes, Node, CPU only, other jobs running: positions 0.12 ms against 0.59 with setters, positions and quaternions 0.84 against 1.60, positions and Euler 0.80 against 1.69. | One pass checks every value first, so a bad row changes nothing; rotations still cost a quaternion or Euler conversion per mesh, the same maths as the setters. | A mesh disposed since the writer was made throws `disposed`, even when another mesh took its slot. | Make a new writer when the list changes; `{ from, count }` writes part of a list. |
 | Scene graph helpers (`@margoengine/scene`, 2026-11-05) | Each `getWorldPosition`, `getWorldQuaternion` and `worldMatrix` call walks up the parents, at most 64 levels. | They read the local values, so a result is right before any frame; `mesh.matrix` is the last frame's. | Joint limits apply at the next frame, so a value outside its limit counts as written until then. Under a rotated, unevenly scaled parent `getWorldQuaternion` and `getWorldScale` give the nearest values. | Read `mesh.matrix` in a per-frame loop over many meshes; `worldMatrix` stays exact under shear. |
 | Scheduler (`@margoengine/ecs/schedule`) | Enforced: one fixed step size per `Schedule`, at most `maxSteps` (default 8) steps an update; time past that is dropped. Systems are synchronous and single threaded; the fixed phase always runs before the frame phase. | A cap stops a long stall from costing more steps than the next frame can pay for, which would snowball. | `update` returns the steps run and `schedule.dropped` holds the seconds lost. A frame system ordered before a fixed one throws MargoError `'state'`. | Raise `maxSteps`, or run a second `Schedule` for a second rate. |
 | Change detection (`@margoengine/ecs/changes`) | Enforced by method: only `component.add`, `remove`, `touch` and `world.destroy` are seen. A write straight into `fields` is invisible until `touch` reports it, and a row counts as changed even when the value written is the same. 24 bytes per world slot per tracker. | `fields` are plain typed arrays, so loops over them stay at full speed; intercepting each write would cost that speed. | The entity is missing from `changed`. | Call `component.touch(entity)` after direct writes. |
@@ -9375,13 +9376,43 @@ engine.start();
 
 `out` is an array of 3 numbers or an object with `x`, `y` and `z`, such as a `Vector3` from `@margoengine/math`; left out, the result is a new `[x, y, z]`. `target` is `[x, y, z]`, `{x, y, z}` or a mesh, meaning its world position.
 
+## Many transforms at once
+
+For scenes where thousands of meshes move every frame, `TransformWriter` from `@margoengine/scene/bulk` writes them from typed arrays in one call. Make it once for a list of meshes and call `write` each frame:
+
+```ts
+import { box, Engine } from '@margoengine/core';
+import { TransformWriter } from '@margoengine/scene/bulk';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const geometry = box();
+const meshes = Array.from({ length: 1000 }, () => engine.createMesh().setGeometry(geometry));
+const writer = new TransformWriter(meshes);
+const positions = new Float32Array(meshes.length * 3);
+const quaternions = new Float32Array(meshes.length * 4);
+
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  for (let i = 0; i < meshes.length; i++) {
+    positions[i * 3] = (i % 40) * 2;
+    positions[i * 3 + 1] = Math.sin(time + i);
+    positions[i * 3 + 2] = Math.floor(i / 40) * 2;
+    quaternions[i * 4 + 3] = 1;
+  }
+  writer.write({ positions, quaternions });
+});
+engine.start();
+```
+
+`write(rows, range?)` takes any of `positions` (3 per mesh), `quaternions` (4) or `rotations` (Euler XYZ, 3, not both) and `scales` (3), as typed or plain arrays. Row `i` belongs to mesh `i` of the list. `{ from, count }` writes part of the list, with row 0 of the arrays for mesh `from`.
+
+The result is what the setters give, bit for bit, `mesh.rotation` and the world matrix included. A write is all or nothing: a value the setters refuse throws `RangeError`, and a mesh disposed since the writer was made throws MargoError `disposed` naming its row, before anything changes. Make a new writer then.
+
 ## Good to know
 
-- World results are right as soon as a value is written, before any frame: they read the local values up the parents, while `mesh.matrix` holds the last frame's matrix. Each call walks up the parents, so read `mesh.matrix` when a per-frame loop over many meshes needs no fresher value.
-- Joint limits apply at the next frame. Until then a value outside its limit counts as written.
-- `lookAt` turns +Z, the way a glTF model faces. A camera looks down its -Z and aims with `camera.target`.
-- `lookAt` holds under any parent, scaled, mirrored or sheared: the direction goes back through the parent's matrix. At the target itself the mesh keeps its rotation, and looking straight along `up` uses the world axis furthest from it.
-- Under a rotated, unevenly scaled parent the world matrix has shear, which no rotation and scale can hold: `getWorldQuaternion` and `getWorldScale` give the nearest ones, and `worldMatrix` stays exact.
+[README continues: https://margoengine.com/llms/packages/scene.md]
 
 === @margoengine/compute (packages/compute/README.md) ===
 

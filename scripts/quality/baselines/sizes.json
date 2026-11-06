@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4658176,
+  "total": 4659940,
   "history": [
     {
       "date": "2026-10-24",
@@ -1874,6 +1874,12 @@
       "commit": "2153152b8",
       "reason": "mipmaps in the root entry",
       "grew": 3
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8d84baca2",
+      "reason": "scene bulk entry: TransformWriter",
+      "grew": 1
     }
   ],
   "items": {
@@ -2239,6 +2245,7 @@
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/tiles": 3415,
     "@margoengine/scene": 1969,
+    "@margoengine/scene/bulk": 1764,
     "@margoengine/scene/mesh": 2119,
     "@margoengine/scenery": 474,
     "@margoengine/scenery/sky": 474,

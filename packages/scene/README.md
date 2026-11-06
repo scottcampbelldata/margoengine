@@ -55,6 +55,40 @@ engine.start();
 
 `out` is an array of 3 numbers or an object with `x`, `y` and `z`, such as a `Vector3` from `@margoengine/math`; left out, the result is a new `[x, y, z]`. `target` is `[x, y, z]`, `{x, y, z}` or a mesh, meaning its world position.
 
+## Many transforms at once
+
+For scenes where thousands of meshes move every frame, `TransformWriter` from `@margoengine/scene/bulk` writes them from typed arrays in one call. Make it once for a list of meshes and call `write` each frame:
+
+```ts
+import { box, Engine } from '@margoengine/core';
+import { TransformWriter } from '@margoengine/scene/bulk';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const geometry = box();
+const meshes = Array.from({ length: 1000 }, () => engine.createMesh().setGeometry(geometry));
+const writer = new TransformWriter(meshes);
+const positions = new Float32Array(meshes.length * 3);
+const quaternions = new Float32Array(meshes.length * 4);
+
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  for (let i = 0; i < meshes.length; i++) {
+    positions[i * 3] = (i % 40) * 2;
+    positions[i * 3 + 1] = Math.sin(time + i);
+    positions[i * 3 + 2] = Math.floor(i / 40) * 2;
+    quaternions[i * 4 + 3] = 1;
+  }
+  writer.write({ positions, quaternions });
+});
+engine.start();
+```
+
+`write(rows, range?)` takes any of `positions` (3 per mesh), `quaternions` (4) or `rotations` (Euler XYZ, 3, not both) and `scales` (3), as typed or plain arrays. Row `i` belongs to mesh `i` of the list. `{ from, count }` writes part of the list, with row 0 of the arrays for mesh `from`.
+
+The result is what the setters give, bit for bit, `mesh.rotation` and the world matrix included. A write is all or nothing: a value the setters refuse throws `RangeError`, and a mesh disposed since the writer was made throws MargoError `disposed` naming its row, before anything changes. Make a new writer then.
+
 ## Good to know
 
 - World results are right as soon as a value is written, before any frame: they read the local values up the parents, while `mesh.matrix` holds the last frame's matrix. Each call walks up the parents, so read `mesh.matrix` when a per-frame loop over many meshes needs no fresher value.
