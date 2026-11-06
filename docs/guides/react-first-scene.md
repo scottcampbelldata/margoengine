@@ -32,7 +32,8 @@ convenience components with a plain colour. `Shadows` turns on the sun's shadows
 ```tsx
 import { Suspense, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Canvas, Model, OrbitControls, Plane, Shadows, Sphere, Stage } from 'margoengine/react';
+import { Canvas, OrbitControls, Plane, Shadows, Sphere, Stage } from 'margoengine/react';
+import { Model } from 'margoengine/react/gltf-pro';
 
 function Scene({ onPick }: { onPick: (name: string) => void }) {
   return (

@@ -12,7 +12,7 @@ Sources: `packages/react/README.md`, `packages/react/SCENE.md`, `packages/react/
 `<Canvas>` creates one engine, and its children are ordinary React components that edit it through hooks and effects.
 
 - React 18 and 19.
-- Import everything from `margoengine/react` (one install), or install `@margoengine/react` alone plus the packages
+- Import from `margoengine/react` (one install; models from `margoengine/react/gltf-pro`), or install `@margoengine/react` alone plus the packages
   its subpaths name.
 - `sideEffects: false`, ESM, full types, `react-server` export condition on every entry.
 
@@ -107,9 +107,9 @@ Rapier. `XR`, `Controller`, `useXR`.
   (webpack and Turbopack), Rollup and esbuild, fails on any warning, and fails if the page requests Wasm or an
   optional package.
 - `examples/next` has `app/` (layout, page, scene) and `pages/pages-router.tsx`.
-- Size: a Next.js page is about 194 KB gzip of JavaScript. Its build output also contains the Basis (527,333 B) and
-  Draco (192,420 B) decoders when you import via `margoengine/react`; they are emitted but never requested. Installing
-  `@margoengine/react` alone avoids them.
+- Size: a Next.js page is about 194 KB gzip of JavaScript. A page that imports `margoengine/react/gltf-pro`, `/fbx`,
+  `/animation` or `/materials` also has the Basis (527,333 B) and Draco (192,420 B) decoders in its build output,
+  requested only for a model that needs them. `margoengine/react` alone emits neither.
 
 ## 6. Coming from react-three-fiber (and drei)
 
@@ -168,4 +168,4 @@ type-checked from packed tarballs), `modern:test:bundlers`. Guides: `docs/react-
 - `Box`, `Sphere`, `Plane` take colour only (no textures); use a glTF `Model`.
 - No lowercase JSX tags, no `extend()`, no event bubbling: R3F code needs a rename pass, not a drop-in swap.
 - Next.js example builds with `--webpack`; Turbopack is covered by the bundler matrix, not the example script.
-- Importing through `margoengine/react` emits the Basis and Draco `.wasm` files into the build (not requested).
+- `Model`, `Fbx`, `Animation` and the `materials` components have their own entries (`margoengine/react/gltf-pro` and so on), so a page without them builds with no Basis or Draco `.wasm`.

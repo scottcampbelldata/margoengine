@@ -9,7 +9,7 @@
 // It also moves the names of the removed `@margoengine/react/kit` and the effects that left `/post` for their own
 // packages (DepthOfField: /dof, Tonemap: /tonemap, TAA: /taa), and rewrites `preload(url)` to the component's
 // `Gltf.preload(url)`, `Fbx.preload(url)` or `Environment.preload(url)` by extension. `margoengine/react`, the one
-// install, still exports every binding and is left alone.
+// install, is left alone.
 //
 // Usage: node scripts/codemod-react-subpaths.mjs [--check] [paths...]
 //   No paths: every tracked .ts/.tsx/.js/.jsx/.mjs/.md file except generated records and history. Idempotent.

@@ -802,8 +802,9 @@ test('Reversed float depth separates sub-millimeter surfaces at industrial range
   assert.notEqual(depth(-500), depth(-500.0001));
 });
 test('Frozen core entry stays portable and the one-install React entry exposes its complete scene bindings', async () => {
-  // margoengine/react re-exports every @margoengine/react subpath but physics (each binding lives in the subpath named
-  // after the package it needs, so @margoengine/react installed alone builds without optional peers).
+  // margoengine/react re-exports every @margoengine/react subpath but REACT_SEPARATE of scripts/umbrella.mjs (each binding
+  // lives in the subpath named after the package it needs, so @margoengine/react installed alone builds without optional
+  // peers).
   const api = await import('../packages/core/dist/index.js'),
     react = await import('margoengine/react');
   assert.deepEqual(
@@ -816,10 +817,7 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
     [
       'Afterimage',
       'AmbientLight',
-      'Animation',
       'ArcballControls',
-      'BatchedItem',
-      'BatchedMesh',
       'Billboard',
       'Bloom',
       'Bounds',
@@ -836,13 +834,11 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
       'EffectComposer',
       'Environment',
       'FXAA',
-      'Fbx',
       'Float',
       'Fog',
       'GTAO',
       'GeometryResource',
       'Glitch',
-      'Gltf',
       'Grid',
       'Group',
       'HemisphereLight',
@@ -852,8 +848,6 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
       'MargoCanvas',
       'MargoContext',
       'Mesh',
-      'MeshTransmissionMaterial',
-      'Model',
       'MotionBlur',
       'OrbitControls',
       'PbrMaterial',

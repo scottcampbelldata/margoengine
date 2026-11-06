@@ -1,5 +1,5 @@
 {
-  "commit": "fca4a22e6",
+  "commit": "54c2c46bb",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -440,16 +440,16 @@
     },
     "@margoengine/culling": {
       ".": {
-        "raw": 37616,
-        "gzip": 11946
+        "raw": 41899,
+        "gzip": 13203
       },
       "./dynamic": {
         "raw": 20393,
         "gzip": 7250
       },
       "./parts": {
-        "raw": 40177,
-        "gzip": 12867
+        "raw": 44464,
+        "gzip": 14113
       },
       "./models": {
         "raw": 8050,
@@ -1898,8 +1898,8 @@
     },
     "@margoengine/terrain": {
       ".": {
-        "raw": 37434,
-        "gzip": 11999
+        "raw": 38313,
+        "gzip": 12120
       }
     },
     "@margoengine/text": {

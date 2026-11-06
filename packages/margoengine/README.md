@@ -60,4 +60,17 @@ install.
 | `margoengine/ifc` | `npm i web-ifc` | You pass an initialized `IfcAPI` to `parseIFC` |
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
 
+`margoengine/react` holds every React binding but five groups, each its own entry: `margoengine/react/gltf-pro`
+(`Model`, `Gltf`), `/fbx`, `/animation`, `/materials` and `/physics`. The first four reach the Draco and Basis decoders,
+and Vite copies a decoder's Wasm into the build as soon as it reads the module, used or not. A page that imports none
+of them builds with no Wasm of theirs:
+
+```tsx
+import { Canvas, Mesh, BoxGeometry } from 'margoengine/react';
+import { Model } from 'margoengine/react/gltf-pro'; // only on a page that loads a model
+```
+
+The kits `margoengine/game`, `/web` and `/viz` include `loadGLTF`, so their builds hold the decoder files; the browser
+fetches them only for a file that uses Draco or KTX2.
+
 Without them nothing else changes; the package that needs one says which to install when you use it.

@@ -4,6 +4,7 @@
 
 ### Packaging
 
+- A page that imports `margoengine/react` no longer gets the Draco and Basis Wasm in its build. Moved out of that entry: `Model` and `Gltf` (now `margoengine/react/gltf-pro`), `Fbx` (`/fbx`), `Animation` (`/animation`) and `BatchedMesh`, `BatchedItem`, `MeshTransmissionMaterial` (`/materials`).
 - `npm run publish:rehearsal` proves a release without making one: it audits all 102 tarballs, then runs `npm install margoengine` and `npm create margo` in clean projects against a stand-in registry on 127.0.0.1 that refuses every write. `npm run publish:dry-run` and the publish workflow run it.
 - `FloatingOrigin`, `OctreeCloud` and `TilesRenderer` now implement the `EnginePlugin` their `setup` takes, so their published types compile in an app with `skipLibCheck` off.
 - The `create-margo` description no longer lists a `cad` template that does not exist.

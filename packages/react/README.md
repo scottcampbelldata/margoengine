@@ -4,7 +4,9 @@ React 18 and 19 components and hooks for Margo Engine: a native canvas, pointer 
 frame callbacks. There is no custom reconciler: `<Canvas>` creates one engine, and its children are ordinary React
 components that edit it.
 
-Import it as `margoengine/react` (from the `margoengine` package, every binding in one import) or from this package
+Import it as `margoengine/react` (from the `margoengine` package, the bindings in one import; `Model`, `Fbx`, `Animation`,
+the `materials` components and physics come from `margoengine/react/gltf-pro`, `/fbx`, `/animation`, `/materials` and
+`/physics`, so a page without them builds without the Draco and Basis Wasm) or from this package
 alone: `@margoengine/react` holds the bindings that need no optional package (`Canvas`, `Mesh`, geometry, materials,
 hooks, views, `Sun`, `Center`), and a binding that needs `@margoengine/<name>` comes from `@margoengine/react/<name>`
 (`OrbitControls` from `/controls` with `@margoengine/controls` installed, `Gltf` from `/gltf-pro`, `Shadows` from
@@ -69,7 +71,8 @@ A box lit by the default sun, with a click handler:
 ```tsx
 import { Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial, Model } from 'margoengine/react';
+import { Canvas, Stage, Mesh, BoxGeometry, PbrMaterial } from 'margoengine/react';
+import { Model } from 'margoengine/react/gltf-pro';
 
 export function App() {
   return (
@@ -180,7 +183,8 @@ A model, its lighting and the orbit controls, directly under the canvas:
 ```tsx
 'use client';
 import { Suspense } from 'react';
-import { MargoCanvas, Model, Environment, OrbitControls, Shadows } from 'margoengine/react';
+import { MargoCanvas, Environment, OrbitControls, Shadows } from 'margoengine/react';
+import { Model } from 'margoengine/react/gltf-pro';
 
 export default function App() {
   return <MargoCanvas backend="webgpu" camera={{ position: [0, 2, 5] }} style={{ height: 400 }}>

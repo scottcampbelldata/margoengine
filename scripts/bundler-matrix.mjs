@@ -362,7 +362,7 @@ ${result.stdout}${result.stderr}`,
           scoped.total <= REACT_BUDGET.total,
           `react alone: ${scoped.total} B gzip emitted > ${REACT_BUDGET.total}`,
         );
-        // The one install re-exports every binding; the page reaches none of the optional packages, so the initial graph
+        // The one install re-exports the light bindings; the page reaches none of the optional packages, so the initial graph
         // must hold none of them.
         assert.deepEqual(
           umbrella.initialModules.filter((id) => extra.test(id) || /\.wasm$/.test(id)),
@@ -370,13 +370,12 @@ ${result.stdout}${result.stderr}`,
           'margoengine: the initial load holds no optional engine package',
         );
         // Regression (2026-10-27): the Stage class's loaders put an optional package's .wasm into every build of a Canvas page.
-        // margoengine/react re-exports every binding, so its module graph still reaches gltf-pro's decoders, and Vite
-        // copies their .wasm when it reads a module, before tree-shaking; no chunk of them is emitted or fetched
-        // (docs/limits.md). @margoengine/react alone emits none (asserted above).
+        // Regression (2026-11-06): margoengine/react re-exported the bindings that reach gltf-pro's decoders, and Vite
+        // copies a .wasm when it reads a module, before tree-shaking (scripts/umbrella.mjs, REACT_SEPARATE).
         assert.deepEqual(
-          umbrella.files.filter((file) => file.endsWith('.wasm')).map((file) => file.replace(/-[\w-]{8}\.wasm$/, '')),
-          ['assets/basis_transcoder', 'assets/draco_decoder'],
-          'margoengine: no .wasm the app does not import; only the decoders gltf-pro names (docs/limits.md)',
+          umbrella.files.filter((file) => /\.wasm$|draco|basis/i.test(file)),
+          [],
+          'margoengine: no Wasm, Draco or Basis file on a page that loads no model',
         );
         assert.deepEqual(
           umbrella.modules.filter((id) => /node_modules\/@margoengine\/(gltf-pro|decoders)\//.test(id)),

@@ -80,6 +80,25 @@ async function bundle(code) {
   };
 }
 
+test('margoengine/react puts no Wasm in a build, and a model page gets it from its own entry', async () => {
+  // An app build, not the library mode of bundle(): library mode inlines assets instead of emitting them.
+  const emitted = async (code) => {
+    const out = await build({
+      configFile: false,
+      publicDir: false,
+      logLevel: 'silent',
+      build: { write: false, target: 'es2022', rollupOptions: { input: 'app', preserveEntrySignatures: 'strict' } },
+      plugins: [
+        { name: 'app', resolveId: (id) => (id === 'app' ? id : null), load: (id) => (id === 'app' ? code : null) },
+      ],
+    });
+    return out.output.map((file) => file.fileName).filter((file) => /\.wasm$|draco|basis/i.test(file));
+  };
+  assert.deepEqual(await emitted("import { Canvas } from 'margoengine/react'; export { Canvas };"), []);
+  assert.deepEqual(await emitted("export * from 'margoengine/react';"), []);
+  assert.notDeepEqual(await emitted("import { Model } from 'margoengine/react/gltf-pro'; export { Model };"), []);
+});
+
 test('importing through margoengine bundles the same code as importing the package', async () => {
   for (const [alias, direct] of [
     [

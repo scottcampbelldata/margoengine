@@ -38,7 +38,7 @@ for (const file of guides)
         assert.match(
           from,
           task?.react
-            ? /^(margoengine\/react|react|react-dom\/client)$/
+            ? /^(margoengine\/react(\/gltf-pro)?|react|react-dom\/client)$/
             : /^(margoengine(\/[a-z0-9-]+){0,2}|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?|@dimforge\/rapier3d-compat)$/,
           `snippet at line ${line} imports ${from}`,
         );

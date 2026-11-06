@@ -137,17 +137,24 @@ export function importMap(root = repository, base = 'https://cdn.jsdelivr.net/np
 }
 
 /**
+ * The @margoengine/react subpaths margoengine/react leaves out, each still its own margoengine/react/<name>. Physics
+ * needs Rapier, a third-party library the app installs itself. The others reach gltf-pro and so the Draco and Basis
+ * decoders: Vite copies a module's `new URL(..., import.meta.url)` file when it reads the module, before tree-shaking,
+ * so re-exporting them here put the Wasm in the build of every page, whatever the page used.
+ */
+export const REACT_SEPARATE = ['physics', 'gltf-pro', 'fbx', 'animation', 'materials'].map(
+  (name) => `@margoengine/react/${name}`,
+);
+
+/**
  * The @margoengine entries one alias re-exports: its own, except margoengine/react, the one install, which has every
- * package and so re-exports every React binding, the root and each @margoengine/react/<package> subpath (which
- * @margoengine/react keeps apart so it builds without optional peers). Not physics: it needs Rapier, a third-party
- * library the app installs itself (margoengine/react/physics).
+ * package and so re-exports the React root and each @margoengine/react/<package> subpath (which @margoengine/react keeps
+ * apart so it builds without optional peers), but for REACT_SEPARATE.
  */
 export function aliasSources(entries, source) {
   return source === '@margoengine/react'
     ? entries
-        .filter(
-          (entry) => entry.source.startsWith('@margoengine/react') && entry.source !== '@margoengine/react/physics',
-        )
+        .filter((entry) => entry.source.startsWith('@margoengine/react') && !REACT_SEPARATE.includes(entry.source))
         .map((entry) => entry.source)
     : [source];
 }
