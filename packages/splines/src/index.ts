@@ -1,5 +1,11 @@
-/** Segment basis: 'catmull-rom' passes through every point, 'bezier' uses 3n+1 control points, 'hermite' takes a tangent per point. */
-export type CurveKind = 'catmull-rom' | 'bezier' | 'hermite';
+/**
+ * Segment basis: 'catmull-rom' passes through every point, 'bezier' uses 3n+1 control points, 'hermite' takes a
+ * tangent per point, 'kochanek-bartels' passes through every point with tension, continuity and bias controls, and
+ * 'bspline' is the uniform cubic B-spline (smooth, pulled toward but not through interior points; open curves are
+ * clamped to start and end at the first and last point).
+ */
+export type CurveKind = 'catmull-rom' | 'bezier' | 'hermite' | 'kochanek-bartels' | 'bspline';
+const KINDS: readonly string[] = ['catmull-rom', 'bezier', 'hermite', 'kochanek-bartels', 'bspline'];
 /** Options for `new Spline(...)`; invalid combinations throw a RangeError. */
 export interface SplineOptions {
   /** Default 'catmull-rom'. */
@@ -8,6 +14,12 @@ export interface SplineOptions {
   closed?: boolean;
   /** One finite 3D tangent per point; required for 'hermite'. */
   tangents?: readonly ArrayLike<number>[];
+  /** 'kochanek-bartels' only: -1 (looser) to 1 (tighter) at each point. Default 0. */
+  tension?: number;
+  /** 'kochanek-bartels' only: -1 (rounded) to 1 (sharp corners) at each point. Default 0. */
+  continuity?: number;
+  /** 'kochanek-bartels' only: -1 (undershoot) to 1 (overshoot) at each point. Default 0. */
+  bias?: number;
   /** Samples of the arc-length lookup, an integer 2..1,000,000. Default 256. */
   divisions?: number;
 }
@@ -22,6 +34,10 @@ export class Spline {
   readonly arcLengths: Float64Array;
   readonly kind: CurveKind;
   readonly closed: boolean;
+  /** Kochanek-Bartels settings, as given (0 when unused). */
+  readonly tension: number;
+  readonly continuity: number;
+  readonly bias: number;
   private readonly tangents?: Float64Array;
   private readonly output = new Float64Array(3);
   private readonly previous = new Float64Array(3);
@@ -29,10 +45,11 @@ export class Spline {
   private readonly count: number;
   constructor(
     points: readonly ArrayLike<number>[],
-    { kind = 'catmull-rom', closed = false, tangents, divisions = 256 }: SplineOptions = {},
+    { kind = 'catmull-rom', closed = false, tangents, divisions = 256, tension = 0, continuity = 0, bias = 0 }: SplineOptions = {},
   ) {
     if (
-      !['catmull-rom', 'bezier', 'hermite'].includes(kind) ||
+      !KINDS.includes(kind) ||
+      ![tension, continuity, bias].every((v) => Number.isFinite(v) && v >= -1 && v <= 1) ||
       typeof closed !== 'boolean' ||
       !Number.isInteger(divisions) ||
       divisions < 2 ||
@@ -49,6 +66,9 @@ export class Spline {
       throw new RangeError('Hermite needs a tangent for each point');
     this.kind = kind;
     this.closed = closed;
+    this.tension = tension;
+    this.continuity = continuity;
+    this.bias = bias;
     this.count = points.length;
     this.points = new Float64Array(points.length * 3);
     for (let i = 0; i < points.length; i++) {
@@ -106,15 +126,37 @@ export class Spline {
           h3 * tangents[((segment + 1) % count) * 3 + a];
       return output;
     }
-    // Catmull-Rom neighbors: wrapped when closed, otherwise mirrored through the end point.
+    // Neighbors: wrapped when closed, otherwise mirrored through the end point.
     const before = closed ? ((segment + count - 1) % count) * 3 : segment > 0 ? i - 3 : -1,
       after = closed ? ((segment + 2) % count) * 3 : segment + 2 < count ? j + 3 : -1,
       last = (count - 1) * 3;
+    if (kind === 'bspline') {
+      const v = 1 - u,
+        w0 = (v * v * v) / 6,
+        w1 = (3 * u3 - 6 * u2 + 4) / 6,
+        w2 = (-3 * u3 + 3 * u2 + 3 * u + 1) / 6,
+        w3 = u3 / 6;
+      for (let a = 0; a < 3; a++) {
+        const o = before < 0 ? 2 * points[a] - points[3 + a] : points[before + a];
+        const x = after < 0 ? 2 * points[last + a] - points[last - 3 + a] : points[after + a];
+        output[a] = w0 * o + w1 * points[i + a] + w2 * points[j + a] + w3 * x;
+      }
+      return output;
+    }
+    // Catmull-Rom is Kochanek-Bartels with all three controls at zero (both weights 0.5).
+    const kb = kind === 'kochanek-bartels',
+      k = 1 - this.tension,
+      wa = kb ? (k * (1 + this.bias) * (1 + this.continuity)) / 2 : 0.5,
+      wb = kb ? (k * (1 - this.bias) * (1 - this.continuity)) / 2 : 0.5,
+      wc = kb ? (k * (1 + this.bias) * (1 - this.continuity)) / 2 : 0.5,
+      wd = kb ? (k * (1 - this.bias) * (1 + this.continuity)) / 2 : 0.5;
     for (let a = 0; a < 3; a++) {
       const p = points[i + a],
         q = points[j + a];
-      const m = (q - (before < 0 ? 2 * points[a] - points[3 + a] : points[before + a])) * 0.5;
-      const n = ((after < 0 ? 2 * points[last + a] - points[last - 3 + a] : points[after + a]) - p) * 0.5;
+      const o = before < 0 ? 2 * points[a] - points[3 + a] : points[before + a];
+      const x = after < 0 ? 2 * points[last + a] - points[last - 3 + a] : points[after + a];
+      const m = kb ? wa * (p - o) + wb * (q - p) : (q - o) * 0.5;
+      const n = kb ? wc * (q - p) + wd * (x - q) : (x - p) * 0.5;
       output[a] = h0 * p + h1 * m + h2 * q + h3 * n;
     }
     return output;
@@ -165,3 +207,7 @@ export class Spline {
     return this.at((low + fraction) / (lengths.length - 1), output);
   }
 }
+
+export * from './closest.js';
+export * from './frames.js';
+export * from './knots.js';

@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/splines",
   "version": "1.0.0",
-  "description": "3D Catmull-Rom, Bezier and Hermite curves with arc-length lookup.",
+  "description": "3D Catmull-Rom, Bezier, Hermite, B-spline and Kochanek-Bartels curves with arc-length lookup, closest point, stable frames and knot editing.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -25,6 +25,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./mesh": {
+      "types": "./dist/mesh.d.ts",
+      "import": "./dist/mesh.js"
+    },
+    "./fit": {
+      "types": "./dist/fit.d.ts",
+      "import": "./dist/fit.js"
     }
   },
   "files": [
