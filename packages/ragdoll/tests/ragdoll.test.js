@@ -8,6 +8,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import { Physics } from '@margoengine/physics';
 import { Ragdoll } from '../dist/index.js';
+import { realRig } from './rig.js';
 
 const rapierDir = process.env.MARGOENGINE_RAPIER
   ? resolve(process.env.MARGOENGINE_RAPIER)
@@ -340,8 +341,9 @@ rtest('misuse throws coded errors that name the fix', async () => {
   );
   assert.throws(() => new Ragdoll(physics, { root: body.hips, joint: { type: 'weld' } }), /'cone', 'hinge' or 'free'/);
   assert.equal(physics.bodyCount, 0, 'a failed build leaves no bodies behind');
-  body.spine.setScale([1, 2, 1]);
-  assert.throws(() => new Ragdoll(physics, { root: body.hips }), /uniform world scales/);
+  body.spine.setScale([1, -1, 1]);
+  assert.throws(() => new Ragdoll(physics, { root: body.hips }), /positive world scales/);
+  assert.equal(physics.bodyCount, 0, 'a refused scale leaves no bodies behind');
   body.spine.setScale([1, 1, 1]);
   const ragdoll = Ragdoll.attach(physics, { root: body.hips });
   assert.throws(() => ragdoll.onPreUpdate(-1), { name: 'RangeError' });
@@ -373,3 +375,153 @@ rtest('a chest whose shoulders and neck sit around it keeps them: both arms and 
   ragdoll.dispose();
   rig.dispose();
 });
+
+/** Every node's world matrix, to compare a pose before and after. */
+const pose = (engine, nodes) => {
+  engine.store.tick(false);
+  return nodes.map((node) => Array.from(node.matrix));
+};
+const worst = (a, b) => Math.max(...a.flatMap((m, i) => m.map((v, k) => Math.abs(v - b[i][k]))));
+const turnZ = (angle) => [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)];
+const allNodes = (body) => [body.hips, body.spine, body.head, body.headEnd, ...body.legs.flatMap((leg) => Object.values(leg))];
+
+rtest("any positive bone scale is taken, a real exporter's and a large one", async () => {
+  for (const scale of [[0.9995, 1, 0.9986], [1, 2, 1], [0.1, 3, 40]]) {
+    const { engine, physics } = await scene(),
+      body = humanoid(engine);
+    body.spine.setScale(scale);
+    engine.store.tick(false);
+    const ragdoll = Ragdoll.attach(physics, { root: body.hips });
+    // A bone's length is the world distance to its child, so it carries the scale above it.
+    near(ragdoll.part(body.spine).length, 0.3 * scale[1], 1e-5, `the spine's world length at ${scale}`);
+    assert.ok(angle(ragdoll.part(body.head).bind) < 1e-6, 'nothing skews a straight bone');
+    ragdoll.dispose();
+    physics.dispose();
+    engine.dispose();
+  }
+});
+
+rtest('a child that is not a bone may be mirrored', async () => {
+  const { engine, physics } = await scene(),
+    body = humanoid(engine);
+  engine.createMesh(body.spine).setPosition([0, 0.3, 0.1]).setScale([-1, 1, 1]);
+  const ragdoll = Ragdoll.attach(physics, { bones: [body.hips, body.spine, { node: body.head, length: 0.25 }] });
+  assert.ok(ragdoll.part(body.spine), 'a mirrored attachment on the spine is no reason to refuse the rig');
+  ragdoll.dispose();
+});
+
+rtest('going limp under an uneven scale leaves a skewed pose where it was', async () => {
+  // The spine stretched and the head turned 30 degrees under it: the head's axes are no longer square, so its world
+  // rotation is not the spine's times its own. Without gravity nothing moves the bodies, so nothing may move the nodes;
+  // the bound is the 32-bit store's rounding at a matrix entry of about 2.
+  const { engine, physics } = await scene({ gravity: [0, 0, 0] }),
+    body = humanoid(engine);
+  body.spine.setScale([1, 2, 1]);
+  body.head.setQuaternion(turnZ(Math.PI / 6));
+  const nodes = allNodes(body),
+    before = pose(engine, nodes),
+    ragdoll = Ragdoll.attach(physics, { root: body.hips, joint: { type: 'free' } });
+  assert.ok(angle(ragdoll.part(body.head).bind) > 0.02, 'the skew is real: bind differs from identity');
+  ragdoll.activate();
+  frames(engine, ragdoll, 30);
+  const off = worst(before, pose(engine, nodes));
+  assert.ok(off < 1e-5, `the pose holds (${off})`);
+  ragdoll.dispose();
+});
+
+rtest('the skew is measured when a bone goes limp, not only when the ragdoll is built', async () => {
+  const { engine, physics } = await scene({ gravity: [0, 0, 0] }),
+    body = humanoid(engine);
+  body.spine.setScale([1, 2, 1]);
+  const ragdoll = Ragdoll.attach(physics, { root: body.hips, joint: { type: 'free' } });
+  frames(engine, ragdoll, 3);
+  // The animation turns the head after the build, so the skew at the build (none) is not the skew now.
+  body.head.setQuaternion(turnZ(Math.PI / 6));
+  frames(engine, ragdoll, 3);
+  const nodes = allNodes(body),
+    before = pose(engine, nodes);
+  ragdoll.activate();
+  frames(engine, ragdoll, 30);
+  const off = worst(before, pose(engine, nodes));
+  assert.ok(off < 1e-5, `the pose holds (${off})`);
+  ragdoll.dispose();
+});
+
+rtest("a kinematic body follows the bone's rotation under an uneven scale", async () => {
+  const { engine, physics } = await scene(),
+    body = humanoid(engine);
+  body.spine.setScale([3, 1, 1]);
+  const ragdoll = Ragdoll.attach(physics, { root: body.hips }),
+    spine = ragdoll.part(body.spine);
+  body.spine.setQuaternion(turnZ(Math.PI / 3));
+  frames(engine, ragdoll, 10);
+  const off = angle(mul(conj(spine.body.rotation), turnZ(Math.PI / 3)));
+  assert.ok(off < 1e-3, `the body turned with the bone (${off} rad)`);
+  ragdoll.dispose();
+});
+
+rtest('a root bone under a skewed parent keeps its place', async () => {
+  // A parent stretched and turned above the root: its axes are not square, so only its full inverse finds the local
+  // position. Same bound as above.
+  const { engine, physics } = await scene({ gravity: [0, 0, 0] }),
+    body = humanoid(engine),
+    stretched = engine.createMesh(null).setScale([1, 2, 1]),
+    turned = engine.createMesh(stretched).setQuaternion(turnZ(Math.PI / 6));
+  body.model.setParent(turned);
+  const nodes = allNodes(body),
+    before = pose(engine, nodes),
+    ragdoll = Ragdoll.attach(physics, { root: body.hips, joint: { type: 'free' } });
+  ragdoll.activate();
+  frames(engine, ragdoll, 30);
+  const off = worst(before, pose(engine, nodes));
+  assert.ok(off < 1e-5, `the pose holds (${off})`);
+  ragdoll.dispose();
+});
+
+rtest('a limp fall with a scaled spine is the fall of the same rig built without one', async () => {
+  // Same world positions either way, so the same bodies and the same physics. Only 32-bit rounding at the build differs.
+  const fall = async (scale, head, end) => {
+    const { engine, physics } = await scene(),
+      body = humanoid(engine);
+    body.spine.setScale(scale);
+    body.head.setPosition([0, head, 0]);
+    body.headEnd.setPosition([0, end, 0]);
+    const ragdoll = Ragdoll.attach(physics, { root: body.hips, active: true }),
+      nodes = ragdoll.bones.map((part) => part.node);
+    ragdoll.part(body.spine).body.setAngularVelocity([4, 0, 1]);
+    frames(engine, ragdoll, 45);
+    return nodes.map((node) => {
+      engine.store.tick(false);
+      return [node.matrix[12], node.matrix[13], node.matrix[14]];
+    });
+  };
+  const scaled = await fall([1, 2, 1], 0.3, 0.25),
+    plain = await fall([1, 1, 1], 0.6, 0.5),
+    off = Math.max(...scaled.map((at, i) => Math.hypot(at[0] - plain[i][0], at[1] - plain[i][1], at[2] - plain[i][2])));
+  assert.ok(off < 1e-3, `every bone lands in the same place (${off} m)`);
+  assert.ok(Math.abs(scaled[0][1] - 1) > 0.5, 'and it did fall');
+});
+
+rtest("a real avatar with exporter scales goes limp: Seed-san's skeleton", async () => {
+  const rig = await realRig('vrm/Seed-san.vrm', { gravity: [0, 0, 0], floor: false });
+  rig.frames(1);
+  const uneven = rig.model.nodes.filter((node) => {
+    const m = node.matrix,
+      sx = Math.hypot(m[0], m[1], m[2]),
+      sz = Math.hypot(m[8], m[9], m[10]);
+    return Math.abs(sx - sz) > 1e-4 * sx;
+  });
+  assert.ok(uneven.length > 0, 'the file has bones past the limit the old check used');
+  const ragdoll = Ragdoll.attach(rig.physics, { root: rig.node('hips'), joint: { type: 'free' }, minLength: 0.001 }),
+    nodes = ragdoll.bones.map((part) => part.node),
+    before = pose(rig.engine, nodes);
+  assert.ok(nodes.some((node) => uneven.includes(node)), 'and they are bones of this ragdoll');
+  ragdoll.activate();
+  rig.frames(30);
+  const off = worst(before, pose(rig.engine, nodes));
+  // Metre scale entries in a 32-bit store, through a chain of about 10 bones.
+  assert.ok(off < 1e-4, `the pose holds (${off})`);
+  ragdoll.dispose();
+  rig.dispose();
+});
+

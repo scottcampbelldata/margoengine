@@ -76,8 +76,10 @@ function fit(rig, mesh, ragdoll) {
       .reduce((sum, value) => sum + value) / 2
   );
 }
-async function knight(options) {
+async function knight({ prepare, ...options } = {}) {
   const rig = await realRig(KNIGHT);
+  rig.frames(1);
+  prepare?.(rig);
   rig.frames(1);
   // The file's rest pose is its bind pose, so the mesh's triangles stand where the bones do.
   const skin = rig.asset.doc.skins[0],
@@ -257,3 +259,27 @@ rtest('a plain skinned mesh works as a source, with joints above the bones count
   assert.equal(ragdoll.part(spine).shape.type, 'capsule');
   rig.dispose();
 });
+
+rtest('a bone with an uneven scale gets a hull stretched along its own axes', async () => {
+  // Stand-in scale on a real rig. The hull's points live in the bone's frame, so each axis keeps its own scale.
+  const size = (points, axis) => {
+    let low = Infinity,
+      high = -Infinity;
+    for (let i = axis; i < points.length; i += 3) {
+      low = Math.min(low, points[i]);
+      high = Math.max(high, points[i]);
+    }
+    return high - low;
+  };
+  const plain = await knight(),
+    even = fitRagdollShapes(plain.ragdoll, plain.rig.model).find((hull) => hull.part.node.name === 'head').shape;
+  plain.rig.dispose();
+  const stretched = await knight({ prepare: (rig) => rig.node('head').setScale([1, 2, 1]) }),
+    uneven = fitRagdollShapes(stretched.ragdoll, stretched.rig.model).find((hull) => hull.part.node.name === 'head').shape;
+  const ratio = (axis) => size(uneven.points, axis) / size(even.points, axis);
+  assert.ok(Math.abs(ratio(0) - 1) < 1e-4, `x keeps its size (${ratio(0)})`);
+  assert.ok(Math.abs(ratio(1) - 2) < 1e-4, `y doubles (${ratio(1)})`);
+  assert.ok(Math.abs(ratio(2) - 1) < 1e-4, `z keeps its size (${ratio(2)})`);
+  stretched.rig.dispose();
+});
+

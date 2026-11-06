@@ -68,7 +68,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/post | `.` 33, `./bloom` 4, `./ssao` 3, `./scene-fade` 4, `./stack` 1, `./fxaa` 1, `./decals` 4, `./ssr` 4, `./gtao` 2, `./ssgi` 2, `./motion-blur` 3, `./lens-flare` 2, `./image` 4, `./smaa` 3, `./glitch` 2, `./afterimage` 2, `./outline` 2, `./mrt` 4, `./depth` 2, `./contact-shadows` 2 | 21 |  | 39,246 |
 | @margoengine/procedural | `.` 40, `./standin` 1, `./noise` 10, `./lsystem` 12, `./voronoi` 15, `./expression` 15 |  |  | 12,594 |
 | @margoengine/quality | `.` 27, `./warm` 3, `./ssaa` 6, `./features` 11, `./power` 8 | 4 | 2 | 3,686 |
-| @margoengine/ragdoll | `.` 8, `./powered` 4, `./getup` 6, `./hulls` 5, `./profile` 6, `./balance` 4 | 50 |  | 7,148 |
+| @margoengine/ragdoll | `.` 8, `./powered` 4, `./getup` 6, `./hulls` 5, `./profile` 6, `./balance` 4 | 50 |  | 7,330 |
 | @margoengine/react | `.` 43, `./controls` 12, `./gltf-pro` 5, `./fbx` 2, `./animation` 3, `./environment` 8, `./html` 2, `./shadows` 4, `./sky` 2, `./text` 2, `./geometry` 6, `./materials` 6, `./post` 28, `./dof` 2, `./tonemap` 2, `./taa` 2, `./voxel` 3, `./physics` 34, `./xr` 12, `./lines` 2, `./devtools` 2, `./helpers` 8 | 46 |  | 8,193 |
 | @margoengine/rigging | `.` 21, `./ik` 12, `./retarget` 10, `./hulls` 4, `./springs` 13, `./vrm` 26, `./voxel-weights` 3, `./correctives` 9, `./transfer` 4, `./face` 10 | 42 |  | 7,631 |
 | @margoengine/road | `.` 3 |  |  | 1,027 |

@@ -1,5 +1,5 @@
 {
-  "commit": "a2742c9be",
+  "commit": "0be559ba2",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -684,12 +684,12 @@
         "gzip": 33654
       },
       "./usdz": {
-        "raw": 32103,
-        "gzip": 11530
+        "raw": 33704,
+        "gzip": 12083
       },
       "./usdz-anim": {
-        "raw": 48490,
-        "gzip": 17297
+        "raw": 51434,
+        "gzip": 18412
       },
       "./threemf": {
         "raw": 38045,
@@ -1234,8 +1234,8 @@
         "gzip": 6681
       },
       "./3dm": {
-        "raw": 4339,
-        "gzip": 2020
+        "raw": 9076,
+        "gzip": 3838
       },
       "./3ds": {
         "raw": 8708,
@@ -1804,20 +1804,20 @@
     },
     "@margoengine/ragdoll": {
       ".": {
-        "raw": 18524,
-        "gzip": 7148
+        "raw": 19082,
+        "gzip": 7330
       },
       "./powered": {
-        "raw": 7904,
-        "gzip": 3209
+        "raw": 7933,
+        "gzip": 3200
       },
       "./getup": {
         "raw": 3805,
         "gzip": 1738
       },
       "./hulls": {
-        "raw": 3720,
-        "gzip": 1751
+        "raw": 3786,
+        "gzip": 1777
       },
       "./profile": {
         "raw": 5083,

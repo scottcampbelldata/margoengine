@@ -77,6 +77,7 @@ export interface RagdollPart {
     readonly axis: ArrayLike<number>;
     readonly rest: ArrayLike<number>;
     readonly spec: RagdollJoint | null;
+    readonly bind: ArrayLike<number>;
     readonly animated: ArrayLike<number>;
     readonly limp: boolean;
     readonly weight: number;

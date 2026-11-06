@@ -132,7 +132,7 @@ Each part has its own `limp` and `weight`, so a second limb can go limp while th
 | `angularDamping` | `0.8` | Per body. |
 | `limitStiffness` | `0.2` | Share of a cone limit's error removed per physics step, 0 to 1. |
 
-Bones need positive uniform world scales (a scale a little off uniform is a known bug, see `docs/known-bugs.md`). Errors follow the package conventions: a `TypeError` or `RangeError` naming
+Bones take any positive scale, even or uneven; zero and mirrored bones are refused. Lengths and shapes are read in world units, so a stretched bone gets a longer body. Under an uneven scale a child's world rotation is not its parent's times its own, so each part keeps `bind`, the difference, measured when the bone goes limp: the pose does not jump. Errors follow the package conventions: a `TypeError` or `RangeError` naming
 the fix for bad options, and a `MargoError` with code `disposed` after `dispose()`, `attached` for a second ragdoll on
 one skeleton or the wrong engine, and `unsupported` for a hinge on a Rapier build without joint frames.
 

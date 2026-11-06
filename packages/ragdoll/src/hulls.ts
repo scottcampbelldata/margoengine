@@ -228,10 +228,10 @@ export function fitRagdollShapes(
   return hulls.map((hull) => {
     const part = ragdoll.bones[hull.joint],
       m = part.node.matrix,
-      // Joint space is the bone's frame before its world scale; a body's frame is in world units.
-      scale = Math.hypot(m[0], m[1], m[2]),
-      points = hull.points.map((v) => v * scale),
-      fitted: RagdollShape = shape === 'box' ? boxAround(points, part.axis) : { type: 'hull', points };
+      // Joint space is the bone's frame before its world scales; a body's frame is in world units.
+      scales = [Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10])],
+      points = hull.points.map((v, i) => v * scales[i % 3]);
+    const fitted: RagdollShape = shape === 'box' ? boxAround(points, part.axis) : { type: 'hull', points };
     ragdoll.setShape(part, fitted);
     return { part, shape: fitted, vertexCount: hull.vertexCount };
   });

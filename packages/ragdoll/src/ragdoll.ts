@@ -128,6 +128,11 @@ export interface RagdollPart {
   readonly rest: ArrayLike<number>;
   /** The joint as built, every default filled in; null for the root bone. */
   readonly spec: RagdollJoint | null;
+  /**
+   * The node's local rotation is the turn from the parent body to this one times this: identity unless an uneven scale
+   * above the bone skews it.
+   */
+  readonly bind: ArrayLike<number>;
   /** The local pose the animation last gave the bone, xyz then xyzw: what motors drive toward. */
   readonly animated: ArrayLike<number>;
   /** True while physics drives this bone. */
@@ -154,6 +159,7 @@ interface Bone extends RagdollPart {
   readonly prev: Float64Array;
   readonly cur: Float64Array;
   readonly animated: Float64Array;
+  readonly bind: Float64Array;
   /** What the ragdoll last wrote into the node, to tell an animated pose from its own. */
   readonly written: Float64Array;
   /** The physics pose as a local transform: this frame's, or the one frozen by `deactivate`. */
@@ -171,8 +177,19 @@ interface Bone extends RagdollPart {
   jump: boolean;
 }
 
+/** Sine of half the smallest turn a 32-bit matrix can tell from none, with room for a chain of them. */
+const ROUNDING = 2e-6;
+const IDENTITY = [0, 0, 0, 1];
 const DEFAULT_JOINT: RagdollJoint = { type: 'cone', swing: Math.PI / 4, twist: [-Math.PI / 6, Math.PI / 6] };
 
+const determinant = (m: ArrayLike<number>): number =>
+  m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
+/** The rotation of a world matrix into `out`, each axis divided by its own scale. */
+const worldTurn = (m: ArrayLike<number>, out: Float64Array): Float64Array =>
+  normalizeQuaternion(
+    rotationToQuaternion(m, out, Math.hypot(m[0], m[1], m[2]), Math.hypot(m[4], m[5], m[6]), Math.hypot(m[8], m[9], m[10])),
+    out,
+  );
 const mul = (a: ArrayLike<number>, b: ArrayLike<number>, out: Float64Array, at = 0): Float64Array => {
   const ax = a[0],
     ay = a[1],
@@ -429,18 +446,13 @@ export class Ragdoll implements EnginePlugin {
     store.tick(false);
     const children = childMeshes(engine);
     const worldPose = (node: Mesh, out: Float64Array): Float64Array => {
-      const m = node.matrix,
-        sx = Math.hypot(m[0], m[1], m[2]),
-        sy = Math.hypot(m[4], m[5], m[6]),
-        sz = Math.hypot(m[8], m[9], m[10]);
-      if (!(sx > 0) || Math.abs(sx - sy) > 1e-4 * sx || Math.abs(sx - sz) > 1e-4 * sx)
-        throw new RangeError('Ragdoll bones need positive uniform world scales; remove non-uniform bone scales.');
+      const m = node.matrix;
+      if (!(determinant(m) > 0))
+        throw new RangeError('Ragdoll bones need positive world scales; remove zero or mirrored bone scales.');
       out[0] = m[12];
       out[1] = m[13];
       out[2] = m[14];
-      rotationToQuaternion(m, this.q, sx, sy, sz);
-      normalizeQuaternion(this.q, this.q);
-      out.set(this.q, 3);
+      out.set(worldTurn(m, this.q), 3);
       return out;
     };
     const parts: Bone[] = [],
@@ -466,7 +478,8 @@ export class Ragdoll implements EnginePlugin {
           inverse = conjugateQuaternion(rotation);
         // The bone runs from the node toward its children: their centre, or the farthest child when that is too close.
         const kids = children.get(node.id) ?? [];
-        const ends = kids.map((kid) => worldPose(kid, new Float64Array(7)));
+        // Only where a child sits counts, so a child that is not a bone may have any scale.
+        const ends = kids.map((kid) => [kid.matrix[12], kid.matrix[13], kid.matrix[14]]);
         let direction: number[] = [0, 1, 0],
           reach = 0,
           spread = 0;
@@ -564,6 +577,7 @@ export class Ragdoll implements EnginePlugin {
           shape,
           axis,
           rest,
+          bind: new Float64Array([0, 0, 0, 1]),
           spec: built,
           cone,
           inertia: Float64Array.from(inverseInertia(shape, axis, length, radius, mass)),
@@ -581,6 +595,7 @@ export class Ragdoll implements EnginePlugin {
         };
         this.readLocal(node, bone.animated);
         bone.local.set(bone.animated);
+        this.fit(bone, parts);
         remap.set(i, parts.length);
         parts.push(bone);
       }
@@ -819,8 +834,10 @@ export class Ragdoll implements EnginePlugin {
     this.live();
     const dt = this.physics.fixedTimestep,
       moved = this.stepped >= 2;
+    this.engine.store.tick(false);
     for (const bone of this.limbBones(limb)) {
       if (bone.limp) continue;
+      this.fit(bone, this.parts);
       bone.limp = true;
       bone.weight = 1;
       bone.fade = 0;
@@ -897,10 +914,8 @@ export class Ragdoll implements EnginePlugin {
       if (bone.limp) continue;
       // Kinematic: the animated world pose is the next target.
       const m = bone.node.matrix,
-        sx = Math.hypot(m[0], m[1], m[2]),
         t = bone.target;
-      rotationToQuaternion(m, this.q, sx, sx, sx);
-      normalizeQuaternion(this.q, this.q);
+      worldTurn(m, this.q);
       t[0] = m[12];
       t[1] = m[13];
       t[2] = m[14];
@@ -915,6 +930,21 @@ export class Ragdoll implements EnginePlugin {
     }
     if (this.loose) this.physicsLocals();
     this.write();
+  }
+
+  /**
+   * Measures `bone.bind` from the pose the nodes hold now. Under an uneven scale a child's world rotation is not its
+   * parent's times its own, so the turn from one body to the next differs from the node's local rotation.
+   */
+  private fit(bone: Bone, parts: readonly Bone[]): void {
+    const parentId = this.engine.store.parents[bone.node.id],
+      up = bone.parent !== -1 ? parts[bone.parent].node : parentId !== -1 ? this.engine.meshes.get(parentId)! : null,
+      turn = worldTurn(bone.node.matrix, new Float64Array(4));
+    if (up) mul(conjugateQuaternion(worldTurn(up.matrix, this.q), this.q), turn, turn);
+    const pose = this.readLocal(bone.node, this.pose);
+    mul(conjugateQuaternion(turn, turn), pose.subarray(3, 7), bone.bind);
+    // Node matrices are 32-bit, so a turn this small is their rounding, not a skew.
+    if (Math.hypot(bone.bind[0], bone.bind[1], bone.bind[2]) < ROUNDING) bone.bind.set(IDENTITY);
   }
 
   /** Reads `node`'s local transform into `out`, xyz then xyzw. */
@@ -961,30 +991,29 @@ export class Ragdoll implements EnginePlugin {
       if (bone.parent !== -1) {
         const up = this.parts[bone.parent].world;
         conjugateQuaternion(up.subarray(3, 7), this.q);
-        mul(this.q, world.subarray(3, 7), local, 3);
+        mul(this.q, world.subarray(3, 7), this.r);
+        mul(this.r, bone.bind, local, 3);
         continue;
       }
       // The root bone: relative to its parent node's world transform (the model), position included.
       const parentId = this.engine.store.parents[bone.node.id];
       if (parentId === -1) {
         local.set(world);
+        mul(world.subarray(3, 7), bone.bind, local, 3);
         continue;
       }
-      const m = this.engine.meshes.get(parentId)!.matrix,
-        sx = Math.hypot(m[0], m[1], m[2]),
-        sy = Math.hypot(m[4], m[5], m[6]),
-        sz = Math.hypot(m[8], m[9], m[10]);
-      rotationToQuaternion(m, this.q, sx, sy, sz);
-      normalizeQuaternion(this.q, this.q);
-      conjugateQuaternion(this.q, this.q);
-      mul(this.q, world.subarray(3, 7), local, 3);
-      this.v[0] = world[0] - m[12];
-      this.v[1] = world[1] - m[13];
-      this.v[2] = world[2] - m[14];
-      rotateByQuaternion(this.v, this.q, this.v);
-      local[0] = this.v[0] / sx;
-      local[1] = this.v[1] / sy;
-      local[2] = this.v[2] / sz;
+      const m = this.engine.meshes.get(parentId)!.matrix;
+      conjugateQuaternion(worldTurn(m, this.q), this.q);
+      mul(this.q, world.subarray(3, 7), this.r);
+      mul(this.r, bone.bind, local, 3);
+      // The parent's matrix undone in full: under an uneven scale its axes need not be square to each other.
+      const x = world[0] - m[12],
+        y = world[1] - m[13],
+        z = world[2] - m[14],
+        size = determinant(m);
+      local[0] = (x * (m[5] * m[10] - m[6] * m[9]) + y * (m[8] * m[6] - m[4] * m[10]) + z * (m[4] * m[9] - m[8] * m[5])) / size;
+      local[1] = (x * (m[9] * m[2] - m[1] * m[10]) + y * (m[0] * m[10] - m[8] * m[2]) + z * (m[8] * m[1] - m[0] * m[9])) / size;
+      local[2] = (x * (m[1] * m[6] - m[5] * m[2]) + y * (m[4] * m[2] - m[0] * m[6]) + z * (m[0] * m[5] - m[4] * m[1])) / size;
     }
   }
 

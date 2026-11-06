@@ -233,3 +233,29 @@ rtest('a hit needs a bone of this ragdoll, and options are checked', async () =>
   assert.throws(() => (motors.strength = 2), { name: 'RangeError' });
   rig.dispose();
 });
+
+rtest('motors hold a pose skewed by an uneven scale', async () => {
+  // Stand-in scale on a real rig: a stretched chest with its arms turned under it. The motors' target is the turn between
+  // the bodies that draws the pose, not the node's local rotation, so with no outside force nothing moves.
+  const rig = await realRig(WALKER, { gravity: [0, 0, 0], floor: false });
+  rig.frames(1);
+  rig.node('chest').setScale([1, 2, 1]);
+  rig.node('upperarm.l').setQuaternion([0, 0, Math.sin(Math.PI / 12), Math.cos(Math.PI / 12)]);
+  rig.frames(1);
+  const ragdoll = Ragdoll.attach(rig.physics, { root: rig.node('hips'), joint: { type: 'free' } }),
+    motors = addRagdollMotors(ragdoll, { root: 1 });
+  rig.frames(2);
+  const skewed = ragdoll.bones.filter((part) => 2 * Math.acos(Math.min(1, Math.abs(part.bind[3]))) > 0.01);
+  assert.ok(skewed.length > 0, 'this rig is skewed');
+  const before = skewed.map((part) => relative(ragdoll, part));
+  ragdoll.activate();
+  rig.frames(60);
+  skewed.forEach((part, i) => {
+    const off = apart(relative(ragdoll, part), before[i]);
+    assert.ok(off < 1e-3, `${part.node.name} holds (${off} rad)`);
+  });
+  motors.dispose();
+  ragdoll.dispose();
+  rig.dispose();
+});
+

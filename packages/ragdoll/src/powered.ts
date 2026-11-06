@@ -76,6 +76,13 @@ const aboutAxis = (axis: ArrayLike<number>, angle: number): number[] => {
   return [axis[0] * sin, axis[1] * sin, axis[2] * sin, Math.cos(angle / 2)];
 };
 
+/** The turn from the parent body that draws the part's animated pose. */
+const bodyTurn = (part: RagdollPart): number[] =>
+  multiplyQuaternions(
+    [part.animated[3], part.animated[4], part.animated[5], part.animated[6]],
+    conjugateQuaternion(part.bind),
+  );
+
 /**
  * The rotation a joint can reach nearest `rotation` (a bone relative to its parent), inside its limits, so a motor
  * never pulls against the limit it would have to pass. `part.spec` must be a cone or free joint.
@@ -308,7 +315,7 @@ export class RagdollMotors {
       running[i] = 1;
       const a = part.animated,
         set = this.targets.get(i),
-        rotation = set ? [set[0], set[1], set[2], set[3]] : [a[3], a[4], a[5], a[6]],
+        rotation = set ? [set[0], set[1], set[2], set[3]] : bodyTurn(part),
         // Force based, with gains from the whole limb's inertia: an acceleration based motor sees only the two bodies at
         // the joint, not what hangs from them.
         motor = {
@@ -400,7 +407,7 @@ export class RagdollMotors {
       parentId = store.parents[node.id],
       a = root.animated;
     let position = [a[0], a[1], a[2]],
-      rotation = [a[3], a[4], a[5], a[6]];
+      rotation = bodyTurn(root);
     if (parentId !== -1) {
       const m = node.engine.meshes.get(parentId)!.matrix,
         sx = Math.hypot(m[0], m[1], m[2]),
@@ -408,8 +415,7 @@ export class RagdollMotors {
         sz = Math.hypot(m[8], m[9], m[10]),
         turn = normalizeQuaternion(rotationToQuaternion(m, new Float64Array(4), sx, sy, sz));
       rotation = multiplyQuaternions(turn, rotation);
-      const moved = rotateByQuaternion([a[0] * sx, a[1] * sy, a[2] * sz], turn);
-      position = [moved[0] + m[12], moved[1] + m[13], moved[2] + m[14]];
+      position = [0, 1, 2].map((k) => m[k] * a[0] + m[k + 4] * a[1] + m[k + 8] * a[2] + m[k + 12]);
     }
     // One change of velocity for the whole body, as if it were rigid: the spring moves the character and bends no joint,
     // and a light root is not flung ahead of the limbs it carries. Each bone takes it by its motor's share, so a limp limb
