@@ -21,12 +21,15 @@ interface Range {
   offset: number;
   size: number;
 }
-/** Immutable data derived only from the asset (morph deltas, skin influences), shared by every copy of a primitive. */
+/** Immutable data every copy of a primitive reads (bind-pose vertices, morph deltas, skin influences), held once. */
 interface Block {
   range: Range;
   refs: number;
   key: string;
   owner: Map<string, Block>;
+  /** The two keys above `owner` in the page's `blocks`, dropped with the last block so the page holds no dead asset. */
+  asset: object;
+  holder: object;
 }
 /** One storage buffer of a page and the ranges living in it. */
 class Pool {
@@ -72,7 +75,7 @@ export interface Slot {
   readonly targets: number;
   readonly joints: number;
   readonly extra: boolean;
-  readonly source: Range;
+  readonly source: Block;
   readonly output: Range;
   readonly weights: Range;
   readonly bones: Range;
@@ -120,11 +123,15 @@ export interface DispatchCache {
 }
 const arenas = new WeakMap<GPUDevice, DeformArena>();
 const roundUp = (value: number, align: number) => Math.ceil(value / align) * align;
-/** The key of a primitive's shared deltas (`m`) or influences (`i`) within its asset and definition. */
-const blockKey = (spec: SlotSpec, kind: 'm' | 'i') =>
+type BlockKind = 's' | 'm' | 'i';
+/** The key of a primitive's shared vertices (`s`), deltas (`m`) or influences (`i`) within its asset and `blockOwner`. */
+const blockKey = (spec: SlotSpec, kind: BlockKind) =>
   kind + ':' + spec.count + ':' + (kind === 'i' ? (spec.skin ?? '') : '');
-const same = (a: SlotSpec, b: SlotSpec, kind: 'm' | 'i') =>
-  a.asset === b.asset && a.definition === b.definition && blockKey(a, kind) === blockKey(b, kind);
+/** What equal blocks have in common: bind-pose vertices are one packed array, the rest come from one definition. */
+const blockOwner = (spec: SlotSpec, kind: BlockKind): object =>
+  kind === 's' ? spec.primitive.vertices : spec.definition;
+const same = (a: SlotSpec, b: SlotSpec, kind: BlockKind) =>
+  a.asset === b.asset && blockOwner(a, kind) === blockOwner(b, kind) && blockKey(a, kind) === blockKey(b, kind);
 
 /** Weights live in a region of at least four floats, the size of the per-primitive buffer they used to have. */
 export const weightRegion = (targets: number) => Math.max(4, targets);
@@ -170,8 +177,9 @@ export class DeformArena {
         );
       let page = [...this.pages, ...fresh].find((p) => this.fits(p, pending.get(p), need));
       if (!page) fresh.push((page = new Page(this.alignment)));
-      // Deltas and influences another copy already placed (or one placed earlier in this call) are shared, not added.
+      // Vertices, deltas and influences another copy already placed (or one placed earlier in this call) are shared.
       const queued = plans.get(page) ?? [];
+      if (this.block(page, spec, 's') || queued.some((q) => same(q, spec, 's'))) need[0] = 0;
       if (this.block(page, spec, 'm') || queued.some((q) => same(q, spec, 'm'))) need[2] = 0;
       if (this.block(page, spec, 'i') || queued.some((q) => same(q, spec, 'i'))) need[3] = 0;
       const sum = pending.get(page) ?? [0, 0, 0, 0, 0, 0];
@@ -187,6 +195,17 @@ export class DeformArena {
       const page = [...plans].find(([, list]) => list.includes(spec))![0];
       return this.place(page, spec);
     });
+    // Outputs start as the bind pose, copied on the GPU: a copy of a placed primitive uploads no vertices.
+    const encoder = this.device.createCommandEncoder();
+    for (const slot of slots)
+      encoder.copyBufferToBuffer(
+        slot.page.source.buffer!,
+        slot.source.range.offset * VERTEX,
+        slot.page.output.buffer!,
+        slot.output.offset * VERTEX,
+        slot.count * VERTEX,
+      );
+    this.device.queue.submit([encoder.finish()]);
     this.version++;
     return slots;
   }
@@ -196,17 +215,20 @@ export class DeformArena {
     if (!page.slots.delete(slot)) return;
     const p = slot.primitive;
     if (this.published(slot)) p.deformed = p.deformedOffset = undefined;
-    page.source.ranges.delete(slot.source);
     page.output.ranges.delete(slot.output);
     page.weights.ranges.delete(slot.weights);
     page.bones.ranges.delete(slot.bones);
     for (const [block, pool] of [
+      [slot.source, page.source],
       [slot.morphs, page.morphs],
       [slot.influences, page.influences],
     ] as const)
       if (block && --block.refs === 0) {
         pool.ranges.delete(block.range);
         block.owner.delete(block.key);
+        const byOwner = page.blocks.get(block.asset)!;
+        if (!block.owner.size) byOwner.delete(block.holder);
+        if (!byOwner.size) page.blocks.delete(block.asset);
       }
     page.version++;
     this.version++;
@@ -284,8 +306,8 @@ export class DeformArena {
     cache.owners = [];
     cache.version = -1;
   }
-  private block(page: Page, spec: SlotSpec, kind: 'm' | 'i'): Block | undefined {
-    return page.blocks.get(spec.asset)?.get(spec.definition)?.get(blockKey(spec, kind));
+  private block(page: Page, spec: SlotSpec, kind: BlockKind): Block | undefined {
+    return page.blocks.get(spec.asset)?.get(blockOwner(spec, kind))?.get(blockKey(spec, kind));
   }
   private needs(spec: SlotSpec): number[] {
     return [
@@ -359,16 +381,17 @@ export class DeformArena {
       pool.ranges.add(range);
       return range;
     };
-    const shared = (pool: Pool, kind: string, size: number, data: () => ArrayBufferView): Block | undefined => {
-      if (!size) return undefined;
-      let byDefinition = page.blocks.get(spec.asset);
-      if (!byDefinition) page.blocks.set(spec.asset, (byDefinition = new Map()));
-      let byKey = byDefinition.get(spec.definition);
-      if (!byKey) byDefinition.set(spec.definition, (byKey = new Map()));
-      const key = blockKey(spec, kind as 'm' | 'i');
+    const shared = (pool: Pool, kind: BlockKind, size: number, data: () => ArrayBufferView): Block | undefined => {
+      if (!size && kind !== 's') return undefined;
+      let byOwner = page.blocks.get(spec.asset);
+      if (!byOwner) page.blocks.set(spec.asset, (byOwner = new Map()));
+      const owner = blockOwner(spec, kind);
+      let byKey = byOwner.get(owner);
+      if (!byKey) byOwner.set(owner, (byKey = new Map()));
+      const key = blockKey(spec, kind);
       let block = byKey.get(key);
       if (!block) {
-        block = { range: allocate(pool, size), refs: 0, key, owner: byKey };
+        block = { range: allocate(pool, size), refs: 0, key, owner: byKey, asset: spec.asset, holder: owner };
         byKey.set(key, block);
         this.write(pool, block.range, data());
       }
@@ -382,7 +405,7 @@ export class DeformArena {
       targets: spec.targets,
       joints: spec.joints,
       extra: spec.extra,
-      source: allocate(page.source, spec.count),
+      source: shared(page.source, 's', spec.count, () => spec.primitive.vertices)!,
       output: allocate(page.output, spec.count),
       weights: allocate(page.weights, weightRegion(spec.targets)),
       bones: allocate(page.bones, spec.joints),
@@ -390,9 +413,6 @@ export class DeformArena {
       influences: shared(page.influences, 'i', spec.joints ? spec.count * (spec.extra ? 4 : 2) : 0, spec.influences),
       index: -1,
     };
-    const vertices = spec.primitive.vertices;
-    this.write(page.source, slot.source, vertices);
-    this.write(page.output, slot.output, vertices);
     page.slots.add(slot);
     page.version++;
     this.publish(slot);
@@ -419,7 +439,7 @@ export class DeformArena {
       slot.index = index;
       data.set(
         [
-          slot.source.offset,
+          slot.source.range.offset,
           slot.output.offset,
           slot.count,
           slot.targets,

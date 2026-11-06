@@ -6,12 +6,12 @@ import { MargoError } from '@margoengine/math/errors';
  * skeleton) that an `Animation` from this package can play apart from the source (`Animation.attach(clone)`). The
  * clone starts in the source's current local node transforms, visibility and morph weights, with its root unparented
  * at the source root's local transform, and is registered with the engine when the source is (as `loadGLTF` does).
- * It shares the source's parsed asset (document, buffers, accessors) and decoded images, and its packed vertex
- * arrays where gltf-pro cached them (worker and progressive loads, prepared static scenes); otherwise the clone packs
- * its own from the shared accessors. gltf-pro shares the GPU textures of shared images, and the GPU vertex and index
- * buffers of shared arrays (and of baked static batches at the same pose), between the copies, freeing each with its
- * last holder in any disposal order; uniforms and bind groups are per model. Materials come from the document, so
- * edits made to the source's materials at runtime are not copied. Clone after a progressive load has finished.
+ * It shares the source's parsed asset (document, buffers, accessors), decoded images and packed vertex arrays.
+ * gltf-pro shares the GPU textures of shared images, and the GPU vertex and index buffers of shared arrays (and of
+ * baked static batches at the same pose), between the copies, freeing each with its last holder in any disposal order;
+ * an `Animation` shares the bind-pose vertices, morph deltas and skin influences the same way. Deformed output,
+ * weights, bones, uniforms and bind groups are per model. Materials come from the document, so edits made to the
+ * source's materials at runtime are not copied. Clone after a progressive load has finished.
  */
 export async function cloneModel(model: PBRModel): Promise<PBRModel> {
   if (!(model instanceof PBRModel)) throw new TypeError('cloneModel needs a glTF-pro PBRModel; pass a loaded model');

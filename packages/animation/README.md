@@ -21,7 +21,7 @@ stage.dispose();
 
 Parses glTF skins, joint hierarchies and inverse bind matrices. Samples STEP, LINEAR (quaternion slerp), and CUBICSPLINE tracks. Animation advances in seconds before the engine updates world matrices. A compute pass blends position/normal/tangent morphs before skinning and writes the vertex draw buffer. Bone matrices use read-only storage buffers, bounded by the GPU's storage limits rather than a fixed bone count.
 
-Every skinned or morphed primitive of a device, across all its Animations, lives in a few shared storage buffers and deforms in one compute dispatch per buffer page and influence format (100 morphed models with two primitives each: one dispatch, not 200). Copies of one asset primitive (`cloneModel`) share one copy of its morph deltas and skin influences. A primitive's deformed vertices start `primitive.deformedOffset` bytes (a multiple of 256) into `primitive.deformed`; gltf-pro, shadows, TAA, selection and picking read them there, and a custom reader binds or copies from that offset.
+Every skinned or morphed primitive of a device, across all its Animations, lives in a few shared storage buffers and deforms in one compute dispatch per buffer page and influence format (100 morphed models with two primitives each: one dispatch, not 200). Copies of one asset primitive (`cloneModel`) share one copy of its bind-pose vertices, morph deltas and skin influences; only the deformed output, weights and bones are per copy, and a copy's output starts as a GPU copy of the bind pose, so a hundred characters upload their vertices once. A primitive's deformed vertices start `primitive.deformedOffset` bytes (a multiple of 256) into `primitive.deformed`; gltf-pro, shadows, TAA, selection and picking read them there, and a custom reader binds or copies from that offset.
 
 Use `animation.setMorph(nodeIndex, targetIndex, weight)` for manual expressions. Play a clip by name/index; set `loop:false` for one-shot playback. Up to eight influences per vertex are supported through paired `JOINTS_0`/`WEIGHTS_0` and optional `JOINTS_1`/`WEIGHTS_1`. Higher sets reject explicitly. No blending between clips is included.
 
@@ -378,11 +378,11 @@ applyKeyframeClip(walk, Animation.attach(hero), t); // or new AnimationGroup(wal
 
 `cloneModel(model)` resolves to a new `PBRModel` with its own root and nodes, starting in the source's current local
 transforms, visibility and morph weights, and registered with the engine when the source is. It shares the source's
-parsed asset (document, buffers, accessors), decoded images, and packed vertex arrays where gltf-pro cached them
-(worker and progressive loads, prepared static scenes; otherwise it packs its own from the shared accessors). Copies
-share the GPU textures of those images and the GPU buffers of those arrays, so a clone uploads no texture and costs no
-texture memory. Disposing any model, source included, leaves the others working: each image, texture and buffer goes
-with its last holder. Materials are rebuilt from the document, so runtime material edits on the source are not copied.
+parsed asset (document, buffers, accessors), decoded images and packed vertex arrays. Copies share the GPU textures of
+those images, the GPU vertex and index buffers of those arrays and, once animated, the deformation inputs (bind-pose
+vertices, morph deltas, skin influences), so a clone uploads no geometry and no texture; what it adds on the GPU is its
+own deformed output, weights, bones, uniforms and bind groups. Disposing any model, source included, leaves the others
+working: each image, texture and buffer goes with its last holder. Materials are rebuilt from the document, so runtime material edits on the source are not copied.
 
 `retargetRig(skeletonOrModel)` reads a bone hierarchy and its current local pose, which becomes the rig's rest pose; a
 model's rig is every node, so armature and mesh nodes count toward bone orientations. `new Retarget(source, target,

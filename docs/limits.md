@@ -14,10 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-178). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-178). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-178). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-178). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-179). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -192,6 +189,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Limit | Value |
 | --- | --- |
 | Textures of `cloneModel` copies | Shared: one GPU texture per device, image and format, freed with its last holder (`p-morph`: 7 textures for 100 copies, not 700). A second model loaded from the same file holds its own images, so it uploads its own textures. |
+| Geometry of `cloneModel` copies (2026-11-06) | Shared: vertex and index buffers per device, asset and array, and in the deformation arena one copy of the bind-pose vertices, morph deltas and skin influences per page. Each animated copy still adds 80 B per vertex of deformed output, 64 B per bone and its morph weights, because those are what differ between copies. A second model loaded from the same file packs and uploads its own. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 

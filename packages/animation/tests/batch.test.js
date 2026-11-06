@@ -17,7 +17,7 @@ function harness() {
     ]),
   );
   let serial = 0;
-  const make = () => {
+  const make = (shared) => {
     const k = serial++,
       nodes = [0, 1].map((id) => ({
         id,
@@ -34,7 +34,7 @@ function harness() {
           return this;
         },
       })),
-      vertices = Float32Array.from({ length: 60 }, (_, i) => k * 1000 + i);
+      vertices = shared ?? Float32Array.from({ length: 60 }, (_, i) => k * 1000 + i);
     const animation = new Animation({
       name: 'model ' + k,
       root: nodes[0],
@@ -56,7 +56,7 @@ function harness() {
     h.engine.use(animation);
     return animation;
   };
-  return { ...h, make };
+  return { ...h, make, asset };
 }
 const output = (p) => new Float32Array(p.deformed.data, p.deformedOffset, p.vertices.length);
 
@@ -104,6 +104,53 @@ test('primitives of many models share buffers on 256-byte offsets through growth
     h.resources.every((r) => r.destroyed),
     'the last model releases every shared buffer',
   );
+});
+
+test('copies of one packed array upload its vertices once, and the last holder frees them', async () => {
+  const h = harness(),
+    queue = h.engine.gpu.queue,
+    write = queue.writeBuffer,
+    vertices = Float32Array.from({ length: 60 }, (_, i) => i + 0.5);
+  let uploads = 0;
+  queue.writeBuffer = function (buffer, offset, data, ...rest) {
+    if (data.buffer === vertices.buffer) uploads++;
+    return write.call(this, buffer, offset, data, ...rest);
+  };
+  const animations = [];
+  try {
+    for (let i = 0; i < 100; i++) animations.push(h.make(vertices));
+    const other = h.make();
+    h.frame();
+    const slots = animations.map((a) => a.resources[0].slot);
+    assert.equal(uploads, 1, 'a hundred copies, one upload of the bind pose');
+    assert.equal(new Set(slots.map((s) => s.source)).size, 1, 'one shared source block');
+    assert.equal(slots[0].source.refs, 100);
+    assert.notEqual(other.resources[0].slot.source, slots[0].source, 'other vertices keep their own block');
+    assert.equal(new Set(slots.map((s) => s.output)).size, 100, 'each copy deforms into its own output');
+    for (const a of animations) assert.deepEqual(output(a.model.primitives[0]), vertices, 'outputs start at bind pose');
+    // The block outlives its first holder, moves with a compaction, and goes with its last holder.
+    animations.shift().dispose();
+    for (let i = 0; i < 40; i++) animations.push(h.make(vertices));
+    h.frame();
+    const page = slots[1].page,
+      block = animations[0].resources[0].slot.source,
+      info = new Uint32Array(page.info.buffer.data);
+    assert.equal(uploads, 1, 'still one upload after growth');
+    assert.equal(info[animations[0].resources[0].slot.index * 12], block.range.offset, 'the slot record reads the block');
+    assert.deepEqual(
+      new Float32Array(page.source.buffer.data, block.range.offset * 80, vertices.length),
+      vertices,
+      'the block holds the vertices',
+    );
+    for (const a of animations.splice(0)) a.dispose();
+    assert.equal(page.source.ranges.size, 1, 'only the other model is left in the pool');
+    assert.equal(page.blocks.get(h.asset).has(vertices), false, 'the page lets go of the array with the last copy');
+    other.dispose();
+    assert.equal(page.blocks.size, 0, 'the emptied page holds no asset');
+  } finally {
+    queue.writeBuffer = write;
+    for (const a of animations) a.dispose();
+  }
 });
 
 test('morph weights longer than the primitive region are refused before they reach a neighbour', () => {
