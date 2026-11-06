@@ -1,5 +1,5 @@
-import { madd, type V3 } from './math.js';
-import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
+import { madd, rotateAxis, type V3 } from './math.js';
+import { cross, dot, normalize, scale, sub } from '@margoengine/math/vec3';
 import { intersectPlane, project, ray, type Basis } from './view.js';
 
 /** What the transform gizmo does: move (`translate`, the default), `rotate` or `scale`. */
@@ -38,6 +38,14 @@ export interface Handle {
   pick: Pick;
 }
 
+/**
+ * What a drag has done so far, drawn from where it began: a `line` from start to current for a move or an axis scale,
+ * an `arc` swept about `axis` from the unit `spoke` by `angle` radians for a turn (`view` for the outer view ring).
+ */
+export type GizmoDelta =
+  | { kind: 'line'; from: V3; to: V3 }
+  | { kind: 'arc'; axis: V3; spoke: V3; angle: number; view: boolean };
+
 /** Everything the gizmo layout depends on, in world space. */
 export interface GizmoFrame {
   mode: TransformMode;
@@ -54,6 +62,10 @@ export interface GizmoFrame {
   /** Hovered or dragged handle, drawn highlighted. */
   axis: HandleName | null;
   dragging: boolean;
+  /** Per axis, 1 or -1: which way the move and scale handles point along it. Default all 1. */
+  flip?: readonly [number, number, number];
+  /** The active drag's progress, for {@link buildDelta}. */
+  delta?: GizmoDelta | null;
 }
 
 const RED: RGBA = [1, 0.25, 0.25, 1],
@@ -62,7 +74,9 @@ const RED: RGBA = [1, 0.25, 0.25, 1],
 const YELLOW: RGBA = [1, 1, 0, 1],
   WHITE: RGBA = [1, 1, 1, 0.55],
   GRAY: RGBA = [0.75, 0.75, 0.75, 0.6],
-  VIEW: RGBA = [1, 0.85, 0.45, 0.85];
+  VIEW: RGBA = [1, 0.85, 0.45, 0.85],
+  DELTA: RGBA = [1, 1, 1, 0.8],
+  SWEEP: RGBA = [1, 1, 1, 0.16];
 const COLORS = [RED, GREEN, BLUE];
 const PLANES: Array<[HandleName, number, number, number]> = [
   ['XY', 0, 1, 2],
@@ -158,6 +172,7 @@ const strip = (points: V3[]): V3[] => {
 /** Builds the visible handles for the current frame. */
 export function buildGizmo(f: GizmoFrame): Handle[] {
   const { origin: o, axes, size: s, eye } = f,
+    flip = f.flip ?? [1, 1, 1],
     handles: Handle[] = [];
   const hidden = (name: string) =>
     (!f.show.X && name.includes('X')) || (!f.show.Y && name.includes('Y')) || (!f.show.Z && name.includes('Z'));
@@ -172,7 +187,7 @@ export function buildGizmo(f: GizmoFrame): Handle[] {
   if (f.mode === 'translate' || f.mode === 'scale') {
     for (let i = 0; i < 3; i++) {
       const name = 'XYZ'[i] as HandleName,
-        a = axes[i];
+        a = scale(axes[i], flip[i]) as V3;
       if (hidden(name) || Math.abs(dot(a, eye)) > AXIS_END_ON_COS) continue;
       const color = lit(name, COLORS[i]),
         prims: Prim[] = [];
@@ -193,8 +208,8 @@ export function buildGizmo(f: GizmoFrame): Handle[] {
     if (f.mode === 'translate' || f.mode === 'scale')
       for (const [name, i, j, k] of PLANES) {
         if (hidden(name) || Math.abs(dot(axes[k], eye)) < PLANE_EDGE_ON_COS) continue;
-        const u = axes[i],
-          v = axes[j],
+        const u = scale(axes[i], flip[i]) as V3,
+          v = scale(axes[j], flip[j]) as V3,
           at = (x: number, y: number) => madd(madd(o, u, x * s), v, y * s),
           lo = LAYOUT.planeMin,
           hi = LAYOUT.planeMax;
@@ -269,6 +284,37 @@ export function buildGizmo(f: GizmoFrame): Handle[] {
     });
   }
   return handles;
+}
+
+/** Draws a drag's progress from where it began: nothing when the frame has no `delta`. */
+export function buildDelta(f: GizmoFrame): Prim[] {
+  const d = f.delta,
+    s = f.size;
+  if (!d) return [];
+  if (d.kind === 'line') {
+    if (Math.hypot(...sub(d.to, d.from)) < 1e-6 * s) return [];
+    return [
+      { kind: 'lines', points: [d.from, d.to], width: 1.5, colors: [DELTA] },
+      octahedron(d.from, f.axes, LAYOUT.center * 0.6 * s, DELTA),
+    ];
+  }
+  const angle = Math.max(-2 * Math.PI, Math.min(2 * Math.PI, d.angle));
+  if (!angle) return [];
+  const radius = (d.view ? LAYOUT.viewRing : LAYOUT.ring) * s,
+    steps = Math.ceil(Math.abs(angle) / (Math.PI / 32)),
+    arc: V3[] = [],
+    fan: V3[] = [];
+  for (let i = 0; i <= steps; i++) arc.push(madd(f.origin, rotateAxis(d.spoke, d.axis, (angle * i) / steps), radius));
+  for (let i = 0; i < steps; i++) fan.push(f.origin, arc[i], arc[i + 1]);
+  return [
+    { kind: 'triangles', points: fan, color: SWEEP },
+    {
+      kind: 'lines',
+      points: [f.origin, arc[0], f.origin, arc[steps], ...strip(arc)],
+      width: 1.5,
+      colors: [DELTA],
+    },
+  ];
 }
 
 const segmentDistance = (px: number, py: number, ax: number, ay: number, bx: number, by: number): number => {

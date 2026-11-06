@@ -4,8 +4,10 @@ import { engineRuntime, meshRuntime, type FrameGraph, type PassContext } from '@
 import { MargoError } from '@margoengine/math/errors';
 import { EventDispatcher, type ControlElement } from './controls.js';
 import {
+  buildDelta,
   buildGizmo,
   pickHandle,
+  type GizmoDelta,
   type GizmoFrame,
   type Handle,
   type HandleName,
@@ -49,6 +51,12 @@ export interface TransformControlsOptions {
   showY?: boolean;
   /** Show the Z handles. Default true. */
   showZ?: boolean;
+  /** Turn the move and scale handles to the camera's side of each axis. Default false. */
+  flipAxes?: boolean;
+  /** Draw a line or swept arc from where a drag began to where it is now. Default true. */
+  showDelta?: boolean;
+  /** Hide the parts of the gizmo behind scene geometry instead of drawing on top. Default false. */
+  occlude?: boolean;
   /** Element to listen on. Defaults to the engine canvas. */
   element?: ControlElement;
   /**
@@ -83,6 +91,10 @@ interface DragStart {
   free: Q4;
   exact: boolean;
   tangent: { x: number; y: number };
+  /** Unit direction from the origin to the grab point, for the swept arc of a turn. */
+  spoke: V3 | null;
+  /** Where an axis or plane scale's pointer is now, relative to the origin. */
+  pointNow: V3 | null;
 }
 
 let counter = 0;
@@ -91,6 +103,8 @@ let counter = 0;
 const GIZMO_SCREEN_FRACTION = 0.2;
 /** Largest tan(fov / 2) used for the gizmo size (a 135 degree lens); wider lenses keep that world size. */
 const GIZMO_TAN_CAP = Math.tan((3 * Math.PI) / 8);
+/** An axis must face this far past side-on (cos of its angle to the view line) to flip, so a side view does not flicker. */
+const FLIP_MARGIN = 0.05;
 
 /**
  * Interactive translate, rotate and scale gizmo for a core `Mesh`.
@@ -119,6 +133,15 @@ export class TransformControls extends EventDispatcher {
   showX: boolean;
   showY: boolean;
   showZ: boolean;
+  /** Turn the move and scale handles to the camera's side of each axis (held still during a drag). Default false. */
+  flipAxes: boolean;
+  /** Draw a line or swept arc from where a drag began to where it is now. Default true. */
+  showDelta: boolean;
+  /**
+   * Hide the parts of the gizmo behind scene geometry instead of drawing on top. Default false. Only the drawing
+   * changes: picking is on the CPU and has no scene depth, so a hidden handle can still be grabbed.
+   */
+  occlude: boolean;
   /** Attached mesh, or null. */
   object: Mesh | null = null;
   /** Hovered or dragged handle. */
@@ -128,6 +151,7 @@ export class TransformControls extends EventDispatcher {
   private drag: DragStart | null = null;
   private pointerId: number | null = null;
   private resetState: { position: V3; quaternion: Q4; scale: V3 } | null = null;
+  private readonly flip: [number, number, number] = [1, 1, 1];
   /** Name of the engine plugin that owns the overlay pass. */
   readonly pluginName: string;
   private disposed = false;
@@ -148,6 +172,9 @@ export class TransformControls extends EventDispatcher {
     this.showX = options.showX ?? true;
     this.showY = options.showY ?? true;
     this.showZ = options.showZ ?? true;
+    this.flipAxes = options.flipAxes ?? false;
+    this.showDelta = options.showDelta ?? true;
+    this.occlude = options.occlude ?? false;
     this.view = options.view ?? null;
     this.pluginName = `margoengine-controls:transform:${++counter}`;
     const order = options.order ?? 1000;
@@ -367,18 +394,39 @@ export class TransformControls extends EventDispatcher {
     // One gizmo unit spans GIZMO_SCREEN_FRACTION of the viewport height. The visible half height at the gizmo is
     // distance * tan(fov / 2) in perspective (tan capped so very wide lenses stay bounded) or the orthographic half height.
     const halfHeight = b.ortho ?? distance * Math.min(b.tanHalf, GIZMO_TAN_CAP),
-      size = 2 * GIZMO_SCREEN_FRACTION * halfHeight * this.size;
+      size = 2 * GIZMO_SCREEN_FRACTION * halfHeight * this.size,
+      eye = b.ortho !== undefined ? scale(b.forward, -1) : scale(toCamera, 1 / distance);
+    if (!this.dragging)
+      for (let i = 0; i < 3; i++) {
+        const facing = dot(axes[i], eye);
+        if (Math.abs(facing) > FLIP_MARGIN) this.flip[i] = facing < 0 ? -1 : 1;
+      }
     return {
       mode: this.mode,
       origin,
       axes,
       size,
-      eye: b.ortho !== undefined ? scale(b.forward, -1) : scale(toCamera, 1 / distance),
+      eye,
       up: b.up,
       show: { X: this.showX, Y: this.showY, Z: this.showZ },
       axis: this.axis,
       dragging: this.dragging,
+      flip: this.flipAxes ? [...this.flip] : undefined,
+      delta: this.showDelta ? this.progress(origin) : null,
     };
+  }
+  /** The active drag's progress for the overlay; `origin` is where the object is now. */
+  private progress(origin: V3): GizmoDelta | null {
+    const d = this.drag;
+    if (!d) return null;
+    if (this.mode === 'translate') return { kind: 'line', from: d.origin, to: origin };
+    if (this.mode === 'scale')
+      return d.pointStart && d.pointNow
+        ? { kind: 'line', from: add(d.origin, d.pointStart) as V3, to: add(d.origin, d.pointNow) as V3 }
+        : null;
+    if (!d.spoke) return null;
+    const axis = d.axis === 'E' ? d.eye : d.axes['XYZ'.indexOf(d.axis)];
+    return { kind: 'arc', axis, spoke: d.spoke, angle: d.angle, view: d.axis === 'E' };
   }
   /** Handles for the current frame (also what the overlay draws). */
   handles(): Handle[] {
@@ -538,21 +586,30 @@ export class TransformControls extends EventDispatcher {
       free: [0, 0, 0, 1],
       exact: true,
       tangent: { x: 0, y: 0 },
+      spoke: null,
+      pointNow: null,
     };
     if (this.mode === 'rotate' && 'XYZ'.includes(axis) && axis.length === 1) {
       const a = f.axes['XYZ'.indexOf(axis)],
         hit = intersectPlane(ray(b, x, y, width, height), o, a);
       drag.exact = !!hit && Math.abs(dot(a, f.eye)) > 0.15;
-      if (drag.exact) drag.pointStart = sub(hit!, o);
-      else {
+      if (drag.exact) {
+        drag.pointStart = sub(hit!, o);
+        drag.spoke = normalize(drag.pointStart) as V3;
+      } else {
         // Ring seen edge-on: drag along the screen tangent of the ring at the grab point.
         const grab = this.closestOnRing('XYZ'.indexOf(axis), f, b, x, y, width, height),
           t = normalize(cross(a, grab));
+        drag.spoke = normalize(grab) as V3;
         const p0 = project(b, add(o, grab), width, height),
           p1 = project(b, madd(add(o, grab), t, f.size * 0.1), width, height);
         const l = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
         drag.tangent = { x: (p1.x - p0.x) / l, y: (p1.y - p0.y) / l };
       }
+    } else if (this.mode === 'rotate' && axis === 'E') {
+      // From the centre to the grab point on screen, laid in the plane of the ring.
+      const across = madd(scale(b.right, x - center.x), b.up, center.y - y);
+      drag.spoke = normalize(madd(across, f.eye, -dot(across, f.eye))) as V3;
     } else if (this.mode === 'translate' || (this.mode === 'scale' && axis !== 'XYZ')) {
       const hit = intersectPlane(ray(b, x, y, width, height), o, drag.normal);
       drag.pointStart = hit ? sub(hit, o) : null;
@@ -689,6 +746,11 @@ export class TransformControls extends EventDispatcher {
         const start = dot(d.pointStart, d.axes[i]);
         if (Math.abs(start) > 1e-9) next[i] = (d.scale[i] * dot(end, d.axes[i])) / start;
       }
+      d.pointNow = end;
+      if (d.axis.length === 1) {
+        const a = d.axes['XYZ'.indexOf(d.axis)];
+        d.pointNow = madd(d.pointStart, a, dot(sub(end, d.pointStart), a));
+      }
     }
     const snap = this.step('scale');
     for (let i = 0; i < 3; i++) {
@@ -776,9 +838,10 @@ export class TransformControls extends EventDispatcher {
     }
     const prims: Prim[] = [];
     for (const handle of buildGizmo(f)) prims.push(...handle.prims);
+    prims.push(...buildDelta(f));
     const canvas = this.engine.canvas,
       ratio = canvas.clientWidth ? ctx.width / canvas.clientWidth : 1;
     const [width, height] = viewSize(ctx);
-    this.overlay.draw(ctx, tessellate(prims, ctx.camera.matrix, width, height, ratio));
+    this.overlay.draw(ctx, tessellate(prims, ctx.camera.matrix, width, height, ratio), this.occlude);
   };
 }

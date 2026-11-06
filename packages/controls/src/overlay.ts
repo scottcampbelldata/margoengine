@@ -99,20 +99,22 @@ export class OverlayRenderer {
   /** Number of triangles drawn in the last frame (for tests). */
   lastTriangles = 0;
 
-  draw(ctx: PassContext, vertices: Float32Array): void {
+  /** Draws over the frame, or with `occlude` only where nothing in the scene's depth buffer is nearer. */
+  draw(ctx: PassContext, vertices: Float32Array, occlude = false): void {
     this.lastTriangles = vertices.length / FLOATS / 3;
     if (!vertices.length) return;
-    if (ctx.backend === 'webgpu') this.drawGPU(ctx, vertices);
-    else this.drawGL(ctx.gl, ctx.width, ctx.height, vertices);
+    if (ctx.backend === 'webgpu') this.drawGPU(ctx, vertices, occlude);
+    else this.drawGL(ctx.gl, ctx.width, ctx.height, vertices, occlude);
   }
 
-  private drawGPU(ctx: Extract<PassContext, { backend: 'webgpu' }>, vertices: Float32Array): void {
+  private drawGPU(ctx: Extract<PassContext, { backend: 'webgpu' }>, vertices: Float32Array, occlude: boolean): void {
     const device = ctx.device;
     if (device !== this.device) {
       this.release();
       this.device = device;
     }
-    const key = ctx.format + ':' + ctx.descriptor.multisample?.count;
+    const depthFormat = occlude ? ctx.descriptor.depthStencil!.format : null,
+      key = ctx.format + ':' + ctx.descriptor.multisample?.count + ':' + depthFormat;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
       const module = device.createShaderModule({ code: WGSL });
@@ -143,6 +145,10 @@ export class OverlayRenderer {
         },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
         multisample: ctx.descriptor.multisample,
+        // The camera's depth is reversed on WebGPU: nearer is larger.
+        depthStencil: depthFormat
+          ? { format: depthFormat, depthWriteEnabled: false, depthCompare: 'greater-equal' }
+          : undefined,
       });
       this.pipelines.set(key, pipeline);
     }
@@ -155,7 +161,10 @@ export class OverlayRenderer {
     }
     device.queue.writeBuffer(this.buffer!, 0, vertices as Float32Array<ArrayBuffer>);
     this.attachment.view = ctx.color;
-    const pass = ctx.encoder.beginRenderPass({ colorAttachments: [this.attachment] });
+    const pass = ctx.encoder.beginRenderPass({
+      colorAttachments: [this.attachment],
+      depthStencilAttachment: occlude ? { view: ctx.depth, depthReadOnly: true, stencilReadOnly: true } : undefined,
+    });
     applyView(pass, ctx);
     pass.setPipeline(pipeline);
     pass.setVertexBuffer(0, this.buffer!, 0, vertices.byteLength);
@@ -163,7 +172,13 @@ export class OverlayRenderer {
     pass.end();
   }
 
-  private drawGL(gl: WebGL2RenderingContext, width: number, height: number, vertices: Float32Array): void {
+  private drawGL(
+    gl: WebGL2RenderingContext,
+    width: number,
+    height: number,
+    vertices: Float32Array,
+    occlude: boolean,
+  ): void {
     if (gl !== this.gl) {
       this.release();
       this.gl = gl;
@@ -215,13 +230,15 @@ export class OverlayRenderer {
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.glBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
-    gl.disable(gl.DEPTH_TEST);
+    if (occlude) gl.depthMask(false);
+    else gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.CULL_FACE);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / FLOATS);
     gl.disable(gl.BLEND);
     gl.enable(gl.DEPTH_TEST);
+    gl.depthMask(true);
     gl.bindVertexArray(null);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
   }

@@ -84,6 +84,12 @@ try {
     `aligned gizmo colors ${JSON.stringify(gizmo.countsWith)}`,
   );
   assert.equal(gizmo.countsWithout.red, 0);
+  const occlude = await page.evaluate(() => window.gizmoOcclude());
+  assert.ok(
+    occlude.hidden.red === 0 && occlude.hidden.green === 0 && occlude.onTop.red > 150 && occlude.open.red > 0,
+    `occlude ${JSON.stringify(occlude)}`,
+  );
+  checks.push('WebGPU: occlude hides the gizmo behind a wall, and off draws it on top again');
   const aligned = await page.evaluate(() => window.gizmoView());
   assert.equal(aligned.axisDots[2], 1);
   assert.equal(aligned.handles.includes('Z'), false, 'camera-aligned Z arrow is deliberately hidden');
@@ -182,6 +188,11 @@ try {
     `WebGL2 overlay ${JSON.stringify(report.webgl2)}`,
   );
   checks.push('WebGL2 backend draws the same gizmo overlay and removes it on dispose');
+  assert.ok(
+    report.webgl2.occluded.red === 0 && report.webgl2.onTop.red > 150,
+    `WebGL2 occlude ${JSON.stringify(report.webgl2)}`,
+  );
+  checks.push('WebGL2: occlude hides the gizmo behind a wall, and off draws it on top again');
 
   // ArcballControls with real mouse input on its own WebGPU canvas (400 x 400 CSS px, camera 6 units from the target).
   await page.locator('#arc').scrollIntoViewIfNeeded();

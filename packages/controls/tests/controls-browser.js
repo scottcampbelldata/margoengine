@@ -168,6 +168,28 @@ window.gizmoView = (position) => {
     zArrowPixels: [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => shown.pixel(zArrow[0] + dx, zArrow[1] + dy))),
   };
 };
+// `occlude`: a box in front of the gizmo hides it, and turning the option off draws it on top again.
+window.gizmoOcclude = () => {
+  const { engine, gizmo, mesh, orbit } = state;
+  orbit.reset();
+  mesh.setPosition([0, 0, 0]);
+  const wall = engine
+    .createMesh()
+    .setGeometry(box())
+    .setMaterial(new PbrMaterial({ color: '#00ffff' }))
+    .setPosition([0, 0, 3])
+    .setScale([6, 6, 0.1]);
+  gizmo.occlude = true;
+  const hidden = analyze((engine.render(), engine)).counts;
+  wall.setPosition([0, 0, -3]);
+  const open = analyze((engine.render(), engine)).counts;
+  wall.setPosition([0, 0, 3]);
+  gizmo.occlude = false;
+  const onTop = analyze((engine.render(), engine)).counts;
+  wall.dispose();
+  engine.render();
+  return { hidden, open, onTop };
+};
 window.gizmoState = () => {
   const { engine, gizmo, mesh } = state;
   gizmo.visible = true;
@@ -218,11 +240,19 @@ window.runGL = async () => {
   gizmo.attach(mesh);
   engine.render();
   const shown = analyze(engine).counts;
+  const wall = engine.createMesh().setGeometry(box()).setPosition([0, 0, 3]).setScale([6, 6, 0.1]);
+  gizmo.occlude = true;
+  engine.render();
+  const occluded = analyze(engine).counts;
+  gizmo.occlude = false;
+  engine.render();
+  const onTop = analyze(engine).counts;
+  wall.dispose();
   gizmo.dispose();
   engine.render();
   const hidden = analyze(engine).counts;
   engine.dispose();
-  return { backend: 'webgl2', shown, hidden };
+  return { backend: 'webgl2', shown, hidden, occluded, onTop };
 };
 
 // ArcballControls on its own canvas and engine: a grey box at the origin and a red marker on the target plane.

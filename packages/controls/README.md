@@ -244,6 +244,28 @@ gizmo.rotationSnap = Math.PI / 12;                               // also snaps t
 // Holding Ctrl while dragging snaps to gizmo.heldSnap (0.25 m, 15 degrees, 0.1 scale) when no snap is set.
 ```
 
+## Gizmo arrows, drag lines and occlusion
+
+With `flipAxes`, move and scale handles point to the camera's side of each axis, so an arrow never hides behind the
+object it moves. They flip once an axis faces away from the camera by more than a small margin, and hold still during a
+drag; a drag moves the same way whichever way its arrow points. During a drag the gizmo draws what the drag has done so far: a line from the
+start (with a small marker) for a move and for an axis or plane scale, and a swept wedge from the grab point for a turn
+on an axis or view ring, which follows snapping and winds past a full turn. A uniform scale and a free turn draw none.
+With `occlude`, handles behind scene geometry are hidden by the scene's depth buffer instead of drawing on top, so the
+part of each arrow inside the object is hidden too.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {TransformControls} from 'margoengine/controls/transform';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const mesh = engine.createMesh().setGeometry(box());
+const gizmo = TransformControls.attach(engine, {flipAxes: true, occlude: true});
+gizmo.attach(mesh);
+gizmo.showDelta = false;  // no line or wedge during a drag
+engine.start();
+```
+
 ## Navigation profiles
 
 Engineers get the mouse, wheel, touch and keys of the tool they know, in one call:
@@ -329,7 +351,7 @@ any of them.
 - **Zoom to cursor.** The dolly is a scaling about the point under the cursor on the plane through the target facing the camera, so the view direction is unchanged and that point keeps its pixel exactly. A fixed-size orthographic projection keeps its target instead, since its visible size does not change.
 - **Engine integration.** Constructed with an engine, a control registers a small plugin whose `onPreUpdate` calls `update(delta)` before each render, and `engine.dispose()` disposes it. Rendering manually with `engine.render()` passes `delta = 0`, which still applies direct input but does not advance damping, auto-rotate or key movement; pass `{delta}` to advance them.
 - **Listeners.** Pointer listeners go on the canvas (or the element you pass), using pointer capture. Keyboard listeners for the trackball, fly, first-person and pointer-lock controls go on the element's `ownerDocument` unless you pass `{keyTarget}`. Nothing is touched at import time and construction only touches the element you give it, so modules are SSR-safe. `dispose()` removes every listener and restores `touch-action`.
-- **Gizmo rendering.** `TransformControls` builds its handles on the CPU each frame (lines, cones, cubes, squares, rings), keeping a constant screen size (under an orthographic camera from @margoengine/cameras: the same fraction of the view height at any `zoom` or `height`, with parallel-ray picking and drags). A frame graph pass (order 1000) turns lines into screen-space quads, sorts triangles back to front and draws them with alpha blending over the finished frame, with no depth test against the scene. It uses WebGPU when the engine does, and a tiny WebGL2 program on the fallback backend.
+- **Gizmo rendering.** `TransformControls` builds its handles on the CPU each frame (lines, cones, cubes, squares, rings), keeping a constant screen size (under an orthographic camera from @margoengine/cameras: the same fraction of the view height at any `zoom` or `height`, with parallel-ray picking and drags). A frame graph pass (order 1000) turns lines into screen-space quads, sorts triangles back to front and draws them with alpha blending over the finished frame, with no depth test against the scene unless `occlude` is on. It uses WebGPU when the engine does, and a tiny WebGL2 program on the fallback backend.
 - **Gizmo picking.** Hit tests are CPU-only in CSS pixels: arrows, scale axes and rings by pixel distance to their projection (back halves of rings lose ties), plane squares by a ray-plane intersection, center and view-ring handles by projected circles. Axes pointing at the camera and planes seen edge-on are hidden and unpickable.
 - **Gizmo dragging.** Translate intersects the cursor ray with a plane through the handle (the axis plane most facing the camera, the handle plane, or the view plane), projects the offset onto the axis, and writes `inverse(parentWorld) x newWorld` as the local position, so parented meshes follow the cursor exactly. Rotation is the signed angle between the grab and current points on the ring plane (falling back to a screen tangent drag when the ring is edge-on), applied as `P^-1 R P` to the local quaternion, where P is the parent's world rotation. Scale is always local: the ratio of current to grab distance along the handle axis, or one handle length of drag up or right doubles the uniform scale. World matrices come from `engineRuntime(engine).store.matrices`. The gizmo stops the pointerdown event from reaching later listeners when it grabs a handle, and emits `dragging-changed` so you can disable `OrbitControls`.
 
@@ -356,6 +378,7 @@ any of them.
 | `translationSnap`, `rotationSnap` (radians), `scaleSnap` | Transform | `null` |
 | `heldSnap` (steps used while Ctrl or Meta is held and no snap is set), `keys` (shortcut key codes) | Transform | 0.25, 15 degrees, 0.1; W E R Q + - Escape |
 | `showX`, `showY`, `showZ`, `visible`, `enabled` | Transform | `true` |
+| `flipAxes`, `showDelta`, `occlude` | Transform | `false`, `true`, `false`; see Gizmo arrows, drag lines and occlusion |
 | `element`, `order` | Transform | engine canvas, `1000` |
 | `view` (one of `engine.views`: its camera, pointers inside its rectangle, drawn only there) | Transform | `null` (engine camera, whole element) |
 
@@ -363,13 +386,12 @@ any of them.
 
 - Orbit, map, first-person, pointer-lock and walk controls do not roll (see above). Without `enableRoll`, trackball rotation cannot pass over the poles.
 - Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`); an orbit `zoom` property is not implemented. `minTargetRadius`, `maxTargetRadius` and `cursor` are not implemented (use `targetBounds` to limit the target).
-- `TransformControls` does not flip arrows toward the camera and draws no start-to-current delta helper lines. A parent with non-uniform scale and rotation shears its children; drags use the parent's rotation without the shear.
-- The gizmo is always on top of the scene (no occlusion by scene geometry).
+- With `occlude`, a handle hidden behind geometry can still be grabbed: picking is on the CPU and has no scene depth. A parent with non-uniform scale and rotation shears its children; `TransformControls` drags use the parent's rotation without the shear.
 - `ArcballControls` has no on-screen gizmo, double-click focus or keyboard bindings. `DragControls` has no rotate mode, `recursive` or `transformGroup` options; pass a model to drag the whole model, or a core mesh to drag that mesh. Skinned models are grabbed in their bind pose (see @margoengine/bvh).
 
 ## Tests
 
-`npm test` in `packages/controls` runs Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, roll in fly and trackball (Q and E at `rollSpeed`, the body axes, looping past the vertical, an orthonormal frame after long flights and tumbles, the rendered matrix, reset), the arcball (sphere mapping continuity, the angle and axis of a drag across the centre, roll and passing over the pole, an orthonormal frame after 1000 drags, pan and zoom keeping the cursor point on its pixel under perspective and fixed-size orthographic cameras, distance and zoom limits, damping coming to rest at 30 and 60 fps, enable flags and reset), fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, constant screen size, picking, drags and orbit pan under an orthographic camera at several zooms, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup. Drag tests move a box under a scaled parent on the view plane (checked against an independent ray-plane intersection), along an axis and on the ground plane, a gltf-pro model by touch under an orthographic camera (600 CSS pixels for 6 world units), and check events, hover, misses falling through to later listeners, other fingers, disposed meshes and models, and cleanup.
+`npm test` in `packages/controls` runs Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, roll in fly and trackball (Q and E at `rollSpeed`, the body axes, looping past the vertical, an orthonormal frame after long flights and tumbles, the rendered matrix, reset), the arcball (sphere mapping continuity, the angle and axis of a drag across the centre, roll and passing over the pole, an orthonormal frame after 1000 drags, pan and zoom keeping the cursor point on its pixel under perspective and fixed-size orthographic cameras, distance and zoom limits, damping coming to rest at 30 and 60 fps, enable flags and reset), fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, constant screen size, picking, drags and orbit pan under an orthographic camera at several zooms, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, arrows flipping to the camera with a margin and held during a drag, the delta line and swept arc, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup. Drag tests move a box under a scaled parent on the view plane (checked against an independent ray-plane intersection), along an axis and on the ground plane, a gltf-pro model by touch under an orthographic camera (600 CSS pixels for 6 world units), and check events, hover, misses falling through to later listeners, other fingers, disposed meshes and models, and cleanup.
 
 `tests/walk.test.js` covers `WalkControls` on real core engines with generated geometry, at fixed time steps: a 12-step
 stair of 0.18 m risers climbed and descended with the eye never jumping more than 6 cm a frame, 0.19 m climbed and 0.25 m
@@ -399,6 +421,6 @@ under the cursor, and Rhino right drag pans there; and the browser conflicts abo
 `mousedown`, Ctrl + wheel, browser shortcuts passing through). Re-record the replay only for an intended change:
 `RECORD=1 node --test tests/profiles.test.js`.
 
-`npm run test:browser` (a real-GPU script, not in CI) starts a real engine in Chromium (or Edge, honoring `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS`) and drives it with `page.mouse`: an orbit drag moves the rendered box to its newly projected position, the wheel enlarges it, the gizmo draws over the mesh, hover turns the X arrow yellow, dragging the X arrow 100 px moves the mesh and the rendered box by the expected amount while the camera stays still, dispose removes every canvas listener and the overlay pass, there are zero WebGPU validation errors, and the WebGL2 backend draws and removes the same overlay. `npm run size` prints the gzip size of the whole bundle and of each control tree-shaken on its own.
+`npm run test:browser` (a real-GPU script, not in CI) starts a real engine in Chromium (or Edge, honoring `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS`) and drives it with `page.mouse`: an orbit drag moves the rendered box to its newly projected position, the wheel enlarges it, the gizmo draws over the mesh, hover turns the X arrow yellow, dragging the X arrow 100 px moves the mesh and the rendered box by the expected amount while the camera stays still, dispose removes every canvas listener and the overlay pass, `occlude` hides the gizmo behind a wall on WebGPU and WebGL2, there are zero WebGPU validation errors, and the WebGL2 backend draws and removes the same overlay. `npm run size` prints the gzip size of the whole bundle and of each control tree-shaken on its own.
 
 Apache-2.0 licensed.
