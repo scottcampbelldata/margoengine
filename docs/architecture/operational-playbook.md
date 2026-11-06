@@ -287,6 +287,16 @@ radius 1.000 where the linear path gives 0.087 (`npm run test:gpu:dqs -w @margoe
 drawing through `VATCrowd`'s pipeline code. Its proof runs the stage's own `skinned` function from a compute shader, since a
 vertex stage cannot write out. Checked on the RTX A6000 only. Unmeasured: its frame cost.
 
+`GPUClearance` (`@margoengine/kinematics-constraints/gpu`, 2026-11-06) runs forward kinematics and GJK in f32, one pose per
+invocation, with `preciseSin` and `preciseCos` because WGSL's builtins may be off by 2^-11. It is the kernel of `hull.ts` with
+two changes that f32 forced, each found against the f64 answer on the real Panda. GJK's stop tested `|v|^2 - v.w`, whose
+rounding is E^2 for a difference of size E, so near contact the error grew as E^2 / d; `v.(v - w)` rounds at `|v|E`. The
+closest point of a simplex face used the normal equations, whose determinant squares a thin triangle's conditioning and
+sent the point to an edge; it now goes through the face's normal. Together they took the worst error on the Panda from
+1.1e-4 to 1.5e-7. There is no expanding polytope, so an overlap reads zero or less. Evidence: `npm run test:gpu -w
+@margoengine/kinematics-constraints` compares every gap with `Robot.clearance` on RTX A6000, inside bounds the test derives
+from the rounding. Unmeasured: other GPUs, and a quiet speed run.
+
 ## 3. Rendering backends and hardware tiers
 
 **Area light integrals (2026-11-05).** `@margoengine/clustered/area` returns early from a quad with nothing to clip; the clip's own result, by the same operations. Evidence: `packages/clustered/test/ltc-edge.test.js` (bit for bit in float32) and `examples/package-benchmarks/area-lights-gpu.mjs` as the package's `test:gpu:area` (11 frames byte-equal, RTX A6000 only).
@@ -931,3 +941,4 @@ The following remain technical gaps, not permission to weaken a check:
 28. Bone-texture crowds have no frame-time measurement and no run on a GPU other than the RTX A6000.
 29. GPU Basis transcoding (`@margoengine/decoders/ktx2-gpu`) equals the Wasm transcoder byte for byte on the RTX A6000 only, and
     its load time against a cold Wasm transcoder is not measured.
+30. `GPUClearance` has no quiet speed measurement and no run on a GPU other than the RTX A6000.

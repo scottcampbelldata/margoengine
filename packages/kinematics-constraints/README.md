@@ -581,8 +581,44 @@ console.log(model.robot.shapeCount, model.missingMeshes);
 
 What the model holds besides `robot`: `links` with their `visuals`, `collisions`, `inertial` and the `joint` each rides on (-1 for the root, which is the robot's base), `joints` with `velocity`, `effort`, `damping` and `friction`, `root`, `home` (the pose nearest zero inside every range) and `meshes`. A mimic joint repeats its source and takes no entry in a configuration. A floating joint opens into six plain joints and a planar joint into two; the last of them carries the link, and they sit in `robot.jointNames` with the suffixes `_x`, `_y`, `_z`, `_rx`, `_ry` and `_u`. Self checks on a real arm start with `robot.ignoreContactsAt(home, gap)`, because neighbouring link meshes usually overlap by design.
 
+## GPU clearance (`margoengine/kinematics-constraints/gpu`)
+
+A sampling planner spends most of its time asking whether a pose is clear, and most of the answers are no. `GPUClearance` answers thousands at once: one compute invocation per pose runs the forward kinematics and measures every shape against every collider. Sort a batch of candidates on the GPU and hand the survivors to a `Roadmap`, which proves each one on the CPU before it joins the graph, so the f32 answers can only change which poses get looked at, never what the planner trusts.
+
+```ts
+import { CapsuleVolume } from 'margoengine/kinematics-constraints';
+import { GPUClearance } from 'margoengine/kinematics-constraints/gpu';
+import { Roadmap } from 'margoengine/kinematics-constraints/plan';
+import { Robot } from 'margoengine/kinematics-constraints/robot';
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter!.requestDevice();
+const arm = new Robot({
+  joints: [{ lower: -3, upper: 3 }],
+  shapes: [{ joint: 0, end: [1, 0, 0], radius: 0.05 }],
+});
+const colliders = [new CapsuleVolume({ start: [0, 1, -1], end: [0, 1, 1], radius: 0.05 })];
+
+using clearance = new GPUClearance(device, arm, colliders, { minClearance: 0.01 });
+const roadmap = new Roadmap(arm, { colliders });
+const poses = roadmap.samplePoses(4096);
+const gaps = await clearance.evaluate(poses); // one gap per pose, in scene units
+roadmap.addPoses(poses, gaps); // keeps the poses above the roadmap's minClearance, after a CPU check
+console.log(roadmap.size, roadmap.query([-1], [1]).status);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `minClearance` | none | A pose stops at the first pair at or below this gap and reads that pair's gap, not its smallest. Leave it out to read every pose's smallest gap. |
+| `selfCollision` | `false` | Also measure the robot's shapes against each other. |
+| `batch` | `16384` | Poses per dispatch. A longer list is split, so no one dispatch holds the GPU for long. |
+
+`evaluate(poses, { signal })` takes `dof` numbers per pose and returns a `Float32Array`. A clear pose reads `Robot.clearance` to f32. An overlap reads zero or less, because there is no depth search on the GPU: compare it with a threshold, do not rank by it. With nothing to test it reads `Infinity`. Calls run one after another, and `signal` is checked between dispatches. `dispose()` or `using` frees the buffers.
+
+Colliders may be spheres, capsules, hulls and an `SDFVolume` on a sampled grid, which goes up to the GPU by its corners and is read by the same branch and bound as on the CPU. A `MeshVolume` is refused, so bake it first with `bakeSDF` from `margoengine/bvh/sdf`. The robot's base, its shapes and the colliders are read once, when you make the object, so make a new one when they move. `robot.describe()` gives the robot as plain numbers, and `SDFVolume.gridData()` the grid, for a kernel of your own.
+
 ## Scope
 
 `Success` describes static analytical proxy clearance at one evaluated instant, within numerical tolerance. It covers neither unsupplied mesh/skinning geometry nor unchecked link portions. Set proxies to enclose the full deformation envelope and any desired padding in your application.
 
-Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. Concave obstacles are in `/sdf`. Planning round them is `/plan`. Real robots load through `/urdf`. This package does not implement dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or call `/plan`.
+Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. Concave obstacles are in `/sdf`. Planning round them is `/plan`. Real robots load through `/urdf`. Batches of poses are checked on the GPU by `/gpu`. This package does not implement dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or call `/plan`.

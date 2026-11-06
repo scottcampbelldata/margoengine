@@ -50,6 +50,10 @@
     "./urdf": {
       "types": "./dist/urdf.d.ts",
       "import": "./dist/urdf.js"
+    },
+    "./gpu": {
+      "types": "./dist/gpu.d.ts",
+      "import": "./dist/gpu.js"
     }
   },
   "files": [
@@ -64,6 +68,7 @@
     "build": "node ../../scripts/build-optional.js kinematics-constraints",
     "test": "npm run build && node --test tests/*.test.js",
     "test:browser": "node ../../scripts/test-kinematics-constraints-browser.js",
+    "test:gpu": "npm run build && node ../../scripts/test-kinematics-constraints-gpu.js",
     "prepack": "npm run build"
   },
   "peerDependencies": {

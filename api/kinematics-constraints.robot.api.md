@@ -17,6 +17,7 @@ export class Robot {
     constructor(options: RobotOptions);
     jointIndex(name: string): number;
     setBase(matrix: ArrayLike<number>): this;
+    describe(): RobotData;
     within(q: ArrayLike<number>, slack?: number): boolean;
     clamp(q: ArrayLike<number>, out?: Float64Array): Float64Array;
     forward(q: ArrayLike<number>): Float64Array;
@@ -39,6 +40,22 @@ export interface RobotCapsuleShape {
     start?: Vec3View;
     end?: Vec3View;
     radius: number;
+}
+
+export interface RobotData {
+    kinds: Uint8Array;
+    parents: Int32Array;
+    variable: Int32Array;
+    multipliers: Float64Array;
+    offsets: Float64Array;
+    origins: Float64Array;
+    axes: Float64Array;
+    base: Float64Array;
+    shapes: {
+        joint: number;
+        radius: number;
+        points: Float64Array;
+    }[];
 }
 
 export interface RobotHullShape {

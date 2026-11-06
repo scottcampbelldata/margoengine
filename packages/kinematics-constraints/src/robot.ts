@@ -63,6 +63,27 @@ export interface RobotOptions {
   base?: ArrayLike<number>;
 }
 
+/** A {@link Robot} as plain numbers, for a kernel of your own: see {@link Robot.describe}. */
+export interface RobotData {
+  /** Per joint: 0 turns, 1 slides, 2 is fixed. */
+  kinds: Uint8Array;
+  /** Per joint: its parent joint; -1 is the base. */
+  parents: Int32Array;
+  /** Per joint: the configuration entry driving it; -1 on a fixed joint. */
+  variable: Int32Array;
+  /** Per joint: its position is the entry times this, plus {@link RobotData.offsets}. */
+  multipliers: Float64Array;
+  offsets: Float64Array;
+  /** Twelve per joint: the columns of its 3x4 origin. */
+  origins: Float64Array;
+  /** Three per joint: its unit axis. */
+  axes: Float64Array;
+  /** The columns of the base's 3x4 matrix. */
+  base: Float64Array;
+  /** Per shape: its joint (-1 is the base), its radius, and its points in that joint's frame, flat. A capsule has two. */
+  shapes: { joint: number; radius: number; points: Float64Array }[];
+}
+
 const REVOLUTE = 0,
   PRISMATIC = 1,
   FIXED = 2;
@@ -313,6 +334,25 @@ export class Robot {
   setBase(matrix: ArrayLike<number>): this {
     this.base.set(matrix12(matrix, 'Robot base'));
     return this;
+  }
+
+  /** The robot as plain numbers, copied, for code that does this maths elsewhere, such as a GPU kernel. */
+  describe(): RobotData {
+    return {
+      kinds: this.kinds.slice(),
+      parents: this.parents.slice(),
+      variable: this.variable.slice(),
+      multipliers: this.multipliers.slice(),
+      offsets: this.offsets.slice(),
+      origins: this.origins.slice(),
+      axes: this.axes.slice(),
+      base: this.base.slice(),
+      shapes: this.shapes.map((shape) => ({
+        joint: shape.joint,
+        radius: shape.radius,
+        points: shape.hull ? hullInJoint(shape) : shape.localEnds.slice(),
+      })),
+    };
   }
 
   /** Whether every entry of `q` is within its joint's range, allowing `slack` beyond it. */
@@ -584,6 +624,20 @@ export class Robot {
     }
     return Int32Array.from(pairs);
   }
+}
+
+/** A hull shape's points in its joint's frame. */
+function hullInJoint(shape: PlacedShape): Float64Array {
+  const points = hullPoints(shape.hull!),
+    m = shape.offset!,
+    out = new Float64Array(points.length);
+  for (let i = 0; i < points.length; i += 3) {
+    const x = points[i],
+      y = points[i + 1],
+      z = points[i + 2];
+    for (let r = 0; r < 3; r++) out[i + r] = m[r] * x + m[3 + r] * y + m[6 + r] * z + m[9 + r];
+  }
+  return out;
 }
 
 function capsuleShape(shape: RobotCapsuleShape, joint: number): PlacedShape {

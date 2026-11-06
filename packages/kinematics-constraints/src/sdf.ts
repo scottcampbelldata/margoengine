@@ -68,6 +68,23 @@ export interface DistanceField {
   spacing?: ArrayLike<number>;
 }
 
+/** A sampled field as plain numbers: {@link SDFVolume.gridData} gives it, and `GPUClearance` uploads it. */
+export interface GridColliderData {
+  /** One sample per grid corner, x fastest. */
+  samples: Float32Array;
+  size: readonly [number, number, number];
+  min: ArrayLike<number>;
+  max: ArrayLike<number>;
+  spacing: ArrayLike<number>;
+  /** World to field space: the columns of a 3x4 matrix. */
+  inverse: Float64Array;
+  scale: number;
+  margin: number;
+  precision: number;
+  lipschitz: number;
+  maxCells: number;
+}
+
 /** Options of {@link SDFVolume}. */
 export interface SDFVolumeOptions {
   field: DistanceField;
@@ -158,6 +175,43 @@ export class SDFVolume implements ConstraintVolume {
   setTransform(matrix: ArrayLike<number>): this {
     this.placement.set(matrix);
     return this;
+  }
+
+  /** The field's grid with this volume's settings, read at every corner; null when the field is a plain function. */
+  gridData(): GridColliderData | null {
+    if (!this.grid) return null;
+    const { field, placement } = this,
+      min = field.min!,
+      max = field.max!,
+      spacing = field.spacing!,
+      nx = Math.round((max[0] - min[0]) / spacing[0]) + 1,
+      ny = Math.round((max[1] - min[1]) / spacing[1]) + 1,
+      nz = Math.round((max[2] - min[2]) / spacing[2]) + 1,
+      samples = new Float32Array(nx * ny * nz),
+      corner = new Float64Array(3);
+    for (let z = 0, at = 0; z < nz; z++) {
+      for (let y = 0; y < ny; y++) {
+        for (let x = 0; x < nx; x++, at++) {
+          corner[0] = Math.min(min[0] + x * spacing[0], max[0]);
+          corner[1] = Math.min(min[1] + y * spacing[1], max[1]);
+          corner[2] = Math.min(min[2] + z * spacing[2], max[2]);
+          samples[at] = field.distance(corner);
+        }
+      }
+    }
+    return {
+      samples,
+      size: [nx, ny, nz],
+      min,
+      max,
+      spacing,
+      inverse: placement.inverse.slice(),
+      scale: placement.scale,
+      margin: this.margin,
+      precision: this.precision,
+      lipschitz: this.lipschitz,
+      maxCells: this.maxCells,
+    };
   }
 
   /** The reading at a world point, margin taken off. */

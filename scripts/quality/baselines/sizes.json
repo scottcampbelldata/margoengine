@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8983315,
+  "total": 9034407,
   "history": [
     {
       "date": "2026-10-24",
@@ -2768,6 +2768,12 @@
       "commit": "8f026d68a",
       "reason": "main camera in depth passes and the velocity variant, the B15 gap; NodeMaterial and TAA hold them",
       "grew": 3
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "b687c84b3",
+      "reason": "feat(kinematics-constraints): batched GPU clearance (new entry @margoengine/kinematics-constraints/gpu)",
+      "grew": 2
     }
   ],
   "items": {
@@ -3027,9 +3033,10 @@
     "@margoengine/inspector/resources": 902,
     "@margoengine/inspector/snapshot": 1320,
     "@margoengine/kinematics-constraints": 11751,
+    "@margoengine/kinematics-constraints/gpu": 22976,
     "@margoengine/kinematics-constraints/limits": 13664,
     "@margoengine/kinematics-constraints/plan": 16249,
-    "@margoengine/kinematics-constraints/robot": 10142,
+    "@margoengine/kinematics-constraints/robot": 10561,
     "@margoengine/kinematics-constraints/sdf": 7230,
     "@margoengine/kinematics-constraints/swept": 9703,
     "@margoengine/kinematics-constraints/urdf": 13599,
@@ -3255,7 +3262,7 @@
     "@margoengine/shader/graph": 14462,
     "@margoengine/shader/lighting": 10314,
     "@margoengine/shader/noise": 5772,
-    "@margoengine/shader/pass": 12796,
+    "@margoengine/shader/pass": 12794,
     "@margoengine/shader/raw": 13652,
     "@margoengine/shader/readback": 8876,
     "@margoengine/shader/subgroups": 3517,

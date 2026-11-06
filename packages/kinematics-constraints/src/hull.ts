@@ -791,6 +791,19 @@ export function hullPoints(hull: ConvexHullVolume): Float64Array {
   return hull['shape'].points;
 }
 
+/** @internal The distinct points of a hull in the world, flat. */
+export function hullWorldPoints(hull: ConvexHullVolume): Float64Array {
+  const { points, matrix: m } = hull['shape'],
+    out = new Float64Array(points.length);
+  for (let i = 0; i < points.length; i += 3) {
+    const x = points[i],
+      y = points[i + 1],
+      z = points[i + 2];
+    for (let r = 0; r < 3; r++) out[i + r] = m[r] * x + m[3 + r] * y + m[6 + r] * z + m[9 + r];
+  }
+  return out;
+}
+
 /** @internal Writes the world box of a hull, min then max, into `out`. */
 export function hullBoundsInto(hull: ConvexHullVolume, out: Float64Array): void {
   const { points, matrix: m } = hull['shape'];

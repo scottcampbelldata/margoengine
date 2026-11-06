@@ -1066,6 +1066,10 @@
       "types": "./dist/kinematics-constraints/urdf.d.ts",
       "import": "./dist/kinematics-constraints/urdf.js"
     },
+    "./kinematics-constraints/gpu": {
+      "types": "./dist/kinematics-constraints/gpu.d.ts",
+      "import": "./dist/kinematics-constraints/gpu.js"
+    },
     "./labels": {
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"

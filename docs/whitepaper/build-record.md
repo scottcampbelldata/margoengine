@@ -1153,3 +1153,27 @@ Six jobs took `@margoengine/ragdoll` from a limp body to a character that stays 
 - **Limits:** job 6 is an assist, not balance on joint torques alone: an outside force carries about half the body's weight and an outside torque holds it upright, both capped and reported. It takes up to five settling steps at the start, has no turning or walking, and is proved on one rig. Job 5's preset needs a T or A pose. Seed-san was not used, because of the open bone scale bug. Each entry has its row in `docs/limits.md`.
 - **Unmeasured:** no speed was measured; no job has a timed number. Behaviour on an authored get-up clip, on stairs or slopes, and with a second character in contact is untested.
 - **Gate:** lint, hygiene, verify, the ragdoll tests (and the physics tests where physics changed), and `tests/claims-file.test.js`, the push from one script that stops at the first failing step. One landing was stopped by hand before verify, after a docs step failed in the same command line; the error messages it had missed were fixed and it landed clean.
+
+## Batch 85: kinematics-constraints
+
+Six jobs took `@margoengine/kinematics-constraints` from one chain and one instant to a robot that plans: motion checked between frames, a solver that respects joint limits, concave obstacles, three sampling planners, real URDF files, and batches of poses on the GPU. Each is an optional entry; core and stage did not change. `@margoengine/loaders` gained an `./xml` entry for job 5.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Swept collision | DONE | 00c215c42 | `/swept`, `/robot` | LIM-251 |
+| 2 | Joint-limit solver | DONE | 031456b6a | `/limits` | LIM-252 |
+| 3 | Concave obstacles | DONE | 694f07857 | `/sdf` | LIM-254 |
+| 4 | Motion planner | DONE | 5b41d3e93 | `/plan` | LIM-257 |
+| 5 | URDF import | DONE | 5952a1649 | `/urdf` | LIM-260 |
+| 6 | Batched GPU clearance | DONE | this commit | `/gpu` | LIM-263 |
+
+- **A bug reached main:** job 1's README example gave a `Float64Array` where a `Float32Array` belongs, a type error the landing did not stop on. Job 2 fixed it, and the lane's README check now type-checks an example before a commit.
+- **Landings stopped, nothing failed reached main:** job 3 at verify, on the duplicates gate. Job 5 twice: at verify, on an entry no test imported, which gained `packages/loaders/tests/xml-entry.test.js`, and at a rebase conflict in the supply-chain list, resolved by hand keeping both entries. Job 6 at verify, because the package gained shaders and the WGSL corpus did not cover it; the corpus was recorded again with `--add`.
+- **Found by the GPU test:** two f32 faults in the first kernel, both against the f64 answer on the real Panda. GJK's stop lost accuracy near contact, and the normal equations lost thin triangles. Together they took the worst error from 1.1e-4 to 1.5e-7; the playbook has both.
+- **Found by mutation:** four mutants ran on the real GPU. One dropped the mimic offset and failed at once. One scaled a face coordinate by 0.999 and passed, too weak to change an answer; one that removed the face branch failed. One removed `minClearance`'s early stop and passed, so nothing tested what the README promises; the test now does, and that mutant fails.
+- **Proved:** job 1 against closed-form contacts and 120 seeded motions. Job 2 on 60 of 60 and 25 of 25 seeded starts. Job 3 on a generated torus and the real Lantern.glb. Job 4 by a dense scan of joint space that shares no code with the swept check, with a fixed seed, in scenes where the straight motion collides. Job 5 on the real Franka Emika Panda, whose forward kinematics match Franka's published DH table within 1e-9 on 200 poses. Job 6 against `Robot.clearance` on the RTX A6000, worst error 2.2e-7.
+- **Real samples:** the Panda description, 161,278 bytes, Apache-2.0, from Gepetto's example-robot-data. The link was master, so it is pinned to commit 6249cab1cdffa4fadb9a53dda964a50d79c5eaaf by matching every file's git blob; `scripts/supply-chain.mjs` records it.
+- **Stand-ins:** planner scenes are generated, and URDF's COLLADA and OBJ paths ran on small generated files. Only STL meshes are real.
+- **Limits:** colliders hold still during a swept check. Job 2 is local: a stall behind an obstacle is reported, not solved. `no-path` from a sampling planner means the budget ran out. A mesh collision shape in a URDF becomes its convex hull. Job 6 is f32 with no overlap depth, sorts poses and proves nothing, and refuses a `MeshVolume`. `docs/limits.md` has them all.
+- **Unmeasured:** jobs 1 to 5 have no timed number. Job 6 has a diagnostic only, 18 to 27 times the CPU on 16,384 Panda poses with other lanes on the machine (`perf-history.md`, entry 78). It has run on one GPU.
+- **Gate:** lint, hygiene, verify, the package tests (and the loaders tests for job 5), `tests/claims-file.test.js`, and for job 6 the GPU test, the push from one script that stops at the first failing step.
