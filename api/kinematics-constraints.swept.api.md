@@ -83,6 +83,7 @@ class Robot {
     forward(q: ArrayLike<number>): Float64Array;
     frameMatrix(joint: number, out?: Float64Array): Float64Array;
     pointOn(joint: number, point: Vec3View, out?: Float64Array): Float64Array;
+    jacobian(joint: number, point: Vec3View, out?: Float64Array): Float64Array;
     place(q: ArrayLike<number>): void;
     shapeGap(shape: number, volume: ConstraintVolume): number;
     pairGap(a: number, b: number): number;

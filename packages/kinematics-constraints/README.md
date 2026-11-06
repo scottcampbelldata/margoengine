@@ -335,7 +335,7 @@ const elbowAt: ElbowEvaluator = (_root, hand, angle, out) => {
 
 const root = [0, 0, 0] as const;
 const hand = [1, 0.8, 0] as const;
-const elbow = new Float64Array(3);
+const elbow = new Float32Array(3);
 elbowAt(root, hand, Math.PI / 2, elbow);
 
 // One big frame, to the far side of the plate. Both poses are clear, so the solver says yes.
@@ -364,8 +364,56 @@ if (next.status === SolveStatus.Success) {
 
 The result holds `clear`, `exhausted`, `time` (the first contact from 0 to 1, or 1 when clear), `clearance` (the smallest gap at a tested pose, beyond `minClearance`), `steps`, `shape` and `collider`. `time` is never later than the true contact, so the pose there is a safe place to stop. A hull needs colliders with `hullClearanceInto`; every built-in collider has it. Colliders hold still during a check: step a moving obstacle yourself. A motion that starts within the gap stops at time 0.
 
+## Joint limits (`margoengine/kinematics-constraints/limits`)
+
+`AvoidanceSolver` leaves joint ranges to its caller, and a plain IK solve runs a joint past its stop or a link into a wall. `JointLimitSolver` owns both. It moves a robot's tip toward a target and keeps every joint in range and every shape clear, on every step of the way: each step is a small quadratic program, and a swept check proves it before it is taken. When it cannot get there it stops short and says why.
+
+```ts
+import { SphereVolume } from 'margoengine/kinematics-constraints';
+import { armRobot, JointLimitSolver } from 'margoengine/kinematics-constraints/limits';
+
+// A three-axis shoulder and an elbow that only bends one way. q is yaw, pitch, twist, elbow.
+const arm = armRobot({ upperLength: 1, forearmLength: 1, radius: 0.05, elbow: [0, 2.6] });
+const solver = new JointLimitSolver(arm, {
+  tip: 'hand',
+  colliders: [new SphereVolume({ center: [0.5, 1, 0], radius: 0.2 })],
+  minClearance: 0.02,
+});
+
+const result = solver.solve([0, 0, 0, 0.5], { position: [0.8, 0.9, 0.6] });
+if (result.reached) console.log('pose', result.q);
+else if (result.blocked) console.log('an obstacle is in the way, at', result.error, 'from the target');
+else console.log('stopped by joints', result.limited);
+```
+
+`solver.solve(start, {position, rotation?})` starts from a pose you know, so the arm moves from where it is. `rotation` is a unit quaternion for the tip joint's frame. A `start` outside a range is brought inside it first. A `start` inside the gap is pushed out before anything else, and such a step need only not sink deeper.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `tip` | Required | Joint that carries the end effector, by index or name. |
+| `point` | `[0, 0, 0]` | The end effector in that joint's frame. |
+| `colliders` | `[]` | Any volumes: spheres, capsules, hulls, and the mesh and field volumes below. |
+| `minClearance` | `0.01` | Gap every shape keeps from every collider. |
+| `influence` | `0.1` | How far past `minClearance` an obstacle starts to count. |
+| `selfCollision` | `false` | Also keep the robot's shapes off each other. |
+| `maxIterations` | `100` | Most iterations. |
+| `tolerance`, `angleTolerance` | `1e-4`, `1e-3` | Distance and angle from the target that count as reached. |
+| `damping` | `0.01` | Damping of the least squares step, for poses near a singularity. |
+| `maxStep` | `0.2` | Most any joint moves per iteration. |
+| `rest` | None | A pose to lean toward with whatever freedom the target leaves. The lean never pulls against the target. |
+| `restWeight` | `0.1` | Share of the way to `rest` per iteration. |
+
+| Result field | Meaning |
+| --- | --- |
+| `reached` | The target is met, in range, keeping the gap. |
+| `q`, `error`, `angleError`, `clearance`, `iterations` | The pose, what is left of the target and the gap at the pose. |
+| `limited` | Configuration entries a joint range held back on the last iteration. |
+| `blocked` | An obstacle held the solve back on the last iteration. |
+
+The result is reused by the next `solve`. This is a local method: from a bad start it can stall behind an obstacle with a way round it, and then `blocked` is your cue to call a planner. `armRobot({upperLength, forearmLength, radius, yaw?, pitch?, twist?, elbow?, base?})` builds the two-bone arm as a `Robot`, bones along +Y as in a glTF rig, with a fixed joint named `hand` at the end. `robot.jacobian(joint, point, out?)` gives the tip's Jacobian at the last pose, for a solver of your own.
+
 ## Scope
 
 `Success` describes static analytical proxy clearance at one evaluated instant, within numerical tolerance. It covers neither unsupplied mesh/skinning geometry nor unchecked link portions. Set proxies to enclose the full deformation envelope and any desired padding in your application.
 
-Motion between frames is checked by `/swept` above. This package does not implement concave mesh collision, a joint-limit solver, dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or use a higher-level planner.
+Motion between frames is checked by `/swept` above. Joint ranges are held by `/limits`. This package does not implement concave mesh collision, dynamics, or a formal industrial/physical robot safety system. It cannot certify an interpolated animation or real machine trajectory. A bounded unsuccessful search is not proof of infeasibility; the application decides whether to hold, reduce the requested motion, reposition the target, or use a higher-level planner.

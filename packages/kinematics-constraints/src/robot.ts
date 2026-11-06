@@ -375,6 +375,45 @@ export class Robot {
     return out;
   }
 
+  /**
+   * Writes how a point on a joint moves per unit of each configuration entry, at the last pose, into `out`: six rows of
+   * `dof` numbers, row-major, the point's velocity then the link's angular velocity. `point` is in that joint's frame.
+   */
+  jacobian(joint: number, point: Vec3View, out: Float64Array = new Float64Array(6 * this.dof)): Float64Array {
+    const n = this.dof,
+      { frames, axes, kinds, variable, multipliers, parents } = this,
+      p = this.pointOn(joint, point, matrix16);
+    out.fill(0);
+    for (let j = joint; j >= 0; j = parents[j]) {
+      const v = variable[j];
+      if (v < 0) continue;
+      const at = j * 12,
+        ax = axes[j * 3],
+        ay = axes[j * 3 + 1],
+        az = axes[j * 3 + 2],
+        m = multipliers[j],
+        wx = frames[at] * ax + frames[at + 3] * ay + frames[at + 6] * az,
+        wy = frames[at + 1] * ax + frames[at + 4] * ay + frames[at + 7] * az,
+        wz = frames[at + 2] * ax + frames[at + 5] * ay + frames[at + 8] * az;
+      if (kinds[j] === PRISMATIC) {
+        out[v] += wx * m;
+        out[n + v] += wy * m;
+        out[2 * n + v] += wz * m;
+      } else {
+        const rx = p[0] - frames[at + 9],
+          ry = p[1] - frames[at + 10],
+          rz = p[2] - frames[at + 11];
+        out[v] += (wy * rz - wz * ry) * m;
+        out[n + v] += (wz * rx - wx * rz) * m;
+        out[2 * n + v] += (wx * ry - wy * rx) * m;
+        out[3 * n + v] += wx * m;
+        out[4 * n + v] += wy * m;
+        out[5 * n + v] += wz * m;
+      }
+    }
+    return out;
+  }
+
   /** Puts the joints and every shape at `q`. The gap methods read this pose. */
   place(q: ArrayLike<number>): void {
     this.forward(q);

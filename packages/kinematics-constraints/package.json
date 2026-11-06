@@ -34,6 +34,10 @@
     "./swept": {
       "types": "./dist/swept.d.ts",
       "import": "./dist/swept.js"
+    },
+    "./limits": {
+      "types": "./dist/limits.d.ts",
+      "import": "./dist/limits.js"
     }
   },
   "files": [

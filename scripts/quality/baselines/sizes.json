@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7870088,
+  "total": 8923671,
   "history": [
     {
       "date": "2026-10-24",
@@ -2678,6 +2678,12 @@
       "commit": "e31809e2d",
       "reason": "New mesh-edit entry ./sculpt-view; sculpt carries a spatial index and draw buffers (Lane G B7)",
       "grew": 3
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "11babcfbb",
+      "reason": "feat(kinematics-constraints): joint-limit solver (new entry @margoengine/kinematics-constraints/limits)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2934,6 +2940,7 @@
     "@margoengine/inspector/resources": 902,
     "@margoengine/inspector/snapshot": 1320,
     "@margoengine/kinematics-constraints": 11751,
+    "@margoengine/kinematics-constraints/limits": 13664,
     "@margoengine/kinematics-constraints/robot": 10142,
     "@margoengine/kinematics-constraints/swept": 9703,
     "@margoengine/labels": 4756,
@@ -3033,6 +3040,7 @@
     "@margoengine/mesh-edit/modifiers": 8566,
     "@margoengine/mesh-edit/remesh": 8715,
     "@margoengine/mesh-edit/sculpt": 9049,
+    "@margoengine/mesh-edit/sculpt-view": 790,
     "@margoengine/mesh-edit/weights": 4033,
     "@margoengine/mixer": 6926,
     "@margoengine/navmesh": 7120,
@@ -3321,6 +3329,7 @@
     "leak @margoengine/mesh-edit -> @margoengine/bvh/tree": 1,
     "leak @margoengine/mesh-edit/bake -> @margoengine/bvh/tree": 1,
     "leak @margoengine/mesh-edit/remesh -> @margoengine/bvh/tree": 1,
+    "leak @margoengine/mesh-edit/sculpt-view -> @margoengine/gltf-pro": 1,
     "leak @margoengine/oit/meshes -> @margoengine/gltf-pro": 1,
     "leak @margoengine/oit/meshes -> @margoengine/materials": 1,
     "leak @margoengine/shader -> @margoengine/gltf-pro": 1,
@@ -3340,8 +3349,6 @@
     "margoengine": 308,
     "margoengine/game": 1030,
     "margoengine/viz": 800,
-    "margoengine/web": 599,
-    "@margoengine/mesh-edit/sculpt-view": 790,
-    "leak @margoengine/mesh-edit/sculpt-view -> @margoengine/gltf-pro": 1
+    "margoengine/web": 599
   }
 }

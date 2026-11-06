@@ -1038,6 +1038,10 @@
       "types": "./dist/kinematics-constraints/swept.d.ts",
       "import": "./dist/kinematics-constraints/swept.js"
     },
+    "./kinematics-constraints/limits": {
+      "types": "./dist/kinematics-constraints/limits.d.ts",
+      "import": "./dist/kinematics-constraints/limits.js"
+    },
     "./labels": {
       "types": "./dist/labels.d.ts",
       "import": "./dist/labels.js"
