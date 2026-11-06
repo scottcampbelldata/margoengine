@@ -1105,7 +1105,8 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B2 | Only the overlap box goes through the exact trees (40 to 75 s to 7 to 11 s on 10,000 faces), overlapping shells joined first | DONE | `218428f9e` | - |
 | B3 | One NURBS evaluator: loaders/nurbs and DXF SPLINE use geometry/nurbs; 3DM surfaces wait on a real rhino3dm run | DONE | `abb31deee` | - |
 | B4 | Shadows, CulledInstances and HDR PostStack run at the WebGPU compatibility level | DONE | `49b220668` | LIM-109 |
-| B6 | Potree BROTLI, 1.4, attributes, pages | DONE | this commit | LIM-100 |
+| B6 | Potree BROTLI, 1.4, attributes, pages | DONE | `28b40e8da` | LIM-100 |
+| B5 | ANGLE Direct3D 11 measured and parked with C11: 50 minutes on three variants, split into passes needed | PARKED | this commit | LIM-162 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

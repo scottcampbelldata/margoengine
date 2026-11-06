@@ -222,6 +222,43 @@ Sweep record: every package's tests and browser or GPU tests on the Mac mini (M6
   in the same file fires on the same test.
 - **Needed to close:** both tests also ask `engine.plugins.has('webgl-pick')`, with a test in the React package.
 
+### The path tracer never compiles on ANGLE Direct3D 11 (parked)
+
+- **What:** on the WebGL2 layer, `@margoengine/voxel-pathtracer` compiles and runs on ANGLE Vulkan in about 20 s, but on
+  ANGLE Direct3D 11, the Windows default for a browser with no WebGPU, the `trace` fragment shader does not finish
+  compiling. `tracer.ready` stays pending and the page shows the raster image and never a traced frame. The page keeps
+  drawing at full rate meanwhile.
+- **Repro:** change `--use-angle=vulkan` to `--use-angle=d3d11` in `packages/voxel-pathtracer/tests/browser-check.mjs`
+  and run it with `--compat`. To time the compiler alone: read the HLSL with `WEBGL_debug_shaders` from a page with
+  `--use-angle=d3d11`, fill ANGLE's `@@` placeholders, and pass it to `D3DCompile` for `ps_5_0` (`fxc`).
+- **Measured** (2026-11-06, one RTX A6000 PC, three compiles at once, so diagnostic; the chain is WGSL, `translateWGSL`
+  GLSL, ANGLE HLSL, `D3DCompile`, and the HLSL is 210,679 bytes):
+
+  | What was compiled | Result |
+  | --- | --- |
+  | The whole of `trace` | Still running at 3,000 s |
+  | `precise` trig in `wideRay` replaced by native `sin` and `cos` | Still running at 3,000 s |
+  | That, and no `glassCandidates` and no shadow walk | Still running at 3,000 s |
+  | `direct`, `closest`, `shadow` and glass stubbed | 516 s, 159 KB of bytecode |
+  | Those and the precise trig stubbed | 125 s, 48 KB |
+  | Precise trig, `closest` and `shadow` stubbed | 524 s, 57 KB |
+  | Precise trig stubbed alone, or with `direct`, glass, or both | Over 560 s |
+  | `[loop]` on every loop, or on the path loop | No help within 280 to 560 s |
+  | One path iteration | Over 280 s |
+
+  A stub that zeroes `cameraRay` folds the whole shader to 1,132 bytes, so that timing says nothing.
+- **Cause:** `D3DCompile` inlines every function, and its time grows worse than linearly with the inlined size. The
+  shader has no function small enough to help: with traversal, direct light, shadow, glass and precise maths all removed
+  it still takes 125 s, so no single feature accounts for the time, and no flag or loop attribute reaches it from WebGL.
+- **Ruled out:** native trig (the numbers above, and it would change the output); leaving features out per scene (the
+  third row drops glass candidates and the shadow walk and still does not finish).
+- **Needed to close:** a wavefront split of `radiance` into several fragment passes: first hit, direct light, surface
+  sampling, with the path state in float targets. The state is about 18 `vec4` a pixel and a pass has 8 targets, so
+  each stage also needs more than one pass or a packed state. Every stage must keep the same maths and output. By the
+  stub timings a stage would still take minutes to compile. It is a rewrite of the path loop and was not attempted.
+- **Meanwhile:** a page on this route gets the raster view. WebGPU is the route on such a machine where the browser has
+  it, and ANGLE Vulkan works.
+
 ### Five shaders still break WebGPU compatibility-level rules
 
 - **What:** with `allowCompatibilityAdapters` from `@margoengine/webgl2-compat/adapter`, these use something the level

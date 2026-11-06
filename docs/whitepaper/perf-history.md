@@ -1787,7 +1787,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   400 x 240 viewport frame 24 ms against 9 ms (RTX A6000, ANGLE Vulkan, other jobs running, diagnostic, commit `3303ffa9c`).
 - **Cause:** WebGL2 has no compute, so `trace` runs as a fragment shader writing four `rgba32float` targets, and a small
   kernel adds them to the image buffers. Before this the tracer refused the layer.
-- **Open:** ANGLE on Direct3D 11, the default on Windows, had not finished compiling `trace` after 20 minutes
+- **Open:** ANGLE on Direct3D 11, the default on Windows, does not finish compiling `trace`: still running at the 50 minute limit, three variants (`docs/known-bugs.md`); before that, it had not finished after 20 minutes
   ([limits.md](../limits.md), Platform), with the page drawing throughout.
 - **Rerun:** not recorded: the timings have no committed script. `node packages/voxel-pathtracer/tests/browser-check.mjs --compat`
   repeats the correctness checks.

@@ -332,7 +332,7 @@ runs in a fragment shader writing four `rgba32float` targets and a small kernel 
 lazy chunk (`src/compat.ts`) only the layer downloads. Results agree with the analytic checks at the same tolerances, and
 the `trace` module stays the one source of the maths.
 
-Compile time decides whether this is useful. ANGLE on Vulkan compiled everything in about 20 s on an RTX A6000; ANGLE on Direct3D 11, the default on Windows, had not finished `trace` after 20 minutes (its smaller kernels take 27 to 86 s each), while the page kept drawing at full rate.
+Compile time decides whether this is useful. ANGLE on Vulkan compiled everything in about 20 s on an RTX A6000; ANGLE on Direct3D 11, the default on Windows, does not finish `trace`: Microsoft's shader compiler was still running at the 50 minute limit, three times (its smaller kernels take 27 to 86 s each), while the page kept drawing at full rate. So that route shows the raster image and never a traced frame (`docs/known-bugs.md`).
 Frames before `ready` show the raster image, so nothing stops working in the meantime. Speed against native WebGPU on one
 GPU, diagnostic because other jobs ran: a 1500 x 1100, 64-sample denoised render took 6.4 s against 2.3 s, and a
 400 x 240 viewport frame 24 ms against 9 ms.
