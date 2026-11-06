@@ -204,6 +204,37 @@ await replay.finished;
 - Contexts apply during a replay as they do live. An action the clip does not hold reads 0; an action this Input lacks is refused. With `LocalPlayers`, record each `player.input`.
 - `input.setFeed(feed)` is what replay uses: an object with `begin()` and `read(action, binding)` in place of the devices, and `null` to go back.
 
+## Pen pressure and tilt
+
+`@margoengine/input/pen` reads a stylus for painting and sculpting, as action values and as every sample of a stroke. Mouse and touch are ignored. Set `touch-action: none` on the element.
+
+```ts
+import {Input} from 'margoengine/input';
+import {Pen} from 'margoengine/input/pen';
+
+declare const canvas: HTMLCanvasElement;
+const input = new Input({
+  size: [{type: 'control', id: 'pen', axis: 'pressure'}],
+  lean: [{type: 'control', id: 'pen', axis: 'tiltX'}],
+  erase: [{type: 'control', id: 'pen', axis: 'eraser'}],
+});
+using pen = new Pen(canvas, {curve: (pressure) => pressure ** 1.5});
+pen.attach(input);
+function tick() {
+  pen.update(); // before input.update()
+  input.update();
+  console.log(input.state('size').value, input.state('lean').value);
+  for (const {x, y, pressure, azimuth, altitude} of pen.take()) console.log(x, y, pressure, azimuth, altitude);
+}
+tick();
+```
+
+- Bindings: `{type: 'control', id: 'pen', axis}` with `axis` `'pressure'` (0 to 1), `'tiltX'` and `'tiltY'` (-1 to 1, a share of 90 degrees), `'altitude'` (0 flat to 1 upright), `'azimuth'` and `'twist'` (share of a full turn), `'tangential'` (-1 to 1), or `'down'`, `'barrel'`, `'eraser'` and `'hover'` (0 or 1). Tilt reads while hovering, for a brush preview.
+- `pen.take()` returns every sample since the last call at the pen's own rate, unpacking the browser's coalesced events, so a fast stroke keeps its points. A sample with `down` false after true ends a stroke. `pen.latest` is the newest sample and `pen.inRange` says whether the pen is near.
+- Tilt and altitude with azimuth are both filled in, whichever the browser gives.
+- A dab between two updates still reads `down` for one update.
+- Options: `curve` (shapes pressure within 0 to 1, default none) and `maxSamples` (kept between `take` calls, oldest dropped, default 4096).
+
 ## Gestures
 
 ```ts

@@ -878,6 +878,10 @@
       "types": "./dist/input/replay.d.ts",
       "import": "./dist/input/replay.js"
     },
+    "./input/pen": {
+      "types": "./dist/input/pen.d.ts",
+      "import": "./dist/input/pen.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"
