@@ -1,4 +1,6 @@
-// NURBS curves and surfaces: evaluation and tessellation only, from the standard B-spline definitions.
+// NURBS held as plain data, the numbers a CAD file hands over: this entry checks them, fills in end knots a file leaves
+// out and tessellates. The maths is the one evaluator of @margoengine/geometry/nurbs.
+import { NurbsCurve as CurveEvaluator, NurbsSurface as SurfaceEvaluator } from '@margoengine/geometry/nurbs';
 import { computeVertexNormals } from './normals.js';
 import { LoaderError, type LoadedGeometry, type ParseLimits } from './types.js';
 import { limits } from './util.js';
@@ -76,74 +78,27 @@ function knotVector(source: ArrayLike<number>, count: number, degree: number, na
   return knots;
 }
 
-function homogeneous(points: ArrayLike<number>, weights: ArrayLike<number> | undefined, count: number): Float64Array {
+/** Checks the control points and weights and gives them the evaluator's shape. */
+function controlPoints(
+  points: ArrayLike<number>,
+  weights: ArrayLike<number> | undefined,
+  count: number,
+): { net: [number, number, number][]; weights: number[] } {
   if (points.length !== count * 3)
     throw new LoaderError(F, 'range', `${points.length} coordinates for ${count} control points`);
   if (weights && weights.length !== count)
     throw new LoaderError(F, 'range', `${weights.length} weights for ${count} control points`);
-  const out = new Float64Array(count * 4);
+  const net: [number, number, number][] = [],
+    out: number[] = [];
   for (let i = 0; i < count; i++) {
     const w = weights ? weights[i] : 1;
     if (!(w > 0) || !Number.isFinite(w)) throw new LoaderError(F, 'range', `weight ${i} must be positive`);
-    for (let c = 0; c < 3; c++) {
-      const value = points[i * 3 + c];
-      if (!Number.isFinite(value)) throw new LoaderError(F, 'range', `control point ${i} is not finite`);
-      out[i * 4 + c] = value * w;
-    }
-    out[i * 4 + 3] = w;
+    const point: [number, number, number] = [points[i * 3], points[i * 3 + 1], points[i * 3 + 2]];
+    if (!point.every(Number.isFinite)) throw new LoaderError(F, 'range', `control point ${i} is not finite`);
+    net.push(point);
+    out.push(w);
   }
-  return out;
-}
-
-/** The knot span holding `t`: the last span at the end of the domain, so the end point is reached. */
-function span(knots: Float64Array, count: number, degree: number, t: number): number {
-  if (t >= knots[count]) {
-    let last = count - 1;
-    while (last > degree && knots[last] === knots[last + 1]) last--;
-    return last;
-  }
-  let low = degree,
-    high = count;
-  while (high - low > 1) {
-    const middle = (low + high) >> 1;
-    if (t < knots[middle]) high = middle;
-    else low = middle;
-  }
-  return low;
-}
-
-/** Fills the `degree + 1` basis values at `t`, and their first derivatives when `derivative` is given. */
-function basis(
-  knots: Float64Array,
-  at: number,
-  degree: number,
-  t: number,
-  values: Float64Array,
-  derivative?: Float64Array,
-): void {
-  const left = new Float64Array(degree + 1),
-    right = new Float64Array(degree + 1);
-  values[0] = 1;
-  for (let j = 1; j <= degree; j++) {
-    if (j === degree && derivative) {
-      // Here `values` holds the degree - 1 basis, which is what the derivative is written in.
-      derivative.fill(0);
-      for (let r = 0; r < degree; r++) {
-        const scaled = (degree * values[r]) / (knots[at + r + 1] - knots[at + r + 1 - degree]);
-        derivative[r] -= scaled;
-        derivative[r + 1] += scaled;
-      }
-    }
-    left[j] = t - knots[at + 1 - j];
-    right[j] = knots[at + j] - t;
-    let saved = 0;
-    for (let r = 0; r < j; r++) {
-      const term = values[r] / (right[r + 1] + left[j - r]);
-      values[r] = saved + right[r + 1] * term;
-      saved = left[j - r] * term;
-    }
-    values[j] = saved;
-  }
+  return { net, weights: out };
 }
 
 function parameter(t: number, knots: Float64Array, degree: number, count: number): number {
@@ -156,28 +111,23 @@ interface PreparedCurve {
   degree: number;
   count: number;
   knots: Float64Array;
-  control: Float64Array;
+  evaluator: CurveEvaluator;
 }
 
 function prepareCurve(curve: NurbsCurve): PreparedCurve {
-  const count = Math.floor(curve.points.length / 3);
+  const count = Math.floor(curve.points.length / 3),
+    knots = knotVector(curve.knots, count, curve.degree, 'the curve'),
+    { net, weights } = controlPoints(curve.points, curve.weights, count);
   return {
     degree: curve.degree,
     count,
-    knots: knotVector(curve.knots, count, curve.degree, 'the curve'),
-    control: homogeneous(curve.points, curve.weights, count),
+    knots,
+    evaluator: new CurveEvaluator({ points: net, degree: curve.degree, knots, weights }),
   };
 }
 
-function curvePoint({ degree, count, knots, control }: PreparedCurve, t: number): [number, number, number] {
-  const at = span(knots, count, degree, t),
-    values = new Float64Array(degree + 1),
-    sum = [0, 0, 0, 0];
-  basis(knots, at, degree, t, values);
-  for (let i = 0; i <= degree; i++)
-    for (let c = 0; c < 4; c++) sum[c] += values[i] * control[(at - degree + i) * 4 + c];
-  return [sum[0] / sum[3], sum[1] / sum[3], sum[2] / sum[3]];
-}
+const curvePoint = ({ evaluator }: PreparedCurve, t: number): [number, number, number] =>
+  evaluator.evaluate(t) as [number, number, number];
 
 /**
  * The point of a NURBS curve at parameter `t`.
@@ -292,56 +242,34 @@ interface PreparedSurface {
   countV: number;
   knotsU: Float64Array;
   knotsV: Float64Array;
-  control: Float64Array;
+  evaluator: SurfaceEvaluator;
 }
 
 function prepareSurface(surface: NurbsSurface): PreparedSurface {
   const { degreeU, degreeV, countU, countV } = surface;
   if (!Number.isSafeInteger(countU) || !Number.isSafeInteger(countV))
     throw new LoaderError(F, 'range', 'countU and countV must be integers');
+  const knotsU = knotVector(surface.knotsU, countU, degreeU, 'the surface along u'),
+    knotsV = knotVector(surface.knotsV, countV, degreeV, 'the surface along v'),
+    { net, weights } = controlPoints(surface.points, surface.weights, countU * countV),
+    rows = <T>(list: T[]) => Array.from({ length: countU }, (_, i) => list.slice(i * countV, (i + 1) * countV));
   return {
     degreeU,
     degreeV,
     countU,
     countV,
-    knotsU: knotVector(surface.knotsU, countU, degreeU, 'the surface along u'),
-    knotsV: knotVector(surface.knotsV, countV, degreeV, 'the surface along v'),
-    control: homogeneous(surface.points, surface.weights, countU * countV),
+    knotsU,
+    knotsV,
+    evaluator: new SurfaceEvaluator({ points: rows(net), degreeU, degreeV, knotsU, knotsV, weights: rows(weights) }),
   };
 }
 
 /** Writes the point and unit normal at (u, v) into `position` and `normal`. */
 function surfacePoint(s: PreparedSurface, u: number, v: number, position: number[], normal: number[]): void {
-  const { degreeU, degreeV, countU, countV, knotsU, knotsV, control } = s,
-    atU = span(knotsU, countU, degreeU, u),
-    atV = span(knotsV, countV, degreeV, v),
-    nu = new Float64Array(degreeU + 1),
-    du = new Float64Array(degreeU + 1),
-    nv = new Float64Array(degreeV + 1),
-    dv = new Float64Array(degreeV + 1),
-    a = [0, 0, 0, 0],
-    au = [0, 0, 0, 0],
-    av = [0, 0, 0, 0];
-  basis(knotsU, atU, degreeU, u, nu, du);
-  basis(knotsV, atV, degreeV, v, nv, dv);
-  for (let i = 0; i <= degreeU; i++)
-    for (let j = 0; j <= degreeV; j++) {
-      const at = ((atU - degreeU + i) * countV + atV - degreeV + j) * 4;
-      for (let c = 0; c < 4; c++) {
-        const value = control[at + c];
-        a[c] += nu[i] * nv[j] * value;
-        au[c] += du[i] * nv[j] * value;
-        av[c] += nu[i] * dv[j] * value;
-      }
-    }
-  const w = a[3],
-    su = [0, 0, 0],
-    sv = [0, 0, 0];
-  for (let c = 0; c < 3; c++) {
-    position[c] = a[c] / w;
-    su[c] = (au[c] - au[3] * position[c]) / w;
-    sv[c] = (av[c] - av[3] * position[c]) / w;
-  }
+  const { point, du: su, dv: sv } = s.evaluator.derivatives(u, v);
+  position[0] = point[0];
+  position[1] = point[1];
+  position[2] = point[2];
   const x = su[1] * sv[2] - su[2] * sv[1],
     y = su[2] * sv[0] - su[0] * sv[2],
     z = su[0] * sv[1] - su[1] * sv[0],

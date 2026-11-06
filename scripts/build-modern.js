@@ -169,6 +169,7 @@ async function buildPackage(name) {
           '@margoengine/sky',
           '@margoengine/geometry',
           '@margoengine/geometry/shapes',
+          '@margoengine/geometry/nurbs',
           '@margoengine/geometry/triangulate',
           '@margoengine/geometry/extrude',
           '@margoengine/geometry/primitives',

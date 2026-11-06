@@ -171,3 +171,31 @@ test('malformed data and limits are named errors', () => {
   refuses(() => tessellateNurbsSurface(s, { maxVertices: 10 }), 'limit');
   refuses(() => tessellateNurbsSurface(s, { maxTriangles: 10 }), 'limit');
 });
+
+test('the numbers are those of the one evaluator in @margoengine/geometry/nurbs', async () => {
+  const { NurbsCurve, NurbsSurface } = await import('@margoengine/geometry/nurbs'),
+    knots = [0, 0, 0, 1, 2, 2, 2],
+    net = [[0, 0, 0], [1, 2, 0], [3, 2, 1], [4, 0, 1]],
+    weights = [1, 2, 0.5, 1],
+    curve = new NurbsCurve({ points: net, degree: 2, knots, weights }),
+    surface = new NurbsSurface({
+      points: [net, net.map(([x, y, z]) => [x, y + 1, z + 2]), net.map(([x, y, z]) => [x, y, z + 4])],
+      degreeU: 1,
+      degreeV: 2,
+      knotsU: [0, 0, 0.5, 1, 1],
+      knotsV: knots,
+    }),
+    data = {
+      degreeU: 1,
+      degreeV: 2,
+      knotsU: [0, 0, 0.5, 1, 1],
+      knotsV: knots,
+      countU: 3,
+      countV: 4,
+      points: [net, net.map(([x, y, z]) => [x, y + 1, z + 2]), net.map(([x, y, z]) => [x, y, z + 4])].flat(2),
+    };
+  for (const t of [0, 0.3, 1, 1.7, 2])
+    assert.deepEqual(evaluateNurbsCurve({ degree: 2, knots, points: net.flat(), weights }, t), curve.evaluate(t));
+  for (const [u, v] of [[0, 0], [0.25, 1.5], [1, 2]])
+    assert.deepEqual(evaluateNurbsSurface(data, u, v).position, surface.evaluate(u, v));
+});

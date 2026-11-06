@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 7586362,
+  "total": 7412863,
   "history": [
     {
       "date": "2026-10-24",
@@ -2882,7 +2882,7 @@
     "@margoengine/loaders/mocap": 2146,
     "@margoengine/loaders/mtl": 8186,
     "@margoengine/loaders/nrrd": 4978,
-    "@margoengine/loaders/nurbs": 3068,
+    "@margoengine/loaders/nurbs": 2763,
     "@margoengine/loaders/pdb": 2464,
     "@margoengine/loaders/render": 3148,
     "@margoengine/loaders/svg": 11621,

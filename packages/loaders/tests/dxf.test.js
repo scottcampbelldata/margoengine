@@ -284,3 +284,11 @@ test('regression: binary DXF before R13 has one-byte group codes, and the versio
   assert.equal(drawing.version, 'AC1009');
   assert.equal(drawing.lines.positions.length, 6);
 });
+
+test('a SPLINE whose knots or weights cannot make a curve stays its control polygon', () => {
+  const body = ['0', 'SECTION', '2', 'ENTITIES', '0', 'SPLINE', '71', '2', '72', '6', '73', '3'];
+  for (const k of [0, 0, 0, 2, 1, 1]) body.push('40', String(k));
+  for (const [x, y] of [[0, 0], [1, 2], [3, 0]]) body.push('10', String(x), '20', String(y), '30', '0');
+  body.push('0', 'ENDSEC', '0', 'EOF');
+  assert.equal(parseDXF(new TextEncoder().encode(body.join('\n'))).lines.positions.length, 4 * 3);
+});

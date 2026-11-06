@@ -564,7 +564,7 @@ console.log((await parseKMZ(await bytes('/maps/tower.kmz'))).models[0]?.location
 
 ## NURBS curves and surfaces
 
-`@margoengine/loaders/nurbs` evaluates and tessellates NURBS curves and surfaces held as plain data, the numbers a CAD file hands you. Rational weights make circles and spheres exact.
+`@margoengine/loaders/nurbs` evaluates and tessellates NURBS curves and surfaces held as plain data, the numbers a CAD file hands you. It checks them, fills in the end knots Rhino leaves out, and hands the maths to `@margoengine/geometry/nurbs`, the one evaluator, which `parseDXF` uses for SPLINE too. Rational weights make circles and spheres exact.
 
 ```ts
 import { evaluateNurbsCurve, tessellateNurbsCurve, tessellateNurbsSurface } from '@margoengine/loaders/nurbs';

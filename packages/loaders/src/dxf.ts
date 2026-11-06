@@ -3,6 +3,7 @@
 // (rows and columns included) and DIMENSION, and the model-space entities a viewer draws. Faces (3DFACE, SOLID, TRACE,
 // polyface and polygon-mesh POLYLINEs, MESH) become one triangle list; curves (LINE, polylines with bulges, ARC,
 // CIRCLE, ELLIPSE, SPLINE) become line segments; ACIS solids (3DSOLID, BODY, REGION) are handed back as SAT text.
+import { NurbsCurve } from '@margoengine/geometry/nurbs';
 import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } from './types.js';
 import { checkCount, latin1, limits, toBytes, type BinaryInput } from './util.js';
 
@@ -526,34 +527,28 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
     if (closed && n > 1) out.push(out[0]);
     return out;
   };
-  /** A NURBS curve sampled per knot span (de Boor on homogeneous points). */
+  /** A NURBS curve sampled per knot span; a curve its numbers cannot make stays its control polygon. */
   const spline = (degree: number, knots: number[], control: number[][], weights: number[]) => {
     const n = control.length,
-      p = degree;
-    if (n < 2 || p < 1 || knots.length !== n + p + 1) return control;
-    const h = control.map((c, i) => {
-        const w = weights[i] ?? 1;
-        return [c[0] * w, c[1] * w, c[2] * w, w];
-      }),
-      at = (t: number, span: number) => {
-        const d = Array.from({ length: p + 1 }, (_, j) => [...h[span - p + j]]);
-        for (let r = 1; r <= p; r++)
-          for (let j = p; j >= r; j--) {
-            const i = span - p + j,
-              denominator = knots[i + p - r + 1] - knots[i],
-              alpha = denominator ? (t - knots[i]) / denominator : 0;
-            for (let k = 0; k < 4; k++) d[j][k] = (1 - alpha) * d[j - 1][k] + alpha * d[j][k];
-          }
-        const w = d[p][3] || 1;
-        return [d[p][0] / w, d[p][1] / w, d[p][2] / w];
-      },
+      p = degree,
+      w = control.map((_, i) => weights[i] ?? 1);
+    if (
+      n <= p ||
+      p < 1 ||
+      knots.length !== n + p + 1 ||
+      !(knots[p] < knots[n]) ||
+      !w.every((x) => x > 0 && x < Infinity) ||
+      knots.some((k, i) => !Number.isFinite(k) || (i > 0 && k < knots[i - 1]))
+    )
+      return control;
+    const curve = new NurbsCurve({ points: control.map((c) => [c[0], c[1], c[2]]), degree: p, knots, weights: w }),
       out: number[][] = [];
     for (let span = p; span < n; span++) {
       const t0 = knots[span],
         t1 = knots[span + 1];
       if (!(t1 > t0)) continue;
       for (let k = out.length ? 1 : 0; k <= splineSegments; k++)
-        out.push(at(t0 + ((t1 - t0) * k) / splineSegments, span));
+        out.push(curve.evaluate(t0 + ((t1 - t0) * k) / splineSegments));
     }
     return out.length ? out : control;
   };
