@@ -177,6 +177,38 @@ Files come from the `basisu` tool or encoder (`-hdr`). The bundled transcoder is
 HDR 4x4 and refuses the later 6x6 HDR formats with `MargoError` `failed`. `tests/ktx2-hdr.test.js` checks real files
 against pixels of the EXR files they were made from.
 
+## Streaming KTX2 mips (`@margoengine/decoders/ktx2-stream`)
+
+KTX 2.0 stores the smallest level first, so `KTX2Streamer` reads the head of a file with a Range request and has a picture
+on the GPU after a small part of the file: `cubemap_yokohama_basis_rd.ktx2` 65,618 of 2,621,370 B, `cubemap_goldengate_uastc_rdo4_zstd5_rd.ktx2` 65,819 of 4,043,747 B on real files. Finer levels load as `want` asks for them, largest on
+screen first, inside `budgetBytes` (default 256 MiB), and levels nothing needs are dropped to make room. A server that
+ignores Range sends the whole file once, which still works. 8-bit and HDR files both stream; each level goes through the same
+worker transcode as a whole file, so its bytes are that level's bytes in the whole file.
+
+```ts
+import {KTX2Streamer} from 'margoengine/decoders/ktx2-stream';
+
+declare const device: GPUDevice;
+declare function useTexture(texture: GPUTexture): void;
+declare const pixelsOnScreen: number;
+
+const streamer = new KTX2Streamer({device, budgetBytes: 128 * 1024 * 1024});
+const rock = await streamer.open('/rock.ktx2');
+useTexture(rock.texture);
+rock.onChange = useTexture;
+
+// Each frame:
+rock.want(pixelsOnScreen);
+streamer.update();
+```
+
+WebGPU textures cannot grow, so a texture is replaced each time a level arrives or leaves: existing levels move by
+`copyTextureToTexture`, the old texture is destroyed, and `onChange` (or `for await` over `updates()`) hands over the new
+one. Keep the texture only until then. A level that fails to load leaves the stream as it was, calls `onError` once, and
+sets `error`; clear it to try again. Block formats start at the coarsest level whose size is a whole number of blocks, since
+WebGPU wants that of level 0; `bytes()` and `usedBytes` report what the streams hold, and `dispose` frees it all. Lower
+`budgetBytes` under memory pressure and the next `update` drops levels to fit.
+
 ## How it works
 
 - **Workers, not the main thread.** Each decoder owns a lazily grown pool of classic workers, by default `Math.min(navigator.hardwareConcurrency || 4, 4)`. Jobs go to an idle worker, then a new one while under the limit, then the least loaded. A crashed worker rejects only its own jobs and is replaced on the next call.

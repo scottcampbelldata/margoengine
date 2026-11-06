@@ -30,7 +30,7 @@ part of `npm run verify`, fails when a report no longer matches the build). For 
 | @margoengine/creative | `.` 15, `./particles` 4, `./targets` 1, `./toon` 2, `./post` 3, `./grass` 2, `./planet` 2, `./stars` 1 | 3 |  | 18,976 |
 | @margoengine/culling | `.` 11, `./dynamic` 2, `./parts` 6, `./models` 6, `./shadows` 3, `./lod` 3, `./meshlets` 5 | 45 |  | 13,718 |
 | @margoengine/cutscene | `.` 43 |  |  | 6,566 |
-| @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3, `./tga` 3, `./dds` 5, `./ktx` 5, `./tiff` 3, `./ktx2-layers` 7, `./ktx2-hdr` 10, `./ktx2-stream` 7 | 28 |  | 478,206 |
+| @margoengine/decoders | `.` 23, `./meshopt` 5, `./texture` 4, `./png` 3, `./tga` 3, `./dds` 5, `./ktx` 5, `./tiff` 3, `./ktx2-layers` 7, `./ktx2-hdr` 10, `./ktx2-stream` 7 | 28 |  | 478,212 |
 | @margoengine/dof | `.` 2, `./lens` 3, `./autofocus` 2 | 8 |  | 7,710 |
 | @margoengine/ecs | `.` 17, `./changes` 1, `./engine` 3, `./growable` 2, `./query` 2, `./relations` 2, `./schedule` 5 | 35 |  | 4,379 |
 | @margoengine/environment | `.` 62, `./probes` 8, `./volumetric` 3, `./reflector` 7, `./refractor` 7, `./cube-camera` 4, `./exr-write` 4 | 15 |  | 29,642 |
