@@ -1,0 +1,83 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Lighting nodes check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
+<script type="module">
+import {createStage} from '/packages/stage/dist/index.js';
+import {planeGeometry,boxGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {Environment,EnvironmentLighting} from '/packages/environment/dist/index.js';
+import {uv,vec3,positionLocal,step,normalWorld} from '/packages/shader/dist/index.js';
+import {LightingMaterial,sunColor,sunVisibility,sunDirection,ambientLight,localLight,litColor,environment} from '/packages/shader/dist/lighting.js';
+import {lightPBR} from '/packages/shared/pbr-hooks.js';
+const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,3],target:[0,0,0]}});
+const engine=stage.engine,device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const flat={color:[0.25,0.25,0.25],toneMapped:false,roughness:0.6,metalness:0},lambert=({normal,direction,color})=>color.div(Math.PI).mul(normal.dot(direction).max(0));
+const sun=(intensity,ambient=0,direction=[0,0,1])=>{engine.lighting.direction.set([...direction,intensity]);engine.lighting.radiance.set([1,1,1,ambient]);};
+// Each scene: a wall facing the camera, optionally the effects around it. The slanted sun throws the caster's shadow beside it.
+const slant=[0.6,0,0.8];
+const scene=(material,{shadows,lights}={})=>{
+  const wall=createMesh(engine,planeGeometry(2,2),material),undo=[()=>wall.destroy()];
+  if(shadows){
+    const caster=createMesh(engine,boxGeometry(0.5,0.5,0.1),new Material({color:[1,1,1]}));caster.root.setPosition([0.6,0,0.5]);
+    const effect=Shadows.attach(engine,{resolution:1024,filter:'hard'});effect.add(wall);effect.add(caster);
+    undo.push(()=>{engine.removePlugin(effect.name);caster.destroy();});
+  }
+  if(lights){
+    const effect=Clustered.attach(engine);effect.add(wall);effect.setLights([{position:[0,0,1],range:8,color:[1,1,1],intensity:1}]);
+    undo.push(()=>engine.removePlugin(effect.name));
+  }
+  return {destroy(){for(const f of undo.reverse())f();}};
+};
+const imageLit=async material=>{
+  sun(0,0);
+  const width=64,height=32,data=new Float32Array(width*height*4);
+  for(let i=0;i<width*height;i++)data.set([0.5,0.25,0.125,1],i*4);
+  const environment=await Environment.attach(engine,{width,height,data}),lighting=EnvironmentLighting.attach(engine,environment),wall=createMesh(engine,planeGeometry(2,2),material);
+  lighting.add(wall);
+  return {destroy(){wall.destroy();engine.removePlugin(lighting.name);engine.removePlugin(environment.name);}};
+};
+const scenarios={
+  // The sun's visibility, as a final colour: 2 x 0.25 = 0.5.
+  sunVisibility:()=>{sun(2);return scene(new LightingMaterial({...flat,lightingNode:sunColor.mul(sunVisibility).mul(0.25)}));},
+  shadowed:()=>{sun(2,0,slant);return scene(new LightingMaterial({...flat,lightingNode:sunColor.mul(sunVisibility).mul(0.25)}),{shadows:true});},
+  sunDirection:()=>{sun(1,0,[0,1,0]);return scene(new LightingMaterial({...flat,lightingNode:sunDirection.mul(0.5)}));},
+  // A two-step model on the sun: lit where uv.x > 0.5 only, read through the surface inside the light function.
+  stepped:()=>{sun(2);return scene(new LightingMaterial({...flat,lightModel:({color})=>color.mul(step(uv().x,0.5))}));},
+  // The same BRDF in the graph and in the material shading, on the sun and on a point light.
+  lambertNodes:()=>{sun(2);return scene(new LightingMaterial({...flat,lightModel:lambert}),{lights:true});},
+  lambertPlain:()=>{sun(2);return scene(new Material({...flat,shading:'lambert'}),{lights:true});},
+  // What the effects worked out, unchanged: litColor must equal a plain Material with the same effects.
+  litNodes:()=>{sun(2,0.5,slant);return scene(new LightingMaterial({...flat,lightingNode:litColor}),{lights:true,shadows:true});},
+  litPlain:()=>{sun(2,0.5,slant);return scene(new Material(flat),{lights:true,shadows:true});},
+  localNodes:()=>{sun(0);return scene(new LightingMaterial({...flat,lightingNode:localLight}),{lights:true});},
+  localPlain:()=>{sun(0);return scene(new Material(flat),{lights:true});},
+  ambientNodes:()=>{sun(0,1);return scene(new LightingMaterial({...flat,lightingNode:ambientLight}));},
+  ambientPlain:()=>{sun(0,1);return scene(new Material(flat));},
+  // The built-in sky: a mirror looking up sees half the gradient's top, one looking down its bottom.
+  skyUp:()=>{sun(0,1);return scene(new LightingMaterial({...flat,lightingNode:environment(vec3(0,1,0),0.5)}));},
+  skyDown:()=>{sun(0,1);return scene(new LightingMaterial({...flat,lightingNode:environment(vec3(0,-1,0),0.5)}));},
+  // Image-based light: a mirror of the wall's own roughness, facing the camera, against a metal wall at the centre pixel.
+  mirrorNodes:()=>imageLit(new LightingMaterial({...flat,lightingNode:environment(normalWorld,0.5)})),
+  mirrorPlain:()=>imageLit(new Material({color:[1,1,1],metalness:1,roughness:0.5,toneMapped:false})),
+  // A varying in each hook, and a node that reads both.
+  varying:()=>{sun(2);return scene(new LightingMaterial({...flat,lightingNode:positionLocal.x.add(1).mul(0.5).mul(litColor),lightModel:({color})=>color.mul(positionLocal.y.add(1))}));},
+};
+window.check={
+  async run(name){device.pushErrorScope('validation');const model=await scenarios[name]();window.current=model;engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {errors:[...(e?[e.message]:[]),...errors.splice(0)]};},
+  clear(){window.current?.destroy();window.current=null;engine.render();},
+  // Every shader variant, with every hook point composed, must compile.
+  async variants(){
+    const {pbrShader,extendedPBRShader,physicalShader}=await import('/packages/gltf-pro/src/shader.ts');
+    const m=new LightingMaterial({lightModel:({color})=>color.mul(uv().x),lightingNode:litColor.add(environment(sunDirection)).add(localLight).add(ambientLight)});
+    const hooks={declarations:'fn margoShadow()->f32 {return 0.5;}\nfn margoLocal(s:Surface)->vec3f {return s.base.rgb;}\n',direct:d=>`${d}*margoShadow()`,light:'margoLocal(s)',ambient:'s.base.rgb*0.1*s.occlusion'};
+    const out=[];
+    for(const source of [pbrShader,extendedPBRShader,physicalShader()]){
+      const info=await device.createShaderModule({code:m.relight(lightPBR(m.shader(source,2),hooks))}).getCompilationInfo();
+      out.push(info.messages.filter(x=>x.type==='error').map(x=>x.message+' line '+x.lineNum));
+    }
+    return out;
+  },
+};
+window.ready=true;
+</script></body></html>

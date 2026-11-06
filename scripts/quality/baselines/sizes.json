@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5015590,
+  "total": 5022984,
   "history": [
     {
       "date": "2026-10-24",
@@ -2192,6 +2192,12 @@
       "commit": "9b2bfe02b",
       "reason": "gltf gains the instancing entry; the root's refusal names it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "f8d15ee8b",
+      "reason": "shader/lighting: new optional entry, light, shadow and environment nodes; Material gains one internal relight step",
+      "grew": 3
     }
   ],
   "items": {
@@ -2598,6 +2604,7 @@
     "@margoengine/shader/editor": 21836,
     "@margoengine/shader/effects": 8306,
     "@margoengine/shader/graph": 11088,
+    "@margoengine/shader/lighting": 7392,
     "@margoengine/shader/noise": 4753,
     "@margoengine/shader/raw": 10429,
     "@margoengine/shader/readback": 8876,
@@ -2764,6 +2771,8 @@
     "leak @margoengine/shader/editor -> @margoengine/materials": 1,
     "leak @margoengine/shader/graph -> @margoengine/gltf-pro": 1,
     "leak @margoengine/shader/graph -> @margoengine/materials": 1,
+    "leak @margoengine/shader/lighting -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/shader/lighting -> @margoengine/materials": 1,
     "leak @margoengine/ui -> @margoengine/text": 1,
     "leak @margoengine/ui/react -> @margoengine/text": 1,
     "leak @margoengine/usdz -> @margoengine/gltf-pro": 1,

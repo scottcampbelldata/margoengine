@@ -1638,6 +1638,10 @@
       "types": "./dist/shader/compute-texture.d.ts",
       "import": "./dist/shader/compute-texture.js"
     },
+    "./shader/lighting": {
+      "types": "./dist/shader/lighting.d.ts",
+      "import": "./dist/shader/lighting.js"
+    },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
       "import": "./dist/shadows.js"

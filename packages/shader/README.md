@@ -224,6 +224,57 @@ read back exactly (65 ms on an NVIDIA Ampere GPU in Edge), a job on an engine th
 submit and while mapping, engine disposal and `device.destroy()` at both points, and a pipeline over the storage-binding
 limit; every job destroyed its buffers and no GPU error escaped.
 
+## Lighting written in the graph (`@margoengine/shader/lighting`)
+
+`LightingMaterial` is a `NodeMaterial` that writes its own lighting: toon steps, hatching, a custom BRDF. Shadows, clustered lights and the environment keep working, because the graph reads what those effects worked out. Attach them as for any material.
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh} from 'margoengine/materials';
+import {sphereGeometry} from 'margoengine/geometry';
+import {Shadows} from 'margoengine/shadows';
+import {Clustered} from 'margoengine/clustered';
+import {floor, max, normalWorld, reflect, viewDirection} from 'margoengine/shader';
+import {LightingMaterial, ambientLight, environment, localLight, sunColor, sunDirection, sunVisibility} from 'margoengine/shader/lighting';
+const stage = await createStage('#app');
+// A BRDF of your own, for the sun and every clustered light: three flat bands.
+const toon = new LightingMaterial({
+  color: '#3366ff',
+  lightModel: ({normal, direction, color}) => color.mul(floor(max(normal.dot(direction), 0).mul(3).add(0.5)).div(3)),
+});
+// Or the whole pixel: the sun as a band through its shadow, the rest of the light as it is, a mirror's rim on top.
+const inked = new LightingMaterial({
+  color: '#ff8000',
+  lightingNode: sunColor.mul(sunVisibility).mul(normalWorld.dot(sunDirection).step(0.3).mul(0.25))
+    .add(localLight).add(ambientLight)
+    .add(environment(reflect(viewDirection.negate(), normalWorld), 0.2).mul(0.1)),
+});
+const shadows = Shadows.attach(stage.engine), lights = Clustered.attach(stage.engine);
+lights.setLights([{position: [0, 2, 1], range: 12, color: [1, 0.3, 0.1], intensity: 20}]);
+for (const material of [toon, inked]) {
+  const mesh = createMesh(stage.engine, sphereGeometry(0.8, 32, 16), material);
+  shadows.add(mesh);
+  lights.add(mesh);
+}
+```
+
+- **`lightModel`** is a function of `{direction, view, normal, color, roughness, metalness}` that returns the light leaving towards the camera, the cosine term included. It replaces the physically based response to the sun and to each clustered point, spot and extra directional light; their colour, falloff and shadows apply around it. Rectangle and disc area lights, ambient and emissive light stay as they are. It compiles to one WGSL function, so stage inputs (`uv()`, `positionLocal`, material nodes) work in it. It runs inside the clustered light loop, where WGSL forbids implicit-derivative reads: sample a texture with an explicit level, or in `lightingNode`.
+- **`lightingNode`** is the final linear colour of the pixel, before fog and tone mapping. It reads:
+
+| Node | What it reads | Without the effect |
+| --- | --- | --- |
+| `sunDirection` | unit vector towards the sun | |
+| `sunColor` | the sun's colour times intensity, before shadows | |
+| `sunVisibility` | the shadow effect's result per channel, 0 to 1 | 1 |
+| `localLight` | the sum of the clustered lights, with their shadows | zero |
+| `ambientLight` | ambient light with the material's response: image-based light, probes, the sky | the built-in sky |
+| `litColor` | the colour the material shows with its usual lighting | |
+| `environment(direction, roughness = 0)` | the scene's ambient light on a mirror facing `direction`, also in `lightModel` | the built-in sky |
+
+In `lightingNode`, `normalWorld` is the shading normal, after normal maps and `normalNode`. The nodes above other than `environment` are refused in other slots and in `lightModel`, where there is no one sun. Set either option or both; `lightModel` then shapes `litColor`, `localLight` and the sun's share of them. `shading` must stay `'standard'`. An SSAO replay and the G-buffer see `normalNode` and the ambient light as they do on any material.
+
+`node packages/shader/test/lighting-check.mjs` (real GPU, under the GPU lock) checks these against what they read: `sunVisibility` under a real shadow map, Lambert written as a `lightModel` against `shading: 'lambert'` on the sun and a point light, and `litColor`, `localLight` and `ambientLight` against a plain `Material` with the same effects.
+
 ## The compute model
 
 `ComputePass` runs 1D, 2D or 3D grids, shares memory inside a workgroup, and can take its size from an earlier pass. None of it costs anything in a pass that does not use it. Here each 256-wide workgroup sums its items with a prefix scan:

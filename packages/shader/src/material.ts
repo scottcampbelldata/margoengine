@@ -51,7 +51,8 @@ const vertex: ShaderStage = {
     viewDirection: `normalize(f.eye.xyz - ${world})`,
   },
 };
-const fragment: ShaderStage = {
+/** @internal The fragment stage, for entries that compile more nodes into the same shader. */
+export const fragmentStage: ShaderStage = {
   kind: 'fragment',
   builtins: {
     uv: 'i.uv.xy',
@@ -102,7 +103,8 @@ export class NodeMaterial extends Material {
    */
   surfaceGraph?: SurfaceGraph;
   private readonly patched = new Map<string, string>();
-  constructor(options: NodeMaterialOptions = {}) {
+  /** `extra` is for subclasses: it compiles nodes of its own after the fragment stage and before the vertex stage. */
+  constructor(options: NodeMaterialOptions = {}, extra?: (program: Program) => void) {
     const { colorNode, opacityNode, roughnessNode, metalnessNode, emissiveNode, normalNode, positionNode, ...rest } =
       options;
     super(rest);
@@ -125,9 +127,10 @@ export class NodeMaterial extends Material {
     ];
     const used = slots.filter((s) => s[0]),
       f = this.program.stage(
-        fragment,
+        fragmentStage,
         used.map((s) => s[0]!),
       );
+    extra?.(this.program);
     const position = positionNode && cast(positionNode, 'vec3f', 'positionNode'),
       v = this.program.stage(vertex, [...(position ? [position] : []), ...this.program.varyings]),
       values = [...v.values];

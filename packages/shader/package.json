@@ -54,6 +54,10 @@
     "./compute-texture": {
       "types": "./dist/compute-texture.d.ts",
       "import": "./dist/compute-texture.js"
+    },
+    "./lighting": {
+      "types": "./dist/lighting.d.ts",
+      "import": "./dist/lighting.js"
     }
   },
   "files": [
@@ -76,6 +80,6 @@
     "build": "node ../../scripts/build-optional.js shader",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/shader/test/browser-check.mjs && node packages/shader/test/noise-check.mjs && node packages/shader/test/readback-check.mjs && node packages/shader/test/editor-check.mjs && node packages/shader/test/compute-texture-check.mjs && node packages/shader/test/compute-model-check.mjs"
+    "test:gpu": "cd ../.. && node packages/shader/test/browser-check.mjs && node packages/shader/test/noise-check.mjs && node packages/shader/test/readback-check.mjs && node packages/shader/test/editor-check.mjs && node packages/shader/test/compute-texture-check.mjs && node packages/shader/test/compute-model-check.mjs && node packages/shader/test/lighting-check.mjs"
   }
 }

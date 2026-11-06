@@ -217,7 +217,7 @@ class NodeMaterial extends Material {
     readonly vertexCode: string;
     readonly varyingFields: string;
     surfaceGraph?: SurfaceGraph;
-    constructor(options?: NodeMaterialOptions);
+    constructor(options?: NodeMaterialOptions, extra?: (program: Program) => void);
     shader(source: string, group: number): string;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }

@@ -353,6 +353,7 @@ class Material {
     dispose(): void;
     [Symbol.dispose]: () => void;
     shader(source: string, group: number): string;
+    relight(code: string): string;
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }
 

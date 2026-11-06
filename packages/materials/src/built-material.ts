@@ -3297,6 +3297,10 @@ export class Material {
     if (bare(this)) return bareShader(source);
     return materialShader(source, group, this.shading);
   }
+  /** @internal A subclass's edit of `code` once the scene's lighting effects are composed into it. */
+  relight(code: string): string {
+    return code;
+  }
   /** @internal gltf-pro LightingEffect bindings for one device; `engine` is the drawing engine. */
   bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
     if (mapped(this)) {
@@ -3972,7 +3976,7 @@ class MaterialShading implements PBRMaterialShading {
   lit(code: string): string {
     const m = this.m,
       out = litShader(m, code);
-    return m.envMap ? envMapLit(out, envKind(m)) : out;
+    return m.relight(m.envMap ? envMapLit(out, envKind(m)) : out);
   }
   bindings(): GPUBindGroupEntry[] {
     const m = this.m,
