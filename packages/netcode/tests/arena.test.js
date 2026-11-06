@@ -46,10 +46,13 @@ test('opened from a file, the arena page says how to serve it instead of showing
 
 // Starts `command` in the repository and resolves with the first match of `pattern` in its output.
 function start(t, command, pattern, env = {}) {
-  const child = spawn(command, { cwd: root, shell: true, env: { ...process.env, ...env } });
+  // Its own process group outside Windows: the shell starts npm, npm starts Vite, and killing only the shell left Vite
+  // running with this test's pipes open, so the test file never exited.
+  const windows = process.platform === 'win32',
+    child = spawn(command, { cwd: root, shell: true, detached: !windows, env: { ...process.env, ...env } });
   t.after(() => {
-    if (process.platform === 'win32') spawn('taskkill', ['/pid', String(child.pid), '/T', '/F']);
-    else child.kill('SIGKILL');
+    if (windows) spawn('taskkill', ['/pid', String(child.pid), '/T', '/F']);
+    else if (child.exitCode === null) process.kill(-child.pid, 'SIGKILL');
   });
   return new Promise((done, fail) => {
     let output = '';
