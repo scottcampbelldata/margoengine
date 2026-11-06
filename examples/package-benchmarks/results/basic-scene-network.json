@@ -1,5 +1,5 @@
 {
-  "commit": "99f96c212",
+  "commit": "33e0e0ecf",
   "dirty": false,
   "browser": "msedge 156.0.4314.58 headless",
   "adapter": "nvidia ampere",
@@ -12,7 +12,7 @@
       "transferred": 808,
       "raw": 558,
       "gzip": 371,
-      "brotli": 232
+      "brotli": 225
     },
     {
       "path": "assets/geometry-BbJ5KwJe.js",
@@ -24,22 +24,22 @@
       "brotli": 1790
     },
     {
-      "path": "assets/index-CC8_oxZZ.js",
+      "path": "assets/index-BkO70iUZ.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 23512,
+      "transferred": 23510,
       "raw": 56375,
-      "gzip": 23131,
-      "brotli": 20424
+      "gzip": 23129,
+      "brotli": 20388
     },
     {
-      "path": "assets/dist-C-oa-L9V.js",
+      "path": "assets/dist-OnNzbgLs.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 6992,
-      "raw": 17143,
-      "gzip": 6620,
-      "brotli": 5953
+      "transferred": 7033,
+      "raw": 17341,
+      "gzip": 6661,
+      "brotli": 5978
     },
     {
       "path": "model.glb",
@@ -53,10 +53,10 @@
   ],
   "total": {
     "requests": 5,
-    "transferred": 35280,
-    "raw": 79359,
-    "gzip": 32569,
-    "brotli": 28758
+    "transferred": 35319,
+    "raw": 79557,
+    "gzip": 32608,
+    "brotli": 28740
   },
   "notFetched": []
 }

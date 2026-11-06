@@ -310,6 +310,8 @@ export class Material {
     set color(v: ColorInput);
     get emissive(): LiveColor;
     set emissive(v: ColorInput);
+    get features(): readonly MaterialFeature[];
+    set features(list: readonly MaterialFeature[]);
     get flatShading(): boolean;
     set flatShading(v: boolean);
     get vertexColors(): boolean;
@@ -418,6 +420,15 @@ export class Material {
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }
 
+export interface MaterialFeature {
+    readonly name: string;
+    shader(code: string, group: number, material: Material): string;
+    lit?(code: string, material: Material): string;
+    bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
+    attach?(material: Material): void;
+    detach?(material: Material): void;
+}
+
 export interface MaterialGraph {
     nodes: readonly MaterialNode[];
 }
@@ -524,6 +535,7 @@ export interface MaterialOptions extends PhysicalOptions {
     clipIntersection?: boolean;
     transparent?: boolean;
     alphaTest?: number;
+    features?: readonly MaterialFeature[];
     side?: MaterialSide;
     doubleSided?: boolean;
     wireframe?: boolean;

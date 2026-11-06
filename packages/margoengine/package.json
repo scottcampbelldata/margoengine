@@ -1162,6 +1162,10 @@
       "types": "./dist/materials/batched.d.ts",
       "import": "./dist/materials/batched.js"
     },
+    "./materials/alpha-hash": {
+      "types": "./dist/materials/alpha-hash.d.ts",
+      "import": "./dist/materials/alpha-hash.js"
+    },
     "./math": {
       "types": "./dist/math.d.ts",
       "import": "./dist/math.js"

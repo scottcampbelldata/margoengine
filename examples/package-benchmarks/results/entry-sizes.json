@@ -1,5 +1,5 @@
 {
-  "commit": "99f96c212",
+  "commit": "33e0e0ecf",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -48,16 +48,40 @@
       "./instanced-skin": {
         "raw": 25662,
         "gzip": 9353
+      },
+      "./geometry-cache": {
+        "raw": 11243,
+        "gzip": 4389
       }
     },
     "@margoengine/animator": {
       ".": {
-        "raw": 50883,
-        "gzip": 18110
+        "raw": 52449,
+        "gzip": 18564
       },
       "./graph": {
-        "raw": 24135,
-        "gzip": 7969
+        "raw": 25570,
+        "gzip": 8320
+      },
+      "./inertialize": {
+        "raw": 4187,
+        "gzip": 1894
+      },
+      "./sync": {
+        "raw": 4159,
+        "gzip": 1859
+      },
+      "./warping": {
+        "raw": 11160,
+        "gzip": 4631
+      },
+      "./fbik": {
+        "raw": 12675,
+        "gzip": 5407
+      },
+      "./motion-matching": {
+        "raw": 17048,
+        "gzip": 6997
       }
     },
     "@margoengine/audio": {
@@ -552,8 +576,8 @@
         "gzip": 626
       },
       "./engine": {
-        "raw": 2744,
-        "gzip": 1199
+        "raw": 3471,
+        "gzip": 1536
       },
       "./growable": {
         "raw": 4971,
@@ -832,32 +856,32 @@
     },
     "@margoengine/gltf": {
       ".": {
-        "raw": 17277,
-        "gzip": 6653
+        "raw": 17475,
+        "gzip": 6698
       },
       "./auto": {
-        "raw": 38182,
-        "gzip": 13658
+        "raw": 38656,
+        "gzip": 13776
       },
       "./instancing": {
-        "raw": 3706,
-        "gzip": 1729
+        "raw": 3894,
+        "gzip": 1796
       },
       "./meshopt": {
         "raw": 1800,
         "gzip": 949
       },
       "./quantized": {
-        "raw": 2223,
-        "gzip": 1129
+        "raw": 2365,
+        "gzip": 1178
       },
       "./scene-data": {
         "raw": 3643,
         "gzip": 1526
       },
       "./textured": {
-        "raw": 13939,
-        "gzip": 5583
+        "raw": 14081,
+        "gzip": 5622
       }
     },
     "@margoengine/gltf-pro": {
@@ -1060,20 +1084,20 @@
     },
     "@margoengine/loaders": {
       ".": {
-        "raw": 149023,
-        "gzip": 52035
+        "raw": 149128,
+        "gzip": 52097
       },
       "./worker": {
-        "raw": 22228,
-        "gzip": 8484
+        "raw": 22264,
+        "gzip": 8505
       },
       "./common": {
         "raw": 7963,
         "gzip": 3161
       },
       "./usd": {
-        "raw": 20139,
-        "gzip": 7697
+        "raw": 20175,
+        "gzip": 7715
       },
       "./font": {
         "raw": 15368,
@@ -1096,12 +1120,12 @@
         "gzip": 1890
       },
       "./vrml": {
-        "raw": 11476,
-        "gzip": 4831
+        "raw": 11597,
+        "gzip": 4878
       },
       "./gcode": {
-        "raw": 3740,
-        "gzip": 1710
+        "raw": 3733,
+        "gzip": 1706
       },
       "./nrrd": {
         "raw": 11795,
@@ -1120,8 +1144,8 @@
         "gzip": 6681
       },
       "./3dm": {
-        "raw": 4226,
-        "gzip": 1962
+        "raw": 4339,
+        "gzip": 2020
       },
       "./3ds": {
         "raw": 5935,
@@ -1156,8 +1180,8 @@
         "gzip": 2812
       },
       "./las": {
-        "raw": 4884,
-        "gzip": 2207
+        "raw": 2509,
+        "gzip": 1210
       },
       "./vdb": {
         "raw": 15517,
@@ -1172,8 +1196,8 @@
         "gzip": 7335
       },
       "dist/workers/usd.js": {
-        "raw": 21673,
-        "gzip": 8348
+        "raw": 21709,
+        "gzip": 8368
       }
     },
     "@margoengine/lod": {
@@ -1202,8 +1226,8 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 195098,
-        "gzip": 60684
+        "raw": 195892,
+        "gzip": 60956
       },
       "./atlas": {
         "raw": 4025,
@@ -1214,8 +1238,12 @@
         "gzip": 7399
       },
       "./batched": {
-        "raw": 116245,
-        "gzip": 35755
+        "raw": 117039,
+        "gzip": 36026
+      },
+      "./alpha-hash": {
+        "raw": 1938,
+        "gzip": 1053
       }
     },
     "@margoengine/math": {
@@ -1482,20 +1510,20 @@
         "gzip": 21989
       },
       "./las": {
-        "raw": 11572,
-        "gzip": 4860
+        "raw": 40390,
+        "gzip": 13735
       },
       "./laz": {
-        "raw": 23797,
-        "gzip": 7790
+        "raw": 26769,
+        "gzip": 8613
       },
       "./e57": {
         "raw": 15818,
         "gzip": 6281
       },
       "./copc": {
-        "raw": 33067,
-        "gzip": 11401
+        "raw": 39219,
+        "gzip": 13390
       },
       "./octree": {
         "raw": 25047,
@@ -1506,8 +1534,8 @@
         "gzip": 14423
       },
       "./potree": {
-        "raw": 8260,
-        "gzip": 3414
+        "raw": 8218,
+        "gzip": 3397
       },
       "./pick": {
         "raw": 12297,
@@ -2080,8 +2108,8 @@
     },
     "@margoengine/taa": {
       ".": {
-        "raw": 38123,
-        "gzip": 11673
+        "raw": 39019,
+        "gzip": 11832
       },
       "./upscale": {
         "raw": 20077,
@@ -2176,8 +2204,8 @@
         "gzip": 10077
       },
       "dist/workers/usdz.js": {
-        "raw": 211444,
-        "gzip": 68667
+        "raw": 211480,
+        "gzip": 68686
       }
     },
     "@margoengine/vfx": {
@@ -2467,9 +2495,9 @@
   },
   "lazyFiles": {
     "packages/gltf/dist/index.js": {
-      "raw": 17277,
-      "gzip": 6653,
-      "brotli": 5976
+      "raw": 17475,
+      "gzip": 6698,
+      "brotli": 6003
     },
     "packages/scenery/dist/sky.js": {
       "raw": 22771,
@@ -2567,14 +2595,14 @@
       "brotli": 45425
     },
     "packages/usdz/dist/workers/usdz.js": {
-      "raw": 208893,
-      "gzip": 68467,
-      "brotli": 59153
+      "raw": 208929,
+      "gzip": 68487,
+      "brotli": 59219
     },
     "packages/loaders/dist/workers/usd.js": {
-      "raw": 21433,
-      "gzip": 8321,
-      "brotli": 7485
+      "raw": 21469,
+      "gzip": 8341,
+      "brotli": 7497
     },
     "packages/bvh/dist/bvh.worker.js": {
       "raw": 7081,
@@ -2635,6 +2663,19 @@
         "raw": 96623,
         "gzip": 30819,
         "loadedBy": "the first compute pipeline or texture read-back on the layer (import() in device/device.ts)"
+      }
+    },
+    "@margoengine/points/las": {
+      "entry": "./las",
+      "base": {
+        "raw": 13946,
+        "gzip": 5761
+      },
+      "lazy": {
+        "name": "LAZ decoder",
+        "raw": 26443,
+        "gzip": 8523,
+        "loadedBy": "the first compressed file, unless the caller passes its own decoder (import() in las.ts)"
       }
     }
   }

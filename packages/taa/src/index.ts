@@ -12,7 +12,7 @@ import {
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { halton, jitterProjection } from './jitter.js';
-import { fullscreen, cameraVelocity, objectVelocity, snapshot, resolve, present } from './shader.js';
+import { fullscreen, cameraVelocity, objectVelocity, snapshot, resolve, stochasticResolve, present } from './shader.js';
 import { displacementGroup, opacityEntries, type CasterCutout } from '../../shared/caster.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, fromTarget, toTarget, viewLoadOp, viewRect, viewSize, ViewStates } from '../../shared/view-rect.js';
@@ -41,6 +41,13 @@ export interface TAAOptions {
    * Needs `depth`. Fixed at construction. Default false.
    */
   velocityOnly?: boolean;
+  /**
+   * Keep history across surfaces cut by noise, such as `alphaHash` from `@margoengine/materials/alpha-hash`: a pixel
+   * then shows the surface on one frame and what is behind it on the next, and the per-pixel depth rejection would
+   * keep the two apart, leaving the grain. History is accepted over the 3x3 depth range instead, with the nearest
+   * pixel's motion, at the price of a pixel of ghosting along moving edges. Default false.
+   */
+  stochastic?: boolean;
 }
 /** A drawable whose per-vertex motion TAA tracks: the `shadowPrimitives` contract of core and gltf-pro meshes. */
 export interface VelocityPrimitive extends CasterCutout {
@@ -228,6 +235,8 @@ export class TAA implements EnginePlugin {
       throw new RangeError(
         'Invalid TAA options; historyWeight must be in [0, 1), depthThreshold in [0, 1] and depth a function.',
       );
+    if (o.stochastic !== undefined && typeof o.stochastic !== 'boolean')
+      throw new TypeError('Invalid TAA stochastic; pass true or false.');
     if (o.velocityOnly !== undefined && typeof o.velocityOnly !== 'boolean')
       throw new TypeError('Invalid TAA velocityOnly; pass true or false.');
     if (o.velocityOnly && !o.depth)
@@ -389,7 +398,7 @@ export class TAA implements EnginePlugin {
       this.resolvePipeline = c.device.createComputePipeline({
         layout: 'auto',
         compute: {
-          module: c.device.createShaderModule({ code: resolve }),
+          module: c.device.createShaderModule({ code: this.options.stochastic ? stochasticResolve() : resolve }),
           entryPoint: 'main',
           constants: { manualSRGB },
         },

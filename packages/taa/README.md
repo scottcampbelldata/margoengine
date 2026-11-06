@@ -45,6 +45,15 @@ const stack = PostStack.attach(stage.engine, [new MotionBlur({velocity: () => ta
 taa = TAA.attach(stage.engine, {velocityOnly: true, depth: () => stack.depthTexture});
 ```
 
+`stochastic: true` keeps history across surfaces cut by noise, such as `alphaHash` from `@margoengine/materials/alpha-hash`. Such a pixel shows the surface on one frame and what is behind it on the next, and the per-pixel depth rejection would keep the two apart and leave the grain. History is accepted over the 3x3 depth range instead, with the nearest pixel's motion, at the price of a pixel of ghosting along moving edges. Default `false`, which compiles the same rejection as before.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+TAA.attach(engine, {stochastic: true});
+```
+
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.
 
 ## Upscaling: `TAAUpscale`

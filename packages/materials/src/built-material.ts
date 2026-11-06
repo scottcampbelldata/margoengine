@@ -1342,6 +1342,8 @@ export interface MaterialOptions extends PhysicalOptions {
   clipIntersection?: boolean;
   transparent?: boolean;
   alphaTest?: number;
+  /** Optional features from this package's entries (`alphaHash()` from `/alpha-hash`, ...). Live; default none. */
+  features?: readonly MaterialFeature[];
   /** Faces drawn by triangle meshes. Explicit side takes precedence over doubleSided. */
   side?: MaterialSide;
   doubleSided?: boolean;
@@ -1389,6 +1391,24 @@ const mapSlots = [
 ] as const;
 /** Names of the texture maps a material can hold, such as `'map'`, `'normalMap'` or `'aoMap'`. */
 export type MapSlot = (typeof mapSlots)[number];
+/**
+ * An optional surface feature from one of this package's entries (`@margoengine/materials/alpha-hash` and the like),
+ * assigned through `Material.features`. It costs a material that does not list it nothing: its WGSL lives in its entry.
+ */
+export interface MaterialFeature {
+  /** What it is: a material holds one feature of each name. */
+  readonly name: string;
+  /** Edits the material's finished shader (`group` is its bind group). The text a feature writes is fixed at creation; assign a new feature to change it. */
+  shader(code: string, group: number, material: Material): string;
+  /** Edits the shader once the scene's lighting effects are composed into it. */
+  lit?(code: string, material: Material): string;
+  /** Bind group entries of `group`, read on every draw; `owner` keys what it allocates. */
+  bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
+  /** Called when the feature joins a material. */
+  attach?(material: Material): void;
+  /** Called when the feature leaves a material. */
+  detach?(material: Material): void;
+}
 const slots = ['map', 'metalRoughnessMap', 'normalMap', 'aoMap', 'emissiveMap', 'matcap'] as const,
   names = ['baseMap', 'mrMap', 'normalMap', 'aoMap', 'emissiveMap', 'matcap'];
 const unit = (v: unknown, label: string) => {
@@ -2089,6 +2109,9 @@ export class Material {
   };
   private glowScale = 1;
   /** On/off features (features.ts letters f...). */
+  /** Optional features and the stamp of their last assignment (their shader text is fixed, so it names the variant). */
+  private added: readonly MaterialFeature[] = [];
+  private addedStamp = 0;
   private readonly switches = { flatShading: false, vertexColors: true, fog: true, toneMapped: true };
   /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
@@ -2641,6 +2664,7 @@ export class Material {
       'subsurfaceDistortion',
       'subsurfacePower',
       'subsurfaceWrap',
+      'features',
     ] as const)
       if (o[key] !== undefined) this[key] = o[key] as never;
     // Physical options enable their lobes as they are set (transmission before the volume values that need it); the
@@ -2780,6 +2804,21 @@ export class Material {
     this.glow.set(v);
   }
   /** Face normals instead of interpolated ones (default false), for lit, normal and matcap shading. */
+  /** The optional features this material uses, in the order their shader edits apply. Assign a new list to change them (live). */
+  get features(): readonly MaterialFeature[] {
+    return this.added;
+  }
+  set features(list: readonly MaterialFeature[]) {
+    if (!Array.isArray(list) || list.some((v) => typeof v?.name !== 'string' || typeof v.shader !== 'function'))
+      throw new TypeError('Material features must be an array of features; pass entries such as [alphaHash()]');
+    if (new Set(list.map((v) => v.name)).size !== list.length)
+      throw new TypeError('Material features must have different names; pass each kind of feature once');
+    const before = this.added;
+    this.added = Object.freeze(list.slice());
+    this.addedStamp = changeStamp();
+    for (const v of before) if (!list.includes(v)) v.detach?.(this);
+    for (const v of list) if (!before.includes(v)) v.attach?.(this);
+  }
   get flatShading(): boolean {
     return this.switches.flatShading;
   }
@@ -3938,7 +3977,13 @@ class MaterialShading implements PBRMaterialShading {
   get version(): number {
     const m = this.m,
       device = this.runtime.gpu;
-    if (!device || m.shader !== Material.prototype.shader || m.bindings !== Material.prototype.bindings || mapped(m))
+    if (
+      !device ||
+      m.shader !== Material.prototype.shader ||
+      m.bindings !== Material.prototype.bindings ||
+      mapped(m) ||
+      m['added'].some((v) => v.bindings)
+    )
       return Number.NaN;
     let v = liveStamp(m, this.seen);
     const base = m['baseMaps'],
@@ -3979,19 +4024,25 @@ class MaterialShading implements PBRMaterialShading {
       own = m.shader(code, group),
       out = key ? featureShader(own, group, key) : own,
       env = m.envMap ? envMapShader(out, group, envKind(m)) : out;
-    return m['clipping'].length ? clipShader(env, group) : env;
+    let text = m['clipping'].length ? clipShader(env, group) : env;
+    for (const v of m['added']) text = v.shader(text, group, m);
+    return text;
   }
   lit(code: string): string {
     const m = this.m,
       out = litShader(m, code);
-    return m.relight(m.envMap ? envMapLit(out, envKind(m)) : out);
+    let text = m.relight(m.envMap ? envMapLit(out, envKind(m)) : out);
+    for (const v of m['added']) if (v.lit) text = v.lit(text, m);
+    return text;
   }
   bindings(): GPUBindGroupEntry[] {
     const m = this.m,
       runtime = this.runtime,
       entries = featureBindings(m, runtime.gpu!, runtime, m.bindings(runtime.gpu!, runtime)),
-      all = m.envMap ? [...entries, ...envBindings(m, runtime.gpu!, runtime)] : entries;
-    return m['clipping'].length ? [...all, { binding: 199, resource: clipUniform(m, runtime.gpu!, runtime) }] : all;
+      all = m.envMap ? [...entries, ...envBindings(m, runtime.gpu!, runtime)] : entries,
+      out = m['clipping'].length ? [...all, { binding: 199, resource: clipUniform(m, runtime.gpu!, runtime) }] : all;
+    if (!m['added'].length) return out;
+    return [...out, ...m['added'].flatMap((v) => v.bindings?.(runtime.gpu!, runtime, m) ?? [])];
   }
 }
 /**
@@ -4016,7 +4067,7 @@ let nextShaderRevision = 1;
  * gltf-pro `PBRMaterialShading.shaderRevision` for `m`: a number that changes whenever what `shader()` and `lit()` read
  * of `m` changes, so gltf-pro composes a material's shader again only then. Their text depends on the shading (fixed),
  * whether the material is bare, the feature maps in use, the feature switches, the normal maps and anisotropy (the
- * tangent frame), the envMap and the clipping planes. Materials with physical maps (their plan follows texture loading)
+ * tangent frame), the envMap, the clipping planes and the optional features. Materials with physical maps (their plan follows texture loading)
  * and classes or instances with their own `shader` give NaN: composed on every frame, as before.
  */
 function shaderRevision(m: Material): number {
@@ -4041,11 +4092,12 @@ function shaderRevision(m: Material): number {
       (+surface[0] << 14) |
       (+surface[1] << 15) |
       (+surface[2] << 16) |
-      (+surface[3] << 17);
+      (+surface[3] << 17),
+    variant = key + m['addedStamp'] * 262144;
   let state = shaderRevisions.get(m);
-  if (!state) shaderRevisions.set(m, (state = { key, revision: nextShaderRevision++ }));
-  else if (state.key !== key) {
-    state.key = key;
+  if (!state) shaderRevisions.set(m, (state = { key: variant, revision: nextShaderRevision++ }));
+  else if (state.key !== variant) {
+    state.key = variant;
     state.revision = nextShaderRevision++;
   }
   return state.revision;

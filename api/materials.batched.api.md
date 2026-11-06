@@ -269,6 +269,8 @@ class Material {
     set color(v: ColorInput);
     get emissive(): LiveColor;
     set emissive(v: ColorInput);
+    get features(): readonly MaterialFeature[];
+    set features(list: readonly MaterialFeature[]);
     get flatShading(): boolean;
     set flatShading(v: boolean);
     get vertexColors(): boolean;
@@ -377,6 +379,15 @@ class Material {
     bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
 }
 
+interface MaterialFeature {
+    readonly name: string;
+    shader(code: string, group: number, material: Material): string;
+    lit?(code: string, material: Material): string;
+    bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
+    attach?(material: Material): void;
+    detach?(material: Material): void;
+}
+
 type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
     material: M extends Material ? Material : readonly Material[];
     setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
@@ -447,6 +458,7 @@ interface MaterialOptions extends PhysicalOptions {
     clipIntersection?: boolean;
     transparent?: boolean;
     alphaTest?: number;
+    features?: readonly MaterialFeature[];
     side?: MaterialSide;
     doubleSided?: boolean;
     wireframe?: boolean;

@@ -33,6 +33,7 @@ export interface TAAOptions {
     depthThreshold?: number;
     depth?: () => GPUTexture | undefined;
     velocityOnly?: boolean;
+    stochastic?: boolean;
 }
 
 export interface TAAVelocity {

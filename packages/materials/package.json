@@ -30,7 +30,8 @@
     "test:gpu": "cd ../.. && node packages/materials/test/browser-check.mjs",
     "test:gpu:cutout-casters": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
     "test:gpu:cutout-passes": "cd ../.. && node packages/materials/test/cutout-passes-browser.mjs",
-    "test:gpu:vertex-inputs": "cd ../.. && node packages/materials/test/vertex-inputs-browser.mjs"
+    "test:gpu:vertex-inputs": "cd ../.. && node packages/materials/test/vertex-inputs-browser.mjs",
+    "test:gpu:features": "cd ../.. && node packages/materials/test/features-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -49,6 +50,10 @@
     "./batched": {
       "types": "./dist/batched.d.ts",
       "import": "./dist/batched.js"
+    },
+    "./alpha-hash": {
+      "types": "./dist/alpha-hash.d.ts",
+      "import": "./dist/alpha-hash.js"
     }
   },
   "files": [

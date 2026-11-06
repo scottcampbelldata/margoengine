@@ -662,6 +662,50 @@ contact.add(fence);
 await engine.pick(x, y); // null through a hole, and no contact shadow under one
 ```
 
+## Optional features
+
+`Material.features` lists optional surface features, each from its own entry of this package: importing the entry is
+the only cost, and a material that does not list a feature keeps its shader text, bindings and uniforms exactly. The list
+is live (assign a new one), holds one feature of each kind, and `clone()` and `copy()` carry it. Every class takes it,
+`WgslMaterial` and `NodeMaterial` included.
+
+### Hashed alpha (`@margoengine/materials/alpha-hash`)
+
+`alphaHash()` is a cut-out whose threshold is noise, so opacity comes out as the share of pixels drawn: hair, foliage and
+fading objects look soft with no sorting, and each pixel writes depth like any cut-out. The noise is a hash of the
+object-space position at a grid about a pixel across (Wyman and McGuire 2017), so it stays on the surface as the object or
+camera moves and does not swim. Opacity is the colour's alpha, `map`, `alphaMap` and vertex colours, the same value
+`alphaTest` reads.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
+import { alphaHash } from 'margoengine/materials/alpha-hash';
+import { planeGeometry } from 'margoengine/geometry';
+import { TAA } from 'margoengine/taa';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const hair = new PbrMaterial({ map: await loadTexture('/strands.png'), side: 'double', features: [alphaHash()] });
+const card = createMesh(engine, planeGeometry(1, 1), hair);
+TAA.attach(engine, { stochastic: true }).add(card); // averages the grain out over frames
+hair.color[3] = 0.4; // a fade: 40% of the pixels draw
+hair.features = []; // live: back to the plain material
+```
+
+| Option | Meaning |
+| --- | --- |
+| `scale` | Noise cells per pixel, above 0 (default 1): above 1 a finer grain, below 1 coarser |
+| `cutoff` | The alpha cutoff of the passes that do not run the colour shader, used while the material's `alphaTest` is 0 (default 0.5). A material with an `alphaTest` of its own keeps it |
+
+Alone the noise shows as grain. `TAA` with `stochastic: true` averages it: on an RTX A6000, a 50% quad's per-pixel spread
+falls from 0.50 to 0.16 of full white after 48 frames, keeping the mean. Without `stochastic` TAA's depth rejection keeps
+the surface and what is behind it apart, and the grain stays. The option costs a pixel of ghosting along moving edges.
+
+Shadow maps, picking, contact shadows and TAA velocity cut at `cutoff`, not by noise, so a fading object's shadow goes at
+once and a surface moving under TAA with opacity below `cutoff` writes no velocity. SSAO's depth and normals see the
+noise. Overlapping copies of a mesh share one pattern, and a material drawn `transparent` blends and ignores the feature.
+
 ## Parallax, triplanar and subsurface
 
 Three more surface options, live like the others. Each compiles into a material's shader only while it is in use:

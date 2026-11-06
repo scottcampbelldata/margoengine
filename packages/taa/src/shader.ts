@@ -99,6 +99,24 @@ export const resolve =
       if(abs(d-previousDepth)<=max(0.000001,temporal.settings.y*max(d,previousDepth))){old+=textureLoad(history,pixel,0).rgb*weight;total+=weight;}}}
     if(total>0.001){result=mix(current,rgb(clamp(ycocg(old/total),lo,hi)),temporal.settings.x);}}
   textureStore(output,p,vec4f(max(result,vec3f(0)),1));textureStore(outputDepth,p,vec4f(textureLoad(depth,p,0)));}`;
+// `stochastic` (TAAOptions): a surface cut by noise holds two depths per pixel, so history is accepted over the 3x3 depth
+// range, and the nearest pixel there gives the motion.
+export const stochasticResolve = () =>
+  resolve
+    .replace(
+      `  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,p,0).xy;
+  let previousDepth=textureLoad(expected,p,0).r;var result=current;
+`,
+      `  var previousDepth=textureLoad(expected,p,0).r;var result=current;var far=previousDepth;var moved=p;
+  for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){let q=clamp(p+vec2i(x,y),vec2i(0),vec2i(size)-1);
+    let d=textureLoad(expected,q,0).r;far=min(far,d);if(d>previousDepth){previousDepth=d;moved=q;}}}
+  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,moved,0).xy;
+`,
+    )
+    .replace(
+      'if(abs(d-previousDepth)<=max(0.000001,temporal.settings.y*max(d,previousDepth))){old+=',
+      'let slack=max(0.000001,temporal.settings.y*max(d,previousDepth));if(d>=far-slack&&d<=previousDepth+slack){old+=',
+    );
 export const present =
   fullscreen +
   `

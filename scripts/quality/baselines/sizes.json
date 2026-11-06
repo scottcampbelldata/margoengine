@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5238117,
+  "total": 5252737,
   "history": [
     {
       "date": "2026-10-24",
@@ -2414,6 +2414,12 @@
       "commit": "24190aa76",
       "reason": "ecs/engine: MeshBridge.sync gathers rows for TransformWriter and groups links per engine, the bulk step its job asked for (gap B9)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "33e0e0ecf",
+      "reason": "materials/alpha-hash is a new entry; root gains the features list",
+      "grew": 2
     }
   ],
   "items": {
@@ -2701,6 +2707,7 @@
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/stream": 1778,
     "@margoengine/materials": 61113,
+    "@margoengine/materials/alpha-hash": 1309,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,
     "@margoengine/materials/transmission": 7416,
@@ -2904,7 +2911,7 @@
     "@margoengine/stats/leaks": 1921,
     "@margoengine/stats/phases": 1714,
     "@margoengine/stats/report": 1378,
-    "@margoengine/taa": 11747,
+    "@margoengine/taa": 12187,
     "@margoengine/taa/upscale": 7093,
     "@margoengine/terrain": 12359,
     "@margoengine/text": 16406,
