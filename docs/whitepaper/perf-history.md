@@ -1698,6 +1698,27 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   A quiet run is still owed. three has no `p-pmrem-refresh` scene: that row compares with `p-pmrem`'s three column.
 - **Guard:** `packages/environment/tests/brdf-share.test.js`, `packages/environment/tests/environment-browser.js` (4b).
 
+### 69. A geometry drawn by several nodes goes into a USDZ once
+
+- **Loss:** `p-export-usdz`, 1,000 nodes of one box: 16.0 ms against three's 2.5, and 2.46 MB against 444 KB. Every node
+  wrote the box's numbers again as world-space text.
+- **Fix:** `exportUSDZ` writes a geometry two or more nodes draw once, as `class Mesh "Shape_0"`. Each node is a `def Mesh`
+  that references it and adds its `matrix4d xformOp:transform`, display name, display primvars and material binding. A
+  material object is written once per kind of colour stream. A mesh used once stays as it was. So does a mirrored node:
+  the plan was `orientation = "leftHanded"` on a reference, but the winding reversed in the file needs nothing from a
+  viewer's handling of a negative scale, and the world-space path already does it. `readUSDA` and `@margoengine/usdz`
+  compose an internal reference, with what the prim authors winning; every other kind of composition stays refused.
+- **After:** 4.4 ms against three's WebGL 3.2, 496,187 B against 444,202 B (run `20261106-021338-817228d0c-dev`, `--no-gate`, other
+  jobs running, diagnostic; RTX A6000, Edge 156).
+- **Apple:** a scene with rotation, non-uniform scale, a mirrored node, a blended material and painted nodes, exported
+  shared and with a geometry per node, on a Mac mini with macOS 27.2: `usdchecker --arkit` passes both, RealityKit gives
+  the same seven models and bounds, and the Quick Look thumbnails are byte-identical.
+- **Difference:** the rest is 52 KB more text and the validated scene collector, which checks every node. A CPU profile
+  in Node (2.4 ms best) finds no hot spot: building the text 24%, `compose` and the collector about 20%, numbers 20%, CRC 7%.
+- **Rerun:** `node bench/cli.mjs parity --cases=p-export-usdz --engines=margo,three-webgl-parity --runs=3 --warmup=1
+  --no-compare --no-fail`. A quiet run is still owed.
+- **Guard:** `packages/exporters/tests/usdz-shared.test.js`.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
@@ -1725,10 +1746,8 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
   4.5 ms against 3.5 (entry 57, busy machine; accepted difference in work, see entry 31; with three's
   `computeVertexNormals()` on both sides, `p-stl-normals`, Margo is 5.2 against 10.7 ms, faster): it computes the flat
   normals the file leaves zero, where three copies the zeros.
-  `p-export-usdz` 16.0 ms against 2.5 (run `20261026-165034`, diagnostic): `exportUSDZ` writes every mesh in world
-  space (2.46 MB) where three's archive is 444 KB. Causes and plans:
-  [known-bugs.md](../known-bugs.md#stl-import-still-computes-normals-threes-stlloader-leaves-zero) and
-  [the USDZ entry](../known-bugs.md#usdz-export-writes-every-mesh-in-world-space).
+  `p-export-usdz` 4.4 ms against 3.2 (entry 69, busy machine). Cause and plan:
+  [known-bugs.md](../known-bugs.md#stl-import-still-computes-normals-threes-stlloader-leaves-zero).
 - **Galaxy S23 Ultra island demo.** A report of 3–5 FPS on that phone, with particles off making no difference.
   - Partial fixes: `909e384a`, and `1c627cdc` (scatter compiles the fade `discard` only when instances can fade).
   - No after number is recorded. The project has no S23 to test on.

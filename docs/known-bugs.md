@@ -23,33 +23,40 @@ are still open.
 These features pass their tests against the published specifications, but the only real check is a device the project
 does not own. Each entry says exactly what is needed to close it.
 
-### USDZ export with textures: never opened in Quick Look
+### USDZ export with textures: Quick Look on a Mac only
 
 - **What:** `exportUSDZ` in `@margoengine/exporters` (`packages/exporters/src/usdz.ts`) writes UsdPreviewSurface
   materials with texture readers (base colour with opacity and `opacityThreshold`, metal-rough on the g and b channels,
   normal, occlusion, emissive, `st`/`st1` texcoords with the V flip, a base-colour `UsdTransform2d`, wrap modes) and
   stores each image 64-byte aligned and uncompressed.
 - **Verified:** the USDZ tests (`packages/exporters/tests/usdz.test.js`) check the shader graph text, every file's
-  alignment, the image bytes and a round trip through our own USD reader (`@margoengine/usdz`). OpenUSD's own checker
-  (`packages/exporters/tests/validate-usdz.py`) has not been run on textured output: it needs the `usd-core` Python package, which is not
-  installed on the development machines.
-- **Not verified:** that Apple's renderers show the textures as intended. A non-default `normalScale` writes a normal
-  scale and bias that OpenUSD's validator may flag as non-standard.
-- **Needed to close:**
-  1. An iPhone or iPad on iOS 17 or later, or a Mac on macOS 14 or later (Quick Look and AR Quick Look).
-  2. The kit's exported files opened there, each compared with the same scene drawn by Margo: a base-colour texture with an
-     alpha mask (`opacityThreshold`), a blended (alpha) texture, a metal-rough map plus a normal map at `normalScale` 1
-     and 2, an occlusion plus emissive map, a base-colour texture transform (offset, scale and rotation) with repeat
-     and mirror wrapping, and rotation alone at +30 and -30 degrees.
-     `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes them (eight files: `normalScale` 1 and 2 are
-     separate; 07 and 08 are the rotations), with engine-drawn reference twins.
-     Texture rotation (KHR_texture_transform radians, written as `UsdTransform2d` degrees with the same sign, and read
-     back the same way by `@margoengine/usdz`) is written but not yet confirmed on a device: Quick Look on iOS 27.2 drew file 06 leaning clockwise, as gltf-pro draws the same glTF
-     transform (the kit's first checklist expected anticlockwise; that expectation was wrong). Files 07 (+30, should
-     lean clockwise) and 08 (-30, anticlockwise) await a device re-check.
-  3. `pip install usd-core`, then `python packages/exporters/tests/validate-usdz.py <file>` on the same files.
-  4. The result (pass, or the difference seen) recorded here and in `docs/threejs-parity.md` (USDZExporter row).
+  alignment, the image bytes and a round trip through our own USD reader (`@margoengine/usdz`). On a Mac mini with
+  macOS 27.2 (2026-11-05, over SSH), the eight kit files: `usdchecker --arkit` passes all of them, and their Quick Look
+  thumbnails draw the alpha mask, the blended texture and the transforms as intended, 07 (+30) leaning clockwise and
+  08 (-30) anticlockwise.
+- **Open:**
+  1. Quick Look ignores `normalScale`: files 03 (scale 1) and 04 (scale 2) give byte-identical thumbnails, and
+     `usdchecker` warns `NormalMapTextureValidator.NonCompliantScaleValues` on 04.
+  2. The thumbnails were read by eye, not compared with the engine-drawn twins.
+  3. Nothing has been opened on an iPhone or iPad, in AR or otherwise.
+- **Needed to close:** `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes the eight files and their twins.
+  Open them on an iPhone or iPad on iOS 17 or later, compare each with the same scene drawn by Margo, and record the
+  result here and in `docs/threejs-parity.md` (USDZExporter row).
 
+### USDZ vertex colours draw grey in Quick Look
+
+- **What:** a painted mesh from `exportUSDZ` is flat grey in Quick Look (macOS 27.2 thumbnail, 2026-11-05). `usdchecker
+  --arkit` passes, and `@margoengine/usdz`, `readUSDA` and any reader that follows `UsdPrimvarReader` get the colours.
+- **Repro:** `exportUSDZ({ nodes: [{ geometry: { positions, normals, indices, colors, colorSize: 3 }, material: { color:
+  [1, 1, 1, 1] } }] })`, then open the file in Quick Look.
+- **Cause (measured):** Apple's renderer does not follow a `UsdPrimvarReader_float3` into `inputs:diffuseColor`. `token`
+  or `string` for `inputs:varname` makes no difference (byte-identical thumbnails). The same mesh with no material bound
+  draws its colours.
+- **Plan:** leave the material out when it says nothing but the paint (no textures, metalness 0, roughness 1, no
+  emission, opaque), and teach `@margoengine/usdz` to read `displayColor` on an unbound mesh. A material that says more
+  cannot show paint on Apple's renderer; it needs the colours baked into a texture.
+
+### WebXR AR hit testing: never run on an AR device
 ### WebXR AR hit testing: never run on an AR device
 
 - **What:** `HitTest` in `@margoengine/xr` (`packages/xr/src/hit-test.ts`): hit-test sources from the viewer, an input
@@ -556,17 +563,6 @@ rows 10.11 and 11.3; run `20261026-165034`, busy machine, diagnostic). Their fir
   What is left is the work itself: the identity index array (0.4 ms) and about 1.1 ms of normal maths.
 - **Plan:** for `parseSTL`, the remaining gap is the computed normals, which are
   the behavior a user needs; an opt-out only to win a benchmark would measure less work, so it is not planned.
-
-### USDZ export writes every mesh in world space
-
-- **What:** `p-export-usdz`, 1,000 boxes: `exportUSDZ` 16.0 ms (52.8 before entry 26) against three's `USDZExporter`
-  2.5 ms; the archives are 2.46 MB against 444 KB.
-- **Cause (measured):** `exportUSDZ` writes each node as its own world-space mesh, so the box's 24 vertices, normals
-  and UVs are written 1,000 times as shortest round-trip text (144,000 numbers). three's archive is 5.5x
-  smaller, so it writes far fewer.
-- **Plan:** write a geometry shared by several nodes once (a mesh under a class prim) and give each node an Xform with
-  its transform that references it, with `orientation = "leftHanded"` for mirrored nodes. It changes the archive's
-  layout, so it waits for the Quick Look check of the entry at the top of this page.
 
 ### Morph targets: CPU per Animation per frame
 

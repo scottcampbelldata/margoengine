@@ -203,7 +203,10 @@ function parseLayer(input: string | BinaryInput, options: USDOptions): Specs {
       fail('USDA layer is not UTF-8 text');
     }
     if (!text.startsWith('#usda 1.0')) fail('expected USDA or USDC');
-    if (/\b(?:references|payload|subLayers|inherits|specializes|variantSet|timeSamples|instanceable)\b/.test(text))
+    // readUSDA composes internal references (`references = </Path>`), so only those pass.
+    if (
+      /\b(?:references(?!\s*=\s*<)|payload|subLayers|inherits|specializes|variantSet|timeSamples|instanceable)\b/.test(text)
+    )
       fail('composition and animation are unsupported');
     specs = asciiSpecs(text, limits.maxDepth, options.signal);
   }

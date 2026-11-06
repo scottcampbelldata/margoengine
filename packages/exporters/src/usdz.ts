@@ -1,12 +1,16 @@
 import {
   collect,
+  determinant3,
   drawables,
   num,
   toWorld,
   normalizeMaterial,
   samplerOf,
   textureFiles,
+  type Drawable,
   type ExportSource,
+  type Geo,
+  type Mat,
   type SceneOptions,
   type TextureData,
 } from './scene.js';
@@ -105,8 +109,52 @@ const TEXTURES = [
   'emissiveTexture',
 ] as const;
 
+/** Whether a material samples UV set `set`. */
+const samples = (material: Mat, set: number): boolean =>
+  TEXTURES.some((slot) => material[slot] && (material[slot].texCoord ?? 0) === set);
+
+/** One geometry written once for the nodes that share it: its class prim's name, local bounds and the UV sets they read. */
+interface Shape {
+  users: number;
+  sets: [boolean, boolean];
+  path?: string;
+  min: number[];
+  max: number[];
+}
+
 /**
- * Static, world-space USD meshes with UsdPreviewSurface materials in a stored, 64-byte-aligned USDZ archive.
+ * The geometries drawn by two or more nodes. A mirrored node keeps its own world-space mesh: its winding is reversed in
+ * the file, so nothing depends on how a renderer treats a negative scale.
+ */
+function sharedShapes(items: readonly Drawable[], fallback: Mat): Map<Geo, Shape> {
+  const shapes = new Map<Geo, Shape>();
+  for (const { geometry, material = fallback, world } of items) {
+    if (determinant3(world) <= 0) continue;
+    let shape = shapes.get(geometry);
+    if (!shape) {
+      const min = [Infinity, Infinity, Infinity],
+        max = [-Infinity, -Infinity, -Infinity];
+      for (let v = 0; v < geometry.count * 3; v++) {
+        min[v % 3] = Math.min(min[v % 3], geometry.positions[v]);
+        max[v % 3] = Math.max(max[v % 3], geometry.positions[v]);
+      }
+      shapes.set(geometry, (shape = { users: 0, sets: [false, false], min, max }));
+    }
+    shape.users++;
+    shape.sets[0] ||= samples(material, 0);
+    shape.sets[1] ||= samples(material, 1);
+  }
+  for (const [geometry, shape] of shapes) if (shape.users < 2) shapes.delete(geometry);
+  return shapes;
+}
+
+const OUTSIDE_FLOAT32 = 'USDZ world position exceeds Float32 range; move the model closer to the origin or lower its scale';
+
+/**
+ * Static USD meshes with UsdPreviewSurface materials in a stored, 64-byte-aligned USDZ archive. A mesh used by one node is
+ * written in world space. A geometry drawn by several nodes is written once, in its own space, as a `class` prim that
+ * each node's Mesh references, with the node's world matrix as `xformOp:transform`. A material shared by several
+ * nodes is written once.
  *
  * Material textures (`TextureData`, as the glTF writers take them) become `UsdUVTexture` readers of the mesh's
  * `primvars:st` (from `uvs`, V flipped) or `primvars:st1` (from `uvs1`): base color into `diffuseColor` scaled by the
@@ -125,7 +173,11 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
   const prefix = options.texturePrefix ?? 'textures/';
   if (typeof prefix === 'string' && /^\/|(^|\/)\.\.(\/|$)/.test(prefix))
     throw new TypeError(`USDZ texturePrefix "${prefix}" leaves the archive; use a relative folder such as 'textures/'`);
-  const files = textureFiles(prefix);
+  const files = textureFiles(prefix),
+    fallback = normalizeMaterial({}),
+    shapes = sharedShapes(items, fallback),
+    written = new Map<string, { path: string; sets: boolean[] }>(),
+    keys = new Map<Mat, number>();
   const lines = [
     '#usda 1.0',
     '(',
@@ -137,10 +189,9 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
   ];
   for (let i = 0; i < items.length; i++) {
     const item = items[i],
-      { geometry } = item,
-      { positions, normals, indices } = toWorld(item),
-      material = item.material ?? normalizeMaterial({}),
-      path = `/Margo/Material_${i}`,
+      { geometry, world } = item,
+      material = item.material ?? fallback,
+      shape = determinant3(world) > 0 ? shapes.get(geometry) : undefined,
       base = material.baseColorTexture;
     for (const slot of TEXTURES) {
       const texture = material[slot];
@@ -165,21 +216,14 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
         for (let c = 0; c < 3; c++) displayColor[v * 3 + c] = colors[v * geometry.colorSize + c] * material.color[c];
         if (displayOpacity) displayOpacity[v] = colors[v * 4 + 3] * opacity;
       }
-    for (let v = 0; v < positions.length; v++)
-      if (!Number.isFinite(Math.fround(positions[v])))
-        throw new RangeError(
-          'USDZ world position exceeds Float32 range; move the model closer to the origin or lower its scale',
-        );
-    const min = [Infinity, Infinity, Infinity],
-      max = [-Infinity, -Infinity, -Infinity];
-    for (let v = 0; v < positions.length; v++) {
-      const axis = v % 3;
-      min[axis] = Math.min(min[axis], positions[v]);
-      max[axis] = Math.max(max[axis], positions[v]);
-    }
+    // One material per object and colour stream; its prim takes the first user's number.
+    if (!keys.has(material)) keys.set(material, keys.size);
+    const key = `${keys.get(material)}:${colors ? 1 : 0}:${displayOpacity ? 1 : 0}`,
+      known = written.get(key),
+      path = known?.path ?? `/Margo/Material_${i}`;
     // Texture shaders, built first so the surface can name their outputs.
     const shaders: string[] = [],
-      sets: boolean[] = [];
+      sets: boolean[] = known?.sets ?? [];
     const uv = (set: number): string => {
       if (!sets[set]) {
         sets[set] = true;
@@ -236,47 +280,88 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
       );
       return `${path}/${name}.outputs:`;
     };
-    const baseOut = base && sample('BaseColorTexture', base, true, material.color),
-      metalRough =
-        material.metallicRoughnessTexture &&
-        sample('MetallicRoughnessTexture', material.metallicRoughnessTexture, false, [
-          1,
-          material.roughness,
-          material.metalness,
-          1,
-        ]),
-      s = material.normalScale,
-      normal =
-        material.normalTexture &&
-        sample('NormalTexture', material.normalTexture, false, [2 * s, 2 * s, 2, 1], [-s, -s, -1, 0]),
-      k = material.occlusionStrength,
-      occlusion =
-        material.occlusionTexture &&
-        sample(
-          'OcclusionTexture',
-          material.occlusionTexture,
-          false,
-          [k, k, k, 1],
-          k === 1 ? undefined : [1 - k, 1 - k, 1 - k, 0],
-        ),
-      emissive = material.emissive.map((v) => v * material.emissiveStrength),
-      emission =
-        material.emissiveTexture && sample('EmissiveTexture', material.emissiveTexture, true, [...emissive, 1]);
-    const vertexST = (set: 0 | 1): string[] => {
+    const surface = (): string[] => {
+      const baseOut = base && sample('BaseColorTexture', base, true, material.color),
+        metalRough =
+          material.metallicRoughnessTexture &&
+          sample('MetallicRoughnessTexture', material.metallicRoughnessTexture, false, [
+            1,
+            material.roughness,
+            material.metalness,
+            1,
+          ]),
+        s = material.normalScale,
+        normal =
+          material.normalTexture &&
+          sample('NormalTexture', material.normalTexture, false, [2 * s, 2 * s, 2, 1], [-s, -s, -1, 0]),
+        k = material.occlusionStrength,
+        occlusion =
+          material.occlusionTexture &&
+          sample(
+            'OcclusionTexture',
+            material.occlusionTexture,
+            false,
+            [k, k, k, 1],
+            k === 1 ? undefined : [1 - k, 1 - k, 1 - k, 0],
+          ),
+        emissive = material.emissive.map((v) => v * material.emissiveStrength),
+        emission =
+          material.emissiveTexture && sample('EmissiveTexture', material.emissiveTexture, true, [...emissive, 1]);
+      return [
+        `def Material "Material_${i}" {`,
+        `    token outputs:surface.connect = <${path}/Surface.outputs:surface>`,
+        '    def Shader "Surface" {',
+        '        uniform token info:id = "UsdPreviewSurface"',
+        baseOut
+          ? `        color3f inputs:diffuseColor.connect = <${baseOut}rgb>`
+          : colors
+            ? `        color3f inputs:diffuseColor.connect = <${path}/Color.outputs:result>`
+            : `        color3f inputs:diffuseColor = ${tuple(material.color.slice(0, 3))}`,
+        emission
+          ? `        color3f inputs:emissiveColor.connect = <${emission}rgb>`
+          : `        color3f inputs:emissiveColor = ${tuple(emissive)}`,
+        metalRough
+          ? `        float inputs:roughness.connect = <${metalRough}g>`
+          : `        float inputs:roughness = ${num(material.roughness)}`,
+        metalRough
+          ? `        float inputs:metallic.connect = <${metalRough}b>`
+          : `        float inputs:metallic = ${num(material.metalness)}`,
+        baseOut && !opaque
+          ? `        float inputs:opacity.connect = <${baseOut}a>`
+          : displayOpacity
+            ? `        float inputs:opacity.connect = <${path}/Opacity.outputs:result>`
+            : `        float inputs:opacity = ${num(opacity)}`,
+        ...(material.alphaMode === 'MASK' && !opaque
+          ? [`        float inputs:opacityThreshold = ${num(cutoff)}`]
+          : []),
+        ...(normal ? [`        normal3f inputs:normal.connect = <${normal}rgb>`] : []),
+        ...(occlusion ? [`        float inputs:occlusion.connect = <${occlusion}r>`] : []),
+        '        token outputs:surface',
+        '    }',
+        ...(colors ? reader('Color', 'float3', 'displayColor', '(1, 1, 1)') : []),
+        ...(displayOpacity ? reader('Opacity', 'float', 'displayOpacity', '1') : []),
+        ...shaders,
+        '}',
+      ];
+    };
+    // Built before the mesh, which writes the UV sets the material reads; written after it.
+    const materialLines = known ? [] : surface();
+    if (!known) written.set(key, { path, sets });
+    const vertexST = (set: 0 | 1, wanted: boolean): string[] => {
       const uvs = set ? geometry.uvs1 : geometry.uvs;
-      return sets[set] && uvs
+      return wanted && uvs
         ? [`    texCoord2f[] primvars:st${set ? '1' : ''} = ${tuples(st(uvs), 2)} (interpolation = "vertex")`]
         : [];
     };
-    lines.push(
-      `def Mesh "Mesh_${i}" (apiSchemas = ["MaterialBindingAPI"]) {`,
-      `    string displayName = ${JSON.stringify(item.name ?? `Mesh ${i}`)}`,
-      `    float3[] extent = ${tuples([...min, ...max], 3)}`,
-      `    point3f[] points = ${tuples(positions, 3)}`,
+    const topology = (points: ArrayLike<number>, normals: ArrayLike<number>, indices: Uint32Array, bounds: number[]) => [
+      `    float3[] extent = ${tuples(bounds, 3)}`,
+      `    point3f[] points = ${tuples(points, 3)}`,
       `    normal3f[] normals = ${tuples(normals, 3)} (interpolation = "vertex")`,
       `    int[] faceVertexCounts = [3${', 3'.repeat(indices.length / 3 - 1)}]`,
       `    int[] faceVertexIndices = [${indices.join(', ')}]`,
       '    uniform token subdivisionScheme = "none"',
+    ];
+    const appearance = [
       `    uniform bool doubleSided = ${material.doubleSided}`,
       `    color3f[] primvars:displayColor = ${tuples(displayColor, 3)}${colors ? ' (interpolation = "vertex")' : ''}`,
       ...(displayOpacity
@@ -284,42 +369,64 @@ export function exportUSDZ(source: ExportSource, options: USDZOptions = {}): Uin
             `    float[] primvars:displayOpacity = [${Array.from(displayOpacity, num).join(', ')}] (interpolation = "vertex")`,
           ]
         : []),
-      ...vertexST(0),
-      ...vertexST(1),
+    ];
+    if (shape) {
+      // The world position of every vertex lies inside the world box of the local bounds' corners.
+      for (let corner = 0; corner < 8; corner++) {
+        const x = corner & 1 ? shape.max[0] : shape.min[0],
+          y = corner & 2 ? shape.max[1] : shape.min[1],
+          z = corner & 4 ? shape.max[2] : shape.min[2];
+        for (let r = 0; r < 3; r++)
+          if (!Number.isFinite(Math.fround(world[r] * x + world[4 + r] * y + world[8 + r] * z + world[12 + r])))
+            throw new RangeError(OUTSIDE_FLOAT32);
+      }
+      if (!shape.path) {
+        const name = `Shape_${i}`;
+        shape.path = `/Margo/${name}`;
+        lines.push(
+          `class Mesh "${name}" {`,
+          ...topology(geometry.positions, geometry.normals, geometry.indices, [...shape.min, ...shape.max]),
+          ...vertexST(0, shape.sets[0]),
+          ...vertexST(1, shape.sets[1]),
+          '}',
+        );
+      }
+      const row = (at: number): string => tuple([world[at], world[at + 1], world[at + 2], world[at + 3]]);
+      lines.push(
+        `def Mesh "Mesh_${i}" (`,
+        '    apiSchemas = ["MaterialBindingAPI"]',
+        `    references = <${shape.path}>`,
+        ') {',
+        `    string displayName = ${JSON.stringify(item.name ?? `Mesh ${i}`)}`,
+        `    matrix4d xformOp:transform = (${row(0)}, ${row(4)}, ${row(8)}, ${row(12)})`,
+        '    uniform token[] xformOpOrder = ["xformOp:transform"]',
+        ...appearance,
+        `    rel material:binding = <${path}>`,
+        '}',
+        ...materialLines,
+      );
+      continue;
+    }
+    const { positions, normals, indices } = toWorld(item);
+    for (let v = 0; v < positions.length; v++)
+      if (!Number.isFinite(Math.fround(positions[v]))) throw new RangeError(OUTSIDE_FLOAT32);
+    const min = [Infinity, Infinity, Infinity],
+      max = [-Infinity, -Infinity, -Infinity];
+    for (let v = 0; v < positions.length; v++) {
+      const axis = v % 3;
+      min[axis] = Math.min(min[axis], positions[v]);
+      max[axis] = Math.max(max[axis], positions[v]);
+    }
+    lines.push(
+      `def Mesh "Mesh_${i}" (apiSchemas = ["MaterialBindingAPI"]) {`,
+      `    string displayName = ${JSON.stringify(item.name ?? `Mesh ${i}`)}`,
+      ...topology(positions, normals, indices, [...min, ...max]),
+      ...appearance,
+      ...vertexST(0, !!sets[0]),
+      ...vertexST(1, !!sets[1]),
       `    rel material:binding = <${path}>`,
       '}',
-      `def Material "Material_${i}" {`,
-      `    token outputs:surface.connect = <${path}/Surface.outputs:surface>`,
-      '    def Shader "Surface" {',
-      '        uniform token info:id = "UsdPreviewSurface"',
-      baseOut
-        ? `        color3f inputs:diffuseColor.connect = <${baseOut}rgb>`
-        : colors
-          ? `        color3f inputs:diffuseColor.connect = <${path}/Color.outputs:result>`
-          : `        color3f inputs:diffuseColor = ${tuple(material.color.slice(0, 3))}`,
-      emission
-        ? `        color3f inputs:emissiveColor.connect = <${emission}rgb>`
-        : `        color3f inputs:emissiveColor = ${tuple(emissive)}`,
-      metalRough
-        ? `        float inputs:roughness.connect = <${metalRough}g>`
-        : `        float inputs:roughness = ${num(material.roughness)}`,
-      metalRough
-        ? `        float inputs:metallic.connect = <${metalRough}b>`
-        : `        float inputs:metallic = ${num(material.metalness)}`,
-      baseOut && !opaque
-        ? `        float inputs:opacity.connect = <${baseOut}a>`
-        : displayOpacity
-          ? `        float inputs:opacity.connect = <${path}/Opacity.outputs:result>`
-          : `        float inputs:opacity = ${num(opacity)}`,
-      ...(material.alphaMode === 'MASK' && !opaque ? [`        float inputs:opacityThreshold = ${num(cutoff)}`] : []),
-      ...(normal ? [`        normal3f inputs:normal.connect = <${normal}rgb>`] : []),
-      ...(occlusion ? [`        float inputs:occlusion.connect = <${occlusion}r>`] : []),
-      '        token outputs:surface',
-      '    }',
-      ...(colors ? reader('Color', 'float3', 'displayColor', '(1, 1, 1)') : []),
-      ...(displayOpacity ? reader('Opacity', 'float', 'displayOpacity', '1') : []),
-      ...shaders,
-      '}',
+      ...materialLines,
     );
   }
   lines.push('}');

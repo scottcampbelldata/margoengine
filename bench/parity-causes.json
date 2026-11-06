@@ -64,8 +64,7 @@
     ]
   },
   "11.3": {
-    "cause": "Before: num() tried toPrecision(1..9) for every number (75% of the time) and CRC-32 ran a byte at a time. Now a binary search with a value cache and slicing-by-8: 52.8 -> 16.0 ms, byte-identical archive. The rest is different output: Margo writes every mesh in world space (2.46 MB for 1,000 boxes), three's archive is 444 KB, so it writes far fewer numbers. Closing it means writing a shared mesh once with per-node transforms, an exporter format change left for a decision",
-    "knownBug": "usdz-export-writes-every-mesh-in-world-space",
+    "cause": "Before: num() tried toPrecision(1..9) for every number and CRC-32 ran a byte at a time (52.8 -> 16.0 ms), and every node wrote its own world-space mesh (2.46 MB). Now a geometry drawn by several nodes is written once and each node references it (perf-history entry 69): 4.4 ms against three's WebGL 3.2, 496 KB against 444 KB, busy machine. What is left is 52 KB more text and the validated scene collector; a profile finds no hot spot, so a quiet run decides it",
     "fixes": [
       {
         "commit": "b30af0b8",

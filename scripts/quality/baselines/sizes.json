@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4611342,
+  "total": 4615371,
   "history": [
     {
       "date": "2026-10-24",
@@ -1784,6 +1784,12 @@
       "commit": "9ffb221c9",
       "reason": "headless gains the formats entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "2d75ea2e4",
+      "reason": "USDZ shared geometry and the reader's vertex colours, alpha modes and references (Batch 5 job 2)",
+      "grew": 4
     }
   ],
   "items": {
@@ -1935,7 +1941,7 @@
     "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
-    "@margoengine/exporters/usdz": 11341,
+    "@margoengine/exporters/usdz": 12020,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 18653,
     "@margoengine/fbx dist/workers/fbx.js": 53500,
@@ -2208,9 +2214,9 @@
     "@margoengine/tween": 5466,
     "@margoengine/ui": 28221,
     "@margoengine/ui/react": 28301,
-    "@margoengine/usdz": 8777,
-    "@margoengine/usdz dist/workers/usdz.js": 67895,
-    "@margoengine/usdz/worker": 9846,
+    "@margoengine/usdz": 9314,
+    "@margoengine/usdz dist/workers/usdz.js": 70174,
+    "@margoengine/usdz/worker": 10380,
     "@margoengine/vfx": 16613,
     "@margoengine/vfx/base": 10476,
     "@margoengine/vfx/curves": 1816,

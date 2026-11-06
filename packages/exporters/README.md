@@ -681,13 +681,32 @@ Apache-2.0 licensed.
 
 ## USDZ for AR Quick Look
 
-`exportUSDZ(engineOrDataScene, options)` returns a `Uint8Array`: a static USDA root and its texture images in an uncompressed ZIP with 64-byte-aligned entries. World-space positions, normals and reflected winding use the existing validated scene collector. Names are kept as display names; hidden descendants are skipped. The stage has a default prim, Y up, meter units, mesh extents and UsdPreviewSurface color/roughness/metalness/emission/opacity materials.
+`exportUSDZ(engineOrDataScene, options)` returns a `Uint8Array`: a static USDA root and its texture images in an uncompressed ZIP with 64-byte-aligned entries. Positions, normals and reflected winding use the existing validated scene collector. Names are kept as display names; hidden descendants are skipped. The stage has a default prim, Y up, meter units, mesh extents and UsdPreviewSurface color/roughness/metalness/emission/opacity materials.
 
 Import `exportUSDZ` from `@margoengine/exporters/usdz`; it loads only USDZ serialization and its shared scene collector. The package root does not export it, so applications that never write USDZ do not carry it.
 
 Save as `.usdz`. A supported Apple device can open `<a rel="ar" href="model.usdz"><img src="preview.png" alt="View the model in AR"></a>`. No headset is required to generate or validate the file.
 
-Hierarchy is baked into world-space meshes. Vertex colors (RGB or RGBA, baked AO included) multiply the base color and are written as vertex `displayColor` (and, for BLEND and MASK materials, `displayOpacity`) primvars that the surface reads through `UsdPrimvarReader` shaders. Animation, skins and morphs are not exported.
+A geometry object two or more nodes draw is written once as a class prim, and each node references it with its own transform, name and material, so a thousand copies of a box cost a thousand short nodes. A mesh used once and a mirrored node are written as world-space meshes, the winding reversed in the file. All other hierarchy is baked.
+
+```ts
+import { exportUSDZ } from 'margoengine/exporters/usdz';
+
+const box = {
+  positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+  normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+  indices: [0, 1, 2, 0, 2, 3],
+};
+// One mesh in the file: pass the same object to share it, a copy to keep a mesh of its own.
+const usdz = exportUSDZ({
+  nodes: [
+    { name: 'left', translation: [-1, 0, 0], geometry: box },
+    { name: 'right', translation: [1, 0, 0], geometry: box },
+  ],
+});
+```
+
+Vertex colors (RGB or RGBA, baked AO included) multiply the base color and are written as vertex `displayColor` (and, for BLEND and MASK materials, `displayOpacity`) primvars that the surface reads through `UsdPrimvarReader` shaders. Quick Look does not follow those readers and draws such a mesh grey ([known bug](../../docs/known-bugs.md#usdz-vertex-colours-draw-grey-in-quick-look)). Animation, skins and morphs are not exported.
 
 Material textures are the same `TextureData` (encoded PNG or JPEG bytes) the glTF writers take, from a data scene or from `materialData` for engine meshes. Each becomes a `UsdUVTexture` reading the mesh's `primvars:st` (its `uvs`, V flipped to USD's bottom-left origin) or `primvars:st1` (`uvs1`, for `texCoord: 1`) through a `UsdPrimvarReader_float2`, with its `wrapS`/`wrapT`:
 
@@ -723,7 +742,7 @@ const usdz = exportUSDZ({
   ],
 });
 // usdz holds scene.usda and textures/albedo.png.
-``` Quick Look presentation remains untested on Apple hardware. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the eight small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with rotation and repeat and mirror wrapping, and rotation +30 and -30 degrees alone) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
+``` Quick Look on a Mac draws the textured kit as intended, apart from `normalScale`, which it ignores; no iPhone or iPad has opened it yet. `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` (repository root, after `npm run build:packages`) writes the eight small textured test scenes for that check (alpha mask, alpha blend, metal-rough with a normal map at scale 1 and 2, occlusion with emissive, texture transform with rotation and repeat and mirror wrapping, and rotation +30 and -30 degrees alone) as `.usdz` files, with `.glb` twins the engine can draw as references; `tests/usdz-quicklook-kit.test.js` checks their layout. `node --test tests/usdz.test.js` checks ZIP layout, the texture shader graph and round trips through `@margoengine/loaders` and `@margoengine/usdz`. Install the official `usd-core` wheel and run `python tests/validate-usdz.py model.usdz` for independent metadata, topology, vertex-color wiring and available OpenUSD package/material validators.
 
 ## Collision and UV animation per engine
 

@@ -25,6 +25,7 @@ export interface USDMesh {
     positions: Float32Array;
     normals: Float32Array;
     uvs?: Float32Array;
+    colors?: Float32Array;
     indices: Uint32Array;
     material: number;
 }

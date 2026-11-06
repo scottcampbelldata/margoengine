@@ -1064,10 +1064,11 @@ test('numbers are written as the shortest text that reads back as the same Float
       uvs: new Float32Array(48).fill(0.5),
       indices: Uint32Array.from({ length: 36 }, (_, i) => i % 24),
     },
+    // A geometry object per node: nodes of one object share a mesh, and this test needs the 144,000 numbers of 1,000 meshes.
     nodes = Array.from({ length: 1000 }, (_, i) => ({
       translation: [Math.sin(i) * 20, (i % 7) * 0.31, Math.cos(i * 1.3) * 20],
       rotation: [0, Math.sin(i / 2), 0, Math.cos(i / 2)],
-      geometry,
+      geometry: { ...geometry },
       material: { color: [0.2, 0.4, 0.6, 1] },
     }));
   // Two separate checks (2026-11-05). The writer against the old digit-by-digit search: both turn the numbers the mesh

@@ -1,5 +1,5 @@
 // Makes the eight small textured USDZ files for the Apple Quick Look check in docs/known-bugs.md ("USDZ export with
-// textures: never opened in Quick Look"). Each file is a lit sphere (a UV sphere written by this script) with textures
+// textures: Quick Look on a Mac only"). Each file is a lit sphere (a UV sphere written by this script) with textures
 // drawn in code, so nothing is downloaded and the files are tiny:
 //   01-alpha-mask.usdz         base colour with an alpha mask (alphaMode MASK, opacityThreshold 0.5)
 //   02-alpha-blend.usdz        base colour with blended alpha (alphaMode BLEND)

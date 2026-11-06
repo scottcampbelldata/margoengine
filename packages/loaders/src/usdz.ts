@@ -37,7 +37,7 @@ export interface USDAReadOptions {
   signal?: AbortSignal;
   /** Return `@path@` asset values as `{asset}` instead of rejecting them. */
   assets?: boolean;
-  /** Drop `over` and `class` prims (with their subtrees) instead of rejecting them. */
+  /** Drop `over` prims (with their subtrees) instead of rejecting them. `class` prims are never drawn in either case. */
   skipOver?: boolean;
 }
 function fail(code: 'syntax' | 'unsupported' | 'range' | 'limit', message: string): never {
@@ -299,9 +299,16 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
         out.set('doc', string(key));
         continue;
       }
+      if (key === 'references') {
+        // Internal references only: a prim of this layer, composed below. Files and lists are composition this reader lacks.
+        expect('=');
+        if (!peek().text.startsWith('<')) fail('unsupported', 'USD composition references to other files is unsupported');
+        out.set(key, value());
+        if (peek().text === ',' || peek().text === ';') take();
+        continue;
+      }
       if (
         [
-          'references',
           'payload',
           'subLayers',
           'variants',
@@ -319,11 +326,12 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
     take();
     return out;
   }
-  const prims = new Map<string, Prim>();
+  const prims = new Map<string, Prim>(),
+    classes = new Map<string, Prim>();
   function prim(parent: string, depth: number): Prim | undefined {
     if (depth > maxDepth) fail('limit', 'prim hierarchy exceeds maxDepth');
     const specifier = take();
-    if (specifier !== 'def' && !(options.skipOver && (specifier === 'over' || specifier === 'class')))
+    if (specifier !== 'def' && specifier !== 'class' && !(options.skipOver && specifier === 'over'))
       fail('unsupported', 'only defined static prims are supported');
     let type = take();
     const name = type.startsWith('"') ? string(type) : value();
@@ -334,20 +342,21 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
       properties = new Map<string, Map<string, Value>>(),
       meta = peek().text === '(' ? metadata() : new Map<string, Value>(),
       children: Prim[] = [];
-    if (prims.has(path)) fail('syntax', 'duplicate prim path');
+    if (prims.has(path) || classes.has(path)) fail('syntax', 'duplicate prim path');
     const result: Prim = { type, name: name as string, path, attrs, metadata: meta, properties, children };
     if (specifier === 'def') prims.set(path, result);
+    else if (specifier === 'class') classes.set(path, result);
     expect('{');
     while (peek().text !== '}') {
       throwIfAborted(options.signal, F);
       const first = peek().text;
-      if (first === 'def' || (options.skipOver && (first === 'over' || first === 'class'))) {
+      if (first === 'def' || first === 'class' || (options.skipOver && first === 'over')) {
         const p = prim(path, depth + 1);
         if (p) children.push(p);
         continue;
       }
       if (!first) fail('syntax', 'unterminated prim');
-      if (first === 'over' || first === 'class' || first === 'variantSet')
+      if (first === 'over' || first === 'variantSet')
         fail('unsupported', `USD composition ${first} is unsupported`);
       const header: string[] = [];
       while (peek().text !== '=') {
@@ -375,10 +384,26 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
     const p = prim('', 1);
     if (p) roots.push(p);
   }
+  // A reference brings its target's properties under the prim; what the prim authors itself is stronger.
+  for (const node of prims.values()) {
+    const reference = node.metadata.get('references');
+    if (reference === undefined) continue;
+    const path = (reference as { path?: string }).path,
+      target = path === undefined ? undefined : (classes.get(path) ?? prims.get(path));
+    if (!target) fail('syntax', `reference target ${path} not found`);
+    if (target.children.length || target.metadata.has('references'))
+      fail('unsupported', 'USD composition references to a prim with children or references is unsupported');
+    for (const [key, value] of target.attrs) if (!node.attrs.has(key)) node.attrs.set(key, value);
+    for (const [key, value] of target.properties) if (!node.properties.has(key)) node.properties.set(key, value);
+    node.metadata.delete('references');
+  }
   return { metadata: metadataMap, roots, prims };
 }
 
-/** Static USDA polygon meshes. Composition, animation and binary Crate layers are rejected explicitly. */
+/**
+ * Static USDA polygon meshes. Internal references (`references = </Path>`, to a `class` or `def` prim without children) are
+ * composed; other composition, animation and binary Crate layers are rejected explicitly.
+ */
 export function parseUSDA(input: string | BinaryInput, options: USDOptions = {}): LoadedGeometry {
   throwIfAborted(options.signal, F);
   const limit = limits(options, F),
