@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5162148,
+  "total": 5168554,
   "history": [
     {
       "date": "2026-10-24",
@@ -2330,6 +2330,12 @@
       "commit": "c5cb5c435",
       "reason": "feat(animation): dual quaternion skinning (new entry @margoengine/animation/dqs)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "9f6fd9061",
+      "reason": "loaders/vdb, new optional entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2599,6 +2605,7 @@
     "@margoengine/loaders/tds": 2685,
     "@margoengine/loaders/threemf-materials": 7917,
     "@margoengine/loaders/usd": 7778,
+    "@margoengine/loaders/vdb": 6406,
     "@margoengine/loaders/vrml": 5087,
     "@margoengine/loaders/vtk-xml": 6937,
     "@margoengine/loaders/worker": 8571,

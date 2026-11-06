@@ -813,6 +813,13 @@ Each is described with its cause and guard in
 - **Cause:** no real runtime or sample file in the repository.
 - **Needed to close:** add rhino3dm as a dev dependency, add a sample file to `THIRD-PARTY-NOTICES.md`, and run the entry's test against both.
 
+### parseVDB is not yet run against a file OpenVDB wrote
+
+- **What:** `@margoengine/loaders/vdb` is tested only on files its own test writes. No published byte-level specification of `.vdb` exists, so the reader and the test's writer share one reading of the format, and a mistake in it would pass both. No real file was on this PC, and getting one needs a download or an OpenVDB install, which needs Scott's approval. The Blosc path has the same gap: its chunks come from the test's own encoder, not from the Blosc library.
+- **Repro:** load any `.vdb` from Blender, Houdini or EmberGen with `parseVDB(bytes)`.
+- **Cause:** no real sample file in the repository.
+- **Needed to close:** add a small sample, compressed with Blosc, to `THIRD-PARTY-NOTICES.md`, and test its voxel count, box and a few values against what OpenVDB reports.
+
 ### parseLAS is not yet run against a real LAZ decoder or survey file
 
 - **What:** `@margoengine/loaders/las` is tested on LAS files built by the test, and its LAZ path through a stand-in `decompress`. No real LAZ decoder was run, because adding one or a sample file needs Scott's approval.

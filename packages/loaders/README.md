@@ -50,6 +50,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseBVH` (`/mocap`) | See [Motion capture](#motion-capture-bvh) |
 | `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
+| `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
 | `parseNRRD` (`/nrrd`, async) | See [NRRD volumes](#nrrd-volumes) |
 | `parseLDraw` (`/ldraw`, async) | See [LDraw](#ldraw) |
 | `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
@@ -565,6 +566,29 @@ console.log(positions.length / 3, classification[0], origin);
 - **Attributes.** `intensity`, `classification`, `returnNumber`, `returnCount`, `gpsTime` where the format has it, and `colors` in [0,1], from 16 bits or from 8 for files that fill only the low byte. `header` and `records` give the header and its variable records, projection included.
 - **Thinning.** `step: 4` keeps every fourth point, and `maxVertices` counts points after thinning.
 - **LAZ.** LAZ is the same layout behind an entropy coder. This package has no decoder of its own: pass `decompress`, a wrapper around one you load, which gets the file and its header and returns the plain point records. Without it a LAZ file is an `unsupported` error. The hook is tested with a stand-in, not a real decoder: see [known bugs](../../docs/known-bugs.md).
+
+## VDB volumes
+
+`parseVDB` from `@margoengine/loaders/vdb` reads OpenVDB `.vdb` files, the sparse volumes that simulation tools write for smoke, clouds and fire. It reads file versions 222 and later, which is OpenVDB 2.0 onward.
+
+```ts
+import { parseVDB } from '@margoengine/loaders/vdb';
+
+const bytes = await (await fetch('/sims/smoke.vdb')).arrayBuffer();
+const { grids, skipped } = await parseVDB(bytes, { grids: ['density'] });
+const density = grids[0]!;
+console.log(density.gridClass, density.activeVoxels, density.box, skipped.length);
+console.log(density.at(10, 20, 30), density.isActive(10, 20, 30));
+const { data, dims, bounds } = density.dense();
+console.log(data.length, dims, bounds); // fig.volume(data, { dims, bounds }) in @margoengine/sciviz
+```
+
+- **Sparse.** Each grid keeps `leaves` (blocks of voxels, with an active mask) and `tiles` (cubes of one value) as the file stores them. `at` and `isActive` look up one voxel, and a voxel with nothing stored holds `background`.
+- **Dense.** `dense()` fills an array over the active box, or over `{ box }`, x fastest. `bounds` is in world units around the voxel centres. A rotated grid gets the box around its corners, so use `matrix` when the rotation matters. `maxValues` caps the array, 536,870,912 by default.
+- **Types.** `float`, `double`, `int32`, `int64`, `vec3s`, `vec3d` and `vec3i`. Grids stored as 16-bit halves widen to `float` or `double`, with `half` set. A vector grid has `components` 3, with the three values side by side.
+- **Compression.** Uncompressed, zlib and Blosc with LZ4, the OpenVDB default, in every value layout. Blosc with another codec or with bit shuffle is refused with code `unsupported`.
+- **Transforms.** `matrix` is the index-to-world matrix of an affine, scale, translation or unitary map, column-major. A frustum map has no matrix, so that grid goes to `skipped`.
+- **Left out.** A grid this reader does not decode goes to `skipped` with the reason, and the others still read: `bool`, mask and point grids. NanoVDB files (`.nvdb`) are refused, because their header is not an OpenVDB one.
 
 ## Tiled TMX
 

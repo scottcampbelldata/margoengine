@@ -632,6 +632,10 @@ File formats written from their public descriptions; no reader of another projec
 | LF22 | B-spline basis functions, knot spans and rational evaluation | loaders/src/nurbs.ts | Piegl and Tiller, "The NURBS Book" (2nd ed., 1997), algorithms A2.1 to A2.3 and A4.1, written from the published mathematics |
 | LF23 | Rational circle and sphere test shapes | loaders/tests/nurbs.test.js | Piegl and Tiller, "The NURBS Book", chapter 7 |
 | LF24 | LAS public header, variable records and point formats 0 to 10 | loaders/src/las.ts | ASPRS, "LAS Specification" 1.4 R15 and earlier versions |
+| LF25 | The VDB tree: a root table over internal nodes over leaf blocks, active masks, tiles, background | loaders/src/vdb.ts | K. Museth, "VDB: High-Resolution Sparse Volumes with Dynamic Topology", ACM Transactions on Graphics 32(3), 2013 |
+| LF26 | `.vdb` byte layout: header, metadata, grid descriptors, transforms, topology, value kinds | loaders/src/vdb.ts | No published specification exists. Written from the agent's general knowledge of the format, with no OpenVDB source open; not yet checked against a real file (known-bugs.md) |
+| LF27 | Blosc chunk header, block offsets and byte shuffle | loaders/src/vdb.ts | The Blosc project's public chunk format description |
+| LF28 | LZ4 block format | loaders/src/vdb.ts, loaders/tests/vdb.test.js | Y. Collet, "LZ4 Block Format Description" |
 
 ## Voxel files: `@margoengine/voxel-edit/formats`
 
