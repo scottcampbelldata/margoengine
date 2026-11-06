@@ -217,6 +217,38 @@ Lists too large to bind, the WebGL2 layer, and a pass with no `prepareShadow` in
 plain classes do. Parts keep their sphere for this test whatever `bounds` says.
 
 
+## Levels of detail: `LodInstances`
+
+`LodInstances` from `margoengine/culling/lod` draws many copies of one object at up to four levels of detail. One compute pass
+tests each instance against the frustum, picks its level by its radius on screen and appends it to that level's list, so the
+frame has no CPU loop over instances. Core then draws each list with its own shader.
+
+```js
+import { Engine, box, PbrMaterial } from 'margoengine';
+import { LodInstances } from 'margoengine/culling/lod';
+
+const engine = await Engine.create(document.querySelector('canvas'));
+const transforms = new Float32Array(16 * 1000);
+for (let i = 0; i < 1000; i++) transforms.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i * 3, 0, 0, 1], i * 16);
+const trees = LodInstances.attach(engine, {
+  levels: [
+    { geometry: box(1, 1, 1), minRadius: 40 },
+    { geometry: box(0.8, 0.8, 0.8), minRadius: 8 },
+    { geometry: box(0.6, 0.6, 0.6) },
+  ],
+  material: new PbrMaterial(),
+  transforms,
+});
+trees.setTransform(0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 1]);
+trees.setVisible(1, false);
+```
+
+`minRadius` is in CSS pixels, each level below the one before; an instance under the last level's value draws nothing (the
+default 0 draws it however small). The first level's bounding sphere stands for every level, so the others must fit in it.
+`readCounts()` resolves the instances drawn per level. Each level holds a list of every instance, 96 bytes each. Instances
+cast no shadows through this class, and the WebGL2 layer draws every shown instance at the first level.
+
+
 ## Moving objects: `DynamicInstances`
 
 Tens or hundreds of thousands of objects that move, hide, appear and go, with a fixed amount of engine CPU work per

@@ -14,7 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-142). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-143). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -101,6 +101,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Occluders that are not parts (`addOccluder` on `CulledInstances` and `CulledParts`) | By method: takes core meshes, gltf-pro models, materials meshes and `Terrain`, drawn whole each frame. Back faces, cut-outs, blended, transmissive, displaced and clipped primitives do not occlude; a material extension that moves vertices cannot be detected. Not on `CulledMeshes`, which runs before the frame's deformers. | Core's depth has no texture binding, so an occluder is drawn a second time, and it must be a surface the frame really shows. | Parts behind a building stop drawing; the image is unchanged. Each occluder costs its triangles again every frame. | Add large things only, and never a model whose extension moves vertices. |
 | Hi-Z with `bounds: 'box'` on slanted occluders | Any long part behind a surface seen at an angle | The test compares the part's nearest corner with the farthest occluder depth in its screen rectangle, and a slanted surface spans a range of depth | The part draws though it is hidden: extra work, never a wrong pixel | Split long parts, or accept it |
 | `CascadeParts` and `CascadeInstances` lists | One u32 per slot per cascade, up to the GPU's storage binding size | Each cascade's list can hold every caster | Past the binding size, or on the WebGL2 layer, every cascade draws every caster, as the plain classes do | Use fewer cascades, or split the parts |
+| `LodInstances` | 1 to 4 levels; 96 bytes per instance per level, plus the 96-byte source record | Each level's list can hold every instance, and one thread appends to one of them | Shadows: not cast, as `shadows.add` takes no `LodInstances`. WebGL2 layer: every shown instance draws the first level. Instances of a level draw in no fixed order, which only shows between exactly coplanar faces | Use `CascadeInstances` for casters of the first level |
 
 ## Geometry
 

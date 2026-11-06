@@ -415,6 +415,12 @@ clips away in that pass, so the map is unchanged. The draw reads rows through an
 list is a plain vertex buffer offset. Evidence: `packages/culling/test/gpu/shadows-cull-check.mjs`, 0 differing pixels against
 every caster drawn in every cascade, RTX A6000. Still missing: a timed run.
 
+`LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
+the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by
+atomic add, and the counts are copied to each level's indirect arguments, so core draws each list through `Batch.redirect`. On
+the WebGL2 layer every shown instance draws the first level. Evidence: `packages/culling/test/gpu/lod-check.mjs`, 0 differing
+pixels against core meshes with levels worked out on the CPU, RTX A6000. Still missing: a timed run.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback

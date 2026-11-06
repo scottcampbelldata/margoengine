@@ -454,6 +454,10 @@
       "types": "./dist/culling/shadows.d.ts",
       "import": "./dist/culling/shadows.js"
     },
+    "./culling/lod": {
+      "types": "./dist/culling/lod.d.ts",
+      "import": "./dist/culling/lod.js"
+    },
     "./cutscene": {
       "types": "./dist/cutscene.d.ts",
       "import": "./dist/cutscene.js"

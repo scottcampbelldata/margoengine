@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4810587,
+  "total": 4814597,
   "history": [
     {
       "date": "2026-10-24",
@@ -2018,6 +2018,12 @@
       "commit": "cdb3f0eac",
       "reason": "New webgl entry ./pick: read-pixels engine.pick on the WebGL2 preview; the root entry gains the shared program builder and the renderer lookup the optional entries need",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "91b038169",
+      "reason": "culling: new lod entry",
+      "grew": 1
     }
   ],
   "items": {
@@ -2123,6 +2129,7 @@
     "@margoengine/creative/toon": 1188,
     "@margoengine/culling": 14096,
     "@margoengine/culling/dynamic": 7461,
+    "@margoengine/culling/lod": 4010,
     "@margoengine/culling/models": 3624,
     "@margoengine/culling/parts": 15027,
     "@margoengine/culling/shadows": 20972,
