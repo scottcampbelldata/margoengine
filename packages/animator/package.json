@@ -44,6 +44,10 @@
     "./sync": {
       "types": "./dist/sync.d.ts",
       "import": "./dist/sync.js"
+    },
+    "./warping": {
+      "types": "./dist/warping.d.ts",
+      "import": "./dist/warping.js"
     }
   },
   "files": [

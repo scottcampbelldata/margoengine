@@ -343,6 +343,44 @@ console.log(sync.phase); // 0 up to 1, the group's place in its cycle
 - **Root motion** follows the phase through `addRootMotion`: a blended cycle travels the blended stride, and entering a state mid-cycle adds no jump.
 - A state belongs to one group. Disposing the group gives each clip its own clock back.
 
+## Warping (`margoengine/animator/warping`)
+
+One walk cycle has to serve every speed and direction a game asks for. `addWarping(animator, warp)` fits the pose to how the character really moves so feet do not slide, and `addDistanceWarp` drives a stop or start clip by distance so it lands on its mark.
+
+```ts
+import {Animator, addRootMotion} from 'margoengine/animator';
+import {addDistanceWarp, addWarping} from 'margoengine/animator/warping';
+
+const animator = Animator.attach(animation, {initial: 'walk', states: {walk: 'Walk', stop: 'Stop'}});
+const node = (name: string) => model.asset.doc.nodes!.findIndex((n) => n.name === name);
+addRootMotion(animator, {joint: node('Hips'), apply: false}); // the game moves the character
+
+const velocity: [number, number, number] = [0, 0, 0];
+const warp = addWarping(animator, {
+  pelvis: node('Hips'),
+  spine: [node('Spine'), node('Chest')],
+  velocity, // write the character's real velocity into this every frame
+  legs: [
+    {hip: node('LeftUpLeg'), knee: node('LeftLeg'), ankle: node('LeftFoot')},
+    {hip: node('RightUpLeg'), knee: node('RightLeg'), ankle: node('RightFoot')},
+  ],
+});
+velocity[0] = 0.8; velocity[2] = 0.8;       // a strafe at 1.13 units a second on a forward walk
+console.log(warp.turn, warp.stride, warp.rate, warp.pelvisDrop);
+
+const stop = {state: 'stop', joint: node('Hips'), distance: 2};
+addDistanceWarp(animator, stop);
+animator.transition('stop');
+stop.distance = 1.5;                        // what is left to the mark, written every frame
+```
+
+- **Orientation.** The hips turn toward the direction of travel, up to `maxTurn` (default pi / 2), settling over `turnTime` (default 0.1 s), and `spine` shares out the turn back so the chest keeps facing front. Facing is the `character` node's +Z (default the model's root).
+- **Stride.** Each foot's offset from the character scales along the direction of travel by real speed over clip speed, so a planted foot stands still. Knees bend toward each leg's `pole`, by default forward of the animated knee, and feet keep their world rotation.
+- **Clip speed.** Measured from the `speedJoint` travel (default `pelvis`) of the state's clips through its blend tree. In-place clips have no travel to measure: set `clipSpeed`. `addRootMotion` with `apply: false` keeps a travelling clip's bone in place while the game moves the character.
+- **Limits and rate.** Past `minStride` (default 0.5) and `maxStride` (default 1.6) the clip's rate makes up the rest, from the next frame, so feet stay planted at any speed and a stopped character stops stepping. `adjustRate: false` leaves the rate alone. `animator.time` then runs at that rate; crossfades keep real time.
+- **Pelvis.** It drops by what the longest stride needs, at most `maxPelvisDrop` (default 0.2).
+- **Distance.** `addDistanceWarp` stands a clip where the travel of `joint` matches `distance`: `mode: 'stop'` reads what is left, `'start'` what has been covered. Time only runs forward, and a distance longer than the clip holds its first frame. The state must play one clip.
+
 ## Explicit rotation writer
 
 `AnimatorOptions.writeRotation?: (node: Mesh, rotation: readonly number[]) => void` is an optional, explicit commit hook for applications that own their transform writer. It is captured and validated once during construction. Omit it to keep the current dynamic `Mesh.setQuaternion` call, including method overrides. This is an additive public API option; it does not change core/stage.

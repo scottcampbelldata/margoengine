@@ -163,6 +163,42 @@ export async function animatorRun({ doc, buffers, index }, options) {
   };
 }
 
+/**
+ * A walk on {@link BIPED}: planar two-bone legs, feet flat, written as tracks. A planted foot slides back at `speed`
+ * under the hips for half the cycle at ankle height 0.1, then swings forward; the hips travel at `speed`. Stand-in data.
+ */
+export function bipedWalk({ duration = 1, speed = 1 } = {}) {
+  const reachUp = Math.hypot(0.45, 0.02),
+    reachDown = Math.hypot(0.44, 0.02),
+    half = (speed * duration) / 4,
+    restUp = Math.atan2(0.02, 0.45),
+    restDown = Math.atan2(-0.02, 0.44);
+  const ankle = (phase) => {
+    const p = ((phase % 1) + 1) % 1;
+    return p < 0.5
+      ? [-0.85, half * (1 - 4 * p)]
+      : [-0.85 + 0.1 * Math.sin(Math.PI * (2 * p - 1)), half * (4 * p - 3)];
+  };
+  const angles = (phase) => {
+    const [y, z] = ankle(phase),
+      d = Math.hypot(y, z),
+      aim = Math.atan2(z, -y),
+      upper = aim + Math.acos((reachUp ** 2 + d ** 2 - reachDown ** 2) / (2 * reachUp * d)),
+      lower = Math.atan2(z - reachUp * Math.sin(upper), -(y + reachUp * Math.cos(upper)));
+    return { hip: -(upper - restUp), knee: upper - restUp - (lower - restDown), foot: lower - restDown };
+  };
+  const leg = (side, offset) => ({
+    [`${side}UpLeg.rotation`]: (t) => axisAngle([1, 0, 0], angles(t / duration + offset).hip),
+    [`${side}Leg.rotation`]: (t) => axisAngle([1, 0, 0], angles(t / duration + offset).knee),
+    [`${side}Foot.rotation`]: (t) => axisAngle([1, 0, 0], angles(t / duration + offset).foot),
+  });
+  return {
+    duration,
+    fps: 120,
+    tracks: { 'Hips.translation': (t) => [0, 1, speed * t], ...leg('Left', 0), ...leg('Right', 0.5) },
+  };
+}
+
 /** The unit quaternion of `angle` radians about a unit `axis`. */
 export const axisAngle = (axis, angle) => {
   const s = Math.sin(angle / 2);

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5232878,
+  "total": 5237761,
   "history": [
     {
       "date": "2026-10-24",
@@ -2390,6 +2390,12 @@
       "commit": "a3f38a6e8",
       "reason": "points/copc: the LAZ decoder moved behind import(), as in points/las, so the joined figure is two gzip streams",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "a8b7df724",
+      "reason": "feat(animator): stride, orientation and distance warping (new entry @margoengine/animator/warping)",
+      "grew": 1
     }
   ],
   "items": {
@@ -2408,6 +2414,7 @@
     "@margoengine/animator/graph": 8542,
     "@margoengine/animator/inertialize": 2150,
     "@margoengine/animator/sync": 2070,
+    "@margoengine/animator/warping": 4883,
     "@margoengine/audio": 7716,
     "@margoengine/behavior": 8909,
     "@margoengine/behavior/steering": 3827,

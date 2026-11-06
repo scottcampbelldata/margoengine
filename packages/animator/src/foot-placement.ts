@@ -3,17 +3,12 @@
 // lowest foot can reach, and two-bone IK bends each leg. Kept out of the Animator class so an app that never adds it
 // does not bundle it.
 import type { Mesh, Vec3 } from '@margoengine/core/extension';
-import {
-  multiplyQuaternions,
-  normalizeQuaternion,
-  rotateByQuaternion,
-  rotationToQuaternion,
-} from '@margoengine/math/quat';
+import { multiplyQuaternions } from '@margoengine/math/quat';
 import { finiteVector } from '@margoengine/math/validate';
-import { MargoError } from '@margoengine/math/errors';
 import { quaternionBlend } from './blend.js';
-import { rotationBetween, solveTwoBoneIK } from './ik.js';
+import { rotationBetween } from './ik.js';
 import type { Animator, GroundHit } from './index.js';
+import { poseTools } from './pose-tools.js';
 
 /** One leg of {@link FootPlacement}: a direct hip, knee, ankle chain. */
 export interface PlacedLeg {
@@ -75,9 +70,8 @@ const UP: Vec3 = [0, 1, 0],
 export function addFootPlacement(animator: Animator, placement: FootPlacement): FootPlacementHandle {
   const model = animator.animation.model,
     nodes = model.nodes,
-    engine = model.root.engine,
-    store = engine.store,
-    parents = store.parents;
+    parents = model.root.engine.store.parents,
+    { rotationOf, setWorldRotation, moveBy, placeLimb } = poseTools(animator, 'Foot placement');
   const node = (index: unknown, label: string): Mesh => {
     if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= nodes.length)
       throw new RangeError(`Foot placement ${label} ${index} is not one of the model's ${nodes.length} glTF nodes`);
@@ -152,20 +146,14 @@ export function addFootPlacement(animator: Animator, placement: FootPlacement): 
     }
     // 2. Drop the pelvis so the lowest foot can reach.
     pelvisOffset = Math.max(drop, -maxDrop);
-    if (pelvisOffset !== 0) {
-      movePelvis(pelvisOffset);
-      store.tick(false);
-    }
+    if (pelvisOffset !== 0) moveBy(pelvis, [0, pelvisOffset, 0]);
     // 3. Bend each leg so its ankle lands at the animated position plus its offset.
     for (let i = 0; i < chains.length; i++) {
       if (offsets[i] === 0 && pelvisOffset === 0 && !normals[i]) continue;
       const { hip, knee, ankle } = chains[i],
         a = animated[i],
-        target: Vec3 = [a[0], a[1] + offsets[i], a[2]],
-        root = position(hip),
-        solved = solveTwoBoneIK(root, position(knee), position(ankle), target, legs[i].pole);
-      turn(hip, rotationBetween(sub(position(knee), root), sub(solved.knee, root)));
-      turn(knee, rotationBetween(sub(position(ankle), position(knee)), sub(solved.ankle, position(knee))));
+        target: Vec3 = [a[0], a[1] + offsets[i], a[2]];
+      placeLimb(hip, knee, ankle, target, legs[i].pole);
       // The foot keeps its animated world orientation (the leg's turn would carry it along), tilted to the slope.
       const normal = normals[i];
       let world = rotations[i];
@@ -176,33 +164,6 @@ export function addFootPlacement(animator: Animator, placement: FootPlacement): 
       setWorldRotation(ankle, world);
     }
   });
-  function movePelvis(dy: number): void {
-    // World offset (0, dy, 0) carried into the pelvis's parent frame (rotation and uniform scale).
-    const parent = parents[pelvis.id],
-      t = store.transforms,
-      id = pelvis.id;
-    let local: number[] = [0, dy, 0];
-    if (parent !== -1) {
-      const m = engine.meshes.get(parent)!.matrix,
-        scale = uniformScale(m),
-        q = rotationToQuaternion(m, [0, 0, 0, 0], scale, scale, scale),
-        inverse = [-q[0], -q[1], -q[2], q[3]];
-      local = rotateByQuaternion(local, inverse).map((v) => v / scale);
-    }
-    pelvis.setPosition([t.x[id] + local[0], t.y[id] + local[1], t.z[id] + local[2]]);
-  }
-  function turn(bone: Mesh, world: number[]): void {
-    setWorldRotation(bone, multiplyQuaternions(world, rotationOf(bone.matrix)));
-  }
-  function setWorldRotation(bone: Mesh, next: ArrayLike<number>): void {
-    const parent = parents[bone.id],
-      base = parent === -1 ? [0, 0, 0, 1] : rotationOf(engine.meshes.get(parent)!.matrix);
-    animator.writeNodeRotation(
-      bone,
-      normalizeQuaternion(multiplyQuaternions([-base[0], -base[1], -base[2], base[3]], next)),
-    );
-    store.tick(false);
-  }
   const dispose = () => {
     if (removed) return;
     removed = true;
@@ -216,29 +177,4 @@ export function addFootPlacement(animator: Animator, placement: FootPlacement): 
     dispose,
     [Symbol.dispose]: dispose,
   };
-}
-
-const sub = (a: ArrayLike<number>, b: ArrayLike<number>): [number, number, number] => [
-  a[0] - b[0],
-  a[1] - b[1],
-  a[2] - b[2],
-];
-function position(node: Mesh): [number, number, number] {
-  const m = node.matrix;
-  return [m[12], m[13], m[14]];
-}
-function uniformScale(m: ArrayLike<number>): number {
-  const sx = Math.hypot(m[0], m[1], m[2]),
-    sy = Math.hypot(m[4], m[5], m[6]),
-    sz = Math.hypot(m[8], m[9], m[10]);
-  if (!(sx > 0) || Math.abs(sx - sy) > 1e-5 * sx || Math.abs(sx - sz) > 1e-5 * sx)
-    throw new MargoError(
-      'state',
-      'Foot placement bones need positive uniform scales; remove non-uniform scales on the legs and above them',
-    );
-  return sx;
-}
-function rotationOf(m: ArrayLike<number>): number[] {
-  const s = uniformScale(m);
-  return normalizeQuaternion(rotationToQuaternion(m, [0, 0, 0, 0], s, s, s));
 }

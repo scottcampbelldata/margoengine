@@ -208,6 +208,8 @@ export class Animator implements EnginePlugin {
    * Animation's `options.speed`, as it does for Animation's own playback, so one pause and speed control serves both.
    */
   playing = true;
+  /** @internal Multiplies how fast state time runs; crossfades keep real time. */
+  clipRate = 1;
   private engine?: Engine;
   private readonly rest: Pose;
   private current: Pose;
@@ -221,7 +223,7 @@ export class Animator implements EnginePlugin {
   private layers = new Set<AdditiveLayer>();
   private readonly scratch = new Map<number, Float32Array>();
   private feet = new Set<FootIK>();
-  private readonly solvers: Array<() => void> = [];
+  private readonly solvers: Array<(step: number) => void> = [];
   private readonly poseSteps: Array<(position: number[][], rotation: number[][]) => void> = [];
   private readonly lateSteps: Array<(pose: Pose, step: number) => void> = [];
   private readonly fadeSteps: Array<(position: number[][], rotation: number[][], state: string, time: number) => void> =
@@ -468,7 +470,7 @@ export class Animator implements EnginePlugin {
    * @internal A step run every frame after the pose, the additive layers and foot IK, with the skeleton's world matrices
    * current ({@link addCCDChain} adds one per chain). Returns its remover.
    */
-  addSolver(step: () => void): () => void {
+  addSolver(step: (step: number) => void): () => void {
     if (this.disposed) throw new MargoError('disposed', 'Animator is disposed; attach a new Animator');
     this.solvers.push(step);
     return () => {
@@ -597,7 +599,8 @@ export class Animator implements EnginePlugin {
     const step = this.playing ? delta * speed : 0,
       before = this.time;
     const clock = this.clocks.get(this.state);
-    this.time = clock ? clock.advance(this.time, step) : this.time + step;
+    const clipStep = step * this.clipRate;
+    this.time = clock ? clock.advance(this.time, clipStep) : this.time + clipStep;
     if (this.events.size) this.fireEvents(before, this.time);
     else this.entered = false;
     const tree = this.options.states[this.state];
@@ -680,7 +683,7 @@ export class Animator implements EnginePlugin {
     if (this.solvers.length) {
       // World matrices of the posed skeleton: the solvers' parent frames.
       this.engine!.store.tick(false);
-      for (let i = 0; i < this.solvers.length; i++) this.solvers[i]();
+      for (let i = 0; i < this.solvers.length; i++) this.solvers[i](step);
     }
   }
   // Compare both the requested values and the exact stored result. External

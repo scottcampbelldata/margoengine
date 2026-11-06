@@ -40,6 +40,7 @@ class Animator implements EnginePlugin {
     state: string;
     time: number;
     playing: boolean;
+    clipRate: number;
     constructor(animation: Animation, options: AnimatorOptions);
     static attach(animation: Animation, options: AnimatorOptions): Animator;
     transition(state: string, duration?: number): this;
@@ -50,7 +51,7 @@ class Animator implements EnginePlugin {
     on<K extends keyof AnimatorEventMap>(type: K, listener: (event: AnimatorEventMap[K]) => void): () => void;
     addLayer(layer: AdditiveLayer): () => void;
     addFootIK(foot: FootIK): () => void;
-    addSolver(step: () => void): () => void;
+    addSolver(step: (step: number) => void): () => void;
     addPoseStep(step: (position: number[][], rotation: number[][]) => void): () => void;
     addFadeStep(step: (position: number[][], rotation: number[][], state: string, time: number) => void): () => void;
     addLateStep(step: (pose: Pose, step: number) => void): () => void;
