@@ -328,6 +328,33 @@ gizmo.showDelta = false;  // no line or wedge during a drag
 engine.start();
 ```
 
+## Keep the target near a point, and zoom an orthographic view
+
+`minTargetRadius` and `maxTargetRadius` hold the target inside a spherical shell around `cursor`: panning stops at the edge
+and the camera moves with the target, so the view never swings. It works with `targetBounds`; the sphere is applied
+last. `zoom` reads and writes a `CameraProjection`'s zoom, within `minZoom` and `maxZoom`. With `orthoZoom`, the wheel,
+dolly drags and pinch change that zoom under a fixed-size orthographic projection (an explicit `height` or fixed bounds),
+about the cursor with `zoomToCursor`. Without it they change only the distance there, which leaves the picture as it was.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {CameraProjection} from 'margoengine/cameras';
+import {OrbitControls} from 'margoengine/controls/orbit';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.createMesh().setGeometry(box());
+CameraProjection.attach(engine, {mode: 'orthographic', height: 6});
+const orbit = OrbitControls.attach(engine);
+orbit.cursor = [0, 1, 0];
+orbit.maxTargetRadius = 5;     // panning stays within 5 units of the point above
+orbit.orthoZoom = true;        // the wheel zooms the fixed-height view
+orbit.zoomToCursor = true;
+orbit.minZoom = 0.25;
+orbit.maxZoom = 8;
+document.querySelector('#fit')!.addEventListener('click', () => {orbit.zoom = 1;});
+engine.start();
+```
+
 ## Navigation profiles
 
 Engineers get the mouse, wheel, touch and keys of the tool they know, in one call:
@@ -399,7 +426,7 @@ keys: window})` replaces them with `OrbitControls` under that profile in one cal
 them), and returns the controls so you can listen for `fit`.
 Under an orthographic `@margoengine/cameras` projection the wheel and dolly drags change the visible height (ortho zoom)
 about the cursor when the projection's `height` is left at its default (perspective height at the target); with an
-explicit `height` or all four fixed bounds they change only the distance, and zoom to cursor adds no pan.
+explicit `height` or all four fixed bounds they change only the distance, and zoom to cursor adds no pan, unless `orthoZoom` is on.
 
 SolidWorks, AutoCAD, Inventor, Fusion, Blender, Maya, Onshape and Rhino are trademarks of their respective owners. They
 are named here only to say whose mouse mapping a profile follows; Margo Engine is not affiliated with or endorsed by
@@ -428,6 +455,8 @@ any of them.
 | `minAzimuthAngle`, `maxAzimuthAngle` | Orbit, Map | `-Infinity`, `Infinity` |
 | `zoomToCursor`, `screenSpacePanning`, `keyPanSpeed` | Orbit, Map | `false`, `true` (`false` for Map), `7` px |
 | `targetBounds` (`{min, max}` boxes the target) | Orbit, Map | `null` |
+| `cursor`, `minTargetRadius`, `maxTargetRadius` (a sphere shell for the target) | Orbit, Map | `[0, 0, 0]`, `0`, `Infinity` |
+| `zoom`, `minZoom`, `maxZoom`, `orthoZoom`, `projection` | Orbit, Map | the projection's zoom, `0`, `Infinity`, `false`, the engine's `cameras` plugin |
 | `autoRotate`, `autoRotateSpeed` | Orbit, Map | `false`, `2` (one turn per 30 s) |
 | `mouseButtons`, `touches`, `keys` | Orbit, Map, Trackball | Left rotates, middle dollies, right pans (Map: left pans, right rotates); one finger rotates, two dolly and pan (Map: pan, dolly and rotate); arrow keys (Trackball: A, S, D), using the exported `MOUSE` and `TOUCH` |
 | `setProfile(profile)`, `profile` | Orbit, Map | `null` (same as `MARGO`); see Navigation profiles |
@@ -447,7 +476,7 @@ any of them.
 ## Limits
 
 - Orbit, map, first-person, pointer-lock and walk controls do not roll (see above). Without `enableRoll`, trackball rotation cannot pass over the poles.
-- Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`); an orbit `zoom` property is not implemented. `minTargetRadius`, `maxTargetRadius` and `cursor` are not implemented (use `targetBounds` to limit the target).
+- Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`).
 - With `occlude`, a handle hidden behind geometry can still be grabbed: picking is on the CPU and has no scene depth. A parent with non-uniform scale and rotation shears its children; `TransformControls` drags use the parent's rotation without the shear.
 - `ArcballControls` has no on-screen gizmo, double-click focus or keyboard bindings. `DragControls` moves a model whole: `recursive` and `transformGroup` follow core mesh children, not the nodes of a model. Skinned models are grabbed in their bind pose (see @margoengine/bvh).
 

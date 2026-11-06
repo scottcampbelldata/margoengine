@@ -41,6 +41,11 @@ interface Tracked {
   y: number;
   touch: boolean;
 }
+/** A projection `OrbitControls.zoom` drives: an @margoengine/cameras `CameraProjection`. */
+export interface OrbitProjection {
+  /** Divides the orthographic frustum; larger shows less. */
+  zoom: number;
+}
 
 /** Directions from the target toward the camera for the profile view keys. */
 const VIEWS: Partial<Record<KeyAction, V3>> = {
@@ -111,6 +116,23 @@ export class OrbitControls extends Controls {
    * model. The camera moves with the target. Default null (unbounded); a bound of Infinity leaves that side free.
    */
   targetBounds: { min: readonly number[]; max: readonly number[] } | null = null;
+  /** Centre of the sphere `minTargetRadius` and `maxTargetRadius` measure from. Default [0, 0, 0]. */
+  cursor: readonly [number, number, number] = [0, 0, 0];
+  /** Closest the target may come to `cursor`. The camera moves with the target. Default 0. */
+  minTargetRadius = 0;
+  /** Farthest the target may go from `cursor`. The camera moves with the target. Default Infinity. */
+  maxTargetRadius = Infinity;
+  /**
+   * Under a fixed-size orthographic projection, make the wheel, dolly drags and pinch change {@link zoom} (about the
+   * cursor with `zoomToCursor`) instead of the distance, which leaves the picture unchanged there. Default false.
+   */
+  orthoZoom = false;
+  /** Smallest {@link zoom}. Default 0. */
+  minZoom = 0;
+  /** Largest {@link zoom}. Default Infinity. */
+  maxZoom = Infinity;
+  /** The projection {@link zoom} drives. Default: the engine's `cameras` plugin when there is one, else null. */
+  projection: OrbitProjection | null = null;
   /** Azimuth limits in radians; both must be finite to apply. Defaults -Infinity and Infinity. */
   minAzimuthAngle = -Infinity;
   maxAzimuthAngle = Infinity;
@@ -133,7 +155,7 @@ export class OrbitControls extends Controls {
   private turnPolar = 0;
   private readonly shiftTarget: V3 = [0, 0, 0];
   private dollyScale = 1;
-  private cursor: { x: number; y: number } | null = null;
+  private pointerAt: { x: number; y: number } | null = null;
   // Pointers owned by these controls, and the last gesture sample.
   private readonly tracked = new Map<number, Tracked>();
   private last = { x: 0, y: 0, spread: 0 };
@@ -223,6 +245,30 @@ export class OrbitControls extends Controls {
   getDistance(): number {
     const o = this.offset();
     return Math.hypot(o[0], o[1], o[2]);
+  }
+  /** The projection in use: `projection`, else the engine's `cameras` plugin, or null. */
+  private zoomed(): OrbitProjection | null {
+    if (this.projection) return this.projection;
+    const plugin = (this.engine as { plugins?: ReadonlyMap<string, unknown> } | null)?.plugins?.get('cameras') as
+      | OrbitProjection
+      | undefined;
+    return plugin && typeof plugin.zoom === 'number' ? plugin : null;
+  }
+  /**
+   * The projection's zoom, 1 without one. Assigning clamps to `minZoom` and `maxZoom`, writes it and dispatches
+   * `change`; it needs a projection, because a plain camera has no zoom.
+   */
+  get zoom(): number {
+    return this.zoomed()?.zoom ?? 1;
+  }
+  set zoom(value: number) {
+    const projection = this.zoomed();
+    if (!projection) throw new TypeError('OrbitControls.zoom needs a CameraProjection; attach one or set `projection`');
+    if (!(value > 0) || !Number.isFinite(value)) throw new RangeError('Orbit zoom must be a finite number above 0');
+    const zoom = clamp(value, this.minZoom, this.maxZoom);
+    if (zoom === projection.zoom) return;
+    projection.zoom = zoom;
+    this.dispatchEvent({ type: 'change' });
   }
   /** A copy of `camera.target`; assigning writes `camera.target`. */
   get target(): V3 {
@@ -336,7 +382,10 @@ export class OrbitControls extends Controls {
     let nx = tx + s[0] * f,
       ny = ty + s[1] * f,
       nz = tz + s[2] * f;
-    const scale = this.dollyScale,
+    // With `orthoZoom` a fixed-size orthographic camera takes the dolly as zoom below, and the distance stays.
+    const fixed = !!(cam as { fixedOrthographic?: boolean }).fixedOrthographic,
+      lens = this.orthoZoom && fixed ? this.zoomed() : null,
+      scale = lens ? 1 : this.dollyScale,
       newDistance = clamp(distance * scale, Math.max(this.minDistance, EPS), this.maxDistance);
 
     // Unit direction from the new target toward the camera.
@@ -357,9 +406,9 @@ export class OrbitControls extends Controls {
 
     if (
       this.zoomToCursor &&
-      this.cursor &&
+      this.pointerAt &&
       scale !== 1 &&
-      !(cam as { fixedOrthographic?: boolean }).fixedOrthographic &&
+      !fixed &&
       distance > 0
     ) {
       const hit = this.cursorHit([nx, ny, nz], [nx + dx * distance, ny + dy * distance, nz + dz * distance]);
@@ -376,6 +425,30 @@ export class OrbitControls extends Controls {
       }
     }
 
+    let zoomChanged = false;
+    if (lens && this.dollyScale !== 1) {
+      const zoom = clamp(lens.zoom / this.dollyScale, this.minZoom, this.maxZoom);
+      if (zoom > 0 && Number.isFinite(zoom) && zoom !== lens.zoom) {
+        // The frustum shrinks by k about the view centre; moving the view by (1 - k) of the cursor point's offset keeps
+        // that point on its pixel.
+        const k = lens.zoom / zoom,
+          hit = this.zoomToCursor && this.pointerAt ? this.cursorHit([nx, ny, nz], [qx, qy, qz], true) : null;
+        if (hit) {
+          const mx = (hit[0] - nx) * (1 - k),
+            my = (hit[1] - ny) * (1 - k),
+            mz = (hit[2] - nz) * (1 - k);
+          nx += mx;
+          ny += my;
+          nz += mz;
+          qx += mx;
+          qy += my;
+          qz += mz;
+        }
+        lens.zoom = zoom;
+        zoomChanged = true;
+      }
+    }
+
     const box = this.targetBounds;
     if (box) {
       const cx = clamp(nx, box.min[0], box.max[0]),
@@ -387,6 +460,28 @@ export class OrbitControls extends Controls {
       nx = cx;
       ny = cy;
       nz = cz;
+    }
+
+    if (this.minTargetRadius > 0 || this.maxTargetRadius < Infinity) {
+      const c = this.cursor,
+        ax = nx - c[0],
+        ay = ny - c[1],
+        az = nz - c[2],
+        radius = Math.hypot(ax, ay, az),
+        limited = clamp(radius, this.minTargetRadius, this.maxTargetRadius);
+      if (limited !== radius) {
+        // A target exactly on the cursor has no direction of its own: it leaves along +X.
+        const k = radius > 0 ? limited / radius : 0,
+          cx = c[0] + (radius > 0 ? ax * k : limited),
+          cy = c[1] + ay * k,
+          cz = c[2] + az * k;
+        qx += cx - nx;
+        qy += cy - ny;
+        qz += cz - nz;
+        nx = cx;
+        ny = cy;
+        nz = cz;
+      }
     }
 
     this.write([qx, qy, qz], [nx, ny, nz]);
@@ -405,7 +500,8 @@ export class OrbitControls extends Controls {
     }
     this.dollyScale = 1;
 
-    const moved = Math.hypot(qx - px, qy - py, qz - pz) > EPS || Math.hypot(nx - tx, ny - ty, nz - tz) > EPS;
+    const moved =
+      Math.hypot(qx - px, qy - py, qz - pz) > EPS || Math.hypot(nx - tx, ny - ty, nz - tz) > EPS || zoomChanged;
     if (moved) this.dispatchEvent({ type: 'change' });
     return moved;
   }
@@ -430,13 +526,23 @@ export class OrbitControls extends Controls {
       l = Math.hypot(x, z) || 1;
     return [x / l, 0, z / l];
   }
-  /** Where the cursor's perspective ray meets the plane through `target` facing a camera at `eye`, or null. */
-  private cursorHit(target: V3, eye: V3): V3 | null {
+  /**
+   * Where the cursor's ray meets the plane through `target` facing a camera at `eye`, or null. The ray is a perspective
+   * one, or with `parallel` the orthographic one `camera.matrix` gives.
+   */
+  private cursorHit(target: V3, eye: V3, parallel = false): V3 | null {
     const cam = this.camera,
-      b = basis({ position: eye, target, fov: cam.fov, up: cam.up }),
+      b = basis({
+        position: eye,
+        target,
+        fov: cam.fov,
+        up: cam.up,
+        matrix: parallel ? cam.matrix : undefined,
+        far: cam.far,
+      }),
       width = Math.max(1, this.element?.clientWidth ?? 1),
       height = Math.max(1, this.element?.clientHeight ?? 1),
-      c = this.cursor as { x: number; y: number };
+      c = this.pointerAt as { x: number; y: number };
     return intersectPlane(ray(b, c.x, c.y, width, height), target, b.forward);
   }
   /** Writes the camera through its setters into vectors these controls own. */
@@ -569,7 +675,7 @@ export class OrbitControls extends Controls {
     this.capture(event.pointerId);
     this.tracked.set(event.pointerId, { x: at.x, y: at.y, touch: false });
     this.last = { x: at.x, y: at.y, spread: 0 };
-    this.cursor = { x: at.x, y: at.y };
+    this.pointerAt = { x: at.x, y: at.y };
     this.begin(gesture);
   };
 
@@ -603,7 +709,7 @@ export class OrbitControls extends Controls {
       const now = this.pair(),
         before = this.last;
       if (this.enableZoom && before.spread > 0 && now.spread > 0) {
-        this.cursor = { x: now.x, y: now.y };
+        this.pointerAt = { x: now.x, y: now.y };
         this.dollyScale *= (before.spread / now.spread) ** this.zoomSpeed;
       }
       const dx = now.x - before.x,
@@ -636,7 +742,7 @@ export class OrbitControls extends Controls {
     if (event.ctrlKey) pixels *= PINCH_BOOST;
     else if (this.activeProfile?.wheel === -1) pixels = -pixels;
     const at = this.local(event);
-    this.cursor = { x: at.x, y: at.y };
+    this.pointerAt = { x: at.x, y: at.y };
     this.dispatchEvent({ type: 'start' });
     this.dollyScale *= this.zoomScale(pixels);
     this.applyNow();
