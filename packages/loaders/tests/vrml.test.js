@@ -186,3 +186,16 @@ test('bytes work like text', () => {
   const bytes = new TextEncoder().encode(`${H}Shape { geometry ${TRI} }`);
   assert.equal(parseVRML(bytes).positions.length, 9);
 });
+
+test('regression: the X3D CAD nodes hold geometry; CATIA exports read as empty before', () => {
+  const shape = (x) =>
+    `<Shape containerField='shape'><IndexedFaceSet coordIndex='0 1 2 -1'><Coordinate point='${x} 0 0 ${x + 1} 0 0 ${x} 1 0'/></IndexedFaceSet></Shape>`;
+  const scene = parseX3D(`<X3D><Scene><CADLayer><CADAssembly>
+    <CADPart translation='0 0 5'><CADFace>${shape(0)}</CADFace></CADPart>
+    <CADFace>${shape(2)}</CADFace>
+  </CADAssembly></CADLayer></Scene></X3D>`);
+  near(scene.positions, [0, 0, 5, 1, 0, 5, 0, 1, 5, 2, 0, 0, 3, 0, 0, 2, 1, 0], 'positions');
+  assert.deepEqual(scene.warnings, []);
+  const vrml = parseVRML(`${H}CADAssembly { children [ CADPart { translation 0 2 0 children [ CADFace { shape Shape { geometry ${TRI} } } ] } ] }`);
+  near(vrml.positions, [0, 2, 0, 1, 2, 0, 0, 3, 0], 'VRML form');
+});

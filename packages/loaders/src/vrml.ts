@@ -471,7 +471,8 @@ function flatten(roots: Node[], F: string, options: VRMLOptions): VRMLScene {
       case 'Shape':
         shape(node, matrix);
         return;
-      case 'Transform': {
+      case 'Transform':
+      case 'CADPart': {
         const t = numbers(node, 'translation') ?? [0, 0, 0],
           c = numbers(node, 'center') ?? [0, 0, 0],
           r = numbers(node, 'rotation') ?? [0, 0, 1, 0],
@@ -496,6 +497,9 @@ function flatten(roots: Node[], F: string, options: VRMLOptions): VRMLScene {
       case 'Collision':
       case 'Billboard':
       case 'StaticGroup':
+      case 'CADLayer':
+      case 'CADAssembly':
+      case 'CADFace':
         break;
       default:
         warnings.add(node.type);
@@ -504,6 +508,8 @@ function flatten(roots: Node[], F: string, options: VRMLOptions): VRMLScene {
     const children = node.fields.children;
     if (Array.isArray(children)) for (const item of children as Node[]) walk(item, world, depth + 1);
     else if (children && typeof children === 'object') walk(children, world, depth + 1);
+    // The X3D CAD component: a CADFace holds its Shape in a field of its own.
+    if (node.type === 'CADFace' && node.fields.shape) walk(node.fields.shape as Node, world, depth + 1);
   };
   for (const root of roots) walk(root, IDENTITY, 0);
 
