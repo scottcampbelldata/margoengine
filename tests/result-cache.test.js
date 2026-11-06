@@ -3,7 +3,7 @@
 // is refused, a failure is never stored and poisons a key holding a pass, and a build gives the same bytes twice.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import {
+import fs, {
   cpSync,
   existsSync,
   mkdirSync,
@@ -14,6 +14,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -264,6 +265,38 @@ test('a failure is never stored', (t) => {
   assert.equal(failed.passed, false);
   assert.deepEqual(store.candidates('step'), []);
   assert.throws(() => store.put({ step: 'step', key: 'k', passed: false }), /only a first-try pass/);
+});
+
+test('an entry another run prunes after the listing counts as not stored', (t) => {
+  const store = new ResultStore(join(temp(t), 'store'));
+  store.put({ step: 'step', key: 'kept', passed: true });
+  const { readdirSync: list, statSync: stat } = fs,
+    /** Runs `read` with the listing still naming gone.json, as if a prune landed just after it. */
+    race = (read, statted) => {
+      fs.readdirSync = (folder, ...rest) => [...list(folder, ...rest), 'gone.json'];
+      if (statted)
+        fs.statSync = (file, ...rest) => (String(file).endsWith('gone.json') ? { mtimeMs: Date.now() + 1000 } : stat(file, ...rest));
+      syncBuiltinESMExports();
+      try {
+        return read();
+      } finally {
+        fs.readdirSync = list;
+        fs.statSync = stat;
+        syncBuiltinESMExports();
+      }
+    },
+    keys = (entries) => entries.map((entry) => entry.key);
+  assert.deepEqual(keys(race(() => store.candidates('step'))), ['kept'], 'gone before the stat');
+  assert.deepEqual(keys(race(() => store.candidates('step'), true)), ['kept'], 'gone before the read');
+  assert.equal(store.get('step', 'gone'), undefined);
+});
+
+test('a stored entry that cannot be parsed still throws', (t) => {
+  const store = new ResultStore(join(temp(t), 'store'));
+  store.put({ step: 'step', key: 'k', passed: true });
+  const [folder] = readdirSync(join(store.dir, 'steps'));
+  writeFileSync(join(store.dir, 'steps', folder, 'k.json'), '{');
+  assert.throws(() => store.candidates('step'), SyntaxError);
 });
 
 test('a second write of one key keeps the first entry and leaves no temp file', (t) => {

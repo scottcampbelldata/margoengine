@@ -485,6 +485,20 @@ function lockHolds(text, repository) {
  * key names exact inputs, so two runs writing one key hold the same answer: the first stays. Replacing it instead fails
  * on Windows (EPERM) while another run touches the file, and ended verify when two ran at once.
  */
+// Lanes share one store and each `put` prunes its step, so a file listed a moment ago may be gone: that is a pass that
+// is no longer stored, the same as one never stored. Anything but a missing file still throws.
+/** When a stored entry was written, or undefined once another run has pruned it. */
+const modified = (file) => statSync(file, { throwIfNoEntry: false })?.mtimeMs;
+/** A stored entry, or undefined once another run has pruned it. */
+function readEntry(file) {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
 export class ResultStore {
   constructor(dir = defaultStoreDir(), { capBytes = CAP_BYTES } = {}) {
     this.dir = dir;
@@ -510,8 +524,7 @@ export class ResultStore {
   /** A stored pass for this exact key, or undefined. A poisoned key is never returned. */
   get(step, key) {
     if (this.isPoisoned(key)) return undefined;
-    const file = join(this.#stepDir(step), `${key}.json`);
-    return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined;
+    return readEntry(join(this.#stepDir(step), `${key}.json`));
   }
   /** Stored passes of a step, newest first, without poisoned keys. */
   candidates(step) {
@@ -519,11 +532,13 @@ export class ResultStore {
     if (!existsSync(folder)) return [];
     return readdirSync(folder)
       .filter((name) => name.endsWith('.json'))
-      .map((name) => ({ name, at: statSync(join(folder, name)).mtimeMs }))
+      .map((name) => ({ name, at: modified(join(folder, name)) }))
+      .filter(({ at }) => at !== undefined)
       .sort((a, b) => b.at - a.at)
       .slice(0, CANDIDATES_PER_STEP)
       .filter(({ name }) => !this.isPoisoned(name.slice(0, -5)))
-      .map(({ name }) => JSON.parse(readFileSync(join(folder, name), 'utf8')));
+      .map(({ name }) => readEntry(join(folder, name)))
+      .filter((entry) => entry !== undefined);
   }
   /** Stores a pass. Refuses anything else: a failure, or a key already poisoned, is never stored. */
   put(entry) {
@@ -543,7 +558,7 @@ export class ResultStore {
     const names = readdirSync(folder).filter((name) => name.endsWith('.json'));
     if (names.length <= CANDIDATES_PER_STEP) return;
     names
-      .map((name) => ({ name, at: statSync(join(folder, name)).mtimeMs }))
+      .map((name) => ({ name, at: modified(join(folder, name)) ?? 0 }))
       .sort((a, b) => b.at - a.at)
       .slice(CANDIDATES_PER_STEP)
       .forEach(({ name }) => rmSync(join(folder, name), { force: true }));
