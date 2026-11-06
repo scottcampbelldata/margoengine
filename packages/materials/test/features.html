@@ -6,6 +6,7 @@ import {Engine} from '/packages/core/dist/index.js';
 import {KTX2LayerDecoder} from '/packages/decoders/dist/ktx2-layers.js';
 import {CubeTexture,NormalMaterial,PbrMaterial,UnlitMaterial,Texture,WgslMaterial,createMesh,createInstancedMesh,loadKTX2Texture} from '/packages/materials/dist/index.js';
 import {alphaHash} from '/packages/materials/dist/alpha-hash.js';
+import {layered} from '/packages/materials/dist/layered.js';
 import {objectNormal} from '/packages/materials/dist/object-normal.js';
 import {TAA} from '/packages/taa/dist/index.js';
 const size=256;
@@ -36,7 +37,67 @@ const stats=(data,box=64)=>{
 // Real KTX-Software files of packages/decoders/tests/fixtures/ktx2-layers.
 const ktx2File=name=>`/packages/decoders/tests/fixtures/ktx2-layers/${name}.ktx2`;
 const compression={features:['texture-compression-bc','texture-compression-astc','texture-compression-etc2']};
+// Two texels side by side, read with hard edges: the left and right halves of a quad.
+const halves=(a,b)=>new Texture({data:new Uint8Array([...a,...b]),width:2,height:1},{minFilter:'nearest',magFilter:'nearest',mipmaps:false,wrapS:'repeat',wrapT:'repeat'});
+const solid=(...c)=>new Texture({data:new Uint8Array([...c,...c,...c,...c]),width:2,height:2},{minFilter:'nearest',magFilter:'nearest',mipmaps:false,wrapS:'repeat',wrapT:'repeat'});
+const light=v=>(v/=255)<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;
+// Linear colour of the pixel at (x, y), y up from the quad's lower edge in canvas rows.
+const at=(data,x,y)=>[0,1,2].map(c=>light(data[(y*size+x)*4+c]));
+// Lets a test see what the surface ended with, as the colour of an unlit material.
+const peek=(expression)=>({name:'peek',shader:code=>code.replace('  return s;\n}',`  s.base=vec4f(${expression},1);\n  return s;\n}`)});
+const layerScene=async(material,geometry=quad())=>{
+  const made=await scene(front),{engine,errors,render}=made;
+  createMesh(engine,geometry,material);await render();
+  const data=await pixels(made);engine.dispose();return {data,errors};
+};
 window.check={
+  // Each way of weighing a layer, and what the layer changes: returns linear colours at named points.
+  async layeredCheck(kind){
+    const blue=[0,0,1,1],left=96,right=160,middle=128;
+    const sampled=async(options,geometry)=>{const {data,errors}=await layerScene(new UnlitMaterial({color:blue,...options}),geometry);return {left:at(data,left,middle),right:at(data,right,middle),errors};};
+    const red={color:[1,0,0]};
+    if(kind==='mask')return sampled({features:[layered({layers:[{...red,mask:halves([0,0,0,255],[255,255,255,255])}]})]});
+    if(kind==='packed')return sampled({features:[layered({layers:[{...red,mask:halves([255,0,0,255],[0,255,0,255]),maskChannel:'g'}]})]});
+    if(kind==='opacity')return sampled({features:[layered({layers:[{...red,opacity:0.25}]})]});
+    if(kind==='order')return sampled({features:[layered({layers:[{...red},{color:[0,1,0],mask:halves([0,0,0,255],[255,255,255,255])}]})]});
+    if(kind==='vertex')return sampled({features:[layered({layers:[{...red,vertexChannel:'g'}]})]},{...quad(),colors:[1,0,1,1,1,1,1,1,1,1,1,1,1,0,1,1].map((v,k)=>k%4===1?(k===1||k===13?0:1):1)});
+    if(kind==='height')return Promise.all([0,0.5,1].map(opacity=>sampled({features:[layered({layers:[{...red,opacity,heightMap:halves([0,0,0,255],[255,255,255,255])}]})]})));
+    if(kind==='array'){
+      const t=new Texture({data:new Uint8Array([255,0,0,255, 0,255,0,255, 255,255,255,255]),width:1,height:1,depth:3},{dimension:'2d-array',minFilter:'nearest',magFilter:'nearest',mipmaps:false});
+      return sampled({features:[layered({layers:[{map:{texture:t,layer:1}}]})]});
+    }
+    if(kind==='shared'){
+      const m=halves([0,0,0,255],[255,255,255,255]),f=layered({layers:[{...red,mask:m},{color:[0,1,0],mask:m,opacity:0.5}]});
+      return {...(await sampled({features:[f]})),slots:f.shader('fn surface(i:Out,front:bool)->Surface {\n  if(!facing&&f.settings.z<0.5){discard;}',2).match(/margoLayerMap\d+:/g).length};
+    }
+    if(kind==='tiling'){
+      const {data,errors}=await layerScene(new UnlitMaterial({color:[1,1,1,1],features:[layered({layers:[{map:halves([0,0,0,255],[255,255,255,255]),tiling:[4,1]}]})]}));
+      // The quad covers x from 40 to 216, 8 cells of about 22 pixels: count the 7 steps between them along one row.
+      let steps=0;for(let x=44;x<212;x++)steps+=(data[(128*size+x)*4]>127)!==(data[(128*size+x+1)*4]>127);
+      return {steps,errors};
+    }
+    if(kind==='detail'){
+      const grey=await sampled({color:[0.5,0.5,0.5,1],features:[layered({detail:{map:solid(128,128,128,255)}})]}),dark=await sampled({color:[0.5,0.5,0.5,1],features:[layered({detail:{map:solid(64,64,64,255)}})]}),half=await sampled({color:[0.5,0.5,0.5,1],features:[layered({detail:{map:solid(64,64,64,255),strength:0.5}})]});
+      return {grey:grey.left,dark:dark.left,half:half.left,errors:[...grey.errors,...dark.errors,...half.errors]};
+    }
+    if(kind==='surface')return sampled({color:[0,0,0,1],roughness:0.8,metalness:0,features:[layered({layers:[{roughness:0.25,metalness:1,mask:halves([0,0,0,255],[255,255,255,255])}]}),peek('s.roughness,s.metal,0.0')]});
+    if(kind==='normal'){
+      // Layer tilts its normal towards +x; the detail normal adds +y.
+      const {data,errors}=await layerScene(new UnlitMaterial({features:[layered({layers:[{normalMap:solid(255,128,128,255),mask:halves([0,0,0,255],[255,255,255,255])}]}),peek('s.n*0.5+0.5')]}));
+      const detail=await layerScene(new UnlitMaterial({features:[layered({detail:{normalMap:solid(128,255,128,255)}}),peek('s.n*0.5+0.5')]}));
+      // The same green on the material's own normal map shows which way green points on this quad.
+      const plain=await layerScene(new PbrMaterial({normalMap:solid(128,255,128,255),emissive:[1,1,1],features:[{name:'peek',shader:code=>code.replace('  return s;\n}','  s.base=vec4f(0,0,0,1);s.emissive=s.n*0.5+0.5;\n  return s;\n}')}]}));
+      return {left:at(data,left,middle),right:at(data,right,middle),detail:at(detail.data,left,middle),plain:at(plain.data,left,middle),errors:[...errors,...detail.errors,...plain.errors]};
+    }
+    if(kind==='live'){
+      const made=await scene(front),{engine,errors,render}=made,f=layered({layers:[{...red,opacity:0}]});
+      createMesh(engine,quad(),new UnlitMaterial({color:blue,features:[f]}));await render();
+      const before=at(await pixels(made),left,middle);
+      f.layers[0].opacity=1;await render();
+      const after=at(await pixels(made),left,middle);engine.dispose();return {before,after,errors};
+    }
+    throw new Error(kind);
+  },
   // A KTX2 file with several images per level: the GPU copy's texels against the decoder's, the drawn result against the
   // texel it should show, and a compressed upload.
   async ktx2(name,kind){

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6415348,
+  "total": 6418578,
   "history": [
     {
       "date": "2026-10-24",
@@ -2456,6 +2456,12 @@
       "commit": "db6953844",
       "reason": "ktx2-stream entry and exact level transcodes",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "58f30b676",
+      "reason": "layered entry and a tangentFrame field on the feature list",
+      "grew": 1
     }
   ],
   "items": {
@@ -2751,6 +2757,7 @@
     "@margoengine/materials/alpha-hash": 1309,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 36453,
+    "@margoengine/materials/layered": 3230,
     "@margoengine/materials/object-normal": 950,
     "@margoengine/materials/transmission": 7416,
     "@margoengine/math": 20105,

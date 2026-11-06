@@ -1182,6 +1182,10 @@
       "types": "./dist/materials/batched.d.ts",
       "import": "./dist/materials/batched.js"
     },
+    "./materials/layered": {
+      "types": "./dist/materials/layered.d.ts",
+      "import": "./dist/materials/layered.js"
+    },
     "./materials/alpha-hash": {
       "types": "./dist/materials/alpha-hash.d.ts",
       "import": "./dist/materials/alpha-hash.js"

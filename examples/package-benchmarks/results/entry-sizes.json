@@ -1,5 +1,5 @@
 {
-  "commit": "8df61017d",
+  "commit": "58f30b676",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -528,8 +528,8 @@
     },
     "@margoengine/decoders": {
       ".": {
-        "raw": 1130658,
-        "gzip": 478206
+        "raw": 1130668,
+        "gzip": 478212
       },
       "./meshopt": {
         "raw": 7194,
@@ -560,8 +560,16 @@
         "gzip": 3873
       },
       "./ktx2-layers": {
-        "raw": 809169,
-        "gzip": 374493
+        "raw": 809376,
+        "gzip": 374585
+      },
+      "./ktx2-hdr": {
+        "raw": 790761,
+        "gzip": 367257
+      },
+      "./ktx2-stream": {
+        "raw": 819042,
+        "gzip": 378288
       }
     },
     "@margoengine/dof": {
@@ -1238,7 +1246,7 @@
     },
     "@margoengine/materials": {
       ".": {
-        "raw": 196749,
+        "raw": 196782,
         "gzip": 61213
       },
       "./atlas": {
@@ -1250,8 +1258,12 @@
         "gzip": 7399
       },
       "./batched": {
-        "raw": 117531,
-        "gzip": 36209
+        "raw": 117564,
+        "gzip": 36223
+      },
+      "./layered": {
+        "raw": 7158,
+        "gzip": 2974
       },
       "./alpha-hash": {
         "raw": 1938,
@@ -2546,9 +2558,9 @@
       "brotli": 5879
     },
     "packages/gltf-pro/dist/index.js": {
-      "raw": 1319122,
-      "gzip": 537001,
-      "brotli": 439096
+      "raw": 1319132,
+      "gzip": 537014,
+      "brotli": 439432
     },
     "packages/staging/dist/index.js": {
       "raw": 20931,
@@ -2571,9 +2583,9 @@
       "brotli": 6071
     },
     "packages/decoders/dist/decoder.worker.js": {
-      "raw": 13467,
-      "gzip": 5114,
-      "brotli": 4570
+      "raw": 14173,
+      "gzip": 5347,
+      "brotli": 4769
     },
     "packages/decoders/dist/draco/draco_wasm_wrapper.js": {
       "raw": 58456,

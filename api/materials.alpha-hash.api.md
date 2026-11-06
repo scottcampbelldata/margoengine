@@ -337,6 +337,7 @@ class Material {
 interface MaterialFeature {
     readonly name: string;
     shader(code: string, group: number, material: Material): string;
+    tangentFrame?: boolean;
     lit?(code: string, material: Material): string;
     bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
     attach?(material: Material): void;

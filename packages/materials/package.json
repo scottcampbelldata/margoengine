@@ -51,6 +51,10 @@
       "types": "./dist/batched.d.ts",
       "import": "./dist/batched.js"
     },
+    "./layered": {
+      "types": "./dist/layered.d.ts",
+      "import": "./dist/layered.js"
+    },
     "./alpha-hash": {
       "types": "./dist/alpha-hash.d.ts",
       "import": "./dist/alpha-hash.js"

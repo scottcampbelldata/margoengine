@@ -1441,6 +1441,8 @@ export interface MaterialFeature {
   readonly name: string;
   /** Edits the material's finished shader (`group` is its bind group). The text a feature writes is fixed at creation; assign a new feature to change it. */
   shader(code: string, group: number, material: Material): string;
+  /** True when `shader` reads the tangent frame `t` and `b` for a normal map of its own, so the frame points as a normal map's does. */
+  tangentFrame?: boolean;
   /** Edits the shader once the scene's lighting effects are composed into it. */
   lit?(code: string, material: Material): string;
   /** Bind group entries of `group`, read on every draw; `owner` keys what it allocates. */
@@ -1812,7 +1814,13 @@ function featureKey(m: Material, code: string): string {
     (m.flatShading && m.shading !== 'basic' && m.shading !== 'depth' && m.shading !== 'distance' ? 'f' : '') +
     (m.vertexColors ? '' : 'v') +
     (lit.includes(m.shading) ? (m.fog ? '' : 'g') + (m.toneMapped ? '' : 't') : '') +
-    (m.normalMap || m.clearcoatNormalMap || m.extensions.includes('anisotropy') || lobeFrame ? 'n' : '') +
+    (m.normalMap ||
+    m.clearcoatNormalMap ||
+    m.extensions.includes('anisotropy') ||
+    lobeFrame ||
+    m['added'].some((v) => v.tangentFrame)
+      ? 'n'
+      : '') +
     surfaceKey(m)
   );
 }

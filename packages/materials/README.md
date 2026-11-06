@@ -734,6 +734,43 @@ The map follows rigid transforms only: a skinned or morphed mesh, or a `BatchedM
 keeps the bind pose's normals, and `triplanar` has no meaningful projection of it. Clearcoat keeps its own tangent-space
 `clearcoatNormalMap`.
 
+### Layered materials and detail maps
+
+`@margoengine/materials/layered` blends full material layers over a material, for rock under moss under snow or paint
+over metal, and adds tiled detail for close-ups. The material is the bottom layer; each layer's colour, roughness,
+metalness and normal mix over what is under it, in order, in every pass.
+
+```ts
+import { PbrMaterial, Texture } from '@margoengine/materials';
+import { layered } from '@margoengine/materials/layered';
+
+const pixel = (r: number, g: number, b: number) =>
+  new Texture({ data: new Uint8Array([r, g, b, 255]), width: 1, height: 1 }, { wrapS: 'repeat', wrapT: 'repeat' });
+const snow = layered({
+  layers: [
+    { color: [0.2, 0.4, 0.1], roughness: 0.9, mask: pixel(128, 0, 0) },
+    { color: [1, 1, 1], roughness: 0.6, mask: pixel(0, 200, 0), maskChannel: 'g', heightMap: pixel(180, 0, 0) },
+  ],
+  detail: { map: pixel(120, 120, 120), tiling: [16, 16], strength: 0.5 },
+});
+export const rock = new PbrMaterial({ color: [0.4, 0.38, 0.36, 1], features: [snow] });
+snow.layers[1].opacity = 0.5; // numbers stay live, with no new shader
+```
+
+A layer's weight is `opacity` (default 1) times its `mask` channel (default red, read without tiling) times its
+`vertexChannel` colour, in any mix. With a `heightMap` that weight becomes a height blend: high points show first and
+`heightContrast` (default 0.1) sets the edge width. A vertexChannel stops the vertex colours tinting the surface; their
+alpha still counts. Maps are `map` (sRGB), `normalMap` with `normalScale` (default 1), `metalRoughnessMap` (green
+roughness, blue metalness, times `roughness` default 1 and `metalness` default 0); `tiling` default [1, 1], `offset`
+default [0, 0], `texCoord` default 0. A map may be `{texture, layer}` of a `'2d-array'` Texture, so one array holds many
+layers. `detail` takes `map` (linear, 0.5 grey changes nothing), `normalMap`, `tiling` (default [8, 8]), `texCoord`
+and `strength` (default 1). A tiled map must be a Texture made with `wrapS: 'repeat'` and `wrapT: 'repeat'`; a clamped
+one is refused, because it would smear past its first tile.
+
+Limits: 8 layers and 9 distinct textures per feature (a Texture used twice in the same colour space counts once). Maps
+are fixed at creation; numbers stay live. Layer normals use the surface's own tangent frame, which comes from the UVs
+when the geometry has no tangents.
+
 ## Parallax, triplanar and subsurface
 
 Three more surface options, live like the others. Each compiles into a material's shader only while it is in use:

@@ -142,3 +142,43 @@ test('loadKTX2Texture: a layer decoder brings a cube, an array or a refusal for 
   await assert.rejects(loadKTX2Texture('https://a.test/a.ktx2', { decoder: {}, fetch }), /needs a decoder/);
   assert.throws(() => new CubeTexture(made('2d-array', 3)), /KTX2 cube map/);
 });
+
+test('layered: an empty call, bad numbers, an array map without its layer and too many textures refuse', async () => {
+  const { layered } = await import('../dist/layered.js');
+  const { Texture } = await import('../dist/index.js');
+  const t = () => new Texture({ data: new Uint8Array(4), width: 1, height: 1 });
+  const array = new Texture({ data: new Uint8Array(8), width: 1, height: 1, depth: 2 }, { dimension: '2d-array' });
+  assert.throws(() => layered(), /layers or detail/);
+  assert.throws(() => layered({ layers: Array(9).fill({}) }), /at most 8/);
+  assert.throws(() => layered({ layers: [{ opacity: 2 }] }), /opacity must be from 0 to 1/);
+  assert.throws(() => layered({ layers: [{ color: [1, 1] }] }), /color must be 3 finite/);
+  assert.throws(() => layered({ layers: [{ heightContrast: 0 }] }), /heightContrast must be above 0/);
+  assert.throws(() => layered({ layers: [{ maskChannel: 'x' }] }), /maskChannel/);
+  assert.throws(() => layered({ layers: [{ map: array }] }), /pass \{texture, layer\}/);
+  assert.throws(() => layered({ layers: [{ map: { texture: array, layer: 2 } }] }), /layer must be an index/);
+  assert.throws(() => layered({ detail: {} }), /needs a map or normalMap/);
+  const clamped = new Texture({ data: new Uint8Array(4), width: 1, height: 1 });
+  assert.throws(() => layered({ detail: { map: clamped } }), /tiling needs Textures that repeat/);
+  assert.throws(() => layered({ layers: [{ map: clamped, tiling: [2, 1] }] }), /tiling needs Textures that repeat/);
+  assert.ok(layered({ layers: [{ map: clamped, mask: clamped }] }));
+  assert.throws(
+    () => layered({ layers: Array.from({ length: 8 }, () => ({ map: t(), mask: t() })) }),
+    /at most; pack|9 at most/,
+  );
+});
+test('layered: textures shared between layers bind once, and only its users see its shader', async () => {
+  const { layered } = await import('../dist/layered.js');
+  const { Texture } = await import('../dist/index.js');
+  const mask = new Texture({ data: new Uint8Array(4), width: 1, height: 1 });
+  const f = layered({ layers: [{ mask, maskChannel: 'r' }, { mask, maskChannel: 'g' }] });
+  const code = f.shader('fn surface(i:Out,front:bool)->Surface {\n  if(!facing&&f.settings.z<0.5){discard;}\n*f.base*i.color;', 2);
+  assert.equal(code.match(/var margoLayerMap\d+:/g).length, 1);
+  assert.match(code, /margoLayerRows\.rows\[3\]/);
+  assert.match(code, /\*f\.base\*i\.color;/, 'colours keep tinting without a vertexChannel');
+  const tinted = layered({ layers: [{ vertexChannel: 'r' }] }).shader(
+    'fn surface(i:Out,front:bool)->Surface {\n  if(!facing&&f.settings.z<0.5){discard;}\n*f.base*i.color;',
+    2,
+  );
+  assert.match(tinted, /\*f\.base\*vec4f\(1,1,1,i\.color\.a\);/);
+  assert.throws(() => f.shader('no surface here', 2), /standard gltf-pro PBR shader/);
+});
