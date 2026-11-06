@@ -30,10 +30,11 @@ test('the manifest matches the sources and lists each module once', () => {
 });
 
 test('the corpus covers every package whose source holds WGSL', () => {
-  // One git process lists the files, so the test opens no package sources itself.
+  // One git process lists the files, so the test opens no package sources itself. POSIX classes, since git grep -E uses
+  // the system's regex library and macOS has no \b there: it matched nothing and git exited 1.
   const files = execFileSync(
     'git',
-    ['grep', '-l', '-E', '@(vertex|fragment|compute)\\b', '--', 'packages/*/src/**', 'packages/shared/*.js'],
+    ['grep', '-l', '-E', '@(vertex|fragment|compute)([^[:alnum:]_]|$)', '--', 'packages/*/src/**', 'packages/shared/*.js'],
     {
       cwd: root,
       encoding: 'utf8',
