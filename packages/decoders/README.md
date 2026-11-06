@@ -13,7 +13,7 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 declare const bytes: Uint8Array;
 
 const draco = new DracoDecoder({workerLimit: 4});
-const ktx2 = new KTX2Decoder({device: engine.gpu, workerLimit: 4});
+const ktx2 = new KTX2Decoder({device: engine.gpu!, workerLimit: 4});
 
 // A KHR_draco_mesh_compression bufferView, with the extension's attribute ids.
 const geometry = await draco.decode(bytes, {attributeIds: {POSITION: 0, NORMAL: 1, TEXCOORD_0: 2}});
@@ -281,7 +281,7 @@ declare const engine: {gpu: GPUDevice} & Parameters<typeof Environment.create>[0
 declare const bytes: Uint8Array;
 
 // As a texture: BC6H on a desktop GPU.
-const decoder = new KTX2HDRDecoder({device: engine.gpu});
+const decoder = new KTX2HDRDecoder({device: engine.gpu!});
 const texture = await decoder.createTexture(bytes);
 
 // As image-based lighting: an equirect or a cube, as floats.

@@ -1159,6 +1159,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B3 surfaces | parse3DM draws surfaces with no render mesh through the one NURBS evaluator; opt-in rhino3dm fetch tool | DONE | `a95fe94b1` | LIM-208 |
 | D1 | Core pass join: accepted limit documented, core unchanged (Scott's ruling) | DONE | `a95fe94b1` | - |
 | B22 | Motion blur pictures: the harness jump found and fixed; three's smear recorded, SSIM not a verdict | DONE | this commit | - |
+| README types | README types: published type fixes, 328 to 289 | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

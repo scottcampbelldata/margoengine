@@ -1287,7 +1287,7 @@ import {KTX2Decoder} from 'margoengine/decoders';
 import {Engine} from 'margoengine/core';
 import {loadKTX2Texture, createMesh, PbrMaterial, Texture} from 'margoengine/materials';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const decoder = new KTX2Decoder({device: engine.gpu});
+const decoder = new KTX2Decoder({device: engine.gpu!});
 const albedo = await loadKTX2Texture('/textures/albedo.ktx2', {decoder});
 createMesh(engine, geometry, new PbrMaterial({map: albedo}));
 ```

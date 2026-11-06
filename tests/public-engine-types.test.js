@@ -43,3 +43,24 @@ export const sun: Float32Array = engine.lighting.direction;
     '',
   );
 });
+
+test('regression: importing scene leaves plugins fitting engine.use, and public meshes and atomics type-check', () => {
+  assert.equal(
+    errors(
+      'packages',
+      `import '@margoengine/scene';
+import type { EngineKernel, Mesh } from '@margoengine/core';
+import { CulledModels } from '@margoengine/culling/models';
+import { storage } from '@margoengine/shader';
+import { webglPicking } from '@margoengine/webgl/pick';
+declare const engine: EngineKernel;
+declare const wall: Mesh;
+engine.use(webglPicking());
+declare const culled: CulledModels;
+culled.addOccluder(wall);
+export const previous = storage(1, 'u32', {atomic: true}).atomicAdd(0, 1);
+`,
+    ),
+    '',
+  );
+});

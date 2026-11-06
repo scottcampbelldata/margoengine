@@ -16,7 +16,7 @@ export interface EncodeVideoOptions {
 }
 
 export interface EncodedVideo {
-    bytes: Uint8Array;
+    bytes: Uint8Array<ArrayBuffer>;
     mimeType: string;
     codec: string;
     width: number;
@@ -51,7 +51,7 @@ export interface RenderedFrame extends HeadlessPixels, FrameTiming {
 export interface SequenceFile {
     index: number;
     name: string;
-    bytes: Uint8Array;
+    bytes: Uint8Array<ArrayBuffer>;
 }
 
 export interface WebCodecsBinding {

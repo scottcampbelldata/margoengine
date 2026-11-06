@@ -194,50 +194,50 @@ export class StorageBuffer<T extends StorageType = StorageType> implements Resou
   }
   /** Atomically adds `value` to element `i` and returns the previous value (compaction: `out.store(counter.atomicAdd(0, 1), i)`).
    * Runs where it is made, in order with other atomics, even when its result is unused; inside `loop` or `Fn` only when the result is used. */
-  atomicAdd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
+  atomicAdd(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicAdd', i, value) as never;
   }
   /** Atomic subtraction; returns the previous value. */
-  atomicSub(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
+  atomicSub(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicSub', i, value) as never;
   }
   /** Atomic maximum; returns the previous value. */
-  atomicMax(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
+  atomicMax(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicMax', i, value) as never;
   }
   /** Atomic minimum; returns the previous value. */
-  atomicMin(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
+  atomicMin(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicMin', i, value) as never;
   }
   /** Atomic bitwise and; returns the previous value. */
-  atomicAnd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
+  atomicAnd(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicAnd', i, value) as never;
   }
   /** Atomic bitwise or; returns the previous value. */
-  atomicOr(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
+  atomicOr(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicOr', i, value) as never;
   }
   /** Atomic bitwise xor; returns the previous value. */
-  atomicXor(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
+  atomicXor(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicXor', i, value) as never;
   }
   /** Atomically replaces element `i`; returns the previous value. */
-  atomicExchange(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T> {
+  atomicExchange(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T> {
     return this.rmw('atomicExchange', i, value) as never;
   }
   /**
    * Sets element `i` to `value` if it equals `compare`. It may fail even when they are equal (WGSL's weak form), so
    * retry in a `Loop` or `While` on `exchanged`.
    */
-  atomicCompareExchange(this: StorageBuffer<Atomic>, i: Index, compare: NodeInput<T>, value: NodeInput<T>): Exchange<T> {
+  atomicCompareExchange(this: StorageBuffer<T & Atomic>, i: Index, compare: NodeInput<T>, value: NodeInput<T>): Exchange<T> {
     return exchange(this.rmw('atomicCompareExchangeWeak', i, compare, value)) as never;
   }
   /** Reads element `i` at this point of the body, after the atomics made before it (unlike `element`, which reads up front). */
-  atomicLoad(this: StorageBuffer<Atomic>, i: Index): Node<T> {
+  atomicLoad(this: StorageBuffer<T & Atomic>, i: Index): Node<T> {
     return this.rmw('atomicLoad', i) as never;
   }
   /** `store` on an atomic buffer. */
-  atomicStore(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Store {
+  atomicStore(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Store {
     return this.store(i, value as never);
   }
   private rmw(op: string, i: Index, ...values: NodeInput[]): Node<T> {

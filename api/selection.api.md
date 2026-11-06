@@ -263,7 +263,7 @@ type PickView = RenderView & {
 interface PickingOverlay {
     drawPick(context: PickingOverlayContext): void;
     pickHit(index: number): {
-        mesh: Mesh;
+        mesh: PublicMesh;
         line?: object;
         segment?: number;
         cloud?: object;

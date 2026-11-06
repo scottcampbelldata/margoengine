@@ -5,12 +5,12 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { MargoError } from '@margoengine/math/errors';
 import { computeShader } from './shaders.js';
 import { Pyramid, depthKind, exactShader, levelTable, occluderPipeline } from './pyramid.js';
-import { OccluderList, type OccluderMesh, type OccluderSource } from './occluders.js';
+import { OccluderList, type OccluderInput } from './occluders.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 export { CulledMeshes } from './meshes.js';
 export type { CulledMeshesOptions } from './meshes.js';
-export type { OccluderContext, OccluderMesh, OccluderPrimitive, OccluderSource } from './occluders.js';
+export type { OccluderContext, OccluderInput, OccluderMesh, OccluderPrimitive, OccluderSource } from './occluders.js';
 
 declare const GPUBufferUsage: {
   MAP_READ: number;
@@ -225,12 +225,12 @@ export class CulledInstances implements EnginePlugin {
    * the large things. Cut-out, blended, displaced and clipped primitives do not occlude, and neither do back faces.
    * @throws TypeError for anything else.
    */
-  addOccluder(source: OccluderMesh | OccluderSource): this {
+  addOccluder(source: OccluderInput): this {
     (this.outside ??= new OccluderList()).add(source);
     return this;
   }
   /** Stops `source` occluding from the next frame. */
-  removeOccluder(source: OccluderMesh | OccluderSource): this {
+  removeOccluder(source: OccluderInput): this {
     this.outside?.remove(source);
     return this;
   }

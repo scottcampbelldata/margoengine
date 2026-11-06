@@ -1,7 +1,4 @@
 {
-  "animation": {
-    "TS2345: Argument of type 'AnimationGroup' is not assignable to parameter of type 'EnginePlugin'.": 1
-  },
   "animator": {
     "TS2552: Cannot find name 'animation'. Did you mean 'animator'?": 5
   },
@@ -22,8 +19,7 @@
     "TS2304: Cannot find name 'otherBVH'.": 1,
     "TS2304: Cannot find name 'otherToThisMatrix'.": 1,
     "TS2304: Cannot find name 'receiverFace'.": 1,
-    "TS2304: Cannot find name 'viewProjectionTimesWorld'.": 1,
-    "TS2345: Argument of type 'PBRModel' is not assignable to parameter of type 'AlphaMaskedModel'.": 1
+    "TS2304: Cannot find name 'viewProjectionTimesWorld'.": 1
   },
   "cameras": {
     "TS2304: Cannot find name 'Raycaster'.": 1,
@@ -43,19 +39,12 @@
     "TS2304: Cannot find name 'physics'.": 1,
     "TS2304: Cannot find name 'player'.": 1
   },
-  "core": {
-    "TS2339: Property 'renderTarget' does not exist on type 'EngineKernel'.": 1
-  },
   "culling": {
     "TS2304: Cannot find name 'bolt'.": 1,
     "TS2304: Cannot find name 'boltMatrices'.": 1,
     "TS2304: Cannot find name 'matrix'.": 1,
     "TS2304: Cannot find name 'plate'.": 1,
-    "TS2304: Cannot find name 'plateMatrices'.": 1,
-    "TS2345: Argument of type 'Mesh' is not assignable to parameter of type 'OccluderMesh | OccluderSource'.": 1
-  },
-  "decoders": {
-    "TS2339: Property 'gpu' does not exist on type 'EngineKernel'.": 1
+    "TS2304: Cannot find name 'plateMatrices'.": 1
   },
   "geometry": {
     "TS2304: Cannot find name 'creasedNormals'.": 1,
@@ -66,13 +55,6 @@
     "TS2304: Cannot find name 'wallGeometry'.": 1,
     "TS2304: Cannot find name 'wallMesh'.": 1
   },
-  "gltf-pro": {
-    "TS2345: Argument of type '(Mesh | Mesh)[]' is not assignable to parameter of type 'Iterable<Mesh>'.": 3,
-    "TS2345: Argument of type 'PBRModel' is not assignable to parameter of type 'EnginePlugin'.": 1
-  },
-  "headless": {
-    "TS2322: Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'BlobPart'.": 1
-  },
   "lightmap": {
     "TS18004: No value exists in scope for the shorthand property 'albedo'. Either declare one or provide an initializer.": 1,
     "TS18004: No value exists in scope for the shorthand property 'positions'. Either declare one or provide an initializer.": 1,
@@ -82,8 +64,6 @@
   "lines": {
     "TS2304: Cannot find name 'lines'.": 1,
     "TS2304: Cannot find name 'model'.": 2,
-    "TS2345: Argument of type 'Lines' is not assignable to parameter of type 'EnginePlugin'.": 2,
-    "TS2345: Argument of type 'Picking' is not assignable to parameter of type 'LinePickHost'.": 1,
     "TS2552: Cannot find name 'skeleton'. Did you mean 'Selection'?": 1
   },
   "loaders": {
@@ -100,8 +80,6 @@
     "TS2304: Cannot find name 'lowGeometry'.": 1,
     "TS2304: Cannot find name 'lowMesh'.": 1,
     "TS2304: Cannot find name 'midGeometry'.": 1,
-    "TS2322: Type 'PBRModel' is not assignable to type 'LODObject'.": 1,
-    "TS2345: Argument of type 'PBRModel' is not assignable to parameter of type '{ readonly lods: readonly LODModelEntry[]; }'.": 1,
     "TS2552: Cannot find name 'parts'. Did you mean 'part'?": 1
   },
   "materials": {
@@ -128,8 +106,6 @@
     "TS2304: Cannot find name 'primitive'.": 1,
     "TS2304: Cannot find name 'shadows'.": 1,
     "TS2304: Cannot find name 'tileset'.": 1,
-    "TS2339: Property 'gpu' does not exist on type 'EngineKernel'.": 2,
-    "TS2345: Argument of type 'EngineKernel' is not assignable to parameter of type 'PrefilterTarget'.": 1,
     "TS2552: Cannot find name 'map'. Did you mean 'Map'?": 1,
     "TS2552: Cannot find name 'tiles'. Did you mean 'tiled'?": 1,
     "TS2552: Cannot find name 'tileset'. Did you mean 'tiles'?": 1
@@ -149,8 +125,7 @@
     "TS2304: Cannot find name 'atlasImage'.": 1,
     "TS2304: Cannot find name 'labels'.": 1,
     "TS2304: Cannot find name 'newXyz'.": 1,
-    "TS2304: Cannot find name 'points'.": 1,
-    "TS2345: Argument of type 'Picking' is not assignable to parameter of type 'PointPickHost'.": 1
+    "TS2304: Cannot find name 'points'.": 1
   },
   "post": {
     "TS2304: Cannot find name 'tracer'.": 1
@@ -206,13 +181,7 @@
     "TS2304: Cannot find name 'rockMesh'.": 1,
     "TS2304: Cannot find name 'shadows'.": 1,
     "TS2304: Cannot find name 'standIn'.": 1,
-    "TS2339: Property 'gpu' does not exist on type 'EngineKernel'.": 1,
     "TS2552: Cannot find name 'bushMesh'. Did you mean 'bushes'?": 1
-  },
-  "selection": {
-    "TS2322: Type 'Picking' is not assignable to type 'HoverPicker'.": 2,
-    "TS2345: Argument of type 'Mesh[]' is not assignable to parameter of type 'Iterable<Mesh | ModelLike>'.": 1,
-    "TS2345: Argument of type 'import(\"<root>/packages/core/dist/plugin\").EnginePlugin' is not assignable to parameter of type 'import(\"<root>/packages/core/dist/api\").EnginePlugin'.": 1
   },
   "shader": {
     "TS2304: Cannot find name 'cells'.": 3,
@@ -226,13 +195,7 @@
     "TS2304: Cannot find name 'texture'.": 1,
     "TS2304: Cannot find name 'uvs'.": 1,
     "TS2304: Cannot find name 'values'.": 3,
-    "TS2322: Type 'Node<\"f32\" | \"vec3f\">' is not assignable to type 'Node<\"vec3f\" | \"vec4f\">'.": 1,
-    "TS2345: Argument of type 'PBRPrimitive' is not assignable to parameter of type 'SkinnedPrimitive'.": 1,
-    "TS2345: Argument of type 'Picking' is not assignable to parameter of type 'RawPickHost'.": 1,
-    "TS2684: The 'this' context of type 'StorageBuffer<\"u32\">' is not assignable to method's 'this' of type 'StorageBuffer<Atomic>'.": 3
-  },
-  "sky": {
-    "TS2741: Property 'lighting' is missing in type 'EngineKernel' but required in type 'LightingTarget'.": 3
+    "TS2322: Type 'Node<\"f32\" | \"vec3f\">' is not assignable to type 'Node<\"vec3f\" | \"vec4f\">'.": 1
   },
   "splines": {
     "TS18004: No value exists in scope for the shorthand property 'normals'. Either declare one or provide an initializer.": 1,
@@ -240,9 +203,6 @@
     "TS2304: Cannot find name 'gpsTrack'.": 1,
     "TS2304: Cannot find name 'positions'.": 1,
     "TS2304: Cannot find name 'waypoints'.": 2
-  },
-  "stats": {
-    "TS2339: Property 'gpu' does not exist on type 'EngineKernel'.": 2
   },
   "taa": {
     "TS7005: Variable 'taa' implicitly has an 'any' type.": 1,
@@ -313,11 +273,6 @@
     "TS2304: Cannot find name 'bloom'.": 2,
     "TS2304: Cannot find name 'sky'.": 2,
     "TS2304: Cannot find name 'water'.": 1,
-    "TS2339: Property 'gpu' does not exist on type 'EngineKernel'.": 2,
     "TS2552: Cannot find name 'GPUTextureUsage'. Did you mean 'GPUTexture'?": 2
-  },
-  "webgl": {
-    "TS2345: Argument of type 'Shadows' is not assignable to parameter of type 'EnginePlugin'.": 1,
-    "TS2345: Argument of type 'import(\"<root>/packages/core/dist/plugin\").EnginePlugin' is not assignable to parameter of type 'import(\"<root>/packages/core/dist/api\").EnginePlugin'.": 2
   }
 }

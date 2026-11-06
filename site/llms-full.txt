@@ -3122,20 +3122,13 @@ does not own. Each entry says exactly what is needed to close it.
 - **Repro:** `createHeadlessStage({ gpu: create([]), width: 640, height: 360 })`, then `loadGLTF(stage.engine, url)` on `examples/assets/flight-helmet.glb` served over HTTP.
 - **Cause:** image decoding uses the browser's `createImageBitmap`, Node has none, and upload uses `copyExternalImageToTexture`, which needs a browser image. A fix needs a decoder hook in the loaders and an upload through `writeTexture`.
 
-### 328 errors in the package README examples
+### 289 errors in the package README examples
 
 - **What:** `npm run check:readmes` (a step of `verify`) type-checks all 719 examples of the 100 packages. When the check was built it found 715 errors in 181 examples; 388 were fixed in the same commit, and with two more from a selection example that landed the same day 329 remained, and 328 now, in 41 packages (voxel 56, materials 40, scatter 29, shader 23, bvh 20, cameras 17, ragdoll 16, the rest 10 or fewer). `scripts/support/readme-types-known.json` lists each by package and message. A new error fails `verify`, and so does an entry that has been fixed and not removed, so the list only shrinks.
 - **Repro:** empty the known list to `{}`, then `npm run build:packages` and `npm run check:readmes`.
 - **Cause:** 285 are names an example uses and never sets up, reader data such as `physics`, `textures` or `candidates`. The README says "runs as written" and these do not. The other 42 are mostly real faults in published types, below. Six of them are `GPUTextureUsage` and `GPUBufferUsage`, which need `@webgpu/types` in the reader's project and in the check.
-- **The published types that are wrong, each shown by a README example written the way the API is meant to be used:**
-  - `Lines`, `AnimationGroup`, `PBRModel` and `Shadows` type `setup` against the internal `Engine`, so `engine.use(x)` on an `EngineKernel` does not compile. `@margoengine/core` also declares `EnginePlugin` twice, in `dist/plugin` and `dist/api`, and the two differ (webgl README).
-  - `Picking` does not satisfy `LinePickHost`, `PointPickHost`, `HoverPicker` or `RawPickHost`.
-  - `EngineKernel` has no `gpu` in its types (decoders, stats, materials, scatter, water READMEs), no `renderTarget` (core README), no `lighting` for sky's `LightingTarget`, and does not fit `PrefilterTarget`.
-  - Two `Mesh` types: `(Mesh | Mesh)[]` is refused by `Iterable<Mesh>` (gltf-pro), `Mesh[]` by `Iterable<Mesh | ModelLike>` (selection), and core's `Mesh` by `addOccluder` (culling).
-  - `PBRModel` is refused as `AlphaMaskedModel` (bvh), by `LOD.fromModel` (lod), and its primitive as `SkinnedPrimitive` (shader).
-  - `Skeleton` is refused as `IKSkeleton` (rigging).
-  - `storage(n, 'u32', {atomic: true}).atomicAdd` refuses the buffer it is called on, and `Var(vec3)` gives a node `colorNode` refuses (shader).
-  - `video.bytes` and the loaders' bytes are `Uint8Array<ArrayBufferLike>`, which is not a `BlobPart`.
+- **Published types fixed 2026-11-06:** `EngineKernel` now declares `gpu`, `renderTarget` and `lighting`; importing scene no longer stops plugins fitting `engine.use`; a public `Mesh` is taken by `addOccluder`; shader atomics keep their element type (`tests/public-engine-types.test.js`). 289 errors are left, nearly all names an example never sets up.
+- **Published types still wrong:** `Skeleton` is refused as `IKSkeleton` (rigging); `Var(vec3)` gives a node `colorNode` refuses (shader); the loaders' bytes are `Uint8Array<ArrayBufferLike>`, which is not a `BlobPart`.
 - **Also open:** `modern:test:packages` checks the same examples against the tarballs with no known list, so check:merge fails on these until the list is empty. That is deliberate: the list is for landing, and nothing is released on it.
 - **Needed to close:** fix each type in its package, give each fragment its setup, and run `npm run check:readmes -- --shrink` until the file is `{}`. This list must be empty before release.
 
@@ -3702,6 +3695,12 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
   against 3.2).
 - **Cause (timestamps per pass):** `MotionBlur` reads TAA's velocity, Margo's only motion-vector source, so the frame
   also runs TAA's velocity and resolve passes (about 0.3 ms); the blur itself is about 0.27 ms.
+- **Why the two pictures differ (2026-11-06):** the harness drew its still frame at t = 0 straight after the timed loop, so
+  Margo blurred by the jump from wherever the loop stopped, in streaks 32 pixels long. The harness now steps one frame
+  into the still frame, and Margo's picture is what a 1/60 s step gives: sharp boxes, under a pixel of motion on most of
+  them. three's picture did not change with that step and stays a heavy smear, so its blur does not come from the last
+  two frames' motion alone. The SSIM of this row compares a true one-frame blur with that smear, so it says nothing
+  about either engine's quality. Timings are unaffected. three's velocity scale in the adapter is not yet explained.
 - **Fixed for effects that need no anti-aliasing:** `TAA`'s `velocityOnly` option runs the velocity pass with no jitter,
   capture, history or resolve: `p-motion-blur-velocity` 0.48 ms GPU and 1.2 ms CPU, against 0.63 and 2.8 for
   `p-motion-blur` in the same run (busy machine, diagnostic). `p-motion-blur` keeps its full TAA frame.
@@ -4838,7 +4837,7 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 declare const bytes: Uint8Array;
 
 const draco = new DracoDecoder({workerLimit: 4});
-const ktx2 = new KTX2Decoder({device: engine.gpu, workerLimit: 4});
+const ktx2 = new KTX2Decoder({device: engine.gpu!, workerLimit: 4});
 
 // A KHR_draco_mesh_compression bufferView, with the extension's attribute ids.
 const geometry = await draco.decode(bytes, {attributeIds: {POSITION: 0, NORMAL: 1, TEXCOORD_0: 2}});

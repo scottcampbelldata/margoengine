@@ -70,7 +70,7 @@ export interface AlphaMaskedModel {
       readonly textures?: readonly {
         readonly source?: number;
         readonly sampler?: number;
-        readonly extensions?: Readonly<Record<string, { readonly source?: number } | undefined>>;
+        readonly extensions?: Readonly<Record<string, unknown>>;
       }[];
       readonly samplers?: readonly { readonly wrapS?: number; readonly wrapT?: number }[];
     };
@@ -146,7 +146,7 @@ async function readMask(
   const { textures = [], samplers = [] } = model.asset.doc,
     texture = textures[map.index],
     sampler = samplers[texture?.sampler ?? -1],
-    source = SOURCES.map((name) => texture?.extensions?.[name]?.source).find((index) => index !== undefined) ?? texture?.source,
+    source = SOURCES.map((name) => (texture?.extensions?.[name] as { source?: number } | undefined)?.source).find((index) => index !== undefined) ?? texture?.source,
     image = model.image(source as number) as object;
   if ('ktx2' in image || 'mipmaps' in image) return 'its base colour map is compressed for the GPU, so no pixels can be read';
   const read = await pixels(image);

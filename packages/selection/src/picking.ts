@@ -13,7 +13,7 @@ import {
   type DrawOptions,
   type RenderView,
 } from '@margoengine/core/extension';
-import type { Camera } from '@margoengine/core';
+import type { Camera, Mesh as PublicMesh } from '@margoengine/core';
 import { meshVertex } from '../../shared/gpu.js';
 import { inView, layerRegistry, meshLayers } from '../../shared/view-rect.js';
 import { PickingPrimitives, type PickingSource } from './picking-primitives.js';
@@ -128,7 +128,14 @@ export interface PickingOverlay {
   /** The hit for item `index` of the last `drawPick`, or null. `mesh` must be a live mesh of the picked scene. */
   pickHit(
     index: number,
-  ): { mesh: Mesh; line?: object; segment?: number; cloud?: object; point?: number; position?: readonly number[] } | null;
+  ): {
+    mesh: PublicMesh;
+    line?: object;
+    segment?: number;
+    cloud?: object;
+    point?: number;
+    position?: readonly number[];
+  } | null;
 }
 /** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
 export interface PickHit {
@@ -607,7 +614,7 @@ export class Picking implements EnginePlugin {
     let hit: PickHit | null = null;
     if (id >= overlayBase) {
       const slot = Math.floor((id - overlayBase) / overlayIds);
-      hit = this.overlays[slot]?.pickHit(id - overlayBase - slot * overlayIds) ?? null;
+      hit = (this.overlays[slot]?.pickHit(id - overlayBase - slot * overlayIds) ?? null) as PickHit | null;
     } else if (id > capacity + total + list.length) {
       const [m, i, k] = tile.instances[id - capacity - total - list.length - 1] ?? [],
         model = models[m],

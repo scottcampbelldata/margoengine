@@ -42,6 +42,11 @@ export interface SceneGraphMembers {
 declare module '@margoengine/core' {
   interface Mesh extends SceneGraphMembers {}
 }
+// The class plugins are typed against gets the same members, or importing this entry would stop every package's plugin
+// fitting `engine.use`: the public Mesh would have members the runtime Mesh lacks.
+declare module '@margoengine/core/extension' {
+  interface Mesh extends SceneGraphMembers {}
+}
 
 /**
  * Adds `children`, `parent`, `userData`, `traverse`, `lookAt`, `getWorldPosition`, `getWorldQuaternion` and

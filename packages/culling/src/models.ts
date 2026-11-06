@@ -7,7 +7,7 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { MargoError } from '@margoengine/math/errors';
 import { compatTier } from '../../shared/compat.js';
 import { viewSize } from '../../shared/view-rect.js';
-import { OccluderList, type OccluderMesh, type OccluderSource } from './occluders.js';
+import { OccluderList, type OccluderInput } from './occluders.js';
 import { Pyramid, depthKind, levelTable } from './pyramid.js';
 import {
   common,
@@ -240,12 +240,12 @@ export class CulledModels implements EnginePlugin {
    * displaced and clipped primitives do not occlude, and neither do back faces.
    * @throws TypeError for anything else.
    */
-  addOccluder(source: OccluderMesh | OccluderSource): this {
+  addOccluder(source: OccluderInput): this {
     (this.outside ??= new OccluderList()).add(source);
     return this;
   }
   /** Stops `source` occluding from the next frame. */
-  removeOccluder(source: OccluderMesh | OccluderSource): this {
+  removeOccluder(source: OccluderInput): this {
     this.outside?.remove(source);
     return this;
   }

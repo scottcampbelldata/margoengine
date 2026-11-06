@@ -35,9 +35,7 @@ export interface AlphaMaskedModel {
             readonly textures?: readonly {
                 readonly source?: number;
                 readonly sampler?: number;
-                readonly extensions?: Readonly<Record<string, {
-                    readonly source?: number;
-                } | undefined>>;
+                readonly extensions?: Readonly<Record<string, unknown>>;
             }[];
             readonly samplers?: readonly {
                 readonly wrapS?: number;

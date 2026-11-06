@@ -32,7 +32,7 @@ export interface SkinnedPrimitive {
   /** Twenty floats a vertex, position first, then at 4 the normal and at 12 UV0, as gltf-pro packs them. */
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
-  readonly definition: { readonly attributes: Readonly<Record<string, number>> };
+  readonly definition: { readonly attributes?: Readonly<Record<string, number>> };
 }
 /** A skin read from a loaded model, for `positionNode` and `normalNode` of a NodeMaterial. */
 export interface ModelSkinning extends Skinning {
@@ -77,7 +77,7 @@ export interface Skinning {
  */
 export function skinningFromModel(model: SkinnedModel, primitive: SkinnedPrimitive): ModelSkinning {
   const { doc } = model.asset,
-    { attributes } = primitive.definition,
+    { attributes = {} } = primitive.definition,
     skin = doc.skins?.[doc.nodes?.[primitive.nodeIndex]?.skin ?? -1];
   if (!skin || attributes.JOINTS_0 === undefined || attributes.WEIGHTS_0 === undefined)
     throw new MargoError('state', 'The primitive has no glTF skin; pick one whose node has a skin and JOINTS_0.');

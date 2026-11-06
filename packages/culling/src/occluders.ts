@@ -2,6 +2,7 @@
 // meshes and anything with `drawOccluder`, such as Terrain. An occluder must be a surface the frame really shows, or
 // parts behind it would vanish: so only front faces draw (a double-sided surface just occludes less), and cut-out,
 // blended, displaced and clipped primitives do not occlude at all.
+import type { Mesh as PublicMesh } from '@margoengine/core';
 import type { Engine, Geometry, PassContext } from '@margoengine/core/extension';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { inView } from '../../shared/view-rect.js';
@@ -47,6 +48,8 @@ export interface OccluderMesh {
   readonly geometry?: Geometry | null;
   readonly matrix: ArrayLike<number>;
 }
+/** What `addOccluder` takes: a mesh from `engine.createMesh()`, or anything {@link OccluderSource} lists. */
+export type OccluderInput = OccluderMesh | PublicMesh | OccluderSource;
 
 const shader = `
 struct Occluder {camera:mat4x4f,model:mat4x4f}
@@ -86,12 +89,15 @@ export class OccluderList {
   private data = new Float32Array(0);
   private samples = 0;
 
-  add(source: OccluderMesh | OccluderSource): void {
+  add(input: OccluderInput): void {
+    // A public Mesh is the runtime mesh behind a narrower type.
+    const source = input as OccluderMesh | OccluderSource;
     if (!source || typeof source !== 'object' || !('id' in source || 'shadowPrimitives' in source || 'drawOccluder' in source))
       throw new TypeError('Invalid occluder; pass a core mesh, a model, a materials mesh or a Terrain');
     this.sources.add(source);
   }
-  remove(source: OccluderMesh | OccluderSource): void {
+  remove(input: OccluderInput): void {
+    const source = input as OccluderMesh | OccluderSource;
     this.sources.delete(source);
   }
   get size(): number {

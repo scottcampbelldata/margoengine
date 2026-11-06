@@ -52,7 +52,7 @@ export interface SkinnedPrimitive {
     readonly vertices: Float32Array;
     readonly indices: Uint32Array;
     readonly definition: {
-        readonly attributes: Readonly<Record<string, number>>;
+        readonly attributes?: Readonly<Record<string, number>>;
     };
 }
 
@@ -291,17 +291,17 @@ class StorageBuffer<T extends StorageType = StorageType> implements Resource {
     update(): void;
     element(i: Index): Node<T>;
     store(i: Index, value: NodeInput<T>): Store;
-    atomicAdd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
-    atomicSub(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
-    atomicMax(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
-    atomicMin(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
-    atomicAnd(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
-    atomicOr(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
-    atomicXor(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
-    atomicExchange(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Node<T>;
-    atomicCompareExchange(this: StorageBuffer<Atomic>, i: Index, compare: NodeInput<T>, value: NodeInput<T>): Exchange<T>;
-    atomicLoad(this: StorageBuffer<Atomic>, i: Index): Node<T>;
-    atomicStore(this: StorageBuffer<Atomic>, i: Index, value: NodeInput<T>): Store;
+    atomicAdd(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicSub(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicMax(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicMin(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicAnd(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicOr(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicXor(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicExchange(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Node<T>;
+    atomicCompareExchange(this: StorageBuffer<T & Atomic>, i: Index, compare: NodeInput<T>, value: NodeInput<T>): Exchange<T>;
+    atomicLoad(this: StorageBuffer<T & Atomic>, i: Index): Node<T>;
+    atomicStore(this: StorageBuffer<T & Atomic>, i: Index, value: NodeInput<T>): Store;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }

@@ -66,7 +66,7 @@ export interface SequenceFile {
   /** For example `frame_0007.png`. */
   name: string;
   /** PNG file bytes. */
-  bytes: Uint8Array;
+  bytes: Uint8Array<ArrayBuffer>;
 }
 
 /** Options of {@link imageSequence}. */
@@ -84,7 +84,7 @@ export async function* imageSequence(
 ): AsyncGenerator<SequenceFile, void, void> {
   let index = 0;
   for await (const frame of frames) {
-    yield { index, name: `${prefix}${String(index).padStart(digits, '0')}.png`, bytes: await encodePNG(frame) };
+    yield { index, name: `${prefix}${String(index).padStart(digits, '0')}.png`, bytes: (await encodePNG(frame)) as Uint8Array<ArrayBuffer> };
     index++;
   }
 }
@@ -117,7 +117,7 @@ export interface EncodeVideoOptions {
 /** What {@link encodeVideo} gives back. */
 export interface EncodedVideo {
   /** The whole file. */
-  bytes: Uint8Array;
+  bytes: Uint8Array<ArrayBuffer>;
   /** For example `video/webm; codecs="vp09.00.51.08"`, for a `Blob` or an HTTP header. */
   mimeType: string;
   /** The codec string used. */
@@ -276,7 +276,7 @@ export async function encodeVideo(
     throw fault('failed', 'The encoder gave no H.264 description', 'headless');
   const track = { codec: used, width, height, fps, description, colorSpace };
   return {
-    bytes: format === 'webm' ? muxWebM(track, samples) : muxMP4(track, samples),
+    bytes: (format === 'webm' ? muxWebM(track, samples) : muxMP4(track, samples)) as Uint8Array<ArrayBuffer>,
     mimeType: `video/${format}; codecs="${used}"`,
     codec: used,
     width,
