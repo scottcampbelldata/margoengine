@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Mesh } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
-import { buildBlocks, expandBlockBounds, packColors, NO_BLOCK, type PointBlocks } from './math.js';
+import { buildBlocks, expandBlockBounds, packColors, packFloatColors, NO_BLOCK, type PointBlocks } from './math.js';
 import { PointsMaterial, type PointsMaterialOptions } from './material.js';
 
 /**
@@ -32,7 +32,15 @@ export interface PointCloudOptions extends PointCloudData {
   blockSize?: number;
   /** Seed of the per-block shuffle used for level of detail. Default 1. */
   seed?: number;
-  /** Color space of per-point colors. Loader output and 8-bit scanner colors are sRGB. Default 'srgb'. */
+  /**
+   * How per-point colors are stored: 'rgba8', 4 bytes a point, clamped to 0..1, or 'float', 16 bytes a point, so HDR and
+   * emissive colors keep values above 1. Default 'rgba8'.
+   */
+  colorFormat?: 'rgba8' | 'float';
+  /**
+   * Color space of per-point colors. Loader output and 8-bit scanner colors are sRGB. Default 'srgb', or 'linear' with
+   * `colorFormat: 'float'`.
+   */
   colorSpace?: 'srgb' | 'linear';
   /**
    * Permute the arrays into block order once at construction so the GPU reads them sequentially (faster for
@@ -69,13 +77,14 @@ export class PointCloud {
   readonly material: PointsMaterial;
   readonly count: number;
   readonly positions: Float32Array;
-  /** Packed RGBA8 per point (r in the low byte), or null. */
+  /** Packed RGBA8 per point (r in the low byte), or null. With `colorFormat: 'float'`, the bits of `floatColors`. */
   colors: Uint32Array | null = null;
   /** Component count of the colors last given (3 or 4). */
   colorComponents: 3 | 4 = 3;
   sizes: Float32Array | null = null;
   /** xyz per point, in the same order as `positions`, or null. */
   readonly normals: Float32Array | null;
+  readonly colorFormat: 'rgba8' | 'float';
   readonly colorSpace: 'srgb' | 'linear';
   readonly blockSize: number;
   readonly seed: number;
@@ -108,7 +117,10 @@ export class PointCloud {
     this.blockSize = options.blockSize ?? 16384;
     this.seed = options.seed ?? 1;
     this.cullMargin = options.cullMargin ?? 0;
-    this.colorSpace = options.colorSpace ?? 'srgb';
+    this.colorFormat = options.colorFormat ?? 'rgba8';
+    if (this.colorFormat !== 'rgba8' && this.colorFormat !== 'float')
+      throw new RangeError("colorFormat must be 'rgba8' or 'float'");
+    this.colorSpace = options.colorSpace ?? (this.colorFormat === 'float' ? 'linear' : 'srgb');
     if (this.colorSpace !== 'srgb' && this.colorSpace !== 'linear')
       throw new RangeError("colorSpace must be 'srgb' or 'linear'");
     if (!Number.isFinite(this.cullMargin) || this.cullMargin < 0)
@@ -134,7 +146,7 @@ export class PointCloud {
         return out;
       };
       stored = permute(stored, 3);
-      if (this.colors) this.colors = permute(this.colors, 1);
+      if (this.colors) this.colors = permute(this.colors, this.colorStride);
       if (this.sizes) this.sizes = permute(this.sizes, 1);
       normals = normals && permute(normals, 3);
       const blockOf = new Uint32Array(this.count).fill(NO_BLOCK);
@@ -149,6 +161,18 @@ export class PointCloud {
     }
     this.positions = stored;
     this.normals = normals;
+  }
+
+  /** 32-bit words of `colors` per point: 1, or 4 with `colorFormat: 'float'`. */
+  get colorStride(): number {
+    return this.colorFormat === 'float' ? 4 : 1;
+  }
+
+  /** With `colorFormat: 'float'` and colors, RGBA float32 per point (a view of `colors`); otherwise null. */
+  get floatColors(): Float32Array | null {
+    return this.colors && this.colorFormat === 'float'
+      ? new Float32Array(this.colors.buffer, this.colors.byteOffset, this.colors.length)
+      : null;
   }
 
   /** The mesh whose world matrix this cloud follows, or null. */
@@ -175,7 +199,9 @@ export class PointCloud {
   updateColors(start: number, values: ArrayLike<number>, components: 3 | 4 = this.colorComponents): this {
     if (!this.colors) throw new MargoError('state', 'The cloud has no per-point colors; call setColors first');
     const n = this.range(start, values.length, components);
-    packColors(values, components, n, this.colors, start);
+    const floats = this.floatColors;
+    if (floats) packFloatColors(values, components, n, floats, start);
+    else packColors(values, components, n, this.colors, start);
     this.dirty.colors.push([start, start + n]);
     return this;
   }
@@ -194,7 +220,7 @@ export class PointCloud {
 
   /**
    * Marks points `start .. start + count` of a channel as changed after you wrote into `positions`, `colors`
-   * (packed) or `sizes` directly. Position edits also grow the block bounds.
+   * (packed, or `floatColors`) or `sizes` directly. Position edits also grow the block bounds.
    */
   markDirty(channel: PointChannel, start = 0, count = this.count - start): this {
     this.range(start, count, 1);
@@ -211,7 +237,10 @@ export class PointCloud {
       if (values.length !== this.count * inferred)
         throw new RangeError(`colors needs ${this.count * inferred} values (${inferred} per point)`);
       this.colorComponents = inferred;
-      this.colors = packColors(values, inferred, this.count, new Uint32Array(this.count));
+      this.colors =
+        this.colorFormat === 'float'
+          ? new Uint32Array(packFloatColors(values, inferred, this.count, new Float32Array(this.count * 4)).buffer)
+          : packColors(values, inferred, this.count, new Uint32Array(this.count));
     }
     if (notify) this.structure++;
     return this;

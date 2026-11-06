@@ -311,8 +311,34 @@ async function gpuPicking() {
   return 'One GPU pick answers points and meshes by depth, honours clipping planes, shapes, hidden points and sphere depth, and maps back through engine.pick';
 }
 
+/** A colour of 4 scaled by a material colour of 0.25 lands on 1: only floats keep the energy past the clamp. */
+async function hdrColors() {
+  const { PointCloud } = await import('@margoengine/points');
+  const { SurfelPlugin } = await import('../dist/surfels.js');
+  const { engine, frame, end } = await rig(),
+    points = PointsPlugin.attach(engine),
+    surfels = SurfelPlugin.attach(engine, { name: 'surfels' }),
+    colors = new Float32Array([4, 0, 0, 4, 0, 0, 4, 0, 0]),
+    material = { size: 40, color: [0.25, 1, 1] },
+    make = (x, extra) =>
+      new PointCloud({ positions: [x, 2, 0, x, 0, 0, x, -2, 0], colors, colorSpace: 'linear', material, ...extra });
+  points.add(make(-3));
+  points.add(make(0, { colorFormat: 'float' }));
+  surfels.add(make(3, { colorFormat: 'float' }));
+  const image = await frame(),
+    x = (v) => Math.round(128 + (v * 221.7) / 10),
+    clamped = image.at(x(-3), 128)[0],
+    float = image.at(x(0), 128)[0],
+    disc = image.at(x(3), 128)[0];
+  assert(clamped < 150, `rgba8 clamps to 1 first: ${clamped}`);
+  assert(float > 250, `float keeps it: ${float}`);
+  assert(disc > 250, `surfels read floats too: ${disc}`);
+  await end();
+  return `HDR colours pass the 0..1 clamp on a real GPU, in points and surfels (${float} and ${disc} against ${clamped})`;
+}
+
 window.runFeatures = async () => {
   const checks = [];
-  for (const check of [adaptiveSize, surfels, surfelDepth, potree, octreeTransform, gpuPicking]) checks.push(await check());
+  for (const check of [adaptiveSize, surfels, surfelDepth, potree, octreeTransform, gpuPicking, hdrColors]) checks.push(await check());
   return checks;
 };

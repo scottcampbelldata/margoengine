@@ -11,7 +11,20 @@ export const FLAG = {
   sphere: 32,
   direct: 64,
   srgbColors: 128,
+  floatColors: 256,
 } as const;
+
+/** WGSL: the colour of point `p`, from `colors` (as RGBA8 or float32) in linear, for shaders with `has` and `colors`. */
+export const pointColorWgsl: string = /* wgsl */ `
+fn pointColor(p:u32)->vec4f{
+  var c:vec4f;
+  if(has(${FLAG.floatColors}u)){
+    let q=p*4u;
+    c=vec4f(bitcast<f32>(colors[q]),bitcast<f32>(colors[q+1u]),bitcast<f32>(colors[q+2u]),bitcast<f32>(colors[q+3u]));
+  } else {c=unpack4x8unorm(colors[p]);}
+  return vec4f(select(c.rgb,toLinear(c.rgb),has(${FLAG.srgbColors}u)),c.a);
+}
+`;
 
 /**
  * Bytes of the shared frame uniform, the per-cloud uniform and the per-batch sprite uniform. Both per-draw uniforms end
@@ -58,7 +71,7 @@ struct VOut{
   @location(3) @interpolate(flat) center:vec3f,
 }
 fn has(bit:u32)->bool{return (cloud.flags.x&bit)!=0u;}
-
+${pointColorWgsl}
 @vertex fn vertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) slot:u32)->VOut{
   var out:VOut;
   var p=slot;
@@ -76,10 +89,7 @@ fn has(bit:u32)->bool{return (cloud.flags.x&bit)!=0u;}
   let corner=CORNERS[vi];
   clip=vec4f(clip.xy+corner*extent*2.0/frame.viewport.xy*clip.w,clip.zw);
   var color=cloud.color;
-  if(has(${FLAG.colors}u)){
-    let c=unpack4x8unorm(colors[p]);
-    color*=vec4f(select(c.rgb,toLinear(c.rgb),has(${FLAG.srgbColors}u)),c.a);
-  }
+  if(has(${FLAG.colors}u)){color*=pointColor(p);}
   out.clip=clip;out.color=color;out.quad=corner*extent;
   out.info=vec4f(radius,select(clip.w,1.0+(1.0-clip.z)/frame.depth.y,frame.depth.w>0.5),radius*clip.w/frame.viewport.z,0.0);
   out.center=world.xyz;

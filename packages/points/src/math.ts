@@ -492,6 +492,36 @@ export function boxScreenRect(
 }
 
 /**
+ * Writes `count` colours as four float32 each into `out` from point `offset`, 3 or 4 components a point in `source`.
+ * Bytes are 0..255; numbers keep their value, so HDR colours stay above 1.
+ * @throws RangeError for too few values, a range past the end, or a negative or non-finite colour.
+ */
+export function packFloatColors(
+  source: ArrayLike<number>,
+  components: number,
+  count: number,
+  out: Float32Array,
+  offset = 0,
+): Float32Array {
+  if (components !== 3 && components !== 4) throw new RangeError('Colors need 3 (RGB) or 4 (RGBA) components');
+  if (source.length < count * components)
+    throw new RangeError(
+      'source holds fewer color values than count * components; pass one value per component for every point.',
+    );
+  if ((offset + count) * 4 > out.length)
+    throw new RangeError('The color range runs past the end of the cloud; use a smaller offset or count.');
+  const scale = source instanceof Uint8Array || source instanceof Uint8ClampedArray ? 1 / 255 : 1;
+  for (let i = 0; i < count; i++)
+    for (let c = 0; c < 4; c++) {
+      const value = c < components ? source[i * components + c] * scale : 1;
+      if (!(value >= 0) || !Number.isFinite(value))
+        throw new RangeError(`Color of point ${offset + i} is ${value}; pass finite numbers of 0 or more`);
+      out[(offset + i) * 4 + c] = value;
+    }
+  return out;
+}
+
+/**
  * Packs per-point colors into RGBA8 words (r in the low byte), the layout WGSL `unpack4x8unorm` reads.
  * `source` holds `components` (3 or 4) values per point: floats in 0..1, or 0..255 bytes for Uint8 arrays.
  * Missing alpha becomes 255.

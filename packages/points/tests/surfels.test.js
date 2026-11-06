@@ -124,11 +124,11 @@ test('fog sets the flag only for materials that take it', () => {
     cloud = plugin.add(new PointCloud({ positions }));
   const flags = () => {
     frame();
-    return plugin['cloudGpu'].get(cloud).uints[24] & 512;
+    return plugin['cloudGpu'].get(cloud).uints[24] & 1024;
   };
   assert.equal(flags(), 0);
   plugin.setFog({ color: [1, 1, 1], density: 0.1 });
-  assert.equal(flags(), 512);
+  assert.equal(flags(), 1024);
   cloud.material.fog = false;
   assert.equal(flags(), 0);
 });

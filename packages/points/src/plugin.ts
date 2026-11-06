@@ -642,7 +642,7 @@ export class PointsPlugin implements EnginePlugin {
     try {
       const uniform = make(CLOUD_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
       const positions = make(cloud.count * 12, storage);
-      const colors = cloud.colors ? make(cloud.count * 4, storage) : null;
+      const colors = cloud.colors ? make(cloud.count * 4 * cloud.colorStride, storage) : null;
       const sizes = cloud.sizes ? make(cloud.count * 4, storage) : null;
       const order = cloud.direct ? null : make(cloud.count * 4, storage);
       const data = new ArrayBuffer(CLOUD_BYTES);
@@ -672,11 +672,11 @@ export class PointsPlugin implements EnginePlugin {
       n = cloud.count;
     if (n) {
       q.writeBuffer(r.positions, 0, cloud.positions as Float32Array<ArrayBuffer>, 0, n * 3);
-      if (r.colors) q.writeBuffer(r.colors, 0, cloud.colors! as Uint32Array<ArrayBuffer>, 0, n);
+      if (r.colors) q.writeBuffer(r.colors, 0, cloud.colors! as Uint32Array<ArrayBuffer>, 0, n * cloud.colorStride);
       if (r.sizes) q.writeBuffer(r.sizes, 0, cloud.sizes! as Float32Array<ArrayBuffer>, 0, n);
       if (r.order) q.writeBuffer(r.order, 0, cloud.blocks.order as Uint32Array<ArrayBuffer>, 0, n);
       this.stats.uploads += 1 + +!!r.colors + +!!r.sizes + +!!r.order;
-      this.stats.uploadBytes += n * (12 + (r.colors ? 4 : 0) + (r.sizes ? 4 : 0) + (r.order ? 4 : 0));
+      this.stats.uploadBytes += n * (12 + (r.colors ? 4 * cloud.colorStride : 0) + (r.sizes ? 4 : 0) + (r.order ? 4 : 0));
     }
     cloud.dirty.positions.length = cloud.dirty.colors.length = cloud.dirty.sizes.length = 0;
     this.cloudGpu.set(cloud, r);
@@ -687,7 +687,7 @@ export class PointsPlugin implements EnginePlugin {
     const q = this.device!.queue;
     const channels = [
       ['positions', r.positions, cloud.positions, 3],
-      ['colors', r.colors, cloud.colors, 1],
+      ['colors', r.colors, cloud.colors, cloud.colorStride],
       ['sizes', r.sizes, cloud.sizes, 1],
     ] as const;
     for (const [channel, buffer, array, stride] of channels) {
@@ -999,7 +999,8 @@ export class PointsPlugin implements EnginePlugin {
       (mapped ? FLAG.map : 0) |
       (m.shading === 'sphere' ? FLAG.sphere : 0) |
       (cloud.direct ? FLAG.direct : 0) |
-      (cloud.colorSpace === 'srgb' ? FLAG.srgbColors : 0);
+      (cloud.colorSpace === 'srgb' ? FLAG.srgbColors : 0) |
+      (cloud.colorFormat === 'float' ? FLAG.floatColors : 0);
     // Clipping planes: count in flags.y (bit 16: intersection), planes from byte 128, unused slots zeroed.
     const planes = m['clipping'];
     u[25] = planes.length / 4 + (m.clipIntersection ? 65536 : 0);

@@ -49,6 +49,28 @@ canvas.addEventListener('click', event => {
 - **Device loss.** `onDeviceRestored` rebuilds every buffer, pipeline and uploaded texture from the CPU copies. `dispose` (and `engine.removePlugin`) destroys them all. Clouds and batches stay registered, so a plugin can be reused.
 - **SSR.** Nothing touches `window`, `navigator` or GPU globals at import or construction time.
 
+## HDR colors
+
+By default per-point colors are bytes, clamped to 0..1. With `colorFormat: 'float'` a cloud stores each color as four float32, so emissive and HDR points keep their energy for bloom and tone mapping. On a plain 8-bit canvas values above 1 still clip at the end; they count when the engine draws to an HDR target or a material `color` scales them down.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PointsPlugin, PointCloud} from 'margoengine/points';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+const sparks = points.add(new PointCloud({
+  positions: new Float32Array([0, 0, 0, 1, 0, 0]),
+  colors: new Float32Array([8, 3, 0.5, 0.2, 4, 12]), // linear, may pass 1
+  colorFormat: 'float',
+  material: {size: 6, shape: 'round'},
+}));
+sparks.updateColors(1, [0, 0, 20]);
+console.log(sparks.floatColors?.[6]); // 20
+```
+
+Float colors default to `colorSpace: 'linear'`. Byte arrays are still read as 0..255. `cloud.floatColors` is a live view; after writing into it call `markDirty('colors')`. `OctreeCloud` takes it as `cloud: {colorFormat: 'float'}`, and `SurfelPlugin` reads it too.
+
 ## Loader interop
 
 `PointCloud` accepts the object `@margoengine/loaders` returns for PLY, PCD, XYZ and other point clouds without importing that package: `{kind: 'points', positions: Float32Array, colors?: Float32Array (sRGB rgb 0..1), normals?: Float32Array}`. Pass it straight in: `new PointCloud({...loaded, material: {size: 2}})`. Normals are kept on `cloud.normals` but not used for shading.
@@ -72,7 +94,8 @@ canvas.addEventListener('click', event => {
 | `colors`, `colorComponents` | none, inferred | RGB or RGBA, float 0..1 or Uint8 0..255 |
 | `sizes` | none | Per-point multiplier of `material.size` |
 | `blockSize` | 16384 | Points per culling block |
-| `colorSpace` | `'srgb'` | Of per-point colors |
+| `colorFormat` | `'rgba8'` | `'float'` keeps HDR colors above 1, at 16 bytes a point instead of 4 |
+| `colorSpace` | `'srgb'`, `'linear'` with `colorFormat: 'float'` | Of per-point colors |
 | `reorder` | false | Permute the arrays into block order for sequential GPU reads; `sourceIndex` maps back |
 | `cullMargin` | 0 | World units added to the frustum test |
 | `seed` | 1 | Shuffle seed |
@@ -440,7 +463,7 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 - One cloud's positions must fit one storage binding: `maxStorageBufferBindingSize / 12` points (about 11 million at the default 128 MiB limit). Split bigger clouds into several `PointCloud`s.
 - `points.pick` is CPU-side over the points drawn in the latest frame; meshes do not occlude it, and clipping planes do not apply to it. `PointPicking` does both on the GPU, but answers later, through a promise.
 - Block bounds only grow on updates; call `rebuild()` to tighten them or to include points that turned finite. Non-finite points are never drawn. A `reorder`ed cloud cannot be rebuilt.
-- Per-point colors are stored as RGBA8, so HDR vertex colors are clamped to 0..1.
+- Per-point colors are stored as RGBA8 by default, so HDR vertex colors are clamped to 0..1; `colorFormat: 'float'` keeps them, at four times the color memory. A float color must be finite and 0 or more.
 - No mipmaps on maps. A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.
 - Transparent points and sprites are not sorted per point. Use `alphaTest` or additive blending for order-independent results. Round antialiased edges of opaque points write depth.
 - A plain `PointCloud` does not grow its points when the budget subsamples its blocks; `OctreeCloud` does with `adaptiveSize`. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own; it reads COPC and Potree.

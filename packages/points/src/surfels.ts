@@ -16,7 +16,7 @@ import { applyView, viewSize } from '../../shared/view-rect.js';
 import { PointCloud } from './cloud.js';
 import { fillFrame } from './frame.js';
 import { allocateBudget, boxInFrustum, mergeRanges, screenArea, worldBox } from './math.js';
-import { FLAG, FRAME_BYTES, frameWgsl } from './shaders.js';
+import { FLAG, FRAME_BYTES, frameWgsl, pointColorWgsl } from './shaders.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -25,9 +25,9 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: num
 type GpuContext = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** Bit of `Cloud.flags.x` past the point shader's: the cloud has normals. */
-const NORMALS = 256,
+const NORMALS = 512,
   /** The cloud takes the fog. */
-  FOGGED = 512,
+  FOGGED = 1024,
   CLOUD_BYTES = 224,
   /** Front depth of a pixel no surfel covers. */
   NOTHING = 3e38;
@@ -53,6 +53,7 @@ struct VOut{
   @location(3) @interpolate(flat) reach:f32,
 }
 fn has(bit:u32)->bool{return (cloud.flags.x&bit)!=0u;}
+${pointColorWgsl}
 fn disc(vi:u32,slot:u32,pushed:bool)->VOut{
   var out:VOut;
   var p=slot;
@@ -60,10 +61,7 @@ fn disc(vi:u32,slot:u32,pushed:bool)->VOut{
   let center=cloud.model*vec4f(positions[p*3u],positions[p*3u+1u],positions[p*3u+2u],1.0);
   let middle=frame.viewProj*center;
   var color=vec4f(cloud.color.rgb,1.0);
-  if(has(${FLAG.colors}u)){
-    let c=unpack4x8unorm(colors[p]);
-    color*=vec4f(select(c.rgb,toLinear(c.rgb),has(${FLAG.srgbColors}u)),c.a);
-  }
+  if(has(${FLAG.colors}u)){color*=pointColor(p);}
   // Behind the camera, or a point its alpha hides (a hidden class).
   if(!(middle.w>1e-6)||color.a<=0.0||color.a<cloud.color.w){out.clip=vec4f(0.0,0.0,-1.0,1.0);return out;}
   if(has(${FOGGED}u)){color=vec4f(mix(color.rgb,margoFog.color.rgb,fogAmount(center.xyz)),color.a);}
@@ -358,7 +356,7 @@ export class SurfelPlugin implements EnginePlugin {
         return buffer;
       },
       positions = upload(cloud.positions, n * 12)!,
-      colors = upload(cloud.colors, n * 4),
+      colors = upload(cloud.colors, n * 4 * cloud.colorStride),
       sizes = upload(cloud.sizes, n * 4),
       order = upload(cloud.direct ? null : cloud.blocks.order, n * 4),
       normals = upload(cloud.normals, n * 12),
@@ -395,7 +393,7 @@ export class SurfelPlugin implements EnginePlugin {
     const q = this.device!.queue,
       channels = [
         ['positions', r.positions, cloud.positions, 3],
-        ['colors', r.colors, cloud.colors, 1],
+        ['colors', r.colors, cloud.colors, cloud.colorStride],
         ['sizes', r.sizes, cloud.sizes, 1],
       ] as const;
     for (const [channel, buffer, array, stride] of channels) {
@@ -548,6 +546,7 @@ export class SurfelPlugin implements EnginePlugin {
       (m.sizeUnits === 'world' ? FLAG.world : 0) |
       (cloud.direct ? FLAG.direct : 0) |
       (cloud.colorSpace === 'srgb' ? FLAG.srgbColors : 0) |
+      (cloud.colorFormat === 'float' ? FLAG.floatColors : 0) |
       (r.normals ? NORMALS : 0) |
       (this.fogSource && m.fog ? FOGGED : 0);
     u[25] = planes.length / 4 + (m.clipIntersection ? 65536 : 0);
