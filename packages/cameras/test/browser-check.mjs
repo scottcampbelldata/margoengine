@@ -39,6 +39,18 @@ try {
   assert.equal(await page.evaluate(() => window.check.pick(200, 100)), 'blue');
   assert.equal(await page.evaluate(() => window.check.pick(100, 300)), null);
   console.log('ok orthographic top-down + pick');
+  // View offset: the right half of the 400 x 400 image stretched over the canvas. The red box (pixels 275 to 325 of
+  // the image) is centred, the green box (175 to 225) is cut by the left edge, and the blue box (above centre) is cut away.
+  result = await page.evaluate(() => window.check.offset(true));
+  assert.equal(result.error, null);
+  px = await shot();
+  assert.ok(
+    is(px(200, 200), 0) && is(px(10, 200), 1) && dark(px(200, 330)),
+    `view offset ${px(200, 200)} ${px(10, 200)}`,
+  );
+  assert.ok(dark(px(110, 200)) && dark(px(290, 200)), 'view offset edges');
+  await page.evaluate(() => window.check.offset(false));
+  console.log('ok view offset');
   result = await page.evaluate(() => window.check.render('perspective', undefined));
   assert.equal(result.error, null);
   px = await shot();

@@ -131,6 +131,35 @@ mirror.layers = layerMask(0);                     // Reflector, Refractor and Cu
   bvh's own `raycaster.layers`. Unit tests: `test/layers.test.js` (real core on a mock GPU); real-GPU layer checks run
   in `scripts/env-mirror-gpu-check.js`.
 
+## View offset: tiles, walls and jitter
+
+`setViewOffset` renders one rectangle of a larger image. The frustum is built for the full image and the view shows only
+the rectangle, in both modes, with any `zoom`, `height` or bounds. 0 core bytes.
+
+```ts
+import {CameraProjection, tileOffsets} from 'margoengine/cameras';
+
+const projection = CameraProjection.attach(engine, {mode: 'perspective'});
+// A 8192 x 4608 screenshot from 2048 x 1152 tiles: size the canvas to a tile, then render each rectangle.
+for (const t of tileOffsets(8192, 4608, 2048, 1152)) {
+  projection.setViewOffset(t.fullWidth, t.fullHeight, t.x, t.y, t.width, t.height);
+  engine.render();
+  await copyTile(t, canvas); // read the pixels into your big image at (t.x, t.y)
+}
+projection.clearViewOffset();
+```
+
+- **Rectangle**: `setViewOffset(fullWidth, fullHeight, x, y, width, height)` in pixels of the full image, origin top
+  left. `x` and `y` may be fractions or negative: a quarter-pixel step per frame is jittered rendering. `viewOffset` is
+  also an option and a property.
+- **Walls**: give each monitor its rectangle of the combined desktop (`fullWidth` the sum of widths).
+- **Tiles**: `tileOffsets(fullWidth, fullHeight, tileWidth, tileHeight = tileWidth)` lists the rectangles row by row;
+  edge tiles are smaller. Size the canvas to the tile; the aspect of the full image is used for the frustum.
+- **Same view everywhere**: culling, `engine.pick`, and passes that read `camera.matrix` see the tile. `fit` still
+  frames the canvas.
+- **Limit**: passes that read neighbouring pixels (bloom, SSAO, DOF, TAA history) see only the tile, so seams can
+  show; render tiles with overlap and crop. See [limits](../../docs/limits.md).
+
 Apache-2.0. Optional, tree-shakable package, about 1.7 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); `/origin` and `/layers` are separate entries; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/cameras

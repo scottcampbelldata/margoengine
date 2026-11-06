@@ -21,6 +21,45 @@ export interface ProjectionOptions {
   far?: number;
   /** Screen up for exactly vertical views; needs a horizontal component. Default [0,0,-1]: north up looking down. */
   up?: Vec3;
+  /** Render only a sub-rectangle of a larger frustum; see `ViewOffset`. Default: none, the whole frustum. */
+  viewOffset?: ViewOffset;
+}
+
+/**
+ * A sub-rectangle of a larger image, in pixels of that image with the origin at its top left. The frustum is built
+ * for the full image (aspect `fullWidth / fullHeight`) and the view shows only the rectangle, so the canvas or render
+ * target should be `width` by `height`. `x` and `y` may be fractions (jittered rendering) or negative.
+ */
+export interface ViewOffset {
+  fullWidth: number;
+  fullHeight: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Splits a `fullWidth` by `fullHeight` image into `tileWidth` by `tileHeight` offsets, row by row from the top left; edge tiles are smaller. */
+export function tileOffsets(
+  fullWidth: number,
+  fullHeight: number,
+  tileWidth: number,
+  tileHeight = tileWidth,
+): ViewOffset[] {
+  if (![fullWidth, fullHeight, tileWidth, tileHeight].every((v) => Number.isInteger(v) && v > 0))
+    throw new RangeError('Invalid projection tiles; pass whole numbers above 0 for the full size and the tile size');
+  const tiles: ViewOffset[] = [];
+  for (let y = 0; y < fullHeight; y += tileHeight)
+    for (let x = 0; x < fullWidth; x += tileWidth)
+      tiles.push({
+        fullWidth,
+        fullHeight,
+        x,
+        y,
+        width: Math.min(tileWidth, fullWidth - x),
+        height: Math.min(tileHeight, fullHeight - y),
+      });
+  return tiles;
 }
 
 /** Options of `CameraProjection.fit`: the view's aspect, the animation time and the margin around the box. */
@@ -62,6 +101,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
   near?: number;
   far?: number;
   up: Vec3 = [0, 0, -1];
+  viewOffset?: ViewOffset;
   private camera?: Camera;
   private worldUp: Vec3 = [0, 1, 0];
   private canvas?: { width: number; height: number };
@@ -170,6 +210,17 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     this.zoom = a.fromZoom * (a.toZoom / a.fromZoom) ** s;
     if (k === 1) this.animation = undefined;
   }
+  /**
+   * Renders the `width` by `height` rectangle at (`x`, `y`) of a `fullWidth` by `fullHeight` image (see `ViewOffset`).
+   * Works in both modes and with any `zoom`, `height` or bounds; `fit` still frames the whole canvas.
+   */
+  setViewOffset(fullWidth: number, fullHeight: number, x: number, y: number, width: number, height: number): void {
+    this.viewOffset = { fullWidth, fullHeight, x, y, width, height };
+  }
+  /** Goes back to the whole frustum. */
+  clearViewOffset(): void {
+    this.viewOffset = undefined;
+  }
   /** Use without an engine, e.g. on a second Camera. */
   attach(camera: Camera): void {
     if (this.camera) throw margoError('attached', 'Projection is already attached; dispose() it or create another');
@@ -225,6 +276,27 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     return u;
   }
   private project(camera: Camera, P: Float64Array, aspect: number, webgpu: boolean): void {
+    const o = this.viewOffset;
+    if (!o) return this.build(camera, P, aspect, webgpu);
+    if (
+      ![o.fullWidth, o.fullHeight, o.x, o.y, o.width, o.height].every(Number.isFinite) ||
+      !(o.fullWidth > 0 && o.fullHeight > 0 && o.width > 0 && o.height > 0)
+    )
+      throw new RangeError(
+        'Invalid projection view offset; pass finite numbers with fullWidth, fullHeight, width and height above 0',
+      );
+    this.build(camera, P, o.fullWidth / o.fullHeight, webgpu);
+    // Remap clip x and y from the full image to the rectangle: rows 0 and 1 gain a multiple of row 3 (w).
+    const sx = o.fullWidth / o.width,
+      sy = o.fullHeight / o.height,
+      ox = (o.fullWidth - 2 * o.x - o.width) / o.width,
+      oy = (o.height - o.fullHeight + 2 * o.y) / o.height;
+    for (let c = 0; c < 4; c++) {
+      P[c * 4] = sx * P[c * 4] + ox * P[c * 4 + 3];
+      P[c * 4 + 1] = sy * P[c * 4 + 1] + oy * P[c * 4 + 3];
+    }
+  }
+  private build(camera: Camera, P: Float64Array, aspect: number, webgpu: boolean): void {
     const n = camera.near,
       f = camera.far;
     if (this.mode === 'perspective') {

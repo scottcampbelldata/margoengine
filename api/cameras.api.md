@@ -18,6 +18,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     near?: number;
     far?: number;
     up: Vec3;
+    viewOffset?: ViewOffset;
     static attach(engine: EngineKernel, options?: ProjectionOptions): CameraProjection;
     constructor(options?: ProjectionOptions);
     setup(engine: Pick<Engine, 'camera'> & {
@@ -28,6 +29,8 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     }): void;
     fit(bounds: ArrayLike<number>, { aspect, duration, padding }?: FitOptions): void;
     onPreUpdate(delta: number): void;
+    setViewOffset(fullWidth: number, fullHeight: number, x: number, y: number, width: number, height: number): void;
+    clearViewOffset(): void;
     attach(camera: Camera): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -51,5 +54,17 @@ export interface ProjectionOptions {
     near?: number;
     far?: number;
     up?: Vec3;
+    viewOffset?: ViewOffset;
 }
+
+export interface ViewOffset {
+    fullWidth: number;
+    fullHeight: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export function tileOffsets(fullWidth: number, fullHeight: number, tileWidth: number, tileHeight?: number): ViewOffset[];
 ```

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4630288,
+  "total": 4630834,
   "history": [
     {
       "date": "2026-10-24",
@@ -1802,6 +1802,12 @@
       "commit": "0943bf4ea",
       "reason": "points: surfels entry (batch 27 job 2)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "9d4a927e1",
+      "reason": "cameras gains view offset (setViewOffset, tileOffsets)",
+      "grew": 1
     }
   ],
   "items": {
@@ -1849,7 +1855,7 @@
     "@margoengine/cache": 2663,
     "@margoengine/cache/hashed": 871,
     "@margoengine/cache/manager": 1985,
-    "@margoengine/cameras": 2093,
+    "@margoengine/cameras": 2639,
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/origin": 1514,
     "@margoengine/cinematic": 2076,
