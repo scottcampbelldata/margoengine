@@ -1754,6 +1754,10 @@
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"
     },
+    "./stats/compile": {
+      "types": "./dist/stats/compile.d.ts",
+      "import": "./dist/stats/compile.js"
+    },
     "./stats/report": {
       "types": "./dist/stats/report.d.ts",
       "import": "./dist/stats/report.js"

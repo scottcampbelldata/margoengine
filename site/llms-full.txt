@@ -323,7 +323,7 @@ changing the base, so the base stays small and an app only pays for what it impo
 | [`@margoengine/webgl`](packages/webgl/README.md) | WebGL2 fallback renderer for browsers without WebGPU: flat-shaded PBR core meshes, opt in with Engine.create(canvas, {fallback: webglRenderer}). |
 | [`@margoengine/webgl2-compat`](packages/webgl2-compat/README.md) | The WebGL2 compatibility layer for browsers without WebGPU (milestones M0 to M8 done); the site's demos run on it there. install() gives core a WebGPU-shaped device on WebGL2 that translates WGSL to GLSL ES 3.00; render shaders, texture views, readbacks of every copyable format, occlusion queries, render bundles, external textures, gather and storage-buffer reads run, compute pipelines run as fragment draws, point draws or on the CPU, whichever the shader allows, and DOF, splats and culling take routes of their own there. XR runs through the /xr entry; the voxel path tracer refuses it. |
 | [`@margoengine/worker`](packages/worker/README.md) | Runs Margo Engine in a Web Worker on an OffscreenCanvas: canvas transfer, resize, pixel ratio and input forwarding, so heavy scenes never block the page. |
-| [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling. |
+| [`@margoengine/stats`](packages/stats/README.md) | Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling and pipeline compile tracking. |
 | [`@margoengine/inspector`](packages/inspector/README.md) | Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger. |
 
 ### Loading and formats (12)
@@ -2566,7 +2566,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-152). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-153). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -2775,6 +2775,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Headless stage (`@margoengine/headless/stage`, 2026-11-05) | No camera controls and no frame loop: `step(delta)` advances time. `engine.onFrame` callbacks do not run, because only `engine.start()` runs them and it needs `requestAnimationFrame`. Stages alive at once share one `gpu`. | `installGPU` changes globals, so a second implementation at once would replace the first's. The frame loop belongs to core, which stays frozen. | A package that drives itself from `engine.onFrame` does not advance; plugins, which update through `render`, do. | Use `stage.onTick` and `stage.step`. Dispose stages on one `gpu` before using another. |
 | Image comparison (`@margoengine/headless/compare`, 2026-11-05) | CPU only. Images must be one size. `decodePNG` rejects interlaced files, ignores colour profiles and gamma, and cuts 16-bit samples to 8. SSIM runs on luma, so a change of hue at equal brightness is seen only by the pixel count. | Tests compare a few images, so the plain code is enough, and it runs anywhere. Both measures run in `compareImages` because each misses what the other sees. | A 4K image takes CPU time on every comparison: both passes run in JavaScript, and this has not been timed. | Compare at the size you render your tests, and tune `threshold`, `maxRatio` and `minSSIM` to your scene. |
 | Output formats (`@margoengine/headless/formats`, 2026-11-05) | JPEG is baseline with fixed standard tables, so files are larger than an optimized encoder's. Lossless WebP is a plain encoder (subtract green and three predictors, no colour cache), so files are larger than libwebp's. Lossy WebP needs a browser or worker. EXR is uncompressed. The engine's output is tone-mapped sRGB, so true HDR needs `PostStack`'s `sceneTexture`. | Previews and captures are small and written once, and plain code runs in Node with no codec to install. Every file is decoded by the browser's own decoders in the GPU check. | Bigger files than the best encoders; sizes have not been compared. | Use lossy WebP in a browser for the smallest previews, or run the file through a dedicated optimizer. |
+| Pipeline compile tracking (`@margoengine/stats/compile`, 2026-11-06) | Sees compiles made after attach, so not the engine's startup pipelines. Times are CPU time around each call: browsers compile in another process, so a blocking call can return quickly and the stall lands later. A hitch means a compile ran in a slow frame or the frame before it, which is evidence, not proof of the cause. Unlabelled compiles show an empty label; the `stacks` option finds them. Keeps the newest 256 records and hitches by default. |
 
 ### React page
 
@@ -4208,6 +4209,27 @@ console.log(JSON.stringify(statsReport(stats, memory)));
 
 Sizes come from the descriptors, so driver padding is not in them, and objects made before `attach` are not seen.
 
+Pipeline compile tracking is in its own entry. It shows which shader and pipeline compiles ran near a slow frame, and when:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Stats} from 'margoengine/stats';
+import {PipelineCompiles} from 'margoengine/stats/compile';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const compiles = PipelineCompiles.attach(engine, {hitchMilliseconds: 33.4});
+compiles.view(Stats.attach(engine));            // totals and the newest hitch in the panel
+compiles.onHitch((hitch) => {
+  console.warn(`${hitch.milliseconds.toFixed(1)} ms frame near`, hitch.compiles.map((record) => record.label));
+});
+engine.start();
+console.log(JSON.stringify(compiles));          // every record and hitch, when you want them
+```
+
+Each record has `kind` (`'shader'`, `'render'` or `'compute'`), `label`, `blocking` (false for the `...Async` calls), `startedAt`, `frame`, `milliseconds` (null while an async call runs) and `failed`. A frame over `hitchMilliseconds` (default 33.4) with compiles in it or in the frame before is a hitch, with `frame`, `at`, `milliseconds` and `compiles`, blocking calls first and then the longest. `capacity` (default 256) is how many records and hitches stay; `count` goes on counting. Label your pipelines to read this easily, or pass `stacks: true` (default false) to keep where each call came from.
+
+It follows the engine's device through a device restore and sees only what is compiled after `attach`. Times are CPU time around each call. Browsers compile in another process, so a blocking call can return quickly and the stall arrives later, which is why the frame before counts too. A hitch is evidence that a compile was near a slow frame, not proof that it was the cause. With your own loop, call `compiles.track(device)` and `compiles.frame(milliseconds)` once per frame.
+
 The engine plugin samples actual frame intervals and counts direct/indirect draw
 and dispatch commands in its frame graph. Render bundle contents and commands
 recorded on other encoders are outside these counters. For a custom encoder,
@@ -4227,27 +4249,6 @@ and passes that cannot accept the derived prototype. Native command receivers,
 draw/dispatch counters and timestamp handling are preserved. Host allocations
 and profiling readbacks remain; this option does not promise zero allocation.
 Guards and inherited accessors can increase CPU cost, so measure your workload.
-
-This option changes reflective behavior: `Object.getPrototypeOf(pass)` is a
-shared frozen object that inherits from the native prototype; wrapper methods
-and the owner are inherited instead of own properties. Native `instanceof` and
-constructor identity are retained. Assigning an individual pass method creates
-an ordinary writable own property, and nested Stats instrumentation can replace
-the owner. Deleting an own method reveals the shared wrapper rather than the
-native method. If the application prevents extensions **after** wrapping, later
-method reassignment or nested Stats owner transfer cannot add an own property
-and throws; default Stats already has writable own methods and an owner slot
-and can update them in that situation. Keep the
-default when consumers depend on native prototype identity, own-property
-reflection, deletion, or these extensibility semantics. No shared prototype can
-be mutated through a returned pass.
-
-The hardware browser regression checks the actual built package's native pass
-layout, fallback behavior, counters, GPU output and timestamp readback. Build
-Stats with `node scripts/build-optional.js stats`, then run
-`node scripts/gpu-lock.mjs run --owner=stats-native-passes -- node scripts/test-stats-native-passes.mjs`.
-It requires a hardware WebGPU adapter with timestamp-query support and writes
-its proof to `test-results/stats-native-passes.json`; it does not measure allocations.
 
 [README continues: https://margoengine.com/llms/packages/stats.md]
 

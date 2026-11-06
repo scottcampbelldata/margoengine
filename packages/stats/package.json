@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/stats",
   "version": "1.0.0",
-  "description": "Allocation-free frame samples, DOM performance overlay and optional WebGPU timestamp profiling.",
+  "description": "Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling and pipeline compile tracking.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -26,6 +26,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./compile": {
+      "types": "./dist/compile.d.ts",
+      "import": "./dist/compile.js"
+    },
     "./report": {
       "types": "./dist/report.d.ts",
       "import": "./dist/report.js"
@@ -48,6 +52,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js stats",
     "test": "npm run build && node --test test/*.test.js",
+    "test:browser": "npm run build && node ../../scripts/test-stats-browser.mjs",
     "prepack": "npm run build"
   }
 }

@@ -32,6 +32,27 @@ console.log(JSON.stringify(statsReport(stats, memory)));
 
 Sizes come from the descriptors, so driver padding is not in them, and objects made before `attach` are not seen.
 
+Pipeline compile tracking is in its own entry. It shows which shader and pipeline compiles ran near a slow frame, and when:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Stats} from 'margoengine/stats';
+import {PipelineCompiles} from 'margoengine/stats/compile';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const compiles = PipelineCompiles.attach(engine, {hitchMilliseconds: 33.4});
+compiles.view(Stats.attach(engine));            // totals and the newest hitch in the panel
+compiles.onHitch((hitch) => {
+  console.warn(`${hitch.milliseconds.toFixed(1)} ms frame near`, hitch.compiles.map((record) => record.label));
+});
+engine.start();
+console.log(JSON.stringify(compiles));          // every record and hitch, when you want them
+```
+
+Each record has `kind` (`'shader'`, `'render'` or `'compute'`), `label`, `blocking` (false for the `...Async` calls), `startedAt`, `frame`, `milliseconds` (null while an async call runs) and `failed`. A frame over `hitchMilliseconds` (default 33.4) with compiles in it or in the frame before is a hitch, with `frame`, `at`, `milliseconds` and `compiles`, blocking calls first and then the longest. `capacity` (default 256) is how many records and hitches stay; `count` goes on counting. Label your pipelines to read this easily, or pass `stacks: true` (default false) to keep where each call came from.
+
+It follows the engine's device through a device restore and sees only what is compiled after `attach`. Times are CPU time around each call. Browsers compile in another process, so a blocking call can return quickly and the stall arrives later, which is why the frame before counts too. A hitch is evidence that a compile was near a slow frame, not proof that it was the cause. With your own loop, call `compiles.track(device)` and `compiles.frame(milliseconds)` once per frame.
+
 The engine plugin samples actual frame intervals and counts direct/indirect draw
 and dispatch commands in its frame graph. Render bundle contents and commands
 recorded on other encoders are outside these counters. For a custom encoder,
