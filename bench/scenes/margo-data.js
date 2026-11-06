@@ -13,7 +13,7 @@ const compute = () => import('@margoengine/compute');
 const task = (setup) => async (_canvas, data, marks, params) => {
   const s = performance.now(),
     { createCompute } = await compute(),
-    gpu = await createCompute({ backend: params.backend });
+    gpu = await createCompute({ backend: params.backend, fastMath: params.fast === 1 });
   marks.createMs = +(performance.now() - s).toFixed(1);
   const b = performance.now(),
     job = await setup(gpu, data, params);
@@ -87,6 +87,11 @@ export const builders = {
       rng = new Random(gpu, { seed });
     return { run: () => rng.normal(n), check: async (r) => ({ mean: round(await r.mean().item()) }) };
   }),
+  'compute-elementwise': task(async (gpu, { values }, { fn }) => {
+    const x = gpu.array(values),
+      call = fn === 'pow' ? () => x.pow(2.5).eval() : () => x[fn]().eval();
+    return { run: call, check: async (r) => ({ mean: round(await r.mean().item()) }) };
+  }),
   'compute-matmul': task(async (gpu, { a, b }, { n }) => {
     const { matmul } = await import('@margoengine/compute/linalg'),
       A = gpu.array(a, { shape: [n, n] }),
@@ -113,6 +118,42 @@ export const builders = {
       check: async (r) => ({ iterations: r.iterations, residual: round(r.residual) }),
     };
   }),
+
+  'tracer-rays': async (canvas, { voxels, size, camera }, marks, { projection, fast }) => {
+    const { VoxelPathTracer } = await import('@margoengine/voxel-pathtracer'),
+      create = GPUDevice.prototype.createShaderModule;
+    let swapped = 0;
+    // The like-for-like row: the same shaders with the ray functions on the builtins. Definitions stay, unused.
+    if (fast)
+      GPUDevice.prototype.createShaderModule = function (d) {
+        const code = d.code.replace(/(?<!fn )precise(Sin|Cos|Asin|Atan)\(/g, (_, f) => {
+          swapped++;
+          return `${f.toLowerCase()}(`;
+        });
+        return create.call(this, { ...d, code });
+      };
+    const engine = await engineFor(canvas, camera, 16, marks),
+      tracer = VoxelPathTracer.attach(engine, {
+        scene: {
+          revision: 1,
+          models: [{ id: 'ground', revision: 1, size, voxels }],
+          instances: [{ id: 'ground-1', modelId: 'ground', matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }],
+          materials: [
+            { id: 1, color: [0.8, 0.75, 0.7], type: 'diffuse' },
+            { id: 2, color: [0.5, 0.7, 0.4], type: 'diffuse' },
+          ],
+          environment: { skyColor: [0.6, 0.75, 1], sunIntensity: 3, sunDirection: [0.4, 0.8, 0.3] },
+        },
+        maxSamples: 1e6,
+        projection,
+        fisheye: { mapping: 'equisolid', fov: 200 },
+      });
+    await tracer.ready;
+    GPUDevice.prototype.createShaderModule = create;
+    // A renamed function or a shader built after ready would otherwise time precise against precise.
+    if (fast && !swapped) throw new Error('tracer-rays: fast=1 swapped no ray function');
+    return app(engine, () => {}, { camera, note: `projection ${projection}` });
+  },
 
   'viz-scatter': figure(async (fig, { x, y, z }) => {
     await fig.scatter({ x, y, z, color: z }, { colormap: 'viridis' });

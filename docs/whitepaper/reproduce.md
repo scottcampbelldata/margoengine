@@ -104,6 +104,7 @@ route is a clone because 1.0.0 is not on npm yet.
 | Kernel tick in Node | `npm run bench -- parts --cases=kernel` (or `node examples/package-benchmarks/parts/kernel-node.mjs`) | no | `benchmarks/runs/<id>.json` (`parts/results-kernel-node.json`) | |
 | glTF export: validator errors and export time | `node examples/package-benchmarks/exporters-model.mjs` | no | `results/exporters-model.json` | Khronos glTF-Validator from node_modules; the timing needs the quiet PC. |
 | Textured instancing, encoding CPU | `node examples/package-benchmarks/textured-instancing.mjs` | no (mock) | `results/textured-instancing.json` | Mock GPU: CPU encoding only, not frame rate. |
+| Precise maths against the builtins, in the bench tool | `npm run bench -- compute --cases=compute-elementwise --runs=3` and `npm run bench -- tracer --runs=3` | yes | `benchmarks/runs/<id>.json` | perf-history entry 71. The record is the `precise-math-gpu.mjs` row. |
 | **Margo vs other engines, same scenes** | `npm run bench -- render objects scaling --engines=all` | yes | `benchmarks/runs/<id>.json`, screenshots in `benchmarks/runs/<id>/` | Scenes in `bench/scenes/catalog.js`; other engines' implementations live in engine-bench. Earlier results: `results/vs-threejs-*.json`. |
 | GPU culling | `node examples/package-benchmarks/parts/culling.mjs --check --label=<name>` | yes | `parts/results-<name>.json` | |
 | Post stack per effect, SSAO + IBL | `node examples/package-benchmarks/gates/post-stack.mjs` | yes | `results/gates-post-stack.json` | |

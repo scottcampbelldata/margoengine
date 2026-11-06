@@ -1730,6 +1730,41 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** `npm run build --workspace packages/scene`, then `node packages/scene/scripts/bulk-bench.mjs 10000`.
 - **Guard:** `packages/scene/tests/bulk.test.js`.
 
+### 71. Precise maths in the bench tool: `compute-elementwise` and the `tracer` suite (diagnostic)
+
+- **What this adds:** entry 48 stays the record of this cost, from its own script. These rows put the same pairs into
+  `npm run bench`, so they reach run records and comparisons. `compute-elementwise` (in the `compute` suite) is twelve
+  functions over 16,777,216 values, x uniform in [0.01, 1), plus `sin` with x up to 10,000, each beside its `fast=1` row
+  (`createCompute({ fastMath: true })`). The opt-in `tracer` suite is camera, panorama and equisolid fisheye at
+  1280 x 720, one sample a frame of a 64^3 terrain, with `fast=1` swapping the four ray functions in the shader text; a
+  `fast=1` case that swapped nothing fails.
+- **Diagnostic, and out of date:** runs `20261105-175948-214a946ba-dev` and `20261105-180202-214a946ba-dev`, RTX A6000,
+  Edge 156, median of 3, with `--no-gate`, so the tool marked them invalid. Commit `214a946ba` predates `4cfb6a0a8`,
+  which adds work to `precisePow` and a hide to `pmProductError`: these rows, `pow` most, do not price the code on main.
+
+| Function | Precise ms | `fast=1` ms |
+| --- | --- | --- |
+| `exp`, `sqrt`, `sinh` | 0.375-0.377 | 0.377-0.378 |
+| `atan`, `log`, `acos`, `asin` | 0.459, 0.458, 0.461, 0.472 | 0.377 |
+| `tanh` | 0.515 | 0.377 |
+| `sin`, `cos` | 0.627 | 0.377 |
+| `sin`, x up to 10,000 | 0.635 | 0.377 |
+| `tan` | 0.884 | 0.377 |
+| `pow` (x^2.5) | 1.502 | 0.388 |
+
+| Projection | Precise ms | `fast=1` ms | Difference |
+| --- | --- | --- | --- |
+| camera (no precise call: the control) | 5.426 | 5.488 | -0.062 ms |
+| panorama | 1.835 | 1.675 | 0.160 ms |
+| fisheye | 1.497 | 1.441 | 0.056 ms |
+
+- **Reading the numbers:** these inputs take the short branch of several functions, so `sinh` here is its polynomial
+  alone; entry 48's inputs reach every branch, and its 1.76 is the figure to use. 0.377 ms is the time to read and write
+  the array. The camera control moved by 0.062 ms with no precise call in its path, more than fisheye's 0.056 ms, so
+  the fisheye row shows no cost above this method's noise; the cause of the control's shift is not known.
+- **Rerun:** `npm run bench -- compute --cases=compute-elementwise --runs=3` and `npm run bench -- tracer --runs=3`.
+  A quiet rerun on current main is owed.
+
 ## Open losses
 
 These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bugs.md#performance-losses-still-open).

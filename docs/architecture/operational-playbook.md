@@ -252,6 +252,7 @@ that comparison; signed zero otherwise remains significant.
 Measured on the RTX A6000 only (`docs/whitepaper/perf-history.md` entry 48): one precise call per element costs 1.0 to
 1.8 times the builtin, `tan` 2.3, `pow` 3.0, and the path tracer's panorama and fisheye rays 1% to 7% of a traced sample.
 The `pow` figure predates the pair for `s R`, which adds work, and has not been measured again.
+`npm run bench` repeats the pairs (`compute-elementwise`, the `tracer` suite; entry 71), diagnostic so far.
 Unmeasured: that cost on other GPUs, one kernel rotation-sync call, and cross-machine kernel bit equality.
 
 `@margoengine/compute/subgroups` is opt-in for the same reason: its float sums follow the GPU's subgroup size, so they

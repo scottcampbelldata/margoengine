@@ -318,6 +318,27 @@ export const SCENES = {
   },
   ...computeScenes(),
   ...vizScenes(),
+  // The path tracer's panorama and fisheye rays, precise functions against the builtins (bench/suites/tracer.mjs).
+  'tracer-rays': {
+    suite: 'data',
+    title: 'Path tracer rays',
+    draws:
+      'One path-traced sample a frame of a 64^3 voxel terrain from just above it. projection is camera, panorama or ' +
+      'fisheye. fast=1 swaps the ray functions preciseSin, preciseCos, preciseAsin and preciseAtan for the WGSL ' +
+      'builtins in the shader text, which only this benchmark does.',
+    measures: ['cpuMs', 'gpuMs', 'fps'],
+    params: { n: 64, projection: 'panorama', fast: 0 },
+    data: (p) => {
+      const n = p.n,
+        voxels = new Uint8Array(n * n * n);
+      for (let z = 0; z < n; z++)
+        for (let x = 0; x < n; x++) {
+          const h = 12 + 6 * Math.sin(x * 0.21) * Math.cos(z * 0.17);
+          for (let y = 0; y < h; y++) voxels[x + n * (z + n * y)] = 1 + ((x + z) & 1);
+        }
+      return { voxels, size: [n, n, n], camera: orbit(n / 3, 24, 400, 0.1, [n / 2, 0, n / 2]) };
+    },
+  },
 };
 
 /**
@@ -380,6 +401,24 @@ function computeScenes() {
       bytes(4),
       () => ({ seed: 42 }),
     ),
+    // One element-wise function over n f32 values, the precise function against the WGSL builtin
+    // (createCompute({ fastMath: true })): docs/whitepaper/perf-history.md entries 48 and 71.
+    'compute-elementwise': {
+      ...task(
+        'Element-wise function',
+        'One call applies fn to n f32 values, x uniform in [0.01, 1) times scale, into a new array. fast=1 is ' +
+          'createCompute({ fastMath: true }), the WGSL builtin; otherwise the precise function. Rate: 8n bytes.',
+        1 << 24,
+        bytes(8),
+        (p) => {
+          const pick = random(303),
+            values = new Float32Array(p.n);
+          for (let i = 0; i < p.n; i++) values[i] = (0.01 + pick() * 0.99) * p.scale;
+          return { values };
+        },
+      ),
+      params: { n: 1 << 24, backend: 'webgpu', fn: 'sin', fast: 0, scale: 1 },
+    },
     'compute-matmul': task(
       'Matrix product',
       'One call multiplies two n x n f32 matrices (entries uniform in [-1, 1)). Rate: 2n^3 floating-point operations.',
@@ -575,6 +614,12 @@ export const STANDARD = {
     ),
     ...[256, 1024, 2048].map((n) => ({ scene: 'compute-matmul', params: { n } })),
     ...[1 << 16, 1 << 20, 1 << 22].map((n) => ({ scene: 'compute-fft', params: { n } })),
+    // Precise functions against the builtins: each pair is the same job, fast=1 on the builtin.
+    ...['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'exp', 'log', 'pow', 'sqrt', 'sinh', 'tanh'].flatMap((fn) =>
+      [0, 1].map((fast) => ({ scene: 'compute-elementwise', params: { fn, fast } })),
+    ),
+    // sin of large arguments, where the argument reduction is the whole cost.
+    ...[0, 1].map((fast) => ({ scene: 'compute-elementwise', params: { fn: 'sin', fast, scale: 10_000 } })),
     // The CPU fallback on the same jobs, at the sizes it finishes in reasonable time.
     ...['compute-sort', 'compute-scan', 'compute-reduce', 'compute-histogram', 'compute-random', 'compute-fft'].map(
       (scene) => ({ scene, params: { n: 1 << 20, backend: 'cpu' } }),
@@ -585,6 +630,9 @@ export const STANDARD = {
     { scene: 'compute-spmv', params: { n: 256, backend: 'cpu' } },
     { scene: 'compute-cg', params: { n: 128, backend: 'cpu' } },
   ],
+  tracer: ['camera', 'panorama', 'fisheye'].flatMap((projection) =>
+    [0, 1].map((fast) => ({ scene: 'tracer-rays', params: { projection, fast } })),
+  ),
   viz: [
     ...[100_000, 1_000_000, 4_000_000].map((n) => ({ scene: 'viz-scatter', params: { n } })),
     ...[256, 1024].map((n) => ({ scene: 'viz-surface', params: { n } })),
@@ -608,7 +656,7 @@ export function caseId(scene, params = {}) {
       if (v !== 'mesh') parts.push(v);
     } else if (k === 'move') {
       if (v) parts.push('moving');
-    } else if (k === 'model') parts.push(v);
+    } else if (k === 'model' || k === 'projection') parts.push(v);
     else if (k === 'n') parts.push(`${v}`);
     else if (v !== def[k]) parts.push(`${k}${v}`);
   }
