@@ -119,10 +119,43 @@ buffer with indirect arguments. It then sets `batch.redirect` (core's one GPU-cu
 core's main pass and every replay of it (SSAO, SSR, selection outline...) draw the compacted list with core's own
 pipelines; core still uploads its instance buffer, which the culler reads. `engine.pick` draws from
 core's CPU instance data and is unaffected. With `minRadius: 0` (default) frames are pixel-identical to core
-(`examples/package-benchmarks/parts/culled-meshes.mjs`). Limits: frustum and screen size only (no Hi-Z occlusion yet; use
-`CulledInstances` for occlusion on static parts); with `engine.render()` (CPU culling on) the GPU test only adds the
-screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies: a dropped part simply disappears, so keep it under the size where a
+(`examples/package-benchmarks/parts/culled-meshes.mjs`). With `engine.render()` (CPU culling on) the GPU test only adds
+the screen-size cut. `minRadius` of 1-2 px is the small-part cull for large assemblies: a dropped part simply disappears, so keep it under the size where a
 part is still recognisable.
+
+### Occlusion for core meshes
+
+`occlusion: true` also drops instances hidden behind others, with the same conservative Hi-Z test as `CulledInstances`:
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {CulledMeshes} from 'margoengine/culling';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const material = new PbrMaterial({color: '#8d99a6'});
+engine.createMesh().setGeometry(box(40, 20, 1)).setMaterial(material).setPosition([0, 0, 5]);   // a wall
+const small = box(0.5, 0.5, 0.5);
+for (let i = 0; i < 2000; i++)
+  engine.createMesh().setGeometry(small).setMaterial(material).setPosition([(i % 50) - 25, 0, -Math.floor(i / 50)]);
+engine.camera.position = [0, 2, 30];
+engine.camera.target = [0, 0, 0];
+
+const culled = CulledMeshes.attach(engine, {occlusion: true});   // occluderSize: 8 (pixels of radius) by default
+engine.start({culling: false});
+setTimeout(async () => console.log(await culled.readCounts()), 1000);   // instances drawn per geometry
+```
+
+Before core's main pass, the instances kept last frame that are at least `occluderSize` pixels in radius are drawn
+depth-only with this frame's camera into the package's own target, which is reduced to a pyramid; the cull kernel then
+hides an instance only if it is strictly behind the farthest occluder depth everywhere it can touch. Occluders are real
+instances of this frame at this frame's position, so a mesh that comes into view draws in that frame: images match
+core's (`test/gpu/meshes-occlusion-check.mjs`).
+
+- A frame falls back to frustum culling when core's shader is changed in a way that moves or discards surfaces (section
+  planes), as for `CulledInstances`. Batches a package has `claimed` are culled but do not occlude.
+- The first frame has no occluders; a hidden crowd starts to drop from the second.
+- It costs a depth pass and a pyramid, so it pays in dense or enclosed scenes. Only core's meshes occlude.
+- WebGL2 compatibility layer: frustum and screen size only, the same image with more drawn.
 
 ## Moving objects: `DynamicInstances`
 

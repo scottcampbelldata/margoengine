@@ -380,6 +380,13 @@ finished it, and a parent reads only children stamped by an earlier dispatch, be
 order. Evidence: trees read back and walked node by node, and rays through a pose only the GPU wrote, against a float64
 CPU tree, in `packages/bvh/tests/gpu-build-browser.js`.
 
+`CulledMeshes` with `occlusion` runs before core's main pass, so it cannot read core's depth, which has no texture binding
+anyway: it redraws last frame's large kept instances depth-only with this frame's camera, at the scene's sample count,
+and shares the Hi-Z pyramid of `packages/culling/src/pyramid.ts` with `CulledInstances`. An instance is hidden only
+strictly behind the farthest occluder depth in its footprint, so the image is core's. On the WebGL2 layer it stays
+frustum and screen size. Evidence: `packages/culling/test/gpu/meshes-occlusion-check.mjs`, 0 differing pixels against
+core through camera and occluder changes, 9 of 1,509 instances drawn behind a wall, RTX A6000.
+
 Accepted compatibility differences include CPU transcendental last bits, exact CPU filtering versus typical GPU
 fixed-point filtering, one signed-normal tie, canonical rgb9e5/snorm readback, unavailable per-sample shading and
 timestamp queries, copied video frames, clamped allowed out-of-bounds reads, refused compressed attachment/readback

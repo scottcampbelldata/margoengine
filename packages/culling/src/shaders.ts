@@ -1,9 +1,61 @@
 // WGSL for GPU-driven culling. Binding numbers are shared by every entry point; `layout:'auto'` keeps each
 // pipeline's bind group to the bindings that entry point uses (at most 8 storage buffers each).
-const common = `
+export const common = `
 struct Cull {camera:mat4x4f,planes:array<vec4f,6>,size:vec4u,mode:vec4u,levels:array<vec4u,16>}
 struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
 @group(0) @binding(0) var<uniform> u:Cull;
+`;
+
+/**
+ * The world sphere of a matrix as core's kernel computes it (radius scaled by sqrt(norm1*normInf) of the 3x3), padded for
+ * float32, and its frustum and screen-size test. They read a `Frame` `f` and a `b` with a local `sphere`.
+ */
+export const sphereCode = `
+fn bound(m:mat4x4f)->vec4f {
+  let c=(m*vec4f(b.sphere.xyz,1.0)).xyz;let a=mat3x3f(abs(m[0].xyz),abs(m[1].xyz),abs(m[2].xyz));
+  let one=vec3f(1.0);let cols=max(max(dot(a[0],one),dot(a[1],one)),dot(a[2],one));let rows=a[0]+a[1]+a[2];
+  var r=b.sphere.w*sqrt(cols*max(max(rows.x,rows.y),rows.z));r+=1e-5*(length(c)+r);
+  return vec4f(c,r);
+}
+fn keep(s:vec4f)->bool {
+  let c=s.xyz;let r=s.w;
+  for(var p=0u;p<6u;p++){if(dot(f.planes[p].xyz,c)+f.planes[p].w< -r){return false;}}
+  let w=dot(vec4f(f.camera[0].w,f.camera[1].w,f.camera[2].w,f.camera[3].w),vec4f(c,1.0));
+  return f.size.z<=0.0||w<=r||r*f.size.y/w>=f.size.z;
+}
+`;
+
+/** The occluder and Hi-Z tests of a world sphere; they read `u` and `hiz`. */
+export const occlusionCode = `
+// Screen radius in pixels (exact for perspective and orthographic cameras): large parts become occluders.
+fn occluder(s:vec4f)->bool {
+  let m=u.camera;let w=dot(vec4f(m[0].w,m[1].w,m[2].w,m[3].w),vec4f(s.xyz,1.0));
+  return w<=s.w||s.w*length(vec3f(m[0].y,m[1].y,m[2].y))/w*f32(u.size.y)*0.5>=bitcast<f32>(u.mode.w);
+}
+// Conservative Hi-Z test: the sphere's box projects inside the hull of its 8 projected corners and its nearest depth
+// is at most the largest corner depth (reversed Z); for perspective (mode.z 1) and orthographic (2) cameras the
+// sphere's own nearest point is used when tighter. It is hidden only if that depth is behind the farthest occluder
+// sample in every pixel the box can touch. Corners behind the eye, or depth at the near plane, count as visible.
+fn unoccluded(s:vec4f)->bool {
+  var lo=vec2f(3.0e38);var hi=vec2f(-3.0e38);var near=0.0;let m=u.camera;
+  for(var c=0u;c<8u;c++){
+    let k=vec3f(f32(c&1u),f32((c>>1u)&1u),f32(c>>2u))*2.0-1.0;let q=m*vec4f(s.xyz+s.w*k,1.0);
+    if(q.w<=1e-6){return true;}
+    let n=q.xyz/q.w;lo=min(lo,n.xy);hi=max(hi,n.xy);near=max(near,n.z);
+  }
+  let row2=vec3f(m[0].z,m[1].z,m[2].z);let row3=vec3f(m[0].w,m[1].w,m[2].w);
+  if(u.mode.z==1u){let q=m*vec4f(s.xyz-s.w*normalize(row3),1.0);if(q.w>1e-6){near=min(near,q.z/q.w);}}
+  if(u.mode.z==2u){let q=m*vec4f(s.xyz,1.0);near=min(near,(q.z+s.w*length(row2))/q.w);}
+  if(near>=1.0){return true;}
+  let size=vec2f(u.size.xy);
+  let p0=vec2u(clamp(vec2f(lo.x*0.5+0.5,0.5-hi.y*0.5)*size,vec2f(0.0),size-1.0));
+  let p1=vec2u(clamp(vec2f(hi.x*0.5+0.5,0.5-lo.y*0.5)*size,vec2f(0.0),size-1.0));
+  var l=0u;
+  while(l+1u<u.size.z&&((p1.x>>l)-(p0.x>>l)>1u||(p1.y>>l)-(p0.y>>l)>1u)){l++;}
+  let e=u.levels[l];let a=p0>>vec2u(l);let b=p1>>vec2u(l);
+  let far=min(min(hiz[e.x+a.y*e.y+a.x],hiz[e.x+a.y*e.y+b.x]),min(hiz[e.x+b.y*e.y+a.x],hiz[e.x+b.y*e.y+b.x]));
+  return near>=far*(1.0-1e-5);
+}
 `;
 
 /** Compute stages. `samples` picks the depth texture type the Hi-Z pyramid is built from. */
@@ -43,36 +95,7 @@ fn inside(s:vec4f)->bool {
   for(var p=0u;p<6u;p++){if(dot(u.planes[p].xyz,s.xyz)+u.planes[p].w< -s.w){return false;}}
   return true;
 }
-// Screen radius in pixels (exact for perspective and orthographic cameras): large parts become occluders.
-fn occluder(s:vec4f)->bool {
-  let m=u.camera;let w=dot(vec4f(m[0].w,m[1].w,m[2].w,m[3].w),vec4f(s.xyz,1.0));
-  return w<=s.w||s.w*length(vec3f(m[0].y,m[1].y,m[2].y))/w*f32(u.size.y)*0.5>=bitcast<f32>(u.mode.w);
-}
-// Conservative Hi-Z test: the sphere's box projects inside the hull of its 8 projected corners and its nearest depth
-// is at most the largest corner depth (reversed Z); for perspective (mode.z 1) and orthographic (2) cameras the
-// sphere's own nearest point is used when tighter. It is hidden only if that depth is behind the farthest occluder
-// sample in every pixel the box can touch. Corners behind the eye, or depth at the near plane, count as visible.
-fn unoccluded(s:vec4f)->bool {
-  var lo=vec2f(3.0e38);var hi=vec2f(-3.0e38);var near=0.0;let m=u.camera;
-  for(var c=0u;c<8u;c++){
-    let k=vec3f(f32(c&1u),f32((c>>1u)&1u),f32(c>>2u))*2.0-1.0;let q=m*vec4f(s.xyz+s.w*k,1.0);
-    if(q.w<=1e-6){return true;}
-    let n=q.xyz/q.w;lo=min(lo,n.xy);hi=max(hi,n.xy);near=max(near,n.z);
-  }
-  let row2=vec3f(m[0].z,m[1].z,m[2].z);let row3=vec3f(m[0].w,m[1].w,m[2].w);
-  if(u.mode.z==1u){let q=m*vec4f(s.xyz-s.w*normalize(row3),1.0);if(q.w>1e-6){near=min(near,q.z/q.w);}}
-  if(u.mode.z==2u){let q=m*vec4f(s.xyz,1.0);near=min(near,(q.z+s.w*length(row2))/q.w);}
-  if(near>=1.0){return true;}
-  let size=vec2f(u.size.xy);
-  let p0=vec2u(clamp(vec2f(lo.x*0.5+0.5,0.5-hi.y*0.5)*size,vec2f(0.0),size-1.0));
-  let p1=vec2u(clamp(vec2f(hi.x*0.5+0.5,0.5-lo.y*0.5)*size,vec2f(0.0),size-1.0));
-  var l=0u;
-  while(l+1u<u.size.z&&((p1.x>>l)-(p0.x>>l)>1u||(p1.y>>l)-(p0.y>>l)>1u)){l++;}
-  let e=u.levels[l];let a=p0>>vec2u(l);let b=p1>>vec2u(l);
-  let far=min(min(hiz[e.x+a.y*e.y+a.x],hiz[e.x+a.y*e.y+b.x]),min(hiz[e.x+b.y*e.y+a.x],hiz[e.x+b.y*e.y+b.x]));
-  return near>=far*(1.0-1e-5);
-}
-
+${occlusionCode}
 // Pass 1 (occlusion only): large parts drawn last frame and still in the frustum, appended per batch for the depth
 // prepass. Any subset of real geometry is a valid occluder set; small parts cost vertex work and hide little.
 @compute @workgroup_size(256) fn early(@builtin(global_invocation_id) g:vec3u) {

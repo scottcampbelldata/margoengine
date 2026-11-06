@@ -3,7 +3,8 @@ import type { EngineKernel } from '@margoengine/core';
 import { Geometry, PbrMaterial } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
-import { computeShader, depthShader } from './shaders.js';
+import { computeShader } from './shaders.js';
+import { Pyramid, depthKind, exactShader, levelTable, occluderPipeline } from './pyramid.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 export { CulledMeshes } from './meshes.js';
@@ -19,7 +20,6 @@ declare const GPUBufferUsage: {
   STORAGE: number;
   INDIRECT: number;
 };
-declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -43,15 +43,6 @@ export interface CulledInstancesOptions {
 }
 
 const modes: readonly CullingMode[] = ['none', 'frustum', 'occlusion'];
-// Occlusion is exact only when core's shader still computes clip positions unchanged and discards nothing beyond
-// its single-sided rule; section planes and similar fragment clipping fall back to frustum culling.
-const exactShader = (shader: string): boolean =>
-  shader.includes('let p=model*vec4f(i.position,1);\nvar o:Output;o.clip=frame.camera*p;') &&
-  shader.split('discard').length === 2;
-const vertexLayout: GPUVertexBufferLayout = {
-  arrayStride: 24,
-  attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
-};
 let serial = 0;
 
 /**
@@ -107,13 +98,8 @@ export class CulledInstances implements EnginePlugin {
   };
   private prepass?: { plain: GPURenderPipeline; sided: GPURenderPipeline };
   private groups: Record<string, GPUBindGroup> = {};
-  private levelGroups: GPUBindGroup[] = [];
-  private depth?: GPUTexture;
-  private hiz?: GPUBuffer;
+  private hiz?: Pyramid;
   private samples = 0;
-  private width = 0;
-  private height = 0;
-  private levels = 0;
   // The main pass draws with core's pipeline state; single-sided batches without mirrored parts use its back-culled
   // variant (cullMode back, override C=1 compiles out the back-face discard), as core does for its own batches.
   private pipeline?: GPURenderPipeline;
@@ -132,13 +118,6 @@ export class CulledInstances implements EnginePlugin {
     colorAttachments: [this.color],
     depthStencilAttachment: this.target,
   };
-  private readonly occluders: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthClearValue: 0,
-    depthLoadOp: 'clear',
-    depthStoreOp: 'store',
-  };
-  private readonly early: GPURenderPassDescriptor = { colorAttachments: [], depthStencilAttachment: this.occluders };
 
   /** Same as `engine.use(new CulledInstances(...))`; returns the CulledInstances. */
   static attach(
@@ -263,12 +242,7 @@ export class CulledInstances implements EnginePlugin {
     try {
       buffer('uniform', 448, GPUBufferUsage.UNIFORM);
       buffer('frame', 128, GPUBufferUsage.UNIFORM);
-      buffer(
-        'levels',
-        16 * 256,
-        GPUBufferUsage.UNIFORM,
-        new Uint32Array(16 * 64).map((_, i) => (i % 64 ? 0 : i / 64)),
-      );
+      buffer('levels', 16 * 256, GPUBufferUsage.UNIFORM, levelTable());
       buffer('records', n * 96, S | GPUBufferUsage.VERTEX, this.records);
       buffer('drawn', n * 96, S | GPUBufferUsage.VERTEX);
       buffer('hidden', n * 4, S | GPUBufferUsage.VERTEX, this.hidden);
@@ -430,27 +404,7 @@ export class CulledInstances implements EnginePlugin {
       scan: entry('scan'),
       scatter: entry('scatter'),
     };
-    const depthModule = d.createShaderModule({ code: depthShader }),
-      prepass = (fragment: boolean) =>
-        d.createRenderPipeline({
-          layout: 'auto',
-          vertex: {
-            module: depthModule,
-            entryPoint: 'vertex',
-            buffers: [
-              vertexLayout,
-              {
-                arrayStride: 4,
-                stepMode: 'instance',
-                attributes: [{ shaderLocation: 2, offset: 0, format: 'uint32' }],
-              },
-            ],
-          },
-          fragment: fragment ? { module: depthModule, entryPoint: 'fragment', targets: [] } : undefined,
-          multisample: { count: samples },
-          depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater-equal' },
-        });
-    this.prepass = { plain: prepass(false), sided: prepass(true) };
+    this.prepass = { plain: occluderPipeline(d, samples, false), sided: occluderPipeline(d, samples, true) };
     const r = (name: string): GPUBindingResource => ({ buffer: b[name] }),
       p = this.compute;
     this.groups.early = this.bind(p.early, [
@@ -488,35 +442,16 @@ export class CulledInstances implements EnginePlugin {
       [11, r('records')],
     ]);
     this.samples = samples;
-    this.width = this.height = 0;
+    this.hiz?.destroy();
+    this.hiz = new Pyramid(d, samples, this.compute, b.uniform, b.levels, this.words);
   }
   // Size-dependent resources: the occluder depth target and the Hi-Z pyramid buffer, for a view of up to width x height.
-  private resize(c: Context, width: number, height: number): void {
-    const d = c.device,
-      p = this.compute!,
-      b = this.buffers;
-    this.depth?.destroy();
-    this.hiz?.destroy();
-    this.depth = this.hiz = undefined;
-    this.depth = d.createTexture({
-      size: [width, height],
-      format: 'depth32float',
-      sampleCount: this.samples,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    });
-    this.width = width;
-    this.height = height;
-    const levels = this.pyramid(width, height);
-    this.hiz = d.createBuffer({ size: levels * 4, usage: GPUBufferUsage.STORAGE });
-    const view = this.depth.createView(),
-      hiz: GPUBindingResource = { buffer: this.hiz };
-    this.occluders.view = view;
-    this.groups.depth0 = this.bind(p.depth0, [
-      [0, { buffer: b.uniform }],
-      [5, hiz],
-      [14, view],
-    ]);
-    this.groups.cull = this.bind(p.cull, [
+  private resize(width: number, height: number): void {
+    const b = this.buffers,
+      pyramid = this.hiz!;
+    pyramid.resize(width, height);
+    const hiz: GPUBindingResource = { buffer: pyramid.buffer! };
+    this.groups.cull = this.bind(this.compute!.cull, [
       [0, { buffer: b.uniform }],
       [1, { buffer: b.hidden }],
       [2, { buffer: b.visible }],
@@ -527,30 +462,6 @@ export class CulledInstances implements EnginePlugin {
       [11, { buffer: b.records }],
       [15, { buffer: b.bounds }],
     ]);
-    this.levelGroups = Array.from({ length: this.levels }, (_, l) =>
-      this.bind(p.reduce, [
-        [0, { buffer: b.uniform }],
-        [5, hiz],
-        [13, { buffer: b.levels, offset: l * 256, size: 16 }],
-      ]),
-    );
-  }
-  // Writes the Hi-Z level table (offset, width, height) for a width x height view, level 0 at full resolution; sets
-  // `levels` and returns the texel count.
-  private pyramid(width: number, height: number): number {
-    let w = width,
-      h = height,
-      offset = 0,
-      level = 0;
-    for (; ; level++) {
-      this.words.set([offset, w, h, 0], 48 + level * 4);
-      offset += w * h;
-      if (w === 1 && h === 1) break;
-      w = Math.ceil(w / 2);
-      h = Math.ceil(h / 2);
-    }
-    this.levels = level + 1;
-    return offset;
   }
   private draw(c: Context): void {
     const d = c.device,
@@ -559,9 +470,10 @@ export class CulledInstances implements EnginePlugin {
     // The occluder depth and Hi-Z cover the view being drawn: its camera projects onto its rectangle. Views of different
     // sizes share resources sized for the largest; a plain frame keeps them at the canvas size.
     const [width, height] = viewSize(c);
-    if (c.view ? width > this.width || height > this.height : width !== this.width || height !== this.height)
-      this.resize(c, Math.max(width, c.view ? this.width : 0), Math.max(height, c.view ? this.height : 0));
-    this.pyramid(width, height);
+    const pyramid = this.hiz!;
+    if (c.view ? width > pyramid.width || height > pyramid.height : width !== pyramid.width || height !== pyramid.height)
+      this.resize(Math.max(width, c.view ? pyramid.width : 0), Math.max(height, c.view ? pyramid.height : 0));
+    pyramid.plan(width, height);
     const occlusion = this.culling === 'occlusion' && exactShader(c.shader),
       mode = occlusion ? 2 : this.culling === 'none' ? 0 : 1;
     if (!(this.occluderSize >= 0))
@@ -570,7 +482,7 @@ export class CulledInstances implements EnginePlugin {
       f = this.floats;
     f.set(m);
     f.set(c.camera.planes, 16);
-    this.words.set([width, height, this.levels, this.slots, mode, this.batches.length, depthKind(m)], 40);
+    this.words.set([width, height, pyramid.levels, this.slots, mode, this.batches.length, depthKind(m)], 40);
     f[47] = this.occluderSize;
     d.queue.writeBuffer(b.uniform, 0, this.words);
     this.flush(d);
@@ -593,7 +505,7 @@ export class CulledInstances implements EnginePlugin {
         select.setBindGroup(0, this.groups.early);
         select.dispatchWorkgroups(groups);
         select.end();
-        const pass = c.encoder.beginRenderPass(this.early);
+        const pass = c.encoder.beginRenderPass(pyramid.pass);
         // The target may be larger than this view (shared with a larger one).
         if (c.view) pass.setViewport(0, 0, width, height, 0, 1);
         this.batches.forEach((batch, i) => {
@@ -609,16 +521,7 @@ export class CulledInstances implements EnginePlugin {
         pass.end();
       }
       const pass = c.encoder.beginComputePass();
-      if (occlusion) {
-        pass.setPipeline(p.depth0);
-        pass.setBindGroup(0, this.groups.depth0);
-        pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(height / 8));
-        pass.setPipeline(p.reduce);
-        for (let l = 1; l < this.levels; l++) {
-          pass.setBindGroup(0, this.levelGroups[l]);
-          pass.dispatchWorkgroups(Math.ceil(this.words[48 + l * 4 + 1] / 8), Math.ceil(this.words[48 + l * 4 + 2] / 8));
-        }
-      }
+      if (occlusion) pyramid.encode(pass, width, height);
       pass.setPipeline(p.cull);
       pass.setBindGroup(0, this.groups.cull);
       pass.dispatchWorkgroups(groups);
@@ -694,17 +597,15 @@ export class CulledInstances implements EnginePlugin {
       g.vertex.destroy();
       g.index.destroy();
     }
-    this.depth?.destroy();
     this.hiz?.destroy();
     this.buffers = {};
     this.geometryBuffers.clear();
     this.groups = {};
-    this.levelGroups = [];
-    this.depth = this.hiz = undefined;
+    this.hiz = undefined;
     this.compute = this.prepass = this.pipeline = this.group = this.culledPipeline = this.culledGroup = undefined;
     this.pipelineKey = '';
     this.bindings = [];
-    this.samples = this.width = this.height = 0;
+    this.samples = 0;
     this.device = undefined;
   }
   onDeviceRestored(engine: Engine): void {
@@ -724,15 +625,6 @@ export class CulledInstances implements EnginePlugin {
   }
 }
 
-// Nearest sphere depth is exact when clip z depends on w alone (perspective: row 2 parallel to row 3) or w is constant
-// (orthographic); other projections use the bounding box corners only.
-function depthKind(m: Float32Array): number {
-  const [a, b, c] = [m[2], m[6], m[10]],
-    [x, y, z] = [m[3], m[7], m[11]],
-    row3 = Math.hypot(x, y, z);
-  if (!row3) return 2;
-  return Math.hypot(b * z - c * y, c * x - a * z, a * y - b * x) <= 1e-6 * Math.hypot(a, b, c) * row3 ? 1 : 0;
-}
 function sameBindings(previous: readonly GPUBindGroupEntry[], entries: readonly GPUBindGroupEntry[]): boolean {
   return (
     previous.length === entries.length &&
