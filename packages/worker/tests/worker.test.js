@@ -1,6 +1,7 @@
 // The handshake, forwarding and lifecycle of a worker canvas, with both ends in one Node thread: a MessageChannel plays
 // the worker's postMessage, plain objects play the two canvases. tests/browser-check.mjs proves them on a real worker.
 import assert from 'node:assert/strict';
+import { packageFolder, readmeTypeErrors } from '../../../scripts/support/readme-types.mjs';
 import { afterEach, beforeEach, test } from 'node:test';
 import { transferCanvas, WorkerCanvas, workerCanvasSupported } from '../dist/index.js';
 import { ReceivedCanvas, receiveCanvas } from '../dist/canvas.js';
@@ -346,4 +347,8 @@ test('waits end: a timeout, an abort, a worker that fails to start', async () =>
 
 test('without a window the page side says the feature is missing', () => {
   assert.equal(workerCanvasSupported(), false);
+});
+
+test('the README examples type-check as written', () => {
+  assert.deepEqual(readmeTypeErrors(packageFolder(import.meta.url)), []);
 });

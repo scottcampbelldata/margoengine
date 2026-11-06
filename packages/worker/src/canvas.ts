@@ -1,6 +1,7 @@
 // The worker side of a worker canvas: an OffscreenCanvas is already an EventTarget with a width and height, so it gets
 // the few element members core and the control packages read, and they run on it unchanged. Written from the HTML
 // specification; the page side is ./index.ts.
+import type { EngineKernel } from '@margoengine/core';
 import type { Engine } from '@margoengine/core/extension';
 import { fault, rangeError } from '../../shared/errors.js';
 
@@ -134,9 +135,10 @@ export class ReceivedCanvas {
     if (engine && !engine.disposed) engine.dispose();
   }
   /** Ties this canvas to `engine`: see the class. Disposing the engine then ends the link to the page. */
-  attach(engine: Engine): this {
+  attach(engine: EngineKernel): this {
     engine.use({ name: 'worker-canvas', setup() {}, dispose: () => this.dispose() });
-    this.engine = engine;
+    // Type only: a runtime import of the extension entry would load core into this small entry.
+    this.engine = engine as unknown as Engine;
     return this;
   }
   /** Ends the link to the page. The page's canvas keeps the last frame. */
