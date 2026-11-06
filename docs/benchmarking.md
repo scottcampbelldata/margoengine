@@ -57,7 +57,7 @@ Options:
 | `--engine-bench=DIR` | `../engine-bench` next to the main checkout | Where other engines live. |
 | `--no-gate` | | Skip the quiet-machine gate. The run is marked invalid. |
 | `--quiet-max`, `--quiet-hold`, `--gpu-max`, `--timeout` | 20 %, 20 s, 20 %, 1800 s | Gate limits (see below). |
-| `--browser=edge\|chrome\|chromium\|firefox` | edge on Windows, chromium elsewhere | The browser for browser suites (`MARGO_BROWSER` works too; see "Choosing the browser"). |
+| `--browser=edge\|chrome\|chromium\|firefox\|webkit` | edge on Windows, chromium elsewhere | The browser for browser suites (`MARGO_BROWSER` works too; see "Choosing the browser"). |
 | `--no-fail` | | Report regressions without failing. |
 | `--require-valid` | | Exit with code 2 when the run is invalid. |
 
@@ -211,7 +211,7 @@ works for all of them, on Windows, macOS and Linux:
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `MARGO_BROWSER=edge\|chrome\|chromium\|firefox` | `edge` on Windows, `chromium` elsewhere | The browser to drive. `chromium` is Playwright's own build (`npx playwright install chromium`); `edge` and `chrome` need that browser installed. `--browser=<name>` on a suite's command line does the same. |
+| `MARGO_BROWSER=edge\|chrome\|chromium\|firefox\|webkit` | `edge` on Windows, `chromium` elsewhere | The browser to drive. `chromium` is Playwright's own build (`npx playwright install chromium`); `edge` and `chrome` need that browser installed. `webkit` is Playwright's own WebKit build (`npx playwright install webkit`), which has WebGPU on macOS; it is not Safari. `--browser=<name>` on a suite's command line does the same. |
 | `BROWSER_CHANNEL=msedge\|chrome\|bundled` | unset | Older spelling of the same choice; `MARGO_BROWSER` wins when both are set. |
 | `BROWSER_EXECUTABLE=<path>` | unset | Launch this binary instead of the browser's normal install. |
 | `MARGO_GPU=default\|nvidia\|amd\|intel` | unset (the hardware GPU with the most video memory) | Windows PC with two GPUs only. Headless Chromium uses the first DXGI adapter, and Windows lists first the one that carries the session's display output, so the adapter changes with whether a Remote Desktop session is connected (nvidia while connected, amd after disconnecting on the Scott PC). The shared launcher (`scripts/lib/gpu-adapter.mjs`) looks the adapters up through PowerShell (about 2 s, cached per process and in a temp file for 30 minutes per boot), skips software adapters, and passes `--use-adapter-luid=<high>,<low>` (decimal; LUIDs change every boot, so never write one down) for the largest hardware GPU. `nvidia`, `amd` or `intel` prefers that vendor; `default` adds no flag, so the browser takes whatever Windows lists first. One hardware GPU: no flag. If the lookup fails, one warning line is printed and no flag is added. |

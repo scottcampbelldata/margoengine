@@ -82,7 +82,7 @@ test('launchBrowser and openBrowser close through the bounded teardown', () => {
   const launcher = readFileSync(new URL('scripts/lib/browser.mjs', root), 'utf8'),
     opener = readFileSync(new URL('scripts/browser.js', root), 'utf8');
   assert.match(launcher, /withBoundedClose\(await launch\(browser\.channel\)\)/);
-  assert.match(launcher, /withBoundedClose\(await launchers\.firefox\.launch/);
+  assert.match(launcher, /withBoundedClose\(await launchers\[browser\.engine\]\.launch/);
   assert.match(
     opener,
     /await closeAll\(\{ servers: \[server\] \}\)/,

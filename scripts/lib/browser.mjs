@@ -1,11 +1,11 @@
-import { chromium, firefox } from '@playwright/test';
+import { chromium, firefox, webkit } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
 import { closeAll, endTree } from '../support/shutdown.mjs';
 
 /**
  * Which browser the repository's browser checks drive, and how it is launched, in one place.
  *
- *   MARGO_BROWSER=edge|chrome|chromium|firefox   default: edge on Windows (the long-standing behaviour), chromium
+ *   MARGO_BROWSER=edge|chrome|chromium|firefox|webkit   default: edge on Windows (the long-standing behaviour), chromium
  *                                                elsewhere (Playwright's own build, so a Linux server needs no Edge)
  *   --browser=<name> on a suite's command line   same values; the legacy names msedge and bundled still work
  *   BROWSER_CHANNEL=msedge|chrome|bundled        older spelling, used when MARGO_BROWSER is not set
@@ -17,6 +17,7 @@ import { closeAll, endTree } from '../support/shutdown.mjs';
  *                                                real GPU; slow, and its pixels differ from a real GPU's
  *
  * Firefox has no WebGPU in Playwright's builds, so a step that needs it is reported as skipped (never passed).
+ * webkit is Playwright's own WebKit build, which has WebGPU on macOS. It is not Safari: Safari needs safaridriver.
  */
 
 const ALIASES = {
@@ -26,6 +27,7 @@ const ALIASES = {
   chromium: 'chromium',
   bundled: 'chromium',
   firefox: 'firefox',
+  webkit: 'webkit',
 };
 
 /** The WebGPU switch a Chromium-family browser needs where WebGPU is not already on. */
@@ -46,7 +48,7 @@ const SOFTWARE_ARGS = [
 /**
  * Picks the browser. `name` overrides the environment (an explicit call such as `openBrowser({ channel: 'chrome' })`).
  * Throws a TypeError naming the accepted values for an unknown name.
- * @returns {{ name: 'edge'|'chrome'|'chromium'|'firefox', engine: 'chromium'|'firefox', channel: string|undefined,
+ * @returns {{ name: 'edge'|'chrome'|'chromium'|'firefox'|'webkit', engine: 'chromium'|'firefox'|'webkit', channel: string|undefined,
  *   executablePath: string|undefined, webgpu: boolean, chooseGpu: boolean, env: object, software: boolean, explicit: boolean, platform: string }}
  */
 export function resolveBrowser({ name, env = process.env, platform = process.platform, argv = process.argv } = {}) {
@@ -62,13 +64,13 @@ export function resolveBrowser({ name, env = process.env, platform = process.pla
       `Unknown browser "${requested}"; set MARGO_BROWSER to one of ${[...new Set(Object.values(ALIASES))].join(', ')}`,
     );
   const picked = ALIASES[key],
-    engine = picked === 'firefox' ? 'firefox' : 'chromium';
+    engine = picked === 'firefox' || picked === 'webkit' ? picked : 'chromium';
   return {
     name: picked,
     engine,
     channel: picked === 'edge' ? 'msedge' : picked === 'chrome' ? 'chrome' : undefined,
     executablePath: env.BROWSER_EXECUTABLE || undefined,
-    webgpu: engine === 'chromium',
+    webgpu: engine !== 'firefox',
     chooseGpu: engine === 'chromium' && platform === 'win32',
     env,
     software: env.MARGO_SOFTWARE_GPU === '1' || env.MARGO_SOFTWARE_GPU === 'true',
@@ -195,6 +197,7 @@ function installHint(browser) {
   if (browser.executablePath)
     return `check that BROWSER_EXECUTABLE=${browser.executablePath} points at a working browser`;
   if (browser.name === 'firefox') return 'run: npx playwright install firefox';
+  if (browser.name === 'webkit') return 'run: npx playwright install webkit';
   if (browser.name === 'chromium') return 'run: npx playwright install chromium';
   if (browser.name === 'chrome')
     return 'install Google Chrome (https://www.google.com/chrome/), or run: npx playwright install chrome';
@@ -208,7 +211,7 @@ export function launchFailureMessage(browser, error, { suite } = {}) {
     .replace(/^browserType\.launch:\s*/, '');
   return [
     `${suite ? `${suite}: ` : ''}cannot start ${browser.name}: ${first}`,
-    `To fix it, ${installHint(browser)}. To use another browser, set MARGO_BROWSER to edge, chrome, chromium or firefox (or pass --browser=<name>).`,
+    `To fix it, ${installHint(browser)}. To use another browser, set MARGO_BROWSER to edge, chrome, chromium, firefox or webkit (or pass --browser=<name>).`,
   ].join('\n');
 }
 
@@ -225,7 +228,7 @@ export async function launchBrowser({
   env,
   platform,
   argv,
-  launchers = { chromium, firefox },
+  launchers = { chromium, firefox, webkit },
   report = console.error,
   exit = process.exit,
   ...options
@@ -234,7 +237,7 @@ export async function launchBrowser({
     reason = unsupportedReason(browser, needs);
   if (reason) return skipSuite(reason);
   try {
-    if (browser.engine === 'firefox') return withBoundedClose(await launchers.firefox.launch({ ...options }));
+    if (browser.engine !== 'chromium') return withBoundedClose(await launchers[browser.engine].launch({ ...options }));
     const launch = (channel) =>
       launchers.chromium.launch({
         ...options,

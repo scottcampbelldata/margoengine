@@ -201,6 +201,32 @@ const attempt = async (env, launchers = { chromium: missing('chromium'), firefox
   return { text: printed.join('\n'), code };
 };
 
+test('webkit is Playwright WebKit: it has WebGPU, takes no Chromium switches, and is refused Chromium-only steps', async () => {
+  const browser = pick({ MARGO_BROWSER: 'webkit' }, 'darwin');
+  assert.equal(browser.name, 'webkit');
+  assert.equal(browser.engine, 'webkit');
+  assert.equal(browser.channel, undefined);
+  assert.equal(unsupportedReason(browser), null);
+  assert.match(unsupportedReason(browser, 'chromium'), /needs a Chromium browser, not webkit/);
+  assert.deepEqual(launchArgs(browser, ['--x']), []);
+  const launched = [];
+  const opened = await launchBrowser({
+    env: { MARGO_BROWSER: 'webkit' },
+    platform: 'darwin',
+    argv: [],
+    headless: false,
+    launchers: {
+      chromium: missing('chromium'),
+      firefox: missing('firefox'),
+      webkit: { launch: async (options) => (launched.push(options), { close: async () => {} }) },
+    },
+  });
+  assert.equal(typeof opened.close, 'function');
+  assert.deepEqual(launched, [{ headless: false }]);
+  const { text } = await attempt({ MARGO_BROWSER: 'webkit' }, { chromium: missing('chromium'), webkit: missing('webkit') });
+  assert.ok(text.includes('npx playwright install webkit'), text);
+});
+
 test('a browser that cannot launch prints the browser, the install command and MARGO_BROWSER, with no stack trace (bug 28)', async () => {
   for (const [browser, command] of [
     ['firefox', 'npx playwright install firefox'],
