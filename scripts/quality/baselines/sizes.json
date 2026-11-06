@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5002943,
+  "total": 5005090,
   "history": [
     {
       "date": "2026-10-24",
@@ -2162,6 +2162,12 @@
       "commit": "d2a381758",
       "reason": "shader root: statements in node graphs (If, Loop, While, Switch, Var, block), tree-shaken when unused",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "1a601570e",
+      "reason": "New quality entry ./features: lowers features by measured cost; shared frame timer with resolution.ts. Core and core + stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -2515,6 +2521,7 @@
     "@margoengine/procedural/standin": 673,
     "@margoengine/procedural/voronoi": 5026,
     "@margoengine/quality": 3663,
+    "@margoengine/quality/features": 2147,
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 6480,

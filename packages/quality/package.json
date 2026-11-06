@@ -33,6 +33,10 @@
     "./ssaa": {
       "types": "./dist/ssaa.d.ts",
       "import": "./dist/ssaa.js"
+    },
+    "./features": {
+      "types": "./dist/features.d.ts",
+      "import": "./dist/features.js"
     }
   },
   "files": [
@@ -49,7 +53,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js quality",
     "test": "npm run build && node --test test/*.test.js",
-    "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs && node packages/quality/test/ssaa-browser.mjs",
+    "test:gpu": "cd ../.. && node packages/quality/test/browser-check.mjs && node packages/quality/test/ssaa-browser.mjs && node packages/quality/test/features-browser.mjs",
     "prepack": "npm run build"
   }
 }

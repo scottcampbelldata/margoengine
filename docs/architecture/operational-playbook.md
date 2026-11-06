@@ -528,6 +528,13 @@ once. The offset exists only inside each `engine.render` call and the frustum pl
 `packages/quality/test/ssaa-browser.mjs` on a real GPU, single-sampled and at 4x MSAA. Missing: Safari, and stills at
 the texture limit.
 
+`FeatureScaler` (`@margoengine/quality/features`) lowers features rather than pixels. Each step is a trial: the frame
+cost over one window after it, against the window before, is the step's measured saving. A saving under 3% of the frame
+gives the step back and rests it for 120 decisions. Known savings choose later steps, least visible first among those
+that cover the shortfall; a feature returns under 70% of budget if its saving leaves the frame under 90%. Evidence:
+`packages/quality/test/features.test.js` on a modelled scene, and `features-browser.mjs` driving real `SSAO` and
+`Shadows` through every level. Missing: how good the savings are in a real scene under load, for the quiet pass.
+
 ### 3.6 Warm-up and device loss
 
 `warmUp(engine)` renders offscreen delta-zero frames until two complete frames run with all asynchronously compiled

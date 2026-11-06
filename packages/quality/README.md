@@ -69,6 +69,57 @@ frame, so it works on the light and phone tiers. On the full 4x MSAA tier it doe
 also switch off multisampling); pass your own `apply(scale)` to scale some other way. `ResolutionScaler` is the same
 decision logic without timers: `push(frameMs)` returns the new scale when it changes.
 
+## Feature scaling
+
+Resolution is one way down. `@margoengine/quality/features` lowers what the frame actually pays for, in steps it measures.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {SSAO} from 'margoengine/post/ssao';
+import {Shadows} from 'margoengine/shadows';
+import {featureKnobs, optionKnob, watchFeatures} from 'margoengine/quality/features';
+import {TAAUpscale} from 'margoengine/taa/upscale';
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+const shadows = Shadows.attach(engine, {distance: 120});
+const ssao = SSAO.attach(engine);
+const upscale = TAAUpscale.attach(engine, {scale: 1});
+
+using features = watchFeatures(
+  [
+    ...featureKnobs({ssao, shadows, camera: engine.camera}),
+    optionKnob('resolution', upscale.options, 'scale', [1, 0.85, 0.7], 2), // anything that reads an option live
+  ],
+  {budget: 12, onChange: ({name, level}) => console.log(name, level)},
+);
+console.log(features.scaler.levels, features.scaler.costs);
+```
+
+Over `budget` it takes one step, then compares the frame cost before and after. A step that saved under 3% of the frame
+is given back at once and rests for 120 decisions, so nothing is lost for no gain. Once a step is measured it is
+chosen by its measured saving: of the steps that cover the shortfall the least visible goes first (`weight`), and with
+none known to cover it the next untried step is tried, in the knobs' order. Under 70% of the budget the most visible lowered feature
+comes back, if its measured cost still leaves the frame under 90%; a rise that had to be undone doubles the wait, as in
+`ResolutionScaler`. `dispose()` puts every feature back.
+
+| `featureKnobs` key | Steps | Weight |
+| --- | --- | --- |
+| `post` | each effect's `enabled` goes false | 1 |
+| `ssao` | `samples` halve twice, then `enabled` false | 1 |
+| `ssr` | `steps` halve twice, then `enabled` false | 1 |
+| `shadows` | `filter` soft, pcf, hard; a set `distance` to 70% and 50% | 1.5 |
+| `lod` | `bias` 1.5 and 2 times | 2 |
+| `camera` | `far` to 75% and 50%; what lies past it stops drawing, so pair it with fog | 3 |
+
+Each starts from the value the app set, and a feature already off gets no knob. A knob is `{name, levels, apply(level), weight}`,
+so anything can be one. `FeatureScaler` is the same logic without timers: `push(frameMs)` returns the change it made,
+`budget` can be set at any time, and `restart()` drops the running measure after a change it did not make, such as a new
+scene. Options: `budget` 12, `window` 30, `settle` 8 (samples ignored after a change), `minSaving` 0.03.
+
+A first change of shadow filter compiles shader variants, so that frame hitches once; `settle` keeps it out of the
+measure. Options that only apply at construction (shadow `resolution`, `cascades`, `VolumetricFog` on or off) cannot be
+knobs: they are what the tier presets below set.
+
 ## Tier presets
 
 The tier also scales optional features. `applyQualityTier()` publishes the tier's `QualityPreset` as

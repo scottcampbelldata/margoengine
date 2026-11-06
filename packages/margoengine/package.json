@@ -1422,6 +1422,10 @@
       "types": "./dist/quality/ssaa.d.ts",
       "import": "./dist/quality/ssaa.js"
     },
+    "./quality/features": {
+      "types": "./dist/quality/features.d.ts",
+      "import": "./dist/quality/features.js"
+    },
     "./ragdoll": {
       "types": "./dist/ragdoll.d.ts",
       "import": "./dist/ragdoll.js"

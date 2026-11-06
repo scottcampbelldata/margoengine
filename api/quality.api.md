@@ -110,13 +110,7 @@ export interface WatchOptions {
     reload?: () => void;
 }
 
-export interface WatchResolutionOptions extends ResolutionOptions {
-    request?: (callback: (time: number) => void) => unknown;
-    queue?: {
-        submit(buffers: unknown): unknown;
-        onSubmittedWorkDone(): Promise<unknown>;
-    };
-    now?: () => number;
+export interface WatchResolutionOptions extends ResolutionOptions, FrameTimers {
     apply?: (scale: number) => void;
 }
 
@@ -139,6 +133,17 @@ export const sceneSamples: () => 1 | 4;
 export function watchQuality({ request, queue, device, onReading, store, reload }?: WatchOptions): void;
 
 export function watchResolution({ request, queue, now, apply, ...options }?: WatchResolutionOptions): ResolutionWatch;
+
+// Not exported from this entry, but used by the exports above:
+
+interface FrameTimers {
+    request?: ((callback: (time: number) => void) => unknown) | null;
+    queue?: {
+        submit(buffers: unknown): unknown;
+        onSubmittedWorkDone(): Promise<unknown>;
+    } | null;
+    now?: () => number;
+}
 
 declare global {
     var margoLow: number | undefined;

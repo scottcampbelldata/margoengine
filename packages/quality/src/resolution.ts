@@ -99,14 +99,58 @@ export class ResolutionScaler {
   }
 }
 
-/** Hooks of {@link watchResolution}; each defaults to the browser's own, so tests can inject them. */
-export interface WatchResolutionOptions extends ResolutionOptions {
+/** Where a watcher gets frame costs from; each defaults to the browser's own, so tests can inject them. */
+export interface FrameTimers {
   /** Frame scheduler, used only when no queue is available. Default `requestAnimationFrame`. */
-  request?: (callback: (time: number) => void) => unknown;
+  request?: ((callback: (time: number) => void) => unknown) | null;
   /** Queue whose `submit` is wrapped to time GPU work (submit to finished). Default `GPUQueue.prototype` when WebGPU exists. */
-  queue?: { submit(buffers: unknown): unknown; onSubmittedWorkDone(): Promise<unknown> };
+  queue?: { submit(buffers: unknown): unknown; onSubmittedWorkDone(): Promise<unknown> } | null;
   /** Clock in milliseconds. Default `performance.now`. */
   now?: () => number;
+}
+
+/** Calls `record` with each frame's cost until the returned function runs: GPU work from submit to finished, or without
+ * a queue the gap between animation frames. */
+export function timeFrames(
+  {
+    request = globalThis.requestAnimationFrame?.bind(globalThis),
+    queue = typeof GPUQueue === 'undefined' ? undefined : (GPUQueue.prototype as unknown as FrameTimers['queue']),
+    now = () => performance.now(),
+  }: FrameTimers,
+  record: (ms: number) => void,
+): () => void {
+  if (queue?.submit) {
+    const submit = queue.submit;
+    const measured = function (this: NonNullable<FrameTimers['queue']>, buffers: unknown): unknown {
+      const start = now(),
+        result = submit.call(this, buffers);
+      void this.onSubmittedWorkDone().then(() => record(now() - start));
+      return result;
+    };
+    queue.submit = measured;
+    return () => {
+      if (queue.submit === measured) queue.submit = submit;
+    };
+  }
+  let stopped = false;
+  if (request) {
+    let last: number | undefined;
+    const tick = (time: number) => {
+      if (stopped) return;
+      // A long gap is a hidden tab or a startup compile, not steady load.
+      if (last !== undefined && time - last < 250) record(time - last);
+      last = time;
+      request(tick);
+    };
+    request(tick);
+  }
+  return () => {
+    stopped = true;
+  };
+}
+
+/** Hooks of {@link watchResolution}; each defaults to the browser's own, so tests can inject them. */
+export interface WatchResolutionOptions extends ResolutionOptions, FrameTimers {
   /** Receives each new scale. Default sets `globalThis.margoLow` (core's pixel-ratio cap) so the next frame resizes the canvas. */
   apply?: (scale: number) => void;
 }
@@ -141,11 +185,9 @@ const inactive: ResolutionWatch = {
  * @throws RangeError for invalid options (see {@link ResolutionOptions}).
  */
 export function watchResolution({
-  request = globalThis.requestAnimationFrame?.bind(globalThis),
-  queue = typeof GPUQueue === 'undefined'
-    ? undefined
-    : (GPUQueue.prototype as unknown as WatchResolutionOptions['queue']),
-  now = () => performance.now(),
+  request,
+  queue,
+  now,
   apply,
   ...options
 }: WatchResolutionOptions = {}): ResolutionWatch {
@@ -157,36 +199,12 @@ export function watchResolution({
     ((scale: number) => {
       globalThis.margoLow = Math.max(0.25, Math.min(globalThis.devicePixelRatio ?? 1, base!) * scale);
     });
-  let stopped = false,
-    cleanup = () => {};
-  const record = (ms: number) => {
+  let stopped = false;
+  const cleanup = timeFrames({ request, queue, now }, (ms) => {
     if (stopped) return;
     const next = scaler.push(ms);
     if (next !== undefined) setScale(next);
-  };
-  if (queue?.submit) {
-    const submit = queue.submit;
-    const measured = function (this: NonNullable<WatchResolutionOptions['queue']>, buffers: unknown): unknown {
-      const start = now(),
-        result = submit.call(this, buffers);
-      void this.onSubmittedWorkDone().then(() => record(now() - start));
-      return result;
-    };
-    queue.submit = measured;
-    cleanup = () => {
-      if (queue.submit === measured) queue.submit = submit;
-    };
-  } else if (request) {
-    let last: number | undefined;
-    const tick = (time: number) => {
-      if (stopped) return;
-      // A long gap is a hidden tab or a startup compile, not steady load.
-      if (last !== undefined && time - last < 250) record(time - last);
-      last = time;
-      request(tick);
-    };
-    request(tick);
-  }
+  });
   const dispose = () => {
     if (stopped) return;
     stopped = true;
