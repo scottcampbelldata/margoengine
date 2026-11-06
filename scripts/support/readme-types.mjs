@@ -24,6 +24,15 @@ export const README_OPTIONS = {
 };
 
 /**
+ * Stands in for the `webgpu` binding in the examples' project: the binding's own types load
+ * `@webgpu/types`, whose globals clash with the DOM library in every other example of the same program.
+ */
+export const README_BINDING = 'export declare function create(flags: string[]): GPU;';
+
+/** The compiler options of a project holding the binding's stand-in as `readme-binding.d.ts`. */
+export const README_PROJECT = { ...README_OPTIONS, paths: { webgpu: ['./readme-binding.d.ts'] } };
+
+/**
  * The examples of a Markdown text. A `ts`, `tsx` or `js` block that imports starts an example; one that does not carries
  * on the example before it, whose setup it uses. Each ends in `export {}`: a file without one would be a global script,
  * and a name one example declares would pass in another.
@@ -63,9 +72,10 @@ export function writeExamples(scratch, packages) {
         writeFileSync(join(scratch, name, `${document}-${index}.tsx`), code);
         count++;
       });
+  writeFileSync(join(scratch, 'readme-binding.d.ts'), README_BINDING);
   writeFileSync(
     join(scratch, 'tsconfig.json'),
-    JSON.stringify({ compilerOptions: README_OPTIONS, include: ['**/*.tsx'] }),
+    JSON.stringify({ compilerOptions: README_PROJECT, include: ['**/*.tsx'] }),
   );
   return count;
 }

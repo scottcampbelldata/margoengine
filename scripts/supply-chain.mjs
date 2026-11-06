@@ -475,7 +475,8 @@ dependencies, platform-optional binaries). Licences: ${Object.entries(tally)
     .join(', ')}.
 Install scripts anywhere in the lock: ${scripts.length ? scripts.join(', ') : 'none'}. Deprecated: ${
     deprecated.length ? deprecated.join(', ') : 'none'
-  }. CI and releases install with \`npm ci\`, which refuses a lockfile that does not match \`package.json\` and checks
+  }. \`webgpu\` is a development dependency only, for the Node proof of \`@margoengine/headless\`, and is never shipped; its
+install script only clears the macOS quarantine flag on its binary. CI and releases install with \`npm ci\`, which refuses a lockfile that does not match \`package.json\` and checks
 every tarball against its integrity hash.
 `;
 }

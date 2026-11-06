@@ -65,7 +65,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js headless",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu": "cd ../.. && node packages/headless/tests/browser-check.mjs",
+    "test:gpu": "cd ../.. && node packages/headless/tests/browser-check.mjs && node packages/headless/tests/node-check.mjs",
     "prepack": "npm run build"
   },
   "peerDependenciesMeta": {

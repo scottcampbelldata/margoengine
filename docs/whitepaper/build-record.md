@@ -306,7 +306,7 @@ Rendering with no page, and files out of it.
 - **Proved:** real GPU. WebM and MP4 play back through a browser's decoder and are compared with the rendered frame.
   JPEG and lossless WebP decode in the browser's own decoders, lossless bit for bit. An EXR of the linear scene capture
   reads back through `parseEXR`. `createHeadlessStage` gives the picture of `createStage` on a page.
-- **Limits:** Node itself was not run: no WebGPU binding is in the repository, so the headless stage is proved through a
+- **Limits (as built; Lane G A2 later ran it in Node):** Node itself was not run: no WebGPU binding was in the repository, so the headless stage is proved through a
   browser's WebGPU on a stand-in canvas. The real ffmpeg read our WebM and ran the VP9 arguments, while raw-video input
   and the H.264 arguments ran only against a stand-in program. The encoders are plain, so files are larger than an
   optimized encoder's, and sizes were not compared.
@@ -1151,10 +1151,11 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | Cache | Result cache: a package build keys on the dist of what it depends on | DONE | `053eebfd0` | - |
 | B16 | React pointer handlers, Picking and HoverHighlight on the WebGL2 preview | DONE | `053eebfd0` | LIM-142 |
 | B18 | Shadow resolution, cascades and fog on or off scale by measured cost | DONE | `75a9990ef` | - |
-| B19 | Long-tail formats: 3DS cameras, lights, keyframes; every LWO map, image map and bone; placed KMZ; loadTextures; parsePCX | DONE | this commit | LIM-195 |
-| IFC | IFC package taken out of this repository, it stays private; 99 public packages | DONE | this commit | - |
-| ROBOT | Robot planning taken out of this repository, it stays private; /swept and /sdf kept | DONE | this commit | - |
-| HULL | GJK reads a flat parallelogram of the Minkowski difference as a gap, not a false contact | DONE | this commit | LIM-251 |
+| B19 | Long-tail formats: 3DS cameras, lights, keyframes; every LWO map, image map and bone; placed KMZ; loadTextures; parsePCX | DONE | `8dd321423` | LIM-195 |
+| IFC | IFC package taken out of this repository, it stays private; 99 public packages | DONE | `866c124de` | - |
+| ROBOT | Robot planning taken out of this repository, it stays private; /swept and /sdf kept | DONE | `d7ec4be35` | - |
+| HULL | GJK reads a flat parallelogram of the Minkowski difference as a gap, not a false contact | DONE | `943fe4751` | LIM-251 |
+| A2, C2 | README examples and the stage run in Node on the webgpu binding (dev dependency), same picture as the page | DONE | this commit | LIM-091 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

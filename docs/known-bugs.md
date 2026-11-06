@@ -158,6 +158,12 @@ does not own. Each entry says exactly what is needed to close it.
 
 ## Open defects
 
+### A textured glTF does not load in Node
+
+- **What:** in Node on the `webgpu` binding, `loadGLTF` of `@margoengine/gltf-pro` rejects with `glTF image 0 could not be decoded (createImageBitmap is not defined)`, so a server thumbnail of a textured model cannot be made. Untextured scenes, sky and shadows draw.
+- **Repro:** `createHeadlessStage({ gpu: create([]), width: 640, height: 360 })`, then `loadGLTF(stage.engine, url)` on `examples/assets/flight-helmet.glb` served over HTTP.
+- **Cause:** image decoding uses the browser's `createImageBitmap`, Node has none, and upload uses `copyExternalImageToTexture`, which needs a browser image. A fix needs a decoder hook in the loaders and an upload through `writeTexture`.
+
 ### 328 errors in the package README examples
 
 - **What:** `npm run check:readmes` (a step of `verify`) type-checks all 719 examples of the 100 packages. When the check was built it found 715 errors in 181 examples; 388 were fixed in the same commit, and with two more from a selection example that landed the same day 329 remained, and 328 now, in 41 packages (voxel 56, materials 40, scatter 29, shader 23, bvh 20, cameras 17, ragdoll 16, the rest 10 or fewer). `scripts/support/readme-types-known.json` lists each by package and message. A new error fails `verify`, and so does an entry that has been fixed and not removed, so the list only shrinks.

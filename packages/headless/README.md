@@ -7,15 +7,15 @@ Margo has no video encoder of its own. Video uses WebCodecs in a browser or work
 
 This package ships no WebGPU binding, because one is a large download that runs code when installed. Your app chooses
 one and passes its `gpu` in. It can be any object with `requestAdapter`: `create([])` from a Node binding such as
-[`webgpu`](https://www.npmjs.com/package/webgpu), or `navigator.gpu` in a browser or worker.
+[`webgpu`](https://www.npmjs.com/package/webgpu) (`npm install webgpu`; every example here runs on version 0.6.2 in Node, on the GPU the machine has), or `navigator.gpu` in a browser or worker.
 
 ```ts
 import { writeFile } from 'node:fs/promises';
 import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
 import { createHeadlessCanvas, installGPU, toPNG } from '@margoengine/headless';
+import { create } from 'webgpu';
 
-declare const gpu: GPU; // from your binding
-
+const gpu = create([]);
 using installed = installGPU({ gpu });
 const canvas = createHeadlessCanvas({ width: 512, height: 512 });
 const engine = await Engine.create(canvas, { backend: 'webgpu' });
@@ -46,9 +46,9 @@ peer:
 import { writeFile } from 'node:fs/promises';
 import { createHeadlessStage } from '@margoengine/headless/stage';
 import { addSky } from '@margoengine/stage/sky';
+import { create } from 'webgpu';
 
-declare const gpu: GPU; // from your binding
-
+const gpu = create([]);
 using stage = await createHeadlessStage({ gpu, width: 640, height: 360 });
 stage.box({ color: '#84d6bd' });
 await addSky(stage);
@@ -77,9 +77,9 @@ import { writeFile } from 'node:fs/promises';
 import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
 import { createHeadlessCanvas, installGPU } from '@margoengine/headless';
 import { imageSequence, renderFrames } from '@margoengine/headless/video';
+import { create } from 'webgpu';
 
-declare const gpu: GPU; // from your binding
-
+const gpu = create([]);
 using installed = installGPU({ gpu });
 const engine = await Engine.create(createHeadlessCanvas({ width: 640, height: 360 }), { backend: 'webgpu' });
 const mesh = engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({ color: '#84d6bd' }));

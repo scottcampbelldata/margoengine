@@ -4,7 +4,10 @@
 // bytes at the visual check's limits. Proves the padding, swizzle, row order and encoder on a real device. Then encodes a
 // turning cube to WebM and MP4 and plays both back. MARGO_KEEP_VIDEO=<path> keeps the files, to open them in other tools.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { openBrowser } from '../../../scripts/browser.js';
 import { compare } from '../../../scripts/support/visual-image.js';
 import { decodePNG } from '../../../tests/support/png.js';
@@ -50,6 +53,14 @@ try {
   assert.equal(stageRun.ticks, 1);
   assert.deepEqual(stageRun.size, [64, 48]);
   console.log(`ok stage: changed ${stageMetrics.changed}, hot ${stageMetrics.hot}, mean ${stageMetrics.mean}`);
+  // The same scene in Node on the `webgpu` binding, with no browser: the picture a server makes is the page's.
+  const nodeFile = join(tmpdir(), `margo-node-scene-${process.pid}.png`);
+  execFileSync(process.execPath, ['packages/headless/tests/node-scene.mts', nodeFile], { stdio: 'inherit', timeout: 120_000 });
+  const nodeMetrics = compare(stageSeen, await decodePNG(new Uint8Array(await readFile(nodeFile))));
+  await rm(nodeFile);
+  assert.ok(nodeMetrics.changed <= LIMITS.changed, `node changed ${nodeMetrics.changed}`);
+  assert.ok(nodeMetrics.hot <= LIMITS.hot, `node hot ${nodeMetrics.hot}`);
+  console.log(`ok stage in Node: changed ${nodeMetrics.changed}, hot ${nodeMetrics.hot}, mean ${nodeMetrics.mean}`);
   // Video: the browser's encoder, Margo's container, the browser's demuxer and decoder. MOST_DIFFERENCE is the mean
   // channel error a 4 Mbit/s encode of a 256 x 192 cube may show; the wrong frame must show more than any right one.
   const MOST_DIFFERENCE = 2;

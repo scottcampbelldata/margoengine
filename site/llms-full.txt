@@ -2850,7 +2850,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Stage saved scenes (`@margoengine/stage/scene`, 2026-11-05) | One `loadGLTF` per URL, all before the first mesh is made; the other entities on a URL are `cloneModel` copies, so they share the parsed file, images and GPU buffers and keep nodes, uniforms and deformed output of their own. Built-in components are `mesh`, `material`, `light` and `camera`; everything else needs `onEntity`. A level's lights and cameras are placed once, at load. A scene's point and spot lights replace a list set by hand with `setLights`. WebGPU for models and for point, spot and second directional lights; shapes, the sun and cameras also on WebGL2. | `loadWorld` is synchronous and all or nothing, so every model must be on hand first. Core has one sun, so the rest go through `@margoengine/clustered`, which needs WebGPU. Core's camera is a perspective look-at camera, so a roll in the entity's rotation is dropped. | A file repeated across entities costs one load, and per copy its nodes and uniforms. Edits to a loaded model's materials are not shared with its copies. | `Clustered`'s `setLights` moves lights after load. Use `onEntity` for another kind of camera. |
 | Stage physics (`@margoengine/stage/physics`, 2026-11-05) | One world per stage. The first call downloads Rapier (see its row in the sizes page) and waits for its Wasm. A dynamic concave mesh gets a convex hull, so its hollows are filled. The shape is picked once from the geometry and the scale at `addBody`. | A stage call has to work with no setup; decomposing a mesh costs far more than a hull, so it is opt-in. | A ball rests on the hull, not in the hollow; a mesh rescaled later keeps its collider. | Pass `colliders` to name the shape, such as `{shape: 'convexDecomposition'}`; add the body again after rescaling. |
 | Stage model viewer (`@margoengine/stage/viewer`, 2026-11-05) | WebGPU only, as gltf-pro. One model per viewer; the model must have geometry. A 'cascaded' floor is a plain box 40 model sizes wide, so its far edge shows as a horizon line against the backdrop; 'contact' has no such line. Lamp, shadow and floor values were picked by eye on one model (flight helmet), not measured against a reference. | One call has to fit any model, so sizes come from `model.bounds` at load. An animated model does not resize them, and the contact shadow is cached (`static`) unless `shadow: {static: false}`. | A model that grows or moves keeps its first shadow and framing; a horizon line with 'cascaded'. | Pass `environment`, `background`, `shadow` and `tonemap` to override, `false` to remove a part. Real-GPU check: `npm run test:gpu --workspace packages/stage`. |
-| Headless stage (`@margoengine/headless/stage`, 2026-11-05) | No camera controls and no frame loop: `step(delta)` advances time and runs `onTick` and `engine.onFrame` callbacks. Stages alive at once share one `gpu`. | `installGPU` changes globals, so a second implementation at once would replace the first's. The frame loop belongs to core, so the stage keeps its own list of `onFrame` callbacks. | A callback registered before the stage exists, on an engine made by hand, does not run. | Use `stage.onTick` and `stage.step`. Dispose stages on one `gpu` before using another. |
+| Headless stage (`@margoengine/headless/stage`, 2026-11-05) | No camera controls and no frame loop: `step(delta)` advances time and runs `onTick` and `engine.onFrame` callbacks. Stages alive at once share one `gpu`. In Node, proved on the `webgpu` binding 0.6.2 on Windows (D3D12 and WARP); a textured glTF does not load there (docs/known-bugs.md). | `installGPU` changes globals, so a second implementation at once would replace the first's. The frame loop belongs to core, so the stage keeps its own list of `onFrame` callbacks. | A callback registered before the stage exists, on an engine made by hand, does not run. | Use `stage.onTick` and `stage.step`. Dispose stages on one `gpu` before using another. |
 | Image comparison (`@margoengine/headless/compare`, 2026-11-05) | CPU only. Images must be one size. `decodePNG` rejects interlaced files, ignores colour profiles and gamma, and cuts 16-bit samples to 8. SSIM runs on luma, so a change of hue at equal brightness is seen only by the pixel count. | Tests compare a few images, so the plain code is enough, and it runs anywhere. Both measures run in `compareImages` because each misses what the other sees. | A 4K image takes CPU time on every comparison: both passes run in JavaScript, and this has not been timed. | Compare at the size you render your tests, and tune `threshold`, `maxRatio` and `minSSIM` to your scene. |
 | Output formats (`@margoengine/headless/formats`, 2026-11-05) | JPEG is baseline with fixed standard tables, so files are larger than an optimized encoder's. Lossless WebP is a plain encoder (subtract green and three predictors, no colour cache), so files are larger than libwebp's. Lossy WebP needs a browser or worker. EXR is uncompressed. The engine's output is tone-mapped sRGB, so true HDR needs `PostStack`'s `sceneTexture`. | Previews and captures are small and written once, and plain code runs in Node with no codec to install. Every file is decoded by the browser's own decoders in the GPU check. | Bigger files than the best encoders; sizes have not been compared. | Use lossy WebP in a browser for the smallest previews, or run the file through a dedicated optimizer. |
 | Pipeline compile tracking (`@margoengine/stats/compile`, 2026-11-06) | Sees compiles made after attach, so not the engine's startup pipelines. Times are CPU time around each call: browsers compile in another process, so a blocking call can return quickly and the stall lands later. A hitch means a compile ran in a slow frame or the frame before it, which is evidence, not proof of the cause. Unlabelled compiles show an empty label; the `stacks` option finds them. Keeps the newest 256 records and hitches by default. |
@@ -3102,6 +3102,12 @@ does not own. Each entry says exactly what is needed to close it.
   run, and the results recorded here.
 
 ## Open defects
+
+### A textured glTF does not load in Node
+
+- **What:** in Node on the `webgpu` binding, `loadGLTF` of `@margoengine/gltf-pro` rejects with `glTF image 0 could not be decoded (createImageBitmap is not defined)`, so a server thumbnail of a textured model cannot be made. Untextured scenes, sky and shadows draw.
+- **Repro:** `createHeadlessStage({ gpu: create([]), width: 640, height: 360 })`, then `loadGLTF(stage.engine, url)` on `examples/assets/flight-helmet.glb` served over HTTP.
+- **Cause:** image decoding uses the browser's `createImageBitmap`, Node has none, and upload uses `copyExternalImageToTexture`, which needs a browser image. A fix needs a decoder hook in the loaders and an upload through `writeTexture`.
 
 ### 328 errors in the package README examples
 
@@ -6605,15 +6611,15 @@ Margo has no video encoder of its own. Video uses WebCodecs in a browser or work
 
 This package ships no WebGPU binding, because one is a large download that runs code when installed. Your app chooses
 one and passes its `gpu` in. It can be any object with `requestAdapter`: `create([])` from a Node binding such as
-[`webgpu`](https://www.npmjs.com/package/webgpu), or `navigator.gpu` in a browser or worker.
+[`webgpu`](https://www.npmjs.com/package/webgpu) (`npm install webgpu`; every example here runs on version 0.6.2 in Node, on the GPU the machine has), or `navigator.gpu` in a browser or worker.
 
 ```ts
 import { writeFile } from 'node:fs/promises';
 import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
 import { createHeadlessCanvas, installGPU, toPNG } from '@margoengine/headless';
+import { create } from 'webgpu';
 
-declare const gpu: GPU; // from your binding
-
+const gpu = create([]);
 using installed = installGPU({ gpu });
 const canvas = createHeadlessCanvas({ width: 512, height: 512 });
 const engine = await Engine.create(canvas, { backend: 'webgpu' });
@@ -6644,9 +6650,9 @@ peer:
 import { writeFile } from 'node:fs/promises';
 import { createHeadlessStage } from '@margoengine/headless/stage';
 import { addSky } from '@margoengine/stage/sky';
+import { create } from 'webgpu';
 
-declare const gpu: GPU; // from your binding
-
+const gpu = create([]);
 using stage = await createHeadlessStage({ gpu, width: 640, height: 360 });
 stage.box({ color: '#84d6bd' });
 await addSky(stage);
@@ -6675,8 +6681,7 @@ import { writeFile } from 'node:fs/promises';
 import { Camera, Engine, box, PbrMaterial } from '@margoengine/core';
 import { createHeadlessCanvas, installGPU } from '@margoengine/headless';
 import { imageSequence, renderFrames } from '@margoengine/headless/video';
-
-declare const gpu: GPU; // from your binding
+import { create } from 'webgpu';
 ```
 
 [README continues: https://margoengine.com/llms/packages/headless.md]

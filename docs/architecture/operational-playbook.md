@@ -370,7 +370,7 @@ frame within 2 of 255. Missing: fog, volumetrics, points, water spray and soft `
 `@margoengine/headless` is outside this ladder: it takes a WebGPU implementation through `installGPU` and a stand-in canvas, so a stage
 runs with no page. Stages alive at once share one `gpu`, because `installGPU` changes globals, and `engine.start()` needs
 `requestAnimationFrame`, so time moves with `step(delta)`. Evidence: `packages/headless/tests/browser-check.mjs`, on a browser's
-WebGPU through the stand-in canvas. Missing: Node itself; no WebGPU binding is in the repository.
+WebGPU through the stand-in canvas, and `packages/headless/tests/node-check.mjs`, which runs the README examples in Node on the `webgpu` binding (Dawn), a dev dependency. The stage scene drawn in Node matches the page at changed 0 on the RTX A6000 (D3D12), and the examples run on WARP. Missing: a textured glTF in Node (docs/known-bugs.md); Linux and macOS runs of the binding.
 
 App-side detection must test both presence of `navigator.gpu` and a non-null adapter. The compatibility layer does not
 silently install itself and changes no globals at import time.
@@ -935,7 +935,7 @@ The following remain technical gaps, not permission to weaken a check:
     and `p-morph-compiled`, `p-motion-blur-velocity` and `p-pmrem-refresh` have no ledger row yet.
 22. The WebGL2 CPU tier's interpreter and the path tracer on the layer have no committed timing script.
 23. `@margoengine/shader` compute passes have no check on the WebGL2 layer, and `@margoengine/compute/nn` and `/graph` no speed measurement.
-24. The headless stage has not run in Node: no WebGPU binding is in the repository.
+24. The headless stage runs in Node on Windows only (Dawn on D3D12 and WARP), and a textured glTF does not load there.
 25. Draw counts in LIM rows are printed by GPU checks and asserted only as bounds, and no result file holds them.
 26. `ScenePass` (`@margoengine/shader/pass`) has no check in a multi-view frame, and its `velocity()` follows one camera.
 27. Dual quaternion skinning has no frame-time measurement and no run on a GPU other than the RTX A6000.

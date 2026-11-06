@@ -55,6 +55,10 @@ jobs:
           npm run build --workspace examples/voxel-sandbox
           npm run test --workspace examples/voxel-sandbox
       - run: npm run test:all
+      - name: README examples of the headless package in Node, on the Windows software adapter
+        env:
+          MARGO_NODE_GPU: Microsoft Basic Render Driver
+        run: node packages/headless/tests/node-check.mjs
       - run: npm run modern:test:react
       - run: npm run modern:test:usdz
       - name: Verify Python .margo writer fixtures

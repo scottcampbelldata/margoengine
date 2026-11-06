@@ -26,7 +26,7 @@ import { cpus, tmpdir } from 'node:os';
 import { openBrowser } from './browser.js';
 import { waitForPageReady } from './support/page-ready.js';
 import { pages } from './support/doc-snippets.mjs';
-import { packageMarkdown, readmeExamples, README_OPTIONS } from './support/readme-types.mjs';
+import { packageMarkdown, readmeExamples, README_BINDING, README_PROJECT } from './support/readme-types.mjs';
 import { BUNDLED } from './supply-chain.mjs';
 
 const names = [
@@ -415,10 +415,11 @@ try {
     shards = Array.from({ length: shardCount }, (_, shard) =>
       readmeFiles.filter((_, index) => index % shardCount === shard),
     );
+  await writeFile(join(fixture, 'readme-binding.d.ts'), README_BINDING);
   for (const [shard, include] of shards.entries())
     await writeFile(
       join(fixture, `tsconfig.readme-${shard}.json`),
-      JSON.stringify({ compilerOptions: README_OPTIONS, include }),
+      JSON.stringify({ compilerOptions: README_PROJECT, include }),
     );
   await writeFile(
     join(fixture, 'consumer.tsx'),
