@@ -30,13 +30,14 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | Package | Component | Licence | Shipped files | Modified | Notices in the tarball |
 | --- | --- | --- | --- | --- | --- |
 | @margoengine/decoders | Draco 3D decoder (Google) | Apache-2.0 | dist/draco/draco_decoder.wasm, dist/draco/draco_wasm_wrapper.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
+| @margoengine/decoders | jxl-oxide JPEG XL decoder (Wonwoo Choi) | MIT OR Apache-2.0 | dist/jxl/jxl_oxide_wasm_bg.wasm, dist/jxl/jxl_oxide_wasm.js | no | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt, dist/jxl/LICENSE-MIT |
 | @margoengine/decoders | Basis Universal transcoder (Binomial LLC) | Apache-2.0 | dist/basis/basis_transcoder.wasm, dist/basis/basis_transcoder.js | the .js glue only: scripts/static-embind.js swaps two `new Function` generators for closures; the file states it in its first line | dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
 | @margoengine/post, @margoengine/tonemap | Colour-transform references: AgX (Troy Sobotka, Eary Chow), ACES filmic curve (Krzysztof Narkowicz), Khronos PBR Neutral; the ACES 1.x style fit written for Margo | attribution (formulas and constants; agx.test.js re-derives every AgX matrix and constant, aces.test.js measures the own ACES fit against its sample table) | AgX/ACES shader code: AgX and the Narkowicz curve also compiled into post (ImagePost) and voxel-pathtracer from packages/shared; the own ACES fit only into tonemap | re-derived; ACES fit written for Margo | NOTICE.md |
 | @margoengine/sciviz | Standard colour-map tables: viridis, magma, inferno, plasma (Smith and van der Walt); cividis (Nuñez, Anderton and Renslow 2018) | CC0-1.0 (viridis family); CC-BY-4.0 (cividis) | dist/tables.js (data only, 256 colours per map) | values rounded to 8 bits per channel and written as hex | NOTICE.md |
 
 ### Licence obligations and how they are met
 
-- **Apache-2.0 (Draco, Basis; Rapier as a peer).** Redistribution must carry the licence text, keep the upstream
+- **Apache-2.0 (Draco, Basis, jxl-oxide under its Apache-2.0 option; Rapier as a peer).** Redistribution must carry the licence text, keep the upstream
   notices and mark modified files. `@margoengine/decoders` ships `dist/LICENSE-Apache-2.0.txt` and
   `dist/THIRD-PARTY-NOTICE.md` (projects, sources, what changed); the modified `basis_transcoder.js` states the change
   in its first line. Neither upstream build ships a NOTICE file to carry forward. Rapier is not redistributed by us.
@@ -50,6 +51,10 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/transcoder/build: `basis_transcoder.wasm`
     (`6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`) and `basis_transcoder.js`
     (`8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1`, before the build's static-embind step).
+  - jxl-oxide-wasm 0.12.6 from npm, https://www.npmjs.com/package/jxl-oxide-wasm/v/0.12.6 (checked 2026-11-06):
+    `jxl_oxide_wasm_bg.wasm` (sha256 `3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69`) and
+    `jxl_oxide_wasm.js` (`d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7`). The crates inside it are named in
+    `dist/THIRD-PARTY-NOTICE.md`.
 - **MPL-2.0 (web-ifc, peer of `@margoengine/ifc`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves `web-ifc.wasm` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries
@@ -84,7 +89,7 @@ than registry.npmjs.org with an integrity hash. Peers are installed by the app, 
 | `@margoengine/creative` | none | none | LICENSE, NOTICE |
 | `@margoengine/culling` | none | none | LICENSE, NOTICE |
 | `@margoengine/cutscene` | none | none | LICENSE, NOTICE |
-| `@margoengine/decoders` | none | Draco 3D decoder (Apache-2.0); Basis Universal transcoder (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt |
+| `@margoengine/decoders` | none | Draco 3D decoder (Apache-2.0); jxl-oxide JPEG XL decoder (MIT); Basis Universal transcoder (Apache-2.0) | LICENSE, NOTICE, dist/THIRD-PARTY-NOTICE.md, dist/LICENSE-Apache-2.0.txt, dist/jxl/LICENSE-MIT |
 | `@margoengine/dof` | none | none | LICENSE, NOTICE |
 | `@margoengine/ecs` | none | none | LICENSE, NOTICE |
 | `@margoengine/environment` | none | none | LICENSE, NOTICE |

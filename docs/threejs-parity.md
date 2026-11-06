@@ -4,11 +4,11 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 ## Summary
 
-191 three.js features in 19 areas (recounted from the rows 2026-10-31; 51 of the COVERED rows are marked †):
+192 three.js features in 19 areas (recounted from the rows 2026-10-31; 51 of the COVERED rows are marked †):
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 159 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| COVERED | 160 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
 | PARTIAL | 5 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 15 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 12 | Out of scope by decision. The note says why and what to use instead. |
@@ -194,7 +194,8 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | LUTCubeLoader | COVERED † | tonemap `parseCube`, `Tonemap.setLUT` (`packages/tonemap/src/cube.ts`, `index.ts`) | | 3D RGB cubes with integer axis sizes 2-65, including common 16³/17³/32³/33³/64³/65³ files, domains and red-fastest order. Text cap: 32 Mi JavaScript characters. Legacy objects without `size` mean 33³. No 1D/shaper LUTs. Verification. |
 | LoadingManager, Cache, progress events | COVERED | cache `LoadingManager` (`@margoengine/cache/manager`, `packages/cache/src/manager.ts`); `AssetCache` (`packages/cache/src/index.ts`); per-loader `AbortSignal` and byte caps (`packages/shared/loading.js`) | | One manager for every loader through their `fetch` option (`fetch: manager.fetch`): item and byte progress (`onStart`, `onProgress`, `onLoad`, `onError`), a URL modifier applied to sibling files too (glTF buffers and images, OBJ/MTL textures), `abort()`, and `itemStart`/`itemEnd` for custom work; composes with `AssetCache` in either order (persistent IndexedDB with revalidation, offline fallback, range requests and LRU eviction, beyond three's in-memory `THREE.Cache`). `loadGLTFProgressive` uses the manager only on its main-thread path; worker decoders fetch nothing. |
 | NRRD volumes | MISSING | sciviz, loaders | | Volume rendering takes data arrays; this file format is not read. |
-| VDB volumes, Lottie, PVRTC, JPEG XL, MaterialX | NOT PLANNED | loaders, decoders | | PVRTC has no WebGPU format; the others are niche formats with runtimes of their own. |
+| JPEG XL | COVERED | decoders `JXLDecoder`, `readJXLHeader` (`@margoengine/decoders/jxl`, `packages/decoders/src/jxl.ts`) | | RGBA8, first frame; three.js has no JPEG XL loader. |
+| VDB volumes, Lottie, PVRTC, MaterialX | NOT PLANNED | loaders, decoders | | PVRTC has no WebGPU format; the others are niche formats with runtimes of their own. |
 
 ### 11. Exporters
 

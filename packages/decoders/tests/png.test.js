@@ -228,3 +228,19 @@ test('broken files are refused with MargoError failed, size limits with RangeErr
     Uint8Array.from({ length: 16 }, (_, i) => i + 1),
   );
 });
+
+test('bitDepth 16 keeps 16-bit samples and scales shallower ones to 0-65535', () => {
+  const wide = (options) => decodePNG(new Uint8Array(encode({ width: 2, height: 1, ...options })), { bitDepth: 16 });
+  const rgba = wide({ colour: 6, depth: 16, samples: [[[1, 513, 65535, 256], [40000, 0, 255, 65534]]] });
+  assert.ok(rgba.data instanceof Uint16Array);
+  assert.deepEqual([...rgba.data], [1, 513, 65535, 256, 40000, 0, 255, 65534]);
+  assert.deepEqual([...wide({ colour: 2, depth: 8, samples: [[[0, 1, 255], [128, 2, 3]]] }).data], [0, 257, 65535, 65535, 32896, 514, 771, 65535]);
+  assert.deepEqual([...wide({ colour: 0, depth: 2, samples: [[[1], [3]]] }).data], [21845, 21845, 21845, 65535, 65535, 65535, 65535, 65535]);
+  assert.deepEqual([...wide({ colour: 4, depth: 8, samples: [[[2, 255], [3, 0]]] }).data], [514, 514, 514, 65535, 771, 771, 771, 0]);
+  const palette = wide({ colour: 3, depth: 8, samples: [[[0], [1]]], plte: [1, 2, 3, 4, 5, 6], trns: [128] });
+  assert.deepEqual([...palette.data], [257, 514, 771, 32896, 1028, 1285, 1542, 65535]);
+  assert.throws(
+    () => decodePNG(new Uint8Array(encode({ width: 1, height: 1, colour: 0, depth: 8, samples: [[[0]]] })), { bitDepth: 12 }),
+    /bitDepth must be 8 or 16/,
+  );
+});

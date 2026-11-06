@@ -574,6 +574,10 @@
       "types": "./dist/decoders/meshopt-simd.d.ts",
       "import": "./dist/decoders/meshopt-simd.js"
     },
+    "./decoders/jxl": {
+      "types": "./dist/decoders/jxl.d.ts",
+      "import": "./dist/decoders/jxl.js"
+    },
     "./dof": {
       "types": "./dist/dof.d.ts",
       "import": "./dist/dof.js"

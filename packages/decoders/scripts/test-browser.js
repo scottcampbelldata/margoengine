@@ -26,6 +26,8 @@ for (const pattern of [
   /^draco_wasm_wrapper-.*\.js$/,
   /^basis_transcoder-.*\.wasm$/,
   /^basis_transcoder-.*\.js$/,
+  /^jxl\.worker-.*\.js$/,
+  /^jxl_oxide_wasm_bg-.*\.wasm$/,
 ])
   assert.ok(
     emitted.some((file) => pattern.test(file)),
@@ -64,7 +66,7 @@ try {
   await page.goto(productionServer.resolvedUrls.local[0]);
   await page.waitForFunction(() => typeof window.runConsumer === 'function');
   report.consumer = await page.evaluate(() => window.runConsumer());
-  assert.deepEqual(report.consumer, { vertices: 24, indices: 36, width: 2048, format: 'rgba8unorm' });
+  assert.deepEqual(report.consumer, { vertices: 24, indices: 36, width: 2048, format: 'rgba8unorm', jxlWidth: 200 });
   report.consumer.emitted = emitted;
   report.checks.push('Production Vite consumer emits the worker and decoders as assets and decodes from them');
   report.browser = browser.version();

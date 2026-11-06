@@ -121,7 +121,7 @@ interface TextureFile {
     mipmaps: TextureFileLevel[];
     format: GPUTextureFormat;
     feature?: GPUFeatureName;
-    target: 'dds' | 'ktx' | 'ktx2';
+    target: 'dds' | 'ktx' | 'ktx2' | 'jxl';
     transcoded?: string;
     srgb: boolean;
     hasAlpha: boolean;

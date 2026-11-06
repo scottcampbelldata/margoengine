@@ -51,6 +51,28 @@ const positions = meshoptDecodeGltfBufferSIMD(bytes, 1000, 12, 'ATTRIBUTES');
 that interface can take either. After changing the Rust source run `node scripts/meshopt-simd-build.mjs`; a test fails while the
 embedded module and the source differ. To time both decoders on a file: `node scripts/meshopt-simd-bench.mjs <file.glb>`.
 
+## JPEG XL (`@margoengine/decoders/jxl`)
+
+`JXLDecoder` decodes `.jxl` files to RGBA8: straight alpha, sRGB, top row first. A browser that reads JPEG XL does the work; anywhere
+else a module worker loads a Wasm build of jxl-oxide on the first decode, so importing the entry downloads no Wasm until a file
+needs it. `jxlTextureFile` turns the result into a `TextureFile`.
+
+```ts
+import {JXLDecoder, jxlTextureFile, uploadTexture} from 'margoengine/decoders/jxl';
+
+declare const device: GPUDevice;
+declare const file: ArrayBuffer;
+
+using decoder = new JXLDecoder();
+const image = await decoder.decode(file);
+const texture = uploadTexture(device, jxlTextureFile(image));
+```
+
+`readJXLHeader(bytes)` reads the size, bit depth, alpha, orientation and colour encoding without decoding. `decode` takes `signal`,
+`maxPixels` (default 2^26) and `transfer`; `new JXLDecoder({browser: false})` always uses the Wasm, and `decoderPath` names another
+folder for `jxl_oxide_wasm_bg.wasm`. `image.decoder` says which ran. Bit depths above 8 come out as 8, an animation gives its first
+frame, a file with an ICC profile and no XYB comes out as stored, and CMYK files are refused (`docs/limits.md`).
+
 ## Texture upload (`@margoengine/decoders/texture`)
 
 `getSupportedTranscodeFormat`, `getBytesPerRow` and `createKTX2Texture` (also on the root) without the transcoder or the
@@ -59,8 +81,8 @@ from here and loads the root only when a file needs decoding.
 
 ## PNG (`@margoengine/decoders/png`)
 
-`decodePNG(bytes, {maxPixels?})` reads any valid PNG (W3C PNG Specification, Third Edition) to
-`{width, height, data}`: RGBA8 rows, top first. Every colour type and bit depth (16-bit keeps the high byte, sub-byte
+`decodePNG(bytes, {maxPixels?, bitDepth?})` reads any valid PNG (W3C PNG Specification, Third Edition) to
+`{width, height, data}`: RGBA8 rows, top first, or `bitDepth: 16` for a `Uint16Array` of 0-65535 that loses nothing. Every colour type and bit depth (16-bit keeps the high byte, sub-byte
 grey scales to 0-255), all five filters, Adam7, palette and `tRNS` alpha. Chunk CRCs, chunk order and the exact
 decompressed size are checked; a broken file throws `MargoError` `failed`, an image over `maxPixels` (default 2^26,
 an 8192 x 8192 image) a RangeError. Ancillary chunks are skipped, so samples come out as stored, without gamma or ICC

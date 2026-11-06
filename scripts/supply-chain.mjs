@@ -50,6 +50,16 @@ export const BUNDLED = [
   },
   {
     package: '@margoengine/decoders',
+    component: 'jxl-oxide JPEG XL decoder (Wonwoo Choi)',
+    licence: 'MIT OR Apache-2.0',
+    files: 'dist/jxl/jxl_oxide_wasm_bg.wasm, dist/jxl/jxl_oxide_wasm.js',
+    source:
+      'packages/decoders/vendor/jxl: jxl-oxide-wasm 0.12.6 from npm, https://www.npmjs.com/package/jxl-oxide-wasm/v/0.12.6 (jxl_oxide_wasm_bg.wasm sha256 3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69, jxl_oxide_wasm.js sha256 d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7), byte-identical',
+    modified: 'no',
+    notices: ['dist/THIRD-PARTY-NOTICE.md', 'dist/LICENSE-Apache-2.0.txt', 'dist/jxl/LICENSE-MIT'],
+  },
+  {
+    package: '@margoengine/decoders',
     component: 'Basis Universal transcoder (Binomial LLC)',
     licence: 'Apache-2.0',
     files: 'dist/basis/basis_transcoder.wasm, dist/basis/basis_transcoder.js',
@@ -336,7 +346,7 @@ ${table(
 
 ### Licence obligations and how they are met
 
-- **Apache-2.0 (Draco, Basis; Rapier as a peer).** Redistribution must carry the licence text, keep the upstream
+- **Apache-2.0 (Draco, Basis, jxl-oxide under its Apache-2.0 option; Rapier as a peer).** Redistribution must carry the licence text, keep the upstream
   notices and mark modified files. \`@margoengine/decoders\` ships \`dist/LICENSE-Apache-2.0.txt\` and
   \`dist/THIRD-PARTY-NOTICE.md\` (projects, sources, what changed); the modified \`basis_transcoder.js\` states the change
   in its first line. Neither upstream build ships a NOTICE file to carry forward. Rapier is not redistributed by us.
@@ -350,6 +360,10 @@ ${table(
     https://github.com/BinomialLLC/basis_universal/tree/v1_50_0_2/webgl/transcoder/build: \`basis_transcoder.wasm\`
     (\`6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a\`) and \`basis_transcoder.js\`
     (\`8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1\`, before the build's static-embind step).
+  - jxl-oxide-wasm 0.12.6 from npm, https://www.npmjs.com/package/jxl-oxide-wasm/v/0.12.6 (checked 2026-11-06):
+    \`jxl_oxide_wasm_bg.wasm\` (sha256 \`3336f3abd4a04fccc437e7a84f12d4b63c12f302044110867f99be14c4c75a69\`) and
+    \`jxl_oxide_wasm.js\` (\`d9a314abc55d167e94e2d995ce6ab5276f86ef9de41f06df11fef3acf55ff6b7\`). The crates inside it are named in
+    \`dist/THIRD-PARTY-NOTICE.md\`.
 - **MPL-2.0 (web-ifc, peer of \`@margoengine/ifc\`).** Not redistributed in any tarball: the app installs it. A site or
   app that serves \`web-ifc.wasm\` must say where its source is (https://github.com/ThatOpen/engine_web-ifc).
 - **Optional local tool, never shipped (sharp and libvips).** sharp (Apache-2.0) and its prebuilt libvips binaries

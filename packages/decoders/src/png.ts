@@ -15,10 +15,19 @@ export interface DecodedPNG {
   data: Uint8Array;
 }
 
+/** A decoded image at 16 bits: RGBA rows, top row first, `width * height * 4` samples of 0-65535. */
+export interface DecodedPNG16 {
+  width: number;
+  height: number;
+  data: Uint16Array;
+}
+
 /** Limits for {@link decodePNG}. */
 export interface PNGDecodeOptions {
   /** Largest `width * height` accepted. Default 2^26 (an 8192 x 8192 image), 256 MiB of RGBA8. */
   maxPixels?: number;
+  /** 16 returns every sample at 16 bits, so a 16-bit file loses nothing. Default 8. */
+  bitDepth?: 8 | 16;
 }
 
 // Adam7 passes: x start, y start, x step, y step.
@@ -63,17 +72,26 @@ function unfilter(rows: Uint8Array, offset: number, height: number, stride: numb
 
 /**
  * Decodes PNG bytes to RGBA8 pixels. Grey and palette images expand to RGBA; 16-bit samples keep their high byte;
- * sub-byte grey scales to 0-255; a `tRNS` colour key or palette alpha becomes the alpha channel.
+ * sub-byte grey scales to 0-255; a `tRNS` colour key or palette alpha becomes the alpha channel. With `bitDepth: 16` the
+ * samples stay 16 bits and shallower ones scale to 0-65535.
  *
  * @throws TypeError when `bytes` is not a Uint8Array.
  * @throws RangeError when the image is larger than `maxPixels`.
  * @throws MargoError `failed` when the bytes are not a complete, valid PNG.
  */
-export function decodePNG(bytes: Uint8Array, options: PNGDecodeOptions = {}): DecodedPNG {
+export function decodePNG(bytes: Uint8Array, options: PNGDecodeOptions & { bitDepth: 16 }): DecodedPNG16;
+export function decodePNG(bytes: Uint8Array, options?: PNGDecodeOptions): DecodedPNG;
+export function decodePNG(
+  bytes: Uint8Array,
+  options: PNGDecodeOptions = {},
+): { width: number; height: number; data: Uint8Array | Uint16Array } {
   if (!(bytes instanceof Uint8Array)) throw new TypeError('decodePNG needs the PNG file as a Uint8Array');
   const maxPixels = options.maxPixels ?? 2 ** 26;
   if (!(Number.isSafeInteger(maxPixels) && maxPixels > 0))
     throw new RangeError('PNG maxPixels must be a positive integer');
+  const wide = options.bitDepth === 16;
+  if (!wide && options.bitDepth !== undefined && options.bitDepth !== 8)
+    throw new RangeError('PNG bitDepth must be 8 or 16');
   if (bytes.length < 8 || PNG_SIGNATURE.some((v, i) => bytes[i] !== v)) throw corrupt('signature is missing');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     idat: Uint8Array[] = [];
@@ -161,7 +179,9 @@ export function decodePNG(bytes: Uint8Array, options: PNGDecodeOptions = {}): De
   }
   // Every IDAT chunk passed its CRC-32 above, which covers these compressed bytes; the Adler-32 would only repeat it.
   const rows = inflateZlib(zlib, size, false),
-    out = new Uint8Array(width * height * 4),
+    out = wide ? new Uint16Array(width * height * 4) : new Uint8Array(width * height * 4),
+    opaque = wide ? 65535 : 255,
+    byte = wide ? 257 : 1,
     max = (1 << Math.min(depth, 8)) - 1,
     key = alpha && colour !== 3 ? alpha : undefined,
     sample = (row: number, index: number): number => {
@@ -171,7 +191,8 @@ export function decodePNG(bytes: Uint8Array, options: PNGDecodeOptions = {}): De
       const bit = index * depth;
       return (rows[row + (bit >> 3)] >> (8 - depth - (bit & 7))) & max;
     },
-    eight = (value: number): number => (depth === 16 ? value >> 8 : depth === 8 ? value : (value * 255) / max);
+    eight = (value: number): number =>
+      depth === 16 ? (wide ? value : value >> 8) : depth === 8 ? value * byte : (value * opaque) / max;
   let offset = 0;
   for (const p of passes) {
     if (!p.w) continue;
@@ -184,14 +205,14 @@ export function decodePNG(bytes: Uint8Array, options: PNGDecodeOptions = {}): De
         if (colour === 3) {
           const index = sample(row, s);
           if (index * 3 >= palette!.length) throw corrupt('pixel uses a colour outside its palette');
-          out[o] = palette![index * 3];
-          out[o + 1] = palette![index * 3 + 1];
-          out[o + 2] = palette![index * 3 + 2];
-          out[o + 3] = alpha && index < alpha.length ? alpha[index] : 255;
+          out[o] = palette![index * 3] * byte;
+          out[o + 1] = palette![index * 3 + 1] * byte;
+          out[o + 2] = palette![index * 3 + 2] * byte;
+          out[o + 3] = alpha && index < alpha.length ? alpha[index] * byte : opaque;
         } else if (colour === 0 || colour === 4) {
           const grey = sample(row, s);
           out[o] = out[o + 1] = out[o + 2] = eight(grey);
-          out[o + 3] = colour === 4 ? eight(sample(row, s + 1)) : key && grey === ((key[0] << 8) | key[1]) ? 0 : 255;
+          out[o + 3] = colour === 4 ? eight(sample(row, s + 1)) : key && grey === ((key[0] << 8) | key[1]) ? 0 : opaque;
         } else {
           const r = sample(row, s),
             g = sample(row, s + 1),
@@ -207,7 +228,7 @@ export function decodePNG(bytes: Uint8Array, options: PNGDecodeOptions = {}): De
                   g === ((key[2] << 8) | key[3]) &&
                   b === ((key[4] << 8) | key[5])
                 ? 0
-                : 255;
+                : opaque;
         }
       }
     }

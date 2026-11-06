@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6492433,
+  "total": 7396830,
   "history": [
     {
       "date": "2026-10-24",
@@ -2546,6 +2546,12 @@
       "commit": "343481d21",
       "reason": "skinningFromModel builds storage() buffers and throws coded errors, so the entry now reaches compute.js and math/errors",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "8fad0f658",
+      "reason": "new entry jxl ships a lazily fetched 1.7 MB Wasm, and decodePNG gains bitDepth",
+      "grew": 1
     }
   ],
   "items": {
@@ -2673,6 +2679,7 @@
     "@margoengine/cutscene": 6822,
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/dds": 3029,
+    "@margoengine/decoders/jxl": 902155,
     "@margoengine/decoders/ktx": 2851,
     "@margoengine/decoders/ktx2-gpu": 14314,
     "@margoengine/decoders/ktx2-hdr": 378245,

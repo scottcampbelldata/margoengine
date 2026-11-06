@@ -85,6 +85,10 @@
     "./meshopt-simd": {
       "types": "./dist/meshopt-simd.d.ts",
       "import": "./dist/meshopt-simd.js"
+    },
+    "./jxl": {
+      "types": "./dist/jxl.d.ts",
+      "import": "./dist/jxl.js"
     }
   },
   "files": [

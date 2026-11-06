@@ -1,7 +1,7 @@
 # Reading the three.js parity counts
 
 Date: 2026-10-31. The table in [threejs-parity.md](threejs-parity.md) was rewritten by feature group:
-**191 features, 159 COVERED, 5 PARTIAL, 15 MISSING**, plus 12 NOT PLANNED by decision. The earlier table
+**192 features, 160 COVERED, 5 PARTIAL, 15 MISSING**, plus 12 NOT PLANNED by decision. The earlier table
 counted 161 rows (153 / 4 / 4); its coarse rows hid gaps that now have rows of their own. The rows and the
 [to-do table](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.

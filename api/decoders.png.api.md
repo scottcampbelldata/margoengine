@@ -9,9 +9,19 @@ export interface DecodedPNG {
     data: Uint8Array;
 }
 
-export interface PNGDecodeOptions {
-    maxPixels?: number;
+export interface DecodedPNG16 {
+    width: number;
+    height: number;
+    data: Uint16Array;
 }
 
+export interface PNGDecodeOptions {
+    maxPixels?: number;
+    bitDepth?: 8 | 16;
+}
+
+export function decodePNG(bytes: Uint8Array, options: PNGDecodeOptions & {
+    bitDepth: 16;
+}): DecodedPNG16;
 export function decodePNG(bytes: Uint8Array, options?: PNGDecodeOptions): DecodedPNG;
 ```

@@ -3,6 +3,9 @@ import { KTX2HDRDecoder } from '../dist/ktx2-hdr.js';
 import { KTX2LayerDecoder } from '../dist/ktx2-layers.js';
 import { KTX2GPUDecoder } from '../dist/ktx2-gpu.js';
 import { KTX2Streamer } from '../dist/ktx2-stream.js';
+import { JXLDecoder, jxlTextureFile, uploadTexture } from '../dist/jxl.js';
+import { decodePNG } from '../dist/png.js';
+import jxlRecords from './fixtures/jxl/records.json';
 
 const fixture = async (name) =>
   new Uint8Array(await (await fetch(new URL(`./fixtures/${name}`, import.meta.url))).arrayBuffer());
@@ -382,6 +385,56 @@ window.runDecoderTests = async () => {
   gpuDecoder.dispose();
   wasmRGBA.dispose();
   checks.push('Basis on compute shaders equals the Wasm transcoder byte for byte on real UASTC and ETC1S files');
+  // JPEG XL: the Wasm module in a module worker gives the bytes Node gives, and the result reads back from the GPU.
+  // Vite turns the dynamic URL in `fixture` into a glob of one folder, so files in a subfolder are fetched by path.
+  const jxlFile = async (name) => new Uint8Array(await (await fetch(`/tests/fixtures/jxl/${name}`)).arrayBuffer()),
+    jxl = new JXLDecoder({ browser: false, workerLimit: 1 }),
+    sha = async (data) =>
+      [...new Uint8Array(await crypto.subtle.digest('SHA-256', data))].map((v) => v.toString(16).padStart(2, '0')).join('');
+  for (const [name, record] of Object.entries(jxlRecords)) {
+    const image = await jxl.decode(await jxlFile(`${name}.jxl`));
+    check(image.decoder === 'wasm', `${name} went through ${image.decoder}`);
+    check((await sha(image.data)) === record.sha256, `${name} decodes to other bytes in the worker`);
+  }
+  check(spawned.some(({ url, type }) => url.includes('jxl.worker') && type === 'module'), 'JPEG XL ran in a module worker');
+  const jxlBytes = await jxlFile('bicycles.jxl');
+  let jxlCut;
+  await jxl.decode(jxlBytes.subarray(0, jxlBytes.length - 1)).catch((error) => (jxlCut = error));
+  check(/cut short/.test(jxlCut?.message), `a file cut short gave ${jxlCut}`);
+  const jxlStop = new AbortController(),
+    jxlAborted = jxl.decode(jxlBytes, { signal: jxlStop.signal });
+  jxlStop.abort();
+  let jxlAbort;
+  await jxlAborted.catch((error) => (jxlAbort = error));
+  check(jxlAbort?.name === 'AbortError', `abort gave ${jxlAbort}`);
+  const jxlImage = await jxl.decode(jxlBytes),
+    jxlTexture = uploadTexture(device, jxlTextureFile(jxlImage), {
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
+    }),
+    [jxlTexels] = await readLevels(device, jxlTexture);
+  check(jxlTexels.every((value, at) => value === jxlImage.data[at]), 'JPEG XL texels read back differ');
+  jxlTexture.destroy();
+  jxl.dispose();
+  checks.push('JPEG XL decodes in a module worker to the bytes of the Node run, stops on abort, and reads back from the GPU');
+  // The browser path. A real browser with JPEG XL is reported when there is one; on this Chromium a PNG stands in for it, so the
+  // read back through the canvas is tested and the browser's own decoder is not.
+  const jxlPNG = await jxlFile('blendmodes-reference.png'),
+    { createImageBitmap: realBitmap } = window,
+    plainPNG = decodePNG(jxlPNG).data;
+  window.createImageBitmap = (blob, options) => {
+    check(blob.type === 'image/jxl', `the browser was handed ${blob.type}`);
+    return realBitmap.call(window, new Blob([jxlPNG], { type: 'image/png' }), options);
+  };
+  const jxlNative = new JXLDecoder({ workerLimit: 1 }),
+    standIn = await jxlNative.decode(await jxlFile('blendmodes.jxl'));
+  window.createImageBitmap = realBitmap;
+  check(standIn.decoder === 'browser' && standIn.width === 1024, `stand-in went through ${standIn.decoder}`);
+  for (let at = 3; at < plainPNG.length; at += 4)
+    check(standIn.data[at] === plainPNG[at], `alpha at ${at} changed through the canvas`);
+  report.jxlBrowser = (await jxlNative.decode(jxlBytes)).decoder;
+  check((await jxlNative.decode(jxlBytes)).decoder === report.jxlBrowser, 'the second decode took another path');
+  jxlNative.dispose();
+  checks.push(`JPEG XL with no option: this browser went through ${report.jxlBrowser}; the canvas read back passed on a stand-in`);
   rgba.dispose();
   negotiated.dispose();
   device.destroy();

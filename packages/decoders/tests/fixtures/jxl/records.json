@@ -1,0 +1,47 @@
+{
+  "alpha_premultiplied": {
+    "width": 1024,
+    "height": 1024,
+    "sha256": "5233695b4a755b6daefb8638672333437795e7ddcec8d8d62c43256ef6417dd9"
+  },
+  "alpha_triangles": {
+    "width": 1024,
+    "height": 1024,
+    "sha256": "d5802aee2c3630dbc36313b9d6bfba078704bc75b46600977a8d3c2768b05497"
+  },
+  "animation_spline": {
+    "width": 320,
+    "height": 320,
+    "sha256": "b652cc485a446d25056aa586342c1315a86a8978473d7dbd74822c6cbb8a2787"
+  },
+  "bench_oriented_brg": {
+    "width": 606,
+    "height": 500,
+    "sha256": "c9dd77159982c2a77c2546fd3dc070dbad033c60f6b376b4f2629983a3c6dfe3"
+  },
+  "bicycles": {
+    "width": 1024,
+    "height": 631,
+    "sha256": "a9718838a227f11b6cc23c2fae0ad8a7e75aed6ba87efbfae9aeba18b9abbae6"
+  },
+  "blendmodes": {
+    "width": 1024,
+    "height": 1024,
+    "sha256": "2756ef6a982461c0436e113da97cf0947c0296ab54bcb04cbb4b355925b6c372"
+  },
+  "grayscale": {
+    "width": 200,
+    "height": 200,
+    "sha256": "60d760b0cdd4e3cf545b3c910e26c0ae89d4a32498e2e6637c6b5a510e4d9876"
+  },
+  "patches_lossless": {
+    "width": 1600,
+    "height": 1096,
+    "sha256": "21fbf3b99c57a0163b82053f2e5c1cfdff5079cf9bfcdfb15ba86f8099bbb4cc"
+  },
+  "sunset_logo": {
+    "width": 924,
+    "height": 1386,
+    "sha256": "36f3dcfa5a4b2d0248d96a750451a98616d87c942e259eaba9c3bef8ce0c4428"
+  }
+}
