@@ -16,8 +16,8 @@ export {
 } from './profiles.js';
 export type { NavigationProfile, DragAction, KeyAction } from './profiles.js';
 export { TrackballControls } from './trackball.js';
-export { ArcballControls, arcballPoint } from './arcball.js';
-export type { ArcballControlsOptions, ArcballProjection } from './arcball.js';
+export { ArcballControls, ArcballGizmo, arcballPoint } from './arcball.js';
+export type { ArcballControlsOptions, ArcballGizmoOptions, ArcballPick, ArcballProjection } from './arcball.js';
 export { FlyControls } from './fly.js';
 export { FirstPersonControls } from './first-person.js';
 export { PointerLockControls } from './pointer-lock.js';

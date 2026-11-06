@@ -4,6 +4,7 @@ import { EPS, madd, rotateAxis, type V3 } from './math.js';
 import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
 import { basis, intersectPlane, ray, type Basis } from './view.js';
 export { Controls };
+export { ArcballGizmo, type ArcballGizmoOptions, type ArcballGizmoTarget } from './arcball-gizmo.js';
 
 // ---- tuning (internal) ----
 /** Pixels of wheel or vertical dolly drag that double (or halve) the distance at zoomSpeed 1, as in OrbitControls. */
@@ -41,6 +42,16 @@ export interface ArcballControlsOptions {
    * `cameras` plugin when there is one, else null (a fixed orthographic camera then dollies without changing size).
    */
   projection?: ArcballProjection | null;
+  /** What a double-click focuses on; see {@link ArcballControls.pick}. Default null. */
+  pick?: ArcballPick | null;
+}
+
+/** Finds the world point under CSS pixel `(x, y)` of the element, or null for none. */
+export type ArcballPick = (x: number, y: number) => readonly number[] | null;
+/** Anything the keyboard shortcuts can listen on: `window`, or a focusable element. */
+interface KeySource {
+  addEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
+  removeEventListener: (type: string, listener: (event: KeyboardEvent) => void) => void;
 }
 
 type ArcballState = ArcballControls['state'];
@@ -57,7 +68,8 @@ interface Tracked {
  * Meta + left) pans with the grabbed point kept under the pointer, middle drag and the wheel zoom toward the cursor.
  * One finger rotates, two fingers pinch to zoom and move to pan. Perspective and orthographic cameras
  * (@margoengine/cameras); a fixed-size orthographic camera zooms by `projection.zoom`. With `enableDamping`, motion
- * eases out after release (a fling keeps spinning and decays). Events: `start`, `change`, `end`.
+ * eases out after release (a fling keeps spinning and decays). A double-click focuses the point under the pointer,
+ * `listenToKeyEvents` turns on the keyboard, and `ArcballGizmo` draws the ball. Events: `start`, `change`, `end`.
  */
 export class ArcballControls extends Controls {
   /** Drag rotation. Default true. */
@@ -86,6 +98,29 @@ export class ArcballControls extends Controls {
   minZoom = 0;
   /** Largest `projection.zoom` under a fixed-size orthographic camera. Default Infinity. */
   maxZoom = Infinity;
+  /** Double-click moves the view centre to the point under the pointer. Default true. */
+  enableFocus = true;
+  /**
+   * Finds what a double-click focuses on, for example with an @margoengine/bvh `Raycaster` and {@link rayAt}. Default
+   * null, or when it returns null: the point on the plane through the target, facing the camera.
+   */
+  pick: ArcballPick | null = null;
+  /** Radians an arrow key or Q and E turn the view. Default 5 degrees. */
+  keyRotateStep = Math.PI / 36;
+  /** CSS pixels Shift + an arrow key pans. Default 40. */
+  keyPanStep = 40;
+  /** Key codes of {@link listenToKeyEvents}. Shift + an arrow pans instead of turning. */
+  keys = {
+    left: 'ArrowLeft',
+    right: 'ArrowRight',
+    up: 'ArrowUp',
+    down: 'ArrowDown',
+    rollLeft: 'KeyQ',
+    rollRight: 'KeyE',
+    zoomIn: 'Equal',
+    zoomOut: 'Minus',
+    reset: 'Home',
+  };
   /** Action of each mouse button (a `MOUSE` value or null). Shift, Ctrl or Meta swaps rotate and pan. */
   mouseButtons: { LEFT: number | null; MIDDLE: number | null; RIGHT: number | null } = {
     LEFT: ROTATE,
@@ -107,6 +142,7 @@ export class ArcballControls extends Controls {
   private last = { x: 0, y: 0, spread: 0 };
   private savedTouchAction: string | null = null;
   private saved!: { position: V3; target: V3; up: V3; fov: number; zoom: number | null };
+  private keySource: KeySource | null = null;
 
   constructor(source: Camera | EngineKernel, element?: ControlElement | null, options: ArcballControlsOptions = {}) {
     super(source, element);
@@ -114,6 +150,7 @@ export class ArcballControls extends Controls {
     if (projection != null && typeof projection.zoom !== 'number')
       throw new TypeError('ArcballControls projection has no numeric zoom; pass a CameraProjection or null');
     this.projectionOption = projection;
+    this.pick = options.pick ?? null;
     this.saveState();
     this.init();
   }
@@ -133,6 +170,7 @@ export class ArcballControls extends Controls {
       [element, 'pointerup', this.onUp as InputEventListener],
       [element, 'pointercancel', this.onUp as InputEventListener],
       [element, 'wheel', this.onWheel as InputEventListener, { passive: false }],
+      [element, 'dblclick', this.onDouble as InputEventListener],
       [element, 'contextmenu', this.onMenu],
     ];
   }
@@ -142,6 +180,40 @@ export class ArcballControls extends Controls {
     const element = this.element;
     if (element?.style && this.savedTouchAction !== null) element.style.touchAction = this.savedTouchAction;
     this.savedTouchAction = null;
+  }
+
+  override dispose(): void {
+    this.stopListenToKeyEvents();
+    super.dispose();
+  }
+  /**
+   * Turns on the keyboard (see `keys`): arrows turn the view, Shift + arrows pan, Q and E roll, + and - zoom and Home
+   * resets. Pass `window` or a focusable element; keys typed into text fields are ignored. Returns the controls.
+   */
+  listenToKeyEvents(target: KeySource): this {
+    this.stopListenToKeyEvents();
+    target.addEventListener('keydown', this.onKey);
+    this.keySource = target;
+    return this;
+  }
+  /** Turns the keyboard off. */
+  stopListenToKeyEvents(): void {
+    this.keySource?.removeEventListener('keydown', this.onKey);
+    this.keySource = null;
+  }
+  /** Moves camera and target together so `point` becomes the view centre; the view keeps its turn and distance. */
+  focus(point: readonly number[]): void {
+    const target = this.camera.target;
+    for (let i = 0; i < 3; i++) this.shift[i] = point[i] - target[i];
+    this.dispatchEvent({ type: 'start' });
+    this.applyNow();
+    this.dispatchEvent({ type: 'end' });
+  }
+  /** The world ray through CSS pixel `(x, y)` of the element, for a {@link pick} built on a raycaster. */
+  rayAt(x: number, y: number): { origin: V3; direction: V3 } {
+    const [width, height] = this.size(),
+      r = ray(this.frame(), x, y, width, height);
+    return { origin: r.origin, direction: r.direction };
   }
 
   /** The projection zoomed under a fixed-size orthographic camera, or null. */
@@ -494,6 +566,56 @@ export class ArcballControls extends Controls {
     this.logScale += (pixels * Math.LN2 * this.zoomSpeed) / PIXELS_PER_DOUBLING;
     this.applyNow();
     this.dispatchEvent({ type: 'end' });
+  };
+
+  private readonly onDouble = (event: MouseEvent): void => {
+    if (!this.enabled || !this.enableFocus) return;
+    const at = this.local(event),
+      b = this.frame(),
+      [width, height] = this.size(),
+      point =
+        this.pick?.(at.x, at.y) ?? intersectPlane(ray(b, at.x, at.y, width, height), [...this.camera.target] as V3, b.forward);
+    if (!point) return;
+    event.preventDefault();
+    this.focus(point);
+  };
+
+  private readonly onKey = (event: KeyboardEvent): void => {
+    if (!this.enabled || event.ctrlKey || event.metaKey || event.altKey) return;
+    const field = event.target as { tagName?: string; isContentEditable?: boolean } | null;
+    if (
+      field?.isContentEditable ||
+      field?.tagName === 'INPUT' ||
+      field?.tagName === 'TEXTAREA' ||
+      field?.tagName === 'SELECT'
+    )
+      return;
+    const k = this.keys,
+      code = event.code,
+      b = this.frame(),
+      step = this.keyRotateStep,
+      pan = this.keyPanStep,
+      arrow = code === k.left ? 0 : code === k.right ? 1 : code === k.up ? 2 : code === k.down ? 3 : -1,
+      zoom = code === k.zoomIn || code === 'NumpadAdd' ? -1 : code === k.zoomOut || code === 'NumpadSubtract' ? 1 : 0;
+    if (arrow >= 0 && event.shiftKey) {
+      if (!this.enablePan) return;
+      this.pan([pan, -pan, 0, 0][arrow], [0, 0, pan, -pan][arrow]);
+    } else if (arrow >= 0) {
+      if (!this.enableRotate) return;
+      // The camera moves the way the arrow points, which is the opposite turn about the screen's axes.
+      if (arrow < 2) this.rotate(b.up, arrow ? step : -step);
+      else this.rotate(b.right, arrow === 2 ? -step : step);
+    } else if (code === k.rollLeft || code === k.rollRight) {
+      if (!this.enableRotate) return;
+      this.rotate(b.forward, code === k.rollLeft ? -step : step);
+    } else if (zoom) {
+      if (!this.enableZoom) return;
+      this.cursor = null;
+      this.logScale += (zoom * Math.LN2 * this.zoomSpeed) / 4;
+    } else if (code === k.reset) this.reset();
+    else return;
+    event.preventDefault?.();
+    this.applyNow();
   };
 
   private readonly onMenu = (event: Event): void => {

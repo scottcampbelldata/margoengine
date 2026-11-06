@@ -2,7 +2,7 @@ import { Engine, PbrMaterial, box } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { OrbitControls, TransformControls } from '@margoengine/controls';
 import { webglRenderer } from '@margoengine/webgl';
-import { ArcballControls } from '@margoengine/controls/arcball';
+import { ArcballControls, ArcballGizmo } from '@margoengine/controls/arcball';
 
 const state = { errors: [] };
 window.controlsState = state;
@@ -189,6 +189,22 @@ window.gizmoOcclude = () => {
   wall.dispose();
   engine.render();
   return { hidden, open, onTop };
+};
+// The arcball's rings draw on the real backend, and `autoHide` leaves the frame clean between gestures.
+window.arcballGizmo = () => {
+  const { engine, gizmo, orbit } = state;
+  orbit.reset();
+  gizmo.visible = false;
+  const arcball = ArcballControls.attach(engine),
+    rings = ArcballGizmo.attach(arcball, { autoHide: false, lineWidth: 3 }),
+    shown = analyze((engine.render(), engine)).counts;
+  rings.autoHide = true;
+  const hidden = analyze((engine.render(), engine)).counts;
+  rings.dispose();
+  arcball.dispose();
+  gizmo.visible = true;
+  engine.render();
+  return { shown, hidden };
 };
 window.gizmoState = () => {
   const { engine, gizmo, mesh } = state;

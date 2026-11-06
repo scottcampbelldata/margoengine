@@ -90,6 +90,10 @@ try {
     `occlude ${JSON.stringify(occlude)}`,
   );
   checks.push('WebGPU: occlude hides the gizmo behind a wall, and off draws it on top again');
+  const rings = await page.evaluate(() => window.arcballGizmo());
+  assert.ok(rings.shown.red > 100 && rings.shown.green > 100, `arcball rings ${JSON.stringify(rings)}`);
+  assert.ok(rings.hidden.red === 0 && rings.hidden.green === 0, `arcball autoHide ${JSON.stringify(rings)}`);
+  checks.push('WebGPU: the arcball rings draw, and autoHide leaves the frame clean');
   const aligned = await page.evaluate(() => window.gizmoView());
   assert.equal(aligned.axisDots[2], 1);
   assert.equal(aligned.handles.includes('Z'), false, 'camera-aligned Z arrow is deliberately hidden');

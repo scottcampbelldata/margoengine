@@ -6,7 +6,7 @@ import { intersectPlane, project, ray, type Basis } from './view.js';
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 /** The gizmo handle being hovered or dragged: an axis (`X`, `Y`, `Z`), a plane (`XY`, `YZ`, `XZ`), `XYZ` (free or uniform), `E` (view-aligned ring) or `XYZE` (trackball ring). */
 export type HandleName = 'X' | 'Y' | 'Z' | 'XY' | 'YZ' | 'XZ' | 'XYZ' | 'E' | 'XYZE';
-type RGBA = readonly [number, number, number, number];
+export type RGBA = readonly [number, number, number, number];
 
 /** A world-space line strip segment list (pairs of points) drawn `width` CSS pixels wide. */
 interface LinePrim {
