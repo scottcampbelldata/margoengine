@@ -1,9 +1,10 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
-import type { Camera, EngineKernel } from '@margoengine/core';
+import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
 import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
 import { Line } from './line.js';
+import { fillFrame } from './math.js';
 import { foggedLineShader, lineShader, phasedShader, pointWidthShader } from './shader.js';
 import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
@@ -368,33 +369,6 @@ export class Lines implements EnginePlugin {
     }
   }
 
-  /**
-   * The Frame uniform: `matrix`, the target size in pixels, CSS to target pixels, the camera's focal length for a view
-   * `viewHeight` pixels tall and whether to encode sRGB.
-   */
-  private fillFrame(
-    data: Float32Array,
-    matrix: ArrayLike<number>,
-    camera: Camera,
-    width: number,
-    height: number,
-    ratio: number,
-    viewHeight: number,
-    encode: number,
-  ): void {
-    const m = camera.matrix;
-    data.set(matrix, 0);
-    data[16] = width;
-    data[17] = height;
-    data[18] = ratio;
-    // Pixels per world unit at clip w 1. Orthographic (clip w constant, e.g. @margoengine/cameras): from the y row's length.
-    data[19] =
-      m[3] || m[7] || m[11]
-        ? (0.5 * viewHeight) / Math.tan((camera.fov * Math.PI) / 360)
-        : 0.5 * viewHeight * Math.hypot(m[1], m[5], m[9]);
-    data[20] = encode;
-  }
-
   private readonly execute = (context: PassContext): void => {
     const stats = this.stats;
     stats.lines = stats.segments = stats.drawCalls = 0;
@@ -413,7 +387,7 @@ export class Lines implements EnginePlugin {
     const canvas = engine.canvas,
       data = this.frameData,
       camera = context.camera;
-    this.fillFrame(
+    fillFrame(
       data,
       camera.matrix,
       camera,

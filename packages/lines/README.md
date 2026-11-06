@@ -157,6 +157,51 @@ pointer.reset();
 
 Any `LineMaterial` option applies too. The far end is cut exactly at the limit, between two points, so a trail shrinks smoothly, and a target that stops fades out with the rest of its trail. Like every line a trail faces the camera, so a flat ribbon on the ground, such as a tyre track seen from low down, is not what it draws. It is a line, so it also picks and takes fog and clipping planes.
 
+## Massive batches
+
+`LineBatch` from `margoengine/lines/batch` draws millions of independent segments from one buffer in one draw: wire views of huge models, graphs, flow lines. Each segment is one 6-vertex instance of 32 bytes, where a `Line` segment is 78 vertices with joins, caps and dashes.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {LineBatch, LineBatches} from 'margoengine/lines/batch';
+
+declare const canvas: HTMLCanvasElement;
+const engine = await Engine.create(canvas);
+const batches = LineBatches.attach(engine);
+
+// One million random segments, each with its own colour, one draw.
+const count = 1_000_000,
+  positions = new Float32Array(count * 6),
+  colors = new Float32Array(count * 3);
+for (let i = 0; i < positions.length; i++) positions[i] = Math.random() * 20 - 10;
+for (let i = 0; i < colors.length; i++) colors[i] = Math.random();
+const flow = batches.add(new LineBatch({positions, colors, width: 1}));
+
+// A wire view shares points through indices: pairs of point numbers, one pair a segment.
+const square = new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+batches.add(new LineBatch({positions: square, indices: [0, 1, 1, 2, 2, 3, 3, 0], color: '#40c0ff', width: 2}));
+
+// Change part of a batch: only those segments upload.
+flow.updateSegments(10, [0, 0, 0, 1, 1, 1]);
+console.log(batches.stats); // {batches, segments, drawCalls} of the last frame
+```
+
+| Option | Default | Notes |
+| --- | --- | --- |
+| `positions` | none | x, y, z per point: two points a segment, or any number with `indices` |
+| `indices` | none | Pairs of point numbers, one pair a segment |
+| `colors` | white | Linear r, g, b or r, g, b, a, one per point, or one per segment without `indices`. Kept at 8 bits a channel, sRGB encoded |
+| `color`, `opacity` | white, `1` | Multiply every segment |
+| `width`, `worldUnits` | `1`, `false` | CSS pixels, or world units; under one pixel fades as `Line` does |
+| `onTop`, `antialias` | `false`, `true` | As on `LineMaterial`; the ramp runs along the sides |
+| `mesh`, `matrix`, `visible` | `null`, identity, `true` | Placement, as on `Line` |
+
+`setSegments(positions, colors, indices)` replaces everything and keeps the buffers when the count stays. `updateSegments(first, positions, colors)` replaces a run of segments and uploads only those. Style fields can be set at any time (`batch.width = 2`).
+
+A batch is one draw while it fits one GPU buffer: 8,388,608 segments at WebGPU's default `maxBufferSize` of 256 MiB, and one further draw for each buffer past that. A batch takes at most 67,108,864 segments. It keeps a CPU copy, 32 bytes a segment, to refill the GPU after a device loss.
+
+Segments are independent: square ends, so those that share a point overlap at the corner, and translucent corners are darker there. There are no joins, round caps, dashes, fog, clipping planes, depth writing or picking. Use `Line` where those matter. WebGPU only.
+
 ## Fog
 
 `lines.setFog(fog)` fogs every line whose material has `fog: true` (the default) with `@margoengine/environment`'s `Fog`

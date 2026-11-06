@@ -4,6 +4,7 @@ import { Lines, Line } from '@margoengine/lines';
 import { LinePicking } from '@margoengine/lines/pick';
 import { Trail } from '@margoengine/lines/trail';
 import { Picking } from '../../selection/dist/index.js';
+import { LineBatch, LineBatches } from '@margoengine/lines/batch';
 import { Capture } from './lines-browser.js';
 
 const assert = (condition, message) => {
@@ -191,8 +192,69 @@ async function trail() {
   return 'Trail follows a mesh, thins and fades toward its far end, and disappears when aged out';
 }
 
+async function batch() {
+  const { engine, frame, done } = await rig();
+  const batches = LineBatches.attach(engine);
+  // Two million segments in one draw: a fan of short ones far from the view, then the two the checks look at.
+  const count = 2_000_000,
+    positions = new Float32Array(count * 6);
+  for (let i = 0; i < count; i++) {
+    positions[i * 6] = 40 + (i % 100);
+    positions[i * 6 + 3] = 41 + (i % 100);
+  }
+  positions.set([-3, 0, 0, 3, 0, 0, 0, -3, 1, 0, 3, 1]);
+  const colors = new Float32Array(count * 3).fill(1);
+  colors.set([1, 0, 0, 0, 1, 0]);
+  const lines = batches.add(new LineBatch({ positions, colors, width: 6 }));
+  let image = await frame();
+  assert(batches.stats.drawCalls === 1 && batches.stats.segments === count, 'Two million segments are one draw');
+  assert(isGreen(image.at(128, 128)), 'The later segment covers the crossing');
+  assert(isRed(image.at(90, 128)), 'A segment draws its own colour');
+  // Pixel width, summed down a column.
+  let rows = 0;
+  for (let y = 100; y < 156; y++) if (image.at(90, y)[0] > 128) rows++;
+  assert(rows === 6, `A 6 px segment covers ${rows} rows`);
+  // World width: 1 unit at distance 10 is 22 pixels.
+  lines.worldUnits = true;
+  lines.width = 1;
+  image = await frame();
+  rows = 0;
+  for (let y = 100; y < 156; y++) if (image.at(90, y)[0] > 128) rows++;
+  assert(Math.abs(rows - 22.17) <= 1.5, `A world-unit segment covers ${rows} rows`);
+  lines.worldUnits = false;
+  lines.width = 6;
+  // Depth: a box in front hides the segment, onTop draws over it.
+  const mesh = engine.createMesh().setGeometry(box(2, 2, 2));
+  mesh.setPosition([-1.5, 0, 3]);
+  image = await frame();
+  const covered = pixel(-1.5, 0, 0);
+  assert(!isRed(image.at(Math.round(covered[0]), 128)), 'A mesh in front hides a batch');
+  lines.onTop = true;
+  image = await frame();
+  assert(isRed(image.at(Math.round(covered[0]), 128)), 'An onTop batch draws over it');
+  // A partial update moves one segment and leaves the rest.
+  lines.onTop = false;
+  mesh.dispose();
+  lines.updateSegments(0, [-3, 2, 0, 3, 2, 0]);
+  image = await frame();
+  const moved = pixel(-2, 2, 0);
+  assert(isRed(image.at(Math.round(moved[0]), Math.round(moved[1]))), 'An updated segment moves');
+  assert(!isRed(image.at(90, 128)), 'It leaves its old place');
+  // A segment crossing the camera plane is cut, not mirrored.
+  lines.updateSegments(1, [1, -1, 30, 1, -1, -30]);
+  image = await frame();
+  let mirrored = 0;
+  for (let y = 0; y < 120; y++) for (let x = 0; x < 120; x++) if (isGreen(image.at(x, y))) mirrored++;
+  assert(mirrored === 0, `A segment past the camera mirrored ${mirrored} pixels`);
+  await engine.rebootDevice?.();
+  image = await frame();
+  assert(isRed(image.at(Math.round(moved[0]), Math.round(moved[1]))), 'A batch survives a device reboot');
+  done();
+  return 'LineBatch draws two million segments in one draw at exact widths, depth tested, with partial updates';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
-  for (const check of [depthWrite, picking, trail]) checks.push(await check());
+  for (const check of [depthWrite, picking, trail, batch]) checks.push(await check());
   return checks;
 };

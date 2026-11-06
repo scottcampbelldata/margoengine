@@ -23,6 +23,7 @@ await build({
         edges: resolve(root, 'src/edges.ts'),
         pick: resolve(root, 'src/pick.ts'),
         trail: resolve(root, 'src/trail.ts'),
+        batch: resolve(root, 'src/batch.ts'),
       },
       formats: ['es'],
       fileName: (_, name) => name + '.js',

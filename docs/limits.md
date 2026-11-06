@@ -13,7 +13,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-083). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-084). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -67,6 +67,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Depth-writing lines (`depthWrite` on `LineMaterial`, `@margoengine/lines`) | By method: two draws per line (solid part, then edge ramp) unless `antialias` is false; depth is written where a line is at least half covered, so a crossing line shows through the outer half of the ramp. Depth follows the centre line, not the round profile of a thick line. | Keeping the smooth edge needs the ramp to blend after every solid part. One draw would either cut the ramp or write depth through it. | Twice the vertex work for these lines; a translucent depth-writing line hides what is drawn behind it after it. | Leave `depthWrite` off where lines do not cross, or set `antialias: false` for one draw. |
 | GPU picking of lines (`LinePicking` in `@margoengine/lines/pick`) | Enforced: 268,435,456 segments per pick, 8 overlays per `Picking`. By method: a pick answers the nearest thing only; `engine.pick` can only answer meshes, so a line that follows no mesh answers an empty stand-in mesh (`lineOf` maps it back); with an overlay registered every pick draws the 3 x 3 pass with all line vertices, uncropped. | Core is frozen, so `engine.pick` keeps its mesh return type; lines share the pass and depth test of meshes. | Picks cost more with many segments; Picking's cached ID texture goes unused. | Read `hit.line` from `picking.pick`; use `intersectLines` from `@margoengine/bvh/lines` for a sorted list of ray hits. |
 | Trails (`Trail` in `@margoengine/lines/trail`) | Enforced: 2 to 65,536 points (`maxPoints`, default 256); past that the oldest point goes and the far end jumps. By method: a trail is a line, so it faces the camera and cannot lie flat on the ground; a dashed trail ignores `tailWidth`, because dash distances use the value widths are stored in. | One line keeps joins, antialiasing, fog, clipping and picking for free. | A tyre track seen from low down looks like a tube, not a flat strip. | Raise `maxPoints`; build a flat strip as a mesh with `@margoengine/splines/mesh`. |
+| Massive line batches (`LineBatch` in `@margoengine/lines/batch`) | Enforced: 67,108,864 segments a batch; one draw per 8,388,608 segments at the default 256 MiB `maxBufferSize`. By method: independent segments with square ends: no joins, round caps, dashes, fog, clipping planes, depth writing or picking; colours at 8 bits a channel; a CPU copy of 32 bytes a segment stays for device loss. | Six vertices and 32 bytes a segment, where `Line` draws 78 vertices and reads a storage buffer whose binding size limits it. | Translucent corners are darker where segments overlap; memory is 64 bytes a segment across CPU and GPU. | Use `Line` where those features matter. |
 
 ## Assets
 

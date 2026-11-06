@@ -46,6 +46,10 @@
     "./trail": {
       "types": "./dist/trail.d.ts",
       "import": "./dist/trail.js"
+    },
+    "./batch": {
+      "types": "./dist/batch.d.ts",
+      "import": "./dist/batch.js"
     }
   },
   "files": [

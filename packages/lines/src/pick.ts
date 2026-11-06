@@ -6,6 +6,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { VERTICES_PER_SEGMENT } from './geometry.js';
 import type { Line } from './line.js';
 import type { Lines } from './lines.js';
+import { fillFrame } from './math.js';
 import { clipCut, lineShader, pointWidthShader } from './shader.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -202,7 +203,7 @@ export class LinePicking {
       const canvas = engine.canvas,
         ratio = canvas.clientWidth ? canvas.width / canvas.clientWidth : 1;
       // A 3 x 3 target under the cropped matrix keeps every distance in drawing-buffer pixels.
-      lines['fillFrame'](this.frameData, c.matrix, c.camera, 3, 3, ratio, c.rect[3], 0);
+      fillFrame(this.frameData, c.matrix, c.camera, 3, 3, ratio, c.rect[3], 0);
       device.queue.writeBuffer(gpu.frame, 0, this.frameData as Float32Array<ArrayBuffer>);
       const pass = c.encoder.beginRenderPass({
         colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],

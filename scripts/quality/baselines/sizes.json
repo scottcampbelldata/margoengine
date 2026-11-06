@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 4580637,
+  "total": 4587161,
   "history": [
     {
       "date": "2026-10-24",
@@ -1736,6 +1736,12 @@
       "commit": "65022531a",
       "reason": "New lines entry ./trail: Trail; lines root gains a width per point variant",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "def2c47e8",
+      "reason": "New lines entry ./batch: LineBatch and LineBatches",
+      "grew": 1
     }
   ],
   "items": {
@@ -1940,6 +1946,7 @@
     "@margoengine/lightmap/global": 7409,
     "@margoengine/lightmap/refracted": 7846,
     "@margoengine/lines": 18423,
+    "@margoengine/lines/batch": 6524,
     "@margoengine/lines/edges": 4811,
     "@margoengine/lines/pick": 5665,
     "@margoengine/lines/trail": 5197,

@@ -1,9 +1,37 @@
 /** Column-major 4x4 helpers only lines uses; shared ones come from `@margoengine/math/mat4`. */
 import type { Mat4 } from '@margoengine/math';
+import type { Camera } from '@margoengine/core';
 
 export type { Mat4 };
 
 export const identity = (): Float32Array => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+
+/**
+ * The Frame uniform of the line shaders: `matrix`, the target size in pixels, CSS to target pixels, the camera's focal
+ * length for a view `viewHeight` pixels tall and whether to encode sRGB.
+ */
+export function fillFrame(
+  data: Float32Array,
+  matrix: ArrayLike<number>,
+  camera: Camera,
+  width: number,
+  height: number,
+  ratio: number,
+  viewHeight: number,
+  encode: number,
+): void {
+  const m = camera.matrix;
+  data.set(matrix, 0);
+  data[16] = width;
+  data[17] = height;
+  data[18] = ratio;
+  // Pixels per world unit at clip w 1. Orthographic (clip w constant, e.g. @margoengine/cameras): from the y row's length.
+  data[19] =
+    m[3] || m[7] || m[11]
+      ? (0.5 * viewHeight) / Math.tan((camera.fov * Math.PI) / 360)
+      : 0.5 * viewHeight * Math.hypot(m[1], m[5], m[9]);
+  data[20] = encode;
+}
 
 /** Writes M * (x, y, z, 1) divided by w into out at offset. */
 export function transformPoint(
