@@ -470,3 +470,34 @@ test('link hull options are checked', () => {
   const odd = new AvoidanceSolver([new Odd({ center: [0, 9, 0], radius: 1 })], { links });
   assert.throws(() => odd.solve(root, hand, hand, 1, 1, 0, 0, 1 / 60, elbowAt), /override hullClearanceInto/);
 });
+
+test('a flat parallelogram of the difference is not an overlap, whatever the rounding says', () => {
+  // A box edge and a segment span an exactly flat parallelogram of the Minkowski difference. On this pose GJK's fourth
+  // vertex closed it, the four volume signs were all rounding, and the query read a false contact with the gap at 0.046.
+  const half = 0.08,
+    box = [];
+  for (const x of [-half, half]) for (const y of [-half, half]) for (const z of [-half, half]) box.push(x + 0.5, y, z);
+  const c = -0.9840033905007274,
+    s = 0.17814973332304776,
+    place = [0.5532603470254689, -0.13950151039659978, 0.41050181024055926],
+    hull = new ConvexHullVolume({ points: box, matrix: [c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, ...place, 1] }),
+    start = [-0.21866270992904902, 0.5544222625903785, 0.059496855130419135],
+    end = [0.10583414882421494, -0.11072446638718247, 0.6986636039800942];
+  // The same gap by brute force: walk the segment in the box's own frame and clamp each point to the box.
+  let truth = Infinity;
+  for (let i = 0; i <= 20000; i++) {
+    const t = i / 20000,
+      x = start[0] + (end[0] - start[0]) * t - place[0],
+      y = start[1] + (end[1] - start[1]) * t - place[1],
+      z = start[2] + (end[2] - start[2]) * t - place[2],
+      lx = c * x + s * y,
+      ly = -s * x + c * y,
+      dx = lx - Math.min(Math.max(lx, 0.5 - half), 0.5 + half),
+      dy = ly - Math.min(Math.max(ly, -half), half),
+      dz = z - Math.min(Math.max(z, -half), half);
+    truth = Math.min(truth, Math.hypot(dx, dy, dz));
+  }
+  assert.ok(truth > 0.04);
+  assert.ok(Math.abs(hull.segmentClearance(start, end, 0) - truth) < 1e-6);
+  assert.ok(Math.abs(hull.hullClearance(new ConvexHullVolume({ points: [...start, ...end] })) - truth) < 1e-6);
+});

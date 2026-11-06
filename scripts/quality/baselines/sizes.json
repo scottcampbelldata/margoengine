@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 8985405,
+  "total": 8985404,
   "history": [
     {
       "date": "2026-10-24",
@@ -3105,7 +3105,7 @@
     "@margoengine/inspector/resources": 902,
     "@margoengine/inspector/snapshot": 1320,
     "@margoengine/kinematics-constraints": 11751,
-    "@margoengine/kinematics-constraints/sdf": 7230,
+    "@margoengine/kinematics-constraints/sdf": 7229,
     "@margoengine/kinematics-constraints/swept": 9491,
     "@margoengine/labels": 4756,
     "@margoengine/lighting2d": 4389,

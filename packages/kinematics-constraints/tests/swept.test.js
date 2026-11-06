@@ -68,6 +68,55 @@ test('sweepChain: however thin the wall and fast the slide, a sphere meets it; m
   assert.equal(sweepChain(at(0), at(40), [wall], { radius: 0.1 }).clear, true);
 });
 
+test('sweepHull: a clear result holds on a dense scan, and a contact is the first, across seeded random motions', () => {
+  const rand = random(85),
+    // Off its own origin, so a turn moves it as well as the line does.
+    hull = new ConvexHullVolume({ points: box(0.08).map((value, i) => (i % 3 === 0 ? value + 0.5 : value)) }),
+    minClearance = 0.01,
+    tolerance = 1e-4,
+    gap = new Float64Array(1);
+  let clear = 0,
+    hits = 0;
+  for (let round = 0; round < 120; round++) {
+    const colliders = [
+      new SphereVolume({ center: [rand() * 2 - 1, rand() * 2 - 1, rand() * 1.6 - 0.2], radius: 0.05 + rand() * 0.1 }),
+      new CapsuleVolume({
+        start: [rand() * 2 - 1, rand() * 2 - 1, rand()],
+        end: [rand() * 2 - 1, rand() * 2 - 1, rand()],
+        radius: 0.02,
+      }),
+      new ConvexHullVolume({ points: box(0.1), matrix: translate(rand() * 2 - 1, rand() * 2 - 1, rand()) }),
+    ];
+    const start = rand() * 6 - 3,
+      turn = rand() * 6 - 3,
+      a = [rand() * 2 - 1, rand() * 2 - 1, rand()],
+      b = [rand() * 2 - 1, rand() * 2 - 1, rand()],
+      pose = (t) => rotateZ(start + turn * t, ...a.map((value, k) => value + (b[k] - value) * t)),
+      at = (t) => {
+        hull.setTransform(pose(t));
+        let least = Infinity;
+        for (const collider of colliders) {
+          collider.hullClearanceInto(hull, gap);
+          least = Math.min(least, gap[0]);
+        }
+        return least;
+      };
+    if (at(0) < minClearance + tolerance) continue;
+    const result = sweepHull(hull, pose(0), pose(1), colliders, { minClearance, tolerance, maxSteps: 100000 });
+    assert.equal(result.exhausted, false);
+    const end = result.clear ? 1 : result.time;
+    for (let i = 0; i <= 1500; i++) {
+      assert.ok(at((end * i) / 1500) >= minClearance - 1e-9, `round ${round}: gap broken before the reported time`);
+    }
+    if (result.clear) clear++;
+    else {
+      hits++;
+      assert.ok(at(result.time) <= minClearance + tolerance + 1e-9);
+    }
+  }
+  assert.ok(clear > 10 && hits > 10, `scene mix: ${clear} clear, ${hits} hit`);
+});
+
 test('sweepChain: a budget that runs out says so and never reads as clear', () => {
   const near = new SphereVolume({ center: [0, 2, 0], radius: 0.99 }),
     out = sweepChain([[0, 0, 0], [1, 0, 0]], [[0, 0, 0], [Math.cos(3), Math.sin(3), 0]], [near], { radius: 0.01, maxSteps: 2 });

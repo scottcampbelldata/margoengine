@@ -197,7 +197,10 @@ function closerFace(i: number, j: number, k: number, mask: number): number {
   return closerEdge(j, k, closerEdge(i, k, closerEdge(i, j, mask)));
 }
 
-/** True when the origin is on the far side of face i-j-k from vertex l, or the tetrahedron has no volume. */
+/**
+ * True when the origin is on the far side of face i-j-k from vertex l, or the tetrahedron has no volume: l stands no
+ * higher than a zero length above the face. The sign of a smaller height is rounding, so it says nothing of the origin.
+ */
 function outside(i: number, j: number, k: number, l: number): boolean {
   const ax = simplex[i * 3],
     ay = simplex[i * 3 + 1],
@@ -214,7 +217,7 @@ function outside(i: number, j: number, k: number, l: number): boolean {
   const opposite = nx * (simplex[l * 3] - ax) + ny * (simplex[l * 3 + 1] - ay) + nz * (simplex[l * 3 + 2] - az),
     origin = -(nx * ax + ny * ay + nz * az),
     limit = FLAT * size[0];
-  if (opposite <= limit * limit * limit && -opposite <= limit * limit * limit) return true;
+  if (opposite * opposite <= limit * limit * (nx * nx + ny * ny + nz * nz)) return true;
   return opposite > 0 ? origin < 0 : origin > 0;
 }
 

@@ -1154,6 +1154,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B19 | Long-tail formats: 3DS cameras, lights, keyframes; every LWO map, image map and bone; placed KMZ; loadTextures; parsePCX | DONE | this commit | LIM-195 |
 | IFC | IFC package taken out of this repository, it stays private; 99 public packages | DONE | this commit | - |
 | ROBOT | Robot planning taken out of this repository, it stays private; /swept and /sdf kept | DONE | this commit | - |
+| HULL | GJK reads a flat parallelogram of the Minkowski difference as a gap, not a false contact | DONE | this commit | LIM-251 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 
