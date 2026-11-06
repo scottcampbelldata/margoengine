@@ -7,6 +7,14 @@ import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { PBRModel } from "@margoengine/gltf-pro";
 
+export interface CrowdLayout {
+    readonly vertex: string;
+    readonly stride: number;
+    readonly rowSize: number;
+    readonly vertices: readonly (Float32Array | Uint32Array)[];
+    readonly attributes: readonly GPUVertexBufferLayout[];
+}
+
 export interface VATBakeOptions {
     fps?: number;
     clips?: readonly (string | number)[];
@@ -30,7 +38,9 @@ export class VATCrowd implements EnginePlugin {
     map: VATMap | null;
     disposed: boolean;
     static attach(engine: EngineKernel, vat: VATData, options?: VATCrowdOptions): VATCrowd;
-    constructor(vat: VATData, { color, map, roughness, metalness }?: VATCrowdOptions);
+    constructor(vat: VATData, { color, map, roughness, metalness }?: VATCrowdOptions,
+    layout?: CrowdLayout);
+    protected get rows(): Float32Array;
     get count(): number;
     add(instance?: VATInstance): number;
     set(index: number, { matrix, clip, offset, speed, uvTransform }: VATInstance): this;

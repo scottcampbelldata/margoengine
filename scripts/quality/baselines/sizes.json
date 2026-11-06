@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 5168554,
+  "total": 5178570,
   "history": [
     {
       "date": "2026-10-24",
@@ -2336,18 +2336,25 @@
       "commit": "9f6fd9061",
       "reason": "loaders/vdb, new optional entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "4b2344d94",
+      "reason": "feat(animation): bone-texture crowds that blend two clips per member (new entry @margoengine/animation/instanced-skin)",
+      "grew": 2
     }
   ],
   "items": {
     "@margoengine/animation": 22595,
     "@margoengine/animation/clip-utils": 5160,
     "@margoengine/animation/dqs": 3473,
+    "@margoengine/animation/instanced-skin": 9634,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/morph-gpu": 3265,
     "@margoengine/animation/pointer": 7146,
     "@margoengine/animation/sampling": 2798,
     "@margoengine/animation/skeleton-utils": 8891,
-    "@margoengine/animation/vat": 8130,
+    "@margoengine/animation/vat": 8512,
     "@margoengine/animator": 18654,
     "@margoengine/animator/graph": 8225,
     "@margoengine/audio": 7716,

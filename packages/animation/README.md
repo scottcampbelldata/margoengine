@@ -482,6 +482,44 @@ models of both kinds in one scene all work; each kind is its own dispatch.
 and `skinDualQuaternion(slots, joints, weights, position, normal?)` is the shader's CPU twin, for tests and CPU picking.
 Only `Animation` has the option: `Skin` on raw data, `bakeVAT` and the bone-texture crowd stay linear.
 
+## Bone-texture crowds (`@margoengine/animation/instanced-skin`)
+
+A vertex animation texture stores finished vertices, so a crowd member can only play one clip. `bakeBones` stores bone
+matrices instead, one row per clip frame, and `SkinnedCrowd` skins each member in the vertex shader: any number of
+characters in one draw, and each can blend two clips, with its own offsets and speeds. The CPU does nothing per member
+per frame. The texture is also far smaller: three texels per bone per frame, whatever the vertex count.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf-pro';
+import {Animation} from 'margoengine/animation';
+import {SkinnedCrowd, bakeBones} from 'margoengine/animation/instanced-skin';
+
+const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
+const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
+const bake = bakeBones(new Animation(model), {fps: 30, clips: ['Walking', 'Running']});
+model.dispose();
+
+const crowd = SkinnedCrowd.attach(stage.engine, bake);
+for (let i = 0; i < 1000; i++)
+  crowd.add({
+    matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 40) * 2, 0, Math.floor(i / 40) * 2, 1],
+    clip: 0,
+    offset: i * 0.13,
+    blendClip: 1,
+    blend: (i % 10) / 10, // a jog: part walk, part run
+  });
+crowd.set(0, {blend: 1});
+```
+
+`bakeBones(animation, {fps = 30, clips})` bakes clips by name or index, all primitives merged in the model root's space,
+up to eight influences per vertex; an unskinned part becomes a bone of its own. The animation's clip, time and playing
+state are restored. A member takes `VATCrowd`'s `matrix`, `clip`, `offset`, `speed` and `uvTransform`, and adds
+`blendClip` (default 0), `blendOffset` (default 0), `blendSpeed` (default 1) and `blend` (0 to 1, default 0, all of the
+first clip). Clips mix as matrices, and bones blend linearly. Everything else follows `VATCrowd`: one material, opaque,
+`shadows.add(crowd)` and `lighting.add(crowd)`, no CPU culling. `poseBones(bake, member, time, out?)` is the shader's CPU
+twin, for bounds and picking. Morph targets stay at the weights they had when baked.
+
 ## Cloning and retargeting (`@margoengine/animation/skeleton-utils`)
 
 Cloning skinned models and retargeting poses and clips between skeletons, in their own entry:

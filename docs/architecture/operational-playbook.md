@@ -283,6 +283,10 @@ influences with joint 0 and an idle joint must not choose them. Checked on the R
 double-precision twin, worst 8.8e-7 in position and 2.1e-7 in normal; the narrowest ring of a 170 degree twist stays at
 radius 1.000 where the linear path gives 0.087 (`npm run test:gpu:dqs -w @margoengine/animation`). Unmeasured: its frame cost.
 
+`SkinnedCrowd` (`@margoengine/animation/instanced-skin`) skins in the vertex stage from a baked rgba32float bone texture,
+drawing through `VATCrowd`'s pipeline code. Its proof runs the stage's own `skinned` function from a compute shader, since a
+vertex stage cannot write out. Checked on the RTX A6000 only. Unmeasured: its frame cost.
+
 ## 3. Rendering backends and hardware tiers
 
 **Area light integrals (2026-11-05).** `@margoengine/clustered/area` returns early from a quad with nothing to clip; the clip's own result, by the same operations. Evidence: `packages/clustered/test/ltc-edge.test.js` (bit for bit in float32) and `examples/package-benchmarks/area-lights-gpu.mjs` as the package's `test:gpu:area` (11 frames byte-equal, RTX A6000 only).
@@ -880,3 +884,4 @@ The following remain technical gaps, not permission to weaken a check:
 25. Draw counts in LIM rows are printed by GPU checks and asserted only as bounds, and no result file holds them.
 26. `ScenePass` (`@margoengine/shader/pass`) has no check in a multi-view frame, and its `velocity()` follows one camera.
 27. Dual quaternion skinning has no frame-time measurement and no run on a GPU other than the RTX A6000.
+28. Bone-texture crowds have no frame-time measurement and no run on a GPU other than the RTX A6000.

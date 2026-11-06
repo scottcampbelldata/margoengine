@@ -252,6 +252,19 @@ export interface VATCrowdOptions {
   metalness?: number;
 }
 
+/** @internal What a crowd of another kind changes: `@margoengine/animation/instanced-skin` draws through VATCrowd. */
+export interface CrowdLayout {
+  /** Bindings, pose sampling and the vertex stage; location 0 is the UV. */
+  readonly vertex: string;
+  /** Floats per instance, the first 24 as {@link VAT_STRIDE}. */
+  readonly stride: number;
+  /** What the vertex stage multiplies a texture row by: vertices, or bones. */
+  readonly rowSize: number;
+  /** Vertex data after the UVs, and how the stage reads it. */
+  readonly vertices: readonly (Float32Array | Uint32Array)[];
+  readonly attributes: readonly GPUVertexBufferLayout[];
+}
+
 /** gltf-pro's lighting hooks (its `PBRLighting`), declared here so the VAT entry does not import gltf-pro. */
 export interface VATLightingHooks {
   readonly declarations: string;
@@ -289,8 +302,7 @@ fn texel(row:u32,v:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+v)*2u+k;let w=u32(
   srgbShader =
     'fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}\n';
 // GGX (Walter et al. 2007) + Schlick, F0 0.04 (glTF 2.0 App. B); hemisphere fill is Margo design (gltf-pro's).
-/** The WGSL source the crowd draws with: bindings, vertex-texture pose sampling and neutral shading. Exposed for tooling and tests; {@link VATCrowd} builds its pipeline from it. */
-export const vatShader = `${neutralShader}${vatVertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
+const unlitShader = (vertex: string) => `${neutralShader}${vertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
  let nn=normalize(i.normal)*select(-1.0,1.0,front);let v=normalize(f.eye.xyz-i.position);let l=normalize(f.light.xyz);let h=(v+l)/max(length(v+l),0.0001);
@@ -302,11 +314,13 @@ export const vatShader = `${neutralShader}${vatVertex}${srgbShader}// gltf-pro's
  if(f.vat.z<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}
  return vec4f(color,1.0);
 }`;
-let lit: string | undefined;
+/** The WGSL source the crowd draws with: bindings, vertex-texture pose sampling and neutral shading. Exposed for tooling and tests; {@link VATCrowd} builds its pipeline from it. */
+export const vatShader = unlitShader(vatVertex);
+const lit = new Map<string, string>();
 // The same lighting with gltf-pro's Surface and hook points, so `lightPBR` composes effects into it. Built only once an
 // effect is added; the HDR flag is then also written to the last Frame float, renamed `settings` where the fog hook reads `.w`.
-const litShader = () =>
-  (lit ??= `${neutralShader}${vatVertex.replace('vat:vec4f}', 'settings:vec4f}').replaceAll('f.vat.', 'f.settings.')}${srgbShader}
+const buildLit = (vertex: string) =>
+  `${neutralShader}${vertex.replace('vat:vec4f}', 'settings:vec4f}').replaceAll('f.vat.', 'f.settings.')}${srgbShader}
 struct Surface {base:vec4f,n:vec3f,roughness:f32,metal:f32,occlusion:f32,emissive:vec3f}
 fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return (s.base.rgb*(1.0-s.metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
@@ -319,7 +333,12 @@ fn ambient(s:Surface)->vec3f {let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return 
  var color=direct+ambient(s)+s.emissive;
  if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0))); color=srgb(color);}
  return vec4f(color,1.0);
-}`);
+}`;
+function litShader(vertex: string): string {
+  let code = lit.get(vertex);
+  if (!code) lit.set(vertex, (code = buildLit(vertex)));
+  return code;
+}
 let serial = 0;
 /**
  * Draws any number of copies of baked VAT data in one instanced call: each instance has its own matrix, clip, time
@@ -337,14 +356,17 @@ export class VATCrowd implements EnginePlugin {
   metalness: number;
   map: VATMap | null;
   disposed = false;
-  private data = new Float32Array(VAT_STRIDE * 16);
+  private data: Float32Array;
   private n = 0;
+  /** The plain shader of this crowd's kind. */
+  private readonly plain: string;
   private dirty = true;
   private engine?: Engine;
   private device?: GPUDevice;
   private gpu?: {
     vat: GPUTexture;
     uvs: GPUBuffer;
+    vertices: GPUBuffer[];
     index: GPUBuffer;
     frame: GPUBuffer;
     clips: GPUBuffer;
@@ -358,7 +380,7 @@ export class VATCrowd implements EnginePlugin {
   private bound: unknown[] = [];
   private readonly frame = new Float32Array(40);
   private readonly lighting = new Set<VATLighting>();
-  private code = vatShader;
+  private code: string;
   private light?: { group: GPUBindGroup; bound: unknown[] };
   private shadow?: {
     pipeline: GPURenderPipeline;
@@ -376,6 +398,14 @@ export class VATCrowd implements EnginePlugin {
   constructor(
     readonly vat: VATData,
     { color = [1, 1, 1, 1], map = null, roughness = 0.6, metalness = 0 }: VATCrowdOptions = {},
+    /** @internal */
+    private readonly layout: CrowdLayout = {
+      vertex: vatVertex,
+      stride: VAT_STRIDE,
+      rowSize: vat?.vertexCount,
+      vertices: [],
+      attributes: [],
+    },
   ) {
     if (
       !(vat?.texels instanceof Float32Array) ||
@@ -390,18 +420,28 @@ export class VATCrowd implements EnginePlugin {
     this.roughness = roughness;
     this.metalness = metalness;
     this.map = map;
+    this.data = new Float32Array(layout.stride * 16);
+    this.plain = this.code = layout.vertex === vatVertex ? vatShader : unlitShader(layout.vertex);
+  }
+  /** @internal This crowd's instance rows, for a kind that adds fields of its own. */
+  protected get rows(): Float32Array {
+    return this.data;
   }
   get count(): number {
     return this.n;
   }
   /** Adds an instance (identity matrix, clip 0, offset 0, speed 1, whole texture by default) and returns its index. */
   add(instance: VATInstance = {}): number {
-    if (this.n * VAT_STRIDE === this.data.length) {
+    const stride = this.layout.stride;
+    if (this.n * stride === this.data.length) {
       const grown = new Float32Array(this.data.length * 2);
       grown.set(this.data);
       this.data = grown;
     }
-    this.data.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1], this.n * VAT_STRIDE);
+    this.data.fill(0, this.n * stride, (this.n + 1) * stride);
+    this.data.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 1], this.n * stride);
+    // A later clip's speed, for a kind with a second clip: one, like the first.
+    if (stride > VAT_STRIDE) this.data[this.n * stride + VAT_STRIDE + 2] = 1;
     this.n++;
     try {
       this.set(this.n - 1, instance);
@@ -421,7 +461,8 @@ export class VATCrowd implements EnginePlugin {
       throw new RangeError(
         'Invalid VAT instance; use an index below the instance count, a clip from vat.clips, a 16-number matrix and finite values',
       );
-    const o = index * VAT_STRIDE,
+    const stride = this.layout.stride,
+      o = index * stride,
       d = this.data;
     if (matrix) d.set(matrix, o);
     if (clip !== undefined) d[o + 16] = clip;
@@ -431,7 +472,7 @@ export class VATCrowd implements EnginePlugin {
       d.set(uvTransform.offset ?? [0, 0], o + 20);
       d.set(uvTransform.scale ?? [1, 1], o + 22);
     }
-    for (let i = o; i < o + VAT_STRIDE; i++)
+    for (let i = o; i < o + stride; i++)
       if (!Number.isFinite(d[i]))
         throw new RangeError(
           'Invalid VAT instance; use an index below the instance count, a clip from vat.clips, a 16-number matrix and finite values',
@@ -490,6 +531,7 @@ export class VATCrowd implements EnginePlugin {
       white,
       blank: [white.createView(), device.createSampler()],
       uvs: buffer(v.uvs, GPUBufferUsage.VERTEX),
+      vertices: this.layout.vertices.map((data) => buffer(data, GPUBufferUsage.VERTEX)),
       index: buffer(v.indices, GPUBufferUsage.INDEX),
       frame: device.createBuffer({ size: 160, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
       clips: buffer(
@@ -531,14 +573,14 @@ export class VATCrowd implements EnginePlugin {
     // ponytail: every instance runs in all four cascades (1,024 robots: about 4x the beauty pass's vertex work); a GPU
     // per-cascade instance compaction with indirect draws is the upgrade if crowds this large need shadows.
     if (!s) {
-      const module = device.createShaderModule({ code: vatVertex });
+      const module = device.createShaderModule({ code: this.layout.vertex });
       s = this.shadow = {
         pipeline: device.createRenderPipeline({
           layout: 'auto',
           vertex: {
             module,
             entryPoint: 'vertex',
-            buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
+            buffers: this.vertexLayout(),
           },
           depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
         }),
@@ -565,18 +607,29 @@ export class VATCrowd implements EnginePlugin {
     const v = s.values;
     v.set(matrix);
     v[32] = this.time;
-    v[36] = this.vat.vertexCount;
+    v[36] = this.layout.rowSize;
     v[37] = this.vat.width;
     device.queue.writeBuffer(s.frames, cascade * 256, v);
     pass.setPipeline(s.pipeline);
     pass.setBindGroup(0, s.groups[cascade]);
-    pass.setVertexBuffer(0, g.uvs);
+    this.bindVertices(pass, g);
     pass.setIndexBuffer(g.index, 'uint32');
     pass.drawIndexed(this.vat.indices.length, this.n);
   }
+  private vertexLayout(): GPUVertexBufferLayout[] {
+    return [
+      { arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] },
+      ...this.layout.attributes,
+    ];
+  }
+  private bindVertices(pass: GPURenderPassEncoder, g: { uvs: GPUBuffer; vertices: GPUBuffer[] }): void {
+    pass.setVertexBuffer(0, g.uvs);
+    g.vertices.forEach((buffer, i) => pass.setVertexBuffer(i + 1, buffer));
+  }
   private upload(device: GPUDevice) {
-    const g = this.resources(device);
-    if (!g.instances || g.instances.size < this.n * VAT_STRIDE * 4) {
+    const g = this.resources(device),
+      stride = this.layout.stride;
+    if (!g.instances || g.instances.size < this.n * stride * 4) {
       g.instances?.destroy();
       g.instances = device.createBuffer({
         size: this.data.byteLength,
@@ -585,7 +638,7 @@ export class VATCrowd implements EnginePlugin {
       this.dirty = true;
     }
     if (this.dirty) {
-      device.queue.writeBuffer(g.instances, 0, this.data, 0, this.n * VAT_STRIDE);
+      device.queue.writeBuffer(g.instances, 0, this.data as Float32Array<ArrayBuffer>, 0, this.n * stride);
       this.dirty = false;
     }
     return g;
@@ -598,12 +651,12 @@ export class VATCrowd implements EnginePlugin {
       samples = c.descriptor.multisample?.count ?? 1,
       depth = c.descriptor.depthStencil!.format;
     // Effects compose into the lit shader (group 1); without any (or none ready) the crowd keeps the unlit shader and its exact calls.
-    let code = vatShader;
+    let code = this.plain;
     const entries: GPUBindGroupEntry[] = [];
     for (const effect of this.lighting) {
       const hooks = effect.pbr!(1);
       if (hooks) {
-        code = lightPBR(code === vatShader ? litShader() : code, hooks);
+        code = lightPBR(code === this.plain ? litShader(this.layout.vertex) : code, hooks);
         entries.push(...effect.bindings());
       }
     }
@@ -617,10 +670,10 @@ export class VATCrowd implements EnginePlugin {
     // 0.045: minimum perceptual roughness of the Filament design document (published engine standard).
     f[34] = Math.min(1, Math.max(0.045, this.roughness));
     f[35] = this.metalness;
-    f[36] = this.vat.vertexCount;
+    f[36] = this.layout.rowSize;
     f[37] = this.vat.width;
     f[38] = +(c.format === 'rgba16float');
-    f[39] = code === vatShader ? 0 : f[38];
+    f[39] = code === this.plain ? 0 : f[38];
     device.queue.writeBuffer(g.frame, 0, f);
     const key = c.format + samples + depth;
     if (this.key !== key || this.code !== code) {
@@ -632,7 +685,7 @@ export class VATCrowd implements EnginePlugin {
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
+          buffers: this.vertexLayout(),
         },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
         primitive: { cullMode: 'back' },
@@ -678,7 +731,7 @@ export class VATCrowd implements EnginePlugin {
         };
       pass.setBindGroup(1, this.light.group);
     }
-    pass.setVertexBuffer(0, g.uvs);
+    this.bindVertices(pass, g);
     pass.setIndexBuffer(g.index, 'uint32');
     pass.drawIndexed(this.vat.indices.length, this.n);
     pass.end();
@@ -688,11 +741,11 @@ export class VATCrowd implements EnginePlugin {
   private release(): void {
     const g = this.gpu;
     if (g)
-      for (const r of [g.vat, g.white, g.uvs, g.index, g.frame, g.clips, g.instances, this.shadow?.frames])
+      for (const r of [g.vat, g.white, g.uvs, ...g.vertices, g.index, g.frame, g.clips, g.instances, this.shadow?.frames])
         r?.destroy();
     this.gpu = this.pipeline = this.group = this.light = this.shadow = undefined;
     this.key = '';
-    this.code = vatShader;
+    this.code = this.plain;
     this.bound = [];
     this.device = undefined;
   }

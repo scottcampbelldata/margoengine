@@ -28,6 +28,7 @@
     "test:gpu": "cd ../.. && node scripts/animation-batched-deformation-tests.js",
     "test:gpu:morph": "cd ../.. && node scripts/animation-morph-gpu-tests.js",
     "test:gpu:dqs": "cd ../.. && node scripts/animation-dqs-tests.js",
+    "test:gpu:instanced-skin": "cd ../.. && node scripts/animation-instanced-skin-tests.js",
     "prepack": "npm --prefix ../.. run build:packages"
   },
   "sideEffects": false,
@@ -67,6 +68,10 @@
     "./dqs": {
       "types": "./dist/dqs.d.ts",
       "import": "./dist/dqs.js"
+    },
+    "./instanced-skin": {
+      "types": "./dist/instanced-skin.d.ts",
+      "import": "./dist/instanced-skin.js"
     }
   },
   "files": [
