@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Geometry, PbrMaterial, type EngineKernel } from '@margoengine/core';
 export { ScatterInstances, type ScatterBatch } from './instances.js';
-import { centroid, freeLocation } from './instances.js';
+import { centroid, freeLocation, positiveColor } from './instances.js';
 export { randomPlacements, radialPlacements } from './candidates.js';
 export {
   PlacementLayout,
@@ -936,6 +936,7 @@ export class Scatter implements EnginePlugin {
           code =
             code.replace(/(@fragment fn fragment[^{]+\{)/, '$1\n if(!lodVisible(i.clip.xy,i.lodFade)){discard;}') +
             fadeCode;
+        if (blades || clusters) code = positiveColor(code);
         // Blades bend core's shading normal after its back-face flip, so both sides of a blade share the ground term.
         if (blades)
           code = code.replace(

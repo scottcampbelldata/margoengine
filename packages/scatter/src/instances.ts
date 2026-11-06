@@ -85,6 +85,16 @@ const translucentLayouts: GPUVertexBufferLayout[] = [
  * edges and drew negative radiance into the HDR scene. Centroid interpolation reads at a covered sample instead.
  */
 export const centroid = '@interpolate(perspective,centroid)';
+/**
+ * Holds core's colour varying at 0 and above in the fragment shader. Centroid gets within the GPU's precision: on a thin
+ * triangle it can still land just outside (2 of 65,536 pixels on an Apple M6 in WebKit, the colour near -0.05, drawn as
+ * negative radiance). The vertex colours are never negative, so neither is a colour read inside the triangle.
+ */
+export const positiveColor = (code: string): string =>
+  code.replace(
+    /@fragment fn fragment\(i:Output,([^{]+)\{/,
+    '@fragment fn fragment(varyings:Output,$1{\n var i=varyings;i.color=max(i.color,vec3f(0.0));',
+  );
 /** The first @location a struct does not use: patches that add varyings to a shared struct must not collide. */
 export const freeLocation = (struct: string): number =>
   Math.max(-1, ...[...struct.matchAll(/@location\((\d+)\)/g)].map((m) => Number(m[1]))) + 1;
@@ -323,7 +333,7 @@ export class ScatterInstances implements EnginePlugin {
               ? 'let linear=$1+foliageTranslucency(n,v,l,i.occlusion,i.translucency)*i.color*frame.radiance.xyz*frame.light.w+i.emissive;'
               : 'let linear=$1+i.emissive;',
           );
-      const module = c.device.createShaderModule({ code });
+      const module = c.device.createShaderModule({ code: positiveColor(code) });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex', buffers: lucent ? translucentLayouts : vertexLayouts },
