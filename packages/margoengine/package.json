@@ -1750,6 +1750,10 @@
       "types": "./dist/rigging/transfer.d.ts",
       "import": "./dist/rigging/transfer.js"
     },
+    "./rigging/face": {
+      "types": "./dist/rigging/face.d.ts",
+      "import": "./dist/rigging/face.js"
+    },
     "./road": {
       "types": "./dist/road.d.ts",
       "import": "./dist/road.js"

@@ -697,6 +697,7 @@ Maya, Pinocchio, libigl, three.js, Babylon, Godot, Unity, Unreal and the like) w
 | Voxel weights (`rigging/voxel-weights`) | O. Dionne and M. de Lasa, "Geodesic voxel binding for production character meshes", SCA 2013; the fill vote for open meshes is ours |
 | Corrective shapes (`rigging/correctives`) | J. P. Lewis, M. Cordner and N. Fong, "Pose space deformation", SIGGRAPH 2000, for the radial basis interpolation; the single-joint reading is plain rotation-vector projection |
 | Weight transfer (`rigging/transfer`) | R. Abdrashitov, K. Raichstat, J. Monsen and D. Hill, "Robust skin weights transfer via weight inpainting", SIGGRAPH Asia 2023 Technical Communications, for matching by distance and normal; the fill is a plain weighted average, not its inpainting solve |
+| Face tracking (`rigging/face`) | Apple's published `ARFaceAnchor.BlendShapeLocation` names, Google's MediaPipe Face Landmarker output format and the VRM 1.0 expression presets; no tracker's code was read |
 
 ## Game AI: `@margoengine/behavior`
 

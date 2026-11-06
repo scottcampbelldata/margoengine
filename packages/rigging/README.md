@@ -436,6 +436,53 @@ console.log(weights.toInfluences(), matched, filled);
 
 `matched` and `filled` count target points. A part of the target with no match at all, such as a hat clear of the head, keeps the closest weights as they are.
 
+## Face tracking (`margoengine/rigging/face`)
+
+Puts a tracked face on a character. Face trackers report the same 52 values from 0 to 1, one per facial movement: Apple's ARKit, Google's MediaPipe Face Landmarker and Live Link Face all do. `addFace` reads a frame in any of their shapes, smooths it and drives the model's morph targets, found by name, or a VRM avatar's expressions.
+
+```ts
+import { loadGLTF } from 'margoengine/gltf-pro';
+import { Animation } from 'margoengine/animation';
+import { addFace } from 'margoengine/rigging/face';
+import type { Engine } from 'margoengine';
+
+declare const engine: Engine;
+const animation = new Animation(await loadGLTF(engine, 'character.glb'));
+const face = addFace(animation, { mirror: true }); // a selfie camera: swap sides
+console.log(face.matched, face.missing); // which of the 52 this model can show
+
+// Call this with each tracker frame, at the tracker's own rate.
+face.push({ jawOpen: 0.4, eyeBlinkLeft: 1 });
+face.push(null); // tracking lost: back to neutral
+face.dispose();
+```
+
+A frame is a record of names to values, or a list of `{ categoryName, score }`, so MediaPipe's `result.faceBlendshapes[0].categories` goes straight in. Names are matched by `faceShapeOf`, which ignores case, separators and any prefix and knows `_L` and `_R`: `EyeBlinkLeft`, `eye_blink_left`, `eyeBlink_L` and `ARKit_eyeBlinkLeft` all read as `eyeBlinkLeft`. Model morph targets are read from `extras.targetNames` on every mesh, so head, teeth and lashes move together. For other names, pass `map`:
+
+```ts
+import { addFace } from 'margoengine/rigging/face';
+import type { VRMHandle } from 'margoengine/rigging/vrm';
+import type { Animator } from 'margoengine/animator';
+
+declare const animation: Animator['animation'];
+declare const avatar: VRMHandle;
+addFace(animation, { map: { jawOpen: 'Mouth_Open', eyeBlinkLeft: ['Blink_L', 'Lash_L'] } });
+addFace(animation, { vrm: avatar }); // or a VRM avatar: drives its preset expressions
+```
+
+| `addFace` option | Default | Meaning |
+| --- | --- | --- |
+| `smoothing` | `0.05` | Time constant in seconds; 0 follows the tracker exactly. The same at any frame rate. |
+| `gain` | `1` | Multiplies values before they clamp to 0 to 1: one number, or per shape. |
+| `mirror` | `false` | Swaps left and right, for a mirrored camera. |
+| `map` | none | Morph target names for shapes the names alone do not find. |
+| `vrm` | none | Drive this avatar's expressions rather than morph targets. |
+| `animator` | none | Run inside this `Animator`; with none, run as an engine plugin. |
+
+`FaceMapper` is the same thing as plain data, with no engine: `push(frame)`, `update(delta)`, `get(shape)`, `values`. `vrmFaceExpressions(get)` gives the VRM presets: what both eyes share goes to `blink` and the rest to `blinkLeft` and `blinkRight`, the eyes' mean to the look presets, `jawOpen`, `mouthPucker`, `mouthFunnel`, the mouth's lower lip and stretch to `aa`, `ou`, `oh`, `ih`, `ee`, and smile, frown, brow and wide eyes to `happy`, `sad`, `angry` and `surprised`. No tracker value stands for `relaxed`. A driven morph target belongs to the face: a clip's track on it is overwritten.
+
+ARKit is a trademark of Apple Inc. MediaPipe is a trademark of Google LLC. Live Link Face is a product of Epic Games, Inc. Margo is not affiliated with them. The 52 names are Apple's published `ARFaceAnchor.BlendShapeLocation` identifiers.
+
 ## Retarget presets (`margoengine/rigging/retarget`)
 
 Clips made for one skeleton play on another: `prepareRetarget(source, target)` recognises each rig's naming (Mixamo with any `mixamorig` prefix, Godot's humanoid profile, Roblox R15, the joints of `@margoengine/exporters/skin`'s `humanoidJoints()`, or the 55 humanoid bone names themselves), maps every target bone to its source bone, and by default turns the target's reference pose so each bone points the way the source's does at rest (an A-pose character driven by T-pose clips). Pass the result to `@margoengine/animation`'s `Retarget`:

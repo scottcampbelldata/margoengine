@@ -14,18 +14,7 @@ How to read "Starts at":
   258V with an Intel Arc 140V integrated GPU, Windows 11, Edge 155, AC power, GPU lock held.
 - **Not measured**: the boundary exists, but nobody has run the case. No number is given.
 
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-236). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-234). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
-Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-230). Past losses and their
+Every number here has a row in [whitepaper/claims.md](whitepaper/claims.md) (LIM-001 to LIM-237). Past losses and their
 fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 
 ## Scale
@@ -238,6 +227,7 @@ fixes are in [whitepaper/perf-history.md](whitepaper/perf-history.md).
 | Voxel weights (`@margoengine/rigging/voxel-weights`, 2026-11-06) | Enforced: resolution 8 to 512, closing 0 to 8. By method: parts closer than about one voxel join, so a finer grid is what keeps fingers apart, and memory grows with the cube of `resolution` (about 20 bytes a voxel). An open mesh is filled only from a bone inside it, through voxels with surface on four of six directions. A part no bone reaches takes straight-line distances, counted in `unreached`. Authored weights are the yardstick by strongest bone, not by value: the mean row gap to the authored weights is 0.30 to 0.54, as bone heat's is 0.32 to 0.43. Not measured: speed in a quiet run (Seed-san's hair mesh took about 3 s at resolution 64 and 33 s at 128 while other lanes ran). |
 | Corrective shapes (`@margoengine/rigging/correctives`, 2026-11-06) | Enforced: 1 to 64 samples a pose space. By method: `pose` and the joint's rotation are read as rotation vectors from `rest`, so a shape reads up to half a turn from rest and the reading jumps sign past it; a clip's track on a driven target is overwritten. Not proven: no real file with correctives was found, so the proof is a real rig and clip with a stand-in morph target. Not measured: speed. |
 | Weight transfer (`@margoengine/rigging/transfer`, 2026-11-06) | By method: the two meshes must be in one pose and space. Either facing passes the angle test, so a layer with its surface parallel to the wrong limb's and inside `maxDistance` takes that limb. The fill is a weighted average, so it blends and never sharpens. A target with nothing of the source around it gets the nearest weights, which can be far from an author's: 41% to 69% agreement on parts of the Twist sample with no surface around them. Not measured: speed in a quiet run. |
+| Face tracking (`@margoengine/rigging/face`, 2026-11-06) | By method: morph targets and VRM expressions only, so a jaw or eye moved by a bone is not driven; the VRM presets are a fixed reading of the 52, and no value stands for `relaxed`. A clip's track on a driven target is overwritten. Not proven: no real model named with these shapes was found and no live tracker has been run; the name matching is proven on stand-in targets, the avatar path on a real VRM avatar with frames the test wrote. Not measured: speed. |
 | `p-morph` build plus first frame (accepted only for now, open in [known-bugs.md](known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend)) | 154 ms, or 125 to 143 with `PBRModel.compile()` (first frame 17), against three's WebGPU 217 and WebGL 54, busy-machine diagnostic. |
 | `PBRModel.compile()` | Compiles for the canvas pass under the lights and effects set when it is called. A later change to either, a batched textureless mesh, and any pass other than beauty compile on the draw as before. |
 

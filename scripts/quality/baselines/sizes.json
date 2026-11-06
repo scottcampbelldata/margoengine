@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 6501671,
+  "total": 7415531,
   "history": [
     {
       "date": "2026-10-24",
@@ -2582,6 +2582,12 @@
       "commit": "be5bb417c",
       "reason": "exact booleans gain the overlap box filter and shell joining",
       "grew": 1
+    },
+    {
+      "date": "2026-11-06",
+      "commit": "07802cd7d",
+      "reason": "feat(rigging): face tracking (new entry @margoengine/rigging/face)",
+      "grew": 1
     }
   ],
   "items": {
@@ -3014,6 +3020,7 @@
     "@margoengine/react/xr": 3818,
     "@margoengine/rigging": 7870,
     "@margoengine/rigging/correctives": 2242,
+    "@margoengine/rigging/face": 2363,
     "@margoengine/rigging/hulls": 2759,
     "@margoengine/rigging/ik": 3740,
     "@margoengine/rigging/retarget": 2862,

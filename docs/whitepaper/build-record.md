@@ -982,6 +982,27 @@ Characters can now blend without a second pose, stay in step, fit any speed and 
 - **Gate:** job 1 failed once in its package test, on a relative path to Fox.glb from the package folder. Jobs 1 and 2 failed once on `quality api`, on error messages with no fix, and landed in one push. Jobs 6 and 7 failed once on `tests/package-lock-sync.test.js`, because the lock file lacked the new splines peer, and landed in one push. Nothing failed reached `main`. When `main` moved during a landing, the job reran its package and claims tests after the rebase, not `verify`.
 - **Slips:** the helper edited no tracked file during a landing, after the first drafts moved to `.lane/next/`. It wrote a test fixture wrongly in job 6, which a failing test showed and the fixture was fixed; the code did not change. A chained command ran job 7's docs script during a stopped rebase; the rebase was aborted and the step redone, and nothing from it landed. It ran `git stash list` twice in the worktree, read only, against the rule that bars `git stash` there. The landing of jobs 6 and 7 pushed three repeated claim rows, because the helper's rebase tool kept both sides of `claims.md` by number; they were removed in the next commit, and `tests/claims-file.test.js` now refuses two rows with the same text.
 
+## Batch 83: rigging
+
+Characters can now swing their hair, come in as VRM avatars, take weights on meshes bone heat cannot solve, fix their own elbows, hand their weights on to clothes, and wear a tracked face. Six of seven jobs are on `main`; the seventh waits on Scott.
+
+| # | Job | Status | Commit | New entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Spring bones and jiggle | DONE | `2d2840ff4` | `@margoengine/rigging/springs` | LIM-219 |
+| 2 | VRM avatars | DONE | `4fccde3b6` | `/vrm` | LIM-226 |
+| 3 | Automatic rig from mesh | HELD | none | none | none |
+| 4 | Geodesic voxel weights | DONE | `13131c625` | `/voxel-weights` | LIM-231 |
+| 5 | Corrective shapes | DONE | `59afd6c39` | `/correctives` | LIM-232 |
+| 6 | Weight transfer | DONE | `53f549c38` | `/transfer` | LIM-234 |
+| 7 | Face blend shape mapping | DONE | this commit | `/face` | LIM-235 |
+
+- **Held:** job 3 was never started. Scott decides whether an automatic rig stays open source.
+- **Bugs:** one reached `main` before this batch: IK, foot tools and look-at threw on scales such as 0.9995, 1, 0.9986, which real exporters write, found on Seed-san's hair. Fixed in `35dac4b0f` by reading each axis's own scale, with "off uniform" tests in `packages/rigging/tests/ik.test.js`, `ik-animator.test.js`, `tests/modern-animator-ccd.test.js`, `tests/modern-animator-look-at.test.js` and `tests/modern-animator-depth.test.js`. The ragdoll check has the same limit and a test that pins its refusal of `[1, 2, 1]`, so it is in `docs/known-bugs.md` for a decision. Caught before landing: the voxel search compared a double against a rounded 32-bit distance, which dropped voxels and held the first test run to its 170 s limit; the distances are now doubles. The voxel draft also flooded every open mesh out and fused limbs with its default closing; a fill from the bones and a default of 0 replaced both.
+- **Proved:** on real files: spring bones and VRM on the VRM Consortium's Seed-san and Twist sample, drawn on a real GPU; voxel weights on RiggedFigure, Fox and Seed-san against authored weights, strongest bone or its neighbour on over 95% of vertices, the same with a fifth of the faces gone, and 95.8% against bone heat's 48.8% on the Fox with a coat over it; transfer on Seed-san's clothes and the Twist sample against authored weights.
+- **Limits:** LIM-232 and LIM-235 read PROVEN (STAND-IN): the corrective's rig and clip are real and its morph target is not, since no real file with correctives was found; the face's name matching runs on stand-in targets and its frames are written by the test, as no real model with those names and no live tracker was run, though the avatar path is a real avatar. The VRM write side is a stand-in: no outside VRM tool has read a written file. No speed was measured in a quiet run; one line per job is on the quiet-pass list.
+- **Gate:** lint, hygiene, verify, the rigging tests and browser test and `tests/claims-file.test.js`, from one script gated on exit codes, with the animator's tests added for the scale fix.
+- **Slips:** job 1's first landing never started, because `setsid` is missing on this PC, and nothing said so. Job 2's first landing failed verify: its docs script edited `THIRD-PARTY-NOTICES.md` by hand, which is generated from `scripts/supply-chain.mjs`. Job 5's first landing failed `quality api` on an error message with no fix, which the helper should have run before starting the landing; jobs 6 and 7 ran that gate first.
+
 ## Real files: every loader on a file from a real tool
 
 Batch 39 proved its formats on files the tests built. A file built by the same mind as the reader repeats its mistakes, so Scott approved downloading a public file for every loader (2026-11-06).
