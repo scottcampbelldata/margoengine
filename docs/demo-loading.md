@@ -7,7 +7,7 @@ starting their normal render loops. The earlier mobile asset optimizations remai
 
 Desktop drawing buffers now cap DPR at 1 while retaining 4× MSAA. Phones retain
 their DPR 2 cap and single sampling. HTML/CSS overlays retain native display
-density. This note measured 19,988 bytes, below the 20,000-byte core/stage gzip gate of that time. The current build measures core at 21,468 bytes gzip and core plus stage at 22,859 bytes gzip. The gate fails at 25,000.
+density. This note measured 19,988 bytes, below the 20,000-byte core/stage gzip gate of that time. The current build measures core at 21,487 bytes gzip and core plus stage at 22,878 bytes gzip. The gate fails at 25,000.
 
 ## Method
 

@@ -44,6 +44,26 @@ const coreHooks = {
   async view(alternateView: boolean) {
     return frame(alternateView ? { camera: alternate } : {});
   },
+  // engine.stats after an alternate camera and after a pick, with a pass counting as a package does while it draws.
+  async counts() {
+    const remove = engine.frameGraph.add({
+      name: 'package-draw',
+      order: 1,
+      execute() {
+        engine.stats.drawCalls++;
+        engine.stats.visible += 2;
+      },
+    });
+    try {
+      await frame({ camera: alternate });
+      const drawn = { ...engine.stats };
+      remove();
+      await engine.pick(160, 120);
+      return { drawn, picked: { ...engine.stats } };
+    } finally {
+      remove();
+    }
+  },
   async offscreen(alternateView: boolean) {
     const target = new HDRRenderTarget(device, canvas.width, canvas.height),
       before = engine.frameGraph.add({

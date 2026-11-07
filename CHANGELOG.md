@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Frame counts
+
+- `engine.stats` now reads the frame last drawn. After `engine.render({ camera })` with another camera, `visible` and `drawCalls` used to read the engine camera's view and lose what packages drew, so an app passing its own camera every frame read counts for a view it never showed. A pick no longer changes either count.
+
 ### Packaging
 
 - A page that imports `margoengine/react` no longer gets the Draco and Basis Wasm in its build. Moved out of that entry: `Model` and `Gltf` (now `margoengine/react/gltf-pro`), `Fbx` (`/fbx`), `Animation` (`/animation`) and `BatchedMesh`, `BatchedItem`, `MeshTransmissionMaterial` (`/materials`).

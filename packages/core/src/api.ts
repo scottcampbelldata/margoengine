@@ -65,6 +65,7 @@ export interface Scene {
    * (`degrees(35)`). `sunDirectionFromAngles` in `@margoengine/sky` takes degrees, not radians.
    */
   readonly lighting: { direction: Float32Array; radiance: Float32Array; ambient: Float32Array };
+  /** Counts of this scene's last drawn frame, whichever camera drew it, package draws included. A pick changes neither. */
   readonly stats: { visible: number; drawCalls: number };
   readonly meshes: ReadonlyMap<number, Mesh>;
   readonly plugins: ReadonlyMap<string, EnginePlugin>;
@@ -96,6 +97,7 @@ export interface EngineKernel {
   readonly renderTarget: RenderTarget | null;
   /** Lighting of the scene being drawn or set up: see {@link Scene.lighting}. */
   readonly lighting: Scene['lighting'];
+  /** Counts of the last drawn frame of the scene being drawn or set up: see {@link Scene.stats}. */
   readonly stats: { visible: number; drawCalls: number };
   onError: (error: unknown) => void;
   /** A mesh in the scene being drawn or set up (the default scene otherwise). */

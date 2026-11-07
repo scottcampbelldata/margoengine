@@ -15,6 +15,7 @@ async function scene(backend = 'webgpu') {
     add() {},
     remove() {},
     dispose() {},
+    pick: async () => null,
     render(camera, _lighting, batches, graph, delta) {
       liveBatches = [...batches];
       const frame = {
@@ -65,7 +66,7 @@ function primaryView(h, ids) {
     ids,
     'primary visibility restored before returning',
   );
-  assert.deepEqual(engine.stats, { visible: ids.length, drawCalls: ids.length ? 1 : 0 });
+  assert.deepEqual(engine.stats, h.frames.at(-1).stats, 'the counts stay those of the frame last drawn');
   const batches = h.batches();
   assert.deepEqual(
     batches.flatMap((b) => Array.from({ length: b.count }, (_, i) => b.instances[i * 24 + 23])),
@@ -100,6 +101,55 @@ test('alternate camera culls shared geometry and restores primary batches with p
     assert.deepEqual(frames.at(-1).ids, [front.id]);
     assert.deepEqual(frames.at(-1).ranges, [[0, 24]], 'primary instances are uploaded again after the alternate view');
     assert.deepEqual(passes, [primary, other, primary]);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('the counts after an alternate camera are that frame, package draws included', async () => {
+  const h = await scene(),
+    { engine, other } = h,
+    // Sees what the engine camera sees, so restoring the primary view collects nothing: the other road through it.
+    twin = new Camera({ position: [0, 0, 0], target: [0, 0, -1], near: 0.1, far: 10 });
+  // What a package does while it draws (gltf-pro, splats, animation): one draw call, here for two nodes.
+  engine.frameGraph.add({
+    name: 'package-draw',
+    order: 1,
+    execute() {
+      engine.stats.drawCalls++;
+      engine.stats.visible += 2;
+    },
+  });
+  try {
+    engine.render();
+    assert.deepEqual(engine.stats, { visible: 3, drawCalls: 2 });
+    engine.render({ camera: other });
+    assert.deepEqual(engine.stats, { visible: 3, drawCalls: 2 }, 'restoring the primary view collected again');
+    engine.render({ camera: twin });
+    assert.deepEqual(engine.stats, { visible: 3, drawCalls: 2 }, 'restoring the primary view collected nothing');
+    engine.render({ camera: other, culling: false });
+    assert.deepEqual(engine.stats, { visible: 4, drawCalls: 2 }, 'both meshes were drawn, not the one the primary sees');
+    engine.render();
+    assert.deepEqual(engine.stats, { visible: 3, drawCalls: 2 }, 'the next frame starts again');
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('a pick collects but draws no frame, so the counts stay', async () => {
+  const h = await scene(),
+    { engine, other } = h;
+  const remove = engine.frameGraph.add({ name: 'package-draw', order: 1, execute: () => engine.stats.drawCalls++ });
+  try {
+    engine.render();
+    remove();
+    await engine.pick(32, 32);
+    assert.deepEqual(engine.stats, { visible: 1, drawCalls: 2 });
+    engine.render({ camera: other, culling: false });
+    await engine.pick(32, 32, { camera: other, viewport: [0, 0, 1, 1] });
+    assert.deepEqual(engine.stats, { visible: 2, drawCalls: 1 });
+    engine.render();
+    assert.deepEqual(engine.stats, { visible: 1, drawCalls: 1 }, 'a frame after a pick counts itself');
   } finally {
     engine.dispose();
   }

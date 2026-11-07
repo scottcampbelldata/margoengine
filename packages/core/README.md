@@ -49,7 +49,7 @@ The canvas is opaque. For a transparent canvas over HTML and CSS, attach `Transp
 
 ## Camera for one render
 
-`engine.render({camera: anotherCamera, delta: 0})` draws the implicit scene through that camera. The camera supplied to `Engine.create` remains `engine.camera`; its fit animation does not advance during the alternate render. Before returning, core restores the primary camera's frustum, visible instances, batches and statistics, including when a pass throws. Plugins receive one pre-update callback per call. A later ordinary render or pick uses the primary camera.
+`engine.render({camera: anotherCamera, delta: 0})` draws the implicit scene through that camera. The camera supplied to `Engine.create` remains `engine.camera`; its fit animation does not advance during the alternate render. Before returning, core restores the primary camera's frustum, visible instances and batches, including when a pass throws. `engine.stats` keeps the counts of the frame it drew: an app that passes its own camera every frame reads what is on screen, package draws included. A pick changes neither count. Plugins receive one pre-update callback per call. A later ordinary render or pick uses the primary camera.
 
 Alternate renders must be sequential, outside a running frame pass. For several cameras in one frame use views (below). Camera-dependent plugins that read `engine.camera` in their update callbacks still follow the primary camera. Use `delta: 0` for additional views so simulation is not advanced again. Projection aspect follows the canvas; an offscreen capture with another aspect needs an explicit `Camera.project` override.
 

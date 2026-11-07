@@ -715,7 +715,6 @@ export class Engine {
       // doubleSided (0 or 1) + 0.25: every `< 0.5` single-sided test keeps its meaning.
       if (unshadowed) batch.instances[offset + 22] += 0.25;
       batch.instances[offset + 23] = mesh.id;
-      this.stats.visible++;
     }
   };
   /**
@@ -893,6 +892,17 @@ export class Engine {
     for (let i = 0; i < 4; i++) invalid ||= radiance[i] < 0 || (i < 3 && ambient[i] < 0);
     if (invalid) throw rangeError('Invalid lighting', 'lighting');
     this.collectInstances();
+    // Counts belong to a drawn frame: a pick and the restore after render({ camera }) collect too, and must leave what
+    // the frame and its packages counted. Every frame, with the renderer's own test: a package can claim or release a
+    // batch without a new collection.
+    if (this.rendering) {
+      const { stats, batchList } = this;
+      stats.visible = stats.drawCalls = 0;
+      for (let i = 0; i < batchList.length; i++) {
+        stats.visible += batchList[i].count;
+        if ((batchList[i].count || batchList[i].redirect) && !batchList[i].claimed) stats.drawCalls++;
+      }
+    }
     if (camera === this.camera) this.primaryCulling = culling;
   }
   /** A view's layer mask: `layers`, else the camera's from @margoengine/cameras/layers, else -1 (every layer). */
@@ -927,7 +937,7 @@ export class Engine {
       for (let i = 0, values = this.materials[m]; !full && i < 8; i++) full = values[0].data[i] !== values[i + 1];
     if (full) {
       for (const batch of this.batchList) batch.count = batch.mask = 0;
-      this.stats.visible = this.unshadowed = 0;
+      this.unshadowed = 0;
       this.materialFrame++;
       this.materials.length = 0;
       this.slots.fill(-1);
@@ -955,10 +965,6 @@ export class Engine {
           if (offset + 16 > batch.end!) batch.end = offset + 16;
         }
       }
-    // Every frame, with the renderer's own test: a package can claim or release a batch without a new collection.
-    this.stats.drawCalls = 0;
-    for (let i = 0; i < this.batchList.length; i++)
-      if ((this.batchList[i].count || this.batchList[i].redirect) && !this.batchList[i].claimed) this.stats.drawCalls++;
   }
   /**
    * The mesh under CSS pixel (x, y), or null. With `view`, picks through that view (null outside its rectangle);

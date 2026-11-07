@@ -147,7 +147,7 @@ browser and counts React commits per second.
 
 ## 9. Sizes (gzip)
 
-- Core + stage alone: 22,859 B (gate 25,000 B).
+- Core + stage alone: 22,878 B (gate 25,000 B).
 - Vite cube page with orbit controls: about 94 KB at load, 101-102 KB once `OrbitControls` mounts. React and React DOM
   are about 66-70% of that. Margo's part (core, stage, bindings) is 25,949 B.
 - Textured `<Model>`: +1,750 B in the entry, plus glTF support (56,074 B) fetched when it mounts.

@@ -33,6 +33,11 @@ try {
     true,
     'Picking after an alternate view did not use the primary camera',
   );
+  assert.deepEqual(
+    await page.evaluate(() => coreHooks.counts()),
+    { drawn: { visible: 3, drawCalls: 2 }, picked: { visible: 3, drawCalls: 2 } },
+    'engine.stats after an alternate camera or a pick is not the frame drawn, package draws included',
+  );
   await page.evaluate(() => coreHooks.view(false));
   const restored = await capture('restored');
   assert.equal(Buffer.compare(primary.data, restored.data), 0, 'Alternate render changed the next primary view');

@@ -20,6 +20,7 @@ export const STEPS = [
   new URL('./silent-geometry-tests.js', import.meta.url),
   new URL('./pbr-box-tests.js', import.meta.url),
   new URL('./scene-helper-tests.js', import.meta.url),
+  new URL('./core-parity-hooks-gpu-check.js', import.meta.url),
 ].map((url) => `scripts/${url.pathname.split('/').pop()}`);
 
 /** Runs the steps in order and exits 1 at the first that fails or runs out of time, naming it. */

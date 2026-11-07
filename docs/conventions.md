@@ -116,6 +116,11 @@ pipeline off the frame (perf-history entry 56). No package can hold it: the dept
 private descriptor. It prevents no engine failure; it is a speed gain Scott approved. Cost: core + stage 22,815 -> 22,859 B gzip. The
 exception covers this one getter; the freeze applies again after it.
 
+**Bug fix, `engine.stats` after another camera (Scott, 2026-11-07):** the counts moved from instance collection to the frame, because
+the collection after `engine.render({ camera })`, and the one a pick runs, overwrote them. No package can hold it: the overwrite runs in
+core's private restore after every plugin hook, and a package would have to wrap `engine.render`. Cost: core 21,468 -> 21,487 B gzip,
+core + stage 22,859 -> 22,878 B gzip. It adds no feature.
+
 ## Names exported by more than one package
 
 A name declared and exported by two packages must mean the same thing, or be renamed. Decisions:

@@ -639,8 +639,8 @@ function joinBatch(
 // The encoder of the last frame that counted, per engine.
 const countedFrames = new WeakMap<object, GPUCommandEncoder>();
 /**
- * Adds `count` to `stats.visible`. Core sets that number only when it collects again, so a frame that collects nothing would
- * add to the frame before: a frame's first count starts again from the meshes core collected, which the batches hold.
+ * Adds `count` to `stats.visible`. Core starts that number on every frame it draws; a draw run by hand, with its own encoder and
+ * no frame of core's, would add to the frame before, so a first count starts again from the meshes core collected, which the batches hold.
  */
 function countVisible(engine: EngineKernel, c: Context, count: number): void {
   const { stats } = engine;
