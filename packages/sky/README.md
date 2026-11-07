@@ -28,9 +28,9 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 
 | Entry | Enables | min+gzip, entry alone |
 | --- | --- | --- |
-| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 6.9 kB |
+| `@margoengine/sky/base` | clock, sun/moon discs, transmittance, default night gradient, `lights`, `nightFactor` | 7.1 kB |
 | `/preetham` | Preetham day model (the default `model`) | 0.7 kB |
-| `/bruneton` | Bruneton day model and its precomputed tables (about 1.3 MB of GPU memory) | 2.3 kB |
+| `/bruneton` | Bruneton day model and its precomputed tables (about 1.3 MB of GPU memory), `groundAlbedo` | 3.0 kB |
 | `/clouds` | `clouds` | 2.2 kB |
 | `/night` | stylized `night` (stars, phased moon) | 2.4 kB |
 | `/fog` | `fog` | 2.0 kB |
@@ -47,8 +47,8 @@ const sky = Sky.attach(engine, {model: 'bruneton', clouds: {coverage: 0.4}}, {br
 | `/weather-fx` | `WeatherFX`, its own plugin: no rain under roofs, splashes, a wet lens | 5.3 kB |
 
 Each entry is compressed on its own ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)),
-so sums overstate a combined bundle: the root `Sky` is 16.8 kB with all of them, against 21.5 kB
-summed. `addSky(stage)` (base, night) sums to about 9.3 kB and Night Citadel (base, night, fog, reflection) to about 12.4 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
+so sums overstate a combined bundle: the root `Sky` is 17.7 kB with all of them, against 22.4 kB
+summed. `addSky(stage)` (base, night) sums to about 9.5 kB and Night Citadel (base, night, fog, reflection) to about 12.6 kB. Recorded traces (`test/fixtures/traces.json`) pin the root `Sky`'s GPU work, WGSL and uploads; with fewer features,
 the shaders leave out the unused functions and branches, and the GPU work, uploads and rendered pixels are the
 same as the root's for that configuration (`test/split.test.js`, and on a real GPU `test/browser-check.mjs`).
 An option or `model` whose feature is missing throws a `TypeError` naming the entry to import. Without a day model
@@ -83,7 +83,7 @@ the same cloud field and clock, with filtering matched to each target's resoluti
 `sky.cloudLayer` gives the layer's noise and clock to what must match it: `cloudShadows(sky)` from
 `@margoengine/shadows/light-function` darkens the ground under these clouds. For clouds you can fly through, see [Volumetric clouds](#volumetric-clouds).
 
-timeScale is clock hours per real second. Sun direction is exposed in the reused sun buffer. The sky draws only where the reversed-Z scene depth is clear. Bruneton precomputation includes transmittance, single scattering, scattering density and orders 2..4, cached until turbidity changes. Tables interpolate four dimensions (radius, view zenith, sun zenith, view/sun angle), with 8 x 32 x 16 x 8 samples; angular and ray integration use 32 samples. Camera Y is meters above Earth; atmosphere math is kilometers.
+timeScale is clock hours per real second. Sun direction is exposed in the reused sun buffer. The sky draws only where the reversed-Z scene depth is clear. Bruneton precomputation includes transmittance, single scattering, scattering density and orders 2..4, cached until turbidity or `groundAlbedo` changes. Tables interpolate four dimensions (radius, view zenith, sun zenith, view/sun angle), with 8 x 32 x 16 x 8 samples; angular and ray integration use 32 samples. Camera Y is meters above Earth; atmosphere math is kilometers.
 
 The default Preetham model computes the shared sun transmittance table. Scattering
 tables are computed when Bruneton is first rendered, including after a model
@@ -106,6 +106,31 @@ more air, warming and dimming it (at 17:34 with turbidity 3.2 the sun is at abou
 69% strength, with green at 64% and blue at 21% of red). Surfaces add their own N·L,
 so there is no further elevation factor. `sunlight(mu, altitude, turbidity)` returns
 that colour for any sun elevation. `sunset` is deprecated and ignored.
+
+### Ground albedo: snow fields and deserts
+
+With the Bruneton model, `groundAlbedo` makes the ground reflect light back into the air, which scatters part of
+it toward the eye: the sky brightens, most near the horizon. Give one number or linear RGB, 0 to 1. About 0.8 suits
+fresh snow, 0.3 to 0.4 desert sand and 0.1 to 0.25 grass or forest; 0, the default, is a black ground and the sky as
+without the option.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky/base';
+import {bruneton} from 'margoengine/sky/bruneton';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+// A snow field: on a real GPU, 90 degrees from a sun 30 degrees up, the horizon is about twice as bright as over a black ground.
+const sky = Sky.attach(engine, {model: 'bruneton', groundAlbedo: 0.85}, {bruneton});
+sky.options.groundAlbedo = [0.4, 0.33, 0.25]; // later, a sand desert: the tables rebuild once
+```
+
+The ground is Lambertian (Bruneton and Neyret 2008: sec. 2, the light the ground reflects from its irradiance; sec. 4, per order): its
+radiance is albedo / pi times the light on it, the direct sun for the first bounce and the sky of the order before
+for the next two, gathered into a 64-entry table over the sun's elevation. Each scattering order's density adds that
+radiance, through the air between, for its directions that end on the ground. A changed albedo rebuilds the tables
+once (three more small passes than without it); the transmittance table is kept. The ground is one albedo
+everywhere, not a texture, and the Preetham model, which has no ground term, ignores it. For a world that is not
+Earth, see `HillaireSky`, whose `atmosphere.groundAlbedo` does the same.
 
 ## Volumetric clouds
 

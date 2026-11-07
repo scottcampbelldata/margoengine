@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky ground albedo check</title><style>body{margin:0}canvas{display:block;width:128px;height:96px}</style></head><body><canvas width="128" height="96"></canvas>
+<script type="module">
+// The Bruneton sky with ground albedo feedback on a real GPU, read from Bloom's HDR scene capture: the sky just above
+// the horizon and 40 degrees up, for a black ground, desert sand, fresh snow and a red ground. Driven by
+// features-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/base.js';
+import {bruneton} from '/packages/sky/dist/bruneton.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,2,-1],fov:20,near:0.5,far:100000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0}),rad=Math.PI/180;
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function centre(){
+ engine.render({delta:0});
+ const w=post.sceneTexture.width,h=post.sceneTexture.height,size=w*h*16;
+ const output=device.createBuffer({size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange().slice(0));staging.unmap();output.destroy();staging.destroy();
+ const p=((h>>1)*w+(w>>1))*4;return Array.from(v.subarray(p,p+3));
+}
+// Look north at `elevation` degrees with the sun 30 degrees up in the east, so the view is 90 degrees from it.
+async function look(sky,elevation){
+ const e=elevation*rad;engine.camera.target=[0,2+Math.sin(e)*1000,-Math.cos(e)*1000];await centre();return centre();
+}
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const sun=[Math.cos(30*rad),Math.sin(30*rad),0];
+  const sky=Sky.attach(engine,{model:'bruneton',timeScale:0,sunDirection:sun},{bruneton}),out={};
+  const both=async(groundAlbedo)=>{sky.options.groundAlbedo=groundAlbedo;return {horizon:await look(sky,1),high:await look(sky,40)};};
+  out.plain=await both(undefined);
+  out.black=await both(0);
+  out.sand=await both(0.4);
+  out.snow=await both(0.9);
+  out.red=await both([0.9,0.1,0.1]);
+  out.back=await both(0);
+  sky.dispose();
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

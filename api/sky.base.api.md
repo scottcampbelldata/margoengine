@@ -151,6 +151,7 @@ export interface SkyOptions {
     clouds?: SkyCloudOptions;
     fog?: SkyFogOptions;
     model?: 'preetham' | 'bruneton';
+    groundAlbedo?: number | readonly [number, number, number];
     hours?: number;
     timeScale?: number;
     turbidity?: number;
@@ -161,7 +162,7 @@ export interface SkyOptions {
 
 export interface SkyTables {
     view: GPUTextureView;
-    run(c: SkyPassContext): void;
+    run(c: SkyPassContext, albedo?: Readonly<ArrayLike<number>>): void;
 }
 
 export const skyEnvironmentFloor: {

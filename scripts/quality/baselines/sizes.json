@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10477346,
+  "total": 10479649,
   "history": [
     {
       "date": "2026-10-24",
@@ -3500,6 +3500,12 @@
       "commit": "ce48e93f8",
       "reason": "new entry tiles/ion: hosted tileset sign-in and credits; root gains TilesRenderer.onUpdate (batch 47 job 8)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "feffd3eba",
+      "reason": "sky/bruneton ground albedo feedback: irradiance and ground density WGSL (+445 B), groundAlbedo option in base (+96 B)",
+      "grew": 3
     }
   ],
   "items": {
@@ -4057,11 +4063,11 @@
     "@margoengine/shadows/transmission": 1027,
     "@margoengine/shadows/virtual": 15956,
     "@margoengine/shadows/vsm": 2046,
-    "@margoengine/sky": 16975,
+    "@margoengine/sky": 18225,
     "@margoengine/sky/aerial": 6719,
     "@margoengine/sky/astro": 9780,
-    "@margoengine/sky/base": 7004,
-    "@margoengine/sky/bruneton": 2557,
+    "@margoengine/sky/base": 7356,
+    "@margoengine/sky/bruneton": 3258,
     "@margoengine/sky/cloud-shadows": 3448,
     "@margoengine/sky/clouds": 2338,
     "@margoengine/sky/fog": 2295,

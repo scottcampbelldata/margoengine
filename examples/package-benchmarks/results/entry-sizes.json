@@ -1,5 +1,5 @@
 {
-  "commit": "b87b0ecaf",
+  "commit": "feffd3eba",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1762,6 +1762,10 @@
       ".": {
         "raw": 3033,
         "gzip": 1259
+      },
+      "./delay": {
+        "raw": 3640,
+        "gzip": 1295
       }
     },
     "@margoengine/netcode": {
@@ -1826,8 +1830,8 @@
         "gzip": 19145
       },
       "./next": {
-        "raw": 70650,
-        "gzip": 38225
+        "raw": 83438,
+        "gzip": 47811
       }
     },
     "@margoengine/physics2d": {
@@ -2352,20 +2356,20 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 46779,
-        "gzip": 16810
+        "raw": 50584,
+        "gzip": 17694
       },
       "./base": {
-        "raw": 17541,
-        "gzip": 6895
+        "raw": 18208,
+        "gzip": 7100
       },
       "./preetham": {
         "raw": 1657,
         "gzip": 719
       },
       "./bruneton": {
-        "raw": 6285,
-        "gzip": 2301
+        "raw": 9419,
+        "gzip": 3002
       },
       "./clouds": {
         "raw": 4510,
@@ -2606,8 +2610,8 @@
     },
     "@margoengine/tiles": {
       ".": {
-        "raw": 46010,
-        "gzip": 15578
+        "raw": 46044,
+        "gzip": 15586
       },
       "./i3dm": {
         "raw": 2794,
@@ -2628,6 +2632,10 @@
       "./terrain": {
         "raw": 12887,
         "gzip": 5747
+      },
+      "./ion": {
+        "raw": 5237,
+        "gzip": 2543
       }
     },
     "@margoengine/tonemap": {
@@ -3010,9 +3018,9 @@
       "brotli": 6003
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 23463,
-      "gzip": 9363,
-      "brotli": 8361
+      "raw": 24130,
+      "gzip": 9558,
+      "brotli": 8574
     },
     "packages/creative/dist/particles.js": {
       "raw": 43160,

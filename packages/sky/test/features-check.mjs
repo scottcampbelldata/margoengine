@@ -319,6 +319,51 @@ const checks = {
     return r;
   },
 };
+checks.albedo = async (page, samples) => {
+  const r = await page.evaluate(() => window.check.run());
+  const show = (v) => v.map((x) => x.toPrecision(4)).join(', ');
+  for (const name of ['plain', 'black', 'sand', 'snow', 'red', 'back'])
+    console.log(`  albedo ${samples}x ${name}: horizon ${show(r[name].horizon)}, 40 degrees up ${show(r[name].high)}`);
+  assert.equal(r.error, null);
+  assert.deepEqual(r.errors, []);
+  // Albedo 0 is the sky without the option, to the bit, before and after a brighter ground.
+  assert.deepEqual(r.black, r.plain);
+  assert.deepEqual(r.back, r.plain);
+  const gain = (a, b, at, c) => a[at][c] / b[at][c] - 1;
+  for (let c = 0; c < 3; c++) {
+    // A brighter ground brightens the sky: sand more than none, snow more than sand.
+    for (const at of ['horizon', 'high'])
+      assert.ok(
+        r.snow[at][c] > r.sand[at][c] && r.sand[at][c] > r.black[at][c],
+        `channel ${c} ${at}: ${show(r.black[at])} / ${show(r.sand[at])} / ${show(r.snow[at])}`,
+      );
+    // Most near the horizon, where the line of sight crosses the most air lit from below.
+    assert.ok(
+      gain(r.snow, r.black, 'horizon', c) > gain(r.snow, r.black, 'high', c),
+      `channel ${c}: horizon gain ${gain(r.snow, r.black, 'horizon', c)}, high ${gain(r.snow, r.black, 'high', c)}`,
+    );
+  }
+  // Size of the effect, 90 degrees from a sun 30 degrees up: snow at albedo 0.9 sends up radiance 0.9 / pi x E x 0.5 x
+  // T (about 0.12 E), and air lit by that lower half sphere scatters 0.5 of it toward the eye (the phase function
+  // integrates to 1), as much as the sun's own single scattering at 90 degrees (3 / (16 pi) E, 0.06 E). So the horizon
+  // about doubles; 1.5x to 3x holds that with the orders of light that follow. Measured green +113%.
+  const snowGain = gain(r.snow, r.black, 'horizon', 1),
+    sandGain = gain(r.sand, r.black, 'horizon', 1);
+  assert.ok(snowGain > 0.5 && snowGain < 2, `snow horizon gain ${snowGain}`);
+  // Nearly linear in the albedo (0.9 / 0.4 = 2.25), a little more because light bounces between the ground and the
+  // air again; clear air sends little back down, so less than 20% more. Measured 2.31.
+  assert.ok(
+    snowGain / sandGain > 2.25 && snowGain / sandGain < 2.25 * 1.2,
+    `snow against sand ${snowGain / sandGain}`,
+  );
+  // A red ground (0.9, 0.1, 0.1) lifts red as much as snow does and blue less than sand does.
+  assert.ok(Math.abs(r.red.horizon[0] - r.snow.horizon[0]) < 1e-3 * r.snow.horizon[0], `red ${show(r.red.horizon)}`);
+  assert.ok(r.red.horizon[2] < r.sand.horizon[2], `red ground blue ${show(r.red.horizon)}`);
+  console.log(
+    `ok albedo ${samples}x: snow lifts the horizon ${(100 * gain(r.snow, r.black, 'horizon', 1)).toFixed(1)}% and 40 degrees up ${(100 * gain(r.snow, r.black, 'high', 1)).toFixed(1)}% (green)`,
+  );
+  return r;
+};
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(checks);
 const context = await openBrowser({ startPath: '/packages/sky/test/volumetric-check.html', port: 5213 }),
   { page, hardware } = context,

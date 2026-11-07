@@ -109,6 +109,13 @@ export interface SkyOptions {
   fog?: SkyFogOptions;
   /** Day model (needs the entry of the same name). Default `'preetham'`. */
   model?: 'preetham' | 'bruneton';
+  /**
+   * Ground albedo for the Bruneton model (needs `bruneton`), 0-1: one number or linear RGB. The ground reflects this
+   * share of the light on it back into the air, which brightens the sky most near the horizon: about 0.8 for fresh
+   * snow, 0.3 to 0.4 for desert sand, 0.1 to 0.25 for grass and forest. Changing it rebuilds the tables. The Preetham
+   * fit has no ground term and ignores it. Default 0 (a black ground, the sky as without the option).
+   */
+  groundAlbedo?: number | readonly [number, number, number];
   /** Clock, hours 0-24 (12 is noon, 6 sunrise); advanced by `timeScale` and wrapped into 0..24. Default 12. */
   hours?: number;
   /** Clock hours per real second, -24..24. Default 1 / 3600 (real time). */
@@ -162,7 +169,8 @@ export interface SkyLightingTarget {
 /** Bruneton's precomputed tables: the view the sky samples and the passes that refill them. */
 export interface SkyTables {
   view: GPUTextureView;
-  run(c: SkyPassContext): void;
+  /** Refills the tables; `albedo` is the ground albedo, linear RGB 0-1, and 0 or absent leaves the ground black. */
+  run(c: SkyPassContext, albedo?: Readonly<ArrayLike<number>>): void;
 }
 /** Features add each GPU object they create here at once, so a setup that fails part-way still releases it. */
 type Owned = { destroy(): void }[];
@@ -304,6 +312,9 @@ export class Sky implements EnginePlugin {
   private format = '';
   private computedT = NaN;
   private scatteringT = NaN;
+  // The ground albedo the tables were built with, and this frame's (the fourth value flags a change).
+  private readonly scatteringA = new Float64Array(3);
+  private readonly albedo = new Float32Array(4);
   private readonly values = new Float32Array(64);
   private time = 0;
   private readonly inverse = this.values.subarray(0, 16);
@@ -414,6 +425,17 @@ export class Sky implements EnginePlugin {
       );
     if ((o.model !== undefined || f.preetham || f.bruneton) && !f[model])
       throw new TypeError(`Sky model '${model}' needs ${model} from @margoengine/sky/${model}`);
+    const albedo = o.groundAlbedo;
+    if (albedo !== undefined) {
+      const values = typeof albedo === 'number' ? [albedo] : albedo;
+      if (
+        !Array.isArray(values) ||
+        (typeof albedo !== 'number' && values.length !== 3) ||
+        values.some((v) => !(typeof v === 'number' && v >= 0 && v <= 1))
+      )
+        throw new RangeError('Invalid sky groundAlbedo; use a number from 0 to 1 or three of them (linear RGB)');
+      if (!f.bruneton) throw new TypeError('Sky groundAlbedo needs bruneton from @margoengine/sky/bruneton');
+    }
     if (o.environment !== undefined && typeof o.environment !== 'boolean')
       throw new RangeError('Sky environment must be true or false; pass a boolean');
     if (o.environment && !f.lighting)
@@ -570,9 +592,17 @@ export class Sky implements EnginePlugin {
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     const turbidity = this.options.turbidity ?? 2;
     if (this.computedT !== turbidity) dispatch(c, this.pipeline!, this.group!, 16, 4);
-    if (this.options.model === 'bruneton' && this.scatteringT !== turbidity) {
-      this.tables!.run(c);
+    const albedo = this.options.groundAlbedo ?? 0,
+      a = this.albedo;
+    a[3] = 0;
+    for (let i = 0; i < 3; i++) {
+      a[i] = typeof albedo === 'number' ? albedo : albedo[i];
+      if (a[i] !== this.scatteringA[i]) a[3] = 1;
+    }
+    if (this.options.model === 'bruneton' && (this.scatteringT !== turbidity || a[3])) {
+      this.tables!.run(c, a);
       this.scatteringT = turbidity;
+      for (let i = 0; i < 3; i++) this.scatteringA[i] = a[i];
     }
     this.computedT = turbidity;
   }

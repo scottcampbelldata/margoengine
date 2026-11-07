@@ -141,6 +141,7 @@ interface SkyOptions {
     clouds?: SkyCloudOptions;
     fog?: SkyFogOptions;
     model?: 'preetham' | 'bruneton';
+    groundAlbedo?: number | readonly [number, number, number];
     hours?: number;
     timeScale?: number;
     turbidity?: number;

@@ -614,6 +614,14 @@ the table and the march within 0.05% on one ray across the top; the CPU sun tran
 optical depth to 1e-4. Missing: other GPUs, a reference image or radiance from another renderer, timing (4 to 6 ms per
 frame at 128 x 96 with Bloom, diagnostic).
 
+The Bruneton `Sky`'s `groundAlbedo` (`@margoengine/sky/bruneton`) adds the ground as a boundary to the four-order
+precomputation, built the first time an albedo above 0 is set: per order a 64-texel irradiance pass (the direct sun,
+then the order before over the upper hemisphere) and a density pass that adds albedo / pi times that light, through
+the air between, for directions that end on the ground. At 0 the sky runs the passes and shaders it had before, so
+the recorded traces stand; a change of albedo rebuilds the scattering once, not the transmittance. Evidence:
+`features-check.mjs` albedo on a Radeon 680M at 4x and 1x (snow +113% at the horizon, sand +49%, albedo 0 bit for
+bit). Missing: other GPUs, a reference sky, timing.
+
 `LightShafts` (`@margoengine/sky/shafts`) is a screen-space pass after the aerial perspective (order 4.5): a half-size
 r16float mask of open sky (2 x 2 depth taps) times the clouds' transmittance along each view ray, from its own copy of
 the cloud noise volumes, then a fullscreen draw that walks the mask toward the sun's projected position and adds light

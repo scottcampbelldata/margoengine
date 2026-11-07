@@ -120,6 +120,7 @@ export interface SkyOptions {
     clouds?: SkyCloudOptions;
     fog?: SkyFogOptions;
     model?: 'preetham' | 'bruneton';
+    groundAlbedo?: number | readonly [number, number, number];
     hours?: number;
     timeScale?: number;
     turbidity?: number;
@@ -193,6 +194,6 @@ type SkyPassContext = Extract<PassContext, {
 
 interface SkyTables {
     view: GPUTextureView;
-    run(c: SkyPassContext): void;
+    run(c: SkyPassContext, albedo?: Readonly<ArrayLike<number>>): void;
 }
 ```
