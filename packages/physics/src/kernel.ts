@@ -27,6 +27,12 @@ interface KernelExports extends WebAssembly.Exports {
   world_pairs(): number;
   world_pair_rows(): number;
   world_solving(): number;
+  world_events(): number;
+  world_clear_events(): void;
+  world_set_filtering(on: number): void;
+  collider_set_state(collider: number, state: number): void;
+  collider_touch(collider: number): void;
+  body_set_enabled(body: number, enabled: number): void;
   body_touch(body: number): void;
   world_awake(): number;
   world_islands(): number;
@@ -95,6 +101,14 @@ export const JOINT_MOTOR_FORCE = 1 << 18;
 export const JOINT_CONTACTS = 1 << 25;
 export const JOINT_CONE = 1 << 26;
 export const JOINT_DISTANCE = 1 << 27;
+/** Bits of the `colliderFlags` column. */
+export const COLLIDER_SENSOR = 1;
+export const COLLIDER_OFF = 2;
+/** Bit of the `flags` column: the body is out of the world. */
+export const BODY_DISABLED = 1 << 11;
+/** An event's first word: the first collider's row under this mask, the sensor bit, and the top bit when it started. */
+export const EVENT_COLLIDER = (1 << 30) - 1;
+export const EVENT_SENSOR = 1 << 30;
 
 /** How a body moves: `dynamic` by forces, `kinematicPosition` to a target, `kinematicVelocity` at its velocity. */
 export type KernelBodyKind = 'fixed' | 'dynamic' | 'kinematicPosition' | 'kinematicVelocity';
@@ -215,6 +229,8 @@ export class KernelWorld {
   readonly columns: Record<string, KernelColumn> = {};
   private readonly api: KernelExports;
   private layout = -1;
+  private stepping = false;
+  private filter: ((a: number, b: number) => boolean) | null = null;
   private hullRows = 0;
 
   /**
@@ -226,12 +242,18 @@ export class KernelWorld {
   constructor(bodies = 1024, colliders = bodies) {
     const module = compiled.value;
     if (!module) throw new MargoError('state', 'The physics kernel is not loaded; call await loadKernel() first.');
-    this.api = new WebAssembly.Instance(module).exports as KernelExports;
+    this.api = new WebAssembly.Instance(module, { env: { contact_filter: (a: number, b: number) => this.ask(a, b) } }).exports as KernelExports;
     if (!Number.isSafeInteger(bodies) || !Number.isSafeInteger(colliders) || !this.api.world_new(bodies, colliders))
       throw new RangeError(
         `Bodies and colliders must be integers from 1 to 4194304; use a smaller world (got ${bodies}, ${colliders}).`,
       );
     this.bind();
+  }
+
+  /** The step asks about a pair. Finding pairs can have grown the world, and a filter may read the columns. */
+  private ask(a: number, b: number): number {
+    if (this.api.world_layout() !== this.layout) this.bind();
+    return this.filter!(a, b) ? 1 : 0;
   }
 
   private bind(): void {
@@ -296,6 +318,33 @@ export class KernelWorld {
       });
     }
     return out;
+  }
+  /**
+   * Decides each pair of collider rows the step looks at; false keeps them from touching, sensor pairs too. It runs inside
+   * the step, so it may read the world and must not change it. Null, the default, asks nothing.
+   */
+  set contactFilter(filter: ((a: number, b: number) => boolean) | null) {
+    this.filter = filter;
+    this.api.world_set_filtering(filter ? 1 : 0);
+  }
+  /** Events waiting in the `events` column, two words each. Read them after a step, then call {@link KernelWorld.clearEvents}. */
+  get eventCount(): number {
+    return this.api.world_events();
+  }
+  clearEvents(): void {
+    this.api.world_clear_events();
+  }
+  /** Sets a collider's `COLLIDER_` bits. What it touched ends, and whatever rested on it wakes. */
+  setColliderState(collider: number, state: number): void {
+    this.api.collider_set_state(collider, state);
+  }
+  /** Wakes what a collider can reach, after its groups were written. */
+  touchCollider(collider: number): void {
+    this.api.collider_touch(collider);
+  }
+  /** Takes a body out of the world or puts it back: out, it keeps its pose and speed, touches nothing and its joints rest. */
+  setBodyEnabled(body: number, enabled: boolean): void {
+    this.api.body_set_enabled(body, enabled ? 1 : 0);
   }
   /** Pairs the last step solved: the first this many rows of the `solvePairs` column. */
   get solvingPairs(): number {
@@ -611,7 +660,14 @@ export class KernelWorld {
   step(dt: number): this {
     if (!(dt > 0) || !Number.isFinite(dt))
       throw new RangeError(`A step must be finite and above zero; a usual step is 1 / 60 (got ${dt}).`);
-    const failed = this.api.world_step(dt);
+    if (this.stepping) throw new MargoError('state', 'A contact filter ran a step; a filter may only read the world.');
+    this.stepping = true;
+    let failed: number;
+    try {
+      failed = this.api.world_step(dt);
+    } finally {
+      this.stepping = false;
+    }
     if (this.api.world_layout() !== this.layout) this.bind();
     if (failed) throw new RangeError('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');
     const lost = this.api.world_lost();

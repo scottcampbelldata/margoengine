@@ -1,15 +1,14 @@
 // A collider of the own solver. Reads only, so it may use `Math`: nothing here can change a step.
 import { MargoError } from '@margoengine/math/errors';
-import type { KernelWorld } from '../kernel.js';
+import { COLLIDER_OFF, COLLIDER_SENSOR, type KernelWorld } from '../kernel.js';
 import type { ColliderShape } from '../collider.js';
 import type { PhysicsBody } from './body.js';
-
-const notYet = (what: string): MargoError =>
-  new MargoError('unsupported', `${what} is not in the own solver yet; use @margoengine/physics.`);
 
 /** A collider on a {@link PhysicsBody}: what `body.colliders` hands you. */
 export class PhysicsCollider {
   private removed = false;
+  /** @internal Whether this collider asks for contact and intersection events: a pair says so when either side does. */
+  emits = true;
   /** @internal */
   constructor(
     private readonly kernel: KernelWorld,
@@ -40,12 +39,24 @@ export class PhysicsCollider {
     return this.shape === 'capsule' ? colliderA[a] + colliderB[a] : colliderA[a];
   }
   isSensor(): boolean {
-    this.columns();
-    return false;
+    return (this.columns().colliderFlags[this.handle] & COLLIDER_SENSOR) !== 0;
+  }
+  /** A sensor sees overlaps and pushes nothing. What it touched ends as what it was, and starts again as what it is. */
+  setSensor(sensor: boolean): this {
+    this.setBit(COLLIDER_SENSOR, sensor);
+    return this;
   }
   isEnabled(): boolean {
-    this.columns();
-    return true;
+    return (this.columns().colliderFlags[this.handle] & COLLIDER_OFF) === 0;
+  }
+  /** A disabled collider touches nothing; it keeps its place on the body, and its mass. */
+  setEnabled(enabled: boolean): this {
+    this.setBit(COLLIDER_OFF, !enabled);
+    return this;
+  }
+  private setBit(bit: number, on: boolean): void {
+    const flags = this.columns().colliderFlags[this.handle];
+    this.kernel.setColliderState(this.handle, on ? flags | bit : flags & ~bit);
   }
   density(): number {
     return this.columns().colliderDensity[this.handle];
@@ -107,12 +118,26 @@ export class PhysicsCollider {
   private wake(): void {
     if (this.body.type === 'dynamic') this.kernel.wake(this.body.row);
   }
-  /** Not served yet: throws. */
-  collisionGroups(): never {
-    throw notYet('collisionGroups');
+  collisionGroups(): number {
+    return this.columns().colliderGroups[this.handle];
   }
-  /** Not served yet: throws. */
-  solverGroups(): never {
-    throw notYet('solverGroups');
+  /** Packed interaction groups, see `collisionGroups` from this package. */
+  setCollisionGroups(groups: number): this {
+    this.columns().colliderGroups[this.handle] = groups;
+    this.reach();
+    return this;
+  }
+  solverGroups(): number {
+    return this.columns().colliderSolverGroups[this.handle];
+  }
+  /** Packed solver groups: pairs whose groups do not meet are detected and fire events, and are not solved. */
+  setSolverGroups(groups: number): this {
+    this.columns().colliderSolverGroups[this.handle] = groups;
+    this.reach();
+    return this;
+  }
+  private reach(): void {
+    this.kernel.touchCollider(this.handle);
+    this.wake();
   }
 }

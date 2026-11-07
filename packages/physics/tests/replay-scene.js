@@ -153,7 +153,9 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {})
       c.jointCap3[joint] = 100;
     }
   }
+  world.contactFilter = (a, b) => (a * 3 + b) % 11 !== 0;
   for (let i = 0; i < steps; i++) {
+    world.clearEvents();
     if (i % 512 === 0) {
       world.setGravity(...GRAVITY[(i / 512) % 4]);
       for (const row of rows) {
@@ -183,6 +185,15 @@ export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {})
       c.forceY[pick] = c.forceY[pick] === 0 ? random.value() : 0;
       c.torqueX[pick] = c.torqueX[pick] === 0 ? random.value() : 0;
     }
+    if (i % 307 === 0) world.setBodyEnabled(pick, (c.flags[pick] & (1 << 11)) !== 0);
+    const collider = c.firstCollider[pick];
+    if (i % 313 === 0 && collider !== 0xffffffff) world.setColliderState(collider, Math.floor(i / 313) % 3);
+    if (i % 317 === 0 && collider !== 0xffffffff) {
+      c.colliderGroups[collider] = i % 2 === 0 ? 0xffffffff : 0x00010001;
+      c.colliderSolverGroups[collider] = i % 3 === 0 ? 0xffffffff : 0x00020002;
+      world.touchCollider(collider);
+    }
+    if (i % 331 === 0) c.dominance[pick] = i % 3;
     if (i % 503 === 0) world.sleep(pick);
     if (i % 509 === 0) world.setCanSleep(pick, i % 2 === 0);
     if (i % 211 === 0 && (c.flags[pick] & 6) === 0) {

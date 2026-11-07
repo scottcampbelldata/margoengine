@@ -109,6 +109,32 @@ pub extern "C" fn world_pairs() -> u32 {
     world().header().pairs
 }
 /// Pair rows handed out so far: pair columns hold rows below this, freed ones with NONE in PAIR_A.
+/// Events waiting in the EVENTS column, two words each.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_events() -> u32 {
+    world().header().events
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn world_clear_events() {
+    world().header_mut().events = 0;
+}
+/// Not zero: the step asks the imported contact_filter about each pair.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_set_filtering(on: u32) {
+    world().header_mut().filtering = on;
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_set_state(collider: u32, state: u32) {
+    world().set_collider_state(collider, state);
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn collider_touch(collider: u32) {
+    world().touch_collider(collider);
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn body_set_enabled(body: u32, enabled: u32) {
+    world().set_body_enabled(body, enabled != 0);
+}
 /// Pairs the last step solved: the first this many of SOLVE_PAIRS.
 #[unsafe(no_mangle)]
 pub extern "C" fn world_solving() -> u32 {

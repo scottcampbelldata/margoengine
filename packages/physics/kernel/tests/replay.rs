@@ -2,7 +2,7 @@
 // build gave, kept in tests/fixtures/replay-hash.json. Bit equality across Node and browsers is proved from the same file.
 use margoengine_physics_kernel::layout::*;
 use margoengine_physics_kernel::math::*;
-use margoengine_physics_kernel::world::World;
+use margoengine_physics_kernel::world::{World, NONE};
 
 const STEPS: u32 = 10_000;
 const EVERY: u32 = 100;
@@ -146,7 +146,10 @@ fn scene() -> Vec<u32> {
             w.set_s(JOINT_CAP_3, at, 100.0);
         }
     }
+    w.filter = Some(|a, b| (a * 3 + b) % 11 != 0);
+    w.header_mut().filtering = 1;
     for i in 0..STEPS {
+        w.header_mut().events = 0;
         if i % 512 == 0 {
             w.header_mut().gravity = GRAVITY[((i / 512) % 4) as usize];
             for &row in &rows {
@@ -188,6 +191,22 @@ fn scene() -> Vec<u32> {
             w.set_s(FORCE_Y, at, force);
             let torque = if w.s(TORQUE_X, at) == 0.0 { random.value() } else { 0.0 };
             w.set_s(TORQUE_X, at, torque);
+        }
+        if i % 307 == 0 {
+            let enabled = w.flags(at) & DISABLED != 0;
+            w.set_body_enabled(pick, enabled);
+        }
+        let collider = w.uu(FIRST_COLLIDER, at);
+        if i % 313 == 0 && collider != NONE {
+            w.set_collider_state(collider, (i / 313) % 3);
+        }
+        if i % 317 == 0 && collider != NONE {
+            w.set_u(COLLIDER_GROUPS, collider as usize, if i % 2 == 0 { u32::MAX } else { 0x0001_0001 });
+            w.set_u(COLLIDER_SOLVER_GROUPS, collider as usize, if i % 3 == 0 { u32::MAX } else { 0x0002_0002 });
+            w.touch_collider(collider);
+        }
+        if i % 331 == 0 {
+            w.set_s(DOMINANCE, at, (i % 3) as f32);
         }
         if i % 503 == 0 {
             w.request_sleep(pick);

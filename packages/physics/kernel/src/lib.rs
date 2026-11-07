@@ -7,6 +7,7 @@
 pub mod api;
 pub mod broad;
 pub mod contact;
+pub mod events;
 pub mod gjk;
 pub mod hull;
 pub mod integrate;

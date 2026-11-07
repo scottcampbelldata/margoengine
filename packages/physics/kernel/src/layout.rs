@@ -98,6 +98,8 @@ columns! {
     INERTIA_FRAME_Z f32 Body,
     INERTIA_FRAME_W f32 Body,
     GRAVITY_SCALE f32 Body,
+    // The higher of two touching bodies is a wall to the lower.
+    DOMINANCE f32 Body,
     LINEAR_DAMPING f32 Body,
     ANGULAR_DAMPING f32 Body,
     // The pose a kinematicPosition body reaches at the end of the next step.
@@ -161,6 +163,11 @@ columns! {
     COLLIDER_FRICTION f32 Collider,
     COLLIDER_RESTITUTION f32 Collider,
     COLLIDER_COMBINE u32 Collider,
+    // Bits of what kind of collider it is, then its packed interaction groups and solver groups: memberships in the high 16
+    // bits, filter in the low 16, all set by default.
+    COLLIDER_FLAGS u32 Collider,
+    COLLIDER_GROUPS u32 Collider,
+    COLLIDER_SOLVER_GROUPS u32 Collider,
     // Broad phase. State bits, the next in the pending chain, the first of its pairs.
     COLLIDER_STATE u32 Collider,
     COLLIDER_PENDING u32 Collider,
@@ -213,6 +220,8 @@ columns! {
     PAIR_FEATURE u32 Pair,
     // The normal impulse the pair gave in this step, over all its substeps.
     PAIR_FORCE f32 Pair,
+    // What the last step has to say: two words an event, see `push_event`.
+    EVENTS u32 Contact,
     // The solver's view of a pair for this step: the surfaces mixed, the first tangent, and the pairs it will solve, densely.
     PAIR_FRICTION f32 Pair,
     PAIR_RESTITUTION f32 Pair,
@@ -474,6 +483,28 @@ pub const LOCK_ANGULAR: u32 = 7 << 6;
 pub const SLEEPING: u32 = 1 << 9;
 /// May go to sleep; a body without it keeps its island awake.
 pub const CAN_SLEEP: u32 = 1 << 10;
+/// Out of the world: on no list, touching nothing, its joints at rest.
+pub const DISABLED: u32 = 1 << 11;
+
+// Bits of the COLLIDER_FLAGS column.
+/// Sees overlaps and pushes nothing.
+pub const COLLIDER_SENSOR: u32 = 1;
+/// Touches nothing and is seen by nothing.
+pub const COLLIDER_OFF: u32 = 2;
+
+// Bits of the PAIR_FLAGS column.
+/// It touched at the end of the last step that looked at it.
+pub const PAIR_TOUCHING: u32 = 1;
+/// A pair that is not solved overlaps: a sensor, or solver groups that do not meet.
+pub const PAIR_OVERLAP: u32 = 2;
+/// In this step's solve the first body, or the second, is a wall to the other.
+pub const PAIR_A_RULES: u32 = 4;
+pub const PAIR_B_RULES: u32 = 8;
+
+// Top bits of an event's first word, over the collider's row.
+pub const EVENT_STARTED: u32 = 1 << 31;
+pub const EVENT_SENSOR: u32 = 1 << 30;
+pub const EVENT_COLLIDER: u32 = (1 << 30) - 1;
 
 // Bits of the COLLIDER_STATE column.
 /// Its ends are in the sorted lists.
@@ -501,3 +532,5 @@ pub const JOINT_CONTACTS: u32 = 1 << 25;
 pub const JOINT_CONE: u32 = 1 << 26;
 /// The first axis is the line between the anchors, and what it measures is their distance: a rope's limit, a spring's motor.
 pub const JOINT_DISTANCE: u32 = 1 << 27;
+/// A body of the joint is out of the world, so nothing solves the joint.
+pub const JOINT_OFF: u32 = 1 << 28;

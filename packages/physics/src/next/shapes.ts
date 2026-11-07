@@ -9,15 +9,6 @@ const PI = 3.141592653589793;
 /** The shapes the own solver holds so far, by the name their options use. */
 const served: Readonly<Record<string, KernelShape>> = { box: 'box', sphere: 'ball', capsule: 'capsule' };
 
-/** Settings the own solver does not hold yet, with the value that asks for nothing. */
-const contactSettings = [
-  ['sensor', false],
-  ['collisionGroups', undefined],
-  ['solverGroups', undefined],
-  ['events', true],
-  ['enabled', true],
-] as const;
-
 /** What the kernel needs for one collider. */
 export interface KernelCollider {
   name: ShapeOptions['shape'];
@@ -54,7 +45,7 @@ function fittedSphere(points: Float32Array, center: number[]): number[] {
 
 /**
  * Turns collider options into kernel arguments. Box and sphere sizes left out are fitted to `fit`, as the Rapier entry does.
- * @throws MargoError (`unsupported`) for a shape or a setting the own solver does not hold yet.
+ * @throws MargoError (`unsupported`) for a shape the own solver does not hold yet.
  * @throws TypeError when a size is left out and there is no geometry to fit.
  */
 export function kernelCollider(
@@ -67,12 +58,6 @@ export function kernelCollider(
       'unsupported',
       `The ${options.shape} shape is not in the own solver yet; use box, sphere or capsule, or @margoengine/physics.`,
     );
-  for (const [name, none] of contactSettings)
-    if (options[name] !== undefined && options[name] !== none)
-      throw new MargoError(
-        'unsupported',
-        `The ${name} setting is not in the own solver yet; leave it out or use @margoengine/physics.`,
-      );
   const fitted = (): Float32Array => {
       if (!fit.geometry) throw new TypeError(`A ${options.shape} collider without explicit size needs a mesh with geometry`);
       return geometryPositions(fit.geometry, fit.scale);

@@ -157,6 +157,7 @@ impl World {
             self.solve_contacts(h, stiffness, false, substep as usize);
             self.solve_impacts();
         }
+        self.gather_events();
         self.header_mut().steps += 1;
         self.check_range();
     }

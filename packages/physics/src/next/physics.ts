@@ -3,7 +3,16 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel, EnginePlugin, Mesh } from '@margoengine/core';
 import type { BodyOptions, BodyType } from '../body.js';
-import { KernelWorld, loadKernel, type KernelContactPoint, type KernelLoadOptions } from '../kernel.js';
+import {
+  COLLIDER_OFF,
+  COLLIDER_SENSOR,
+  EVENT_COLLIDER,
+  EVENT_SENSOR,
+  KernelWorld,
+  loadKernel,
+  type KernelContactPoint,
+  type KernelLoadOptions,
+} from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import { colliderGeometry } from '../mesh-fit.js';
 import type { ColliderOptions, ShapeOptions } from '../shapes.js';
@@ -35,6 +44,23 @@ export interface PhysicsOptions {
   solverIterations?: number;
   /** Plugin name (default 'physics'). */
   name?: string;
+  /** Decides each candidate pair of bodies; false lets them pass through each other and keeps their sensor events quiet. */
+  contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
+}
+
+/** Kind of collision event: `contactstart` and `contactend` for solid contacts, `intersectionstart` and `intersectionend` for sensors. */
+export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
+/** Two colliders began or stopped touching. */
+export interface CollisionEvent {
+  type: CollisionEventType;
+  bodyA: PhysicsBody;
+  bodyB: PhysicsBody;
+  meshA: Mesh | null;
+  meshB: Mesh | null;
+  colliderA: PhysicsCollider;
+  colliderB: PhysicsCollider;
+  /** True when either collider is a sensor (intersection events). */
+  sensor: boolean;
 }
 
 /** How hard two colliders pressed on each other in the last step. Only the own solver has this event. */
@@ -52,8 +78,12 @@ export interface ContactForceEvent {
   force: number;
 }
 
-/** Events a Physics world emits so far. `touching` and `contactPoints` read contacts after a step. */
+/** Events a Physics world emits, keyed by event name. `touching` and `contactPoints` read contacts after a step. */
 export interface PhysicsEventMap {
+  contactstart: CollisionEvent;
+  contactend: CollisionEvent;
+  intersectionstart: CollisionEvent;
+  intersectionend: CollisionEvent;
   /** After each step that has a listener, once for each pair of colliders that pressed on each other. */
   contactforce: ContactForceEvent;
   /** Before each fixed step, with the step length. Drive kinematic bodies here. */
@@ -109,7 +139,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   private readonly attachments = new Set<PhysicsAttachment>();
   private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();
   // Gathered into a reused array; a step run from inside a listener gathers into its own.
-  private readonly eventBuffer: ContactForceEvent[] = [];
+  private readonly eventBuffer: (CollisionEvent | ContactForceEvent)[] = [];
   private dispatching = false;
 
   /**
@@ -132,7 +162,6 @@ export class Physics implements EnginePlugin, BodyOwner {
    */
   constructor(engine: EngineKernel | null, options: PhysicsOptions = {}) {
     if ('rapier' in options) throw new TypeError('The own solver takes no rapier option; leave it out.');
-    if ('contactFilter' in options) throw later('contactFilter', 'contact events');
     this.name = options.name ?? 'physics';
     this.fixedTimestep = options.fixedTimestep ?? 1 / 60;
     this.maxSubsteps = options.maxSubsteps ?? 4;
@@ -146,6 +175,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     checkVec(gravity, 'Gravity');
     this.world = new KernelWorld();
     this.world.setGravity(...gravity);
+    const filter = options.contactFilter;
+    if (filter) this.world.contactFilter = (a, b) => filter(this.byRow.get(a)!.body, this.byRow.get(b)!.body);
     const substeps = options.substeps ?? options.solverIterations;
     if (substeps !== undefined) this.world.substeps = substeps;
     if (options.iterations !== undefined) this.world.iterations = options.iterations;
@@ -265,16 +296,43 @@ export class Physics implements EnginePlugin, BodyOwner {
   private dispatch(dt: number): void {
     const outer = this.dispatching,
       events = outer ? [] : this.eventBuffer;
+    this.gatherEvents(events);
     this.gatherForces(events, dt);
     this.dispatching = true;
     try {
-      for (let i = 0; i < events.length; i++) this.emit(events[i].type, events[i]);
+      for (let i = 0; i < events.length; i++) this.emit(events[i].type, events[i] as never);
     } finally {
       this.dispatching = outer;
       events.length = 0;
     }
   }
-  private gatherForces(events: ContactForceEvent[], dt: number): void {
+  private gatherEvents(events: (CollisionEvent | ContactForceEvent)[]): void {
+    const kernel = this.kernel,
+      words = kernel.columns.events,
+      count = kernel.eventCount;
+    for (let i = 0; i < count; i++) {
+      const first = words[2 * i],
+        colliderA = this.byRow.get(first & EVENT_COLLIDER),
+        colliderB = this.byRow.get(words[2 * i + 1]);
+      if (!colliderA || !colliderB || !(colliderA.emits || colliderB.emits)) continue;
+      const sensor = (first & EVENT_SENSOR) !== 0,
+        started = first >>> 31 !== 0,
+        bodyA = colliderA.body,
+        bodyB = colliderB.body;
+      events.push({
+        type: sensor ? (started ? 'intersectionstart' : 'intersectionend') : started ? 'contactstart' : 'contactend',
+        bodyA,
+        bodyB,
+        meshA: bodyA.mesh,
+        meshB: bodyB.mesh,
+        colliderA,
+        colliderB,
+        sensor,
+      });
+    }
+    kernel.clearEvents();
+  }
+  private gatherForces(events: (CollisionEvent | ContactForceEvent)[], dt: number): void {
     if (!this.listeners.get('contactforce')?.size) return;
     const kernel = this.kernel,
       { solvePairs, pairForce, pairA, pairB } = kernel.columns,
@@ -325,7 +383,6 @@ export class Physics implements EnginePlugin, BodyOwner {
       throw new MargoError('state', 'This mesh already has a physics body; remove it first or use the existing body.');
     if (options.ccd) throw later('ccd', 'continuous collision');
     if (options.follow) throw later('follow', 'the character and vehicle batch');
-    if (options.dominance) throw later('dominance', 'contact events');
     const start = mesh ? meshPose(mesh, this.engine) : null,
       position = options.position ?? start?.position ?? [0, 0, 0],
       rotation: Quat = options.rotation ?? start?.rotation ?? [0, 0, 0, 1];
@@ -342,6 +399,7 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.linearDamping !== undefined) columns.linearDamping[row] = options.linearDamping;
     if (options.angularDamping !== undefined) columns.angularDamping[row] = options.angularDamping;
     if (options.gravityScale !== undefined) columns.gravityScale[row] = options.gravityScale;
+    if (options.dominance !== undefined) columns.dominance[row] = options.dominance;
     if (options.canSleep !== undefined) kernel.setCanSleep(row, options.canSleep);
     if (options.additionalMass !== undefined) columns.additionalMass[row] = options.additionalMass;
     const angular = options.lockRotations ? 7 : options.enabledRotations ? bits(options.enabledRotations) : 0,
@@ -400,6 +458,11 @@ export class Physics implements EnginePlugin, BodyOwner {
     const { name, shape, size, options: placed } = kernelCollider(options, fit),
       row = this.kernel.addCollider(body.row, shape, size, placed),
       collider = new PhysicsCollider(this.kernel, row, body, name);
+    if (options.collisionGroups !== undefined) this.kernel.columns.colliderGroups[row] = options.collisionGroups;
+    if (options.solverGroups !== undefined) this.kernel.columns.colliderSolverGroups[row] = options.solverGroups;
+    if (options.sensor || options.enabled === false)
+      this.kernel.setColliderState(row, (options.sensor ? COLLIDER_SENSOR : 0) | (options.enabled === false ? COLLIDER_OFF : 0));
+    collider.emits = options.events ?? true;
     body.colliders.push(collider);
     this.byRow.set(row, collider);
     return collider;
@@ -438,13 +501,8 @@ export class Physics implements EnginePlugin, BodyOwner {
     return this.attachments.delete(attachment);
   }
 
-  /**
-   * Subscribes to step events. Returns an unsubscribe function.
-   * @throws MargoError (`unsupported`) for a contact event: it could never fire yet.
-   */
+  /** Subscribes to step and contact events. Returns an unsubscribe function. */
   on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void {
-    if (type !== 'beforestep' && type !== 'afterstep' && type !== 'contactforce')
-      throw later(`The ${String(type)} event`, 'contact events');
     if (this.disposed) return noop;
     let set = this.listeners.get(type);
     if (!set) this.listeners.set(type, (set = new Set()));

@@ -74,12 +74,19 @@ pub struct Header {
     pub joint_max_push: f32,
     /// The row of the body that left the range a step can work in, or NONE. No step runs after it.
     pub lost: u32,
+    /// Events listed since whoever reads them last cleared them.
+    pub events: u32,
+    /// Not zero: the narrow phase asks the contact filter about each pair.
+    pub filtering: u32,
 }
 
 const HEADER_BYTES: u32 = ((core::mem::size_of::<Header>() + 15) & !15) as u32;
 
 pub struct World {
     pub arena: Arena,
+    /// The contact filter of a native build; Wasm asks its import.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub filter: Option<fn(u32, u32) -> bool>,
 }
 
 impl World {
@@ -94,7 +101,11 @@ impl World {
         if !arena.ensure(bytes as usize) {
             return None;
         }
-        let world = Self { arena };
+        let world = Self {
+            arena,
+            #[cfg(not(target_arch = "wasm32"))]
+            filter: None,
+        };
         unsafe {
             core::ptr::write_bytes(world.arena.base, 0, bytes as usize);
             world.header_ptr().write(Header {
@@ -138,6 +149,8 @@ impl World {
                 joint_loose_share: 0.2,
                 joint_max_push: 3.0,
                 lost: NONE,
+                events: 0,
+                filtering: 0,
             });
         }
         Some(world)
@@ -367,6 +380,8 @@ impl World {
             *self.f(COLLIDER_FRICTION).add(at) = 0.5;
             *self.f(COLLIDER_RESTITUTION).add(at) = 0.0;
             *self.u(COLLIDER_COMBINE).add(at) = 0;
+            *self.u(COLLIDER_GROUPS).add(at) = u32::MAX;
+            *self.u(COLLIDER_SOLVER_GROUPS).add(at) = u32::MAX;
             *self.u(COLLIDER_PAIRS).add(at) = NONE;
             // At the end of the body's chain, so colliders add up in the order they were given.
             *self.u(COLLIDER_NEXT).add(at) = NONE;

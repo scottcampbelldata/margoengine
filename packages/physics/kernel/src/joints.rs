@@ -348,7 +348,7 @@ impl World {
     /// Wakes what a moving body is joined to.
     pub fn wake_across_joints(&mut self) {
         for row in 0..self.header().joint_rows as usize {
-            if self.uu(JOINT_FLAGS, row) & JOINT_ALIVE == 0 {
+            if self.uu(JOINT_FLAGS, row) & (JOINT_ALIVE | JOINT_OFF) != JOINT_ALIVE {
                 continue;
             }
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
@@ -364,7 +364,7 @@ impl World {
     /// Joined bodies are one island; a moving scripted body keeps what it holds awake, as a touch does.
     pub fn unite_joints(&mut self) {
         for row in 0..self.header().joint_rows as usize {
-            if self.uu(JOINT_FLAGS, row) & JOINT_ALIVE == 0 {
+            if self.uu(JOINT_FLAGS, row) & (JOINT_ALIVE | JOINT_OFF) != JOINT_ALIVE {
                 continue;
             }
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
@@ -388,7 +388,8 @@ impl World {
         let (mut count, mut at) = (0, self.uu(FIRST_JOINT, body));
         while at != NONE {
             let row = at as usize;
-            if self.uu(JOINT_FLAGS, row) & (JOINT_LOCK * 63) != 0 {
+            let flags = self.uu(JOINT_FLAGS, row);
+            if flags & (JOINT_LOCK * 63) != 0 && flags & JOINT_OFF == 0 {
                 count += 1;
             }
             at = self.uu(if self.uu(JOINT_A, row) as usize == body { JOINT_NEXT_A } else { JOINT_NEXT_B }, row);
@@ -471,7 +472,7 @@ impl World {
         let stamp = self.header().steps + 1;
         let rows = self.header().joint_rows as usize;
         let live = |w: &World, row: usize| {
-            w.uu(JOINT_FLAGS, row) & JOINT_ALIVE != 0 && (w.is_awake(w.uu(JOINT_A, row) as usize) || w.is_awake(w.uu(JOINT_B, row) as usize))
+            w.uu(JOINT_FLAGS, row) & (JOINT_ALIVE | JOINT_OFF) == JOINT_ALIVE && (w.is_awake(w.uu(JOINT_A, row) as usize) || w.is_awake(w.uu(JOINT_B, row) as usize))
         };
         for row in 0..rows {
             if !live(self, row) {

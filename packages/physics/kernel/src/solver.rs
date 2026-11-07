@@ -106,6 +106,12 @@ impl Moving {
     fn at(&self, r: V3) -> V3 {
         self.linear.add(self.angular.cross(r))
     }
+    /// Takes no push: a wall to whatever it is solved against.
+    #[inline(always)]
+    fn immovable(&mut self) {
+        self.mass = v3(0.0, 0.0, 0.0);
+        self.inertia = Sym { xx: 0.0, xy: 0.0, xz: 0.0, yy: 0.0, yz: 0.0, zz: 0.0 };
+    }
 }
 
 impl World {
@@ -124,6 +130,19 @@ impl World {
             linear: self.v(LINEAR_X, at),
             angular: self.v(ANGULAR_X, at),
         }
+    }
+
+    /// The two bodies of a pair as its solve sees them: the one that dominates takes no push from this pair.
+    #[inline(always)]
+    fn pair_moving(&self, row: usize, a: usize, b: usize) -> (Moving, Moving) {
+        let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+        let flags = self.uu(PAIR_FLAGS, row);
+        if flags & PAIR_A_RULES != 0 {
+            body_a.immovable();
+        } else if flags & PAIR_B_RULES != 0 {
+            body_b.immovable();
+        }
+        (body_a, body_b)
     }
 
     #[inline(always)]
@@ -215,7 +234,19 @@ impl World {
             let other = normal.cross(tangent);
             self.set_v(PAIR_TANGENT_X, row, tangent);
             let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
-            let (body_a, body_b) = (self.moving(a), self.moving(b));
+            // Fixed and kinematic bodies take no push anyway, and a body must never be a wall to its floor.
+            let (rank_a, rank_b) = (self.s(DOMINANCE, a), self.s(DOMINANCE, b));
+            let rule = if self.flags(a) & KIND != DYNAMIC || self.flags(b) & KIND != DYNAMIC {
+                0
+            } else if rank_a > rank_b {
+                PAIR_A_RULES
+            } else if rank_b > rank_a {
+                PAIR_B_RULES
+            } else {
+                0
+            };
+            self.set_u(PAIR_FLAGS, row, self.uu(PAIR_FLAGS, row) & !(PAIR_A_RULES | PAIR_B_RULES) | rule);
+            let (body_a, body_b) = self.pair_moving(row, a, b);
             for k in 0..count {
                 let at = row * MANIFOLD + k;
                 let (arm_a, arm_b) = (rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)), rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
@@ -241,7 +272,7 @@ impl World {
         for i in 0..self.header().solving as usize {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
-            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
             let normal = self.v(PAIR_NORMAL_X, row);
             for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
                 let at = row * MANIFOLD + k;
@@ -264,7 +295,7 @@ impl World {
         for i in 0..self.header().solving as usize {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
-            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
             let (center_a, center_b) = (self.v(CENTER_X, a), self.v(CENTER_X, b));
             let (rotation_a, rotation_b) = (self.q(ROTATION_X, a), self.q(ROTATION_X, b));
             let normal = self.v(PAIR_NORMAL_X, row);
@@ -369,7 +400,7 @@ impl World {
             let at = self.uu(IMPACTS, i) as usize;
             let row = at / MANIFOLD;
             let (a, b) = self.pair_bodies(row as u32);
-            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
             let normal = self.v(PAIR_NORMAL_X, row);
             let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
             let speed = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal);

@@ -306,7 +306,38 @@ console.log(body.position[1]);         // fallen about 4.9 m in the second
 physics.dispose();
 ```
 
-It holds `box`, `sphere` and `capsule` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact events, sensors and groups are not served yet. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: other shapes, `setType`, `setMassProperties`, inertia of its own, `ccd`, `follow`, `dominance`, disabling a body, `contactFilter`, friction, restitution and every other contact setting, joints, queries, character controllers, `addModel`, `touching`, `contactPoints`, contact events and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+It holds `box`, `sphere` and `capsule` colliders, bodies of every kind, forces, impulses, velocities, damping, locks, kinematic targets, gravity, sleeping and the `beforestep` and `afterstep` events. Bodies collide, with friction, restitution and the four combine rules, and `physics.touching(a, b)` and `physics.contactPoints(body)` read the contacts of the last step. Contact and intersection events, sensors, `collisionGroups`, `solverGroups`, `contactFilter`, `dominance` and `enabled` on bodies and colliders work as on the root entry, with the same names. A call that needs what is still to come throws a `MargoError` with code `unsupported` naming what it waits for: other shapes and `addModel`, `setType`, `setMassProperties`, inertia of its own, `additionalSolverIterations` and the `generic` joint with the shapes and queries batch, `ccd` with continuous collision, queries, `follow` and character controllers, and `debugRender`. `body.sleep()` and impulses take effect at the next step.
+
+After each step a pair that began or stopped touching fires `contactstart` or `contactend`, or `intersectionstart` or `intersectionend` when either collider is a sensor, with both bodies, meshes and colliders. A sensor sees overlaps and pushes nothing, and it sees kinematic and fixed bodies too. Two fixed bodies never meet, sensor or not. A collider stays quiet with `events: false` when the other side has it too. A pair of sleepers says nothing, and neither does a body removed while it touches, as on the root entry. `collisionGroups` keeps a pair apart; `solverGroups` lets it be seen and fire events without being solved. `contactFilter(a, b)` runs inside the step for each candidate pair of bodies: it may read the world and must not change it, so a step run from it throws, and false lets the pair pass and keeps its sensor events quiet. A body of higher `dominance` is a wall to a dynamic body of lower dominance, in contacts only, and floors still hold it. `body.enabled = false` takes a body out of the world: it keeps its pose and speed, nothing wakes it, its touches end and what rested on it falls, and its joints rest until it comes back, awake. `collider.setEnabled(false)` does the same for one collider, which keeps its mass.
+
+```ts
+import {Physics, collisionGroups} from 'margoengine/physics/next';
+
+await Physics.load();
+const physics = new Physics(null, {
+  contactFilter: (a, b) => a.userData !== 'ghost' && b.userData !== 'ghost',
+});
+physics.addBody(null, {
+  type: 'fixed',
+  position: [0, -0.5, 0],
+  colliders: {shape: 'box', halfExtents: [20, 0.5, 20], collisionGroups: collisionGroups([0], [0, 1])},
+});
+physics.addBody(null, {
+  type: 'fixed',
+  position: [0, 2, 0],
+  colliders: {shape: 'box', halfExtents: [2, 0.25, 2], sensor: true},
+});
+const ball = physics.addBody(null, {
+  position: [0, 5, 0],
+  dominance: 1,
+  colliders: {shape: 'sphere', radius: 0.3, collisionGroups: collisionGroups([1], [0])},
+});
+physics.on('intersectionstart', ({bodyA, bodyB}) => console.log('entered', bodyA === ball || bodyB === ball));
+physics.on('contactstart', ({meshA, meshB}) => console.log('landed', meshA, meshB));
+for (let i = 0; i < 120; i++) physics.step();
+ball.enabled = false;
+physics.dispose();
+```
 
 `physics.on('contactforce', listener)` says how hard two colliders pressed on each other: after each step with a listener, once a pair, with `bodyA`, `bodyB`, `meshA`, `meshB`, `colliderA`, `colliderB`, `impulse` (the normal impulse of the whole step, N s) and `force` (that over the step's length, N). A box at rest on a floor reads its weight, and the impulses of a landing add up to what stops it. A pair of sleepers is not solved, so it says nothing. Only the own solver has this event.
 

@@ -32,6 +32,19 @@ export type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVel
 
 export type ColliderOptions = ShapeOptions & ColliderSettings;
 
+export interface CollisionEvent {
+    type: CollisionEventType;
+    bodyA: PhysicsBody;
+    bodyB: PhysicsBody;
+    meshA: Mesh | null;
+    meshB: Mesh | null;
+    colliderA: PhysicsCollider;
+    colliderB: PhysicsCollider;
+    sensor: boolean;
+}
+
+export type CollisionEventType = 'contactstart' | 'contactend' | 'intersectionstart' | 'intersectionend';
+
 export interface ConeJointOptions {
     type: 'cone';
     anchorA?: Vec3;
@@ -143,6 +156,12 @@ export class KernelWorld {
     get pairCount(): number;
     pairs(): [number, number][];
     contacts(): KernelContact[];
+    set contactFilter(filter: ((a: number, b: number) => boolean) | null);
+    get eventCount(): number;
+    clearEvents(): void;
+    setColliderState(collider: number, state: number): void;
+    touchCollider(collider: number): void;
+    setBodyEnabled(body: number, enabled: boolean): void;
     get solvingPairs(): number;
     get awakeCount(): number;
     get islandCount(): number;
@@ -318,6 +337,7 @@ export class PhysicsCollider {
     readonly handle: number;
     readonly body: PhysicsBody;
     readonly shape: ColliderShape;
+    emits: boolean;
     constructor(kernel: KernelWorld,
     handle: number,
     body: PhysicsBody,
@@ -326,7 +346,9 @@ export class PhysicsCollider {
     markRemoved(): void;
     get boundingRadius(): number;
     isSensor(): boolean;
+    setSensor(sensor: boolean): this;
     isEnabled(): boolean;
+    setEnabled(enabled: boolean): this;
     density(): number;
     translationWrtParent(): {
         x: number;
@@ -350,11 +372,17 @@ export class PhysicsCollider {
     setFriction(friction: number): this;
     restitution(): number;
     setRestitution(restitution: number): this;
-    collisionGroups(): never;
-    solverGroups(): never;
+    collisionGroups(): number;
+    setCollisionGroups(groups: number): this;
+    solverGroups(): number;
+    setSolverGroups(groups: number): this;
 }
 
 export interface PhysicsEventMap {
+    contactstart: CollisionEvent;
+    contactend: CollisionEvent;
+    intersectionstart: CollisionEvent;
+    intersectionend: CollisionEvent;
     contactforce: ContactForceEvent;
     beforestep: number;
     afterstep: number;
@@ -399,6 +427,7 @@ export interface PhysicsOptions {
     iterations?: number;
     solverIterations?: number;
     name?: string;
+    contactFilter?: (a: PhysicsBody, b: PhysicsBody) => boolean;
 }
 
 export type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model' | 'maxForce'> & {
@@ -463,6 +492,8 @@ export type ShapeOptions = {
     shape: 'custom';
     desc: ColliderDesc;
 };
+
+export function collisionGroups(memberships: number | readonly number[], filter?: number | readonly number[]): number;
 
 export function loadKernel({ signal }?: KernelLoadOptions): Promise<void>;
 

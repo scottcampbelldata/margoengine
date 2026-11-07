@@ -38,6 +38,7 @@ impl World {
                 }
             }
         }
+        self.pair_ended(row);
     }
 
     /// True when `body` is on the awake list.

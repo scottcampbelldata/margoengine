@@ -3,7 +3,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Mesh } from '@margoengine/core';
 import type { BodyType } from '../body.js';
-import type { KernelWorld } from '../kernel.js';
+import { BODY_DISABLED, type KernelWorld } from '../kernel.js';
 import { checkVec, type Quat, type Vec3 } from '../math.js';
 import type { ColliderOptions } from '../shapes.js';
 import type { PhysicsCollider } from './collider.js';
@@ -301,13 +301,12 @@ export class PhysicsBody {
   set ccd(enabled: boolean) {
     if (enabled) throw later('ccd', 'continuous collision');
   }
-  /** Not served yet: reads true, and false throws. */
+  /** False takes the body out of the world: it keeps its pose and speed, touches nothing and its joints rest. */
   get enabled(): boolean {
-    this.world();
-    return true;
+    return (this.columns.flags[this.row] & BODY_DISABLED) === 0;
   }
   set enabled(value: boolean) {
-    if (!value) throw later('Disabling a body', 'contact events');
+    this.world().setBodyEnabled(this.row, value);
   }
   /** Stops all turning, on every world axis, or frees it again. */
   lockRotations(locked = true): this {

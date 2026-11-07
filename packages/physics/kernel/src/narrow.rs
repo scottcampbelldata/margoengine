@@ -2,6 +2,7 @@
 // as Gregorius 2015 sets out: find the touching features, then clip one face against the side planes of the other, so a
 // box resting on a box has all its points from the first frame, with no artificial torque while they gather.
 use crate::broad::MARGIN;
+use crate::events::groups_meet;
 use crate::gjk::{Posed, Segment, epa, gjk};
 use crate::hull::{BoxData, Poly, box_poly};
 use crate::layout::*;
@@ -558,11 +559,26 @@ impl World {
             let row = self.uu(ACTIVE_PAIRS, i) as usize;
             let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
             let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
-            // Scripted bodies pass through each other: nothing can push them.
-            if self.flags(body_a) & KIND != DYNAMIC && self.flags(body_b) & KIND != DYNAMIC || self.joined(body_a, body_b) {
+            let flags = self.uu(PAIR_FLAGS, row) & !PAIR_OVERLAP;
+            let sensor = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_SENSOR != 0;
+            // Scripted bodies pass through each other: nothing can push them. A sensor still sees them.
+            let scripted = self.flags(body_a) & KIND != DYNAMIC && self.flags(body_b) & KIND != DYNAMIC;
+            if scripted && !sensor || !self.may_touch(a, b, body_a, body_b) {
+                self.set_u(PAIR_FLAGS, row, flags);
                 self.drop_contacts(row, body_a, body_b);
                 continue;
             }
+            // A pair nothing solves needs to know only that it overlaps.
+            if sensor || !groups_meet(self.uu(COLLIDER_SOLVER_GROUPS, a), self.uu(COLLIDER_SOLVER_GROUPS, b)) {
+                manifold.held_count = 0;
+                manifold.feature = 0;
+                self.collide(a, b, 0.0, &mut manifold);
+                let overlaps = manifold.points[..manifold.count].iter().any(|point| point.separation <= 0.0);
+                self.set_u(PAIR_FLAGS, row, if overlaps { flags | PAIR_OVERLAP } else { flags });
+                self.drop_contacts(row, body_a, body_b);
+                continue;
+            }
+            self.set_u(PAIR_FLAGS, row, flags);
             let limit = self.contact_limit(a, b, dt);
             manifold.held_count = self.uu(PAIR_CONTACTS, row) as usize;
             for k in 0..manifold.held_count {

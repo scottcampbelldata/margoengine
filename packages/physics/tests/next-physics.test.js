@@ -21,21 +21,14 @@ test('a call that is not served yet says so, and what to use', () => {
     () => physics.intersectPoint(),
     () => physics.intersectShape(),
     () => physics.debugRender(),
-    () => physics.on('contactstart', () => {}),
     () => physics.addBody(null, { ccd: true }),
-    () => physics.addBody(null, { dominance: 1 }),
     () => physics.addBody(null, { colliders: { shape: 'cylinder', radius: 1, halfHeight: 1 } }),
-    () => physics.addBody(null, { colliders: { shape: 'sphere', radius: 1, sensor: true } }),
     () => body.setType('fixed'),
     () => body.setMassProperties(),
     () => body.setAdditionalMass(1, [1, 1, 1]),
     () => {
       body.ccd = true;
     },
-    () => {
-      body.enabled = false;
-    },
-    () => new Physics(null, { contactFilter: () => true }),
   ])
     assert.throws(call, unsupported);
   assert.equal(physics.bodyCount, 1, 'a refused body leaves nothing behind');
