@@ -1,0 +1,13 @@
+# Work list 1
+
+Stays with the first account, the manager session. Listed so the other accounts know what not to touch.
+
+**Stream P, own physics:** batches 122 to 131. Owns `packages/physics`, `packages/physics2d` and their kernels.
+
+**Stream G, gaps:** the open gap list and the ragdoll items. Owns `packages/ragdoll` until they finish.
+
+**Stream C, game logic and links:** finish batch 88, then 89, 93, 94 (fsm, navmesh, behavior), 113, 114, 115 (net, netcode, save), 116 to 119 (xr, react, sciviz, mcp).
+
+**Finishing batches 44 and 49:** usdz and shadows, already running here.
+
+**After every list is done, in this order:** batch 120 kit packages, AVIF decoder, app origin check, batches 133, 134, 136, 137 clean-room codecs, batch 121 second pass, batch 132 research and quality audit, leftovers of batches 19 and 21, then npm and PyPI only on Scott's word.
