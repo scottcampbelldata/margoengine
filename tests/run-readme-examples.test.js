@@ -162,6 +162,28 @@ test('a small real file is a sample, and an LFS pointer of any size is not', () 
   }
 });
 
+// Regression: the fixtures were listed by the pathspec packages/*/test, which git matches against whole paths, so no
+// fixture was ever a sample and an example naming one (sky's catalog.gz, points' fullwave.laz) got a 404. A fixture now
+// answers to its own name, and never stands in for an extension: some are odd files kept for their oddity.
+test('a package test fixture answers to its own name only', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'readme-fixtures-'));
+  try {
+    writeFileSync(join(folder, 'screen.png'), Buffer.alloc(90, 3));
+    writeFileSync(join(folder, 'odd.png'), Buffer.alloc(10, 1));
+    writeFileSync(join(folder, 'catalog.gz'), Buffer.alloc(30, 2));
+    const { byName, byExtension } = sampleFiles(['screen.png'], folder, ['odd.png', 'catalog.gz', 'screen.png']);
+    assert.equal(byName.get('catalog.gz')?.path, join(folder, 'catalog.gz'));
+    assert.equal(byName.get('odd.png')?.path, join(folder, 'odd.png'));
+    assert.equal(byExtension.get('.png')?.path, join(folder, 'screen.png'));
+    assert.equal(byExtension.has('.gz'), false);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+  // The repository's own listing holds the fixtures.
+  const listed = sampleFiles();
+  assert.match(listed.byName.get('fullwave.laz')?.path ?? '', /packages[\\/]points[\\/]tests/);
+});
+
 // Regression: a tileset (JSON that links its tiles by relative path) was never served, so every tiles example failed
 // with "Failed to fetch". A page now gets a file under examples/assets by its path there, links included.
 test('a page gets a sample of several files by its path under examples/assets', () => {

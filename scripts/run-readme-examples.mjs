@@ -105,32 +105,45 @@ export function isLfsPointer(path) {
   return readFileSync(path, 'latin1').startsWith(LFS_POINTER);
 }
 
+const gitFiles = (...specs) =>
+  spawnSync('git', ['ls-files', ...specs], { cwd: root, encoding: 'utf8', maxBuffer: 2 ** 26 }).stdout.split('\n');
+
 /**
- * The samples a file name stands for: `byName` for a file of that very name in the sample folders, `byExtension` for the
- * smallest real file of each extension. `files` are repository paths under `base` (default: the sample folders git lists).
+ * The samples a file name stands for: `byName` for a file of that very name in the sample folders or the packages' test
+ * fixtures, `byExtension` for the smallest real file of each extension in the sample folders only (a fixture may be an odd
+ * file kept for its oddity, so it answers only to its own name). `files` and `fixtures` are repository paths under
+ * `base` (default: what git lists in examples/assets, and under every packages/<name>/test or tests folder).
  */
-export function sampleFiles(files, base = root) {
-  const listed =
-      files ??
-      spawnSync('git', ['ls-files', 'examples/assets', 'packages/*/tests', 'packages/*/test'], {
-        cwd: root,
-        encoding: 'utf8',
-        maxBuffer: 2 ** 26,
-      }).stdout.split('\n'),
+export function sampleFiles(
+  files,
+  base = root,
+  fixtures = files ? [] : gitFiles(':(glob)packages/*/tests/**', ':(glob)packages/*/test/**'),
+) {
+  const listed = files ?? gitFiles('examples/assets'),
     samples = new Map(),
     byName = new Map();
-  for (const file of listed.filter(Boolean)) {
+  const real = (file) => {
     const path = join(base, file),
       extension = extname(file).toLowerCase();
     // A file kept to test a refusal is no sample.
     if (!extension || CODE.has(extension) || !existsSync(path) || /invalid|corrupt|truncat|broken|malformed|\bbad\b|damaged/i.test(file))
-      continue;
+      return undefined;
     const { size } = statSync(path);
     // An empty file or a Git LFS pointer is no sample, and a loader would rightly refuse it; a small real file is one.
-    if (!size || isLfsPointer(path)) continue;
+    return !size || isLfsPointer(path) ? undefined : { path, size, extension };
+  };
+  for (const file of listed.filter(Boolean)) {
+    const sample = real(file);
+    if (!sample) continue;
+    const { path, size, extension } = sample;
     byName.set(basename(file).toLowerCase(), { path, size });
     if (PREFERRED[extension] === file) samples.set(extension, { path, size: 0 });
     if (size < (samples.get(extension)?.size ?? 2 ** 24)) samples.set(extension, { path, size });
+  }
+  for (const file of fixtures.filter(Boolean)) {
+    const name = basename(file).toLowerCase(),
+      sample = !byName.has(name) && real(file);
+    if (sample) byName.set(name, { path: sample.path, size: sample.size });
   }
   // A .gltf and a .bin an example names together are one model, so the .bin stands for that .gltf's own buffer.
   const gltf = samples.get('.gltf'),
