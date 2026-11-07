@@ -2,6 +2,7 @@
 // Three callers: `npm run check:readmes` (scripts/check-readme-types.mjs, a step of `npm run verify`, so nothing lands
 // without it), modern-package-tests.js (the same examples against the packed tarballs) and the scene and worker tests.
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,13 +47,42 @@ export const README_PROJECT = { ...README_OPTIONS, paths: { webgpu: ['./readme-b
  * and a name one example declares would pass in another.
  */
 export function readmeExamples(markdown) {
-  const examples = [];
-  for (const [, code] of markdown.matchAll(/```(?:tsx?|js)\r?\n([\s\S]*?)```/g)) {
-    if (!examples.length || /^\s*(?:import\s|const\s+\{[^}]+\}\s*=\s*await\s+import\s*\()/m.test(code))
-      examples.push(code);
-    else examples[examples.length - 1] += `\n${code}`;
+  return readmeEntries(markdown).map(({ code }) => code);
+}
+
+/** The examples of a Markdown text with the heading each starts under: [{ code, heading }], heading '' before the first. */
+export function readmeEntries(markdown) {
+  const entries = [];
+  for (const { 1: code, index } of markdown.matchAll(/```(?:tsx?|js)\r?\n([\s\S]*?)```/g)) {
+    if (!entries.length || /^\s*(?:import\s|const\s+\{[^}]+\}\s*=\s*await\s+import\s*\()/m.test(code))
+      entries.push({ code, heading: lastHeading(markdown.slice(0, index)) });
+    else entries.at(-1).code += `\n${code}`;
   }
-  return examples.map((code) => `${code}\nexport {};\n`);
+  return entries.map(({ code, heading }) => ({ code: `${code}\nexport {};\n`, heading }));
+}
+
+/** The last Markdown heading of `text`; a `#` line inside a code block is not one. */
+function lastHeading(text) {
+  const prose = text.replace(/^```[\s\S]*?^```/gm, '');
+  return [...prose.matchAll(/^#{1,6}[ \t]+(.+?)[ \t]*\r?$/gm)].at(-1)?.[1] ?? '';
+}
+
+/**
+ * The id of each example of one document, `<package>/<document>-<heading>-<hash>`, in the order given. The id comes from what
+ * the example says and the heading above it, never its place in the file, so a new example above a listed one leaves the
+ * known list as it stands. Line endings do not count: a Windows and a Linux checkout agree. Two identical examples under one
+ * heading are told apart by a number, and changing a listed example changes its id, as it is a different example now.
+ */
+export function exampleIds(name, document, entries) {
+  const seen = new Map();
+  return entries.map(({ code, heading }) => {
+    const words = heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32).replace(/-$/, ''),
+      hash = createHash('sha256').update(code.replace(/\r\n/g, '\n').trim()).digest('hex').slice(0, 6),
+      id = `${name}/${document}-${words ? `${words}-` : ''}${hash}`,
+      count = (seen.get(id) ?? 0) + 1;
+    seen.set(id, count);
+    return count === 1 ? id : `${id}-${count}`;
+  });
 }
 
 /**

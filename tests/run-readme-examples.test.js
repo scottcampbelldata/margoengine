@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { exampleIds, readmeEntries } from '../scripts/support/readme-types.mjs';
 import {
   askedElements,
   goneLine,
@@ -75,6 +76,34 @@ test('examples on one port take turns, and the rest stay side by side', () => {
     turns.map((turn) => turn.map(({ id }) => id)),
     [['a', 'c'], ['b'], ['d'], ['e']],
   );
+});
+
+// Ids were file positions: a new example above a listed one moved every id under it, and the full check failed on all of them.
+test('an example keeps its id when another is added above it, and across line endings', () => {
+  const block = (code) => `\`\`\`ts\nimport '${code}';\n\`\`\`\n`,
+    ids = (markdown) => exampleIds('sky', 'readme', readmeEntries(markdown)),
+    before = `# Sky\n\n## Sun position\n\n${block('a')}\n## Fog\n\n${block('b')}`,
+    after = `# Sky\n\n## New part\n\n${block('new')}\n## Sun position\n\n${block('new too')}\n${block('a')}\n## Fog\n\n${block('b')}`,
+    [sun, fog] = ids(before);
+  assert.match(sun, /^sky\/readme-sun-position-[0-9a-f]{6}$/);
+  assert.match(fog, /^sky\/readme-fog-[0-9a-f]{6}$/);
+  assert.ok(ids(after).includes(sun) && ids(after).includes(fog));
+  assert.deepEqual(ids(before.replace(/\n/g, '\r\n')), [sun, fog]);
+});
+
+test('identical examples under one heading get their own ids, and a # line in a code block is no heading', () => {
+  const block = '```ts\nimport \'a\';\n```\n',
+    markdown = `## Real\n\n\`\`\`sh\n# not a heading\n\`\`\`\n\n${block}\n${block}`,
+    ids = exampleIds('sky', 'readme', readmeEntries(markdown));
+  assert.match(ids[0], /^sky\/readme-real-[0-9a-f]{6}$/);
+  assert.equal(ids[1], `${ids[0]}-2`);
+});
+
+test('an example with no heading above it still has an id, and a long heading is cut', () => {
+  const markdown = `\`\`\`ts\nimport 'a';\n\`\`\`\n\n# ${'long words '.repeat(20)}\n\n\`\`\`ts\nimport 'b';\n\`\`\`\n`,
+    [first, second] = exampleIds('sky', 'readme', readmeEntries(markdown));
+  assert.match(first, /^sky\/readme-[0-9a-f]{6}$/);
+  assert.ok(second.length < 'sky/readme-'.length + 32 + 8);
 });
 
 test('--packages takes whole package names, and adds to --only', () => {

@@ -17,7 +17,7 @@ import { pathToFileURL } from 'node:url';
 import { createServer, transformWithOxc } from 'vite';
 import { acquire } from './gpu-lock.mjs';
 import { launchBrowser } from './lib/browser.mjs';
-import { packageMarkdown, readmeExamples } from './support/readme-types.mjs';
+import { exampleIds, packageMarkdown, readmeEntries } from './support/readme-types.mjs';
 import { closeAll } from './support/shutdown.mjs';
 import { workspacePackages } from './check-readme-types.mjs';
 
@@ -37,9 +37,11 @@ const root = resolve(import.meta.dirname, '..'),
 /** What the examples of a package are, by id: `{ id, name, code }`. */
 export function collectExamples(packages) {
   return packages.flatMap(({ name, folder }) =>
-    packageMarkdown(folder).flatMap(({ document, markdown }) =>
-      readmeExamples(markdown).map((code, index) => ({ id: `${name}/${document}-${index}`, name, code })),
-    ),
+    packageMarkdown(folder).flatMap(({ document, markdown }) => {
+      const entries = readmeEntries(markdown),
+        ids = exampleIds(name, document, entries);
+      return entries.map(({ code }, index) => ({ id: ids[index], name, code }));
+    }),
   );
 }
 
