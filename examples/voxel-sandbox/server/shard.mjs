@@ -4,7 +4,7 @@
 // When the span ends it writes the final snapshot, closes every client with 1001 (a page sees that on its own socket
 // and asks /join again) and exits; the router forks the next world.
 import { randomInt } from 'node:crypto';
-import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { VoxelServer } from '@margoengine/voxel-net/server';
@@ -17,7 +17,16 @@ import { GEM_TOTAL } from '../src/plaza-area.ts';
 import { PlazaCounts } from './counts.mjs';
 import { HOST, identityOfRequest, loadSalt } from './identity.mjs';
 import { areaOf } from './reports.mjs';
-import { listRolling, pruneRolling, rollingAtOrBefore, writeRolling, writeSnapshot, writeWhole } from './snapshots.mjs';
+import {
+  listRolling,
+  pruneRolling,
+  readWhole,
+  removeWhole,
+  rollingAtOrBefore,
+  writeRolling,
+  writeSnapshot,
+  writeWhole,
+} from './snapshots.mjs';
 
 export { HOST };
 
@@ -544,10 +553,7 @@ export class PlazaShard {
     this.#counts?.saved(revision);
   }
   async #loadWorld() {
-    const text = await readFile(this.#stateFile, 'utf8').catch((error) => {
-      if (error.code === 'ENOENT') return undefined;
-      throw error;
-    });
+    const text = await readWhole(this.#stateFile, 'utf8');
     if (text === undefined) return undefined;
     const { counts, ...world } = JSON.parse(text);
     this.#savedCounts = counts;
@@ -595,7 +601,7 @@ export class PlazaShard {
         }),
       );
     }
-    await rm(this.#stateFile, { force: true });
+    await removeWhole(this.#stateFile);
     await rm(this.#worldDir, { recursive: true, force: true });
   }
 }

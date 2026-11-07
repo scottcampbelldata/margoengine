@@ -12,7 +12,7 @@
 // Run `npm run build:packages` first: the shards import the built packages.
 import { fork } from 'node:child_process';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import { chmod, mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { createServer as createHttp } from 'node:http';
 import { createServer as createSocketServer } from 'node:net';
@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HOST, identityOfRequest, loadSalt } from './identity.mjs';
 import { areaOf, REPORT_WINDOW, ReportBook } from './reports.mjs';
-import { writeWhole } from './snapshots.mjs';
+import { hasWhole, readWhole, writeWhole } from './snapshots.mjs';
 
 const SHARD_FILE = fileURLToPath(new URL('./shard.mjs', import.meta.url)),
   MAX_REPORT_BYTES = 256,
@@ -177,7 +177,7 @@ export class PlazaRouter {
       .map((name) => name.match(/^shard-(\d+)$/))
       .filter((match) => match && Number(match[1]) < this.#o.maxShards)
       .map((match) => Number(match[1]))
-      .filter((index) => existsSync(join(this.#o.dataDir, `shard-${index}`, 'state.json')));
+      .filter((index) => hasWhole(join(this.#o.dataDir, `shard-${index}`, 'state.json')));
     for (const index of new Set([0, ...live])) this.#startShard(index);
     this.#every(5000, () => this.#watchdog());
     if (this.#peer) {
@@ -579,10 +579,7 @@ export class PlazaRouter {
   }
   async #loadTotals() {
     const dir = this.#o.dataDir;
-    const text = await readFile(join(dir, 'totals.json'), 'utf8').catch((error) => {
-      if (error.code === 'ENOENT') return undefined;
-      throw error;
-    });
+    const text = await readWhole(join(dir, 'totals.json'), 'utf8');
     if (text !== undefined) this.#totals = JSON.parse(text);
     const finals = await this.#finals();
     this.#worldsFinished = finals.length;

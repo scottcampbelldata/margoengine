@@ -10,6 +10,7 @@ import { VoxelWorld } from '@margoengine/voxel';
 import { VoxelNetClient } from '@margoengine/voxel-net';
 import { connectWebSocket } from '@margoengine/voxel-net/server';
 import { HOST, PlazaShard } from '../server/shard.mjs';
+import { readWholeSync } from '../server/snapshots.mjs';
 import { defineBlocks } from '../src/blocks.ts';
 import { decodeCounts } from '../src/counts.ts';
 import { plazaFinds } from '../src/finds.ts';
@@ -344,7 +345,7 @@ test('a crash: at most the last save of counts is lost, a placed block the old s
   // Saved by the 30 ms timer; no snapshot was ever taken, so the world restarts without the block.
   const file = pathJoin(dir, 'shard-0', 'state.json');
   assert.ok(
-    await drive([a], () => JSON.parse(readFileSync(file, 'utf8')).counts?.placed.length === 1),
+    await drive([a], () => JSON.parse(readWholeSync(file, 'utf8') ?? '{}').counts?.placed.length === 1),
     'the counts reached the disk',
   );
   a.client.close();
@@ -431,12 +432,12 @@ test('a world end sends each player its last counts before 1001; the counts die 
   a.client.edit(...ore, 0);
   assert.ok(await drive([a, b], () => tinOf(a) === 1));
   assert.ok(
-    await drive([a, b], () => readFileSync(pathJoin(dir, 'shard-0', 'state.json'), 'utf8').includes(identity)),
+    await drive([a, b], () => readWholeSync(pathJoin(dir, 'shard-0', 'state.json'), 'utf8')?.includes(identity)),
     'state.json holds the salted identity while the world lives',
   );
   for (const raw of ['203.0.113.1', readFileSync(pathJoin(dir, 'identity.salt'), 'utf8')])
     assert.ok(
-      !readFileSync(pathJoin(dir, 'shard-0', 'state.json'), 'utf8').includes(raw),
+      !readWholeSync(pathJoin(dir, 'shard-0', 'state.json'), 'utf8').includes(raw),
       'never the address or the salt',
     );
 

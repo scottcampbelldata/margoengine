@@ -220,7 +220,8 @@ removes goes back to its owner. The world's opal count (`found` of 1,000) only g
 A player is the salted hash of their address (`server/identity.mjs`), so a household shares one count, more than one tab
 shares it too, and a new address starts from nothing and cannot break what the old one placed. Counts live in the world's
 `state.json`, written every 30 seconds when they changed and with each snapshot, so a restart keeps them and a crash loses at
-most the last 30 seconds. They belong to one world: when the 6 hours end each page gets its last counts, and then the state
+most the last 30 seconds. Every file the server writes (`writeWhole`, `server/snapshots.mjs`) appears whole or not at all,
+and a write still lands while another process, such as a virus scanner after each write, holds the old file open. They belong to one world: when the 6 hours end each page gets its last counts, and then the state
 file is deleted, so nobody's counts carry over to the next world and only `found` and `total` stay, in the final `<id>.json`,
 `/finished/index.json` and, for the live world, `/join`. The page hears through one app message (`src/counts.ts`).
 The router's `/join` answer carries the world's `seed` and `floor`; the page keeps `floor` and asks the shard's own

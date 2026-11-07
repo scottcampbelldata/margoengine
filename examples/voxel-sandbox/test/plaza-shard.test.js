@@ -1,6 +1,7 @@
 // One shard, in this process, over real sockets on a free port: the edit rule, names, identity, snapshots and rollback.
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { open } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join as pathJoin } from 'node:path';
 import test from 'node:test';
@@ -243,6 +244,22 @@ test('snapshot then rollback restores the 3 x 3 areas and nothing else, then the
   await shard.rollback({ cx: first[0] >> 5, cz: first[2] >> 5 }, 0);
   assert.equal(world.getBlock(...first), 0);
   a.client.close();
+});
+
+test('a shard saves while another process holds its state.json open, as a virus scanner does after each write', async (t) => {
+  const dir = dataDir(t),
+    { shard } = await startShard(t, { dataDir: dir }),
+    file = pathJoin(dir, 'shard-0', 'state.json'),
+    held = await open(file, 'r');
+  t.after(() => held.close());
+  // A rollback always saves: a snapshot, then the state file over the open one.
+  await shard.rollback(undefined, 0);
+  await shard.rollback(undefined, 0);
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).id, shard.world.id);
+  assert.deepEqual(
+    readdirSync(pathJoin(dir, 'shard-0')).filter((name) => name.startsWith('state.json')),
+    ['state.json'],
+  );
 });
 
 test('no edit lands anywhere while a rollback is running, so none is lost to it', async (t) => {
