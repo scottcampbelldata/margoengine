@@ -726,6 +726,10 @@
       "types": "./dist/exporters/capture.d.ts",
       "import": "./dist/exporters/capture.js"
     },
+    "./exporters/jpeg-read": {
+      "types": "./dist/exporters/jpeg-read.d.ts",
+      "import": "./dist/exporters/jpeg-read.js"
+    },
     "./exporters/apng": {
       "types": "./dist/exporters/apng.d.ts",
       "import": "./dist/exporters/apng.js"
@@ -873,6 +877,18 @@
     "./fbx/layers": {
       "types": "./dist/fbx/layers.d.ts",
       "import": "./dist/fbx/layers.js"
+    },
+    "./fbx/deformers": {
+      "types": "./dist/fbx/deformers.d.ts",
+      "import": "./dist/fbx/deformers.js"
+    },
+    "./fbx/curves": {
+      "types": "./dist/fbx/curves.d.ts",
+      "import": "./dist/fbx/curves.js"
+    },
+    "./fbx/pbr": {
+      "types": "./dist/fbx/pbr.d.ts",
+      "import": "./dist/fbx/pbr.js"
     },
     "./fsm": {
       "types": "./dist/fsm.d.ts",

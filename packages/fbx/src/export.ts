@@ -1,11 +1,13 @@
 // FBX 7.4 writer, binary and ASCII. Written from the Blender Foundation's public description of the binary layout
 // (node records, typed and deflated arrays) and the public ASCII structure; see docs/clean-room.md.
-import { collect, polygons, textureFiles } from '@margoengine/exporters/collect';
+import { cameraDefinition, collect, lightDefinition, polygons, textureFiles } from '@margoengine/exporters/collect';
 import type {
+  CameraData,
   ExportNode,
   ExportScene,
   ExportSource,
   Geo,
+  LightData,
   Mat,
   Node,
   SceneOptions,
@@ -76,6 +78,73 @@ const int = (value: number): Whole => ({ int: value }),
     new TypeError(
       'Skin joint or animation target is not an exported scene node; include every joint and target node in the exported scene',
     );
+
+// Inches of film a written camera has: any size gives the same view, as the lens is worked out from it.
+const FILM_INCH = 1,
+  INCH_MM = 25.4,
+  DEGREES = 180 / Math.PI;
+
+/** The properties of a camera as FBX holds it: film and lens for a perspective one, a zoom for an orthographic one. */
+function cameraProperties(camera: CameraData): Rec[] {
+  const { perspective, orthographic } = cameraDefinition(camera),
+    aspect = orthographic ? orthographic.xmag / orthographic.ymag : perspective!.aspectRatio,
+    near = (perspective ?? orthographic)!.znear * CM,
+    // FBX has no infinite projection, so an open far plane is a long way past the near one.
+    far = (perspective ?? orthographic)!.zfar,
+    out: Rec[] = [
+      P('NearPlane', 'double', 'Number', '', near),
+      P('FarPlane', 'double', 'Number', '', far === undefined ? near * 1e6 : far * CM),
+    ];
+  if (aspect !== undefined)
+    out.push(
+      P('AspectRatioMode', 'enum', '', '', int(1)),
+      P('AspectWidth', 'double', 'Number', '', Math.abs(aspect)),
+      P('AspectHeight', 'double', 'Number', '', 1),
+    );
+  if (orthographic) {
+    out.push(
+      P('CameraProjectionType', 'enum', '', '', int(1)),
+      // In metres whatever the file's unit, as Blender reads and writes it: the view's widest side.
+      P('OrthoZoom', 'double', 'Number', '', Math.max(Math.abs(orthographic.xmag), Math.abs(orthographic.ymag)) * 2),
+    );
+    return out;
+  }
+  const half = Math.tan(perspective!.yfov / 2);
+  out.push(
+    P('CameraProjectionType', 'enum', '', '', int(0)),
+    P('ApertureMode', 'enum', '', '', int(3)),
+    P('GateFit', 'enum', '', '', int(0)),
+    P('FilmHeight', 'double', 'Number', '', FILM_INCH),
+    P('FilmWidth', 'double', 'Number', '', FILM_INCH * Math.abs(aspect ?? 1)),
+    P('FocalLength', 'double', 'Number', '', (FILM_INCH * INCH_MM) / (2 * half)),
+    P('FieldOfView', 'FieldOfView', '', 'A', perspective!.yfov * DEGREES),
+  );
+  return out;
+}
+
+/** The properties of a light as FBX holds it: its percentage is the value over 100 that the importer reads. */
+function lightProperties(light: LightData): Rec[] {
+  const { type, color, intensity, range, spot } = lightDefinition(light),
+    out: Rec[] = [
+      P('LightType', 'enum', '', '', int(type === 'directional' ? 1 : type === 'spot' ? 2 : 0)),
+      P('Color', 'Color', '', 'A', ...(color as [number, number, number])),
+      P('Intensity', 'Number', '', 'A', (intensity ?? 1) * 100),
+      // glTF's punctual lights fall off with the square of the distance; sunlight does not fall off.
+      P('DecayType', 'enum', '', '', int(type === 'directional' ? 0 : 2)),
+    ];
+  if (range !== undefined)
+    out.push(
+      P('EnableFarAttenuation', 'int', 'Integer', '', int(1)),
+      P('FarAttenuationEnd', 'double', 'Number', '', range * CM),
+    );
+  // A whole cone in degrees, where glTF runs from the axis in radians.
+  if (spot)
+    out.push(
+      P('OuterAngle', 'Number', '', 'A', (spot.outerConeAngle ?? Math.PI / 4) * 2 * DEGREES),
+      P('InnerAngle', 'Number', '', 'A', (spot.innerConeAngle ?? 0) * 2 * DEGREES),
+    );
+  return out;
+}
 
 /** A column-major matrix in metres as the same matrix in centimetres: only its translation changes. */
 function centimetres(matrix: ArrayLike<number>): Float64Array {
@@ -549,6 +618,31 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
     return id;
   };
 
+  const attach = (name: string, kind: string, rotation: number[], properties: Rec[], parentId: bigint, inherit: boolean) => {
+    const id = add('Model', name, 'Model', kind, [
+      ['Version', [int(232)]],
+      [
+        'Properties70',
+        [],
+        [
+          P('Lcl Rotation', 'Lcl Rotation', '', 'A', rotation[0], rotation[1], rotation[2]),
+          ...(inherit ? [P('InheritType', 'enum', '', '', int(1))] : []),
+        ],
+      ],
+      ['Shading', [flag(1)]],
+      ['Culling', ['CullingOff']],
+    ]);
+    link(id, parentId);
+    link(
+      add('NodeAttribute', name, 'NodeAttribute', kind, [
+        ['TypeFlags', [kind]],
+        ['GeometryVersion', [int(124)]],
+        ['Properties70', [], properties],
+      ]),
+      id,
+    );
+  };
+
   const visit = (node: Node, parentId: bigint, inheritParentScale: boolean) => {
     signal?.throwIfAborted();
     const joint = !!node.source && joints.has(node.source),
@@ -581,6 +675,12 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
         id,
       );
     const passOn = inheritParentScale || uneven(node.s) || (!!node.source && stretched.has(node.source));
+    // A glTF camera and light look down -Z, an FBX camera down +X and an FBX light down -Y. A child model turns one into
+    // the other: the node keeps its own transform, curves and children, and may hold a mesh as well.
+    if (node.camera)
+      attach(node.camera.name ?? `${node.name ?? 'Node'} camera`, 'Camera', [0, 90, 0], cameraProperties(node.camera), id, passOn);
+    if (node.light)
+      attach(node.light.name ?? `${node.name ?? 'Node'} light`, 'Light', [90, 0, 0], lightProperties(node.light), id, passOn);
     for (const child of node.children) visit(child, id, passOn);
   };
   for (const root of roots) visit(root, 0n, false);

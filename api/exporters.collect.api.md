@@ -6,6 +6,24 @@
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { Vec2 } from "@margoengine/math";
 
+export interface CameraData {
+    type: 'perspective' | 'orthographic';
+    name?: string;
+    perspective?: {
+        yfov: number;
+        znear: number;
+        zfar?: number;
+        aspectRatio?: number;
+    };
+    orthographic?: {
+        xmag: number;
+        ymag: number;
+        znear: number;
+        zfar: number;
+    };
+    extras?: Extras;
+}
+
 export interface ExportNode {
     name?: string;
     translation?: readonly number[];
@@ -69,6 +87,17 @@ export interface Geo {
         tangents?: Float32Array;
     }[];
     base?: Geo;
+}
+
+export interface LightData {
+    type: 'directional' | 'point' | 'spot';
+    name?: string;
+    color: readonly number[];
+    intensity: number;
+    range?: number;
+    innerConeAngle?: number;
+    outerConeAngle?: number;
+    extras?: Extras;
 }
 
 export interface Mat {
@@ -157,7 +186,11 @@ export interface TextureData {
     extras?: Extras;
 }
 
+export function cameraDefinition(camera: CameraData): GLTFCameraDefinition;
+
 export function collect(source: ExportSource, options?: SceneOptions, plan?: (bytes: number) => void, loaded?: LoadedModels): Node[];
+
+export function lightDefinition(light: LightData): GLTFLightDefinition;
 
 export function polygons(faceSizes: Uint8Array | undefined, indices: Uint32Array): number[][];
 
@@ -183,24 +216,6 @@ interface AnimationData {
     extras?: Extras;
 }
 
-interface CameraData {
-    type: 'perspective' | 'orthographic';
-    name?: string;
-    perspective?: {
-        yfov: number;
-        znear: number;
-        zfar?: number;
-        aspectRatio?: number;
-    };
-    orthographic?: {
-        xmag: number;
-        ymag: number;
-        znear: number;
-        zfar: number;
-    };
-    extras?: Extras;
-}
-
 interface ExportPrimitive {
     geometry: Geometry | GeometryData;
     material?: PbrMaterial | MaterialData;
@@ -211,6 +226,145 @@ interface ExportPrimitive {
 type Extras = {
     readonly [key: string]: unknown;
 };
+
+interface GLTFCameraDefinition extends GLTFProperty {
+  type: 'perspective' | 'orthographic';
+  perspective?: { yfov: number; znear: number; zfar?: number; aspectRatio?: number };
+  orthographic?: { xmag: number; ymag: number; znear: number; zfar: number };
+}
+
+interface GLTFExtensions {
+  [key: string]: unknown;
+  KHR_draco_mesh_compression?: { bufferView: number; attributes: Record<string, number> };
+  EXT_meshopt_compression?: GLTFMeshopt;
+  KHR_meshopt_compression?: GLTFMeshopt;
+  KHR_texture_basisu?: { source: number };
+  EXT_texture_webp?: { source: number };
+  EXT_texture_avif?: { source: number };
+  KHR_texture_transform?: GLTFTextureTransform;
+  EXT_mesh_gpu_instancing?: GLTFInstancing;
+  KHR_lights_punctual?: { light?: number; lights?: GLTFLightDefinition[] };
+  EXT_lights_ies?: {
+    lights?: { name?: string; uri?: string; bufferView?: number; mimeType?: string }[];
+    light?: number;
+    multiplier?: number;
+    color?: number[];
+  };
+  EXT_lights_image_based?: { lights?: GLTFImageBasedLight[]; light?: number };
+  KHR_node_visibility?: { visible?: boolean };
+  KHR_materials_variants?: { variants?: { name: string }[]; mappings?: { material: number; variants: number[] }[] };
+  KHR_materials_unlit?: object;
+  KHR_materials_emissive_strength?: { emissiveStrength?: number };
+  KHR_materials_ior?: { ior?: number };
+  KHR_materials_dispersion?: { dispersion?: number };
+  KHR_materials_clearcoat?: {
+    clearcoatFactor?: number;
+    clearcoatRoughnessFactor?: number;
+    clearcoatTexture?: GLTFTextureInfo;
+    clearcoatRoughnessTexture?: GLTFTextureInfo;
+    clearcoatNormalTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_transmission?: { transmissionFactor?: number; transmissionTexture?: GLTFTextureInfo };
+  KHR_materials_volume?: {
+    thicknessFactor?: number;
+    thicknessTexture?: GLTFTextureInfo;
+    attenuationDistance?: number;
+    attenuationColor?: number[];
+  };
+  KHR_materials_sheen?: {
+    sheenColorFactor?: number[];
+    sheenRoughnessFactor?: number;
+    sheenColorTexture?: GLTFTextureInfo;
+    sheenRoughnessTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_specular?: {
+    specularFactor?: number;
+    specularColorFactor?: number[];
+    specularTexture?: GLTFTextureInfo;
+    specularColorTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_iridescence?: {
+    iridescenceFactor?: number;
+    iridescenceIor?: number;
+    iridescenceThicknessMinimum?: number;
+    iridescenceThicknessMaximum?: number;
+    iridescenceTexture?: GLTFTextureInfo;
+    iridescenceThicknessTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_anisotropy?: {
+    anisotropyStrength?: number;
+    anisotropyRotation?: number;
+    anisotropyTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_diffuse_transmission?: {
+    diffuseTransmissionFactor?: number;
+    diffuseTransmissionColorFactor?: number[];
+    diffuseTransmissionTexture?: GLTFTextureInfo;
+    diffuseTransmissionColorTexture?: GLTFTextureInfo;
+  };
+  KHR_materials_volume_scatter?: {
+    multiscatterColorFactor?: number[];
+    multiscatterColorTexture?: GLTFTextureInfo;
+    scatterAnisotropy?: number;
+  };
+  EXT_materials_bump?: {
+    bumpFactor?: number;
+    bumpTexture?: GLTFTextureInfo;
+    heightSpace?: 'world' | 'object';
+  };
+}
+
+interface GLTFImageBasedLight extends GLTFProperty {
+  rotation?: number[];
+  intensity?: number;
+  irradianceCoefficients: number[][];
+  specularImages: number[][];
+  specularImageSize: number;
+}
+
+interface GLTFInstancing {
+  attributes: Record<string, number>;
+}
+
+interface GLTFLightDefinition extends GLTFProperty {
+  type: 'directional' | 'point' | 'spot';
+  color?: number[];
+  intensity?: number;
+  range?: number;
+  spot?: { innerConeAngle?: number; outerConeAngle?: number };
+}
+
+interface GLTFMeshopt {
+  fallback?: boolean;
+  buffer: number;
+  byteOffset?: number;
+  byteLength: number;
+  byteStride: number;
+  count: number;
+  mode: string;
+  filter?: string;
+}
+
+interface GLTFProperty<E extends Record<string, unknown> = GLTFExtensions> {
+  name?: string;
+  extras?: unknown;
+  extensions?: E;
+  [key: string]: unknown;
+}
+
+interface GLTFTextureInfo extends GLTFProperty {
+  index: number;
+  texCoord?: number;
+  scale?: number;
+  strength?: number;
+}
+
+interface GLTFTextureTransform {
+  offset?: readonly [number, number];
+  rotation?: number;
+  scale?: readonly [number, number];
+  texCoord?: number;
+}
 
 interface GeometryData {
     positions: ArrayLike<number>;
@@ -227,17 +381,6 @@ interface GeometryData {
     joints?: ArrayLike<number>;
     weights?: ArrayLike<number>;
     morphs?: readonly MorphData[];
-}
-
-interface LightData {
-    type: 'directional' | 'point' | 'spot';
-    name?: string;
-    color: readonly number[];
-    intensity: number;
-    range?: number;
-    innerConeAngle?: number;
-    outerConeAngle?: number;
-    extras?: Extras;
 }
 
 interface LightmapData {

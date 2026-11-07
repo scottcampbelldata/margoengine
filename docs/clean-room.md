@@ -211,6 +211,10 @@ carry the same citation as a one-line comment in the code.
 | EX14 | FBX physically based materials and layered textures: the property names real files carry, the specular to metallic sum | fbx/src/pbr.ts | Autodesk's public help on the Max Physical and PBR materials, the Stingray PBS shader and Arnold Standard Surface; the FBX SDK class reference (FbxLayeredTexture); the published glTF notes on KHR_materials_pbrSpecularGlossiness conversion. Read from real files; no code of any importer read. |
 | EX15 | FBX curve records: the NURBS fields real files carry and the wrapped points of a periodic form | fbx/src/curves.ts | FbxNurbsCurve class reference, real Maya and 3ds Max files; the evaluation is Piegl and Tiller, The NURBS Book, in geometry/nurbs |
 | EX16 | In-between weights and blended skin share | fbx/src/deformers.ts, fbx/src/skin.ts | FbxBlendShapeChannel, FbxSkin and FbxCluster class references; piecewise linear stops and the share measured against OBJ frames Maya wrote |
+| EX17 | FBX camera and light properties on export, and the turn from -Z to +X and -Y | fbx/src/export.ts | FbxCamera and FbxLight class references; thin lens field of view; checked by reading the file in Blender as a user |
+| EX4 | Euler XYZ to and from quaternion, slerp, Hermite sampling of glTF cubic keys | fbx/src/export.ts | Textbook rotation algebra (Shoemake 1985 for slerp); glTF 2.0 specification, appendix C, for the cubic spline |
+
+### gltf-pro
 
 | id | formula | file | source |
 | --- | --- | --- | --- |

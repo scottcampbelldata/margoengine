@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10014343,
+  "total": 10048167,
   "history": [
     {
       "date": "2026-10-24",
@@ -2978,6 +2978,12 @@
       "commit": "237cd14b6",
       "reason": "oit/vfx entry and effect hooks in oit, vfx, splats and points",
       "grew": 4
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "c1b9a6f7f",
+      "reason": "fbx: entries pbr, curves, deformers, camera and light export",
+      "grew": 10
     }
   ],
   "items": {
@@ -3150,7 +3156,7 @@
     "@margoengine/exporters/apng": 2322,
     "@margoengine/exporters/atlas": 2403,
     "@margoengine/exporters/capture": 7241,
-    "@margoengine/exporters/collect": 9643,
+    "@margoengine/exporters/collect": 10836,
     "@margoengine/exporters/dae": 12699,
     "@margoengine/exporters/draco": 185946,
     "@margoengine/exporters/godot": 10258,
@@ -3162,6 +3168,7 @@
     "@margoengine/exporters/godot-precision-addon": 5995,
     "@margoengine/exporters/hash": 1717,
     "@margoengine/exporters/import-names": 1038,
+    "@margoengine/exporters/jpeg-read": 4030,
     "@margoengine/exporters/ktx2": 1013431,
     "@margoengine/exporters/meshopt": 8399,
     "@margoengine/exporters/model": 9536,
@@ -3186,12 +3193,15 @@
     "@margoengine/exporters/usdz": 17538,
     "@margoengine/exporters/usdz-anim": 20310,
     "@margoengine/exporters/webp": 3661,
-    "@margoengine/fbx": 21226,
-    "@margoengine/fbx dist/workers/fbx.js": 64259,
-    "@margoengine/fbx/export": 7913,
+    "@margoengine/fbx": 22144,
+    "@margoengine/fbx dist/workers/fbx.js": 83143,
+    "@margoengine/fbx/curves": 2304,
+    "@margoengine/fbx/deformers": 1108,
+    "@margoengine/fbx/export": 8525,
     "@margoengine/fbx/layers": 4780,
+    "@margoengine/fbx/pbr": 3843,
     "@margoengine/fbx/scene-extras": 2735,
-    "@margoengine/fbx/worker": 22167,
+    "@margoengine/fbx/worker": 23098,
     "@margoengine/fsm": 1131,
     "@margoengine/geometry": 24691,
     "@margoengine/geometry/delaunay": 3404,
@@ -3635,6 +3645,7 @@
     "leak @margoengine/creative/particles -> @margoengine/vfx/base": 1,
     "leak @margoengine/fbx -> @margoengine/exporters": 1,
     "leak @margoengine/fbx -> @margoengine/gltf-pro": 1,
+    "leak @margoengine/fbx/export -> @margoengine/exporters/collect": 1,
     "leak @margoengine/fbx/worker -> @margoengine/gltf-pro/worker": 1,
     "leak @margoengine/inspector -> @margoengine/lines": 1,
     "leak @margoengine/kinematics-constraints/sdf -> @margoengine/bvh/inside": 1,

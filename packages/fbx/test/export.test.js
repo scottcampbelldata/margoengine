@@ -545,3 +545,117 @@ test('the d|DeformPercent curve property reads as the weight curve (importer rej
     );
   assert.equal(json.animations[0].channels[0].target.path, 'weights');
 });
+
+const quatY = (degrees) => [0, Math.sin((degrees * Math.PI) / 360), 0, Math.cos((degrees * Math.PI) / 360)];
+const near = (a, b, within = 1e-5) => assert.ok(Math.abs(a - b) <= within, `${a} is not ${b}`);
+/** The world direction of a node's -Z in a glTF document. */
+function looks(doc, index) {
+  const parents = new Map();
+  doc.nodes.forEach((n, i) => (n.children ?? []).forEach((c) => parents.set(c, i)));
+  let v = [0, 0, -1];
+  for (let at = index; at !== undefined; at = parents.get(at)) {
+    const [x, y, z, w] = doc.nodes[at].rotation ?? [0, 0, 0, 1],
+      t = [2 * (y * v[2] - z * v[1]), 2 * (z * v[0] - x * v[2]), 2 * (x * v[1] - y * v[0])];
+    v = [
+      v[0] + w * t[0] + y * t[2] - z * t[1],
+      v[1] + w * t[1] + z * t[0] - x * t[2],
+      v[2] + w * t[2] + x * t[1] - y * t[0],
+    ];
+  }
+  return v;
+}
+
+test('cameras and lights keep their projection and aim through the file', async () => {
+  const { sceneExtras } = await import('../dist/scene-extras.js');
+  const { fbx } = await exportFBX({
+      nodes: [
+        {
+          name: 'rig',
+          rotation: quatY(90),
+          children: [
+            { name: 'view', camera: { type: 'perspective', perspective: { yfov: 0.7, znear: 0.5, zfar: 80, aspectRatio: 1.5 } } },
+            { name: 'plan', camera: { type: 'orthographic', orthographic: { xmag: 4, ymag: 2, znear: 0.25, zfar: 30 } } },
+            {
+              name: 'lamp',
+              light: { type: 'spot', color: [1, 0.5, 0.25], intensity: 3, range: 12, innerConeAngle: 0.2, outerConeAngle: 0.6 },
+            },
+            { name: 'sun', light: { type: 'directional', color: [1, 1, 1], intensity: 2 } },
+            { name: 'bulb', light: { type: 'point', color: [0, 1, 0], intensity: 0.5 } },
+          ],
+        },
+      ],
+    }),
+    { json: doc } = readGLB(await convertFBX(fbx, { extensions: [sceneExtras] })),
+    cameras = doc.cameras,
+    lights = doc.extensions.KHR_lights_punctual.lights;
+  assert.equal(cameras.length, 2);
+  const view = cameras.find((c) => c.type === 'perspective').perspective,
+    plan = cameras.find((c) => c.type === 'orthographic').orthographic;
+  near(view.yfov, 0.7);
+  near(view.znear, 0.5);
+  near(view.zfar, 80, 1e-4);
+  near(view.aspectRatio, 1.5);
+  near(plan.xmag, 4);
+  near(plan.ymag, 2);
+  near(plan.znear, 0.25);
+  near(plan.zfar, 30, 1e-4);
+  const { fbx: tall } = await exportFBX({
+    nodes: [{ name: 'tall', camera: { type: 'orthographic', orthographic: { xmag: 1, ymag: 2, znear: 1, zfar: 2 } } }],
+  });
+  const standing = readGLB(await convertFBX(tall, { extensions: [sceneExtras] })).json.cameras[0].orthographic;
+  near(standing.xmag, 1);
+  near(standing.ymag, 2);
+  const by = (type) => lights.find((l) => l.type === type),
+    spot = by('spot');
+  assert.deepEqual(spot.color, [1, 0.5, 0.25]);
+  near(spot.intensity, 3);
+  near(spot.range, 12, 1e-4);
+  near(spot.spot.innerConeAngle, 0.2);
+  near(spot.spot.outerConeAngle, 0.6);
+  near(by('directional').intensity, 2);
+  near(by('point').intensity, 0.5);
+  assert.equal(by('point').range, undefined);
+  // The rig turns a quarter about Y, so all of them look down -X. Each is two nodes down from its own FBX helper.
+  for (const [i, n] of doc.nodes.entries()) {
+    if (n.camera === undefined && n.extensions?.KHR_lights_punctual === undefined) continue;
+    if (lights[n.extensions?.KHR_lights_punctual?.light]?.type === 'point') continue;
+    const v = looks(doc, i);
+    near(v[0], -1);
+    near(v[1], 0);
+    near(v[2], 0);
+  }
+});
+
+test('a node may hold a mesh, a camera and a light at once, and they ride on its children list', async () => {
+  const { sceneExtras } = await import('../dist/scene-extras.js'),
+    geometry = {
+      positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+      indices: new Uint16Array([0, 1, 2]),
+    },
+    { fbx } = await exportFBX({
+      nodes: [
+        {
+          name: 'head',
+          geometry,
+          camera: { type: 'perspective', name: 'eye', perspective: { yfov: 1, znear: 0.1 } },
+          light: { type: 'point', name: 'torch', color: [1, 1, 1], intensity: 1 },
+        },
+      ],
+    }),
+    { json: doc } = readGLB(await convertFBX(fbx, { extensions: [sceneExtras] }));
+  assert.equal(doc.meshes.length, 1);
+  assert.equal(doc.cameras.length, 1);
+  assert.equal(doc.cameras[0].name, 'eye');
+  assert.equal(doc.extensions.KHR_lights_punctual.lights[0].name, 'torch');
+  // An open far plane has no FBX form: it comes back a million near planes out.
+  near(doc.cameras[0].perspective.zfar, 1e5, 1);
+});
+
+test('a camera or light glTF would refuse is refused here too', async () => {
+  await assert.rejects(exportFBX({ nodes: [{ name: 'a', camera: { type: 'perspective' } }] }), /projection is missing/);
+  await assert.rejects(
+    exportFBX({ nodes: [{ name: 'a', light: { type: 'point', color: [2, 0, 0], intensity: 1 } }] }),
+    /Light color/,
+  );
+});

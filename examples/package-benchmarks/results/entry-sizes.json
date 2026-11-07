@@ -1,5 +1,5 @@
 {
-  "commit": "237cd14b6",
+  "commit": "c1b9a6f7f",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -732,8 +732,8 @@
         "gzip": 9403
       },
       "./collect": {
-        "raw": 26331,
-        "gzip": 9520
+        "raw": 29528,
+        "gzip": 10520
       },
       "./dae": {
         "raw": 33806,
@@ -742,6 +742,10 @@
       "./capture": {
         "raw": 18182,
         "gzip": 7075
+      },
+      "./jpeg-read": {
+        "raw": 8510,
+        "gzip": 3774
       },
       "./apng": {
         "raw": 4721,
@@ -874,28 +878,40 @@
     },
     "@margoengine/fbx": {
       ".": {
-        "raw": 65050,
-        "gzip": 20607
+        "raw": 66655,
+        "gzip": 21499
       },
       "./worker": {
-        "raw": 67718,
-        "gzip": 21521
+        "raw": 69323,
+        "gzip": 22425
       },
       "./export": {
-        "raw": 19132,
-        "gzip": 7657
+        "raw": 21044,
+        "gzip": 8269
       },
       "./scene-extras": {
-        "raw": 5289,
-        "gzip": 2479
+        "raw": 5315,
+        "gzip": 2487
       },
       "./layers": {
         "raw": 10393,
         "gzip": 4524
       },
+      "./deformers": {
+        "raw": 1520,
+        "gzip": 852
+      },
+      "./curves": {
+        "raw": 4446,
+        "gzip": 2048
+      },
+      "./pbr": {
+        "raw": 9492,
+        "gzip": 3587
+      },
       "dist/workers/fbx.js": {
-        "raw": 198082,
-        "gzip": 62696
+        "raw": 245340,
+        "gzip": 80721
       }
     },
     "@margoengine/fsm": {
@@ -2898,9 +2914,9 @@
       "brotli": 14087
     },
     "packages/fbx/dist/workers/fbx.js": {
-      "raw": 196365,
-      "gzip": 62553,
-      "brotli": 54410
+      "raw": 243231,
+      "gzip": 80540,
+      "brotli": 69584
     },
     "packages/usdz/dist/workers/usdz.js": {
       "raw": 216239,

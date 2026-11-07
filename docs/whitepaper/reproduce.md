@@ -157,6 +157,9 @@ route is a clone because 1.0.0 is not on npm yet.
 | FBX animation layers against Maya | `node --test packages/fbx/test/layers.test.js` after `npm run build --workspace @margoengine/fbx` compares a converted clip, posed by plain glTF rules, with the OBJ frame Maya wrote (`packages/fbx/test/fixtures/real/`) | no | console | Sources and sums in that folder's NOTICE.md. |
 | FBX PBR materials from Max and Maya | `node --test packages/fbx/test/pbr.test.js` after `npm run build --workspace @margoengine/fbx` reads real 3ds Max and Maya files. |
 | FBX curves and deformers against Max and Maya | `node --test packages/fbx/test/curves.test.js packages/fbx/test/deformers.test.js` after `npm run build --workspace @margoengine/fbx` reads real files and Maya's OBJ frames. |
+| FBX camera and light export in Blender | Write a scene with `exportFBX`, then `blender --background --factory-startup --python packages/fbx/test/fixtures/blender-read-export.py -- /absolute/file.fbx /absolute/out.json` and compare the JSON with the scene, Blender's axes being x, -z, y. |
+| Unit tests, API snapshots, size gate | `npm run verify` | no | console | `npm run verify:full` adds packed-package and interop suites. |
+
 ## A second machine
 
 On a discrete-GPU desktop or a Mac: the setup above, then `npm run bench` and `npm run bench -- features`, and
