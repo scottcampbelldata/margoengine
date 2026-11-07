@@ -240,14 +240,11 @@ export const splats: TilesModelDrawer = async (
   model.root.visible = false;
   const splatScene = placed.length ? await scene(host) : undefined;
   const entries = splatScene ? placed.map((p) => splatScene.add(p)) : [];
-  let bytes = content.byteLength;
-  // The splats' own arrays, kept to rebuild the cloud; the GPU copy is counted by the cloud, not here.
-  for (const { data } of placed)
-    bytes +=
-      data.positions.byteLength +
-      data.covariances.byteLength +
-      data.colors.byteLength +
-      (data.sphericalHarmonics?.byteLength ?? 0);
+  // Under budget 'gpu': the meshes, plus about 128 bytes a splat of @margoengine/splats buffers and its harmonics.
+  // Under 'content': the file. The splats' CPU arrays kept for rebuilds are not GPU memory and are not counted.
+  let bytes = host.measure(model, content.byteLength);
+  if (host.budget === 'gpu')
+    for (const { data } of placed) bytes += (data.positions.length / 3) * 128 + (data.sphericalHarmonics?.byteLength ?? 0);
   return {
     bytes,
     get visible() {

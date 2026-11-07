@@ -92,6 +92,14 @@ try {
     real,
   );
 
+  const memory = (results.gpuMemory = await call((n) => window.tilesFixture.run(n), 'gpu-memory'));
+  assert.deepEqual(memory.errors, [], 'gpu-memory: WebGPU or engine errors');
+  check(
+    "budget 'gpu', real file: BoomBox's tile counts within 2% of the buffers and textures the device made for it and freed with it",
+    Math.abs(memory.counted - memory.freed) <= 0.02 * memory.freed && memory.freed > 4 * memory.file,
+    memory,
+  );
+
   const splat = (results.cesiumSplats = await call((n) => window.tilesFixture.run(n), 'cesium-splats'));
   assert.deepEqual(splat.errors, [], 'cesium-splats: WebGPU or engine errors');
   check(

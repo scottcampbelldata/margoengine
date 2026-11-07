@@ -27,6 +27,7 @@ export {
   type TilesModel,
   type TilesModelDrawer,
 } from './renderer.js';
+export { modelGpuBytes, textureBytes, type MeasurableModel } from './memory.js';
 export {
   TileBounds,
   createBounds,

@@ -148,6 +148,64 @@ async function run(name: string): Promise<unknown> {
     tiles.dispose();
     return result;
   }
+  if (name === 'gpu-memory') {
+    // What the GPU really holds for a tile, counted at the device: every buffer and texture created while the tile
+    // loads and draws, less those destroyed; then what disposing the tile frees. The tile is Khronos's real BoomBox
+    // (10.6 MB GLB, four 2048 x 2048 PNG textures) as one glTF tile, so the file size and the GPU size differ widely.
+    const from = errors.length,
+      sizes = new Map<object, number>();
+    let live = 0;
+    const blocks: Record<string, number> = { bc7: 16, astc: 16, etc2: 16, bc1: 8, bc4: 8 };
+    const texel = (format: string) => {
+      const block = Object.keys(blocks).find((k) => format.startsWith(k));
+      return block ? blocks[block] / 16 : format.startsWith('rgba16') ? 8 : format.startsWith('rgba32') ? 16 : 4;
+    };
+    const track = (object: GPUBuffer | GPUTexture, bytes: number) => {
+      sizes.set(object, bytes);
+      live += bytes;
+      const destroy = object.destroy.bind(object);
+      object.destroy = () => {
+        if (sizes.has(object)) live -= sizes.get(object)!;
+        sizes.delete(object);
+        destroy();
+      };
+      return object;
+    };
+    const createBuffer = device.createBuffer.bind(device),
+      createTexture = device.createTexture.bind(device);
+    device.createBuffer = (d) => track(createBuffer(d), d.size) as GPUBuffer;
+    device.createTexture = (d) => {
+      const t = createTexture(d),
+        [w, h, layers = 1] = Array.isArray(d.size) ? d.size : [(d.size as GPUExtent3DDict).width, (d.size as GPUExtent3DDict).height ?? 1, (d.size as GPUExtent3DDict).depthOrArrayLayers ?? 1];
+      let bytes = 0;
+      for (let l = 0; l < (d.mipLevelCount ?? 1); l++) bytes += Math.max(1, w >> l) * Math.max(1, h >> l) * layers * texel(d.format);
+      // Render targets (the frame's own) are not tile memory; keep them apart by their usage.
+      return track(t, d.usage & GPUTextureUsage.TEXTURE_BINDING && !(d.usage & GPUTextureUsage.STORAGE_BINDING) ? bytes * (d.sampleCount ?? 1) : 0) as GPUTexture;
+    };
+    const glb = new Uint8Array(await (await fetch('../../../examples/assets/khronos/BoomBox/BoomBox.glb')).arrayBuffer());
+    const json = {
+      asset: { version: '1.1' },
+      geometricError: 1,
+      root: { boundingVolume: { box: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1] }, geometricError: 0, content: { uri: 'boom.glb' } },
+    };
+    const files = memoryFetch(new Map([['tileset.json', new TextEncoder().encode(JSON.stringify(json))], ['boom.glb', glb]]));
+    engine.camera.position = [0, 0, 0.08];
+    engine.camera.target = [0, 0, 0];
+    await frame();
+    const before = live;
+    tiles = await TilesRenderer.load(engine, files.url, { fetch: files.fetch });
+    const timing = await converge();
+    await frame();
+    await frame();
+    const loaded = live - before,
+      counted = tiles.tileset.progress.bytes;
+    tiles.dispose();
+    await frame();
+    const freed = loaded - (live - before);
+    device.createBuffer = createBuffer;
+    device.createTexture = createTexture;
+    return { ...timing, file: glb.byteLength, counted, loaded, freed, errors: errors.slice(from) };
+  }
   if (name === 'cesium-splats') {
     // CesiumJS's real sh_unit_cube splat tileset (Specs/Data, Apache-2.0): one glTF tile of 27 Gaussian splats with
     // SH degree 3 in an SPZ payload (KHR_gaussian_splatting_compression_spz_2), not geo-referenced ('local' frame).
@@ -225,6 +283,8 @@ async function run(name: string): Promise<unknown> {
       fetch: memory.fetch,
       maxConcurrentRequests: 8,
       memoryBudget: 80_000,
+      // This case checks eviction against file sizes (its 80 kB is a file budget); 'gpu-memory' checks the GPU count.
+      budget: 'content',
     });
     const timing = await converge();
     const data = pixels();

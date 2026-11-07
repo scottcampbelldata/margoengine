@@ -573,6 +573,7 @@
       "identity",
       "implicitBounds",
       "invert",
+      "modelGpuBytes",
       "mortonIndex",
       "multiply",
       "parseB3dm",
@@ -584,6 +585,7 @@
       "readComponents",
       "regionBounds",
       "sphereBounds",
+      "textureBytes",
       "transformDirection",
       "transformPoint",
       "translation"

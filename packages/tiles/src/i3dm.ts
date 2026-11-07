@@ -80,6 +80,7 @@ export const i3dm: TilesInstancesDrawer = async (
     import('@margoengine/gltf-pro/instancing'),
     host.loadModel(gltf, signal) as Promise<InstancedModel>,
   ]);
+  let nodes = 0;
   try {
     signal.throwIfAborted();
     if (!Array.isArray(model.primitives))
@@ -105,6 +106,7 @@ export const i3dm: TilesInstancesDrawer = async (
       }
       primitive.instances = rows;
     }
+    nodes = byNode.size;
     host.place(
       root,
       host.contentMatrix(tile, [rtc[0] + center[0], rtc[1] + center[1], rtc[2] + center[2]], false),
@@ -114,8 +116,10 @@ export const i3dm: TilesInstancesDrawer = async (
     model.dispose();
     throw error;
   }
+  // Under budget 'gpu': the model once, plus each node's instance rows (24 float32 per instance, as PBRInstances holds).
+  const rows = host.budget === 'gpu' ? nodes * content.length * 24 * 4 : 0;
   return {
-    bytes: content.byteLength,
+    bytes: host.measure(model, content.byteLength) + rows,
     get visible() {
       return model.root.visible;
     },

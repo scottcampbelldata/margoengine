@@ -117,6 +117,17 @@ export interface InstancesContent {
     readonly byteLength: number;
 }
 
+export interface MeasurableModel {
+    readonly primitives?: readonly MeasurablePrimitive[];
+    readonly pointsAndLines?: readonly MeasurablePrimitive[];
+    readonly asset?: {
+        readonly doc?: {
+            readonly textures?: readonly (TextureJSON | undefined)[];
+        };
+    };
+    image?(index: number): unknown;
+}
+
 export interface MetadataEntity {
     class: string;
     properties?: Record<string, unknown>;
@@ -261,6 +272,7 @@ export class TilesRenderer implements EnginePlugin {
     update(): TilesFrame;
     contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
     createContent(content: TileContent, tile: TilesetTile, signal: AbortSignal): Promise<TileRenderable>;
+    measure(model: TilesModel, fileBytes: number): number;
     dispose(): void;
     [Symbol.dispose](): void;
 }
@@ -269,6 +281,7 @@ export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
     frame?: 'enu' | 'local' | ArrayLike<number>;
     origin?: TilesOrigin;
     loadModel?: (engine: EngineKernel, gltf: Uint8Array, signal: AbortSignal) => Promise<TilesModel>;
+    budget?: 'gpu' | 'content';
     pointBudget?: number;
     i3dm?: TilesInstancesDrawer;
     dracoPoints?: (content: PointsContent, signal: AbortSignal) => Promise<PointsContent>;
@@ -456,6 +469,8 @@ export function implicitBounds(root: TileBounds, scheme: 'QUADTREE' | 'OCTREE', 
 
 export function invert(m: ArrayLike<number>, out?: TileMatrix): TileMatrix;
 
+export function modelGpuBytes(model: MeasurableModel): number | undefined;
+
 export function mortonIndex(x: number, y: number, z?: number): number;
 
 export function multiply(a: ArrayLike<number>, b: ArrayLike<number>, out?: TileMatrix): TileMatrix;
@@ -477,6 +492,8 @@ export function readComponents(bytes: Uint8Array, byteOffset: number, componentT
 export function regionBounds(region: ArrayLike<number>): TileBounds;
 
 export function sphereBounds(sphere: ArrayLike<number>, transform?: ArrayLike<number>): TileBounds;
+
+export function textureBytes(width: number, height: number, levels?: number): number;
 
 export function transformDirection(m: ArrayLike<number>, p: ArrayLike<number>): [number, number, number];
 
@@ -500,6 +517,24 @@ interface ImplicitContext {
     readonly subtrees: Map<string, Subtree>;
 }
 
+interface MeasurablePrimitive {
+    readonly vertices?: ArrayBufferView;
+    readonly indices?: ArrayBufferView;
+    readonly uvs?: ArrayBufferView;
+    readonly material?: {
+        readonly maps?: readonly ({
+            readonly index: number;
+        } | null | undefined)[];
+    };
+}
+
+interface TextureJSON {
+    source?: number;
+    extensions?: Record<string, {
+        source?: number;
+    } | undefined>;
+}
+
 interface TilesContentHost {
     readonly engine: EngineKernel;
     readonly url: string;
@@ -508,6 +543,8 @@ interface TilesContentHost {
     forget(mesh: Mesh): void;
     contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
     fetch(url: string, signal: AbortSignal): Promise<Uint8Array>;
+    readonly budget: 'gpu' | 'content';
+    measure(model: TilesModel, fileBytes: number): number;
     onUpdate(listener: () => void): () => void;
     offset(): Vec3;
 }

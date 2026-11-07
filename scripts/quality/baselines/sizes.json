@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10449475,
+  "total": 10450161,
   "history": [
     {
       "date": "2026-10-24",
@@ -3434,6 +3434,12 @@
       "commit": "ae97bb92b",
       "reason": "tiles/s2: S2 bounding volumes (batch 47 job 4)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "052e39110",
+      "reason": "tiles: GPU memory budget (batch 47 job 5)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4044,7 +4050,7 @@
     "@margoengine/tilemap/autotile": 1605,
     "@margoengine/tilemap/ldtk": 3070,
     "@margoengine/tilemap/tiled": 4264,
-    "@margoengine/tiles": 15241,
+    "@margoengine/tiles": 15927,
     "@margoengine/tiles/i3dm": 1629,
     "@margoengine/tiles/metadata": 4946,
     "@margoengine/tiles/s2": 3004,

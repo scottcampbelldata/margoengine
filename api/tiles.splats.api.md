@@ -192,6 +192,8 @@ interface TilesContentHost {
     forget(mesh: Mesh): void;
     contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
     fetch(url: string, signal: AbortSignal): Promise<Uint8Array>;
+    readonly budget: 'gpu' | 'content';
+    measure(model: TilesModel, fileBytes: number): number;
     onUpdate(listener: () => void): () => void;
     offset(): Vec3;
 }

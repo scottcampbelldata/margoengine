@@ -53,7 +53,7 @@ Each update measures every visible tile's screen-space error, `geometricError x 
 | --- | --- | --- |
 | `maximumScreenSpaceError` | `16` | Pixels of error allowed before refining. |
 | `maxConcurrentRequests` | `6` | Requests in flight at once. |
-| `memoryBudget` | 512 MiB | Bytes of ready content kept. Past it, the least recently used tiles outside the view are evicted; if the view alone needs more, only hole-filling loads start (`tileset.overBudget` is then true). |
+| `memoryBudget` | 512 MiB | Bytes of ready tiles kept: GPU bytes in `TilesRenderer` (see `budget`), file bytes in `Tileset`. Past it, the least recently used tiles outside the view are evicted; if the view alone needs more, only hole-filling loads start (`tileset.overBudget` is then true). |
 | `skipLevelOfDetail` | `false` | Skip loading far-too-coarse parents (see Selection). |
 | `skipScreenSpaceErrorFactor` | `16` | How coarse a parent may be before it is skipped. |
 | `boundingVolumes` | none | Bounding volume extensions to read: `[s2]` from `margoengine/tiles/s2`. A tileset that requires S2 without it fails with code `unsupported`. |
@@ -62,6 +62,7 @@ Each update measures every visible tile's screen-space error, `geometricError x 
 | `frame` (renderer) | `'enu'` | `'enu'`, `'local'` or a 4x4 matrix; see below. |
 | `origin` (renderer) | none | A floating origin (`FloatingOrigin` from `margoengine/cameras/origin`). |
 | `loadModel` (renderer) | gltf-pro's `parseGLTFAsync` | Your own glTF loader. |
+| `budget` (renderer) | `'gpu'` | What `memoryBudget` counts: `'gpu'` the GPU memory each tile's model takes (vertex, index and uv buffers, textures with their mip chains or KTX2 levels, i3dm instance rows, point and splat buffers), so the cache limit matches what the device holds; `'content'` the bytes of each tile's file, as `Tileset` alone counts. |
 | `pointBudget` (renderer) | 2,000,000 | Budget of the points plugin made for pnts tiles. |
 | `i3dm` (renderer) | none | The i3dm drawer from `margoengine/tiles/i3dm`; without it an i3dm tile fails with code `unsupported`. |
 | `dracoPoints` (renderer) | none | The Draco pnts decoder from `margoengine/tiles/metadata`; without it a Draco pnts tile fails with code `unsupported`. |
@@ -194,5 +195,5 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 - Metadata: feature ID textures are named, not read (sample the texture yourself); property textures, property attributes and a `schemaUri` schema in glTF are not read; 64-bit integers become doubles (exact to 2^53); feature IDs of a Draco-compressed glTF primitive are not read; picking a vertex is yours (a raycast hit), the tables then give its feature.
 - Draco pnts decode in Web Workers (`@margoengine/decoders/draco-points`), so not in Node without a decoder of your own.
 - A tile whose glTF requires KHR_techniques_webgl (archived GLSL shaders, such as the billboard level of Cesium's TilesetWithTreeBillboards) fails with code `unsupported`, as glTF says a loader must; the rest of the tileset draws.
-- Memory is counted as the bytes of each tile's content file, not the GPU memory its model takes.
+- `budget: 'gpu'` counts gltf-pro models exactly from their arrays and images (Khronos BoomBox: within 0.1% of what the device allocated); points, i3dm rows and splats by their buffer layouts; a custom `loadModel` whose models have no `primitives` is counted by file size. Uniform buffers, pipelines and the engine's own targets are not tile memory and are not counted.
 - Orthographic cameras need `Tileset.update` with `orthographicHeight`; the renderer reads a perspective camera.

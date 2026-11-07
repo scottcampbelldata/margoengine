@@ -5,6 +5,7 @@
 // float64 frame matrix; see the README's "Coordinates and precision".
 import type { EngineKernel, EnginePlugin, Mesh, Vec3 } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
+import { type MeasurableModel, modelGpuBytes } from './memory.js';
 import type { InstancesContent, ModelContent, PointsContent, TileContent } from './formats.js';
 import {
   type TileMatrix,
@@ -52,6 +53,10 @@ export interface TilesContentHost {
   contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
   /** Fetches bytes with the tileset's own fetch and signal. */
   fetch(url: string, signal: AbortSignal): Promise<Uint8Array>;
+  /** What the memory budget counts (the renderer's `budget` option). */
+  readonly budget: 'gpu' | 'content';
+  /** Bytes a tile's model counts against the memory budget: its GPU bytes (`budget: 'gpu'`) or `fileBytes`. */
+  measure(model: TilesModel, fileBytes: number): number;
   /** Calls `listener` at the end of every selection update (after tile visibility is set); returns the unsubscribe. */
   onUpdate(listener: () => void): () => void;
   /** Float64 world position of engine-local [0, 0, 0]: the floating origin's, or [0, 0, 0] without one. */
@@ -99,6 +104,12 @@ export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
   origin?: TilesOrigin;
   /** Loads one glTF / GLB into the engine. Default: gltf-pro's `parseGLTFAsync`. */
   loadModel?: (engine: EngineKernel, gltf: Uint8Array, signal: AbortSignal) => Promise<TilesModel>;
+  /**
+   * What `memoryBudget` counts: `'gpu'` (default) the GPU memory each tile's model takes (vertex, index and uv buffers,
+   * textures with their mip chains, point and splat buffers), so the cache limit matches what the device holds;
+   * `'content'` the bytes of each tile's file, as `Tileset` alone does.
+   */
+  budget?: 'gpu' | 'content';
   /** Point budget of the points plugin made for pnts tiles. Default 2,000,000. */
   pointBudget?: number;
   /**
@@ -143,6 +154,7 @@ export class TilesRenderer implements EnginePlugin {
   private readonly origin?: TilesOrigin;
   private readonly loadModel: NonNullable<TilesRendererOptions['loadModel']>;
   private readonly pointBudget: number;
+  private readonly budget: 'gpu' | 'content';
   private readonly i3dm?: TilesInstancesDrawer;
   private readonly dracoPoints?: TilesRendererOptions['dracoPoints'];
   private readonly splats?: TilesModelDrawer;
@@ -175,6 +187,9 @@ export class TilesRenderer implements EnginePlugin {
     this.tileset = tileset;
     this.origin = options.origin;
     this.pointBudget = options.pointBudget ?? 2_000_000;
+    this.budget = options.budget ?? 'gpu';
+    if (this.budget !== 'gpu' && this.budget !== 'content')
+      throw new TypeError(`Invalid budget ${JSON.stringify(this.budget)}; use 'gpu' or 'content'`);
     this.i3dm = options.i3dm;
     this.dracoPoints = options.dracoPoints;
     this.splats = options.splats;
@@ -285,7 +300,7 @@ export class TilesRenderer implements EnginePlugin {
         this.place(model.root, this.contentMatrix(tile, content.type === 'b3dm' ? content.rtcCenter : undefined));
         model.root.visible = false;
         return {
-          bytes: content.byteLength,
+          bytes: this.measure(model, content.byteLength),
           get visible() {
             return model.root.visible;
           },
@@ -323,7 +338,11 @@ export class TilesRenderer implements EnginePlugin {
         cloud.attach(anchor);
         cloud.visible = false;
         return {
-          bytes: content.byteLength,
+          // Points upload their positions (float32 xyz) and RGBA8 colours.
+          bytes:
+            this.budget === 'gpu'
+              ? (content.positions.length / 3) * (12 + (colors ? 4 : 0))
+              : content.byteLength,
           get visible() {
             return cloud.visible;
           },
@@ -369,8 +388,14 @@ export class TilesRenderer implements EnginePlugin {
         return this.i3dm((this.host ??= this.contentHost(engine)), content, tile, signal);
     }
   }
+  /** Bytes a model counts against the budget (see `budget`). */
+  measure(model: TilesModel, fileBytes: number): number {
+    return this.budget === 'gpu' ? (modelGpuBytes(model as MeasurableModel) ?? fileBytes) : fileBytes;
+  }
   private contentHost(engine: EngineKernel): TilesContentHost {
     return {
+      budget: this.budget,
+      measure: (model, fileBytes) => this.measure(model, fileBytes),
       engine,
       url: this.tileset.url,
       loadModel: (gltf, signal) => this.loadModel(engine, gltf, signal),
