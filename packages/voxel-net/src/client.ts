@@ -244,7 +244,10 @@ export class VoxelNetClient {
   onResume: (event: VoxelNetResume) => void = () => {};
   /** Called when the server has the player again, in the same place. Default does nothing. */
   onResumed: (event: VoxelNetResumed) => void = () => {};
-  /** Receives errors: a message the client cannot read, a chunk that fails to decode. Default console.error. */
+  /**
+   * Receives errors: a message the client cannot read, a chunk that fails to decode or cannot go into the world (one
+   * the app already made at that key, with setBlock). Default console.error.
+   */
   onError: (error: unknown) => void = (error) => console.error(error);
   #transport: VoxelNetTransport;
   readonly #view: number;
@@ -532,8 +535,10 @@ export class VoxelNetClient {
   #decode(key: string, entry: Entry): void {
     const bytes = entry.bytes as Uint8Array;
     entry.decoding = true;
-    decodeChunk(bytes).then(
-      (chunk) => {
+    // The catch comes after the then, so that a throw while the chunk goes into the world (a chunk the app made at that
+    // key with setBlock, say) reaches onError like a chunk that fails to decode, instead of an unhandled rejection.
+    decodeChunk(bytes)
+      .then((chunk) => {
         if (this.#chunks.get(key) !== entry || this.#closed) return;
         if (entry.swap) this.world.removeChunk(entry.cx, entry.cy, entry.cz);
         entry.swap = false;
@@ -543,9 +548,8 @@ export class VoxelNetClient {
         entry.bytes = undefined;
         if (entry.changes.length) this.world.setBlocks(entry.changes);
         entry.changes = [];
-      },
-      (error) => this.onError(error),
-    );
+      })
+      .catch((error) => this.onError(error));
   }
   // The chunks the player stands in and on are in the world.
   #ready(p: MutableVec3): boolean {
