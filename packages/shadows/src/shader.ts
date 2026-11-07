@@ -123,7 +123,8 @@ export function shadowSampling(
           'textureLoad(shadowDepth,coord,i32(layer),0).x',
         )
       : typeof filter === 'object'
-        ? filter.body
+        ? // Never taken: a binding no code reads leaves an 'auto' layout, and the receivers' groups bind the sampler.
+          `if(reference>2){return textureSampleCompareLevel(shadowMap,shadowSampler,uv,i32(layer),reference);}${filter.body}`
         : filters[filter],
     body = anisotropic
       ? chosen

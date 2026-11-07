@@ -6,6 +6,15 @@
     "ground": { "size": 6, "y": 0 },
     "size": 512
   },
+  "soft": {
+    "model": "examples/assets/khronos-samples/DiffuseTransmissionPlant.glb",
+    "toLight": [-0.5, 1, 0.3],
+    "camera": { "position": [0.2, 1.7, 1.0], "target": [0.2, 0, 0], "fov": 50 },
+    "ground": { "size": 6, "y": 0 },
+    "size": 512,
+    "lightSize": 0.04,
+    "samples": 256
+  },
   "alpha": {
     "model": "examples/assets/khronos/AlphaBlendModeTest/AlphaBlendModeTest.glb",
     "masksOnly": true,

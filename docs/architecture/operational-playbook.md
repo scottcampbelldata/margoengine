@@ -540,6 +540,14 @@ ground and the sky's own render along the sun ray agree on all 256 points, befor
 the old ground and the new sky, and core meshes, materials, gltf-pro, terrain and voxels go dark under a black pattern in both
 classes. Missing: other GPUs; a real cloud photograph over real ground is not the claim, the claim is agreement with the sky.
 
+A `ShadowFilterEffect` replaces the named filters' last step in `shadowVisibility`, after the cascade pick and the receiver
+plane. `varianceFilter` turns the depth map into two moments, blurs them by two separable passes when the map changes, and
+bounds the lit share with Chebyshev's inequality. A filter's shader must keep `shadowSampler` read, in a branch never taken,
+since 'auto' layouts drop what no code reads; `shadowSampling` adds that branch. Evidence:
+`packages/shadows/test/vsm-browser.mjs`, on a straight edge 2.7 pixels wide at blur 2 and 11.1 at blur 16, and row-to-row
+grain 0.00023 against 0.0033 for PCSS; `check.mjs`, the real plant under a soft Cycles sun, overlap 0.76 and mean difference
+0.0088, PCSS 0.97 and 0.0010. RTX A6000. Missing: other GPUs, and any timing.
+
 `LodInstances` (`@margoengine/culling/lod`) tests each instance against the frustum and picks its level in one compute pass:
 the level is the first whose limit the world sphere's radius in pixels reaches. Instances append to their level's list by
 atomic add, and the counts are copied to each level's indirect arguments, so core draws each list through `Batch.redirect`. On

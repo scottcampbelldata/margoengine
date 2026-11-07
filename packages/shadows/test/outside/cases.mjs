@@ -26,5 +26,9 @@ export const cases = [
   { name: 'pattern-shadows', scene: 'pattern', kind: 'shadows', minShadow: 2000, iou: 0.9, difference: 0.03, options: { resolution: 256, bounds: box, filter: 'hard' } },
   { name: 'pattern-virtual', scene: 'pattern', kind: 'virtual', minShadow: 2000, iou: 0.9, difference: 0.03, options: { distance: 20, filter: 'hard' } },
   { name: 'pattern-control', scene: 'pattern', kind: 'shadows', minShadow: 2000, below: 0.8, control: 'shifted', options: { resolution: 256, bounds: box, filter: 'hard' } },
+  // The plant under a sun of 0.04 half-angle tangent, Cycles' soft edges. PCSS is the reference for what a map can do here:
+  // a variance edge has one width, so it is too wide near the stems and too narrow far up, and the bound is that spread.
+  { name: 'soft-pcss', scene: 'soft', kind: 'shadows', minShadow: 2000, iou: 0.85, difference: 0.03, options: { ...hard, filter: 'soft', lightSize: 0.04 } },
+  { name: 'soft-variance', scene: 'soft', kind: 'shadows', minShadow: 2000, iou: 0.75, difference: 0.03, options: { ...hard, filter: undefined, variance: { size: 2048, blur: 8, bleed: 0.1 } } },
   { name: 'alpha-control', scene: 'alpha', kind: 'shadows', minShadow: 1000, below: 0.78, control: 'solid', options: panels },
 ];

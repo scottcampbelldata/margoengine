@@ -8,6 +8,7 @@ import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
 import {lightPattern} from '/packages/shadows/dist/light-function.js';
+import {varianceFilter} from '/packages/shadows/dist/vsm.js';
 import {Terrain} from '/packages/terrain/dist/index.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const scenes=await (await fetch('/packages/shadows/test/outside/scenes.json')).json();
@@ -70,6 +71,7 @@ window.check={
     const c=kind==='virtual'?VirtualShadows:Shadows,p=scene.pattern;
     // control 'shifted': the mask a quarter turn off, so the check must fail.
     if(p)options={...options,effects:[lightPattern({texture:mask,size:p.size,offset:control==='shifted'?[p.offset[0]+0.25,p.offset[1]+0.25]:p.offset})]};
+    if(options.variance)options={...options,filter:varianceFilter(options.variance)};
     effect=c.attach(engine,options);
     if(ground)effect.add(ground,{castShadow:false});
     const masks=!model?[]:scene.masksOnly?model.shadowPrimitives.filter(p=>p.cutoff>0):model.shadowPrimitives;

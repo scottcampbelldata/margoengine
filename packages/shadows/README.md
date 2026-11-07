@@ -184,6 +184,32 @@ The mask lies across the light and travels along it. Its right is world up cross
 
 The `effects` array is fixed at construction. With none, the receivers' shaders and the frame are unchanged. An effect is any object with `wgsl(group, binding)` and `call`, four bindings from 40, resources named `shadowFx...`: see `ShadowEffect` in the types.
 
+## Variance shadow maps
+
+`@margoengine/shadows/vsm` is a filter you give in place of `'soft'`, `'pcf'` or `'hard'`: wide, smooth edges with no grain, at one bilinear read per lit pixel however wide the edge is.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+import {varianceFilter} from 'margoengine/shadows/vsm';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const filter = varianceFilter({blur: 8});
+const shadows = Shadows.attach(engine, {filter});
+shadows.add(engine.createMesh().setGeometry(box(14, 0.1, 14)));
+shadows.add(engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([0, 1, 0]));
+filter.options.blur = 16;
+engine.start();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `size` | 1024 | Side of the moment map in texels, fixed at creation. Two `rg32float` arrays of this size, one layer per cascade: 64 MiB at 1024 with four cascades. |
+| `blur` | 4 | Blur radius in moment map texels, 0 to 32. Live. |
+| `bleed` | 0.2 | Share of the Chebyshev bound removed against light bleeding, 0 to under 1: more darkens and narrows the edge. Live. |
+| `minVariance` | 0.000001 | Least variance, in squared 0 to 1 map depth, a floor against self-shadowing. Live. |
+
+The blur runs only when the map changes, and its cost follows the map's texels, not the lit pixels. Choose it over PCSS for a wide edge with no grain; choose PCSS where edges must harden towards the caster, because a variance edge has one width everywhere, and where casters overlap at different depths, because some light bleeds between them. `VirtualShadows` keeps its named filters: it has no map of this shape to blur.
+
 ## Virtual shadow maps
 
 `margoengine/shadows/virtual` is a second, optional entry for one directional light: `VirtualShadows` keeps the texel density a camera needs at every distance, in small pages of depth, and renders only the pages that are seen and have changed. Importing it costs `Shadows` users nothing; the root entry does not reach it.

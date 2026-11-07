@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadows: variance filter</title><style>body{margin:0;background:#000}canvas{display:block;width:512px;height:512px}</style></head><body><canvas width="512" height="512"></canvas>
+<script type="module">
+// A box's straight shadow edge on a floor under the variance filter and under PCSS, and every receiver under the filter.
+// vsm-browser.mjs measures the frames.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {varianceFilter} from '/packages/shadows/dist/vsm.js';
+import {Terrain} from '/packages/terrain/dist/index.js';
+import {BlockTypes,VoxelWorld} from '/packages/voxel/dist/index.js';
+import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,8,0.01],target:[0,0,0],fov:50,near:0.05,far:100}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.radiance.set([0.6,0.6,0.6,0]);
+engine.lighting.direction.set([0,1,0]);
+const white=new PbrMaterial({color:'#ffffff'});
+const frames=async(n)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const floor=engine.createMesh().setGeometry(box(20,0.2,20)).setMaterial(white).setPosition([0,-0.1,0]);
+const caster=engine.createMesh().setGeometry(box(4,1,12)).setMaterial(white).setPosition([-2,1.5,0]);
+caster.hidden=false;
+const bounds={min:[-8,-0.5,-8],max:[8,3,8]};
+let effect,filter;
+const tilted=[-0.8,1,0.04];
+window.check={
+  // No shadows, then a named filter or a variance filter with these settings.
+  async edge(setting){
+    effect?.dispose();effect=undefined;
+    const length=Math.hypot(...tilted);
+    engine.lighting.direction.set(tilted.map(v=>v/length));
+    if(setting){
+      filter=setting.variance?varianceFilter(setting.variance):setting.filter;
+      effect=Shadows.attach(engine,{resolution:1024,bounds,casterMargin:2,bias:0.0005,normalBias:0.01,lightSize:setting.lightSize??0.05,filter});
+      effect.add(floor,{castShadow:false});effect.add(caster);
+    }
+    await waitForPipelines(()=>frames(1));await frames(3);
+    return errors;
+  },
+  // The map moved: the blur must run again.
+  async move(x){caster.setPosition([x,1.5,0]);await frames(3);return errors;},
+  // A filter set live, no shader change.
+  async set(options){Object.assign(filter.options,options);await frames(3);return errors;},
+  async restore(){effect.onDeviceRestored(engine);await waitForPipelines(()=>frames(1));await frames(3);return errors;},
+  end(){effect?.dispose();effect=undefined;floor.dispose?.();caster.dispose?.();},
+};
+const pixel=(r,g,b,a=255)=>({width:16,height:16,data:Uint8Array.from({length:16*16*4},(_,i)=>[r,g,b,a][i%4])});
+const receivers={
+  gltf:async()=>({source:await loadGLTF(engine,'/examples/assets/khronos-samples/GlassVaseFlowers.glb')}),
+  terrain:async()=>{
+    const layer=(lo,hi)=>({height:[-1e6,1e6],slope:[lo,hi],scale:1});
+    const t=Terrain.attach(engine,{origin:[-32,-32],size:[64,64],heightScale:1,cellSize:1,resolution:64,levels:2,layers:[layer(0,0.25),layer(0.25,0.5),layer(0.5,0.75),layer(0.75,1)],
+      textures(gpu){
+        const heightmap=gpu.createTexture({size:[2,2],format:'r32float',usage:6}),layers=gpu.createTexture({size:[1,1,4],format:'rgba8unorm-srgb',usage:6});
+        gpu.queue.writeTexture({texture:heightmap},new Float32Array(4),{bytesPerRow:8,rowsPerImage:2},[2,2]);
+        gpu.queue.writeTexture({texture:layers},new Uint8Array(16).fill(231),{bytesPerRow:4,rowsPerImage:1},[1,1,4]);
+        return {heightmap,layers};
+      }});
+    return {source:t,receive:{static:true}};
+  },
+  voxels:async()=>{
+    const blocks=new BlockTypes(),stone=blocks.define('stone',{textures:0}),world=new VoxelWorld({blocks});
+    world.addChunk(0,0,0);world.addChunk(-1,0,0);world.addChunk(0,0,-1);world.addChunk(-1,0,-1);
+    for(const key of [[0,0],[-1,0],[0,-1],[-1,-1]])world.getChunk(key[0],0,key[1]).fillLight(0xf0);
+    const cells=[];for(let x=-12;x<12;x++)for(let z=-12;z<12;z++)cells.push([x,0,z,stone]);
+    world.setBlocks(cells.flat());
+    const v=VoxelRenderer.attach(engine,{world,textures:new BlockTextures({size:16,images:[pixel(255,255,255),pixel(0,0,0)]})});
+    for(let i=0;i<200&&!(!world.dirty.size&&v.stats.pending===0&&v.stats.draws>0&&!v.stats.compiling);i++){await frames(1);await new Promise(r=>setTimeout(r,10));}
+    return {source:v,receive:{static:true}};
+  },
+};
+// A receiver compiles and draws under the filter, with cascades and no bounds.
+window.check.receiver=async(name)=>{
+  Object.assign(engine.camera,{position:[0.4,4,0.5],target:[0,0,0]});
+  const r=await receivers[name]();
+  const e=Shadows.attach(engine,{filter:varianceFilter({size:256}),distance:60});
+  e.add(r.source,r.receive??{});
+  await waitForPipelines(()=>frames(1));await frames(3);
+  e.dispose();r.source.dispose?.();
+  await frames(1);
+  return errors;
+};
+window.ready=true;
+</script></body></html>

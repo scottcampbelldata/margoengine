@@ -97,3 +97,14 @@ test('lightPattern lays its mask across the light', () => {
   pattern.options.size = 0;
   assert.throws(() => pattern.update({ context: { device }, light: l, changed: false }), RangeError);
 });
+test('varianceFilter checks its settings', async () => {
+  const { varianceFilter } = await import('../dist/vsm.js');
+  assert.throws(() => varianceFilter({ size: 8 }), RangeError);
+  const filter = varianceFilter({ blur: 8 });
+  assert.ok(filter.body.includes('shadowFxMomentsAt(uv,layer)'), 'the body is read before wgsl runs, so it names no binding');
+  const code = shadowSampling(1, filter, false, false, false, [filter]);
+  assert.ok(code.includes('fn shadowFxMomentsAt('));
+  assert.ok(code.includes('textureSampleCompareLevel(shadowMap,shadowSampler'), "an 'auto' layout must keep the sampler");
+  assert.doesNotThrow(() => new Shadows({ filter }));
+  assert.throws(() => new Shadows({ filter: { nope: 1 } }), RangeError);
+});

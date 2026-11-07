@@ -2078,6 +2078,10 @@
       "types": "./dist/shadows/light-function.d.ts",
       "import": "./dist/shadows/light-function.js"
     },
+    "./shadows/vsm": {
+      "types": "./dist/shadows/vsm.d.ts",
+      "import": "./dist/shadows/vsm.js"
+    },
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"

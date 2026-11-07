@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10100076,
+  "total": 10108164,
   "history": [
     {
       "date": "2026-10-24",
@@ -3038,6 +3038,12 @@
       "commit": "7974a966b",
       "reason": "balance: torques as forces through the passes and a flat four corner sole, Lane G item 1",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "9939edbbc",
+      "reason": "@margoengine/shadows/vsm: new optional entry, variance shadow maps; shadows gains filter effects",
+      "grew": 1
     }
   ],
   "items": {
@@ -3558,6 +3564,7 @@
     "@margoengine/shadows": 18738,
     "@margoengine/shadows/light-function": 1921,
     "@margoengine/shadows/virtual": 15442,
+    "@margoengine/shadows/vsm": 2046,
     "@margoengine/sky": 16975,
     "@margoengine/sky/base": 7004,
     "@margoengine/sky/bruneton": 2557,

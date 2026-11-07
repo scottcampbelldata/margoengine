@@ -1,5 +1,5 @@
 {
-  "commit": "3d3828ceb",
+  "commit": "9939edbbc",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -1920,8 +1920,8 @@
         "gzip": 2163
       },
       "./balance": {
-        "raw": 13387,
-        "gzip": 5153
+        "raw": 14698,
+        "gzip": 5649
       }
     },
     "@margoengine/react": {
@@ -2194,8 +2194,8 @@
     },
     "@margoengine/shadows": {
       ".": {
-        "raw": 55009,
-        "gzip": 18192
+        "raw": 55113,
+        "gzip": 18210
       },
       "./virtual": {
         "raw": 45381,
@@ -2204,6 +2204,10 @@
       "./light-function": {
         "raw": 3643,
         "gzip": 1665
+      },
+      "./vsm": {
+        "raw": 3954,
+        "gzip": 1790
       }
     },
     "@margoengine/sky": {
@@ -2818,9 +2822,9 @@
       "brotli": 26250
     },
     "packages/shadows/dist/index.js": {
-      "raw": 55009,
-      "gzip": 18192,
-      "brotli": 16054
+      "raw": 55113,
+      "gzip": 18210,
+      "brotli": 16089
     },
     "packages/xr/dist/index.js": {
       "raw": 19428,
