@@ -1,6 +1,8 @@
 // Any stored texture as RGBA8 pixels (`@margoengine/decoders/image`), for tools that need the picture itself: an exporter
 // writing PNG, a converter. The file's own signature picks the reader, and each reader loads only when a file needs it.
 import { decodeFailed, deviceUnsupported } from './errors.js';
+import { readKTX2Index } from './ktx2-file.js';
+import { decodePNG } from './png.js';
 import type { TranscodedKTX2Result } from './protocol.js';
 import type { TextureFile } from './texture-file.js';
 
@@ -148,7 +150,7 @@ export async function textureFileToRGBA(file: TextureFile): Promise<DecodedImage
 /** Basis Universal KTX2: a worker in a browser; in Node, which has no Web Worker, the same Wasm in this thread. */
 async function transcodeBasis(bytes: Uint8Array, signal?: AbortSignal): Promise<DecodedImage> {
   if (typeof Worker !== 'undefined') {
-    const { KTX2Decoder } = await import('./ktx2.js'),
+    const { KTX2Decoder } = await import('./image-ktx2.js'),
       decoder = new KTX2Decoder({ target: 'rgba8', workerLimit: 1 });
     try {
       const { width, height, mipmaps } = await decoder.transcode(bytes, { signal });
@@ -218,18 +220,16 @@ export async function decodeImage(bytes: Uint8Array, options: DecodeImageOptions
   const format = imageFormat(bytes);
   switch (format) {
     case 'png':
-      return (await import('./png.js')).decodePNG(bytes);
+      return decodePNG(bytes);
     case 'webp':
       return (await import('./webp.js')).parseWebP(bytes);
     case 'dds':
       return textureFileToRGBA((await import('./dds.js')).parseDDS(bytes));
     case 'ktx':
       return textureFileToRGBA((await import('./ktx.js')).parseKTX(bytes));
-    case 'ktx2': {
-      const { readKTX2Index } = await import('./ktx2-file.js');
+    case 'ktx2':
       if (!readKTX2Index(bytes).vkFormat) return transcodeBasis(bytes, options.signal);
-      return textureFileToRGBA(await (await import('./ktx2-layers.js')).parseKTX2(bytes, options));
-    }
+      return textureFileToRGBA(await (await import('./image-ktx2.js')).parseKTX2(bytes, options));
     case 'jpeg':
     case 'avif':
       throw deviceUnsupported(`decodeImage does not read ${format} files; use the browser's image decoder`);

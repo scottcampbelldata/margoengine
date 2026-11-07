@@ -123,6 +123,7 @@ test('public API exposes exporter functions and module evaluation is SSR-safe', 
     'sampleFrames',
     'splitGLB',
     'writeOpacityMaps',
+    'writeTextures',
   ]);
   // A fresh process where touching any browser or GPU global throws, then import and export.
   const script = `for (const name of ['window', 'document', 'navigator', 'Worker', 'GPUBufferUsage', 'requestAnimationFrame']) Object.defineProperty(globalThis, name, {get() {throw new Error('touched ' + name);}, configurable: true});
