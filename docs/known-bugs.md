@@ -51,9 +51,50 @@ does not own. Each entry says exactly what is needed to close it.
   RealityKit's bounds on all 76 files read 1.00 times glTF's, robot-expressive's posed parts aside.
 - **Fixed in the exporter:** `height`, `ground`, `size` and `bounds`, skin points at rest in the world, `extent` on each
   `SkelRoot`. `packages/exporters/tests/usdz-size.test.js`.
+- **Retest so far:** Scott on his iPhone, of Fox-Run and the Robot files at the new sizes: "Both look right". That covers those two
+  models' look on one iPhone only. Dragging, in his words "i could drag them", held on the three files he could open. On all 8
+  start-here files, in his words: "they all work but the rigged figure still floats and does not make contact with the ground". The
+  rest of the 76 files are untested.
 - **Not known:** whether the clipping and the failed move had a cause beyond standing inside a huge model.
 - **Needed to close:** on an iPhone, open `Fox-Run.usdz` and `RobotExpressive-Dance.usdz` at the new sizes: each stands on the
   floor in view at about 2 m and a drag moves it.
+
+### RiggedFigure first loads off the floor in AR Quick Look on an iPhone
+
+- **What:** Scott, on his iPhone, of the 8 start-here files (2026-11-06): "they all work but the rigged figure still floats and does not
+  make contact with the ground". He named no fault in the other seven. How far it floated is not recorded.
+- **Variant run (Scott, 2026-11-06, one phone, one load each):** "rigged figure control loads with its feet in the ground but when i drag it up
+  it sits properly same for root joint the rest look good". The five files: Control (byte for byte the file that floated, text USD inside),
+  ControlBinary (the same scene as binary USD), Scaled (the exporter's height option at 1.2 m, root scale 0.8276, text), NoAnimation (binary, clip
+  removed), RootJoint (binary, an identity joint added at the origin).
+- **Repro:** `exportAnimatedUSDZ` of `examples/assets/khronos/RiggedFigure/RiggedFigure.glb` with `{ ground: true }`, opened in AR Quick Look.
+- **Cause:** not found. The numbers and the Mac say it touches, the phone says it does not. Ruled out, on a Mac only: the file's rest points
+  (lowest y -6.6e-8), the `SkelRoot` extent (-6.3e-8 at all 39 frames), RealityKit's `visualBounds` (1.3e-8) and mesh bounds, and no joint reaches
+  below the feet (lowest 0.022). RealityKit's own renderer, running the clip, puts the soles on a plane at y = 0 within one pixel (about 3 mm) at
+  three times, as it does the other files. That renderer is not AR Quick Look, whose floor logic could not be read here.
+- **Only this file, among the skinned ones:** root scale exactly 1, first joint at the hips (y 0.686) and not near the origin, first joint rotated at rest.
+- **What the variant run shows:**
+  - The same bytes floated on one load and sank on another, so one fixed offset in the file cannot be the whole story. A drag up leaves the feet on
+    the floor, so the distance from feet to origin is right once Quick Look places the model again. Both point at first placement or load timing.
+    Neither proves it: the two loads were on different occasions, with the room and how well the phone had found the floor not recorded.
+  - Control and ControlBinary hold the same scene and differed. So either a difference this size appears with no change to the scene, or text
+    against binary matters, and one load each cannot say which. Either way, Scaled and NoAnimation looking good is no evidence about root scale or the clip.
+  - RootJoint was off too, so a joint at the origin did not cure it on that load. Nothing now supports the first joint's position as the cause.
+- **What it does not show:**
+  - Which of root scale, size or the clip matters, if any. Scaled changes root scale and size together.
+  - Text against binary: text was off in 2 of 3 loads, binary in 1 of 3.
+  - That Quick Look does this to any file. The animated 1.45 m figure was off in 3 of 4 loads (the first report plus Control, ControlBinary and
+    RootJoint), and the seven other files plus Scaled and NoAnimation in 0 of 9. That split was picked after looking, and those nine were reported as
+    fine and not measured, so it is weak, but it leaves something in this figure that makes a bad first placement more likely still open.
+- **Smallest run that would settle it:** Control and Scaled, three loads each, alternating (Control, Scaled, Control and so on), on the same floor
+  spot. Close Quick Look fully between loads, let the phone find the floor first, and before any drag note floats, sinks or touches, with rough centimetres.
+  - Control changes direction or sometimes touches, and Scaled does too: first placement varies whatever the root scale. Record it as Quick Look's own
+    behaviour, with the exporter unchanged.
+  - Control wrong in 3 of 3 and Scaled right in 3 of 3: a file-side candidate. That split comes up by chance 1 time in 20, and it would still need a
+    variant that changes root scale without size before any exporter change.
+  - Anything between leaves the question open, and the entry says so.
+- **Needed to close:** that run, then either a root-cause fix with a regression test or the phone evidence that it is Quick Look's own behaviour. The
+  exporter stays as it is until a file-side cause is shown.
 
 ### USDZ vertex colours draw grey in Quick Look
 
