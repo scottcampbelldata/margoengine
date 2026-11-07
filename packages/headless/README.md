@@ -125,6 +125,8 @@ engine.render({ camera: new Camera({ position: [2, 2, 3], target: [0, 0, 0] }) }
 await encodeWithFFmpeg(renderFrames(engine, { frames: 90 }), { output: 'turntable.mp4' });
 ```
 
+`npm run test:real-ffmpeg` writes an H.264 and a VP9 file through the ffmpeg you have (`FFMPEG` names another) and decodes them back to check frames, tags and colours.
+
 | Export | What it does |
 | --- | --- |
 | `renderFrames(engine, { frames, fps?, camera?, update?, signal? })` | Async iterator of frames: pixels plus `index`, `time`, `delta` and `progress`. `fps` defaults to 30, `camera` to the engine's. `update` runs before each frame is drawn. `progress` is `index / frames`: it never reaches 1, so a full turn loops with no repeated frame. The next frame is not drawn until you ask for it. |
