@@ -168,3 +168,82 @@ test('bad options reject and abort stops the work', () => {
     message: 'stop',
   });
 });
+
+const roundBall = () => {
+  let high = createPrimitiveMesh('cube', 'hi');
+  for (let i = 0; i < 3; i++) high = subdivideMesh(high, { createId }).mesh;
+  return { ...high, vertices: high.vertices.map((p) => p.map((x) => x / Math.hypot(...p))) };
+};
+const skew = (mesh, [a, b, c, d]) =>
+  Math.max(
+    ...[a, b, c, d].map((v, i, all) => {
+      const p = mesh.vertices[v],
+        u = mesh.vertices[all[(i + 1) % 4]].map((x, k) => x - p[k]),
+        w = mesh.vertices[all[(i + 3) % 4]].map((x, k) => x - p[k]),
+        cosine = (u[0] * w[0] + u[1] * w[1] + u[2] * w[2]) / (Math.hypot(...u) * Math.hypot(...w));
+      return Math.abs(Math.acos(cosine) - Math.PI / 2);
+    }),
+  );
+
+test('quads pairs a curved surface into mostly quads, each triangle in at most one, none a sliver', () => {
+  const made = remeshMesh(roundBall(), { targetLength: 0.15, quads: true, preserveSeams: false, createId }),
+    { mesh, quads, unpaired } = made,
+    triangles = quads.length * 2 + unpaired,
+    corners = new Set();
+  assert.equal(unpaired, 0, `${quads.length} quads of ${triangles} triangles`);
+  for (const quad of quads) {
+    assert.ok(skew(mesh, quad) <= (65 * Math.PI) / 180 + 1e-9);
+    const key = [...quad].sort((a, b) => a - b).join();
+    assert.equal(corners.has(key), false, 'each quad once');
+    corners.add(key);
+  }
+  assert.ok(quads.every((q) => new Set(q).size === 4));
+  assertClosed(mesh);
+});
+
+test('quads with seams kept still pair most of a curved surface', () => {
+  const { quads, unpaired } = remeshMesh(roundBall(), { targetLength: 0.15, quads: true, createId }),
+    triangles = quads.length * 2 + unpaired;
+  assert.ok(quads.length * 2 >= triangles * 0.8, `${quads.length} quads of ${triangles} triangles`);
+});
+
+test('quads on a cube: flat pairs become single faces, the corners and volume hold, and sources follow', () => {
+  const { mesh, quads, sources } = remeshMesh(createPrimitiveMesh('cube', 'q'), { targetLength: 0.25, quads: true, createId }),
+    four = mesh.faces.filter((face) => face.vertices.length === 4);
+  assert.ok(four.length * 1.2 >= quads.length && four.length > 0, `${four.length} faces of ${quads.length} quads`);
+  assert.ok(Math.abs(Math.abs(volume(mesh)) - 1) < 1e-9);
+  assert.deepEqual(Object.keys(sources).sort(), mesh.faces.map((face) => face.id).sort());
+  assertClosed(mesh);
+});
+
+test('a UV seam stays an edge of the quads, unless told otherwise', () => {
+  const vertices = [[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]],
+    split = {
+      vertices,
+      faces: [
+        { id: 'a', vertices: [0, 1, 2], uv: [[0, 0], [0.4, 0], [0.4, 0.4]] },
+        { id: 'b', vertices: [0, 2, 3], uv: [[0.6, 0.6], [1, 1], [0.6, 1]] },
+      ],
+    },
+    options = { targetLength: 2, iterations: 1, quads: true, createId };
+  const kept = remeshMesh(split, options);
+  assert.equal(kept.quads.length, 0);
+  assert.equal(kept.unpaired, 2);
+  assert.equal(remeshMesh(split, { ...options, preserveSeams: false }).quads.length, 1);
+});
+
+test('quads never pair across a crease', () => {
+  const cube = createPrimitiveMesh('cube', 'c'),
+    { mesh, quads } = remeshMesh(cube, { targetLength: 0.25, quads: true, createId });
+  // On a cube every quad lies on one side: its corners share an axis value.
+  for (const quad of quads) {
+    const points = quad.map((v) => mesh.vertices[v]);
+    assert.ok([0, 1, 2].some((axis) => points.every((p) => Math.abs(p[axis] - points[0][axis]) < 1e-9)));
+  }
+});
+
+test('without quads the result has no quad fields and stays all triangles', () => {
+  const made = remeshMesh(createPrimitiveMesh('cube', 'n'), { targetLength: 0.25, createId });
+  assert.equal(made.quads, undefined);
+  assert.ok(made.mesh.faces.every((face) => face.vertices.length === 3));
+});

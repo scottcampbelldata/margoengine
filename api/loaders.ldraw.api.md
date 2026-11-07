@@ -10,12 +10,25 @@ export interface LDrawColor {
     edge: [number, number, number];
 }
 
+export interface LDrawInstances {
+    file: string;
+    code: number;
+    positions: Float32Array;
+    indices: Uint32Array;
+    groups: LoadedGroup[];
+    lines: Float32Array;
+    lineColors: Float32Array;
+    conditionalLines: Float32Array;
+    matrices: Float32Array;
+}
+
 export interface LDrawModel extends LoadedGeometry {
     kind: 'mesh';
     groups: LoadedGroup[];
     lines: Float32Array;
     lineColors: Float32Array;
     conditionalLines: Float32Array;
+    instances: LDrawInstances[];
     palette: LDrawColor[];
     name?: string;
     missing: string[];
@@ -31,6 +44,7 @@ export interface LDrawOptions extends ParseLimits {
     edges?: boolean;
     maxDepth?: number;
     maxInstances?: number;
+    instanced?: boolean;
     signal?: AbortSignal;
 }
 

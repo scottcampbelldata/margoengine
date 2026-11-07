@@ -29,6 +29,9 @@ export interface CanvasProps extends EngineOptions {
         webglRenderer: RendererFactory;
         webglPicking?: () => EnginePlugin;
     }>;
+    loadCompat?: () => Promise<{
+        install(): Promise<unknown>;
+    }>;
     fallbackContent?: ReactNode;
 }
 
@@ -66,7 +69,7 @@ export interface LoaderContext {
     fetch: typeof fetch;
 }
 
-export function MargoCanvas({ children, style, className, label, capacity, backend, camera, powerPreference, fallback, loadFallback, fallbackContent, frameloop, maxDpr, onCreated, onError }: CanvasProps): import("react").JSX.Element;
+export function MargoCanvas({ children, style, className, label, capacity, backend, camera, powerPreference, fallback, loadFallback, fallbackContent, loadCompat, frameloop, maxDpr, onCreated, onError }: CanvasProps): import("react").JSX.Element;
 
 export type MargoCanvasProps = CanvasProps;
 

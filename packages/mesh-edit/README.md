@@ -333,14 +333,17 @@ import { remeshMesh, remeshMeshVoxels } from 'margoengine/mesh-edit/remesh';
 const box = createPrimitiveMesh('cube', 'box');
 // Even triangles on the same surface; the cube keeps its corners and creases.
 const even = remeshMesh(box, { targetLength: 0.1 });
+// The same, paired into a mostly quad surface.
+const quads = remeshMesh(box, { targetLength: 0.1, quads: true });
 // A new closed surface from a voxel grid, with quad topology.
 const voxels = remeshMeshVoxels(box, { voxelSize: 0.05 });
-console.log(even.mesh.faces.length, voxels.quads.length, voxels.nonManifoldEdges);
+console.log(even.mesh.faces.length, quads.quads?.length, quads.unpaired, voxels.quads.length, voxels.nonManifoldEdges);
 ```
 
-- `remeshMesh(mesh, {targetLength, iterations = 5, sharpAngle = 40 degrees in radians, preserveSeams = true, createId, signal})` is isotropic remeshing (Botsch and Kobbelt, 2004): each round splits edges over 4/3 of the target, collapses those under 4/5, flips toward six neighbors per vertex, relaxes along the surface and snaps back onto the input. `targetLength` defaults to the mean edge length. Open edges, creases above `sharpAngle` and UV seams stay in place. Corner UVs carry over, and `sources` names the input face under each output face. The output is triangles.
+- `remeshMesh(mesh, {targetLength, iterations = 5, sharpAngle = 40 degrees in radians, preserveSeams = true, createId, signal})` is isotropic remeshing (Botsch and Kobbelt, 2004): each round splits edges over 4/3 of the target, collapses those under 4/5, flips toward six neighbors per vertex, relaxes along the surface and snaps back onto the input. Creases, seams and open borders stay, and so does every corner where one of them turns by more than `sharpAngle`, so a target larger than the mesh leaves it as it is. `targetLength` defaults to the mean edge length. Open edges, creases above `sharpAngle` and UV seams stay in place. Corner UVs carry over, and `sources` names the input face under each output face. The output is triangles.
 - `remeshMeshVoxels(mesh, {voxelSize, maxCells = 16777216, createId, signal})` builds a signed distance grid and extracts it with surface nets (Gibson, 1998). Whatever the input's triangles were, the result has edges of about `voxelSize`; gaps under a voxel close and details under a voxel go. The input must be closed (use `fillMeshHoles` first). Inside is decided by parity, so where two parts overlap the shared region counts as outside: union them first if that matters. UVs do not carry over.
-- A `PolygonMesh` face must be planar, so a warped grid quad is stored as two triangles. `quads` always lists the full quad topology as vertex indices of `mesh`.
+- `quads: true` on `remeshMesh` pairs the even triangles across their edges, the squarest pair first, and leaves creases and seams as edges. A pair whose worst corner is over 65 degrees from a right angle stays apart. `quads` lists the pairs and `unpaired` counts the triangles left: measured on a rounded cube at `targetLength` 0.15, 228 of 1,234 (81.5% paired) with seams kept and none of 1,254 with `preserveSeams: false`; more seams leave more, since each island can leave odd ones. The matching is greedy with an augmenting search, so it is quad-dominant, not all quads: for an all-quad surface use `remeshMeshVoxels`, which gives up the input's UVs.
+- A `PolygonMesh` face must be planar, so a warped quad, from either remesher, is stored as two triangles. `quads` always lists the full quad topology as vertex indices of `mesh`.
 - `nonManifoldEdges` counts edges joining four faces, which happens where two sheets of the surface pass within a voxel. A finer `voxelSize` separates them.
 ## Sculpt brushes
 

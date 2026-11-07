@@ -124,5 +124,6 @@ interface TriSurface {
     points: MutableVec3[];
     tris: SurfaceTri[];
     sharp: Set<string>;
+    corner?: number;
 }
 ```

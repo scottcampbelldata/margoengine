@@ -1,17 +1,18 @@
 // @margoengine/mesh-edit/remesh: rebuild a messy or scanned mesh into even faces, before sculpting, simulation or
 // simplification. Isotropic remeshing keeps the surface and improves the triangles; voxel remeshing rebuilds the
 // surface from a grid, which also closes gaps and merges overlapping parts.
-import type { MutableVec2, MutableVec3 } from '@margoengine/math';
+import type { MutableVec2, MutableVec3, Vec3 } from '@margoengine/math';
 import { MeshBVH } from '@margoengine/bvh/tree';
 import { assertOptions } from './edit-support.js';
 import { FaceSink } from './face-sink.js';
-import { assertPolygonMesh, collectPolygonEdges, compilePolygonMesh } from './polygon.js';
+import { assertPolygonMesh, collectPolygonEdges, compilePolygonMesh, polygonGeometryError } from './polygon.js';
 import {
   collapseShortEdges,
   flipTowardValence,
   markSharpEdges,
   polygonMeshOfSurface,
   relaxTangential,
+  sameUV,
   splitLongEdges,
   triSurfaceOf,
 } from './tri-surface.js';
@@ -27,6 +28,8 @@ export interface RemeshOptions {
   sharpAngle?: number;
   /** Keep UV seams as edges, so textures stay put. Default true. */
   preserveSeams?: boolean;
+  /** Pair the even triangles into quads, so the result is mostly quads. Default false. */
+  quads?: boolean;
   /** Face ID generator (default `crypto.randomUUID`). */
   createId?: () => string;
   /** Checked between rounds; aborting throws the signal's reason. */
@@ -38,6 +41,13 @@ export interface RemeshResult {
   mesh: PolygonMesh;
   /** For each output face ID, the input face it lies on. */
   sources: Record<string, string>;
+  /**
+   * With `quads`: every pair as `mesh` vertex indices, in the winding of its faces. A flat pair is one face of `mesh`; a
+   * warped one stays two triangles there, because a face must be planar.
+   */
+  quads?: [number, number, number, number][];
+  /** With `quads`: triangles left without a partner. */
+  unpaired?: number;
   diagnostics: string[];
 }
 
@@ -100,10 +110,146 @@ function surfaceProjector(mesh: PolygonMesh): (p: MutableVec3) => void {
   };
 }
 
+/** A corner further than this from a right angle, in radians, leaves two triangles apart: they would make a sliver. */
+const QUAD_CORNER = (65 * Math.PI) / 180;
+/** How many pairs a search for a lone triangle's partner may pass through. */
+const PAIR_PATH = 256;
+
+/** Two triangles over a shared edge, as a quad: how far its worst corner is from a right angle. Infinity when not convex. */
+function quadSkew(corners: readonly Vec3[]): number {
+  const sub = (p: Vec3, q: Vec3): MutableVec3 => [p[0] - q[0], p[1] - q[1], p[2] - q[2]],
+    cross = (u: Vec3, v: Vec3): MutableVec3 => [
+      u[1] * v[2] - u[2] * v[1],
+      u[2] * v[0] - u[0] * v[2],
+      u[0] * v[1] - u[1] * v[0],
+    ],
+    dot = (u: Vec3, v: Vec3) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2],
+    turns = corners.map((corner, i) =>
+      cross(sub(corners[(i + 1) % 4], corner), sub(corners[(i + 3) % 4], corner)),
+    ),
+    axis = turns.reduce((sum, turn) => [sum[0] + turn[0], sum[1] + turn[1], sum[2] + turn[2]], [0, 0, 0]);
+  let worst = 0;
+  for (let i = 0; i < 4; i++) {
+    if (dot(turns[i], axis) <= 0) return Infinity;
+    const u = sub(corners[(i + 1) % 4], corners[i]),
+      v = sub(corners[(i + 3) % 4], corners[i]),
+      angle = Math.atan2(Math.hypot(...turns[i]), dot(u, v));
+    worst = Math.max(worst, Math.abs(angle - Math.PI / 2));
+  }
+  return worst;
+}
+
+/**
+ * Pairs triangles across edges, the squarest pair first, so each triangle joins at most one quad. A greedy matching
+ * with an augmenting search: it leaves a few more triangles alone than an optimal one would, and costs a sort. Creases above `sharpAngle` and UV
+ * seams stay edges of the result. `sources` loses the second triangle of each flat pair, which becomes one face.
+ */
+function pairTriangles(
+  mesh: PolygonMesh,
+  sharpAngle: number,
+  preserveSeams: boolean,
+  sources: Record<string, string>,
+): { mesh: PolygonMesh; quads: [number, number, number, number][]; unpaired: number } {
+  const edges = new Map<number, [number, number][]>(),
+    count = mesh.vertices.length;
+  mesh.faces.forEach(({ vertices }, face) => {
+    for (let corner = 0; corner < 3; corner++) {
+      const a = vertices[corner],
+        b = vertices[(corner + 1) % 3],
+        key = Math.min(a, b) * count + Math.max(a, b),
+        list = edges.get(key);
+      if (list) list.push([face, corner]);
+      else edges.set(key, [[face, corner]]);
+    }
+  });
+  const normal = (face: PolygonFace): MutableVec3 => {
+      const [a, b, c] = face.vertices.map((v) => mesh.vertices[v]),
+        u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+        v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]],
+        n: MutableVec3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
+        size = Math.hypot(n[0], n[1], n[2]) || 1;
+      return [n[0] / size, n[1] / size, n[2] / size];
+    },
+    pairs: { skew: number; first: number; second: number; quad: [number, number, number, number]; uv: MutableVec2[] }[] = [];
+  for (const list of edges.values()) {
+    if (list.length !== 2) continue;
+    const [[first, i], [second, j]] = list,
+      p = mesh.faces[first],
+      q = mesh.faces[second],
+      a = p.vertices[i],
+      b = p.vertices[(i + 1) % 3];
+    // Faces that run the shared edge the same way are wound against each other: no quad has both.
+    if (q.vertices[j] !== b || q.vertices[(j + 1) % 3] !== a) continue;
+    const m = normal(p),
+      n = normal(q),
+      bend = Math.acos(Math.min(1, Math.max(-1, m[0] * n[0] + m[1] * n[1] + m[2] * n[2])));
+    if (bend > sharpAngle) continue;
+    if (preserveSeams && !(sameUV(p.uv[i], q.uv[(j + 1) % 3]) && sameUV(p.uv[(i + 1) % 3], q.uv[j]))) continue;
+    const quad: [number, number, number, number] = [a, q.vertices[(j + 2) % 3], b, p.vertices[(i + 2) % 3]],
+      skew = quadSkew(quad.map((v) => mesh.vertices[v]));
+    if (skew <= QUAD_CORNER)
+      pairs.push({ skew, first, second, quad, uv: [p.uv[i], q.uv[(j + 2) % 3], p.uv[(i + 1) % 3], p.uv[(i + 2) % 3]] });
+  }
+  pairs.sort((x, y) => x.skew - y.skew || x.first - y.first || x.second - y.second);
+  // Each triangle's pair, or -1. A triangle left alone then follows alternating paths to another lone triangle and flips
+  // them (Kuhn's augmenting search; blossoms are not contracted, so a path through an odd cycle can be missed).
+  const partner = new Int32Array(mesh.faces.length).fill(-1),
+    around: number[][] = mesh.faces.map(() => []),
+    seen = new Int32Array(mesh.faces.length).fill(-1),
+    other = (pair: number, face: number) => (pairs[pair].first === face ? pairs[pair].second : pairs[pair].first),
+    take = (pair: number) => {
+      partner[pairs[pair].first] = partner[pairs[pair].second] = pair;
+    },
+    reach = (face: number, from: number, depth: number): boolean => {
+      seen[face] = from;
+      for (const near of around[face]) {
+        const next = other(near, face);
+        if (seen[next] === from) continue;
+        seen[next] = from;
+        if (partner[next] < 0) {
+          take(near);
+          return true;
+        }
+        const freed = other(partner[next], next);
+        if (depth < PAIR_PATH && seen[freed] !== from && reach(freed, from, depth + 1)) {
+          take(near);
+          return true;
+        }
+      }
+      return false;
+    };
+  pairs.forEach(({ first, second }, i) => {
+    around[first].push(i);
+    around[second].push(i);
+    if (partner[first] < 0 && partner[second] < 0) take(i);
+  });
+  for (let lone = 0; lone < partner.length; lone++) if (partner[lone] < 0) reach(lone, lone, 0);
+  const merged = new Map<number, PolygonFace>(),
+    dropped = new Set<number>(),
+    quads: [number, number, number, number][] = [];
+  for (const { first, second, quad, uv } of pairs.filter((_, i) => partner[_.first] === i)) {
+    quads.push(quad);
+    if (polygonGeometryError(quad.map((v) => mesh.vertices[v])) === null) {
+      merged.set(first, { id: mesh.faces[first].id, vertices: quad, uv });
+      dropped.add(second);
+      delete sources[mesh.faces[second].id];
+    }
+  }
+  return {
+    mesh: {
+      vertices: mesh.vertices,
+      faces: mesh.faces.flatMap((face, i) => (dropped.has(i) ? [] : [merged.get(i) ?? face])),
+    },
+    quads,
+    unpaired: mesh.faces.length - quads.length * 2,
+  };
+}
+
 /**
  * Rebuild a surface into even triangles of about `targetLength` (isotropic remeshing; Botsch and Kobbelt, 2004): each
  * round splits long edges, collapses short ones, flips toward six neighbors per vertex and relaxes vertices along the
  * surface, then snaps them back onto the input. Open edges, creases above `sharpAngle` and UV seams stay in place.
+ * With `quads`, the triangles then pair up across their edges, the squarest first, for a mostly quad surface.
  * @throws TypeError for a bad mesh or options; RangeError for an option outside its limits; the signal's reason when
  * aborted.
  */
@@ -148,6 +294,11 @@ export function remeshMesh(mesh: PolygonMesh, options: RemeshOptions = {}): Reme
       sources[id] = source;
       return id;
     });
+  if (options.quads) {
+    const paired = pairTriangles(output, sharpAngle, preserveSeams, sources);
+    assertPolygonMesh(paired.mesh);
+    return { ...paired, sources, diagnostics: [] };
+  }
   assertPolygonMesh(output);
   return { mesh: output, sources, diagnostics: [] };
 }

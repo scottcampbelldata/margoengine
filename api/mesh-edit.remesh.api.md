@@ -10,6 +10,7 @@ export interface RemeshOptions {
     iterations?: number;
     sharpAngle?: number;
     preserveSeams?: boolean;
+    quads?: boolean;
     createId?: () => string;
     signal?: AbortSignal;
 }
@@ -17,6 +18,8 @@ export interface RemeshOptions {
 export interface RemeshResult {
     mesh: PolygonMesh;
     sources: Record<string, string>;
+    quads?: [number, number, number, number][];
+    unpaired?: number;
     diagnostics: string[];
 }
 

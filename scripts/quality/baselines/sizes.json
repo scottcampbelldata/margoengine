@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10215333,
+  "total": 10243012,
   "history": [
     {
       "date": "2026-10-24",
@@ -3320,6 +3320,12 @@
       "commit": "24c2f58a4",
       "reason": "bake option on autoLOD and bakeSurfaceMaps",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "095050f46",
+      "reason": "B32 quad pairing in remesh (+967 B) and B36 instanced LDraw parts (+157 B): both new options a job asks for, reached only through their own entries",
+      "grew": 2
     }
   ],
   "items": {
@@ -3468,6 +3474,7 @@
     "@margoengine/decoders": 492515,
     "@margoengine/decoders/bc": 3890,
     "@margoengine/decoders/brotli": 68932,
+    "@margoengine/decoders/bzip2": 2168,
     "@margoengine/decoders/dds": 3029,
     "@margoengine/decoders/draco-points": 154011,
     "@margoengine/decoders/image": 786471,
@@ -3487,6 +3494,7 @@
     "@margoengine/decoders/tiff": 4129,
     "@margoengine/decoders/webp": 11720,
     "@margoengine/decoders/webp-lossless": 3366,
+    "@margoengine/decoders/xz": 4182,
     "@margoengine/dof": 7880,
     "@margoengine/dof/autofocus": 2154,
     "@margoengine/dof/lens": 1506,
@@ -3640,7 +3648,7 @@
     "@margoengine/loaders/gcode": 1962,
     "@margoengine/loaders/kmz": 17581,
     "@margoengine/loaders/las": 1466,
-    "@margoengine/loaders/ldraw": 4126,
+    "@margoengine/loaders/ldraw": 4539,
     "@margoengine/loaders/lottie": 7591,
     "@margoengine/loaders/lwo": 4394,
     "@margoengine/loaders/materialx": 5082,
@@ -3716,7 +3724,7 @@
     "@margoengine/mesh-edit/boolean-exact": 10620,
     "@margoengine/mesh-edit/modeling": 35469,
     "@margoengine/mesh-edit/modifiers": 8566,
-    "@margoengine/mesh-edit/remesh": 8715,
+    "@margoengine/mesh-edit/remesh": 9973,
     "@margoengine/mesh-edit/sculpt": 9049,
     "@margoengine/mesh-edit/sculpt-view": 790,
     "@margoengine/mesh-edit/weights": 4033,
@@ -4061,8 +4069,6 @@
     "margoengine": 308,
     "margoengine/game": 996,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/decoders/bzip2": 2168,
-    "@margoengine/decoders/xz": 4182
+    "margoengine/web": 577
   }
 }
