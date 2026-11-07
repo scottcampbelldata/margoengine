@@ -34,6 +34,10 @@
     "./node": {
       "types": "./dist/node.d.ts",
       "import": "./dist/node.js"
+    },
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
     }
   },
   "files": [
@@ -44,15 +48,33 @@
   "publishConfig": {
     "access": "public"
   },
+  "peerDependencies": {
+    "@margoengine/animation": "^1.0.0",
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf-pro": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/animation": {
+      "optional": true
+    },
+    "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/gltf-pro": {
+      "optional": true
+    }
+  },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
   },
   "devDependencies": {
+    "@margoengine/core": "^1.0.0",
     "@margoengine/ecs": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js save",
     "test": "npm run build && node --test tests/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/save/tests/browser/engine-check.mjs"
   }
 }

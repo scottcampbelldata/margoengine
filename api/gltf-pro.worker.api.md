@@ -899,6 +899,7 @@ class PBRModel implements EnginePlugin {
     readonly cameras: GLTFCamera[];
     readonly pointsAndLines: PBRPrimitive[];
     readonly variants: readonly string[];
+    selectedVariant: number | undefined;
     disposed: boolean;
     readonly splatPrimitives: {
         primitive: GLTFPrimitive;
@@ -952,6 +953,7 @@ class PBRModel implements EnginePlugin {
     setCapture(hook: PBRCapture): () => void;
     setTransmission(hook: PBRTransmission): () => void;
     selectVariant(variant?: string | number): void;
+    get ownedMeshes(): readonly Mesh[];
     get shadowPrimitives(): ShadowCasterRecord[];
     get tintPrimitives(): (ShadowCasterRecord & {
         tint: readonly number[];

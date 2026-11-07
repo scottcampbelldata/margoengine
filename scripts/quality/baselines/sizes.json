@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10611783,
+  "total": 10620226,
   "history": [
     {
       "date": "2026-10-24",
@@ -3692,6 +3692,12 @@
       "commit": "02ca99be3",
       "reason": "new entry @margoengine/blender/live (live link)",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "b0ba69cba",
+      "reason": "new entry save/engine: captureScene and restoreScene; gltf-pro selectedVariant and ownedMeshes",
+      "grew": 1
     }
   ],
   "items": {
@@ -4231,6 +4237,7 @@
     "@margoengine/rigging/vrm": 10526,
     "@margoengine/road": 1171,
     "@margoengine/save": 6952,
+    "@margoengine/save/engine": 8443,
     "@margoengine/save/node": 939,
     "@margoengine/scatter": 19252,
     "@margoengine/scatter/paint": 1507,

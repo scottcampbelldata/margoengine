@@ -1987,6 +1987,8 @@ export class PBRModel implements EnginePlugin {
   readonly pointsAndLines: PBRPrimitive[] = [];
   /** KHR_materials_variants names in file order (empty without the extension); `selectVariant` takes a name or its index. */
   readonly variants: readonly string[];
+  /** The variant `selectVariant` last chose, by its index in `variants`; undefined for each primitive's own material. */
+  selectedVariant: number | undefined;
   private readonly materials: PBRMaterial[];
   private readonly defaults = new Map<PBRPrimitive, PBRMaterial>();
   disposed = false;
@@ -3156,6 +3158,14 @@ export class PBRModel implements EnginePlugin {
           (mipSampler ??= device.createSampler({ minFilter: 'linear', magFilter: 'linear' })),
         );
     }
+    this.selectedVariant = variant === undefined ? undefined : index;
+  }
+  /**
+   * Every mesh this model made and will dispose: `root`, `nodes` and the meshes of its baked batches. A mesh you
+   * parented to a node is yours and is not here. `@margoengine/save/engine` reads it to tell the two apart.
+   */
+  get ownedMeshes(): readonly Mesh[] {
+    return this.created;
   }
   get shadowPrimitives(): ShadowCasterRecord[] {
     const out: ShadowCasterRecord[] = [];

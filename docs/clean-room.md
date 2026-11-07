@@ -1013,6 +1013,7 @@ idb and the like) was read.
 | Web Storage adapter | The HTML Standard, Web Storage (`getItem`, `setItem`, `removeItem`, `key`, `length`); RFC 4648 base64 |
 | IndexedDB adapter | W3C Indexed Database API 3.0 (open and upgradeneeded, object stores, readonly and readwrite transactions, requests) |
 | File adapter | Node.js `fs/promises` documentation (`writeFile` with `signal` and `flush`, `rename` replacing the target) |
+| Engine scene binding (`./engine`) | No outside source: it writes this repository's own objects into the document above. Node poses are compared with the glTF 2.0 specification's `translation`, `rotation`, `scale` and `matrix` of a node. |
 
 ## E57 reader and writer in `@margoengine/points/e57`
 

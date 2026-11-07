@@ -564,7 +564,9 @@ test('KHR_materials_variants: names, switching rebinds the mapped material, unde
       });
   assert.deepEqual(model.variants, ['Red', 'Film']);
   draw();
+  assert.equal(model.selectedVariant, undefined);
   model.selectVariant('Red');
+  assert.equal(model.selectedVariant, 0, 'the index, by name or by number');
   assert.equal(p.material, model.primitives[1].material, 'the mapped material object');
   await null; // next frame: within one frame a changed uniform goes to a frame-arena slice
   draw();
@@ -585,6 +587,8 @@ test('KHR_materials_variants: names, switching rebinds the mapped material, unde
   );
   assert.equal(log.filter((e) => e[0] === 'pass.drawIndexed').length, 3);
   model.selectVariant();
+  assert.equal(model.selectedVariant, undefined);
+  assert.ok([model.root, ...model.nodes].every((mesh) => model.ownedMeshes.includes(mesh)), 'ownedMeshes has what the model made');
   assert.equal(p.material, own);
   assert.equal(model.primitives[1].material, model.primitives[1].material, 'unmapped primitives keep theirs');
   assert.throws(() => model.selectVariant('Blue'), {
@@ -592,6 +596,7 @@ test('KHR_materials_variants: names, switching rebinds the mapped material, unde
     message: 'selectVariant: the model has no material variant Blue; pass an index below the variant count',
   });
   assert.throws(() => model.selectVariant(2), RangeError);
+  assert.equal(model.selectedVariant, undefined, 'a refused choice changes nothing');
   model.dispose();
   engine.dispose();
 });

@@ -58,12 +58,12 @@ export function memoryStorage(): SaveStorage {
 }
 
 // Base64 for Web Storage, which holds strings only (RFC 4648, section 4).
-const toBase64 = (bytes: Uint8Array): string => {
+export const toBase64 = (bytes: Uint8Array): string => {
   let text = '';
   for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(text);
 };
-const fromBase64 = (text: string): Uint8Array => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+export const fromBase64 = (text: string): Uint8Array => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 
 /** The part of the Web Storage interface the adapter uses (`localStorage` and `sessionStorage` have it). */
 export interface WebStorageLike {

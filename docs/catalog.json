@@ -2455,9 +2455,9 @@
     "version": "1.0.0",
     "published": false,
     "description": "Save and load: versioned scene and world documents with stable ids, prefabs with overrides, migrations, all-or-nothing loading and storage adapters.",
-    "requirements": "See the package guide for requirements",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "save",
-    "install": "npm install @margoengine/save@1.0.0",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/save@1.0.0",
     "imports": "import { MAX_ENTITIES } from '@margoengine/save';",
     "exports": [
       "MAX_ENTITIES",

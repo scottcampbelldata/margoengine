@@ -106,6 +106,74 @@ const copyPosition = copy.component({ x: Float32Array, y: Float32Array });
 loadWorld(snapshot, ecsAdapter(copy, { position: copyPosition }));
 ```
 
+## Saving a running scene
+
+`@margoengine/save/engine` needs no mapping. `captureScene(engine)` reads the scene as it stands and gives a save
+document; `restoreScene(engine, document)` puts it back.
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { loadGame, memoryStorage, saveGame } from 'margoengine/save';
+import { captureScene, restoreScene } from 'margoengine/save/engine';
+
+const engine = await Engine.create(document.createElement('canvas'));
+const crate = engine.createMesh().setGeometry(box()).setPosition([0, 1, 0]);
+crate.name = 'crate';
+
+const storage = memoryStorage();
+await saveGame(storage, 'slot-1', captureScene(engine, { meta: { title: 'Chapter 1' } }));
+
+crate.setPosition([5, 0, 0]);
+const { meshes, meta } = await restoreScene(engine, await loadGame(storage, 'slot-1'));
+console.log(meshes.get('crate')?.position.y, meta.title); // 1 'Chapter 1'
+```
+
+What it saves:
+
+| Part | Saved as |
+| --- | --- |
+| A mesh | Its name, parent, local transform, geometry, material, `visible` and `receiveShadow`. Meshes that share a geometry or a material share one again. |
+| A glTF model | Its URL (`model.asset.baseURL`), the material variant, and only the nodes that differ from the file. A mesh hanging from a node stays on that node. A URL used twice loads once, and the rest are `cloneModel` copies. |
+| The view | The camera, the scene's lighting and its background. `camera: false` leaves the camera alone. |
+| A plugin | Its own `saveState()` and `loadState(state)` when it has them, else its JSON `options` and every property with both a getter and a setter. |
+
+A mesh's id is its name, or its name with a number when two share one, and it stays the same across saves (`meshId`).
+
+Plugins keep much of their state in public fields, which the default cannot tell from private ones, so name those,
+or write the two functions:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { captureScene, restoreScene } from 'margoengine/save/engine';
+
+const engine = await Engine.create(document.createElement('canvas'));
+const weather = { name: 'weather', rain: 0.5, setup() {} };
+const score = { name: 'score', points: 12, setup() {} };
+engine.use(weather).use(score);
+
+const plugins = {
+  weather: { properties: ['rain'] }, // these fields, in place of the default
+  score: { save: (p: typeof score) => p.points, load: (p: typeof score, state: unknown) => void (p.points = state as number) },
+  debugOverlay: null, // leave this one out
+};
+const saved = captureScene(engine, { plugins, onSkip: (plugin) => console.warn('nothing saved for', plugin.name) });
+weather.rain = 0;
+await restoreScene(engine, saved, { plugins });
+console.log(weather.rain); // 0.5
+```
+
+A plugin in the save and not in the scene needs `type` in its binding (`{ type: Sky }`), which attaches it with the
+saved options; without one the save is refused before anything changes.
+
+`restoreScene` is all or nothing. It checks the whole save, loads the models out of sight and builds every mesh, and
+only then applies plugin state, camera and lighting and removes what the scene held. A model that fails to load, a
+throw from `onEntity` or a plugin, or an abort leaves the running scene as it was, and `signal` stops it. `filter`
+keeps a mesh and all under it out of a capture and out of what a restore removes, such as your UI; `clear: false` adds
+to the scene. `components(mesh)` adds your own data, and `onEntity(mesh, entity, get)` reads it back. Other options:
+`scene`, `version`, `meta`, `migrations`, `modelURL` for a model not loaded from a URL, `load` and `clone`.
+
+Geometry is written into the save, so a large static mesh is better as a glTF model, which saves as a URL.
+
 ## Validation and migrations
 
 `validateSave(document, {components, strictComponents})` never throws and lists every problem with its path and fix
@@ -134,6 +202,6 @@ browsers and Node 18+); `decodeSave(bytes)` reads either. Storage adapters share
 A full Web Storage or a failed transaction throws `MargoError` `'failed'` and keeps the previous save; a missing
 API throws `'unsupported'`. `saveGame` never writes an invalid document.
 
-Apache-2.0. Optional, tree-shakable package; no core dependency.
+Apache-2.0. Optional, tree-shakable package. Only `/engine` uses core, as an optional peer, with `@margoengine/gltf-pro` and `@margoengine/animation` loaded when a save holds a model.
 
-Build and unit tests: npm test --workspace @margoengine/save
+Build and unit tests: npm test --workspace @margoengine/save. Real GPU, models and IndexedDB: npm run test:gpu --workspace @margoengine/save

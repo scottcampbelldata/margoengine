@@ -2158,6 +2158,10 @@
       "types": "./dist/save/node.d.ts",
       "import": "./dist/save/node.js"
     },
+    "./save/engine": {
+      "types": "./dist/save/engine.d.ts",
+      "import": "./dist/save/engine.js"
+    },
     "./scatter": {
       "types": "./dist/scatter.d.ts",
       "import": "./dist/scatter.js"
