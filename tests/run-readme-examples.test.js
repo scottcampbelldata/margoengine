@@ -12,9 +12,10 @@ import {
   placeOf,
   runInNode,
   assetFile,
+  claimScratch,
   sampleFiles,
 } from '../scripts/run-readme-examples.mjs';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -199,5 +200,26 @@ test('a page gets a sample of several files by its path under examples/assets', 
     assert.equal(assetFile('/../outside.json', folder), undefined);
   } finally {
     rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('a run starting never deletes the files of a run still going in the same checkout', () => {
+  // Two runs in one worktree (2026-11-07): the second cleared the shared scratch folder, so the first one's page failed
+  // to import water/readme-margoengine-water-aac7d3.tsx ("Failed to fetch dynamically imported module").
+  const base = mkdtempSync(join(tmpdir(), 'readme-scratch-'));
+  try {
+    const live = join(base, 'run-111', 'page', 'water');
+    mkdirSync(live, { recursive: true });
+    writeFileSync(join(live, 'example.tsx'), 'export {};');
+    mkdirSync(join(base, 'run-222', 'page'), { recursive: true });
+    mkdirSync(join(base, 'page'), { recursive: true });
+    writeFileSync(join(base, 'static.glb'), '');
+    const folder = claimScratch(base, 333, (pid) => pid === 111);
+    assert.equal(folder, join(base, 'run-333'));
+    assert.ok(existsSync(join(live, 'example.tsx')), 'the live run keeps its example');
+    assert.deepEqual(readdirSync(base).sort(), ['run-111', 'run-333'], 'what gone runs and the old shared layout left is removed');
+    assert.deepEqual(readdirSync(folder), ['page']);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
   }
 });

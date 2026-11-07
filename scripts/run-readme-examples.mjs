@@ -11,7 +11,7 @@
 //   npm run check:readme-run -- --failed           the examples that failed in the last report
 //   npm run check:readme-run -- --shrink           writes the known list down to what still fails; it never adds an entry
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createServer, transformWithOxc } from 'vite';
@@ -22,7 +22,10 @@ import { closeAll } from './support/shutdown.mjs';
 import { workspacePackages } from './check-readme-types.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
-  scratch = join(root, 'test-results/readme-run'),
+  // Each run writes only its own folder: the lock gives a run one shared GPU slot, so two runs in one checkout can overlap,
+  // and one that cleared a shared folder deleted the other's example files mid-run (its page then failed to import them).
+  scratchBase = join(root, 'test-results/readme-run'),
+  scratch = join(scratchBase, `run-${process.pid}`),
   knownFile = join(root, 'scripts/support/readme-run-known.json'),
   reportFile = join(root, 'test-results/readme-run-report.json'),
   option = (name) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3),
@@ -33,6 +36,32 @@ const root = resolve(import.meta.dirname, '..'),
   PAGE_JOBS = 3,
   // A whole run took 5 minutes on the RTX A6000 (2026-11-07) and about 25 when first measured; the limit is well past both.
   LIMIT_MINUTES = 60;
+
+/** True while the process `pid` lives. */
+const isAlive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+};
+
+/**
+ * Makes the empty folder `run-<pid>` under `base` for this run, and removes what runs whose process is gone left there.
+ * The folder of a run still going is never touched.
+ */
+export function claimScratch(base, pid = process.pid, alive = isAlive) {
+  mkdirSync(base, { recursive: true });
+  for (const entry of readdirSync(base)) {
+    const owner = /^run-(\d+)$/.exec(entry)?.[1];
+    if (owner && Number(owner) !== pid && alive(Number(owner))) continue;
+    rmSync(join(base, entry), { recursive: true, force: true });
+  }
+  const folder = join(base, `run-${pid}`);
+  mkdirSync(join(folder, 'page'), { recursive: true });
+  return folder;
+}
 
 /** What the examples of a package are, by id: `{ id, name, code }`. */
 export function collectExamples(packages) {
@@ -372,8 +401,7 @@ async function run() {
     known = existsSync(knownFile) ? JSON.parse(readFileSync(knownFile, 'utf8')) : {},
     samples = sampleFiles(),
     results = new Map();
-  rmSync(scratch, { recursive: true, force: true });
-  mkdirSync(join(scratch, 'page'), { recursive: true });
+  claimScratch(scratchBase);
   samples.byExtension.set('.glb', { path: modelWithClips(join(scratch, 'clips.glb')), size: 0 });
   samples.staticModel = await staticModel(join(scratch, 'static.glb'));
   await eachLimited(nodeTurns(examples.filter(({ code }) => placeOf(code) !== 'page')), NODE_JOBS, async (turn) => {
