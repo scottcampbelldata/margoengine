@@ -315,7 +315,7 @@ const again = Ragdoll.attach(otherPhysics, ragdollOptions(JSON.parse(saved), oth
 
 ## Balance (`margoengine/ragdoll/balance`)
 
-`addRagdollBalance(ragdoll, motors, {feet})` keeps a powered character on its feet. It watches the capture point of the centre of mass, the spot a step must reach to stop the fall, and swings a foot there; two-bone maths sets each leg from where the hips should be to where its foot is, and the joint motors do the rest.
+`addRagdollBalance(ragdoll, motors, {feet})` keeps a powered character on its feet, on its own legs. It watches the capture point of the centre of mass, the spot a step must reach to stop the fall, and swings a foot there; two-bone maths sets each leg from where the hips should be to where its foot is. The weight goes down the stance legs as torque pairs at knee and ankle, held to what the sole can answer, so no outside force holds it up.
 
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
@@ -349,13 +349,13 @@ if (balance.state === 'fallen') motors.fade(0, 0.5);
 | `stepHeight` | `0.15` | How high a foot lifts, as a share of the leg's length. |
 | `stepTrigger` | `0.2` | How far the capture point may leave the feet before a step, as a share of the leg's length. |
 | `stance` | `0.97` | Hip height held, as a share of the height when added. |
-| `carry` | `0.6` | Share of the upper body's weight an outside force carries, 0 to 1. |
-| `upright` | `10` | Frequency in rad/s of the outside torque that holds the hips upright. |
-| `maxUpright` | `40` | Largest turn that torque gives, in rad/s². A harder blow knocks the character over. |
-| `fallTilt` | `0.8` | Radians of lean past which it has fallen and every assist stops. |
+| `carry` | `0` | Share of the upper body's weight an outside force carries, 0 to 1. Off: it stands on its own legs. |
+| `upright` | `10` | Frequency in rad/s of the turn that holds the hips upright, answered through the legs by the ground. |
+| `maxUpright` | `40` | Largest turn that gives, in rad/s². A harder blow knocks the character over. |
+| `fallTilt` | `0.8` | Radians of lean past which it has fallen and balancing stops. |
 | `gravity` | `9.81` | World gravity along up, in m/s². |
 
-This is an assist, and it says so: `carry` and `upright` are outside forces, not muscles, and both have caps. `balance.carried` reads the share of the body's weight the force gave at the last step, `steps` counts steps, `capture` is the capture point, `tilt` the lean, and `state` is `standing`, `stepping` or `fallen`. Add it with the character standing still, before `activate`. After a fall, get up with `margoengine/ragdoll/getup` and call `reset()`. `motors.setTarget(bone, rotation)` is what it drives the legs with, and is open to any controller: a rotation relative to the parent bone, or `null` for the animation's pose.
+Every torque is a pair inside the body, so a hard enough blow knocks it over. Set `carry` to lend an outside force, capped at 1.5 times the share asked for; `balance.carried` reads the share of the body's weight it gave at the last step, and is 0 without it. While it balances it adds inertia to the feet and shins and brings the character's island, not the world, to 8 solver passes; `dispose` takes both away. `steps` counts steps, `capture` is the capture point, `tilt` the lean, and `state` is `standing`, `stepping` or `fallen`. Add it with the character standing still, before `activate`. After a fall, get up with `margoengine/ragdoll/getup` and call `reset()`. `motors.setTarget(bone, rotation)` is what it drives the legs with, and is open to any controller: a rotation relative to the parent bone, or `null` for the animation's pose.
 
 ## Clean room
 

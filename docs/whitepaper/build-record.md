@@ -1394,3 +1394,25 @@ Eight jobs, and a rule that came in half way: a check that shares a mistake with
 - **Bug the gate found:** the port test walks `packages` while a package's README check makes and removes a scratch folder there, and it read a file just gone. Fixed in the walk, with a test.
 - **Unmeasured:** no timed number. Every vertex of Hoodie is unshared, 3 per triangle, against Blender's 7,657; the output is right and its size has not been looked into.
 - **Gate:** lint, hygiene, verify and the fbx tests, the push from one script that stops at the first failing step. The audit that opened jobs 5 to 8 confirmed the 4 second fbx step ran 123 tests, all passing.
+
+## Ragdoll balance on its own legs
+
+The balance controller settled only on the exact hull points of one build. It now stands with no outside force by default, and settles whatever the rounding.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Settle regardless of hull rounding, on its own legs | DONE, ONE FIGURE CREEPS | this commit | `/balance` | LIM-248 |
+
+- **Before, 24 setups on Knight:** 24 bad. Late steps in all, drift 0.087 to 0.711 m, hips 0.312 to 0.370 m of 0.398 asked, 0.032 to 0.474 m/s, 0.543 of the weight carried.
+- **After, the same 24:** 0 bad. No step at all, drift 0.004 m at most, hips 0.396 m, 0.0034 to 0.0072 m/s, nothing carried. 0 of 96 over 32 seeds.
+- **Other figures, 24 setups each:** Barbarian, Ranger, Rogue and RiggedFigure 24 bad before, 0 after. Mage 5 read over 0.02 m/s on one frame, up to 0.034, while it moves 0.005 m/s at most over half a second. Seed-san stands and creeps 0.018 m/s: in known-bugs.md, not in the tests.
+- **Pushes, 128 at 1.5 m/s:** 8 do not end standing still and 3 of those fall, against 6 and none before with half the weight held from outside. Standing on its own legs costs this; `carry` lends the force back.
+- **What the plan had wrong:** the 5 cm sag was the knee's rest bend read as hinge angle. An ankle cap by limb inertia is 0.31 N m, of no use: the cap is the centre of pressure, measured per side of the sole, not half a foot's length. Capture used bone origins, 3 cm from the centre of mass. Trunk reaction on the thighs alone is cancelled by the hip motors, so it goes down to the foot. Weight is split along the foot line; an equal split pulled the feet together. A real rotated hip joint made pushes worse and is not used.
+- **Not in the plan:** the head flopped on today's code too, as a rod motor's cap cannot hold it (known-bugs.md): balance gives such joints a solver motor from real inertia. Foot and shin need added inertia and the island 8 solver passes, the world's 4 included. A wide stance needs an inset on the line between the feet or a sideways push never steps.
+- **Bug found on the way:** added inertia counts from the first step, so a torque given before it spun a bone by the old inertia and the solver carried that at the new one. It threw RiggedFigure off the floor and shook Knight for seconds. The first step now gives no torque.
+- **Ruled out by measurement:** a stiff solver ankle (falls), a soft solver spring as a torque, knee torque alone, a foot-on-ground filter, smoothing the torques over two frames (better on Knight, worse on Mage), filtering the velocity, damping against the feet's velocity (32 of 128 pushes bad), holding the centre of mass over the feet from the hips (Seed-san leaned 0.1 rad). Height and lean gains are flat around the values kept.
+- **Existing tests changed:** none; the tests added sit beside them.
+- **Size:** `@margoengine/ragdoll/balance` grew from 3,159 to 5,153 bytes gzipped and its budget was raised for it: the torques through the legs are what replace the outside force. An optional entry; core and stage do not change.
+- **Not proved:** turning, slopes, or a world above 8 solver passes: at 16 the KayKit figures creep about 0.03 m/s and RiggedFigure and Seed-san fall.
+- **Unmeasured:** no speed number, including what the added passes cost.
+- **Gate:** lint, hygiene, verify, the ragdoll tests and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.

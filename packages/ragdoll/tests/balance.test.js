@@ -30,7 +30,23 @@ const bones = (rig) => ({
   ),
 });
 
-async function standing({ balance = true, ...options } = {}) {
+/** Moves every hull point of the ragdoll by up to `ulps` 32-bit rounding steps, the same way for one seed. */
+function roundDifferently(ragdoll, ulps, seed) {
+  let state = seed;
+  const random = () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+  };
+  for (const part of ragdoll.bones) {
+    if (part.shape.type !== 'hull') continue;
+    const points = Array.from(part.shape.points, (p) => Math.fround(p * (1 + random() * ulps * 2.4e-7)));
+    ragdoll.setShape(part, { type: 'hull', points });
+  }
+}
+
+async function standing({ balance = true, rounding, ...options } = {}) {
   const rig = await realRig('kaykit/adventurers/characters/Knight.glb');
   rig.frames(1);
   const ragdoll = Ragdoll.attach(
@@ -38,6 +54,7 @@ async function standing({ balance = true, ...options } = {}) {
     ragdollOptions(humanoidProfile(rig.model.nodes, { bones: bones(rig), mass: 30 }), rig.model.nodes),
   );
   fitRagdollShapes(ragdoll, rig.model);
+  if (rounding) roundDifferently(ragdoll, rounding.ulps, rounding.seed);
   const motors = addRagdollMotors(ragdoll, { frequency: 8 }),
     feet = [rig.node('foot.l'), rig.node('foot.r')],
     keeper = balance ? addRagdollBalance(ragdoll, motors, { feet, ...options }) : null,
@@ -71,6 +88,151 @@ rtest('without it the character folds up; with it the same character settles, st
   assert.ok(keeper.tilt < 0.15, `upright (${keeper.tilt} rad)`);
   assert.ok(Math.hypot(hips.position[0] - start[0], hips.position[2] - start[2]) < 0.1, 'and stays where it was');
   assert.equal(keeper.steps, settled, 'no step unasked');
+  rig.dispose();
+});
+
+// A character that settles settles whatever the rounding of its hull points: it stands where it stood, at the height it was
+// asked for, on its own legs, with no step after the first second. The command is stance 0.97 of the height over the feet.
+const HELD_HEIGHT = 0.398;
+for (const ulps of [1, 4, 16])
+  test(`it settles on its own legs with its hull points ${ulps} rounding steps off`, { skip, timeout: 300_000 }, async () => {
+    const failures = [];
+    for (let seed = 1; seed <= 8; seed++) {
+      const { rig, ragdoll, keeper, hips } = await standing({ rounding: { ulps, seed } }),
+        fail = (what) => failures.push(`seed ${seed}: ${what}`);
+      let steps = 0,
+        settled,
+        drift = 0,
+        off = 0,
+        carried = 0;
+      for (let frame = 1; frame <= 360; frame++) {
+        rig.frames(1);
+        if (frame === 60) {
+          settled = [...hips.position];
+          steps = keeper.steps;
+        }
+        if (settled) drift = Math.max(drift, Math.hypot(hips.position[0] - settled[0], hips.position[2] - settled[2]));
+        if (frame >= 120) off = Math.max(off, Math.abs(hips.position[1] - HELD_HEIGHT));
+        carried = Math.max(carried, keeper.carried);
+      }
+      let mass = 0;
+      const speed = [0, 0, 0];
+      for (const { body } of ragdoll.bones) {
+        mass += body.mass;
+        body.linearVelocity.forEach((v, k) => (speed[k] += v * body.mass));
+      }
+      const still = Math.hypot(...speed) / mass;
+      if (keeper.steps !== steps) fail(`${keeper.steps - steps} steps after frame 60`);
+      if (drift >= 0.05) fail(`hips drifted ${drift} m`);
+      if (off >= 0.02) fail(`hips ${off} m off the height asked for`);
+      if (still >= 0.02) fail(`centre of mass at ${still} m/s`);
+      if (carried !== 0) fail(`an outside force carried ${carried} of its weight`);
+      rig.dispose();
+    }
+    assert.deepEqual(failures, []);
+  });
+
+// Figures beyond Knight: its kin have other bodies on one skeleton, and RiggedFigure is another skeleton, 70 kg on bent knees.
+const kin = (name) => [`kaykit/adventurers/characters/${name}.glb`, bones, 30];
+const figures = {
+  Barbarian: kin('Barbarian'),
+  Ranger: kin('Ranger'),
+  Rogue: kin('Rogue'),
+  RiggedFigure: [
+    'khronos/RiggedFigure/RiggedFigure.glb',
+    (rig) => ({
+      hips: rig.node('torso_joint_1'),
+      spine: rig.node('torso_joint_2'),
+      chest: rig.node('torso_joint_3'),
+      head: rig.node('neck_joint_2'),
+      ...Object.fromEntries(
+        [
+          ['left', 'L'],
+          ['right', 'R'],
+        ].flatMap(([side, s]) => [
+          [`${side}UpperArm`, rig.node(`arm_joint_${s}_1`)],
+          [`${side}LowerArm`, rig.node(`arm_joint_${s}_2`)],
+          [`${side}Hand`, rig.node(`arm_joint_${s}_3`)],
+          [`${side}UpperLeg`, rig.node(`leg_joint_${s}_1`)],
+          [`${side}LowerLeg`, rig.node(`leg_joint_${s}_2`)],
+          [`${side}Foot`, rig.node(`leg_joint_${s}_3`)],
+        ]),
+      ),
+    }),
+    70,
+  ],
+};
+
+async function figure([path, boneMap, mass], rounding) {
+  const rig = await realRig(path);
+  rig.frames(1);
+  const map = boneMap(rig),
+    ragdoll = Ragdoll.attach(rig.physics, ragdollOptions(humanoidProfile(rig.model.nodes, { bones: map, mass }), rig.model.nodes));
+  fitRagdollShapes(ragdoll, rig.model);
+  roundDifferently(ragdoll, rounding.ulps, rounding.seed);
+  const motors = addRagdollMotors(ragdoll, { frequency: 8 }),
+    keeper = addRagdollBalance(ragdoll, motors, { feet: [map.leftFoot, map.rightFoot] });
+  ragdoll.activate();
+  return { rig, ragdoll, keeper, hips: ragdoll.bones[0].body };
+}
+
+// Knight's bounds as shares of the hip height, so a bigger figure is held to the same standing: 0.05 m and 0.02 m on 0.406 m.
+for (const [name, entry] of Object.entries(figures))
+  test(`${name} settles on its own legs, whatever the rounding of its hull points`, { skip, timeout: 300_000 }, async () => {
+    const failures = [];
+    for (const ulps of [1, 4, 16])
+      for (let seed = 1; seed <= 8; seed++) {
+        const { rig, ragdoll, keeper, hips } = await figure(entry, { ulps, seed }),
+          size = hips.position[1],
+          fail = (what) => failures.push(`${ulps} steps, seed ${seed}: ${what}`);
+        let steps = 0,
+          settled,
+          drift = 0;
+        const heights = [];
+        for (let frame = 1; frame <= 360; frame++) {
+          rig.frames(1);
+          if (frame === 60) {
+            settled = [...hips.position];
+            steps = keeper.steps;
+          }
+          if (settled) drift = Math.max(drift, Math.hypot(hips.position[0] - settled[0], hips.position[2] - settled[2]));
+          if (frame >= 120) heights.push(hips.position[1]);
+        }
+        const speed = [0, 0, 0];
+        let mass = 0;
+        for (const { body } of ragdoll.bones) {
+          mass += body.mass;
+          body.linearVelocity.forEach((v, k) => (speed[k] += v * body.mass));
+        }
+        const still = Math.hypot(...speed) / mass;
+        if (keeper.state === 'fallen') fail('it fell');
+        if (keeper.steps !== steps) fail(`${keeper.steps - steps} steps after frame 60`);
+        if (drift >= (0.05 / 0.406) * size) fail(`hips drifted ${drift} m`);
+        if (Math.max(...heights) - Math.min(...heights) >= (0.02 / 0.406) * size) fail('its hips did not hold their height');
+        if (still >= 0.02) fail(`centre of mass at ${still} m/s`);
+        if (keeper.carried !== 0) fail('an outside force carried it');
+        rig.dispose();
+      }
+    assert.deepEqual(failures, []);
+  });
+
+rtest('what it adds to the solver stays on the character and goes with dispose', async () => {
+  const plain = await standing({ balance: false }),
+    foot = (ragdoll) => ragdoll.bones.find((part) => part.node.name === 'foot.l').body,
+    inertia = (body) => body.raw.principalInertia().x;
+  plain.rig.frames(1);
+  const alone = inertia(foot(plain.ragdoll));
+  plain.rig.dispose();
+  const { rig, ragdoll, keeper } = await standing(),
+    passes = rig.physics.world.numSolverIterations;
+  rig.frames(1);
+  assert.ok(inertia(foot(ragdoll)) > alone * 2, 'the foot is harder to spin while it balances');
+  assert.ok(foot(ragdoll).raw.additionalSolverIterations() > 0, 'and its island gets more solver passes');
+  keeper.dispose();
+  rig.frames(1);
+  assert.ok(Math.abs(inertia(foot(ragdoll)) - alone) < 1e-6 * alone, 'dispose puts the inertia back');
+  assert.equal(foot(ragdoll).raw.additionalSolverIterations(), 0, 'and the passes');
+  assert.equal(rig.physics.world.numSolverIterations, passes, 'the world is never touched');
   rig.dispose();
 });
 

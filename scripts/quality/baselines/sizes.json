@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10051531,
+  "total": 10053781,
   "history": [
     {
       "date": "2026-10-24",
@@ -2990,6 +2990,12 @@
       "commit": "50cc3e2c9",
       "reason": "New entry @margoengine/cutscene/lipsync: dialogue and lip sync.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "a23dae280",
+      "reason": "balance carries the weight through the legs instead of an outside force: torques, sole limits, real inertia",
+      "grew": 1
     }
   ],
   "items": {
@@ -3437,7 +3443,7 @@
     "@margoengine/quality/ssaa": 2241,
     "@margoengine/quality/warm": 1536,
     "@margoengine/ragdoll": 7368,
-    "@margoengine/ragdoll/balance": 3159,
+    "@margoengine/ragdoll/balance": 5409,
     "@margoengine/ragdoll/getup": 1994,
     "@margoengine/ragdoll/hulls": 2007,
     "@margoengine/ragdoll/powered": 3402,
