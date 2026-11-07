@@ -221,7 +221,13 @@ test("the static reader names the animation entry; malformed animation data is r
   );
   // A static file may not carry animation fields: the header flag says which reader owns them.
   const view = new DataView(bytes().buffer);
+  // Flag 2 belongs to the curves entry (named); flag 3, both at once, is no file this exporter writes.
   view.setUint32(20, 2, true);
+  assert.throws(
+    () => margoToGLTF(new Uint8Array(view.buffer)),
+    /load it with parseMargoCurves or loadMargoCurves from @margoengine\/blender\/curves/,
+  );
+  view.setUint32(20, 3, true);
   assert.throws(
     () => margoToGLTF(new Uint8Array(view.buffer)),
     /Unsupported \.margo flags/,

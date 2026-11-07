@@ -89,3 +89,19 @@ An exported scene with an Armature modifier or shape keys sets header flag `1` a
 Each action becomes one clip named after it: the armature's active action and its NLA strips' actions, and the shape keys' actions, sampled at every frame of the action's range with LINEAR interpolation (rotations as continuous quaternions). A clip starts from the pose shown at export, so a bone or key the action does not key keeps that pose; channels equal to it throughout are omitted. Object-level animation, constraints' targets outside the armature and drivers are baked into the bone samples only.
 
 `margoToGLTF(bytes)` turns either kind into a glTF 2.0 document whose single buffer is the file: type-2 sections become interleaved bufferViews (stride 80: POSITION 0, NORMAL 16, TANGENT 32 when no tangent has w = 0, TEXCOORD_0 48, TEXCOORD_1 56, COLOR_0 64; stride 24: POSITION 0, NORMAL 12), type-3 sections index accessors, type-4 sections images, and the manifest's views move by their section's file offset.
+
+## Curves, points and volumes (header flag `2`)
+
+With "Curves, points and volumes" on (`export_scene(..., curves=True)`), visible curves objects (legacy curves, hair curves and curves made by geometry nodes, read from the object's evaluated geometry), point clouds and volumes are written as data, header flag `2`. The static and animation readers refuse such a file by name; `@margoengine/blender/curves` reads it, and its meshes as `decodeMargo` does. A file holds either animation (flag `1`) or shapes (flag `2`), never both. Two more section types are allowed, both with zero flags:
+
+| Type | Content |
+| --- | --- |
+| 6 | Shape data: little-endian Float32 values, viewed by the manifest's `curves` and `pointClouds` |
+| 7 | One volume's grids as an OpenVDB file, as Blender's `VolumeGrids.save` writes it |
+
+The manifest adds three arrays, and a node points at one entry with `curves`, `points` or `volume` (an index):
+
+- `curves[i]`: `{section, count, splines, attributes}`. `count` is the curves object's control points; `splines[j]` is `{type, points, cyclic, resolution}` with `type` `catmullRom`, `poly`, `bezier` or `nurbs` and, for NURBS, `order` (2..64) and `knots` (`normal`, `endpoint`, `bezier` or `endpointBezier`). The splines' points follow each other, in order, and sum to `count`.
+- `pointClouds[i]`: `{section, count, attributes}`.
+- `attributes` maps a name to `{byteOffset, components}` in the type-6 `section`, `count` values of `components` floats each: `position` (3, required), `handleLeft`, `handleRight` (3, Bezier, required for a Bezier spline), `handleTypeLeft`, `handleTypeRight` (1, Blender's enum: 0 free, 1 auto, 2 vector, 3 aligned), `radius` (1, metres), `tilt` (1, radians), `weight` (1, NURBS) and, for a point cloud, `color` (4, linear RGBA of its first colour attribute). An attribute Blender does not hold is left out. Positions, handles and radii are in the object's space in Y-up metres, as mesh vertices are, and the node's TRS places them.
+- `volumes[i]`: `{section, grids}`: the type-7 section and the grid names. OpenVDB keeps Blender's Z-up object space, so a volume's node TRS is the unit scale times the Z-up to Y-up turn times the object's world matrix.

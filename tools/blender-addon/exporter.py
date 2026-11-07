@@ -9,6 +9,7 @@ import numpy as np
 from mathutils import Matrix, Vector
 from .animation import animated, export_animated
 from .bake import bake_material, principled
+from .curves import KINDS, GeometryData, read_object
 from .writer import png, write
 
 
@@ -16,12 +17,14 @@ class NeedsBake(ValueError):
     """A node graph the direct Principled subset cannot carry; baking turns it into images."""
 
 
-def export_scene(context, path, bake_size=1024, lights_cameras=True):
+def export_scene(context, path, bake_size=1024, lights_cameras=True, curves=False):
     """Writes the visible scene to `path` and returns the file size. Materials outside the direct Principled subset
     (procedural node graphs, textured metallic or roughness, other shaders) are baked with Cycles to bake_size x
     bake_size images on each object's active UV map; bake_size=0 turns baking off, so they fail by name instead.
     lights_cameras writes visible point, spot and sun lights and cameras as nodes with `margo:` light and camera tags,
-    which @margoengine/blender/components builds; False leaves them out as before."""
+    which @margoengine/blender/components builds; False leaves them out as before. curves writes visible curves
+    objects as splines, point clouds as points and volumes as OpenVDB grids (header flag 2), which
+    @margoengine/blender/curves reads; False leaves them out as before."""
     if bake_size and not 16 <= bake_size <= 4096:
         raise ValueError("bake_size must be 0 (off) or 16 to 4096 pixels")
     # Blender Z-up to Margo/glTF Y-up; a proper rotation preserves winding.
@@ -529,6 +532,26 @@ def export_scene(context, path, bake_size=1024, lights_cameras=True):
             world.translation *= unit_scale
             node = node_of(obj.original, None, world, instance=tuple(instance.persistent_id) if instance.is_instance else "")
             node["extras"]["margo"]["properties"] = {**own, **tags}
+    extra = GeometryData(unit_scale)
+    if curves:
+        for instance in depsgraph.object_instances:
+            obj = instance.object
+            visible = instance.parent.original if instance.is_instance and instance.parent else obj.original
+            if obj.type not in KINDS or not instance.show_self or not visible.visible_get(view_layer=context.view_layer):
+                continue
+            added = read_object(obj, extra)
+            if not added:
+                continue
+            if "volume" in added:
+                # OpenVDB grids keep Blender's Z-up object space, so the node turns them (scale, basis, world).
+                world = Matrix.Scale(unit_scale, 4) @ basis @ instance.matrix_world
+            else:
+                world = convert(instance.matrix_world)
+            node = node_of(obj.original, None, world, instance=tuple(instance.persistent_id) if instance.is_instance else "")
+            node.update(added)
+    if (extra.curves or extra.points or extra.volumes) and moving:
+        raise ValueError("Curves, point clouds and volumes cannot be exported with skins, shape keys or actions yet; "
+                         "export them from a scene without animation, or turn off Curves, Points and Volumes")
     roots = [node["id"] for node in nodes]
     fields, animation = {}, b""
     if moving:
@@ -536,13 +559,14 @@ def export_scene(context, path, bake_size=1024, lights_cameras=True):
         roots += animated_roots
     for node in nodes:
         del node["id"]
-    if not geometry:
+    shapes = {key: value for key, value in (("curves", extra.curves), ("pointClouds", extra.points), ("volumes", extra.volumes)) if value}
+    if not geometry and not shapes:
         raise ValueError("No visible mesh triangles to export")
     if len(nodes) > 100_000:
         raise ValueError("Too many exported objects")
     meshes = [node_of.meshes.get(i, {}) for i in range(len(geometry))]
-    document = {"nodes": nodes, "meshes": meshes, "materials": materials, "textures": textures, "samplers": samplers, "scenes": [{"nodes": roots}], "scene": 0, **fields}
+    document = {"nodes": nodes, "meshes": meshes, "materials": materials, "textures": textures, "samplers": samplers, "scenes": [{"nodes": roots}], "scene": 0, **fields, **shapes}
     used = sorted({name for material in materials for name in material.get("extensions", {})})
     if used:
         document["extensionsUsed"] = used
-    return write(path, document, geometry, images, animation)
+    return write(path, document, geometry, images, animation, extra.data(), extra.vdbs)

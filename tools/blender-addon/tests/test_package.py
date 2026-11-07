@@ -20,7 +20,10 @@ class PackageTests(unittest.TestCase):
             with ZipFile(destination) as archive:
                 prefix = packager.manifest["id"] + "/"
                 self.assertEqual(set(archive.namelist()), {prefix + name for name in (
-                    "blender_manifest.toml", "__init__.py", "exporter.py", "animation.py", "bake.py", "live.py", "writer.py", "LICENSE", "NOTICE")})
+                    "blender_manifest.toml", "__init__.py", "exporter.py", "animation.py", "bake.py", "curves.py", "live.py", "writer.py", "LICENSE", "NOTICE")})
+                # Every module the add-on imports ships (curves.py was once left out, so Blender failed to enable it).
+                modules = {path.name for path in root.glob("*.py")} - {"package_addon.py"}
+                self.assertLessEqual({prefix + name for name in modules}, set(archive.namelist()))
                 self.assertIsNone(archive.testzip())
                 manifest = tomllib.loads(archive.read(prefix + "blender_manifest.toml").decode())
                 tree = ast.parse(archive.read(prefix + "__init__.py"))
@@ -33,7 +36,7 @@ class PackageTests(unittest.TestCase):
                 self.assertIn("network", manifest["permissions"])
                 for name in ("LICENSE", "NOTICE"):
                     self.assertEqual(archive.read(prefix + name), (root.parents[1] / name).read_bytes())
-                for name in ("__init__.py", "exporter.py", "bake.py", "live.py", "writer.py"):
+                for name in sorted(modules):
                     compile(archive.read(prefix + name), name, "exec")
 
 

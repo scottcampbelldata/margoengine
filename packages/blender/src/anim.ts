@@ -15,6 +15,7 @@ import {
   maxBytes,
   pngSize,
   readContainer,
+  animatedFlag,
   type MargoSection,
 } from "./container.js";
 import type { MargoOptions } from "./index.js";
@@ -66,7 +67,7 @@ export function margoToGLTF(
   countLimit("maxNodes", maxNodes);
   const { buffer, base, length, flags, sections, manifest } = readContainer(
       input,
-      true,
+      animatedFlag,
     ),
     doc = manifest;
   if (

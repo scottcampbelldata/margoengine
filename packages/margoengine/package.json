@@ -286,6 +286,10 @@
       "types": "./dist/blender/live.d.ts",
       "import": "./dist/blender/live.js"
     },
+    "./blender/curves": {
+      "types": "./dist/blender/curves.d.ts",
+      "import": "./dist/blender/curves.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"

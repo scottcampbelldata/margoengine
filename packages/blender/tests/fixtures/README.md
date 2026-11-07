@@ -20,3 +20,7 @@
 - `pbr-ext.margo`: exported for this project by Blender 5.2.3 LTS from `tools/blender-addon/tests/blender_pbr_ext.py`:
   Principled planes with transmission, IOR, coat, sheen and subsurface over a backdrop (Apache-2.0, as this
   repository). Regenerate the same way and copy the file here.
+- `curves.margo` and `curves-truth.json`: exported for this project by Blender 5.2.3 LTS from
+  `tools/blender-addon/tests/blender_curves.py` with `curves=True`: Bezier, poly, NURBS and hair curves, a point cloud
+  and a volume; the JSON holds Blender's own evaluated polylines, points and openvdb voxel reads (Apache-2.0, as this
+  repository). Regenerate the same way and copy both files here.

@@ -22,8 +22,10 @@ def png(width, height, rgba):
             + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 
 
-def encode(document, geometry, images=(), animation=b""):
-    """`animation` holds the animated scene's skins, morph targets and keyframes; bufferViews name it as `section: "data"`."""
+def encode(document, geometry, images=(), animation=b"", data=b"", vdbs=()):
+    """`animation` holds the animated scene's skins, morph targets and keyframes; bufferViews name it as `section: "data"`.
+    `data` holds the Float32 curve and point attributes the manifest's `curves` and `pointClouds` view, and `vdbs` the
+    OpenVDB file of each of its `volumes`, by the index each volume's `section` gives."""
     sections = [(1, b"", 0)]
     shared = {}
 
@@ -80,6 +82,34 @@ def encode(document, geometry, images=(), animation=b""):
         doc["bufferViews"] = views
     elif any(key in doc for key in ("bufferViews", "accessors", "skins", "animations")):
         raise ValueError("Animated scene without a data section")
+    shapes = any(doc.get(key) for key in ("curves", "pointClouds", "volumes"))
+    if shapes and animation:
+        raise ValueError("Curves, point clouds and volumes cannot share a file with animation data")
+    if data or vdbs or shapes:
+        if not shapes or len(data) % 4:
+            raise ValueError("Curve and point data must come with the manifest records that view it")
+        data_section = None
+        if data:
+            data_section = len(sections)
+            sections.append((6, bytes(data), 0))
+        for kind in ("curves", "pointClouds"):
+            records = []
+            for record in doc.get(kind, ()):
+                count = record["count"]
+                for view in record["attributes"].values():
+                    if data_section is None or view["byteOffset"] % 4 or view["byteOffset"] + count * view["components"] * 4 > len(data):
+                        raise ValueError("Curve or point attribute outside the data section")
+                records.append(dict(record, section=data_section))
+            if records:
+                doc[kind] = records
+        volumes = []
+        for record in doc.get("volumes", ()):
+            if not 0 <= record["section"] < len(vdbs) or not vdbs[record["section"]]:
+                raise ValueError("Volume without its OpenVDB file")
+            volumes.append(dict(record, section=len(sections)))
+            sections.append((7, bytes(vdbs[record["section"]]), 0))
+        if volumes:
+            doc["volumes"] = volumes
     manifest = json.dumps(doc, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
     if len(manifest) > 1024 * 1024 or not 3 <= len(sections) <= 4096:
         raise ValueError(".margo manifest/section budget exceeded")
@@ -93,12 +123,12 @@ def encode(document, geometry, images=(), animation=b""):
         offset += len(padded)
     if offset > MAX_BYTES:
         raise ValueError(".margo exceeds 256 MiB")
-    header = struct.pack("<16I", 0x4F47524D, 1, offset, len(sections), 64, 1 if animation else 0, 80, *([0] * 9))
+    header = struct.pack("<16I", 0x4F47524D, 1, offset, len(sections), 64, 1 if animation else 2 if shapes else 0, 80, *([0] * 9))
     return header + b"".join(table) + b"".join(payload)
 
 
-def write(path, document, geometry, images=(), animation=b""):
-    data = encode(document, geometry, images, animation)
+def write(path, document, geometry, images=(), animation=b"", data=b"", vdbs=()):
+    data = encode(document, geometry, images, animation, data, vdbs)
     destination = os.path.abspath(path)
     temporary = None
     try:

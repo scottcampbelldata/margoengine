@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10651294,
+  "total": 10658114,
   "history": [
     {
       "date": "2026-10-24",
@@ -3752,6 +3752,12 @@
       "commit": "f00e2cd59",
       "reason": "new entry @margoengine/scenery/aurora, 5610 B gzip; /stars shares SkyLayer",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "c25e2cc0c",
+      "reason": "new optional entry @margoengine/blender/curves: curves, point clouds and volumes from Blender",
+      "grew": 3
     }
   ],
   "items": {
@@ -3813,9 +3819,10 @@
     "@margoengine/biomes/view": 10454,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
-    "@margoengine/blender": 4000,
+    "@margoengine/blender": 4339,
     "@margoengine/blender/anim": 5097,
     "@margoengine/blender/components": 15198,
+    "@margoengine/blender/curves": 6480,
     "@margoengine/blender/live": 4649,
     "@margoengine/blender/pbr-ext": 12254,
     "@margoengine/bvh": 23398,
@@ -4501,6 +4508,7 @@
     "leak @margoengine/blender -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/anim -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/components -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/blender/curves -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/live -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/pbr-ext -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/controls -> @margoengine/bvh": 1,

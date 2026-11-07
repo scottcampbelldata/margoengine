@@ -37,10 +37,15 @@ class EXPORT_SCENE_OT_margo(bpy.types.Operator, ExportHelper):
         description="Export visible point, spot and sun lights and cameras, so the scene opens lit and framed as authored",
         default=True,
     )
+    curves: bpy.props.BoolProperty(
+        name="Curves, points and volumes",
+        description="Export visible curves as splines, point clouds as points and volumes as OpenVDB grids; the file then needs @margoengine/blender/curves",
+        default=False,
+    )
 
     def execute(self, context):
         try:
-            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras)
+            size = export_scene(context, self.filepath, bake_size=self.bake_size, lights_cameras=self.lights_cameras, curves=self.curves)
         except (ValueError, OSError, OverflowError, RuntimeError) as error:
             self.report({"ERROR"}, str(error))
             return {"CANCELLED"}

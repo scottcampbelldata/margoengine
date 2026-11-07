@@ -128,6 +128,39 @@ engine.start();
 
 `view: false` keeps the engine's camera; `viewGLTFCamera(scene.model, scene.model.cameras[i])` from `margoengine/gltf-pro` switches to another. Point and spot lights light the scene through `@margoengine/clustered` (pass `clustered`); without it only the first sun lights it. A real Blender 5.2.3 LTS export points every light and camera where Blender does (to 1e-6) and projects as Blender's `calc_matrix_camera` does, and on the GPU the page opens on Blender's framing with the sun at Blender's strength (LIM-417; `tests/scene.test.js`). Area lights, panoramic cameras and lens shift fail by object name, as does a custom property the exporter writes itself.
 
+## Curves, points and volumes (`margoengine/blender/curves`)
+
+With the dialog's **Curves, points and volumes** option on (`export_scene(..., curves=True)`, off by default), the exporter writes each visible curves object as splines (legacy Bezier, poly and NURBS curves, hair curves and curves made by geometry nodes, read from the evaluated geometry with their radius, tilt, handles and weights), each point cloud as points with its radii and first colour attribute, and each volume as the OpenVDB file of its grids, with no conversion to meshes. Such a file needs this entry; `loadMargo` refuses it by name. The meshes in it draw as `loadMargo` draws them, and the shapes come back as data for the line, point and volume packages. `evaluateSpline` gives the polyline Blender draws at the spline's resolution:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadMargoCurves, evaluateSpline} from 'margoengine/blender/curves';
+import {Lines, Line} from 'margoengine/lines';
+import {parseVDB} from 'margoengine/loaders/vdb';
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+// The test scene in tests/fixtures: Bezier, poly, NURBS and hair curves, a point cloud and a smoke volume.
+const scene = await loadMargoCurves(engine, '/curves.margo');
+const lines = new Lines();
+engine.use(lines);
+const place = (m: Float32Array, xyz: Float32Array) =>
+  Array.from(xyz, (_, i) => m[i % 3] * xyz[i - (i % 3)] + m[4 + (i % 3)] * xyz[i - (i % 3) + 1] + m[8 + (i % 3)] * xyz[i - (i % 3) + 2] + m[12 + (i % 3)]);
+for (const curve of scene.curves)
+  for (const spline of curve.splines) {
+    if (spline.type === 'nurbs' && spline.cyclic && spline.knots === 'endpoint') continue; // not evaluated yet
+    const positions = place(curve.matrix, evaluateSpline(spline));
+    if (spline.cyclic) positions.push(...positions.slice(0, 3));
+    lines.add(new Line({positions, width: 2}));
+  }
+const [cloud] = scene.points; // positions, radius and colors for PointCloud from margoengine/points
+console.log(cloud.name, cloud.positions.length / 3);
+const {grids} = await parseVDB(scene.volumes[0].vdb); // grids[0].dense() for fig.volume in margoengine/sciviz
+console.log(grids[0].name, grids[0].activeVoxels);
+engine.start();
+```
+
+A real Blender 5.2.3 LTS export evaluates to Blender's own Convert to Mesh polylines to 2e-5 m (Bezier with free, aligned, auto and vector handles; poly; Uniform and Endpoint NURBS with weights, open and cyclic; open and cyclic Catmull-Rom hair), keeps the cloud's points, radii and colour, and its volume reads with `parseVDB` voxel for voxel as Blender's bundled openvdb module reads it (LIM-420; `tests/curves.test.js`). `evaluateSpline` refuses NURBS with Bezier knot modes and cyclic NURBS with Endpoint knots by name (their control data is still in the file), a scene with both animation and shapes fails to export by name, and a beveled or extruded curve exports as its spline, not its surface. Volume grids keep Blender's Z-up object space; `matrix` places them.
+
 ## Characters: armatures, skins, shape keys and actions
 
 A mesh with an Armature modifier or shape keys exports as an animated `.margo`: the armature's bones become joint nodes, vertex groups of deform bones become up to eight normalised influences per vertex, shape keys become morph targets, and each action (the active one, NLA strips' and the shape keys') becomes a clip sampled at every frame. Load it with the `anim` entry and play it with `@margoengine/animation`:

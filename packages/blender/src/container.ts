@@ -5,6 +5,8 @@ export const maxBytes = 256 * 1024 * 1024;
 const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 /** Header flag of a file with skins, morph targets or animations (FORMAT.md, "Animated files"). */
 export const animatedFlag = 1;
+/** Header flag of a file with curves, point clouds or volumes (FORMAT.md, "Curves, points and volumes"). */
+export const shapesFlag = 2;
 
 /** One entry of the section table: its type, the element stride its flags select and its bytes in the file. */
 export interface MargoSection {
@@ -26,12 +28,12 @@ export interface MargoContainer {
 }
 
 /**
- * Checks the header and section table of `.margo` bytes and parses the manifest. `animated` says which header flags
- * the caller reads: the static reader refuses animated files by name, the animation reader accepts both.
+ * Checks the header and section table of `.margo` bytes and parses the manifest. `accept` is the one header flag the
+ * caller reads besides a static file (0 for none): each reader refuses the other kinds by name.
  */
 export function readContainer(
   input: ArrayBuffer | ArrayBufferView,
-  animated: boolean,
+  accept: 0 | typeof animatedFlag | typeof shapesFlag,
 ): MargoContainer {
   if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input))
     throw new TypeError(
@@ -60,15 +62,19 @@ export function readContainer(
       "Invalid .margo header/version/stride; the input is not a version 1 .margo file, so export it again with the Margo Blender add-on",
     );
   const flags = view.getUint32(20, true);
-  if (flags === animatedFlag && !animated)
+  if (flags === animatedFlag && accept !== animatedFlag)
     throw new TypeError(
       "Animated .margo (skins, shape keys or actions); load it with parseAnimatedMargo or loadAnimatedMargo from @margoengine/blender/anim",
+    );
+  if (flags === shapesFlag && accept !== shapesFlag)
+    throw new TypeError(
+      ".margo with curves, point clouds or volumes; load it with parseMargoCurves or loadMargoCurves from @margoengine/blender/curves",
     );
   for (let at = 20; at < 64; at += 4)
     if (
       at !== 24 &&
       view.getUint32(at, true) !== 0 &&
-      !(at === 20 && flags === animatedFlag)
+      !(at === 20 && flags === accept)
     )
       throw new TypeError(
         "Unsupported .margo flags; the file was written by a newer exporter, so update @margoengine/blender or re-export it",
@@ -79,7 +85,12 @@ export function readContainer(
       "Invalid .margo section count; the file is truncated or corrupt, so download or export it again",
     );
   const sections: MargoSection[] = [],
-    types = flags === animatedFlag ? [1, 2, 3, 4, 5] : [1, 2, 3, 4];
+    types =
+      flags === animatedFlag
+        ? [1, 2, 3, 4, 5]
+        : flags === shapesFlag
+          ? [1, 2, 3, 4, 6, 7]
+          : [1, 2, 3, 4];
   let end = 64 + count * 16;
   for (let i = 0; i < count; i++) {
     const at = 64 + i * 16,

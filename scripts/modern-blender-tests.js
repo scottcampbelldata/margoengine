@@ -142,6 +142,47 @@ if (process.env.MARGO_BLENDER) {
       "truth",
     );
   }
+  // Curves, points and volumes: a fresh Blender export carries the committed fixture's shapes and Blender's same numbers.
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    [
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "--python",
+      "tools/blender-addon/tests/blender_curves.py",
+      "--",
+      "test-results/blender/curves",
+    ],
+    { stdio: "inherit" },
+  );
+  {
+    const { decodeMargoCurves } = await import("../packages/blender/dist/curves.js");
+    const shapes = (bytes) => {
+      const { curves, points, volumes } = decodeMargoCurves(bytes);
+      return {
+        curves: curves.map((c) => [c.name, [...c.matrix], c.splines.map((s) => ({ ...s, positions: [...s.positions], radius: s.radius && [...s.radius], tilt: s.tilt && [...s.tilt], weight: s.weight && [...s.weight], handleLeft: s.handleLeft && [...s.handleLeft], handleRight: s.handleRight && [...s.handleRight], handleTypeLeft: s.handleTypeLeft && [...s.handleTypeLeft], handleTypeRight: s.handleTypeRight && [...s.handleTypeRight] }))]),
+        points: points.map((p) => [p.name, [...p.matrix], [...p.positions], [...p.radius], [...p.colors]]),
+        volumes: volumes.map((v) => [v.name, [...v.matrix], v.grids]),
+      };
+    };
+    const close = (a, b, path) => {
+      if (typeof a === "number") assert.ok(Math.abs(a - b) < 1e-6, `fresh curves export differs at ${path}: ${a} against ${b}`);
+      else if (a && typeof a === "object") for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) close(a[key], b[key], `${path}.${key}`);
+      else assert.equal(a, b, `fresh curves export differs at ${path}`);
+    };
+    close(
+      shapes(await readFile("test-results/blender/curves/curves.margo")),
+      shapes(await readFile("packages/blender/tests/fixtures/curves.margo")),
+      "shapes",
+    );
+    close(
+      JSON.parse(await readFile("test-results/blender/curves/curves-truth.json", "utf8")),
+      JSON.parse(await readFile("packages/blender/tests/fixtures/curves-truth.json", "utf8")),
+      "truth",
+    );
+  }
   const { margoComponents } =
     await import("../packages/blender/dist/components.js");
   assert.deepEqual(

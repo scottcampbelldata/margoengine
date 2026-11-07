@@ -144,6 +144,27 @@ class FormatTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside the data section"):
             format.encode(document, geometry, images, b"\0" * 4)
 
+    def test_shapes_sections_set_header_flag_2(self):
+        document, geometry, images = fixture()
+        points = struct.pack("<6f", 0, 0, 0, 1, 2, 3)
+        document = dict(document, pointClouds=[{"count": 2, "attributes": {"position": {"byteOffset": 0, "components": 3}}}],
+                        volumes=[{"grids": ["density"], "section": 0}])
+        data = format.encode(document, geometry, images, data=points, vdbs=[b"vdb!"])
+        count = struct.unpack_from("<I", data, 12)[0]
+        table = [struct.unpack_from("<4I", data, 64 + 16 * i) for i in range(count)]
+        manifest = json.loads(data[table[0][1]:table[0][1] + table[0][2]])
+        self.assertEqual(struct.unpack_from("<I", data, 20)[0], 2)
+        self.assertEqual([row[0] for row in table[-2:]], [6, 7])
+        self.assertEqual(manifest["pointClouds"][0]["section"], count - 2)
+        self.assertEqual(manifest["volumes"][0]["section"], count - 1)
+        self.assertEqual(data[table[-1][1]:table[-1][1] + 4], b"vdb!")
+        with self.assertRaisesRegex(ValueError, "outside the data section"):
+            format.encode(document, geometry, images, data=points[:12], vdbs=[b"vdb!"])
+        with self.assertRaisesRegex(ValueError, "without its OpenVDB file"):
+            format.encode(document, geometry, images, data=points)
+        with self.assertRaisesRegex(ValueError, "cannot share a file with animation"):
+            format.encode(dict(document, bufferViews=[{"section": "data", "byteLength": 4}]), geometry, images, b"\0" * 4, points, [b"v"])
+
     def test_png_pixels_roundtrip(self):
         rgba = bytes((230, 40, 20, 255, 40, 230, 20, 255, 20, 40, 230, 255, 230, 230, 20, 255))
         data = format.png(2, 2, rgba)
