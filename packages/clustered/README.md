@@ -116,7 +116,7 @@ stop();
 // Shadow texels shared by importance: nearer, brighter lights get bigger maps and the rest stop casting.
 lights.setLights(shadowBudget([
   {position: [0, 2, 0], range: 8, castShadow: true},
-  {position: [9, 2, 0], direction: [0, -1, 0], range: 8, castShadow: true},
+  {position: [9, 2, 0], direction: [0, -1, 0], outerAngle: 0.6, range: 8, castShadow: true},
 ], {viewer: engine.camera.position, texels: 1024 * 1024}));
 engine.start();
 ```

@@ -574,7 +574,7 @@ import { IndexedDBChunkStore, VoxelStreamer } from 'margoengine/voxel/stream';
 import {Engine} from 'margoengine/core';
 import {BlockTypes, VoxelWorld} from 'margoengine/voxel';
 const blocks = new BlockTypes();
-blocks.define('stone');
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
 const world = new VoxelWorld({ blocks });
 const engine = await Engine.create(document.querySelector('canvas')!);
 

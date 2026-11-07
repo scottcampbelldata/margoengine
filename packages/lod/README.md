@@ -31,7 +31,7 @@ for (const part of parts)                      // core meshes; the anchor's worl
 // Meshes and models work too: their `visible` (or `root.visible`) is toggled.
 const model = await loadGLTF(engine, '/valve.glb');                  // or createMesh() from @margoengine/materials
 const anchor = part(), lowMesh = part().setGeometry(lowGeometry);
-lods.add(anchor, [{object: model}, {object: lowMesh, screen: 0.05}, {object: Imposter.bake(engine, model)}]);
+lods.add(anchor, [{object: model}, {object: lowMesh, screen: 0.05}, {object: Imposter.bake(engine, model), screen: 0.01}]);
 
 const data = await imposter.export();          // cache it (IndexedDB, a file) ...
 const cached = Imposter.fromData(engine, data); // ... and skip the bake next load

@@ -92,7 +92,7 @@ import { FileChunkStore } from 'margoengine/voxel-net/file-store';
 import { VoxelServer } from 'margoengine/voxel-net/server';
 
 const blocks = new BlockTypes();
-for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
 // Edited chunks on disk, one file each in world/chunks: they survive a restart.
 const store = new FileChunkStore('world/chunks');
 const server = new VoxelServer({
@@ -133,7 +133,7 @@ import { BlockTypes } from 'margoengine/voxel';
 import { VoxelServer } from 'margoengine/voxel-net/server';
 
 const blocks = new BlockTypes();
-for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
 const server = new VoxelServer({ blocks, filterName: (name, id) => name || `guest ${id}` });
 await server.listen(8787, '0.0.0.0');
 // A snapshot on disk: typed arrays in a Map, so v8.serialize writes it as it is.
@@ -169,7 +169,7 @@ import { connectVoxelNet } from 'margoengine/voxel-net';
 import { VoxelServer } from 'margoengine/voxel-net/server';
 
 const blocks = new BlockTypes();
-for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
 
 // Server: greet each player once it has spawned, and tell everyone how many are here.
 const server = new VoxelServer({ blocks });
@@ -212,7 +212,7 @@ import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { connectVoxelNet, SERVER_SILENT_CODE } from 'margoengine/voxel-net';
 
 const blocks = new BlockTypes();
-for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
 const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }), { serverTimeout: 15_000 });
 client.onClose = ({ code, byClient }) => {
   if (byClient) return;
@@ -230,7 +230,7 @@ import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
 import { connectVoxelNet } from 'margoengine/voxel-net';
 
 const blocks = new BlockTypes();
-for (const name of ['stone', 'dirt', 'grass', 'sand']) blocks.define(name);
+for (const name of ['stone', 'dirt', 'grass', 'sand', 'water', 'log', 'leaves']) blocks.define(name);
 const client = connectVoxelNet('ws://127.0.0.1:8787', new VoxelWorld({ blocks }));
 client.onResume = ({ attempt, cause, delay }) => {
   if (attempt >= 2) console.log(`Reconnecting (${cause}), try ${attempt} in ${Math.round(delay)} ms`);

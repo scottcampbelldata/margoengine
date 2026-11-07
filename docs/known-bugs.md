@@ -16,6 +16,27 @@ are still open.
 - **Needed to close:** save both pictures, find the pixels and which pass writes them, and fix it in the package that
   owns that pass.
 
+## README examples
+
+### 129 of 757 README examples do not run yet
+
+- **What:** `npm run check:readme-run` ran 628 of 757 examples on 2026-11-06 (RTX A6000, Chromium). The other 129 are in
+  `scripts/support/readme-run-known.json`, each with its error.
+- **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
+- **Cause:** 109 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+  and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. Ragdoll,
+  fbx and the animator's joint indices are in this group. 20 start `example:`, and these need reading one at a time:
+  - Five attach one plugin twice to one engine, which core refuses (`post/readme-7`, `shadows/readme-0`, `quality/readme-4`,
+    `sky/readme-6`, `ragdoll/readme-4`), so the example shows two alternatives as if one ran after the other.
+  - `cameras/readme-6` needs `source` on Tonemap, `exporters/readme-28` reads a second view the example never made,
+    `exporters/readme-32` needs the Studio source profile, `stage/readme-1` gets a model minimal glTF refuses, and
+    `headless/readme-3` passes a page engine to `readPixels`.
+  - `react/readme-0` and `-3` fail on how the page loads React, `worker/readme-0` on the worker's message, `input/readme-1`
+    times out, `controls/readme-5` and `-6` find no WebGPU in Node, `loaders/readme-2` needs a page, `loaders/readme-22`
+    wants an OpenVDB sample, `xr/readme-1` needs a headset and `headless/readme-4` needs ffmpeg.
+- **Needed to close:** a matching sample for each `sample:` entry, each `example:` entry fixed in its README or its package, and
+  the list empty.
+
 ## Boulder demo
 
 ### The robot's arm shows a copper piston through its shell at close range

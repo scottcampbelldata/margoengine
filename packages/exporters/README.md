@@ -468,7 +468,7 @@ const clip = {fps: 12, frames: [0, 4, 8], end: 12};
 const cels: ExportNode[] = [{name: 'Prop_Cel1', primitives: bank0}, {name: 'Prop_Cel2', primitives: bank1}];
 const prop: ExportNode = {name: 'Prop', children: cels};
 const poses = [{translation: [0, 0, 0]}, {translation: [0, 1, 0]}, {translation: [0, 0, 0]}];
-const channels = [...animateCels(cels, clip, [0, 1, 0]), ...animateTransforms(prop, clip, poses)];
+const channels = [...animateCels(cels, clip, [0, 1, 0]), ...animateTransforms(prop, clip, poses, {paths: ['translation']})];
 const glb = exportGLB({nodes: [prop], animations: [{name: 'Clip', channels, extras: {fps: 12}}]});
 ```
 

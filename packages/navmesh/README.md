@@ -34,7 +34,7 @@ const removeCrate = crowd.addObstacle({position: [2,0,2], radius: 0.5}); // agen
 crowd.on('arrive', (agent) => console.log('arrived', agent.id));
 let last = performance.now();
 const frame = (now: number) => {
-  crowd.update(Math.min(0.1, (now - last) / 1000));
+  crowd.update(Math.min(0.1, Math.max(0, now - last) / 1000)); // a frame's time can be just before the first performance.now()
   last = now;
   // guard.position, guard.velocity and guard.state ('moving', 'offmesh', 'arrived', ...) drive your character.
   requestAnimationFrame(frame);
