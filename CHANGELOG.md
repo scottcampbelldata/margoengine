@@ -4,6 +4,7 @@
 
 ### Networking
 
+- `@margoengine/netcode/signal`: `SignalServer`, `SignalClient` and `PeerMesh` let peers of a room find each other and make WebRTC links, proved with three real Chromium pages.
 - `@margoengine/netcode/rooms`: `reconnectWindow`, `onDrop`, `onReconnect`, `room.dropped`, `JoinedRoom.reconnectionToken` and `RoomsClient.reconnect` let a dropped player come back to the same room and seat. The join reply now carries the token, so a rooms client and server must be the same version.
 - `@margoengine/netcode/webtransport`: `openWebTransport`, `acceptWebTransport` and `webTransportConnection` give a `Connection` of real datagrams and a reliable stream over HTTP/3, proved in Chromium against a real HTTP/3 server. The server host is yours to supply: Node has no HTTP/3 server.
 - `@margoengine/netcode/smoothing`: `CorrectionSmoother` blends prediction errors away over a few frames instead of snapping, while the simulation stays exact. `GameClient` gains `oncorrection(before, after)`.

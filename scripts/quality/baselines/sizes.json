@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10547009,
+  "total": 10550329,
   "history": [
     {
       "date": "2026-10-24",
@@ -3632,6 +3632,12 @@
       "commit": "b4521dc97",
       "reason": "new optional entry @margoengine/weather/data (parseMetar, metarState: METAR and SPECI reports into a weather state); nothing else grows",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "f9b487f60",
+      "reason": "netcode: new optional entry ./signal (batch 114 job 5)",
+      "grew": 1
     }
   ],
   "items": {
@@ -4064,6 +4070,7 @@
     "@margoengine/netcode/node": 6457,
     "@margoengine/netcode/rollback": 3437,
     "@margoengine/netcode/rooms": 6007,
+    "@margoengine/netcode/signal": 3320,
     "@margoengine/netcode/smoothing": 1758,
     "@margoengine/netcode/webrtc": 998,
     "@margoengine/netcode/websocket": 1076,

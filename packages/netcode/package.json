@@ -55,6 +55,10 @@
       "types": "./dist/webtransport.d.ts",
       "import": "./dist/webtransport.js"
     },
+    "./signal": {
+      "types": "./dist/signal.d.ts",
+      "import": "./dist/signal.js"
+    },
     "./interest": {
       "types": "./dist/interest.d.ts",
       "import": "./dist/interest.js"
@@ -79,6 +83,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js netcode",
     "test": "npm run build && node --test tests/*.test.js",
+    "test:browser": "npm run build && node tests/browser/signal.mjs",
     "prepack": "npm run build"
   }
 }

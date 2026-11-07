@@ -1742,6 +1742,10 @@
       "types": "./dist/netcode/webtransport.d.ts",
       "import": "./dist/netcode/webtransport.js"
     },
+    "./netcode/signal": {
+      "types": "./dist/netcode/signal.d.ts",
+      "import": "./dist/netcode/signal.js"
+    },
     "./netcode/interest": {
       "types": "./dist/netcode/interest.d.ts",
       "import": "./dist/netcode/interest.js"

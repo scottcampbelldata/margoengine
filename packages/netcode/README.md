@@ -349,7 +349,7 @@ Each transport is its own entry, so an app loads only the one it uses.
 - `@margoengine/netcode/webrtc`: `createDataChannels(peer)` makes two pre-negotiated data channels on an
   `RTCPeerConnection` (ordered reliable, and unordered with `maxRetransmits: 0`) and `dataChannelConnection(channels)`
   wraps them as a `Connection`, so snapshots and inputs really are unreliable and never wait behind a lost packet.
-  Signalling (offer, answer, ICE candidates) is yours to carry, over any channel. Works for client-server and for
+  `@margoengine/netcode/signal` carries the offers, answers and ICE candidates (see "Signalling for WebRTC" below), or carry them yourself over any channel. Works for client-server and for
   `RollbackSession` peers.
 - `@margoengine/netcode/webtransport`: `openWebTransport(url, { signal, serverCertificateHashes, congestionControl })`
   resolves with a `Connection` over the W3C WebTransport class on HTTP/3: 'unreliable' messages are real datagrams, so a
@@ -600,6 +600,58 @@ rooms.close();
 - No seat is kept after a clean `leave()`, a kick, a protocol or rate-limit close, or a hook that threw: the seat is for a link that was lost.
 - A client that comes back before the server noticed the loss takes over: its old connection closes with `CloseCode.removed`, and neither `onDrop` nor `onLeave` runs.
 - A seat is held for the client that had it. Reserving a seat ahead for a player who has not joined yet (for example from a matchmaker) is not built.
+
+## Signalling for WebRTC
+
+Two browsers cannot open a WebRTC link until they have swapped an offer, an answer and ICE candidates through something else. `@margoengine/netcode/signal` is that something: a small server that passes messages between the peers of a room, a client, and `PeerMesh`, which makes a link to every peer of the room. Once linked, the peers talk directly and the server carries nothing.
+
+```ts
+// Server and two peers' signalling in one file for the example; in a game the server runs on Node and each
+// peer in its own browser, where `new PeerMesh(room, ...)` then makes the links.
+import { LoopbackNetwork } from '@margoengine/netcode';
+import { SignalClient, SignalServer } from '@margoengine/netcode/signal';
+
+const network = new LoopbackNetwork({ latency: 10 });
+const signals = new SignalServer({ maxPeers: 8 });
+network.listen().onconnection = (connection) => signals.accept(connection);
+const tick = setInterval(() => network.advance(10), 5);
+
+const one = await SignalClient.join(network.connect(), 'lobby-7');
+const two = await SignalClient.join(network.connect(), 'lobby-7');
+console.log('two sees', [...two.peers], 'which is', one.id);
+one.onsignal = (from, data) => console.log('from', from, data);
+two.send(one.id, { hello: 'there' });
+await new Promise((resolve) => setTimeout(resolve, 100));
+clearInterval(tick);
+signals.close();
+```
+
+In the browser:
+
+```ts
+import { GameClient, type Game } from '@margoengine/netcode';
+import { PeerMesh, SignalClient } from '@margoengine/netcode/signal';
+import { openWebSocket } from '@margoengine/netcode/websocket';
+
+export async function joinMesh(game: Game<unknown, unknown>, url: string) {
+  const room = await SignalClient.join(await openWebSocket(url), 'lobby-7', { token: 'from your login' });
+  return new PeerMesh(room, {
+    configuration: { iceServers: [{ urls: 'stun:stun.example.com' }] }, // none means the same network only
+    onconnection: (peer, connection) => void GameClient.join(game, connection, { input: () => ({}) }),
+    onerror: (peer, error) => console.error(peer, error),
+  });
+}
+```
+
+On Node, `listenWebSocket` gives the server its connections: `listener.onconnection = (connection) => signals.accept(connection)`.
+
+- The joiner offers to the peers already there, so two peers never offer to each other, and each step with a peer waits for the one before it. A candidate found before the description went out waits for it.
+- `PeerMesh` takes over the client's `onsignal` and `onleft`; `onpeer` stays yours. `mesh.connections` holds each open `Connection`, ready for `GameClient`, `GameServer` or `RollbackSession`.
+- A link that is up lives on its own: it ends when its channels close or it fails, not when the peer leaves the room or the server goes. A link still being set up goes with the peer.
+- The server sets each message's sender itself, so a peer cannot pose as another, and a message never leaves its room. It keeps no history.
+- Server options, each with a default: `maxRooms` 1,024, `maxPeers` 16, `maxMessageBytes` 65,536, `messagesPerSecond` 100 with a `burst` of 200, `joinTimeout` 10,000 ms, and `authorize(room, token)`, default anyone with the room's name.
+- A room's name is not a secret unless `authorize` makes it one, and what a peer sends may be anything: `onsignal` is for you to check. `PeerMesh` sends what is not a description or candidate to `onerror`.
+- Run behind `wss://`: the server sees every description, which holds each peer's addresses.
 
 ## One schema, generated code
 

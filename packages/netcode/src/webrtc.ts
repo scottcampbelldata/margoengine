@@ -1,6 +1,6 @@
 // A Connection over two WebRTC data channels: one ordered and reliable, one unordered with no retransmits (real
-// unreliable delivery in browsers). Signalling (exchanging offers, answers and ICE candidates) is the app's: any
-// channel works, a WebSocket to your server included.
+// unreliable delivery in browsers). Signalling (exchanging offers, answers and ICE candidates) goes over any
+// channel: `@margoengine/netcode/signal` is one, or carry them yourself.
 import { CloseCode, type Connection, type Delivery } from './transport.js';
 
 /** The two data channels of one peer connection, as {@link createDataChannels} makes them. */
