@@ -2,6 +2,7 @@
 // Assessment: From Error Visibility to Structural Similarity" (2004): an 11 x 11 Gaussian window of sigma 1.5, K1 0.01,
 // K2 0.03, on luma. The PNG reader follows the W3C PNG specification. Runs anywhere, with no node: imports.
 import type { HeadlessPixels } from './index.js';
+import { crc32 } from '../../shared/crc32.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** RGBA pixels, or PNG file bytes where a function says so. */
@@ -214,18 +215,7 @@ const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10],
     [0, 2, 2, 4],
     [1, 0, 2, 2],
     [0, 1, 1, 2],
-  ],
-  CRC_TABLE = Uint32Array.from({ length: 256 }, (_, n) => {
-    for (let bit = 0; bit < 8; bit++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1;
-    return n >>> 0;
-  });
-
-/** PNG's CRC-32 of a chunk's name and body. */
-function chunkCRC(bytes: Uint8Array): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
-  return (crc ^ 0xffffffff) >>> 0;
-}
+  ];
 
 const badPNG = () => fault('failed', 'Not a PNG file this reader can use', 'headless');
 
@@ -279,7 +269,7 @@ export async function decodePNG(bytes: Uint8Array): Promise<HeadlessPixels> {
     const length = view.getUint32(at),
       name = String.fromCharCode(...bytes.subarray(at + 4, at + 8)),
       body = bytes.subarray(at + 8, at + 8 + length);
-    if (at + 12 + length > bytes.length || view.getUint32(at + 8 + length) !== chunkCRC(bytes.subarray(at + 4, at + 8 + length)))
+    if (at + 12 + length > bytes.length || view.getUint32(at + 8 + length) !== crc32(bytes.subarray(at + 4, at + 8 + length)))
       throw badPNG();
     if (name === 'IDAT') compressed.push(body);
     else if (name === 'PLTE') palette = body;
