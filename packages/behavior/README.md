@@ -445,6 +445,65 @@ flow around it. After writing `field.cost` yourself, call `field.rebuild()`.
 slide. It steers and nothing more: units do not avoid each other, so add `separation` from `./steering` or physics for
 that. Build one field per goal and per movement type.
 
+## Task network planner
+
+Write behaviour as high level tasks broken into smaller ones, and let the planner look ahead through their effects: long
+multi-step plans that stay readable, with priority set by the order you list things in.
+
+```ts
+import { HtnAgent, type HtnTask, planTasks } from 'margoengine/behavior/htn';
+
+const tasks: HtnTask[] = [
+  {
+    name: 'BeGuard',
+    methods: [
+      { when: { CanSeeEnemy: true }, subtasks: ['AttackEnemy'] }, // listed first, so tried first
+      { subtasks: ['WalkToPost', 'CheckPost'] },
+    ],
+  },
+  {
+    name: 'AttackEnemy',
+    methods: [
+      { when: (state) => (state.Ammo as number) > 0, subtasks: ['Aim', 'Shoot'] },
+      { subtasks: ['FindAmmo', 'Reload', 'AttackEnemy'] }, // a task may name itself once effects end the recursion
+    ],
+  },
+  { name: 'Aim' },
+  {
+    name: 'Shoot',
+    effects: (state) => {
+      state.Ammo = (state.Ammo as number) - 1;
+    },
+  },
+  { name: 'FindAmmo', run: (state, delta) => 'success' }, // return 'running' until done
+  { name: 'Reload', effects: { Ammo: 6 } },
+  { name: 'WalkToPost', effects: { At: 'post' } },
+  { name: 'CheckPost', preconditions: { At: 'post' } },
+];
+
+const plan = planTasks(tasks, 'BeGuard', { CanSeeEnemy: true, Ammo: 0 });
+plan?.tasks.map((task) => task.name); // ['FindAmmo', 'Reload', 'Aim', 'Shoot']
+
+const guard = new HtnAgent(tasks, 'BeGuard', { state: { CanSeeEnemy: false, Ammo: 2 } });
+guard.update(1 / 60); // every tick
+guard.state.CanSeeEnemy = true; // a sensor; the next update finds a plan of higher priority
+```
+
+A compound task lists `methods`, and the first whose `when` holds gives its `subtasks`. A primitive task has
+`preconditions`, `effects` and `run`. The planner walks a working copy of the state forward; when a task fails it goes
+back to the last decomposition and tries the next method. Conditions and effects are symbols or a function, for sums like
+`Ammo -= 1`. There are no costs: use `./goap` to find the cheapest of many orders, and this when you know the shape of the
+behaviour and want it fast and readable.
+
+`expected` lists what the world should do by itself while a task runs, such as seeing the enemy on arrival. It counts in
+planning and in checking a plan and is never written to the world, so a sensor has to make it true or the plan fails.
+
+`HtnAgent` plans when it has no plan, a task failed, or a sensor changed `agent.state`; a task's own effects never cause
+it. On a sensor change it checks the tasks left and fails the plan at once if one no longer works, even one not reached
+yet. A new plan replaces a working one only with priority: `plan.record` holds the method index taken at each
+decomposition, and `compareRecords(a, b)` compares them, so a recovery animation is not cut short by a lesser plan. For a
+partial plan, split it in the domain: a method that only walks while the enemy is far, and one that attacks when near.
+
 Errors name their fix: a bad argument throws `TypeError` or `RangeError` (`Agent maxSpeed must be a finite number of
 0 or more`), a call that is not valid right now throws `MargoError` with code `state` (ticking from inside a handler),
 `disposed` (after `dispose()`) or `failed` (a rejected task). `using tree = new BehaviorTree(...)` halts it at the end

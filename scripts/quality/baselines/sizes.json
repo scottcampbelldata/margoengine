@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10572023,
+  "total": 10574000,
   "history": [
     {
       "date": "2026-10-24",
@@ -3656,6 +3656,12 @@
       "commit": "a006fbd69",
       "reason": "netcode: new optional entry ./relay, and the outage fix in ./rollback (batch 114 job 7)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "54ad70507",
+      "reason": "new optional entry @margoengine/behavior/htn",
+      "grew": 1
     }
   ],
   "items": {
@@ -3686,6 +3692,7 @@
     "@margoengine/behavior/eqs": 2221,
     "@margoengine/behavior/flowfield": 2656,
     "@margoengine/behavior/goap": 2157,
+    "@margoengine/behavior/htn": 1977,
     "@margoengine/behavior/perception": 3773,
     "@margoengine/behavior/smart-objects": 2029,
     "@margoengine/behavior/steering": 3827,

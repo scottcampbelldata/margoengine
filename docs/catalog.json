@@ -2398,7 +2398,7 @@
     "package": "@margoengine/behavior",
     "version": "1.0.0",
     "published": false,
-    "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, perception (./perception), environment queries (./eqs), a goal planner (./goap), smart objects (./smart-objects), and flow fields (./flowfield).",
+    "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, perception (./perception), environment queries (./eqs), a goal planner (./goap), smart objects (./smart-objects), flow fields (./flowfield), and a task network planner (./htn).",
     "requirements": "See the package guide for requirements",
     "keywords": "behavior",
     "install": "npm install @margoengine/behavior@1.0.0",

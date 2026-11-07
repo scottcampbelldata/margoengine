@@ -158,6 +158,10 @@
       "types": "./dist/behavior/flowfield.d.ts",
       "import": "./dist/behavior/flowfield.js"
     },
+    "./behavior/htn": {
+      "types": "./dist/behavior/htn.d.ts",
+      "import": "./dist/behavior/htn.js"
+    },
     "./biomes": {
       "types": "./dist/biomes.d.ts",
       "import": "./dist/biomes.js"

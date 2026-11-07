@@ -1,6 +1,6 @@
 {
-  "commit": "b4521dc97",
-  "dirty": true,
+  "commit": "54ad70507",
+  "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
     "raw": 57071,
@@ -134,6 +134,10 @@
       "./flowfield": {
         "raw": 6107,
         "gzip": 2400
+      },
+      "./htn": {
+        "raw": 4322,
+        "gzip": 1721
       }
     },
     "@margoengine/biomes": {
@@ -1798,12 +1802,12 @@
     },
     "@margoengine/netcode": {
       ".": {
-        "raw": 38923,
-        "gzip": 12493
+        "raw": 39063,
+        "gzip": 12534
       },
       "./rollback": {
-        "raw": 8910,
-        "gzip": 3196
+        "raw": 8947,
+        "gzip": 3219
       },
       "./websocket": {
         "raw": 1975,
@@ -1828,6 +1832,18 @@
       "./webtransport": {
         "raw": 3467,
         "gzip": 1563
+      },
+      "./signal": {
+        "raw": 8340,
+        "gzip": 3064
+      },
+      "./extrapolate": {
+        "raw": 1069,
+        "gzip": 543
+      },
+      "./relay": {
+        "raw": 9547,
+        "gzip": 3361
       },
       "./interest": {
         "raw": 5662,
@@ -1870,8 +1886,8 @@
         "gzip": 19145
       },
       "./next": {
-        "raw": 97222,
-        "gzip": 57331
+        "raw": 127405,
+        "gzip": 75369
       }
     },
     "@margoengine/physics2d": {
