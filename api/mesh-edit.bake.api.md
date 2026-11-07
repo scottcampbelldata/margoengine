@@ -30,6 +30,7 @@ export interface BakeMapsResult {
     color?: BakeImage;
     covered: number;
     missed: number;
+    shared: number;
 }
 
 export interface BakeSample {
@@ -39,7 +40,17 @@ export interface BakeSample {
     face: string;
 }
 
+export interface BakeSurface {
+    positions: ArrayLike<number>;
+    indices: ArrayLike<number>;
+    uvs: ArrayLike<number>;
+    normals?: ArrayLike<number>;
+    tangents?: ArrayLike<number>;
+}
+
 export function bakeMeshMaps(low: PolygonMesh, high: PolygonMesh, options?: BakeMapsOptions): BakeMapsResult;
+
+export function bakeSurfaceMaps(low: BakeSurface, high: BakeSurface, options?: BakeMapsOptions): BakeMapsResult;
 
 // Not exported from this entry, but used by the exports above:
 

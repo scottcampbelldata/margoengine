@@ -516,6 +516,192 @@ test('autoLOD levels a loaded model: its nodes, materials and transforms, points
   }
 });
 
+/** A lumpy sphere with UVs in the unit square, as glTF: a detail a level loses, for `bake` to keep. */
+const lumpy = (segments) => {
+  const positions = [],
+    normals = [],
+    uvs = [],
+    indices = [];
+  for (let y = 0; y <= segments; y++)
+    for (let x = 0; x <= segments; x++) {
+      const a = (x / segments) * Math.PI * 2,
+        b = 0.05 + (y / segments) * (Math.PI - 0.1),
+        r = 1 + 0.04 * Math.sin(a * 9) * Math.sin(b * 9),
+        p = [Math.cos(a) * Math.sin(b) * r, Math.cos(b) * r, Math.sin(a) * Math.sin(b) * r];
+      positions.push(...p);
+      uvs.push(x / segments, y / segments);
+    }
+  for (let y = 0; y < segments; y++)
+    for (let x = 0; x < segments; x++) {
+      const i = y * (segments + 1) + x,
+        j = i + segments + 1;
+      indices.push(i, j, i + 1, i + 1, j, j + 1);
+    }
+  // True normals of the lumps, so the detail is in the shading: a sum of the faces around each vertex.
+  normals.length = positions.length;
+  normals.fill(0);
+  for (let t = 0; t < indices.length; t += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => positions.slice(indices[t + k] * 3, indices[t + k] * 3 + 3)),
+      u = b.map((v, k) => v - a[k]),
+      w = c.map((v, k) => v - a[k]),
+      n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+    for (let k = 0; k < 3; k++) for (let e = 0; e < 3; e++) normals[indices[t + k] * 3 + e] += n[e];
+  }
+  for (let i = 0; i < normals.length; i += 3) {
+    const size = Math.hypot(normals[i], normals[i + 1], normals[i + 2]);
+    for (let e = 0; e < 3; e++) normals[i + e] /= size;
+  }
+  return { positions, normals, uvs, indices };
+};
+/** One primitive of `lumpy`, its UVs scaled by `scale`, with `material` on it. */
+const bakeModel = (engine, material = {}, scale = 1, extra = {}, images = []) => {
+  const { positions, normals, uvs, indices } = lumpy(32),
+    buffers = [],
+    add = (data) => buffers.push(data) - 1,
+    views = [],
+    accessor = (data, type, componentType = 5126) => {
+      views.push({ bufferView: add(data), componentType, count: data.length / { SCALAR: 1, VEC2: 2, VEC3: 3 }[type], type });
+      return views.length - 1;
+    },
+    position = accessor(new Float32Array(positions), 'VEC3');
+  views[position].min = [-2, -2, -2];
+  views[position].max = [2, 2, 2];
+  const doc = {
+      asset: { version: '2.0' },
+      scene: 0,
+      scenes: [{ nodes: [0] }],
+      nodes: [{ mesh: 0 }],
+      materials: [{ name: 'skin', ...material }],
+      meshes: [
+        {
+          primitives: [
+            {
+              attributes: {
+                POSITION: position,
+                NORMAL: accessor(new Float32Array(normals), 'VEC3'),
+                TEXCOORD_0: accessor(new Float32Array(uvs.map((v) => v * scale)), 'VEC2'),
+              },
+              indices: accessor(new Uint32Array(indices), 'SCALAR', 5125),
+              material: 0,
+            },
+          ],
+        },
+      ],
+      accessors: views,
+      bufferViews: buffers.map((b, i) => ({ buffer: i, byteLength: b.byteLength })),
+      buffers: buffers.map((b) => ({ byteLength: b.byteLength })),
+      ...extra,
+    },
+    model = new PBRModel(engine, new GLTFAsset(doc, buffers), images);
+  engine.use(model);
+  return model;
+};
+
+test('bake gives a loaded model\'s levels their own normal map, halved a level, and leaves the source as it was', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      model = bakeModel(engine),
+      lod = await autoLOD(system, model, { ratios: [0.5, 0.25], screens: [0.5, 0.25], bake: { size: 64 } }),
+      [, near, far] = lod.levels.map((l) => l.object),
+      map = (level) => level.primitives[0].material.maps[2];
+    assert.equal(model.primitives[0].material.maps[2], undefined, 'the source draws as it did');
+    assert.equal(model.asset.doc.textures, undefined, 'the source document is unchanged');
+    for (const [level, size] of [[near, 64], [far, 32]]) {
+      const { index } = map(level),
+        image = level.image(level.asset.doc.textures[index].source);
+      assert.equal(image.width, size);
+      assert.equal(image.format, 'rgba8unorm');
+      assert.equal(image.mipmaps.length, Math.log2(size) + 1, 'every mip, for a far level');
+      assert.equal(image.mipmaps.at(-1).data.length, 4);
+    }
+    // The detail the level lost is in the map: it leans all over, and leans more where more was lost.
+    const lean = (level) => {
+      const { data } = level.image(level.asset.doc.textures[map(level).index].source).mipmaps[0];
+      let sum = 0;
+      for (let i = 0; i < data.length; i += 4) sum += Math.hypot(data[i] - 128, data[i + 1] - 128);
+      return sum / (data.length / 4);
+    };
+    assert.ok(lean(near) > 4 && lean(far) > lean(near), `${lean(near)} then ${lean(far)}`);
+    model.dispose();
+    assert.equal(near.disposed, true);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('a real Fox bakes as a rigged model: its levels keep the skin and take the map', async () => {
+  const engine = await headless();
+  try {
+    const model = realFox(engine),
+      lod = await autoLOD(LODSystem.attach(engine), model, { ratios: [0.5], screens: [0.5], bake: { size: 64 } }),
+      [level] = lod.levels.slice(1).map((l) => l.object),
+      { material } = level.primitives[0],
+      { index } = material.maps[2];
+    assert.ok(level.asset.doc.meshes[0].primitives[0].attributes.JOINTS_0 !== undefined, 'the skin stays');
+    assert.equal(level.image(level.asset.doc.textures[index].source).width, 64);
+    assert.equal(material.base, model.primitives[0].material.base, 'the base colour is the same array, so an edit reaches it');
+    model.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('bake keeps a map the source has of its own, and adds occlusion when asked', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      pixel = { width: 1, height: 1, format: 'rgba8unorm', mipmaps: [{ data: new Uint8Array(4), width: 1, height: 1 }] },
+      model = bakeModel(
+        engine,
+        { normalTexture: { index: 0 } },
+        1,
+        { textures: [{ source: 0 }], images: [{ mimeType: 'image/png' }] },
+        [pixel],
+      );
+    const lod = await autoLOD(system, model, {
+        ratios: [0.5],
+        screens: [0.5],
+        bake: { size: 32, maps: ['normal', 'ao'] },
+      }),
+      { maps } = lod.levels[1].object.primitives[0].material;
+    assert.equal(maps[2].index, 0, 'the source\'s own normal map stays');
+    assert.ok(maps[3].index >= 1, 'occlusion is baked');
+    model.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('bake leaves a tiled primitive alone: the map would have no texel for most of it', async () => {
+  const engine = await headless();
+  try {
+    const model = bakeModel(engine, {}, 4),
+      lod = await autoLOD(LODSystem.attach(engine), model, { ratios: [0.5], screens: [0.5], bake: true });
+    assert.equal(lod.levels[1].object.primitives[0].material, model.primitives[0].material);
+    model.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('bake refuses what it cannot do: a core mesh has no UVs, and maps are named', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      mesh = engine.createMesh().setGeometry(box(1, 1, 1));
+    await assert.rejects(autoLOD(system, mesh, { bake: true }), TypeError);
+    await assert.rejects(autoLOD(system, mesh, { bake: { maps: ['color'] } }), TypeError);
+    const model = bakeModel(engine),
+      stop = new AbortController();
+    stop.abort(new Error('stopped'));
+    await assert.rejects(autoLOD(system, model, { bake: true, signal: stop.signal }), /stopped/);
+    model.dispose();
+  } finally {
+    engine.dispose();
+  }
+});
+
 // Later UV sets ride in a buffer of their own, so whatever keeps some vertices has to keep the same rows of it.
 test('a level keeps TEXCOORD_2 on the vertices it kept, skinned or still, and a far mesh on those it merged', async () => {
   const engine = await headless();

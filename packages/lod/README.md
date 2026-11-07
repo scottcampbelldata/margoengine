@@ -254,6 +254,40 @@ city.remove(); // frees the far meshes, shows the sources
 
 A core mesh's levels keep positions and normals, since core geometry holds nothing else.
 
+### Baked levels
+
+`bake` keeps the look a level loses. Each primitive of each level gets a normal map of the source's surface, read through the source's own UVs, in the frame the level shades with. On a lumpy sphere at 8% of its triangles the error against the source picture falls to about half, in `packages/lod/test/auto-check.mjs`.
+
+```ts
+import {createStage} from 'margoengine';
+import {createMesh, PbrMaterial} from 'margoengine/materials';
+import {LODSystem} from 'margoengine/lod';
+import {autoLOD} from 'margoengine/lod/auto';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const lods = LODSystem.attach(stage.engine);
+const positions = [], normals = [], uvs = [], indices = [], n = 64;
+for (let y = 0; y <= n; y++) for (let x = 0; x <= n; x++) {
+  const a = (x / n) * Math.PI * 2, b = 0.05 + (y / n) * 3.04, p = [Math.cos(a) * Math.sin(b), Math.cos(b), Math.sin(a) * Math.sin(b)];
+  positions.push(...p); normals.push(...p); uvs.push(x / n, y / n);
+}
+for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+  const i = y * (n + 1) + x, j = i + n + 1;
+  indices.push(i, j, i + 1, i + 1, j, j + 1);
+}
+const mesh = createMesh(stage.engine, {positions, normals, uvs, indices}, new PbrMaterial());
+const lod = await autoLOD(lods, mesh, {ratios: [0.25, 0.1], bake: {size: 256, maps: ['normal', 'ao']}});
+console.log(lod.levels.length); // 3
+```
+
+| `bake` | Default | Meaning |
+| --- | --- | --- |
+| `true`, or an object | off | A materials mesh or loaded model, skinned or still. A core mesh has no UVs and throws a `TypeError`. |
+| `size` | 512 | Texels across the first level's maps, 1 to 8192; each lower level has half the last, down to 32 |
+| `maps` | `['normal']` | `'normal'`, `'ao'` or both |
+| `distance` | 5% of the primitive's size | How far from a level's surface rays search, in the mesh's own units |
+
+A map the source has of its own stays, and that kind is not baked, so a model with a normal map keeps it on every level. A primitive whose UVs leave the unit square or overlap gets no maps, since one texel would have to serve two places: its levels draw as they do without `bake`. Run `unwrapMesh` from `@margoengine/mesh-edit` on such a mesh first. Levels hold their maps on the CPU as well, with every mip, and the maps go with the mesh. The bake runs on the calling thread, a primitive and level at a time, with a turn for the page between them; a level of a hundred thousand texels takes about a second. `hierarchicalLOD` does not bake.
+
 ### Moving sources
 
 A far mesh is built from where its sources stood. `update()` rebuilds the far meshes of every cell whose sources moved, and returns how many; `follow: true` does the same each frame for the cells showing their far mesh, a frame behind the sources.

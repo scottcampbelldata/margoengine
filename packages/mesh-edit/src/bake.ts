@@ -14,6 +14,26 @@ export interface BakeImage {
   data: Uint8ClampedArray | Uint8Array;
 }
 
+/**
+ * A triangle surface for {@link bakeSurfaceMaps}: what {@link bakeMeshMaps} makes of a polygon mesh, with the normals and
+ * tangents the surface shades with, so a map baked onto a mesh that already has them lands on that frame.
+ */
+export interface BakeSurface {
+  /** Three numbers a vertex. */
+  positions: ArrayLike<number>;
+  /** Three vertices a triangle. */
+  indices: ArrayLike<number>;
+  /** Two numbers a vertex: the layout of the low surface, and where the high surface's `'color'` reads. */
+  uvs: ArrayLike<number>;
+  /** Three numbers a vertex. Default smooth normals, shared by position. */
+  normals?: ArrayLike<number>;
+  /**
+   * Read on the low surface: four numbers a vertex, as glTF `TANGENT` holds them. A triangle with a `w` of 0 at a corner
+   * has no tangents, and takes its frame from its UVs, as a shader with no tangents does.
+   */
+  tangents?: ArrayLike<number>;
+}
+
 /** What a texel's ray found on the high mesh, for {@link BakeMapsOptions.color}. */
 export interface BakeSample {
   /** Hit position on the high mesh. */
@@ -61,6 +81,8 @@ export interface BakeMapsResult {
   covered: number;
   /** Covered texels whose ray found nothing within `distance`; they keep the low surface's own normal. */
   missed: number;
+  /** Times a triangle reached a texel another triangle holds: overlapping UVs, which the first triangle wins. */
+  shared: number;
 }
 
 const unit = (v: number[]): MutableVec3 => {
@@ -75,7 +97,7 @@ const cross = (u: Vec3, v: Vec3): MutableVec3 => [
 ];
 
 /** Vertex normals shared across a mesh's smooth surface: area-weighted, by position so UV seams do not crease. */
-function smoothNormals(positions: readonly number[], indices: readonly number[]): Float32Array {
+function smoothNormals(positions: ArrayLike<number>, indices: ArrayLike<number>): Float32Array {
   const sums = new Map<string, MutableVec3>(),
     keys: string[] = [];
   for (let i = 0; i < positions.length; i += 3) keys.push(`${positions[i]},${positions[i + 1]},${positions[i + 2]}`);
@@ -159,6 +181,46 @@ function dilate(images: readonly BakeImage[], mask: Uint8Array, width: number, h
 export function bakeMeshMaps(low: PolygonMesh, high: PolygonMesh, options: BakeMapsOptions = {}): BakeMapsResult {
   assertPolygonMesh(low);
   assertPolygonMesh(high);
+  const target = compilePolygonMesh(high);
+  return bakeSurfaces(compilePolygonMesh(low), target, options, (triangle) => target.triangleFaces[triangle]);
+}
+
+function assertSurface(surface: BakeSurface, name: string): void {
+  const { positions, indices, uvs, normals, tangents } = surface ?? {},
+    vertices = (positions?.length ?? 0) / 3;
+  let fits =
+    Number.isInteger(vertices) &&
+    (indices?.length ?? 1) % 3 === 0 &&
+    uvs?.length === vertices * 2 &&
+    (normals === undefined || normals.length === vertices * 3) &&
+    (tangents === undefined || tangents.length === vertices * 4);
+  for (let i = 0; fits && i < indices.length; i++) fits = indices[i] >= 0 && indices[i] < vertices;
+  if (!fits)
+    throw new TypeError(
+      `Bake ${name} needs positions, uvs, and any normals and tangents of one vertex count, with indices in range; check them.`,
+    );
+}
+
+/**
+ * {@link bakeMeshMaps} for triangles that already carry their shading frame, such as a loaded model's primitive and a
+ * simplified copy of it: rays leave along `low.normals`, and the normal map is written in the frame of `low.tangents`,
+ * so a material drawing `low` with that map shows the surface of `high`. The `face` of a {@link BakeSample} is the
+ * triangle's number. Nothing is welded or checked for shape, so any triangles go.
+ * @throws TypeError for surfaces that do not fit together or bad options; RangeError for an option outside its limits;
+ * the signal's reason when aborted.
+ */
+export function bakeSurfaceMaps(low: BakeSurface, high: BakeSurface, options: BakeMapsOptions = {}): BakeMapsResult {
+  assertSurface(low, 'low surface');
+  assertSurface(high, 'high surface');
+  return bakeSurfaces(low, high, options, String);
+}
+
+function bakeSurfaces(
+  source: BakeSurface,
+  target: BakeSurface,
+  options: BakeMapsOptions,
+  faceOf: (triangle: number) => string,
+): BakeMapsResult {
   assertOptions(options, 'Bake');
   const { width = 512, height = width, maps = ['normal'], aoRays = 32, padding = 4, seed = 1, signal, color } = options;
   for (const size of [width, height])
@@ -177,13 +239,12 @@ export function bakeMeshMaps(low: PolygonMesh, high: PolygonMesh, options: BakeM
     if (typeof color !== 'function' && !(image && image.data?.length === image.width * image.height * 4))
       throw new TypeError("Bake 'color' needs a color image or function; supply one or leave out 'color'.");
   }
-  const target = compilePolygonMesh(high),
-    source = compilePolygonMesh(low),
-    targetNormals = smoothNormals(target.positions, target.indices),
-    sourceNormals = smoothNormals(source.positions, source.indices),
+  const targetNormals = target.normals ?? smoothNormals(target.positions, target.indices),
+    sourceNormals = source.normals ?? smoothNormals(source.positions, source.indices),
+    tangents = source.tangents,
     bvh = MeshBVH.build({
       positions: new Float64Array(target.positions),
-      indices: target.indices,
+      indices: Array.from(target.indices),
       precision: 'float64',
     }),
     box = bvh.getBoundingBox(),
@@ -201,7 +262,8 @@ export function bakeMeshMaps(low: PolygonMesh, high: PolygonMesh, options: BakeM
     bias = size * 1e-5;
   let state = seed >>> 0 || 1,
     covered = 0,
-    missed = 0;
+    missed = 0,
+    shared = 0;
   const random = (): number => {
       state ^= state << 13;
       state ^= state >>> 17;
@@ -240,7 +302,8 @@ export function bakeMeshMaps(low: PolygonMesh, high: PolygonMesh, options: BakeM
         (c): MutableVec3 => [source.positions[c * 3], source.positions[c * 3 + 1], source.positions[c * 3 + 2]],
       ),
       N = corner.map((c): MutableVec3 => [sourceNormals[c * 3], sourceNormals[c * 3 + 1], sourceNormals[c * 3 + 2]]),
-      area = (uv[1][0] - uv[0][0]) * (uv[2][1] - uv[0][1]) - (uv[1][1] - uv[0][1]) * (uv[2][0] - uv[0][0]);
+      area = (uv[1][0] - uv[0][0]) * (uv[2][1] - uv[0][1]) - (uv[1][1] - uv[0][1]) * (uv[2][0] - uv[0][0]),
+      sign = tangents && corner.every((c) => tangents[c * 4 + 3]) ? Math.sign(tangents[corner[0] * 4 + 3]) : 0;
     if (!area) continue;
     // The UV gradient of position gives the tangent frame (image V runs down, so the green axis is the minus V way).
     const e1 = [P[1][0] - P[0][0], P[1][1] - P[0][1], P[1][2] - P[0][2]],
@@ -257,24 +320,36 @@ export function bakeMeshMaps(low: PolygonMesh, high: PolygonMesh, options: BakeM
       maxY = Math.min(height - 1, Math.ceil(Math.max(uv[0][1], uv[1][1], uv[2][1])));
     for (let y = minY; y <= maxY; y++)
       for (let x = minX; x <= maxX; x++) {
-        const at = y * width + x;
-        if (mask[at]) continue;
-        const px = x + 0.5 - uv[0][0],
+        const at = y * width + x,
+          px = x + 0.5 - uv[0][0],
           py = y + 0.5 - uv[0][1],
           s = (px * dv2 - py * du2) / area,
           r = (du1 * py - dv1 * px) / area,
           w = 1 - s - r;
         // Slack keeps texel centers on a shared edge from falling between its two triangles to rounding.
         if (s < -1e-9 || r < -1e-9 || w < -1e-9) continue;
+        if (mask[at]) {
+          // A texel on an edge is both triangles', which is no overlap; one well inside this triangle as well is.
+          if (s > 1e-6 && r > 1e-6 && w > 1e-6) shared++;
+          continue;
+        }
         mask[at] = 1;
         covered++;
         const point = [0, 1, 2].map((k) => P[0][k] * w + P[1][k] * s + P[2][k] * r) as MutableVec3,
           n = unit([0, 1, 2].map((k) => N[0][k] * w + N[1][k] * s + N[2][k] * r)),
           hit = probe(point, n);
-        // Gram-Schmidt against the smooth normal, with the UV frame's own handedness.
-        const along = dot(tangent as MutableVec3, n),
-          T = unit([0, 1, 2].map((k) => tangent[k] - n[k] * along)),
-          B = dot(cross(n, T), bitangent as MutableVec3) >= 0 ? cross(n, T) : (cross(T, n) as MutableVec3);
+        // Gram-Schmidt against the smooth normal, with the UV frame's own handedness, or the surface's tangents as a
+        // shader reads them: interpolated, and the bitangent from the normal, the tangent and its sign.
+        const axis = sign
+            ? [0, 1, 2].map(
+                (k) =>
+                  tangents![corner[0] * 4 + k] * w + tangents![corner[1] * 4 + k] * s + tangents![corner[2] * 4 + k] * r,
+              )
+            : tangent,
+          along = dot(axis as MutableVec3, n),
+          T = unit([0, 1, 2].map((k) => axis[k] - n[k] * along)),
+          flip = sign ? sign > 0 : dot(cross(n, T), bitangent as MutableVec3) >= 0,
+          B = flip ? cross(n, T) : (cross(T, n) as MutableVec3);
         if (!hit) {
           missed++;
           write(normal, at, 128, 128, 255);
@@ -314,7 +389,7 @@ export function bakeMeshMaps(low: PolygonMesh, high: PolygonMesh, options: BakeM
           write(ao, at, value, value, value);
         }
         if (colorMap) {
-          const face = target.triangleFaces[hit.faceIndex],
+          const face = faceOf(hit.faceIndex),
             u = target.uvs[a * 2] * wa + target.uvs[b * 2] * wb + target.uvs[c * 2] * wc,
             v = target.uvs[a * 2 + 1] * wa + target.uvs[b * 2 + 1] * wb + target.uvs[c * 2 + 1] * wc,
             rgba =
@@ -327,5 +402,5 @@ export function bakeMeshMaps(low: PolygonMesh, high: PolygonMesh, options: BakeM
   }
   const images = [normal, ao, colorMap].filter((item): item is BakeImage => item !== undefined);
   dilate(images, mask, width, height, padding);
-  return { normal, ao, color: colorMap, covered, missed };
+  return { normal, ao, color: colorMap, covered, missed, shared };
 }

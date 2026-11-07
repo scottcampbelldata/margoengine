@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10213392,
+  "total": 10215333,
   "history": [
     {
       "date": "2026-10-24",
@@ -3314,6 +3314,12 @@
       "commit": "a786cd9d4",
       "reason": "new optional entries for bzip2 and xz, loaded only by a file that needs them",
       "grew": 2
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "24c2f58a4",
+      "reason": "bake option on autoLOD and bakeSurfaceMaps",
+      "grew": 2
     }
   ],
   "items": {
@@ -3656,7 +3662,7 @@
     "@margoengine/loaders/worker": 8571,
     "@margoengine/loaders/xml": 1561,
     "@margoengine/lod": 14316,
-    "@margoengine/lod/auto": 7888,
+    "@margoengine/lod/auto": 9492,
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/stream": 1778,
     "@margoengine/materials": 64979,
@@ -3706,7 +3712,7 @@
     "@margoengine/math/vector4": 919,
     "@margoengine/mcp": 8664,
     "@margoengine/mesh-edit": 30203,
-    "@margoengine/mesh-edit/bake": 4733,
+    "@margoengine/mesh-edit/bake": 5070,
     "@margoengine/mesh-edit/boolean-exact": 10620,
     "@margoengine/mesh-edit/modeling": 35469,
     "@margoengine/mesh-edit/modifiers": 8566,

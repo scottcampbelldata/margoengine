@@ -48,6 +48,12 @@ try {
     model.far.meshes === 1 && model.far.pixels > 0 && model.far.spread > 8,
     `the far model draws: ${JSON.stringify(model.far)}`,
   );
+  for (const [name, { level, triangles, plain, baked }] of Object.entries(r.baked)) {
+    assert.equal(level, 1, `${name}: the check looks at a level`);
+    assert.ok(triangles < 3000, `${name}: a tenth of the triangles: ${triangles}`);
+    assert.ok(plain.rms > 4, `${name}: without a map the level has lost the lumps: ${JSON.stringify(plain)}`);
+    assert.ok(baked.rms < plain.rms * 0.6, `${name}: with one it keeps them: ${JSON.stringify({ plain, baked })}`);
+  }
   assert.ok(r.moving.after > r.moving.before + 20, `a far mesh follows its source: ${JSON.stringify(r.moving)}`);
   assert.deepEqual(await page.evaluate(() => window.check.errors), []);
   assert.deepEqual(pageErrors, []);

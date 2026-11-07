@@ -1253,6 +1253,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B29 | Flat trails, `normal` on `Trail` | DONE | `6d7d62bee` | LIM-083 |
 | B30 | Triangle order at import, `optimize` and `reorder` | DONE | `a786cd9d4` | LIM-322 |
 | B35 | bzip2 and xz decoders; NRRD bzip2, VTK XML LZMA | DONE | this commit | LIM-330 |
+| B31 | bake on autoLOD, bakeSurfaceMaps | DONE | this commit | LIM-332 |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

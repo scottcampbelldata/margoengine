@@ -9,10 +9,17 @@ import { PBRModel } from "@margoengine/gltf-pro";
 import { Material, MaterialMesh } from "@margoengine/materials";
 import { MutableVec3 } from "@margoengine/math";
 
+export interface AutoLODBake {
+    size?: number;
+    maps?: readonly ('normal' | 'ao')[];
+    distance?: number;
+}
+
 export interface AutoLODOptions {
     ratios?: readonly number[];
     screens?: readonly number[];
     crease?: number;
+    bake?: boolean | AutoLODBake;
     signal?: AbortSignal;
 }
 

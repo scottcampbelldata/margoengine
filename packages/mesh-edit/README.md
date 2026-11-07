@@ -433,6 +433,17 @@ Each covered texel casts one ray along the low surface's smooth normal, through 
 | `seed` | 1 | Occlusion rays repeat exactly for a seed |
 | `signal` | none | `AbortSignal`, checked per low triangle |
 
+`bakeSurfaceMaps(low, high, options)` takes the same options for triangles that already carry their shading frame, such as a loaded model's primitive and a simplified copy of it: `{positions, indices, uvs, normals, tangents}`, as flat arrays. Rays leave along `low.normals`, and the normal map is written in the frame of `low.tangents` as a shader reads them, so a material drawing `low` shows `high`. `@margoengine/lod/auto` calls it for its `bake` option. Nothing is welded, so any triangles go. `shared` in the result counts the texels a second triangle also lay well inside, which is how overlapping UVs show.
+
+```ts
+import { bakeSurfaceMaps } from 'margoengine/mesh-edit/bake';
+
+const square = { positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], indices: [0, 1, 2, 0, 2, 3], uvs: [0, 0, 1, 0, 1, 1, 0, 1] };
+const tilted = { ...square, positions: [0, 0, 0, 1, 0, 0.5, 1, 1, 0.5, 0, 1, 0] };
+const { normal, shared } = bakeSurfaceMaps(square, tilted, { width: 64, distance: 1 });
+console.log(normal?.width, shared); // 64 0
+```
+
 Normals are tangent space with green up, the glTF convention, in a frame built from the low mesh's UVs. Overlapping UVs share texels, first triangle wins: run `unwrapMesh` first. `missed` counts texels that found nothing; raise `distance` when it is above zero. The bake runs on the calling thread.
 ## Vertex groups and weight painting
 

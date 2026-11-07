@@ -4,12 +4,14 @@
 import { Geometry, type Mesh } from '@margoengine/core';
 import { meshRuntime } from '@margoengine/core/extension';
 import type { Animation } from '@margoengine/animation';
-import type { GLTFDocument, PBRModel, PBRPrimitive, PreparedGeometry } from '@margoengine/gltf-pro';
-import type { createMesh, Material, MaterialMesh, MeshGeometry } from '@margoengine/materials';
+import type { GLTFDocument, GLTFImage, PBRModel, PBRPrimitive, PreparedGeometry } from '@margoengine/gltf-pro';
+import type { createMesh, Material, MaterialMesh, MeshGeometry, Texture } from '@margoengine/materials';
 import { MargoError } from '@margoengine/math/errors';
 import { normalMatrix, simplifyPacked, type Modeling, type PackedGeometry } from './attributes.js';
+import { bakeLevels, bakeOptions, levelImage, type AutoLODBake, type BakedLevels, type BakeWants } from './auto-bake.js';
 import type { LOD, LODLevel, LODObject, LODSystem } from './index.js';
 export type { PackedGeometry } from './attributes.js';
+export type { AutoLODBake } from './auto-bake.js';
 
 /** Options of {@link autoLOD}. */
 export interface AutoLODOptions {
@@ -19,6 +21,11 @@ export interface AutoLODOptions {
   screens?: readonly number[];
   /** Normals of a level bend across edges up to this angle, in degrees, and break past it. Default 60. */
   crease?: number;
+  /**
+   * Bakes what simplifying took away into maps each level draws with, read through the source's UVs, so a level keeps the
+   * look of its source. A materials mesh or loaded model only; default false. See {@link AutoLODBake}.
+   */
+  bake?: boolean | AutoLODBake;
   /** Cancels the wait for the simplifier and the work after it. */
   signal?: AbortSignal;
 }
@@ -159,7 +166,7 @@ async function modeling(signal?: AbortSignal): Promise<Modeling> {
   signal?.throwIfAborted();
   return loaded;
 }
-async function materialsPackage(signal?: AbortSignal): Promise<{ createMesh: typeof createMesh }> {
+async function materialsPackage(signal?: AbortSignal): Promise<{ createMesh: typeof createMesh; Texture: typeof Texture }> {
   const loaded = await import('@margoengine/materials');
   signal?.throwIfAborted();
   return loaded;
@@ -221,6 +228,49 @@ function meshGeometry(parts: readonly PackedGeometry[], slots?: readonly number[
 /** The material slots of a materials mesh's primitives, or undefined for one scalar material. */
 const slotsOf = (model: MaterialMesh<Material | readonly Material[]> & PBRModel) =>
   Array.isArray(model.material) ? model.primitives.map((p) => p.definition.material!) : undefined;
+/** The material of each primitive of a materials mesh, as one list. */
+const materialsOf = (model: MaterialMesh<Material | readonly Material[]> & PBRModel): Material[] => {
+  const slots = slotsOf(model);
+  return model.primitives.map((_, i) => (slots ? (model.material as readonly Material[])[slots[i]] : (model.material as Material)));
+};
+/**
+ * What a level of a loaded model adds for its baked maps: a document with their textures and images, the images to hand
+ * the level, and each record's material with them in its normal and occlusion slots. A copy shares the source's factor
+ * arrays, so an edit of those still reaches the level.
+ */
+function bakedDocument(
+  doc: GLTFDocument,
+  images: readonly GLTFImage[],
+  records: readonly PBRPrimitive[],
+  baked: BakedLevels | undefined,
+  level: number,
+): { doc: GLTFDocument; images: readonly GLTFImage[]; materials: PBRPrimitive['material'][] } {
+  const sources = [...(doc.images ?? [])],
+    textures = [...(doc.textures ?? [])],
+    held = [...images],
+    copies = new Map<PBRPrimitive['definition'], PBRPrimitive['material']>(),
+    add = (image: Parameters<typeof levelImage>[0]) => {
+      held[sources.length] = levelImage(image);
+      sources.push({ mimeType: 'image/png' });
+      return { index: textures.push({ source: sources.length - 1 }) - 1 };
+    },
+    materials = records.map(({ definition, material }) => {
+      const maps = baked?.get(definition)?.[level];
+      if (!maps) return material;
+      let copy = copies.get(definition);
+      if (!copy) {
+        const slots = [...material.maps];
+        if (maps.normal) slots[2] = add(maps.normal);
+        if (maps.ao) slots[3] = add(maps.ao);
+        copy = { ...material, maps: slots };
+        copies.set(definition, copy);
+      }
+      return copy;
+    });
+  return copies.size
+    ? { doc: { ...doc, images: sources, textures }, images: held, materials }
+    : { doc, images, materials };
+}
 /** Shows the top nodes of a model, so its root can stay visible and carry the levels made from it. */
 function ownNodes(model: PBRModel): LODObject {
   const children = new Set(model.asset.doc.nodes?.flatMap((node) => node.children ?? [])),
@@ -294,26 +344,28 @@ async function modelFrom(
   doc: GLTFDocument,
   prepared: readonly (readonly PreparedGeometry[])[],
   records: readonly PBRPrimitive[],
+  baked: BakedLevels | undefined,
+  level: number,
   signal?: AbortSignal,
 ): Promise<PBRModel> {
   const { GLTFAsset, PBRModel: Model, closeImages } = await import('@margoengine/gltf-pro');
   signal?.throwIfAborted();
   const { asset } = source,
-    images = source.shareImages();
+    levelled = bakedDocument(doc, source.shareImages(), records, baked, level);
   let made: PBRModel;
   try {
     made = new Model(
       source.root.engine,
-      new GLTFAsset(doc, asset.buffers, undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
-      images,
+      new GLTFAsset(levelled.doc, asset.buffers, undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
+      levelled.images,
       prepared,
     );
   } catch (error) {
-    closeImages(images);
+    closeImages(levelled.images);
     throw error;
   }
   made.primitives.forEach((p, i) => {
-    p.material = records[i].material;
+    p.material = levelled.materials[i];
     p.extension = records[i].extension;
   });
   source.root.engine.use(made);
@@ -324,6 +376,7 @@ async function gltfLevel(
   model: PBRModel,
   simplified: ReadonlyMap<PBRPrimitive['definition'], PackedGeometry[]>,
   level: number,
+  baked: BakedLevels | undefined,
   signal?: AbortSignal,
 ): Promise<PBRModel> {
   const doc = model.asset.doc,
@@ -338,7 +391,7 @@ async function gltfLevel(
       node.mesh !== undefined && !meshes[node.mesh]?.primitives.length ? { ...node, mesh: undefined } : node,
     ),
     records = model.primitives.filter((p) => simplified.has(p.definition)),
-    made = await modelFrom(model, { ...doc, nodes, meshes }, prepared, records, signal);
+    made = await modelFrom(model, { ...doc, nodes, meshes }, prepared, records, baked, level, signal);
   placeNodes(model, made);
   return made;
 }
@@ -460,6 +513,7 @@ async function riggedLevel(
   model: PBRModel,
   simplified: ReadonlyMap<PBRPrimitive['definition'], PackedGeometry[]>,
   level: number,
+  baked: BakedLevels | undefined,
   signal?: AbortSignal,
 ): Promise<PBRModel> {
   const { GLTFAsset, PBRModel: Model, closeImages } = await import('@margoengine/gltf-pro');
@@ -489,20 +543,20 @@ async function riggedLevel(
       buffers: [...out.buffers, { byteLength: bytes.byteLength }],
     },
     records = model.primitives.filter((p) => simplified.has(p.definition)),
-    images = model.shareImages();
+    levelled = bakedDocument(levelDoc, model.shareImages(), records, baked, level);
   let made: PBRModel;
   try {
     made = new Model(
       model.root.engine,
-      new GLTFAsset(levelDoc, [...asset.buffers, bytes], undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
-      images,
+      new GLTFAsset(levelled.doc, [...asset.buffers, bytes], undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
+      levelled.images,
     );
   } catch (error) {
-    closeImages(images);
+    closeImages(levelled.images);
     throw error;
   }
   made.primitives.forEach((p, i) => {
-    p.material = records[i].material;
+    p.material = levelled.materials[i];
     p.extension = records[i].extension;
     p.weights = records[i].weights;
   });
@@ -575,6 +629,7 @@ async function modelLevels(
   model: PBRModel,
   simplified: ReadonlyMap<PBRPrimitive['definition'], PackedGeometry[]>,
   count: number,
+  baked: BakedLevels | undefined,
   signal?: AbortSignal,
 ): Promise<PBRModel[]> {
   const made: PBRModel[] = [];
@@ -587,7 +642,7 @@ async function modelLevels(
     }
     const source = model.root.engine.plugins.get('animation:' + model.name) as Animation | undefined;
     for (let level = 0; level < count; level++) {
-      const next = await (deforms ? riggedLevel : gltfLevel)(model, simplified, level, signal);
+      const next = await (deforms ? riggedLevel : gltfLevel)(model, simplified, level, baked, signal);
       next.root.setParent(model.root);
       play?.attach(next, { skeleton: model, skinning: source?.options.skinning });
       model.onDispose(() => next.dispose());
@@ -597,23 +652,58 @@ async function modelLevels(
   }
   if ((model as { instances?: unknown }).instances)
     throw new TypeError('autoLOD needs one mesh, not instances; use LodInstances from @margoengine/culling/lod');
-  const { createMesh } = await materialsPackage(signal);
+  const { createMesh, Texture } = await materialsPackage(signal),
+    sources = materialsOf(model);
   for (let level = 0; level < count; level++) {
-    const parts = model.primitives.map((p) => simplified.get(p.definition)![level]);
-    const mesh = createMesh(model.root.engine, meshGeometry(parts, slotsOf(model)), model.material, {
-      renderOrder: model.renderOrder,
-    });
+    const parts = model.primitives.map((p) => simplified.get(p.definition)![level]),
+      owned: { dispose(): void }[] = [],
+      materials = sources.map((source, i) => {
+        const maps = baked?.get(model.primitives[i].definition)?.[level];
+        if (!maps) return source;
+        const copy = source.clone(),
+          texture = (image: NonNullable<typeof maps.normal>) => {
+            const made = new Texture(image, { colorSpace: 'linear' });
+            owned.push(made);
+            return made;
+          };
+        if (maps.normal) copy.normalMap = texture(maps.normal);
+        if (maps.ao) copy.aoMap = texture(maps.ao);
+        owned.push(copy);
+        return copy;
+      }),
+      own = owned.length > 0,
+      mesh = own
+        ? createMesh(
+            model.root.engine,
+            meshGeometry(parts, materials.length > 1 ? materials.map((_, i) => i) : undefined),
+            materials.length > 1 ? materials : materials[0],
+            { renderOrder: model.renderOrder },
+          )
+        : createMesh(model.root.engine, meshGeometry(parts, slotsOf(model)), model.material, {
+            renderOrder: model.renderOrder,
+          });
     mesh.root.setParent(model.root);
-    model.onDispose(() => mesh.dispose());
+    model.onDispose(() => {
+      mesh.dispose();
+      for (const item of owned) item.dispose();
+    });
     made.push(mesh);
   }
   return made;
+}
+/** What each primitive can take: a map the source has of its own stays, and its level bakes none of that kind. */
+function bakeWants(model: PBRModel): BakeWants {
+  if (!isMaterialMesh(model)) return (p) => ({ normal: !p.material.maps[2], ao: !p.material.maps[3] });
+  const sources = materialsOf(model),
+    of = new Map(model.primitives.map((p, i) => [p, sources[i]]));
+  return (p) => ({ normal: !of.get(p)!.normalMap, ao: !of.get(p)!.aoMap, greenUp: !p.vertices[11] });
 }
 async function autoModelLOD(
   system: LODSystem,
   model: PBRModel,
   ratios: readonly number[],
   screens: readonly number[],
+  bake: AutoLODBake | undefined,
   signal?: AbortSignal,
 ): Promise<LOD> {
   live(model);
@@ -625,7 +715,10 @@ async function autoModelLOD(
         p.definition,
         simplifyPacked(simplify, p, ratios, signal, rigged(model, p) ? deformation(model, p) : undefined),
       );
-  const made = await modelLevels(model, simplified, ratios.length, signal),
+  const baked = bake
+      ? await bakeLevels(model.primitives, simplified, bakeWants(model), bake, signal)
+      : undefined,
+    made = await modelLevels(model, simplified, ratios.length, baked, signal),
     levels: LODLevel[] = [{ object: ownNodes(model) }];
   made.forEach((object, i) => levels.push({ object, screen: screens[i] }));
   const lod = system.add(model.root, levels, { radius: modelRadius(model) });
@@ -646,17 +739,20 @@ const positionsOf = (geometry: Geometry, out = new Float32Array(geometry.vertice
  * A skinned or morphed model's levels keep the skin weights and morph deltas of the vertices they keep and follow the
  * source: its joints, morph weights and animated nodes, whatever moves them. Only the shown level deforms. This loads
  * `@margoengine/animation` and needs WebGPU. Attach the model's `Animation` first.
- * @throws TypeError for a mesh with no core geometry, or a materials mesh with instances; RangeError for ratios or
- * screens that do not fit; the `signal`'s reason when it aborts.
+ * `bake` draws each level with maps of what simplifying took away ({@link AutoLODBake}).
+ * @throws TypeError for a mesh with no core geometry, a materials mesh with instances, or `bake` on a core mesh, which
+ * has no UVs; RangeError for ratios or screens that do not fit; the `signal`'s reason when it aborts.
  */
 export async function autoLOD(system: LODSystem, mesh: LODSource, options: AutoLODOptions = {}): Promise<LOD> {
   const { ratios = [0.5, 0.25, 0.125], crease = 60, signal } = options,
-    screens = options.screens ?? ratios.map((_, i) => 0.25 * 0.5 ** i);
+    screens = options.screens ?? ratios.map((_, i) => 0.25 * 0.5 ** i),
+    bake = bakeOptions(options.bake);
   if (isModel(mesh)) {
     if (screens.length !== ratios.length)
       throw new RangeError('autoLOD needs one screen size per ratio; give them the same length');
-    return autoModelLOD(system, mesh, ratios, screens, signal);
+    return autoModelLOD(system, mesh, ratios, screens, bake, signal);
   }
+  if (bake) throw new TypeError('autoLOD bake needs UVs, which a core mesh has none of; pass a materials mesh or a loaded model');
   const geometry = meshRuntime(mesh).geometry;
   if (!(geometry instanceof Geometry))
     throw new TypeError(
@@ -830,6 +926,8 @@ export async function hierarchicalLOD(
             },
             [prepared],
             records,
+            undefined,
+            0,
             signal,
           );
         model.root.setPosition(center as [number, number, number]);

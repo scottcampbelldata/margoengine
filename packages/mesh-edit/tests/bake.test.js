@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createPrimitiveMesh } from '@margoengine/mesh-edit';
-import { bakeMeshMaps } from '@margoengine/mesh-edit/bake';
+import { bakeMeshMaps, bakeSurfaceMaps } from '@margoengine/mesh-edit/bake';
 import { subdivideMesh } from '@margoengine/mesh-edit/modeling';
 
 let next = 0;
@@ -196,4 +196,84 @@ test('bad options reject and abort stops the bake', () => {
   assert.throws(() => bakeMeshMaps(low, high, { signal: AbortSignal.abort(new RangeError('stop')) }), {
     message: 'stop',
   });
+});
+
+/** A unit square facing +Z, UVs as its X and Y. */
+const square = (rest = {}) => ({
+  positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+  indices: [0, 1, 2, 0, 2, 3],
+  uvs: [0, 0, 1, 0, 1, 1, 0, 1],
+  normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+  ...rest,
+});
+/** The same square leaning over: its normal tips toward -X, by about 26.6 degrees. */
+const leaning = () => {
+  const n = [-0.5 / Math.hypot(0.5, 1), 0, 1 / Math.hypot(0.5, 1)];
+  return square({
+    positions: [0, 0, -0.25, 1, 0, 0.25, 1, 1, 0.25, 0, 1, -0.25],
+    normals: [...n, ...n, ...n, ...n],
+  });
+};
+const middle = ({ data, width }) => [...data.subarray(((width >> 1) * width + (width >> 1)) * 4, ((width >> 1) * width + (width >> 1)) * 4 + 3)];
+
+test('bakeSurfaceMaps writes in the frame the low surface shades with', () => {
+  const options = { width: 16, distance: 1 },
+    high = leaning(),
+    // X is the tangent, as UVs have it: the lean is all red. The bitangent is Y, so green stays flat.
+    fromUVs = middle(bakeSurfaceMaps(square(), high, options).normal),
+    // Tangent Y, sign 1: the bitangent, N x T, is -X, so the lean moves to green.
+    turned = middle(
+      bakeSurfaceMaps(square({ tangents: [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1] }), high, options).normal,
+    ),
+    // The same tangent with sign -1 flips the bitangent, and green with it.
+    mirrored = middle(
+      bakeSurfaceMaps(square({ tangents: [0, 1, 0, -1, 0, 1, 0, -1, 0, 1, 0, -1, 0, 1, 0, -1] }), high, options).normal,
+    );
+  assert.ok(Math.abs(fromUVs[0] - 70) < 3 && Math.abs(fromUVs[1] - 127.5) < 3, String(fromUVs));
+  assert.ok(Math.abs(turned[0] - 127.5) < 3 && Math.abs(turned[1] - 185) < 3, String(turned));
+  assert.ok(Math.abs(mirrored[0] - 127.5) < 3 && Math.abs(mirrored[1] - 70) < 3, String(mirrored));
+});
+
+test('a tangent w of 0 means no tangents: the frame comes from the UVs, as a shader with none does', () => {
+  const options = { width: 16, distance: 1 },
+    none = bakeSurfaceMaps(square({ tangents: new Float32Array(16) }), leaning(), options).normal,
+    plain = bakeSurfaceMaps(square(), leaning(), options).normal;
+  assert.deepEqual([...none.data], [...plain.data]);
+});
+
+test('bakeSurfaceMaps leaves along the low normals it is given, and reads the high normals as given', () => {
+  // The same flat surfaces, so only the given normals can make the map lean.
+  const tilted = [0.6, 0, 0.8],
+    low = square({ normals: [...tilted, ...tilted, ...tilted, ...tilted] }),
+    high = square({ positions: [0, 0, 0.1, 1, 0, 0.1, 1, 1, 0.1, 0, 1, 0.1] }),
+    texel = middle(bakeSurfaceMaps(low, high, { width: 16, distance: 1 }).normal);
+  assert.ok(texel[2] < 240, `a high normal of +Z is off a low normal of ${tilted}: ${texel}`);
+});
+
+test('shared counts the texels overlapping UVs fight over, and a clean layout has almost none', () => {
+  const stacked = square({
+      positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1],
+      normals: new Array(8).fill([0, 0, 1]).flat(),
+      uvs: [0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1],
+      indices: [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7],
+    }),
+    clean = bakeSurfaceMaps(square(), square(), { width: 32 }),
+    fought = bakeSurfaceMaps(stacked, square(), { width: 32 });
+  assert.ok(clean.shared <= clean.covered * 0.05, `${clean.shared} of ${clean.covered}`);
+  assert.ok(fought.shared >= fought.covered * 0.95, `${fought.shared} of ${fought.covered}`);
+});
+
+test('bakeSurfaceMaps names a triangle in a colour sample, and refuses surfaces that do not fit', () => {
+  const seen = new Set();
+  bakeSurfaceMaps(square(), square(), {
+    width: 8,
+    distance: 1,
+    maps: ['color'],
+    color: ({ face }) => (seen.add(face), [0, 0, 0, 255]),
+  });
+  assert.deepEqual([...seen].sort(), ['0', '1']);
+  assert.throws(() => bakeSurfaceMaps(square({ uvs: [0, 0] }), square()), TypeError);
+  assert.throws(() => bakeSurfaceMaps(square(), square({ indices: [0, 1, 9] })), TypeError);
+  assert.throws(() => bakeSurfaceMaps(square({ tangents: [1, 0, 0] }), square()), TypeError);
+  assert.throws(() => bakeSurfaceMaps(square(), square({ normals: [0, 0, 1] })), TypeError);
 });
