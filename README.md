@@ -255,7 +255,7 @@ which stays for v1.0.
 | --- | --- |
 | Chrome and Edge (desktop) | Tested. The browser suites run in Chromium on a real GPU (Intel Arc 140V) and on SwiftShader in the manual browser workflow. |
 | Safari on iPhone | Demos run, checked by hand only. |
-| Safari on macOS | Has WebGPU, not tested. |
+| Safari on macOS | Draws five real models as Edge does, checked by hand. No test suite runs there. |
 | Firefox | Not tested. |
 | Android | Not tested. |
 

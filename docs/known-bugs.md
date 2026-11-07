@@ -96,6 +96,13 @@ does not own. Each entry says exactly what is needed to close it.
 - **Needed to close:** that run, then either a root-cause fix with a regression test or the phone evidence that it is Quick Look's own behaviour. The
   exporter stays as it is until a file-side cause is shown.
 
+### JPEG XL: the Wasm path does not apply a file's colour profile
+
+- **What:** `bench_oriented_brg.jxl`, a picture of a red bench on grass, comes out with a green bench and blue grass from `JXLDecoder` in every browser that has no JPEG XL decoder of its own, and red in Safari, whose decoder applies the profile. Mean gap 30 of 255 between the two, found by the first real run of the browser path (Safari 27.2, 2026-11-06). `JXLImage` promised sRGB; that wording is corrected.
+- **Repro:** `await new JXLDecoder({ browser: false }).decode(bytes)` on `packages/decoders/tests/fixtures/jxl/bench_oriented_brg.jxl`, then look at the pixels. `tools/real-proof/safari` shows both paths side by side.
+- **Cause:** the file stores its samples with swapped primaries and an ICC profile, not in XYB, and the Wasm path hands them back as stored. The test compares with `djxl`, whose PNG keeps the same samples and the same profile, so a comparison of raw samples passes on a picture a person would call wrong.
+- **Needed to close:** convert through the file's profile in the Wasm path, at least for matrix and curve profiles, with a test against the colours Safari gives.
+
 ### USDZ vertex colours draw grey in Quick Look
 
 - **What:** a painted mesh from `exportUSDZ` is flat grey in Quick Look (macOS 27.2 thumbnail, 2026-11-05). `usdchecker
@@ -109,7 +116,6 @@ does not own. Each entry says exactly what is needed to close it.
   emission, opaque), and teach `@margoengine/usdz` to read `displayColor` on an unbound mesh. A material that says more
   cannot show paint on Apple's renderer; it needs the colours baked into a texture.
 
-### WebXR AR hit testing: never run on an AR device
 ### WebXR AR hit testing: never run on an AR device
 
 - **What:** `HitTest` in `@margoengine/xr` (`packages/xr/src/hit-test.ts`): hit-test sources from the viewer, an input

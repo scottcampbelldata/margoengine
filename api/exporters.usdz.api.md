@@ -15,6 +15,7 @@ export interface USDZMeasure {
     size: [number, number, number];
     bounds: USDZBox;
     scale: number;
+    skipped: GLBSceneSkip[];
 }
 
 export interface USDZOptions extends SceneOptions {
@@ -23,9 +24,9 @@ export interface USDZOptions extends SceneOptions {
     ground?: boolean;
 }
 
-export function exportUSDZ(source: ExportSource, options?: USDZOptions): Uint8Array;
+export function exportUSDZ(source: ExportSource | Uint8Array, options?: USDZOptions): Uint8Array;
 
-export function measureUSDZ(source: ExportSource, options?: USDZOptions): USDZMeasure;
+export function measureUSDZ(source: ExportSource | Uint8Array, options?: USDZOptions): USDZMeasure;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -110,6 +111,11 @@ type ExportSource = EngineKernel | ExportScene;
 type Extras = {
     readonly [key: string]: unknown;
 };
+
+interface GLBSceneSkip {
+    kind: 'primitive' | 'texture' | 'colors' | 'channel';
+    index: number;
+}
 
 interface GeometryData {
     positions: ArrayLike<number>;

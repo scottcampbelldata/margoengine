@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 9949986,
+  "total": 9954178,
   "history": [
     {
       "date": "2026-10-24",
@@ -2954,6 +2954,12 @@
       "commit": "8b0a6c0ec",
       "reason": "New entry @margoengine/cutscene/record: the take recorder.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "ef68799a8",
+      "reason": "decodePNG reads interlaced files and checks CRCs; exportUSDZ takes GLB bytes through the GLB reader",
+      "grew": 2
     }
   ],
   "items": {
@@ -3159,7 +3165,7 @@
     "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28243,
     "@margoengine/exporters/unreal-precision-importer": 16503,
-    "@margoengine/exporters/usdz": 13813,
+    "@margoengine/exporters/usdz": 17538,
     "@margoengine/exporters/usdz-anim": 20310,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 21226,
@@ -3209,7 +3215,7 @@
     "@margoengine/gltf/scene-data": 1782,
     "@margoengine/gltf/textured": 5839,
     "@margoengine/headless": 2864,
-    "@margoengine/headless/compare": 2607,
+    "@margoengine/headless/compare": 3074,
     "@margoengine/headless/ffmpeg": 1434,
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/stage": 3306,

@@ -30,7 +30,10 @@ export interface JXLDecodeOptions {
   transfer?: boolean;
 }
 
-/** A decoded JPEG XL image: RGBA8 rows, top row first, straight alpha, sRGB, `width * height * 4` bytes. */
+/**
+ * A decoded JPEG XL image: RGBA8 rows, top row first, straight alpha, `width * height * 4` bytes. sRGB, unless the Wasm path
+ * read a file with an ICC profile not stored in XYB: those samples come out as stored (docs/known-bugs.md).
+ */
 export interface JXLImage extends DecodedJXL {
   hasAlpha: boolean;
   /** True for an animation, of which `data` is the first frame. */
