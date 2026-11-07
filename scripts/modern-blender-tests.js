@@ -66,6 +66,35 @@ if (process.env.MARGO_BLENDER) {
     ],
     { stdio: "inherit" },
   );
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    [
+      "--background",
+      "--factory-startup",
+      "--python-exit-code",
+      "1",
+      "--python",
+      "tools/blender-addon/tests/blender_components.py",
+      "--",
+      "test-results/blender/components",
+    ],
+    { stdio: "inherit" },
+  );
+  const { margoComponents } =
+    await import("../packages/blender/dist/components.js");
+  assert.deepEqual(
+    margoComponents(
+      decodeMargo(
+        await readFile("test-results/blender/components/components.margo"),
+      ),
+    ).document,
+    margoComponents(
+      decodeMargo(
+        await readFile("packages/blender/tests/fixtures/components.margo"),
+      ),
+    ).document,
+    "Blender's tagged level must give the committed fixture's components",
+  );
   const { margoToGLTF } = await import("../packages/blender/dist/anim.js");
   assert.deepEqual(
     margoToGLTF(await readFile("test-results/blender/anim/anim.margo"))
@@ -468,8 +497,77 @@ try {
     `GPU skinning differs from Blender by ${JSON.stringify(animated.clips)} m`,
   );
   results.push({ animated });
+  // Components (real Blender 5.2.3 export): physics bodies move the model's nodes, the sun becomes the engine's
+  // light and each script runs once per object that names it.
+  await page.route("**/components.margo", async (route) =>
+    route.fulfill({
+      body: await readFile("packages/blender/tests/fixtures/components.margo"),
+      contentType: "application/octet-stream",
+    }),
+  );
+  const components = await page.evaluate(async () => {
+    const { Engine } = await import("/packages/core/dist/index.js");
+    const { loadMargoComponents } =
+      await import("/packages/blender/dist/components.js");
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "width:256px;height:256px";
+    document.body.append(canvas);
+    const engine = await Engine.create(canvas, {
+      backend: "webgpu",
+      capacity: 64,
+      camera: { position: [0, 4, 10], target: [0, 0, 0] },
+    });
+    engine.gpu.pushErrorScope("validation");
+    const ran = [],
+      cleaned = [];
+    const scene = await loadMargoComponents(engine, "/components.margo", {
+      scripts: {
+        door: ({ node, properties }) => {
+          ran.push(["door", node.name, Object.keys(properties).length]);
+          return () => cleaned.push(node.name);
+        },
+        glow: ({ node, physics }) => void ran.push(["glow", node.name, !!physics]),
+      },
+    });
+    const index = (name) =>
+        scene.model.asset.doc.nodes.findIndex((n) => n.name === name),
+      crate = scene.model.nodes[index("Crate")];
+    const start = crate.position.y;
+    for (let i = 0; i < 300; i++) scene.physics.physics.step();
+    engine.store.tick(false);
+    engine.render({ culling: false });
+    const result = {
+      start,
+      rest: crate.position.y,
+      sun: engine.lighting.direction[3],
+      lights: scene.model.lights.map((l) => l.type),
+      ran,
+    };
+    scene.dispose();
+    result.cleaned = cleaned;
+    result.validation = (await engine.gpu.popErrorScope())?.message ?? null;
+    engine.dispose();
+    canvas.remove();
+    return result;
+  });
+  assert.equal(components.validation, null);
+  assert.ok(Math.abs(components.start - 3) < 1e-6, `crate starts at ${components.start}`);
+  assert.ok(
+    Math.abs(components.rest - 0.5) < 0.01,
+    `the crate's node rests at ${components.rest}, not on the floor`,
+  );
+  assert.equal(components.sun, 3, "the tagged sun's 3 lux must light the engine");
+  assert.deepEqual(components.lights, ["point", "directional", "spot"]);
+  assert.deepEqual(components.ran, [
+    ["door", "Pad", 2],
+    ["glow", "Pad", true],
+    ["door", "Sun", 3],
+  ]);
+  assert.deepEqual(components.cleaned, ["Sun", "Pad"]);
+  results.push({ components });
+
   for (let i = 0; i < results.length; i++) {
-    if (results[i].animated) continue;
+    if (results[i].animated || results[i].components) continue;
     const screenshot = Buffer.from(
         results[i].screenshot.split(",")[1],
         "base64",

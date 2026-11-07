@@ -34,6 +34,10 @@
     "./anim": {
       "types": "./dist/anim.d.ts",
       "import": "./dist/anim.js"
+    },
+    "./components": {
+      "types": "./dist/components.d.ts",
+      "import": "./dist/components.js"
     }
   },
   "scripts": {

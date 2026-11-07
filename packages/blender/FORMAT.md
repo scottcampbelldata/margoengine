@@ -70,6 +70,10 @@ Meshes without UVs, tangents or vertex colors use this layout. Positions and nor
 
 The reader expands each shared compact geometry once into the existing PBR renderer layout: position w = 1, normal w = 0, zero tangents/UVs and white vertex color. PBR vertices and uint32 indices remain typed-array views of the input. Aggregate decoded geometry, including expanded vertices and indices, is bounded at 256 MiB before allocation. GPU uploads copy bytes. Unknown versions, default strides and layout flags fail explicitly; this file is not a dump of the engine's Wasm memory or device-specific uniforms.
 
+## Components (`margo:` tags)
+
+Object custom properties whose names start with `margo:` are kept in `extras.margo.properties` (strings, booleans, finite numbers, and arrays of up to 32 finite numbers). `@margoengine/blender/components` reads the tags its README lists (`margo:collider`, `margo:body`, `margo:light`, `margo:script` and their settings) and writes them into the decoded document as KHR_implicit_shapes, KHR_physics_rigid_bodies and KHR_lights_punctual; the file itself holds only the properties, so the format does not change and older readers keep them as data.
+
 ## Animated files (header flag `1`)
 
 An exported scene with an Armature modifier or shape keys sets header flag `1` and adds one type-5 section. The static reader (`decodeMargo`, `parseMargo`, `loadMargo`) refuses such a file by name; `@margoengine/blender/anim` reads both kinds. In an animated file the manifest may also hold, with glTF 2.0 meaning:

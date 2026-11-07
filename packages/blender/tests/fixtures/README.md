@@ -7,3 +7,6 @@
   vertices per clip and frame (Apache-2.0, as this repository). Regenerate with
   `blender --background --factory-startup --python tools/blender-addon/tests/blender_anim.py -- <folder>` and copy both
   files here.
+- `components.margo`: exported for this project by Blender 5.2.3 LTS from
+  `tools/blender-addon/tests/blender_components.py`: a level whose objects carry `margo:` component tags (Apache-2.0, as
+  this repository). Regenerate the same way and copy the file here.

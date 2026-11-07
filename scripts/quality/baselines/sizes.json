@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10529493,
+  "total": 10544221,
   "history": [
     {
       "date": "2026-10-24",
@@ -3620,6 +3620,12 @@
       "commit": "a0bf6defb",
       "reason": "netcode: reconnection and held seats in ./rooms (batch 114 job 4)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "84b605cd8",
+      "reason": "blender/components: margo: tags to colliders, bodies, lights and scripts (batch 48 job 2)",
+      "grew": 2
     }
   ],
   "items": {
@@ -3681,6 +3687,7 @@
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4000,
     "@margoengine/blender/anim": 5097,
+    "@margoengine/blender/components": 14727,
     "@margoengine/bvh": 23398,
     "@margoengine/bvh/alpha": 16873,
     "@margoengine/bvh/bake": 2583,
@@ -4350,6 +4357,7 @@
     "leak @margoengine/animation/skeleton-utils -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/blender/anim -> @margoengine/gltf-pro/model": 1,
+    "leak @margoengine/blender/components -> @margoengine/gltf-pro/model": 1,
     "leak @margoengine/controls -> @margoengine/bvh": 1,
     "leak @margoengine/controls/drag -> @margoengine/bvh": 1,
     "leak @margoengine/controls/third-person -> @margoengine/bvh": 1,
