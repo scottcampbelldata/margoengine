@@ -1240,9 +1240,10 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | B37 | cull phase limit documented | DONE | `ca45d8bb3` | - |
 | B28 | 13/7 Arcball gizmo | DONE | `5b4dd4af7` | LIM limits row |
 | B39 | 8/5 Spherical harmonics | DONE | `5b4dd4af7` | LIM-048 |
-| jxl-icc | JPEG XL Wasm path applies the file's ICC profile | DONE | this commit | LIM-233 |
-| stats-visible | stats.visible counts a glTF model's nodes once a frame | DONE | this commit | - |
-| test-readers | Five of the six test readers read the file under test; fbx waits | DONE | this commit | - |
+| jxl-icc | JPEG XL Wasm path applies the file's ICC profile | DONE | `99be50288` | LIM-233 |
+| stats-visible | stats.visible counts a glTF model's nodes once a frame | DONE | `5051c31a0` | - |
+| test-readers | Five of the six test readers read the file under test; fbx waits | DONE | `4131fd1e1` | - |
+| spawn-einval | Python test scripts never start the Windows app alias; a failed probe fails | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 

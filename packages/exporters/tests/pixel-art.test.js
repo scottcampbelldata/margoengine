@@ -8,6 +8,7 @@ import { parseGLTFAsync } from '@margoengine/gltf-pro';
 import { exportDAE, exportGLB, exportGLTF, paletteTexture, pixelArtTexture } from '../dist/index.js';
 import { exportModel } from '../dist/model.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import { findPython } from '../../../scripts/support/find-python.mjs';
 import { readGLB } from './helpers.js';
 
 const quad = {
@@ -106,7 +107,7 @@ test('Unreal pixel-art script sets the texture group, filter, mip policy and sto
   assert.throws(() => createUnrealPixelArtScript({ mipmaps: 'linear' }), RangeError);
   // Run the script against a fake unreal module: a setting that does not read back raises, an empty path raises.
   const { spawnSync } = await import('node:child_process');
-  const python = ['python3', 'python'].find((cmd) => spawnSync(cmd, ['--version']).status === 0);
+  const python = findPython();
   if (!python) return; // no Python on this machine; the text assertions above still hold
   const fake = `
 import sys, types

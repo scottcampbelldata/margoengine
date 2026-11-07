@@ -1,6 +1,7 @@
 // Native importer texts for the precision bundles: every application name lands where it should and nowhere else.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { findPython } from '../../../scripts/support/find-python.mjs';
 import { createGodotFlipbookPlayer } from '../dist/godot-flipbook.js';
 import { createGodotPrecisionAddon } from '../dist/godot-precision-addon.js';
 import { godotImportedNodeName, GODOT_SUFFIX_IMPORT_SETTINGS } from '../dist/import-names.js';
@@ -124,7 +125,7 @@ try:
 except ValueError:
     print("OK")
 `;
-  const python = ['python3', 'python'].find((cmd) => spawnSync(cmd, ['--version']).status === 0);
+  const python = findPython();
   if (!python) return; // no Python on this machine; the text assertion above still holds
   const run = spawnSync(python, ['-c', script], { encoding: 'utf8' });
   // A process that never started has no stderr; report the spawn error itself (it once surfaced as an invalid

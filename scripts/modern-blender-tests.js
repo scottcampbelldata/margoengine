@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { build } from 'vite';
+import { findPython } from './support/find-python.mjs';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
 import { decodeMargo } from '../packages/blender/dist/index.js';
@@ -14,7 +15,7 @@ const fixtures = [
   await readFile('packages/blender/tests/fixtures/compact-triangle.margo'),
 ];
 if (process.env.MARGO_BLENDER) {
-  execFileSync('python', ['tools/blender-addon/package_addon.py'], { stdio: 'inherit' });
+  execFileSync(findPython(), ['tools/blender-addon/package_addon.py'], { stdio: 'inherit' });
   execFileSync(
     process.env.MARGO_BLENDER,
     [
