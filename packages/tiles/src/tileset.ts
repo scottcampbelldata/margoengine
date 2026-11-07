@@ -529,6 +529,10 @@ export class Tileset {
     this.queue.want(tile.id, priority, (signal) => this.loadTile(tile, signal));
   }
 
+  /** Fetches bytes with this tileset's fetch (auth headers, caches); a non-OK answer throws code `failed`. */
+  fetchBytes(url: string, signal?: AbortSignal): Promise<Uint8Array> {
+    return fetchBytes(this.fetcher, url, signal);
+  }
   private async loadTile(tile: TilesetTile, signal: AbortSignal): Promise<void> {
     tile.state = 'loading';
     const created: TileRenderable[] = [];

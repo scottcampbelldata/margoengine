@@ -251,6 +251,7 @@ export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
     origin?: TilesOrigin;
     loadModel?: (engine: EngineKernel, gltf: Uint8Array, signal: AbortSignal) => Promise<TilesModel>;
     pointBudget?: number;
+    i3dm?: TilesInstancesDrawer;
 }
 
 export interface TilesView {
@@ -287,6 +288,7 @@ export class Tileset {
     retry(): void;
     dispose(): void;
     [Symbol.dispose](): void;
+    fetchBytes(url: string, signal?: AbortSignal): Promise<Uint8Array>;
 }
 
 export interface TilesetEvents {
@@ -473,4 +475,16 @@ interface ImplicitContext {
     readonly transform: TileMatrix;
     readonly subtrees: Map<string, Subtree>;
 }
+
+interface TilesContentHost {
+    readonly engine: EngineKernel;
+    readonly url: string;
+    loadModel(gltf: Uint8Array, signal: AbortSignal): Promise<TilesModel>;
+    place(mesh: Mesh, matrix: TileMatrix): void;
+    forget(mesh: Mesh): void;
+    contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
+    fetch(url: string, signal: AbortSignal): Promise<Uint8Array>;
+}
+
+type TilesInstancesDrawer = (host: TilesContentHost, content: InstancesContent, tile: TilesetTile, signal: AbortSignal) => Promise<TileRenderable>;
 ```

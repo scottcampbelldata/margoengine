@@ -5,7 +5,7 @@
 // float64 frame matrix; see the README's "Coordinates and precision".
 import type { EngineKernel, EnginePlugin, Mesh, Vec3 } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
-import type { TileContent } from './formats.js';
+import type { InstancesContent, TileContent } from './formats.js';
 import {
   type TileMatrix,
   Y_UP_TO_Z_UP,
@@ -37,6 +37,31 @@ export interface TilesModel {
   dispose(): void;
 }
 
+/** What a content drawer (such as `i3dm` from `@margoengine/tiles/i3dm`) gets from the renderer. */
+export interface TilesContentHost {
+  readonly engine: EngineKernel;
+  /** The tileset JSON's URL. */
+  readonly url: string;
+  /** Loads a glTF / GLB with the renderer's `loadModel`. */
+  loadModel(gltf: Uint8Array, signal: AbortSignal): Promise<TilesModel>;
+  /** Places a root mesh at a float64 world matrix (through the floating origin when there is one). */
+  place(mesh: Mesh, matrix: TileMatrix): void;
+  /** Stops a floating origin tracking a mesh placed with `place`. */
+  forget(mesh: Mesh): void;
+  /** frame x tile transform x RTC (x y-up to z-up when `gltf`), float64. */
+  contentMatrix(tile: TilesetTile, rtc?: readonly number[], gltf?: boolean): TileMatrix;
+  /** Fetches bytes with the tileset's own fetch and signal. */
+  fetch(url: string, signal: AbortSignal): Promise<Uint8Array>;
+}
+
+/** Draws Instanced 3D Model (i3dm) content; `i3dm` from `@margoengine/tiles/i3dm` is one. */
+export type TilesInstancesDrawer = (
+  host: TilesContentHost,
+  content: InstancesContent,
+  tile: TilesetTile,
+  signal: AbortSignal,
+) => Promise<TileRenderable>;
+
 /** Options of `TilesRenderer.load`. */
 export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
   /**
@@ -52,6 +77,11 @@ export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
   loadModel?: (engine: EngineKernel, gltf: Uint8Array, signal: AbortSignal) => Promise<TilesModel>;
   /** Point budget of the points plugin made for pnts tiles. Default 2,000,000. */
   pointBudget?: number;
+  /**
+   * Draws i3dm (instanced) content: pass `i3dm` from `@margoengine/tiles/i3dm`. Without it an i3dm tile fails with
+   * code `unsupported` and the rest of the tileset still draws.
+   */
+  i3dm?: TilesInstancesDrawer;
 }
 
 interface PointsHost {
@@ -79,6 +109,8 @@ export class TilesRenderer implements EnginePlugin {
   private readonly origin?: TilesOrigin;
   private readonly loadModel: NonNullable<TilesRendererOptions['loadModel']>;
   private readonly pointBudget: number;
+  private readonly i3dm?: TilesInstancesDrawer;
+  private host?: TilesContentHost;
   private points?: Promise<{ host: PointsHost; PointCloud: new (options: object) => object }>;
   private readonly planes = new Float64Array(24);
 
@@ -106,6 +138,7 @@ export class TilesRenderer implements EnginePlugin {
     this.tileset = tileset;
     this.origin = options.origin;
     this.pointBudget = options.pointBudget ?? 2_000_000;
+    this.i3dm = options.i3dm;
     this.loadModel =
       options.loadModel ??
       (async (engine, gltf, signal) => {
@@ -270,12 +303,25 @@ export class TilesRenderer implements EnginePlugin {
           },
         };
       }
-      default:
-        throw new MargoError(
-          'unsupported',
-          'i3dm instanced content is parsed but not drawn yet; convert it to glTF with EXT_mesh_gpu_instancing',
-        );
+      case 'i3dm':
+        if (!this.i3dm)
+          throw new MargoError(
+            'unsupported',
+            "i3dm instanced content needs its drawer: import { i3dm } from '@margoengine/tiles/i3dm' and pass { i3dm } to TilesRenderer.load",
+          );
+        return this.i3dm((this.host ??= this.contentHost(engine)), content, tile, signal);
     }
+  }
+  private contentHost(engine: EngineKernel): TilesContentHost {
+    return {
+      engine,
+      url: this.tileset.url,
+      loadModel: (gltf, signal) => this.loadModel(engine, gltf, signal),
+      place: (mesh, matrix) => this.place(mesh, matrix),
+      forget: (mesh) => this.origin?.forget(mesh),
+      contentMatrix: (tile, rtc, gltf) => this.contentMatrix(tile, rtc, gltf),
+      fetch: (url, signal) => this.tileset.fetchBytes(url, signal),
+    };
   }
   private async loadPoints(
     engine: EngineKernel,

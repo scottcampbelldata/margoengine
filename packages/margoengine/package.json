@@ -2390,6 +2390,10 @@
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"
     },
+    "./tiles/i3dm": {
+      "types": "./dist/tiles/i3dm.d.ts",
+      "import": "./dist/tiles/i3dm.js"
+    },
     "./tonemap": {
       "types": "./dist/tonemap.d.ts",
       "import": "./dist/tonemap.js"

@@ -2,8 +2,9 @@
 // tiles, anchored in ECEF at 40 N 75.6 W) streamed by TilesRenderer through gltf-pro and drawn by the engine.
 // tests/tiles-browser.mjs drives it and checks the numbers. Built imports, so it uses the published package boundary.
 import { Engine } from '../../core/dist/extension.js';
+import { i3dm } from '../dist/i3dm.js';
 import { TilesRenderer } from '../dist/index.js';
-import { cityTileset, memoryFetch } from './generator.js';
+import { cityTileset, groveTileset, memoryFetch } from './generator.js';
 
 const W = 480,
   H = 270,
@@ -78,6 +79,38 @@ function snapshot() {
 }
 
 async function run(name: string): Promise<unknown> {
+  if (name === 'grove') {
+    // 25 box trees from one i3dm tile (EAST_NORTH_UP, RTC_CENTER, ECEF), drawn as instances through gltf-pro.
+    const grove = groveTileset({ n: 5, spacing: 40, height: 12 }),
+      files = memoryFetch(grove.files);
+    engine.camera.position = [0, 90, 230];
+    engine.camera.target = [0, 0, -10];
+    tiles = await TilesRenderer.load(engine, files.url, { fetch: files.fetch, i3dm });
+    const timing = await converge();
+    const data = pixels();
+    const trees = grove.offsets.map((_, i) => {
+      const content = tiles.tileset.root.contents[0] as unknown as { matrices: Float64Array };
+      const foot = tiles.toWorld([0, 1, 2].map((k) => content.matrices[i * 16 + 12 + k] + grove.rtc[k]));
+      return project([foot[0], foot[1] + 6, foot[2]]);
+    });
+    const onScreen = trees.filter(([x, y, w]) => w > 0 && x > 4 && x < W - 4 && y > 4 && y < H - 4);
+    const drawn = onScreen.filter(([x, y]) => lit(data, x, y)).length;
+    // Between trees (half a spacing east of the middle one, at half height) the background shows.
+    const gap = project([20, 6, 0]);
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] > 30) count++;
+    const result = {
+      ...timing,
+      ...snapshot(),
+      onScreen: onScreen.length,
+      drawn,
+      gapLit: lit(data, gap[0], gap[1]),
+      lit: count,
+      errors: [...errors],
+    };
+    tiles.dispose();
+    return result;
+  }
   if (name === 'city') {
     tiles = await TilesRenderer.load(engine, memory.url, {
       fetch: memory.fetch,

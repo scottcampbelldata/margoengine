@@ -395,3 +395,61 @@ export function memoryFetch(files, { base = 'https://tiles.test/', delay = 0, fa
 export async function settle(rounds = 20) {
   for (let i = 0; i < rounds; i++) await new Promise((r) => setTimeout(r, 0));
 }
+
+/**
+ * An i3dm around a GLB (gltfFormat 1) or a glTF URI string (gltfFormat 0): float POSITION (relative to RTC_CENTER
+ * when given), optional NORMAL_UP and NORMAL_RIGHT, uniform SCALE and EAST_NORTH_UP.
+ */
+export function i3dm(gltf, { positions, up, right, scale, rtcCenter, eastNorthUp } = {}) {
+  const n = positions.length / 3,
+    parts = [],
+    json = { INSTANCES_LENGTH: n };
+  let offset = 0;
+  const add = (name, values) => {
+    const bytes = new Uint8Array(new Float32Array(values).buffer);
+    json[name] = { byteOffset: offset };
+    parts.push(bytes);
+    offset += bytes.byteLength;
+  };
+  add('POSITION', positions);
+  if (up) add('NORMAL_UP', up);
+  if (right) add('NORMAL_RIGHT', right);
+  if (scale) add('SCALE', scale);
+  if (rtcCenter) json.RTC_CENTER = rtcCenter;
+  if (eastNorthUp) json.EAST_NORTH_UP = true;
+  const body = typeof gltf === 'string' ? encoder.encode(gltf) : gltf;
+  return wrap('i3dm', 32, json, concat(parts), null, null, body, typeof gltf === 'string' ? 0 : 1);
+}
+
+/**
+ * A grove: one tile at lon/lat (no transform, ECEF) whose i3dm places `n` x `n` box trees `spacing` metres apart on
+ * an east-north grid, standing on the ellipsoid (EAST_NORTH_UP), positions relative to RTC_CENTER. With `uri`, the
+ * tree is an external GLB (gltfFormat 0). Returns {files, tileset, rtc, offsets} (offsets: east-north metres).
+ */
+export function groveTileset({ n = 5, spacing = 40, lon = -75.6, lat = 40.04, uri = false, height = 12 } = {}) {
+  const files = new Map(),
+    rtc = ecef(lon, lat),
+    frame = enu(lon, lat),
+    positions = [],
+    offsets = [];
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      const e = (i - (n - 1) / 2) * spacing,
+        north = (j - (n - 1) / 2) * spacing,
+        p = [0, 1, 2].map((k) => frame[k] * e + frame[4 + k] * north + frame[12 + k] - rtc[k]);
+      positions.push(...p);
+      offsets.push([e, north]);
+    }
+  // A y-up glTF box standing on its base: the instance origin is the foot of the tree.
+  const tree = boxGLB({ size: [6, height, 6], center: [0, height / 2, 0], color: [0.2, 0.7, 0.25] });
+  if (uri) files.set('models/tree.glb', tree);
+  files.set('tiles/grove.i3dm', i3dm(uri ? '../models/tree.glb' : tree, { positions, rtcCenter: rtc, eastNorthUp: true }));
+  const radius = Math.hypot(n * spacing, height) + 10;
+  const tileset = {
+    asset: { version: '1.0' },
+    geometricError: 100,
+    root: { boundingVolume: { sphere: [...rtc, radius] }, geometricError: 0, refine: 'ADD', content: { uri: 'tiles/grove.i3dm' } },
+  };
+  files.set('tileset.json', encoder.encode(JSON.stringify(tileset)));
+  return { files, tileset, rtc, offsets };
+}

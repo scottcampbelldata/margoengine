@@ -71,6 +71,15 @@ try {
   const disposed = await call(() => window.tilesFixture.dispose(), 'dispose');
   check('dispose detaches the renderer without errors', !disposed.plugins && disposed.errors.length === 0, disposed);
 
+  const grove = (results.grove = await call((n) => window.tilesFixture.run(n), 'grove'));
+  assert.deepEqual(grove.errors, [], 'grove: WebGPU or engine errors');
+  check(
+    'i3dm: every on-screen tree of the 25 instances is drawn where float64 maths puts it',
+    grove.onScreen >= 20 && grove.drawn === grove.onScreen,
+    grove,
+  );
+  check('i3dm: the gap between trees stays background (instances, not one stretched box)', !grove.gapLit, grove);
+
   assert.deepEqual(pageErrors, []);
   for (const name of checks) console.log(`ok - ${name}`);
   console.log(

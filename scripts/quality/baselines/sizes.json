@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10280798,
+  "total": 10282427,
   "history": [
     {
       "date": "2026-10-24",
@@ -3302,6 +3302,12 @@
       "commit": "6ea261807",
       "reason": "Own physics job 3: the kernel blueprint gains bodies, colliders and mass",
       "grew": 1
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "4717cbfd",
+      "reason": "tiles/i3dm: i3dm instanced content drawn through gltf-pro instancing, own entry; root gains the i3dm option and Tileset.fetchBytes",
+      "grew": 1
     }
   ],
   "items": {
@@ -3901,6 +3907,7 @@
     "@margoengine/tilemap/ldtk": 3070,
     "@margoengine/tilemap/tiled": 4264,
     "@margoengine/tiles": 14561,
+    "@margoengine/tiles/i3dm": 1629,
     "@margoengine/tonemap": 11059,
     "@margoengine/toon": 1701,
     "@margoengine/transitions": 4303,

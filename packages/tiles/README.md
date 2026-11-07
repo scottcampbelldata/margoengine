@@ -37,7 +37,7 @@ The renderer updates selection every frame from `engine.camera`. `tiles.dispose(
 | Refinement | `REPLACE` (children drawn only once every visible child is ready, so no holes and no overlap) and `ADD` |
 | Implicit tiling | `QUADTREE` and `OCTREE`, `subtreeLevels`, `availableLevels` (or the 1.0 extension's `maximumLevel`), binary and JSON subtree files, constant and bitstream availability, child subtrees, `{level}` `{x}` `{y}` `{z}` templates |
 | External tilesets | content that is tileset JSON becomes the tile's child; its transforms continue from the tile |
-| Content | glTF and GLB, b3dm (with `RTC_CENTER` and the batch table), pnts (`POSITION`, `POSITION_QUANTIZED`, `RGBA`, `RGB`, `RGB565`, `NORMAL`, `NORMAL_OCT16P`, `BATCH_ID`, `CONSTANT_RGBA`), cmpt (nested); i3dm is parsed (one matrix per instance) but not drawn yet |
+| Content | glTF and GLB, b3dm (with `RTC_CENTER` and the batch table), pnts (`POSITION`, `POSITION_QUANTIZED`, `RGBA`, `RGB`, `RGB565`, `NORMAL`, `NORMAL_OCT16P`, `BATCH_ID`, `CONSTANT_RGBA`), cmpt (nested), i3dm (`POSITION`, `POSITION_QUANTIZED`, `NORMAL_UP` / `NORMAL_RIGHT` and their oct-encoded forms, `SCALE`, `SCALE_NON_UNIFORM`, `EAST_NORTH_UP`, `RTC_CENTER`, embedded or external glTF; drawn with `i3dm` from `margoengine/tiles/i3dm`) |
 | Metadata | `schema` / `schemaUri`, `metadata` on the tileset, tiles and contents, `groups`; `tileset.properties(entity)` fills in schema defaults |
 
 ## Selection
@@ -61,6 +61,7 @@ Each update measures every visible tile's screen-space error, `geometricError x 
 | `origin` (renderer) | none | A floating origin (`FloatingOrigin` from `margoengine/cameras/origin`). |
 | `loadModel` (renderer) | gltf-pro's `parseGLTFAsync` | Your own glTF loader. |
 | `pointBudget` (renderer) | 2,000,000 | Budget of the points plugin made for pnts tiles. |
+| `i3dm` (renderer) | none | The i3dm drawer from `margoengine/tiles/i3dm`; without it an i3dm tile fails with code `unsupported`. |
 
 ## Coordinates and precision
 
@@ -80,6 +81,22 @@ origin.lookAt(tiles.cartographicToWorld(2.35, 48.85, 600), tiles.cartographicToW
 ```
 
 `toWorld(ecef)`, `toTileset(world)` and `cartographicToWorld(lon, lat, height)` convert points; the WGS84 helpers (`cartographicToEcef`, `ecefToCartographic`, `eastNorthUpToEcef`) are exported too.
+
+## Instanced content (i3dm)
+
+Trees, poles and street furniture often come as i3dm: one glTF and a transform per instance. Pass the drawer from `margoengine/tiles/i3dm` and each glTF primitive draws every instance of its tile in one instanced draw (gltf-pro's `PBRInstances`). Tilesets without i3dm never load this module.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { TilesRenderer } from 'margoengine/tiles';
+import { i3dm } from 'margoengine/tiles/i3dm';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const tiles = await TilesRenderer.load(engine, 'https://example.com/trees/tileset.json', { i3dm });
+engine.start();
+```
+
+Each instance is placed as the specification says: tile transform x `RTC_CENTER` x instance (position, `NORMAL_RIGHT` and `NORMAL_UP` as the x and y axes, or the east-north-up frame at the instance with `EAST_NORTH_UP`, then the scale) x the glTF's y-up to z-up turn. All of it is float64; the model root sits at the mean instance position, so the float32 instance rows stay within the tile's own size. An external glTF (`gltfFormat` 0) is fetched with the tileset's `fetch`, relative to the tile's content URL. `instanceMatrices` and `instanceCenter` are exported for your own renderer.
 
 ## Without the engine
 
@@ -101,7 +118,7 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 
 ## Limits
 
-- i3dm content is parsed but not drawn; convert it to glTF with `EXT_mesh_gpu_instancing`.
+- i3dm batch tables are read (`content.batchTable`) but per-instance picking and per-instance colours are not wired to them; an i3dm external glTF resolves against the tile's first content URL.
 - S2 bounding volumes, Draco-compressed pnts and binary metadata property tables are not read.
 - Memory is counted as the bytes of each tile's content file, not the GPU memory its model takes.
 - Orthographic cameras need `Tileset.update` with `orthographicHeight`; the renderer reads a perspective camera.

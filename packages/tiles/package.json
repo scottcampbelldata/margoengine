@@ -29,6 +29,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./i3dm": {
+      "types": "./dist/i3dm.d.ts",
+      "import": "./dist/i3dm.js"
     }
   },
   "files": [

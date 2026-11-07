@@ -494,14 +494,15 @@ export function parseI3dm(
       y = [0, 1, 0],
       z = [0, 0, 1];
     // The rotation's columns are NORMAL_RIGHT, NORMAL_UP and their cross product (the forward axis). With
-    // EAST_NORTH_UP and no normals, right is east and up the ellipsoid's up at the instance.
+    // EAST_NORTH_UP and no normals, the basis is the east-north-up frame at the instance: right (x) is east and up (y)
+    // is north, so z is the ellipsoid up and a y-up glTF, turned z-up, stands upright.
     if (up && right) {
       x = [right[i * 3], right[i * 3 + 1], right[i * 3 + 2]];
       y = [up[i * 3], up[i * 3 + 1], up[i * 3 + 2]];
     } else if (enu && eastNorthUp) {
       const frame = eastNorthUp(rtc ? [p[0] + rtc[0], p[1] + rtc[1], p[2] + rtc[2]] : p);
       x = [frame[0], frame[1], frame[2]];
-      y = [frame[8], frame[9], frame[10]];
+      y = [frame[4], frame[5], frame[6]];
     }
     z = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
     const s = scales
