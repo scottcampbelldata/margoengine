@@ -223,7 +223,7 @@ function pivotChain(node: FBXNode): PivotChain {
     rotationActive = active !== 0 && active !== false;
   const order = rotationActive ? Number(property(node, 'RotationOrder', 0)) : 0,
     inherit = Number(property(node, 'InheritType', 0));
-  if (inherit !== 0)
+  if (inherit !== 0 && inherit !== 1)
     throw new RangeError(
       `FBX unsupported InheritType ${inherit} on ${objectName(node)}; bake or remove it in your 3D tool before export`,
     );

@@ -1,3 +1,5 @@
+import type { Curve, LayerRead, StackTracks } from './animation.js';
+import type { FBXNode } from './document.js';
 import type { SceneContext } from './scene.js';
 
 /**
@@ -13,4 +15,8 @@ export interface FBXExtension {
 export interface ExtensionHooks extends FBXExtension {
   /** After the node tree is built. True when it added something worth a file with no mesh. */
   scene?(ctx: SceneContext): boolean | void;
+  /** Reads one animation curve of any kind, in place of the linear and step reader. */
+  curve?(node: FBXNode, times: number[], values: ArrayLike<number>): Curve;
+  /** Turns a stack's layers into one set of tracks, in place of the single layer reader. */
+  blend?(ctx: SceneContext, layers: readonly FBXNode[], read: LayerRead): StackTracks;
 }

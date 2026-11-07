@@ -5,10 +5,11 @@ import { readResponse } from '../../shared/loading.js';
 import { serve } from '../../shared/worker.js';
 import { convertFBX } from './index.js';
 import type { FBXExtension } from './extension.js';
+import { animationLayers } from './layers.js';
 import { sceneExtras } from './scene-extras.js';
 const budget = 64 * 1024 * 1024; // convertFBX's input budget
 // Functions cannot cross to a worker, so the page sends names and the worker holds every entry.
-const known: readonly FBXExtension[] = [sceneExtras];
+const known: readonly FBXExtension[] = [sceneExtras, animationLayers];
 type FBXJob = {
   url?: string;
   input?: ArrayBuffer;

@@ -171,6 +171,10 @@ const ASSETS = [
     'test fixtures: original FBX scenes exported for this project by Blender 5.3 from the scripts beside them (CC0 1.0)',
   ],
   [
+    'packages/fbx/test/fixtures/real/NOTICE.md',
+    'test fixtures: Maya and 3ds Max FBX files with OBJ frames from the ufbx test data (MIT or Unlicense, Samuli Raivio); commit and sha256 there',
+  ],
+  [
     'packages/gltf-pro/tests/fixtures/bump/NOTICE.md',
     'test fixture: BumpMaterial.gltf, the EXT_materials_bump interoperability file from luma.gl (CC0-1.0, vis.gl contributors)',
   ],

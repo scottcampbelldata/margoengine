@@ -80,6 +80,9 @@ export interface SceneContext {
   layers: boolean;
 }
 
+/** One animation sample against the 128,000,000 steps of a scene: about 2,000,000 samples, a few seconds of work. */
+const SAMPLE_WORK = 64;
+
 export function context(
   document: FBXDocument,
   signal?: AbortSignal,
@@ -159,13 +162,18 @@ export function localParts(
   ctx: SceneContext,
   model: FBXNode,
   overrides?: { translation?: number[]; rotation?: number[]; scale?: number[] },
+  sampling = false,
 ) {
-  // The pivot chain allocates fixed-size matrices; property lookup scans also
-  // count when animation repeatedly evaluates the same model.
-  ctx.budget.reserve(8192);
-  ctx.budget.work(4096 + model.children.length * 32 + (findChild(model, 'Properties70')?.children.length ?? 0) * 32);
+  // A sample's matrices are gone by the next one, so animation is charged as work alone: mocap takes millions of steps
+  // and holds none of them. Building a node once also pays for the pivot chain and its property scans.
+  if (sampling) ctx.budget.work(SAMPLE_WORK);
+  else {
+    ctx.budget.reserve(8192);
+    ctx.budget.work(4096 + model.children.length * 32 + (findChild(model, 'Properties70')?.children.length ?? 0) * 32);
+  }
   try {
-    return decomposeTRS(convertedMatrix(ctx, fbxLocalTransform(model, overrides)));
+    const local = fbxLocalTransform(model, overrides);
+    return decomposeTRS(sampling ? multiply(multiply(ctx.basis, local), ctx.basisInverse) : convertedMatrix(ctx, local));
   } catch (error) {
     throw new TypeError(
       `FBX model ${objectName(model)}: ${error instanceof Error ? error.message : String(error)}; fix the model or remove it before export`,

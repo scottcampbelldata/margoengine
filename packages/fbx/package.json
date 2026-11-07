@@ -37,6 +37,10 @@
     "./scene-extras": {
       "types": "./dist/scene-extras.d.ts",
       "import": "./dist/scene-extras.js"
+    },
+    "./layers": {
+      "types": "./dist/layers.d.ts",
+      "import": "./dist/layers.js"
     }
   },
   "files": [

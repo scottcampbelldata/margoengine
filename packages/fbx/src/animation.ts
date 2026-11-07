@@ -3,15 +3,33 @@ import { array, findChild, id, objectName, property, type FBXNode } from './docu
 import { children, localParts, type SceneContext } from './scene.js';
 import type { MorphBinding } from './morph.js';
 
-interface Curve {
+export interface Curve {
   times: number[];
   values: ArrayLike<number>;
   interpolation: 'LINEAR' | 'STEP';
+  /** The value at a time, for a curve that is not straight between its keys. */
+  at?: (time: number) => number;
+  /** Times the value jumps at. */
+  breaks?: number[];
+  /** Degrees that come back in range, so two samples say nothing of the turn between them. */
+  wrapped?: boolean;
+}
+/** What one animation layer holds: per model, its paths' axes; per blend channel, its weight curve. */
+export interface StackTracks {
+  models: Map<bigint, Map<string, Axes>>;
+  weights: Map<bigint, Curve>;
+}
+/** The readers an extension blends layers with. */
+export interface LayerRead {
+  layer(node: FBXNode): StackTracks;
+  /** The curve under an animation curve node, as on a layer's Weight. */
+  weight(key: bigint): Curve | undefined;
+  sample(curve: Curve, time: number): number;
 }
 const ticksPerSecond = 46186158000,
   maxKeys = 1_000_000,
   animated = ['Lcl Translation', 'Lcl Rotation', 'Lcl Scaling', 'DeformPercent'];
-function curve(node: FBXNode): Curve {
+function curve(ctx: SceneContext, node: FBXNode): Curve {
   const raw = findChild(node, 'KeyTime')?.properties[0] as ArrayLike<number | bigint> | undefined,
     values = array(node, 'KeyValueFloat');
   if (!raw || !raw.length || raw.length !== values.length || raw.length > maxKeys)
@@ -30,7 +48,8 @@ function curve(node: FBXNode): Curve {
     )
       throw new RangeError('Invalid FBX key attribute references; re-export the file, it looks damaged');
   }
-  if (flags) {
+  const reader = ctx.extensions.find((extension) => extension.curve);
+  if (flags && !reader) {
     if (!flags.length || (!refs && flags.length !== 1 && flags.length !== raw.length))
       throw new RangeError('Invalid FBX key flags; re-export the file, it looks damaged');
     for (let i = 0; i < flags.length; i++) {
@@ -58,9 +77,10 @@ function curve(node: FBXNode): Curve {
     times.push(time);
     previous = time;
   }
-  return { times, values, interpolation: mode ?? 'LINEAR' };
+  return reader ? reader.curve!(node, times, values) : { times, values, interpolation: mode ?? 'LINEAR' };
 }
 function sample(c: Curve, time: number): number {
+  if (c.at) return c.at(time);
   let lo = 0,
     hi = c.times.length - 1;
   while (lo < hi) {
@@ -72,6 +92,20 @@ function sample(c: Curve, time: number): number {
   if (c.interpolation === 'STEP' || lo === next || time <= c.times[lo]) return c.values[lo];
   const alpha = Math.min(1, (time - c.times[lo]) / (c.times[next] - c.times[lo]));
   return c.values[lo] * (1 - alpha) + c.values[next] * alpha;
+}
+const float = new Float32Array(1),
+  floatBits = new Uint32Array(float.buffer);
+/** The Float32 just below a positive time: glTF has no jump, so one is two keys as close as its times allow. */
+function justBefore(time: number): number {
+  float[0] = time;
+  floatBits[0]--;
+  return float[0];
+}
+/** The first key of each jump, which no refining can improve on. */
+function jumpStarts(curves: Curve[]): Set<number> {
+  const out = new Set<number>();
+  for (const c of curves) for (const t of c.breaks ?? []) if (t > c.times[0]) out.add(justBefore(t));
+  return out;
 }
 function commonTimes(curves: Curve[]): number[] {
   const values = new Set<number>();
@@ -89,7 +123,9 @@ function commonTimes(curves: Curve[]): number[] {
           'FBX animation key budget exceeded; simplify or split the scene, the import limits are listed in the README',
         );
     }
+    for (const t of c.breaks ?? []) values.add(t);
   }
+  for (const t of jumpStarts(curves)) values.add(t);
   const result = [...values].sort((a, b) => a - b);
   for (let i = 1; i < result.length; i++)
     if (Math.fround(result[i]) <= Math.fround(result[i - 1]))
@@ -98,13 +134,12 @@ function commonTimes(curves: Curve[]): number[] {
       );
   return result;
 }
-type Axes = (Curve | undefined)[];
+export type Axes = (Curve | undefined)[];
 type Parts = ReturnType<typeof localParts>;
 function createLocalSampler(
   ctx: SceneContext,
   model: FBXNode,
   tracks: Map<string, Axes>,
-  beforeSample: () => void,
 ): (time: number) => Parts {
   const defaults = {
     translation: property(model, 'Lcl Translation', [0, 0, 0]),
@@ -114,7 +149,6 @@ function createLocalSampler(
   const hasModelChildren = children(ctx, id(model.properties[0])).some((n) => n.name === 'Model');
   let samples = 0;
   return function sampleLocal(time: number): Parts {
-    beforeSample();
     if ((++samples & 255) === 0) ctx.signal?.throwIfAborted();
     const override: { translation?: number[]; rotation?: number[]; scale?: number[] } = {};
     for (const [name, path] of [
@@ -136,7 +170,7 @@ function createLocalSampler(
       throw new TypeError(
         'Unsupported FBX animated nonuniform parent scale; bake or remove it in your 3D tool before export',
       );
-    return localParts(ctx, model, override);
+    return localParts(ctx, model, override, true);
   };
 }
 
@@ -147,10 +181,8 @@ function keepQuaternionHemisphere(previous: Float32Array, next: Float32Array): v
   if (dot < 0) for (let k = 0; k < 4; k++) next[k] *= -1;
 }
 
-function refineTimes(seed: number[], evaluate: (time: number) => Parts, rotation: Axes | undefined): number[] {
-  const out = [seed[0]];
-  let work = 0;
-  const acceptable = (a: Parts, b: Parts, p: Parts, alpha: number) => {
+/** Whether a straight glTF segment from a to b passes through p, a sample at `alpha` of it. */
+function partsAgree(a: Parts, b: Parts, p: Parts, alpha: number): boolean {
     for (const key of ['translation', 'scale'] as const)
       for (let k = 0; k < 3; k++) {
         const expected = a[key][k] * (1 - alpha) + b[key][k] * alpha;
@@ -176,17 +208,34 @@ function refineTimes(seed: number[], evaluate: (time: number) => Parts, rotation
       agreement += v * p.rotation[k];
     }
     return 1 - Math.min(1, Math.abs(agreement) / Math.sqrt(length)) <= 1.25e-9; // angular error <= 1e-4 radians
-  };
-  const visit = (start: number, end: number, a: Parts, b: Parts, depth: number): void => {
+}
+
+/** Adds keys until straight segments meet `acceptable`; the segment of a jump stays as it is. */
+function refineTimes<T>(
+  seed: number[],
+  evaluate: (time: number) => T,
+  acceptable: (a: T, b: T, p: T, alpha: number) => boolean,
+  jumps: Set<number>,
+  mustSplit: (start: number, end: number) => boolean = () => false,
+  /** Blended angles can truly jump where the nearest set of angles changes: such a segment ends at the search's depth. */
+  mayJump = false,
+): number[] {
+  const out = [seed[0]];
+  let work = 0;
+  const visit = (start: number, end: number, a: T, b: T, depth: number): void => {
     if (++work > 1_000_000)
       throw new RangeError(
         'FBX animation baking work budget exceeded; simplify or split the scene, the import limits are listed in the README',
       );
-    let split = rotation?.some((c) => c && Math.abs(sample(c, end) - sample(c, start)) > 45) ?? false;
+    let split = mustSplit(start, end);
     for (const alpha of [0.25, 0.5, 0.75])
       if (!acceptable(a, b, evaluate(start + (end - start) * alpha), alpha)) split = true;
     if (split) {
       const mid = (start + end) / 2;
+      if (depth >= 18 && mayJump) {
+        out.push(end);
+        return;
+      }
       if (depth >= 18 || Math.fround(mid) <= Math.fround(start) || Math.fround(mid) >= Math.fround(end))
         throw new RangeError(
           'FBX animation cannot meet baking tolerance; simplify or split the scene, the import limits are listed in the README',
@@ -202,7 +251,10 @@ function refineTimes(seed: number[], evaluate: (time: number) => Parts, rotation
         );
     }
   };
-  for (let i = 1; i < seed.length; i++) visit(seed[i - 1], seed[i], evaluate(seed[i - 1]), evaluate(seed[i]), 0);
+  for (let i = 1; i < seed.length; i++) {
+    if (jumps.has(seed[i - 1])) out.push(seed[i]);
+    else visit(seed[i - 1], seed[i], evaluate(seed[i - 1]), evaluate(seed[i]), 0);
+  }
   return out;
 }
 function axes(ctx: SceneContext, node: FBXNode, cache: Map<bigint, Curve>): Axes {
@@ -217,7 +269,7 @@ function axes(ctx: SceneContext, node: FBXNode, cache: Map<bigint, Curve>): Axes
     if (out[axis]) throw new TypeError('Duplicate FBX animation axis; keep one per target when exporting');
     let data = cache.get(c.child);
     if (!data) {
-      data = curve(source);
+      data = curve(ctx, source);
       cache.set(c.child, data);
     }
     out[axis] = data;
@@ -225,11 +277,77 @@ function axes(ctx: SceneContext, node: FBXNode, cache: Map<bigint, Curve>): Axes
   return out;
 }
 
+const blending = (ctx: SceneContext): boolean => ctx.extensions.some((extension) => extension.blend);
+
+/** The curves of one animation layer, by target. */
+function layerTracks(ctx: SceneContext, layer: FBXNode, cache: Map<bigint, Curve>): StackTracks {
+  const models = new Map<bigint, Map<string, Axes>>(),
+    weights = new Map<bigint, Curve>();
+  for (const track of children(ctx, id(layer.properties[0])).filter((n) => n.name === 'AnimationCurveNode')) {
+    // Curves on anything else (a lens, a light, a tool's own bookkeeping) have no glTF node channel and are left out.
+    const targets = (ctx.outgoing.get(id(track.properties[0])) ?? []).filter(
+      (c) => c.kind === 'OP' && animated.includes(c.property ?? ''),
+    );
+    if (!targets.length) continue;
+    const tracks = axes(ctx, track, cache);
+    // In a stack of layers, an axis with no curve still holds a value: the curve node's own, which the blend reads.
+    if (blending(ctx))
+      ['d|X', 'd|Y', 'd|Z'].forEach((name, k) => {
+        const value = Number(property(track, name, NaN));
+        if (!tracks[k] && Number.isFinite(value))
+          tracks[k] = { times: [], values: [], interpolation: 'LINEAR', at: () => value };
+      });
+    if (!tracks.some(Boolean)) continue;
+    for (const target of targets) {
+      const path = target.property ?? '';
+      if (path === 'DeformPercent') {
+        if (tracks.filter(Boolean).length !== 1 || !tracks[0])
+          throw new TypeError('Unsupported FBX morph curve axes; bake or remove it in your 3D tool before export');
+        if (weights.has(target.parent))
+          throw new TypeError('Duplicate animation target; keep one per target when exporting');
+        weights.set(target.parent, tracks[0]);
+        continue;
+      }
+      if (!ctx.models.has(target.parent))
+        throw new TypeError('FBX animation target is not a model; animate a model node');
+      const record = models.get(target.parent) ?? new Map<string, Axes>();
+      if (record.has(path)) throw new TypeError('Duplicate animation target; keep one per target when exporting');
+      record.set(path, tracks);
+      models.set(target.parent, record);
+    }
+  }
+  return { models, weights };
+}
+
+/** The one layer a stack may hold without the layers entry. */
+function singleLayer(ctx: SceneContext, layers: FBXNode[], cache: Map<bigint, Curve>): StackTracks {
+  if (layers.length > 1)
+    throw new TypeError('Unsupported FBX animation layer blending; bake or remove it in your 3D tool before export');
+  for (const layer of layers) {
+    if (Number(property(layer, 'Weight', 100)) !== 100 || Number(property(layer, 'Mute', 0)) !== 0)
+      throw new TypeError('Unsupported FBX animation layer blending; bake or remove it in your 3D tool before export');
+    if (Number(property(layer, 'BlendMode', 0)) !== 0)
+      throw new TypeError('Unsupported FBX animation layer mode; bake or remove it in your 3D tool before export');
+    return layerTracks(ctx, layer, cache);
+  }
+  return { models: new Map(), weights: new Map() };
+}
+
 export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): AnimationData[] {
   const clips: AnimationData[] = [],
-    cache = new Map<bigint, Curve>();
-  let totalValues = 0,
-    bakingSamples = 0;
+    cache = new Map<bigint, Curve>(),
+    blender = ctx.extensions.find((extension) => extension.blend),
+    read: LayerRead = {
+      layer: (node) => layerTracks(ctx, node, cache),
+      weight(key) {
+        for (const c of ctx.incoming.get(key) ?? []) {
+          const source = ctx.document.objects.get(c.child)!;
+          if (c.kind === 'OP' && source.name === 'AnimationCurve') return curve(ctx, source);
+        }
+      },
+      sample,
+    };
+  let totalValues = 0;
   const reserve = (count: number) => {
     totalValues += count;
     if (totalValues > 16_000_000)
@@ -240,59 +358,24 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
   };
   for (const stack of ctx.document.objects.values()) {
     if (stack.name !== 'AnimationStack') continue;
-    const models = new Map<bigint, Map<string, Axes>>(),
-      weights = new Map<bigint, Curve>(),
-      channels: AnimationChannelData[] = [];
-    const layers = children(ctx, id(stack.properties[0])).filter((n) => n.name === 'AnimationLayer');
-    if (layers.length > 1)
-      throw new TypeError('Unsupported FBX animation layer blending; bake or remove it in your 3D tool before export');
-    for (const layer of layers) {
-      if (Number(property(layer, 'Weight', 100)) !== 100 || Number(property(layer, 'Mute', 0)) !== 0)
-        throw new TypeError(
-          'Unsupported FBX animation layer blending; bake or remove it in your 3D tool before export',
-        );
-      if (Number(property(layer, 'BlendMode', 0)) !== 0)
-        throw new TypeError('Unsupported FBX animation layer mode; bake or remove it in your 3D tool before export');
-      for (const track of children(ctx, id(layer.properties[0])).filter((n) => n.name === 'AnimationCurveNode')) {
-        // Curves on anything else (a lens, a light, a tool's own bookkeeping) have no glTF node channel and are left out.
-        const targets = (ctx.outgoing.get(id(track.properties[0])) ?? []).filter(
-          (c) => c.kind === 'OP' && animated.includes(c.property ?? ''),
-        );
-        if (!targets.length) continue;
-        const tracks = axes(ctx, track, cache);
-        if (!tracks.some(Boolean)) continue;
-        for (const target of targets) {
-          const path = target.property ?? '';
-          if (path === 'DeformPercent') {
-            if (tracks.filter(Boolean).length !== 1 || !tracks[0])
-              throw new TypeError('Unsupported FBX morph curve axes; bake or remove it in your 3D tool before export');
-            if (weights.has(target.parent))
-              throw new TypeError('Duplicate animation target; keep one per target when exporting');
-            weights.set(target.parent, tracks[0]);
-            continue;
-          }
-          if (!ctx.models.has(target.parent))
-            throw new TypeError('FBX animation target is not a model; animate a model node');
-          const record = models.get(target.parent) ?? new Map<string, Axes>();
-          if (record.has(path)) throw new TypeError('Duplicate animation target; keep one per target when exporting');
-          record.set(path, tracks);
-          models.set(target.parent, record);
-        }
-      }
-    }
+    const channels: AnimationChannelData[] = [],
+      layers = children(ctx, id(stack.properties[0])).filter((n) => n.name === 'AnimationLayer'),
+      { models, weights } = blender ? blender.blend!(ctx, layers, read) : singleLayer(ctx, layers, cache);
     for (const [key, tracks] of models) {
       const model = ctx.models.get(key)!,
         node = ctx.nodes.get(key)!,
         all = [...tracks.values()].flat().filter((c): c is Curve => !!c),
-        interpolation = all[0].interpolation;
-      const sampleLocal = createLocalSampler(ctx, model, tracks, () => {
-        if (++bakingSamples > 100_000)
-          throw new RangeError(
-            'FBX animation sampling work budget exceeded; simplify or split the scene, the import limits are listed in the README',
-          );
-      });
+        interpolation = all[0].interpolation,
+        turning = tracks.get('Lcl Rotation');
+      const sampleLocal = createLocalSampler(ctx, model, tracks);
       const seed = commonTimes(all),
-        times = interpolation === 'LINEAR' ? refineTimes(seed, sampleLocal, tracks.get('Lcl Rotation')) : seed;
+        times =
+          interpolation === 'LINEAR'
+            ? refineTimes(seed, sampleLocal, partsAgree, jumpStarts(all), (start, end) =>
+                (turning ?? []).some((c) => c && !c.wrapped && Math.abs(sample(c, end) - sample(c, start)) > 45),
+                !!turning?.some((c) => c?.wrapped),
+              )
+            : seed;
       reserve(times.length * 11);
       const outputs = {
         translation: new Float32Array(times.length * 3),
@@ -324,13 +407,17 @@ export function buildAnimations(ctx: SceneContext, morphs: MorphBinding[]): Anim
       const curves = binding.channels.map((key) => weights.get(key)),
         all = curves.filter((c): c is Curve => !!c);
       if (!all.length) continue;
-      const times = commonTimes(all),
-        width = curves.length;
+      const width = curves.length,
+        rest = binding.mesh.node.morphWeights!,
+        weightsAt = (time: number) => curves.map((c, k) => (c ? sample(c, time) / 100 : rest[k])),
+        // Weights run from 0 to 1, so an absolute 1e-5 is the transform tolerance at that size.
+        agree = (a: number[], b: number[], p: number[], alpha: number) =>
+          p.every((v, k) => Math.abs(v - (a[k] * (1 - alpha) + b[k] * alpha)) <= 1e-5),
+        seed = commonTimes(all),
+        times = all.some((c) => c.at) ? refineTimes(seed, weightsAt, agree, jumpStarts(all)) : seed;
       reserve(times.length * (width + 1));
       const values = new Float32Array(times.length * width);
-      for (let i = 0; i < times.length; i++)
-        for (let k = 0; k < width; k++)
-          values[i * width + k] = curves[k] ? sample(curves[k]!, times[i]) / 100 : binding.mesh.node.morphWeights![k];
+      for (let i = 0; i < times.length; i++) values.set(weightsAt(times[i]), i * width);
       channels.push({
         node: binding.mesh.node,
         path: 'weights',

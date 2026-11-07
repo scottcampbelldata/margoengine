@@ -26,7 +26,7 @@ animation.play('Walking');
 - Linear Normalize skin clusters, exact joint IDs and bind matrices, four strongest influences with deterministic tie order and normalization, and remapping onto split vertices.
 - Single-shape blend channels with sparse position/normal deltas, names, initial weights, and animated percent weights. Blender's all-100 per-control-point FullWeights convention is accepted.
 - Lambert/Phong dielectric materials, diffuse/emissive colors, opacity/transparency, shininess-derived roughness, and embedded or external PNG/JPEG diffuse and normal textures.
-- Multiple animation stacks, one layer per stack, STEP and LINEAR curves, missing-axis rest values, and interpolation at common key times. LINEAR transform tracks are adaptively baked for Euler motion and moving pivots, with sampled translation/scale tolerance `1e-5 * max(1, magnitude)` and angular tolerance `1e-4` radians. These are sampling criteria, not a proof of continuous error bounds. Rotation segments are subdivided to preserve full turns.
+- Multiple animation stacks, one layer per stack (any number with `animationLayers`), STEP and LINEAR curves (every kind with `animationLayers`), missing-axis rest values, and interpolation at common key times. LINEAR transform tracks are adaptively baked for Euler motion and moving pivots, with sampled translation/scale tolerance `1e-5 * max(1, magnitude)` and angular tolerance `1e-4` radians. These are sampling criteria, not a proof of continuous error bounds. Rotation segments are subdivided to preserve full turns.
 
 ## UV sets and colour layers
 
@@ -45,6 +45,26 @@ A texture whose `UVSet` names a later set samples that set (`texCoord`); the fir
 A vertex that differs in any kept layer is split, so a file with a separate lightmap layout can gain vertices. Sets past the fourth and layers past the second are dropped. gltf-pro draws `COLOR_0` only, so `COLOR_1` is there for your own reader; it packs `TEXCOORD_2` and `3` only when a material reads them.
 
 Proof: a grid from Blender's own exporter with three UV maps and two colour attributes (`test/fixtures/blender-layers.py`) keeps every value Blender reports.
+
+## Animation layers and cubic curves
+
+`animationLayers` from `margoengine/fbx/layers` reads every kind of curve (cubic with auto, user, weighted and TCB tangents, constant, constant next) and blends a stack's layers, so clips from MotionBuilder and Maya import as authored.
+
+```ts
+import {loadFBX} from 'margoengine/fbx';
+import {animationLayers} from 'margoengine/fbx/layers';
+import {Animation} from 'margoengine/animation';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadFBX(engine, '/assets/take.fbx', {extensions: [animationLayers]});
+Animation.attach(model).play('Take 001');
+```
+
+A glTF clip here is linear, so a cubic span becomes as many keys as it takes to stay within the baking tolerance above, and a constant key becomes two keys one Float32 step apart. Layers follow their `BlendMode`: additive adds the weighted value, override shows the weighted value and hides what is below, passthrough mixes with what is below. `Weight` and curves on it, `Mute` and `Solo` count. `RotationAccumulationMode` picks quaternions (by layer) or plain angles (by channel), and `ScaleAccumulationMode` picks multiplying, where a weight is a power, or adding. Rotation blends as XYZ on every node, whatever its order: that is what Maya stores.
+
+Without the entry, a file with cubic curves or several layers is refused with an error that says so. Stacks of one layer pass through with no blending, so a turn past 180 degrees stays one.
+
+Proof: Maya's own frame of a file with three layers, weighted by a curve, on cubes of all six rotation orders matches to the OBJ's six decimals (`test/layers.test.js`). Override at a partial weight is by the SDK reference's definition, on hand-written files (stand-in).
 
 ## Cameras and lights
 
@@ -102,7 +122,7 @@ Children of a node with an uneven scale get `InheritType` 1, the plain parent x 
 
 Input is capped at 64 MiB, converted GLB at 128 MiB, expanded position vertices at 1,000,000 across mesh instances, and decoded texture pixels at 16,000,000. Parsing also bounds cumulative decoded arrays to 64 MiB, allocation accounting to 128 MiB, node/property counts, hierarchy depth, and work. Geometry, deformation, and animation have additional work/output limits. These are import budgets, not a zero-allocation or peak-heap guarantee. The downstream glTF runtime separately limits GLB/buffer bytes to 64 MiB, so a larger `convertFBX` result may be exportable but cannot be attached by `parseFBX`.
 
-Unsupported data rejects explicitly: InheritType other than 0, nonuniform ancestor scales (including animated parent scales), unrepresentable shear, spherical rotation order, Additive/TotalOne or nonlinear skinning, progressive morphs, layered textures, cubic/mixed/constant-next animation interpolation, and animation-layer blending. Cameras and lights stay empty nodes without `sceneExtras`. Non-mesh geometry does not produce renderable output. Curves on anything but a node's transform or a blend channel's weight are left out. Extra UV/layer sets and unsupported material maps are omitted. Arbitrary shader graphs are outside the supported material subset.
+Unsupported data rejects explicitly: InheritType other than 0, nonuniform ancestor scales (including animated parent scales), unrepresentable shear, spherical rotation order, Additive/TotalOne or nonlinear skinning, progressive morphs, layered textures, and, without `animationLayers`, cubic/mixed/constant-next curves and more than one animation layer. Cameras and lights stay empty nodes without `sceneExtras`. Non-mesh geometry does not produce renderable output. Curves on anything but a node's transform or a blend channel's weight are left out. Extra UV/layer sets and unsupported material maps are omitted. Arbitrary shader graphs are outside the supported material subset.
 
 Array decompression requires platform `DecompressionStream('deflate')`. Image decoding in `parseFBX` requires `createImageBitmap`; `convertFBX` can run headlessly without image decoding. Cancellation is checked during fetch, decompression, parsing, baking, and image decoding; synchronous CPU sections cannot process a newly dispatched abort until the JavaScript event loop resumes.
 
