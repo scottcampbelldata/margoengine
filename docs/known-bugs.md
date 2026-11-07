@@ -29,19 +29,19 @@ are still open.
 
 ## README examples
 
-### 115 of 767 README examples do not run yet
+### 107 of 767 README examples do not run yet
 
 - **What:** `npm run check:readme-run`, a step of `check:merge` since 2026-11-07, ran 641 of 767 examples that day (RTX A6000,
-  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 115 are left there, each with its error. A new failure fails the step, and
+  Chromium). The other 126 went into `scripts/support/readme-run-known.json`; 107 are left there, each with its error. A new failure fails the step, and
   so does an entry that passes or names an example that is gone. An id is the heading above an example and a hash of its code, so
   an example added above one on the list leaves it alone; changing a listed example changes its id, and the entry moves with it.
 - **Repro:** `npm run build:packages`, then `npm run check:readme-run -- --only=<id>` with an id from that list.
-- **Cause:** 97 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
-  and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. Ragdoll,
-  fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 18 start
+- **Cause:** 90 entries start `sample:`. The example names a file of its own (a font, a scan, a rigged model with named joints)
+  and the check has no matching sample, or the sample does not fit it, so these say nothing about the example yet. The ragdoll's
+  get-up (no free rig here has get-up clips), the animator's warping (no clip here travels, so a distance warp has nothing to fit), fbx, the animator's joint indices and `usdz/readme-margoengine-usdz-087124` and `usdz/readme-composition-fbebfe` (no `.usdz` file is in the repository) are in this group. 17 start
   `example:`, and these need reading one at a time:
-  - Five attach one plugin twice to one engine, which core refuses (`post/readme-smaa-10a00a`, `shadows/readme-margoengine-shadows-7183ea`, `quality/readme-tier-presets-0abcba`,
-    `sky/readme-fog-b452c1`, `ragdoll/readme-saved-profiles-margoengine-ragdo-104541`), so the example shows two alternatives as if one ran after the other.
+  - Four attach one plugin twice to one engine, which core refuses (`post/readme-smaa-10a00a`, `shadows/readme-margoengine-shadows-7183ea`, `quality/readme-tier-presets-0abcba`,
+    `sky/readme-fog-b452c1`), so the example shows two alternatives as if one ran after the other.
   - `cameras/readme-physical-exposure-margoengine-ca-6d1c49` needs `source` on Tonemap, `exporters/readme-render-to-file-80cd28` reads a second view the example never made,
     `exporters/readme-unity-asset-and-support-bundles-a4fd05` needs the Studio source profile, `stage/readme-feature-entries-a6844a` gets a model minimal glTF refuses, and
     `headless/readme-image-sequences-and-video-9967ce` passes a page engine to `readPixels`.
@@ -997,6 +997,8 @@ diagnostic). Their causes and the fixes that landed are in `bench/parity-causes.
 | LAS: a file with a deprecated extra bytes type, 11 to 30, was refused whole | Those pairs and triples were not known | Read as `name[0]`, `name[1]` and so on | `packages/points/tests/laz-real.test.js` |
 | LAZ: chunk size 0 failed | Only 2^32-1 meant variable chunks; the specification names both | Both mean variable chunks | `packages/points/tests/laz.test.js` (test encoder) |
 | LAS: positions 16 m coarse on a real file (`simple1_3.las`) | ALSXX_PP stored the header box as raw integers, a thousand times too far out, and positions are float32 relative to that box | When the first point lies outside the box the first point is the origin | `packages/points/tests/las.test.js`, `packages/loaders/tests/las.test.js` |
+| A web page read as a point cache was refused as "Point cache holds 3418670067845590500 floats, over maxFloats; raise maxFloats" | MDD has no magic, so any file reads as an MDD header, and the reader checked `maxFloats` before the bytes the file holds | The size a header claims is checked against the file first: a cut file or no point cache is refused as one | `packages/animation/tests/point-cache.test.js` |
+| Eight README examples on the readme-run known list were renamed by README edits and failed unseen | An id hashes the example's code, and `check:readme-run` runs only in the full check after a push | Six run on KayKit's mannequin (CC0) and the warping and get-up entries carry their new ids; verify now fails on a known entry no example holds | `tests/run-readme-examples.test.js` |
 | `docs/known-bugs.md` held rebase conflict markers on main | A conflict resolved by hand in commit 9f8c8a24d kept them, and no check read for them | Both sides kept, markers gone | `tests/conflict-markers.test.js` |
 
 ## Fixed 2026-11-05

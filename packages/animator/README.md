@@ -92,9 +92,9 @@ import { Animation } from 'margoengine/animation';
 import { Animator, addRootMotion } from 'margoengine/animator';
 
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
-const model = await loadGLTF(engine, '/hero.glb'); // a Walk clip that travels forward
-const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walk' } });
-const hips = model.asset.doc.nodes!.findIndex((n) => n.name === 'Hips');
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb'); // KayKit's mannequin (CC0)
+const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walking_A' } });
+const hips = model.asset.doc.nodes!.findIndex((n) => n.name === 'hips');
 const motion = addRootMotion(animator, {
   joint: hips, // the bone whose clip translation is the travel
   target: model.root, // default: the model's root node
@@ -104,7 +104,7 @@ const motion = addRootMotion(animator, {
   smoothing: 0, // default: seconds of path averaged into the travel; 0.5 suits a real walk
 });
 engine.start();
-console.log(motion.translation, motion.yaw); // last frame's travel and turn
+console.log(motion.translation, motion.yaw); // last frame's travel and turn: none, as Walking_A walks in place
 motion.dispose(); // the hips travel with the clip again
 ```
 

@@ -20,15 +20,15 @@ await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
 const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
-const model = await loadGLTF(engine, '/hero.glb'); // a skinned character with a Run clip
-Animator.attach(Animation.attach(model), { initial: 'run', states: { run: 'Run' } });
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb'); // KayKit's skinned mannequin (CC0), with a Running_A clip
+Animator.attach(Animation.attach(model), { initial: 'run', states: { run: 'Running_A' } });
 
 // After the Animator, so it runs after the animation each frame.
-const hips = model.nodes.find((node) => node.name === 'Hips')!;
+const hips = model.nodes.find((node) => node.name === 'hips')!;
 const ragdoll = Ragdoll.attach(physics, { root: hips });
 
 // A hit: go limp and push the bone that was struck.
-const head = ragdoll.bones.find((part) => part.node.name === 'Head');
+const head = ragdoll.bones.find((part) => part.node.name === 'head');
 ragdoll.activate();
 head?.body.applyImpulse([0, 2, -30]);
 
@@ -56,14 +56,17 @@ For full control, list the bones yourself instead of `root`: each is a node or `
 One bone is the root, and every other bone's parent node must be in the list.
 
 ```ts
-const node = (name: string) => model.nodes.find((n) => n.name === name)!;
+// A second mannequin on the same rig: a skeleton has one ragdoll.
+const other = await loadGLTF(engine, '/Rig_Medium_General.glb');
+const node = (name: string) => other.nodes.find((n) => n.name === name)!;
 const custom = Ragdoll.attach(physics, {
   bones: [
-    node('Hips'),
-    { node: node('Spine'), joint: { type: 'cone', swing: 0.4, twist: [-0.3, 0.3] } },
-    { node: node('Head'), length: 0.25, radius: 0.1 },
-    node('LeftUpLeg'),
-    { node: node('LeftLeg'), joint: { type: 'hinge', axis: [1, 0, 0], limits: [0, 2.4] } },
+    node('hips'),
+    { node: node('spine'), joint: { type: 'cone', swing: 0.4, twist: [-0.3, 0.3] } },
+    node('chest'),
+    { node: node('head'), length: 0.25, radius: 0.1 },
+    node('upperleg.l'),
+    { node: node('lowerleg.l'), joint: { type: 'hinge', axis: [1, 0, 0], limits: [0, 2.4] } },
   ],
 });
 ```
@@ -103,13 +106,13 @@ Without an animation, blending back returns to the pose the bones had before the
 `activate(limb)` makes one limb physical while the rest keeps animating: pass a bone (a node or a part), or a list. That bone and every bone under it go limp and hang from the bones that keep animating, so a hit swings one arm while the character walks on. `deactivate(seconds, limb)` blends that limb back alone. The spine takes the whole upper body, with the legs still walking.
 
 ```ts
-const arm = model.nodes.find((node) => node.name === 'LeftArm')!;
+const arm = model.nodes.find((node) => node.name === 'upperarm.l')!;
 ragdoll.activate(arm);
 ragdoll.part(arm)?.body.applyImpulse([0, 2, -20]);
 setTimeout(() => ragdoll.deactivate(0.4, arm), 800);
 
-const rightArm = model.nodes.find((node) => node.name === 'RightArm')!;
-const spine = model.nodes.find((node) => node.name === 'Spine')!;
+const rightArm = model.nodes.find((node) => node.name === 'upperarm.r')!;
+const spine = model.nodes.find((node) => node.name === 'spine')!;
 ragdoll.activate([arm, rightArm]); // a list: both arms
 ragdoll.activate(spine); // the upper body; `activate()` with no bone is all of them
 ```
@@ -152,9 +155,9 @@ await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
 const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb'); // KayKit's skinned mannequin (CC0)
 const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
-const hips = bone('Hips');
+const hips = bone('hips');
 const ragdoll = Ragdoll.attach(physics, { root: hips });
 const motors = addRagdollMotors(ragdoll, { root: 1 });
 ragdoll.activate(); // physical, and still walking its clip
@@ -162,7 +165,7 @@ ragdoll.activate(); // physical, and still walking its clip
 // A hit: the impulse lands on the chest, the limb weakens at once and gets its strength back over 0.6 seconds.
 motors.hit(ragdoll.bones[4], [0, 0, -150], { weaken: 0.8, recover: 0.6 });
 
-motors.setStrength(bone('LeftHand'), 0); // that limb hangs while the rest stays powered
+motors.setStrength(bone('hand.l'), 0); // that limb hangs while the rest stays powered
 motors.fade(0, 1.5); // weaken over a second and a half: a slow collapse
 ```
 
@@ -254,9 +257,9 @@ await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
 const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb'); // KayKit's skinned mannequin (CC0)
 const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
-const hips = bone('Hips');
+const hips = bone('hips');
 const ragdoll = Ragdoll.attach(physics, { root: hips });
 const fitted = fitRagdollShapes(ragdoll, model);
 console.log(`${fitted.length} of ${ragdoll.bones.length} bones fit the mesh`);
@@ -289,15 +292,24 @@ await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
 const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
-const model = await loadGLTF(engine, '/hero.glb');
-const otherModel = await loadGLTF(engine, '/guard.glb');
-const otherPhysics = new Physics(engine);
+// Two KayKit mannequins (CC0) on one rig: one engine has one Physics, which both ragdolls share.
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb');
+const otherModel = await loadGLTF(engine, '/Rig_Medium_General.glb');
+const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
+// KayKit names its bones its own way, so name the humanoid ones.
+const bones = {
+  hips: bone('hips'), spine: bone('spine'), chest: bone('chest'), head: bone('head'),
+  leftUpperArm: bone('upperarm.l'), leftLowerArm: bone('lowerarm.l'), leftHand: bone('wrist.l'),
+  rightUpperArm: bone('upperarm.r'), rightLowerArm: bone('lowerarm.r'), rightHand: bone('wrist.r'),
+  leftUpperLeg: bone('upperleg.l'), leftLowerLeg: bone('lowerleg.l'), leftFoot: bone('foot.l'),
+  rightUpperLeg: bone('upperleg.r'), rightLowerLeg: bone('lowerleg.r'), rightFoot: bone('foot.r'),
+};
 
 // Anatomical ranges, hinged knees and elbows, published mass shares.
-const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes, { mass: 82 }), model.nodes));
+const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes, { mass: 82, bones }), model.nodes));
 
 const saved = JSON.stringify(saveRagdollProfile(ragdoll));
-const again = Ragdoll.attach(otherPhysics, ragdollOptions(JSON.parse(saved), otherModel.nodes));
+const again = Ragdoll.attach(physics, ragdollOptions(JSON.parse(saved), otherModel.nodes));
 ```
 
 | Function | Gives |
@@ -325,14 +337,22 @@ await Physics.load();
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!);
 const physics = new Physics(engine);
 physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [20, 0.1, 20] } });
-const model = await loadGLTF(engine, '/hero.glb');
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb'); // KayKit's skinned mannequin (CC0)
 const bone = (name: string) => model.nodes.find((node) => node.name === name)!;
-const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes), model.nodes));
+// KayKit names its bones its own way, so name the humanoid ones.
+const bones = {
+  hips: bone('hips'), spine: bone('spine'), chest: bone('chest'), head: bone('head'),
+  leftUpperArm: bone('upperarm.l'), leftLowerArm: bone('lowerarm.l'), leftHand: bone('wrist.l'),
+  rightUpperArm: bone('upperarm.r'), rightLowerArm: bone('lowerarm.r'), rightHand: bone('wrist.r'),
+  leftUpperLeg: bone('upperleg.l'), leftLowerLeg: bone('lowerleg.l'), leftFoot: bone('foot.l'),
+  rightUpperLeg: bone('upperleg.r'), rightLowerLeg: bone('lowerleg.r'), rightFoot: bone('foot.r'),
+};
+const ragdoll = Ragdoll.attach(physics, ragdollOptions(humanoidProfile(model.nodes, { bones }), model.nodes));
 const motors = addRagdollMotors(ragdoll, { frequency: 8 });
-const balance = addRagdollBalance(ragdoll, motors, { feet: [bone('LeftFoot'), bone('RightFoot')] });
+const balance = addRagdollBalance(ragdoll, motors, { feet: [bone('foot.l'), bone('foot.r')] });
 ragdoll.activate();
 
-motors.hit(bone('Spine'), [0, 0, -40]); // it stumbles, steps and catches itself
+motors.hit(bone('spine'), [0, 0, -40]); // it stumbles, steps and catches itself
 if (balance.state === 'fallen') motors.fade(0, 0.5);
 ```
 
