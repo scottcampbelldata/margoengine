@@ -44,6 +44,56 @@ console.log(response.status);
 of files available offline ahead of time, fetch them once and wait for the writes:
 `await Promise.all(urls.map(u => cache.fetch(u).then(r => r.arrayBuffer()))); await cache.flush();`
 
+## Range requests and streaming
+
+`margoengine/cache/ranges` keeps the byte ranges a file is read in, as aligned blocks, so a streamed model (gltf-pro's
+`loadGLTFProgressive`, KTX2 streaming, LAS and COPC point clouds) also loads from disk and offline. Only the blocks a
+request covers and does not have go to the network; a request whose blocks are all stored is answered 206 with no
+request at all.
+
+```ts
+import {RangeCache} from 'margoengine/cache/ranges';
+
+const ranges = new RangeCache({
+  name: 'plant-viewer-ranges', // its own IndexedDB database
+  version: '2026.10',          // change it to drop every stored block
+  maxBytes: 2 ** 30,           // byte budget over all files; least recently used files are evicted (default 512 MiB)
+  block: 65536,                // ranges are fetched and stored in whole aligned blocks (default 64 KiB)
+});
+const head = await ranges.fetch('/line-4.glb', {headers: {Range: 'bytes=0-65535'}});
+console.log(head.status, head.headers.get('content-range')); // 206, 'bytes 0-65535/<file size>'
+await ranges.flush();
+console.log(ranges.stats, await ranges.usage()); // {hits, revalidated, offline, partial, misses, ...}, {bytes, files, blocks}
+```
+
+Progressive streaming runs its requests in a worker with the global `fetch`, so it reaches the cache through a service
+worker. Route every request for a streamed file to the RangeCache (it also answers whole-file requests from its blocks):
+
+```js
+// sw.js (module service worker)
+import {RangeCache} from 'margoengine/cache/ranges';
+const ranges = new RangeCache({name: 'plant-viewer-ranges', version: '2026.10'});
+type FetchEvent = Event & {request: Request; respondWith(response: Promise<Response>): void};
+self.addEventListener('fetch', e => {
+  const event = e as FetchEvent;
+  if (/\.(glb|gltf|bin|ktx2|las|laz|copc)$/i.test(new URL(event.request.url).pathname))
+    event.respondWith(ranges.fetch(event.request));
+});
+```
+
+- A miss is asked for widened to whole blocks (`bytes=10-19` becomes `bytes=0-65535`); gltf-pro's 256 KB requests are
+  whole blocks already. A request needing blocks that are not stored asks for each run of adjacent missing blocks once.
+  A server that ignores `Range` answers 200: the whole file is stored and the request is answered 206 from it.
+- Stored blocks are revalidated once per RangeCache with a one-byte conditional request (`Range: bytes=0-0` with
+  `If-None-Match` / `If-Modified-Since`) unless `Cache-Control: max-age` holds. A response with another ETag,
+  Last-Modified or size drops every block of the file and the request is asked again, so blocks of two versions are
+  never mixed. Offline, failing or past `timeout` (default 5 s), stored blocks are served (`stats.offline`); a request
+  needing a block never fetched fails as the network does.
+- A request without `Range` is answered 200 from the blocks (fetching only the missing ones), and a 200 download is
+  stored as blocks. Multi-range requests, non-GET and non-HTTP requests, `no-store` and error answers pass through.
+- `version` or `block` changed: every block is dropped. `delete(url)`, `clear()`, `dispose()` and `using` work as in
+  AssetCache. Without IndexedDB every request goes to the network.
+
 ## Loaders
 
 | Loader | Option | Worker entry with `fetch` |
@@ -125,7 +175,7 @@ manager.abort(); // cancels every request in flight (each reports onError); the 
 - Range requests (`Range: bytes=a-b`, `a-`, `-n`): a hit is answered 206 from the stored whole file (416 when
   unsatisfiable; a multi-range request gets the whole file). A miss goes to the network unchanged and downloads the
   whole file once in the background, so the next visit (or the offline one) has it. Cold, that costs the range bytes
-  plus the whole file.
+  plus the whole file. To store only the ranges read, use `margoengine/cache/ranges` (above).
 
 ## Budget, quota and failures
 
@@ -167,5 +217,8 @@ budget and revalidation.
   works). `Expires` and `Age` are ignored; `no-cache` and missing `max-age` mean "revalidate".
 - A miss is read fully before the loader gets it (all Margo loaders read whole files anyway).
 - Eviction reads every entry's metadata (not the bytes) before each write: fine for thousands of files.
+- RangeCache: proved in Node with gltf-pro's real streaming code, an in-memory IndexedDB and a stand-in server; not yet
+  run in a browser or service worker, and not timed. Eviction reads every file's record (one per file, not per block)
+  before each write. Two requests in flight at once that share a block both fetch it (it is stored once).
 - Measured in a real browser (DamagedHelmet, the earlier test model, and a 62 MB GLB, online, throttled and DevTools offline):
   `examples/package-benchmarks/cache/offline-gpu.mjs`, results in `examples/package-benchmarks/cache/results.json`.

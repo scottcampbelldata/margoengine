@@ -294,6 +294,10 @@
       "types": "./dist/cache/hashed.d.ts",
       "import": "./dist/cache/hashed.js"
     },
+    "./cache/ranges": {
+      "types": "./dist/cache/ranges.d.ts",
+      "import": "./dist/cache/ranges.js"
+    },
     "./cameras": {
       "types": "./dist/cameras.d.ts",
       "import": "./dist/cameras.js"

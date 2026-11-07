@@ -33,6 +33,10 @@
     "./hashed": {
       "types": "./dist/hashed.d.ts",
       "import": "./dist/hashed.js"
+    },
+    "./ranges": {
+      "types": "./dist/ranges.d.ts",
+      "import": "./dist/ranges.js"
     }
   },
   "files": [

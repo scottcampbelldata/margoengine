@@ -3014,6 +3014,7 @@ package's own gzip size, scaled so the parts add up to the chunk's). Core lights
 | LAS and LAZ (`@margoengine/loaders/las`, `@margoengine/points/las`, 2026-11-06) | By method: one reader, in `points`; `loaders/las` is a thin layer over it. A `.laz` opens with no hook through the decoder of `points/laz`, which loads only when a compressed file arrives. Formats 0 to 10 equal LASzip and lazrs record for record and field by field on real files (`packages/points/tests/laz-real.test.js`). No public file of formats 4, 5 or 9 was found, so LASzip itself compressed those samples from real points, and it wrote the samples where the scanner channel switches. Stand-in proof only, on the test encoder: compressor 0, compressor 1 with version 2 items, and chunk size 0, because no tool here writes them. Refused with code `unsupported`: LAZ item version 1, coders other than arithmetic, compressors above 3, chunk table versions other than 0, waveform samples that are compressed or not 8, 16 or 32 bits. An extra bytes type above 30 is a `header` error. A LAS 1.4 compatibility mode file reads as stored, not remapped. Positions are 32-bit floats relative to `origin`. | Item version 1 is the coding of LASzip 1.0. The LAZ specification 1.4 R1 calls it outdated and leaves it out, the LASzip paper says it does not describe it, and the clean room rule keeps LASzip's source closed. The specification leaves compatibility mode out too. | Older LASzip files stay closed: three real samples of them were seen. `/las` in `loaders` takes whole files, so a file larger than memory does not open there. | Compress the file again with a current LASzip, or pass `decompress` with a decoder of your own. `loadLAS` of `points/las` streams from a URL; `step` thins a cloud; `maxVertices` refuses one past the limit. |
 | OpenVDB volumes (`@margoengine/loaders/vdb`, 2026-11-06) | By method: file versions 222 and later; `float`, `double`, `int32`, `int64`, `vec3s`, `vec3d`, `vec3i` and half grids; uncompressed, zlib and Blosc with LZ4. Other grids and frustum transforms are left out. NanoVDB is not read. Tested only on stand-in files the test writes (LIM-202). | No published byte-level specification and no real sample file in the repository to prove more against. | A left-out grid is named in `skipped`; a file with no grid offsets, another Blosc codec or an older version is refused with code `unsupported`. | Convert the grid to a supported type in the tool that wrote it. |
 | MaterialX and Lottie (`@margoengine/loaders/materialx`, `/lottie`, 2026-11-06) | By method: MaterialX converts four surface shaders and the nodes node materials can hold; emission, opacity, procedural nodes, `uvtiling`, includes and custom nodedefs do not convert. Lottie leaves out masks, mattes, text, effects, blend modes, 3D layers, repeaters, merge paths, rounded corners, star roundness and expressions (LIM-205). Neither output has been compared with a reference renderer or player. | Node materials are a closed set of nodes; a Lottie frame here is paths and images, and those features need a compositor. | MaterialX names each loss in `skipped`, and Lottie each feature in `unsupported`, except expressions. | Bake the feature in the authoring tool, or build the graph with `@margoengine/materials` by hand. |
+| Range cache (`@margoengine/cache/ranges`, 2026-11-07) | Proved on stand-ins: gltf-pro's own streaming code (`GLTFStream`) runs through `RangeCache.fetch` in Node, with an in-memory IndexedDB and a stand-in server, and its buffers equal the file cold and offline. Not yet run in a real browser or service worker, and not timed. By method: blocks are 64 KiB by default; eviction is per file and reads every file's record (one per file, not per block) before each write; two requests in flight at once that share a block both fetch it. | Blocks let a streamed file be stored as it is read, without the whole file. | A cold request is widened to whole blocks, at most one block more on each side. A request needing a block never fetched fails offline. | Use `AssetCache` to store whole files; a smaller `block` widens requests less. |
 
 React and React DOM are 66% of the page; Margo's part (core, stage, bindings) is 25,949 B gzip (27,028 B before the
 stage feature entries and the React subpaths of 2026-10-27, which took 3,089 B of minified loaders out of the stage). Nothing optional is in
@@ -5437,32 +5438,41 @@ console.log(response.status);
 of files available offline ahead of time, fetch them once and wait for the writes:
 `await Promise.all(urls.map(u => cache.fetch(u).then(r => r.arrayBuffer()))); await cache.flush();`
 
-## Loaders
+## Range requests and streaming
 
-| Loader | Option | Worker entry with `fetch` |
-| --- | --- | --- |
-| gltf-pro `loadGLTF`, `parseGLTFAsync` | `fetch` (file, external .bin and images) | `loadGLTFInWorker` runs on the main thread (a function cannot move to the worker); for a GLB use `parseGLTFInWorker(engine, await (await cache.fetch(url)).arrayBuffer())` to keep parsing in the worker |
-| fbx `loadFBX`, `parseFBX`, `convertFBX` | `fetch` (file and external textures) | `loadFBXInWorker` / `parseFBXInWorker` run on the main thread; `parseFBXInWorker(engine, bytes)` without `fetch` keeps the worker for embedded textures |
-| usdz `loadUSDZ` | `fetch` | `loadUSDZInWorker` downloads through `fetch` here and parses in the worker |
-| loaders `fetchBytes`, `load` | `fetch` (already existed) | `parse*InWorker(bytes)` |
-
-The cache itself also works inside your own worker (`new AssetCache(...)` there opens the same database).
-
-## Loading manager
-
-`@margoengine/cache/manager` is a separate entry (about 2 kB gzip, no IndexedDB code) with `LoadingManager`: one
-progress, error and abort source for every loader. `manager.fetch` is fetch-compatible, so it goes in the same `fetch`
-option as `cache.fetch`, and every file a loader requests through it counts as one item: the model and also the
-external buffers, `mtllib` files and textures the loader resolves next to it.
+`margoengine/cache/ranges` keeps the byte ranges a file is read in, as aligned blocks, so a streamed model (gltf-pro's
+`loadGLTFProgressive`, KTX2 streaming, LAS and COPC point clouds) also loads from disk and offline. Only the blocks a
+request covers and does not have go to the network; a request whose blocks are all stored is answered 206 with no
+request at all.
 
 ```ts
-import {AssetCache} from 'margoengine/cache';
-import {LoadingManager} from 'margoengine/cache/manager';
-import {loadGLTF} from 'margoengine/gltf-pro';
-import {loadOBJ} from 'margoengine/loaders/mtl';
-import {Engine} from 'margoengine/core';
-const engine = await Engine.create(document.querySelector('canvas')!);
-const dropped = new Map<string, File>(); // filled by your drop handler: files dropped on the page, by name
+import {RangeCache} from 'margoengine/cache/ranges';
+
+const ranges = new RangeCache({
+  name: 'plant-viewer-ranges', // its own IndexedDB database
+  version: '2026.10',          // change it to drop every stored block
+  maxBytes: 2 ** 30,           // byte budget over all files; least recently used files are evicted (default 512 MiB)
+  block: 65536,                // ranges are fetched and stored in whole aligned blocks (default 64 KiB)
+});
+const head = await ranges.fetch('/line-4.glb', {headers: {Range: 'bytes=0-65535'}});
+console.log(head.status, head.headers.get('content-range')); // 206, 'bytes 0-65535/<file size>'
+await ranges.flush();
+console.log(ranges.stats, await ranges.usage()); // {hits, revalidated, offline, partial, misses, ...}, {bytes, files, blocks}
+```
+
+Progressive streaming runs its requests in a worker with the global `fetch`, so it reaches the cache through a service
+worker. Route every request for a streamed file to the RangeCache (it also answers whole-file requests from its blocks):
+
+```js
+// sw.js (module service worker)
+import {RangeCache} from 'margoengine/cache/ranges';
+const ranges = new RangeCache({name: 'plant-viewer-ranges', version: '2026.10'});
+type FetchEvent = Event & {request: Request; respondWith(response: Promise<Response>): void};
+self.addEventListener('fetch', e => {
+  const event = e as FetchEvent;
+  if (/\.(glb|gltf|bin|ktx2|las|laz|copc)$/i.test(new URL(event.request.url).pathname))
+    event.respondWith(ranges.fetch(event.request));
+});
 ```
 
 [README continues: https://margoengine.com/llms/packages/cache.md]
