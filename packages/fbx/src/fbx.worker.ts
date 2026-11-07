@@ -6,7 +6,7 @@ import { serve } from '../../shared/worker.js';
 import { convertFBX } from './index.js';
 import type { FBXExtension } from './extension.js';
 import { animationLayers } from './layers.js';
-import { sceneExtras } from './scene-extras.js';
+import { nurbsCurves } from './curves.js';
 const budget = 64 * 1024 * 1024; // convertFBX's input budget
 import { pbrMaterials } from './pbr.js';
 const known: readonly FBXExtension[] = [sceneExtras, animationLayers];

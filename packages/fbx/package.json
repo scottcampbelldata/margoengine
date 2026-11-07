@@ -42,6 +42,10 @@
       "types": "./dist/layers.d.ts",
       "import": "./dist/layers.js"
     },
+    "./curves": {
+      "types": "./dist/curves.d.ts",
+      "import": "./dist/curves.js"
+    },
     "./pbr": {
       "types": "./dist/pbr.d.ts",
       "import": "./dist/pbr.js"
