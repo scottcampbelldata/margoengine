@@ -2954,6 +2954,10 @@
       "types": "./dist/xr/models.d.ts",
       "import": "./dist/xr/models.js"
     },
+    "./xr/ar": {
+      "types": "./dist/xr/ar.d.ts",
+      "import": "./dist/xr/ar.js"
+    },
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"

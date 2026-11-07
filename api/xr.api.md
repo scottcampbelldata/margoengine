@@ -237,6 +237,7 @@ export interface XRSessionOptions {
     referenceSpace?: 'viewer' | 'local' | 'local-floor' | 'bounded-floor' | 'unbounded';
     requiredFeatures?: string[];
     optionalFeatures?: string[];
+    init?: Record<string, unknown>;
     signal?: AbortSignal;
     onFrame?: (state: XRFrameState) => void;
 }

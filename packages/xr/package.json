@@ -43,6 +43,10 @@
     "./models": {
       "types": "./dist/models.d.ts",
       "import": "./dist/models.js"
+    },
+    "./ar": {
+      "types": "./dist/ar.d.ts",
+      "import": "./dist/ar.js"
     }
   },
   "files": [

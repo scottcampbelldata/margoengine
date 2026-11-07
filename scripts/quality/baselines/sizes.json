@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10678018,
+  "total": 10680846,
   "history": [
     {
       "date": "2026-10-24",
@@ -3794,6 +3794,12 @@
       "commit": "94a48aabf",
       "reason": "new entry @margoengine/blender/ktx2: KTX2 textures in .margo",
       "grew": 3
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "d36044b0f",
+      "reason": "xr/ar: new optional entry, AR planes, depth and light estimation",
+      "grew": 1
     }
   ],
   "items": {
@@ -4537,6 +4543,7 @@
     "@margoengine/worker": 2128,
     "@margoengine/worker/canvas": 1597,
     "@margoengine/xr": 8631,
+    "@margoengine/xr/ar": 2828,
     "@margoengine/xr/device-check": 2344,
     "@margoengine/xr/models": 3208,
     "leak @margoengine/animation -> @margoengine/gltf-pro/model": 1,

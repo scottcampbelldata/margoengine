@@ -129,3 +129,32 @@ enter.onclick=()=>void xr.requestSession('immersive-vr',{optionalFeatures:['hand
 ```
 
 For a device's own model, serve the [WebXR input profile assets](https://github.com/immersive-web/webxr-input-profiles) and call `fetchProfile(source, baseUrl)`: it picks the most specific listed profile and gives its layout and model URL. `componentStates(layout, controller)` and `responseWeight(response, state)` give each node's weight for the layout's visual responses each frame. `xr.onFrame(callback)` runs a function every XR frame, before the session's own `onFrame`.
+
+## AR planes, depth and light
+
+`@margoengine/xr/ar` reads what an AR device knows about the room, each in the session's reference space. Ask for the features when the session starts; `init` passes module options such as `depthSensing` through to `navigator.xr.requestSession`.
+
+- `ARPlanes.create(xr, { onAdd, onChange, onRemove, show })` follows `frame.detectedPlanes`: each plane's pose (its y axis is the normal), outline, orientation and label, and with `show` a flat mesh per plane.
+- `ARDepth.create(xr)` reads CPU depth: `depthAt(frame, view, x, y)` in metres at a point of the view (0 to 1 from the top left) and `pointAt(...)` the real-world point there.
+- `await ARLight.create(xr, { lighting: engine.lighting })` turns the room's light estimate into `estimate` (spherical harmonics in `@margoengine/math` SH3 order, the brightest light's direction and colour) and points the engine's sun at the room's brightest light, with the ambient set to the room's average light.
+
+```ts
+import {Engine,PbrMaterial} from 'margoengine/core';
+import {XR} from 'margoengine/xr';
+import {ARDepth,ARLight,ARPlanes,DEPTH_SENSING} from 'margoengine/xr/ar';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+const xr=await XR.create(engine);
+const enter=document.createElement('button');enter.textContent='Enter AR';document.body.append(enter);
+enter.onclick=async()=>{
+  await xr.requestSession('immersive-ar',{optionalFeatures:['plane-detection','depth-sensing','light-estimation'],init:{depthSensing:DEPTH_SENSING}});
+  const planes=ARPlanes.create(xr,{show:{engine,material:new PbrMaterial({color:'#4f9be8'})},onAdd:(plane)=>console.log('plane',plane.label)});
+  const light=await ARLight.create(xr,{lighting:engine.lighting});
+  const depth=ARDepth.create(xr);
+  xr.onFrame(({frame,viewer})=>{const view=viewer?.views[0];if(view)console.log(depth.depthAt(frame,view,0.5,0.5));});
+  // planes.dispose() and light.dispose() stop them.
+};
+```
+
+Each `create` throws a coded error naming the feature to ask for when the session lacks it.

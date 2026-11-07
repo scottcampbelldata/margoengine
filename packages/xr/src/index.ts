@@ -55,6 +55,11 @@ export interface XRSessionOptions {
   requiredFeatures?: string[];
   /** Features used when granted, such as 'hit-test'. */
   optionalFeatures?: string[];
+  /**
+   * More session init members from WebXR modules, passed to `navigator.xr.requestSession` as given: for example
+   * `{ depthSensing: DEPTH_SENSING }` from `@margoengine/xr/ar`. The feature lists above win over any given here.
+   */
+  init?: Record<string, unknown>;
   /** Abort while the browser negotiates the session or the layer is set up: the session is ended and the request rejects with the reason. */
   signal?: AbortSignal;
   /** Called once per XR frame with reused state; copy anything you keep. */
@@ -89,7 +94,8 @@ export async function createXREngine(
   Object.defineProperty(gpu, 'requestAdapter', {
     configurable: true,
     writable: true,
-    value: (init?: GPURequestAdapterOptions) => request.call(gpu, { ...init, xrCompatible: true } as GPURequestAdapterOptions),
+    value: (init?: GPURequestAdapterOptions) =>
+      request.call(gpu, { ...init, xrCompatible: true } as GPURequestAdapterOptions),
   });
   let engine: EngineKernel;
   try {
@@ -267,6 +273,7 @@ export class XR implements EnginePlugin {
           "WebGPU XR bindings do not support inline sessions; remove 'webgpu' from the features or request an immersive mode",
         );
       session = await system()!.requestSession(mode, {
+        ...options.init,
         requiredFeatures: [
           ...new Set([
             ...(mode === 'inline' || platform().XRGPUBinding?.webgl ? [] : ['webgpu']),
@@ -364,7 +371,8 @@ export class XR implements EnginePlugin {
       } else if (this.mode !== 'inline') {
         this.renderOptions.delta = delta;
         this.engine.render(this.renderOptions);
-        if (viewer) this.renderer!.render(this.engine, this.binding!, this.layer!, viewer, this.mode === 'immersive-ar');
+        if (viewer)
+          this.renderer!.render(this.engine, this.binding!, this.layer!, viewer, this.mode === 'immersive-ar');
       }
       if (this.session === frame.session && !this.disposed)
         this.handle = frame.session.requestAnimationFrame(this.frame);

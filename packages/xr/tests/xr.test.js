@@ -426,6 +426,15 @@ test('inline uses viewer space without WebGPU layers and preserves reusable inpu
   await xr.end();
   assert.equal(f.engine.starts, 0);
 });
+test('requestSession passes module init members through, and its own feature lists win', async (t) => {
+  const f = await fixture(t),
+    xr = await XRManager.create(f.engine),
+    depthSensing = { usagePreference: ['cpu-optimized'], dataFormatPreference: ['float32'] };
+  await useXRSession(xr, 'inline', { init: { depthSensing, requiredFeatures: ['bogus'] }, onFrame() {} });
+  assert.equal(f.requests[0].init.depthSensing, depthSensing);
+  assert.ok(!f.requests[0].init.requiredFeatures.includes('bogus'));
+  await xr.end();
+});
 test('controller hand matrices are preallocated and clear when tracking is lost', () => {
   const source = { targetRaySpace: {}, profiles: [], hand: new Map([['wrist', {}]]) },
     controller = new XRController(source),
