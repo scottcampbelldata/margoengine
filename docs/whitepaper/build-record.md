@@ -1383,6 +1383,28 @@ Seven jobs took `@margoengine/cinematic` from one damped follow rig to a camera 
 - **Unmeasured:** no job has a timed number. No preset was compared with recorded camera motion, and no person has judged a shot.
 - **Gate:** lint, hygiene, verify, the README run, the package tests and `tests/claims-file.test.js` for each job, with `test:gpu` for jobs 2, 4 and 7, the push from one script that stops at the first failing step.
 
+## Batch 89: fsm
+
+Five jobs took `@margoengine/fsm` from a small hierarchy to a statechart: regions that run at once, memory, timers, machines as JSON, and snapshots. History and delays are options of the root entry, as the batch asked; the rest are new optional entries. Core and stage do not change.
+
+| # | Job | Status | Commit | Entry | Claim |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Parallel regions | DONE | a52ec275d | `/parallel` | LIM-321 |
+| 2 | History states | DONE | 7686982ed | root, `history` and `initial` | LIM-322 |
+| 3 | Delayed transitions | DONE | b3fe7bdd1 | root, `after` | LIM-323 |
+| 4 | Machines as data | DONE | 011140999 | `/document` | LIM-325 |
+| 5 | Snapshots and trace | DONE | this commit | `/trace` | LIM-332 |
+
+- **What was reused:** the batch searched every package first and found no parallel, history or delayed state code to wire in. `/document` takes the shape of `AnimatorGraphDocument`. The root gained `plan`, `matches`, `memory`, `clock`, `entered` and `listener`, so the entries need no private access.
+- **Caught before landing, each held by a test:** delivered one region at a time, a guard reading another region saw that region already moved, so all regions now choose before any moves. A hook raising an event during `update` hit its own machine in the middle of a change, so an update is now a delivery. A delayed transition from a parent to its own child fired for ever, so it waits again after firing. Regions named `__proto__` set a prototype, so region tables are built by entries.
+- **Proved:** with Sismic 1.6.14, an outside statechart interpreter run through its documented interface and never read: 150 seeded charts of compound and nested parallel states, history, delays and guards on what is active, 6,150 steps, 928 of them moves, no difference. `traces.json` holds what Sismic did, so `npm test` replays it with no Python. The same traces hold with every chart loaded from a JSON document, and with every step taken by a new machine restored from a JSON snapshot of the last. With history switched off in the build the replay fails; with one-at-a-time delivery the unit test fails and the replay does not, as seeded guards rarely meet on one event.
+- **Stand-ins:** the charts are generated, not from a shipped game. No snapshot went through a real save file or a real network.
+- **Differences from SCXML and Sismic, on purpose:** `history` is a property of the state, not a target of its own, so an entry through a parent's `initial` uses it too; a transition stays local to a common ancestor, where Sismic leaves and re-enters; a declined guard on a delay is asked again on each update, as in Sismic and unlike a delayed event in SCXML. The charts keep off the first two, and the limits rows say so.
+- **Limits:** a transition cannot cross regions or enter one from outside. No join when all regions finish. A hook that throws leaves its state change half done.
+- **Landings stopped, nothing failed reached main:** job 1 lost three rounds to the gate rerunning verify whenever main moved, because the rule matched `scripts/quality/baselines/sizes.json`, which every landing rewrites, and then an outer limit of 3,400 s ended it. The rule now leaves records out. Job 4 stopped once at verify, on an error message with no fix in it.
+- **Unmeasured:** no job has a timed number.
+- **Gate:** lint, hygiene, verify, the README run from job 2 on, the package tests and `tests/claims-file.test.js` for each job, the push from one script that stops at the first failing step. No job has a GPU step: the package has no GPU code.
+
 ## Lane U: first iPhone failure of animated USDZ
 
 Scott placed Fox-Run in AR Quick Look on an iPhone and stood between the legs of a 79 metre fox; robot-expressive ran off the screen. This one-off lane found why and fixed it in `@margoengine/exporters`.

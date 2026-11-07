@@ -1,5 +1,5 @@
 {
-  "commit": "aaeb06fe0",
+  "commit": "8ff965735",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -960,16 +960,20 @@
     },
     "@margoengine/fsm": {
       ".": {
-        "raw": 4167,
-        "gzip": 1604
+        "raw": 4262,
+        "gzip": 1637
       },
       "./parallel": {
-        "raw": 6635,
-        "gzip": 2382
+        "raw": 6730,
+        "gzip": 2416
       },
       "./document": {
-        "raw": 12091,
-        "gzip": 4168
+        "raw": 12186,
+        "gzip": 4201
+      },
+      "./trace": {
+        "raw": 3740,
+        "gzip": 1607
       }
     },
     "@margoengine/geometry": {

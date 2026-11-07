@@ -38,11 +38,13 @@ export class ParallelRegions<C> {
   /** True between `start()` and `stop()`. */
   running = false;
   private readonly list: readonly StateMachine<C>[];
-  private readonly starts: string[];
+  /** Where each region starts next, in region order. */
+  readonly starts: string[];
   private readonly queue: string[] = [];
   private readonly forward: ((event: string) => void) | undefined;
   private readonly history: boolean;
-  private busy = false;
+  /** True during a delivery: while regions start, take an event or update. */
+  busy = false;
   private draining = false;
   /**
    * @param regions The regions by name, in the order they enter and take updates.

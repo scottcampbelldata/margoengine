@@ -946,6 +946,10 @@
       "types": "./dist/fsm/document.d.ts",
       "import": "./dist/fsm/document.js"
     },
+    "./fsm/trace": {
+      "types": "./dist/fsm/trace.d.ts",
+      "import": "./dist/fsm/trace.js"
+    },
     "./geometry": {
       "types": "./dist/geometry.d.ts",
       "import": "./dist/geometry.js"

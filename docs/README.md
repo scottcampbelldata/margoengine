@@ -167,7 +167,7 @@ node --test tests/catalog.test.js
 | [`@margoengine/ragdoll`](../packages/ragdoll/README.md) | Ragdolls on Margo physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation. |
 | [`@margoengine/navmesh`](../packages/navmesh/README.md) | Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build). |
 | [`@margoengine/ecs`](../packages/ecs/README.md) | Typed-array packed sparse-set entity component storage. |
-| [`@margoengine/fsm`](../packages/fsm/README.md) | Hierarchical state transitions with cross-fade progress. |
+| [`@margoengine/fsm`](../packages/fsm/README.md) | Hierarchical state machines with history, delayed transitions, parallel regions, JSON documents, snapshots and traces. |
 | [`@margoengine/behavior`](../packages/behavior/README.md) | Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, and steering and flocking behaviours. |
 | [`@margoengine/save`](../packages/save/README.md) | Save and load: versioned scene and world documents with stable ids, prefabs with overrides, migrations, all-or-nothing loading and storage adapters. |
 | [`@margoengine/net`](../packages/net/README.md) | Hermite and quaternion snapshot interpolation with bounded prediction. |

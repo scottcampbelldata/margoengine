@@ -2,7 +2,7 @@
 
 Import `margoengine/fsm` from the `margoengine` package, or `@margoengine/fsm` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Hierarchical states preserve common ancestors during transitions, bubble events from leaf to root, and expose previous/state/blend for cross-fades.
+Hierarchical states preserve common ancestors during transitions, bubble events from leaf to root, and expose previous/state/blend for cross-fades. On top of that: [history states](#history-states), [delayed transitions](#delayed-transitions), [parallel regions](#parallel-regions-margoenginefsmparallel), [machines as data](#machines-as-data-margoenginefsmdocument), and [snapshots and traces](#snapshots-and-trace-margoenginefsmtrace).
 
 ```ts
 import {StateMachine} from 'margoengine/fsm';
@@ -171,6 +171,37 @@ const again = loadMachine(JSON.parse(text), guard, bindings);
 - A state with regions takes no hooks in a document; put them on its parent.
 
 Guards in `StateMachine` get the context too: `guard: (context) => context.awake`.
+
+## Snapshots and trace (`margoengine/fsm/trace`)
+
+`snapshotMachine` gives where a machine is now as plain data: the state, cross-fade, every delay's progress, what states remember and all parallel regions. Put it in a save file or send it over the network, and `restoreMachine` puts a machine with the same definition back there. The machine then goes on exactly as the first would have, so rollback netcode can go back and replay.
+
+```ts
+import {StateMachine} from 'margoengine/fsm';
+import {MachineTrace, restoreMachine, snapshotMachine} from 'margoengine/fsm/trace';
+
+const make = () => new StateMachine({idle: {}, windup: {}, swing: {}}, 'idle', {}, [
+  {from: 'idle', to: 'windup', event: 'attack'},
+  {from: 'windup', to: 'swing', after: 0.5}
+]);
+
+const machine = make();
+using trace = new MachineTrace(machine, {capacity: 64});
+machine.send('attack');
+machine.update(0.25);
+
+const save = JSON.stringify(snapshotMachine(machine));
+const loaded = make();
+restoreMachine(loaded, JSON.parse(save));
+loaded.update(0.25);
+console.log(loaded.state); // 'swing'
+console.log(trace.records); // [{machine: '', clock: 0, from: 'idle', to: 'windup', event: 'attack', after: null}]
+```
+
+- `restoreMachine` runs no hooks. It restores the machine, and what your hooks did to your context is yours to save beside it.
+- A snapshot that does not fit the machine throws a `TypeError` and leaves the machine untouched. Both functions throw a `MargoError` with code `state` from a hook in the middle of a change.
+- `MachineTrace` keeps the newest `capacity` changes, default 256, oldest first in `records`, for every machine down through parallel regions. `machine` says which, such as `alive/weapon`; `event` and `after` say what caused the change, both null for `goto`. `from` is null when regions start and `to` when they stop. `dispose()`, or `using`, stops it.
+- A machine has one `listener`, the hook a trace uses; set it yourself for your own debug overlay. A second trace on the same machine throws a `MargoError` with code `attached`.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

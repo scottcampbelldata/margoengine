@@ -62,8 +62,12 @@ export class StateMachine<C> {
   readonly entered = new Map<string, number>();
   /** What each state with `history` remembers, by state name. Delete a key, or clear it, to forget. */
   readonly memory = new Map<string, string>();
-  private duration = 0;
-  private changing = false;
+  /** Length of the running cross-fade in seconds. */
+  duration = 0;
+  /** True while the hooks of a state change run. */
+  changing = false;
+  /** Called on every state change, before any hook, with the transition that caused it, or null for `goto`. */
+  listener: ((from: string, to: string, transition: Transition<C> | null) => void) | null = null;
   private readonly paths = new Map<string, readonly string[]>();
   private readonly timed: readonly Transition<C>[];
   /**
@@ -135,7 +139,7 @@ export class StateMachine<C> {
       if (nested) return nested;
       for (const transition of this.transitions)
         if (transition.event === event && transition.from === path[i] && (!transition.guard || transition.guard(this.context)))
-          return () => this.goto(transition.to, transition.duration ?? 0);
+          return () => this.change(transition.to, transition.duration ?? 0, transition);
     }
     return null;
   }
@@ -157,6 +161,9 @@ export class StateMachine<C> {
    * @throws MargoError `'state'` when called from an enter/exit hook.
    */
   goto(next: string, duration = 0): void {
+    this.change(next, duration, null);
+  }
+  private change(next: string, duration: number, transition: Transition<C> | null): void {
     if (!this.paths.has(next) || !Number.isFinite(duration) || duration < 0)
       throw new RangeError('Invalid state transition; transition only to a state that exists');
     if (this.changing)
@@ -166,6 +173,7 @@ export class StateMachine<C> {
       );
     next = this.resolve(next);
     if (next === this.state) return;
+    this.listener?.(this.state, next, transition);
     const from = this.paths.get(this.state)!,
       to = this.paths.get(next)!;
     let common = 0;
@@ -260,7 +268,7 @@ export class StateMachine<C> {
       if (!transition) return count;
       if (++count > MAX_FIRED)
         throw new MargoError('state', 'Delayed transitions fire without end; use longer delays or a shorter delta');
-      this.goto(transition.to, transition.duration ?? 0);
+      this.change(transition.to, transition.duration ?? 0, transition);
       if (this.entered.has(transition.from)) this.entered.set(transition.from, this.clock);
     }
   }

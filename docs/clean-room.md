@@ -880,6 +880,7 @@ Written clean room from the published work below. No source of a statechart libr
 | Shallow and deep history, recorded on exit, default before the first visit (`history`, `initial`) | Harel 1987, as above, for H and H*; SCXML sections 3.1.4, 3.10 and `exitStates` in Appendix D. History as a property of the state rather than a target of its own is our own |
 | Delayed transitions (`after`) | Harel 1987, as above, for timeouts on a state; SCXML section 6.2 for delay and Appendix D for the end of a step. Splitting a step at the moment a delay ends is the event-scheduling of discrete event simulation, as in any textbook on it; asking a guard again each update is our own |
 | Machines as data (`fsm/document`) | The JSON format is our own, in the shape of `@margoengine/animator/graph`. Functions by name in place of code follows SCXML's split of a chart from its data model, in spirit only: the format shares nothing with SCXML |
+| Snapshots and trace (`fsm/trace`) | The configuration of a statechart, with its history values, as all a machine needs to go on: Harel 1987 and SCXML Appendix D. The snapshot format, restoring with no hooks and the rolling record are our own |
 
 ## Save and load: `@margoengine/save`
 

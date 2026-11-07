@@ -62,6 +62,8 @@ class ParallelRegions<C> {
     readonly options: ParallelOptions;
     readonly machines: Readonly<Record<string, StateMachine<C>>>;
     running: boolean;
+    readonly starts: string[];
+    busy: boolean;
     constructor(definition: Readonly<Record<string, Region<C>>>, context: C, options?: ParallelOptions);
     get active(): Record<string, string | null>;
     matches(region: string, state: string): boolean;
@@ -102,6 +104,9 @@ class StateMachine<C> {
     clock: number;
     readonly entered: Map<string, number>;
     readonly memory: Map<string, string>;
+    duration: number;
+    changing: boolean;
+    listener: ((from: string, to: string, transition: Transition<C> | null) => void) | null;
     constructor(states: Readonly<Record<string, State<C>>>, initial: string, context: C, transitions?: readonly Transition<C>[]);
     get blend(): number;
     matches(name: string): boolean;

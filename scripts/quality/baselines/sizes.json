@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 10231187,
+  "total": 10233050,
   "history": [
     {
       "date": "2026-10-24",
@@ -3224,6 +3224,12 @@
       "commit": "aaeb06fe0",
       "reason": "usdz reads MaterialX in USD",
       "grew": 5
+    },
+    {
+      "date": "2026-11-07",
+      "commit": "8ff965735",
+      "reason": "new optional entry @margoengine/fsm/trace",
+      "grew": 1
     }
   ],
   "items": {
@@ -3456,6 +3462,7 @@
     "@margoengine/fsm": 1852,
     "@margoengine/fsm/document": 4414,
     "@margoengine/fsm/parallel": 2607,
+    "@margoengine/fsm/trace": 1863,
     "@margoengine/geometry": 24691,
     "@margoengine/geometry/delaunay": 3404,
     "@margoengine/geometry/extras": 5826,

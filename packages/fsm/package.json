@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/fsm",
   "version": "1.0.0",
-  "description": "Hierarchical state transitions with cross-fade progress.",
+  "description": "Hierarchical state machines with history, delayed transitions, parallel regions, JSON documents, snapshots and traces.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -33,6 +33,10 @@
     "./document": {
       "types": "./dist/document.d.ts",
       "import": "./dist/document.js"
+    },
+    "./trace": {
+      "types": "./dist/trace.d.ts",
+      "import": "./dist/trace.js"
     }
   },
   "files": [
