@@ -17,14 +17,14 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 let off = false,
   patched = 0;
-await page.route('**/packages/gltf-pro/dist/src-*.js*', async (route) => {
+// Any chunk: the build moves the trimming between them, and `patched` below proves one was switched.
+await page.route('**/packages/gltf-pro/dist/*.js*', async (route) => {
   const response = await route.fetch();
   let body = await response.text();
   if (off) {
     const next = body.replace(String.raw`/\bstruct Input \{/`, String.raw`/\bno such text \{/`);
-    assert.notEqual(next, body, 'the trimming switch must match the build');
+    if (next !== body) patched++;
     body = next;
-    patched++;
   }
   await route.fulfill({ response, body });
 });
