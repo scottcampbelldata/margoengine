@@ -2276,12 +2276,12 @@
     },
     "@margoengine/sky": {
       ".": {
-        "raw": 46278,
-        "gzip": 16587
+        "raw": 46404,
+        "gzip": 16684
       },
       "./base": {
-        "raw": 17398,
-        "gzip": 6814
+        "raw": 17537,
+        "gzip": 6885
       },
       "./preetham": {
         "raw": 1657,
@@ -2898,9 +2898,9 @@
       "brotli": 6003
     },
     "packages/scenery/dist/sky.js": {
-      "raw": 22949,
-      "gzip": 9168,
-      "brotli": 8175
+      "raw": 23088,
+      "gzip": 9238,
+      "brotli": 8236
     },
     "packages/creative/dist/particles.js": {
       "raw": 43160,

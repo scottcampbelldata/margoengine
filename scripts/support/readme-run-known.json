@@ -102,7 +102,6 @@
   "rigging/readme-spring-bones-and-jiggle-margoeng-a41e82": "sample: RangeError: Spring center must be the chain's first joint or an ancestor of it",
   "rigging/readme-vrm-avatars-margoengine-rigging-009c8e": "sample: RangeError: This VRM is invalid; fix it: humanoid bone leftUpperLeg is required; humanoid bone leftLowerLeg is required; humanoid bone leftFoot is required; hum",
   "shadows/readme-margoengine-shadows-7183ea": "example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments",
-  "sky/readme-fog-b452c1": "example: TypeError: Invalid plugin; see https://margoengine.com/errors#arguments",
   "splats/readme-margoengine-splats-03fb4a": "sample: RangeError: A .splat file must hold 1 to 3,000,000 splats of 32 bytes each; check that the file is complete.",
   "splats/readme-margoengine-splats-f08e38": "sample: Error: Failed to load splats: 404",
   "splats/readme-ply-captures-editing-and-level-o-0d1416": "sample: Error: Failed to load splats: 404",

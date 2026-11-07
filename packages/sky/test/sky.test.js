@@ -723,3 +723,26 @@ test('cloudLayer gives the cloud field, height and clock to what must match the 
   assert.doesNotMatch(layer.field, /frame\./, 'the field must stand alone, away from the sky frame');
   assert.deepEqual([layer.coverage, layer.drift, layer.height], [0.3, 50, 2000]);
 });
+test('a second Sky.attach on one scene says it is a second sky, and the first keeps rendering', async () => {
+  const { Sky: BaseSky } = await import('../dist/base.js'),
+    { preetham } = await import('../dist/preetham.js');
+  // The sky README's day/night example once attached a second sky after the fog example's and got core's bare
+  // "Invalid plugin". One sky per scene stays the rule; the error now names it and what to do instead.
+  for (const [Kind, features] of [[Sky], [BaseSky, { preetham }]]) {
+    const h = optionalGPU();
+    const first = Kind.attach(h.engine, { hours: 12 }, features);
+    assert.ok(first instanceof Kind, 'attach builds the class it is called on, so the root Sky keeps its features');
+    assert.equal(h.engine.plugins.get('sky'), first);
+    assert.throws(
+      () => Kind.attach(h.engine, { hours: 18.5 }, features),
+      (error) => error.name === 'MargoError' && error.code === 'attached' && /already has a Sky/.test(error.message),
+    );
+    assert.equal(h.engine.plugins.get('sky'), first, 'the failed attach leaves the first sky in place');
+    h.frame();
+    first.dispose();
+    h.engine.removePlugin('sky');
+    const again = Kind.attach(h.engine, { hours: 6 }, features);
+    assert.equal(h.engine.plugins.get('sky'), again, 'after removing the first, a new sky attaches');
+    again.dispose();
+  }
+});

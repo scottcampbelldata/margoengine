@@ -1,5 +1,4 @@
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime } from '@margoengine/core/extension';
 import { Sky as SkyBase, type SkyOptions } from './base.js';
 import { preetham } from './preetham.js';
 import { bruneton } from './bruneton.js';
@@ -31,8 +30,6 @@ export class Sky extends SkyBase {
     super(options, features);
   }
   static override attach(engine: EngineKernel, options: SkyOptions = {}): Sky {
-    const effect = new Sky(options);
-    engineRuntime(engine).use(effect);
-    return effect;
+    return super.attach(engine, options) as Sky;
   }
 }

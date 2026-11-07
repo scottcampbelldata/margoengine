@@ -378,9 +378,13 @@ the sun direction, strength and transmittance colour into engine lighting.
 Intensity defaults to 1 and minimum to 0; the radiance colour is always written.
 Omit `lighting` to keep independent scene lighting.
 
-For a day/night scene, enable the optional moon and RGB ambient floor:
+For a day/night scene, enable the optional moon and RGB ambient floor. A scene holds one Sky, so set this up on a
+new engine, or pass these options to the `Sky.attach` you already have; a second `Sky.attach` on one scene throws:
 
 ```ts
+import {Engine} from 'margoengine/core';
+import {Sky} from 'margoengine/sky';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 Sky.attach(engine, {hours: 18.5, lighting: {
   intensity: 6, color: [1, 0.8, 0.54],
   moon: {intensity: 0.6, color: [0.25, 0.45, 0.75]},
