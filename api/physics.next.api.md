@@ -44,6 +44,18 @@ export interface ConeJointOptions {
     contactsEnabled?: boolean;
 }
 
+export interface ContactForceEvent {
+    type: 'contactforce';
+    bodyA: PhysicsBody;
+    bodyB: PhysicsBody;
+    meshA: Mesh | null;
+    meshB: Mesh | null;
+    colliderA: PhysicsCollider;
+    colliderB: PhysicsCollider;
+    impulse: number;
+    force: number;
+}
+
 export type JointDof = 'linX' | 'linY' | 'linZ' | 'angX' | 'angY' | 'angZ';
 
 export type JointOptions = (JointBase & {
@@ -131,6 +143,7 @@ export class KernelWorld {
     get pairCount(): number;
     pairs(): [number, number][];
     contacts(): KernelContact[];
+    get solvingPairs(): number;
     get awakeCount(): number;
     get islandCount(): number;
     get sleepEnergy(): number;
@@ -342,6 +355,7 @@ export class PhysicsCollider {
 }
 
 export interface PhysicsEventMap {
+    contactforce: ContactForceEvent;
     beforestep: number;
     afterstep: number;
 }

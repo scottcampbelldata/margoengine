@@ -234,3 +234,38 @@ test('more colliders than the world had room for keep their friction', async () 
     assert.equal(colliderCombine[row], 3);
   });
 });
+
+test('contactforce says how hard a pair pressed: a box at rest reads its weight', () => {
+  const physics = new Physics(null),
+    floor = physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } }),
+    box = physics.addBody(null, { position: [0, 0.5, 0], canSleep: false, colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], mass: 3 } }),
+    seen = [];
+  const stop = physics.on('contactforce', (event) => seen.push(event));
+  for (let i = 0; i < 30; i++) physics.step();
+  stop();
+  const last = seen.at(-1);
+  assert.equal(seen.length, 30, 'once a step for the one pair');
+  assert.ok(Math.abs(last.force - 3 * 9.81) < 0.05, `a weight of 29.43 N, read ${last.force}`);
+  assert.ok(Math.abs(last.impulse - (3 * 9.81) / 60) < 0.001, `its impulse, read ${last.impulse}`);
+  assert.deepEqual(new Set([last.bodyA, last.bodyB]), new Set([floor, box]));
+  assert.equal(last.type, 'contactforce');
+  assert.ok(last.colliderA.body === last.bodyA && last.meshA === null);
+  physics.step();
+  assert.equal(seen.length, 30, 'no listener: nothing is gathered');
+  physics.dispose();
+});
+
+test('contactforce listeners may step and remove: each gathers into its own list', () => {
+  const physics = new Physics(null);
+  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } });
+  const box = physics.addBody(null, { position: [0, 0.5, 0], colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5] } });
+  let calls = 0;
+  physics.on('contactforce', () => {
+    calls++;
+    if (calls === 1) physics.step();
+    if (calls === 2) physics.removeBody(box);
+  });
+  for (let i = 0; i < 5; i++) physics.step();
+  assert.equal(calls, 2);
+  physics.dispose();
+});

@@ -229,6 +229,7 @@ impl World {
                 self.set_s(CONTACT_TANGENT_MASS, at, mass(tangent));
                 self.set_s(CONTACT_OTHER_MASS, at, mass(other));
             }
+            self.set_s(PAIR_FORCE, row, 0.0);
             self.set_u(SOLVE_PAIRS, solving, row as u32);
             solving += 1;
         }
@@ -309,6 +310,7 @@ impl World {
                 self.set_v(CONTACT_TANGENT_X, at, held);
                 self.set_v(CONTACT_DRIFT_X, at, drift);
             }
+            let mut given = 0.0;
             for k in 0..count {
                 let at = row * MANIFOLD + (k + turn) % count;
                 let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
@@ -336,6 +338,7 @@ impl World {
                 let total = if !biased && gap > 0.0 && total > pressed { pressed } else { total };
                 let applied = normal.scale(total - pressed);
                 self.set_s(CONTACT_NORMAL_IMPULSE, at, total);
+                given += total;
                 body_a.push(applied.scale(-1.0), arm_a);
                 body_b.push(applied, arm_b);
                 if biased && bounce > 0.0 && pressed == 0.0 && total > 0.0 && speed < -threshold {
@@ -343,6 +346,10 @@ impl World {
                     self.set_u(IMPACTS, impacts, at as u32);
                     impacts += 1;
                 }
+            }
+            // What a point holds after the relaxing pass is all it gave in this substep, its warm start included.
+            if !biased {
+                self.set_s(PAIR_FORCE, row, self.s(PAIR_FORCE, row) + given);
             }
             self.settle(a, &body_a);
             self.settle(b, &body_b);
@@ -372,6 +379,7 @@ impl World {
             let total = if total > 0.0 { total } else { 0.0 };
             let applied = normal.scale(total - pressed);
             self.set_s(CONTACT_NORMAL_IMPULSE, at, total);
+            self.set_s(PAIR_FORCE, row, self.s(PAIR_FORCE, row) + total - pressed);
             body_a.push(applied.scale(-1.0), arm_a);
             body_b.push(applied, arm_b);
             self.settle(a, &body_a);

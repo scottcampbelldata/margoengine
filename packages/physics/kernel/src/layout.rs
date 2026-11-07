@@ -211,6 +211,8 @@ columns! {
     PAIR_NORMAL_Z f32 Pair,
     // The feature that made the manifold, for the coherence of the next step.
     PAIR_FEATURE u32 Pair,
+    // The normal impulse the pair gave in this step, over all its substeps.
+    PAIR_FORCE f32 Pair,
     // The solver's view of a pair for this step: the surfaces mixed, the first tangent, and the pairs it will solve, densely.
     PAIR_FRICTION f32 Pair,
     PAIR_RESTITUTION f32 Pair,

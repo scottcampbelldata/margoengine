@@ -26,6 +26,7 @@ interface KernelExports extends WebAssembly.Exports {
   world_layout(): number;
   world_pairs(): number;
   world_pair_rows(): number;
+  world_solving(): number;
   body_touch(body: number): void;
   world_awake(): number;
   world_islands(): number;
@@ -295,6 +296,10 @@ export class KernelWorld {
       });
     }
     return out;
+  }
+  /** Pairs the last step solved: the first this many rows of the `solvePairs` column. */
+  get solvingPairs(): number {
+    return this.api.world_solving();
   }
   /** Bodies a step walks: the moving ones. Sleeping and fixed bodies are on no list, so they cost a step nothing. */
   get awakeCount(): number {

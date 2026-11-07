@@ -109,6 +109,11 @@ pub extern "C" fn world_pairs() -> u32 {
     world().header().pairs
 }
 /// Pair rows handed out so far: pair columns hold rows below this, freed ones with NONE in PAIR_A.
+/// Pairs the last step solved: the first this many of SOLVE_PAIRS.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_solving() -> u32 {
+    world().header().solving
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn world_pair_rows() -> u32 {
     world().header().pair_rows

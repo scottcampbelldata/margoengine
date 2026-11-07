@@ -37,8 +37,25 @@ export interface PhysicsOptions {
   name?: string;
 }
 
-/** Events a Physics world emits so far. Contact events are not served yet; `touching` and `contactPoints` read contacts after a step. */
+/** How hard two colliders pressed on each other in the last step. Only the own solver has this event. */
+export interface ContactForceEvent {
+  type: 'contactforce';
+  bodyA: PhysicsBody;
+  bodyB: PhysicsBody;
+  meshA: Mesh | null;
+  meshB: Mesh | null;
+  colliderA: PhysicsCollider;
+  colliderB: PhysicsCollider;
+  /** The normal impulse of the whole step, in newton seconds. */
+  impulse: number;
+  /** `impulse` over the step's length, in newtons. A box at rest on a floor reads its weight. */
+  force: number;
+}
+
+/** Events a Physics world emits so far. `touching` and `contactPoints` read contacts after a step. */
 export interface PhysicsEventMap {
+  /** After each step that has a listener, once for each pair of colliders that pressed on each other. */
+  contactforce: ContactForceEvent;
   /** Before each fixed step, with the step length. Drive kinematic bodies here. */
   beforestep: number;
   afterstep: number;
@@ -91,6 +108,9 @@ export class Physics implements EnginePlugin, BodyOwner {
   private readonly byRow = new Map<number, PhysicsCollider>();
   private readonly attachments = new Set<PhysicsAttachment>();
   private readonly listeners = new Map<keyof PhysicsEventMap, Set<(event: never) => void>>();
+  // Gathered into a reused array; a step run from inside a listener gathers into its own.
+  private readonly eventBuffer: ContactForceEvent[] = [];
+  private dispatching = false;
 
   /**
    * Gets the solver ready, once per app: compiling it is asynchronous, so `new Physics(engine)` can stay synchronous.
@@ -237,9 +257,49 @@ export class Physics implements EnginePlugin, BodyOwner {
     this.attachments.forEach(this.attachmentStep);
     kernel.step(dt);
     this.stepCount++;
+    this.dispatch(dt);
     this.emit('afterstep', dt);
   }
   private readonly attachmentStep = (attachment: PhysicsAttachment): void => attachment.beforeStep?.(this.fixedTimestep);
+  /** Reads what the step found into events, then calls listeners: one may change the world, so nothing is read after one runs. */
+  private dispatch(dt: number): void {
+    const outer = this.dispatching,
+      events = outer ? [] : this.eventBuffer;
+    this.gatherForces(events, dt);
+    this.dispatching = true;
+    try {
+      for (let i = 0; i < events.length; i++) this.emit(events[i].type, events[i]);
+    } finally {
+      this.dispatching = outer;
+      events.length = 0;
+    }
+  }
+  private gatherForces(events: ContactForceEvent[], dt: number): void {
+    if (!this.listeners.get('contactforce')?.size) return;
+    const kernel = this.kernel,
+      { solvePairs, pairForce, pairA, pairB } = kernel.columns,
+      count = kernel.solvingPairs;
+    for (let i = 0; i < count; i++) {
+      const row = solvePairs[i],
+        impulse = pairForce[row],
+        colliderA = this.byRow.get(pairA[row]),
+        colliderB = this.byRow.get(pairB[row]);
+      if (!(impulse > 0) || !colliderA || !colliderB) continue;
+      const bodyA = colliderA.body,
+        bodyB = colliderB.body;
+      events.push({
+        type: 'contactforce',
+        bodyA,
+        bodyB,
+        meshA: bodyA.mesh,
+        meshB: bodyB.mesh,
+        colliderA,
+        colliderB,
+        impulse,
+        force: impulse / dt,
+      });
+    }
+  }
 
   /** Writes body poses to their meshes, interpolated by `alpha` between the last two steps. Allocates nothing. */
   sync(alpha = this.lastAlpha): void {
@@ -383,7 +443,8 @@ export class Physics implements EnginePlugin, BodyOwner {
    * @throws MargoError (`unsupported`) for a contact event: it could never fire yet.
    */
   on<K extends keyof PhysicsEventMap>(type: K, listener: (event: PhysicsEventMap[K]) => void): () => void {
-    if (type !== 'beforestep' && type !== 'afterstep') throw later(`The ${String(type)} event`, 'contact events');
+    if (type !== 'beforestep' && type !== 'afterstep' && type !== 'contactforce')
+      throw later(`The ${String(type)} event`, 'contact events');
     if (this.disposed) return noop;
     let set = this.listeners.get(type);
     if (!set) this.listeners.set(type, (set = new Set()));
